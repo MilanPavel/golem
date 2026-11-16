@@ -1,8 +1,40 @@
 {
   "$defs": {
+    "ModelRejection": {
+      "additionalProperties": false,
+      "description": "A candidate the pick left out, and why in plain words.",
+      "properties": {
+        "ref": {
+          "minLength": 1,
+          "title": "Ref",
+          "type": "string"
+        },
+        "tier": {
+          "enum": [
+            "local",
+            "budget",
+            "frontier"
+          ],
+          "title": "Tier",
+          "type": "string"
+        },
+        "why": {
+          "minLength": 1,
+          "title": "Why",
+          "type": "string"
+        }
+      },
+      "required": [
+        "ref",
+        "tier",
+        "why"
+      ],
+      "title": "ModelRejection",
+      "type": "object"
+    },
     "TraceModelSpan": {
       "additionalProperties": false,
-      "description": "A model call, with the tool calls it asked for, in request order.\n\n``prompt_cut`` says whether Ollama cut the prompt that did not fit: \"no\"\nand \"yes\" are proven from exact numbers, \"likely\" is an estimate, and null\nmeans golem cannot tell. ``prompt_cut_kind`` is set with \"yes\" and\n\"likely\". ``dropped_message_ids`` are the messages the model probably did\nnot see (older messages only), and ``dropped_tokens`` is an estimate of\ntheir size.\n\n``cost_usd`` is what the call cost, as its ``model.call.completed`` recorded\nit. Null when the price was not known or the call has no token counts.",
+      "description": "A model call, with the tool calls it asked for, in request order.\n\n``prompt_cut`` says whether Ollama cut the prompt that did not fit: \"no\"\nand \"yes\" are proven from exact numbers, \"likely\" is an estimate, and null\nmeans golem cannot tell. ``prompt_cut_kind`` is set with \"yes\" and\n\"likely\". ``dropped_message_ids`` are the messages the model probably did\nnot see (older messages only), and ``dropped_tokens`` is an estimate of\ntheir size.\n\n``cost_usd`` is what the call cost, as its ``model.call.completed`` recorded\nit. Null when the price was not known or the call has no token counts.\n\n``load_ms``, ``prompt_ms`` and ``reply_ms`` are from the model server's own clock.\nOllama only.",
       "properties": {
         "approval_wait_ms": {
           "anyOf": [
@@ -127,6 +159,19 @@
           "title": "Kind",
           "type": "string"
         },
+        "load_ms": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Load Ms"
+        },
         "model": {
           "anyOf": [
             {
@@ -195,10 +240,36 @@
           "default": null,
           "title": "Prompt Cut Kind"
         },
+        "prompt_ms": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Prompt Ms"
+        },
         "recorded": {
           "default": true,
           "title": "Recorded",
           "type": "boolean"
+        },
+        "reply_ms": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reply Ms"
         },
         "start": {
           "minLength": 1,
@@ -241,6 +312,43 @@
         "status"
       ],
       "title": "TraceModelSpan",
+      "type": "object"
+    },
+    "TraceRoute": {
+      "additionalProperties": false,
+      "description": "Why a run used the model it did: the pick of a session that is not ``pinned``.\n\n``reason`` and ``detail`` are those of ``model.routed``, and ``rejected`` the\ncandidates the pick dropped.",
+      "properties": {
+        "detail": {
+          "title": "Detail",
+          "type": "string"
+        },
+        "reason": {
+          "enum": [
+            "pinned",
+            "privacy",
+            "fit",
+            "budget",
+            "cheapest",
+            "escalated",
+            "fallback",
+            "user"
+          ],
+          "title": "Reason",
+          "type": "string"
+        },
+        "rejected": {
+          "items": {
+            "$ref": "#/$defs/ModelRejection"
+          },
+          "title": "Rejected",
+          "type": "array"
+        }
+      },
+      "required": [
+        "reason",
+        "detail"
+      ],
+      "title": "TraceRoute",
       "type": "object"
     },
     "TraceTokens": {
@@ -435,7 +543,7 @@
     }
   },
   "additionalProperties": false,
-  "description": "A run, with its model calls in order.",
+  "description": "A run, with its model calls in order.\n\n``route`` is the pick for the run, null for a run of a ``pinned`` session.",
   "properties": {
     "approval_wait_ms": {
       "anyOf": [
@@ -535,6 +643,17 @@
       "default": true,
       "title": "Recorded",
       "type": "boolean"
+    },
+    "route": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/TraceRoute"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
     },
     "start": {
       "minLength": 1,

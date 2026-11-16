@@ -31,11 +31,6 @@ for (const theme of ["slip", "kiln"] as const) {
         expect(tinted("bg-deny-soft")).toHaveLength(1);
         expect(group.getByRole("button", { name: "Install Ollama" })).toBeTruthy();
       }
-      if (label === "A key line open") {
-        const line = within(group.getByRole("group", { name: "Anthropic key" }));
-        expect(line.getByText("golem auth set anthropic")).toBeTruthy();
-        expect(line.getByText("The page never takes a key. Paste it in a terminal.")).toBeTruthy();
-      }
       expect(group.queryByRole("button", { name: /Update|Reveal|Restart/ })).toBeNull();
       await expectAxeClean(region, DIALOG_RULES);
     });

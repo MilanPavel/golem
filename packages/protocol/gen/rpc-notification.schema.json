@@ -276,11 +276,571 @@
       "title": "CallPrice",
       "type": "object"
     },
+    "CheckCompletedData": {
+      "additionalProperties": false,
+      "description": "A check ended. ``exit_code`` is null when it timed out.\n\n``output`` is the last 4,000 characters. When there was more, the whole\noutput is in the artifact ``artifact_id``.",
+      "properties": {
+        "artifact_id": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Artifact Id"
+        },
+        "check_id": {
+          "minLength": 1,
+          "title": "Check Id",
+          "type": "string"
+        },
+        "duration_ms": {
+          "minimum": 0,
+          "title": "Duration Ms",
+          "type": "integer"
+        },
+        "exit_code": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Exit Code"
+        },
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "output": {
+          "title": "Output",
+          "type": "string"
+        },
+        "round": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Round",
+          "type": "integer"
+        },
+        "status": {
+          "enum": [
+            "passed",
+            "failed",
+            "timed_out"
+          ],
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "check_id",
+        "name",
+        "status",
+        "exit_code",
+        "duration_ms",
+        "output"
+      ],
+      "title": "CheckCompletedData",
+      "type": "object"
+    },
+    "CheckCompletedEvent": {
+      "additionalProperties": false,
+      "description": "A check ended.",
+      "properties": {
+        "data": {
+          "$ref": "#/$defs/CheckCompletedData"
+        },
+        "run_id": {
+          "minLength": 1,
+          "title": "Run Id",
+          "type": "string"
+        },
+        "seq": {
+          "minimum": 1,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "session_id": {
+          "minLength": 1,
+          "title": "Session Id",
+          "type": "string"
+        },
+        "ts": {
+          "minLength": 1,
+          "title": "Ts",
+          "type": "string"
+        },
+        "type": {
+          "const": "check.completed",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "seq",
+        "session_id",
+        "run_id",
+        "ts",
+        "type",
+        "data"
+      ],
+      "title": "CheckCompletedEvent",
+      "type": "object"
+    },
+    "CheckInfo": {
+      "additionalProperties": false,
+      "description": "One check: its name and the shell command it runs.",
+      "properties": {
+        "command": {
+          "minLength": 1,
+          "title": "Command",
+          "type": "string"
+        },
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "command"
+      ],
+      "title": "CheckInfo",
+      "type": "object"
+    },
+    "CheckOfferedData": {
+      "additionalProperties": false,
+      "description": "The turn changed files and the session has not said whether golem may run checks.\n\nSent once per session. Nothing ran. ``session.set_checks`` answers it.",
+      "properties": {
+        "checks": {
+          "items": {
+            "$ref": "#/$defs/CheckInfo"
+          },
+          "title": "Checks",
+          "type": "array"
+        }
+      },
+      "required": [
+        "checks"
+      ],
+      "title": "CheckOfferedData",
+      "type": "object"
+    },
+    "CheckOfferedEvent": {
+      "additionalProperties": false,
+      "description": "The turn changed files and golem asks whether it may run the project's checks.",
+      "properties": {
+        "data": {
+          "$ref": "#/$defs/CheckOfferedData"
+        },
+        "run_id": {
+          "minLength": 1,
+          "title": "Run Id",
+          "type": "string"
+        },
+        "seq": {
+          "minimum": 1,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "session_id": {
+          "minLength": 1,
+          "title": "Session Id",
+          "type": "string"
+        },
+        "ts": {
+          "minLength": 1,
+          "title": "Ts",
+          "type": "string"
+        },
+        "type": {
+          "const": "check.offered",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "seq",
+        "session_id",
+        "run_id",
+        "ts",
+        "type",
+        "data"
+      ],
+      "title": "CheckOfferedEvent",
+      "type": "object"
+    },
+    "CheckStartedData": {
+      "additionalProperties": false,
+      "description": "A check began. ``round`` is 0 for the first run after a turn.",
+      "properties": {
+        "check_id": {
+          "minLength": 1,
+          "title": "Check Id",
+          "type": "string"
+        },
+        "command": {
+          "minLength": 1,
+          "title": "Command",
+          "type": "string"
+        },
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "round": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Round",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "check_id",
+        "name",
+        "command"
+      ],
+      "title": "CheckStartedData",
+      "type": "object"
+    },
+    "CheckStartedEvent": {
+      "additionalProperties": false,
+      "description": "A check is running.",
+      "properties": {
+        "data": {
+          "$ref": "#/$defs/CheckStartedData"
+        },
+        "run_id": {
+          "minLength": 1,
+          "title": "Run Id",
+          "type": "string"
+        },
+        "seq": {
+          "minimum": 1,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "session_id": {
+          "minLength": 1,
+          "title": "Session Id",
+          "type": "string"
+        },
+        "ts": {
+          "minLength": 1,
+          "title": "Ts",
+          "type": "string"
+        },
+        "type": {
+          "const": "check.started",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "seq",
+        "session_id",
+        "run_id",
+        "ts",
+        "type",
+        "data"
+      ],
+      "title": "CheckStartedEvent",
+      "type": "object"
+    },
+    "ContextChangedData": {
+      "additionalProperties": false,
+      "description": "What golem sends of the history changed before a model call.\n\n``cleared`` means old tool results are now sent as one line each: ``count`` is how\nmany, and ``before_tokens`` and ``after_tokens`` are rough sizes of the history before\nand after. For ``summarised``, ``count`` is the messages a summary now stands for.\n``grew`` is for a later change: ``window_from`` and ``window_to`` are the window\nbefore and after, and ``reload_ms`` the time the model took to load again. The\ncheckpoint keeps every message, so no transcript event changes. A field a change\ndoes not use is None.",
+      "properties": {
+        "action": {
+          "enum": [
+            "cleared",
+            "summarised",
+            "grew"
+          ],
+          "title": "Action",
+          "type": "string"
+        },
+        "after_tokens": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "After Tokens"
+        },
+        "before_tokens": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Before Tokens"
+        },
+        "count": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Count"
+        },
+        "reload_ms": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reload Ms"
+        },
+        "window_from": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Window From"
+        },
+        "window_to": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Window To"
+        }
+      },
+      "required": [
+        "action"
+      ],
+      "title": "ContextChangedData",
+      "type": "object"
+    },
+    "ContextChangedEvent": {
+      "additionalProperties": false,
+      "description": "What golem sends of the history changed, before the model call that follows.\n\n``run_id`` is null when ``session.compact`` made the change: no run owns it.",
+      "properties": {
+        "data": {
+          "$ref": "#/$defs/ContextChangedData"
+        },
+        "run_id": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Run Id"
+        },
+        "seq": {
+          "minimum": 1,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "session_id": {
+          "minLength": 1,
+          "title": "Session Id",
+          "type": "string"
+        },
+        "ts": {
+          "minLength": 1,
+          "title": "Ts",
+          "type": "string"
+        },
+        "type": {
+          "const": "context.changed",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "seq",
+        "session_id",
+        "ts",
+        "type",
+        "data"
+      ],
+      "title": "ContextChangedEvent",
+      "type": "object"
+    },
     "EmptyEventData": {
       "additionalProperties": false,
       "description": "No payload. Used by ``run.started``, ``run.completed``, and ``session.closed``.",
       "properties": {},
       "title": "EmptyEventData",
+      "type": "object"
+    },
+    "FileChangedData": {
+      "additionalProperties": false,
+      "description": "One change to one file, recorded before this event was sent.\n\n``path`` is relative to the session folder. ``call_id`` is the tool call that\nmade the change, and null for a shell change or an undo. ``reverts`` is the\nchange an undo took back. The texts are not sent; read them by ``change_id``.",
+      "properties": {
+        "added": {
+          "minimum": 0,
+          "title": "Added",
+          "type": "integer"
+        },
+        "call_id": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Call Id"
+        },
+        "change_id": {
+          "minLength": 1,
+          "title": "Change Id",
+          "type": "string"
+        },
+        "path": {
+          "minLength": 1,
+          "title": "Path",
+          "type": "string"
+        },
+        "removed": {
+          "minimum": 0,
+          "title": "Removed",
+          "type": "integer"
+        },
+        "reverts": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reverts"
+        },
+        "source": {
+          "enum": [
+            "tool",
+            "shell",
+            "revert"
+          ],
+          "title": "Source",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "created",
+            "modified",
+            "deleted"
+          ],
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "change_id",
+        "path",
+        "status",
+        "added",
+        "removed",
+        "source"
+      ],
+      "title": "FileChangedData",
+      "type": "object"
+    },
+    "FileChangedEvent": {
+      "additionalProperties": false,
+      "description": "A file in the session folder changed. Sent before the ``tool.completed`` of its call.\n\n``run_id`` is null for an undo, which is made between runs.",
+      "properties": {
+        "data": {
+          "$ref": "#/$defs/FileChangedData"
+        },
+        "run_id": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Run Id"
+        },
+        "seq": {
+          "minimum": 1,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "session_id": {
+          "minLength": 1,
+          "title": "Session Id",
+          "type": "string"
+        },
+        "ts": {
+          "minLength": 1,
+          "title": "Ts",
+          "type": "string"
+        },
+        "type": {
+          "const": "file.changed",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "seq",
+        "session_id",
+        "run_id",
+        "ts",
+        "type",
+        "data"
+      ],
+      "title": "FileChangedEvent",
       "type": "object"
     },
     "ForkedFrom": {
@@ -618,7 +1178,7 @@
     },
     "ModelCallCompletedData": {
       "additionalProperties": false,
-      "description": "A model call ended.\n\n``first_token_ms`` is the time from the request to the first text, and\nNone when no text came. ``latency_ms`` is the time to the end.\n``failed`` is true when the call raised or was stopped.\n\n``context_window`` is the window the call ran with, read from the model server\nafter the call. Exact. None when it could not be read.\n\n``text_tool_calls`` is set when the model wrote a tool call as text in its\nreply. ``recovered`` means golem turned the text into tool calls. ``unread``\nmeans the text held a call golem could not read, so the reply stayed text.\nNone when the reply had no such text.\n\n``cost_usd`` is the cost of this call at ``price``. Both are None when the\nprice is not known. A local model costs 0.",
+      "description": "A model call ended.\n\n``first_token_ms`` is the time from the request to the first text, and\nNone when no text came. ``latency_ms`` is the time to the end.\n``failed`` is true when the call raised or was stopped.\n\n``context_window`` is the window the call ran with, read from the model server\nafter the call. Exact. None when it could not be read.\n\n``text_tool_calls`` is set when the model wrote a tool call as text in its\nreply. ``recovered`` means golem turned the text into tool calls. ``unread``\nmeans the text held a call golem could not read, so the reply stayed text.\nNone when the reply had no such text.\n\n``cost_usd`` is the cost of this call at ``price``. Both are None when the\nprice is not known. A local model costs 0.\n\n``load_ms``, ``prompt_ms`` and ``reply_ms`` are the time the model server spent loading\nthe model, reading the prompt and writing the reply. From the model server's own clock.\nOllama only.",
       "properties": {
         "context_window": {
           "anyOf": [
@@ -669,6 +1229,19 @@
           "title": "Latency Ms",
           "type": "integer"
         },
+        "load_ms": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Load Ms"
+        },
         "message_id": {
           "minLength": 1,
           "title": "Message Id",
@@ -684,6 +1257,32 @@
             }
           ],
           "default": null
+        },
+        "prompt_ms": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Prompt Ms"
+        },
+        "reply_ms": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reply Ms"
         },
         "stop_reason": {
           "anyOf": [
@@ -780,6 +1379,13 @@
       "additionalProperties": false,
       "description": "A request went to the model.\n\n``message_id`` is the assistant reply's id, which identifies the model\ncall. ``index`` counts the calls of this run from 1. ``provider`` and\n``model`` are None when the profile does not resolve.\n\n``tier`` is the model's tier when the call was sent (``local``, ``budget`` or\n``frontier``), and None on an older event or when the profile does not resolve.\n\n``system_prompt_sha`` and ``tools_sha`` are the sha256 of the system\nprompt and of the tool schemas (compact JSON, sorted keys) sent with the\ncall, which the daemon keeps by hash. Each is None when it was not sent.\n``message_ids`` are the history messages sent, in order, not counting the\nsystem prompt.\n\n``window_estimated`` is true when golem did not send the window and read it\nfrom Ollama (the loaded context or the Modelfile). An older event has no\nfield and reads as False. ``window_planned`` is true when golem chose the ``num_ctx`` it\nsent (``[context] window``), and false for one that someone set or that golem did not send.\n\nThe size fields count what was sent, in UTF-8 bytes and in characters: the\nsystem text, the tool schemas as compact JSON, and each history message in\n``message_ids`` order (its text and its tool calls as JSON). ``message_chars``\nand ``message_bytes`` have one number per message sent. Each is None on an\nevent recorded before they existed.",
       "properties": {
+        "cleared_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Cleared Ids",
+          "type": "array"
+        },
         "context_window": {
           "anyOf": [
             {
@@ -792,6 +1398,19 @@
           ],
           "default": null,
           "title": "Context Window"
+        },
+        "estimated_tokens": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Estimated Tokens"
         },
         "index": {
           "minimum": 1,
@@ -881,6 +1500,19 @@
           ],
           "default": null,
           "title": "Provider"
+        },
+        "summary_chars": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Summary Chars"
         },
         "system_bytes": {
           "anyOf": [
@@ -1121,6 +1753,161 @@
       "title": "ModelOptionsChangedEvent",
       "type": "object"
     },
+    "ModelRejection": {
+      "additionalProperties": false,
+      "description": "A candidate the pick left out, and why in plain words.",
+      "properties": {
+        "ref": {
+          "minLength": 1,
+          "title": "Ref",
+          "type": "string"
+        },
+        "tier": {
+          "enum": [
+            "local",
+            "budget",
+            "frontier"
+          ],
+          "title": "Tier",
+          "type": "string"
+        },
+        "why": {
+          "minLength": 1,
+          "title": "Why",
+          "type": "string"
+        }
+      },
+      "required": [
+        "ref",
+        "tier",
+        "why"
+      ],
+      "title": "ModelRejection",
+      "type": "object"
+    },
+    "ModelRoutedData": {
+      "additionalProperties": false,
+      "description": "Which model a run uses, and why golem picked it.\n\nSent right after ``run.started`` in a session whose route is not ``pinned``.\n``model_profile`` is the profile that runs. ``provider`` and ``model`` are what\nit resolves to, null when it does not resolve. ``reason`` is why this model\n(ADR-055), ``detail`` one short sentence, and ``rejected`` the candidates the\npick dropped. The session's own model does not change.",
+      "properties": {
+        "detail": {
+          "title": "Detail",
+          "type": "string"
+        },
+        "model": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Model"
+        },
+        "model_profile": {
+          "minLength": 1,
+          "title": "Model Profile",
+          "type": "string"
+        },
+        "provider": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Provider"
+        },
+        "reason": {
+          "enum": [
+            "pinned",
+            "privacy",
+            "fit",
+            "budget",
+            "cheapest",
+            "escalated",
+            "fallback",
+            "user"
+          ],
+          "title": "Reason",
+          "type": "string"
+        },
+        "rejected": {
+          "items": {
+            "$ref": "#/$defs/ModelRejection"
+          },
+          "title": "Rejected",
+          "type": "array"
+        },
+        "tier": {
+          "enum": [
+            "local",
+            "budget",
+            "frontier"
+          ],
+          "title": "Tier",
+          "type": "string"
+        }
+      },
+      "required": [
+        "model_profile",
+        "tier",
+        "reason",
+        "detail"
+      ],
+      "title": "ModelRoutedData",
+      "type": "object"
+    },
+    "ModelRoutedEvent": {
+      "additionalProperties": false,
+      "description": "The pick for this run: the model that runs it and why.",
+      "properties": {
+        "data": {
+          "$ref": "#/$defs/ModelRoutedData"
+        },
+        "run_id": {
+          "minLength": 1,
+          "title": "Run Id",
+          "type": "string"
+        },
+        "seq": {
+          "minimum": 1,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "session_id": {
+          "minLength": 1,
+          "title": "Session Id",
+          "type": "string"
+        },
+        "ts": {
+          "minLength": 1,
+          "title": "Ts",
+          "type": "string"
+        },
+        "type": {
+          "const": "model.routed",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "seq",
+        "session_id",
+        "run_id",
+        "ts",
+        "type",
+        "data"
+      ],
+      "title": "ModelRoutedEvent",
+      "type": "object"
+    },
     "ModelSelectedData": {
       "additionalProperties": false,
       "description": "The model the session's next run uses.\n\n``model_profile`` is the name asked for, a profile or a ``provider/model``\nref. ``model_provider`` and ``model_name`` are what it resolved to when it\nwas chosen. ``reason`` ``user`` is ``session.set_model``.",
@@ -1210,6 +1997,179 @@
         "data"
       ],
       "title": "ModelSelectedEvent",
+      "type": "object"
+    },
+    "ModelWaitingData": {
+      "additionalProperties": false,
+      "description": "A chat call waits, or no longer waits, for its turn on a local model server.\n\nSent for the reply ``message_id`` only, so other sessions never show it. Stored only\nuntil its message completes.",
+      "properties": {
+        "message_id": {
+          "minLength": 1,
+          "title": "Message Id",
+          "type": "string"
+        },
+        "waiting": {
+          "title": "Waiting",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "message_id",
+        "waiting"
+      ],
+      "title": "ModelWaitingData",
+      "type": "object"
+    },
+    "ModelWaitingEvent": {
+      "additionalProperties": false,
+      "description": "A chat call waits for the local model. A live signal: ``message.completed`` replaces it.",
+      "properties": {
+        "data": {
+          "$ref": "#/$defs/ModelWaitingData"
+        },
+        "run_id": {
+          "minLength": 1,
+          "title": "Run Id",
+          "type": "string"
+        },
+        "seq": {
+          "minimum": 1,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "session_id": {
+          "minLength": 1,
+          "title": "Session Id",
+          "type": "string"
+        },
+        "ts": {
+          "minLength": 1,
+          "title": "Ts",
+          "type": "string"
+        },
+        "type": {
+          "const": "model.waiting",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "seq",
+        "session_id",
+        "run_id",
+        "ts",
+        "type",
+        "data"
+      ],
+      "title": "ModelWaitingEvent",
+      "type": "object"
+    },
+    "PlanProposedData": {
+      "additionalProperties": false,
+      "description": "The plan a plan first run ended with, sent for the user to read.\n\n``plan_id`` names this plan. ``call_id`` is the ``propose_plan`` call.",
+      "properties": {
+        "call_id": {
+          "minLength": 1,
+          "title": "Call Id",
+          "type": "string"
+        },
+        "plan_id": {
+          "minLength": 1,
+          "title": "Plan Id",
+          "type": "string"
+        },
+        "steps": {
+          "items": {
+            "$ref": "#/$defs/PlanStep"
+          },
+          "maxItems": 20,
+          "minItems": 1,
+          "title": "Steps",
+          "type": "array"
+        },
+        "title": {
+          "maxLength": 120,
+          "minLength": 1,
+          "title": "Title",
+          "type": "string"
+        }
+      },
+      "required": [
+        "plan_id",
+        "call_id",
+        "title",
+        "steps"
+      ],
+      "title": "PlanProposedData",
+      "type": "object"
+    },
+    "PlanProposedEvent": {
+      "additionalProperties": false,
+      "description": "A plan first run proposed its plan with ``propose_plan``.",
+      "properties": {
+        "data": {
+          "$ref": "#/$defs/PlanProposedData"
+        },
+        "run_id": {
+          "minLength": 1,
+          "title": "Run Id",
+          "type": "string"
+        },
+        "seq": {
+          "minimum": 1,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "session_id": {
+          "minLength": 1,
+          "title": "Session Id",
+          "type": "string"
+        },
+        "ts": {
+          "minLength": 1,
+          "title": "Ts",
+          "type": "string"
+        },
+        "type": {
+          "const": "plan.proposed",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "seq",
+        "session_id",
+        "run_id",
+        "ts",
+        "type",
+        "data"
+      ],
+      "title": "PlanProposedEvent",
+      "type": "object"
+    },
+    "PlanStep": {
+      "additionalProperties": false,
+      "description": "One step of a plan: what to do, and the files it will touch.",
+      "properties": {
+        "files": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 20,
+          "title": "Files",
+          "type": "array"
+        },
+        "text": {
+          "maxLength": 300,
+          "minLength": 1,
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "text"
+      ],
+      "title": "PlanStep",
       "type": "object"
     },
     "PromptSectionInfo": {
@@ -1343,14 +2303,16 @@
     },
     "RunFailedData": {
       "additionalProperties": false,
-      "description": "Why a run stopped. No traceback.\n\n``code`` names a failure a client can act on. ``model_unreachable``: the\nmodel's server did not answer. ``not_installed``: the model needs a local\nserver that is not installed, such as Ollama. ``provider`` is the provider\nwhose server it was, and ``hint`` says how to fix it, such as\n``run ollama serve``.",
+      "description": "Why a run stopped. No traceback.\n\n``code`` names a failure a client can act on. ``model_unreachable``: the\nmodel's server did not answer. ``not_installed``: the model needs a local\nserver that is not installed, such as Ollama. ``budget_spent``: a cap in\n``[budget]`` is spent, so a paid call was not made. ``provider`` is the\nprovider whose server it was, and ``hint`` says how to fix it, such as\n``run ollama serve``. ``context_full``: the prompt does not fit the model's window,\neven after clearing and summarising, and nothing was sent.",
       "properties": {
         "code": {
           "anyOf": [
             {
               "enum": [
                 "model_unreachable",
-                "not_installed"
+                "not_installed",
+                "context_full",
+                "budget_spent"
               ],
               "type": "string"
             },
@@ -1515,6 +2477,64 @@
       "title": "SessionAllowance",
       "type": "object"
     },
+    "SessionChecksChangedData": {
+      "additionalProperties": false,
+      "description": "Whether the session lets golem run the project's checks, after a change.\n\n``on`` true is the user's yes and false their no. The last event holds the\nanswer, so a replayed session gets it back. A session without one has not\nbeen asked.",
+      "properties": {
+        "on": {
+          "title": "On",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "on"
+      ],
+      "title": "SessionChecksChangedData",
+      "type": "object"
+    },
+    "SessionChecksChangedEvent": {
+      "additionalProperties": false,
+      "description": "``session.set_checks`` changed whether the session lets golem run checks.",
+      "properties": {
+        "data": {
+          "$ref": "#/$defs/SessionChecksChangedData"
+        },
+        "run_id": {
+          "title": "Run Id",
+          "type": "null"
+        },
+        "seq": {
+          "minimum": 1,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "session_id": {
+          "minLength": 1,
+          "title": "Session Id",
+          "type": "string"
+        },
+        "ts": {
+          "minLength": 1,
+          "title": "Ts",
+          "type": "string"
+        },
+        "type": {
+          "const": "session.checks.changed",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "seq",
+        "session_id",
+        "run_id",
+        "ts",
+        "type",
+        "data"
+      ],
+      "title": "SessionChecksChangedEvent",
+      "type": "object"
+    },
     "SessionClosedEvent": {
       "additionalProperties": false,
       "description": "The session left the list. ``run_id`` is null: no run owns the change.\n\nThe earlier events stay in the log. ``session.list`` hides the session.",
@@ -1642,7 +2662,7 @@
     },
     "SessionCreatedData": {
       "additionalProperties": false,
-      "description": "Profile stored for a new session.\n\n``model_profile`` is a profile name or a ``provider/model`` ref.\n``model_provider`` and ``model_name`` are set when the daemon can resolve\nit, and null otherwise. ``forked_from`` is set on a session made by\n``session.fork``. ``cwd`` is the project folder the file tools work in,\nor null for a session without one. ``origin`` is who started the session:\n``cli``, ``routine:<name>``, and so on. Null means ``user``, and an older\ndaemon leaves it out.",
+      "description": "Profile stored for a new session.\n\n``model_profile`` is a profile name or a ``provider/model`` ref.\n``model_provider`` and ``model_name`` are set when the daemon can resolve\nit, and null otherwise. ``forked_from`` is set on a session made by\n``session.fork``. ``cwd`` is the project folder the file tools work in,\nor null for a session without one. ``origin`` is who started the session:\n``cli``, ``routine:<name>``, and so on. Null means ``user``, and an older\ndaemon leaves it out. ``route`` is the session's route mode when it was\nmade. Null means ``pinned``, and an older daemon leaves it out.",
       "properties": {
         "cwd": {
           "anyOf": [
@@ -1711,6 +2731,23 @@
           ],
           "default": null,
           "title": "Origin"
+        },
+        "route": {
+          "anyOf": [
+            {
+              "enum": [
+                "pinned",
+                "local",
+                "auto"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Route"
         }
       },
       "required": [
@@ -1832,9 +2869,67 @@
       "title": "SessionModeChangedEvent",
       "type": "object"
     },
+    "SessionPlanChangedData": {
+      "additionalProperties": false,
+      "description": "Whether the session is in plan first, after a change.\n\nThe last event holds the switch, so a replayed session gets it back.",
+      "properties": {
+        "on": {
+          "title": "On",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "on"
+      ],
+      "title": "SessionPlanChangedData",
+      "type": "object"
+    },
+    "SessionPlanChangedEvent": {
+      "additionalProperties": false,
+      "description": "``session.set_plan`` put the session in plan first, or took it out.",
+      "properties": {
+        "data": {
+          "$ref": "#/$defs/SessionPlanChangedData"
+        },
+        "run_id": {
+          "title": "Run Id",
+          "type": "null"
+        },
+        "seq": {
+          "minimum": 1,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "session_id": {
+          "minLength": 1,
+          "title": "Session Id",
+          "type": "string"
+        },
+        "ts": {
+          "minLength": 1,
+          "title": "Ts",
+          "type": "string"
+        },
+        "type": {
+          "const": "session.plan.changed",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "seq",
+        "session_id",
+        "run_id",
+        "ts",
+        "type",
+        "data"
+      ],
+      "title": "SessionPlanChangedEvent",
+      "type": "object"
+    },
     "SessionUpdatedData": {
       "additionalProperties": false,
-      "description": "A session attribute changed: its title, folder, allowed tools, or MCP servers.\n\nA field left null did not change. ``cwd`` is set once, on a session made\nbefore sessions had a folder, by the first ``message.send`` that names one.\n``allowed_tools`` is the whole list after ``session.revoke``, and\n``mcp_servers`` the on-demand MCP servers the session turned on, after\n``mcp.enable`` or ``mcp.disable``.",
+      "description": "A session attribute changed: its title, folder, allowed tools, MCP servers, or route.\n\nA field left null did not change. ``route`` is the session's route mode after\n``session.set_route``. ``cwd`` is set once, on a session made\nbefore sessions had a folder, by the first ``message.send`` that names one.\n``allowed_tools`` is the whole list after ``session.revoke``, and\n``mcp_servers`` the on-demand MCP servers the session turned on, after\n``mcp.enable`` or ``mcp.disable``.",
       "properties": {
         "allowed_tools": {
           "anyOf": [
@@ -1878,6 +2973,23 @@
           ],
           "default": null,
           "title": "Mcp Servers"
+        },
+        "route": {
+          "anyOf": [
+            {
+              "enum": [
+                "pinned",
+                "local",
+                "auto"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Route"
         },
         "title": {
           "anyOf": [
@@ -2792,6 +3904,102 @@
       ],
       "title": "ToolStartedEvent",
       "type": "object"
+    },
+    "ToolWritingData": {
+      "additionalProperties": false,
+      "description": "How far the model got writing a ``write_file`` or ``edit_file`` call.\n\nStored only until its message completes. ``index`` is the call's place in the reply.\n``path`` is None until the model has written the whole path. ``lines`` and ``chars``\ncount the file text written so far.",
+      "properties": {
+        "chars": {
+          "minimum": 0,
+          "title": "Chars",
+          "type": "integer"
+        },
+        "index": {
+          "minimum": 0,
+          "title": "Index",
+          "type": "integer"
+        },
+        "lines": {
+          "minimum": 0,
+          "title": "Lines",
+          "type": "integer"
+        },
+        "message_id": {
+          "minLength": 1,
+          "title": "Message Id",
+          "type": "string"
+        },
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Path"
+        }
+      },
+      "required": [
+        "message_id",
+        "index",
+        "name",
+        "lines",
+        "chars"
+      ],
+      "title": "ToolWritingData",
+      "type": "object"
+    },
+    "ToolWritingEvent": {
+      "additionalProperties": false,
+      "description": "The model is still writing a file call. A live signal: ``message.completed`` replaces it.",
+      "properties": {
+        "data": {
+          "$ref": "#/$defs/ToolWritingData"
+        },
+        "run_id": {
+          "minLength": 1,
+          "title": "Run Id",
+          "type": "string"
+        },
+        "seq": {
+          "minimum": 1,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "session_id": {
+          "minLength": 1,
+          "title": "Session Id",
+          "type": "string"
+        },
+        "ts": {
+          "minLength": 1,
+          "title": "Ts",
+          "type": "string"
+        },
+        "type": {
+          "const": "tool.writing",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "seq",
+        "session_id",
+        "run_id",
+        "ts",
+        "type",
+        "data"
+      ],
+      "title": "ToolWritingEvent",
+      "type": "object"
     }
   },
   "additionalProperties": false,
@@ -2814,6 +4022,11 @@
         "mapping": {
           "approval.needed": "#/$defs/ApprovalNeededEvent",
           "approval.resolved": "#/$defs/ApprovalResolvedEvent",
+          "check.completed": "#/$defs/CheckCompletedEvent",
+          "check.offered": "#/$defs/CheckOfferedEvent",
+          "check.started": "#/$defs/CheckStartedEvent",
+          "context.changed": "#/$defs/ContextChangedEvent",
+          "file.changed": "#/$defs/FileChangedEvent",
           "message.completed": "#/$defs/MessageCompletedEvent",
           "message.delta": "#/$defs/MessageDeltaEvent",
           "message.started": "#/$defs/MessageStartedEvent",
@@ -2821,15 +4034,20 @@
           "model.call.completed": "#/$defs/ModelCallCompletedEvent",
           "model.call.started": "#/$defs/ModelCallStartedEvent",
           "model.options.changed": "#/$defs/ModelOptionsChangedEvent",
+          "model.routed": "#/$defs/ModelRoutedEvent",
           "model.selected": "#/$defs/ModelSelectedEvent",
+          "model.waiting": "#/$defs/ModelWaitingEvent",
+          "plan.proposed": "#/$defs/PlanProposedEvent",
           "run.cancelled": "#/$defs/RunCancelledEvent",
           "run.completed": "#/$defs/RunCompletedEvent",
           "run.failed": "#/$defs/RunFailedEvent",
           "run.started": "#/$defs/RunStartedEvent",
+          "session.checks.changed": "#/$defs/SessionChecksChangedEvent",
           "session.closed": "#/$defs/SessionClosedEvent",
           "session.completed": "#/$defs/SessionCompletedEvent",
           "session.created": "#/$defs/SessionCreatedEvent",
           "session.mode.changed": "#/$defs/SessionModeChangedEvent",
+          "session.plan.changed": "#/$defs/SessionPlanChangedEvent",
           "session.updated": "#/$defs/SessionUpdatedEvent",
           "skill.activated": "#/$defs/SkillActivatedEvent",
           "skill.deactivated": "#/$defs/SkillDeactivatedEvent",
@@ -2839,7 +4057,8 @@
           "tool.failed": "#/$defs/ToolFailedEvent",
           "tool.output": "#/$defs/ToolOutputEvent",
           "tool.requested": "#/$defs/ToolRequestedEvent",
-          "tool.started": "#/$defs/ToolStartedEvent"
+          "tool.started": "#/$defs/ToolStartedEvent",
+          "tool.writing": "#/$defs/ToolWritingEvent"
         },
         "propertyName": "type"
       },
@@ -2860,10 +4079,19 @@
           "$ref": "#/$defs/ModelSelectedEvent"
         },
         {
+          "$ref": "#/$defs/ModelRoutedEvent"
+        },
+        {
           "$ref": "#/$defs/ModelOptionsChangedEvent"
         },
         {
           "$ref": "#/$defs/SessionModeChangedEvent"
+        },
+        {
+          "$ref": "#/$defs/SessionChecksChangedEvent"
+        },
+        {
+          "$ref": "#/$defs/SessionPlanChangedEvent"
         },
         {
           "$ref": "#/$defs/MessageStartedEvent"
@@ -2884,6 +4112,9 @@
           "$ref": "#/$defs/ModelCallCompletedEvent"
         },
         {
+          "$ref": "#/$defs/ContextChangedEvent"
+        },
+        {
           "$ref": "#/$defs/RunStartedEvent"
         },
         {
@@ -2897,6 +4128,12 @@
         },
         {
           "$ref": "#/$defs/ToolRequestedEvent"
+        },
+        {
+          "$ref": "#/$defs/ToolWritingEvent"
+        },
+        {
+          "$ref": "#/$defs/ModelWaitingEvent"
         },
         {
           "$ref": "#/$defs/ToolStartedEvent"
@@ -2920,6 +4157,12 @@
           "$ref": "#/$defs/TodosUpdatedEvent"
         },
         {
+          "$ref": "#/$defs/PlanProposedEvent"
+        },
+        {
+          "$ref": "#/$defs/FileChangedEvent"
+        },
+        {
           "$ref": "#/$defs/SkillActivatedEvent"
         },
         {
@@ -2927,6 +4170,15 @@
         },
         {
           "$ref": "#/$defs/SkillSkippedEvent"
+        },
+        {
+          "$ref": "#/$defs/CheckOfferedEvent"
+        },
+        {
+          "$ref": "#/$defs/CheckStartedEvent"
+        },
+        {
+          "$ref": "#/$defs/CheckCompletedEvent"
         }
       ],
       "title": "Params"

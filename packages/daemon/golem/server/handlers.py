@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import logging
 import os
 import time
@@ -12,6 +13,16 @@ from typing import Literal, cast
 from pydantic import BaseModel, ConfigDict
 
 from golem import __version__, install_info
+from golem.coding import commit as commit_git
+from golem.coding.changes import (
+    ChangeStore,
+    FileChange,
+    before_run,
+    net_files,
+    revert_hunk,
+    status_of,
+)
+from golem.coding.files import list_paths, read_text
 from golem.config import load_settings
 from golem.config_edit import (
     McpTableError,
@@ -40,6 +51,7 @@ from golem.secrets import SecretStore, SecretStoreError, check_name
 from golem.server.dispatcher import (
     APPROVAL_NOT_FOUND,
     ARTIFACT_NOT_FOUND,
+    BUDGET_SPENT,
     INTERNAL_ERROR,
     INVALID_PARAMS,
     INVALID_TOOL_ARGS,
@@ -73,6 +85,7 @@ from golem.server.mcp_import import mcp_import_apply, mcp_import_scan
 from golem.server.mcp_login import mcp_login, mcp_logout
 from golem.server.mcp_model import turn_on
 from golem.server.mcp_try import mcp_call, mcp_logs, mcp_test
+from golem.server.routines import routine_get, routine_list, routine_remove, routine_update
 from golem.server.skills_edit import (
     skill_create,
     skill_create_protected,
@@ -84,6 +97,7 @@ from golem.server.skills_edit import (
 from golem.sessions.manager import (
     ApprovalNotFoundError,
     BlankTitleError,
+    BudgetSpentError,
     InvalidToolArgsError,
     MessageNotFoundError,
     RuleWriteError,
@@ -100,7 +114,9 @@ from golem.skills.index import build_index
 from golem.skills.invoke import SkillInvokeError
 from golem.skills.pinned import SkillPinError
 from golem.skills.registry import listed_skill
-from golem.tools.registry import ToolScope
+from golem.tools.paths import NO_FOLDER, writable
+from golem.tools.registry import ToolError, ToolScope
+from golem.tools.write import DIFF_CHARS, Change, apply, diff_counts, diff_text
 from golem_protocol.commands import (
     ApprovalRespondParams,
     ApprovalRespondResult,
@@ -113,6 +129,19 @@ from golem_protocol.commands import (
     AuthRemoveResult,
     AuthSetParams,
     AuthSetResult,
+    ChangedFile,
+    ChangesCommitInfoParams,
+    ChangesCommitInfoResult,
+    ChangesCommitParams,
+    ChangesCommitResult,
+    ChangesDiffParams,
+    ChangesDiffResult,
+    ChangesListParams,
+    ChangesListResult,
+    ChangesRevertParams,
+    ChangesRevertResult,
+    ChangesSuggestMessageParams,
+    ChangesSuggestMessageResult,
     ConfigAllowance,
     ConfigGetParams,
     ConfigGetResult,
@@ -125,6 +154,10 @@ from golem_protocol.commands import (
     CostModelRow,
     CostTotals,
     DaemonStatus,
+    FileListParams,
+    FileListResult,
+    FileReadParams,
+    FileReadResult,
     FsListDirsParams,
     FsListDirsResult,
     HelloParams,
@@ -175,6 +208,9 @@ from golem_protocol.commands import (
     ModelSetDefaultParams,
     ModelSetDefaultResult,
     ModelSetup,
+    ModelSpeedInfo,
+    NotifyTestParams,
+    NotifyTestResult,
     OllamaInstallCancelParams,
     OllamaInstallCancelResult,
     OllamaInstallParams,
@@ -187,6 +223,12 @@ from golem_protocol.commands import (
     PolicyEditResult,
     PolicyRemoveParams,
     PolicyUpdateParams,
+    RevertConflict,
+    RevertTarget,
+    RoutineGetParams,
+    RoutineListParams,
+    RoutineRemoveParams,
+    RoutineUpdateParams,
     RunCancelParams,
     RunCancelResult,
     RuntimeInstallCancelParams,
@@ -195,6 +237,8 @@ from golem_protocol.commands import (
     SessionAttachResult,
     SessionCloseParams,
     SessionCloseResult,
+    SessionCompactParams,
+    SessionCompactResult,
     SessionCreateParams,
     SessionCreateResult,
     SessionDetachParams,
@@ -209,12 +253,18 @@ from golem_protocol.commands import (
     SessionRenameResult,
     SessionRevokeParams,
     SessionRevokeResult,
+    SessionSetChecksParams,
+    SessionSetChecksResult,
     SessionSetModelParams,
     SessionSetModelResult,
     SessionSetModeParams,
     SessionSetModeResult,
     SessionSetOptionsParams,
     SessionSetOptionsResult,
+    SessionSetPlanParams,
+    SessionSetPlanResult,
+    SessionSetRouteParams,
+    SessionSetRouteResult,
     SessionSetSkillsParams,
     SessionSetSkillsResult,
     SetupInstall,
@@ -234,7 +284,7 @@ from golem_protocol.commands import (
     TraceSpanParams,
     TraceSpanResult,
 )
-from golem_protocol.events import Ping
+from golem_protocol.events import FileChangedData, Ping
 from golem_protocol.rpc import ModelOptionsSavedNotification
 from golem_protocol.version import PROTOCOL_MAJOR, PROTOCOL_MINOR
 
@@ -409,6 +459,8 @@ async def _message_send(ctx: RequestContext, params: MessageSendParams) -> Messa
         raise RpcCallError(SESSION_NOT_FOUND, str(exc)) from exc
     except ModelConfigError as exc:
         raise RpcCallError(MODEL_NOT_CONFIGURED, str(exc)) from exc
+    except BudgetSpentError as exc:
+        raise RpcCallError(BUDGET_SPENT, str(exc)) from exc
     except SkillInvokeError as exc:
         raise RpcCallError(SKILL_NOT_FOUND, str(exc)) from exc
     return MessageSendResult(run_id=run_id)
@@ -485,6 +537,293 @@ async def _session_inspect(
             InspectMessage(role=message.role, text=message.text) for message in view.messages
         ],
     )
+
+
+def _changes(ctx: RequestContext) -> ChangeStore:
+    changes = ctx.state.changes
+    if changes is None:
+        raise RpcCallError(INTERNAL_ERROR, "changes are not ready")
+    return changes
+
+
+def _disk_sha(path: Path) -> str | None:
+    """The sha256 of the file's text. None for no file, and "" for one that is not UTF-8."""
+    try:
+        text = path.read_bytes().decode("utf-8")
+    except FileNotFoundError:
+        return None
+    except (OSError, UnicodeDecodeError):
+        return ""
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def _disk_text(path: Path) -> str | None:
+    """The file's text, None when there is no file or it is not UTF-8."""
+    try:
+        return path.read_bytes().decode("utf-8")
+    except (OSError, UnicodeDecodeError):
+        return None
+
+
+async def _session_folder(ctx: RequestContext, session_id: str) -> str | None:
+    try:
+        return await _sessions(ctx).cwd_of(session_id)
+    except SessionNotFoundError as exc:
+        raise RpcCallError(SESSION_NOT_FOUND, "session not found") from exc
+    except SchemaMismatchError as exc:
+        raise RpcCallError(SESSION_NOT_FOUND, str(exc)) from exc
+
+
+async def _changes_list(ctx: RequestContext, params: ChangesListParams) -> ChangesListResult:
+    store = _changes(ctx)
+    folder = await _session_folder(ctx, params.session_id)
+    if folder is None:
+        return ChangesListResult(files=[])
+    files: list[ChangedFile] = []
+    for net in net_files(await store.list(params.session_id)):
+        diff = diff_text(
+            net.path, await store.text(net.before_sha), await store.text(net.after_sha)
+        )
+        added, removed = diff_counts(diff)
+        on_disk = await asyncio.to_thread(_disk_sha, Path(folder) / net.path)
+        files.append(
+            ChangedFile(
+                path=net.path,
+                status=net.status,
+                added=added,
+                removed=removed,
+                change_ids=list(net.change_ids),
+                stale=on_disk != net.after_sha,
+            )
+        )
+    return ChangesListResult(files=files)
+
+
+async def _changes_diff(ctx: RequestContext, params: ChangesDiffParams) -> ChangesDiffResult:
+    if (params.path is None) == (params.change_id is None):
+        raise RpcCallError(INVALID_PARAMS, "set exactly one of path and change_id")
+    store = _changes(ctx)
+    await _session_folder(ctx, params.session_id)
+    if params.change_id is not None:
+        change = await store.get(params.session_id, params.change_id)
+        if change is None:
+            raise RpcCallError(INVALID_PARAMS, "no such change in this session")
+        path, before_sha, after_sha = change.path, change.before_sha, change.after_sha
+    else:
+        group = [c for c in await store.list(params.session_id) if c.path == params.path]
+        if not group:
+            raise RpcCallError(INVALID_PARAMS, "this session has not changed that file")
+        path, before_sha, after_sha = group[0].path, group[0].before_sha, group[-1].after_sha
+    diff = diff_text(path, await store.text(before_sha), await store.text(after_sha))
+    return ChangesDiffResult(diff=diff[:DIFF_CHARS], truncated=len(diff) > DIFF_CHARS)
+
+
+def _text_sha(text: str | None) -> str | None:
+    return None if text is None else hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+async def _revert_texts(
+    store: ChangeStore, session_id: str, target: RevertTarget
+) -> dict[str, tuple[str | None, str]]:
+    """For each path a revert writes: its new text (None: delete) and the change it takes back.
+
+    Raises :class:`RpcCallError` for a target that is malformed or names nothing.
+    """
+    changes = await store.list(session_id)
+    last = {change.path: change.change_id for change in changes}
+    by_path: dict[str, list[FileChange]] = {}
+    for change in changes:
+        by_path.setdefault(change.path, []).append(change)
+    needs = {
+        "change": (target.change_id,),
+        "file": (target.path,),
+        "hunk": (target.path, target.hunk),
+        "run": (target.run_id,),
+    }[target.kind]
+    given = {
+        "change_id": target.change_id,
+        "path": target.path,
+        "hunk": target.hunk,
+        "run_id": target.run_id,
+    }
+    if any(value is None for value in needs) or sum(v is not None for v in given.values()) != len(
+        needs
+    ):
+        raise RpcCallError(INVALID_PARAMS, f"a {target.kind} target takes only its own fields")
+    if target.kind == "change":
+        change = await store.get(session_id, cast(str, target.change_id))
+        if change is None:
+            raise RpcCallError(INVALID_PARAMS, "no such change in this session")
+        return {change.path: (await store.text(change.before_sha), change.change_id)}
+    if target.kind == "run":
+        shas = before_run(changes, cast(str, target.run_id))
+        return {path: (await store.text(sha), last[path]) for path, sha in shas.items()}
+    group = by_path.get(cast(str, target.path))
+    if not group:
+        raise RpcCallError(INVALID_PARAMS, "this session has not changed that file")
+    path = cast(str, target.path)
+    if target.kind == "file":
+        return {path: (await store.text(group[0].before_sha), last[path])}
+    before = await store.text(group[0].before_sha) or ""
+    after = await store.text(group[-1].after_sha) or ""
+    try:
+        text = revert_hunk(before, after, cast(int, target.hunk))
+    except IndexError as exc:
+        raise RpcCallError(INVALID_PARAMS, str(exc)) from exc
+    return {path: (text, last[path])}
+
+
+def _write_back(folder: Path, path: str, text: str | None, before: str | None) -> None:
+    """Write ``text`` to the file, or delete it for None. Never removes a folder."""
+    target = writable(folder, path)
+    if text is not None:
+        apply(Change(folder, target, path, before, text))
+        return
+    try:
+        target.unlink(missing_ok=True)
+    except OSError as exc:
+        raise ToolError(f"cannot delete {path}: {exc.strerror or exc}") from exc
+
+
+async def _changes_revert(ctx: RequestContext, params: ChangesRevertParams) -> ChangesRevertResult:
+    store = _changes(ctx)
+    sessions = _sessions(ctx)
+    try:
+        async with sessions.idle(params.session_id) as folder:
+            if folder is None:
+                raise RpcCallError(INVALID_PARAMS, "this session has no folder")
+            root = Path(folder)
+            wanted = await _revert_texts(store, params.session_id, params.target)
+            last_after = {c.path: c.after_sha for c in await store.list(params.session_id)}
+            todo: list[tuple[str, str | None, str]] = []
+            conflicts: list[RevertConflict] = []
+            for path, (text, reverts) in wanted.items():
+                try:
+                    writable(root, path)
+                except ToolError as exc:
+                    raise RpcCallError(INVALID_PARAMS, str(exc)) from exc
+                on_disk = await asyncio.to_thread(_disk_sha, root / path)
+                if on_disk == _text_sha(text):
+                    continue
+                if on_disk == "" or (on_disk != last_after[path] and not params.force):
+                    conflicts.append(RevertConflict(path=path, reason="changed_on_disk"))
+                    continue
+                todo.append((path, text, reverts))
+            reverted: list[str] = []
+            for path, text, reverts in todo:
+                before = await asyncio.to_thread(_disk_text, root / path)
+                try:
+                    await asyncio.to_thread(_write_back, root, path, text, before)
+                except ToolError as exc:
+                    raise RpcCallError(INTERNAL_ERROR, str(exc)) from exc
+                change = await store.record(
+                    session_id=params.session_id,
+                    run_id=None,
+                    call_id=None,
+                    path=path,
+                    before=before,
+                    after=text,
+                    source="revert",
+                    reverts=reverts,
+                )
+                await sessions.announce_change(
+                    params.session_id,
+                    FileChangedData(
+                        change_id=change.change_id,
+                        path=path,
+                        status=status_of(change.before_sha, change.after_sha),
+                        added=change.added,
+                        removed=change.removed,
+                        source="revert",
+                        reverts=reverts,
+                    ),
+                )
+                reverted.append(path)
+    except SessionNotFoundError as exc:
+        raise RpcCallError(SESSION_NOT_FOUND, "session not found") from exc
+    except SessionBusyError as exc:
+        raise RpcCallError(SESSION_BUSY, "session is busy") from exc
+    except SchemaMismatchError as exc:
+        raise RpcCallError(SESSION_NOT_FOUND, str(exc)) from exc
+    return ChangesRevertResult(reverted=reverted, conflicts=conflicts)
+
+
+async def _session_files(ctx: RequestContext, session_id: str) -> Path:
+    folder = await _session_folder(ctx, session_id)
+    if folder is None:
+        raise RpcCallError(INVALID_PARAMS, NO_FOLDER)
+    return Path(folder)
+
+
+async def _file_read(ctx: RequestContext, params: FileReadParams) -> FileReadResult:
+    folder = await _session_files(ctx, params.session_id)
+    try:
+        return await asyncio.to_thread(read_text, folder, params.path)
+    except ToolError as exc:
+        raise RpcCallError(INVALID_PARAMS, str(exc)) from exc
+
+
+async def _file_list(ctx: RequestContext, params: FileListParams) -> FileListResult:
+    folder = await _session_files(ctx, params.session_id)
+    return await asyncio.to_thread(list_paths, folder, params.query, params.limit)
+
+
+async def _commit_folder(ctx: RequestContext, session_id: str) -> str:
+    folder = await _session_folder(ctx, session_id)
+    if folder is None:
+        raise RpcCallError(INVALID_PARAMS, "this session has no folder")
+    return folder
+
+
+async def _changes_commit(ctx: RequestContext, params: ChangesCommitParams) -> ChangesCommitResult:
+    folder = await _commit_folder(ctx, params.session_id)
+    try:
+        if await _sessions(ctx).is_busy(params.session_id):
+            raise RpcCallError(SESSION_BUSY, "session is busy")
+        outcome = await commit_git.commit(folder, params.paths, params.message)
+    except ToolError as exc:
+        raise RpcCallError(INVALID_PARAMS, str(exc)) from exc
+    except SessionNotFoundError as exc:
+        raise RpcCallError(SESSION_NOT_FOUND, "session not found") from exc
+    except SchemaMismatchError as exc:
+        raise RpcCallError(SESSION_NOT_FOUND, str(exc)) from exc
+    return ChangesCommitResult(ok=outcome.ok, sha=outcome.sha, output=outcome.output)
+
+
+async def _changes_commit_info(
+    ctx: RequestContext, params: ChangesCommitInfoParams
+) -> ChangesCommitInfoResult:
+    store = _changes(ctx)
+    folder = await _commit_folder(ctx, params.session_id)
+    paths = [net.path for net in net_files(await store.list(params.session_id))]
+    found = await commit_git.info(folder, paths)
+    return ChangesCommitInfoResult(
+        repository=found.repository, branch=found.branch, paths=found.paths
+    )
+
+
+async def _changes_suggest_message(
+    ctx: RequestContext, params: ChangesSuggestMessageParams
+) -> ChangesSuggestMessageResult:
+    sessions = _sessions(ctx)
+    folder = await _commit_folder(ctx, params.session_id)
+    try:
+        profile = await sessions.model_profile(params.session_id)
+        model = sessions.router.chat_model(
+            profile, await sessions.session_options(params.session_id)
+        )
+        message = await commit_git.suggest(folder, params.paths, model)
+    except ToolError as exc:
+        raise RpcCallError(INVALID_PARAMS, str(exc)) from exc
+    except commit_git.SuggestError as exc:
+        raise RpcCallError(INTERNAL_ERROR, str(exc)) from exc
+    except ModelConfigError as exc:
+        raise RpcCallError(MODEL_NOT_CONFIGURED, str(exc)) from exc
+    except SessionNotFoundError as exc:
+        raise RpcCallError(SESSION_NOT_FOUND, "session not found") from exc
+    except SchemaMismatchError as exc:
+        raise RpcCallError(SESSION_NOT_FOUND, str(exc)) from exc
+    return ChangesSuggestMessageResult(message=message)
 
 
 async def _trace_get(ctx: RequestContext, params: TraceGetParams) -> TraceGetResult:
@@ -709,6 +1048,13 @@ async def _model_list(ctx: RequestContext, params: ModelListParams) -> ModelList
                 recommended_for=cast(list[ModelCategory], list(model.recommended_for)),
                 think_values=list(model.think_values),
                 tier=model.tier,
+                speed=None
+                if model.speed is None
+                else ModelSpeedInfo(
+                    prompt_tps=model.speed.prompt_tps,
+                    reply_tps=model.speed.reply_tps,
+                    samples=model.speed.samples,
+                ),
             )
             for model in listing.models
         ],
@@ -913,6 +1259,60 @@ async def _session_set_mode(
         raise RpcCallError(SESSION_NOT_FOUND, "session not found") from exc
     log.info("session mode session=%s mode=%s override=%s", params.session_id, mode, override)
     return SessionSetModeResult(session_id=params.session_id, mode=mode, override=override)
+
+
+async def _session_compact(
+    ctx: RequestContext, params: SessionCompactParams
+) -> SessionCompactResult:
+    try:
+        result = await _sessions(ctx).compact(params.session_id, params.action, params.focus)
+    except (SessionNotFoundError, SchemaMismatchError) as exc:
+        raise RpcCallError(SESSION_NOT_FOUND, "session not found") from exc
+    except SessionBusyError as exc:
+        raise RpcCallError(SESSION_BUSY, "session is busy") from exc
+    except Exception as exc:
+        log.warning("session compact failed session=%s", params.session_id, exc_info=True)
+        raise RpcCallError(INTERNAL_ERROR, f"could not {params.action}: {exc}") from exc
+    log.info(
+        "session compact session=%s action=%s count=%d",
+        params.session_id,
+        params.action,
+        result.count,
+    )
+    return result
+
+
+async def _session_set_checks(
+    ctx: RequestContext, params: SessionSetChecksParams
+) -> SessionSetChecksResult:
+    try:
+        on = await _sessions(ctx).set_checks(params.session_id, params.on)
+    except (SessionNotFoundError, SchemaMismatchError) as exc:
+        raise RpcCallError(SESSION_NOT_FOUND, "session not found") from exc
+    log.info("session checks session=%s on=%s", params.session_id, on)
+    return SessionSetChecksResult(session_id=params.session_id, on=on)
+
+
+async def _session_set_route(
+    ctx: RequestContext, params: SessionSetRouteParams
+) -> SessionSetRouteResult:
+    try:
+        mode = await _sessions(ctx).set_route(params.session_id, params.mode)
+    except (SessionNotFoundError, SchemaMismatchError) as exc:
+        raise RpcCallError(SESSION_NOT_FOUND, "session not found") from exc
+    log.info("session route session=%s mode=%s", params.session_id, mode)
+    return SessionSetRouteResult(session_id=params.session_id, mode=mode)
+
+
+async def _session_set_plan(
+    ctx: RequestContext, params: SessionSetPlanParams
+) -> SessionSetPlanResult:
+    try:
+        on = await _sessions(ctx).set_plan(params.session_id, params.on)
+    except (SessionNotFoundError, SchemaMismatchError) as exc:
+        raise RpcCallError(SESSION_NOT_FOUND, "session not found") from exc
+    log.info("session plan first session=%s on=%s", params.session_id, on)
+    return SessionSetPlanResult(session_id=params.session_id, on=on)
 
 
 async def _config_get(ctx: RequestContext, params: ConfigGetParams) -> ConfigGetResult:
@@ -1257,6 +1657,14 @@ async def _ollama_start(ctx: RequestContext, _params: OllamaStartParams) -> Olla
     return OllamaStartResult(running=running)
 
 
+async def _notify_test(ctx: RequestContext, _params: NotifyTestParams) -> NotifyTestResult:
+    notifier = ctx.state.notifier
+    if notifier is None:
+        raise RpcCallError(INVALID_PARAMS, "the daemon is not ready for notifications yet")
+    posted = await notifier.test()
+    return NotifyTestResult(posted=posted, mechanism=notifier.poster.name)
+
+
 def _key_store(router: ModelRouter, provider_name: str) -> KeyStore:
     provider = router.provider(provider_name)
     if provider is None:
@@ -1298,6 +1706,18 @@ def standard_methods() -> dict[str, Method]:
         ),
         "run.cancel": Method("run.cancel", RunCancelParams, True, _run_cancel),
         "artifact.read": Method("artifact.read", ArtifactReadParams, True, _artifact_read),
+        "changes.list": Method("changes.list", ChangesListParams, True, _changes_list),
+        "changes.diff": Method("changes.diff", ChangesDiffParams, True, _changes_diff),
+        "changes.revert": Method("changes.revert", ChangesRevertParams, True, _changes_revert),
+        "file.read": Method("file.read", FileReadParams, True, _file_read),
+        "file.list": Method("file.list", FileListParams, True, _file_list),
+        "changes.commit": Method("changes.commit", ChangesCommitParams, True, _changes_commit),
+        "changes.commit_info": Method(
+            "changes.commit_info", ChangesCommitInfoParams, True, _changes_commit_info
+        ),
+        "changes.suggest_message": Method(
+            "changes.suggest_message", ChangesSuggestMessageParams, True, _changes_suggest_message
+        ),
         "session.inspect": Method("session.inspect", SessionInspectParams, True, _session_inspect),
         "cost.get": Method("cost.get", CostGetParams, True, _cost_get),
         "trace.get": Method("trace.get", TraceGetParams, True, _trace_get),
@@ -1348,6 +1768,10 @@ def standard_methods() -> dict[str, Method]:
         "skill.set_disabled": Method(
             "skill.set_disabled", SkillSetDisabledParams, True, skill_set_disabled
         ),
+        "routine.list": Method("routine.list", RoutineListParams, True, routine_list),
+        "routine.get": Method("routine.get", RoutineGetParams, True, routine_get),
+        "routine.update": Method("routine.update", RoutineUpdateParams, True, routine_update),
+        "routine.remove": Method("routine.remove", RoutineRemoveParams, True, routine_remove),
         "session.set_skills": Method(
             "session.set_skills", SessionSetSkillsParams, True, _session_set_skills
         ),
@@ -1375,12 +1799,23 @@ def standard_methods() -> dict[str, Method]:
         "session.set_mode": Method(
             "session.set_mode", SessionSetModeParams, True, _session_set_mode
         ),
+        "session.set_route": Method(
+            "session.set_route", SessionSetRouteParams, True, _session_set_route
+        ),
+        "session.compact": Method("session.compact", SessionCompactParams, True, _session_compact),
+        "session.set_checks": Method(
+            "session.set_checks", SessionSetChecksParams, True, _session_set_checks
+        ),
+        "session.set_plan": Method(
+            "session.set_plan", SessionSetPlanParams, True, _session_set_plan
+        ),
         "fs.list_dirs": Method("fs.list_dirs", FsListDirsParams, True, _fs_list_dirs),
         "setup.status": Method("setup.status", SetupStatusParams, True, _setup_status),
         "ollama.install": Method("ollama.install", OllamaInstallParams, True, _ollama_install),
         "ollama.install_cancel": Method(
             "ollama.install_cancel", OllamaInstallCancelParams, True, _ollama_install_cancel
         ),
+        "notify.test": Method("notify.test", NotifyTestParams, True, _notify_test),
         "ollama.start": Method("ollama.start", OllamaStartParams, True, _ollama_start),
         "session.set_model": Method(
             "session.set_model", SessionSetModelParams, True, _session_set_model

@@ -1,0 +1,52 @@
+{
+  "additionalProperties": false,
+  "description": "How far the model got writing a ``write_file`` or ``edit_file`` call.\n\nStored only until its message completes. ``index`` is the call's place in the reply.\n``path`` is None until the model has written the whole path. ``lines`` and ``chars``\ncount the file text written so far.",
+  "properties": {
+    "chars": {
+      "minimum": 0,
+      "title": "Chars",
+      "type": "integer"
+    },
+    "index": {
+      "minimum": 0,
+      "title": "Index",
+      "type": "integer"
+    },
+    "lines": {
+      "minimum": 0,
+      "title": "Lines",
+      "type": "integer"
+    },
+    "message_id": {
+      "minLength": 1,
+      "title": "Message Id",
+      "type": "string"
+    },
+    "name": {
+      "minLength": 1,
+      "title": "Name",
+      "type": "string"
+    },
+    "path": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Path"
+    }
+  },
+  "required": [
+    "message_id",
+    "index",
+    "name",
+    "lines",
+    "chars"
+  ],
+  "title": "ToolWritingData",
+  "type": "object"
+}

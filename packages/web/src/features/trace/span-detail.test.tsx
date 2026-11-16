@@ -91,6 +91,17 @@ test("Metadata says when the reply was cut at the length limit", () => {
   expect(lines({ ...MODEL_DETAIL, stop_reason: "stop" })).toContain("stop");
 });
 
+test("Metadata shows the prompt and load time, and the header drops the estimate sign", () => {
+  const timed = { ...MODEL_DETAIL, span: { ...MODEL_DETAIL.span, prompt_ms: 192_000, load_ms: 8_000, reply_ms: 2_000 } };
+  const rows = Object.fromEntries(metadataRows(timed));
+  expect(rows["prompt"]).toBe("read 3.4K in 3m 12.0s");
+  expect(rows["load"]).toBe("loaded in 0m 08.0s");
+  expect(modelLine(timed)).toContain(" · 105 tok/s · ");
+  const warm = { ...timed, span: { ...timed.span, load_ms: 40 } };
+  expect(Object.fromEntries(metadataRows(warm))["load"]).toBeUndefined();
+  expect(Object.fromEntries(metadataRows(MODEL_DETAIL))["prompt"]).toBeUndefined();
+});
+
 test("the Reply renders Markdown in the trace style, and the header has the throughput", async () => {
   const { user } = show(MODEL_DETAIL);
   expect(document.body.textContent).toContain("tok/s");
@@ -326,4 +337,13 @@ test("a call proven uncut shows no cut line, no tag, and no badge", () => {
   expect(screen.queryByRole("note")).toBeNull();
   expect(document.body.textContent).not.toContain("Ollama");
   expect(document.body.textContent).not.toContain("not seen");
+});
+
+test("the meter says how many results were cleared at the selected call, and says nothing before", () => {
+  const cleared = { ...MODEL_DETAIL, context: { ...MODEL_DETAIL.context!, cleared: { count: 5, tokens: 1200 } } };
+  const view = show(cleared);
+  expect(screen.getByRole("region", { name: "Context window" }).textContent).toContain("5 old tool results were sent as one line at this call");
+  view.unmount();
+  show(MODEL_DETAIL);
+  expect(screen.getByRole("region", { name: "Context window" }).textContent).not.toContain("one line");
 });

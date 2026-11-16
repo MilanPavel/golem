@@ -23,8 +23,26 @@ import type { FsListDirsResult } from "../../protocol/gen/fs-list-dirs-result.ts
 import type { SetupStatusResult } from "../../protocol/gen/setup-status-result.ts";
 import type { ApprovalRespondResult } from "../../protocol/gen/approval-respond-result.ts";
 import type { ArtifactReadResult } from "../../protocol/gen/artifact-read-result.ts";
+import type { ChangesCommitInfoResult } from "../../protocol/gen/changes-commit-info-result.ts";
+import type { ChangesCommitResult } from "../../protocol/gen/changes-commit-result.ts";
+import type { ChangesDiffResult } from "../../protocol/gen/changes-diff-result.ts";
+import type { ChangesListResult } from "../../protocol/gen/changes-list-result.ts";
+import type { ChangesRevertResult } from "../../protocol/gen/changes-revert-result.ts";
+import type { FileListResult } from "../../protocol/gen/file-list-result.ts";
+import type { FileReadResult } from "../../protocol/gen/file-read-result.ts";
+import type { ChangesSuggestMessageResult } from "../../protocol/gen/changes-suggest-message-result.ts";
 import type { ConfigGetResult } from "../../protocol/gen/config-get-result.ts";
 import type { PolicyEditResult } from "../../protocol/gen/policy-edit-result.ts";
+
+/** What `changes.diff` shows: the net change of one file, or one change. */
+export type ChangesDiffTarget = { path: string } | { changeId: string };
+
+/** What `changes.revert` takes back: one change, a file, one hunk of a file, or a turn and all after it. */
+export type ChangesRevertTarget =
+  | { kind: "change"; changeId: string }
+  | { kind: "file"; path: string }
+  | { kind: "hunk"; path: string; hunk: number }
+  | { kind: "run"; runId: string };
 
 export type ApprovalChoice = "allow" | "allow_session" | "allow_always" | "deny";
 
@@ -35,9 +53,11 @@ import type { McpListResult } from "../../protocol/gen/mcp-list-result.ts";
 import type { McpServer } from "../../protocol/gen/mcp-server.ts";
 import type { ModelServerStatus } from "../../protocol/gen/model-server-status.ts";
 import type { SkillCall } from "../../protocol/gen/skill-call.ts";
-import type { SkillListResult } from "../../protocol/gen/skill-list-result.ts";
 import type { SkillCreateResult } from "../../protocol/gen/skill-create-result.ts";
+import type { SkillListResult } from "../../protocol/gen/skill-list-result.ts";
 import type { SkillReadResult } from "../../protocol/gen/skill-read-result.ts";
+import type { SkillSetDisabledResult } from "../../protocol/gen/skill-set-disabled-result.ts";
+import type { SkillWriteResult } from "../../protocol/gen/skill-write-result.ts";
 import type { McpToggleResult } from "../../protocol/gen/mcp-toggle-result.ts";
 import type { SessionSetSkillsResult } from "../../protocol/gen/session-set-skills-result.ts";
 import type { McpToolsResult } from "../../protocol/gen/mcp-tools-result.ts";
@@ -66,6 +86,11 @@ import type { ModelOptionsSaved } from "../../protocol/gen/model-options-saved.t
 import type { ModelOptionsSetResult } from "../../protocol/gen/model-options-set-result.ts";
 import type { PermissionsSetModeParams } from "../../protocol/gen/permissions-set-mode-params.ts";
 import type { PermissionsSetModeResult } from "../../protocol/gen/permissions-set-mode-result.ts";
+import type { SessionCompactResult } from "../../protocol/gen/session-compact-result.ts";
+import type { SessionSetChecksResult } from "../../protocol/gen/session-set-checks-result.ts";
+import type { SessionSetRouteParams } from "../../protocol/gen/session-set-route-params.ts";
+import type { SessionSetRouteResult } from "../../protocol/gen/session-set-route-result.ts";
+import type { SessionSetPlanResult } from "../../protocol/gen/session-set-plan-result.ts";
 import type { SessionSetModeParams } from "../../protocol/gen/session-set-mode-params.ts";
 import type { SessionSetModeResult } from "../../protocol/gen/session-set-mode-result.ts";
 import type { SessionSetOptionsResult } from "../../protocol/gen/session-set-options-result.ts";
@@ -77,6 +102,7 @@ import type { SessionCloseResult } from "../../protocol/gen/session-close-result
 import type { SessionCreateResult } from "../../protocol/gen/session-create-result.ts";
 import type { SessionForkResult } from "../../protocol/gen/session-fork-result.ts";
 import type { SessionInspectResult } from "../../protocol/gen/session-inspect-result.ts";
+import type { CostGetResult } from "../../protocol/gen/cost-get-result.ts";
 import type { TraceGetResult } from "../../protocol/gen/trace-get-result.ts";
 import type { TraceSpanResult } from "../../protocol/gen/trace-span-result.ts";
 import type { SessionListResult, SessionSummary } from "../../protocol/gen/session-list-result.ts";
@@ -95,6 +121,12 @@ import {
   isMcpServerDetail,
   isRuntimeInstallDone,
   isRuntimeName,
+  isChangesCommitInfoResult,
+  isChangesCommitResult,
+  isChangesListResult,
+  isChangesRevertResult,
+  isFileListResult,
+  isFileReadResult,
   isFsListDirsResult,
   isSetupStatusResult,
   isDaemonStatus,
@@ -125,14 +157,20 @@ import {
   isModelOptionsSetResult,
   isModelSetDefaultResult,
   isPermissionsSetModeResult,
+  isSessionCompactResult,
+  isSessionSetChecksResult,
+  isSessionSetRouteResult,
+  isSessionSetPlanResult,
   isSessionSetModeResult,
   isSessionSetOptionsResult,
   isPullDone,
   isPullProgress,
   isRefResult,
-  isSkillListResult,
   isSkillCreateResult,
+  isSkillListResult,
   isSkillReadResult,
+  isSkillSetDisabledResult,
+  isSkillWriteResult,
   isSessionSetModelResult,
   isPing,
   isRecord,
@@ -142,6 +180,7 @@ import {
   isSessionCreateResult,
   isSessionForkResult,
   isSessionInspectResult,
+  isCostGetResult,
   isTraceGetResult,
   isTraceSpanResult,
   isSessionListResult,
@@ -170,6 +209,8 @@ export const KEY_REJECTED = -32014;
 export const KEY_UNCHECKED = -32015;
 /** Installing or starting Ollama failed. `data.no_brew` means Homebrew is missing. */
 export const OLLAMA_FAILED = -32016;
+/** A paid model was refused because a cap in `[budget]` is spent. The message says which and what to do. */
+export const BUDGET_SPENT = -32017;
 
 export type { ChatEvent, SessionSummary };
 /** The web gateway closes a link with this code when its token is missing or wrong. Retrying cannot help. */
@@ -227,7 +268,7 @@ export interface GolemClient {
    * Create a session. Its events arrive only after {@link GolemClient.attachSession}.
    * `cwd` is its project folder, an absolute path. File tools work only inside it.
    */
-  createSession(options?: { cwd?: string; modelProfile?: string }): Promise<SessionCreateResult>;
+  createSession(options?: { cwd?: string; modelProfile?: string; origin?: "user" | "cli" }): Promise<SessionCreateResult>;
   /**
    * Replay the session's events after `afterSeq`, then stream new ones.
    * The client attaches again after a reconnect, from the last `seq` it saw.
@@ -258,6 +299,8 @@ export interface GolemClient {
   cancelRun(runId: string): Promise<RunCancelResult>;
   inspectSession(sessionId: string): Promise<SessionInspectResult>;
   /** A session's runs as a tree: run, then model call, then tool call. Oldest run first. */
+  /** What model calls cost: today, the week, and with a session id that session. */
+  getCost(sessionId?: string): Promise<CostGetResult>;
   getTrace(sessionId: string): Promise<TraceGetResult>;
   /** The full input and output of one model or tool span, by the `id` that `getTrace` gave. */
   getTraceSpan(sessionId: string, spanId: string): Promise<TraceSpanResult>;
@@ -275,6 +318,25 @@ export interface GolemClient {
   /** Answer the tool call the session's run waits on. The run goes on in the daemon. */
   /** `limit` characters of a session's artifact from `offset`, and the artifact's size. */
   readArtifact(sessionId: string, artifactId: string, offset?: number, limit?: number): Promise<ArtifactReadResult>;
+  /** The files a session changed, each as its net change, with counts and flags only. */
+  changesList(sessionId: string): Promise<ChangesListResult>;
+  /** The diff of a file (`path`) or of one change (`changeId`). */
+  changesDiff(sessionId: string, target: ChangesDiffTarget): Promise<ChangesDiffResult>;
+  /**
+   * Put back what a change, a file, a hunk or a turn wrote. A file that changed on disk is left
+   * alone and listed in `conflicts`, unless `force`. Refused while the session has a run.
+   */
+  changesRevert(sessionId: string, target: ChangesRevertTarget, force?: boolean): Promise<ChangesRevertResult>;
+  /** The start of one text file of the session's folder, with its line count. */
+  readFile(sessionId: string, path: string): Promise<FileReadResult>;
+  /** Files of the session's folder whose path holds `query`, shortest first. */
+  listFiles(sessionId: string, query?: string, limit?: number): Promise<FileListResult>;
+  /** Commit `paths` of the session folder with the user's own git. Never pushes. */
+  changesCommit(sessionId: string, paths: string[], message: string): Promise<ChangesCommitResult>;
+  /** Whether the session folder is in a git work tree, its branch, and which of the changed files git sees. */
+  changesCommitInfo(sessionId: string): Promise<ChangesCommitInfoResult>;
+  /** A commit message the session's model suggests for `paths`. */
+  changesSuggestMessage(sessionId: string, paths: string[]): Promise<ChangesSuggestMessageResult>;
   /** `args` are the call's arguments as the user edited them. They go only with `allow`. */
   respondApproval(
     sessionId: string,
@@ -310,6 +372,17 @@ export interface GolemClient {
   setSessionOptions(sessionId: string, options: Record<string, number | string | null>): Promise<SessionSetOptionsResult>;
   /** Set the permission mode of one session, or `null` to follow config.toml again. The session stores `session.mode.changed`. */
   setSessionMode(sessionId: string, mode: SessionSetModeParams["mode"]): Promise<SessionSetModeResult>;
+  /**
+   * Clear old tool results, or summarise old turns, of an idle session, so the next call sends less.
+   * `focus` is what a summary must keep. The call can take a minute with a local model. Nothing is deleted.
+   */
+  compactSession(sessionId: string, action: "clear" | "summarise", focus?: string): Promise<SessionCompactResult>;
+  /** Say whether golem may run the project's checks in one session. The session stores `session.checks.changed`. */
+  setChecks(sessionId: string, on: boolean): Promise<SessionSetChecksResult>;
+  /** Set how one session picks the model of each turn. The session stores `session.updated` with its `route`. */
+  setRoute(sessionId: string, mode: SessionSetRouteParams["mode"]): Promise<SessionSetRouteResult>;
+  /** Put one session in plan first, or take it out. Its runs then only read and end in `plan.proposed`. The session stores `session.plan.changed`. */
+  setPlan(sessionId: string, on: boolean): Promise<SessionSetPlanResult>;
   /** `model.options.saved`: the options saved for a model changed, from any client. */
   onOptionsSaved(listener: (saved: ModelOptionsSaved) => void): () => void;
   /** Size, fit, and free disk for a local model before downloading it. */
@@ -423,6 +496,18 @@ export interface GolemClient {
     params: { name: string; scope: "user" | "project"; cwd?: string; description: string; modelInvocable?: boolean },
     options?: { local?: boolean },
   ): Promise<SkillCreateResult>;
+  /**
+   * `skill.write`: check `text` and write it over the `SKILL.md` at `path` when
+   * the file is still as it was read (`baseMtimeNs`). `dryRun` only checks.
+   * With `local`, a project skill is written even when the project is not
+   * trusted (`skill.write_protected`).
+   */
+  writeSkill(
+    params: { path: string; text: string; baseMtimeNs: number; cwd?: string; dryRun?: boolean },
+    options?: { local?: boolean },
+  ): Promise<SkillWriteResult>;
+  /** `skill.set_disabled`: turn a skill off, or on again, in `config.toml`. */
+  setSkillDisabled(name: string, disabled: boolean): Promise<SkillSetDisabledResult>;
   /**
    * `skill.registry.changed`: skills changed on disk. `root` is the folder
    * whose project skills changed, or `null` when every folder's did.
@@ -1071,11 +1156,12 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       }
       return result;
     },
-    async createSession(options?: { cwd?: string; modelProfile?: string }): Promise<SessionCreateResult> {
+    async createSession(options?: { cwd?: string; modelProfile?: string; origin?: "user" | "cli" }): Promise<SessionCreateResult> {
       await ready;
-      const params: { cwd?: string; model_profile?: string } = {};
+      const params: { cwd?: string; model_profile?: string; origin?: string } = {};
       if (options?.cwd !== undefined) params.cwd = options.cwd;
       if (options?.modelProfile !== undefined) params.model_profile = options.modelProfile;
+      if (options?.origin !== undefined) params.origin = options.origin;
       const result = await call("session.create", params);
       if (!isSessionCreateResult(result)) {
         throw new Error("invalid session.create result");
@@ -1186,6 +1272,14 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       }
       return result;
     },
+    async getCost(sessionId?: string): Promise<CostGetResult> {
+      await ready;
+      const result = await call("cost.get", sessionId === undefined ? {} : { session_id: sessionId });
+      if (!isCostGetResult(result)) {
+        throw new Error("invalid cost.get result");
+      }
+      return result;
+    },
     async getTrace(sessionId: string): Promise<TraceGetResult> {
       await ready;
       const result = await call("trace.get", { session_id: sessionId });
@@ -1252,6 +1346,85 @@ export function connectGolem(options: ConnectOptions): GolemClient {
         throw new Error("invalid artifact.read result");
       }
       return { text: result["text"], offset: result["offset"], size: result["size"] };
+    },
+    async changesList(sessionId: string): Promise<ChangesListResult> {
+      await ready;
+      const result = await call("changes.list", { session_id: sessionId });
+      if (!isChangesListResult(result)) {
+        throw new Error("invalid changes.list result");
+      }
+      return result;
+    },
+    async changesDiff(sessionId: string, target: ChangesDiffTarget): Promise<ChangesDiffResult> {
+      await ready;
+      const result = await call("changes.diff", {
+        session_id: sessionId,
+        ...("path" in target ? { path: target.path } : { change_id: target.changeId }),
+      });
+      if (!isRecord(result) || typeof result["diff"] !== "string" || typeof result["truncated"] !== "boolean") {
+        throw new Error("invalid changes.diff result");
+      }
+      return { diff: result["diff"], truncated: result["truncated"] };
+    },
+    async changesRevert(sessionId: string, target: ChangesRevertTarget, force = false): Promise<ChangesRevertResult> {
+      await ready;
+      const wire =
+        target.kind === "change"
+          ? { kind: "change", change_id: target.changeId }
+          : target.kind === "file"
+            ? { kind: "file", path: target.path }
+            : target.kind === "hunk"
+              ? { kind: "hunk", path: target.path, hunk: target.hunk }
+              : { kind: "run", run_id: target.runId };
+      const result = await call("changes.revert", { session_id: sessionId, target: wire, force });
+      if (!isChangesRevertResult(result)) {
+        throw new Error("invalid changes.revert result");
+      }
+      return result;
+    },
+    async readFile(sessionId: string, path: string): Promise<FileReadResult> {
+      await ready;
+      const result = await call("file.read", { session_id: sessionId, path });
+      if (!isFileReadResult(result)) {
+        throw new Error("invalid file.read result");
+      }
+      return result;
+    },
+    async listFiles(sessionId: string, query?: string, limit?: number): Promise<FileListResult> {
+      await ready;
+      const result = await call("file.list", {
+        session_id: sessionId,
+        ...(query === undefined ? {} : { query }),
+        ...(limit === undefined ? {} : { limit }),
+      });
+      if (!isFileListResult(result)) {
+        throw new Error("invalid file.list result");
+      }
+      return result;
+    },
+    async changesCommit(sessionId: string, paths: string[], message: string): Promise<ChangesCommitResult> {
+      await ready;
+      const result = await call("changes.commit", { session_id: sessionId, paths, message });
+      if (!isChangesCommitResult(result)) {
+        throw new Error("invalid changes.commit result");
+      }
+      return result;
+    },
+    async changesCommitInfo(sessionId: string): Promise<ChangesCommitInfoResult> {
+      await ready;
+      const result = await call("changes.commit_info", { session_id: sessionId });
+      if (!isChangesCommitInfoResult(result)) {
+        throw new Error("invalid changes.commit_info result");
+      }
+      return result;
+    },
+    async changesSuggestMessage(sessionId: string, paths: string[]): Promise<ChangesSuggestMessageResult> {
+      await ready;
+      const result = await call("changes.suggest_message", { session_id: sessionId, paths });
+      if (!isRecord(result) || typeof result["message"] !== "string") {
+        throw new Error("invalid changes.suggest_message result");
+      }
+      return { message: result["message"] };
     },
     async respondApproval(
       sessionId: string,
@@ -1353,6 +1526,38 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       const result = await call("session.set_mode", { session_id: sessionId, mode });
       if (!isSessionSetModeResult(result)) {
         throw new Error("invalid session.set_mode result");
+      }
+      return result;
+    },
+    async setRoute(sessionId: string, mode: SessionSetRouteParams["mode"]): Promise<SessionSetRouteResult> {
+      await ready;
+      const result = await call("session.set_route", { session_id: sessionId, mode });
+      if (!isSessionSetRouteResult(result)) {
+        throw new Error("invalid session.set_route result");
+      }
+      return result;
+    },
+    async compactSession(sessionId: string, action: "clear" | "summarise", focus?: string): Promise<SessionCompactResult> {
+      await ready;
+      const result = await call("session.compact", { session_id: sessionId, action, focus: focus ?? null });
+      if (!isSessionCompactResult(result)) {
+        throw new Error("invalid session.compact result");
+      }
+      return result;
+    },
+    async setChecks(sessionId: string, on: boolean): Promise<SessionSetChecksResult> {
+      await ready;
+      const result = await call("session.set_checks", { session_id: sessionId, on });
+      if (!isSessionSetChecksResult(result)) {
+        throw new Error("invalid session.set_checks result");
+      }
+      return result;
+    },
+    async setPlan(sessionId: string, on: boolean): Promise<SessionSetPlanResult> {
+      await ready;
+      const result = await call("session.set_plan", { session_id: sessionId, on });
+      if (!isSessionSetPlanResult(result)) {
+        throw new Error("invalid session.set_plan result");
       }
       return result;
     },
@@ -1684,6 +1889,21 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       }
       return result;
     },
+    async writeSkill(params, options): Promise<SkillWriteResult> {
+      await ready;
+      const body = {
+        path: params.path,
+        text: params.text,
+        base_mtime_ns: params.baseMtimeNs,
+        ...(params.cwd === undefined ? {} : { cwd: params.cwd }),
+        ...(params.dryRun === true ? { dry_run: true } : {}),
+      };
+      const result = await call(options?.local === true ? "skill.write_protected" : "skill.write", body);
+      if (!isSkillWriteResult(result)) {
+        throw new Error("invalid skill.write result");
+      }
+      return result;
+    },
     async createSkill(params, options): Promise<SkillCreateResult> {
       await ready;
       const body = {
@@ -1696,6 +1916,14 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       const result = await call(options?.local === true ? "skill.create_protected" : "skill.create", body);
       if (!isSkillCreateResult(result)) {
         throw new Error("invalid skill.create result");
+      }
+      return result;
+    },
+    async setSkillDisabled(name: string, disabled: boolean): Promise<SkillSetDisabledResult> {
+      await ready;
+      const result = await call("skill.set_disabled", { name, disabled });
+      if (!isSkillSetDisabledResult(result)) {
+        throw new Error("invalid skill.set_disabled result");
       }
       return result;
     },

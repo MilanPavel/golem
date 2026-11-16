@@ -1,0 +1,34 @@
+{
+  "additionalProperties": false,
+  "description": "A check began. ``round`` is 0 for the first run after a turn.",
+  "properties": {
+    "check_id": {
+      "minLength": 1,
+      "title": "Check Id",
+      "type": "string"
+    },
+    "command": {
+      "minLength": 1,
+      "title": "Command",
+      "type": "string"
+    },
+    "name": {
+      "minLength": 1,
+      "title": "Name",
+      "type": "string"
+    },
+    "round": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Round",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "check_id",
+    "name",
+    "command"
+  ],
+  "title": "CheckStartedData",
+  "type": "object"
+}

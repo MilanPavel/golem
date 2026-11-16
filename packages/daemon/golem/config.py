@@ -18,7 +18,7 @@ from contextvars import ContextVar
 from dataclasses import dataclass
 from fnmatch import fnmatchcase
 from pathlib import Path
-from typing import Annotated, Literal, cast
+from typing import Annotated, Any, Literal, cast
 
 from pydantic import (
     BaseModel,
@@ -37,6 +37,7 @@ from pydantic_settings import (
 )
 
 from golem.paths import resolve_paths
+from golem.routines import ScheduleError, parse_schedule
 
 LogLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR"]
 ModelProvider = Literal["anthropic", "openai", "openai_compat"]
@@ -331,12 +332,30 @@ class ContextSettings(BaseModel):
     ``window`` is ``"auto"`` (golem plans it from the model and this Mac's memory),
     ``"ollama"`` (golem sends none and Ollama picks), or a number of tokens.
     ``keep_alive`` is sent with a planned window when no other ``keep_alive`` is set.
+
+    ``reply_reserve`` is the tokens kept free for the reply. When the history passes
+    ``clear_at`` of the rest of the window, old tool results go out as one line each
+    until it is down to ``clear_to``. The newest ``keep_results`` results are kept.
+    When clearing is not enough and the history is still past ``compact_at``, every turn
+    but the last ``keep_turns`` is replaced by a summary in what is sent.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     window: Literal["auto", "ollama"] | Annotated[int, Field(ge=512, le=262144)] = "auto"
     keep_alive: str | None = "30m"
+    reply_reserve: int = Field(default=4096, ge=0)
+    clear_at: float = 0.70
+    clear_to: float = 0.40
+    compact_at: float = 0.85
+    keep_results: int = Field(default=4, ge=0)
+    keep_turns: int = Field(default=4, ge=1)
+
+    @model_validator(mode="after")
+    def _ordered(self) -> ContextSettings:
+        if not 0 < self.clear_to < self.clear_at < self.compact_at < 1:
+            raise ValueError("[context] needs 0 < clear_to < clear_at < compact_at < 1")
+        return self
 
 
 class BudgetSettings(BaseModel):
@@ -520,6 +539,66 @@ def load_mcp(path: Path) -> McpServers:
     return _MCP_SERVERS.validate_python(data.get("mcp", {}))
 
 
+ROUTINE_NAME = r"^[a-z0-9][a-z0-9-]{0,39}$"
+"""A routine name: lowercase letters, digits and dashes. It becomes part of a session origin."""
+
+RoutineMissed = Literal["skip", "run_once"]
+
+
+class RoutineWatch(BaseModel):
+    """``on = { watch, glob }``. Start when a file matching ``glob`` appears in ``watch`` (4.3)."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    watch: str = Field(min_length=1)
+    glob: str = Field(default="*", min_length=1)
+
+
+class RoutineSettings(BaseModel):
+    """One ``[[routine]]``: a trigger, and what to run when it fires (ADR-050).
+
+    Exactly one of ``schedule`` (cron, or ``every 15m``, ``daily 08:30``,
+    ``weekdays 08:30``, ``weekly mon 06:00``) and ``on`` sets the trigger. ``prompt``
+    is the text or the ``/skill`` the session starts with, in ``folder`` with
+    ``model`` and the on-demand MCP servers in ``mcp``. ``missed`` says what happens
+    to a firing that came due while the daemon was down or the Mac asleep:
+    ``skip`` drops it, ``run_once`` fires it once, late. ``notify_finished`` and
+    ``notify_failed`` override the notification settings for this routine.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    _no_secrets = model_validator(mode="before")(_no_inline_secrets)
+
+    name: str = Field(pattern=ROUTINE_NAME)
+    schedule: str | None = Field(default=None, min_length=1)
+    on: RoutineWatch | None = None
+    prompt: str = Field(min_length=1)
+    folder: str | None = Field(default=None, min_length=1)
+    model: str | None = Field(default=None, min_length=1)
+    mcp: list[str] = Field(default_factory=list[str])
+    missed: RoutineMissed = "skip"
+    enabled: bool = True
+    notify_finished: bool | None = None
+    notify_failed: bool | None = None
+
+    @field_validator("schedule")
+    @classmethod
+    def _schedule_parses(cls, value: str | None) -> str | None:
+        if value is not None:
+            try:
+                parse_schedule(value)
+            except ScheduleError as exc:
+                raise ValueError(str(exc)) from exc
+        return value
+
+    @model_validator(mode="after")
+    def _one_trigger(self) -> RoutineSettings:
+        if (self.schedule is None) == (self.on is None):
+            raise ValueError("a routine needs exactly one of schedule and on")
+        return self
+
+
 PROTECTED_SETTINGS = frozenset(
     {
         "providers",
@@ -551,6 +630,7 @@ BROWSER_SETTINGS = frozenset(
         "session_titles",
         "rule",
         "mcp",
+        "routine",
         "skills",
         "ollama",
         "routing",
@@ -559,6 +639,20 @@ BROWSER_SETTINGS = frozenset(
     }
 )
 """Top-level settings the browser may edit. Every ``GolemSettings`` field is in one list."""
+
+
+class _ProjectToml(TomlConfigSettingsSource):
+    """A project's ``.golem/config.toml``, without its ``[[routine]]`` list.
+
+    A list from a higher layer replaces the user's whole list, and this layer is read
+    whether or not the folder is trusted. A project's routines reach the daemon only
+    through ``golem.routine_files``, which checks trust (ADR-050).
+    """
+
+    def __call__(self) -> dict[str, Any]:
+        data = dict(super().__call__())
+        data.pop("routine", None)
+        return data
 
 
 class GolemSettings(BaseSettings):
@@ -606,6 +700,17 @@ class GolemSettings(BaseSettings):
     routing: RoutingSettings = Field(default_factory=RoutingSettings)
     context: ContextSettings = Field(default_factory=ContextSettings)
     budget: BudgetSettings = Field(default_factory=BudgetSettings)
+    routine: list[RoutineSettings] = Field(default_factory=list[RoutineSettings])
+
+    @field_validator("routine")
+    @classmethod
+    def _unique_routines(cls, value: list[RoutineSettings]) -> list[RoutineSettings]:
+        seen: set[str] = set()
+        for routine in value:
+            if routine.name in seen:
+                raise ValueError(f"two routines are called {routine.name}")
+            seen.add(routine.name)
+        return value
 
     _no_secrets = model_validator(mode="before")(_no_inline_secrets)
 
@@ -625,7 +730,12 @@ class GolemSettings(BaseSettings):
         if files is not None:
             for path in (files.project_config, files.user_config):
                 if path.is_file():
-                    sources.append(TomlConfigSettingsSource(settings_cls, toml_file=path))
+                    source: PydanticBaseSettingsSource = (
+                        _ProjectToml(settings_cls, toml_file=path)
+                        if path == files.project_config and path != files.user_config
+                        else TomlConfigSettingsSource(settings_cls, toml_file=path)
+                    )
+                    sources.append(source)
         return tuple(sources)
 
 

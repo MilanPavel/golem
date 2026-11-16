@@ -1,0 +1,32 @@
+{
+  "additionalProperties": false,
+  "description": "A candidate the pick left out, and why in plain words.",
+  "properties": {
+    "ref": {
+      "minLength": 1,
+      "title": "Ref",
+      "type": "string"
+    },
+    "tier": {
+      "enum": [
+        "local",
+        "budget",
+        "frontier"
+      ],
+      "title": "Tier",
+      "type": "string"
+    },
+    "why": {
+      "minLength": 1,
+      "title": "Why",
+      "type": "string"
+    }
+  },
+  "required": [
+    "ref",
+    "tier",
+    "why"
+  ],
+  "title": "ModelRejection",
+  "type": "object"
+}

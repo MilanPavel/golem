@@ -26,6 +26,9 @@ export type ComposerOutcome =
   | { kind: "unknown"; notice: string }
   | { kind: "help" }
   | { kind: "context" }
+  | { kind: "cost" }
+  /** `/compact [focus]` summarises old turns, `/context clear` clears old tool results. */
+  | { kind: "compact"; action: "clear" | "summarise"; focus: string | null }
   | { kind: "tune" }
   /** Set one option for this session, or with a null `value` remove its override. `notice` is what to print. */
   | { kind: "tune-set"; name: string; value: TuneValue | null; notice: string }
@@ -42,6 +45,8 @@ export type ComposerOutcome =
   | { kind: "sessions" }
   | { kind: "setup" }
   | { kind: "skills" }
+  /** `/skill new`: start the new-skill form. */
+  | { kind: "skill-new" }
   | { kind: "permissions" }
   | { kind: "new" }
   | { kind: "fork" }
@@ -52,6 +57,7 @@ export type ComposerOutcome =
   | { kind: "export"; path: string | null }
   | { kind: "time" }
   | { kind: "todos" }
+  | { kind: "changes" }
   | { kind: "thinking" }
   | { kind: "detail"; level: Detail | null }
   /** Show the permission mode ("show"), or set it for this chat. A null `mode` returns to the default. */
@@ -128,7 +134,7 @@ export function pinnedNotice(active: readonly string[]): string {
 }
 
 const UNKNOWN = "unknown command \u2014 /help lists them";
-const SKILL_USAGE = "/skill run <name> [args] \u00b7 /skill pin <name> \u00b7 /skill unpin <name>";
+const SKILL_USAGE = "/skill run <name> [args] \u00b7 /skill pin <name> \u00b7 /skill unpin <name> \u00b7 /skill new";
 const HELD_SKILL = "a skill is not held \u2014 /debug hold turns hold off";
 
 /** Built-in providers that take an API key. A provider added in config.toml works too. */
@@ -170,9 +176,33 @@ export const COMMANDS: readonly Command[] = [
   {
     name: "/context",
     group: "view",
+    args: "[clear]",
+    description: "Shows what fills the context. clear drops old tool results from it.",
+    choices: ["clear"],
+    run: (_debug, args) => {
+      if (args.length === 0) return { kind: "context" };
+      return args.length === 1 && args[0] === "clear"
+        ? { kind: "compact", action: "clear", focus: null }
+        : { kind: "unknown", notice: "/context or /context clear" };
+    },
+  },
+  {
+    name: "/compact",
+    group: "session",
+    args: "[focus]",
+    description: "Summarises the old turns, so the next call sends less. focus is what to keep.",
+    run: (_debug, args) => ({
+      kind: "compact",
+      action: "summarise",
+      focus: args.length === 0 ? null : args.join(" "),
+    }),
+  },
+  {
+    name: "/cost",
+    group: "view",
     args: "",
-    description: "Shows what fills the model's context: the prompt, the tools, and the messages.",
-    run: withoutArgs({ kind: "context" }),
+    description: "Shows what model calls cost, by session, day and model, and what running locally saved.",
+    run: withoutArgs({ kind: "cost" }),
   },
   {
     name: "/debug",
@@ -329,8 +359,8 @@ export const COMMANDS: readonly Command[] = [
     name: "/skill",
     group: "tools",
     args: "run|pin|unpin <name>",
-    description: "Runs a skill once, or pins one for the whole session. Alone, lists the pinned skills.",
-    choices: ["run", "pin", "unpin"],
+    description: "Runs a skill once, pins one for the session, or makes one. Alone, lists the pinned ones.",
+    choices: ["run", "pin", "unpin", "new"],
     // The composer reads /skill itself, because a skill's arguments keep their spacing and quotes.
     run: () => ({ kind: "unknown", notice: SKILL_USAGE }),
   },
@@ -373,6 +403,13 @@ export const COMMANDS: readonly Command[] = [
     args: "[name]",
     description: "Shows the title, or sets it.",
     run: (_debug, args) => ({ kind: "title", title: args.length === 0 ? null : args.join(" ") }),
+  },
+  {
+    name: "/changes",
+    group: "view",
+    args: "",
+    description: "Shows the files this session changed, with their diffs.",
+    run: withoutArgs({ kind: "changes" }),
   },
   {
     name: "/todos",
@@ -514,7 +551,7 @@ function applyCommand(
   return skill === undefined ? unknown() : runSkill(debug, skill.name, afterWords(text, 1), text);
 }
 
-/** `/skill` alone, `/skill run <name> [args]`, `/skill pin <name>`, and `/skill unpin <name>`. */
+/** `/skill` alone, `/skill run <name> [args]`, `/skill pin <name>`, `/skill unpin <name>`, and `/skill new`. */
 function skillCommand(
   debug: DebugState,
   text: string,
@@ -524,6 +561,9 @@ function skillCommand(
   const [, sub, name, extra] = text.split(/\s+/);
   if (sub === undefined) {
     return local(debug, null, false, pinnedNotice(pins.active));
+  }
+  if (sub === "new") {
+    return name === undefined ? { kind: "skill-new" } : { kind: "unknown", notice: SKILL_USAGE };
   }
   if (sub === "pin" || sub === "unpin") {
     return pinCommand(debug, sub === "pin", name, extra, pins);

@@ -29,13 +29,16 @@ export type End1 = string | null;
 export type FirstTokenMs1 = number | null;
 export type Id1 = string;
 export type Kind1 = 'run' | 'model' | 'tool';
+export type LoadMs = number | null;
 export type Model1 = string | null;
 export type Name1 = string;
 export type NumCtx = number | null;
 export type Preview1 = string;
 export type PromptCut = ('no' | 'yes' | 'likely') | null;
 export type PromptCutKind = ('older_messages' | 'middle') | null;
+export type PromptMs = number | null;
 export type Recorded1 = boolean;
+export type ReplyMs = number | null;
 export type Start1 = string;
 export type Status1 = 'ok' | 'failed' | 'cancelled' | 'denied' | 'running';
 export type WindowPlanned = boolean;
@@ -49,6 +52,12 @@ export type Model2 = string | null;
 export type Name2 = string;
 export type Preview2 = string;
 export type Recorded2 = boolean;
+export type Detail = string;
+export type Reason = 'pinned' | 'privacy' | 'fit' | 'budget' | 'cheapest' | 'escalated' | 'fallback' | 'user';
+export type Ref = string;
+export type Tier = 'local' | 'budget' | 'frontier';
+export type Why = string;
+export type Rejected = ModelRejection[];
 export type Start2 = string;
 export type Status2 = 'ok' | 'failed' | 'cancelled' | 'denied' | 'running';
 export type Runs = TraceRunSpan[];
@@ -69,6 +78,8 @@ export interface TraceGetResult {
 /**
  * A run, with its model calls in order.
  *
+ * ``route`` is the pick for the run, null for a run of a ``pinned`` session.
+ *
  * This interface was referenced by `TraceGetResult`'s JSON-Schema
  * via the `definition` "TraceRunSpan".
  */
@@ -84,6 +95,7 @@ export interface TraceRunSpan {
   name: Name2;
   preview?: Preview2;
   recorded?: Recorded2;
+  route?: TraceRoute | null;
   start: Start2;
   status: Status2;
   tokens?: TraceTokens | null;
@@ -101,6 +113,9 @@ export interface TraceRunSpan {
  * ``cost_usd`` is what the call cost, as its ``model.call.completed`` recorded
  * it. Null when the price was not known or the call has no token counts.
  *
+ * ``load_ms``, ``prompt_ms`` and ``reply_ms`` are from the model server's own clock.
+ * Ollama only.
+ *
  * This interface was referenced by `TraceGetResult`'s JSON-Schema
  * via the `definition` "TraceModelSpan".
  */
@@ -117,13 +132,16 @@ export interface TraceModelSpan {
   first_token_ms?: FirstTokenMs1;
   id: Id1;
   kind: Kind1;
+  load_ms?: LoadMs;
   model?: Model1;
   name: Name1;
   num_ctx?: NumCtx;
   preview?: Preview1;
   prompt_cut?: PromptCut;
   prompt_cut_kind?: PromptCutKind;
+  prompt_ms?: PromptMs;
   recorded?: Recorded1;
+  reply_ms?: ReplyMs;
   start: Start1;
   status: Status1;
   tokens?: TraceTokens | null;
@@ -161,4 +179,29 @@ export interface TraceTokens {
   cache_write?: CacheWrite;
   input?: Input;
   output?: Output;
+}
+/**
+ * Why a run used the model it did: the pick of a session that is not ``pinned``.
+ *
+ * ``reason`` and ``detail`` are those of ``model.routed``, and ``rejected`` the
+ * candidates the pick dropped.
+ *
+ * This interface was referenced by `TraceGetResult`'s JSON-Schema
+ * via the `definition` "TraceRoute".
+ */
+export interface TraceRoute {
+  detail: Detail;
+  reason: Reason;
+  rejected?: Rejected;
+}
+/**
+ * A candidate the pick left out, and why in plain words.
+ *
+ * This interface was referenced by `TraceGetResult`'s JSON-Schema
+ * via the `definition` "ModelRejection".
+ */
+export interface ModelRejection {
+  ref: Ref;
+  tier: Tier;
+  why: Why;
 }

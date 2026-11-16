@@ -5,6 +5,7 @@ export type Subject = string | null;
 export type Tool = string;
 export type Cwd = string | null;
 export type McpServers = string[] | null;
+export type Route = ('pinned' | 'local' | 'auto') | null;
 export type Title = string | null;
 export type RunId = null;
 export type Seq = number;
@@ -24,9 +25,10 @@ export interface SessionUpdatedEvent {
   type: Type;
 }
 /**
- * A session attribute changed: its title, folder, allowed tools, or MCP servers.
+ * A session attribute changed: its title, folder, allowed tools, MCP servers, or route.
  *
- * A field left null did not change. ``cwd`` is set once, on a session made
+ * A field left null did not change. ``route`` is the session's route mode after
+ * ``session.set_route``. ``cwd`` is set once, on a session made
  * before sessions had a folder, by the first ``message.send`` that names one.
  * ``allowed_tools`` is the whole list after ``session.revoke``, and
  * ``mcp_servers`` the on-demand MCP servers the session turned on, after
@@ -39,6 +41,7 @@ export interface SessionUpdatedData {
   allowed_tools?: AllowedTools;
   cwd?: Cwd;
   mcp_servers?: McpServers;
+  route?: Route;
   title?: Title;
 }
 /**

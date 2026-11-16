@@ -26,9 +26,11 @@ from golem_protocol.events import (
     RunCompletedEvent,
     RunFailedEvent,
     RunStartedEvent,
+    SessionChecksChangedEvent,
     SessionClosedEvent,
     SessionCreatedEvent,
     SessionModeChangedEvent,
+    SessionPlanChangedEvent,
     SessionUpdatedEvent,
     SkillActivatedEvent,
     SkillDeactivatedEvent,
@@ -42,8 +44,8 @@ async def project(tx: Transaction, event: ChatEvent) -> None:
         parent = event.data.forked_from
         await tx.execute(
             "INSERT INTO sessions (session_id, model_profile, created_at, updated_at,"
-            " forked_from_session_id, forked_from_message_id, cwd, origin)"
-            " VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            " forked_from_session_id, forked_from_message_id, cwd, origin, route)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 event.session_id,
                 event.data.model_profile,
@@ -53,6 +55,7 @@ async def project(tx: Transaction, event: ChatEvent) -> None:
                 None if parent is None else parent.message_id,
                 event.data.cwd,
                 None if event.data.origin in (None, "user") else event.data.origin,
+                event.data.route or "pinned",
             ),
         )
         return
@@ -78,6 +81,11 @@ async def project(tx: Transaction, event: ChatEvent) -> None:
                 "UPDATE sessions SET mcp_servers = ? WHERE session_id = ?",
                 (json.dumps(event.data.mcp_servers), event.session_id),
             )
+        if event.data.route is not None:
+            await tx.execute(
+                "UPDATE sessions SET route = ? WHERE session_id = ?",
+                (event.data.route, event.session_id),
+            )
     elif isinstance(event, SkillActivatedEvent) and event.data.how == "pinned":
         await _set_skills(tx, event.session_id, lambda names: [*names, event.data.name])
     elif isinstance(event, SkillDeactivatedEvent):
@@ -88,6 +96,16 @@ async def project(tx: Transaction, event: ChatEvent) -> None:
         await tx.execute(
             "UPDATE sessions SET options = ? WHERE session_id = ?",
             (json.dumps(event.data.options), event.session_id),
+        )
+    elif isinstance(event, SessionChecksChangedEvent):
+        await tx.execute(
+            "UPDATE sessions SET checks = ? WHERE session_id = ?",
+            (int(event.data.on), event.session_id),
+        )
+    elif isinstance(event, SessionPlanChangedEvent):
+        await tx.execute(
+            "UPDATE sessions SET plan_first = ? WHERE session_id = ?",
+            (int(event.data.on), event.session_id),
         )
     elif isinstance(event, SessionModeChangedEvent):
         await tx.execute(

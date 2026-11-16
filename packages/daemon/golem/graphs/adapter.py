@@ -7,12 +7,14 @@ items only. Provider clients stay in the model router.
 from __future__ import annotations
 
 import json
-from collections.abc import Mapping
+import time
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from typing import Literal, cast
 
 from langchain_core.messages import AIMessage, AIMessageChunk, BaseMessage, ToolMessage
 
+from golem.graphs.partial_args import partial_field, partial_string
 from golem_protocol.commands import TraceMessage
 
 STREAM_KEY = "golem"
@@ -25,7 +27,11 @@ PIN_SKIPPED_KIND = "skill.pin_skipped"
 """``STREAM_KEY`` value of a model call's report that it left a pinned skill out."""
 
 SKILL_LOADED_KIND = "skill.loaded"
+PLAN_PROPOSED_KIND = "plan.proposed"
 """``STREAM_KEY`` value of a tool call that loaded a skill for the model."""
+
+FILE_CHANGED_KIND = "file.changed"
+"""``STREAM_KEY`` value of a tool call that wrote a file, with the text before and after."""
 
 APPROVAL_KIND = "approval"
 """``STREAM_KEY`` value of an interrupt that waits for a tool approval."""
@@ -36,6 +42,14 @@ class ModelStarted:
     """A model call began. Its reply will have ``message_id``."""
 
     message_id: str
+
+
+@dataclass(frozen=True, slots=True)
+class ModelWaiting:
+    """The call with this ``message_id`` waits, or stopped waiting, for the local model."""
+
+    message_id: str
+    waiting: bool
 
 
 @dataclass(frozen=True, slots=True)
@@ -53,6 +67,9 @@ class ModelRequested:
 
     The size fields are the characters and UTF-8 bytes of what was sent, or None
     when not given. ``profile`` is the profile this call uses, or None when not given.
+    ``cleared_ids`` are the tool results sent as a one-line stub. ``summary_chars`` is the
+    length of the summary sent as the first message, or None. ``estimated_tokens`` is the
+    prompt as golem estimated it before sending, or None.
     """
 
     message_id: str
@@ -71,6 +88,24 @@ class ModelRequested:
     message_chars: tuple[int, ...] | None = None
     message_bytes: tuple[int, ...] | None = None
     profile: str | None = None
+    cleared_ids: tuple[str, ...] = ()
+    summary_chars: int | None = None
+    estimated_tokens: int | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class ContextChanged:
+    """The context view changed before a model call: old tool results were cleared, or old
+    turns were summarised.
+
+    The token counts are rough. ``count`` is the number of results cleared, or of messages
+    the summary stands for.
+    """
+
+    action: Literal["cleared", "summarised"]
+    before_tokens: int | None = None
+    after_tokens: int | None = None
+    count: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -85,6 +120,9 @@ class ModelResponded:
     message_id: str
     context_window: int | None = None
     text_tool_calls: Literal["recovered", "unread"] | None = None
+    timings: Mapping[str, int] = field(default_factory=dict[str, int])
+    """The model server's own numbers: ``load_ms``, ``prompt_ms``, ``reply_ms``,
+    ``prompt_tokens``, ``reply_tokens``. Each may be absent. Ollama only."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -106,6 +144,21 @@ class RequestedCall:
     call_id: str
     name: str
     args: dict[str, object]
+
+
+@dataclass(frozen=True, slots=True)
+class ToolWriting:
+    """How far the model got writing a file tool call, from its streamed arguments.
+
+    ``path`` is set once the model has written all of it. ``lines`` and ``chars``
+    count the file text so far: ``content`` of ``write_file``, ``new_string`` of ``edit_file``.
+    """
+
+    index: int
+    name: str
+    path: str | None
+    lines: int
+    chars: int
 
 
 @dataclass(frozen=True, slots=True)
@@ -160,6 +213,17 @@ class TodosChanged:
 
 
 @dataclass(frozen=True, slots=True)
+class FileChanged:
+    """A tool wrote a file. ``before`` and ``after`` are whole texts, for the store only."""
+
+    call_id: str | None
+    path: str
+    before: str | None
+    after: str | None
+    source: Literal["tool", "shell", "revert"]
+
+
+@dataclass(frozen=True, slots=True)
 class ApprovalAsked:
     """The run paused on a tool call that needs the user's answer."""
 
@@ -170,6 +234,16 @@ class ApprovalAsked:
     message_id: str | None = None
     subject: str | None = None
     diff: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class PlanProposed:
+    """``propose_plan`` ended a plan first run with this plan."""
+
+    call_id: str
+    plan_id: str
+    title: str
+    steps: tuple[dict[str, object], ...]
 
 
 @dataclass(frozen=True, slots=True)
@@ -202,12 +276,43 @@ class PinSkipped:
     message: str
 
 
+@dataclass(frozen=True, slots=True)
+class CheckOffered:
+    """The turn changed files and the session has not said whether the checks may run."""
+
+    checks: tuple[tuple[str, str], ...]
+    """``(name, command)`` of each check."""
+
+
+@dataclass(frozen=True, slots=True)
+class CheckStarted:
+    check_id: str
+    name: str
+    command: str
+    round: int = 0
+
+
+@dataclass(frozen=True, slots=True)
+class CheckCompleted:
+    check_id: str
+    name: str
+    status: str
+    exit_code: int | None
+    duration_ms: int
+    output: str
+    artifact_id: str | None = None
+    round: int = 0
+
+
 Fact = (
     ModelStarted
+    | ModelWaiting
     | ModelRequested
     | ModelResponded
+    | ContextChanged
     | TextDelta
     | ThinkingDelta
+    | ToolWriting
     | TextCompleted
     | ToolStarted
     | ToolOutput
@@ -215,9 +320,14 @@ Fact = (
     | ToolErrored
     | ApprovalAsked
     | TodosChanged
+    | PlanProposed
+    | FileChanged
     | PinRead
     | PinSkipped
     | SkillLoaded
+    | CheckOffered
+    | CheckStarted
+    | CheckCompleted
 )
 
 
@@ -457,16 +567,37 @@ def _partial_suffix(text: str, tag: str) -> int:
     return 0
 
 
+WRITING_FIELDS = {"write_file": "content", "edit_file": "new_string"}
+"""The tools whose writing is reported, and the argument that holds the file text."""
+
+WRITING_EVERY = 1.0
+"""Seconds between two :class:`ToolWriting` facts of one call."""
+
+
+@dataclass
+class _Writing:
+    """The streamed call at one ``index``: its name, and its argument text in pieces."""
+
+    name: str = ""
+    args: list[str] = field(default_factory=list[str])
+    sent_at: float | None = None
+
+
 class Translator:
     """:func:`translate` that also separates thinking from the answer while streaming.
 
     A chunk's ``reasoning_content`` becomes a :class:`ThinkingDelta`. Content that
     starts with ``<think>`` is split into thinking and answer, across chunks. One
     translator serves one run, and a new model call starts it over.
+
+    The ``tool_call_chunks`` of a ``write_file`` or ``edit_file`` call become a
+    :class:`ToolWriting`, at most once per second per call. ``clock`` is in seconds.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, clock: Callable[[], float] = time.monotonic) -> None:
         self._split = _ThinkSplitter()
+        self._clock = clock
+        self._writing: dict[int, _Writing] = {}
 
     def __call__(self, part: object) -> list[Fact]:
         if isinstance(part, dict):
@@ -476,9 +607,11 @@ class Translator:
                 return self._streamed(raw.get("data"))
             fact = translate(raw)
             if isinstance(fact, TextCompleted):
+                self._writing.clear()
                 return [*self._split.finish(), fact]
             if isinstance(fact, ModelStarted):
                 self._split.finish()
+                self._writing.clear()
             return [] if fact is None else [fact]
         return []
 
@@ -493,7 +626,47 @@ class Translator:
         text = message_text(chunk)
         if text:
             facts.extend(self._split.feed(text))
+        facts.extend(self._writes(chunk))
         return facts
+
+    def _writes(self, chunk: AIMessageChunk) -> list[Fact]:
+        """Collect the tool-call pieces of ``chunk``, and report the file calls that are due."""
+        due: list[int] = []
+        for piece in chunk.tool_call_chunks:
+            index = piece.get("index")
+            index = index if isinstance(index, int) else 0
+            call = self._writing.setdefault(index, _Writing())
+            name = piece.get("name")
+            if name:
+                call.name = name
+            args = piece.get("args")
+            if args:
+                call.args.append(args)
+            if call.name in WRITING_FIELDS and index not in due:
+                due.append(index)
+        facts: list[Fact] = []
+        now = self._clock()
+        for index in due:
+            call = self._writing[index]
+            if call.sent_at is not None and now - call.sent_at < WRITING_EVERY:
+                continue
+            call.sent_at = now
+            facts.append(_writing_fact(index, call))
+        return facts
+
+
+def _writing_fact(index: int, call: _Writing) -> ToolWriting:
+    """What ``call`` has written so far. The text is read only when a fact is due, not per chunk."""
+    text = "".join(call.args)
+    path = partial_field(text, "path")
+    body = partial_string(text, WRITING_FIELDS[call.name]) or ""
+    return ToolWriting(
+        index=index,
+        name=call.name,
+        path=path[0] if path is not None and path[1] else None,
+        lines=len(body.splitlines()),
+        chars=len(body),
+    )
 
 
 def _completed(data: object) -> TextCompleted | ApprovalAsked | None:
@@ -597,6 +770,17 @@ def _text_calls(value: object) -> Literal["recovered", "unread"] | None:
     return "unread" if value == "unread" else None
 
 
+def _timings(value: object) -> dict[str, int]:
+    if not isinstance(value, dict):
+        return {}
+    raw = cast(dict[str, object], value)
+    return {
+        key: number
+        for key in ("load_ms", "prompt_ms", "reply_ms", "prompt_tokens", "reply_tokens")
+        if isinstance(number := raw.get(key), int) and not isinstance(number, bool) and number >= 0
+    }
+
+
 def _custom(data: object) -> Fact | None:
     if not isinstance(data, dict):
         return None
@@ -606,6 +790,8 @@ def _custom(data: object) -> Fact | None:
     call_id = item.get("call_id")
     if kind == "model.started" and isinstance(message_id, str):
         return ModelStarted(message_id)
+    if kind == "model.waiting" and isinstance(message_id, str):
+        return ModelWaiting(message_id, item.get("waiting") is True)
     if kind == "model.request" and isinstance(message_id, str):
         return _request(message_id, item)
     if kind == "model.response" and isinstance(message_id, str):
@@ -614,9 +800,19 @@ def _custom(data: object) -> Fact | None:
             message_id,
             _positive(item.get("context_window")),
             _text_calls(text_calls),
+            _timings(item.get("timings")),
+        )
+    if kind == "context.changed" and item.get("action") in ("cleared", "summarised"):
+        return ContextChanged(
+            "summarised" if item.get("action") == "summarised" else "cleared",
+            _count(item.get("before_tokens")),
+            _count(item.get("after_tokens")),
+            _count(item.get("count")),
         )
     if kind in (PIN_READ_KIND, PIN_SKIPPED_KIND):
         return _pin(kind, item)
+    if kind in ("check.offered", "check.started", "check.completed"):
+        return _check(kind, item)
     if not isinstance(call_id, str):
         return None
     if kind == SKILL_LOADED_KIND:
@@ -653,12 +849,75 @@ def _custom(data: object) -> Fact | None:
             if isinstance(row, dict)
         )
         return TodosChanged(call_id, rows)
+    if kind == PLAN_PROPOSED_KIND:
+        plan_id, title, steps = item.get("plan_id"), item.get("title"), item.get("steps")
+        if not (isinstance(plan_id, str) and isinstance(title, str) and isinstance(steps, list)):
+            return None
+        rows = tuple(
+            dict(cast(dict[str, object], row))
+            for row in cast(list[object], steps)
+            if isinstance(row, dict)
+        )
+        return PlanProposed(call_id, plan_id, title, rows)
+    if kind == FILE_CHANGED_KIND:
+        path, before, after = item.get("path"), item.get("before"), item.get("after")
+        if not isinstance(path, str) or not path:
+            return None
+        if not (before is None or isinstance(before, str)):
+            return None
+        if not (after is None or isinstance(after, str)):
+            return None
+        source = item.get("source")
+        if source not in ("tool", "shell", "revert"):
+            return None
+        return FileChanged(call_id or None, path, before, after, source)
     if kind == "tool.failed":
         message = item.get("message")
         return ToolErrored(
             call_id, message if isinstance(message, str) and message else "failed", _duration(item)
         )
     return None
+
+
+def _check(kind: object, item: Mapping[str, object]) -> Fact | None:
+    if kind == "check.offered":
+        rows = item.get("checks")
+        if not isinstance(rows, list):
+            return None
+        pairs = [
+            (row.get("name"), row.get("command"))
+            for row in cast(list[object], rows)
+            if isinstance(row, dict)
+            for row in [cast(dict[str, object], row)]
+        ]
+        found = tuple((n, c) for n, c in pairs if isinstance(n, str) and isinstance(c, str))
+        return CheckOffered(found) if found else None
+    check_id, name = item.get("check_id"), item.get("name")
+    if not isinstance(check_id, str) or not isinstance(name, str):
+        return None
+    number = item.get("round")
+    round_no = number if isinstance(number, int) else 0
+    if kind == "check.started":
+        command = item.get("command")
+        return CheckStarted(check_id, name, command, round_no) if isinstance(command, str) else None
+    status, exit_code = item.get("status"), item.get("exit_code")
+    duration, output, artifact_id = (
+        item.get("duration_ms"),
+        item.get("output"),
+        item.get("artifact_id"),
+    )
+    if not isinstance(status, str) or not isinstance(duration, int) or not isinstance(output, str):
+        return None
+    return CheckCompleted(
+        check_id,
+        name,
+        status,
+        exit_code if isinstance(exit_code, int) else None,
+        duration,
+        output,
+        artifact_id if isinstance(artifact_id, str) else None,
+        round_no,
+    )
 
 
 def _duration(item: Mapping[str, object]) -> int | None:
@@ -691,6 +950,11 @@ def _request(message_id: str, item: Mapping[str, object]) -> ModelRequested:
         _counts(item.get("message_chars")),
         _counts(item.get("message_bytes")),
         profile if isinstance(profile := item.get("profile"), str) and profile else None,
+        tuple(i for i in cast(list[object], cleared) if isinstance(i, str))
+        if isinstance(cleared := item.get("cleared_ids"), list)
+        else (),
+        _count(item.get("summary_chars")),
+        _count(item.get("estimated_tokens")),
     )
 
 
@@ -746,18 +1010,24 @@ def _pin(kind: object, item: Mapping[str, object]) -> PinRead | PinSkipped | Non
 
 __all__ = [
     "APPROVAL_KIND",
+    "FILE_CHANGED_KIND",
     "PIN_READ_KIND",
     "PIN_SKIPPED_KIND",
+    "PLAN_PROPOSED_KIND",
     "SKILL_LOADED_KIND",
     "STREAM_KEY",
     "ApprovalAsked",
+    "ContextChanged",
     "Fact",
+    "FileChanged",
     "ModelRequested",
     "ModelResponded",
     "ModelStarted",
+    "ModelWaiting",
     "PinRead",
     "PinSkipped",
     "PlainMessage",
+    "PlanProposed",
     "RequestedCall",
     "SkillLoaded",
     "TextCompleted",
@@ -768,6 +1038,7 @@ __all__ = [
     "ToolFinished",
     "ToolOutput",
     "ToolStarted",
+    "ToolWriting",
     "Translator",
     "message_text",
     "plain_messages",

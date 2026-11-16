@@ -25,6 +25,7 @@ import httpx
 from langchain_core.language_models import BaseChatModel
 
 from golem.config import (
+    BudgetSettings,
     ContextSettings,
     GolemSettings,
     ModelOptions,
@@ -32,6 +33,7 @@ from golem.config import (
     ProviderKind,
     ProviderSettings,
     RoleSettings,
+    RoutingSettings,
     load_settings,
     unknown_provider_message,
 )
@@ -148,7 +150,9 @@ class _Catalog:
     saved: dict[str, ModelOptions]
     budget_max_price: float = BUDGET_MAX_PRICE
     roles: RoleSettings = field(default_factory=RoleSettings)
+    routing: RoutingSettings = field(default_factory=RoutingSettings)
     context: ContextSettings = field(default_factory=ContextSettings)
+    budget: BudgetSettings = field(default_factory=BudgetSettings)
 
 
 class ModelRouter:
@@ -455,10 +459,20 @@ class ModelRouter:
         catalog = self._current()
         return ContextSettings() if catalog is None else catalog.context
 
+    def budget_settings(self) -> BudgetSettings:
+        """``[budget]``, read from the current ``config.toml``."""
+        catalog = self._current()
+        return BudgetSettings() if catalog is None else catalog.budget
+
     def budget_max_price(self) -> float:
         """``[routing] budget_max_price``, read from the current ``config.toml``."""
         catalog = self._current()
         return BUDGET_MAX_PRICE if catalog is None else catalog.budget_max_price
+
+    def routing_settings(self) -> RoutingSettings:
+        """``[routing]``, read from the current ``config.toml``."""
+        catalog = self._current()
+        return RoutingSettings() if catalog is None else catalog.routing
 
     def roles(self) -> RoleSettings:
         """``[routing.roles]``, read from the current ``config.toml``."""
@@ -571,7 +585,9 @@ def _catalog(settings: GolemSettings) -> _Catalog:
         saved=dict(settings.ollama.models),
         budget_max_price=settings.routing.budget_max_price,
         roles=settings.routing.roles,
+        routing=settings.routing,
         context=settings.context,
+        budget=settings.budget,
     )
 
 

@@ -14,11 +14,13 @@ from golem_protocol.commands import SessionSummary
 from golem_protocol.events import (
     ChatEvent,
     EmptyEventData,
+    MessageCompletedData,
     MessageDeltaData,
     MessageDeltaEvent,
     RunStartedEvent,
     SessionCreatedData,
     SessionUpdatedData,
+    ToolWritingData,
 )
 
 
@@ -198,3 +200,27 @@ async def test_a_sessions_mcp_servers_are_kept_in_its_row(database: Database) ->
     assert record is not None and (record.title, record.mcp_servers) == ("Plans", ("git", "web"))
     with pytest.raises(ValidationError, match="mcp_servers"):
         SessionUpdatedData()
+
+
+async def test_tool_writing_is_stored_while_its_message_is_open_and_dropped_when_it_completes(
+    database: Database,
+) -> None:
+    log = _log(database)
+    await _session(log, "s_a")
+    watcher = _Watch()
+    await log.watch(10, watcher)
+    writing = ToolWritingData(message_id="m_1", index=0, name="write_file", lines=3, chars=40)
+    await log.emit("s_a", "r_1", "tool.writing", writing)
+    assert [event.type for event in await log.stored("s_a")] == ["session.created", "tool.writing"]
+    assert watcher.summaries == []
+
+    await log.emit(
+        "s_a",
+        "r_1",
+        "message.completed",
+        MessageCompletedData(message_id="m_1", role="assistant", text=""),
+    )
+    assert [event.type for event in await log.stored("s_a")] == [
+        "session.created",
+        "message.completed",
+    ]

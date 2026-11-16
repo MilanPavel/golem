@@ -7,6 +7,7 @@ export {
   KEY_REJECTED,
   KEY_UNCHECKED,
   OLLAMA_FAILED,
+  BUDGET_SPENT,
   MESSAGE_NOT_FOUND,
   MODEL_PULL_FAILED,
   APPROVAL_NOT_FOUND,
@@ -20,6 +21,8 @@ export {
   SESSION_BUSY,
   SESSION_NOT_FOUND,
   type ApprovalChoice,
+  type ChangesDiffTarget,
+  type ChangesRevertTarget,
   type SendOptions,
   type ChatEvent,
   type ConnectionState,
@@ -68,16 +71,27 @@ export type { ModelOptionsSetResult } from "../../protocol/gen/model-options-set
 export type { PermissionsSetModeParams } from "../../protocol/gen/permissions-set-mode-params.ts";
 export type { PermissionsSetModeResult } from "../../protocol/gen/permissions-set-mode-result.ts";
 export type { SessionSetModeParams } from "../../protocol/gen/session-set-mode-params.ts";
+export type { SessionCompactParams } from "../../protocol/gen/session-compact-params.ts";
+export type { SessionCompactResult } from "../../protocol/gen/session-compact-result.ts";
 export type { SessionSetModeResult } from "../../protocol/gen/session-set-mode-result.ts";
 export type { SessionSetOptionsResult } from "../../protocol/gen/session-set-options-result.ts";
 export type { McpToggleResult } from "../../protocol/gen/mcp-toggle-result.ts";
 export type { SessionSetSkillsResult } from "../../protocol/gen/session-set-skills-result.ts";
 export type { ArtifactReadResult } from "../../protocol/gen/artifact-read-result.ts";
+export type { ChangesCommitResult } from "../../protocol/gen/changes-commit-result.ts";
+export type { ChangesCommitInfoResult } from "../../protocol/gen/changes-commit-info-result.ts";
+export type { ChangesSuggestMessageResult } from "../../protocol/gen/changes-suggest-message-result.ts";
+export type { ChangesDiffResult } from "../../protocol/gen/changes-diff-result.ts";
+export type { ChangedFile, ChangesListResult } from "../../protocol/gen/changes-list-result.ts";
+export type { ChangesRevertResult, RevertConflict } from "../../protocol/gen/changes-revert-result.ts";
+export type { FileListResult } from "../../protocol/gen/file-list-result.ts";
+export type { FileReadResult } from "../../protocol/gen/file-read-result.ts";
 export type { McpToolInfo, McpToolsResult } from "../../protocol/gen/mcp-tools-result.ts";
 export type { TraceContext } from "../../protocol/gen/trace-context.ts";
 export type { TraceContextItem } from "../../protocol/gen/trace-context-item.ts";
 export type { TraceContextPart } from "../../protocol/gen/trace-context-part.ts";
 export type { PromptSectionInfo } from "../../protocol/gen/prompt-section-info.ts";
+export type { CostDayRow, CostGetResult, CostModelRow, CostTotals } from "../../protocol/gen/cost-get-result.ts";
 export type { TraceGetResult } from "../../protocol/gen/trace-get-result.ts";
 export type { TraceMessage } from "../../protocol/gen/trace-message.ts";
 export type { TraceModelSpan } from "../../protocol/gen/trace-model-span.ts";
@@ -90,6 +104,9 @@ export type { SkillCall } from "../../protocol/gen/skill-call.ts";
 export type { SkillCreateResult } from "../../protocol/gen/skill-create-result.ts";
 export type { SkillReadResult } from "../../protocol/gen/skill-read-result.ts";
 export type { ListedSkill, SkillListResult } from "../../protocol/gen/skill-list-result.ts";
+export type { SkillSetDisabledResult } from "../../protocol/gen/skill-set-disabled-result.ts";
+export type { SkillIssue, SkillWriteResult } from "../../protocol/gen/skill-write-result.ts";
+export type { AuthKeyStatus, AuthListResult } from "../../protocol/gen/auth-list-result.ts";
 export type { ConfigAllowance, ConfigGetResult, ConfigRule } from "../../protocol/gen/config-get-result.ts";
 export type { ListedModel, ModelListResult } from "../../protocol/gen/model-list-result.ts";
 export type { DirEntry, FsListDirsResult } from "../../protocol/gen/fs-list-dirs-result.ts";

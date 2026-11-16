@@ -2,18 +2,21 @@ import "./code-editor.css";
 import { useEffect, useRef, useState } from "react";
 import { cn } from "../../../ui/cn.ts";
 
+/** What the text is written in. */
+type Language = "toml" | "markdown";
+
 type Token = { content: string; color?: string | undefined; fontStyle?: number | undefined };
 
 const ITALIC = 1;
 const BOLD = 2;
 
 /** The text as coloured lines, once Shiki has loaded. Until then, and for a grammar that fails, there are none. */
-function useTokens(text: string): readonly (readonly Token[])[] | null {
+function useTokens(text: string, language: Language): readonly (readonly Token[])[] | null {
   const [tokens, setTokens] = useState<{ text: string; lines: readonly (readonly Token[])[] } | null>(null);
   useEffect(() => {
     let live = true;
     void import("../../chat/highlight-engine.ts")
-      .then(({ tokenize }) => tokenize(text, "toml"))
+      .then(({ tokenize }) => tokenize(text, language))
       .then(
         (lines) => {
           if (live) setTokens({ text, lines });
@@ -23,13 +26,13 @@ function useTokens(text: string): readonly (readonly Token[])[] | null {
     return () => {
       live = false;
     };
-  }, [text]);
+  }, [text, language]);
   // Tokens of an older text would be drawn out of place, so they show only for the text they came from.
   return tokens !== null && tokens.text === text ? tokens.lines : null;
 }
 
 /**
- * A text box for TOML: line numbers, colours, and a mark on the lines with a problem. The colours
+ * A text box for TOML or Markdown: line numbers, colours, and a mark on the lines with a problem. The colours
  * are a copy of the text drawn under a transparent textarea, which keeps the browser's own editing,
  * selection, undo, and screen-reader support. Lines do not wrap, so a line is a line in both.
  */
@@ -38,14 +41,21 @@ export function CodeEditor({
   onChange,
   marked,
   label,
+  language = "toml",
+  readOnly = false,
+  className,
 }: {
   value: string;
   onChange: (value: string) => void;
   /** Line numbers (from 1) with a problem. */
   marked: ReadonlySet<number>;
   label: string;
+  language?: Language;
+  readOnly?: boolean;
+  /** Replaces the default sizing: fills the free height of its parent, at least `min-h-72`. */
+  className?: string;
 }) {
-  const tokens = useTokens(value);
+  const tokens = useTokens(value, language);
   const under = useRef<HTMLPreElement>(null);
   const gutter = useRef<HTMLDivElement>(null);
   const count = value.split("\n").length;
@@ -60,7 +70,7 @@ export function CodeEditor({
   }
 
   return (
-    <div className="code-editor flex h-96 overflow-hidden rounded-md border border-line-strong bg-surface focus-within:border-clay">
+    <div className={cn("code-editor flex min-h-72 flex-1 overflow-hidden rounded-md border border-line-strong bg-surface focus-within:border-clay", className)}>
       <div
         ref={gutter}
         aria-hidden="true"
@@ -99,6 +109,7 @@ export function CodeEditor({
         <textarea
           aria-label={label}
           value={value}
+          readOnly={readOnly}
           onChange={(event) => onChange(event.target.value)}
           onScroll={follow}
           wrap="off"

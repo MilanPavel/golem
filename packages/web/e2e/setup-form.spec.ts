@@ -69,17 +69,19 @@ test("Change… then Make default: the Model card shows the new default, and no 
   expect((await second.client.listSessions()).sessions).toHaveLength(0);
 });
 
-test("API keys are chips, a chip opens the command line, and the page has no key field", async ({ page, rig }) => {
+test("Setup has no API keys strip; the keys are on their own tab, which has no key field", async ({ page, rig }) => {
   const { gateway } = await startStack(rig, { ollama: { installed: [NAME] } });
   await open(page, gateway.url);
-  // Which providers have a key depends on the keys in the environment the daemon runs in, so only
-  // the chip for a provider without one is checked here; the saved marks are in the component's tests.
-  const keys = page.getByRole("group", { name: "API keys" });
-  await expect(keys).toBeVisible();
-  await keys.getByRole("button", { name: /^Anthropic/ }).click();
-  await expect(page.getByRole("group", { name: "Anthropic key" })).toContainText("golem auth set anthropic");
-  await expect(page.getByText("The page never takes a key. Paste it in a terminal.")).toBeVisible();
-  await expect(page.locator("input[type=password]")).toHaveCount(0);
+  await expect(page.getByRole("group", { name: "API keys" })).toHaveCount(0);
+  await page.getByRole("navigation", { name: "Settings sections" }).getByRole("link", { name: "API keys" }).click();
+  await expect(page).toHaveURL(/\/settings\/keys$/);
+  // Which providers have a key depends on the keys in the environment the daemon runs in, so only the
+  // row's name and blurb are checked here; the saved and missing rows are in the component's tests.
+  const models = page.getByRole("list", { name: "Model providers" });
+  await expect(models).toBeVisible();
+  await expect(models.getByRole("listitem").filter({ hasText: "Anthropic" })).toContainText("Claude");
+  await expect(page.getByText("Keys are set and removed in a terminal.")).toBeVisible();
+  await expect(page.locator("input")).toHaveCount(0);
 });
 
 for (const [theme, label] of [

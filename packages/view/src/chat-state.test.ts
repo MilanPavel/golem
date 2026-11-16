@@ -16,6 +16,7 @@ import {
   providersUp,
   reduceChat,
   serverUp,
+  stopWriting,
   thinkingLine,
 } from "./chat-state.ts";
 
@@ -162,6 +163,23 @@ test("a model server that did not answer says how to fix it, until a run complet
     data: {},
   });
   assert.equal(completed.down, null);
+});
+
+test("a spent budget says what to do and marks no server down", () => {
+  const spent = reduceChat(emptyChat, {
+    seq: 2,
+    session_id: "s",
+    run_id: "r",
+    ts: "t",
+    type: "run.failed",
+    data: {
+      message: "the daily budget is spent",
+      code: "budget_spent",
+      hint: "raise it in Settings › Routing, or switch the model",
+    },
+  });
+  assert.equal(spent.error, "the daily budget is spent · raise it in Settings › Routing, or switch the model");
+  assert.equal(spent.down, null);
 });
 
 test("a server that answers again is no longer marked down", () => {
@@ -980,4 +998,66 @@ test("a reply that hit the length limit is marked cut unless it asked for a tool
   assert.equal(run([done("a"), call("a", "max_tokens")])?.cut, true);
   assert.equal(run([done("a"), call("a", "stop")])?.cut, undefined);
   assert.equal(run([done("a"), call("a", "length"), tool("a")])?.cut, undefined);
+});
+
+test("tool.writing sets what the reply is writing, and the reply completing, a request, or the run ending clears it", () => {
+  const base = { session_id: "s", run_id: "r", ts: "t" } as const;
+  const started: ChatEvent = { ...base, seq: 1, type: "message.started", data: { message_id: "a", role: "assistant" } };
+  const writing = (seq: number, path: string | null, lines: number, chars: number): ChatEvent => ({
+    ...base,
+    seq,
+    type: "tool.writing",
+    data: { message_id: "a", index: 0, name: "write_file", path, lines, chars },
+  });
+  let state = [started, writing(2, null, 0, 0)].reduce(reduceChat, emptyChat);
+  assert.deepEqual(state.messages[0]?.writing, { name: "write_file", path: null, lines: 0, chars: 0 });
+  state = reduceChat(state, writing(3, "src/a.ts", 12, 340));
+  assert.deepEqual(state.messages[0]?.writing, { name: "write_file", path: "src/a.ts", lines: 12, chars: 340 });
+
+  const completed = reduceChat(state, {
+    ...base,
+    seq: 4,
+    type: "message.completed",
+    data: { message_id: "a", role: "assistant", text: "" },
+  });
+  assert.equal(completed.messages[0]?.writing, undefined);
+
+  const requested = reduceChat(state, {
+    ...base,
+    seq: 4,
+    type: "tool.requested",
+    data: { call_id: "c1", message_id: "a", name: "write_file", args: { path: "src/a.ts" } },
+  });
+  assert.equal(requested.messages[0]?.writing, undefined);
+  assert.equal(requested.messages[0]?.tools?.length, 1);
+
+  for (const type of ["run.completed", "run.cancelled", "run.failed"] as const) {
+    const data = type === "run.cancelled" ? { reason: "user" } : type === "run.failed" ? { message: "x" } : {};
+    const ended = reduceChat(state, { ...base, seq: 4, type, data } as ChatEvent);
+    assert.equal(ended.messages[0]?.writing, undefined, type);
+  }
+
+  // A reply that was never opened is left alone.
+  assert.deepEqual(reduceChat(emptyChat, writing(2, "x", 1, 1)), emptyChat);
+  assert.equal(stopWriting(emptyChat), emptyChat);
+});
+
+test("model.waiting shows the local-model wait, and the first token, the end of the wait, or the run ending clears it", () => {
+  const base = { session_id: "s", run_id: "r", ts: "t" } as const;
+  const waiting = (seq: number, on: boolean): ChatEvent => ({
+    ...base,
+    seq,
+    type: "model.waiting",
+    data: { message_id: "a", waiting: on },
+  });
+  const started: ChatEvent = { ...base, seq: 1, type: "message.started", data: { message_id: "a", role: "assistant" } };
+  const on = [started, waiting(2, true)].reduce(reduceChat, emptyChat);
+  assert.equal(on.localWait, true);
+  assert.equal(reduceChat(on, waiting(3, false)).localWait, false);
+  const delta: ChatEvent = { ...base, seq: 3, type: "message.delta", data: { message_id: "a", text: "hi" } };
+  assert.equal(reduceChat(on, delta).localWait, false);
+  for (const type of ["run.completed", "run.cancelled"] as const) {
+    assert.equal(reduceChat(on, { ...base, seq: 3, type, data: type === "run.cancelled" ? { reason: "user" } : {} } as ChatEvent).localWait, false);
+  }
+  assert.equal(emptyChat.localWait, false);
 });

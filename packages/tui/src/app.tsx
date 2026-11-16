@@ -1,5 +1,6 @@
 import { spawn } from "node:child_process";
 import { homedir } from "node:os";
+import { dirname, join } from "node:path";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Box, Text, useApp, useInput, usePaste, useStdin, useWindowSize } from "ink";
 import {
@@ -27,6 +28,8 @@ import {
   downloadEnded,
   emptyChat,
   forkPoint,
+  stopWriting,
+  writingLabel,
   NO_MODEL_NOTICE,
   noModelChosen,
   advance,
@@ -148,9 +151,12 @@ import {
   runningTry,
   startedTry,
   tryHeading,
+  sessionCostLabel,
+  costReportLines,
   tryTitle,
   type TryRun,
 } from "@golem/view";
+import { compactWaiting, runCompact } from "./compact.ts";
 import { dropTry, startTry, tryLines } from "./try-again.ts";
 import { pressTune, tuneKeyOf, tuneLines, tuneLitLines, tuneMemorySpans, tuneOpening, type TuneAction } from "./tune-panel.ts";
 import { folderFacts } from "./folder-facts.ts";
@@ -161,6 +167,7 @@ import {
   closedDebug,
   COMMANDS,
   contextSegments,
+  fitLine,
   helpLines,
   toggleDebugTab,
   withModelChoices,
@@ -198,7 +205,7 @@ import {
   type ToolsUi,
 } from "./setup-frame-tools.ts";
 import { SetupFrame } from "./setup-frame.tsx";
-import { draftAt, edit, editDraft, insertText, type Draft } from "./edit.ts";
+import { draftAt, edit, editDraft, editFile, insertText, type Draft } from "./edit.ts";
 import { collapsePaste, deleteToken, expandPastes, noPastes, type Pastes } from "./paste.ts";
 import {
   browseHistory,
@@ -287,15 +294,31 @@ import {
   pressMcpManager,
 } from "./mcp-manager.ts";
 import {
+  changesKeyOf,
+  closedChangesManager,
+  layoutChanges,
+  openChangesManager,
+  pressChanges,
+  type ChangesAction,
+  type ChangesData,
+  type ChangesLine,
+  type ChangesManagerState,
+} from "./changes-manager.ts";
+import {
   closedSkillsManager,
   layoutSkillsManager,
+  openNewSkill,
   openSkillsManager,
   pressSkillsManager,
+  showSkillDetail,
+  skillCreateFailed,
   type SkillList,
+  type SkillsManagerAction,
   skillsManagerKeyOf,
+  skillsManagerTyping,
   type SkillsManagerState,
 } from "./skills-manager.ts";
-import { assistantChars, elapsedSeconds, meterLine, meterPhase } from "./progress.ts";
+import { assistantChars, elapsedSeconds, meterLine, meterPhase, writingNow } from "./progress.ts";
 import {
   alertLabel,
   fitSegments,
@@ -350,6 +373,7 @@ import {
   DIFF_ADD_BG,
   DIFF_DEL,
   DIFF_DEL_BG,
+  DIFF_HUNK,
   HINT,
   PLACEHOLDER,
   QUESTION_BG,
@@ -405,11 +429,14 @@ export function App({
   onWheel,
   onPointer,
   service,
+  sessionId: firstSession,
 }: {
   client: GolemClient;
   onWheel?: WheelSubscribe;
   onPointer?: PointerSubscribe;
   service?: ServiceControl;
+  /** Follow this session at start, in place of the newest one in the folder (`golem open <id>`). */
+  sessionId?: string;
 }) {
   const [connection, setConnection] = useState<ConnectionState>(client.state);
   const [problem, setProblem] = useState<ServiceProblem | null>(null);
@@ -484,15 +511,19 @@ export function App({
   const [showTodos, setShowTodos] = useState(DEFAULT_PREFS.todos);
   const [showThinking, setShowThinking] = useState(DEFAULT_PREFS.thinking);
   const [tick, setTick] = useState(0);
+  const writingStarts = useRef(new Map<string, number>());
   const [debug, setDebug] = useState<DebugState>(closedDebug);
   const [debugOffset, setDebugOffset] = useState(0);
   const [wire, setWire] = useState<readonly WireLine[]>([]);
   const [modelMessages, setModelMessages] = useState<CheckpointMessage[]>([]);
   const [modelCount, setModelCount] = useState<number | null>(null);
   const [switcher, setSwitcher] = useState<SwitcherState>(closedSwitcher);
-  const [panel, setPanel] = useState<"help" | "context" | null>(null);
+  const [panel, setPanel] = useState<"help" | "context" | "cost" | null>(null);
   const [contextReport, setContextReport] = useState<ContextReport>({ kind: "loading" });
   const contextGen = useRef(0);
+  /** The lines of the `/cost` panel, or a line saying it is loading or failed. */
+  const [costText, setCostText] = useState<string[]>([]);
+  const costGen = useRef(0);
   /** The `/tune` panel, or null while it is closed. It takes the keys while it is open. */
   const [tune, setTune] = useState<TuneState | null>(null);
   const tuneRef = useRef(tune);
@@ -522,6 +553,15 @@ export function App({
   const [skillList, setSkillList] = useState<SkillList>({ skills: null, error: null });
   const skillListRef = useRef(skillList);
   skillListRef.current = skillList;
+  const [changesManager, setChangesManager] = useState<ChangesManagerState>(closedChangesManager);
+  const changesManagerRef = useRef(changesManager);
+  changesManagerRef.current = changesManager;
+  const [changes, setChanges] = useState<ChangesData>({ files: null, error: null, diffs: {} });
+  const changesRef = useRef(changes);
+  changesRef.current = changes;
+  // The paths whose diff is being read, so a key press does not ask twice.
+  const changesAsked = useRef(new Set<string>());
+  const budgetBodyRef = useRef(0);
   const helpOpen = panel !== null;
   const [keysOpen, setKeysOpen] = useState(false);
   const [keysOffset, setKeysOffset] = useState(0);
@@ -669,6 +709,7 @@ export function App({
     perms.open ||
     mcpManager.open ||
     skillsManager.open ||
+    changesManager.open ||
     picker.open ||
     keysOpen ||
     suggestDismissed ||
@@ -704,6 +745,7 @@ export function App({
     open: budget.suggestions > 0 && suggestMatches.length > 0,
   };
   overlayFrame.current = { columns, body: budget.body };
+  budgetBodyRef.current = budget.body;
   const diffOffset = chat.approval !== null && diffScroll.callId === chat.approval.callId ? diffScroll.offset : 0;
   const contextSegmentRows = panel === "context" && tune === null ? contextSegments(contextReport, columns) : [];
   const panelLines =
@@ -711,6 +753,8 @@ export function App({
       ? tuneLines(tune, columns)
       : panel === "help"
         ? helpLines(COMMANDS, columns)
+        : panel === "cost"
+          ? costText.map((line) => fitLine(line, columns))
         : panel === "context"
           ? contextSegmentRows.map((line) => line.map((segment) => segment.text).join(""))
           : [];
@@ -744,7 +788,17 @@ export function App({
       : [];
   startersRef.current = starters;
   const starterRows = starterLines(starters, starters.length > 0 ? starterPick : null);
-  const transcriptOptions = { times: showTimes, now, toolOutput, thinking: showThinking };
+  // Seconds count from the first `tool.writing` of a call, on this clock.
+  const writingSince = writingStarts.current;
+  for (const message of chat.messages) {
+    if (message.writing == null) {
+      writingSince.delete(message.id);
+    } else if (!writingSince.has(message.id)) {
+      writingSince.set(message.id, Date.now());
+    }
+  }
+  const writingSeconds = (id: string) => Math.max(0, Math.floor((Date.now() - (writingSince.get(id) ?? Date.now())) / 1000));
+  const transcriptOptions = { times: showTimes, now, toolOutput, thinking: showThinking, writingSeconds };
   const measured = layoutTranscript(chat.messages, columns, chatHeight, offset, transcriptOptions);
   const widthKey = measured.overflow ? Math.max(1, columns - 1) : columns;
   const followed = followTail(tail, measured.lineCount, widthKey, offset);
@@ -754,7 +808,9 @@ export function App({
       : layoutTranscript(chat.messages, columns, chatHeight, followed.offset, transcriptOptions);
   const cwd = shortCwd(sessionCwd ?? process.cwd(), homedir());
   const versions = versionLabel(GOLEM_VERSION, daemonVersion);
-  const phase = meterPhase(chat.busy, assistantChars(chat.messages), chat.approval !== null);
+  const writing = writingNow(chat.messages);
+  const writingText = writing === null ? null : writingLabel(writing.writing, writingSeconds(writing.id));
+  const phase = meterPhase(chat.busy, assistantChars(chat.messages), chat.approval !== null, writing !== null);
   const page = Math.max(1, (keysOpen ? budget.body : Math.max(1, chatHeight)) - 1);
   const debugPage = Math.max(1, budget.debug - 2);
 
@@ -778,6 +834,7 @@ export function App({
       setLiveTitle(null);
       setPanel(null);
       contextGen.current += 1;
+      costGen.current += 1;
       showTune(null);
       setKeysOpen(false);
       historyCursorRef.current = null;
@@ -795,7 +852,7 @@ export function App({
     onError: (error) => {
       setChat((current) => ({ ...current, error: messageOf(error) }));
     },
-  });
+  }, firstSession);
   const sessionRef = session.ref;
   const sessionId = session.id;
 
@@ -900,6 +957,7 @@ export function App({
       skippedSkills: chat.skippedSkills,
       context: sessionId === null ? null : chat.context.last,
       mode: sessionId === null ? "" : effectiveMode(chat.permissionMode, defaultMode),
+      cost: sessionId === null ? "" : sessionCostLabel(chat.messages),
       tune: sessionId === null || chipTune === null ? "" : tuneChip(withSession(chipTune, chat.options), model.provider),
     }),
     columns,
@@ -1047,6 +1105,13 @@ export function App({
     });
   }, [onWheel]);
 
+  // A lost connection ends the file the model was writing: no `tool.requested` will come for it.
+  useEffect(() => {
+    if (connection.status === "reconnecting" || connection.status === "closed") {
+      setChat(stopWriting);
+    }
+  }, [connection.status]);
+
   useEffect(() => {
     if (!chat.busy) {
       return;
@@ -1145,6 +1210,9 @@ export function App({
       setChat((current) => reduceChat(current, event));
       if (event.type === "run.cancelled" && event.data.reason === "user") {
         showHint(CANCELLED_NOTICE);
+      }
+      if (event.type === "file.changed" && changesManagerRef.current.open) {
+        loadChanges(event.session_id, event.data.path);
       }
       if (event.type === "run.completed" && panelOpen.current) {
         loadCheckpointRef.current(event.session_id);
@@ -1527,6 +1595,25 @@ export function App({
     })();
   }
 
+  /** `/cost`: `cost.get` for this session, printed as the report. */
+  function loadCost(): void {
+    const gen = ++costGen.current;
+    const id = sessionRef.current;
+    if (connectionRef.current.status !== "connected") {
+      setCostText(["not connected"]);
+      return;
+    }
+    setCostText(["loading\u2026"]);
+    void (async () => {
+      try {
+        const result = await (id === null ? client.getCost() : client.getCost(id));
+        if (gen === costGen.current) setCostText(costReportLines(result));
+      } catch (error) {
+        if (gen === costGen.current) setCostText([messageOf(error)]);
+      }
+    })();
+  }
+
   function showTune(next: TuneState | null): void {
     tuneRef.current = next;
     setTune(next);
@@ -1739,6 +1826,15 @@ export function App({
       loadTune(opening.model, opening.sessionId);
       return;
     }
+    if (outcome.kind === "cost") {
+      setDraft(draftAt(""));
+      setPanel("cost");
+      setKeysOpen(false);
+      setSwitcher(closedSwitcher);
+      setChat((current) => ({ ...current, notice: null }));
+      loadCost();
+      return;
+    }
     if (outcome.kind === "context") {
       setDraft(draftAt(""));
       setPanel("context");
@@ -1779,6 +1875,19 @@ export function App({
       }));
       return;
     }
+    if (outcome.kind === "changes") {
+      const id = sessionRef.current;
+      if (id === null) {
+        setChat((state) => ({ ...state, notice: "open a session first" }));
+        return;
+      }
+      setDraft(draftAt(""));
+      setKeysOpen(false);
+      setSwitcher(closedSwitcher);
+      showChangesManager(openChangesManager());
+      loadChanges(id, null);
+      return;
+    }
     if (outcome.kind === "skills") {
       setDraft(draftAt(""));
       setKeysOpen(false);
@@ -1786,6 +1895,14 @@ export function App({
       const opened = openSkillsManager();
       skillsManagerRef.current = opened;
       setSkillsManager(opened);
+      loadSkills();
+      return;
+    }
+    if (outcome.kind === "skill-new") {
+      setDraft(draftAt(""));
+      setKeysOpen(false);
+      setSwitcher(closedSwitcher);
+      showSkillsManager(openNewSkill());
       loadSkills();
       return;
     }
@@ -1909,6 +2026,11 @@ export function App({
     if (outcome.kind === "fork") {
       setDraft(draftAt(""));
       forkHere();
+      return;
+    }
+    if (outcome.kind === "compact") {
+      setDraft(draftAt(""));
+      compactHere(outcome.action, outcome.focus);
       return;
     }
     if (outcome.kind === "title") {
@@ -3474,14 +3596,210 @@ export function App({
     }
   }
 
-  function onSkillsManagerPress(press: Press): void {
-    const key = skillsManagerKeyOf(press);
+  function showChangesManager(next: ChangesManagerState): void {
+    changesManagerRef.current = next;
+    setChangesManager(next);
+  }
+
+  function showChanges(next: ChangesData): void {
+    changesRef.current = next;
+    setChanges(next);
+  }
+
+  /** Read the file list, then the diff of the selected file. `stale` is a path whose diff changed. */
+  function loadChanges(id: string, stale: string | null): void {
+    if (stale !== null) {
+      changesAsked.current.delete(stale);
+      const diffs = { ...changesRef.current.diffs };
+      delete diffs[stale];
+      showChanges({ ...changesRef.current, diffs });
+    }
+    client.changesList(id).then(
+      (result) => {
+        if (!changesManagerRef.current.open) {
+          return;
+        }
+        showChanges({ ...changesRef.current, files: result.files, error: null });
+        const path = result.files[Math.min(changesManagerRef.current.file, result.files.length - 1)]?.path;
+        if (path !== undefined) {
+          loadChangesDiff(id, path);
+        }
+      },
+      (error: unknown) => showChanges({ ...changesRef.current, error: messageOf(error) }),
+    );
+  }
+
+  function loadChangesDiff(id: string, path: string): void {
+    if (changesAsked.current.has(path) || changesRef.current.diffs[path] !== undefined) {
+      return;
+    }
+    changesAsked.current.add(path);
+    client.changesDiff(id, { path }).then(
+      (result) => showChanges({ ...changesRef.current, diffs: { ...changesRef.current.diffs, [path]: result.diff } }),
+      (error: unknown) => {
+        changesAsked.current.delete(path);
+        showChanges({ ...changesRef.current, failed: { ...changesRef.current.failed, [path]: messageOf(error) } });
+      },
+    );
+  }
+
+  function runChangesAction(action: ChangesAction): void {
+    if (action.kind === "close") {
+      changesAsked.current.clear();
+      showChanges({ files: null, error: null, diffs: {} });
+    } else if (action.kind === "load" && sessionRef.current !== null) {
+      loadChangesDiff(sessionRef.current, action.path);
+    }
+  }
+
+  function onChangesManagerPress(press: Press): void {
+    const key = changesKeyOf(press);
     if (key === null) {
       return;
     }
-    const pressed = pressSkillsManager(skillsManagerRef.current, skillListRef.current.skills ?? [], key);
-    skillsManagerRef.current = pressed.state;
-    setSkillsManager(pressed.state);
+    const pressed = pressChanges(changesManagerRef.current, changesRef.current, key, Math.max(1, budgetBodyRef.current - 3));
+    showChangesManager(pressed.state);
+    runChangesAction(pressed.action);
+  }
+
+  function onSkillsManagerPress(press: Press): void {
+    const key = skillsManagerKeyOf(press, skillsManagerTyping(skillsManagerRef.current));
+    if (key === null) {
+      return;
+    }
+    const pressed = pressSkillsManager(
+      skillsManagerRef.current,
+      skillListRef.current.skills ?? [],
+      key,
+      chatRef.current.activeSkills,
+    );
+    showSkillsManager(pressed.state);
+    runSkillsAction(pressed.action);
+  }
+
+  function showSkillsManager(next: SkillsManagerState): void {
+    skillsManagerRef.current = next;
+    setSkillsManager(next);
+  }
+
+  function runSkillsAction(action: SkillsManagerAction): void {
+    const notify = (notice: string) => setChat((state) => ({ ...state, notice }));
+    const failed = (error: unknown) => notify(messageOf(error));
+    if (action.kind === "run") {
+      showSkillsManager(closedSkillsManager);
+      setDraft(draftAt(`/${action.name} `));
+    } else if (action.kind === "pin") {
+      const current = sessionRef.current;
+      if (current === null) {
+        notify("open a session first");
+        return;
+      }
+      const change = action.pin ? { pin: [action.name] } : { unpin: [action.name] };
+      client
+        .setSkills(current, change)
+        .then(() => notify(action.pin ? `${action.name} is pinned for this session` : `${action.name} is unpinned`), failed);
+    } else if (action.kind === "edit") {
+      void editSkillFile(action.path);
+    } else if (action.kind === "copy") {
+      void copyBundledSkill(action.name);
+    } else if (action.kind === "set-disabled") {
+      client.setSkillDisabled(action.name, action.disabled).then(() => {
+        notify(action.disabled ? `${action.name} is turned off` : `${action.name} is turned on`);
+        loadSkills();
+      }, failed);
+    } else if (action.kind === "reveal") {
+      revealInFolder(join(action.path, "SKILL.md"));
+    } else if (action.kind === "create") {
+      const where = action.scope === "user" ? {} : { cwd: skillsFolder() };
+      client
+        .createSkill({ name: action.name, scope: action.scope, description: action.description, ...where }, { local: true })
+        .then(
+          (created) => editSkillFile(dirname(created.path)),
+          (error: unknown) => showSkillsManager(skillCreateFailed(skillsManagerRef.current, messageOf(error))),
+        );
+    }
+  }
+
+  /**
+   * Open a skill's real `SKILL.md` in `$EDITOR`, then read the skills again and
+   * show that skill's detail, with its errors if the file is now broken.
+   */
+  async function editSkillFile(folder: string): Promise<void> {
+    if (editing.current) {
+      return;
+    }
+    editing.current = true;
+    let notice = "";
+    try {
+      const saved = await editFile(join(folder, "SKILL.md"), suspendTerminal);
+      notice = saved ? "" : "the editor did not exit cleanly";
+    } catch (error) {
+      notice = messageOf(error);
+    } finally {
+      editing.current = false;
+    }
+    try {
+      const listed = await client.listSkills(skillsFolder());
+      setSkillList({ skills: listed.skills, error: null });
+      const skill = listed.skills.find((item) => item.path === folder);
+      if (skill !== undefined && notice === "") {
+        const first = skill.errors?.[0];
+        notice = skill.usable
+          ? `${skill.name} saved · reloaded · ✔ usable`
+          : first !== undefined
+            ? `✘ ${skill.name}: ${first}`
+            : `${skill.name} saved · reloaded · not usable`;
+      }
+    } catch (error) {
+      notice = notice === "" ? messageOf(error) : notice;
+    }
+    showSkillsManager(showSkillDetail(skillsManagerRef.current, folder));
+    if (notice !== "") {
+      setChat((state) => ({ ...state, notice }));
+    }
+  }
+
+  /** A bundled skill is read-only, so Copy to Yours makes `~/.golem/skills/<name>` with the same text. */
+  async function copyBundledSkill(name: string): Promise<void> {
+    try {
+      const folder = skillsFolder();
+      const original = await client.readSkill(name, folder);
+      if (original.source !== "bundled") {
+        throw new Error(`${name} is hidden by another skill: edit that one`);
+      }
+      const bundled = skillListRef.current.skills?.find((item) => item.name === name && item.source === "bundled");
+      const created = await client.createSkill(
+        { name, scope: "user", description: bundled?.description || name },
+        { local: true },
+      );
+      const written = await client.writeSkill(
+        { path: created.path, text: original.text, baseMtimeNs: created.mtime_ns },
+        { local: true },
+      );
+      if (!written.written) {
+        throw new Error(written.errors?.[0]?.message ?? `could not copy ${name}`);
+      }
+      const listed = await client.listSkills(folder);
+      setSkillList({ skills: listed.skills, error: null });
+      showSkillsManager(showSkillDetail(skillsManagerRef.current, dirname(created.path)));
+      setChat((state) => ({ ...state, notice: `${name} is copied to ~/.golem/skills and now yours to edit` }));
+    } catch (error) {
+      setChat((state) => ({ ...state, notice: messageOf(error) }));
+    }
+  }
+
+  /** Show a file in Finder, or its folder in the desktop's file manager. */
+  function revealInFolder(file: string): void {
+    const [bin, args] =
+      process.platform === "darwin" ? (["open", ["-R", file]] as const) : (["xdg-open", [dirname(file)]] as const);
+    const failed = () => setChat((state) => ({ ...state, notice: `could not open ${dirname(file)}` }));
+    try {
+      const child = spawn(bin, args, { stdio: "ignore", detached: true });
+      child.on("error", failed);
+      child.unref();
+    } catch {
+      failed();
+    }
   }
 
   function onTunePress(press: Press): void {
@@ -3650,6 +3968,26 @@ export function App({
       },
       (error: unknown) => {
         setChat((state) => ({ ...state, error: messageOf(error) }));
+      },
+    );
+  }
+
+  function compactHere(action: "clear" | "summarise", focus: string | null): void {
+    const current = sessionRef.current;
+    if (current === null || connectionRef.current.status !== "connected") {
+      return;
+    }
+    if (busyRef.current) {
+      setChat((state) => ({ ...state, notice: "wait for the answer to finish before compacting" }));
+      return;
+    }
+    setChat((state) => ({ ...state, error: null, notice: compactWaiting(action) }));
+    void runCompact(client, current, action, focus).then(
+      (notice) => {
+        setChat((state) => ({ ...state, error: null, notice }));
+      },
+      (error: unknown) => {
+        setChat((state) => ({ ...state, notice: null, error: messageOf(error) }));
       },
     );
   }
@@ -3990,6 +4328,10 @@ export function App({
       onSkillsManagerPress(press);
       return;
     }
+    if (changesManagerRef.current.open && !keysOpenRef.current && press.name !== "f1" && press.name !== "ctrl-c") {
+      onChangesManagerPress(press);
+      return;
+    }
     const installing = installRef.current;
     if (installing !== null && press.name === "escape" && !keysOpenRef.current) {
       // Esc stops brew while it runs, and puts the band away after.
@@ -4122,6 +4464,7 @@ export function App({
       permsRef.current.open ||
       mcpManagerRef.current.open ||
       skillsManagerRef.current.open ||
+      changesManagerRef.current.open ||
       tuneRef.current !== null ||
       keysOpenRef.current
     ) {
@@ -4166,7 +4509,7 @@ export function App({
     },
     all: transcript.all,
     pinned: transcript.pinned === null ? null : { row: budget.header, offset: transcript.pinned.offset },
-    shown: !keysOpen && !picker.open && !mcpManager.open && !skillsManager.open && !perms.open && !switcher.open,
+    shown: !keysOpen && !picker.open && !mcpManager.open && !skillsManager.open && !changesManager.open && !perms.open && !switcher.open,
   };
   const composer =
     argsEdit !== null
@@ -4270,8 +4613,15 @@ export function App({
             home: homedir(),
             columns,
             rows: budget.body,
+            pinned: chat.activeSkills,
           }).map((line, index) => (
             <McpManagerRow key={index} line={line} />
+          ))}
+        </Box>
+      ) : changesManager.open ? (
+        <Box flexDirection="column" width={columns} height={budget.body} flexShrink={0} overflow="hidden">
+          {layoutChanges(changesManager, changes, columns, budget.body).map((line, index) => (
+            <ChangesRow key={index} line={line} />
           ))}
         </Box>
       ) : perms.open ? (
@@ -4396,6 +4746,8 @@ export function App({
             tick,
             columns,
             startingServer(servers, model.provider),
+            chat.localWait,
+            writingText,
           )}
         </Text>
       ) : null}
@@ -4500,7 +4852,9 @@ function LineView({ line, columns }: { line: LayoutLine; columns: [number, numbe
               ? DIFF_ADD
               : span.tone === "del"
                 ? DIFF_DEL
-                : span.dim === true
+                : span.warn === true
+                  ? "yellow"
+                  : span.dim === true
                   ? undefined
                   : span.code === true && !user
                     ? "cyan"
@@ -4667,6 +5021,21 @@ function StatusSegmentView({
     return <Text color="red">{text}</Text>;
   }
   return <Text dimColor>{text}</Text>;
+}
+
+function ChangesRow({ line }: { line: ChangesLine }) {
+  const color = line.tone === "add" ? DIFF_ADD : line.tone === "del" ? DIFF_DEL : line.tone === "hunk" ? DIFF_HUNK : undefined;
+  return (
+    <Text wrap="truncate-end" bold={line.bold === true} dimColor={line.dim === true || line.tone === "meta"}>
+      {line.left === null ? null : (
+        <>
+          <Text inverse={line.leftSelected === true}>{line.left}</Text>
+          {"│"}
+        </>
+      )}
+      <Text color={color}>{line.text}</Text>
+    </Text>
+  );
 }
 
 function McpManagerRow({ line }: { line: McpManagerLine }) {

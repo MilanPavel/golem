@@ -74,7 +74,7 @@ export function Workbench({ tabs, onClose, id = WORKBENCH_ID, floating = true }:
           </IconButton>
         </div>
         {tabs.map((tab) => (
-          <TabsContent key={tab.id} value={tab.id} className="min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4 data-[state=active]:flex">
+          <TabsContent key={tab.id} value={tab.id} className="relative min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4 data-[state=active]:flex">
             {tab.render()}
           </TabsContent>
         ))}

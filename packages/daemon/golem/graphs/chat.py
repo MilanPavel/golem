@@ -1,5 +1,5 @@
 """The chat graph: ``START → call_model``, then ``tools → call_model`` while
-the reply asks for tools, then ``END``.
+the reply asks for tools, then ``checks`` and ``END``.
 
 Checkpoint messages carry the protocol ``message_id`` as their LangChain
 ``id``, so the event log and the checkpoint name the same message. The first
@@ -14,6 +14,7 @@ import json
 import logging
 from collections.abc import AsyncGenerator, AsyncIterator, Awaitable, Callable, Mapping, Sequence
 from contextlib import AbstractAsyncContextManager, aclosing, nullcontext
+from dataclasses import dataclass, replace
 from typing import Literal, Protocol, cast
 
 from langchain_core.language_models import BaseChatModel
@@ -26,11 +27,29 @@ from langgraph.errors import GraphRecursionError
 from langgraph.graph import END, START, StateGraph  # pyright: ignore[reportMissingTypeStubs]
 from langgraph.types import Command
 
-from golem.config import ModelPrice, PermissionMode
+from golem.coding.changes import ChangeStore
+from golem.config import ContextSettings, ModelPrice, PermissionMode
 from golem.graphs.adapter import STREAM_KEY, message_text
-from golem.graphs.context_view import view
+from golem.graphs.checks_node import CHECKS_KEY, checks_node
+from golem.graphs.compact import Compaction, clear_now, summarise_now
+from golem.graphs.context_view import (
+    SUMMARY_ID,
+    ContextView,
+    cleared_ids,
+    freed_by,
+    plan_clear,
+    plan_summary,
+    sent_chars,
+    used_tokens,
+    view,
+)
+from golem.graphs.estimate import TokenRatios
+from golem.graphs.fit import Fitted, fit_prompt, num_predict_of, prompt_estimate, reply_reserve
+from golem.graphs.notes import is_note
 from golem.graphs.prompt import PINNED_KEY, PromptContext, SystemPrompt
+from golem.graphs.result_budget import ResultBudget, result_budget
 from golem.graphs.state import AgentState
+from golem.graphs.summarise import Summariser
 from golem.graphs.text_calls import recover
 from golem.graphs.tools_node import (
     ALLOWED_KEY,
@@ -40,7 +59,9 @@ from golem.graphs.tools_node import (
     MCP_NOW_KEY,
     MODE_KEY,
     PINNED_FOLDERS_KEY,
+    PLAN_KEY,
     Answer,
+    BudgetOf,
     EnableMcp,
     cancelled_results,
     scope_of,
@@ -48,6 +69,7 @@ from golem.graphs.tools_node import (
     unanswered_calls,
 )
 from golem.models.discovery import Loaded
+from golem.models.errors import BUDGET_HINT, BudgetSpent
 from golem.models.gate import ServerGate
 from golem.models.ollama import LocalServers
 from golem.models.router import ModelRouter
@@ -151,12 +173,20 @@ class ChatRuntime:
         """The price of a profile's model, or None when unknown. No I/O."""
         self.tier_of = tier_of
         """The tier of a profile's model, or None when the profile does not resolve. No I/O."""
+        self.note_speed: Callable[..., object] | None = None
+        """Told the profile and server timings of each finished call, for the speed book."""
         self.enable_mcp: EnableMcp | None = None
         """Turns on an on-demand MCP server for a session, for the model's ``mcp_enable``."""
         self.skills: SkillRegistry | None = None
         """The skills sessions see, for the model's ``load_skill``."""
+        self.changes: ChangeStore | None = None
+        """Where each file a tool writes is recorded. None: not recorded."""
         self.until_pulled: Callable[[str], Awaitable[None]] | None = None
         """Waits until a model's download ends, given its ref. Raises with the download's error."""
+        self.context: ContextSettings | None = None
+        """The ``[context]`` settings the graph was built with."""
+        self.summariser: Summariser | None = None
+        """Writes the summaries of the graph, and of a manual compaction."""
 
     async def values(self, session_id: str) -> Mapping[str, object]:
         """Checkpoint values for ``session_id``, or an empty mapping."""
@@ -195,6 +225,8 @@ class ChatRuntime:
         pinned_folders: Sequence[str] = (),
         options: Mapping[str, float | str] | None = None,
         permission_mode: PermissionMode | None = None,
+        checks: bool | None = None,
+        plan_first: bool = False,
     ) -> AsyncGenerator[object]:
         """Stream one user turn. The first turn writes the state fields.
 
@@ -222,6 +254,8 @@ class ChatRuntime:
                 PINNED_FOLDERS_KEY: list(pinned_folders),
                 OPTIONS_KEY: dict(options or {}),
                 MODE_KEY: permission_mode,
+                CHECKS_KEY: checks,
+                PLAN_KEY: plan_first,
             },
             "recursion_limit": _RECURSION_LIMIT,
         }
@@ -253,6 +287,8 @@ class ChatRuntime:
         pinned_folders: Sequence[str] = (),
         options: Mapping[str, float | str] | None = None,
         permission_mode: PermissionMode | None = None,
+        checks: bool | None = None,
+        plan_first: bool = False,
     ) -> AsyncGenerator[object]:
         """Go on with a run paused on a tool approval, with the user's ``answer``.
 
@@ -272,6 +308,8 @@ class ChatRuntime:
                 PINNED_FOLDERS_KEY: list(pinned_folders),
                 OPTIONS_KEY: dict(options or {}),
                 MODE_KEY: permission_mode,
+                CHECKS_KEY: checks,
+                PLAN_KEY: plan_first,
             },
             "recursion_limit": _RECURSION_LIMIT,
         }
@@ -312,6 +350,55 @@ class ChatRuntime:
             as_node="call_model",
         )
         return len(calls)
+
+    async def compact(
+        self,
+        session_id: str,
+        action: Literal["clear", "summarise"],
+        *,
+        profile: str,
+        options: Mapping[str, float | str],
+        focus: str | None,
+        system_chars: int,
+        tools_chars: int,
+    ) -> Compaction:
+        """Clear or summarise the history of an idle session, and store the new context view.
+
+        The checkpoint keeps every message. ``system_chars`` and ``tools_chars`` are the sizes
+        of what a call sends besides the history. Raises when the summary call fails.
+        """
+        values = await self.values(session_id)
+        messages = _without_thinking(_messages(values))
+        ctx = cast(ContextView | None, values.get("context_view"))
+        settings = self.context if self.context is not None else self.router.context_settings()
+        window = self.window_of(profile, options) if self.window_of is not None else ContextWindow()
+        room = _room(settings, window)
+        used, ratio = used_tokens(view(messages, ctx), system_chars, tools_chars)
+        if action == "clear":
+            done = clear_now(
+                messages, ctx, used=used, ratio=ratio, keep_results=settings.keep_results
+            )
+        elif self.summariser is None:
+            raise ValueError("this daemon has no summariser")
+        else:
+            done = await summarise_now(
+                self.summariser,
+                messages,
+                ctx,
+                keep_turns=settings.keep_turns,
+                focus=focus,
+                used=used,
+                ratio=ratio,
+                session_id=session_id,
+                profile=profile,
+                options=options,
+            )
+        done = replace(done, window=room)
+        if done.view is not None:
+            await self._graph.aupdate_state(
+                self._config(session_id), {"context_view": done.view}, as_node="call_model"
+            )
+        return done
 
     async def message_text(self, session_id: str, message_id: str) -> str | None:
         """Text of the checkpoint message with ``message_id``, or None."""
@@ -390,6 +477,10 @@ def open_chat(
     gate: ServerGate | None = None,
     tier_of: Callable[[str], Tier | None] | None = None,
     learn_window: Callable[[str], Awaitable[None]] | None = None,
+    context: ContextSettings | None = None,
+    summariser: Summariser | None = None,
+    ratios: TokenRatios | None = None,
+    paid_ok: Callable[[str | None], Awaitable[bool]] | None = None,
 ) -> ChatRuntime:
     """Compile the chat graph against ``checkpointer``.
 
@@ -410,28 +501,47 @@ def open_chat(
     ``model.response``, with ``text_tool_calls`` (``recovered`` or ``unread``) when the reply
     held a tool call written as text. A failure there never fails the call. With ``gate``,
     a call to a local server waits for its turn first, so one generation runs at a time on it.
+    ``context`` holds the ``[context]`` settings. When the history fills the window past
+    ``clear_at``, old tool results are sent as one line each. Without it, nothing is cleared.
+    With ``summariser``, a history still past ``compact_at`` after that has its old turns
+    replaced by a summary in what is sent. Before each call the prompt is estimated with the
+    tokens per character ``ratios`` learned from finished calls, and a prompt that would not fit
+    the window is cleared and summarised harder, or the call raises ``ContextFull``.
+    ``paid_ok`` is awaited with the session id before each call to a paid model. When it says
+    no, a cap in ``[budget]`` is spent: the run fails with ``budget_spent`` before the call,
+    so every tool result of the run is stored by then.
     """
+    clearing = context
+    learned = TokenRatios() if ratios is None else ratios
     registry = default_registry() if tools is None else tools
     rules = Policy(None) if policy is None else policy
     binder = _ToolBinder()
     system_prompt = SystemPrompt() if prompt is None else prompt
 
-    async def call_model(state: AgentState, config: RunnableConfig) -> dict[str, list[BaseMessage]]:
+    async def call_model(state: AgentState, config: RunnableConfig) -> dict[str, object]:
         messages = list(state["messages"])
+        profile = state["model_profile"]
+        paid = tier_of is not None and tier_of(profile) not in (None, "local")
+        if paid_ok is not None and paid and not await paid_ok(state.get("session_id")):
+            raise BudgetSpent(
+                "a budget cap is spent, so the run stopped before its next paid call",
+                hint=BUDGET_HINT,
+            )
         message_id = _reply_id(messages, config)
         get_stream_writer()({STREAM_KEY: "model.started", "message_id": message_id})
-        profile = state["model_profile"]
         scope = scope_of(config)
         overrides = _options(config)
         await registry.prepare(scope)
         tools = registry.scoped(scope)
-        schemas = tools.schemas()
+        plan_first = _plan(config)
+        schemas = tools.schemas(plan_first=plan_first)
         context = PromptContext(
             state,
             _cwd(config),
             _pinned(config),
             get_stream_writer(),
             tuple(sorted(scope.enabled)),
+            plan_first=plan_first,
         )
         parts = system_prompt.parts(context)
         text = "\n\n".join(t for _, t in parts)
@@ -446,12 +556,74 @@ def open_chat(
                 except Exception:
                     log.debug("learning the model %s failed", profile, exc_info=True)
             window = window_of(profile, overrides) if window_of is not None else ContextWindow()
+            current = state.get("context_view")
+            original = current
+            plain = _without_thinking(messages)
+            system_chars = 0 if system is None else len(message_text(system))
+            tools_chars = (
+                len(json.dumps(schemas, sort_keys=True, separators=(",", ":")))
+                if schemas and binder.offers(profile)
+                else 0
+            )
+            room = _room(clearing, window)
+            used, ratio = used_tokens(history, system_chars, tools_chars, learned.learned(profile))
+            if clearing is not None and room is not None:
+                cleared = _clear_old(plain, current, clearing, room, used, ratio)
+                if cleared is not None:
+                    current = cleared.view
+                    used = cast(int, cleared.item["after_tokens"])
+                    get_stream_writer()(cleared.item)
+                if used >= clearing.compact_at * room:
+                    summed = await _summarise_old(
+                        summariser,
+                        plain,
+                        current,
+                        clearing,
+                        used,
+                        ratio,
+                        session_id=state.get("session_id"),
+                        profile=profile,
+                        options=overrides,
+                    )
+                    if summed is not None:
+                        current = summed.view
+                        used = cast(int, summed.item["after_tokens"])
+                        get_stream_writer()(summed.item)
+                    else:
+                        # Nothing to summarise, or it failed: clear all but the newest two.
+                        harder = clearing.model_copy(
+                            update={"clear_at": 0.0, "clear_to": 0.0, "keep_results": 2}
+                        )
+                        again = _clear_old(plain, current, harder, room, used, ratio)
+                        if again is not None:
+                            current = again.view
+                            used = cast(int, again.item["after_tokens"])
+                            get_stream_writer()(again.item)
+                        if used >= clearing.compact_at * room:
+                            log.info("the prompt is still at %d of %d tokens", used, room)
+            if clearing is not None and window.window is not None:
+                fitted = await _fit(
+                    learned, router, profile, plain, current, system_chars + tools_chars,
+                    window.window, clearing, summariser, state.get("session_id"), overrides,
+                )  # fmt: skip
+                current = fitted.view
+                for change in fitted.items:
+                    get_stream_writer()(change)
+            if current is not original:
+                history = view(plain, current)
+                sent = history if system is None else [system, *history]
             request: dict[str, object] = {STREAM_KEY: "model.request", "message_id": message_id}
             request["profile"] = profile
             request["message_ids"] = [m.id for m in history if m.id]
+            request["cleared_ids"] = cleared_ids(messages, current)
+            if history and history[0].id == SUMMARY_ID:
+                request["summary_chars"] = len(message_text(history[0]))
             if parts:
                 request["system_sections"] = [{"name": n, "chars": len(t)} for n, t in parts]
             request["context_window"] = window.window
+            request["estimated_tokens"] = prompt_estimate(
+                learned, profile, history, system_chars + tools_chars
+            )
             request["num_ctx"] = window.num_ctx
             request["window_estimated"] = window.estimated
             request["window_planned"] = window.planned
@@ -464,7 +636,7 @@ def open_chat(
             request.update(_sizes(system, history, schemas if binder.offers(profile) else []))
             get_stream_writer()(request)
             try:
-                async with _gated(router, gate, profile):
+                async with _gated(router, gate, profile, message_id):
                     response = await binder.invoke(
                         profile, router.chat_model(profile, overrides), sent, schemas
                     )
@@ -473,6 +645,7 @@ def open_chat(
                 if down is None:
                     raise
                 raise down from exc
+        _learn(learned, profile, history, system_chars + tools_chars, response, window.window)
         loaded: int | None = None
         if note_loaded is not None:
             try:
@@ -510,14 +683,26 @@ def open_chat(
         }
         if text_tool_calls is not None:
             response_item["text_tool_calls"] = text_tool_calls
+        # Only Ollama sends these numbers, so a hosted reply has none.
+        timings = _timings(response)
+        if timings:
+            response_item["timings"] = timings
         get_stream_writer()(response_item)
-        return {"messages": [response.model_copy(update=update)]}
+        result: dict[str, object] = {"messages": [response.model_copy(update=update)]}
+        if current is not original:
+            result["context_view"] = current
+        return result
 
     def route(state: AgentState) -> Literal["tools", "end"]:
         last = state["messages"][-1] if state["messages"] else None
         if isinstance(last, AIMessage) and last.tool_calls:
             return "tools"
         return "end"
+
+    def route_after_checks(state: AgentState) -> Literal["call_model", "end"]:
+        # The checks node adds a note only when a check failed and a round is left.
+        last = state["messages"][-1] if state["messages"] else None
+        return "call_model" if last is not None and is_note(last) else "end"
 
     builder = cast(_GraphBuilder, StateGraph(AgentState))
     builder.add_node("call_model", call_model)
@@ -530,11 +715,16 @@ def open_chat(
             artifacts,
             lambda: runtime[0].enable_mcp if runtime else None,
             lambda: runtime[0].skills if runtime else None,
+            _budget_by_window(window_of),
         ),
     )
     builder.add_edge(START, "call_model")
-    builder.add_conditional_edges("call_model", route, {"tools": "tools", "end": END})
+    builder.add_node("checks", checks_node(rules, artifacts))
+    builder.add_conditional_edges("call_model", route, {"tools": "tools", "end": "checks"})
     builder.add_edge("tools", "call_model")
+    builder.add_conditional_edges(
+        "checks", route_after_checks, {"call_model": "call_model", "end": END}
+    )
     runtime.append(
         ChatRuntime(
             builder.compile(checkpointer=checkpointer),
@@ -547,7 +737,229 @@ def open_chat(
             tier_of,
         )
     )
+    runtime[0].context = context
+    runtime[0].summariser = summariser
     return runtime[0]
+
+
+def _timings(message: AIMessage) -> dict[str, int]:
+    """The server's own numbers of a call, from Ollama's last chunk. Durations become ms."""
+    meta = message.response_metadata
+    found: dict[str, int] = {}
+    for key, name in (
+        ("load_duration", "load_ms"),
+        ("prompt_eval_duration", "prompt_ms"),
+        ("eval_duration", "reply_ms"),
+    ):
+        value = meta.get(key)
+        if isinstance(value, int | float) and not isinstance(value, bool) and value >= 0:
+            found[name] = round(value / 1_000_000)
+    for key, name in (("prompt_eval_count", "prompt_tokens"), ("eval_count", "reply_tokens")):
+        value = meta.get(key)
+        if isinstance(value, int) and not isinstance(value, bool) and value >= 0:
+            found[name] = value
+    return found
+
+
+def _budget_by_window(window_of: WindowOf | None) -> BudgetOf | None:
+    """The tools node's result budget from the window of the session's model."""
+    if window_of is None:
+        return None
+
+    def budget(state: AgentState, config: RunnableConfig) -> ResultBudget:
+        return result_budget(window_of(state["model_profile"], _options(config)).window)
+
+    return budget
+
+
+@dataclass(frozen=True, slots=True)
+class _Cleared:
+    view: ContextView
+    item: dict[str, object]
+
+
+def _room(settings: ContextSettings | None, window: ContextWindow) -> int | None:
+    """The tokens the history may fill, or None when nothing may be cleared or summarised.
+
+    An unknown window, or one no bigger than the reply reserve, has no room.
+    """
+    if settings is None or window.window is None:
+        return None
+    room = window.window - settings.reply_reserve
+    return room if room > 0 else None
+
+
+def _clear_old(
+    messages: Sequence[BaseMessage],
+    current: ContextView | None,
+    settings: ContextSettings,
+    room: int,
+    used: int,
+    ratio: float,
+) -> _Cleared | None:
+    """The view that clears old tool results and the ``context.changed`` item, or None.
+
+    ``messages`` is the stored history, ``used`` the tokens the call would send and ``ratio``
+    the tokens per character that estimate used.
+    """
+    planned = plan_clear(
+        messages,
+        current,
+        used=used,
+        ratio=ratio,
+        room=room,
+        clear_at=settings.clear_at,
+        clear_to=settings.clear_to,
+        keep_results=settings.keep_results,
+    )
+    if planned is None:
+        return None
+    freed, count = freed_by(messages, current, planned, ratio)
+    if count == 0:
+        return None
+    item: dict[str, object] = {
+        STREAM_KEY: "context.changed",
+        "action": "cleared",
+        "before_tokens": used,
+        "after_tokens": max(0, used - freed),
+        "count": count,
+    }
+    return _Cleared(planned, item)
+
+
+async def _summarise_old(
+    summariser: Summariser | None,
+    messages: Sequence[BaseMessage],
+    current: ContextView | None,
+    settings: ContextSettings,
+    used: int,
+    ratio: float,
+    *,
+    session_id: str | None,
+    profile: str,
+    options: Mapping[str, float | str],
+) -> _Cleared | None:
+    """The view that sends a summary of the old turns and its ``context.changed`` item.
+
+    None when there is nothing to summarise by turns (too few, or one long turn), when
+    there is no summariser, or when the summary failed: a failed summary never fails the run.
+    """
+    if summariser is None:
+        return None
+    found = plan_summary(messages, current, keep_turns=settings.keep_turns)
+    if found is None:
+        return None
+    start, end = found
+    earlier = (current or {}).get("summary") if start > 0 else None
+    try:
+        text = await summariser.make(
+            session_id=session_id,
+            session_profile=profile,
+            options=options,
+            messages=messages[start:end],
+            earlier=earlier,
+        )
+    except Exception:
+        log.warning("summarising old turns failed", exc_info=True)
+        return None
+    planned: ContextView = {
+        **(current or {}),
+        "summary": text,
+        "summarised_before": cast(str, messages[end].id),
+    }
+    now = view(messages, planned)
+    before = sum(len(_sent_text(m)) for m in view(messages, current))
+    after = sum(len(_sent_text(m)) for m in now)
+    item: dict[str, object] = {
+        STREAM_KEY: "context.changed",
+        "action": "summarised",
+        "before_tokens": used,
+        "after_tokens": max(0, used - round((before - after) * ratio)),
+        "count": end - start,
+    }
+    return _Cleared(planned, item)
+
+
+async def _fit(
+    learned: TokenRatios,
+    router: ModelRouter,
+    profile: str,
+    plain: Sequence[BaseMessage],
+    current: ContextView | None,
+    fixed_chars: int,
+    window: int,
+    settings: ContextSettings,
+    summariser: Summariser | None,
+    session_id: str | None,
+    options: Mapping[str, float | str],
+) -> Fitted:
+    """The view that fits ``window`` with the reply reserve, or raises ``ContextFull``."""
+
+    async def summarise(ctx: ContextView | None) -> tuple[ContextView, int] | None:
+        last_turn = settings.model_copy(update={"keep_turns": 1})
+        found = await _summarise_old(
+            summariser, plain, ctx, last_turn, 0, 1.0,
+            session_id=session_id, profile=profile, options=options,
+        )  # fmt: skip
+        return None if found is None else (found.view, cast(int, found.item["count"]))
+
+    def changed(action: str, before: int, after: int, count: int) -> dict[str, object]:
+        return {
+            STREAM_KEY: "context.changed",
+            "action": action,
+            "before_tokens": before,
+            "after_tokens": after,
+            "count": count,
+        }
+
+    reserve = reply_reserve(settings.reply_reserve, _num_predict(router, profile, options), window)
+    return await fit_prompt(
+        plain,
+        current,
+        model=profile,
+        ratios=learned,
+        fixed_chars=fixed_chars,
+        window=window,
+        reserve=reserve,
+        summarise=summarise,
+        item=changed,
+    )
+
+
+def _num_predict(
+    router: ModelRouter, profile: str, overrides: Mapping[str, float | str]
+) -> float | str | None:
+    """The ``num_predict`` the call is sent with: the session's, else the saved one."""
+    if "num_predict" in overrides:
+        return num_predict_of(overrides)
+    try:
+        saved = router.ollama_options(router.resolve(profile).model_id, overrides)
+    except Exception:
+        return None
+    return num_predict_of(saved)
+
+
+def _learn(
+    learned: TokenRatios,
+    profile: str,
+    history: Sequence[BaseMessage],
+    fixed_chars: int,
+    response: AIMessage,
+    window: int | None,
+) -> None:
+    """Teach ``learned`` from a finished call, and log the estimate against the real count."""
+    usage = response.usage_metadata
+    tokens = usage.get("input_tokens") if usage else None
+    if not tokens:
+        return
+    chars = fixed_chars + sum(sent_chars(m) for m in history)
+    log.debug(
+        "%s: estimated %d tokens, the server counted %d",
+        profile,
+        prompt_estimate(learned, profile, history, fixed_chars),
+        tokens,
+    )
+    learned.note(profile, chars=chars, tokens=tokens, window=window)
 
 
 def _without_thinking(messages: Sequence[BaseMessage]) -> list[BaseMessage]:
@@ -662,11 +1074,18 @@ def _held(
 
 
 def _gated(
-    router: ModelRouter, gate: ServerGate | None, profile: str
+    router: ModelRouter, gate: ServerGate | None, profile: str, message_id: str
 ) -> AbstractAsyncContextManager[None]:
     """Wait for a turn on the local server ``profile`` runs on, or not for any other model."""
     target = None if gate is None else router.ollama_server(profile)
-    return nullcontext() if gate is None or target is None else gate.hold(target[1], "chat")
+    if gate is None or target is None:
+        return nullcontext()
+    write = get_stream_writer()
+
+    def notice(waiting: bool) -> None:
+        write({STREAM_KEY: "model.waiting", "message_id": message_id, "waiting": waiting})
+
+    return gate.hold(target[1], "chat", notice)
 
 
 def _ai(message: BaseMessage) -> AIMessage:
@@ -691,6 +1110,11 @@ def _options(config: RunnableConfig) -> dict[str, float | str]:
         for key, value in cast(dict[object, object], raw).items()
         if isinstance(key, str) and isinstance(value, (int, float, str))
     }
+
+
+def _plan(config: RunnableConfig) -> bool:
+    """Whether the session is in plan first."""
+    return cast(Mapping[str, object], config.get("configurable", {})).get(PLAN_KEY) is True
 
 
 def _pinned(config: RunnableConfig) -> tuple[str, ...]:
@@ -735,9 +1159,13 @@ def _turn_input(
 ) -> AgentState:
     if has_checkpoint:
         # model_profile rides along so that session.set_model applies from this turn.
-        return cast(AgentState, {"messages": [message], "model_profile": model_profile})
+        return cast(
+            AgentState,
+            {"messages": [message], "model_profile": model_profile, "check_round": 0},
+        )
     return {
         "messages": [message],
+        "check_round": 0,
         "session_id": session_id,
         "model_profile": model_profile,
         "schema_version": schema_version,

@@ -1,0 +1,15 @@
+{
+  "additionalProperties": false,
+  "description": "The subject, then a blank line and the body when there is one.",
+  "properties": {
+    "message": {
+      "title": "Message",
+      "type": "string"
+    }
+  },
+  "required": [
+    "message"
+  ],
+  "title": "ChangesSuggestMessageResult",
+  "type": "object"
+}

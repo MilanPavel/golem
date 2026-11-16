@@ -1,0 +1,133 @@
+{
+  "$defs": {
+    "FileChangedData": {
+      "additionalProperties": false,
+      "description": "One change to one file, recorded before this event was sent.\n\n``path`` is relative to the session folder. ``call_id`` is the tool call that\nmade the change, and null for a shell change or an undo. ``reverts`` is the\nchange an undo took back. The texts are not sent; read them by ``change_id``.",
+      "properties": {
+        "added": {
+          "minimum": 0,
+          "title": "Added",
+          "type": "integer"
+        },
+        "call_id": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Call Id"
+        },
+        "change_id": {
+          "minLength": 1,
+          "title": "Change Id",
+          "type": "string"
+        },
+        "path": {
+          "minLength": 1,
+          "title": "Path",
+          "type": "string"
+        },
+        "removed": {
+          "minimum": 0,
+          "title": "Removed",
+          "type": "integer"
+        },
+        "reverts": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reverts"
+        },
+        "source": {
+          "enum": [
+            "tool",
+            "shell",
+            "revert"
+          ],
+          "title": "Source",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "created",
+            "modified",
+            "deleted"
+          ],
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "change_id",
+        "path",
+        "status",
+        "added",
+        "removed",
+        "source"
+      ],
+      "title": "FileChangedData",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "A file in the session folder changed. Sent before the ``tool.completed`` of its call.\n\n``run_id`` is null for an undo, which is made between runs.",
+  "properties": {
+    "data": {
+      "$ref": "#/$defs/FileChangedData"
+    },
+    "run_id": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Run Id"
+    },
+    "seq": {
+      "minimum": 1,
+      "title": "Seq",
+      "type": "integer"
+    },
+    "session_id": {
+      "minLength": 1,
+      "title": "Session Id",
+      "type": "string"
+    },
+    "ts": {
+      "minLength": 1,
+      "title": "Ts",
+      "type": "string"
+    },
+    "type": {
+      "const": "file.changed",
+      "title": "Type",
+      "type": "string"
+    }
+  },
+  "required": [
+    "seq",
+    "session_id",
+    "run_id",
+    "ts",
+    "type",
+    "data"
+  ],
+  "title": "FileChangedEvent",
+  "type": "object"
+}

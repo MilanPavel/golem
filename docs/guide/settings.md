@@ -142,6 +142,12 @@ The providers are `openai`, `anthropic`, `google`, `deepseek`, `xai`, `moonshot`
 |---|---|---|
 | `window` | `"auto"` | The context window golem asks Ollama for. `"auto"` plans one from the model's size and maximum and this Mac's memory. `"ollama"` sends none, so Ollama uses its own default. A number from 512 to 262144 is used as it is, and cut to the model's maximum when that is known. A `num_ctx` you set for a model, a profile's `ctx`, or a chat's option always wins |
 | `keep_alive` | `"30m"` | How long Ollama keeps the model loaded after a call. golem sends it only with a window it planned, and never over a `keep_alive` you set. Leave it out to send none |
+| `reply_reserve` | `4096` | Tokens of the window kept free for the reply. The rest is the room the history may fill |
+| `clear_at` | `0.70` | When the history passes this share of the room, golem sends old tool results as one line each |
+| `clear_to` | `0.40` | How far clearing goes down, as a share of the room. Must be above 0 and below `clear_at` |
+| `compact_at` | `0.85` | When the history is still past this share of the room after clearing, golem replaces the old turns with a summary in what it sends. Must be above `clear_at` and below 1 |
+| `keep_results` | `4` | The newest tool results that are never cleared. A model whose window is unknown is never cleared |
+| `keep_turns` | `4` | The newest turns that are never summarised. At least 1 |
 
 ### `[routing]`
 
@@ -171,6 +177,10 @@ Caps on what paid models may cost.
 | `daily_usd` | none | The most paid models may cost in one day, in USD. None means no cap |
 | `session_usd` | none | The most paid models may cost in one chat, in USD. None means no cap |
 | `over` | `"local"` | What to do at a cap: `local` goes on with a local model, `ask` asks you |
+
+The spend is what the `model_calls` table holds for paid models: chat calls, titles and summaries. "Today" is your local day. At a cap, a chat that picks its model (`auto`) runs a local one, and its model chip says `the daily budget is spent` or `the session budget is spent`. A chat pinned to a paid model is refused with `budget_spent` and a message that names the cap and the amount. A run already going stops before its next paid call. A local model is never stopped by a cap, and a title or summary that would use a paid model is skipped.
+
+A cap is checked before a call, and a call costs what it costs only when it ends. So one call can pass a cap by its own cost. Golem does not guess the cost of the next call to block it. Until the question for `over = "ask"` exists, `ask` refuses a paid turn the same way `local` does.
 
 ### `[routing.roles]`
 
@@ -221,6 +231,8 @@ Only your own file sets these.
 |---|---|---|
 | `checks` | `"ask"` | Whether golem runs checks after it changed files: `ask`, `auto`, or `off` |
 | `fix_rounds` | `2` | How many times golem may fix what a check found, up to 5 |
+
+After a turn in which the model wrote a file, edited a file, or ran a shell command that succeeded, golem runs the checks one by one in the shell sandbox, with your `[shell]` settings, and shows each as it starts and ends. With `ask`, it offers them once in a session and runs nothing until you say yes. In autopilot mode `ask` runs them without asking. `auto` runs them unless you said no in that session. A failed check is shown to you only, and is not yet given to the model.
 
 Each `[[coding.check]]` is one command. With none, golem looks at the project's own files: a `lint` recipe in a justfile, a `lint` or `typecheck` script in `package.json`, a ruff setup, `Cargo.toml`, or `go.mod`. Tests are never detected. Add them yourself.
 

@@ -1,0 +1,26 @@
+{
+  "additionalProperties": false,
+  "description": "``changes.suggest_message``. Ask the session's model for a commit message.",
+  "properties": {
+    "paths": {
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 500,
+      "minItems": 1,
+      "title": "Paths",
+      "type": "array"
+    },
+    "session_id": {
+      "minLength": 1,
+      "title": "Session Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "session_id",
+    "paths"
+  ],
+  "title": "ChangesSuggestMessageParams",
+  "type": "object"
+}

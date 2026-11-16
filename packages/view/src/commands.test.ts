@@ -207,6 +207,11 @@ test("/fork takes no arguments", () => {
   assert.equal(applyComposer(closedDebug, "/fork here").kind, "unknown");
 });
 
+test("/changes takes no arguments", () => {
+  assert.deepEqual(applyComposer(closedDebug, "/changes"), { kind: "changes" });
+  assert.equal(applyComposer(closedDebug, "/changes x").kind, "unknown");
+});
+
 test("/todos toggles the todo list and /artifact takes an optional id", () => {
   assert.deepEqual(applyComposer(closedDebug, "/todos"), { kind: "todos" });
   assert.deepEqual(applyComposer(closedDebug, "/artifact"), { kind: "artifact", id: null });
@@ -322,6 +327,12 @@ test("/skill pin and /skill unpin name one skill", () => {
   });
 });
 
+test("/skill new opens the new-skill form, and /skills keeps opening the list", () => {
+  assert.deepEqual(applyComposer(closedDebug, "/skill new", SKILLS, PINS), { kind: "skill-new" });
+  assert.equal(applyComposer(closedDebug, "/skill new extra", SKILLS, PINS).kind, "unknown");
+  assert.deepEqual(applyComposer(closedDebug, "/skills", SKILLS, PINS), { kind: "skills" });
+});
+
 test("/skill pin and unpin say why when there is nothing to do", () => {
   const notice = (line: string): string | null => {
     const outcome = applyComposer(closedDebug, line, SKILLS, PINS);
@@ -361,9 +372,25 @@ test("every command has a group and the names are unique", () => {
   assert.equal(new Set(names).size, names.length);
 });
 
-test("/context opens the context panel and takes no argument", () => {
+test("/context opens the context panel, and /context clear clears old tool results", () => {
   assert.deepEqual(applyComposer(closedDebug, "/context"), { kind: "context" });
+  assert.deepEqual(applyComposer(closedDebug, "/context clear"), { kind: "compact", action: "clear", focus: null });
   assert.equal(applyComposer(closedDebug, "/context x").kind, "unknown");
+  assert.equal(applyComposer(closedDebug, "/context clear x").kind, "unknown");
+});
+
+test("/compact summarises, with the rest of the line as the focus", () => {
+  assert.deepEqual(applyComposer(closedDebug, "/compact"), { kind: "compact", action: "summarise", focus: null });
+  assert.deepEqual(applyComposer(closedDebug, "/compact the file names  and the plan"), {
+    kind: "compact",
+    action: "summarise",
+    focus: "the file names and the plan",
+  });
+});
+
+test("/cost opens the cost report and takes no argument", () => {
+  assert.deepEqual(applyComposer(closedDebug, "/cost"), { kind: "cost" });
+  assert.equal(applyComposer(closedDebug, "/cost x").kind, "unknown");
 });
 
 test("/tune opens the tune panel, is in the model group, and takes no argument", () => {

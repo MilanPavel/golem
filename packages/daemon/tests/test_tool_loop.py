@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any, cast
 
 import pytest
-from fakes import ToolCallingChatModel
+from fakes import StreamingToolChatModel, ToolCallingChatModel
 from langchain_anthropic import ChatAnthropic
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, ToolMessage
 from langchain_ollama import ChatOllama
@@ -50,6 +50,7 @@ from golem_protocol.events import (
     ToolCompletedEvent,
     ToolFailedEvent,
     ToolRequestedEvent,
+    ToolWritingEvent,
 )
 
 
@@ -518,6 +519,60 @@ async def test_tool_output_streams_and_leaves_the_log_when_the_call_ends(
     assert events[-1].type == "run.completed"
 
 
+class _WriteArgs(BaseModel):
+    path: str
+    content: str
+
+
+class _Collect:
+    def __init__(self) -> None:
+        self.seen: list[ChatEvent] = []
+
+    def deliver(self, event: ChatEvent) -> None:
+        self.seen.append(event)
+
+
+async def test_a_file_call_that_streams_reports_its_progress_and_leaves_the_log(
+    database: Database, project: Path
+) -> None:
+    async def run(args: _WriteArgs, ctx: ToolContext) -> ToolResult:
+        del ctx
+        return ToolResult(output="ok", summary=f"{len(args.content)} chars")
+
+    writer = Tool(name="write_file", description="writes", args=_WriteArgs, run=run, read_only=True)
+    content = "one\ntwo\nthree\n" * 20
+    model = StreamingToolChatModel(
+        replies=[[("write_file", {"path": "out/notes.txt", "content": content})], "done"]
+    )
+    chat = _chat(database, model, ToolRegistry([*READ_ONLY_TOOLS, writer]))
+    session_id = await chat.manager.create(None, cwd=str(project))
+    target = _Collect()
+    await chat.manager.attach(session_id, 0, target)  # type: ignore[arg-type]
+    events = await chat.finished(await chat.manager.send(session_id, "write it"))
+
+    writing = [event for event in target.seen if isinstance(event, ToolWritingEvent)]
+    assert writing
+    assert (writing[0].data.name, writing[0].data.index) == ("write_file", 0)
+    started = [event for event in target.seen if isinstance(event, MessageStartedEvent)]
+    assert writing[0].data.message_id == started[0].data.message_id
+    assert "tool.writing" not in [event.type for event in events]
+    assert events[-1].type == "run.completed"
+
+
+async def test_a_call_that_is_not_a_file_write_reports_no_progress(
+    database: Database, project: Path
+) -> None:
+    model = StreamingToolChatModel(replies=[[("read_file", {"path": "notes.txt"})], "ok"])
+    chat = _chat(database, model)
+    session_id = await chat.manager.create(None, cwd=str(project))
+    target = _Collect()
+    await chat.manager.attach(session_id, 0, target)  # type: ignore[arg-type]
+    await chat.finished(await chat.manager.send(session_id, "read it"))
+    types = [event.type for event in target.seen]
+    assert "tool.requested" in types
+    assert "tool.writing" not in types
+
+
 async def test_a_call_that_ran_but_failed_is_marked_and_the_model_still_gets_the_output(
     database: Database, project: Path
 ) -> None:
@@ -615,6 +670,48 @@ async def test_a_reply_cut_by_the_length_limit_records_it(
 
     (done,) = [e for e in events if isinstance(e, ModelCallCompletedEvent)]
     assert done.data.stop_reason == "length"
+
+
+_OLLAMA_TIMES = {
+    "total_duration": 9_000_000_000,
+    "load_duration": 8_200_400_000,
+    "prompt_eval_count": 35_000,
+    "prompt_eval_duration": 192_000_000_000,
+    "eval_count": 210,
+    "eval_duration": 1_800_600_000,
+}
+
+
+async def test_an_ollama_reply_records_its_server_timings(
+    database: Database, project: Path
+) -> None:
+    model = ToolCallingChatModel(replies=["hi"], response_metadata=_OLLAMA_TIMES)
+    chat = _chat(database, model)
+    noted: list[tuple[str, dict[str, int]]] = []
+
+    def note(profile: str, timings: Mapping[str, int]) -> None:
+        noted.append((profile, dict(timings)))
+
+    chat.runtime.note_speed = note
+    session_id = await chat.manager.create(None, cwd=str(project))
+    events = await chat.finished(await chat.manager.send(session_id, "hello"))
+
+    (done,) = [e for e in events if isinstance(e, ModelCallCompletedEvent)]
+    assert (done.data.load_ms, done.data.prompt_ms, done.data.reply_ms) == (8200, 192000, 1801)
+    ((_, timings),) = noted
+    assert (timings["prompt_tokens"], timings["reply_tokens"]) == (35_000, 210)
+
+
+async def test_a_hosted_style_reply_has_no_server_timings(
+    database: Database, project: Path
+) -> None:
+    model = ToolCallingChatModel(replies=["hi"], response_metadata={"stop_reason": "end_turn"})
+    chat = _chat(database, model)
+    session_id = await chat.manager.create(None, cwd=str(project))
+    events = await chat.finished(await chat.manager.send(session_id, "hello"))
+
+    (done,) = [e for e in events if isinstance(e, ModelCallCompletedEvent)]
+    assert (done.data.load_ms, done.data.prompt_ms, done.data.reply_ms) == (None, None, None)
 
 
 async def test_a_model_without_usage_records_none_not_zeros(
@@ -717,3 +814,60 @@ async def test_each_call_names_the_model_it_used_not_the_runs_first() -> None:
     # A call that names no profile keeps the run's model.
     await _apply(ModelRequested("m9"), progress, emit)
     assert seen[-1] == ModelIdentity("anthropic/first", "anthropic", "first")
+
+
+async def test_a_run_stops_before_a_paid_call_when_the_cap_is_spent(
+    database: Database, project: Path
+) -> None:
+    model = ToolCallingChatModel(replies=[[("read_file", {"path": "notes.txt"})], "It says 42."])
+    answers = [True, False]
+    asked: list[str | None] = []
+
+    async def paid_ok(session_id: str | None) -> bool:
+        asked.append(session_id)
+        return answers.pop(0)
+
+    chat = _Chat(
+        database,
+        open_chat(
+            ModelRouter(model=model),
+            InMemorySaver(),
+            tier_of=lambda _profile: "frontier",
+            paid_ok=paid_ok,
+        ),
+    )
+    session_id = await chat.manager.create(None, cwd=str(project))
+    events = await chat.finished(await chat.manager.send(session_id, "what is in notes?"))
+
+    failed = events[-1]
+    assert isinstance(failed, RunFailedEvent)
+    assert failed.data.code == "budget_spent"
+    assert failed.data.hint is not None and "Settings" in failed.data.hint
+    assert asked == [session_id, session_id]
+    assert len(model.seen) == 1
+    stored = _messages(await chat.runtime.values(session_id))
+    calls = {c["id"] for m in stored if isinstance(m, AIMessage) for c in m.tool_calls}
+    answered = {m.tool_call_id for m in stored if isinstance(m, ToolMessage)}
+    assert calls and calls == answered
+
+
+async def test_a_local_model_is_never_asked_about_the_cap(
+    database: Database, project: Path
+) -> None:
+    model = ToolCallingChatModel(replies=["hello"])
+
+    async def paid_ok(session_id: str | None) -> bool:
+        raise AssertionError("a local model needs no yes")
+
+    chat = _Chat(
+        database,
+        open_chat(
+            ModelRouter(model=model),
+            InMemorySaver(),
+            tier_of=lambda _profile: "local",
+            paid_ok=paid_ok,
+        ),
+    )
+    session_id = await chat.manager.create(None, cwd=str(project))
+    events = await chat.finished(await chat.manager.send(session_id, "hi"))
+    assert events[-1].type == "run.completed"

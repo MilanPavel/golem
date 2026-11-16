@@ -20,21 +20,29 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
-from collections.abc import AsyncGenerator, Awaitable, Callable, Sequence
+from collections.abc import AsyncGenerator, Awaitable, Callable, Mapping, Sequence
 from contextlib import aclosing
 from dataclasses import dataclass, field
 from typing import Literal
 
 from pydantic import BaseModel
 
+from golem.coding.changes import ChangeStore, status_of
 from golem.config import ModelPrice, PermissionMode
 from golem.graphs.adapter import (
     ApprovalAsked,
+    CheckCompleted,
+    CheckOffered,
+    CheckStarted,
+    ContextChanged,
+    FileChanged,
     ModelRequested,
     ModelResponded,
     ModelStarted,
+    ModelWaiting,
     PinRead,
     PinSkipped,
+    PlanProposed,
     SkillLoaded,
     TextCompleted,
     TextDelta,
@@ -44,12 +52,14 @@ from golem.graphs.adapter import (
     ToolFinished,
     ToolOutput,
     ToolStarted,
+    ToolWriting,
     Translator,
 )
 from golem.graphs.chat import ChatRuntime
 from golem.graphs.tools_node import Answer
 from golem.models.cost import cost_usd
-from golem.models.errors import ModelUnreachable
+from golem.models.errors import ContextFull, ModelUnreachable
+from golem.models.pick import Choice
 from golem.models.router import ModelConfigError, ModelIdentity
 from golem.models.tiers import Tier
 from golem.permissions.engine import Allowance
@@ -62,14 +72,24 @@ from golem_protocol.events import (
     ApprovalNeededData,
     ApprovalResolvedData,
     CallPrice,
+    CheckCompletedData,
+    CheckInfo,
+    CheckOfferedData,
+    CheckStartedData,
+    ContextChangedData,
     EmptyEventData,
     EventType,
+    FileChangedData,
     MessageCompletedData,
     MessageDeltaData,
     MessageStartedData,
     MessageThinkingDeltaData,
     ModelCallCompletedData,
     ModelCallStartedData,
+    ModelRejection,
+    ModelRoutedData,
+    ModelWaitingData,
+    PlanProposedData,
     PromptSectionInfo,
     RunCancelledData,
     RunFailedData,
@@ -82,6 +102,7 @@ from golem_protocol.events import (
     ToolOutputData,
     ToolRequestedData,
     ToolStartedData,
+    ToolWritingData,
 )
 
 log = logging.getLogger("golem.sessions")
@@ -114,9 +135,13 @@ class Turn:
     pinned_folders: tuple[str, ...] = ()
     options: dict[str, float | str] = field(default_factory=dict[str, float | str], compare=False)
     permission_mode: PermissionMode | None = None
+    checks: bool | None = None
+    plan_first: bool = False
     pins: PinMemory = field(default_factory=PinMemory, compare=False)
     skill: Invocation | None = None
     typed: str | None = None
+    routed: Choice | None = field(default=None, compare=False)
+    """The pick for this turn, None on a ``pinned`` session. ``model_profile`` is its model."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -149,6 +174,8 @@ class Resume:
     pinned_folders: tuple[str, ...] = ()
     options: dict[str, float | str] = field(default_factory=dict[str, float | str], compare=False)
     permission_mode: PermissionMode | None = None
+    checks: bool | None = None
+    plan_first: bool = False
     pins: PinMemory = field(default_factory=PinMemory, compare=False)
 
 
@@ -198,6 +225,9 @@ class _Progress:
     first_at: float | None = None
     ran_window: int | None = None
     text_tool_calls: Literal["recovered", "unread"] | None = None
+    timings: Mapping[str, int] = field(default_factory=dict[str, int])
+    """The model server's own numbers for the call, from ``model.response``."""
+    note_speed: Callable[..., object] | None = None
     translate: Translator = field(default_factory=Translator)
     """Turns stream parts into facts. It holds text that may be half of a ``<think>`` tag."""
     thinking: list[str] = field(default_factory=list[str])
@@ -205,6 +235,10 @@ class _Progress:
     """When the first thinking fragment of the open reply came."""
     think_ms: int | None = None
     """Thinking time of the open reply, set when its first answer fragment comes."""
+    changes: ChangeStore | None = None
+    """Records the files a tool wrote. None: they are not recorded and send no event."""
+    session_id: str = ""
+    run_id: str = ""
 
 
 async def run_turn(
@@ -222,6 +256,10 @@ async def run_turn(
         identify=runtime.router.identity,
         price_of=runtime.price_of,
         tier_of=runtime.tier_of,
+        changes=runtime.changes,
+        session_id=turn.session_id,
+        run_id=turn.run_id,
+        note_speed=runtime.note_speed,
     )
 
     async def emit(kind: EventType, data: BaseModel) -> None:
@@ -253,6 +291,8 @@ async def run_turn(
         # Emits are shielded: once one is awaited, it lands even if this task is cancelled.
         progress.run_started = True
         await emit("run.started", EmptyEventData())
+        if turn.routed is not None:
+            await emit("model.routed", _routed(runtime, turn.model_profile, turn.routed))
         progress.open = turn.assistant_message_id
         await emit(
             "message.started",
@@ -273,6 +313,8 @@ async def run_turn(
             pinned_folders=turn.pinned_folders,
             options=turn.options,
             permission_mode=turn.permission_mode,
+            checks=turn.checks,
+            plan_first=turn.plan_first,
             skill_folder=None if skill is None else str(skill.path),
         )
         return await _finish(stream, progress, emit)
@@ -289,6 +331,24 @@ async def run_turn(
         raise
     except Exception as exc:
         return await _failed(turn.run_id, exc, progress, emit)
+
+
+def _routed(runtime: ChatRuntime, profile: str, choice: Choice) -> ModelRoutedData:
+    identity = runtime.router.identity(profile)
+    tier = None
+    if choice.model is not None:
+        tier = choice.model.tier
+    elif runtime.tier_of is not None:
+        tier = runtime.tier_of(profile)
+    return ModelRoutedData(
+        model_profile=profile,
+        provider=identity.provider,
+        model=identity.name,
+        tier=tier or "frontier",
+        reason=choice.reason,
+        detail=choice.detail,
+        rejected=[ModelRejection(ref=r.ref, tier=r.tier, why=r.why) for r in choice.rejected],
+    )
 
 
 async def _until_pulled(runtime: ChatRuntime, profile: str) -> None:
@@ -317,6 +377,10 @@ async def resume_turn(
         identify=runtime.router.identity,
         price_of=runtime.price_of,
         tier_of=runtime.tier_of,
+        changes=runtime.changes,
+        session_id=resume.session_id,
+        run_id=resume.run_id,
+        note_speed=runtime.note_speed,
     )
 
     async def emit(kind: EventType, data: BaseModel) -> None:
@@ -346,6 +410,8 @@ async def resume_turn(
             pinned_folders=resume.pinned_folders,
             options=resume.options,
             permission_mode=resume.permission_mode,
+            checks=resume.checks,
+            plan_first=resume.plan_first,
         )
         return await _finish(stream, progress, emit)
     except asyncio.CancelledError:
@@ -392,6 +458,10 @@ async def _failed(
         )
         await emit("run.failed", data)
         return
+    if isinstance(exc, ContextFull):
+        log.warning("run %s failed: needs about %d of %d tokens", run_id, exc.need, exc.window)
+        await emit("run.failed", RunFailedData(message=exc.message, code=exc.code, hint=exc.hint))
+        return
     log.exception("run %s failed", run_id, exc_info=exc)
     message = str(exc).strip() or type(exc).__name__
     await emit("run.failed", RunFailedData(message=message))
@@ -411,6 +481,11 @@ async def _apply(
         await emit(
             "message.started", MessageStartedData(message_id=fact.message_id, role="assistant")
         )
+    elif isinstance(fact, ModelWaiting):
+        await emit(
+            "model.waiting",
+            ModelWaitingData(message_id=fact.message_id, waiting=fact.waiting),
+        )
     elif isinstance(fact, ModelRequested):
         progress.index += 1
         progress.call = fact.message_id
@@ -418,6 +493,7 @@ async def _apply(
         progress.first_at = None
         progress.ran_window = None
         progress.text_tool_calls = None
+        progress.timings = {}
         model = progress.model
         if fact.profile is not None and progress.identify is not None:
             model = progress.identify(fact.profile)
@@ -447,11 +523,25 @@ async def _apply(
                 tools_bytes=fact.tools_bytes,
                 message_chars=None if fact.message_chars is None else list(fact.message_chars),
                 message_bytes=None if fact.message_bytes is None else list(fact.message_bytes),
+                cleared_ids=list(fact.cleared_ids),
+                summary_chars=fact.summary_chars,
+                estimated_tokens=fact.estimated_tokens,
+            ),
+        )
+    elif isinstance(fact, ContextChanged):
+        await emit(
+            "context.changed",
+            ContextChangedData(
+                action=fact.action,
+                before_tokens=fact.before_tokens,
+                after_tokens=fact.after_tokens,
+                count=fact.count,
             ),
         )
     elif isinstance(fact, ModelResponded):
         progress.ran_window = fact.context_window
         progress.text_tool_calls = fact.text_tool_calls
+        progress.timings = fact.timings
     elif isinstance(fact, ThinkingDelta) and progress.open is not None:
         if progress.think_at is None:
             progress.think_at = time.monotonic()
@@ -468,6 +558,18 @@ async def _apply(
             progress.think_ms = _ms(now - progress.think_at)
         progress.parts.append(fact.text)
         await emit("message.delta", MessageDeltaData(message_id=progress.open, text=fact.text))
+    elif isinstance(fact, ToolWriting) and progress.open is not None:
+        await emit(
+            "tool.writing",
+            ToolWritingData(
+                message_id=progress.open,
+                index=fact.index,
+                name=fact.name,
+                path=fact.path,
+                lines=fact.lines,
+                chars=fact.chars,
+            ),
+        )
     elif isinstance(fact, TextCompleted):
         message_id = fact.message_id or progress.open
         if message_id is None:
@@ -532,6 +634,20 @@ async def _apply(
             "todos.updated",
             TodosUpdatedData.model_validate({"call_id": fact.call_id, "todos": list(fact.todos)}),
         )
+    elif isinstance(fact, PlanProposed):
+        await emit(
+            "plan.proposed",
+            PlanProposedData.model_validate(
+                {
+                    "plan_id": fact.plan_id,
+                    "call_id": fact.call_id,
+                    "title": fact.title,
+                    "steps": list(fact.steps),
+                }
+            ),
+        )
+    elif isinstance(fact, FileChanged):
+        await _record_change(fact, progress, emit)
     elif isinstance(fact, PinRead):
         if progress.pins.read(fact.name, fact.hash):
             data = {"name": fact.name, "source": fact.source, "how": "pinned"}
@@ -546,6 +662,32 @@ async def _apply(
         skipped = SkillSkippedData.model_validate(data)
         if progress.pins.skipped(skipped.name, skipped.reason):
             await emit("skill.skipped", skipped)
+    elif isinstance(fact, CheckOffered):
+        infos = [CheckInfo(name=name, command=command) for name, command in fact.checks]
+        await emit("check.offered", CheckOfferedData(checks=infos))
+    elif isinstance(fact, CheckStarted):
+        await emit(
+            "check.started",
+            CheckStartedData(
+                check_id=fact.check_id, name=fact.name, command=fact.command, round=fact.round
+            ),
+        )
+    elif isinstance(fact, CheckCompleted):
+        await emit(
+            "check.completed",
+            CheckCompletedData.model_validate(
+                {
+                    "check_id": fact.check_id,
+                    "name": fact.name,
+                    "status": fact.status,
+                    "exit_code": fact.exit_code,
+                    "duration_ms": fact.duration_ms,
+                    "output": fact.output,
+                    "artifact_id": fact.artifact_id,
+                    "round": fact.round,
+                }
+            ),
+        )
     elif isinstance(fact, ApprovalAsked):
         progress.waiting = True
         await emit(
@@ -560,6 +702,42 @@ async def _apply(
                 diff=fact.diff,
             ),
         )
+
+
+async def _record_change(
+    fact: FileChanged,
+    progress: _Progress,
+    emit: Callable[[EventType, BaseModel], Awaitable[None]],
+) -> None:
+    """Store the change, then tell the screens. The texts stay here and never go out."""
+    if progress.changes is None or fact.before == fact.after:
+        return
+    try:
+        change = await progress.changes.record(
+            session_id=progress.session_id,
+            run_id=progress.run_id,
+            call_id=fact.call_id,
+            path=fact.path,
+            before=fact.before,
+            after=fact.after,
+            source=fact.source,
+        )
+    except Exception:
+        log.exception("could not record the change to %s", fact.path)
+        return
+    await emit(
+        "file.changed",
+        FileChangedData(
+            change_id=change.change_id,
+            call_id=change.call_id,
+            path=change.path,
+            status=status_of(change.before_sha, change.after_sha),
+            added=change.added,
+            removed=change.removed,
+            source=change.source,
+            reverts=change.reverts,
+        ),
+    )
 
 
 def _tier(progress: _Progress, model: ModelIdentity | None) -> Tier | None:
@@ -593,6 +771,12 @@ async def _end_call(
             price = CallPrice(
                 input=found.input, output=found.output, cached_input=found.cached_input
             )
+    timings: Mapping[str, int] = {} if failed else progress.timings
+    if timings and model is not None and progress.note_speed is not None:
+        try:
+            progress.note_speed(model.profile, timings)
+        except Exception:
+            log.debug("noting the speed of %s failed", model.profile, exc_info=True)
     await emit(
         "model.call.completed",
         ModelCallCompletedData(
@@ -606,6 +790,9 @@ async def _end_call(
             text_tool_calls=None if failed else progress.text_tool_calls,
             cost_usd=cost,
             price=price,
+            load_ms=timings.get("load_ms"),
+            prompt_ms=timings.get("prompt_ms"),
+            reply_ms=timings.get("reply_ms"),
         ),
     )
 

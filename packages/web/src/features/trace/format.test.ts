@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { endContext, formatDuration, inputSeries, latestContext, localTime, runTokens, summaryLine, throughput, tokenCell, totalTokens } from "./format.ts";
+import { endContext, formatDuration, inputSeries, latestContext, localTime, runTokens, summaryLine, throughput, throughputIsExact, tokenCell, totalTokens } from "./format.ts";
 import { GROWING_TRACE, LONG_TRACE, OLD_TRACE, SHORT_TRACE, sampleModel, sampleRun, sampleTool } from "./sample.ts";
 import type { TraceModelSpan } from "../../store/trace.ts";
 
@@ -77,6 +77,16 @@ test("throughput is output over the time after the first token", () => {
   expect(throughput({ ...span, first_token_ms: null })).toBeNull();
   expect(throughput({ ...span, tokens: { ...span.tokens, output: 0 } })).toBeNull();
   expect(throughput({ ...span, duration_ms: 2_010 })).toBeNull();
+});
+
+test("throughput prefers the reply time the model server reported", () => {
+  const span = { ...first, duration_ms: 10_000, first_token_ms: 2_000, tokens: { input: 1, output: 576, cache_read: null, cache_write: null } };
+  expect(throughputIsExact(span)).toBe(false);
+  const exact: TraceModelSpan = { ...span, reply_ms: 8_000, first_token_ms: null };
+  expect(throughput(exact)).toBe(72);
+  expect(throughputIsExact(exact)).toBe(true);
+  const faster: TraceModelSpan = { ...exact, reply_ms: 4_000 };
+  expect(throughput(faster)).toBe(144);
 });
 
 test("local time has milliseconds, and a bad string stays as it is", () => {

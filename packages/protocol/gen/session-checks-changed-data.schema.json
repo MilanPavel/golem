@@ -1,0 +1,15 @@
+{
+  "additionalProperties": false,
+  "description": "Whether the session lets golem run the project's checks, after a change.\n\n``on`` true is the user's yes and false their no. The last event holds the\nanswer, so a replayed session gets it back. A session without one has not\nbeen asked.",
+  "properties": {
+    "on": {
+      "title": "On",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "on"
+  ],
+  "title": "SessionChecksChangedData",
+  "type": "object"
+}

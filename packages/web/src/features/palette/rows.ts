@@ -17,12 +17,14 @@ export const COMMAND_KEYS: Readonly<Record<string, string>> = { "/help": "?" };
 export type PaletteRow = SearchListItem &
   (
     | { kind: "command"; command: Command; key: string | null }
-    | { kind: "page"; page: "keys" | "settings" | "trace"; name: string; description: string; key: string | null }
+    | { kind: "page"; page: "keys" | "settings" | "trace" | "skills" | "new-skill"; name: string; description: string; key: string | null }
     | { kind: "message"; text: string }
   );
 
 const KEYS = { name: "Keys", description: "The keys this page uses.", key: "?" };
 const TRACE = { name: "Trace", description: "Model calls, context, tools, and timings of this session", key: null };
+const SKILLS = { name: "Skills…", description: "Every skill golem finds, and what each may do.", key: null };
+const NEW_SKILL = { name: "New skill…", description: "Make a skill of your own, or one for this project.", key: null };
 const SETTINGS = { name: "Settings", description: "Setup, appearance, and the rest of the settings.", key: null };
 
 /** How well the query fits a name, or null for no fit: 0 when the name starts with it, 1 when the text holds it. */
@@ -59,6 +61,10 @@ export function paletteRows(commands: readonly Command[], query: string, hasSess
       if (settings !== null) {
         found.push({ row: { id: "page:settings", group: title, kind: "page", page: "settings", ...SETTINGS }, rank: settings });
       }
+      const skills = rank(SKILLS.name, "", SKILLS.description, needle);
+      if (skills !== null) found.push({ row: { id: "page:skills", group: title, kind: "page", page: "skills", ...SKILLS }, rank: skills });
+      const fresh = rank(NEW_SKILL.name, "", NEW_SKILL.description, needle);
+      if (fresh !== null) found.push({ row: { id: "page:new-skill", group: title, kind: "page", page: "new-skill", ...NEW_SKILL }, rank: fresh });
       const at = rank(KEYS.name, "", KEYS.description, needle);
       if (at !== null) found.push({ row: { id: "page:keys", group: title, kind: "page", page: "keys", ...KEYS }, rank: at });
     }

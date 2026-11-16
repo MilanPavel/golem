@@ -40,3 +40,9 @@ class AgentState(MessagesState):
     """Folders of the skills this session ran, oldest first. Empty in older checkpoints."""
     context_view: NotRequired[ContextView]
     """What a model call sends of ``messages``. Replaced whole on update. Empty or missing: all."""
+    checks_offered: NotRequired[bool]
+    """Whether the session was offered its checks. Set once, so the offer is made once."""
+    check_round: NotRequired[int]
+    """Fix rounds the checks sent back to the model in this turn. Reset to 0 each turn."""
+    check_results: NotRequired[list[dict[str, object]]]
+    """What the checks of the latest turn reported. Replaced each turn, empty when none ran."""

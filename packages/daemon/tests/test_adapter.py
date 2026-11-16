@@ -17,6 +17,7 @@ from golem.graphs.adapter import (
     ToolErrored,
     ToolFinished,
     ToolStarted,
+    ToolWriting,
     Translator,
     plain_messages,
     split_think,
@@ -307,3 +308,80 @@ def test_split_think_of_a_whole_answer() -> None:
     assert split_think("<think>a</think>b") == ("a", "b")
     assert split_think("<think>a") == ("a", "")
     assert split_think("x<think>a</think>b") == ("", "x<think>a</think>b")
+
+
+def _calls(*pieces: dict[str, object]) -> dict[str, object]:
+    return {
+        "type": "messages",
+        "data": (
+            AIMessageChunk(content="", tool_call_chunks=list(pieces)),  # type: ignore[arg-type]
+            {"langgraph_node": "call_model"},
+        ),
+    }
+
+
+def _piece(args: str, name: str | None = None, index: int = 0) -> dict[str, object]:
+    return {"name": name, "args": args, "id": None, "index": index}
+
+
+class _Clock:
+    def __init__(self) -> None:
+        self.now = 100.0
+
+    def __call__(self) -> float:
+        return self.now
+
+
+def test_a_file_call_in_pieces_reports_at_most_once_a_second() -> None:
+    clock = _Clock()
+    translator = Translator(clock)
+    text = '{"path": "a.py", "content": "x = 1\\ny = 2\\nz = 3"}'
+    pieces = [text[start : start + 6] for start in range(0, len(text), 6)]
+    facts: list[ToolWriting] = []
+    for number, piece in enumerate(pieces):
+        for fact in translator(_calls(_piece(piece, "write_file" if number == 0 else None))):
+            assert isinstance(fact, ToolWriting)
+            facts.append(fact)
+        clock.now += 0.4
+    # One chunk every 0.4 s: the 1st, 4th, 7th, and so on.
+    assert len(facts) == -(-len(pieces) // 3)
+    assert facts[0].path is None
+    assert [fact.chars for fact in facts] == sorted(fact.chars for fact in facts)
+    clock.now += 2
+    last = translator(_calls(_piece("")))
+    assert last == [ToolWriting(0, "write_file", "a.py", 3, len("x = 1\ny = 2\nz = 3"))]
+
+
+def test_a_second_call_is_counted_apart_from_the_first() -> None:
+    translator = Translator(_Clock())
+    first = translator(_calls(_piece('{"path": "a.py", "content": "a"}', "write_file", 0)))
+    second = translator(_calls(_piece('{"path": "b.py", "content": "bb"}', "write_file", 1)))
+    assert first == [ToolWriting(0, "write_file", "a.py", 1, 1)]
+    assert second == [ToolWriting(1, "write_file", "b.py", 1, 2)]
+
+
+def test_a_path_is_given_only_when_it_is_whole() -> None:
+    translator = Translator(_Clock())
+    facts = translator(_calls(_piece('{"path": "src/ma', "write_file")))
+    assert facts == [ToolWriting(0, "write_file", None, 0, 0)]
+
+
+def test_an_edit_counts_its_new_string() -> None:
+    translator = Translator(_Clock())
+    args = '{"path": "a.py", "old_string": "q", "new_string": "l1\\nl2'
+    assert translator(_calls(_piece(args, "edit_file"))) == [
+        ToolWriting(0, "edit_file", "a.py", 2, 5)
+    ]
+
+
+def test_a_call_that_is_not_a_file_write_gives_no_fact() -> None:
+    translator = Translator(_Clock())
+    assert translator(_calls(_piece('{"path": "a.py"}', "read_file"))) == []
+
+
+def test_a_finished_message_starts_the_collecting_over() -> None:
+    translator = Translator(_Clock())
+    translator(_calls(_piece('{"path": "a.py"', "write_file")))
+    translator(_done(""))
+    # Without a name, the pieces of a new message belong to no file call.
+    assert translator(_calls(_piece(', "content": "x"}'))) == []

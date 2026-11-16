@@ -5,14 +5,21 @@ from __future__ import annotations
 import json
 import re
 import tomllib
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal, cast
 
-from golem.config import CodingSettings
+from langchain_core.messages import BaseMessage, HumanMessage, ToolMessage
+
+from golem.config import CodingSettings, PermissionMode
+from golem.graphs.notes import is_note
 
 MAX_DETECTED = 4
 _DEFAULT_TIMEOUT = 120
+_EDITING_TOOLS = ("write_file", "edit_file")
+_SHELL_TOOLS = ("shell", "shell_unsandboxed")
+_SHELL_OK = "[exit code 0]"
 
 
 @dataclass(frozen=True, slots=True)
@@ -28,6 +35,43 @@ def checks_for(root: Path, settings: CodingSettings) -> list[Check]:
     if settings.check:
         return [Check(c.name, c.command, c.timeout_seconds, "config") for c in settings.check]
     return detect(root)
+
+
+def edited_this_turn(messages: Sequence[BaseMessage]) -> bool:
+    """A successful write_file, edit_file or shell result since the last human message.
+
+    A note from golem is not a human message here, so a fix round still counts the edits before it.
+    """
+    for message in reversed(messages):
+        if isinstance(message, HumanMessage):
+            if is_note(message):
+                continue
+            return False
+        if not isinstance(message, ToolMessage) or message.status != "success":
+            continue
+        if message.name in _EDITING_TOOLS:
+            return True
+        if message.name in _SHELL_TOOLS and _SHELL_OK in message.text.splitlines():
+            return True
+    return False
+
+
+def decide(
+    setting: Literal["ask", "auto", "off"], answer: bool | None, mode: PermissionMode
+) -> Literal["run", "offer", "skip"]:
+    """Whether to run the checks, ask first, or leave them.
+
+    ``answer`` is the session's reply to the offer, None when it has not given one.
+    ``off`` never runs. ``auto`` runs unless the session said no. ``ask`` follows the
+    session's reply, and without one runs in autopilot mode and otherwise offers.
+    """
+    if setting == "off":
+        return "skip"
+    if setting == "auto":
+        return "skip" if answer is False else "run"
+    if answer is not None:
+        return "run" if answer else "skip"
+    return "run" if mode == "autopilot" else "offer"
 
 
 def detect(root: Path) -> list[Check]:

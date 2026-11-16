@@ -1,0 +1,21 @@
+{
+  "additionalProperties": false,
+  "description": "A chat call waits, or no longer waits, for its turn on a local model server.\n\nSent for the reply ``message_id`` only, so other sessions never show it. Stored only\nuntil its message completes.",
+  "properties": {
+    "message_id": {
+      "minLength": 1,
+      "title": "Message Id",
+      "type": "string"
+    },
+    "waiting": {
+      "title": "Waiting",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "message_id",
+    "waiting"
+  ],
+  "title": "ModelWaitingData",
+  "type": "object"
+}

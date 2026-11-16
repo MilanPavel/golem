@@ -20,14 +20,15 @@ import { Dot, serverSummary, SignInPanel, type Login } from "../features/setting
 import type { McpServer } from "../store/mcp.ts";
 import { ConnectionScreen } from "../features/connection/connection-screen.tsx";
 import { connectionScreen, type ConnectionHost } from "../features/connection/connection-screen.ts";
-import { DetailSwitch, ToolLine, TranscriptMessages } from "../features/chat/index.ts";
-import { CUT_REPLY, SAMPLE_CHAT, SAMPLE_TOOLS, THINKING_CASES, TURN_CHAT } from "../features/chat/sample.ts";
+import { DetailSwitch, EditCards, ToolLine, TranscriptMessages, WritingRow } from "../features/chat/index.ts";
+import { COST_CASES, CUT_REPLY, SAMPLE_CHAT, SAMPLE_TOOLS, THINKING_CASES, TURN_CHAT } from "../features/chat/sample.ts";
 import { ApprovalBar } from "../features/approval/index.ts";
 import { ANSWERED, PENDING_EDIT, PENDING_SHELL } from "../features/approval/sample.ts";
 import { DiffModeSwitch, DiffView } from "../features/diff/index.ts";
 import { SAMPLE_EDIT_DIFF, SAMPLE_LONG_LINE_DIFF, SAMPLE_NEW_FILE_DIFF } from "../features/diff/sample.ts";
 import { TodoList } from "../features/drawer/index.ts";
-import { Workbench, type WorkbenchTab } from "../features/workbench/index.ts";
+import { ChangesView, Workbench, type WorkbenchTab } from "../features/workbench/index.ts";
+import type { ChangedFile } from "../store/changes.ts";
 import { Composer, ContextChipView, DockView, Meter, ModeChipView, TuneChipView } from "../features/composer/index.ts";
 import { createHistory } from "../features/composer/history.ts";
 import { CommandsDialog } from "../features/composer/help-dialog.tsx";
@@ -43,10 +44,18 @@ import { APPROVAL_DETAIL, APPROVAL_TRACE, CUT_LIKELY_DETAIL, CUT_MIDDLE_DETAIL, 
 import type { TraceRunSpan, TraceSpanResult } from "../store/trace.ts";
 import { FORM_CASES } from "../features/setup/sample.ts";
 import { GolemBlockView } from "../features/setup/golem-block.tsx";
+import { KeysView } from "../features/settings/keys-section.tsx";
+import { KEYS_CASES } from "../features/settings/keys-sample.ts";
+import { SkillList } from "../features/settings/skills-section.tsx";
+import { SkillOverview } from "../features/settings/skills/skill-detail.tsx";
+import { SAMPLE_BROKEN_SKILL_MD, SAMPLE_SKILLS } from "../features/settings/skills/sample.ts";
+import { UsageView } from "../features/settings/usage-section.tsx";
+import { EMPTY_USAGE, SAMPLE_USAGE } from "../features/settings/usage-sample.ts";
+import { CodeEditor } from "../features/settings/config/code-editor.tsx";
 import { CatalogView } from "../features/settings/mcp/catalog-panel.tsx";
 import { ImportListView } from "../features/settings/mcp/import-panel.tsx";
 import { SAMPLE_CATALOG, SAMPLE_SCAN } from "../features/settings/mcp/sample.ts";
-import { AddKey, SetupFormView, SetupHeader } from "../features/setup/setup-form.tsx";
+import { SetupFormView, SetupHeader } from "../features/setup/setup-form.tsx";
 import { ToolsOfferView } from "../features/setup/tools-offer.tsx";
 import { TOOLS_CASES } from "../features/setup/tools-sample.ts";
 import { PullStatusView, pullSummary } from "../features/models/index.ts";
@@ -269,6 +278,54 @@ function WorkbenchDemo() {
       <h3 className="mb-2 font-mono text-xs text-faint">Workbench</h3>
       <div className="flex h-96 max-w-full justify-end overflow-hidden rounded-lg border border-line">
         <Workbench id={id} tabs={DEMO_TABS} floating={false} onClose={() => {}} />
+      </div>
+    </section>
+  );
+}
+
+const SAMPLE_CHANGES: ChangedFile[] = [
+  { path: "src/socket.ts", status: "modified", added: 3, removed: 3, change_ids: ["c_1"], stale: false },
+  { path: "src/utils/clamp.ts", status: "created", added: 3, removed: 0, change_ids: ["c_2"], stale: false },
+  { path: "docs/old-notes.md", status: "deleted", added: 0, removed: 12, change_ids: ["c_3"], stale: true },
+];
+
+/** The Changes tab's list with three files, the first open, in a narrow and a wide panel. */
+function ChangesDemo() {
+  const anchor = useAnchor();
+  const [open, setOpen] = useState<string | null>("src/socket.ts");
+  const [mode, setMode] = useState<"unified" | "split">("split");
+  return (
+    <section className="mt-6" id={anchor("Changes tab")}>
+      <h3 className="mb-2 font-mono text-xs text-faint">Changes tab</h3>
+      <div className="flex flex-wrap items-start gap-4">
+        {(
+          [
+            ["Narrow panel", false],
+            ["Wide panel", true],
+          ] as const
+        ).map(([title, canSplit]) => (
+          <div key={title} className={canSplit ? "flex w-full max-w-4xl flex-col gap-3" : "flex w-80 flex-col gap-3"}>
+            <p className="text-xs text-muted">{title}</p>
+            <div className="flex flex-col gap-3 rounded-lg border border-line bg-surface p-4">
+              <ChangesView
+                files={SAMPLE_CHANGES}
+                error={null}
+                open={open}
+                onOpen={setOpen}
+                diff={{ diff: SAMPLE_EDIT_DIFF, truncated: true, error: null }}
+                mode={mode}
+                onMode={setMode}
+                canSplit={canSplit}
+              />
+            </div>
+          </div>
+        ))}
+        <div className="flex w-80 flex-col gap-3">
+          <p className="text-xs text-muted">Empty</p>
+          <div className="rounded-lg border border-line bg-surface p-4">
+            <ChangesView files={[]} error={null} open={null} onOpen={() => {}} diff={{ diff: null, truncated: false, error: null }} mode="unified" onMode={() => {}} canSplit={false} />
+          </div>
+        </div>
       </div>
     </section>
   );
@@ -658,11 +715,11 @@ function McpSignInDemo() {
   );
 }
 
-/** Settings → Setup: the golem block, the status rows, and the key chips, in each state. */
+/** Settings → Setup: the golem block and the status rows, in each state. */
 function SetupFormDemo() {
   return (
     <div className="flex flex-col gap-4">
-      {FORM_CASES.map(({ label, rows, actions, providers, header, block, openKey }) => (
+      {FORM_CASES.map(({ label, rows, actions, header, block }) => (
         <section key={label} aria-label={`Setup, ${label}`} className="flex flex-col gap-3 rounded-lg border border-line bg-bg p-4">
           <span className="font-mono text-xs text-faint">{label}</span>
           <SetupHeader mark={header.mark} text={header.text} onRunAgain={() => {}} />
@@ -675,7 +732,6 @@ function SetupFormDemo() {
             onNavigate={() => {}}
             hasPage={() => false}
           />
-          <AddKey providers={providers} actions={actions} onCheck={() => {}} initialOpen={openKey ?? null} />
         </section>
       ))}
     </div>
@@ -683,6 +739,60 @@ function SetupFormDemo() {
 }
 
 /** Settings → MCP servers: the Catalog tab's cards, and the Import tab with nothing picked and with some picked. */
+function SkillsDemo() {
+  const broken = SAMPLE_SKILLS[3];
+  return (
+    <div className="flex flex-col gap-4">
+      <section aria-label="Skills, list" className="flex flex-col gap-3 rounded-lg border border-line bg-bg p-4">
+        <span className="font-mono text-xs text-faint">List</span>
+        <SkillList skills={SAMPLE_SKILLS} wide selected={SAMPLE_SKILLS[1]?.path ?? null} register={() => {}} onNew={() => {}} onOpen={() => {}} />
+      </section>
+      <section aria-label="Skills, overview" className="flex flex-col gap-3 rounded-lg border border-line bg-bg p-4">
+        <span className="font-mono text-xs text-faint">Overview of a broken skill</span>
+        {broken === undefined ? null : <SkillOverview skill={broken} />}
+      </section>
+      <section aria-label="Skills, SKILL.md" className="flex flex-col gap-3 rounded-lg border border-line bg-bg p-4">
+        <span className="font-mono text-xs text-faint">SKILL.md with a problem on line 3</span>
+        <CodeEditor value={SAMPLE_BROKEN_SKILL_MD} onChange={() => {}} marked={new Set([3])} label="broken-one SKILL.md" language="markdown" className="h-72" />
+        <p role="alert" className="rounded-md border border-deny bg-deny-soft px-3 py-2 font-mono text-xs text-deny">
+          line 3: expected &apos;,&apos; or &apos;]&apos;
+        </p>
+      </section>
+    </div>
+  );
+}
+
+/** Settings → API keys in each state: mixed, a fresh install, all set, no MCP keys, and a drawer open. */
+function ApiKeysDemo() {
+  return (
+    <div className="flex flex-col gap-4">
+      {KEYS_CASES.map(({ label, providers, servers, openKey }) => (
+        <section key={label} aria-label={`API keys, ${label}`} className="flex flex-col gap-3 rounded-lg border border-line bg-bg p-4">
+          <span className="font-mono text-xs text-faint">{label}</span>
+          <KeysView providers={providers} servers={servers} onRefresh={() => {}} onNavigate={() => {}} onServer={() => {}} initialOpen={openKey ?? null} />
+        </section>
+      ))}
+    </div>
+  );
+}
+
+/** Settings → Usage, with a week of calls and with none. */
+function UsageDemo() {
+  return (
+    <div className="flex flex-col gap-4">
+      {[
+        ["Usage, filled", SAMPLE_USAGE],
+        ["Usage, empty", EMPTY_USAGE],
+      ].map(([label, result]) => (
+        <section key={label as string} aria-label={label as string} className="flex flex-col gap-3 rounded-lg border border-line bg-bg p-4">
+          <span className="font-mono text-xs text-faint">{label as string}</span>
+          <UsageView result={result as typeof SAMPLE_USAGE} />
+        </section>
+      ))}
+    </div>
+  );
+}
+
 function McpTabsDemo() {
   const [picked, setPicked] = useState<ReadonlySet<string>>(new Set(["a", "e"]));
   const none = new Set<string>();
@@ -919,6 +1029,21 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
       <section className="mt-6" id={anchor("MCP servers")}>
         <h3 className="mb-2 font-mono text-xs text-faint">MCP servers</h3>
         <McpTabsDemo />
+      </section>
+
+      <section className="mt-6" id={anchor("Skills")}>
+        <h3 className="mb-2 font-mono text-xs text-faint">Skills</h3>
+        <SkillsDemo />
+      </section>
+
+      <section className="mt-6" id={anchor("API keys")}>
+        <h3 className="mb-2 font-mono text-xs text-faint">API keys</h3>
+        <ApiKeysDemo />
+      </section>
+
+      <section className="mt-6" id={anchor("Usage")}>
+        <h3 className="mb-2 font-mono text-xs text-faint">Usage</h3>
+        <UsageDemo />
       </section>
 
       <section className="mt-6" id={anchor("Tools panel")}>
@@ -1167,6 +1292,16 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
               <TranscriptMessages chat={TURN_CHAT} detail={detail} />
             </div>
           ))}
+          <div aria-label="Edit cards" role="group" className="flex flex-col gap-2 rounded-lg border border-line bg-bg p-4">
+            <p className="font-mono text-xs text-faint">edit cards: an edit, a new file, an edit with no diff kept</p>
+            <EditCards
+              tools={[
+                { callId: "ec1", name: "edit_file", args: { path: "src/socket.ts" }, status: "done", summary: "+3 -3 src/socket.ts", diff: SAMPLE_EDIT_DIFF },
+                { callId: "ec2", name: "write_file", args: { path: "src/clamp.ts" }, status: "done", summary: "new file +4 -0 src/clamp.ts", diff: SAMPLE_NEW_FILE_DIFF },
+                { callId: "ec3", name: "edit_file", args: { path: "src/old.ts" }, status: "done", summary: "done" },
+              ]}
+            />
+          </div>
         </div>
       </section>
 
@@ -1182,10 +1317,31 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
         </div>
       </section>
 
+      <section className="mt-6" id={anchor("Cost")}>
+        <h3 className="mb-2 font-mono text-xs text-faint">Cost</h3>
+        <div className="flex flex-col gap-6 rounded-lg border border-line bg-bg p-4">
+          {COST_CASES.map(({ label, message }) => (
+            <div key={label} aria-label={`Cost, ${label}`} role="group" className="flex flex-col gap-1">
+              <p className="font-mono text-xs text-faint">{label}</p>
+              <TranscriptMessages chat={{ messages: [message], error: null, notice: null }} />
+            </div>
+          ))}
+        </div>
+      </section>
+
       <section className="mt-6" id={anchor("Cut reply")}>
         <h3 className="mb-2 font-mono text-xs text-faint">Cut reply</h3>
         <div className="rounded-lg border border-line bg-bg p-4">
           <TranscriptMessages chat={{ messages: [CUT_REPLY], error: null, notice: null }} />
+        </div>
+      </section>
+
+      <section className="mt-6" id={anchor("Writing a file")}>
+        <h3 className="mb-2 font-mono text-xs text-faint">Writing a file</h3>
+        <div className="flex flex-col gap-3 rounded-lg border border-line bg-bg p-4">
+          <WritingRow writing={{ name: "write_file", path: "tests/test_fetch.py", lines: 14, chars: 420 }} />
+          <WritingRow writing={{ name: "write_file", path: null, lines: 0, chars: 0 }} />
+          <WritingRow writing={{ name: "edit_file", path: "src/fetch.py", lines: 6, chars: 180 }} />
         </div>
       </section>
 
@@ -1194,6 +1350,8 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
       <TodoListDemo />
 
       <WorkbenchDemo />
+
+      <ChangesDemo />
 
       <section className="mt-6" id={anchor("Command palette and keys")}>
         <h3 className="mb-2 font-mono text-xs text-faint">Command palette and keys</h3>

@@ -1,0 +1,33 @@
+{
+  "additionalProperties": false,
+  "description": "``changes.commit``. Commit these files of the session folder with the user's own git.",
+  "properties": {
+    "message": {
+      "maxLength": 10000,
+      "minLength": 1,
+      "title": "Message",
+      "type": "string"
+    },
+    "paths": {
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 500,
+      "minItems": 1,
+      "title": "Paths",
+      "type": "array"
+    },
+    "session_id": {
+      "minLength": 1,
+      "title": "Session Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "session_id",
+    "paths",
+    "message"
+  ],
+  "title": "ChangesCommitParams",
+  "type": "object"
+}

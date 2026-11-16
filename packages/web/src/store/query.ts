@@ -1,5 +1,6 @@
 import type { GolemClient } from "@golem/client";
 import { QueryClient } from "@tanstack/react-query";
+import { CHANGES_REFETCH_MS } from "./changes.ts";
 
 export type QueryWiringClient = Pick<
   GolemClient,
@@ -22,6 +23,19 @@ export function createQueryClient(): QueryClient {
 export function keepQueriesHonest(client: QueryWiringClient, queryClient: QueryClient): () => void {
   const stale = (...queryKey: unknown[]): void => {
     void queryClient.invalidateQueries({ queryKey });
+  };
+  // A burst of `file.changed` events for a session marks its two keys once.
+  const waiting = new Map<string, ReturnType<typeof setTimeout>>();
+  const staleChanges = (sessionId: string): void => {
+    if (waiting.has(sessionId)) return;
+    waiting.set(
+      sessionId,
+      setTimeout(() => {
+        waiting.delete(sessionId);
+        stale("changes.list", sessionId);
+        stale("changes.diff", sessionId);
+      }, CHANGES_REFETCH_MS),
+    );
   };
   let wasConnected = client.state.status === "connected";
   const offs = [
@@ -46,6 +60,9 @@ export function keepQueriesHonest(client: QueryWiringClient, queryClient: QueryC
       if (event.type === "approval.resolved") {
         stale("config.get");
       }
+      if (event.type === "file.changed") {
+        staleChanges(event.session_id);
+      }
       if (event.type === "session.updated") {
         stale("session.inspect", event.session_id);
       }
@@ -67,5 +84,9 @@ export function keepQueriesHonest(client: QueryWiringClient, queryClient: QueryC
     for (const off of offs) {
       off();
     }
+    for (const timer of waiting.values()) {
+      clearTimeout(timer);
+    }
+    waiting.clear();
   };
 }

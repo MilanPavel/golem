@@ -11,7 +11,7 @@ from __future__ import annotations
 from collections.abc import Awaitable, Callable, Iterable, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Protocol
+from typing import Any, Literal, Protocol
 
 import httpx
 from pydantic import BaseModel, ValidationError
@@ -94,6 +94,18 @@ class ToolContext:
     """Turns on an on-demand MCP server for the session. Returns its tool names."""
     skills: SkillView | None = None
     """The skills the session's folder sees, for ``load_skill``."""
+    page_chars: int | None = None
+    """The most characters of a result page for the model's window, for ``read_artifact``."""
+
+
+@dataclass(frozen=True, slots=True)
+class FileEdit:
+    """One file a call wrote. ``before`` is None for a new file, ``after`` for a deleted one."""
+
+    path: str  # relative to the session folder
+    before: str | None
+    after: str | None
+    source: Literal["tool", "shell"] = "tool"
 
 
 @dataclass(frozen=True, slots=True)
@@ -106,7 +118,8 @@ class ToolResult:
     exited non-zero. The screen marks it, and the model gets the output as usual.
 
     ``diff`` is what the call changed, as a unified diff, for the screen. Not
-    sent to the model.
+    sent to the model. ``edits`` are the files the call wrote, whole texts, for the
+    tools node to report. They never reach the wire.
     """
 
     output: str
@@ -114,6 +127,7 @@ class ToolResult:
     update: Mapping[str, object] | None = None
     failed: bool = False
     diff: str | None = None
+    edits: tuple[FileEdit, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -164,6 +178,8 @@ class Tool[A: BaseModel]:
     parameters: Mapping[str, object] | None = None
     allow_from: PermissionMode | None = None
     offline_only: bool = False
+    plan_only: bool = False
+    """Offered only while the session is in plan first, such as ``propose_plan``."""
 
     def schema(self) -> dict[str, object]:
         """The OpenAI function format, which every chat model's ``bind_tools`` accepts."""
@@ -235,7 +251,7 @@ class ToolRegistry:
     def __init__(self, tools: Iterable[Tool[Any]], source: ToolSource | None = None) -> None:
         self._tools = {tool.name: tool for tool in tools}
         self._source = source
-        self._schemas = [tool.schema() for tool in self._tools.values()]
+        self._schemas = [tool.schema() for tool in self._tools.values() if not tool.plan_only]
         self._extra: dict[str, Tool[Any]] = {}
 
     def scoped(self, scope: ToolScope) -> ToolRegistry:
@@ -280,8 +296,20 @@ class ToolRegistry:
             )
         ]
 
-    def schemas(self) -> list[dict[str, object]]:
+    def schemas(self, *, plan_first: bool = False) -> list[dict[str, object]]:
+        """The tool schemas for a model call.
+
+        In plan first: golem's read-only and internal tools, and ``propose_plan``. Outside
+        tools are left out. Otherwise ``propose_plan`` is.
+        """
+        if plan_first:
+            return [tool.schema() for tool in self._tools.values() if self.plan_allows(tool.name)]
         return [*self._schemas, *(tool.schema() for tool in self._extra.values())]
+
+    def plan_allows(self, name: str) -> bool:
+        """Whether a plan first run may call ``name``: a read-only or internal tool of golem's."""
+        tool = self._tools.get(name)
+        return tool is not None and (tool.read_only or tool.internal)
 
     async def preview(
         self, name: str, raw: Mapping[str, object], ctx: ToolContext

@@ -8,7 +8,10 @@ import {
   parseDiff,
   REPLY_CUT_NOTE,
   thinkingLine,
+  turnFooterParts,
+  turnTotals,
   visibleText,
+  writingLabel,
   type ChatMessage,
   type Detail,
   type DiffExcerpt,
@@ -25,6 +28,8 @@ export type Span = {
   dim?: boolean;
   /** A row of a diff: drawn green or red on a tinted background. */
   tone?: "add" | "del";
+  /** Drawn yellow: a file the model is still writing. */
+  warn?: boolean;
 };
 
 export type LineRole = "user" | "assistant" | "plain";
@@ -73,6 +78,8 @@ export type TranscriptOptions = {
   thinking?: boolean;
   /** How many diff rows an edit shows under its line: none, 10 or 30. Unset is `normal`. */
   detail?: Detail;
+  /** Whole seconds since the first `tool.writing` of the call a reply is writing. Unset counts 0. */
+  writingSeconds?: (messageId: string) => number;
 };
 
 /** Output rows shown per tool call while Ctrl-O is on. */
@@ -96,8 +103,12 @@ export function layoutMessages(
   const width = Math.max(1, columns);
   const lines: LayoutLine[] = [];
   let previous: ChatMessage | undefined;
-  for (const message of messages) {
+  let runStart = 0;
+  for (const [index, message] of messages.entries()) {
     const continues = previous?.role === "assistant" && message.role === "assistant";
+    if (!continues) {
+      runStart = index;
+    }
     previous = message;
     if (lines.length > 0 && !continues) {
       lines.push({ role: "plain", spans: [{ text: "" }] });
@@ -128,7 +139,13 @@ export function layoutMessages(
         lines.push(wrappedLine(role, spans));
       }
     }
-    const duration = tools.length > 0 ? null : answerDuration(message);
+    if (message.writing != null) {
+      const label = writingLabel(message.writing, options?.writingSeconds?.(message.id) ?? 0);
+      for (const spans of wrapSpans([{ text: `◐ ${label}`, warn: true }], width)) {
+        lines.push(wrappedLine(role, spans));
+      }
+    }
+    const duration = tools.length > 0 ? null : answerDuration(message, messages.slice(runStart, index + 1));
     if (duration !== null) {
       lines.push(paint({ role, spans: [{ text: duration, dim: true }] }, width));
     }
@@ -458,11 +475,13 @@ function labelSpans(label: string, message: ChatMessage, options: TranscriptOpti
   return spans;
 }
 
-function answerDuration(message: ChatMessage): string | null {
+/** The footer of an answer: its time, then the model, tokens and cost of the run's calls. */
+function answerDuration(message: ChatMessage, run: readonly ChatMessage[]): string | null {
   if (message.role !== "assistant" || message.streaming || message.durationMs === undefined) {
     return null;
   }
-  const text = formatDuration(message.durationMs);
+  const time = formatDuration(message.durationMs);
+  const text = [time, ...turnFooterParts(turnTotals(run))].filter((part) => part.length > 0).join(" · ");
   return text.length > 0 ? text : null;
 }
 

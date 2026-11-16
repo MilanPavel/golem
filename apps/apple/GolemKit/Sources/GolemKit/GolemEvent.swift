@@ -6,8 +6,12 @@ import Foundation
 /// working against a newer daemon (the protocol grows by minor versions).
 public enum GolemEvent {
     case approvalNeeded(ApprovalNeededEvent)
+    case checkCompleted(CheckCompletedEvent)
+    case checkOffered(CheckOfferedEvent)
+    case checkStarted(CheckStartedEvent)
     case approvalResolved(ApprovalResolvedEvent)
     case messageCompleted(MessageCompletedEvent)
+    case modelRouted(ModelRoutedEvent)
     case messageDelta(MessageDeltaEvent)
     case messageStarted(MessageStartedEvent)
     case messageThinkingDelta(MessageThinkingDeltaEvent)
@@ -21,12 +25,15 @@ public enum GolemEvent {
     case runStarted(RunStartedEvent)
     case sessionClosed(SessionClosedEvent)
     case sessionCreated(SessionCreatedEvent)
+    case sessionChecksChanged(SessionChecksChangedEvent)
+    case sessionPlanChanged(SessionPlanChangedEvent)
     case sessionModeChanged(SessionModeChangedEvent)
     case sessionUpdated(SessionUpdatedEvent)
     case skillActivated(SkillActivatedEvent)
     case skillDeactivated(SkillDeactivatedEvent)
     case skillSkipped(SkillSkippedEvent)
     case todosUpdated(TodosUpdatedEvent)
+    case planProposed(PlanProposedEvent)
     case toolCompleted(ToolCompletedEvent)
     case toolFailed(ToolFailedEvent)
     case toolOutput(ToolOutputEvent)
@@ -56,6 +63,14 @@ extension GolemEvent: Decodable {
     public init(from decoder: Decoder) throws {
         let type = try decoder.container(keyedBy: Probe.self).decode(String.self, forKey: .type)
         switch type {
+        case "check.completed":
+            self = .checkCompleted(try CheckCompletedEvent(from: decoder))
+        case "check.offered":
+            self = .checkOffered(try CheckOfferedEvent(from: decoder))
+        case "check.started":
+            self = .checkStarted(try CheckStartedEvent(from: decoder))
+        case "model.routed":
+            self = .modelRouted(try ModelRoutedEvent(from: decoder))
         case "approval.needed":
             self = .approvalNeeded(try ApprovalNeededEvent(from: decoder))
         case "approval.resolved":
@@ -88,6 +103,10 @@ extension GolemEvent: Decodable {
             self = .sessionClosed(try SessionClosedEvent(from: decoder))
         case "session.created":
             self = .sessionCreated(try SessionCreatedEvent(from: decoder))
+        case "session.checks.changed":
+            self = .sessionChecksChanged(try SessionChecksChangedEvent(from: decoder))
+        case "session.plan.changed":
+            self = .sessionPlanChanged(try SessionPlanChangedEvent(from: decoder))
         case "session.mode.changed":
             self = .sessionModeChanged(try SessionModeChangedEvent(from: decoder))
         case "session.updated":
@@ -100,6 +119,8 @@ extension GolemEvent: Decodable {
             self = .skillSkipped(try SkillSkippedEvent(from: decoder))
         case "todos.updated":
             self = .todosUpdated(try TodosUpdatedEvent(from: decoder))
+        case "plan.proposed":
+            self = .planProposed(try PlanProposedEvent(from: decoder))
         case "tool.completed":
             self = .toolCompleted(try ToolCompletedEvent(from: decoder))
         case "tool.failed":
@@ -119,8 +140,12 @@ extension GolemEvent: Decodable {
     public var seq: Int? {
         switch self {
         case .approvalNeeded(let event): return event.seq
+        case .checkCompleted(let event): return event.seq
+        case .checkOffered(let event): return event.seq
+        case .checkStarted(let event): return event.seq
         case .approvalResolved(let event): return event.seq
         case .messageCompleted(let event): return event.seq
+        case .modelRouted(let event): return event.seq
         case .messageDelta(let event): return event.seq
         case .messageStarted(let event): return event.seq
         case .messageThinkingDelta(let event): return event.seq
@@ -134,12 +159,15 @@ extension GolemEvent: Decodable {
         case .runStarted(let event): return event.seq
         case .sessionClosed(let event): return event.seq
         case .sessionCreated(let event): return event.seq
+        case .sessionChecksChanged(let event): return event.seq
+        case .sessionPlanChanged(let event): return event.seq
         case .sessionModeChanged(let event): return event.seq
         case .sessionUpdated(let event): return event.seq
         case .skillActivated(let event): return event.seq
         case .skillDeactivated(let event): return event.seq
         case .skillSkipped(let event): return event.seq
         case .todosUpdated(let event): return event.seq
+        case .planProposed(let event): return event.seq
         case .toolCompleted(let event): return event.seq
         case .toolFailed(let event): return event.seq
         case .toolOutput(let event): return event.seq

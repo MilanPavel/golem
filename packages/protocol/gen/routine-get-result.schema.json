@@ -1,0 +1,345 @@
+{
+  "$defs": {
+    "RoutineConfig": {
+      "additionalProperties": false,
+      "description": "One ``[[routine]]`` as written. The daemon checks it when it loads.\n\nExactly one of ``schedule`` and ``on`` is set. ``schedule`` is cron, or\n``every 15m``, ``every 1h``, ``daily 08:30``, ``weekdays 08:30``, ``weekly mon 06:00``.\n``missed`` is what happens to a firing that came due while golem could not\nrun it: ``skip`` drops it, ``run_once`` fires it once, late.\n``notify_finished`` and ``notify_failed`` override the notification settings\nfor this routine, and null keeps them.",
+      "properties": {
+        "enabled": {
+          "default": true,
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "folder": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Folder"
+        },
+        "mcp": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Mcp",
+          "type": "array"
+        },
+        "missed": {
+          "default": "skip",
+          "enum": [
+            "skip",
+            "run_once"
+          ],
+          "title": "Missed",
+          "type": "string"
+        },
+        "model": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Model"
+        },
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "notify_failed": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Notify Failed"
+        },
+        "notify_finished": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Notify Finished"
+        },
+        "on": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RoutineWatchConfig"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "prompt": {
+          "minLength": 1,
+          "title": "Prompt",
+          "type": "string"
+        },
+        "schedule": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Schedule"
+        }
+      },
+      "required": [
+        "name",
+        "prompt"
+      ],
+      "title": "RoutineConfig",
+      "type": "object"
+    },
+    "RoutineInfo": {
+      "additionalProperties": false,
+      "description": "A routine and what the daemon knows about it.\n\n``source`` is ``user`` or ``project``, and ``folder`` is the project folder\nof a project routine. ``path`` is the file it is written in. ``next_at`` is\nthe next firing in the Mac's time zone, or null for a routine with ``on``,\none that is disabled or paused, or one that is blocked. ``last`` is its\nlatest run. ``paused`` is runtime state, not config. ``blocked`` is true for\na project routine in a folder that is not in ``trusted_projects``: it is\nlisted, and never runs.",
+      "properties": {
+        "blocked": {
+          "default": false,
+          "title": "Blocked",
+          "type": "boolean"
+        },
+        "config": {
+          "$ref": "#/$defs/RoutineConfig"
+        },
+        "folder": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Folder"
+        },
+        "last": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RoutineRunSummary"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "next_at": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Next At"
+        },
+        "path": {
+          "title": "Path",
+          "type": "string"
+        },
+        "paused": {
+          "default": false,
+          "title": "Paused",
+          "type": "boolean"
+        },
+        "source": {
+          "enum": [
+            "user",
+            "project"
+          ],
+          "title": "Source",
+          "type": "string"
+        }
+      },
+      "required": [
+        "config",
+        "source",
+        "path"
+      ],
+      "title": "RoutineInfo",
+      "type": "object"
+    },
+    "RoutineRunSummary": {
+      "additionalProperties": false,
+      "description": "One firing of a routine: a ``routine_run`` (ADR-050).\n\nThe times are ISO 8601 with an offset. ``reason`` says why a firing was\n``skipped``: ``missed``, ``paused``, ``untrusted``, ``still running`` or ``quiet``.\n``scope`` is ``user`` or the project folder. Nothing fills these until the\nscheduler (4.2.2), so a list has none yet.",
+      "properties": {
+        "due_at": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Due At"
+        },
+        "ended_at": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Ended At"
+        },
+        "reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reason"
+        },
+        "routine": {
+          "minLength": 1,
+          "title": "Routine",
+          "type": "string"
+        },
+        "routine_run_id": {
+          "minLength": 1,
+          "title": "Routine Run Id",
+          "type": "string"
+        },
+        "scope": {
+          "minLength": 1,
+          "title": "Scope",
+          "type": "string"
+        },
+        "session_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Session Id"
+        },
+        "started_at": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Started At"
+        },
+        "status": {
+          "enum": [
+            "queued",
+            "running",
+            "waiting",
+            "succeeded",
+            "failed",
+            "skipped",
+            "cancelled"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "trigger": {
+          "enum": [
+            "schedule",
+            "watch",
+            "manual",
+            "hook"
+          ],
+          "title": "Trigger",
+          "type": "string"
+        }
+      },
+      "required": [
+        "routine_run_id",
+        "routine",
+        "scope",
+        "trigger",
+        "status"
+      ],
+      "title": "RoutineRunSummary",
+      "type": "object"
+    },
+    "RoutineWatchConfig": {
+      "additionalProperties": false,
+      "description": "``on = { watch, glob }``: a new file in ``watch`` that matches ``glob``.",
+      "properties": {
+        "glob": {
+          "default": "*",
+          "minLength": 1,
+          "title": "Glob",
+          "type": "string"
+        },
+        "watch": {
+          "minLength": 1,
+          "title": "Watch",
+          "type": "string"
+        }
+      },
+      "required": [
+        "watch"
+      ],
+      "title": "RoutineWatchConfig",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "The routine and its last 50 runs, newest first.",
+  "properties": {
+    "routine": {
+      "$ref": "#/$defs/RoutineInfo"
+    },
+    "runs": {
+      "items": {
+        "$ref": "#/$defs/RoutineRunSummary"
+      },
+      "title": "Runs",
+      "type": "array"
+    }
+  },
+  "required": [
+    "routine"
+  ],
+  "title": "RoutineGetResult",
+  "type": "object"
+}

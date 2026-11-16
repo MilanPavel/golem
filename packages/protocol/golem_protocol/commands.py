@@ -7,7 +7,14 @@ from typing import Any, Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, SecretStr, model_validator
 
-from golem_protocol.events import PermissionMode, PromptSectionInfo, SkillCall, SkillSource
+from golem_protocol.events import (
+    ModelRejection,
+    PermissionMode,
+    PromptSectionInfo,
+    RouteMode,
+    SkillCall,
+    SkillSource,
+)
 
 
 class HelloParams(BaseModel):
@@ -194,6 +201,8 @@ class SessionSummary(BaseModel):
     the id of the session this one was forked from, null for a session that is
     not a fork. An older daemon leaves it out. ``origin`` is who started the
     session: ``user``, ``cli``, ``routine:<name>``. A session never changes it.
+    ``route`` is the session's route mode. An older daemon leaves it out.
+    ``plan_first`` is true while the session is in plan first (``session.set_plan``).
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -208,6 +217,8 @@ class SessionSummary(BaseModel):
     cwd: str | None = Field(default=None, min_length=1)
     forked_from: str | None = Field(default=None, min_length=1)
     origin: str = Field(default="user", min_length=1)
+    route: RouteMode = "pinned"
+    plan_first: bool = False
 
 
 class SessionListResult(BaseModel):
@@ -523,10 +534,16 @@ class TraceModelSpan(TraceSpan):
 
     ``cost_usd`` is what the call cost, as its ``model.call.completed`` recorded
     it. Null when the price was not known or the call has no token counts.
+
+    ``load_ms``, ``prompt_ms`` and ``reply_ms`` are from the model server's own clock.
+    Ollama only.
     """
 
     children: list[TraceToolSpan] = Field(default_factory=list[TraceToolSpan])
     cost_usd: float | None = Field(default=None, ge=0)
+    load_ms: int | None = Field(default=None, ge=0)
+    prompt_ms: int | None = Field(default=None, ge=0)
+    reply_ms: int | None = Field(default=None, ge=0)
     context_window: int | None = Field(default=None, ge=1)
     num_ctx: int | None = Field(default=None, ge=1)
     context_window_estimated: bool = False
@@ -537,9 +554,29 @@ class TraceModelSpan(TraceSpan):
     dropped_tokens: int | None = Field(default=None, ge=0)
 
 
-class TraceRunSpan(TraceSpan):
-    """A run, with its model calls in order."""
+class TraceRoute(BaseModel):
+    """Why a run used the model it did: the pick of a session that is not ``pinned``.
 
+    ``reason`` and ``detail`` are those of ``model.routed``, and ``rejected`` the
+    candidates the pick dropped.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    reason: Literal[
+        "pinned", "privacy", "fit", "budget", "cheapest", "escalated", "fallback", "user"
+    ]
+    detail: str
+    rejected: list[ModelRejection] = Field(default_factory=list[ModelRejection])
+
+
+class TraceRunSpan(TraceSpan):
+    """A run, with its model calls in order.
+
+    ``route`` is the pick for the run, null for a run of a ``pinned`` session.
+    """
+
+    route: TraceRoute | None = None
     children: list[TraceModelSpan] = Field(default_factory=list[TraceModelSpan])
 
 
@@ -581,19 +618,31 @@ class TraceContextPart(BaseModel):
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    key: Literal["system", "tools", "user", "assistant", "tool_results"]
+    key: Literal["system", "tools", "user", "assistant", "tool_results", "summary"]
     tokens: int = Field(ge=0)
     chars: int = Field(ge=0)
     items: list[TraceContextItem] = Field(default_factory=list[TraceContextItem])
 
 
+class TraceContextCleared(BaseModel):
+    """Tool results the call sent as a one-line stub, and the tokens that saved."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    count: int = Field(default=0, ge=0)
+    tokens: int = Field(default=0, ge=0)
+
+
 class TraceContext(BaseModel):
     """What filled one model call's context, and how big the window was.
 
-    ``parts`` always has the five keys, in order. They add up to ``used``
+    ``parts`` always has the six keys, in order. ``summary`` is the summary of old turns
+    that was sent as the first message, and 0 when none was. They add up to ``used``
     when it is known. The split between them is an estimate (about four
     characters a token, scaled to ``used``), so ``estimated`` is always true.
-    The ``prompt_cut`` fields are those of the model span.
+    The ``prompt_cut`` fields are those of the model span. A cleared result counts as its
+    stub in ``tool_results``, and ``cleared`` says how many there were and the tokens
+    not sent because of it.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -608,6 +657,7 @@ class TraceContext(BaseModel):
     prompt_cut_kind: Literal["older_messages", "middle"] | None = None
     dropped_message_ids: list[str] = Field(default_factory=list[str])
     dropped_tokens: int | None = Field(default=None, ge=0)
+    cleared: TraceContextCleared = Field(default_factory=TraceContextCleared)
 
 
 class TraceMessage(BaseModel):
@@ -754,6 +804,19 @@ class ModelPriceInfo(BaseModel):
 ModelCategory = Literal["general", "coding", "reasoning", "vision", "fast", "long-context"]
 
 
+class ModelSpeedInfo(BaseModel):
+    """Typical speed of a local model: the median of its recent calls.
+
+    From the model server's own clock. ``samples`` is how many calls it rests on.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    prompt_tps: float | None = Field(default=None, ge=0)
+    reply_tps: float | None = Field(default=None, ge=0)
+    samples: int = Field(ge=0)
+
+
 class ListedModel(BaseModel):
     """One model, by ``provider/model`` ref.
 
@@ -774,7 +837,7 @@ class ListedModel(BaseModel):
     ``tier`` is ``local`` for Ollama, ``budget`` for a hosted model whose blended price is at
     or below ``[routing] budget_max_price``, and ``frontier`` otherwise.
     ``stale`` means a cached list was shown because the provider did not
-    answer in time.
+    answer in time. ``speed`` is set for a local model golem has timed.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -798,6 +861,7 @@ class ListedModel(BaseModel):
     recommended_for: list[ModelCategory] = Field(default_factory=list[ModelCategory])
     think_values: list[str] = Field(default_factory=list[str])
     tier: Literal["local", "budget", "frontier"]
+    speed: ModelSpeedInfo | None = None
 
 
 class ListedProvider(BaseModel):
@@ -1040,6 +1104,114 @@ class SessionSetModeResult(BaseModel):
     session_id: str = Field(min_length=1)
     mode: PermissionMode
     override: bool
+
+
+class SessionSetRouteParams(BaseModel):
+    """``session.set_route``. Set how this session picks the model of each turn.
+
+    ``pinned`` runs the session's own model. ``local`` never uses a hosted model.
+    ``auto`` starts local and uses a hosted model only when the routing rules allow
+    it (ADR-055). The daemon emits ``session.updated`` with ``route``, and the mode
+    applies from the session's next turn. It is kept with the session and is not
+    written to ``config.toml``.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    session_id: str = Field(min_length=1)
+    mode: RouteMode
+
+
+class SessionSetRouteResult(BaseModel):
+    """The session's route mode after the change."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    session_id: str = Field(min_length=1)
+    mode: RouteMode
+
+
+class SessionCompactParams(BaseModel):
+    """``session.compact``. Shrink what the next model call sends, between turns.
+
+    ``clear`` sends all but the newest tool results as one line each. ``summarise`` replaces
+    the old turns with a summary written by the ``summarise`` role's model, and ``focus``, when
+    given, says what the summary must keep. Nothing is deleted from the session: only the
+    context view changes. The call can take a minute with a local model, and other requests
+    go on meanwhile. Error ``-32004`` when the session has a run or is compacting.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    session_id: str = Field(min_length=1)
+    action: Literal["clear", "summarise"]
+    focus: str | None = None
+
+
+class SessionCompactResult(BaseModel):
+    """What the compaction did.
+
+    ``count`` is the tool results cleared, or the turns summarised, and 0 when there was
+    nothing to do (``before_tokens`` and ``after_tokens`` are then equal, and no event is
+    stored). ``window`` is the tokens the history may fill (the model's window less the
+    reply reserve), None when it is unknown. ``model`` is the model that wrote a summary.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    before_tokens: int = Field(ge=0)
+    after_tokens: int = Field(ge=0)
+    count: int = Field(ge=0)
+    window: int | None = Field(default=None, ge=1)
+    model: str | None = None
+
+
+class SessionSetChecksParams(BaseModel):
+    """``session.set_checks``. Say whether golem may run the project's checks in this session.
+
+    ``on`` true lets it run them after a turn that changed files, false stops
+    it. The daemon emits ``session.checks.changed``. The answer is kept with
+    the session and is not written to ``config.toml``. It matters when
+    ``[coding] checks`` is ``ask``, and ``auto`` follows it only for a no.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    session_id: str = Field(min_length=1)
+    on: bool
+
+
+class SessionSetChecksResult(BaseModel):
+    """The session's answer after the change."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    session_id: str = Field(min_length=1)
+    on: bool
+
+
+class SessionSetPlanParams(BaseModel):
+    """``session.set_plan``. Put one session in plan first, or take it out.
+
+    With ``on`` true the session's runs only read, and each ends with a plan
+    sent as ``plan.proposed``. The daemon emits ``session.plan.changed``. It
+    applies from the session's next turn, is kept with the session, and is
+    not written to ``config.toml``. A new session starts with it off.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    session_id: str = Field(min_length=1)
+    on: bool
+
+
+class SessionSetPlanResult(BaseModel):
+    """Whether the session is in plan first after the change."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    session_id: str = Field(min_length=1)
+    on: bool
 
 
 class PermissionsSetModeParams(BaseModel):
@@ -1354,6 +1526,200 @@ class SkillSetDisabledResult(BaseModel):
 
     name: str
     disabled: bool
+
+
+RoutineSource = Literal["user", "project"]
+"""Where a routine is written: the user's ``config.toml``, or a project's."""
+
+RoutineRunStatus = Literal[
+    "queued", "running", "waiting", "succeeded", "failed", "skipped", "cancelled"
+]
+"""``waiting`` is never stored: it is a running session that waits for an answer."""
+
+RoutineTrigger = Literal["schedule", "watch", "manual", "hook"]
+
+
+class RoutineWatchConfig(BaseModel):
+    """``on = { watch, glob }``: a new file in ``watch`` that matches ``glob``."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    watch: str = Field(min_length=1)
+    glob: str = Field(default="*", min_length=1)
+
+
+class RoutineConfig(BaseModel):
+    """One ``[[routine]]`` as written. The daemon checks it when it loads.
+
+    Exactly one of ``schedule`` and ``on`` is set. ``schedule`` is cron, or
+    ``every 15m``, ``every 1h``, ``daily 08:30``, ``weekdays 08:30``, ``weekly mon 06:00``.
+    ``missed`` is what happens to a firing that came due while golem could not
+    run it: ``skip`` drops it, ``run_once`` fires it once, late.
+    ``notify_finished`` and ``notify_failed`` override the notification settings
+    for this routine, and null keeps them.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    name: str = Field(min_length=1)
+    schedule: str | None = None
+    on: RoutineWatchConfig | None = None
+    prompt: str = Field(min_length=1)
+    folder: str | None = None
+    model: str | None = None
+    mcp: list[str] = Field(default_factory=list[str])
+    missed: Literal["skip", "run_once"] = "skip"
+    enabled: bool = True
+    notify_finished: bool | None = None
+    notify_failed: bool | None = None
+
+
+class RoutineRunSummary(BaseModel):
+    """One firing of a routine: a ``routine_run`` (ADR-050).
+
+    The times are ISO 8601 with an offset. ``reason`` says why a firing was
+    ``skipped``: ``missed``, ``paused``, ``untrusted``, ``still running`` or ``quiet``.
+    ``scope`` is ``user`` or the project folder. Nothing fills these until the
+    scheduler (4.2.2), so a list has none yet.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    routine_run_id: str = Field(min_length=1)
+    routine: str = Field(min_length=1)
+    scope: str = Field(min_length=1)
+    session_id: str | None = None
+    trigger: RoutineTrigger
+    due_at: str | None = None
+    started_at: str | None = None
+    ended_at: str | None = None
+    status: RoutineRunStatus
+    reason: str | None = None
+
+
+class RoutineInfo(BaseModel):
+    """A routine and what the daemon knows about it.
+
+    ``source`` is ``user`` or ``project``, and ``folder`` is the project folder
+    of a project routine. ``path`` is the file it is written in. ``next_at`` is
+    the next firing in the Mac's time zone, or null for a routine with ``on``,
+    one that is disabled or paused, or one that is blocked. ``last`` is its
+    latest run. ``paused`` is runtime state, not config. ``blocked`` is true for
+    a project routine in a folder that is not in ``trusted_projects``: it is
+    listed, and never runs.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    config: RoutineConfig
+    source: RoutineSource
+    folder: str | None = None
+    path: str
+    next_at: str | None = None
+    last: RoutineRunSummary | None = None
+    paused: bool = False
+    blocked: bool = False
+
+
+class RoutineIssue(BaseModel):
+    """A routine that did not load: the file, the line (from 1) when known, and why."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    file: str
+    line: int | None = Field(default=None, ge=1)
+    message: str
+
+
+class RoutineListParams(BaseModel):
+    """``routine.list``. The user's routines, and the project routines of ``folders``.
+
+    A folder in ``trusted_projects`` lists its routines as they are. Any other
+    folder that has some lists them ``blocked``. The daemon never looks at a
+    folder it is not given.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    folders: list[str] = Field(default_factory=list[str])
+
+
+class RoutineListResult(BaseModel):
+    """The routines, user ones first, each group in file order, and the files' problems."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    routines: list[RoutineInfo]
+    issues: list[RoutineIssue] = Field(default_factory=list[RoutineIssue])
+
+
+class RoutineGetParams(BaseModel):
+    """``routine.get``. A routine by name. ``folder`` picks a project routine."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    name: str = Field(min_length=1)
+    folder: str | None = Field(default=None, min_length=1)
+
+
+class RoutineGetResult(BaseModel):
+    """The routine and its last 50 runs, newest first."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    routine: RoutineInfo
+    runs: list[RoutineRunSummary] = Field(default_factory=list[RoutineRunSummary])
+
+
+class RoutineUpdateParams(BaseModel):
+    """``routine.update``. Change keys of a user routine, or create it with ``create``.
+
+    ``fields`` are the keys of ``RoutineConfig`` to set. A null value removes the
+    key. ``fields.name`` renames the routine. With ``create`` the routine must
+    not exist yet and ``fields`` must make a whole one. Only the user's
+    ``config.toml`` is edited: ``folder`` names a project routine and is
+    refused, because a project's file is edited in the project.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    name: str = Field(min_length=1)
+    fields: dict[str, Any]
+    create: bool = False
+    folder: str | None = Field(default=None, min_length=1)
+
+
+class RoutineUpdateResult(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    routine: RoutineInfo
+
+
+class RoutineRemoveParams(BaseModel):
+    """``routine.remove``. Delete a user routine from ``config.toml``."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    name: str = Field(min_length=1)
+    folder: str | None = Field(default=None, min_length=1)
+
+
+class RoutineRemoveResult(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    name: str = Field(min_length=1)
+
+
+class RoutineChanged(BaseModel):
+    """A routine was added, changed or removed. List the routines again.
+
+    ``name`` is null when the file changed in a way that is not one routine.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    name: str | None = None
+    change: Literal["added", "updated", "removed", "reloaded"]
 
 
 class McpListParams(BaseModel):
@@ -2288,6 +2654,203 @@ class ArtifactReadResult(BaseModel):
     size: int = Field(ge=0)
 
 
+class ChangesListParams(BaseModel):
+    """``changes.list``. The files a session changed, each as its net change."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    session_id: str = Field(min_length=1)
+
+
+class ChangedFile(BaseModel):
+    """One changed file: first before against last after, as counts and flags.
+
+    ``stale`` is true when the file on disk is not what golem last wrote, because
+    someone else changed it since.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    path: str
+    status: Literal["created", "modified", "deleted"]
+    added: int = Field(ge=0)
+    removed: int = Field(ge=0)
+    change_ids: list[str]
+    stale: bool
+
+
+class ChangesListResult(BaseModel):
+    """The changed files in order of first change. A session without a folder has none."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    files: list[ChangedFile]
+
+
+class ChangesDiffParams(BaseModel):
+    """``changes.diff``. The diff of a file or of one change: exactly one of the two is set."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    session_id: str = Field(min_length=1)
+    path: str | None = Field(default=None, min_length=1)
+    change_id: str | None = Field(default=None, min_length=1)
+
+
+class ChangesDiffResult(BaseModel):
+    """A unified diff, cut when long, and whether it was cut."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    diff: str
+    truncated: bool
+
+
+class RevertTarget(BaseModel):
+    """What ``changes.revert`` takes back. Each kind needs its own field and no other.
+
+    ``change`` needs ``change_id``, ``file`` needs ``path``, ``hunk`` needs ``path`` and
+    ``hunk`` (0-based, of the file's net diff), and ``run`` needs ``run_id``.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    kind: Literal["change", "file", "hunk", "run"]
+    change_id: str | None = Field(default=None, min_length=1)
+    path: str | None = Field(default=None, min_length=1)
+    hunk: int | None = Field(default=None, ge=0)
+    run_id: str | None = Field(default=None, min_length=1)
+
+
+class ChangesRevertParams(BaseModel):
+    """``changes.revert``. Put back what a change, a file, a hunk or a turn wrote.
+
+    Without ``force``, a file that changed on disk since golem wrote it is left alone
+    and listed as a conflict. Refused while the session has a run.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    session_id: str = Field(min_length=1)
+    target: RevertTarget
+    force: bool = False
+
+
+class RevertConflict(BaseModel):
+    """A file a revert did not touch."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    path: str
+    reason: Literal["changed_on_disk"]
+
+
+class ChangesRevertResult(BaseModel):
+    """The paths written, and the paths left alone. Each write is a change of its own."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    reverted: list[str]
+    conflicts: list[RevertConflict]
+
+
+class FileReadParams(BaseModel):
+    """``file.read``. One text file of the session's folder."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    session_id: str = Field(min_length=1)
+    path: str = Field(min_length=1)
+
+
+class FileReadResult(BaseModel):
+    """The file's path relative to the folder, the start of its text, and its line count.
+
+    ``truncated`` is true when the file is longer than the limit and ``text`` is its start.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    path: str
+    text: str
+    truncated: bool
+    lines: int = Field(ge=0)
+
+
+class FileListParams(BaseModel):
+    """``file.list``. Files of the session's folder whose path holds ``query``, case-insensitive."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    session_id: str = Field(min_length=1)
+    query: str = ""
+    limit: int = Field(default=50, ge=1, le=200)
+
+
+class FileListResult(BaseModel):
+    """Relative paths, shortest first, then alphabetical. ``more`` is true when others match."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    paths: list[str]
+    more: bool
+
+
+class ChangesCommitParams(BaseModel):
+    """``changes.commit``. Commit these files of the session folder with the user's own git."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    session_id: str = Field(min_length=1)
+    paths: list[str] = Field(min_length=1, max_length=500)
+    message: str = Field(min_length=1, max_length=10_000)
+
+
+class ChangesCommitResult(BaseModel):
+    """Whether git committed. ``sha`` is the short hash on success. ``output`` is git's text."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    ok: bool
+    sha: str | None
+    output: str = Field(max_length=4_000)
+
+
+class ChangesCommitInfoParams(BaseModel):
+    """``changes.commit_info``. What git says about the session folder and its changes."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    session_id: str = Field(min_length=1)
+
+
+class ChangesCommitInfoResult(BaseModel):
+    """``repository`` is false outside a git work tree. ``paths`` are the changed files git sees."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    repository: bool
+    branch: str | None
+    paths: list[str]
+
+
+class ChangesSuggestMessageParams(BaseModel):
+    """``changes.suggest_message``. Ask the session's model for a commit message."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    session_id: str = Field(min_length=1)
+    paths: list[str] = Field(min_length=1, max_length=500)
+
+
+class ChangesSuggestMessageResult(BaseModel):
+    """The subject, then a blank line and the body when there is one."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    message: str
+
+
 class ApprovalRespondParams(BaseModel):
     """``approval.respond``. Answer the tool call a session's run waits on.
 
@@ -2475,6 +3038,24 @@ class OllamaStartResult(BaseModel):
     running: bool
 
 
+class NotifyTestParams(BaseModel):
+    """``notify.test``. Post a sample notification, for Settings and ``golem doctor``."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+
+class NotifyTestResult(BaseModel):
+    """``posted`` is false when nothing was shown: no poster on this machine, or macOS refused.
+
+    ``mechanism`` names the poster that tried, such as ``osascript`` or ``none``.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    posted: bool
+    mechanism: str
+
+
 class FsListDirsParams(BaseModel):
     """``fs.list_dirs``. The folders directly under ``path``, for a folder picker.
 
@@ -2529,6 +3110,17 @@ __all__ = [
     "AuthRemoveResult",
     "AuthSetParams",
     "AuthSetResult",
+    "ChangedFile",
+    "ChangesCommitInfoParams",
+    "ChangesCommitInfoResult",
+    "ChangesCommitParams",
+    "ChangesCommitResult",
+    "ChangesDiffParams",
+    "ChangesDiffResult",
+    "ChangesListParams",
+    "ChangesListResult",
+    "ChangesSuggestMessageParams",
+    "ChangesSuggestMessageResult",
     "ConfigAllowance",
     "ConfigError",
     "ConfigGetParams",
@@ -2545,6 +3137,10 @@ __all__ = [
     "CostTotals",
     "DaemonStatus",
     "DirEntry",
+    "FileListParams",
+    "FileListResult",
+    "FileReadParams",
+    "FileReadResult",
     "FsListDirsParams",
     "FsListDirsResult",
     "HelloParams",
@@ -2625,6 +3221,9 @@ __all__ = [
     "ModelPullResult",
     "ModelSetDefaultParams",
     "ModelSetDefaultResult",
+    "ModelSpeedInfo",
+    "NotifyTestParams",
+    "NotifyTestResult",
     "OllamaInstallCancelParams",
     "OllamaInstallCancelResult",
     "OllamaInstallDone",
@@ -2639,6 +3238,20 @@ __all__ = [
     "PolicyEditResult",
     "PolicyRemoveParams",
     "PolicyUpdateParams",
+    "RoutineChanged",
+    "RoutineConfig",
+    "RoutineGetParams",
+    "RoutineGetResult",
+    "RoutineInfo",
+    "RoutineIssue",
+    "RoutineListParams",
+    "RoutineListResult",
+    "RoutineRemoveParams",
+    "RoutineRemoveResult",
+    "RoutineRunSummary",
+    "RoutineUpdateParams",
+    "RoutineUpdateResult",
+    "RoutineWatchConfig",
     "RunCancelParams",
     "RunCancelResult",
     "RuntimeInstallCancelParams",
@@ -2652,6 +3265,8 @@ __all__ = [
     "SessionAttachResult",
     "SessionCloseParams",
     "SessionCloseResult",
+    "SessionCompactParams",
+    "SessionCompactResult",
     "SessionCreateParams",
     "SessionCreateResult",
     "SessionDetachParams",
@@ -2666,12 +3281,18 @@ __all__ = [
     "SessionRenameResult",
     "SessionRevokeParams",
     "SessionRevokeResult",
+    "SessionSetChecksParams",
+    "SessionSetChecksResult",
     "SessionSetModeParams",
     "SessionSetModeResult",
     "SessionSetModelParams",
     "SessionSetModelResult",
     "SessionSetOptionsParams",
     "SessionSetOptionsResult",
+    "SessionSetPlanParams",
+    "SessionSetPlanResult",
+    "SessionSetRouteParams",
+    "SessionSetRouteResult",
     "SessionSetSkillsParams",
     "SessionSetSkillsResult",
     "SessionSummary",
@@ -2698,12 +3319,14 @@ __all__ = [
     "SkillWriteParams",
     "SkillWriteResult",
     "TraceContext",
+    "TraceContextCleared",
     "TraceContextItem",
     "TraceContextPart",
     "TraceGetParams",
     "TraceGetResult",
     "TraceMessage",
     "TraceModelSpan",
+    "TraceRoute",
     "TraceRunSpan",
     "TraceSpan",
     "TraceSpanParams",

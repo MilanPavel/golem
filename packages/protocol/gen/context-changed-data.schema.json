@@ -1,0 +1,98 @@
+{
+  "additionalProperties": false,
+  "description": "What golem sends of the history changed before a model call.\n\n``cleared`` means old tool results are now sent as one line each: ``count`` is how\nmany, and ``before_tokens`` and ``after_tokens`` are rough sizes of the history before\nand after. For ``summarised``, ``count`` is the messages a summary now stands for.\n``grew`` is for a later change: ``window_from`` and ``window_to`` are the window\nbefore and after, and ``reload_ms`` the time the model took to load again. The\ncheckpoint keeps every message, so no transcript event changes. A field a change\ndoes not use is None.",
+  "properties": {
+    "action": {
+      "enum": [
+        "cleared",
+        "summarised",
+        "grew"
+      ],
+      "title": "Action",
+      "type": "string"
+    },
+    "after_tokens": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "After Tokens"
+    },
+    "before_tokens": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Before Tokens"
+    },
+    "count": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Count"
+    },
+    "reload_ms": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Reload Ms"
+    },
+    "window_from": {
+      "anyOf": [
+        {
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Window From"
+    },
+    "window_to": {
+      "anyOf": [
+        {
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Window To"
+    }
+  },
+  "required": [
+    "action"
+  ],
+  "title": "ContextChangedData",
+  "type": "object"
+}

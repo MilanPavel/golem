@@ -95,6 +95,33 @@ test("allowing an edit from its diff changes the file and the bar leaves a chip"
   expect(read(project)).toBe(NEW);
 });
 
+test("opening an edit's diff below a long chat leaves the page where it is", async ({ page, rig }) => {
+  const stack = await startStack(rig);
+  const project = await makeSession(rig, stack);
+  stack.model.reply(Array.from({ length: 80 }, (_, line) => `Line ${String(line)}.`).join("\n\n"));
+  queueEdit(stack.model);
+  await page.goto(stack.gateway.url);
+  await expect(page.getByText("connected", { exact: true })).toBeVisible();
+  await page.goto(new URL(`/s/${project.sessionId}`, stack.gateway.url).href);
+  await expect(page.getByText("connected", { exact: true })).toBeVisible();
+  await composer(page).fill("say a lot");
+  await composer(page).press("Enter");
+  await expect(answers(page).last()).toContainText("Line 79.");
+  await composer(page).fill("edit the notes");
+  await composer(page).press("Enter");
+  await card(page).getByRole("button", { name: /Allow once/ }).click();
+  await expect(answers(page).last()).toContainText("Done.");
+  await page.getByRole("button", { name: "Show the diff of notes.txt here" }).click();
+  await expect(page.getByRole("table", { name: "Change to notes.txt" }).first()).toBeVisible();
+  // Nothing may stick out below the window: the page itself never scrolls, only the chat does.
+  const pageScroll = await page.evaluate(() => {
+    const root = document.documentElement;
+    root.scrollTop = 10_000;
+    return { moved: root.scrollTop, extra: root.scrollHeight - root.clientHeight };
+  });
+  expect(pageScroll).toEqual({ moved: 0, extra: 0 });
+});
+
 test("denying an edit leaves the file and tells the model", async ({ page, rig }) => {
   const stack = await startStack(rig);
   const project = await makeSession(rig, stack);

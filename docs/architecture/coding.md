@@ -124,7 +124,7 @@ A small model often gets `old_string` right in substance and wrong by a space. `
 - **More than one match on a rung is an error,** never a guess. The model is told, and adds context.
 - **On a miss,** the error says which lines of the file come closest, so the model can copy them.
 - **What the model gets back is one line,** `edited src/fetch.py (+18 -4)`. The screen gets the diff from `tool.completed` and `file.changed`. Today the model reads the whole diff, so every edit is paid twice in its context.
-- **Progress.** While the model is still writing a `write_file` or `edit_file` call, an event says which file and how many lines so far, so a slow write never looks like a hang.
+- **Progress.** While the model is still writing a `write_file` or `edit_file` call, `tool.writing` says which file and how many lines so far, at most once a second per call, so a slow write never looks like a hang. It is a live signal like `message.delta`: `golem.db` deletes it when the message completes. A provider that sends the whole call at the end sends no `tool.writing`.
 
 ### Checks
 
@@ -200,7 +200,7 @@ The contracts of each part are in the step issues: [#936](https://github.com/Mil
 
 ### What is recorded
 
-Every write by `write_file` and `edit_file`; changes a shell command made, as far as golem can see them ([#952](https://github.com/MilanPavel/golem/issues/952), planned); and every undo. Not recorded: binary files, files that are not UTF-8, files over the read limit, and anything outside the session folder. A forked session starts with an empty change set.
+Every write by `write_file` and `edit_file`; changes a shell command made, as far as golem can see them, which is only in a git repository and where the sandbox exists, because git runs in it: a folder with no git records nothing from the shell ([#952](https://github.com/MilanPavel/golem/issues/952)); git worktrees inside the session folder (at most 8) are watched too, found by reading `<git folder>/worktrees/*/gitdir`, and their files are shown by their path from the session folder; and every undo. Not recorded: binary files, files that are not UTF-8, files over the read limit, and anything outside the session folder. A forked session starts with an empty change set.
 
 ### The calls and the event
 
@@ -209,6 +209,9 @@ Every write by `write_file` and `edit_file`; changes a shell command made, as fa
 | `file.changed` | Event | [#949](https://github.com/MilanPavel/golem/issues/949) |
 | `changes.list {session_id}` | Call | [#950](https://github.com/MilanPavel/golem/issues/950) |
 | `changes.diff {session_id, path or change_id}` | Call | [#950](https://github.com/MilanPavel/golem/issues/950) |
+| `changes.commit {session_id, paths, message}` | Call | [#981](https://github.com/MilanPavel/golem/issues/981) |
+| `changes.commit_info {session_id}` | Call | [#981](https://github.com/MilanPavel/golem/issues/981) |
+| `changes.suggest_message {session_id, paths}` | Call | [#981](https://github.com/MilanPavel/golem/issues/981) |
 | `changes.revert {session_id, target, force}` | Call | [#953](https://github.com/MilanPavel/golem/issues/953) |
 | `file.read` | Call | [#966](https://github.com/MilanPavel/golem/issues/966) |
 | `session.set_plan` | Call | [#979](https://github.com/MilanPavel/golem/issues/979) |

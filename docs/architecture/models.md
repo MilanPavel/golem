@@ -148,9 +148,21 @@ A setting that needs a secret names it as `keychain:<name>` and the daemon resol
 
 `think` is the one option that depends on the model. `model.options.get` sends its row only for a model whose `/api/show` `capabilities` include `thinking`, as a `choice` with `values` (the same list as `think_values` in `model.list`), and `model.options.set` and `session.set_options` check a value against that list. The router maps it to `ChatOllama.reasoning` (`off` is `False`, `on` is `True`, a level is sent as it is), sends nothing when it is unset, and drops a saved value the model does not take.
 
+### Routing a turn
+
+A session has a route mode: `pinned`, `local` or `auto` ([ADR-055](../adr/055-model-routing.md)). A new session takes `[routing] mode`, which is `pinned` by default, and a fork copies the mode of its source. `session.set_route` changes it. The daemon stores `session.updated` with `route`, the projection sets `sessions.route`, and the mode applies from the next turn.
+
+`SessionManager.send` picks the model of a turn when the mode is not `pinned`:
+- The candidates come from `ladder`: the session's own model, plus one local, one budget and one frontier model. Their facts are the cached ones from `ListedFacts`, so `send` never waits for the network.
+- The traits are the input tokens of the session's last chat model call plus `len(text) // 4` (none before the first call), `[context] reply_reserve`, tools needed, and `local_only` on mode `local`. A paid model is allowed only when the session has `paid_ok`, which nothing sets until the paid question exists. So `auto` stays local for now.
+- `pick` returns the choice. When its best model is paid and not allowed, `send` picks again among the local candidates, and lists each paid one as rejected.
+- When nothing passes, the turn runs on the session's own model, with the reason `fallback` and a detail that says no other model passed. On mode `local` with a hosted session model it is refused instead: "this session is local only and has no local model; pick one with /model".
+
+The turn runs on the picked profile. `sessions.model_profile` stays the user's choice: it is the pinned model and the start of the ladder, and routing never stores `model.selected`. The runner emits `model.routed` right after `run.started`, with the profile, what it resolved to, the tier, the `reason`, a one-line `detail`, and the `rejected` candidates with why. A `pinned` session emits nothing. The run span of `trace.get` carries the same `reason`, `detail` and `rejected` as `route`. Only the model that was picked is waited for while it downloads.
+
 ### Model errors
 
-A run ends in `run.failed` with a `message` and no traceback. A failure a client can act on also has a `code`. `model_unreachable`: the model's server did not answer. `not_installed`: the model needs a local Ollama, and no `ollama` binary is on `PATH` or at a known install path. Either comes with the `provider` and a `hint` that says how to fix it, such as `run ollama serve`.
+A run ends in `run.failed` with a `message` and no traceback. A failure a client can act on also has a `code`. `model_unreachable`: the model's server did not answer. `not_installed`: the model needs a local Ollama, and no `ollama` binary is on `PATH` or at a known install path. Either comes with the `provider` and a `hint` that says how to fix it, such as `run ollama serve`. `budget_spent`: a cap in `[budget]` is spent, so a run stopped before its next paid call (see `models/budget.py`); it has a `hint` and no `provider`.
 
 ### The local model server
 
@@ -168,6 +180,8 @@ The daemon starts a local Ollama when a model call, `model.list`, or a download 
 - One golem started has its pid in `run/ollama-<port>.pid`, so a restarted daemon takes it back.
 
 **Stopping it.** It stops when the daemon stops, and after `[ollama] idle_stop_minutes` with nothing holding it.
+
+**One at a time.** `ServerGate` lets `[ollama] parallel` generations run on a server, and chat goes ahead of titles. A chat call that waits more than a second sends `model.waiting`, and the web and the TUI show `waiting for the local model` until its turn or its first token. Only the call that waits shows it. A title never does.
 
 **What clients see.** Each change goes out as `model.server.status`. A start that fails ends the run with `model_unreachable` and the log file in `hint`.
 
@@ -187,6 +201,7 @@ Downloads go through Ollama (`golem/models/pulls.py`):
 ### The model list
 
 `model.list` returns `default` (null before one is chosen), this machine's `ram_gb`, `disk_free_gb` in the home folder where Ollama keeps its models, a list of providers with their status (`ready`, `needs_key`, `server_down`, `not_installed` for a local Ollama with no binary, or `unlisted` when nothing uses one yet), and one entry per model ref. Each entry has a `tier`: `local` for Ollama, `budget` for a hosted model whose blended price, `(3 × input + output) / 4` in USD per million tokens, is at or below `[routing] budget_max_price` (default 1.50), and `frontier` for any other hosted model, an unknown price included; a hosted catalog entry may set `tier` to override the rule. Each entry has `think_values`, what the `think` option takes for that model (`off` and `on`, or `low`, `medium`, and `high`, empty when the model cannot think; see ADR-045), and `categories`, from the fixed set general, coding, reasoning, vision, fast, and long-context, in that order. A catalog model has the catalog's own. Any other model gets general, plus vision and reasoning from Ollama's `/api/show` `capabilities` (`vision`, `thinking`) or LiteLLM's `supports_vision` and `supports_reasoning`, plus long-context when its context holds 200,000 tokens or more. A catalog model carries the catalog's `tags`, and one is `recommended`: the largest entry tagged `starter` whose `min_ram_gb` this Mac has (`models/data/catalog.toml`). With no Ollama binary, a catalog model is `not_installed`, one install away, and the picker labels it `install`. `setup` says where the user is, for a first-run screen in the TUI or the browser: `ollama_installed`, `ollama_running`, `keys` (the providers with a key), and `default_status`, the default model's status, `unknown` when golem does not list it, or null with no default.
+- **Speed:** an installed local model that golem has timed carries `speed` (`prompt_tps`, `reply_tps`, `samples`). `SpeedBook` (`golem/models/speed.py`) takes the server's own timings of each finished Ollama call (`model.call.completed`, see [tracing](tracing.md)) and keeps the last 20 samples per ref; the figure is their median. A call counts for `prompt_tps` only with at least 200 prompt tokens read in at least 50 ms (a cached prompt reads almost nothing), for `reply_tps` with at least 20 reply tokens, and for the typical cold load only above 500 ms. `first_token_ms(ref, prompt_tokens, cold=)` is the worst-case wait for a first token: prompt tokens over `prompt_tps`, plus the typical load when cold. The book is saved to `cache/speed.json` at most every 30 seconds and on shutdown, and a broken file is ignored.
 - **Where entries come from** (`golem/models/discovery.py`):
   - installed Ollama models, from `/api/tags`, with `/api/show` filling in what an older Ollama leaves out;
   - local models to download, from the bundled `catalog.toml`;
@@ -209,8 +224,10 @@ Downloads go through Ollama (`golem/models/pulls.py`):
 | `packages/daemon/golem/models/install.py` | Installing Ollama with Homebrew |
 | `packages/daemon/golem/models/pulls.py`, `registry.py` | Downloads, and sizes from the registry |
 | `packages/daemon/golem/models/discovery.py` | `model.list`: every model, with status, price, and size |
+| `packages/daemon/golem/models/speed.py` | `SpeedBook`: the typical load, prompt and reply speed of each local model |
 | `packages/daemon/golem/models/prices.py`, `catalog.py`, `hardware.py` | Prices from LiteLLM, the local catalog, and this Mac's memory |
-| `packages/daemon/golem/models/errors.py` | `ModelUnreachable` and its codes |
+| `packages/daemon/golem/models/errors.py` | `ModelUnreachable`, `BudgetSpent` and their codes |
+| `packages/daemon/golem/models/budget.py` | What the `[budget]` caps leave: `room`, and `Budget.paid_ok` |
 
 ## Read more
 

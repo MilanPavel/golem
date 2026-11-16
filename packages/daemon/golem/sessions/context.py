@@ -8,15 +8,22 @@ Shares are whole numbers that add up to the total exactly.
 from __future__ import annotations
 
 import json
-from collections.abc import Mapping, Sequence
+from collections.abc import Collection, Mapping, Sequence
 from typing import Literal, get_args
 
+from golem.graphs.context_view import stub_text
 from golem.mcp.tools import server_of
 from golem.tokens import CHARS_PER_TOKEN
-from golem_protocol.commands import TraceContext, TraceContextItem, TraceContextPart, TraceMessage
+from golem_protocol.commands import (
+    TraceContext,
+    TraceContextCleared,
+    TraceContextItem,
+    TraceContextPart,
+    TraceMessage,
+)
 from golem_protocol.events import PromptSectionInfo
 
-Key = Literal["system", "tools", "user", "assistant", "tool_results"]
+Key = Literal["system", "tools", "user", "assistant", "tool_results", "summary"]
 _KEYS: tuple[Key, ...] = get_args(Key)
 _ROLE_KEY: dict[str, Key] = {"user": "user", "assistant": "assistant", "tool": "tool_results"}
 
@@ -58,6 +65,26 @@ def _message_weight(message: TraceMessage) -> int:
     return weight
 
 
+def _stubbed(
+    messages: Sequence[TraceMessage], cleared_ids: Collection[str]
+) -> tuple[list[TraceMessage], list[int]]:
+    """``messages`` with each cleared result as its stub, and the characters each one saved."""
+    names = {
+        str(call.get("call_id")): str(call.get("name")) for m in messages for call in m.tool_calls
+    }
+    shown: list[TraceMessage] = []
+    saved: list[int] = []
+    for m in messages:
+        if m.role == "tool" and m.id is not None and m.id in cleared_ids:
+            note = stub_text(names.get(m.call_id or ""), len(m.text))
+            shown.append(m.model_copy(update={"text": note}))
+            saved.append(max(0, len(m.text) - len(note)))
+        else:
+            shown.append(m)
+            saved.append(0)
+    return shown, saved
+
+
 def context_breakdown(
     *,
     used: int | None,
@@ -68,13 +95,18 @@ def context_breakdown(
     sections: Sequence[PromptSectionInfo] | None,
     tools: Sequence[Mapping[str, object]] | None,
     messages: Sequence[TraceMessage],
+    cleared_ids: Collection[str] = (),
+    summary_chars: int = 0,
 ) -> tuple[TraceContext, list[TraceMessage]]:
     """The context of one model call, and ``messages`` with ``tokens`` set on each.
 
     The parts add up to ``used`` when it is known, else to the estimate of
     four characters a token. Items add up to their part, and the messages of
-    one role to theirs.
+    one role to theirs. A result in ``cleared_ids`` counts as its stub, and its
+    message comes back as the stub; ``cleared`` has their number and the tokens saved.
+    ``summary_chars`` is the summary of old turns sent as the first message. It is its own part.
     """
+    messages, saved = _stubbed(messages, cleared_ids)
     prompt_chars = 0 if system_prompt is None else len(system_prompt)
     section_list = list(sections or [])
     schemas = list(tools or [])
@@ -90,6 +122,7 @@ def context_breakdown(
         "user": 0,
         "assistant": 0,
         "tool_results": 0,
+        "summary": summary_chars,
     }
     for key in ("user", "assistant", "tool_results"):
         chars[key] = sum(message_weights[i] for i in by_key[key])
@@ -123,7 +156,11 @@ def context_breakdown(
         TraceContextPart(key=key, tokens=tokens[key], chars=chars[key], items=items[key])
         for key in _KEYS
     ]
+    per_char = total / all_chars if all_chars else 0.0
     context = TraceContext(
+        cleared=TraceContextCleared(
+            count=sum(1 for n in saved if n > 0), tokens=round(sum(saved) * per_char)
+        ),
         used=used,
         window=window,
         window_estimated=window_estimated,

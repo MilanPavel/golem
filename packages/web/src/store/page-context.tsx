@@ -2,7 +2,9 @@ import { keepPreviousData, QueryClientProvider, useInfiniteQuery, useQuery, type
 import { createContext, useCallback, useContext, useSyncExternalStore, type ReactNode } from "react";
 import { useSyncExternalStoreWithSelector } from "use-sync-external-store/with-selector";
 import { ConnectionProvider } from "./connection-context.tsx";
+import { changesDiffKey, changesListKey, type ChangedFiles, type FileDiff } from "./changes.ts";
 import { configKey, type ConfigGetResult } from "./config.ts";
+import { KEYS_KEY } from "./keys.ts";
 import type { FsListDirsResult } from "./dirs.ts";
 import { MODEL_LIST_ALL_KEY, MODEL_LIST_KEY, SETUP_STATUS_KEY, type ModelListResult } from "./models.ts";
 import type { Page, PageActions } from "./page.ts";
@@ -10,7 +12,7 @@ import type { AppInstallSnapshot } from "./app-install.ts";
 import type { PageHostSnapshot } from "./page-host.ts";
 import type { PullsSnapshot } from "./pulls.ts";
 import type { Route } from "./router.ts";
-import type { McpListResult, SessionSummary, SetupStatusResult, SkillListResult } from "@golem/client";
+import type { AuthListResult, CostGetResult, McpListResult, SessionSummary, SetupStatusResult, SkillListResult } from "@golem/client";
 import { ARTIFACT_PAGE, artifactKey, traceKey, traceSpanKey, type ArtifactReadResult, type TraceGetResult, type TraceSpanResult } from "./trace.ts";
 import { mcpCatalogKey, mcpListKey, mcpToolsKey, type McpCatalogResult, type McpToolsResult } from "./mcp.ts";
 import type { Pastes } from "@golem/view";
@@ -215,6 +217,21 @@ export function useSessionReader(id: string | null): () => { view: SessionView; 
   );
 }
 
+/**
+ * Where each provider's key is kept (`auth.list`, never a key). A key set in a terminal pushes no event, so
+ * the answer is read again whenever the tab is seen, and whenever Settings asks.
+ */
+export function useKeys(enabled = true): UseQueryResult<AuthListResult> {
+  const { queries } = usePage();
+  return useQuery({ queryKey: [...KEYS_KEY], queryFn: queries.keys, enabled, staleTime: 0, refetchOnWindowFocus: true });
+}
+
+/** What model calls cost. Read again whenever Settings opens and the tab is seen: nothing pushes a change. */
+export function useCost(enabled = true): UseQueryResult<CostGetResult> {
+  const { queries } = usePage();
+  return useQuery({ queryKey: ["cost.get"], queryFn: queries.cost, enabled, staleTime: 0, retry: false, refetchOnWindowFocus: true });
+}
+
 /** The skills a folder sees (all of them for null). Fetched only once `enabled`, and again after a skills change. */
 export function useSkillList(cwd: string | null, enabled = true): UseQueryResult<SkillListResult> {
   const { queries } = usePage();
@@ -237,6 +254,31 @@ export function useTraceSpan(sessionId: string, spanId: string | null): UseQuery
     enabled: spanId !== null,
     retry: false,
   });
+}
+
+/** The files a session changed. Read when first used, and again after a `file.changed` event. */
+export function useChangedFiles(sessionId: string): ChangedFiles {
+  const { queries } = usePage();
+  const result = useQuery({
+    queryKey: changesListKey(sessionId),
+    queryFn: async () => (await queries.changesList(sessionId)).files,
+  });
+  return { files: result.data ?? null, error: result.error === null ? null : result.error.message };
+}
+
+/** One file's diff. Not read for a null path. */
+export function useFileDiff(sessionId: string, path: string | null): FileDiff {
+  const { queries } = usePage();
+  const result = useQuery({
+    queryKey: changesDiffKey(sessionId, path ?? ""),
+    queryFn: () => queries.changesDiff(sessionId, { path: path ?? "" }),
+    enabled: path !== null,
+  });
+  return {
+    diff: result.data?.diff ?? null,
+    truncated: result.data?.truncated ?? false,
+    error: result.error === null ? null : result.error.message,
+  };
 }
 
 /** An artifact, a page of characters at a time. Fetched only once `enabled`, and `fetchNextPage` reads the next one. */

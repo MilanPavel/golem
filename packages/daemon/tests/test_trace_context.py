@@ -63,6 +63,7 @@ def test_the_parts_add_up_to_the_tokens_the_provider_counted() -> None:
         "user",
         "assistant",
         "tool_results",
+        "summary",
     ]
     assert sum(p.tokens for p in context.parts) == 31500
     assert context.used == 31500 and context.window == 128000 and context.estimated is True
@@ -104,6 +105,23 @@ def test_without_a_count_the_parts_add_up_to_four_characters_a_token() -> None:
     assert sum(p.tokens for p in context.parts) == round(303 / 4)
 
 
+def test_a_summary_sent_is_its_own_part() -> None:
+    context, _ = context_breakdown(
+        used=None,
+        window=None,
+        window_estimated=False,
+        num_ctx=None,
+        system_prompt="s" * 100,
+        sections=None,
+        tools=None,
+        messages=[TraceMessage(role="user", text="u" * 100)],
+        summary_chars=200,
+    )
+    summary = next(p for p in context.parts if p.key == "summary")
+    assert summary.chars == 200 and summary.tokens == 50
+    assert sum(p.tokens for p in context.parts) == 100
+
+
 def test_nothing_sent_is_all_zero() -> None:
     context, messages = context_breakdown(
         used=None,
@@ -116,7 +134,7 @@ def test_nothing_sent_is_all_zero() -> None:
         messages=[],
     )
     assert messages == []
-    assert len(context.parts) == 5
+    assert len(context.parts) == 6
     assert all(p.tokens == 0 and p.chars == 0 and p.items == [] for p in context.parts)
 
 

@@ -13,20 +13,25 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-from collections.abc import Coroutine, Mapping, Sequence
-from dataclasses import dataclass, field
+from collections.abc import AsyncGenerator, Callable, Coroutine, Iterable, Mapping, Sequence
+from contextlib import asynccontextmanager
+from dataclasses import dataclass, field, replace
 from pathlib import Path
-from typing import cast
+from typing import Literal, cast
 
 from langchain_core.messages import BaseMessage
 
-from golem.config import PermissionMode
+from golem.config import PermissionMode, RouteMode
 from golem.graphs.adapter import PlainMessage, plain_messages, trace_messages
 from golem.graphs.chat import ChatRuntime
 from golem.graphs.context_view import ContextView, view
 from golem.graphs.state import SCHEMA_VERSION
 from golem.models import options as model_options
-from golem.models.router import ModelIdentity, ModelRouter
+from golem.models.budget import Budget, Room, spent_text
+from golem.models.errors import BUDGET_HINT
+from golem.models.facts import FactsSource, ModelFacts
+from golem.models.pick import Choice, Rejected, Traits, ladder, pick
+from golem.models.router import ModelConfigError, ModelIdentity, ModelRouter
 from golem.permissions.engine import MCP_ENABLE, Allowance, server_grant
 from golem.permissions.policy import explain
 from golem.sessions.approvals import pending_approval
@@ -52,20 +57,24 @@ from golem.skills.registry import SkillRegistry
 from golem.store.blobs import BlobStore
 from golem.store.records import RunRecords, SessionActivity, SessionRecords
 from golem.tools.registry import ToolError, ToolScope
-from golem_protocol.commands import TraceRunSpan, TraceSpanResult
+from golem_protocol.commands import SessionCompactResult, TraceRunSpan, TraceSpanResult
 from golem_protocol.events import (
     ApprovalDecision,
     ChatEvent,
+    ContextChangedData,
     EmptyEventData,
+    FileChangedData,
     ForkedFrom,
     MessageCompletedEvent,
     ModelOptionsChangedData,
     ModelSelectedData,
     RunCancelledData,
     SessionAllowance,
+    SessionChecksChangedData,
     SessionCompletedData,
     SessionCreatedData,
     SessionModeChangedData,
+    SessionPlanChangedData,
     SessionUpdatedData,
     SkillActivatedData,
     SkillActivatedEvent,
@@ -133,6 +142,13 @@ class SessionView:
         return sum(1 for message in self.messages if message.role != "system")
 
 
+class BudgetSpentError(Exception):
+    """A turn on a paid model was refused because a cap in ``[budget]`` is spent."""
+
+    def __init__(self, message: str) -> None:
+        super().__init__(message)
+
+
 class SchemaMismatchError(Exception):
     """The checkpoint's ``schema_version`` is not the one this process writes."""
 
@@ -157,12 +173,22 @@ class _LiveSession:
     """The Ollama option overrides of this session."""
     permission_mode: PermissionMode | None = None
     """The session's permission mode override, None to follow ``config.toml``."""
+    checks: bool | None = None
+    """Whether the session lets golem run checks. None until it answers the offer."""
+    route: RouteMode = "pinned"
+    """How the session picks the model of each turn."""
+    paid_ok: bool = False
+    """The user agreed to a paid model for this session. Nothing sets it yet."""
+    plan_first: bool = False
+    """Whether the session is in plan first: its runs only read and end in a plan."""
     pins: PinMemory = field(default_factory=PinMemory)
     """What the log last said about each pin, so a run logs only a change."""
     title: str | None = None
     titling: bool = False
     closed: bool = False
     task: asyncio.Task[None] | None = None
+    compacting: bool = False
+    """A compaction is writing the session's context view. No run may start."""
 
 
 def _schemas(text: str | None) -> list[dict[str, object]] | None:
@@ -208,6 +234,12 @@ class SessionManager:
         self._records = records
         self._run_records = runs
         self._titles = titles
+        self.facts: FactsSource | None = None
+        """Where a routed turn reads the facts of the models. None: it has none."""
+        self.budget: Budget | None = None
+        """The caps of ``[budget]``. None: a turn is never held back for its cost."""
+        self.listed_refs: Callable[[], Sequence[str]] = lambda: ()
+        """The refs of the models the daemon knows of, for the candidates of a pick."""
         self._sessions: dict[str, _LiveSession] = {}
         self._runs: dict[str, _LiveRun] = {}
         self._naming: set[asyncio.Task[None]] = set()
@@ -241,6 +273,7 @@ class SessionManager:
                 schema_version=SCHEMA_VERSION,
                 cwd=cwd,
                 origin="user" if origin is None else origin,
+                route=self._runtime.router.routing_settings().mode,
             )
             await self._announce(session)
             self._sessions[session.session_id] = session
@@ -272,6 +305,7 @@ class SessionManager:
                 cwd=source.cwd,
                 mcp_servers=set(source.mcp_servers),
                 skills=list(source.skills),
+                route=source.route,
             )
             if not await self._runtime.fork(
                 session_id, fork.session_id, at_message_id=at_message_id
@@ -350,6 +384,62 @@ class SessionManager:
                 messages=[PlainMessage("system", system), *messages] if system else messages,
             )
 
+    async def compact(
+        self, session_id: str, action: Literal["clear", "summarise"], focus: str | None
+    ) -> SessionCompactResult:
+        """Clear old tool results or summarise old turns of an idle session.
+
+        Only the context view changes: the checkpoint keeps every message, and the next
+        model call sends the smaller view. Stores ``context.changed`` (no run) unless there was
+        nothing to do. The summary call can take a minute, and the session stays busy meanwhile.
+
+        Raises :class:`SessionNotFoundError`, :class:`SchemaMismatchError`,
+        :class:`SessionBusyError` when a run is open, waits for an approval, or a compaction
+        is running, and whatever the summary call raises.
+        """
+        async with self._lock:
+            session = await self._resolve(session_id)
+            if (session.task is not None and not session.task.done()) or session.compacting:
+                raise SessionBusyError(session_id)
+            if await self._run_records.waiting(session_id) is not None:
+                raise SessionBusyError(session_id)
+            session.compacting = True
+        try:
+            system = await self._runtime.system_prompt(
+                session_id, session.cwd, session.skills, sorted(session.mcp_servers)
+            )
+            schemas = self._runtime.tools.scoped(_scope(session)).schemas()
+            done = await self._runtime.compact(
+                session_id,
+                action,
+                profile=session.model_profile,
+                options=dict(session.options),
+                focus=focus,
+                system_chars=len(system),
+                tools_chars=len(json.dumps(schemas, sort_keys=True, separators=(",", ":"))),
+            )
+            if done.view is not None:
+                await self._events.emit(
+                    session_id,
+                    None,
+                    "context.changed",
+                    ContextChangedData(
+                        action=done.action,
+                        before_tokens=done.before_tokens,
+                        after_tokens=done.after_tokens,
+                        count=done.messages,
+                    ),
+                )
+        finally:
+            session.compacting = False
+        return SessionCompactResult(
+            before_tokens=done.before_tokens,
+            after_tokens=done.after_tokens,
+            count=done.count,
+            window=done.window,
+            model=done.model,
+        )
+
     async def trace(self, session_id: str) -> tuple[str | None, list[TraceRunSpan]]:
         """The session's title and its runs as a tree of spans. Does not start a run.
 
@@ -414,6 +504,8 @@ class SessionManager:
                 sections=found.result.system_sections,
                 tools=tools,
                 messages=found.result.messages,
+                cleared_ids=found.cleared_ids,
+                summary_chars=found.summary_chars,
             )
             updates["context"] = context.model_copy(
                 update={
@@ -528,6 +620,44 @@ class SessionManager:
         async with self._lock:
             return dict((await self._resolve(session_id)).options)
 
+    async def cwd_of(self, session_id: str) -> str | None:
+        """The folder the session works in, None for a session without one.
+
+        Raises :class:`SessionNotFoundError` or :class:`SchemaMismatchError`.
+        """
+        async with self._lock:
+            return (await self._resolve(session_id)).cwd
+
+    @asynccontextmanager
+    async def idle(self, session_id: str) -> AsyncGenerator[str | None]:
+        """Keep the session without a run while the block runs. Yields its folder.
+
+        Raises :class:`SessionNotFoundError`, :class:`SchemaMismatchError`, or
+        :class:`SessionBusyError` when a run is active or waits on an approval.
+        """
+        async with self._lock:
+            session = await self._resolve(session_id)
+            if session.task is not None and not session.task.done():
+                raise SessionBusyError(session_id)
+            if await self._run_records.waiting(session_id) is not None:
+                raise SessionBusyError(session_id)
+            yield session.cwd
+
+    async def announce_change(self, session_id: str, data: FileChangedData) -> None:
+        """Tell the session's screens about a change made between runs."""
+        await self._events.emit(session_id, None, "file.changed", data)
+
+    async def is_busy(self, session_id: str) -> bool:
+        """Whether a run is active or waits for an approval.
+
+        Raises :class:`SessionNotFoundError` or :class:`SchemaMismatchError`.
+        """
+        async with self._lock:
+            session = await self._resolve(session_id)
+            if session.task is not None and not session.task.done():
+                return True
+            return await self._run_records.waiting(session_id) is not None
+
     async def model_profile(self, session_id: str) -> str:
         """The profile or ref the session runs on.
 
@@ -590,6 +720,57 @@ class SessionManager:
                 session.permission_mode = mode
             return self._effective_mode(session), session.permission_mode is not None
 
+    async def set_checks(self, session_id: str, on: bool) -> bool:
+        """Say whether golem may run the project's checks in this session.
+
+        Stores ``session.checks.changed`` unless the answer is the one it already has.
+        It applies from the next turn.
+
+        Raises :class:`SessionNotFoundError` or :class:`SchemaMismatchError`.
+        """
+        async with self._lock:
+            session = await self._resolve(session_id)
+            if on != session.checks:
+                await self._events.emit(
+                    session_id, None, "session.checks.changed", SessionChecksChangedData(on=on)
+                )
+                session.checks = on
+            return on
+
+    async def set_route(self, session_id: str, mode: RouteMode) -> RouteMode:
+        """Set how the session picks the model of each turn.
+
+        Stores ``session.updated`` with the route unless the session already has it.
+        It applies from the next turn.
+
+        Raises :class:`SessionNotFoundError` or :class:`SchemaMismatchError`.
+        """
+        async with self._lock:
+            session = await self._resolve(session_id)
+            if mode != session.route:
+                await self._events.emit(
+                    session_id, None, "session.updated", SessionUpdatedData(route=mode)
+                )
+                session.route = mode
+            return mode
+
+    async def set_plan(self, session_id: str, on: bool) -> bool:
+        """Put the session in plan first, or take it out.
+
+        Stores ``session.plan.changed`` unless the session is already so. It applies
+        from the next turn.
+
+        Raises :class:`SessionNotFoundError` or :class:`SchemaMismatchError`.
+        """
+        async with self._lock:
+            session = await self._resolve(session_id)
+            if on != session.plan_first:
+                await self._events.emit(
+                    session_id, None, "session.plan.changed", SessionPlanChangedData(on=on)
+                )
+                session.plan_first = on
+            return on
+
     async def permission_mode(self, session_id: str) -> PermissionMode:
         """The mode the session runs in: its override, else the one in ``config.toml``.
 
@@ -628,9 +809,16 @@ class SessionManager:
             session = await self._resolve(session_id)
             if session.task is not None and not session.task.done():
                 raise SessionBusyError(session_id)
+            if session.compacting:
+                raise SessionBusyError(session_id)
             if await self._run_records.waiting(session_id) is not None:
                 raise SessionBusyError(session_id)
-            self._runtime.router.chat_model(session.model_profile)
+            room = None if self.budget is None else await self.budget.room(session_id)
+            profile, routed = session.model_profile, None
+            if session.route != "pinned":
+                profile, routed = await self._route(session, text, room)
+            self._check_budget(profile, room)
+            self._runtime.router.chat_model(profile)
             folder = session.cwd if session.cwd is not None else cwd
             invocation = None if skill is None else self._invoke(session_id, folder, skill)
             if session.cwd is None and cwd is not None:
@@ -644,7 +832,7 @@ class SessionManager:
                 text=text if invocation is None else invocation.text,
                 skill=invocation,
                 typed=None if invocation is None else text,
-                model_profile=session.model_profile,
+                model_profile=profile,
                 schema_version=session.schema_version,
                 user_message_id=new_id("m"),
                 assistant_message_id=new_id("m"),
@@ -655,11 +843,95 @@ class SessionManager:
                 pinned_folders=self._pinned_folders(session),
                 options=dict(session.options),
                 permission_mode=session.permission_mode,
+                checks=session.checks,
+                plan_first=session.plan_first,
                 pins=session.pins,
+                routed=routed,
             )
             control = RunControl()
             await self._start(session, turn.run_id, control, self._turn(session, turn, control))
             return turn.run_id
+
+    def _check_budget(self, profile: str, room: Room | None) -> None:
+        """Refuse a turn on a paid model while a cap is spent. A local model is never refused.
+
+        With ``over = "ask"`` the turn is refused too, until the question of a paid step-up
+        can be asked (ticket 9.3.6): that is the place to ask instead of raising.
+        """
+        if room is None or not room.spent or self.budget is None:
+            return
+        tier = None if self._runtime.tier_of is None else self._runtime.tier_of(profile)
+        if tier in (None, "local"):
+            return
+        spent = room.spent_today if room.cap == "day" else room.spent_session
+        cap = self._runtime.router.budget_settings()
+        limit = cap.daily_usd if room.cap == "day" else cap.session_usd
+        raise BudgetSpentError(
+            f"{spent_text(room)}: ${spent:.2f} of ${limit or 0:.2f}; {BUDGET_HINT}"
+        )
+
+    async def _route(
+        self, session: _LiveSession, text: str, room: Room | None = None
+    ) -> tuple[str, Choice]:
+        """The profile this turn runs on, and why. Reads cached facts, never the network.
+
+        Raises :class:`~golem.models.router.ModelConfigError` on route ``local`` when the
+        session's model is hosted and no local model passes.
+        """
+        router = self._runtime.router
+        settings = router.routing_settings()
+        everything = await self._facts_of(session, settings.ladder.model_dump().values())
+        candidates = ladder(settings.ladder, session.model_profile, everything)
+        own = next((m for m in candidates if session.model_profile in (m.profile, m.ref)), None)
+        used = await self._records.last_input(session.session_id)
+        traits = Traits(
+            prompt_tokens=None if used is None else used + len(text) // 4,
+            reply_reserve=router.context_settings().reply_reserve,
+            needs_tools=True,
+            local_only=session.route == "local",
+            paid_allowed=session.paid_ok,
+            paid_room_usd=None if room is None else room.usd,
+        )
+        choice = Choice(None, "fallback", "no model facts", ())
+        if own is not None:
+            choice = pick(session.route, own, candidates, traits)
+        if choice.needs_consent and own is not None:
+            # Until golem can ask about a paid model, a turn without a yes stays local.
+            held = [
+                Rejected(m.ref, m.tier, "a paid model needs your OK")
+                for m in candidates
+                if m.tier != "local"
+            ]
+            free = pick(session.route, own, [m for m in candidates if m.tier == "local"], traits)
+            choice = replace(free, rejected=(*free.rejected, *held))
+        picked = choice.model
+        if picked is not None:
+            if choice.reason == "budget" and room is not None:
+                choice = replace(choice, detail=spent_text(room))
+            return picked.profile, choice
+        tier = own.tier if own is not None else None
+        if tier is None and self._runtime.tier_of is not None:
+            tier = self._runtime.tier_of(session.model_profile)
+        if session.route == "local" and tier != "local":
+            raise ModelConfigError(
+                "this session is local only and has no local model; pick one with /model"
+            )
+        detail = f"no other model passed ({choice.detail}), so the session's model runs"
+        return session.model_profile, Choice(own, "fallback", detail, choice.rejected)
+
+    async def _facts_of(self, session: _LiveSession, named: Iterable[object]) -> list[ModelFacts]:
+        """The facts of the session's model, the ladder's names and every listed model."""
+        if self.facts is None:
+            return []
+        router = self._runtime.router
+        refs: list[str] = []
+        for name in (session.model_profile, *(n for n in named if isinstance(n, str))):
+            try:
+                refs.append(router.resolve(name).ref)
+            except ModelConfigError:
+                continue
+        refs.extend(self.listed_refs())
+        return await self.facts.facts(list(dict.fromkeys(refs)), overrides=dict(session.options))
 
     async def respond(
         self,
@@ -729,6 +1001,8 @@ class SessionManager:
                 pinned_folders=self._pinned_folders(session),
                 options=dict(session.options),
                 permission_mode=session.permission_mode,
+                checks=session.checks,
+                plan_first=session.plan_first,
                 pins=session.pins,
             )
             control = RunControl()
@@ -1074,6 +1348,9 @@ class SessionManager:
             skills=[] if record is None else list(record.skills),
             options={} if record is None else dict(record.options),
             permission_mode=None if record is None else record.permission_mode,
+            checks=None if record is None else record.checks,
+            route="pinned" if record is None else record.route,
+            plan_first=False if record is None else record.plan_first,
         )
         if session.skills:
             session.pins = PinMemory.from_events(await self._events.stored(session_id))
@@ -1095,6 +1372,7 @@ class SessionManager:
                 forked_from=forked_from,
                 cwd=session.cwd,
                 origin=None if session.origin == "user" else session.origin,
+                route=session.route,
             ),
         )
 

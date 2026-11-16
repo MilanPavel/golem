@@ -11,13 +11,14 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from collections.abc import Callable, Mapping
+from collections.abc import Awaitable, Callable, Mapping
 from typing import Protocol, cast
 
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from golem.config import ModelPrice
 from golem.models.cost import cost_usd
+from golem.models.errors import BUDGET_HINT, BudgetSpent
 from golem.models.gate import ServerGate
 from golem.models.roles import for_role
 from golem.models.router import ModelConfigError, ModelRouter
@@ -71,6 +72,11 @@ class ModelTitles:
         self._usage: Usage | None = None
         self._price_of: Callable[[str], ModelPrice | None] | None = None
         self._tier_of: Callable[[str], Tier | None] | None = None
+        self._paid_ok: Callable[[str | None], Awaitable[bool]] | None = None
+
+    def limit(self, paid_ok: Callable[[str | None], Awaitable[bool]]) -> None:
+        """Skip a paid title when ``paid_ok`` says a cap in ``[budget]`` is spent."""
+        self._paid_ok = paid_ok
 
     def bind(
         self, tier_of_ref: Callable[[str], Tier | None], budget_refs: Callable[[], list[str]]
@@ -111,6 +117,10 @@ class ModelTitles:
             tier_of_profile=self._tier_of_profile,
             budget_models=self._budget_refs(),
         )
+        ask = self._paid_ok
+        paid = self._tier_of_profile(role.profile) not in (None, "local")
+        if ask is not None and paid and not await ask(session_id):
+            raise BudgetSpent("a budget cap is spent, so there is no paid title", hint=BUDGET_HINT)
         overrides: dict[str, float | str] = dict(options or {}) if role.same_as_session else {}
         server = self._router.ollama_server(role.profile)
         if server is not None:
@@ -147,7 +157,7 @@ class ModelTitles:
             return
         try:
             identity = self._router.identity(profile)
-            usage = _token_usage(metadata)
+            usage = token_usage(metadata)
             price = None if self._price_of is None else self._price_of(profile)
             tier = None if self._tier_of is None else self._tier_of(profile)
             await self._usage.record_role_call(
@@ -164,7 +174,7 @@ class ModelTitles:
             log.warning("recording the title call failed", exc_info=True)
 
 
-def _token_usage(metadata: object) -> TokenUsage | None:
+def token_usage(metadata: object) -> TokenUsage | None:
     """The tokens of a langchain ``usage_metadata``, or None when there is none."""
     if not isinstance(metadata, dict):
         return None

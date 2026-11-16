@@ -1291,6 +1291,56 @@ test("model.server.status reaches onModelServer, and a malformed one does not", 
   }
 });
 
+test("skill.read, write, create and set_disabled send their params, and local clients use the protected twins", async () => {
+  const sent: Record<string, unknown>[] = [];
+  const server = await listen((socket) => {
+    attach(socket, {
+      answerPing: true,
+      results: {
+        "skill.read": { path: "/s/ship/SKILL.md", text: "x", mtime_ns: 5, source: "user" },
+        "skill.write": { ok: true, written: true, mtime_ns: 6 },
+        "skill.write_protected": { ok: true, written: true, mtime_ns: 7 },
+        "skill.create": { path: "/s/new/SKILL.md", mtime_ns: 8 },
+        "skill.create_protected": { path: "/p/new/SKILL.md", mtime_ns: 9 },
+        "skill.set_disabled": { name: "ship", disabled: true },
+      },
+      onRequest: (_socket, method, params) => {
+        if (method.startsWith("skill.")) {
+          sent.push({ method, ...params });
+        }
+      },
+    });
+  });
+  const client = connectGolem({ socketPath: server.socketPath, clientName: "tui", reconnect: false, heartbeatMs: 60_000 });
+  try {
+    assert.equal((await client.readSkill("ship", "/repo")).mtime_ns, 5);
+    assert.equal((await client.writeSkill({ path: "/s/ship/SKILL.md", text: "y", baseMtimeNs: 5 })).mtime_ns, 6);
+    const local = await client.writeSkill(
+      { path: "/s/ship/SKILL.md", text: "y", baseMtimeNs: 5, cwd: "/repo", dryRun: true },
+      { local: true },
+    );
+    assert.equal(local.mtime_ns, 7);
+    assert.equal((await client.createSkill({ name: "new", scope: "user", description: "d" })).mtime_ns, 8);
+    const project = await client.createSkill(
+      { name: "new", scope: "project", description: "d", cwd: "/repo", modelInvocable: false },
+      { local: true },
+    );
+    assert.equal(project.mtime_ns, 9);
+    assert.deepEqual(await client.setSkillDisabled("ship", true), { name: "ship", disabled: true });
+    assert.deepEqual(sent, [
+      { method: "skill.read", name: "ship", cwd: "/repo" },
+      { method: "skill.write", path: "/s/ship/SKILL.md", text: "y", base_mtime_ns: 5 },
+      { method: "skill.write_protected", path: "/s/ship/SKILL.md", text: "y", base_mtime_ns: 5, cwd: "/repo", dry_run: true },
+      { method: "skill.create", name: "new", scope: "user", description: "d" },
+      { method: "skill.create_protected", name: "new", scope: "project", description: "d", cwd: "/repo", model_invocable: false },
+      { method: "skill.set_disabled", name: "ship", disabled: true },
+    ]);
+  } finally {
+    client.close();
+    await server.close();
+  }
+});
+
 test("skill.list reads the skills, and skill.registry.changed reaches onSkillsChanged", async () => {
   const ship = { name: "ship", description: "Ship it.", source: "project", path: "/repo/.agents/skills/ship", usable: true };
   const sent: Record<string, unknown>[] = [];
@@ -1352,6 +1402,40 @@ test("forkSession sends the message id and reads the new session", async () => {
   }
 });
 
+test("getCost sends the session id when it has one and checks what comes back", async () => {
+  const sent: Record<string, unknown>[] = [];
+  const totals = { calls: 1, input: 2, output: 3, cost_usd: 0.5, saved_usd: 0 };
+  const result = { today: totals, week: totals, by_model: [], by_day: [] };
+  const server = await listen((socket) => {
+    attach(socket, {
+      answerPing: true,
+      results: { "cost.get": result },
+      onRequest: (_socket, method, params) => {
+        if (method === "cost.get") sent.push(params);
+      },
+    });
+  });
+  const client = connectGolem({ socketPath: server.socketPath, clientName: "web", reconnect: false, heartbeatMs: 60_000 });
+  try {
+    assert.deepEqual(await client.getCost(), result);
+    await client.getCost("s_test");
+    assert.deepEqual(sent, [{}, { session_id: "s_test" }]);
+  } finally {
+    client.close();
+    await server.close();
+  }
+  const bad = await listen((socket) => {
+    attach(socket, { answerPing: true, results: { "cost.get": { today: totals } } });
+  });
+  const refused = connectGolem({ socketPath: bad.socketPath, clientName: "web", reconnect: false, heartbeatMs: 60_000 });
+  try {
+    await assert.rejects(() => refused.getCost(), /invalid cost.get result/);
+  } finally {
+    refused.close();
+    await bad.close();
+  }
+});
+
 test("getTrace and getTraceSpan send their ids and check what comes back", async () => {
   const sent: [string, Record<string, unknown>][] = [];
   const span = { id: "m_1", kind: "model", name: "model 1", start: "t", status: "ok" };
@@ -1395,6 +1479,144 @@ test("getTrace and getTraceSpan send their ids and check what comes back", async
   try {
     await assert.rejects(() => refused.getTrace("s_test"), /invalid trace.get result/);
     await assert.rejects(() => refused.getTraceSpan("s_test", "m_1"), /invalid trace.span result/);
+  } finally {
+    refused.close();
+    await bad.close();
+  }
+});
+
+test("changesList and changesDiff send their targets and check what comes back", async () => {
+  const sent: [string, Record<string, unknown>][] = [];
+  const list = { files: [{ path: "a.txt", status: "modified", added: 2, removed: 1, change_ids: ["c_1", "c_2"], stale: false }] };
+  const diff = { diff: "--- a/a.txt\n+++ b/a.txt\n", truncated: false };
+  const server = await listen((socket) => {
+    attach(socket, {
+      answerPing: true,
+      results: { "changes.list": list, "changes.diff": diff },
+      onRequest: (_socket, method, params) => {
+        if (method.startsWith("changes.")) sent.push([method, params]);
+      },
+    });
+  });
+  const client = connectGolem({ socketPath: server.socketPath, clientName: "web", reconnect: false, heartbeatMs: 60_000 });
+  try {
+    assert.deepEqual(await client.changesList("s_test"), list);
+    assert.deepEqual(await client.changesDiff("s_test", { path: "a.txt" }), diff);
+    assert.deepEqual(await client.changesDiff("s_test", { changeId: "c_1" }), diff);
+    assert.deepEqual(sent, [
+      ["changes.list", { session_id: "s_test" }],
+      ["changes.diff", { session_id: "s_test", path: "a.txt" }],
+      ["changes.diff", { session_id: "s_test", change_id: "c_1" }],
+    ]);
+  } finally {
+    client.close();
+    await server.close();
+  }
+  const bad = await listen((socket) => {
+    attach(socket, {
+      answerPing: true,
+      results: {
+        "changes.list": { files: [{ ...list.files[0], status: "moved" }] },
+        "changes.diff": { diff: "x" },
+      },
+    });
+  });
+  const refused = connectGolem({ socketPath: bad.socketPath, clientName: "web", reconnect: false, heartbeatMs: 60_000 });
+  try {
+    await assert.rejects(() => refused.changesList("s_test"), /invalid changes.list result/);
+    await assert.rejects(() => refused.changesDiff("s_test", { path: "a.txt" }), /invalid changes.diff result/);
+  } finally {
+    refused.close();
+    await bad.close();
+  }
+});
+
+test("changesRevert sends each kind of target and checks what comes back", async () => {
+  const sent: [string, Record<string, unknown>][] = [];
+  const reply = { reverted: ["a.txt"], conflicts: [{ path: "b.txt", reason: "changed_on_disk" }] };
+  const server = await listen((socket) => {
+    attach(socket, {
+      answerPing: true,
+      results: { "changes.revert": reply },
+      onRequest: (_socket, method, params) => {
+        if (method === "changes.revert") sent.push([method, params]);
+      },
+    });
+  });
+  const client = connectGolem({ socketPath: server.socketPath, clientName: "web", reconnect: false, heartbeatMs: 60_000 });
+  try {
+    assert.deepEqual(await client.changesRevert("s_test", { kind: "change", changeId: "c_1" }), reply);
+    await client.changesRevert("s_test", { kind: "file", path: "a.txt" }, true);
+    await client.changesRevert("s_test", { kind: "hunk", path: "a.txt", hunk: 2 });
+    await client.changesRevert("s_test", { kind: "run", runId: "r_1" });
+    assert.deepEqual(sent, [
+      ["changes.revert", { session_id: "s_test", target: { kind: "change", change_id: "c_1" }, force: false }],
+      ["changes.revert", { session_id: "s_test", target: { kind: "file", path: "a.txt" }, force: true }],
+      ["changes.revert", { session_id: "s_test", target: { kind: "hunk", path: "a.txt", hunk: 2 }, force: false }],
+      ["changes.revert", { session_id: "s_test", target: { kind: "run", run_id: "r_1" }, force: false }],
+    ]);
+  } finally {
+    client.close();
+    await server.close();
+  }
+  const bad = await listen((socket) => {
+    attach(socket, { answerPing: true, results: { "changes.revert": { reverted: ["a.txt"] } } });
+  });
+  const refused = connectGolem({ socketPath: bad.socketPath, clientName: "web", reconnect: false, heartbeatMs: 60_000 });
+  try {
+    await assert.rejects(
+      () => refused.changesRevert("s_test", { kind: "file", path: "a.txt" }),
+      /invalid changes.revert result/,
+    );
+  } finally {
+    refused.close();
+    await bad.close();
+  }
+});
+
+test("the commit calls send their targets and check what comes back", async () => {
+  const sent: [string, Record<string, unknown>][] = [];
+  const commit = { ok: true, sha: "abc1234", output: "[main abc1234] msg" };
+  const info = { repository: true, branch: "main", paths: ["a.txt"] };
+  const suggested = { message: "Update a.txt" };
+  const server = await listen((socket) => {
+    attach(socket, {
+      answerPing: true,
+      results: { "changes.commit": commit, "changes.commit_info": info, "changes.suggest_message": suggested },
+      onRequest: (_socket, method, params) => {
+        if (method.startsWith("changes.")) sent.push([method, params]);
+      },
+    });
+  });
+  const client = connectGolem({ socketPath: server.socketPath, clientName: "web", reconnect: false, heartbeatMs: 60_000 });
+  try {
+    assert.deepEqual(await client.changesCommit("s_test", ["a.txt"], "msg"), commit);
+    assert.deepEqual(await client.changesCommitInfo("s_test"), info);
+    assert.deepEqual(await client.changesSuggestMessage("s_test", ["a.txt"]), suggested);
+    assert.deepEqual(sent, [
+      ["changes.commit", { session_id: "s_test", paths: ["a.txt"], message: "msg" }],
+      ["changes.commit_info", { session_id: "s_test" }],
+      ["changes.suggest_message", { session_id: "s_test", paths: ["a.txt"] }],
+    ]);
+  } finally {
+    client.close();
+    await server.close();
+  }
+  const bad = await listen((socket) => {
+    attach(socket, {
+      answerPing: true,
+      results: {
+        "changes.commit": { ok: "yes" },
+        "changes.commit_info": { repository: true },
+        "changes.suggest_message": {},
+      },
+    });
+  });
+  const refused = connectGolem({ socketPath: bad.socketPath, clientName: "web", reconnect: false, heartbeatMs: 60_000 });
+  try {
+    await assert.rejects(() => refused.changesCommit("s_test", ["a.txt"], "m"), /invalid changes.commit result/);
+    await assert.rejects(() => refused.changesCommitInfo("s_test"), /invalid changes.commit_info result/);
+    await assert.rejects(() => refused.changesSuggestMessage("s_test", ["a.txt"]), /invalid changes.suggest_message result/);
   } finally {
     refused.close();
     await bad.close();
@@ -1462,6 +1684,45 @@ test("listDirs sends the path only when given, and rejects a malformed listing",
   const refused = connectGolem({ socketPath: bad.socketPath, clientName: "tui", reconnect: false, heartbeatMs: 60_000 });
   try {
     await assert.rejects(() => refused.listDirs(), /invalid fs.list_dirs result/);
+  } finally {
+    refused.close();
+    await bad.close();
+  }
+});
+
+test("readFile and listFiles send their arguments and reject a malformed result", async () => {
+  const seen: [string, Record<string, unknown>][] = [];
+  const read = { path: "a.txt", text: "hi", truncated: false, lines: 1 };
+  const daemon = await listen((socket) => {
+    attach(socket, {
+      answerPing: true,
+      results: { "file.read": read, "file.list": { paths: ["a.txt"], more: false } },
+      onRequest: (_socket, method, params) => {
+        if (method.startsWith("file.")) seen.push([method, params]);
+      },
+    });
+  });
+  const client = connectGolem({ socketPath: daemon.socketPath, clientName: "tui", reconnect: false, heartbeatMs: 60_000 });
+  try {
+    assert.deepEqual(await client.readFile("s_1", "a.txt"), read);
+    assert.deepEqual(await client.listFiles("s_1"), { paths: ["a.txt"], more: false });
+    await client.listFiles("s_1", "a", 5);
+    assert.deepEqual(seen, [
+      ["file.read", { session_id: "s_1", path: "a.txt" }],
+      ["file.list", { session_id: "s_1" }],
+      ["file.list", { session_id: "s_1", query: "a", limit: 5 }],
+    ]);
+  } finally {
+    client.close();
+    await daemon.close();
+  }
+  const bad = await listen((socket) => {
+    attach(socket, { answerPing: true, results: { "file.read": { path: "a" }, "file.list": { paths: [1] } } });
+  });
+  const refused = connectGolem({ socketPath: bad.socketPath, clientName: "tui", reconnect: false, heartbeatMs: 60_000 });
+  try {
+    await assert.rejects(() => refused.readFile("s_1", "a"), /invalid file.read result/);
+    await assert.rejects(() => refused.listFiles("s_1"), /invalid file.list result/);
   } finally {
     refused.close();
     await bad.close();

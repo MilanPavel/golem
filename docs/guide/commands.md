@@ -38,12 +38,16 @@ golem has commands in two places: `golem …` in your shell, and `/…` inside t
 | `golem mcp remove <name>` | Removes the server from `config.toml`, stops it, and deletes its token |
 | `golem auth list` | Which providers have a key |
 | `golem models` | Every model you can use or download, with size, price, and context. `--refresh` asks the providers again |
+| `golem cost` | What model calls cost: tokens and money for today and the last 7 days, the week by model, and what running locally saved. Same report as `/cost`, without the session row |
 | `golem config edit [--project]` | Opens `config.toml` (or the project's) in `$EDITOR`, and saves it only when the daemon accepts it. If a setting needs a restart, it offers one |
 | `golem config show` | The settings and tool rules in effect for this folder. `--resolved` is accepted and prints the same |
 | `golem skills` | The skills this folder sees, and why one is not used. `golem skills list` is the same |
 | `golem skills check <path>` | Checks a skill, its `SKILL.md`, or a folder of skills. Needs no daemon |
 | `golem skills new <name> [--project] [--description "…"]` | Makes a skill in `~/.golem/skills`, or in `.agents/skills` of this folder with `--project`, and opens it in `$EDITOR` |
 | `golem skills edit <name>` | Opens the skill's `SKILL.md` in `$EDITOR`, then checks it and prints its mistakes |
+| `golem ask "<prompt>" [--folder <dir>] [--model <profile>] [--skill <name>]` | Starts a session, waits, and prints the answer. If the run stops to ask you about a tool, it prints the question and exits with 3: answer it with `golem open <id>`. A failed run exits with 1 |
+| `golem ask --detach "<prompt>"` | Starts the session and prints its id at once. The work goes on without this window. Open it later with `golem open <id>` |
+| `golem open <id> [--web]` | Opens the terminal chat on that session. With `--web`, opens the web page at that session |
 | `golem web` | The same as `golem`, kept as an alias |
 | `golem web install` / `uninstall` | Keeps the web page running at login (a launchd job), or removes that job |
 | `golem web logout` | Signs every browser out of the web UI |
@@ -110,6 +114,8 @@ To change one option without the panel, type `/tune <option> <value>`, for examp
 
 The status line shows the options that differ from the model's default, such as `temp 0.2 · top_p 0.9`, at most three and then `+N`. The context size is left out, because the context bar already shows it.
 
+The line under an answer ends with the model, `local` for a model on your machine, the tokens the run used, and golem's estimate of its cost, such as `qwen3:27b · local · 4.1K tok · $0.00`. Once a call in the session has cost something, the status line ends with the session's total so far, such as `$0.03`.
+
 ### Tools, skills, and MCP
 
 | Command | What it does |
@@ -132,8 +138,12 @@ The status line shows the options that differ from the model's default, such as 
 
 | Command | What it does |
 |---|---|
+| `/changes` | Review the files this session changed. In the terminal: the files on the left, the diff on the right, `n` and `p` jump by hunk. In the web UI it opens the Changes tab |
 | `/todos` | Show or hide the agent's todo list above the composer |
 | `/context` | See how full the model's context is, and what fills it. In the web UI it opens the trace |
+| `/cost` | What model calls cost: this session, today, the week, the week by model, and what running locally saved. In the web UI it opens Settings → Usage |
+| `/compact [focus]` | Replace the old turns with a summary, so the next call sends less. `focus` is what the summary must keep, such as `/compact the file names and the plan`. The last turns stay as they are |
+| `/context clear` | Send old tool results as one line each, keeping the newest few, so the next call sends less |
 | `/time` | Show or hide the time beside each message |
 | `/thinking` | Show or hide the thinking line above each answer. It only changes what you see; the `think` setting in `/tune` is what the model is asked to do |
 | `/detail [quiet\|normal\|verbose]` | Web UI: how much of a turn's tool steps shows. Quiet is the step count, Normal a one-line summary you can open, Verbose opens every step with its arguments and output. Alone, it says the current level |
@@ -141,6 +151,8 @@ The status line shows the options that differ from the model's default, such as 
 | `/debug wire`, `/debug model` | Show the protocol messages, or exactly what the model sees |
 | `/debug hold`, `/debug go` | Hold your next message, to look at it in the model tab before it is sent, then send it |
 | `/help` | List every command |
+
+`/compact` and `/context clear` run between turns, without waiting for the context to fill. Each prints one line when it is done, such as `summarised 9 earlier turns with qwen3:27b · ctx 84% → 31% · 6.2 s` or `cleared 12 old tool results · ctx 71% → 38%`, and `nothing to compact yet` when there is nothing to do. A summary can take a minute with a local model, and the line says it is working meanwhile. They are refused while an answer is running. Nothing is deleted: the chat on screen and the saved session stay whole, and only what the next call sends gets shorter. `/compact` keeps the last `keep_turns` turns and `/context clear` keeps the newest `keep_results` tool results, from `[context]` in the settings.
 
 `/context` draws the model's window as a grid of cells, coloured by what fills them, with a legend beside it (or under it in a narrow terminal). One cell is 0.5% of the window.
 
