@@ -61,7 +61,8 @@ export function DiffView({ diff, mode }: { diff: string; mode: DiffMode }) {
           {file.deleted ? <span className="rounded-xs bg-deny-soft px-1.5 text-deny">deleted</span> : null}
         </p>
       ) : null}
-      <div className="overflow-x-auto rounded-sm border border-line bg-bg">
+      {/* relative: the hidden caption and header are absolutely placed, and must stay inside this box. */}
+      <div className="relative overflow-x-auto rounded-sm border border-line bg-bg">
         <table className={cn("diff-table border-collapse", isSplit ? "w-full table-fixed" : "w-max min-w-full")}>
           {isSplit ? (
             // Two equal halves: each side's number and sign columns stay narrow, the text takes the rest.

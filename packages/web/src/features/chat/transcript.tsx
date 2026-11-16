@@ -405,7 +405,7 @@ export function TranscriptColumn({ chat, className, waiting = null }: { chat: Tr
 
   return (
     <div className={cn("relative flex min-h-0 flex-1 flex-col", className)}>
-      <div ref={scroller} onScroll={onScroll} className="min-h-0 flex-1 overflow-y-auto" data-transcript-scroller>
+      <div ref={scroller} onScroll={onScroll} className="relative min-h-0 flex-1 overflow-y-auto" data-transcript-scroller>
         <div ref={content} className="mx-auto flex max-w-column flex-col gap-8 px-5 py-7">
           <TranscriptMessages chat={chat} waiting={waiting} />
         </div>
