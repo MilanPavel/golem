@@ -161,6 +161,22 @@ async def test_two_invalid_calls_step_up_once_and_the_run_finishes(short_home: P
         await stop_daemon(app, task)
 
 
+async def test_a_call_written_as_unreadable_json_steps_up(short_home: Path) -> None:
+    leaked = '{"type":"function","function":{"name":"no_such_tool","parameters":{"a":"b"}}}'
+    router = _router([leaked], ["done"])
+    app, task = await start_daemon(short_home, router=router, facts=_facts_all())
+    client = await RpcClient.connect(app.paths.socket_path)
+    try:
+        await _send(client, await _start(app, client, "auto"))
+        await _ended(client)
+        (escalated,) = _escalations(client)
+        assert escalated["model_profile"] == CHEAP
+        assert _models(client) == ["small", "cheap"]
+    finally:
+        await client.close()
+        await stop_daemon(app, task)
+
+
 async def test_pinned_and_local_never_step_up(short_home: Path) -> None:
     for mode in (None, "local"):
         router = _router([*BAD_TWICE, "done"], ["nope"])
