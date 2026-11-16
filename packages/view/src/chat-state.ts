@@ -75,7 +75,8 @@ export type ChatMessage = {
   interrupted?: boolean;
   /** Event time. Completed messages use `message.completed`; a streaming reply uses `message.started`. */
   at?: string;
-  /** The run the message belongs to, from `message.completed`. A user message holds the request that started it. */
+  /** The run the message belongs to, from `message.completed`. A user message holds the request that started it,
+   * and a reply's run finds the changes of its turn. */
   runId?: string;
   /** Milliseconds from `run.started` to this finished answer. */
   durationMs?: number;
@@ -298,6 +299,7 @@ function reduceChatEvent(state: ChatState, event: ChatEvent): ChatState {
             text: "",
             streaming: true,
             at: event.ts,
+            ...(event.run_id == null ? {} : { runId: event.run_id }),
             ...callOf(state, event.data.message_id),
           },
         ],
@@ -622,7 +624,7 @@ function upsertCompleted(
     streaming: false,
     interrupted: event.data.interrupted === true,
     at: event.ts,
-    runId: event.run_id,
+    ...(event.run_id == null ? {} : { runId: event.run_id }),
     ...(durationMs === undefined ? {} : { durationMs }),
     ...(event.data.skill == null ? {} : { skill: event.data.skill }),
     ...callOf({ calls }, event.data.message_id),

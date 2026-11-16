@@ -110,6 +110,32 @@ export function changesLine(files: readonly TurnFile[]): string {
   return parts.join(" ");
 }
 
+/** Under this many columns the row keeps only the totals and `/changes`. */
+export const CHANGES_ROW_WIDE = 70;
+
+/**
+ * The one dim row after a turn that changed files: `─ 3 files +43 −4 · /changes to review · /undo takes this turn back ─`.
+ * Names only the commands in `commands`. Empty when the turn changed nothing.
+ */
+export function changesRow(turn: TurnChanges | null, columns: number, commands: readonly string[]): string {
+  if (turn === null || turn.files.length === 0) {
+    return "";
+  }
+  if (turn.reverted) {
+    const count = turn.files.length;
+    return `─ undone: ${count} ${count === 1 ? "file" : "files"} put back ─`;
+  }
+  const parts = [changesLine(turn.files)];
+  const wide = columns >= CHANGES_ROW_WIDE;
+  if (commands.includes("/changes")) {
+    parts.push(wide ? "/changes to review" : "/changes");
+  }
+  if (wide && commands.includes("/undo")) {
+    parts.push("/undo takes this turn back");
+  }
+  return `─ ${parts.join(" · ")} ─`;
+}
+
 /** Every changed path once, in the order it first changed. */
 export function changedPaths(state: ChangesState): string[] {
   const seen = new Set<string>();

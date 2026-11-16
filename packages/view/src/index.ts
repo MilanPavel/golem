@@ -251,7 +251,9 @@ export {
 } from "./diff.ts";
 export {
   changedPaths,
+  CHANGES_ROW_WIDE,
   changesLine,
+  changesRow,
   cutTitle,
   noChanges,
   reduceChanges,
