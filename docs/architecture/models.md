@@ -154,11 +154,28 @@ A session has a route mode: `pinned`, `local` or `auto` ([ADR-055](../adr/055-mo
 
 `SessionManager.send` picks the model of a turn when the mode is not `pinned`:
 - The candidates come from `ladder`: the session's own model, plus one local, one budget and one frontier model. Their facts are the cached ones from `ListedFacts`, so `send` never waits for the network.
-- The traits are the input tokens of the session's last chat model call plus `len(text) // 4` (none before the first call), `[context] reply_reserve`, tools needed, and `local_only` on mode `local`. A paid model is allowed only when the session has `paid_ok`, which nothing sets until the paid question exists. So `auto` stays local for now.
-- `pick` returns the choice. When its best model is paid and not allowed, `send` picks again among the local candidates, and lists each paid one as rejected.
-- When nothing passes, the turn runs on the session's own model, with the reason `fallback` and a detail that says no other model passed. On mode `local` with a hosted session model it is refused instead: "this session is local only and has no local model; pick one with /model".
+- The traits are the input tokens of the session's last chat model call plus `len(text) // 4` (none before the first call), `[context] reply_reserve`, tools needed, and `local_only` on mode `local`. `paid_allowed` is true when the session has `paid_ok` and `[routing] paid` is not `always_ask`.
+- With `paid = "never"` (and for the sessions of routines), `_route` takes the paid candidates out before the pick and lists each as rejected ("paid models are turned off").
+- `pick` returns the choice. When its best model is paid, `_route` returns it with a question to ask first (see the paid question below).
+- When nothing passes, the turn runs on the session's own model, with the reason `fallback` and a detail that says no other model passed. When that model is paid, the same question comes first, and with `paid = "never"` the turn is refused. On mode `local` with a hosted session model it is refused instead: "this session is local only and has no local model; pick one with /model".
 
 The turn runs on the picked profile. `sessions.model_profile` stays the user's choice: it is the pinned model and the start of the ladder, and routing never stores `model.selected`. The runner emits `model.routed` right after `run.started`, with the profile, what it resolved to, the tier, the `reason`, a one-line `detail`, and the `rejected` candidates with why. A `pinned` session emits nothing. The run span of `trace.get` carries the same `reason`, `detail` and `rejected` as `route`. Only the model that was picked is waited for while it downloads.
+
+### The paid question
+
+A turn that would run on a paid model without the user's yes becomes a run that starts waiting ([ADR-055](../adr/055-model-routing.md), section 7). `SessionManager.send` makes the run as usual, with the skill, the user's `message.completed` and `run.started`, then stores `route.consent.needed` and stops: no graph runs, no model is called, and the run has no task. The projection marks the run `waiting`, as for an approval, so the session is busy, `session.list` says `waiting`, a reattach replays the question, `run.cancel` ends it with `run.cancelled`, and a restart leaves it waiting (recovery closes only `running` runs).
+
+`route.consent.needed` carries the paid model (`model_profile`, `provider`, `model`, `tier`), `why`, `estimated_usd`, `alternatives` and, when a cap is set, `caps`. The estimate is `cost_usd` of the prompt estimate as input and `[context] reply_reserve` as output at the model's price (the price of its facts, else the profile's), null when there is none. Over a spent cap with `[budget] over = "ask"`, `why` is "The daily budget ($2.00) is spent." and `alternatives` leaves out `session`.
+
+`route.consent.answer` (`session_id`, `run_id`, `answer`) reads the question from the run's events (`sessions/approvals.py`, `pending_consent`) under the manager's lock, so one answer wins and any other gets `-32010`. An answer the question did not offer is `-32602`. It stores `route.consent.answered`, which marks the run `running`, then picks again with `SessionManager._route` and starts a task for the same run (`Turn.begun` skips the events already stored):
+
+| Answer | What the pick does |
+|---|---|
+| `session` | Stores `session.updated` with `paid_ok` (not with `always_ask`), then picks with the paid models allowed |
+| `once` | Picks with the paid models allowed, and over a cap lets this run's paid calls pass `Budget.paid_ok` until it ends |
+| `local` | Picks among the local candidates, and `model.routed.detail` is "you chose to stay local". If none passes, the run fails (`context_full` when the reason is fit) |
+
+`sessions.paid_ok` is a column set by `session.updated`. A fork does not copy it. A pinned session never asks, and a spent cap still refuses a pinned paid model with `budget_spent`.
 
 ### Model errors
 

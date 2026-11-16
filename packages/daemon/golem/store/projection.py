@@ -22,6 +22,8 @@ from golem_protocol.events import (
     ModelCallStartedEvent,
     ModelOptionsChangedEvent,
     ModelSelectedEvent,
+    RouteConsentAnsweredEvent,
+    RouteConsentNeededEvent,
     RunCancelledEvent,
     RunCompletedEvent,
     RunFailedEvent,
@@ -86,6 +88,11 @@ async def project(tx: Transaction, event: ChatEvent) -> None:
                 "UPDATE sessions SET route = ? WHERE session_id = ?",
                 (event.data.route, event.session_id),
             )
+        if event.data.paid_ok is not None:
+            await tx.execute(
+                "UPDATE sessions SET paid_ok = ? WHERE session_id = ?",
+                (int(event.data.paid_ok), event.session_id),
+            )
     elif isinstance(event, SkillActivatedEvent) and event.data.how == "pinned":
         await _set_skills(tx, event.session_id, lambda names: [*names, event.data.name])
     elif isinstance(event, SkillDeactivatedEvent):
@@ -129,17 +136,17 @@ async def project(tx: Transaction, event: ChatEvent) -> None:
             "INSERT INTO runs (run_id, session_id, status, started_at) VALUES (?, ?, 'running', ?)",
             (event.run_id, event.session_id, event.ts),
         )
-    elif isinstance(event, ApprovalNeededEvent):
+    elif isinstance(event, ApprovalNeededEvent | RouteConsentNeededEvent):
         await tx.execute(
             "UPDATE runs SET status = 'waiting' WHERE run_id = ? AND status = 'running'",
             (event.run_id,),
         )
-    elif isinstance(event, ApprovalResolvedEvent):
+    elif isinstance(event, ApprovalResolvedEvent | RouteConsentAnsweredEvent):
         await tx.execute(
             "UPDATE runs SET status = 'running' WHERE run_id = ? AND status = 'waiting'",
             (event.run_id,),
         )
-        if event.data.decision == "allow_session":
+        if isinstance(event, ApprovalResolvedEvent) and event.data.decision == "allow_session":
             await _allow_tool(tx, event.session_id, event.data.name, event.data.subject)
     elif isinstance(event, RunCompletedEvent):
         await _finish_run(tx, event.run_id, "completed", event.ts, None)

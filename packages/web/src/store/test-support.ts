@@ -115,6 +115,7 @@ export function fakeClient() {
     sendMessage: vi.fn<PageClient["sendMessage"]>(async () => ({}) as never),
     cancelRun: vi.fn<PageClient["cancelRun"]>(async () => ({}) as never),
     respondApproval: vi.fn<PageClient["respondApproval"]>(async () => ({}) as never),
+    answerConsent: vi.fn<PageClient["answerConsent"]>(async () => ({}) as never),
     listSkills: vi.fn<PageClient["listSkills"]>(async () => ({ skills: [] })),
     setSkills: vi.fn<PageClient["setSkills"]>(async () => ({}) as never),
     readSkill: vi.fn<PageClient["readSkill"]>(async () => ({ path: "/Users/me/.golem/skills/a/SKILL.md", text: "", mtime_ns: 1, source: "user" })),

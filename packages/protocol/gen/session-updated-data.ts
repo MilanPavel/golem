@@ -5,6 +5,7 @@ export type Subject = string | null;
 export type Tool = string;
 export type Cwd = string | null;
 export type McpServers = string[] | null;
+export type PaidOk = boolean | null;
 export type Route = ('pinned' | 'local' | 'auto') | null;
 export type Title = string | null;
 
@@ -16,12 +17,14 @@ export type Title = string | null;
  * before sessions had a folder, by the first ``message.send`` that names one.
  * ``allowed_tools`` is the whole list after ``session.revoke``, and
  * ``mcp_servers`` the on-demand MCP servers the session turned on, after
- * ``mcp.enable`` or ``mcp.disable``.
+ * ``mcp.enable`` or ``mcp.disable``. ``paid_ok`` true is the user's yes to paid
+ * models for the rest of the session (``route.consent.answer`` with ``session``).
  */
 export interface SessionUpdatedData {
   allowed_tools?: AllowedTools;
   cwd?: Cwd;
   mcp_servers?: McpServers;
+  paid_ok?: PaidOk;
   route?: Route;
   title?: Title;
 }

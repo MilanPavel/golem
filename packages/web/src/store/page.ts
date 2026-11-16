@@ -1,4 +1,4 @@
-import { OLLAMA_FAILED, RpcError, type ApprovalChoice, type ConfigGetResult, type ConfigRawGetResult, type ConfigRawResult, type FsListDirsResult, type McpAddParams, type McpCallResult, type McpImportApplyParams, type McpImportApplyResult, type McpImportScanResult, type McpCatalogResult, type McpListResult, type McpLogsResult, type McpServerConfig, type McpServerDetail, type McpServerLog, type McpLoginDone, type McpTestProgress, type McpTestResult, type GolemClient, type RuntimeName, type SetupStatusResult, type SkillListResult, type TraceGetResult, type TraceSpanResult, type ArtifactReadResult, type ChangesDiffResult, type ChangesDiffTarget, type ChangesListResult, type ChangesRevertResult, type ChangesRevertTarget, type ChangesCommitResult, type ChangesCommitInfoResult, type ChangesSuggestMessageResult, type ModelOptionsGetResult, type ModelOptionsSetResult, type SessionSetOptionsResult, type SkillCreateResult, type SkillReadResult, type SkillWriteResult, type AuthListResult, type FileListResult, type FileReadResult, type CostGetResult, type SessionCompactResult } from "@golem/client";
+import { OLLAMA_FAILED, RpcError, type ApprovalChoice, type ConfigGetResult, type ConfigRawGetResult, type ConfigRawResult, type FsListDirsResult, type McpAddParams, type McpCallResult, type McpImportApplyParams, type McpImportApplyResult, type McpImportScanResult, type McpCatalogResult, type McpListResult, type McpLogsResult, type McpServerConfig, type McpServerDetail, type McpServerLog, type McpLoginDone, type McpTestProgress, type McpTestResult, type GolemClient, type RuntimeName, type SetupStatusResult, type SkillListResult, type TraceGetResult, type TraceSpanResult, type ArtifactReadResult, type ChangesDiffResult, type ChangesDiffTarget, type ChangesListResult, type ChangesRevertResult, type ChangesRevertTarget, type ChangesCommitResult, type ChangesCommitInfoResult, type ChangesSuggestMessageResult, type ModelOptionsGetResult, type ModelOptionsSetResult, type SessionSetOptionsResult, type SkillCreateResult, type SkillReadResult, type SkillWriteResult, type AuthListResult, type FileListResult, type FileReadResult, type CostGetResult, type SessionCompactResult, type ConsentChoice } from "@golem/client";
 import { changeToolFilter, installEventOf, type InstallEvent, type PermissionMode, type CompactAction } from "@golem/view";
 import type { QueryClient } from "@tanstack/react-query";
 import { createDrafts, type Drafts } from "./drafts.ts";
@@ -110,6 +110,7 @@ export type PageClient = Pick<
   | "cancelOllamaInstall"
   | "onOllamaInstall"
   | "respondApproval"
+  | "answerConsent"
   | "checkNow"
   | "close"
 >;
@@ -161,6 +162,8 @@ export type PageActions = {
   fork(sessionId: string, atMessageId: string): Promise<string>;
   close(sessionId: string): Promise<void>;
   respond(sessionId: string, callId: string, decision: ApprovalChoice, args?: Readonly<Record<string, unknown>>): Promise<void>;
+  /** Answers the paid step-up question the session's run waits on. The run goes on in its events. */
+  answerConsent(sessionId: string, runId: string, answer: ConsentChoice): Promise<void>;
   /** Switches the session's model. The chip changes from the daemon's `model.selected` event. */
   useModel(sessionId: string, name: string): Promise<void>;
   setDefault(name: string): Promise<void>;
@@ -486,6 +489,9 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
       async respond(sessionId, callId, decision, args) {
         if (args === undefined) await client.respondApproval(sessionId, callId, decision);
         else await client.respondApproval(sessionId, callId, decision, args);
+      },
+      async answerConsent(sessionId, runId, answer) {
+        await client.answerConsent(sessionId, runId, answer);
       },
       async updateRule(target, index, action, cwd) {
         try {

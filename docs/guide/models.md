@@ -64,6 +64,22 @@ An environment variable such as `ANTHROPIC_API_KEY` wins over the Keychain, whic
 
 `[budget] daily_usd` and `session_usd` cap what hosted models may cost. A cap is checked before each paid call, and a call's cost is known only after it ends, so one call can pass a cap by its own cost. When a cap is spent, a chat that picks its model runs a local one, a chat pinned to a paid model is refused with `budget_spent` (raise the cap in Settings › Routing, or switch the model), and a run that is under way stops before its next paid call. A local model is never blocked. See [Settings](./settings.md#budget).
 
+### The paid question
+
+On `auto`, golem stays on a local model until a turn does not fit any of them. Then it asks before it uses a paid model: "Use a paid model for this?", with the model, its tier and a rough cost for the turn. The web shows a card above the composer, and the terminal a band with keys.
+
+| Answer | Key | What happens |
+|---|---|---|
+| Allow for this session | `a` | This turn runs on the paid model, and later turns of this chat need no question while the caps hold |
+| Just this once | `o` | This turn runs on the paid model, and the next paid turn asks again |
+| Stay local | `l` | golem picks again among the local models. If none fits, the turn fails and says why |
+
+The question shows on every screen attached to the chat, and any of them may answer it, once. The turn waits, with no model call made, until someone answers, and it survives a restart of golem. Stop cancels it like any other turn. A chat pinned to a paid model never asks: you chose that model.
+
+`[routing] paid` sets how often golem asks. `ask` asks once and remembers "for this session", `always_ask` asks before every paid turn and remembers nothing (so the first answer behaves like "just this once"), and `never` never asks and never uses a paid model. A fork does not copy the answer: it asks again. A routine never asks and never uses a paid model on `auto`.
+
+With `[budget] over = "ask"`, a spent cap asks the same question ("The daily budget ($2.00) is spent."), with only "Just this once" and "Stay local". The answer is not remembered. A chat pinned to a paid model is still refused when a cap is spent.
+
 ## Short names, and other providers
 
 golem reads `~/.golem/config.toml`, and picks up model changes without a restart. A **profile** gives a model a short name:

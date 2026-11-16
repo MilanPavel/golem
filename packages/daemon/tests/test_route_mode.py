@@ -78,10 +78,12 @@ class _Router(ModelRouter):
         return model
 
 
-def _router(mode: str = "pinned", budget: BudgetSettings | None = None) -> _Router:
+def _router(
+    mode: str = "pinned", budget: BudgetSettings | None = None, paid: str = "ask"
+) -> _Router:
     return _Router(
         GolemSettings(
-            routing=RoutingSettings.model_validate({"mode": mode}),
+            routing=RoutingSettings.model_validate({"mode": mode, "paid": paid}),
             budget=budget or BudgetSettings(),
         )
     )
@@ -297,10 +299,10 @@ async def test_auto_runs_the_cheapest_model_that_fits(short_home: Path) -> None:
         await stop_daemon(app, task)
 
 
-async def test_auto_that_does_not_fit_locally_stays_local_and_lists_the_paid_model(
+async def test_auto_that_does_not_fit_locally_with_paid_off_stays_local_and_lists_the_model(
     short_home: Path,
 ) -> None:
-    router = _router()
+    router = _router(paid="never")
     facts = _Facts(
         _facts(LOCAL, "local", 8000),
         _facts(CHEAP, "budget", 128000, 0.5),
@@ -319,7 +321,7 @@ async def test_auto_that_does_not_fit_locally_stays_local_and_lists_the_paid_mod
         assert "no other model passed" in cast(str, routed[0]["detail"])
         rejected = cast(list[dict[str, str]], routed[0]["rejected"])
         by_ref = {r["ref"]: r["why"] for r in rejected}
-        assert by_ref[CHEAP] == "a paid model needs your OK"
+        assert by_ref[CHEAP] == "paid models are turned off"
         assert by_ref[LOCAL].startswith("does not fit")
         assert _call_models(client) == ["small"]
         assert CHEAP not in router.models
@@ -446,7 +448,8 @@ async def test_pinned_on_a_paid_model_with_a_spent_cap_is_refused(short_home: Pa
         await stop_daemon(app, task)
 
 
-async def test_over_ask_also_refuses_until_the_question_exists(short_home: Path) -> None:
+async def test_over_ask_still_refuses_a_pinned_paid_model(short_home: Path) -> None:
+    """A pinned model is the user's own choice: it never asks, so a spent cap refuses it."""
     router = _router(budget=BudgetSettings(daily_usd=0.01, over="ask"))
     app, task = await start_daemon(short_home, router=router, facts=_Facts(*_ALL))
     client = await RpcClient.connect(app.paths.socket_path)

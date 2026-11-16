@@ -22,6 +22,7 @@ import type { OllamaStartResult } from "../../protocol/gen/ollama-start-result.t
 import type { FsListDirsResult } from "../../protocol/gen/fs-list-dirs-result.ts";
 import type { SetupStatusResult } from "../../protocol/gen/setup-status-result.ts";
 import type { ApprovalRespondResult } from "../../protocol/gen/approval-respond-result.ts";
+import type { RouteConsentAnswerResult } from "../../protocol/gen/route-consent-answer-result.ts";
 import type { ArtifactReadResult } from "../../protocol/gen/artifact-read-result.ts";
 import type { ChangesCommitInfoResult } from "../../protocol/gen/changes-commit-info-result.ts";
 import type { ChangesCommitResult } from "../../protocol/gen/changes-commit-result.ts";
@@ -45,6 +46,9 @@ export type ChangesRevertTarget =
   | { kind: "run"; runId: string };
 
 export type ApprovalChoice = "allow" | "allow_session" | "allow_always" | "deny";
+
+/** An answer to the paid step-up question: this session, this turn only, or stay local. */
+export type ConsentChoice = "session" | "once" | "local";
 
 /** `cwd` is the sender's folder. `skill` runs a skill once by name. */
 export type SendOptions = { cwd?: string; skill?: SkillCall };
@@ -344,6 +348,8 @@ export interface GolemClient {
     decision: ApprovalChoice,
     args?: Readonly<Record<string, unknown>>,
   ): Promise<ApprovalRespondResult>;
+  /** Answer the paid step-up question a run waits on. The run goes on in the session's events. */
+  answerConsent(sessionId: string, runId: string, answer: ConsentChoice): Promise<RouteConsentAnswerResult>;
   /** Set the action of rule `index` in the user's or the project's file. `cwd` names the project. */
   updateRule(
     target: "user" | "project",
@@ -1437,6 +1443,14 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       const result = await call("approval.respond", params);
       if (!isRecord(result) || typeof result["run_id"] !== "string") {
         throw new Error("invalid approval.respond result");
+      }
+      return { run_id: result["run_id"] };
+    },
+    async answerConsent(sessionId: string, runId: string, answer: ConsentChoice): Promise<RouteConsentAnswerResult> {
+      await ready;
+      const result = await call("route.consent.answer", { session_id: sessionId, run_id: runId, answer });
+      if (!isRecord(result) || typeof result["run_id"] !== "string") {
+        throw new Error("invalid route.consent.answer result");
       }
       return { run_id: result["run_id"] };
     },

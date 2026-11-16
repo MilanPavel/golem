@@ -89,6 +89,8 @@ export type KeyPlace = {
   approvalEdit?: boolean;
   /** The question about running checks waits for an answer. */
   question?: boolean;
+  /** The run waits for an answer about a paid model. */
+  consent?: boolean;
 };
 
 export type ScrollToward = "up" | "down" | "start" | "end";
@@ -116,6 +118,7 @@ export type KeyEffect =
   | { kind: "cycle-mode" }
   | { kind: "restart-service" }
   | { kind: "approve"; decision: "allow" | "allow_session" | "allow_always" | "deny" }
+  | { kind: "consent"; answer: "session" | "once" | "local" }
   | { kind: "scroll-diff"; toward: ScrollToward; line: boolean }
   | { kind: "edit-args" }
   | { kind: "checks"; on: boolean }
@@ -143,6 +146,7 @@ type KeyWhen = {
   approvalDiff?: boolean;
   approvalEdit?: boolean;
   question?: boolean;
+  consent?: boolean;
 };
 
 export type KeyBinding = {
@@ -209,6 +213,7 @@ export const KEYS: readonly KeyBinding[] = [
   ...argsEditKeys(),
   ...approvalKeys(),
   ...checksKeys(),
+  ...consentKeys(),
   {
     id: "suggest-up",
     label: "Up",
@@ -561,6 +566,27 @@ function checksKeys(): KeyBinding[] {
   ];
 }
 
+function consentKeys(): KeyBinding[] {
+  const answer = (
+    id: string,
+    description: string,
+    input: string,
+    choice: "session" | "once" | "local",
+  ): KeyBinding => ({
+    id,
+    label: input,
+    contexts: ["approval"],
+    description,
+    when: { input, overlay: false, switcher: false, consent: true },
+    run: () => ({ kind: "consent", answer: choice }),
+  });
+  return [
+    answer("consent-session", "Allows a paid model for the rest of the session.", "a", "session"),
+    answer("consent-once", "Allows a paid model for this turn only.", "o", "once"),
+    answer("consent-local", "Stays on a local model for this turn.", "l", "local"),
+  ];
+}
+
 function argsEditKeys(): KeyBinding[] {
   const key = (id: string, label: string, description: string, name: PressName, run: ArgsKey): KeyBinding => ({
     id,
@@ -845,6 +871,9 @@ function whenMatches(when: KeyWhen, place: KeyPlace, press: Press): boolean {
     return false;
   }
   if (when.approvalDiff !== undefined && when.approvalDiff !== (place.approvalDiff === true)) {
+    return false;
+  }
+  if (when.consent !== undefined && when.consent !== (place.consent === true)) {
     return false;
   }
   if (when.approvalEdit !== undefined && when.approvalEdit !== (place.approvalEdit === true)) {

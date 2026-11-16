@@ -227,7 +227,8 @@ class SessionUpdatedData(BaseModel):
     before sessions had a folder, by the first ``message.send`` that names one.
     ``allowed_tools`` is the whole list after ``session.revoke``, and
     ``mcp_servers`` the on-demand MCP servers the session turned on, after
-    ``mcp.enable`` or ``mcp.disable``.
+    ``mcp.enable`` or ``mcp.disable``. ``paid_ok`` true is the user's yes to paid
+    models for the rest of the session (``route.consent.answer`` with ``session``).
     """
 
     model_config = _CONFIG
@@ -237,13 +238,22 @@ class SessionUpdatedData(BaseModel):
     allowed_tools: list[SessionAllowance] | None = None
     mcp_servers: list[str] | None = None
     route: RouteMode | None = None
+    paid_ok: bool | None = None
 
     @model_validator(mode="after")
     def _changes_something(self) -> Self:
-        fields = (self.title, self.cwd, self.allowed_tools, self.mcp_servers, self.route)
+        fields = (
+            self.title,
+            self.cwd,
+            self.allowed_tools,
+            self.mcp_servers,
+            self.route,
+            self.paid_ok,
+        )
         if all(field is None for field in fields):
             raise ValueError(
-                "session.updated needs a title, a cwd, allowed_tools, mcp_servers, or a route"
+                "session.updated needs a title, a cwd, allowed_tools, mcp_servers, a route,"
+                " or paid_ok"
             )
         return self
 
@@ -308,6 +318,52 @@ class ModelRoutedData(BaseModel):
     ]
     detail: str
     rejected: list[ModelRejection] = Field(default_factory=list[ModelRejection])
+
+
+ConsentAnswer = Literal["session", "once", "local"]
+"""The answer to the paid step-up question: ``session`` for the rest of the session,
+``once`` for this turn, ``local`` to stay on a local model."""
+
+
+class ConsentCaps(BaseModel):
+    """The caps of ``[budget]`` and what is spent, in USD. A cap that is not set is null."""
+
+    model_config = _CONFIG
+
+    session_usd: float | None = Field(default=None, ge=0)
+    daily_usd: float | None = Field(default=None, ge=0)
+    spent_session: float = Field(ge=0)
+    spent_today: float = Field(ge=0)
+
+
+class RouteConsentNeededData(BaseModel):
+    """The run waits for the user's yes to a paid model. It is paused until
+    ``route.consent.answer``.
+
+    ``model_profile``, ``provider``, ``model`` and ``tier`` name the paid model that would
+    run. ``why`` is one plain sentence on why golem asks. ``estimated_usd`` is golem's
+    estimate for this turn, null when the price is unknown. ``caps`` is set when a cap is.
+    ``alternatives`` are the answers the user may give: a spent cap leaves out ``session``.
+    """
+
+    model_config = _CONFIG
+
+    model_profile: str = Field(min_length=1)
+    provider: str | None = Field(default=None, min_length=1)
+    model: str | None = Field(default=None, min_length=1)
+    tier: Literal["local", "budget", "frontier"]
+    why: str
+    estimated_usd: float | None = Field(default=None, ge=0)
+    alternatives: list[ConsentAnswer]
+    caps: ConsentCaps | None = None
+
+
+class RouteConsentAnsweredData(BaseModel):
+    """The user answered the paid step-up question, and the run goes on."""
+
+    model_config = _CONFIG
+
+    answer: ConsentAnswer
 
 
 class ModelOptionsChangedData(BaseModel):
@@ -1271,6 +1327,32 @@ class ApprovalResolvedEvent(BaseModel):
     data: ApprovalResolvedData
 
 
+class RouteConsentNeededEvent(BaseModel):
+    """The run is waiting for an answer about a paid model."""
+
+    model_config = _CONFIG
+
+    seq: int = Field(ge=1)
+    session_id: str = Field(min_length=1)
+    run_id: str = Field(min_length=1)
+    ts: str = Field(min_length=1)
+    type: Literal["route.consent.needed"]
+    data: RouteConsentNeededData
+
+
+class RouteConsentAnsweredEvent(BaseModel):
+    """The paid step-up question was answered, and the run goes on."""
+
+    model_config = _CONFIG
+
+    seq: int = Field(ge=1)
+    session_id: str = Field(min_length=1)
+    run_id: str = Field(min_length=1)
+    ts: str = Field(min_length=1)
+    type: Literal["route.consent.answered"]
+    data: RouteConsentAnsweredData
+
+
 class FileChangedEvent(BaseModel):
     """A file in the session folder changed. Sent before the ``tool.completed`` of its call.
 
@@ -1377,6 +1459,8 @@ EventType = Literal[
     "tool.failed",
     "approval.needed",
     "approval.resolved",
+    "route.consent.needed",
+    "route.consent.answered",
     "todos.updated",
     "plan.proposed",
     "file.changed",
@@ -1421,6 +1505,8 @@ ChatEvent = Annotated[
     | ToolFailedEvent
     | ApprovalNeededEvent
     | ApprovalResolvedEvent
+    | RouteConsentNeededEvent
+    | RouteConsentAnsweredEvent
     | TodosUpdatedEvent
     | PlanProposedEvent
     | FileChangedEvent
@@ -1453,6 +1539,8 @@ __all__ = [
     "CheckOfferedEvent",
     "CheckStartedData",
     "CheckStartedEvent",
+    "ConsentAnswer",
+    "ConsentCaps",
     "ContextChangedData",
     "ContextChangedEvent",
     "EmptyEventData",
@@ -1487,6 +1575,10 @@ __all__ = [
     "PlanProposedEvent",
     "PlanStep",
     "PromptSectionInfo",
+    "RouteConsentAnsweredData",
+    "RouteConsentAnsweredEvent",
+    "RouteConsentNeededData",
+    "RouteConsentNeededEvent",
     "RouteMode",
     "RunCancelledData",
     "RunCancelledEvent",

@@ -12,7 +12,7 @@ import { approvalTarget } from "./text.ts";
 const CHIP = "rounded-sm bg-clay-soft px-1.5 py-0.5 font-mono text-xs font-medium text-clay-ink";
 
 /** The clay seal: a shield with a tick. */
-function Seal() {
+export function Seal() {
   return (
     <span className="mt-0.5 grid size-5 flex-none place-items-center rounded-sm bg-clay text-on-clay">
       <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
