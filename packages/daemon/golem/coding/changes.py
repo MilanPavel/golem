@@ -124,6 +124,23 @@ class ChangeStore:
         )
         return [FileChange(*tuple(row)) for row in rows]
 
+    async def reverted_since(self, session_id: str, seq: int) -> list[str]:
+        """Paths of the undos after ``seq``, once each, in the order they happened."""
+        rows = await self._database.fetch_all(
+            "SELECT path FROM file_changes WHERE session_id = ? AND source = 'revert'"
+            " AND seq > ? ORDER BY seq",
+            (session_id, seq),
+        )
+        return list(dict.fromkeys(str(row["path"]) for row in rows))
+
+    async def last_seq(self, session_id: str) -> int:
+        """The highest ``seq`` of the session's changes, 0 when it has none."""
+        row = await self._database.fetch_one(
+            "SELECT COALESCE(MAX(seq), 0) AS last FROM file_changes WHERE session_id = ?",
+            (session_id,),
+        )
+        return 0 if row is None else int(row["last"])
+
     async def get(self, session_id: str, change_id: str) -> FileChange | None:
         row = await self._database.fetch_one(
             f"SELECT {_COLUMNS} FROM file_changes WHERE session_id = ? AND change_id = ?",
