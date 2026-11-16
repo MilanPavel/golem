@@ -21,7 +21,7 @@ import type { McpServer } from "../store/mcp.ts";
 import { ConnectionScreen } from "../features/connection/connection-screen.tsx";
 import { connectionScreen, type ConnectionHost } from "../features/connection/connection-screen.ts";
 import { DetailSwitch, EditCards, ToolLine, TranscriptMessages, WritingRow } from "../features/chat/index.ts";
-import { COST_CASES, CUT_REPLY, SAMPLE_CHAT, SAMPLE_TOOLS, THINKING_CASES, TURN_CHAT } from "../features/chat/sample.ts";
+import { COST_CASES, CUT_REPLY, NOTICE_CHAT, SAMPLE_CHAT, SAMPLE_TOOLS, THINKING_CASES, TURN_CHAT } from "../features/chat/sample.ts";
 import { ApprovalBar } from "../features/approval/index.ts";
 import { ANSWERED, PENDING_EDIT, PENDING_SHELL } from "../features/approval/sample.ts";
 import { DiffModeSwitch, DiffView } from "../features/diff/index.ts";
@@ -40,8 +40,8 @@ import { sampleTry, sampleTuneBackend } from "../features/models/sample-tune.ts"
 import { FinishSetupStripView, WelcomeView } from "../features/welcome/index.ts";
 import { WELCOME_CASES } from "../features/welcome/sample.ts";
 import { SpanDetail, TraceSummary, TraceTree } from "../features/trace/index.ts";
-import { APPROVAL_DETAIL, APPROVAL_TRACE, CUT_LIKELY_DETAIL, CUT_MIDDLE_DETAIL, CUT_YES_DETAIL, FULL_DETAIL, MODEL_DETAIL, NO_PROMPT_DETAIL, NUM_CTX_DETAIL, OLD_DETAIL, SECTIONS_DETAIL, TOOL_DETAIL, UNKNOWN_WINDOW_DETAIL, FAILED_TRACE, GROWING_TRACE, LONG_TRACE, OLD_TRACE, SHORT_TRACE } from "../features/trace/sample.ts";
-import type { TraceRunSpan, TraceSpanResult } from "../store/trace.ts";
+import { APPROVAL_DETAIL, APPROVAL_TRACE, CLEARED_DETAIL, GROWING_EVENTS, CUT_LIKELY_DETAIL, CUT_MIDDLE_DETAIL, CUT_YES_DETAIL, FULL_DETAIL, MODEL_DETAIL, NO_PROMPT_DETAIL, NUM_CTX_DETAIL, OLD_DETAIL, SECTIONS_DETAIL, TOOL_DETAIL, UNKNOWN_WINDOW_DETAIL, FAILED_TRACE, GROWING_TRACE, LONG_TRACE, OLD_TRACE, SHORT_TRACE } from "../features/trace/sample.ts";
+import type { TraceContextEvent, TraceRunSpan, TraceSpanResult } from "../store/trace.ts";
 import { FORM_CASES } from "../features/setup/sample.ts";
 import { GolemBlockView } from "../features/setup/golem-block.tsx";
 import { KeysView } from "../features/settings/keys-section.tsx";
@@ -947,12 +947,12 @@ function TraceDemo({ label, runs }: { label: string; runs: TraceRunSpan[] }) {
   );
 }
 
-function SummaryDemo({ label, runs }: { label: string; runs: TraceRunSpan[] }) {
+function SummaryDemo({ label, runs, events }: { label: string; runs: TraceRunSpan[]; events?: TraceContextEvent[] }) {
   return (
     <figure className="w-full">
       <figcaption className="mb-1 font-mono text-xs text-faint">{label}</figcaption>
       <div className="flex items-center rounded-md border border-line bg-bg px-4 py-2">
-        <TraceSummary runs={runs} />
+        <TraceSummary runs={runs} events={events} />
       </div>
     </figure>
   );
@@ -1018,6 +1018,7 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
 
       <Group title="Trace">
         <SummaryDemo label="Summary, context growing" runs={GROWING_TRACE} />
+        <SummaryDemo label="Summary, ticks where golem cleared and grew the window" runs={GROWING_TRACE} events={GROWING_EVENTS} />
         <SummaryDemo label="Summary, 26 model calls" runs={LONG_TRACE} />
         <SummaryDemo label="Summary, a session from before traces" runs={OLD_TRACE} />
         <InspectorDemo label="The inspector beside the chat" runs={SHORT_TRACE} result={TOOL_DETAIL} />
@@ -1029,6 +1030,7 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
         <TraceDemo label="A session from before traces" runs={OLD_TRACE} />
         <DetailDemo label="A model call: context, reply, metadata" result={MODEL_DETAIL} />
         <DetailDemo label="A model call, nearly full, with MCP tools" result={FULL_DETAIL} />
+        <DetailDemo label="A model call with a summary, a cleared result and the reply reserve" result={CLEARED_DETAIL} />
         <DetailDemo label="Ollama input over num_ctx" result={NUM_CTX_DETAIL} />
         <DetailDemo label="Ollama with no ctx: window unknown" result={UNKNOWN_WINDOW_DETAIL} />
         <DetailDemo label="Ollama dropped older messages (proven)" result={CUT_YES_DETAIL} />
@@ -1213,6 +1215,11 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
           />
           <DockView
             busy={false}
+            meter={<Meter state="idle" runStartedAt={null} aside={<ContextChipView used={38000} window={100000} cleared={12} onOpen={() => {}} />} />}
+            composer={<DemoComposer />}
+          />
+          <DockView
+            busy={false}
             meter={<Meter state="idle" runStartedAt={null} aside={<ContextChipView used={1300} window={16384} windowEstimated onOpen={() => {}} />} />}
             composer={<DemoComposer />}
           />
@@ -1381,6 +1388,12 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
             <div key={detail} aria-label={`A turn with four tool steps, ${detail}`} role="group" className="flex flex-col gap-6 rounded-lg border border-line bg-bg p-4">
               <p className="font-mono text-xs text-faint">{detail}</p>
               <TranscriptMessages chat={TURN_CHAT} detail={detail} />
+            </div>
+          ))}
+          {(["normal", "quiet"] as const).map((detail) => (
+            <div key={detail} aria-label={`Notices of cleared, summarised and grew, ${detail}`} role="group" className="flex flex-col gap-6 rounded-lg border border-line bg-bg p-4">
+              <p className="font-mono text-xs text-faint">notices, {detail}: a clear hides in quiet</p>
+              <TranscriptMessages chat={NOTICE_CHAT} detail={detail} />
             </div>
           ))}
           <div aria-label="Edit cards" role="group" className="flex flex-col gap-2 rounded-lg border border-line bg-bg p-4">

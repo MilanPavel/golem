@@ -156,7 +156,7 @@ The line under an answer ends with the model, `local` for a model on your machin
 
 `/compact` and `/context clear` run between turns, without waiting for the context to fill. Each prints one line when it is done, such as `summarised 9 earlier turns with qwen3:27b · ctx 84% → 31% · 6.2 s` or `cleared 12 old tool results · ctx 71% → 38%`, and `nothing to compact yet` when there is nothing to do. A summary can take a minute with a local model, and the line says it is working meanwhile. They are refused while an answer is running. Nothing is deleted: the chat on screen and the saved session stay whole, and only what the next call sends gets shorter. `/compact` keeps the last `keep_turns` turns and `/context clear` keeps the newest `keep_results` tool results, from `[context]` in the settings.
 
-`/context` draws the model's window as a grid of cells, coloured by what fills them, with a legend beside it (or under it in a narrow terminal). One cell is 0.5% of the window.
+`/context` draws the model's window as a grid of cells, coloured by what fills them, with a legend beside it (or under it in a narrow terminal). One cell is 0.5% of the window. The legend has a `Summary` row when a summary stands for old turns, a `Free` row for what is left outside the reply reserve, a `Reply reserve` row (drawn `▨`, at the end of the grid), and a dim `Cleared · 12 tool results · 11.2K not sent` row when old tool results were sent as one line each. In the chat, a dim line such as `⊖ golem cleared 12 old tool results · ctx 71% → 38%` shows where golem cleared or summarised, or grew the window.
 
 ```text
 ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■    qwen3:8b

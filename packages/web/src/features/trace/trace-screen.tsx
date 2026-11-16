@@ -1,5 +1,5 @@
 import type { UseQueryResult } from "@tanstack/react-query";
-import type { TraceGetResult, TraceRunSpan, TraceSpanResult } from "../../store/trace.ts";
+import type { TraceContextEvent, TraceGetResult, TraceRunSpan, TraceSpanResult } from "../../store/trace.ts";
 import { useNavigate, useTrace, useTraceSpan } from "../../store/page-context.tsx";
 import { sessionPath, tracePath } from "../../store/router.ts";
 import { Button } from "../../ui/button.tsx";
@@ -15,7 +15,7 @@ export const SELECT_A_SPAN = "Select a span to see what went in and what came ou
 export const NOTHING_TO_TRACE = "Nothing to trace yet. Send a message first.";
 
 /** The full page's header: a way back to the chat, and Refresh, then the summary line. */
-function Header({ id, runs, refreshing, onRefresh }: { id: string; runs: readonly TraceRunSpan[] | null; refreshing: boolean; onRefresh: () => void }) {
+function Header({ id, runs, events, refreshing, onRefresh }: { id: string; runs: readonly TraceRunSpan[] | null; events: readonly TraceContextEvent[]; refreshing: boolean; onRefresh: () => void }) {
   const navigate = useNavigate();
   return (
     <div className="flex flex-col">
@@ -32,7 +32,7 @@ function Header({ id, runs, refreshing, onRefresh }: { id: string; runs: readonl
       </div>
       {runs === null || runs.length === 0 ? null : (
         <div className="flex items-center border-b border-line px-4 py-1.5">
-          <TraceSummary runs={runs} />
+          <TraceSummary runs={runs} events={events} />
         </div>
       )}
     </div>
@@ -180,7 +180,7 @@ export function TraceScreen({ id, span }: { id: string; span: string | null }) {
   const data = useTraceData(id, span);
   return (
     <div data-screen="trace" className="flex min-h-0 min-w-0 flex-1 flex-col">
-      <Header id={id} runs={data.trace.data?.runs ?? null} refreshing={data.refreshing} onRefresh={data.refresh} />
+      <Header id={id} runs={data.trace.data?.runs ?? null} events={data.trace.data?.context_events ?? []} refreshing={data.refreshing} onRefresh={data.refresh} />
       <TraceBody id={id} span={span} data={data} layout="split" onSelect={(next) => navigate(tracePath(id, next), { replace: true })} />
     </div>
   );

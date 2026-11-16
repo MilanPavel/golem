@@ -181,6 +181,19 @@
       "default": null,
       "title": "Prompt Cut Kind"
     },
+    "reserve": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Reserve"
+    },
     "used": {
       "anyOf": [
         {
@@ -210,6 +223,11 @@
     "window_estimated": {
       "default": false,
       "title": "Window Estimated",
+      "type": "boolean"
+    },
+    "window_planned": {
+      "default": false,
+      "title": "Window Planned",
       "type": "boolean"
     }
   },

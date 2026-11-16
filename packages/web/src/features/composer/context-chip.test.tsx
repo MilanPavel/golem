@@ -23,3 +23,8 @@ test("an unknown window shows the tokens only", () => {
   render(<ContextChipView used={1300} window={null} onOpen={() => {}} />);
   expect(screen.getByRole("button").textContent).toBe("ctx 1.3K");
 });
+
+test("after a clear the chip says how many results were cleared", () => {
+  render(<ContextChipView used={38000} window={100000} cleared={12} onOpen={() => {}} />);
+  expect(screen.getByRole("button").textContent).toBe("ctx 38% · 12 cleared");
+});

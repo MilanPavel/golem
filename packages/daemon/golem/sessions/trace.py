@@ -21,6 +21,7 @@ from typing import Literal
 
 from golem.sessions.cut import CallFacts, PromptCut, judge
 from golem_protocol.commands import (
+    TraceContextEvent,
     TraceMessage,
     TraceModelSpan,
     TraceRoute,
@@ -34,9 +35,11 @@ from golem_protocol.events import (
     ApprovalNeededEvent,
     ApprovalResolvedEvent,
     ChatEvent,
+    ContextChangedEvent,
     MessageCompletedEvent,
     MessageStartedEvent,
     ModelCallCompletedEvent,
+    ModelCallStartedData,
     ModelCallStartedEvent,
     ModelRoutedEvent,
     RunCancelledEvent,
@@ -73,6 +76,19 @@ def build_trace(events: Sequence[ChatEvent]) -> list[TraceRunSpan]:
         if run is not None:
             runs.append(run)
     return _with_cuts(runs, events)
+
+
+def context_events(events: Sequence[ChatEvent]) -> list[TraceContextEvent]:
+    """The ``context.changed`` events, oldest first, each with the model call right after it."""
+    starts = [e for e in events if isinstance(e, ModelCallStartedEvent)]
+    found: list[TraceContextEvent] = []
+    for event in events:
+        if not isinstance(event, ContextChangedEvent):
+            continue
+        after = next((s.data.message_id for s in starts if s.seq > event.seq), None)
+        fields = event.data.model_dump()
+        found.append(TraceContextEvent(seq=event.seq, call_id=after, run_id=event.run_id, **fields))
+    return found
 
 
 def _with_cuts(runs: list[TraceRunSpan], events: Sequence[ChatEvent]) -> list[TraceRunSpan]:
@@ -431,6 +447,7 @@ class SpanRead:
     cut: PromptCut = field(default_factory=PromptCut)
     cleared_ids: tuple[str, ...] = ()
     summary_chars: int = 0
+    window_planned: bool = False
 
 
 def read_span(
@@ -532,6 +549,7 @@ def _model_read(
             text_tool_calls=None if done is None else done.text_tool_calls,
             provider=None if here is None else here.provider,
             system_sections=None if here is None else here.system_sections,
+            summary_of=_summary_of(here, messages),
         ),
         system_prompt_sha=None if here is None else here.system_prompt_sha,
         tools_sha=None if here is None else here.tools_sha,
@@ -540,7 +558,16 @@ def _model_read(
         window_estimated=estimated,
         cleared_ids=() if here is None else tuple(here.cleared_ids),
         summary_chars=0 if here is None else here.summary_chars or 0,
+        window_planned=False if here is None else here.window_planned,
     )
+
+
+def _summary_of(here: ModelCallStartedData | None, messages: Sequence[TraceMessage]) -> int | None:
+    """The messages before the first one sent, when a summary was sent in their place."""
+    if here is None or not here.summary_chars or not here.message_ids:
+        return None
+    sent = set(here.message_ids)
+    return next((i for i, m in enumerate(messages) if m.id in sent), None)
 
 
 def _context(

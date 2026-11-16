@@ -580,11 +580,34 @@ class TraceRunSpan(TraceSpan):
     children: list[TraceModelSpan] = Field(default_factory=list[TraceModelSpan])
 
 
+class TraceContextEvent(BaseModel):
+    """One ``context.changed`` of the session, for the trace.
+
+    ``call_id`` is the model call that came right after the change, null when none has yet.
+    The other fields are those of ``context.changed``.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    seq: int = Field(ge=1)
+    action: Literal["cleared", "summarised", "grew"]
+    call_id: str | None = Field(default=None, min_length=1)
+    run_id: str | None = Field(default=None, min_length=1)
+    before_tokens: int | None = Field(default=None, ge=0)
+    after_tokens: int | None = Field(default=None, ge=0)
+    count: int | None = Field(default=None, ge=0)
+    window_from: int | None = Field(default=None, ge=1)
+    window_to: int | None = Field(default=None, ge=1)
+    reload_ms: int | None = Field(default=None, ge=0)
+    room: int | None = Field(default=None, ge=1)
+
+
 class TraceGetResult(BaseModel):
     """Runs of a session, oldest first.
 
     The tree is run, then model call, then tool call. A client picks a span
-    by ``id`` and loads it with ``trace.span``.
+    by ``id`` and loads it with ``trace.span``. ``context_events`` are the
+    session's ``context.changed`` events, oldest first.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -592,6 +615,7 @@ class TraceGetResult(BaseModel):
     session_id: str = Field(min_length=1)
     title: str | None = None
     runs: list[TraceRunSpan]
+    context_events: list[TraceContextEvent] = Field(default_factory=list[TraceContextEvent])
 
 
 class TraceSpanParams(BaseModel):
@@ -658,6 +682,9 @@ class TraceContext(BaseModel):
     dropped_message_ids: list[str] = Field(default_factory=list[str])
     dropped_tokens: int | None = Field(default=None, ge=0)
     cleared: TraceContextCleared = Field(default_factory=TraceContextCleared)
+    window_planned: bool = False
+    reserve: int | None = Field(default=None, ge=0)
+    """Tokens kept free for the reply (``reply_reserve``). Null when the window is unknown."""
 
 
 class TraceMessage(BaseModel):
@@ -671,6 +698,8 @@ class TraceMessage(BaseModel):
     tool_calls: list[dict[str, Any]] = Field(default_factory=list[dict[str, Any]])
     call_id: str | None = None
     tokens: int | None = Field(default=None, ge=0)
+    original: str | None = None
+    """For a tool result sent as a stub, ``text`` is the stub and this is the full result."""
 
 
 class TraceSpanResult(BaseModel):
@@ -703,6 +732,8 @@ class TraceSpanResult(BaseModel):
     provider: str | None = None
     context: TraceContext | None = None
     system_sections: list[PromptSectionInfo] | None = None
+    summary_of: int | None = Field(default=None, ge=0)
+    """For a model span that was sent a summary, how many earlier messages it stands for."""
 
 
 class AuthSetParams(BaseModel):

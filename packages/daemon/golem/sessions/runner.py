@@ -536,6 +536,7 @@ async def _apply(
                 before_tokens=fact.before_tokens,
                 after_tokens=fact.after_tokens,
                 count=fact.count,
+                room=fact.room,
             ),
         )
     elif isinstance(fact, ModelResponded):

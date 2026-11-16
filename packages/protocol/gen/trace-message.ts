@@ -2,6 +2,7 @@
 
 export type CallId = string | null;
 export type Id = string | null;
+export type Original = string | null;
 export type Role = 'user' | 'assistant' | 'tool';
 export type Text = string;
 export type Tokens = number | null;
@@ -15,6 +16,7 @@ export type ToolCalls = {
 export interface TraceMessage {
   call_id?: CallId;
   id?: Id;
+  original?: Original;
   role: Role;
   text: Text;
   tokens?: Tokens;

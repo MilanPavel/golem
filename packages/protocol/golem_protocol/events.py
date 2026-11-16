@@ -577,6 +577,8 @@ class ContextChangedData(BaseModel):
     window_from: int | None = Field(default=None, ge=1)
     window_to: int | None = Field(default=None, ge=1)
     reload_ms: int | None = Field(default=None, ge=0)
+    room: int | None = Field(default=None, ge=1)
+    """The tokens the history may fill (the window less the reply reserve). None when unknown."""
 
 
 class TokenUsage(BaseModel):

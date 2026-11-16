@@ -180,7 +180,7 @@ A model call has no id of its own. Each call makes exactly one assistant message
 | Event | Fields |
 |---|---|
 | `model.call.started` | `message_id`, `index` (1-based within the run), `profile`, `provider`, `model`, `system_prompt_sha`, `tools_sha`, `message_ids`, `context_window`, `num_ctx`, `window_estimated`, `system_sections`, `system_chars`, `system_bytes`, `tools_chars`, `tools_bytes`, `message_chars`, `message_bytes`, `cleared_ids` (tool results sent as a one-line stub on this call), `estimated_tokens` (golem's estimate of the prompt before it was sent) |
-| `context.changed` | `action` (`cleared`, `summarised`, or `grew`), `before_tokens`, `after_tokens`, `count`, `window_from`, `window_to`, `reload_ms`. Only `cleared` is sent so far: old tool results are now sent as one line each, `count` of them, and the tokens are rough sizes of the history. It comes before the `model.call.started` of the call it changed. `session.compact` stores the same event with a null `run_id`, so the trace does not show it |
+| `context.changed` | `action` (`cleared`, `summarised`, or `grew`), `before_tokens`, `after_tokens`, `count`, `window_from`, `window_to`, `reload_ms`. `cleared` and `summarised` are sent so far: `count` is the results cleared or the messages summarised, and the tokens are rough sizes of the history. `room` is the tokens the history may fill (the window less the reply reserve), the base of the percentages in the chat line. It comes before the `model.call.started` of the call it changed. `session.compact` stores the same event with a null `run_id`. `trace.get` lists these as `context_events`, each with the `call_id` of the model call right after it |
 | `model.call.completed` | `message_id`, `usage` (`input`, `output`, `cache_read`, `cache_write`), `stop_reason`, `first_token_ms`, `latency_ms`, `failed`, `context_window`, `text_tool_calls`, `cost_usd`, `price`, `load_ms`, `prompt_ms`, `reply_ms` |
 | `tool.completed`, `tool.failed` | `duration_ms`, as well as what they had before |
 
@@ -234,7 +234,7 @@ The page shows every duration as minutes and seconds, from `formatDuration` in `
 3. **The tool calls.** One for each `tool.requested`, put under the model call named by its `message_id`. If that id is unknown, it goes under the newest model call that had started by then. The end, status, and preview come from `tool.completed` or `tool.failed`.
 4. **Names and previews are short.** A preview is cut at 200 characters.
 
-`trace.get` returns the runs, oldest first, each with its model calls and their tools. A model span carries its `context_window`, and one the event did not record gets today's window with `context_window_estimated` set.
+`trace.get` returns the runs, oldest first, each with its model calls and their tools, and `context_events`, the session's `context.changed` events with the call after each. A model span carries its `context_window`, and one the event did not record gets today's window with `context_window_estimated` set.
 
 ### One span in full
 
@@ -248,7 +248,7 @@ An unknown `span_id` is an error. Neither method calls the model or starts a run
 
 ### What filled the context
 
-`context_breakdown` returns five parts, always in this order: `system`, `tools`, `user`, `assistant`, and `tool_results`. Each has `tokens`, `chars`, and `items`.
+`context_breakdown` returns six parts, always in this order: `system`, `tools`, `user`, `assistant`, `tool_results`, and `summary`. Each has `tokens`, `chars`, and `items`.
 
 - **The weights** are characters: the system prompt's length, the compact JSON of each tool schema, and each message's text plus its tool calls.
 - **The total** is the input tokens the provider counted. With none, it is the characters divided by four.
@@ -258,7 +258,9 @@ An unknown `span_id` is an error. Neither method calls the model or starts a run
 - **The window** is the one recorded, or today's, with `window_estimated` set. `estimated` is always true, because of the split.
 - **A local model's window** comes from what golem sent, then from Ollama's `/api/ps`, then from the Modelfile, and the last two are estimated ([ADR-043](../adr/043-ollama-context-window.md)).
 
-The web page draws this as the context meter: a bar with a segment for each part, in the order above, and a `Free` row. Each part has its own colour. A line under the bar says when Ollama cut the prompt (see A cut prompt). The Tools disclosure groups the tools by server with each one's cost. The thin bar in the page's summary line is clay, then the `wait` colour from 80% full, then `deny` from 95%. The chat's `ctx 6%` chip is built from the live `model.call.*` events, so it comes back after a reload.
+`summary` is the summary of old turns sent as the first message, and 0 when there was none. `context` also has `reserve` (the `[context] reply_reserve`, null when the window is unknown), `window_planned`, and `cleared` (how many results were sent as stubs and the tokens that saved). In `trace.span` a message sent as a stub has the stub as `text` and the full result as `original`, and `summary_of` is how many earlier messages the summary stands for.
+
+The web page draws this as the context meter: a bar with a segment for each part, in the order above, then a `Free` row and a hatched `Reply reserve` that close the bar, so the parts, free and the reserve add up to the window. A muted `Cleared` row is not in the bar. The sparkline in the summary line ticks the calls that came right after a `context.changed`. When a cut is found in a session whose window golem planned, the note says the model server should not have cut the prompt, and to report it. Each part has its own colour. A line under the bar says when Ollama cut the prompt (see A cut prompt). The Tools disclosure groups the tools by server with each one's cost. The thin bar in the page's summary line is clay, then the `wait` colour from 80% full, then `deny` from 95%. The chat's `ctx 6%` chip is built from the live `model.call.*` events, so it comes back after a reload.
 
 ### Older sessions
 

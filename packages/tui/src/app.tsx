@@ -854,6 +854,7 @@ export function App({
     changes: changesState,
     liveRunId: chat.busy ? chat.runId : null,
     commands: COMMANDS.map((command) => command.name),
+    notices: chat.notices,
   };
   const measured = layoutTranscript(chat.messages, columns, chatHeight, offset, transcriptOptions);
   const widthKey = measured.overflow ? Math.max(1, columns - 1) : columns;

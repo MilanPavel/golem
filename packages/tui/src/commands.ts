@@ -32,7 +32,7 @@ export function helpLines(commands: readonly Pick<Command, "name" | "args" | "de
   return commands.map((command) => fitLine(`${usage(command).padEnd(width)}  ${command.description}`, columns));
 }
 
-const PART_COLORS: Record<ContextKey | "free", string> = {
+const PART_COLORS: Record<ContextKey | "free" | "reserve" | "cleared", string> = {
   system: CTX_SYSTEM,
   tools: CTX_TOOLS,
   user: CTX_USER,
@@ -40,6 +40,8 @@ const PART_COLORS: Record<ContextKey | "free", string> = {
   tool_results: CTX_RESULTS,
   summary: CTX_SUMMARY,
   free: HINT,
+  reserve: HINT,
+  cleared: HINT,
 };
 
 /** `/context`: the view's report as coloured segments, each line cut to the terminal. */
