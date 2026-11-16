@@ -49,6 +49,8 @@
 
   /* Layout widths from docs/design/index.md: w-sidebar is 268 px, max-w-column is 46 rem. */
   --spacing-sidebar: 16.75rem;
+  /* The icon rail beside the panel: w-rail is 52 px. */
+  --spacing-rail: 3.25rem;
   --container-column: 46rem;
   /* The tallest the model dialog grows: 44 rem. It keeps one size whatever it shows. */
   --spacing-dialog: 44rem;
