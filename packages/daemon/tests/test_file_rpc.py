@@ -147,6 +147,35 @@ async def test_the_list_skips_folders_glob_skips(setup: Setup) -> None:
     assert result["paths"] == ["src/x.js"]
 
 
+def _dot_files(folder: Path) -> None:
+    (folder / ".aws").mkdir()
+    (folder / ".aws" / "config").write_text("", "utf-8")
+    (folder / ".zshrc").write_text("", "utf-8")
+    (folder / "src").mkdir()
+    (folder / "src" / ".env").write_text("", "utf-8")
+    (folder / "src" / "a.py").write_text("", "utf-8")
+
+
+async def test_the_list_leaves_out_dot_files_and_dot_folders(setup: Setup) -> None:
+    _dot_files(setup.folder)
+    assert rpc_result(await _list(setup))["paths"] == ["src/a.py"]
+    assert rpc_result(await _list(setup, hidden=False))["paths"] == ["src/a.py"]
+
+
+async def test_the_list_holds_dot_files_when_hidden_is_on(setup: Setup) -> None:
+    _dot_files(setup.folder)
+    result = rpc_result(await _list(setup, hidden=True))
+    assert result["paths"] == [".zshrc", "src/.env", "src/a.py", ".aws/config"]
+
+
+async def test_a_query_names_a_dot_file_only_when_hidden_is_on(setup: Setup) -> None:
+    _dot_files(setup.folder)
+    assert rpc_result(await _list(setup, query=".zshrc"))["paths"] == []
+    assert rpc_result(await _list(setup, query=".zshrc", hidden=True))["paths"] == [".zshrc"]
+    assert rpc_result(await _list(setup, query="config"))["paths"] == []
+    assert rpc_result(await _list(setup, query="config", hidden=True))["paths"] == [".aws/config"]
+
+
 async def test_the_list_refuses_a_bad_limit(setup: Setup) -> None:
     assert error_code(await _list(setup, limit=0)) == INVALID_PARAMS
     assert error_code(await _list(setup, limit=201)) == INVALID_PARAMS

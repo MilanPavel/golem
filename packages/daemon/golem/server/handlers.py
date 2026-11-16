@@ -796,7 +796,7 @@ async def _file_read(ctx: RequestContext, params: FileReadParams) -> FileReadRes
 
 async def _file_list(ctx: RequestContext, params: FileListParams) -> FileListResult:
     folder = await _session_files(ctx, params.session_id)
-    return await asyncio.to_thread(list_paths, folder, params.query, params.limit)
+    return await asyncio.to_thread(list_paths, folder, params.query, params.limit, params.hidden)
 
 
 async def _commit_folder(ctx: RequestContext, session_id: str) -> str:

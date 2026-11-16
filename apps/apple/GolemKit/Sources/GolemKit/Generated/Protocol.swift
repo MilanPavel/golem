@@ -2210,20 +2210,26 @@ public enum FileChangedEventType: String, Codable {
     case fileChanged = "file.changed"
 }
 
-/// ``file.list``. Files of the session's folder whose path holds ``query``, case-insensitive.
+/// ``file.list``. Files of the session's folder whose path holds ``query``,
+/// case-insensitive.
+///
+/// Dot files and files in dot folders are listed only when ``hidden`` is true.
 // MARK: - FileListParams
 public struct FileListParams: Codable {
+    public let hidden: Bool?
     public let limit: Int?
     public let query: String?
     public let sessionID: String
 
     public enum CodingKeys: String, CodingKey {
+        case hidden = "hidden"
         case limit = "limit"
         case query = "query"
         case sessionID = "session_id"
     }
 
-    public init(limit: Int?, query: String?, sessionID: String) {
+    public init(hidden: Bool?, limit: Int?, query: String?, sessionID: String) {
+        self.hidden = hidden
         self.limit = limit
         self.query = query
         self.sessionID = sessionID

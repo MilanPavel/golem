@@ -348,7 +348,7 @@ export interface GolemClient {
   /** The start of one text file of the session's folder, with its line count. */
   readFile(sessionId: string, path: string): Promise<FileReadResult>;
   /** Files of the session's folder whose path holds `query`, shortest first. */
-  listFiles(sessionId: string, query?: string, limit?: number): Promise<FileListResult>;
+  listFiles(sessionId: string, query?: string, limit?: number, hidden?: boolean): Promise<FileListResult>;
   /** Commit `paths` of the session folder with the user's own git. Never pushes. */
   changesCommit(sessionId: string, paths: string[], message: string): Promise<ChangesCommitResult>;
   /** Whether the session folder is in a git work tree, its branch, and which of the changed files git sees. */
@@ -1426,12 +1426,13 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       }
       return result;
     },
-    async listFiles(sessionId: string, query?: string, limit?: number): Promise<FileListResult> {
+    async listFiles(sessionId: string, query?: string, limit?: number, hidden?: boolean): Promise<FileListResult> {
       await ready;
       const result = await call("file.list", {
         session_id: sessionId,
         ...(query === undefined ? {} : { query }),
         ...(limit === undefined ? {} : { limit }),
+        ...(hidden === undefined ? {} : { hidden }),
       });
       if (!isFileListResult(result)) {
         throw new Error("invalid file.list result");

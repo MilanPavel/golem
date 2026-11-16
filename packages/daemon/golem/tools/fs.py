@@ -221,10 +221,17 @@ def _grep_file(where: Readable, path: Path, regex: re.Pattern[str]) -> list[str]
     return hits
 
 
-def walk_files(base: Path) -> Iterator[Path]:
+def walk_files(base: Path, *, hidden: bool = True) -> Iterator[Path]:
+    """Files under ``base``. With ``hidden`` false, dot folders and dot files are left out."""
     for folder, dirs, names in os.walk(base):
-        dirs[:] = sorted(name for name in dirs if name not in SKIPPED_DIRS)
+        dirs[:] = sorted(
+            name
+            for name in dirs
+            if name not in SKIPPED_DIRS and (hidden or not name.startswith("."))
+        )
         for name in sorted(names):
+            if not hidden and name.startswith("."):
+                continue
             yield Path(folder) / name
 
 
