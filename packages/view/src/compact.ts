@@ -11,7 +11,7 @@ export const NOTHING_TO_COMPACT = "nothing to compact yet";
 /** The line shown while a summary is being written, which can take a minute with a local model. */
 export const COMPACTING = "summarising earlier turns …";
 
-function plural(count: number, one: string, many: string): string {
+export function plural(count: number, one: string, many: string): string {
   return `${count} ${count === 1 ? one : many}`;
 }
 

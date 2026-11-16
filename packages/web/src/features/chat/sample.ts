@@ -1,5 +1,5 @@
 import { SAMPLE_EDIT_DIFF } from "../diff/sample.ts";
-import type { ChatMessage, ChatState, ToolBlock } from "@golem/view";
+import type { ChatMessage, ChatNotice, ChatState, ToolBlock } from "@golem/view";
 
 const CODE = ["```ts", "export function clamp(n: number, lo: number, hi: number): number {", "  // keep n inside the range", '  return Math.min(Math.max(n, lo), hi);', "}", "```"].join("\n");
 
@@ -139,6 +139,24 @@ export const TURN_CHAT: Pick<ChatState, "messages" | "error" | "notice"> = {
     { id: "ts3b", role: "assistant", text: "", streaming: false, durationMs: 7600, tools: [{ callId: "c4", name: "mcp__github__list_issues", args: { repo: "golem" }, status: "failed", error: "rate limited" }] },
     { id: "ts4", role: "assistant", text: "It is set in `socket.ts`, and `meter.ts` only reads it.", streaming: false, durationMs: 8800 },
   ] satisfies ChatMessage[],
+  error: null,
+  notice: null,
+};
+
+/** A turn where golem cleared old tool results between two steps, and summarised before the next question. */
+export const NOTICE_CHAT: Pick<ChatState, "messages" | "error" | "notice" | "notices"> = {
+  messages: [
+    { id: "nu1", role: "user", text: "Find where the retry delay is set.", streaming: false },
+    { id: "ns1", role: "assistant", text: "", streaming: false, durationMs: 2100, tools: [{ callId: "n1", name: "grep", args: { pattern: "retryDelay" }, status: "done", summary: "3 matches" }] },
+    { id: "ns2", role: "assistant", text: "It is set in `socket.ts`.", streaming: false, durationMs: 4300 },
+    { id: "nu2", role: "user", text: "And the timeout?", streaming: false },
+    { id: "ns3", role: "assistant", text: "In `client.ts`.", streaming: false, durationMs: 1800 },
+  ] satisfies ChatMessage[],
+  notices: [
+    { id: "context-4", afterId: "ns1", action: "cleared", text: "golem cleared 12 old tool results · ctx 71% → 38%", at: "2026-11-01T15:00:03" },
+    { id: "context-9", afterId: "ns2", action: "summarised", text: "golem summarised 9 earlier turns · ctx 84% → 31%", at: "2026-11-01T15:00:09" },
+    { id: "context-12", afterId: "ns3", action: "grew", text: "window grew 32K → 64K · reloaded in 8 s", at: "2026-11-01T15:00:20" },
+  ] satisfies ChatNotice[],
   error: null,
   notice: null,
 };

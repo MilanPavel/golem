@@ -140,6 +140,7 @@ The line under an answer ends with the model, `local` for a model on your machin
 |---|---|
 | `/changes` | Review the files this session changed. In the terminal: the files on the left, the diff on the right, `n` and `p` jump by hunk, `u` undoes the hunk under the cursor and `U` the selected file (each asks `y/n`). In the web UI it opens the Changes tab |
 | `/undo` | Take back the files the last turn changed. It lists them and asks; a file edited since golem wrote it is listed again, and `o` overwrites it or `k` keeps yours. `/undo` again goes one turn further back. Terminal only for now |
+| `/commit` | Commit the files this session changed, with your own git and your hooks. golem suggests the message and you can edit it. In the terminal it opens a band under `/changes` (`g` does the same there): `enter` commits all the files, `ctrl+r` suggests again. In the web UI it opens a dialog where you can leave files out. Nothing is committed until you press commit, and nothing is pushed |
 | `/todos` | Show or hide the agent's todo list above the composer |
 | `/context` | See how full the model's context is, and what fills it. In the web UI it opens the trace |
 | `/cost` | What model calls cost: this session, today, the week, the week by model, and what running locally saved. In the web UI it opens Settings → Usage |
@@ -155,7 +156,7 @@ The line under an answer ends with the model, `local` for a model on your machin
 
 `/compact` and `/context clear` run between turns, without waiting for the context to fill. Each prints one line when it is done, such as `summarised 9 earlier turns with qwen3:27b · ctx 84% → 31% · 6.2 s` or `cleared 12 old tool results · ctx 71% → 38%`, and `nothing to compact yet` when there is nothing to do. A summary can take a minute with a local model, and the line says it is working meanwhile. They are refused while an answer is running. Nothing is deleted: the chat on screen and the saved session stay whole, and only what the next call sends gets shorter. `/compact` keeps the last `keep_turns` turns and `/context clear` keeps the newest `keep_results` tool results, from `[context]` in the settings.
 
-`/context` draws the model's window as a grid of cells, coloured by what fills them, with a legend beside it (or under it in a narrow terminal). One cell is 0.5% of the window.
+`/context` draws the model's window as a grid of cells, coloured by what fills them, with a legend beside it (or under it in a narrow terminal). One cell is 0.5% of the window. The legend has a `Summary` row when a summary stands for old turns, a `Free` row for what is left outside the reply reserve, a `Reply reserve` row (drawn `▨`, at the end of the grid), and a dim `Cleared · 12 tool results · 11.2K not sent` row when old tool results were sent as one line each. In the chat, a dim line such as `⊖ golem cleared 12 old tool results · ctx 71% → 38%` shows where golem cleared or summarised, or grew the window.
 
 ```text
 ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■    qwen3:8b
