@@ -17,6 +17,9 @@ import {
   formatDuration,
   noticesAfter,
   parseDiff,
+  helperHead,
+  helperTreeRows,
+  isDelegate,
   planFooter,
   planOfCall,
   PROPOSE_PLAN_TOOL,
@@ -358,6 +361,9 @@ export function toolLines(tool: ToolBlock, width: number, expanded: boolean, det
   if (isFinishedEdit(tool)) {
     return editLines(tool, tool.diff, width, expanded, detail);
   }
+  if (isDelegate(tool)) {
+    return helperLines(tool, width, expanded);
+  }
   const head: Span[] = [{ text: tool.name, bold: true }];
   const label = toolLabel(tool.args);
   if (label.length > 0) {
@@ -393,6 +399,39 @@ export function toolLines(tool: ToolBlock, width: number, expanded: boolean, det
   }
   if (tool.artifactId !== undefined) {
     lines.push(...wrapSpans([{ text: `  │ all of it: /artifact ${tool.artifactId}`, dim: true }], width));
+  }
+  return lines;
+}
+
+/**
+ * A `delegate` call as a tree: the helper's head line, then its calls by name and what came back.
+ * Closed, only the head shows. While Ctrl-O is on, the helper's steps and its answer show too.
+ */
+export function helperLines(tool: ToolBlock, width: number, expanded: boolean): Span[][] {
+  const failed = tool.status === "failed";
+  const lines = wrapSpans(
+    [
+      { text: `${expanded ? "▾" : "▸"} ` },
+      { text: helperHead(tool), bold: true },
+      { text: ` ${TOOL_MARKS[tool.status]}`, dim: !failed },
+    ],
+    width,
+  );
+  if (!expanded) {
+    return lines;
+  }
+  for (const row of helperTreeRows(tool)) {
+    lines.push(...wrapSpans([{ text: `    ${visibleText(row)}`, dim: true }], width));
+  }
+  for (const step of tool.child?.toolSteps ?? []) {
+    for (const spans of toolLines(step, width, false)) {
+      lines.push(...wrapSpans([{ text: "      " }, ...spans], width));
+    }
+  }
+  if (tool.status === "done" && tool.preview !== undefined) {
+    for (const row of tool.preview.split("\n").slice(0, TOOL_PREVIEW_ROWS)) {
+      lines.push(...wrapSpans([{ text: `    │ ${visibleText(row)}`, dim: true }], width));
+    }
   }
   return lines;
 }

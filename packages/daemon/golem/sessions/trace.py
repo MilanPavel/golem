@@ -1,7 +1,8 @@
 """A session's events as a tree of spans, and what one span took in and gave out.
 
 Pure: these functions read lists the caller loaded, and do no I/O. The tree
-is run, then model call, then tool call.
+is run, then model call, then tool call. The tool call of a ``delegate`` has the model calls
+of its helper under it, each with its own tool calls (ADR-058).
 
 A session recorded before ``model.call.*`` events existed has none. Its model
 spans are rebuilt from each assistant message's ``message.started`` and
@@ -17,11 +18,13 @@ import logging
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field, replace
 from datetime import datetime
-from typing import Literal
+from typing import Literal, TypeVar
 
 from golem.sessions.cut import CallFacts, PromptCut, judge
 from golem_protocol.commands import (
     TraceContextEvent,
+    TraceHelperModelSpan,
+    TraceHelperToolSpan,
     TraceMessage,
     TraceModelSpan,
     TraceRoute,
@@ -51,6 +54,7 @@ from golem_protocol.events import (
 )
 
 Status = Literal["ok", "failed", "cancelled", "denied", "running"]
+M = TypeVar("M", TraceModelSpan, TraceHelperModelSpan)
 
 _NAME_CHARS = 80
 _PREVIEW_CHARS = 200
@@ -62,9 +66,10 @@ log = logging.getLogger(__name__)
 def build_trace(events: Sequence[ChatEvent]) -> list[TraceRunSpan]:
     """The runs found in ``events``, oldest first, each with its model and tool spans.
 
-    The events of a child run are left out until the trace nests them under their ``delegate``
-    call.
+    The events of a child run are nested under the ``delegate`` tool span that started it. They
+    are not part of the run's own calls, so the cut of a prompt is judged without them.
     """
+    kids = _children(events)
     events = _own(events)
     order: list[str] = []
     by_run: dict[str, list[ChatEvent]] = {}
@@ -77,7 +82,7 @@ def build_trace(events: Sequence[ChatEvent]) -> list[TraceRunSpan]:
         by_run[event.run_id].append(event)
     runs: list[TraceRunSpan] = []
     for run_id in order:
-        run = _run(run_id, by_run[run_id])
+        run = _run(run_id, by_run[run_id], kids)
         if run is not None:
             runs.append(run)
     return _with_cuts(runs, events)
@@ -99,6 +104,16 @@ def context_events(events: Sequence[ChatEvent]) -> list[TraceContextEvent]:
 def _own(events: Sequence[ChatEvent]) -> list[ChatEvent]:
     """``events`` without those of a child run, which name their ``delegate`` call."""
     return [e for e in events if getattr(e.data, "parent_call_id", None) is None]
+
+
+def _children(events: Sequence[ChatEvent]) -> dict[str, list[ChatEvent]]:
+    """The events of each child run, by the id of the ``delegate`` call that started it."""
+    found: dict[str, list[ChatEvent]] = {}
+    for event in events:
+        parent = getattr(event.data, "parent_call_id", None)
+        if parent is not None:
+            found.setdefault(parent, []).append(event)
+    return found
 
 
 def _with_cuts(runs: list[TraceRunSpan], events: Sequence[ChatEvent]) -> list[TraceRunSpan]:
@@ -140,7 +155,9 @@ def _with_cuts(runs: list[TraceRunSpan], events: Sequence[ChatEvent]) -> list[Tr
     return cut
 
 
-def _run(run_id: str, events: list[ChatEvent]) -> TraceRunSpan | None:
+def _run(
+    run_id: str, events: list[ChatEvent], kids: dict[str, list[ChatEvent]]
+) -> TraceRunSpan | None:
     start: str | None = None
     end: str | None = None
     status: Status = "running"
@@ -167,7 +184,7 @@ def _run(run_id: str, events: list[ChatEvent]) -> TraceRunSpan | None:
             end, status = event.ts, "cancelled"
     if start is None:
         start = events[0].ts
-    models = _models(events, ended=end is not None, cancelled=status == "cancelled")
+    models = _models(events, ended=end is not None, cancelled=status == "cancelled", kids=kids)
     return TraceRunSpan(
         id=run_id,
         kind="run",
@@ -181,7 +198,13 @@ def _run(run_id: str, events: list[ChatEvent]) -> TraceRunSpan | None:
     )
 
 
-def _models(events: list[ChatEvent], *, ended: bool, cancelled: bool) -> list[TraceModelSpan]:
+def _models(
+    events: list[ChatEvent],
+    *,
+    ended: bool,
+    cancelled: bool,
+    kids: dict[str, list[ChatEvent]] | None = None,
+) -> list[TraceModelSpan]:
     started = [e for e in events if isinstance(e, ModelCallStartedEvent)]
     models = (
         _recorded_models(events, started, cancelled)
@@ -195,10 +218,23 @@ def _models(events: list[ChatEvent], *, ended: bool, cancelled: bool) -> list[Tr
     for event in events:
         if isinstance(event, ToolRequestedEvent):
             tool = _tool(event, events, ended=ended)
+            if kids is not None and event.data.call_id in kids:
+                inner = _models(kids[event.data.call_id], ended=ended, cancelled=cancelled)
+                tool = tool.model_copy(update={"children": [_helper_model(m) for m in inner]})
             tools[by_message.get(event.data.message_id, _last_before(models, event.ts))].append(
                 tool
             )
     return [m.model_copy(update={"children": t}) for m, t in zip(models, tools, strict=True)]
+
+
+def _helper_model(model: TraceModelSpan) -> TraceHelperModelSpan:
+    """``model`` as a span of a helper: the same fields, and its tools without children."""
+    fields = {n: getattr(model, n) for n in TraceHelperModelSpan.model_fields if n != "children"}
+    tools = [
+        TraceHelperToolSpan(**{n: getattr(t, n) for n in TraceSpan.model_fields})
+        for t in model.children
+    ]
+    return TraceHelperModelSpan(**fields, children=tools)
 
 
 def _last_before(models: list[TraceModelSpan], ts: str) -> int:
@@ -365,8 +401,35 @@ def spans(runs: Sequence[TraceRunSpan]) -> list[TraceSpan]:
         flat.append(_bare(run))
         for model in run.children:
             flat.append(_bare(model))
-            flat.extend(_bare(tool) for tool in model.children)
+            for tool in model.children:
+                flat.append(_bare(tool))
+                for helper in tool.children:
+                    flat.append(_bare(helper))
+                    flat.extend(_bare(inner) for inner in helper.children)
     return flat
+
+
+def helper_of(runs: Sequence[TraceRunSpan], span_id: str) -> str | None:
+    """The id of the ``delegate`` call whose helper made span ``span_id``, else None."""
+    for run in runs:
+        for model in run.children:
+            for tool in model.children:
+                for helper in tool.children:
+                    if helper.id == span_id or any(t.id == span_id for t in helper.children):
+                        return tool.id
+    return None
+
+
+def _model_group(
+    runs: Sequence[TraceRunSpan], span_id: str
+) -> Sequence[TraceModelSpan | TraceHelperModelSpan]:
+    """The model spans that share a context with span ``span_id``: the run's own, or a helper's."""
+    own = [m for run in runs for m in run.children]
+    for model in own:
+        for tool in model.children:
+            if any(h.id == span_id for h in tool.children):
+                return tool.children
+    return own
 
 
 def _bare(span: TraceSpan) -> TraceSpan:
@@ -430,18 +493,27 @@ def with_windows(
             known[name] = window_of(name)
         return known[name]
 
+    def fill(model: M) -> M:
+        if model.context_window is None:
+            window, estimated = filled_window(model, None, profile, lookup)
+            used = None if model.tokens is None else model.tokens.input
+            if window is not None and (used is None or used <= window):
+                model = model.model_copy(
+                    update={"context_window": window, "context_window_estimated": estimated}
+                )
+        return model
+
+    def fill_tool(tool: TraceToolSpan) -> TraceToolSpan:
+        if not tool.children:
+            return tool
+        return tool.model_copy(update={"children": [fill(h) for h in tool.children]})
+
     filled: list[TraceRunSpan] = []
     for run in runs:
         models: list[TraceModelSpan] = []
         for model in run.children:
-            if model.context_window is None:
-                window, estimated = filled_window(model, None, profile, lookup)
-                used = None if model.tokens is None else model.tokens.input
-                if window is not None and (used is None or used <= window):
-                    model = model.model_copy(
-                        update={"context_window": window, "context_window_estimated": estimated}
-                    )
-            models.append(model)
+            tools = [fill_tool(tool) for tool in model.children]
+            models.append(fill(model).model_copy(update={"children": tools}))
         filled.append(run.model_copy(update={"children": models}))
     return filled
 
@@ -474,7 +546,6 @@ def read_span(
     is a span too, but it has no input or output of its own: it comes back as
     the span alone.
     """
-    events = _own(events)
     flat = spans(runs)
     span = next((s for s in flat if s.id == span_id), None)
     if span is None:
@@ -482,7 +553,8 @@ def read_span(
     if span.kind == "tool":
         return SpanRead(_tool_read(span, events, messages))
     if span.kind == "model":
-        found = _model_read(span, [s for s in flat if s.kind == "model"], events, messages)
+        group = _model_group(runs, span_id)
+        found = _model_read(span, [_bare(m) for m in group], events, messages)
         full = next((m for run in runs for m in run.children if m.id == span_id), None)
         if full is None:
             return found

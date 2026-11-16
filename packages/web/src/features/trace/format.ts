@@ -1,6 +1,6 @@
 import { contextLevel, contextPercent, contextSummary, formatDuration as formatViewDuration, formatTokens, formatWindow, type ContextLevel } from "@golem/view";
 import type { TraceContextEvent } from "../../store/trace.ts";
-import { modelsOf, type TraceNode, type TraceRunSpan, type TraceSpan } from "../../store/trace.ts";
+import { modelsOf, withHelperModels, type TraceNode, type TraceRunSpan, type TraceSpan } from "../../store/trace.ts";
 
 /** `—` for an unknown time, else minutes and seconds: `0m 00.048s` under a second, `0m 18.4s`, `2m 30.8s`. */
 export function formatDuration(ms: number | null | undefined): string {
@@ -16,11 +16,11 @@ export function spanTokens(span: TraceNode): number | null {
   return (tokens.input ?? 0) + (tokens.output ?? 0);
 }
 
-/** Input plus output tokens of every model call, or null when none is recorded. */
+/** Input plus output tokens of every model call, helpers' included, or null when none is recorded. */
 export function totalTokens(runs: readonly TraceRunSpan[]): number | null {
   let total: number | null = null;
   for (const run of runs) {
-    for (const model of modelsOf(run)) {
+    for (const model of withHelperModels(run)) {
       const tokens = spanTokens(model);
       if (tokens !== null) total = (total ?? 0) + tokens;
     }
@@ -103,10 +103,10 @@ export function summaryLine(runs: readonly TraceRunSpan[]): string {
   return latest === null ? base : `${base} · ${contextText(latest)}`;
 }
 
-/** Input plus output tokens of the run's model calls, or null when none is recorded. */
+/** Input plus output tokens of the run's model calls, its helpers' included, or null when none is recorded. */
 export function runTokens(run: TraceRunSpan): number | null {
   let total: number | null = null;
-  for (const model of modelsOf(run)) {
+  for (const model of withHelperModels(run)) {
     const tokens = spanTokens(model);
     if (tokens !== null) total = (total ?? 0) + tokens;
   }

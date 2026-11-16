@@ -6,7 +6,7 @@ from typing import Any
 
 from pydantic import TypeAdapter
 
-from golem.sessions.trace import build_trace, with_windows
+from golem.sessions.trace import build_trace, helper_of, spans, with_windows
 from golem_protocol.events import ChatEvent
 
 _EVENT: TypeAdapter[ChatEvent] = TypeAdapter(ChatEvent)
@@ -413,3 +413,115 @@ def test_a_model_span_has_the_cost_its_call_recorded() -> None:
     log.add("run.completed", {})
     (run,) = build_trace(log.events)
     assert [m.cost_usd for m in run.children] == [0.012, None]
+
+
+def _helper_log(*, finish: bool = True) -> _Log:
+    """A run whose first reply delegates; the helper reads one file in two model calls."""
+    log = _Log()
+    log.user("look around")
+    log.model("m_1", text="I will ask a helper")
+    log.tool("d1", "m_1", name="delegate", end=None)
+    helper = {"parent_call_id": "d1"}
+    for message_id, call_id in (("k_1", "kc_1"), ("k_2", None)):
+        log.add(
+            "model.call.started",
+            {
+                "message_id": message_id,
+                "index": 1,
+                "profile": "p",
+                "provider": "x",
+                "model": "helper-model",
+                "context_window": 8000,
+                **helper,
+            },
+        )
+        log.add(
+            "model.call.completed",
+            {
+                "message_id": message_id,
+                "latency_ms": 300,
+                "usage": {"input": 4000, "output": 10},
+                "cost_usd": 0.25,
+                **helper,
+            },
+        )
+        if call_id is not None:
+            log.add(
+                "tool.requested",
+                {
+                    "call_id": call_id,
+                    "message_id": message_id,
+                    "name": "read_file",
+                    "args": {},
+                    **helper,
+                },
+            )
+            log.add("tool.started", {"call_id": call_id, **helper})
+            log.add(
+                "tool.completed",
+                {"call_id": call_id, "summary": "3 lines", "preview": "x", **helper},
+            )
+    if finish:
+        log.add("tool.completed", {"call_id": "d1", "summary": "explorer", "preview": "found"})
+    log.model("m_2", text="done", used=900)
+    log.add("run.completed", {})
+    return log
+
+
+def test_a_helpers_calls_nest_under_its_delegate_tool_span() -> None:
+    (run,) = build_trace(_helper_log().events)
+    assert _ids(run.children) == ["m_1", "m_2"]
+    delegate = run.children[0].children[0]
+    assert (delegate.id, delegate.name, delegate.status) == ("d1", "delegate", "ok")
+    assert _ids(delegate.children) == ["k_1", "k_2"]
+    first, second = delegate.children
+    assert (first.model, first.context_window, first.status) == ("x/helper-model", 8000, "ok")
+    assert first.tokens is not None and first.tokens.input == 4000
+    assert _ids(first.children) == ["kc_1"]
+    assert first.children[0].status == "ok"
+    assert second.children == []
+    # The run's own second call has no helper under it.
+    assert run.children[1].children == []
+
+
+def test_a_helper_does_not_change_the_parents_cut_or_input_series() -> None:
+    (with_helper,) = build_trace(_helper_log().events)
+    bare = _Log()
+    bare.user("look around")
+    bare.model("m_1", text="I will ask a helper")
+    bare.tool("d1", "m_1", name="delegate")
+    bare.model("m_2", text="done", used=900)
+    bare.add("run.completed", {})
+    (without,) = build_trace(bare.events)
+    series = [m.tokens.input for m in with_helper.children if m.tokens is not None]
+    assert series == [m.tokens.input for m in without.children if m.tokens is not None]
+    assert [m.prompt_cut for m in with_helper.children] == [m.prompt_cut for m in without.children]
+    assert all(m.prompt_cut is None for m in with_helper.children[0].children[0].children)
+
+
+def test_a_helper_still_running_or_cut_off_shows_open_spans() -> None:
+    log = _helper_log(finish=False)
+    open_events = [e for e in log.events if e.type != "run.completed"]
+    (run,) = build_trace(open_events)
+    assert run.children[0].children[0].status == "running"
+    (ended,) = build_trace(log.events)
+    assert ended.children[0].children[0].status == "cancelled"
+
+
+def test_spans_lists_the_helpers_calls_after_the_delegate_span() -> None:
+    runs = build_trace(_helper_log().events)
+    assert _ids(spans(runs)) == ["r1", "m_1", "d1", "k_1", "kc_1", "k_2", "m_2"]
+    assert helper_of(runs, "kc_1") == "d1"
+    assert helper_of(runs, "k_2") == "d1"
+    assert helper_of(runs, "d1") is None
+    assert helper_of(runs, "m_2") is None
+
+
+def test_with_windows_fills_a_helpers_model_span_too() -> None:
+    log = _helper_log()
+    for event in log.events:
+        if event.type == "model.call.started" and getattr(event.data, "parent_call_id", None):
+            object.__setattr__(event.data, "context_window", None)
+    runs = with_windows(build_trace(log.events), lambda name: 32000, "p")
+    helper = runs[0].children[0].children[0].children[0]
+    assert (helper.context_window, helper.context_window_estimated) == (32000, True)

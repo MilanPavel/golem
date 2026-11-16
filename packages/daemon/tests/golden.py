@@ -1,4 +1,4 @@
-"""Record the events a real daemon sends for five chats, as fixtures for the view package.
+"""Record the events a real daemon sends for six chats, as fixtures for the view package.
 
 Each scenario runs against an in-process daemon with a fake model. A client
 attaches from 0 and collects every event as the wire delivered it (``live``),
@@ -110,6 +110,19 @@ def scenarios() -> dict[str, Scenario]:
     return {
         "plain": Scenario(ScriptedChatModel(replies=["Hello there."]), _plain),
         "tool": Scenario(ToolCallingChatModel(replies=[read, "It is 42."]), _tool, files=notes),
+        "delegate": Scenario(
+            ToolCallingChatModel(
+                replies=[
+                    [("delegate", {"brief": "find the answer in notes.txt"})],
+                    read,
+                    "notes.txt says the answer is 42.",
+                    "It is 42.",
+                ],
+                usage={"input_tokens": 100, "output_tokens": 20, "total_tokens": 120},
+            ),
+            _tool,
+            files=notes,
+        ),
         "approval": Scenario(
             ToolCallingChatModel(replies=[read, "It is 42."]),
             _approval,

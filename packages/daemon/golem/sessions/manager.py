@@ -27,6 +27,7 @@ from golem.config import ModelPrice, PermissionMode, RouteMode
 from golem.evals.whatif import build_report, session_model
 from golem.graphs.adapter import PlainMessage, plain_messages, trace_messages
 from golem.graphs.chat import ChatRuntime, Growth
+from golem.graphs.child import child_thread
 from golem.graphs.context_view import ContextView, view
 from golem.graphs.state import SCHEMA_VERSION
 from golem.graphs.step_up import Consent, StepAsk, StepRequest, StepUp
@@ -64,6 +65,7 @@ from golem.sessions.trace import (
     build_trace,
     context_events,
     filled_window,
+    helper_of,
     read_span,
     with_windows,
 )
@@ -621,8 +623,12 @@ class SessionManager:
         async with self._lock:
             session = await self._resolve(session_id)
             events = await self._events.stored(session_id)
-            messages = trace_messages(await self._runtime.values(session_id))
-        found = read_span(build_trace(events), events, messages, span_id)
+            runs = build_trace(events)
+            # A helper's calls are read from its own thread, not the session's.
+            parent = helper_of(runs, span_id)
+            thread = session_id if parent is None else child_thread(session_id, parent)
+            messages = trace_messages(await self._runtime.values(thread))
+        found = read_span(runs, events, messages, span_id)
         if found is None:
             raise SpanNotFoundError(span_id)
         updates: dict[str, object] = {}

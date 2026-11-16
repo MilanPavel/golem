@@ -668,3 +668,49 @@ def test_a_note_of_golem_does_not_start_a_new_count_of_helpers() -> None:
     history = [HumanMessage(content="hi"), done, note("checks failed"), done]
     assert _delegated_this_turn(history) == 2
     assert _delegated_this_turn([*history, HumanMessage(content="next")]) == 0
+
+
+async def test_the_trace_nests_the_helper_and_trace_span_reads_its_thread(
+    database: Database, project: Path
+) -> None:
+    model = ToolCallingChatModel(
+        replies=[
+            [("delegate", {"brief": "look at a.py"})],
+            [("read_file", {"path": "a.py"})],
+            "a.py has a().",
+            "ok",
+        ],
+        usage=USAGE,
+    )
+    chat = _Chat(database, model)
+    session_id, _, _ = await chat.run(project)
+
+    _, runs = await chat.manager.trace(session_id)
+    (run,) = runs
+    delegate = run.children[0].children[0]
+    assert (delegate.name, delegate.id) == ("delegate", "call_1")
+    helper_calls = delegate.children
+    assert len(helper_calls) == 2
+    assert [t.name for t in helper_calls[0].children] == ["read_file"]
+    # The run's own calls are two; the helper's are under delegate.
+    assert len(run.children) == 2
+    # Tokens of the helper are in its spans, so a total over them includes it.
+    own = sum(m.tokens.input or 0 for m in run.children if m.tokens is not None)
+    inside = sum(m.tokens.input or 0 for m in helper_calls if m.tokens is not None)
+    assert inside == 2 * USAGE["input_tokens"] and own == 2 * USAGE["input_tokens"]
+
+    # A helper's model call is read from the helper's thread: its context starts at the brief.
+    read = await chat.manager.trace_span(session_id, helper_calls[0].id)
+    assert read.span.id == helper_calls[0].id
+    assert [m.role for m in read.messages][:1] == ["user"]
+    assert read.messages[0].text == "look at a.py"
+    # Its reply is the helper's, not the parent's.
+    assert read.reply is not None and read.reply.id == helper_calls[0].id
+    # A helper's tool call has its result from the same thread.
+    step = helper_calls[0].children[0]
+    result = await chat.manager.trace_span(session_id, step.id)
+    assert result.args == {"path": "a.py"}
+    assert result.result is not None and "def a()" in result.result
+    # The parent's own call still reads the parent's thread.
+    top = await chat.manager.trace_span(session_id, run.children[1].id)
+    assert top.messages[0].text == "go"

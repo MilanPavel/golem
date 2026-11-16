@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
-import { modelsOf, toolsOf, type TraceNode, type TraceRunSpan } from "../../store/trace.ts";
+import { helperModelsOf, modelsOf, toolsOf, type TraceNode, type TraceRunSpan } from "../../store/trace.ts";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../../ui/tooltip.tsx";
 import { formatDuration, tokenCell, type TokenCell } from "./format.ts";
 import { NOT_RECORDED_LINE } from "./span-text.ts";
@@ -9,12 +9,12 @@ import { WaterfallBar } from "./waterfall-bar.tsx";
 type Row = {
   span: TraceNode;
   run: TraceRunSpan;
-  depth: 0 | 1 | 2;
+  depth: 0 | 1 | 2 | 3 | 4;
   parent: string | null;
   hasChildren: boolean;
 };
 
-const INDENT = ["pl-0", "pl-4", "pl-8"] as const;
+const INDENT = ["pl-0", "pl-4", "pl-8", "pl-12", "pl-16"] as const;
 
 /** Every span, in tree order, that is not hidden inside a closed parent. */
 export function visibleRows(runs: readonly TraceRunSpan[], open: ReadonlySet<string>): Row[] {
@@ -26,7 +26,16 @@ export function visibleRows(runs: readonly TraceRunSpan[], open: ReadonlySet<str
       rows.push({ span: model, run, depth: 1, parent: run.id, hasChildren: toolsOf(model).length > 0 });
       if (!open.has(model.id)) continue;
       for (const tool of toolsOf(model)) {
-        rows.push({ span: tool, run, depth: 2, parent: model.id, hasChildren: false });
+        const helper = helperModelsOf(tool);
+        rows.push({ span: tool, run, depth: 2, parent: model.id, hasChildren: helper.length > 0 });
+        if (!open.has(tool.id)) continue;
+        for (const inner of helper) {
+          rows.push({ span: inner, run, depth: 3, parent: tool.id, hasChildren: toolsOf(inner).length > 0 });
+          if (!open.has(inner.id)) continue;
+          for (const step of toolsOf(inner)) {
+            rows.push({ span: step, run, depth: 4, parent: inner.id, hasChildren: false });
+          }
+        }
       }
     }
   }
@@ -37,10 +46,13 @@ export function visibleRows(runs: readonly TraceRunSpan[], open: ReadonlySet<str
 export function initialOpen(runs: readonly TraceRunSpan[], selected: string | null): Set<string> {
   const open = new Set<string>();
   runs.forEach((run, index) => {
-    const spans: TraceNode[] = [run, ...modelsOf(run), ...modelsOf(run).flatMap(toolsOf)];
+    const tools = modelsOf(run).flatMap(toolsOf);
+    const helpers = tools.flatMap(helperModelsOf);
+    const spans: TraceNode[] = [run, ...modelsOf(run), ...tools, ...helpers, ...helpers.flatMap(toolsOf)];
     const holds = selected !== null && spans.some((span) => span.id === selected);
     if (index === runs.length - 1 || holds) open.add(run.id);
     for (const model of modelsOf(run)) open.add(model.id);
+    for (const span of [...tools.filter((tool) => helperModelsOf(tool).length > 0), ...helpers]) open.add(span.id);
   });
   return open;
 }
@@ -209,7 +221,9 @@ export function TraceTree({
     setSeen(runs.length);
     const newest = runs[runs.length - 1];
     if (runs.length > seen && newest !== undefined) {
-      setOpen((now) => new Set([...now, newest.id, ...modelsOf(newest).map((model) => model.id)]));
+      const tools = modelsOf(newest).flatMap(toolsOf);
+      const spans = [...modelsOf(newest), ...tools.filter((tool) => helperModelsOf(tool).length > 0), ...tools.flatMap(helperModelsOf)];
+      setOpen((now) => new Set([...now, newest.id, ...spans.map((span) => span.id)]));
     }
   }
 

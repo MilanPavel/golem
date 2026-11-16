@@ -107,6 +107,8 @@ export type { CostDayRow, CostGetResult, CostModelRow, CostTotals } from "../../
 export type { EvalRoutingResult, EvalScenarioRow, EvalTopSession } from "../../protocol/gen/eval-routing-result.ts";
 export type { TraceGetResult } from "../../protocol/gen/trace-get-result.ts";
 export type { TraceMessage } from "../../protocol/gen/trace-message.ts";
+export type { TraceHelperModelSpan } from "../../protocol/gen/trace-helper-model-span.ts";
+export type { TraceHelperToolSpan } from "../../protocol/gen/trace-helper-tool-span.ts";
 export type { TraceModelSpan } from "../../protocol/gen/trace-model-span.ts";
 export type { TraceRunSpan } from "../../protocol/gen/trace-run-span.ts";
 export type { TraceSpan } from "../../protocol/gen/trace-span.ts";

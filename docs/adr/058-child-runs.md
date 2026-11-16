@@ -28,7 +28,7 @@ What exists today:
    - Child calls carry `cost_usd` and usage like any call and roll up into the run. A usage row of a child call has the role `explore`.
 
 3. **Old clients.** An event with `parent_call_id` must not be drawn as a top-level step.
-   - The shared reducer in `packages/view` ignores such events until #912 and then folds them under the `delegate` step they belong to. Both web and TUI use that reducer.
+   - The shared reducer in `packages/view` folds such events under the `delegate` step they belong to (`child` on the step). Both web and TUI use that reducer.
    - A client older than the version that adds the field would draw them flat. That is acceptable for one release, because clients and daemon ship together ([ADR-020](020-safe-upgrades.md)).
    - The trace builder nests child spans under the `delegate` tool span. The parent's context series (`inputSeries`) does not include child calls, because they are a different context.
 

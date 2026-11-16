@@ -625,11 +625,7 @@ class TraceSpan(BaseModel):
     recorded: bool = True
 
 
-class TraceToolSpan(TraceSpan):
-    """A tool call. It has no children."""
-
-
-class TraceModelSpan(TraceSpan):
+class _TraceModelFields(TraceSpan):
     """A model call, with the tool calls it asked for, in request order.
 
     ``prompt_cut`` says whether Ollama cut the prompt that did not fit: "no"
@@ -646,7 +642,6 @@ class TraceModelSpan(TraceSpan):
     Ollama only.
     """
 
-    children: list[TraceToolSpan] = Field(default_factory=list[TraceToolSpan])
     cost_usd: float | None = Field(default=None, ge=0)
     load_ms: int | None = Field(default=None, ge=0)
     prompt_ms: int | None = Field(default=None, ge=0)
@@ -659,6 +654,37 @@ class TraceModelSpan(TraceSpan):
     prompt_cut_kind: Literal["older_messages", "middle"] | None = None
     dropped_message_ids: list[str] = Field(default_factory=list[str])
     dropped_tokens: int | None = Field(default=None, ge=0)
+
+
+class TraceHelperToolSpan(TraceSpan):
+    """A tool call of a helper. It has no children."""
+
+
+class TraceHelperModelSpan(_TraceModelFields):
+    """A model call of a helper, with the helper's tool calls it asked for, in request order."""
+
+    children: list[TraceHelperToolSpan] = Field(default_factory=list[TraceHelperToolSpan])
+
+
+class TraceToolSpan(TraceSpan):
+    """A tool call.
+
+    A ``delegate`` call has the model calls of its helper in ``children``, in order, each with
+    the helper's own tool calls. Any other tool call has none. A helper's calls have a context
+    of their own, so they are not part of the run's context series.
+    """
+
+    children: list[TraceHelperModelSpan] = Field(default_factory=list[TraceHelperModelSpan])
+
+
+class TraceModelSpan(_TraceModelFields):
+    """A model call, with the tool calls it asked for, in request order.
+
+    The tool calls are the run's own, so a ``delegate`` call has its helper's model calls
+    under it.
+    """
+
+    children: list[TraceToolSpan] = Field(default_factory=list[TraceToolSpan])
 
 
 class TraceRoute(BaseModel):

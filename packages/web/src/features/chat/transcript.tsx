@@ -1,4 +1,4 @@
-import { BUILD_TEXT, openPlan, displayToolName, formatTurnTime, groupTurns, turnFooterParts, stepCount, stepMark, summarizeSteps, turnFooter, LIVE_OUTPUT_CHARS, thinkingLine, unreadCallNotice, writingLabel, REPLY_CUT_NOTE, type ChatMessage, type ChatState, type Detail, type StepMark, type ToolBlock, type WritingBlock, noticesAfter, type ChatNotice, checksOf, checksSummary, turnRoutedNote, sessionModelOf, type SessionModelRef, rewoundLine, UNDO_WAIT } from "@golem/view";
+import { BUILD_TEXT, helperLine, isDelegate, openPlan, displayToolName, formatTurnTime, groupTurns, turnFooterParts, stepCount, stepMark, summarizeSteps, turnFooter, LIVE_OUTPUT_CHARS, thinkingLine, unreadCallNotice, writingLabel, REPLY_CUT_NOTE, type ChatMessage, type ChatState, type Detail, type StepMark, type ToolBlock, type WritingBlock, noticesAfter, type ChatNotice, checksOf, checksSummary, turnRoutedNote, sessionModelOf, type SessionModelRef, rewoundLine, UNDO_WAIT } from "@golem/view";
 import { Fragment, memo, useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { usePageActions, usePulls, useSession, useModelList, useTurnCards } from "../../store/page-context.tsx";
 import type { PullsSnapshot } from "../../store/pulls.ts";
@@ -105,8 +105,58 @@ function ToolOutput({ tool, mode }: { tool: ToolBlock; mode: DiffMode }) {
   }
 }
 
+/**
+ * A `delegate` call as one line about its helper. Opened, it shows the helper's tool steps, indented
+ * and drawn like any step, and then the helper's answer, which is the tool's result. In Quiet it is
+ * only the line.
+ */
+function HelperLine({ tool, defaultOpen, quiet }: { tool: ToolBlock; defaultOpen: boolean; quiet: boolean }) {
+  const [open, setOpen] = useState(defaultOpen);
+  const bodyId = useId();
+  const steps = tool.child?.toolSteps ?? [];
+  const shown = open && !quiet;
+  return (
+    <li data-tool-status={tool.status} data-helper className="tool-line">
+      <button
+        type="button"
+        aria-expanded={quiet ? undefined : shown}
+        aria-controls={quiet ? undefined : bodyId}
+        disabled={quiet}
+        className="tool-line-head outline-offset-2 outline-clay focus-visible:outline-2"
+        onClick={() => {
+          setOpen((value) => !value);
+        }}
+      >
+        <span aria-hidden="true" className="tool-chevron text-faint">{quiet ? "" : "›"}</span>
+        <span className="font-medium text-ink">{displayToolName(tool.name)}</span>
+        <span className="truncate" title={helperLine(tool)}>{helperLine(tool)}</span>
+      </button>
+      {shown ? (
+        <div id={bodyId} className="tool-tablet">
+          {steps.length > 0 ? (
+            <ul aria-label="Helper steps" className="mb-2 flex list-none flex-col gap-0.5 border-l border-line py-0.5 pl-3">
+              {steps.map((step) => (
+                <ToolLine key={step.callId} tool={step} defaultOpen={defaultOpen} />
+              ))}
+            </ul>
+          ) : null}
+          <ToolOutput tool={tool} mode="unified" />
+        </div>
+      ) : null}
+    </li>
+  );
+}
+
 /** One tool call as a line that opens into its tablet: the arguments and the output. The answered approval is a chip after the row. */
-export function ToolLine({ tool, defaultOpen = false, pending = false }: { tool: ToolBlock; defaultOpen?: boolean; pending?: boolean }) {
+export function ToolLine({ tool, defaultOpen = false, pending = false, detail = "normal" }: { tool: ToolBlock; defaultOpen?: boolean; pending?: boolean; detail?: Detail }) {
+  return isDelegate(tool) ? (
+    <HelperLine tool={tool} defaultOpen={defaultOpen} quiet={detail === "quiet"} />
+  ) : (
+    <StepLine tool={tool} defaultOpen={defaultOpen} pending={pending} />
+  );
+}
+
+function StepLine({ tool, defaultOpen, pending }: { tool: ToolBlock; defaultOpen: boolean; pending: boolean }) {
   const args = squeezeArgs(tool.args);
   const [open, setOpen] = useState(defaultOpen);
   const tabletId = useId();
@@ -299,7 +349,7 @@ export function ActivityLine({ tools, detail, streaming = false, pendingId = nul
       {open && rows.length > 0 ? (
         <ul id={listId} aria-label="Tool calls" className="flex list-none flex-col gap-0.5 border-l border-line py-0.5 pl-3 font-mono text-xs leading-snug">
           {rows.map((tool) => (
-            <ToolLine key={`${tool.callId}:${verbose}`} tool={tool} defaultOpen={verbose} pending={tool.callId === pendingId} />
+            <ToolLine key={`${tool.callId}:${verbose}`} tool={tool} defaultOpen={verbose} pending={tool.callId === pendingId} detail={detail} />
           ))}
         </ul>
       ) : null}

@@ -74,6 +74,39 @@ export type ToolBlock = {
   diff?: string;
   /** The question the run asked about this call, from `approval.needed` and `approval.resolved`. */
   approval?: ToolApproval;
+  /** What the helper of a `delegate` call did, from the events that name this call as `parent_call_id`. */
+  child?: HelperRun;
+};
+
+/**
+ * A helper's work, folded under the `delegate` call that started it. Its model calls and tool
+ * calls are not messages: its text is the tool's result. `tokens` and `costUsd` are the sums of its
+ * finished model calls, and `answerTokens` is the output of its last one.
+ */
+export type HelperRun = {
+  model: string | null;
+  modelCalls: number;
+  toolSteps: ToolBlock[];
+  tokens: number | null;
+  costUsd: number | null;
+  status: "running" | "done" | "failed";
+  answerTokens: number | null;
+  /** Time of its first event. */
+  startedAt: string | null;
+  /** From `tool.completed` of the `delegate` call, or the time between its first and last event. */
+  durationMs: number | null;
+};
+
+const emptyHelper: HelperRun = {
+  model: null,
+  modelCalls: 0,
+  toolSteps: [],
+  tokens: null,
+  costUsd: null,
+  status: "running",
+  answerTokens: null,
+  startedAt: null,
+  durationMs: null,
 };
 
 /** Characters of live output kept per tool call. */
@@ -327,14 +360,110 @@ function retryFor(messages: readonly ChatMessage[], data: RunFailure): ChatState
   return sent === undefined || sent.text.trim() === "" ? null : { text: sent.text, provider: data.provider ?? "ollama" };
 }
 
-/** An event of a child run: it names the `delegate` call that started it. Not drawn as a step yet. */
-function isChildEvent(event: ChatEvent): boolean {
+/** The `delegate` call an event of a child run names, or null for the run's own events. */
+function parentCallOf(event: ChatEvent): string | null {
   const data: object = event.data;
-  return "parent_call_id" in data && typeof data.parent_call_id === "string";
+  return "parent_call_id" in data && typeof data.parent_call_id === "string" ? data.parent_call_id : null;
+}
+
+/** A tool call after one of the events of its life: started, output, completed or failed. */
+function foldTool(tool: ToolBlock, event: ChatEvent): ToolBlock {
+  switch (event.type) {
+    case "tool.started":
+      return { ...tool, status: "running" };
+    case "tool.output":
+      return { ...tool, output: ((tool.output ?? "") + event.data.text).slice(-LIVE_OUTPUT_CHARS) };
+    case "tool.completed":
+      return {
+        ...withoutOutput(tool),
+        status: "done",
+        summary: event.data.summary,
+        preview: event.data.preview,
+        truncated: event.data.truncated === true,
+        ...(event.data.artifact_id == null ? {} : { artifactId: event.data.artifact_id }),
+        ...(event.data.failed === true ? { unsuccessful: true } : {}),
+        ...(event.data.diff ? { diff: event.data.diff } : {}),
+      };
+    case "tool.failed":
+      return { ...withoutOutput(tool), status: "failed", error: event.data.message };
+    default:
+      return tool;
+  }
+}
+
+/** The live output goes once the call ends: it is not in the log, so a replay would not have it. */
+function withoutOutput(tool: ToolBlock): ToolBlock {
+  const rest = { ...tool };
+  delete rest.output;
+  return rest;
+}
+
+function elapsed(from: string | null, to: string): number | null {
+  if (from === null) return null;
+  const ms = Date.parse(to) - Date.parse(from);
+  return Number.isNaN(ms) || ms < 0 ? null : ms;
+}
+
+/** The helper after one of its own events: a model call, or a step of one of its tools. */
+function foldHelper(child: HelperRun, event: ChatEvent): HelperRun {
+  const next = { ...child, startedAt: child.startedAt ?? event.ts };
+  switch (event.type) {
+    case "model.call.started":
+      return { ...next, modelCalls: child.modelCalls + 1, model: event.data.model ?? child.model };
+    case "model.call.completed": {
+      const usage = event.data.usage;
+      const counted = typeof usage?.input === "number" || typeof usage?.output === "number";
+      return {
+        ...next,
+        tokens: counted ? (child.tokens ?? 0) + (usage?.input ?? 0) + (usage?.output ?? 0) : child.tokens,
+        costUsd: event.data.cost_usd == null ? child.costUsd : (child.costUsd ?? 0) + event.data.cost_usd,
+        answerTokens: counted ? (usage?.output ?? 0) : child.answerTokens,
+      };
+    }
+    case "tool.requested": {
+      const block: ToolBlock = {
+        callId: event.data.call_id,
+        name: event.data.name,
+        args: event.data.args,
+        status: "requested",
+      };
+      return { ...next, toolSteps: [...child.toolSteps.filter((tool) => tool.callId !== block.callId), block] };
+    }
+    case "tool.started":
+    case "tool.output":
+    case "tool.completed":
+    case "tool.failed": {
+      const callId = event.data.call_id;
+      return { ...next, toolSteps: child.toolSteps.map((tool) => (tool.callId === callId ? foldTool(tool, event) : tool)) };
+    }
+    default:
+      return next;
+  }
+}
+
+/** The chat after an event of a child run: folded into the `delegate` step it belongs to. Nothing else sees it. */
+function reduceChild(state: ChatState, parentCallId: string, event: ChatEvent): ChatState {
+  return updateTool(state, parentCallId, (tool) => ({ ...tool, child: foldHelper(tool.child ?? emptyHelper, event) }));
+}
+
+/** A `delegate` call that ended: its helper is done or failed, and took as long as the call did. */
+function endHelper(tool: ToolBlock, event: ChatEvent): ToolBlock {
+  if (tool.name !== "delegate" || (event.type !== "tool.completed" && event.type !== "tool.failed")) return tool;
+  const child = tool.child ?? emptyHelper;
+  const own = event.data.duration_ms ?? null;
+  return {
+    ...tool,
+    child: {
+      ...child,
+      status: event.type === "tool.failed" ? "failed" : "done",
+      durationMs: own ?? elapsed(child.startedAt, event.ts),
+    },
+  };
 }
 
 export function reduceChat(state: ChatState, event: ChatEvent): ChatState {
-  if (isChildEvent(event)) return state;
+  const parent = parentCallOf(event);
+  if (parent !== null) return reduceChild(state, parent, event);
   const base = reduceChatEvent(state, event);
   const plan = reducePlan(state.plan, event);
   const next = plan === state.plan ? base : { ...base, plan };
@@ -592,29 +721,11 @@ function reduceChatEvent(state: ChatState, event: ChatEvent): ChatState {
     case "todos.updated":
       return { ...state, todos: event.data.todos.map((todo) => ({ id: todo.id, text: todo.text, status: todo.status })) };
     case "tool.started":
-      return updateTool(state, event.data.call_id, (tool) => ({ ...tool, status: "running" }));
     case "tool.output":
-      return updateTool(state, event.data.call_id, (tool) => ({
-        ...tool,
-        output: ((tool.output ?? "") + event.data.text).slice(-LIVE_OUTPUT_CHARS),
-      }));
+      return updateTool(state, event.data.call_id, (tool) => foldTool(tool, event));
     case "tool.completed":
-      return updateTool(state, event.data.call_id, (tool) => ({
-        ...tool,
-        status: "done",
-        summary: event.data.summary,
-        preview: event.data.preview,
-        truncated: event.data.truncated === true,
-        ...(event.data.artifact_id == null ? {} : { artifactId: event.data.artifact_id }),
-        ...(event.data.failed === true ? { unsuccessful: true } : {}),
-        ...(event.data.diff ? { diff: event.data.diff } : {}),
-      }));
     case "tool.failed":
-      return updateTool(state, event.data.call_id, (tool) => ({
-        ...tool,
-        status: "failed",
-        error: event.data.message,
-      }));
+      return updateTool(state, event.data.call_id, (tool) => endHelper(foldTool(tool, event), event));
     default:
       return state;
   }

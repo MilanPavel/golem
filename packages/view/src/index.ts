@@ -89,8 +89,21 @@ export {
   type WhyInput,
   type WhyRow,
 } from "./route.ts";
-export { helperStop, helperStopWords, type HelperStop } from "./helper.ts";
 export { costReportLines, formatCost, formatCount, referenceName, roleName, sessionCostLabel, turnFooterParts, turnTotals, type TurnTotals } from "./cost.ts";
+export {
+  DEFAULT_HELPER,
+  DELEGATE_TOOL,
+  helperCounts,
+  helperHead,
+  helperLine,
+  helperName,
+  helperStop,
+  helperStopWords,
+  helperToolCounts,
+  helperTreeRows,
+  isDelegate,
+  type HelperStop,
+} from "./helper.ts";
 export { groupTurns, turnFooter, type Turn } from "./turns.ts";
 export { editedArgs, parseArgs, type ParsedArgs } from "./approval-args.ts";
 export { inboxItems, type InboxItem, type InboxPending, type InboxSession } from "./inbox.ts";
@@ -123,6 +136,7 @@ export {
   type ChatNotice,
   type ChatState,
   type DeltaBatcher,
+  type HelperRun,
   type MessageCall,
   type ConsentCaps,
   type PendingApproval,
