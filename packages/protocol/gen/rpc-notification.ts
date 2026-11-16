@@ -171,6 +171,7 @@ export type MessageId5 = string;
 export type MessageIds = string[];
 export type Model1 = string | null;
 export type NumCtx = number | null;
+export type ParentCallId = string | null;
 export type Profile = string;
 export type Provider1 = string | null;
 export type SummaryChars = number | null;
@@ -198,6 +199,7 @@ export type FirstTokenMs = number | null;
 export type LatencyMs = number;
 export type LoadMs = number | null;
 export type MessageId6 = string;
+export type ParentCallId1 = string | null;
 export type CachedInput = number | null;
 export type Input = number | null;
 export type Output = number | null;
@@ -255,6 +257,7 @@ export type Type20 = 'run.cancelled';
 export type CallId = string;
 export type MessageId7 = string;
 export type Name2 = string;
+export type ParentCallId2 = string | null;
 export type RunId22 = string;
 export type Seq21 = number;
 export type SessionId22 = string;
@@ -279,6 +282,7 @@ export type SessionId24 = string;
 export type Ts23 = string;
 export type Type23 = 'model.waiting';
 export type CallId1 = string;
+export type ParentCallId3 = string | null;
 export type RunId25 = string;
 export type Seq24 = number;
 export type SessionId25 = string;
@@ -296,6 +300,7 @@ export type CallId3 = string;
 export type Diff = string | null;
 export type DurationMs = number | null;
 export type Failed1 = boolean;
+export type ParentCallId4 = string | null;
 export type Preview = string;
 export type Summary1 = string;
 export type Truncated = boolean;
@@ -307,6 +312,7 @@ export type Type26 = 'tool.completed';
 export type CallId4 = string;
 export type DurationMs1 = number | null;
 export type Message1 = string;
+export type ParentCallId5 = string | null;
 export type RunId28 = string;
 export type Seq27 = number;
 export type SessionId28 = string;
@@ -1240,6 +1246,10 @@ export interface ModelCallStartedEvent {
  * and ``message_bytes`` have one number per message sent. Each is None on an
  * event recorded before they existed.
  *
+ * ``parent_call_id`` is set on an event of a child run: the id of the ``delegate`` call
+ * that started it. The event is in the parent's run, and a client that does not know
+ * child runs ignores it. None for the run's own events.
+ *
  * This interface was referenced by `RpcNotification`'s JSON-Schema
  * via the `definition` "ModelCallStartedData".
  */
@@ -1254,6 +1264,7 @@ export interface ModelCallStartedData {
   message_ids?: MessageIds;
   model?: Model1;
   num_ctx?: NumCtx;
+  parent_call_id?: ParentCallId;
   profile: Profile;
   provider?: Provider1;
   summary_chars?: SummaryChars;
@@ -1319,6 +1330,10 @@ export interface ModelCallCompletedEvent {
  * the model, reading the prompt and writing the reply. From the model server's own clock.
  * Ollama only.
  *
+ * ``parent_call_id`` is set on an event of a child run: the id of the ``delegate`` call
+ * that started it. The event is in the parent's run, and a client that does not know
+ * child runs ignores it. None for the run's own events.
+ *
  * This interface was referenced by `RpcNotification`'s JSON-Schema
  * via the `definition` "ModelCallCompletedData".
  */
@@ -1330,6 +1345,7 @@ export interface ModelCallCompletedData {
   latency_ms: LatencyMs;
   load_ms?: LoadMs;
   message_id: MessageId6;
+  parent_call_id?: ParentCallId1;
   price?: CallPrice | null;
   prompt_ms?: PromptMs;
   reply_ms?: ReplyMs;
@@ -1505,6 +1521,10 @@ export interface ToolRequestedEvent {
  * ``message_id`` is the assistant message that asked. ``args`` are the
  * arguments as the model wrote them.
  *
+ * ``parent_call_id`` is set on an event of a child run: the id of the ``delegate`` call
+ * that started it. The event is in the parent's run, and a client that does not know
+ * child runs ignores it. None for the run's own events.
+ *
  * This interface was referenced by `RpcNotification`'s JSON-Schema
  * via the `definition` "ToolRequestedData".
  */
@@ -1513,6 +1533,7 @@ export interface ToolRequestedData {
   call_id: CallId;
   message_id: MessageId7;
   name: Name2;
+  parent_call_id?: ParentCallId2;
 }
 export interface Args1 {
   [k: string]: unknown;
@@ -1593,11 +1614,16 @@ export interface ToolStartedEvent {
 /**
  * A requested tool call is running.
  *
+ * ``parent_call_id`` is set on an event of a child run: the id of the ``delegate`` call
+ * that started it. The event is in the parent's run, and a client that does not know
+ * child runs ignores it. None for the run's own events.
+ *
  * This interface was referenced by `RpcNotification`'s JSON-Schema
  * via the `definition` "ToolStartedData".
  */
 export interface ToolStartedData {
   call_id: CallId1;
+  parent_call_id?: ParentCallId3;
 }
 /**
  * More output from a running call. ``tool.completed`` or ``tool.failed`` replaces it.
@@ -1654,6 +1680,10 @@ export interface ToolCompletedEvent {
  *
  * ``diff`` is the change a file tool made, as a unified diff.
  *
+ * ``parent_call_id`` is set on an event of a child run: the id of the ``delegate`` call
+ * that started it. The event is in the parent's run, and a client that does not know
+ * child runs ignores it. None for the run's own events.
+ *
  * This interface was referenced by `RpcNotification`'s JSON-Schema
  * via the `definition` "ToolCompletedData".
  */
@@ -1663,6 +1693,7 @@ export interface ToolCompletedData {
   diff?: Diff;
   duration_ms?: DurationMs;
   failed?: Failed1;
+  parent_call_id?: ParentCallId4;
   preview: Preview;
   summary: Summary1;
   truncated?: Truncated;
@@ -1687,6 +1718,10 @@ export interface ToolFailedEvent {
  * ``duration_ms`` is how long the tool ran before it raised. None means a
  * call that was denied or cut off, which never ran or was not timed.
  *
+ * ``parent_call_id`` is set on an event of a child run: the id of the ``delegate`` call
+ * that started it. The event is in the parent's run, and a client that does not know
+ * child runs ignores it. None for the run's own events.
+ *
  * This interface was referenced by `RpcNotification`'s JSON-Schema
  * via the `definition` "ToolFailedData".
  */
@@ -1694,6 +1729,7 @@ export interface ToolFailedData {
   call_id: CallId4;
   duration_ms?: DurationMs1;
   message: Message1;
+  parent_call_id?: ParentCallId5;
 }
 /**
  * The run is waiting for an answer about one tool call.

@@ -176,11 +176,12 @@ async def project_model_call(
         tier = data.tier or ("local" if data.provider == "ollama" else None)
         await tx.execute(
             "INSERT OR REPLACE INTO model_calls (call_id, session_id, run_id, role, provider,"
-            " model, tier, started_at, day) VALUES (?, ?, ?, 'chat', ?, ?, ?, ?, ?)",
+            " model, tier, started_at, day) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 data.message_id,
                 event.session_id,
                 event.run_id,
+                "chat" if data.parent_call_id is None else "explore",
                 data.provider,
                 data.model,
                 tier,

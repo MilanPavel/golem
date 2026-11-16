@@ -66,6 +66,14 @@ class Artifacts(Protocol):
 
 
 @dataclass(frozen=True, slots=True)
+class Delegated:
+    """What a helper run gave back: its answer, and why it stopped (``done`` or a limit)."""
+
+    text: str
+    stopped: str
+
+
+@dataclass(frozen=True, slots=True)
 class ToolContext:
     """What a call may touch. ``root`` is the session folder, or None without one.
 
@@ -96,6 +104,8 @@ class ToolContext:
     """The skills the session's folder sees, for ``load_skill``."""
     page_chars: int | None = None
     """The most characters of a result page for the model's window, for ``read_artifact``."""
+    delegate: Callable[[str], Awaitable[Delegated]] | None = None
+    """Runs a helper on a brief and waits for its answer, for ``delegate``. None in a helper."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -219,11 +229,13 @@ class ToolScope:
     """Which outside tools one session sees.
 
     ``root`` is its folder, which may bring a trusted project's MCP servers,
-    and ``enabled`` the on-demand servers it turned on with ``/mcp enable``.
+    and ``enabled`` the on-demand servers it turned on with ``/mcp enable``. With ``only``
+    the scope has exactly those of golem's own tools and no outside ones, as a helper's does.
     """
 
     root: Path | None = None
     enabled: frozenset[str] = frozenset()
+    only: frozenset[str] | None = None
 
 
 class ToolSource(Protocol):
@@ -257,13 +269,19 @@ class ToolRegistry:
     def scoped(self, scope: ToolScope) -> ToolRegistry:
         """This registry with the outside tools ``scope`` sees."""
         view = ToolRegistry.__new__(ToolRegistry)
+        if scope.only is not None:
+            view._tools = {n: t for n, t in self._tools.items() if n in scope.only}
+            view._source = None
+            view._schemas = [t.schema() for t in view._tools.values() if not t.plan_only]
+            view._extra = {}
+            return view
         view._tools, view._source, view._schemas = self._tools, self._source, self._schemas
         found: Iterable[Tool[Any]] = () if self._source is None else self._source.tools(scope)
         view._extra = {tool.name: tool for tool in found if tool.name not in self._tools}
         return view
 
     async def prepare(self, scope: ToolScope) -> None:
-        if self._source is not None:
+        if self._source is not None and scope.only is None:
             await self._source.prepare(scope)
 
     @property
@@ -351,6 +369,7 @@ __all__ = [
     "MAX_OUTPUT_CHARS",
     "ArtifactPage",
     "Artifacts",
+    "Delegated",
     "InvalidArguments",
     "Network",
     "Preview",

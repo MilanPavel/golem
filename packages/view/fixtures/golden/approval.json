@@ -55,7 +55,7 @@
       "data": {
         "cleared_ids": [],
         "context_window": null,
-        "estimated_tokens": 2780,
+        "estimated_tokens": 2963,
         "index": 1,
         "message_bytes": [
           10
@@ -69,6 +69,7 @@
         ],
         "model": null,
         "num_ctx": null,
+        "parent_call_id": null,
         "profile": "remote",
         "provider": null,
         "summary_chars": null,
@@ -77,9 +78,9 @@
         "system_prompt_sha": null,
         "system_sections": null,
         "tier": null,
-        "tools_bytes": 9247,
-        "tools_chars": 9247,
-        "tools_sha": "19c048618fd8fbc14b5505c81e1f92e5512ce1b384f79601130a1a689096d147",
+        "tools_bytes": 9858,
+        "tools_chars": 9858,
+        "tools_sha": "55153538b30b199d91498f166762712cbd8738111dfa68799b398e16ee612855",
         "window_estimated": false,
         "window_planned": false
       },
@@ -114,6 +115,7 @@
         "latency_ms": 0,
         "load_ms": null,
         "message_id": "id-4",
+        "parent_call_id": null,
         "price": null,
         "prompt_ms": null,
         "reply_ms": null,
@@ -134,7 +136,8 @@
         },
         "call_id": "call_1",
         "message_id": "id-4",
-        "name": "read_file"
+        "name": "read_file",
+        "parent_call_id": null
       },
       "run_id": "id-2",
       "seq": 8,
@@ -177,7 +180,8 @@
     },
     {
       "data": {
-        "call_id": "call_1"
+        "call_id": "call_1",
+        "parent_call_id": null
       },
       "run_id": "id-2",
       "seq": 11,
@@ -192,6 +196,7 @@
         "diff": null,
         "duration_ms": 0,
         "failed": false,
+        "parent_call_id": null,
         "preview": "     1|the answer is 42",
         "summary": "1 line",
         "truncated": false
@@ -217,7 +222,7 @@
       "data": {
         "cleared_ids": [],
         "context_window": null,
-        "estimated_tokens": 2820,
+        "estimated_tokens": 3004,
         "index": 1,
         "message_bytes": [
           10,
@@ -237,6 +242,7 @@
         ],
         "model": null,
         "num_ctx": null,
+        "parent_call_id": null,
         "profile": "remote",
         "provider": null,
         "summary_chars": null,
@@ -245,9 +251,9 @@
         "system_prompt_sha": null,
         "system_sections": null,
         "tier": null,
-        "tools_bytes": 9247,
-        "tools_chars": 9247,
-        "tools_sha": "19c048618fd8fbc14b5505c81e1f92e5512ce1b384f79601130a1a689096d147",
+        "tools_bytes": 9858,
+        "tools_chars": 9858,
+        "tools_sha": "55153538b30b199d91498f166762712cbd8738111dfa68799b398e16ee612855",
         "window_estimated": false,
         "window_planned": false
       },
@@ -282,6 +288,7 @@
         "latency_ms": 0,
         "load_ms": null,
         "message_id": "id-5",
+        "parent_call_id": null,
         "price": null,
         "prompt_ms": null,
         "reply_ms": null,
@@ -360,7 +367,7 @@
       "data": {
         "cleared_ids": [],
         "context_window": null,
-        "estimated_tokens": 2780,
+        "estimated_tokens": 2963,
         "index": 1,
         "message_bytes": [
           10
@@ -374,6 +381,7 @@
         ],
         "model": null,
         "num_ctx": null,
+        "parent_call_id": null,
         "profile": "remote",
         "provider": null,
         "summary_chars": null,
@@ -382,9 +390,9 @@
         "system_prompt_sha": null,
         "system_sections": null,
         "tier": null,
-        "tools_bytes": 9247,
-        "tools_chars": 9247,
-        "tools_sha": "19c048618fd8fbc14b5505c81e1f92e5512ce1b384f79601130a1a689096d147",
+        "tools_bytes": 9858,
+        "tools_chars": 9858,
+        "tools_sha": "55153538b30b199d91498f166762712cbd8738111dfa68799b398e16ee612855",
         "window_estimated": false,
         "window_planned": false
       },
@@ -419,6 +427,7 @@
         "latency_ms": 0,
         "load_ms": null,
         "message_id": "id-4",
+        "parent_call_id": null,
         "price": null,
         "prompt_ms": null,
         "reply_ms": null,
@@ -439,7 +448,8 @@
         },
         "call_id": "call_1",
         "message_id": "id-4",
-        "name": "read_file"
+        "name": "read_file",
+        "parent_call_id": null
       },
       "run_id": "id-2",
       "seq": 8,
@@ -482,7 +492,8 @@
     },
     {
       "data": {
-        "call_id": "call_1"
+        "call_id": "call_1",
+        "parent_call_id": null
       },
       "run_id": "id-2",
       "seq": 11,
@@ -497,6 +508,7 @@
         "diff": null,
         "duration_ms": 0,
         "failed": false,
+        "parent_call_id": null,
         "preview": "     1|the answer is 42",
         "summary": "1 line",
         "truncated": false
@@ -522,7 +534,7 @@
       "data": {
         "cleared_ids": [],
         "context_window": null,
-        "estimated_tokens": 2820,
+        "estimated_tokens": 3004,
         "index": 1,
         "message_bytes": [
           10,
@@ -542,6 +554,7 @@
         ],
         "model": null,
         "num_ctx": null,
+        "parent_call_id": null,
         "profile": "remote",
         "provider": null,
         "summary_chars": null,
@@ -550,9 +563,9 @@
         "system_prompt_sha": null,
         "system_sections": null,
         "tier": null,
-        "tools_bytes": 9247,
-        "tools_chars": 9247,
-        "tools_sha": "19c048618fd8fbc14b5505c81e1f92e5512ce1b384f79601130a1a689096d147",
+        "tools_bytes": 9858,
+        "tools_chars": 9858,
+        "tools_sha": "55153538b30b199d91498f166762712cbd8738111dfa68799b398e16ee612855",
         "window_estimated": false,
         "window_planned": false
       },
@@ -587,6 +600,7 @@
         "latency_ms": 0,
         "load_ms": null,
         "message_id": "id-5",
+        "parent_call_id": null,
         "price": null,
         "prompt_ms": null,
         "reply_ms": null,

@@ -1,3 +1,4 @@
+import type { ChatEvent } from "@golem/client";
 import { expect, test, vi } from "vitest";
 import { createSessionStore } from "./session-store.ts";
 import { ev, fakeFrame } from "./test-support.ts";
@@ -98,4 +99,20 @@ test("a model call that started and ended gives the live context", () => {
   store.dispatch(ev("s", "model.call.started", { message_id: "m1", index: 1, profile: "p", context_window: 128000 }));
   store.dispatch(ev("s", "model.call.completed", { message_id: "m1", latency_ms: 10, usage: { input: 32000, output: 5 } }));
   expect(store.getSnapshot().context.last).toEqual({ spanId: "m1", used: 32000, window: 128000, windowEstimated: false, windowPlanned: false, numCtx: null });
+});
+
+test("file.changed events fold into the changes of the session, by run", () => {
+  const store = createSessionStore(fakeFrame());
+  const changed = (run: string, id: string, path: string) =>
+    ({ ...ev("s", "file.changed", { change_id: id, path, status: "modified", added: 2, removed: 1, source: "tool" }), run_id: run }) as ChatEvent;
+  store.dispatch(changed("r1", "c1", "a.py"));
+  store.dispatch(changed("r2", "c2", "b.py"));
+  const turns = store.getSnapshot().changes.turns;
+  expect(turns.map((turn) => [turn.runId, turn.files.map((file) => file.path)])).toEqual([["r1", ["a.py"]], ["r2", ["b.py"]]]);
+});
+
+test("a user message keeps the run it started", () => {
+  const store = createSessionStore(fakeFrame());
+  store.dispatch({ ...ev("s", "message.completed", { message_id: "u1", role: "user", text: "hi" }), run_id: "r9" } as ChatEvent);
+  expect(store.getSnapshot().chat.messages[0]?.runId).toBe("r9");
 });

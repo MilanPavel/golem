@@ -47,6 +47,7 @@ export const GALLERY_SECTIONS = [
   "workbench",
   "changes-tab",
   "files-tab",
+  "changes-by-turn",
   "checks-strip",
   "checks-tab",
   "checks-question",

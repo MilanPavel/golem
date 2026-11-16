@@ -160,6 +160,7 @@ async def test_the_model_reads_a_file_then_answers(database: Database, project: 
         "web_fetch",
         "web_search",
         "read_artifact",
+        "delegate",
         "todo_write",
         "load_skill",
     ]

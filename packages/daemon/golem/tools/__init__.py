@@ -2,6 +2,7 @@
 
 from golem.config import WebSettings
 from golem.tools.artifacts import READ_ARTIFACT
+from golem.tools.delegate import DELEGATE
 from golem.tools.fs import READ_ONLY_TOOLS
 from golem.tools.plan import PROPOSE_PLAN
 from golem.tools.registry import ToolRegistry, ToolSource
@@ -29,6 +30,7 @@ def default_registry(
             WEB_FETCH,
             *search,
             READ_ARTIFACT,
+            DELEGATE,
             TODO_WRITE,
             PROPOSE_PLAN,
             LOAD_SKILL,

@@ -3,15 +3,21 @@
 export type CallId = string;
 export type DurationMs = number | null;
 export type Message = string;
+export type ParentCallId = string | null;
 
 /**
  * A tool call did not run, or stopped with an error. The model sees the same message.
  *
  * ``duration_ms`` is how long the tool ran before it raised. None means a
  * call that was denied or cut off, which never ran or was not timed.
+ *
+ * ``parent_call_id`` is set on an event of a child run: the id of the ``delegate`` call
+ * that started it. The event is in the parent's run, and a client that does not know
+ * child runs ignores it. None for the run's own events.
  */
 export interface ToolFailedData {
   call_id: CallId;
   duration_ms?: DurationMs;
   message: Message;
+  parent_call_id?: ParentCallId;
 }

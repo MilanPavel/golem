@@ -5923,6 +5923,10 @@ public enum MessageThinkingDeltaEventType: String, Codable {
 /// ``load_ms``, ``prompt_ms`` and ``reply_ms`` are the time the model server spent loading
 /// the model, reading the prompt and writing the reply. From the model server's own clock.
 /// Ollama only.
+///
+/// ``parent_call_id`` is set on an event of a child run: the id of the ``delegate`` call
+/// that started it. The event is in the parent's run, and a client that does not know
+/// child runs ignores it. None for the run's own events.
 // MARK: - ModelCallCompletedData
 public struct ModelCallCompletedData: Codable {
     public let contextWindow: Int?
@@ -5932,6 +5936,7 @@ public struct ModelCallCompletedData: Codable {
     public let latencyMS: Int
     public let loadMS: Int?
     public let messageID: String
+    public let parentCallID: String?
     public let price: ModelCallCompletedDataCallPrice?
     public let promptMS: Int?
     public let replyMS: Int?
@@ -5947,6 +5952,7 @@ public struct ModelCallCompletedData: Codable {
         case latencyMS = "latency_ms"
         case loadMS = "load_ms"
         case messageID = "message_id"
+        case parentCallID = "parent_call_id"
         case price = "price"
         case promptMS = "prompt_ms"
         case replyMS = "reply_ms"
@@ -5955,7 +5961,7 @@ public struct ModelCallCompletedData: Codable {
         case usage = "usage"
     }
 
-    public init(contextWindow: Int?, costUsd: Double?, failed: Bool?, firstTokenMS: Int?, latencyMS: Int, loadMS: Int?, messageID: String, price: ModelCallCompletedDataCallPrice?, promptMS: Int?, replyMS: Int?, stopReason: String?, textToolCalls: TextToolCalls?, usage: ModelCallCompletedDataTokenUsage?) {
+    public init(contextWindow: Int?, costUsd: Double?, failed: Bool?, firstTokenMS: Int?, latencyMS: Int, loadMS: Int?, messageID: String, parentCallID: String?, price: ModelCallCompletedDataCallPrice?, promptMS: Int?, replyMS: Int?, stopReason: String?, textToolCalls: TextToolCalls?, usage: ModelCallCompletedDataTokenUsage?) {
         self.contextWindow = contextWindow
         self.costUsd = costUsd
         self.failed = failed
@@ -5963,6 +5969,7 @@ public struct ModelCallCompletedData: Codable {
         self.latencyMS = latencyMS
         self.loadMS = loadMS
         self.messageID = messageID
+        self.parentCallID = parentCallID
         self.price = price
         self.promptMS = promptMS
         self.replyMS = replyMS
@@ -6069,6 +6076,10 @@ public struct ModelCallCompletedEvent: Codable {
 /// ``load_ms``, ``prompt_ms`` and ``reply_ms`` are the time the model server spent loading
 /// the model, reading the prompt and writing the reply. From the model server's own clock.
 /// Ollama only.
+///
+/// ``parent_call_id`` is set on an event of a child run: the id of the ``delegate`` call
+/// that started it. The event is in the parent's run, and a client that does not know
+/// child runs ignores it. None for the run's own events.
 // MARK: - ModelCallCompletedEventData
 public struct ModelCallCompletedEventData: Codable {
     public let contextWindow: Int?
@@ -6078,6 +6089,7 @@ public struct ModelCallCompletedEventData: Codable {
     public let latencyMS: Int
     public let loadMS: Int?
     public let messageID: String
+    public let parentCallID: String?
     public let price: PurpleCallPrice?
     public let promptMS: Int?
     public let replyMS: Int?
@@ -6093,6 +6105,7 @@ public struct ModelCallCompletedEventData: Codable {
         case latencyMS = "latency_ms"
         case loadMS = "load_ms"
         case messageID = "message_id"
+        case parentCallID = "parent_call_id"
         case price = "price"
         case promptMS = "prompt_ms"
         case replyMS = "reply_ms"
@@ -6101,7 +6114,7 @@ public struct ModelCallCompletedEventData: Codable {
         case usage = "usage"
     }
 
-    public init(contextWindow: Int?, costUsd: Double?, failed: Bool?, firstTokenMS: Int?, latencyMS: Int, loadMS: Int?, messageID: String, price: PurpleCallPrice?, promptMS: Int?, replyMS: Int?, stopReason: String?, textToolCalls: TextToolCalls?, usage: PurpleTokenUsage?) {
+    public init(contextWindow: Int?, costUsd: Double?, failed: Bool?, firstTokenMS: Int?, latencyMS: Int, loadMS: Int?, messageID: String, parentCallID: String?, price: PurpleCallPrice?, promptMS: Int?, replyMS: Int?, stopReason: String?, textToolCalls: TextToolCalls?, usage: PurpleTokenUsage?) {
         self.contextWindow = contextWindow
         self.costUsd = costUsd
         self.failed = failed
@@ -6109,6 +6122,7 @@ public struct ModelCallCompletedEventData: Codable {
         self.latencyMS = latencyMS
         self.loadMS = loadMS
         self.messageID = messageID
+        self.parentCallID = parentCallID
         self.price = price
         self.promptMS = promptMS
         self.replyMS = replyMS
@@ -6191,6 +6205,10 @@ public enum ModelCallCompletedEventType: String, Codable {
 /// ``message_ids`` order (its text and its tool calls as JSON). ``message_chars``
 /// and ``message_bytes`` have one number per message sent. Each is None on an
 /// event recorded before they existed.
+///
+/// ``parent_call_id`` is set on an event of a child run: the id of the ``delegate`` call
+/// that started it. The event is in the parent's run, and a client that does not know
+/// child runs ignores it. None for the run's own events.
 // MARK: - ModelCallStartedData
 public struct ModelCallStartedData: Codable {
     public let clearedIDS: [String]?
@@ -6203,6 +6221,7 @@ public struct ModelCallStartedData: Codable {
     public let messageIDS: [String]?
     public let model: String?
     public let numCtx: Int?
+    public let parentCallID: String?
     public let profile: String
     public let provider: String?
     public let summaryChars: Int?
@@ -6228,6 +6247,7 @@ public struct ModelCallStartedData: Codable {
         case messageIDS = "message_ids"
         case model = "model"
         case numCtx = "num_ctx"
+        case parentCallID = "parent_call_id"
         case profile = "profile"
         case provider = "provider"
         case summaryChars = "summary_chars"
@@ -6243,7 +6263,7 @@ public struct ModelCallStartedData: Codable {
         case windowPlanned = "window_planned"
     }
 
-    public init(clearedIDS: [String]?, contextWindow: Int?, estimatedTokens: Int?, index: Int, messageBytes: [Int]?, messageChars: [Int]?, messageID: String, messageIDS: [String]?, model: String?, numCtx: Int?, profile: String, provider: String?, summaryChars: Int?, systemBytes: Int?, systemChars: Int?, systemPromptSHA: String?, systemSections: [PurplePromptSectionInfo]?, tier: Tier?, toolsBytes: Int?, toolsChars: Int?, toolsSHA: String?, windowEstimated: Bool?, windowPlanned: Bool?) {
+    public init(clearedIDS: [String]?, contextWindow: Int?, estimatedTokens: Int?, index: Int, messageBytes: [Int]?, messageChars: [Int]?, messageID: String, messageIDS: [String]?, model: String?, numCtx: Int?, parentCallID: String?, profile: String, provider: String?, summaryChars: Int?, systemBytes: Int?, systemChars: Int?, systemPromptSHA: String?, systemSections: [PurplePromptSectionInfo]?, tier: Tier?, toolsBytes: Int?, toolsChars: Int?, toolsSHA: String?, windowEstimated: Bool?, windowPlanned: Bool?) {
         self.clearedIDS = clearedIDS
         self.contextWindow = contextWindow
         self.estimatedTokens = estimatedTokens
@@ -6254,6 +6274,7 @@ public struct ModelCallStartedData: Codable {
         self.messageIDS = messageIDS
         self.model = model
         self.numCtx = numCtx
+        self.parentCallID = parentCallID
         self.profile = profile
         self.provider = provider
         self.summaryChars = summaryChars
@@ -6347,6 +6368,10 @@ public struct ModelCallStartedEvent: Codable {
 /// ``message_ids`` order (its text and its tool calls as JSON). ``message_chars``
 /// and ``message_bytes`` have one number per message sent. Each is None on an
 /// event recorded before they existed.
+///
+/// ``parent_call_id`` is set on an event of a child run: the id of the ``delegate`` call
+/// that started it. The event is in the parent's run, and a client that does not know
+/// child runs ignores it. None for the run's own events.
 // MARK: - ModelCallStartedEventData
 public struct ModelCallStartedEventData: Codable {
     public let clearedIDS: [String]?
@@ -6359,6 +6384,7 @@ public struct ModelCallStartedEventData: Codable {
     public let messageIDS: [String]?
     public let model: String?
     public let numCtx: Int?
+    public let parentCallID: String?
     public let profile: String
     public let provider: String?
     public let summaryChars: Int?
@@ -6384,6 +6410,7 @@ public struct ModelCallStartedEventData: Codable {
         case messageIDS = "message_ids"
         case model = "model"
         case numCtx = "num_ctx"
+        case parentCallID = "parent_call_id"
         case profile = "profile"
         case provider = "provider"
         case summaryChars = "summary_chars"
@@ -6399,7 +6426,7 @@ public struct ModelCallStartedEventData: Codable {
         case windowPlanned = "window_planned"
     }
 
-    public init(clearedIDS: [String]?, contextWindow: Int?, estimatedTokens: Int?, index: Int, messageBytes: [Int]?, messageChars: [Int]?, messageID: String, messageIDS: [String]?, model: String?, numCtx: Int?, profile: String, provider: String?, summaryChars: Int?, systemBytes: Int?, systemChars: Int?, systemPromptSHA: String?, systemSections: [FluffyPromptSectionInfo]?, tier: Tier?, toolsBytes: Int?, toolsChars: Int?, toolsSHA: String?, windowEstimated: Bool?, windowPlanned: Bool?) {
+    public init(clearedIDS: [String]?, contextWindow: Int?, estimatedTokens: Int?, index: Int, messageBytes: [Int]?, messageChars: [Int]?, messageID: String, messageIDS: [String]?, model: String?, numCtx: Int?, parentCallID: String?, profile: String, provider: String?, summaryChars: Int?, systemBytes: Int?, systemChars: Int?, systemPromptSHA: String?, systemSections: [FluffyPromptSectionInfo]?, tier: Tier?, toolsBytes: Int?, toolsChars: Int?, toolsSHA: String?, windowEstimated: Bool?, windowPlanned: Bool?) {
         self.clearedIDS = clearedIDS
         self.contextWindow = contextWindow
         self.estimatedTokens = estimatedTokens
@@ -6410,6 +6437,7 @@ public struct ModelCallStartedEventData: Codable {
         self.messageIDS = messageIDS
         self.model = model
         self.numCtx = numCtx
+        self.parentCallID = parentCallID
         self.profile = profile
         self.provider = provider
         self.summaryChars = summaryChars
@@ -9894,6 +9922,10 @@ public struct Params: Codable {
 /// and ``message_bytes`` have one number per message sent. Each is None on an
 /// event recorded before they existed.
 ///
+/// ``parent_call_id`` is set on an event of a child run: the id of the ``delegate`` call
+/// that started it. The event is in the parent's run, and a client that does not know
+/// child runs ignores it. None for the run's own events.
+///
 /// A model call ended.
 ///
 /// ``first_token_ms`` is the time from the request to the first text, and
@@ -9914,6 +9946,10 @@ public struct Params: Codable {
 /// ``load_ms``, ``prompt_ms`` and ``reply_ms`` are the time the model server spent loading
 /// the model, reading the prompt and writing the reply. From the model server's own clock.
 /// Ollama only.
+///
+/// ``parent_call_id`` is set on an event of a child run: the id of the ``delegate`` call
+/// that started it. The event is in the parent's run, and a client that does not know
+/// child runs ignores it. None for the run's own events.
 ///
 /// What golem sends of the history changed before a model call.
 ///
@@ -9942,6 +9978,10 @@ public struct Params: Codable {
 /// ``message_id`` is the assistant message that asked. ``args`` are the
 /// arguments as the model wrote them.
 ///
+/// ``parent_call_id`` is set on an event of a child run: the id of the ``delegate`` call
+/// that started it. The event is in the parent's run, and a client that does not know
+/// child runs ignores it. None for the run's own events.
+///
 /// How far the model got writing a ``write_file`` or ``edit_file`` call.
 ///
 /// Stored only until its message completes. ``index`` is the call's place in the reply.
@@ -9954,6 +9994,10 @@ public struct Params: Codable {
 /// until its message completes.
 ///
 /// A requested tool call is running.
+///
+/// ``parent_call_id`` is set on an event of a child run: the id of the ``delegate`` call
+/// that started it. The event is in the parent's run, and a client that does not know
+/// child runs ignores it. None for the run's own events.
 ///
 /// Text a running tool call printed. Stored only until the call ends.
 ///
@@ -9973,10 +10017,18 @@ public struct Params: Codable {
 ///
 /// ``diff`` is the change a file tool made, as a unified diff.
 ///
+/// ``parent_call_id`` is set on an event of a child run: the id of the ``delegate`` call
+/// that started it. The event is in the parent's run, and a client that does not know
+/// child runs ignores it. None for the run's own events.
+///
 /// A tool call did not run, or stopped with an error. The model sees the same message.
 ///
 /// ``duration_ms`` is how long the tool ran before it raised. None means a
 /// call that was denied or cut off, which never ran or was not timed.
+///
+/// ``parent_call_id`` is set on an event of a child run: the id of the ``delegate`` call
+/// that started it. The event is in the parent's run, and a client that does not know
+/// child runs ignores it. None for the run's own events.
 ///
 /// A tool call waits for the user. The run is paused until ``approval.respond``.
 ///
@@ -10077,6 +10129,7 @@ public struct ParamsData: Codable {
     public let messageChars: [Int]?
     public let messageIDS: [String]?
     public let numCtx: Int?
+    public let parentCallID: String?
     public let profile: String?
     public let summaryChars: Int?
     public let systemBytes: Int?
@@ -10180,6 +10233,7 @@ public struct ParamsData: Codable {
         case messageChars = "message_chars"
         case messageIDS = "message_ids"
         case numCtx = "num_ctx"
+        case parentCallID = "parent_call_id"
         case profile = "profile"
         case summaryChars = "summary_chars"
         case systemBytes = "system_bytes"
@@ -10246,7 +10300,7 @@ public struct ParamsData: Codable {
         case output = "output"
     }
 
-    public init(cwd: String?, forkedFrom: PurpleForkedFrom?, modelName: String?, modelProfile: String?, modelProvider: String?, origin: String?, route: Route?, allowedTools: [PurpleSessionAllowance]?, mcpServers: [String]?, title: String?, runID: String?, status: PurpleStatus?, summary: String?, reason: PurpleReason?, detail: String?, model: String?, provider: String?, rejected: [FluffyModelRejection]?, tier: Tier?, options: [String: Option]?, mode: Mode?, on: Bool?, messageID: String?, role: MessageCompletedDataRole?, text: String?, interrupted: Bool?, skill: FluffySkillCall?, thinking: String?, thinkingMS: Int?, clearedIDS: [String]?, contextWindow: Int?, estimatedTokens: Int?, index: Int?, messageBytes: [Int]?, messageChars: [Int]?, messageIDS: [String]?, numCtx: Int?, profile: String?, summaryChars: Int?, systemBytes: Int?, systemChars: Int?, systemPromptSHA: String?, systemSections: [TentacledPromptSectionInfo]?, toolsBytes: Int?, toolsChars: Int?, toolsSHA: String?, windowEstimated: Bool?, windowPlanned: Bool?, costUsd: Double?, failed: Bool?, firstTokenMS: Int?, latencyMS: Int?, loadMS: Int?, price: FluffyCallPrice?, promptMS: Int?, replyMS: Int?, stopReason: String?, textToolCalls: TextToolCalls?, usage: FluffyTokenUsage?, action: ContextChangedDataAction?, afterTokens: Int?, beforeTokens: Int?, count: Int?, reloadMS: Int?, room: Int?, windowFrom: Int?, windowTo: Int?, code: Code?, hint: String?, message: String?, args: [String: JSONAny]?, callID: String?, name: String?, chars: Int?, lines: Int?, path: String?, waiting: Bool?, artifactID: String?, diff: String?, durationMS: Int?, preview: String?, truncated: Bool?, source: String?, subject: String?, decision: Decision?, rule: String?, todos: [PurpleTodo]?, planID: String?, steps: [FluffyPlanStep]?, added: Int?, changeID: String?, removed: Int?, reverts: String?, hash: String?, how: How?, checks: [FluffyCheckInfo]?, checkID: String?, command: String?, round: Int?, exitCode: Int?, output: String?) {
+    public init(cwd: String?, forkedFrom: PurpleForkedFrom?, modelName: String?, modelProfile: String?, modelProvider: String?, origin: String?, route: Route?, allowedTools: [PurpleSessionAllowance]?, mcpServers: [String]?, title: String?, runID: String?, status: PurpleStatus?, summary: String?, reason: PurpleReason?, detail: String?, model: String?, provider: String?, rejected: [FluffyModelRejection]?, tier: Tier?, options: [String: Option]?, mode: Mode?, on: Bool?, messageID: String?, role: MessageCompletedDataRole?, text: String?, interrupted: Bool?, skill: FluffySkillCall?, thinking: String?, thinkingMS: Int?, clearedIDS: [String]?, contextWindow: Int?, estimatedTokens: Int?, index: Int?, messageBytes: [Int]?, messageChars: [Int]?, messageIDS: [String]?, numCtx: Int?, parentCallID: String?, profile: String?, summaryChars: Int?, systemBytes: Int?, systemChars: Int?, systemPromptSHA: String?, systemSections: [TentacledPromptSectionInfo]?, toolsBytes: Int?, toolsChars: Int?, toolsSHA: String?, windowEstimated: Bool?, windowPlanned: Bool?, costUsd: Double?, failed: Bool?, firstTokenMS: Int?, latencyMS: Int?, loadMS: Int?, price: FluffyCallPrice?, promptMS: Int?, replyMS: Int?, stopReason: String?, textToolCalls: TextToolCalls?, usage: FluffyTokenUsage?, action: ContextChangedDataAction?, afterTokens: Int?, beforeTokens: Int?, count: Int?, reloadMS: Int?, room: Int?, windowFrom: Int?, windowTo: Int?, code: Code?, hint: String?, message: String?, args: [String: JSONAny]?, callID: String?, name: String?, chars: Int?, lines: Int?, path: String?, waiting: Bool?, artifactID: String?, diff: String?, durationMS: Int?, preview: String?, truncated: Bool?, source: String?, subject: String?, decision: Decision?, rule: String?, todos: [PurpleTodo]?, planID: String?, steps: [FluffyPlanStep]?, added: Int?, changeID: String?, removed: Int?, reverts: String?, hash: String?, how: How?, checks: [FluffyCheckInfo]?, checkID: String?, command: String?, round: Int?, exitCode: Int?, output: String?) {
         self.cwd = cwd
         self.forkedFrom = forkedFrom
         self.modelName = modelName
@@ -10284,6 +10338,7 @@ public struct ParamsData: Codable {
         self.messageChars = messageChars
         self.messageIDS = messageIDS
         self.numCtx = numCtx
+        self.parentCallID = parentCallID
         self.profile = profile
         self.summaryChars = summaryChars
         self.systemBytes = systemBytes
@@ -13810,6 +13865,10 @@ public struct TokenUsage: Codable {
 /// result, without the wait for an approval. None means it was not measured.
 ///
 /// ``diff`` is the change a file tool made, as a unified diff.
+///
+/// ``parent_call_id`` is set on an event of a child run: the id of the ``delegate`` call
+/// that started it. The event is in the parent's run, and a client that does not know
+/// child runs ignores it. None for the run's own events.
 // MARK: - ToolCompletedData
 public struct ToolCompletedData: Codable {
     public let artifactID: String?
@@ -13817,6 +13876,7 @@ public struct ToolCompletedData: Codable {
     public let diff: String?
     public let durationMS: Int?
     public let failed: Bool?
+    public let parentCallID: String?
     public let preview: String
     public let summary: String
     public let truncated: Bool?
@@ -13827,17 +13887,19 @@ public struct ToolCompletedData: Codable {
         case diff = "diff"
         case durationMS = "duration_ms"
         case failed = "failed"
+        case parentCallID = "parent_call_id"
         case preview = "preview"
         case summary = "summary"
         case truncated = "truncated"
     }
 
-    public init(artifactID: String?, callID: String, diff: String?, durationMS: Int?, failed: Bool?, preview: String, summary: String, truncated: Bool?) {
+    public init(artifactID: String?, callID: String, diff: String?, durationMS: Int?, failed: Bool?, parentCallID: String?, preview: String, summary: String, truncated: Bool?) {
         self.artifactID = artifactID
         self.callID = callID
         self.diff = diff
         self.durationMS = durationMS
         self.failed = failed
+        self.parentCallID = parentCallID
         self.preview = preview
         self.summary = summary
         self.truncated = truncated
@@ -13888,6 +13950,10 @@ public struct ToolCompletedEvent: Codable {
 /// result, without the wait for an approval. None means it was not measured.
 ///
 /// ``diff`` is the change a file tool made, as a unified diff.
+///
+/// ``parent_call_id`` is set on an event of a child run: the id of the ``delegate`` call
+/// that started it. The event is in the parent's run, and a client that does not know
+/// child runs ignores it. None for the run's own events.
 // MARK: - ToolCompletedEventData
 public struct ToolCompletedEventData: Codable {
     public let artifactID: String?
@@ -13895,6 +13961,7 @@ public struct ToolCompletedEventData: Codable {
     public let diff: String?
     public let durationMS: Int?
     public let failed: Bool?
+    public let parentCallID: String?
     public let preview: String
     public let summary: String
     public let truncated: Bool?
@@ -13905,17 +13972,19 @@ public struct ToolCompletedEventData: Codable {
         case diff = "diff"
         case durationMS = "duration_ms"
         case failed = "failed"
+        case parentCallID = "parent_call_id"
         case preview = "preview"
         case summary = "summary"
         case truncated = "truncated"
     }
 
-    public init(artifactID: String?, callID: String, diff: String?, durationMS: Int?, failed: Bool?, preview: String, summary: String, truncated: Bool?) {
+    public init(artifactID: String?, callID: String, diff: String?, durationMS: Int?, failed: Bool?, parentCallID: String?, preview: String, summary: String, truncated: Bool?) {
         self.artifactID = artifactID
         self.callID = callID
         self.diff = diff
         self.durationMS = durationMS
         self.failed = failed
+        self.parentCallID = parentCallID
         self.preview = preview
         self.summary = summary
         self.truncated = truncated
@@ -13930,22 +13999,29 @@ public enum ToolCompletedEventType: String, Codable {
 ///
 /// ``duration_ms`` is how long the tool ran before it raised. None means a
 /// call that was denied or cut off, which never ran or was not timed.
+///
+/// ``parent_call_id`` is set on an event of a child run: the id of the ``delegate`` call
+/// that started it. The event is in the parent's run, and a client that does not know
+/// child runs ignores it. None for the run's own events.
 // MARK: - ToolFailedData
 public struct ToolFailedData: Codable {
     public let callID: String
     public let durationMS: Int?
     public let message: String
+    public let parentCallID: String?
 
     public enum CodingKeys: String, CodingKey {
         case callID = "call_id"
         case durationMS = "duration_ms"
         case message = "message"
+        case parentCallID = "parent_call_id"
     }
 
-    public init(callID: String, durationMS: Int?, message: String) {
+    public init(callID: String, durationMS: Int?, message: String, parentCallID: String?) {
         self.callID = callID
         self.durationMS = durationMS
         self.message = message
+        self.parentCallID = parentCallID
     }
 }
 
@@ -13982,22 +14058,29 @@ public struct ToolFailedEvent: Codable {
 ///
 /// ``duration_ms`` is how long the tool ran before it raised. None means a
 /// call that was denied or cut off, which never ran or was not timed.
+///
+/// ``parent_call_id`` is set on an event of a child run: the id of the ``delegate`` call
+/// that started it. The event is in the parent's run, and a client that does not know
+/// child runs ignores it. None for the run's own events.
 // MARK: - ToolFailedEventData
 public struct ToolFailedEventData: Codable {
     public let callID: String
     public let durationMS: Int?
     public let message: String
+    public let parentCallID: String?
 
     public enum CodingKeys: String, CodingKey {
         case callID = "call_id"
         case durationMS = "duration_ms"
         case message = "message"
+        case parentCallID = "parent_call_id"
     }
 
-    public init(callID: String, durationMS: Int?, message: String) {
+    public init(callID: String, durationMS: Int?, message: String, parentCallID: String?) {
         self.callID = callID
         self.durationMS = durationMS
         self.message = message
+        self.parentCallID = parentCallID
     }
 }
 
@@ -14076,25 +14159,32 @@ public enum ToolOutputEventType: String, Codable {
 ///
 /// ``message_id`` is the assistant message that asked. ``args`` are the
 /// arguments as the model wrote them.
+///
+/// ``parent_call_id`` is set on an event of a child run: the id of the ``delegate`` call
+/// that started it. The event is in the parent's run, and a client that does not know
+/// child runs ignores it. None for the run's own events.
 // MARK: - ToolRequestedData
 public struct ToolRequestedData: Codable {
     public let args: [String: JSONAny]
     public let callID: String
     public let messageID: String
     public let name: String
+    public let parentCallID: String?
 
     public enum CodingKeys: String, CodingKey {
         case args = "args"
         case callID = "call_id"
         case messageID = "message_id"
         case name = "name"
+        case parentCallID = "parent_call_id"
     }
 
-    public init(args: [String: JSONAny], callID: String, messageID: String, name: String) {
+    public init(args: [String: JSONAny], callID: String, messageID: String, name: String, parentCallID: String?) {
         self.args = args
         self.callID = callID
         self.messageID = messageID
         self.name = name
+        self.parentCallID = parentCallID
     }
 }
 
@@ -14131,25 +14221,32 @@ public struct ToolRequestedEvent: Codable {
 ///
 /// ``message_id`` is the assistant message that asked. ``args`` are the
 /// arguments as the model wrote them.
+///
+/// ``parent_call_id`` is set on an event of a child run: the id of the ``delegate`` call
+/// that started it. The event is in the parent's run, and a client that does not know
+/// child runs ignores it. None for the run's own events.
 // MARK: - ToolRequestedEventData
 public struct ToolRequestedEventData: Codable {
     public let args: [String: JSONAny]
     public let callID: String
     public let messageID: String
     public let name: String
+    public let parentCallID: String?
 
     public enum CodingKeys: String, CodingKey {
         case args = "args"
         case callID = "call_id"
         case messageID = "message_id"
         case name = "name"
+        case parentCallID = "parent_call_id"
     }
 
-    public init(args: [String: JSONAny], callID: String, messageID: String, name: String) {
+    public init(args: [String: JSONAny], callID: String, messageID: String, name: String, parentCallID: String?) {
         self.args = args
         self.callID = callID
         self.messageID = messageID
         self.name = name
+        self.parentCallID = parentCallID
     }
 }
 
@@ -14158,16 +14255,23 @@ public enum ToolRequestedEventType: String, Codable {
 }
 
 /// A requested tool call is running.
+///
+/// ``parent_call_id`` is set on an event of a child run: the id of the ``delegate`` call
+/// that started it. The event is in the parent's run, and a client that does not know
+/// child runs ignores it. None for the run's own events.
 // MARK: - ToolStartedData
 public struct ToolStartedData: Codable {
     public let callID: String
+    public let parentCallID: String?
 
     public enum CodingKeys: String, CodingKey {
         case callID = "call_id"
+        case parentCallID = "parent_call_id"
     }
 
-    public init(callID: String) {
+    public init(callID: String, parentCallID: String?) {
         self.callID = callID
+        self.parentCallID = parentCallID
     }
 }
 
@@ -14201,16 +14305,23 @@ public struct ToolStartedEvent: Codable {
 }
 
 /// A requested tool call is running.
+///
+/// ``parent_call_id`` is set on an event of a child run: the id of the ``delegate`` call
+/// that started it. The event is in the parent's run, and a client that does not know
+/// child runs ignores it. None for the run's own events.
 // MARK: - ToolStartedEventData
 public struct ToolStartedEventData: Codable {
     public let callID: String
+    public let parentCallID: String?
 
     public enum CodingKeys: String, CodingKey {
         case callID = "call_id"
+        case parentCallID = "parent_call_id"
     }
 
-    public init(callID: String) {
+    public init(callID: String, parentCallID: String?) {
         self.callID = callID
+        self.parentCallID = parentCallID
     }
 }
 

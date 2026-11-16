@@ -52,6 +52,8 @@ def open_turn(events: list[ChatEvent]) -> OpenTurn:
     parts: dict[str, list[str]] = {}
     calls: list[str] = []
     for event in events:
+        if getattr(event.data, "parent_call_id", None) is not None:
+            continue  # a child run's call, which ends with the delegate call that holds it
         if isinstance(event, MessageCompletedEvent):
             if event.data.role == "user":
                 user = event.data.message_id

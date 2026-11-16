@@ -2,6 +2,8 @@
 
 import type { ChatEvent } from "@golem/client";
 
+import type { ChatMessage } from "./chat-state.ts";
+
 export type FileStatus = "created" | "modified" | "deleted";
 
 export type TurnFile = {
@@ -143,4 +145,58 @@ export function changedPaths(state: ChangesState): string[] {
     }
   }
   return [...seen];
+}
+
+/** Longest title of a turn card, in characters, the cut mark included. */
+export const TURN_TITLE_MAX = 80;
+
+/** One card of the by-turn view. */
+export type TurnCard = {
+  runId: string;
+  /** Counts the turns that changed files, the first being 1. */
+  number: number;
+  /** The request that started the run, on one line and cut at {@link TURN_TITLE_MAX}. */
+  title: string;
+  /** When the request was sent, or null when the transcript does not hold it. */
+  at: string | null;
+  files: TurnFile[];
+  /** `2 files +9 −3`. */
+  line: string;
+  reverted: boolean;
+};
+
+/** One line, cut at `max` characters with an ellipsis. */
+export function cutTitle(text: string, max: number = TURN_TITLE_MAX): string {
+  const line = text.replace(/\s+/g, " ").trim();
+  return line.length <= max ? line : `${line.slice(0, max - 1).trimEnd()}…`;
+}
+
+/**
+ * The turns that changed files, newest first. A title is the user message of the run. A change with
+ * no run (an undo) has no card: it only marked another turn reverted.
+ */
+export function turnCards(state: ChangesState, messages: readonly ChatMessage[]): TurnCard[] {
+  const requests = new Map<string, ChatMessage>();
+  for (const message of messages) {
+    if (message.role === "user" && message.runId !== undefined && !requests.has(message.runId)) {
+      requests.set(message.runId, message);
+    }
+  }
+  const cards: TurnCard[] = [];
+  for (const turn of state.turns) {
+    if (turn.runId === null || turn.files.length === 0) {
+      continue;
+    }
+    const request = requests.get(turn.runId);
+    cards.push({
+      runId: turn.runId,
+      number: cards.length + 1,
+      title: request === undefined ? "" : cutTitle(request.text),
+      at: request?.at ?? null,
+      files: turn.files,
+      line: changesLine(turn.files),
+      reverted: turn.reverted,
+    });
+  }
+  return cards.reverse();
 }
