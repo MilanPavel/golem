@@ -1,6 +1,6 @@
-import { BUILD_TEXT, helperLine, isDelegate, openPlan, displayToolName, formatTurnTime, groupTurns, turnFooterParts, stepCount, stepMark, summarizeSteps, turnFooter, LIVE_OUTPUT_CHARS, thinkingLine, unreadCallNotice, writingLabel, REPLY_CUT_NOTE, type ChatMessage, type ChatState, type Detail, type StepMark, type ToolBlock, type WritingBlock, noticesAfter, type ChatNotice, checksOf, checksSummary, turnRoutedNote, sessionModelOf, type SessionModelRef, rewoundLine, UNDO_WAIT } from "@golem/view";
+import { BUILD_TEXT, canTryStronger, lastQuestion, NO_STRONGER_NOTICE, STRONGER_ACTION, strongerLabel, helperLine, isDelegate, openPlan, displayToolName, formatTurnTime, groupTurns, turnFooterParts, stepCount, stepMark, summarizeSteps, turnFooter, LIVE_OUTPUT_CHARS, thinkingLine, unreadCallNotice, writingLabel, REPLY_CUT_NOTE, type ChatMessage, type ChatState, type Detail, type StepMark, type ToolBlock, type WritingBlock, noticesAfter, type ChatNotice, checksOf, checksSummary, turnRoutedNote, sessionModelOf, type SessionModelRef, rewoundLine, UNDO_WAIT } from "@golem/view";
 import { Fragment, memo, useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
-import { usePageActions, usePulls, useSession, useModelList, useTurnCards } from "../../store/page-context.tsx";
+import { useConfig, usePageActions, usePulls, useSession, useModelList, useTurnCards } from "../../store/page-context.tsx";
 import type { PullsSnapshot } from "../../store/pulls.ts";
 import type { SessionModel } from "../../store/session-store.ts";
 import { pullShare, shortName } from "../models/index.ts";
@@ -395,6 +395,9 @@ export type TurnUndo = {
   onRedo: (runId: string) => void;
 };
 
+/** The action at the end of the last answer's footer: send the question again one tier up. */
+export type StrongerAction = { title: string; onClick: () => void };
+
 /** One run: one golem, each model step in order, one activity line for all their tools, and one footer once the run is done. */
 export function GolemTurn({
   steps,
@@ -406,7 +409,8 @@ export function GolemTurn({
   notices = [],
   routedNote = "",
   undo,
-}: { steps: readonly ChatMessage[]; pendingId?: string | null; thinkingShown?: boolean; detail?: Detail; plan?: PlanActions; checks?: ReturnType<typeof checksSummary> | null; notices?: readonly ChatNotice[]; routedNote?: string; undo?: TurnUndo }) {
+  stronger,
+}: { steps: readonly ChatMessage[]; pendingId?: string | null; thinkingShown?: boolean; detail?: Detail; plan?: PlanActions; checks?: ReturnType<typeof checksSummary> | null; notices?: readonly ChatNotice[]; routedNote?: string; undo?: TurnUndo; stronger?: StrongerAction }) {
   const chosenDetail = useDetail();
   const detail = detailOverride ?? chosenDetail;
   const footer = turnFooter(steps);
@@ -463,7 +467,19 @@ export function GolemTurn({
       ) : null}
       {steps.map((step) => (step.writing == null ? null : <WritingRow key={step.id} writing={step.writing} />))}
       {checks === null ? null : <ChecksStrip {...checks} />}
-      {foot.length > 0 ?<p className="font-mono text-xs text-faint">{foot.join(" · ")}</p> : null}
+      {foot.length > 0 || stronger !== undefined ? (
+        <p className="font-mono text-xs text-faint">
+          {foot.join(" · ")}
+          {stronger === undefined ? null : (
+            <>
+              {foot.length > 0 ? " · " : ""}
+              <button type="button" title={stronger.title} onClick={stronger.onClick} className="text-clay-ink hover:underline">
+                {STRONGER_ACTION}
+              </button>
+            </>
+          )}
+        </p>
+      ) : null}
     </article>
   );
 }
@@ -480,7 +496,7 @@ function turnChecks(chat: TranscriptChat, steps: readonly ChatMessage[]): Return
 }
 
 /** The messages and the closing error or notice. Pure: the page's stores are not read here. */
-export function TranscriptMessages({ chat, thinkingShown, detail, waiting = null, plan, session = null, undo }: { session?: SessionModelRef | null; chat: TranscriptChat; thinkingShown?: boolean; detail?: Detail; waiting?: string | null; plan?: Omit<PlanActions, "open">; undo?: TurnUndo }) {
+export function TranscriptMessages({ chat, thinkingShown, detail, waiting = null, plan, session = null, undo, stronger }: { session?: SessionModelRef | null; chat: TranscriptChat; thinkingShown?: boolean; detail?: Detail; waiting?: string | null; plan?: Omit<PlanActions, "open">; undo?: TurnUndo; stronger?: StrongerAction }) {
   const pendingId = chat.approval?.callId ?? null;
   const planActions: PlanActions | undefined =
     plan === undefined || chat.plan === undefined ? undefined : { ...plan, open: openPlan(chat.plan)?.callId ?? null };
@@ -496,7 +512,7 @@ export function TranscriptMessages({ chat, thinkingShown, detail, waiting = null
       {noticesAfter(notices, null, quiet).map((item) => (
         <NoticeLine key={item.id} notice={item} />
       ))}
-      {groupTurns(chat.messages).map((turn) =>
+      {groupTurns(chat.messages).map((turn, index, turns) =>
         turn.kind === "user" ? (
           <Fragment key={turn.id}>
             <UserMessage message={turn.message} />
@@ -516,6 +532,7 @@ export function TranscriptMessages({ chat, thinkingShown, detail, waiting = null
             notices={notices}
             routedNote={turnRoutedNote(turn.steps, chat.route, session)}
             {...(undo === undefined ? {} : { undo })}
+            {...(stronger === undefined || index !== turns.length - 1 ? {} : { stronger })}
           />
         ),
       )}
@@ -530,7 +547,7 @@ export function TranscriptMessages({ chat, thinkingShown, detail, waiting = null
  * The scrolling column. While you are at the bottom it follows the text; once you scroll up it
  * stays where you are and offers a way back down.
  */
-export function TranscriptColumn({ chat, className, waiting = null, plan, session = null, undo }: { session?: SessionModelRef | null; chat: TranscriptChat; className?: string; waiting?: string | null; plan?: Omit<PlanActions, "open">; undo?: TurnUndo }) {
+export function TranscriptColumn({ chat, className, waiting = null, plan, session = null, undo, stronger }: { session?: SessionModelRef | null; chat: TranscriptChat; className?: string; waiting?: string | null; plan?: Omit<PlanActions, "open">; undo?: TurnUndo; stronger?: StrongerAction }) {
   const scroller = useRef<HTMLDivElement>(null);
   const content = useRef<HTMLDivElement>(null);
   const stuck = useRef(true);
@@ -570,7 +587,7 @@ export function TranscriptColumn({ chat, className, waiting = null, plan, sessio
     <div className={cn("relative flex min-h-0 flex-1 flex-col", className)}>
       <div ref={scroller} onScroll={onScroll} className="relative min-h-0 flex-1 overflow-y-auto" data-transcript-scroller>
         <div ref={content} className="mx-auto flex max-w-column flex-col gap-8 px-5 py-7">
-          <TranscriptMessages chat={chat} waiting={waiting} plan={plan} session={session} {...(undo === undefined ? {} : { undo })} />
+          <TranscriptMessages chat={chat} waiting={waiting} plan={plan} session={session} {...(undo === undefined ? {} : { undo })} {...(stronger === undefined ? {} : { stronger })} />
         </div>
       </div>
       {atBottom ? null : (
@@ -633,9 +650,28 @@ export function Transcript({ id }: { id: string }) {
       if (card !== undefined) undo.ask(redoTargets(card));
     },
   };
+  const cwd = useSession(id, (view) => view.cwd);
+  const routed = chat.route.last !== null;
+  const config = useConfig(cwd, id, routed);
+  const [failure, setFailure] = useState<string | null>(null);
+  const question = lastQuestion(chat.messages);
+  const title = strongerLabel(models.data?.models ?? [], config.data?.routing, chat.route.last);
+  const offered = canTryStronger({ mode: chat.route.mode, idle: !chat.busy, models: models.data?.models ?? [], routing: config.data?.routing, last: chat.route.last });
+  const stronger: StrongerAction | undefined =
+    offered && question !== null && title !== null
+      ? {
+          title,
+          onClick: () => {
+            setFailure(null);
+            actions.sendStronger(id, question).catch((error: unknown) => {
+              setFailure(error instanceof Error && error.message !== "" ? error.message : NO_STRONGER_NOTICE);
+            });
+          },
+        }
+      : undefined;
   return (
     <>
-      <TranscriptColumn chat={chat} waiting={waitingLine(chat.busy, model, pulls)} plan={plan} session={session} undo={turnUndo} />
+      <TranscriptColumn chat={failure === null ? chat : { ...chat, error: failure }} waiting={waitingLine(chat.busy, model, pulls)} plan={plan} session={session} undo={turnUndo} {...(stronger === undefined ? {} : { stronger })} />
       {undo.dialogs}
     </>
   );

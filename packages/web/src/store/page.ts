@@ -126,6 +126,8 @@ export type PageActions = {
   createSession(cwd: string | null, model: string | null): Promise<string>;
   /** Sends a message. With `skill`, the daemon fills the skill's body in from `args`. */
   send(sessionId: string, text: string, skill?: { name: string; args: string }): Promise<void>;
+  /** Sends `text` again as a new turn on the tier above the last answer. Rejects with the daemon's reason. */
+  sendStronger(sessionId: string, text: string): Promise<void>;
   /** Pins a skill for the session, or unpins it. The pinned list arrives as `chat.activeSkills`. */
   pinSkill(sessionId: string, name: string, pin: boolean): Promise<void>;
   /** The `SKILL.md` of the skill `name` that a session in `cwd` sees, with its `mtime_ns`. */
@@ -438,6 +440,9 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
       async send(sessionId, text, skill) {
         if (skill === undefined) await client.sendMessage(sessionId, text);
         else await client.sendMessage(sessionId, text, { skill });
+      },
+      async sendStronger(sessionId, text) {
+        await client.sendMessage(sessionId, text, { stronger: true });
       },
       async pinSkill(sessionId, name, pin) {
         await client.setSkills(sessionId, pin ? { pin: [name] } : { unpin: [name] });

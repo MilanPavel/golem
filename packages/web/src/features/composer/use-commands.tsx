@@ -11,8 +11,10 @@ import {
   exportFileName,
   forkPoint,
   invocableSkills,
+  lastQuestion,
   modeChanged,
   modeReport,
+  NO_STRONGER_NOTICE,
   modelNames,
   NOTES_CLEARED,
   notesNotice,
@@ -291,6 +293,17 @@ export function useCommands({ session, cwd, typing, send }: UseCommandsOptions):
               return say(`Route: ${found.mode}. It applies from the next turn.`);
             } catch (err) {
               return fail(err, "Could not change the route.");
+            }
+          }
+          case "stronger": {
+            const question = lastQuestion(view.chat.messages);
+            if (view.chat.route.mode !== "auto") return say("Try again on a stronger model needs route auto: /route auto.");
+            if (view.chat.busy || question === null) return say("Wait for the answer, then try again.");
+            try {
+              await actions.sendStronger(sessionId, question);
+              return "handled";
+            } catch (err) {
+              return fail(err, NO_STRONGER_NOTICE);
             }
           }
           case "changes":

@@ -6,10 +6,12 @@ import type { ChatEvent, ConfigRouting, CostGetResult, ListedModel, ModelRoutedD
 import { emptyChat, reduceChat } from "./chat-state.ts";
 import { applyComposer, closedDebug } from "./commands.ts";
 import {
+  canTryStronger,
   emptyRoute,
   foldRoute,
   isRouteMode,
   ladderRows,
+  lastQuestion,
   routeForSpan,
   routeHeadline,
   routeLabel,
@@ -19,6 +21,7 @@ import {
   routedNote,
   sessionModelOf,
   spendRows,
+  strongerLabel,
   turnRoutedNote,
   waitHint,
   whyLines,
@@ -266,4 +269,38 @@ test("/route reads a mode, why, or nothing", () => {
   assert.deepEqual(applyComposer(closedDebug, "/route why"), { kind: "route", mode: "why" });
   assert.equal(applyComposer(closedDebug, "/route balanced").kind, "unknown");
   assert.equal(applyComposer(closedDebug, "/route auto now").kind, "unknown");
+});
+
+const FROM_LOCAL = routed({ model_profile: "local", provider: "ollama", model: "qwen3:27b", tier: "local", reason: "cheapest", detail: "" });
+
+test("strongerLabel names the ready model above the last answer's tier, or nothing", () => {
+  assert.equal(strongerLabel([QWEN, DEEPSEEK], null, FROM_LOCAL), "Try again on deepseek-chat");
+  assert.equal(strongerLabel([QWEN, DEEPSEEK, OPUS], { ladder: { frontier: "anthropic/opus" } } as ConfigRouting, routed()), "Try again on opus");
+  assert.equal(strongerLabel([QWEN, CHEAP_NOKEY], null, FROM_LOCAL), null);
+  assert.equal(strongerLabel([QWEN, DEEPSEEK], null, routed()), null);
+  assert.equal(strongerLabel([QWEN, DEEPSEEK], null, null), null);
+});
+
+test("canTryStronger needs route auto, an idle chat and a model above", () => {
+  const base = { mode: "auto" as const, idle: true, models: [QWEN, DEEPSEEK], routing: null, last: FROM_LOCAL };
+  assert.equal(canTryStronger(base), true);
+  assert.equal(canTryStronger({ ...base, mode: "pinned" }), false);
+  assert.equal(canTryStronger({ ...base, idle: false }), false);
+  assert.equal(canTryStronger({ ...base, models: [QWEN] }), false);
+});
+
+test("a stronger turn's footer says it was tried again", () => {
+  const again = routed({ reason: "user", detail: "you asked for a stronger model", replaces_model: "ollama/qwen3:27b" });
+  assert.equal(routedNote(again, SESSION), "tried again on deepseek-chat");
+});
+
+test("lastQuestion is the newest user text", () => {
+  const messages = [
+    { role: "user", text: "first" },
+    { role: "assistant", text: "a" },
+    { role: "user", text: "second" },
+    { role: "assistant", text: "b" },
+  ];
+  assert.equal(lastQuestion(messages), "second");
+  assert.equal(lastQuestion([{ role: "assistant", text: "a" }]), null);
 });

@@ -318,6 +318,9 @@ class ModelRoutedData(BaseModel):
     it resolves to, null when it does not resolve. ``reason`` is why this model
     (ADR-055), ``detail`` one short sentence, and ``rejected`` the candidates the
     pick dropped. The session's own model does not change.
+
+    ``replaces_model`` (``provider/model``) is set when the user asked to try the last
+    question again on a stronger model: it is the model that wrote the answer before.
     """
 
     model_config = _CONFIG
@@ -331,6 +334,7 @@ class ModelRoutedData(BaseModel):
     ]
     detail: str
     rejected: list[ModelRejection] = Field(default_factory=list[ModelRejection])
+    replaces_model: str | None = Field(default=None, min_length=1)
 
 
 ConsentAnswer = Literal["session", "once", "local"]
@@ -359,6 +363,8 @@ class RouteConsentNeededData(BaseModel):
     ``alternatives`` are the answers the user may give: a spent cap leaves out ``session``.
     ``signal`` is set when the question comes in the middle of a run, because the model
     struggled (a struggle signal of the daemon); ``why`` then says how. It is null before a turn.
+    ``replaces_model`` is set when the question is for a turn the user asked to run on a
+    stronger model; the turn's ``model.routed`` then carries it too.
     """
 
     model_config = _CONFIG
@@ -372,6 +378,7 @@ class RouteConsentNeededData(BaseModel):
     alternatives: list[ConsentAnswer]
     caps: ConsentCaps | None = None
     signal: str | None = Field(default=None, min_length=1)
+    replaces_model: str | None = Field(default=None, min_length=1)
 
 
 class RouteConsentAnsweredData(BaseModel):

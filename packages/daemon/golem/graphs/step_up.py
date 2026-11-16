@@ -39,6 +39,8 @@ class Consent:
     caps: ConsentCaps | None = None
     signal: str | None = None
     """The struggle that makes golem ask in the middle of a run, None before a turn."""
+    replaces: str | None = None
+    """The model whose answer the user asked to try again on a stronger one."""
 
 
 @dataclass(frozen=True, slots=True)

@@ -9,6 +9,7 @@ export type Ref = string;
 export type Tier = 'local' | 'budget' | 'frontier';
 export type Why = string;
 export type Rejected = ModelRejection[];
+export type ReplacesModel = string | null;
 export type Tier1 = 'local' | 'budget' | 'frontier';
 
 /**
@@ -19,6 +20,9 @@ export type Tier1 = 'local' | 'budget' | 'frontier';
  * it resolves to, null when it does not resolve. ``reason`` is why this model
  * (ADR-055), ``detail`` one short sentence, and ``rejected`` the candidates the
  * pick dropped. The session's own model does not change.
+ *
+ * ``replaces_model`` (``provider/model``) is set when the user asked to try the last
+ * question again on a stronger model: it is the model that wrote the answer before.
  */
 export interface ModelRoutedData {
   detail: Detail;
@@ -27,6 +31,7 @@ export interface ModelRoutedData {
   provider?: Provider;
   reason: Reason;
   rejected?: Rejected;
+  replaces_model?: ReplacesModel;
   tier: Tier1;
 }
 /**

@@ -471,7 +471,11 @@ async def _message_send(ctx: RequestContext, params: MessageSendParams) -> Messa
     _check_cwd(params.cwd)
     try:
         run_id = await sessions.send(
-            params.session_id, params.text, cwd=params.cwd, skill=params.skill
+            params.session_id,
+            params.text,
+            cwd=params.cwd,
+            skill=params.skill,
+            stronger=params.stronger,
         )
     except SessionNotFoundError as exc:
         raise RpcCallError(SESSION_NOT_FOUND, "session not found") from exc

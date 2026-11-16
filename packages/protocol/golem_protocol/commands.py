@@ -275,6 +275,10 @@ class MessageSendParams(BaseModel):
     user typed, such as ``/ship fix the mcp restart``. A skill the session
     does not see, or one that is disabled, broken, or not user-invocable, is
     error ``-32013``.
+
+    ``stronger`` runs this one turn on the tier above the model that wrote the last
+    answer (ADR-055). The session's model and route do not change. It needs route
+    ``auto``. When no stronger model may be used, the send fails and no turn starts.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -283,6 +287,7 @@ class MessageSendParams(BaseModel):
     text: str = Field(min_length=1, max_length=100_000)
     cwd: str | None = Field(default=None, min_length=1)
     skill: SkillCall | None = None
+    stronger: bool = False
 
 
 class MessageSendResult(BaseModel):

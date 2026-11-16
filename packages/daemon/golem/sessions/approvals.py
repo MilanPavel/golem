@@ -83,6 +83,8 @@ class PendingConsent:
     since: str
     signal: str | None = None
     """The struggle that made the run ask in its middle, None for the question before a turn."""
+    replaces: str | None = None
+    """The model the user asked to try again on a stronger one, None for any other turn."""
 
 
 def pending_consent(events: list[ChatEvent]) -> PendingConsent | None:
@@ -105,6 +107,7 @@ def pending_consent(events: list[ChatEvent]) -> PendingConsent | None:
         alternatives=tuple(asked.data.alternatives),
         since=asked.ts,
         signal=asked.data.signal,
+        replaces=asked.data.replaces_model,
     )
 
 

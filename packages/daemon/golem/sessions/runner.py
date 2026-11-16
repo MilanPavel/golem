@@ -156,6 +156,8 @@ class Turn:
     """The window growth this turn's first call loads and reports, None when none."""
     step_up: bool = False
     """The run may move to a stronger model once (route ``auto``)."""
+    replaces: str | None = None
+    """The model whose answer the user asked to try again on a stronger one."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -293,7 +295,8 @@ async def run_turn(
         else:
             await _begin(turn, emit, progress)
         if turn.routed is not None:
-            await emit("model.routed", _routed(runtime, turn.model_profile, turn.routed))
+            routed = _routed(runtime, turn.model_profile, turn.routed, turn.replaces)
+            await emit("model.routed", routed)
         progress.open = turn.assistant_message_id
         await emit(
             "message.started",
@@ -396,11 +399,14 @@ async def ask_consent(
             alternatives=list(consent.alternatives),
             caps=consent.caps,
             signal=consent.signal,
+            replaces_model=consent.replaces,
         ),
     )
 
 
-def _routed(runtime: ChatRuntime, profile: str, choice: Choice) -> ModelRoutedData:
+def _routed(
+    runtime: ChatRuntime, profile: str, choice: Choice, replaces: str | None = None
+) -> ModelRoutedData:
     identity = runtime.router.identity(profile)
     tier = None
     if choice.model is not None:
@@ -415,6 +421,7 @@ def _routed(runtime: ChatRuntime, profile: str, choice: Choice) -> ModelRoutedDa
         reason=choice.reason,
         detail=choice.detail,
         rejected=[ModelRejection(ref=r.ref, tier=r.tier, why=r.why) for r in choice.rejected],
+        replaces_model=replaces,
     )
 
 

@@ -9,6 +9,7 @@ export type EstimatedUsd = number | null;
 export type Model = string | null;
 export type ModelProfile = string;
 export type Provider = string | null;
+export type ReplacesModel = string | null;
 export type Signal = string | null;
 export type Tier = 'local' | 'budget' | 'frontier';
 export type Why = string;
@@ -39,6 +40,8 @@ export interface RouteConsentNeededEvent {
  * ``alternatives`` are the answers the user may give: a spent cap leaves out ``session``.
  * ``signal`` is set when the question comes in the middle of a run, because the model
  * struggled (a struggle signal of the daemon); ``why`` then says how. It is null before a turn.
+ * ``replaces_model`` is set when the question is for a turn the user asked to run on a
+ * stronger model; the turn's ``model.routed`` then carries it too.
  *
  * This interface was referenced by `RouteConsentNeededEvent`'s JSON-Schema
  * via the `definition` "RouteConsentNeededData".
@@ -50,6 +53,7 @@ export interface RouteConsentNeededData {
   model?: Model;
   model_profile: ModelProfile;
   provider?: Provider;
+  replaces_model?: ReplacesModel;
   signal?: Signal;
   tier: Tier;
   why: Why;

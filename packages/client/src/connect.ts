@@ -50,8 +50,8 @@ export type ApprovalChoice = "allow" | "allow_session" | "allow_always" | "deny"
 /** An answer to the paid step-up question: this session, this turn only, or stay local. */
 export type ConsentChoice = "session" | "once" | "local";
 
-/** `cwd` is the sender's folder. `skill` runs a skill once by name. */
-export type SendOptions = { cwd?: string; skill?: SkillCall };
+/** `cwd` is the sender's folder. `skill` runs a skill once by name. `stronger` runs the turn one tier up. */
+export type SendOptions = { cwd?: string; skill?: SkillCall; stronger?: boolean };
 import type { DaemonStatus } from "../../protocol/gen/daemon-status.ts";
 import type { McpListResult } from "../../protocol/gen/mcp-list-result.ts";
 import type { McpServer } from "../../protocol/gen/mcp-server.ts";
@@ -1277,6 +1277,9 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       }
       if (options?.skill !== undefined) {
         params["skill"] = options.skill;
+      }
+      if (options?.stronger === true) {
+        params["stronger"] = true;
       }
       const result = await call("message.send", params);
       if (!isMessageSendResult(result)) {
