@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import type { ChatEvent } from "@golem/client";
-import { changedPaths, changesLine, noChanges, reduceChanges, totals, turnOf, type ChangesState, type TurnFile } from "./changes.ts";
+import type { ChatMessage } from "./chat-state.ts";
+import { changedPaths, changesLine, cutTitle, noChanges, reduceChanges, totals, turnCards, turnOf, type ChangesState, type TurnFile } from "./changes.ts";
 
 type Over = {
   id: string;
@@ -113,4 +114,33 @@ test("totals and changesLine", () => {
   assert.equal(changesLine([file(2, 1)]), "1 file +2 −1");
   assert.equal(changesLine([file(40, 4), file(3, 0), file(0, 0)]), "3 files +43 −4");
   assert.equal(changesLine([file(0, 5), file(0, 0)]), "2 files −5");
+});
+
+function ask(runId: string, text: string, at = "2026-01-01T00:00:00Z"): ChatMessage {
+  return { id: `m-${runId}`, role: "user", text, streaming: false, at, runId };
+}
+
+test("turn cards come newest first, numbered from the oldest, with the request as title", () => {
+  const state = fold([change("r1", { id: "c1" }), change("r2", { id: "c2", path: "b.py", added: 2, removed: 1 }), change("r3", { id: "c3" })]);
+  const cards = turnCards(state, [ask("r1", "first"), ask("r2", "second"), ask("r3", "third")]);
+  assert.deepEqual(cards.map((card) => [card.number, card.title, card.runId]), [[3, "third", "r3"], [2, "second", "r2"], [1, "first", "r1"]]);
+  assert.equal(cards[1]?.line, "1 file +2 −1");
+  assert.equal(cards[1]?.at, "2026-01-01T00:00:00Z");
+});
+
+test("a turn with no request in the transcript has an empty title; an undo has no card", () => {
+  const state = fold([change("r1", { id: "c1" }), change("r1", { id: "u1", source: "revert", reverts: "c1" })]);
+  const cards = turnCards(state, []);
+  assert.equal(cards.length, 1);
+  assert.equal(cards[0]?.title, "");
+  assert.equal(cards[0]?.at, null);
+  assert.equal(cards[0]?.reverted, true);
+});
+
+test("a title is one line and cut at 80 characters", () => {
+  assert.equal(cutTitle("make   the\nwait configurable"), "make the wait configurable");
+  const cut = cutTitle("x".repeat(100));
+  assert.equal(cut.length, 80);
+  assert.ok(cut.endsWith("…"));
+  assert.equal(cutTitle("y".repeat(80)).length, 80);
 });

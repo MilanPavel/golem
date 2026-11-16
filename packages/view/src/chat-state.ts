@@ -75,6 +75,8 @@ export type ChatMessage = {
   interrupted?: boolean;
   /** Event time. Completed messages use `message.completed`; a streaming reply uses `message.started`. */
   at?: string;
+  /** The run the message belongs to, from `message.completed`. A user message holds the request that started it. */
+  runId?: string;
   /** Milliseconds from `run.started` to this finished answer. */
   durationMs?: number;
   /** What the model thought before it answered, from `message.thinking.delta` and `message.completed`. */
@@ -620,6 +622,7 @@ function upsertCompleted(
     streaming: false,
     interrupted: event.data.interrupted === true,
     at: event.ts,
+    runId: event.run_id,
     ...(durationMs === undefined ? {} : { durationMs }),
     ...(event.data.skill == null ? {} : { skill: event.data.skill }),
     ...callOf({ calls }, event.data.message_id),

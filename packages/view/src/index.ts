@@ -252,12 +252,16 @@ export {
 export {
   changedPaths,
   changesLine,
+  cutTitle,
   noChanges,
   reduceChanges,
   totals,
+  turnCards,
   turnOf,
+  TURN_TITLE_MAX,
   type ChangesState,
   type FileStatus,
+  type TurnCard,
   type TurnChanges,
   type TurnFile,
 } from "./changes.ts";

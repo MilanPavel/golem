@@ -1,85 +1,15 @@
-import { useEffect, useId, useRef, useState, type ReactNode } from "react";
-import { Badge } from "../../ui/badge.tsx";
-import { cn } from "../../ui/cn.ts";
-import { ChevronDownIcon } from "../../ui/icons.tsx";
+import { useEffect, useId, useRef, useState } from "react";
 import { useChangedFiles, useFileDiff } from "../../store/page-context.tsx";
 import type { ChangedFile, FileDiff } from "../../store/changes.ts";
-import { DiffModeSwitch, DiffView, useDiffMode, type DiffMode } from "../diff/index.ts";
+import { useDiffMode, type DiffMode } from "../diff/index.ts";
+import { ChangesViewSwitch, useChangesView } from "./changes-view.tsx";
+import { Counts, DiffPanel, Row, plural } from "./file-row.tsx";
+import { TurnsTab } from "./turns-view.tsx";
 import { useRequestedChange } from "./workbench-state.ts";
 import { useWorkbenchWidth } from "./workbench-width.ts";
 
 /** From this panel width, in rem, a diff may be shown side by side. Narrower, it is unified. */
 export const SPLIT_MIN_WIDTH = 40;
-
-const SMALL = "px-1.5 py-0 text-xs";
-
-/** The folder part of a path with its slash, and the file name. */
-function splitPath(path: string): [string, string] {
-  const slash = path.lastIndexOf("/");
-  return [path.slice(0, slash + 1), path.slice(slash + 1)];
-}
-
-function plural(count: number, word: string): string {
-  return `${count} ${word}${count === 1 ? "" : "s"}`;
-}
-
-function Counts({ added, removed }: { added: number; removed: number }) {
-  return (
-    <>
-      <span className="text-allow">
-        +{added}
-        <span className="sr-only"> lines added</span>
-      </span>
-      <span className="text-deny">
-        −{removed}
-        <span className="sr-only"> lines removed</span>
-      </span>
-    </>
-  );
-}
-
-function Row({
-  file,
-  open,
-  onToggle,
-  panel,
-  children,
-}: {
-  file: ChangedFile;
-  open: boolean;
-  onToggle: () => void;
-  panel: string;
-  children: ReactNode;
-}) {
-  const [folder, name] = splitPath(file.path);
-  return (
-    <li data-path={file.path} className="flex flex-col gap-2">
-      <button
-        type="button"
-        aria-expanded={open}
-        aria-controls={open ? panel : undefined}
-        title={file.path}
-        onClick={onToggle}
-        className="flex w-full min-w-0 items-center gap-2 rounded-sm px-1.5 py-1 text-left font-mono text-xs outline-offset-2 outline-clay hover:bg-sunken focus-visible:outline-2"
-      >
-        <ChevronDownIcon aria-hidden="true" className={cn("size-3.5 flex-none text-muted", !open && "-rotate-90")} />
-        <span className="flex min-w-0 flex-1 items-baseline">
-          {folder === "" ? null : <span className="min-w-0 truncate text-muted">{folder}</span>}
-          <span className="flex-none text-ink">{name}</span>
-        </span>
-        {file.status === "created" ? <Badge tone="allow" className={SMALL}>new</Badge> : null}
-        {file.status === "deleted" ? <Badge tone="deny" className={SMALL}>deleted</Badge> : null}
-        {file.stale ? <Badge tone="wait" className={SMALL}>changed on disk</Badge> : null}
-        <Counts added={file.added} removed={file.removed} />
-      </button>
-      {open ? (
-        <div id={panel} className="min-w-0">
-          {children}
-        </div>
-      ) : null}
-    </li>
-  );
-}
 
 type ChangesViewProps = {
   files: readonly ChangedFile[] | null;
@@ -105,7 +35,6 @@ export function ChangesView({ files, error, open, onOpen, diff, mode, onMode, ca
   }
   const added = files.reduce((sum, file) => sum + file.added, 0);
   const removed = files.reduce((sum, file) => sum + file.removed, 0);
-  const shown: DiffMode = canSplit ? mode : "unified";
   return (
     <>
       <ul className="flex flex-col gap-1">
@@ -119,19 +48,7 @@ export function ChangesView({ files, error, open, onOpen, diff, mode, onMode, ca
               onOpen(file.path === open ? null : file.path);
             }}
           >
-            <div className="mb-2 flex items-center justify-between gap-2">
-              <DiffModeSwitch mode={shown} onChange={onMode} disabled={!canSplit} />
-            </div>
-            {diff.error !== null ? (
-              <p className="text-sm text-muted">{`Could not read the diff. ${diff.error}`}</p>
-            ) : diff.diff === null ? (
-              <p className="text-sm text-muted">Reading the diff.</p>
-            ) : (
-              <>
-                <DiffView diff={diff.diff} mode={shown} />
-                {diff.truncated ? <p className="mt-2 text-xs text-muted">This diff is cut. Open the file to see all of it.</p> : null}
-              </>
-            )}
+            <DiffPanel diff={diff} mode={mode} onMode={onMode} canSplit={canSplit} />
           </Row>
         ))}
       </ul>
@@ -148,7 +65,7 @@ export function ChangesView({ files, error, open, onOpen, diff, mode, onMode, ca
  * The Changes tab: every file the session changed, and a click opens one to its diff. One file is
  * open at a time, the first at the start. `openChange` from the chat opens the file it names.
  */
-export function ChangesTab({ sessionId }: { sessionId: string }) {
+function ByFileTab({ sessionId }: { sessionId: string }) {
   const { files, error } = useChangedFiles(sessionId);
   const [mode, setMode] = useDiffMode();
   const [width] = useWorkbenchWidth();
@@ -198,6 +115,17 @@ export function ChangesTab({ sessionId }: { sessionId: string }) {
         onMode={setMode}
         canSplit={width >= SPLIT_MIN_WIDTH}
       />
+    </div>
+  );
+}
+
+/** The Changes tab: the files of the session, or the same changes by turn. The choice is kept. */
+export function ChangesTab({ sessionId }: { sessionId: string }) {
+  const [view, setView] = useChangesView();
+  return (
+    <div className="flex min-w-0 flex-col gap-3">
+      <ChangesViewSwitch view={view} onChange={setView} />
+      {view === "turn" ? <TurnsTab sessionId={sessionId} /> : <ByFileTab sessionId={sessionId} />}
     </div>
   );
 }
