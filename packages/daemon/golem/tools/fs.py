@@ -16,7 +16,7 @@ from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from golem.tools.paths import Readable, readable
+from golem.tools.paths import Readable, in_secret_dir, is_secret_tree, readable, secret_folders
 from golem.tools.registry import Tool, ToolContext, ToolError, ToolResult
 
 SKIPPED_DIRS = frozenset(
@@ -136,6 +136,7 @@ def list_dir(where: Readable, args: ListDirArgs) -> ToolResult:
         children = sorted(path.iterdir(), key=lambda child: child.name)
     except OSError as exc:
         raise ToolError(f"cannot list {args.path}: {exc.strerror or exc}") from exc
+    children = [child for child in children if not in_secret_dir(child, where.home)]
     names = [f"{child.name}/" if child.is_dir() else child.name for child in children]
     shown = names[:MAX_ENTRIES]
     output = "\n".join(shown) if shown else "(empty folder)"
@@ -177,7 +178,7 @@ def grep(where: Readable, args: GrepArgs) -> ToolResult:
     if base.is_file():
         files: Iterator[Path] = iter([base])
     elif base.is_dir():
-        files = walk_files(base)
+        files = walk_files(base, where.home)
     else:
         raise ToolError(f"{args.path} does not exist")
     matches: list[str] = []
@@ -221,11 +222,21 @@ def _grep_file(where: Readable, path: Path, regex: re.Pattern[str]) -> list[str]
     return hits
 
 
-def walk_files(base: Path) -> Iterator[Path]:
+def walk_files(base: Path, home: Path | None = None) -> Iterator[Path]:
+    """Files under ``base``, less :data:`SKIPPED_DIRS` and the credentials folders of ``home``."""
+    secret = secret_folders(home)
     for folder, dirs, names in os.walk(base):
-        dirs[:] = sorted(name for name in dirs if name not in SKIPPED_DIRS)
+        here = Path(folder)
+        dirs[:] = sorted(
+            name
+            for name in dirs
+            if name not in SKIPPED_DIRS
+            and not is_secret_tree((here / name).resolve(), home, secret)
+        )
         for name in sorted(names):
-            yield Path(folder) / name
+            path = here / name
+            if not in_secret_dir(path, home, secret):
+                yield path
 
 
 def in_skipped_dir(rel: Path) -> bool:
