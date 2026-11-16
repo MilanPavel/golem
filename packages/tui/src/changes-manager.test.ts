@@ -95,7 +95,7 @@ test("layout at 120 columns puts the files beside the diff", () => {
   const rows = layoutChanges(openChangesManager(), data(), 120, 12);
   assert.equal(rows.length, 12);
   assert.equal(rows[0]?.text, "changes · 3 files +5 −4");
-  assert.equal(rows[11]?.text, "↑↓ file · n/p hunk · PgUp/PgDn scroll · u undo hunk · U undo file · esc back");
+  assert.equal(rows[11]?.text, "↑↓ file · n/p hunk · PgUp/PgDn scroll · u undo hunk · U undo file · g commit · esc back");
   assert.equal(rows[1]?.left?.length, 28);
   assert.equal(rows[1]?.left, "M a.py                 +2 −2 ".slice(0, 28).padEnd(28));
   assert.equal(rows[1]?.leftSelected, true);

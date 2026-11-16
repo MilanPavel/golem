@@ -27,7 +27,7 @@ import { ANSWERED, PENDING_EDIT, PENDING_SHELL } from "../features/approval/samp
 import { DiffModeSwitch, DiffView } from "../features/diff/index.ts";
 import { SAMPLE_EDIT_DIFF, SAMPLE_LONG_LINE_DIFF, SAMPLE_NEW_FILE_DIFF } from "../features/diff/sample.ts";
 import { TodoList } from "../features/drawer/index.ts";
-import { ChangesView, Workbench, type WorkbenchTab } from "../features/workbench/index.ts";
+import { ChangesView, CommitDialogView, Workbench, type WorkbenchTab } from "../features/workbench/index.ts";
 import type { ChangedFile } from "../store/changes.ts";
 import { Composer, ContextChipView, DockView, Meter, ModeChipView, NotesChipView, TuneChipView } from "../features/composer/index.ts";
 import { createHistory } from "../features/composer/history.ts";
@@ -361,6 +361,58 @@ function ChangesDemo() {
           </div>
         </div>
       </div>
+    </section>
+  );
+}
+
+const COMMIT_PATHS = ["src/socket.ts", "src/clamp.ts", "docs/old-notes.md"];
+
+/** The commit dialog: a ready one, and one where git refused. Each opens from a button. */
+function CommitDialogDemo({ theme }: { theme: string }) {
+  const [shown, setShown] = useState<"ready" | "refused" | null>(null);
+  const [chosen, setChosen] = useState<ReadonlySet<string>>(new Set(COMMIT_PATHS));
+  const [message, setMessage] = useState("Clamp the socket read size\n\nA read past the buffer no longer splits a UTF-8 character.");
+  const anchor = useAnchor();
+  return (
+    <section className="mt-6" id={anchor("Commit dialog")}>
+      <h3 className="mb-2 font-mono text-xs text-faint">Commit dialog</h3>
+      <div className="flex flex-wrap items-center gap-2">
+        {(
+          [
+            ["ready", "Commit dialog"],
+            ["refused", "Commit refused"],
+          ] as const
+        ).map(([kind, label]) => (
+          <Button key={kind} onClick={() => setShown(kind)}>
+            {label}
+            <span className="sr-only">, {theme}</span>
+          </Button>
+        ))}
+      </div>
+      <CommitDialogView
+        open={shown !== null}
+        onOpenChange={(open) => setShown(open ? shown : null)}
+        branch="main"
+        paths={COMMIT_PATHS}
+        chosen={chosen}
+        onToggle={(path) =>
+          setChosen((current) => {
+            const next = new Set(current);
+            if (!next.delete(path)) next.add(path);
+            return next;
+          })
+        }
+        message={message}
+        onMessage={setMessage}
+        suggesting={false}
+        suggestNote={null}
+        onSuggestAgain={() => {}}
+        runActive={false}
+        committing={false}
+        onCommit={() => setShown("refused")}
+        failure={shown === "refused" ? "[main 0000000] hook failed\nlint: src/socket.ts:12 unused variable\nCommit stopped by the pre-commit hook." : null}
+        error={null}
+      />
     </section>
   );
 }
@@ -1391,6 +1443,8 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
       <WorkbenchDemo />
 
       <ChangesDemo />
+
+      <CommitDialogDemo theme={theme} />
 
       <section className="mt-6" id={anchor("Command palette and keys")}>
         <h3 className="mb-2 font-mono text-xs text-faint">Command palette and keys</h3>

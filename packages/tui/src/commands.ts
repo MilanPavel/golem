@@ -5,6 +5,7 @@ import { CTX_REPLIES, CTX_RESULTS, CTX_SUMMARY, CTX_SYSTEM, CTX_TOOLS, CTX_USER,
 export {
   applyComposer,
   closedDebug,
+  committedLine,
   COMMANDS,
   invocableSkills,
   KEY_PROVIDERS,

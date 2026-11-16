@@ -34,6 +34,7 @@ export function keepQueriesHonest(client: QueryWiringClient, queryClient: QueryC
         waiting.delete(sessionId);
         stale("changes.list", sessionId);
         stale("changes.diff", sessionId);
+        stale("changes.commit_info", sessionId);
       }, CHANGES_REFETCH_MS),
     );
   };
