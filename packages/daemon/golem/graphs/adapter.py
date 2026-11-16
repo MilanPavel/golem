@@ -106,6 +106,7 @@ class ContextChanged:
     before_tokens: int | None = None
     after_tokens: int | None = None
     count: int | None = None
+    room: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -808,6 +809,7 @@ def _custom(data: object) -> Fact | None:
             _count(item.get("before_tokens")),
             _count(item.get("after_tokens")),
             _count(item.get("count")),
+            _positive(item.get("room")),
         )
     if kind in (PIN_READ_KIND, PIN_SKIPPED_KIND):
         return _pin(kind, item)

@@ -1,13 +1,15 @@
-import { notesFor, type NotesState } from "@golem/view";
+import { committedLine, notesFor, type NotesState } from "@golem/view";
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { Badge } from "../../ui/badge.tsx";
 import { cn } from "../../ui/cn.ts";
 import { IconButton } from "../../ui/icon-button.tsx";
 import { ChevronDownIcon, OpenIcon } from "../../ui/icons.tsx";
-import { useChangedFiles, useFileDiff, useNotes } from "../../store/page-context.tsx";
+import { Button } from "../../ui/button.tsx";
+import { useChangedFiles, useCommitInfo, useFileDiff, useNotes, useSession } from "../../store/page-context.tsx";
 import type { ChangedFile, FileDiff } from "../../store/changes.ts";
 import { DiffModeSwitch, DiffView, useDiffMode, type DiffMode, type NoteLine } from "../diff/index.ts";
-import { openFile, useRequestedChange } from "./workbench-state.ts";
+import { CommitDialog } from "./commit-dialog.tsx";
+import { openFile, useCommitRequest, useRequestedChange } from "./workbench-state.ts";
 import { useWorkbenchWidth } from "./workbench-width.ts";
 
 /** From this panel width, in rem, a diff may be shown side by side. Narrower, it is unified. */
@@ -113,6 +115,8 @@ type ChangesViewProps = {
   canSplit: boolean;
   /** Shows a file in the Files tab. Without it the rows have no open button. */
   onOpenFile?: (path: string) => void;
+  /** Beside the totals: the Commit button. */
+  footer?: ReactNode;
   /** With it, a diff in the unified layout takes review notes. */
   notes?: {
     state: NotesState;
@@ -123,7 +127,7 @@ type ChangesViewProps = {
 };
 
 /** The list of changed files, the open one with its diff, and the totals. It reads nothing itself. */
-export function ChangesView({ files, error, open, onOpen, diff, mode, onMode, canSplit, onOpenFile, notes }: ChangesViewProps) {
+export function ChangesView({ files, error, open, onOpen, diff, mode, onMode, canSplit, onOpenFile, footer, notes }: ChangesViewProps) {
   const panel = useId();
   if (files === null) {
     return <p className="text-sm text-muted">{error === null ? "Reading the changes." : `Could not read the changes. ${error}`}</p>;
@@ -178,11 +182,14 @@ export function ChangesView({ files, error, open, onOpen, diff, mode, onMode, ca
           </Row>
         ))}
       </ul>
-      <p className="flex flex-wrap items-center gap-x-2 border-t border-line pt-2 font-mono text-xs text-muted">
-        <span>{plural(files.length, "file")}</span>
-        <span aria-hidden="true">·</span>
-        <Counts added={added} removed={removed} />
-      </p>
+      <div className="flex flex-wrap items-center justify-between gap-2 border-t border-line pt-2">
+        <p className="flex flex-wrap items-center gap-x-2 font-mono text-xs text-muted">
+          <span>{plural(files.length, "file")}</span>
+          <span aria-hidden="true">·</span>
+          <Counts added={added} removed={removed} />
+        </p>
+        {footer}
+      </div>
     </>
   );
 }
@@ -200,6 +207,12 @@ export function ChangesTab({ sessionId }: { sessionId: string }) {
   const [chosen, setChosen] = useState<string | null | undefined>(undefined);
   const reveal = useRef<string | null>(null);
   const root = useRef<HTMLDivElement>(null);
+  const info = useCommitInfo(sessionId);
+  const runActive = useSession(sessionId, (view) => view.chat.busy);
+  const [commitOpen, setCommitOpen] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [commitAsked, clearCommitAsked] = useCommitRequest();
+  const commitPaths = info?.repository === true ? info.paths : [];
 
   const paths = files?.map((file) => file.path) ?? null;
   const wanted = chosen === undefined ? (paths?.[0] ?? null) : chosen;
@@ -219,6 +232,23 @@ export function ChangesTab({ sessionId }: { sessionId: string }) {
     reveal.current = requested;
     clearRequest();
   }, [requested, clearRequest]);
+
+  // `/commit` asks for the dialog. It opens once git has answered, or says why it cannot.
+  const [commitTaken, setCommitTaken] = useState(false);
+  if (commitAsked && !commitTaken && info !== null) {
+    setCommitTaken(true);
+    if (!info.repository) setNotice("This folder is not a git repository.");
+    else if (info.paths.length === 0) setNotice("Nothing to commit.");
+    else {
+      setNotice(null);
+      setCommitOpen(true);
+    }
+  } else if (!commitAsked && commitTaken) {
+    setCommitTaken(false);
+  }
+  useEffect(() => {
+    if (commitTaken) clearCommitAsked();
+  }, [commitTaken, clearCommitAsked]);
 
   // The row of a requested file may only appear once the list has it.
   useEffect(() => {
@@ -250,6 +280,33 @@ export function ChangesTab({ sessionId }: { sessionId: string }) {
           onEdit: notes.edit,
           onRemove: notes.remove,
         }}
+        footer={
+          commitPaths.length === 0 ? null : (
+            <Button
+              size="sm"
+              onClick={() => {
+                setNotice(null);
+                setCommitOpen(true);
+              }}
+            >
+              Commit…
+            </Button>
+          )
+        }
+      />
+      {notice === null ? null : (
+        <p role="status" className="font-mono text-xs text-ink">
+          {notice}
+        </p>
+      )}
+      <CommitDialog
+        sessionId={sessionId}
+        open={commitOpen}
+        onOpenChange={setCommitOpen}
+        branch={info?.branch ?? null}
+        paths={commitPaths}
+        runActive={runActive}
+        onCommitted={(sha) => setNotice(committedLine(sha))}
       />
     </div>
   );

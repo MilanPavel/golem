@@ -219,6 +219,7 @@ export type AfterTokens = number | null;
 export type BeforeTokens = number | null;
 export type Count = number | null;
 export type ReloadMs = number | null;
+export type Room = number | null;
 export type WindowFrom = number | null;
 export type WindowTo = number | null;
 export type RunId17 = string | null;
@@ -1395,6 +1396,7 @@ export interface ContextChangedData {
   before_tokens?: BeforeTokens;
   count?: Count;
   reload_ms?: ReloadMs;
+  room?: Room;
   window_from?: WindowFrom;
   window_to?: WindowTo;
 }

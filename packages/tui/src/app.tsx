@@ -168,6 +168,7 @@ import { folderFacts } from "./folder-facts.ts";
 import {
   applyComposer,
   invocableSkills,
+  committedLine,
   pinnableSkills,
   closedDebug,
   COMMANDS,
@@ -324,6 +325,17 @@ import {
   type ChangesLine,
   type ChangesManagerState,
 } from "./changes-manager.ts";
+import {
+  commitErrored,
+  commitKeyOf,
+  commitRefused,
+  openCommitBand,
+  pressCommit,
+  suggestionArrived,
+  suggestionFailed,
+  type CommitAction,
+  type CommitBand,
+} from "./commit-band.ts";
 import {
   closedSkillsManager,
   layoutSkillsManager,
@@ -842,6 +854,7 @@ export function App({
     changes: changesState,
     liveRunId: chat.busy ? chat.runId : null,
     commands: COMMANDS.map((command) => command.name),
+    notices: chat.notices,
   };
   const measured = layoutTranscript(chat.messages, columns, chatHeight, offset, transcriptOptions);
   const widthKey = measured.overflow ? Math.max(1, columns - 1) : columns;
@@ -1938,6 +1951,20 @@ export function App({
       setSwitcher(closedSwitcher);
       showChangesManager(openChangesManager());
       loadChanges(id, null);
+      return;
+    }
+    if (outcome.kind === "commit") {
+      const id = sessionRef.current;
+      if (id === null) {
+        setChat((state) => ({ ...state, notice: "open a session first" }));
+        return;
+      }
+      setDraft(draftAt(""));
+      setKeysOpen(false);
+      setSwitcher(closedSwitcher);
+      showChangesManager(openChangesManager());
+      loadChanges(id, null);
+      openCommit(id);
       return;
     }
     if (outcome.kind === "undo") {
@@ -3760,8 +3787,81 @@ export function App({
     );
   }
 
-  function runChangesAction(action: ChangesAction): void {
+  /** Ask git about the folder, then open the band. Nothing is committed until the person presses enter in it. */
+  function openCommit(id: string): void {
+    const note = (text: string): void => {
+      if (changesManagerRef.current.open) showChangesManager({ ...changesManagerRef.current, note: text });
+    };
+    client.changesCommitInfo(id).then(
+      (info) => {
+        if (!changesManagerRef.current.open) {
+          return;
+        }
+        if (!info.repository) {
+          note("not a git repository");
+        } else if (info.paths.length === 0) {
+          note("nothing to commit");
+        } else {
+          showChangesManager({ ...changesManagerRef.current, note: null, commit: openCommitBand(info) });
+          askSuggestion(id, info.paths, null);
+        }
+      },
+      (error: unknown) => note(messageOf(error)),
+    );
+  }
+
+  function updateCommitBand(change: (band: CommitBand) => CommitBand): void {
+    const current = changesManagerRef.current;
+    if (current.commit !== null && current.commit !== undefined) {
+      showChangesManager({ ...current, commit: change(current.commit) });
+    }
+  }
+
+  /** `replaceAt` is the band's edit count when the person asked again: the answer then replaces the message if they typed nothing since. */
+  function askSuggestion(id: string, paths: readonly string[], replaceAt: number | null): void {
+    client.changesSuggestMessage(id, [...paths]).then(
+      (result) => updateCommitBand((band) => suggestionArrived(band, result.message, replaceAt)),
+      () => updateCommitBand(suggestionFailed),
+    );
+  }
+
+  function runCommitAction(action: CommitAction, band: CommitBand): void {
+    const id = sessionRef.current;
     if (action.kind === "close") {
+      showChangesManager({ ...changesManagerRef.current, commit: null });
+    } else if (action.kind === "suggest" && id !== null) {
+      askSuggestion(id, band.paths, action.edits);
+    } else if (action.kind === "commit" && id !== null) {
+      client.changesCommit(id, [...band.paths], action.message).then(
+        (result) => {
+          if (!result.ok) {
+            updateCommitBand((current) => commitRefused(current, result.output));
+            return;
+          }
+          const said = committedLine(result.sha);
+          showChangesManager({ ...changesManagerRef.current, commit: null, note: said });
+          setChat((state) => ({ ...state, notice: said }));
+          loadChanges(id, null);
+        },
+        (error: unknown) => updateCommitBand((current) => commitErrored(current, messageOf(error))),
+      );
+    }
+  }
+
+  function onCommitBandPress(press: Press, band: CommitBand): void {
+    const key = commitKeyOf(press);
+    if (key === null) {
+      return;
+    }
+    const pressed = pressCommit(band, key, busyRef.current);
+    updateCommitBand(() => pressed.band);
+    runCommitAction(pressed.action, pressed.band);
+  }
+
+  function runChangesAction(action: ChangesAction): void {
+    if (action.kind === "commit-info" && sessionRef.current !== null) {
+      openCommit(sessionRef.current);
+    } else if (action.kind === "close") {
       changesAsked.current.clear();
       showChanges({ files: null, error: null, diffs: {} });
     } else if (action.kind === "load" && sessionRef.current !== null) {
@@ -3793,6 +3893,11 @@ export function App({
   }
 
   function onChangesManagerPress(press: Press): void {
+    const band = changesManagerRef.current.commit;
+    if (band !== null && band !== undefined) {
+      onCommitBandPress(press, band);
+      return;
+    }
     const key = changesKeyOf(press);
     if (key === null) {
       return;

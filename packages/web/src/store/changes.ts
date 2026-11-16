@@ -1,6 +1,6 @@
-import type { ChangedFile, ChangesDiffResult, ChangesListResult } from "@golem/client";
+import type { ChangedFile, ChangesCommitInfoResult, ChangesCommitResult, ChangesDiffResult, ChangesListResult } from "@golem/client";
 
-export type { ChangedFile, ChangesDiffResult, ChangesListResult };
+export type { ChangedFile, ChangesCommitInfoResult, ChangesCommitResult, ChangesDiffResult, ChangesListResult };
 
 /** How long a burst of `file.changed` events waits, so it makes one request. */
 export const CHANGES_REFETCH_MS = 150;
@@ -13,6 +13,11 @@ export function changesListKey(sessionId: string): readonly unknown[] {
 /** The query key of `changes.diff` for one file. A `file.changed` event for the session marks it stale. */
 export function changesDiffKey(sessionId: string, path: string): readonly unknown[] {
   return ["changes.diff", sessionId, path];
+}
+
+/** The query key of `changes.commit_info`. A `file.changed` event for the session marks it stale. */
+export function commitInfoKey(sessionId: string): readonly unknown[] {
+  return ["changes.commit_info", sessionId];
 }
 
 /** What the Changes tab reads for the list. */

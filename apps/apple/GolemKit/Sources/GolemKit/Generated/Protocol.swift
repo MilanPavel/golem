@@ -1502,6 +1502,7 @@ public struct ContextChangedData: Codable {
     public let beforeTokens: Int?
     public let count: Int?
     public let reloadMS: Int?
+    public let room: Int?
     public let windowFrom: Int?
     public let windowTo: Int?
 
@@ -1511,16 +1512,18 @@ public struct ContextChangedData: Codable {
         case beforeTokens = "before_tokens"
         case count = "count"
         case reloadMS = "reload_ms"
+        case room = "room"
         case windowFrom = "window_from"
         case windowTo = "window_to"
     }
 
-    public init(action: ContextChangedDataAction, afterTokens: Int?, beforeTokens: Int?, count: Int?, reloadMS: Int?, windowFrom: Int?, windowTo: Int?) {
+    public init(action: ContextChangedDataAction, afterTokens: Int?, beforeTokens: Int?, count: Int?, reloadMS: Int?, room: Int?, windowFrom: Int?, windowTo: Int?) {
         self.action = action
         self.afterTokens = afterTokens
         self.beforeTokens = beforeTokens
         self.count = count
         self.reloadMS = reloadMS
+        self.room = room
         self.windowFrom = windowFrom
         self.windowTo = windowTo
     }
@@ -1579,6 +1582,7 @@ public struct ContextChangedEventData: Codable {
     public let beforeTokens: Int?
     public let count: Int?
     public let reloadMS: Int?
+    public let room: Int?
     public let windowFrom: Int?
     public let windowTo: Int?
 
@@ -1588,16 +1592,18 @@ public struct ContextChangedEventData: Codable {
         case beforeTokens = "before_tokens"
         case count = "count"
         case reloadMS = "reload_ms"
+        case room = "room"
         case windowFrom = "window_from"
         case windowTo = "window_to"
     }
 
-    public init(action: ContextChangedDataAction, afterTokens: Int?, beforeTokens: Int?, count: Int?, reloadMS: Int?, windowFrom: Int?, windowTo: Int?) {
+    public init(action: ContextChangedDataAction, afterTokens: Int?, beforeTokens: Int?, count: Int?, reloadMS: Int?, room: Int?, windowFrom: Int?, windowTo: Int?) {
         self.action = action
         self.afterTokens = afterTokens
         self.beforeTokens = beforeTokens
         self.count = count
         self.reloadMS = reloadMS
+        self.room = room
         self.windowFrom = windowFrom
         self.windowTo = windowTo
     }
@@ -10098,6 +10104,7 @@ public struct ParamsData: Codable {
     public let beforeTokens: Int?
     public let count: Int?
     public let reloadMS: Int?
+    public let room: Int?
     public let windowFrom: Int?
     public let windowTo: Int?
     public let code: Code?
@@ -10200,6 +10207,7 @@ public struct ParamsData: Codable {
         case beforeTokens = "before_tokens"
         case count = "count"
         case reloadMS = "reload_ms"
+        case room = "room"
         case windowFrom = "window_from"
         case windowTo = "window_to"
         case code = "code"
@@ -10238,7 +10246,7 @@ public struct ParamsData: Codable {
         case output = "output"
     }
 
-    public init(cwd: String?, forkedFrom: PurpleForkedFrom?, modelName: String?, modelProfile: String?, modelProvider: String?, origin: String?, route: Route?, allowedTools: [PurpleSessionAllowance]?, mcpServers: [String]?, title: String?, runID: String?, status: PurpleStatus?, summary: String?, reason: PurpleReason?, detail: String?, model: String?, provider: String?, rejected: [FluffyModelRejection]?, tier: Tier?, options: [String: Option]?, mode: Mode?, on: Bool?, messageID: String?, role: MessageCompletedDataRole?, text: String?, interrupted: Bool?, skill: FluffySkillCall?, thinking: String?, thinkingMS: Int?, clearedIDS: [String]?, contextWindow: Int?, estimatedTokens: Int?, index: Int?, messageBytes: [Int]?, messageChars: [Int]?, messageIDS: [String]?, numCtx: Int?, profile: String?, summaryChars: Int?, systemBytes: Int?, systemChars: Int?, systemPromptSHA: String?, systemSections: [TentacledPromptSectionInfo]?, toolsBytes: Int?, toolsChars: Int?, toolsSHA: String?, windowEstimated: Bool?, windowPlanned: Bool?, costUsd: Double?, failed: Bool?, firstTokenMS: Int?, latencyMS: Int?, loadMS: Int?, price: FluffyCallPrice?, promptMS: Int?, replyMS: Int?, stopReason: String?, textToolCalls: TextToolCalls?, usage: FluffyTokenUsage?, action: ContextChangedDataAction?, afterTokens: Int?, beforeTokens: Int?, count: Int?, reloadMS: Int?, windowFrom: Int?, windowTo: Int?, code: Code?, hint: String?, message: String?, args: [String: JSONAny]?, callID: String?, name: String?, chars: Int?, lines: Int?, path: String?, waiting: Bool?, artifactID: String?, diff: String?, durationMS: Int?, preview: String?, truncated: Bool?, source: String?, subject: String?, decision: Decision?, rule: String?, todos: [PurpleTodo]?, planID: String?, steps: [FluffyPlanStep]?, added: Int?, changeID: String?, removed: Int?, reverts: String?, hash: String?, how: How?, checks: [FluffyCheckInfo]?, checkID: String?, command: String?, round: Int?, exitCode: Int?, output: String?) {
+    public init(cwd: String?, forkedFrom: PurpleForkedFrom?, modelName: String?, modelProfile: String?, modelProvider: String?, origin: String?, route: Route?, allowedTools: [PurpleSessionAllowance]?, mcpServers: [String]?, title: String?, runID: String?, status: PurpleStatus?, summary: String?, reason: PurpleReason?, detail: String?, model: String?, provider: String?, rejected: [FluffyModelRejection]?, tier: Tier?, options: [String: Option]?, mode: Mode?, on: Bool?, messageID: String?, role: MessageCompletedDataRole?, text: String?, interrupted: Bool?, skill: FluffySkillCall?, thinking: String?, thinkingMS: Int?, clearedIDS: [String]?, contextWindow: Int?, estimatedTokens: Int?, index: Int?, messageBytes: [Int]?, messageChars: [Int]?, messageIDS: [String]?, numCtx: Int?, profile: String?, summaryChars: Int?, systemBytes: Int?, systemChars: Int?, systemPromptSHA: String?, systemSections: [TentacledPromptSectionInfo]?, toolsBytes: Int?, toolsChars: Int?, toolsSHA: String?, windowEstimated: Bool?, windowPlanned: Bool?, costUsd: Double?, failed: Bool?, firstTokenMS: Int?, latencyMS: Int?, loadMS: Int?, price: FluffyCallPrice?, promptMS: Int?, replyMS: Int?, stopReason: String?, textToolCalls: TextToolCalls?, usage: FluffyTokenUsage?, action: ContextChangedDataAction?, afterTokens: Int?, beforeTokens: Int?, count: Int?, reloadMS: Int?, room: Int?, windowFrom: Int?, windowTo: Int?, code: Code?, hint: String?, message: String?, args: [String: JSONAny]?, callID: String?, name: String?, chars: Int?, lines: Int?, path: String?, waiting: Bool?, artifactID: String?, diff: String?, durationMS: Int?, preview: String?, truncated: Bool?, source: String?, subject: String?, decision: Decision?, rule: String?, todos: [PurpleTodo]?, planID: String?, steps: [FluffyPlanStep]?, added: Int?, changeID: String?, removed: Int?, reverts: String?, hash: String?, how: How?, checks: [FluffyCheckInfo]?, checkID: String?, command: String?, round: Int?, exitCode: Int?, output: String?) {
         self.cwd = cwd
         self.forkedFrom = forkedFrom
         self.modelName = modelName
@@ -10303,6 +10311,7 @@ public struct ParamsData: Codable {
         self.beforeTokens = beforeTokens
         self.count = count
         self.reloadMS = reloadMS
+        self.room = room
         self.windowFrom = windowFrom
         self.windowTo = windowTo
         self.code = code
@@ -14325,6 +14334,53 @@ public struct TraceContextCleared: Codable {
     }
 }
 
+/// One ``context.changed`` of the session, for the trace.
+///
+/// ``call_id`` is the model call that came right after the change, null when none has yet.
+/// The other fields are those of ``context.changed``.
+// MARK: - TraceContextEvent
+public struct TraceContextEvent: Codable {
+    public let action: ContextChangedDataAction
+    public let afterTokens: Int?
+    public let beforeTokens: Int?
+    public let callID: String?
+    public let count: Int?
+    public let reloadMS: Int?
+    public let room: Int?
+    public let runID: String?
+    public let seq: Int
+    public let windowFrom: Int?
+    public let windowTo: Int?
+
+    public enum CodingKeys: String, CodingKey {
+        case action = "action"
+        case afterTokens = "after_tokens"
+        case beforeTokens = "before_tokens"
+        case callID = "call_id"
+        case count = "count"
+        case reloadMS = "reload_ms"
+        case room = "room"
+        case runID = "run_id"
+        case seq = "seq"
+        case windowFrom = "window_from"
+        case windowTo = "window_to"
+    }
+
+    public init(action: ContextChangedDataAction, afterTokens: Int?, beforeTokens: Int?, callID: String?, count: Int?, reloadMS: Int?, room: Int?, runID: String?, seq: Int, windowFrom: Int?, windowTo: Int?) {
+        self.action = action
+        self.afterTokens = afterTokens
+        self.beforeTokens = beforeTokens
+        self.callID = callID
+        self.count = count
+        self.reloadMS = reloadMS
+        self.room = room
+        self.runID = runID
+        self.seq = seq
+        self.windowFrom = windowFrom
+        self.windowTo = windowTo
+    }
+}
+
 /// One tool or one prompt section, with its share of the tokens.
 // MARK: - TraceContextItem
 public struct TraceContextItem: Codable {
@@ -14416,9 +14472,11 @@ public struct TraceContext: Codable {
     public let parts: [PurpleTraceContextPart]
     public let promptCut: PromptCut?
     public let promptCutKind: PromptCutKind?
+    public let reserve: Int?
     public let used: Int?
     public let window: Int?
     public let windowEstimated: Bool?
+    public let windowPlanned: Bool?
 
     public enum CodingKeys: String, CodingKey {
         case cleared = "cleared"
@@ -14429,12 +14487,14 @@ public struct TraceContext: Codable {
         case parts = "parts"
         case promptCut = "prompt_cut"
         case promptCutKind = "prompt_cut_kind"
+        case reserve = "reserve"
         case used = "used"
         case window = "window"
         case windowEstimated = "window_estimated"
+        case windowPlanned = "window_planned"
     }
 
-    public init(cleared: PurpleTraceContextCleared?, droppedMessageIDS: [String]?, droppedTokens: Int?, estimated: Bool?, numCtx: Int?, parts: [PurpleTraceContextPart], promptCut: PromptCut?, promptCutKind: PromptCutKind?, used: Int?, window: Int?, windowEstimated: Bool?) {
+    public init(cleared: PurpleTraceContextCleared?, droppedMessageIDS: [String]?, droppedTokens: Int?, estimated: Bool?, numCtx: Int?, parts: [PurpleTraceContextPart], promptCut: PromptCut?, promptCutKind: PromptCutKind?, reserve: Int?, used: Int?, window: Int?, windowEstimated: Bool?, windowPlanned: Bool?) {
         self.cleared = cleared
         self.droppedMessageIDS = droppedMessageIDS
         self.droppedTokens = droppedTokens
@@ -14443,9 +14503,11 @@ public struct TraceContext: Codable {
         self.parts = parts
         self.promptCut = promptCut
         self.promptCutKind = promptCutKind
+        self.reserve = reserve
         self.used = used
         self.window = window
         self.windowEstimated = windowEstimated
+        self.windowPlanned = windowPlanned
     }
 }
 
@@ -14537,23 +14599,74 @@ public struct TraceGetParams: Codable {
 /// Runs of a session, oldest first.
 ///
 /// The tree is run, then model call, then tool call. A client picks a span
-/// by ``id`` and loads it with ``trace.span``.
+/// by ``id`` and loads it with ``trace.span``. ``context_events`` are the
+/// session's ``context.changed`` events, oldest first.
 // MARK: - TraceGetResult
 public struct TraceGetResult: Codable {
+    public let contextEvents: [ContextEventElement]?
     public let runs: [RunElement]
     public let sessionID: String
     public let title: String?
 
     public enum CodingKeys: String, CodingKey {
+        case contextEvents = "context_events"
         case runs = "runs"
         case sessionID = "session_id"
         case title = "title"
     }
 
-    public init(runs: [RunElement], sessionID: String, title: String?) {
+    public init(contextEvents: [ContextEventElement]?, runs: [RunElement], sessionID: String, title: String?) {
+        self.contextEvents = contextEvents
         self.runs = runs
         self.sessionID = sessionID
         self.title = title
+    }
+}
+
+/// One ``context.changed`` of the session, for the trace.
+///
+/// ``call_id`` is the model call that came right after the change, null when none has yet.
+/// The other fields are those of ``context.changed``.
+// MARK: - ContextEventElement
+public struct ContextEventElement: Codable {
+    public let action: ContextChangedDataAction
+    public let afterTokens: Int?
+    public let beforeTokens: Int?
+    public let callID: String?
+    public let count: Int?
+    public let reloadMS: Int?
+    public let room: Int?
+    public let runID: String?
+    public let seq: Int
+    public let windowFrom: Int?
+    public let windowTo: Int?
+
+    public enum CodingKeys: String, CodingKey {
+        case action = "action"
+        case afterTokens = "after_tokens"
+        case beforeTokens = "before_tokens"
+        case callID = "call_id"
+        case count = "count"
+        case reloadMS = "reload_ms"
+        case room = "room"
+        case runID = "run_id"
+        case seq = "seq"
+        case windowFrom = "window_from"
+        case windowTo = "window_to"
+    }
+
+    public init(action: ContextChangedDataAction, afterTokens: Int?, beforeTokens: Int?, callID: String?, count: Int?, reloadMS: Int?, room: Int?, runID: String?, seq: Int, windowFrom: Int?, windowTo: Int?) {
+        self.action = action
+        self.afterTokens = afterTokens
+        self.beforeTokens = beforeTokens
+        self.callID = callID
+        self.count = count
+        self.reloadMS = reloadMS
+        self.room = room
+        self.runID = runID
+        self.seq = seq
+        self.windowFrom = windowFrom
+        self.windowTo = windowTo
     }
 }
 
@@ -14852,6 +14965,7 @@ public struct TentacledModelRejection: Codable {
 public struct TraceMessage: Codable {
     public let callID: String?
     public let id: String?
+    public let original: String?
     public let role: TraceMessageRole
     public let text: String
     public let tokens: Int?
@@ -14860,15 +14974,17 @@ public struct TraceMessage: Codable {
     public enum CodingKeys: String, CodingKey {
         case callID = "call_id"
         case id = "id"
+        case original = "original"
         case role = "role"
         case text = "text"
         case tokens = "tokens"
         case toolCalls = "tool_calls"
     }
 
-    public init(callID: String?, id: String?, role: TraceMessageRole, text: String, tokens: Int?, toolCalls: [[String: JSONAny]]?) {
+    public init(callID: String?, id: String?, original: String?, role: TraceMessageRole, text: String, tokens: Int?, toolCalls: [[String: JSONAny]]?) {
         self.callID = callID
         self.id = id
+        self.original = original
         self.role = role
         self.text = text
         self.tokens = tokens
@@ -15416,6 +15532,7 @@ public struct TraceSpanResult: Codable {
     public let result: String?
     public let span: SpanClass
     public let stopReason: String?
+    public let summaryOf: Int?
     public let systemPrompt: String?
     public let systemSections: [StickyPromptSectionInfo]?
     public let textToolCalls: TextToolCalls?
@@ -15433,13 +15550,14 @@ public struct TraceSpanResult: Codable {
         case result = "result"
         case span = "span"
         case stopReason = "stop_reason"
+        case summaryOf = "summary_of"
         case systemPrompt = "system_prompt"
         case systemSections = "system_sections"
         case textToolCalls = "text_tool_calls"
         case tools = "tools"
     }
 
-    public init(approval: [String: JSONAny]?, args: [String: JSONAny]?, artifactID: String?, context: TraceContextClass?, messages: [TraceMessageElement]?, newFrom: Int?, provider: String?, reply: TraceMessageElement?, result: String?, span: SpanClass, stopReason: String?, systemPrompt: String?, systemSections: [StickyPromptSectionInfo]?, textToolCalls: TextToolCalls?, tools: [[String: JSONAny]]?) {
+    public init(approval: [String: JSONAny]?, args: [String: JSONAny]?, artifactID: String?, context: TraceContextClass?, messages: [TraceMessageElement]?, newFrom: Int?, provider: String?, reply: TraceMessageElement?, result: String?, span: SpanClass, stopReason: String?, summaryOf: Int?, systemPrompt: String?, systemSections: [StickyPromptSectionInfo]?, textToolCalls: TextToolCalls?, tools: [[String: JSONAny]]?) {
         self.approval = approval
         self.args = args
         self.artifactID = artifactID
@@ -15451,6 +15569,7 @@ public struct TraceSpanResult: Codable {
         self.result = result
         self.span = span
         self.stopReason = stopReason
+        self.summaryOf = summaryOf
         self.systemPrompt = systemPrompt
         self.systemSections = systemSections
         self.textToolCalls = textToolCalls
@@ -15477,9 +15596,11 @@ public struct TraceContextClass: Codable {
     public let parts: [FluffyTraceContextPart]
     public let promptCut: PromptCut?
     public let promptCutKind: PromptCutKind?
+    public let reserve: Int?
     public let used: Int?
     public let window: Int?
     public let windowEstimated: Bool?
+    public let windowPlanned: Bool?
 
     public enum CodingKeys: String, CodingKey {
         case cleared = "cleared"
@@ -15490,12 +15611,14 @@ public struct TraceContextClass: Codable {
         case parts = "parts"
         case promptCut = "prompt_cut"
         case promptCutKind = "prompt_cut_kind"
+        case reserve = "reserve"
         case used = "used"
         case window = "window"
         case windowEstimated = "window_estimated"
+        case windowPlanned = "window_planned"
     }
 
-    public init(cleared: FluffyTraceContextCleared?, droppedMessageIDS: [String]?, droppedTokens: Int?, estimated: Bool?, numCtx: Int?, parts: [FluffyTraceContextPart], promptCut: PromptCut?, promptCutKind: PromptCutKind?, used: Int?, window: Int?, windowEstimated: Bool?) {
+    public init(cleared: FluffyTraceContextCleared?, droppedMessageIDS: [String]?, droppedTokens: Int?, estimated: Bool?, numCtx: Int?, parts: [FluffyTraceContextPart], promptCut: PromptCut?, promptCutKind: PromptCutKind?, reserve: Int?, used: Int?, window: Int?, windowEstimated: Bool?, windowPlanned: Bool?) {
         self.cleared = cleared
         self.droppedMessageIDS = droppedMessageIDS
         self.droppedTokens = droppedTokens
@@ -15504,9 +15627,11 @@ public struct TraceContextClass: Codable {
         self.parts = parts
         self.promptCut = promptCut
         self.promptCutKind = promptCutKind
+        self.reserve = reserve
         self.used = used
         self.window = window
         self.windowEstimated = windowEstimated
+        self.windowPlanned = windowPlanned
     }
 }
 
@@ -15575,6 +15700,7 @@ public struct FluffyTraceContextItem: Codable {
 public struct TraceMessageElement: Codable {
     public let callID: String?
     public let id: String?
+    public let original: String?
     public let role: TraceMessageRole
     public let text: String
     public let tokens: Int?
@@ -15583,15 +15709,17 @@ public struct TraceMessageElement: Codable {
     public enum CodingKeys: String, CodingKey {
         case callID = "call_id"
         case id = "id"
+        case original = "original"
         case role = "role"
         case text = "text"
         case tokens = "tokens"
         case toolCalls = "tool_calls"
     }
 
-    public init(callID: String?, id: String?, role: TraceMessageRole, text: String, tokens: Int?, toolCalls: [[String: JSONAny]]?) {
+    public init(callID: String?, id: String?, original: String?, role: TraceMessageRole, text: String, tokens: Int?, toolCalls: [[String: JSONAny]]?) {
         self.callID = callID
         self.id = id
+        self.original = original
         self.role = role
         self.text = text
         self.tokens = tokens

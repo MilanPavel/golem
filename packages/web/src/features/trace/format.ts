@@ -1,4 +1,5 @@
 import { contextLevel, contextPercent, contextSummary, formatDuration as formatViewDuration, formatTokens, formatWindow, type ContextLevel } from "@golem/view";
+import type { TraceContextEvent } from "../../store/trace.ts";
 import { modelsOf, type TraceNode, type TraceRunSpan, type TraceSpan } from "../../store/trace.ts";
 
 /** `—` for an unknown time, else minutes and seconds: `0m 00.048s` under a second, `0m 18.4s`, `2m 30.8s`. */
@@ -63,6 +64,34 @@ export function inputSeries(runs: readonly TraceRunSpan[]): number[] {
     }
   }
   return values;
+}
+
+/** A tick on the sparkline: the call at `index` of the series came right after a change of the context. */
+export type SparkMark = { index: number; label: string };
+
+/** `cleared`, `summarised`, or the new window of a `grew`: `64K`. */
+export function eventLabel(event: TraceContextEvent): string {
+  if (event.action === "grew") return event.window_to == null ? "window grew" : formatWindow(event.window_to);
+  return event.action;
+}
+
+/** The marks for `inputSeries`: where golem cleared, summarised or grew the window. One mark per call. */
+export function inputMarks(runs: readonly TraceRunSpan[], events: readonly TraceContextEvent[]): SparkMark[] {
+  const at = new Map<string, number>();
+  let count = 0;
+  for (const run of runs) {
+    for (const model of modelsOf(run)) {
+      at.set(model.id, count);
+      if (typeof model.tokens?.input === "number") count += 1;
+    }
+  }
+  const labels = new Map<number, string[]>();
+  for (const event of events) {
+    const index = event.call_id == null ? undefined : at.get(event.call_id);
+    if (index === undefined || index >= count) continue;
+    labels.set(index, [...(labels.get(index) ?? []), eventLabel(event)]);
+  }
+  return [...labels.entries()].sort((a, b) => a[0] - b[0]).map(([index, list]) => ({ index, label: list.join(", ") }));
 }
 
 /** `2 runs · 2m 30.8s · 110.7K tokens · context 32.0K / 128K · 25%`, with `—` where no tokens were recorded. */

@@ -2,7 +2,7 @@ import { keepPreviousData, QueryClientProvider, useInfiniteQuery, useQuery, type
 import { createContext, useCallback, useContext, useSyncExternalStore, type ReactNode } from "react";
 import { useSyncExternalStoreWithSelector } from "use-sync-external-store/with-selector";
 import { ConnectionProvider } from "./connection-context.tsx";
-import { changesDiffKey, changesListKey, type ChangedFiles, type FileDiff } from "./changes.ts";
+import { changesDiffKey, changesListKey, commitInfoKey, type ChangedFiles, type ChangesCommitInfoResult, type FileDiff } from "./changes.ts";
 import { fileListKey, fileReadKey, type FileRead } from "./files.ts";
 import { configKey, type ConfigGetResult } from "./config.ts";
 import { KEYS_KEY } from "./keys.ts";
@@ -286,6 +286,17 @@ export function useChangedFiles(sessionId: string): ChangedFiles {
     queryFn: async () => (await queries.changesList(sessionId)).files,
   });
   return { files: result.data ?? null, error: result.error === null ? null : result.error.message };
+}
+
+/** What git says about the session folder: whether it is a repository, its branch, and the changed paths it sees. */
+export function useCommitInfo(sessionId: string): ChangesCommitInfoResult | null {
+  const { queries } = usePage();
+  const result = useQuery({
+    queryKey: commitInfoKey(sessionId),
+    queryFn: () => queries.changesCommitInfo(sessionId),
+    retry: false,
+  });
+  return result.data ?? null;
 }
 
 /** One file's diff. Not read for a null path. */

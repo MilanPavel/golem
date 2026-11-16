@@ -1,5 +1,8 @@
 import type { ChatEvent, TraceContext, TraceContextPart, TraceModelSpan, TraceRunSpan } from "@golem/client";
 
+import { plural } from "./compact.ts";
+import { formatTurnTime } from "./duration.ts";
+
 export type { TraceContext, TraceContextPart };
 export type ContextKey = TraceContextPart["key"];
 export type ContextLevel = "ok" | "high" | "full";
@@ -10,7 +13,7 @@ export const CHARS_PER_TOKEN = 4;
 /** The display order of the parts. */
 export const CONTEXT_KEYS: readonly ContextKey[] = ["system", "tools", "user", "assistant", "tool_results", "summary"];
 
-export const CONTEXT_LABELS: Record<ContextKey | "free", string> = {
+export const CONTEXT_LABELS: Record<ContextKey | "free" | "reserve" | "cleared", string> = {
   system: "System prompt",
   tools: "Tool definitions",
   user: "Your messages",
@@ -18,6 +21,8 @@ export const CONTEXT_LABELS: Record<ContextKey | "free", string> = {
   tool_results: "Tool results",
   summary: "Summary",
   free: "Free",
+  reserve: "Reply reserve",
+  cleared: "Cleared",
 };
 
 /** `612`, then `9.1K` from a thousand on. */
@@ -88,8 +93,11 @@ export type CutFields = Pick<TraceContext, "prompt_cut" | "prompt_cut_kind" | "d
  * `warn` is true for a proven cut and for a prompt cut in the middle. A size of a cut always has `≈`:
  * only the fact of a proven cut is known, never how much was lost. A "no" and an unknown cut say nothing.
  */
-export function cutNote(span: CutFields): { text: string; warn: boolean } | null {
+export const PLANNED_CUT_NOTE = "The model server cut this prompt. That should not happen: please report it.";
+
+export function cutNote(span: CutFields, planned = false): { text: string; warn: boolean } | null {
   const cut = span.prompt_cut ?? null;
+  if (planned && (cut === "yes" || cut === "likely")) return { text: PLANNED_CUT_NOTE, warn: true };
   const count = span.dropped_message_ids?.length ?? 0;
   const tokens = span.dropped_tokens ?? null;
   const size = tokens === null ? "" : ` (≈${formatTokens(tokens)})`;
@@ -113,6 +121,13 @@ export function cutNote(span: CutFields): { text: string; warn: boolean } | null
   return null;
 }
 
+/** The muted legend row for cleared results: `Cleared · 12 tool results · 11.2K not sent`, or null. */
+export function clearedLegend(context: Pick<TraceContext, "cleared">): string | null {
+  const count = context.cleared?.count ?? 0;
+  if (count <= 0) return null;
+  return `${CONTEXT_LABELS.cleared} · ${plural(count, "tool result", "tool results")} · ${formatTokens(context.cleared?.tokens ?? 0)} not sent`;
+}
+
 /** What was cleared at one model call: a line for the Context tab, or null when nothing was. */
 export function clearedNote(context: Pick<TraceContext, "cleared">): string | null {
   const count = context.cleared?.count ?? 0;
@@ -121,12 +136,60 @@ export function clearedNote(context: Pick<TraceContext, "cleared">): string | nu
   return `${count} old tool ${count === 1 ? "result was" : "results were"} sent as one line at this call, saving ≈${formatTokens(tokens)}.`;
 }
 
-/** Cells of a bar `width` wide for each part, in display order, and the free rest. */
+/** The line for the summary message of a call: `summary of 9 earlier messages`. */
+export function summaryOfLine(count: number): string {
+  return `summary of ${plural(count, "earlier message", "earlier messages")}`;
+}
+
+/** What `context.changed` carries. */
+export type ContextChangeData = Extract<ChatEvent, { type: "context.changed" }>["data"];
+
+/**
+ * The one quiet line for a change of what golem sends: `golem cleared 12 old tool results · ctx 71% → 38%`,
+ * `golem summarised 9 earlier turns · ctx 84% → 31%`, or `window grew 32K → 64K · reloaded in 8 s`.
+ * Percentages are of the room (window less the reply reserve), or tokens when the room is unknown.
+ */
+export function contextChangedNote(data: ContextChangeData): string {
+  if (data.action === "grew") {
+    const from = data.window_from ?? null;
+    const to = data.window_to ?? null;
+    const sizes = from === null || to === null ? "" : ` ${formatWindow(from)} → ${formatWindow(to)}`;
+    const reload = data.reload_ms == null ? "" : ` · reloaded in ${data.reload_ms < 60_000 ? `${Math.round(data.reload_ms / 1000)} s` : formatTurnTime(data.reload_ms)}`;
+    return `window grew${sizes}${reload}`;
+  }
+  const what =
+    data.action === "cleared"
+      ? plural(data.count ?? 0, "old tool result", "old tool results")
+      : plural(data.count ?? 0, "earlier turn", "earlier turns");
+  const head = `golem ${data.action} ${what}`;
+  if (data.before_tokens == null || data.after_tokens == null) return head;
+  const room = data.room ?? null;
+  const share = (tokens: number): string => (room === null || room <= 0 ? formatTokens(tokens) : `${Math.round((tokens / room) * 100)}%`);
+  return `${head} · ctx ${share(data.before_tokens)} → ${share(data.after_tokens)}`;
+}
+
+/** A cell of the bar: a part, the free rest, or the reply reserve at its end. */
+export type ContextCell = ContextKey | "free" | "reserve";
+
+/** The free tokens outside the reserve, and the reserve, of a call whose window is known. */
+export function contextRoom(ctx: TraceContext): { free: number; reserve: number } | null {
+  const window = ctx.window ?? null;
+  if (window === null) return null;
+  const left = Math.max(0, window - contextUsed(ctx));
+  const reserve = Math.min(ctx.reserve ?? 0, left);
+  return { free: left - reserve, reserve };
+}
+
+/**
+ * Cells of a bar `width` wide for each part, in display order, then the free rest, then the reply
+ * `reserve` (tokens) when there is one.
+ */
 export function contextCells(
   parts: readonly TraceContextPart[],
   window: number | null,
   width: number,
-): { key: ContextKey | "free"; cells: number }[] {
+  reserve = 0,
+): { key: ContextCell; cells: number }[] {
   const tokensOf = (key: ContextKey): number => parts.find((part) => part.key === key)?.tokens ?? 0;
   const used = CONTEXT_KEYS.reduce((sum, key) => sum + tokensOf(key), 0);
   const total = Math.max(window ?? 0, used);
@@ -142,13 +205,19 @@ export function contextCells(
     if (slot !== undefined) cells[slot.index] = (cells[slot.index] ?? 0) + 1;
   }
   const taken = cells.reduce((sum, count) => sum + count, 0);
-  return [...CONTEXT_KEYS.map((key, index) => ({ key, cells: cells[index] ?? 0 })), { key: "free" as const, cells: Math.max(0, width - taken) }];
+  const kept = Math.min(Math.max(0, width - taken), Math.round((Math.min(reserve, Math.max(0, total - used)) / total) * width));
+  const out: { key: ContextCell; cells: number }[] = [
+    ...CONTEXT_KEYS.map((key, index) => ({ key, cells: cells[index] ?? 0 })),
+    { key: "free" as const, cells: Math.max(0, width - taken - kept) },
+  ];
+  if (kept > 0) out.push({ key: "reserve", cells: kept });
+  return out;
 }
 
 /** `█` for each used cell, then `░` for each free one. */
-export function contextBar(parts: readonly TraceContextPart[], window: number | null, width: number): string {
-  return contextCells(parts, window, width)
-    .map(({ key, cells }) => (key === "free" ? "░" : "█").repeat(cells))
+export function contextBar(parts: readonly TraceContextPart[], window: number | null, width: number, reserve = 0): string {
+  return contextCells(parts, window, width, reserve)
+    .map(({ key, cells }) => (key === "free" ? "░" : key === "reserve" ? "▒" : "█").repeat(cells))
     .join("");
 }
 
@@ -250,7 +319,7 @@ function toolServerLines(part: TraceContextPart): string[] {
 }
 
 /** One line of the panel: segments in order, a part's own colour on the segments that name one. */
-export type ContextLine = { text: string; part?: ContextKey | "free" }[];
+export type ContextLine = { text: string; part?: ContextKey | "free" | "reserve" | "cleared" }[];
 
 /** The panel's grid: rows of cells, the parts in display order, then the free ones. One cell is 0.5% of the window. */
 export function contextGrid(
@@ -258,8 +327,9 @@ export function contextGrid(
   window: number | null,
   rows = 10,
   cols = 20,
-): (ContextKey | "free")[][] {
-  const flat = contextCells(parts, window, rows * cols).flatMap(({ key, cells }) => Array.from({ length: cells }, () => key));
+  reserve = 0,
+): ContextCell[][] {
+  const flat = contextCells(parts, window, rows * cols, reserve).flatMap(({ key, cells }) => Array.from({ length: cells }, () => key));
   return Array.from({ length: rows }, (_, row) => flat.slice(row * cols, (row + 1) * cols));
 }
 
@@ -268,10 +338,10 @@ const GRID_GAP = "   ";
 /** The least width that holds the grid and the legend side by side. */
 const SIDE_BY_SIDE = 84;
 
-function gridLine(cells: readonly (ContextKey | "free")[]): ContextLine {
+function gridLine(cells: readonly ContextCell[]): ContextLine {
   const line: ContextLine = [];
   for (const key of cells) {
-    const glyph = key === "free" ? "\u25A1 " : "\u25A0 ";
+    const glyph = key === "free" ? "\u25A1 " : key === "reserve" ? "\u25A8 " : "\u25A0 ";
     const last = line[line.length - 1];
     if (last !== undefined && last.part === key) last.text += glyph;
     else line.push({ text: glyph, part: key });
@@ -310,14 +380,22 @@ export function contextReportLines(report: ContextReport, columns: number): Cont
   const grid = used !== null && window !== null;
   const servers = ctx.parts.filter((part) => part.key === "tools").flatMap(toolServerLines).map(plain);
   if (used !== null && window !== null) {
-    const cells = contextGrid(ctx.parts, window).map(gridLine);
+    const room = contextRoom(ctx);
+    const cells = contextGrid(ctx.parts, window, 10, 20, room?.reserve ?? 0).map(gridLine);
     const head: ContextLine[] = [];
     if (report.model !== null) head.push(plain(report.model));
     head.push(plain(summary), plain(""));
     const legend: ContextLine[] = ctx.parts
       .filter((part) => part.tokens > 0)
       .map((part): ContextLine => [{ text: "\u25A0 ", part: part.key }, { text: row(CONTEXT_LABELS[part.key], part.tokens) }]);
-    if (used <= window) legend.push([{ text: "\u25A1 ", part: "free" }, { text: row(CONTEXT_LABELS.free, window - used) }]);
+    if (used <= window) {
+      legend.push([{ text: "\u25A1 ", part: "free" }, { text: row(CONTEXT_LABELS.free, room?.free ?? window - used) }]);
+      if (room !== null && room.reserve > 0) {
+        legend.push([{ text: "\u25A8 ", part: "reserve" }, { text: row(CONTEXT_LABELS.reserve, room.reserve) }]);
+      }
+    }
+    const cleared = clearedLegend(ctx);
+    if (cleared !== null) legend.push([{ text: "\u25A8 ", part: "cleared" }, { text: cleared }]);
     const side = [...head, ...legend];
     if (columns >= SIDE_BY_SIDE) {
       const height = Math.max(cells.length, side.length);
@@ -335,6 +413,10 @@ export function contextReportLines(report: ContextReport, columns: number): Cont
       lines.push(plain(row(CONTEXT_LABELS[part.key], part.tokens)));
       if (part.key === "tools") lines.push(...servers);
     }
+  }
+  if (!grid) {
+    const cleared = clearedLegend(ctx);
+    if (cleared !== null) lines.push(plain(cleared));
   }
   if (grid) lines.push(...servers);
   if (ctx.estimated) lines.push(plain("Parts are estimates, scaled to the provider's count."));

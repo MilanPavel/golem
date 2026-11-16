@@ -35,6 +35,7 @@ export function keepQueriesHonest(client: QueryWiringClient, queryClient: QueryC
         stale("changes.list", sessionId);
         stale("changes.diff", sessionId);
         stale("file.read", sessionId);
+        stale("changes.commit_info", sessionId);
       }, CHANGES_REFETCH_MS),
     );
   };

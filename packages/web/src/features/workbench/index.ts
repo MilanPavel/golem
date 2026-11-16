@@ -1,11 +1,13 @@
 export { ChangesTab, ChangesView } from "./changes-tab.tsx";
 export { FilesTab, FilesView } from "./files-tab.tsx";
+export { CommitDialogView, type CommitDialogViewProps } from "./commit-dialog.tsx";
 export { Workbench, WORKBENCH_ID } from "./workbench.tsx";
 export type { WorkbenchTab } from "./workbench.tsx";
 export {
   openChange,
   openFile,
   openWorkbench,
+  requestCommit,
   useRequestedChange,
   useRequestedFile,
   useWorkbenchTab,

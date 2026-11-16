@@ -88,6 +88,7 @@ export type { FileListResult } from "../../protocol/gen/file-list-result.ts";
 export type { FileReadResult } from "../../protocol/gen/file-read-result.ts";
 export type { McpToolInfo, McpToolsResult } from "../../protocol/gen/mcp-tools-result.ts";
 export type { TraceContext } from "../../protocol/gen/trace-context.ts";
+export type { TraceContextEvent } from "../../protocol/gen/trace-context-event.ts";
 export type { TraceContextItem } from "../../protocol/gen/trace-context-item.ts";
 export type { TraceContextPart } from "../../protocol/gen/trace-context-part.ts";
 export type { PromptSectionInfo } from "../../protocol/gen/prompt-section-info.ts";

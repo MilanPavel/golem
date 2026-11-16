@@ -107,6 +107,19 @@
           "default": null,
           "title": "Prompt Cut Kind"
         },
+        "reserve": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reserve"
+        },
         "used": {
           "anyOf": [
             {
@@ -136,6 +149,11 @@
         "window_estimated": {
           "default": false,
           "title": "Window Estimated",
+          "type": "boolean"
+        },
+        "window_planned": {
+          "default": false,
+          "title": "Window Planned",
           "type": "boolean"
         }
       },
@@ -268,6 +286,18 @@
           ],
           "default": null,
           "title": "Id"
+        },
+        "original": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Original"
         },
         "role": {
           "enum": [
@@ -624,6 +654,19 @@
       ],
       "default": null,
       "title": "Stop Reason"
+    },
+    "summary_of": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Summary Of"
     },
     "system_prompt": {
       "anyOf": [

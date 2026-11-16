@@ -41,6 +41,17 @@ test("the gallery's Commands dialog lists the groups and passes axe", async () =
   await expectAxeClean(dialog, DIALOG_RULES);
 });
 
+test("the gallery's commit dialog lists the files, shows git's refusal, and passes axe", async () => {
+  showTheme("slip");
+  const user = userEvent.setup();
+  render(<Gallery />);
+  await user.click(screen.getByRole("button", { name: "Commit refused, slip" }));
+  const dialog = await screen.findByRole("dialog", { name: "Commit changes" });
+  expect(within(dialog).getAllByRole("checkbox")).toHaveLength(3);
+  expect(dialog.textContent).toContain("hook failed");
+  await expectAxeClean(dialog, DIALOG_RULES);
+});
+
 test("each gallery section has a stable anchor, the slip one plain and the kiln one prefixed, and no id repeats", () => {
   const { container } = render(<Gallery />);
   for (const id of ["trace", "approval", "setup-form", "model-dialog", "kiln-trace", "kiln-approval"]) {

@@ -66,6 +66,21 @@ export function useRequestedFile(): [FileRequest | null, () => void] {
   return [request, clear];
 }
 
+const commitRequestStore = createStore<boolean>(false);
+
+/** Asks the Changes tab to open its commit dialog. Opens the tab too. */
+export function requestCommit(): void {
+  commitRequestStore.set(true);
+  openWorkbench("changes");
+}
+
+/** Whether the commit dialog was asked for, and a function that clears the request. */
+export function useCommitRequest(): [boolean, () => void] {
+  const asked = useSyncExternalStore(commitRequestStore.subscribe, commitRequestStore.getSnapshot);
+  const clear = useCallback(() => commitRequestStore.set(false), []);
+  return [asked, clear];
+}
+
 /** The remembered path, and a function that clears it. */
 export function useRequestedChange(): [string | null, () => void] {
   const path = useSyncExternalStore(requestedStore.subscribe, requestedStore.getSnapshot);

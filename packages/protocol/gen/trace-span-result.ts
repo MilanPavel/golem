@@ -23,11 +23,14 @@ export type Tokens2 = number;
 export type Parts = TraceContextPart[];
 export type PromptCut = ('no' | 'yes' | 'likely') | null;
 export type PromptCutKind = ('older_messages' | 'middle') | null;
+export type Reserve = number | null;
 export type Used = number | null;
 export type Window = number | null;
 export type WindowEstimated = boolean;
+export type WindowPlanned = boolean;
 export type CallId = string | null;
 export type Id = string | null;
+export type Original = string | null;
 export type Role = 'user' | 'assistant' | 'tool';
 export type Text = string;
 export type Tokens3 = number | null;
@@ -55,6 +58,7 @@ export type CacheWrite = number | null;
 export type Input = number | null;
 export type Output = number | null;
 export type StopReason = string | null;
+export type SummaryOf = number | null;
 export type SystemPrompt = string | null;
 export type SystemSections = PromptSectionInfo[] | null;
 export type Chars1 = number;
@@ -90,6 +94,7 @@ export interface TraceSpanResult {
   result?: Result;
   span: TraceSpan;
   stop_reason?: StopReason;
+  summary_of?: SummaryOf;
   system_prompt?: SystemPrompt;
   system_sections?: SystemSections;
   text_tool_calls?: TextToolCalls;
@@ -118,9 +123,11 @@ export interface TraceContext {
   parts: Parts;
   prompt_cut?: PromptCut;
   prompt_cut_kind?: PromptCutKind;
+  reserve?: Reserve;
   used?: Used;
   window?: Window;
   window_estimated?: WindowEstimated;
+  window_planned?: WindowPlanned;
 }
 /**
  * Tool results the call sent as a one-line stub, and the tokens that saved.
@@ -164,6 +171,7 @@ export interface TraceContextItem {
 export interface TraceMessage {
   call_id?: CallId;
   id?: Id;
+  original?: Original;
   role: Role;
   text: Text;
   tokens?: Tokens3;
