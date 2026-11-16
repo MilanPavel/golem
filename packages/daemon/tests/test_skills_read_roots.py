@@ -287,6 +287,6 @@ def test_client_file_methods_refuse_credentials(
     for name in (".aws/config", ".netrc"):
         with pytest.raises(ToolError, match="holds credentials"):
             read_text(home, name)
-    shown = list_paths(home, "", 100).paths
+    shown = list_paths(home, "", 100, hidden=True).paths
     assert "notes.txt" in shown and ".golem/skills/x/SKILL.md" in shown
     assert not any(".aws" in p or ".netrc" in p for p in shown)
