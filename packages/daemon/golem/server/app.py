@@ -300,6 +300,7 @@ class DaemonApp:
                     tier_of=lambda profile: _tier_of(router, models, profile),
                     ratios=TokenRatios(),
                     paid_ok=budget.paid_ok,
+                    budget_refs=models.budget_refs,
                     summariser=Summariser(
                         router,
                         gate=gate,

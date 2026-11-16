@@ -10,6 +10,7 @@ export type MessageId = string;
 export type MessageIds = string[];
 export type Model = string | null;
 export type NumCtx = number | null;
+export type ParentCallId = string | null;
 export type Profile = string;
 export type Provider = string | null;
 export type SummaryChars = number | null;
@@ -69,6 +70,10 @@ export interface ModelCallStartedEvent {
  * and ``message_bytes`` have one number per message sent. Each is None on an
  * event recorded before they existed.
  *
+ * ``parent_call_id`` is set on an event of a child run: the id of the ``delegate`` call
+ * that started it. The event is in the parent's run, and a client that does not know
+ * child runs ignores it. None for the run's own events.
+ *
  * This interface was referenced by `ModelCallStartedEvent`'s JSON-Schema
  * via the `definition` "ModelCallStartedData".
  */
@@ -83,6 +88,7 @@ export interface ModelCallStartedData {
   message_ids?: MessageIds;
   model?: Model;
   num_ctx?: NumCtx;
+  parent_call_id?: ParentCallId;
   profile: Profile;
   provider?: Provider;
   summary_chars?: SummaryChars;

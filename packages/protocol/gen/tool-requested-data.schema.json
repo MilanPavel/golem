@@ -1,6 +1,6 @@
 {
   "additionalProperties": false,
-  "description": "The model asked for one tool call.\n\n``message_id`` is the assistant message that asked. ``args`` are the\narguments as the model wrote them.",
+  "description": "The model asked for one tool call.\n\n``message_id`` is the assistant message that asked. ``args`` are the\narguments as the model wrote them.\n\n``parent_call_id`` is set on an event of a child run: the id of the ``delegate`` call\nthat started it. The event is in the parent's run, and a client that does not know\nchild runs ignores it. None for the run's own events.",
   "properties": {
     "args": {
       "additionalProperties": true,
@@ -21,6 +21,19 @@
       "minLength": 1,
       "title": "Name",
       "type": "string"
+    },
+    "parent_call_id": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Parent Call Id"
     }
   },
   "required": [

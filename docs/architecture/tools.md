@@ -135,6 +135,7 @@ Every session gets these (`default_registry`), plus the tools of its MCP servers
 | `read_file`, `list_dir`, `glob`, `grep` | Read the session's project folder, and the folder of each skill the session ran | Allowed: read-only |
 | `git_status`, `git_diff`, `git_log` | Read the project's git repository | Allowed: read-only |
 | `read_artifact` | Read a page of long output | Allowed: read-only |
+| `delegate` | Run a helper (the explorer) on a brief and return its short answer | Allowed: read-only |
 | `todo_write` | Replace the agent's todo list | Allowed: internal |
 | `write_file`, `edit_file` | Create, replace, or edit a file in the project folder | Asks, per file |
 | `shell` | Run a command in the sandbox | Asks, per command |
@@ -154,6 +155,19 @@ A `Tool` says how the rules treat it:
 | `parameters` | A JSON Schema given as it is, for an MCP server's tool. The server checks the arguments |
 
 One call returns at most 5 MB (`MAX_OUTPUT_CHARS`), and the rest is cut.
+
+### `delegate` and the explorer
+
+`delegate(brief, agent = "explorer")` hands a wide reading or searching question to a helper that starts with an empty context ([ADR-058](../adr/058-child-runs.md)). The helper is a child run: the same chat graph on its own checkpoint thread, `<session_id>/c/<call_id>`, whose first message is the brief. It is not a session, and nothing lists it.
+
+- **Tools.** Only `read_file`, `list_dir`, `glob`, `grep`, `git_log`, `git_diff`, `git_status` and `read_artifact`. A call to anything else, `delegate` included, gets the "unknown tool" error, which the helper reads. A call the rules would ask about is refused with a message, because a helper never asks for approval and gets none of the session's allowances.
+- **Prompt.** One fixed section: answer the brief, read only what is needed, end with findings first and the paths that matter.
+- **Model.** The `explore` role of [ADR-055](../adr/055-model-routing.md): on a local session the same model with the same options, waiting its turn at the `ServerGate`. A paid helper model is checked against the budget before each call. A session that stays local keeps a local helper.
+- **Limits.** 15 model calls, then one last call without tools that asks for the answer; 5 minutes; 6 000 characters of answer. The result starts with `explorer finished: calls` (or `time`) when a limit ended it.
+- **Events.** The helper's model and tool events go into the parent's log with `parent_call_id`, the id of the `delegate` call. They are never `message.*` events, and the run's own call counters and `MAX_MODEL_CALLS` ignore them. While it runs, `tool.output` of the `delegate` call shows one line per tool call. Clients that do not know child runs ignore events with `parent_call_id`.
+- **Cancel.** Cancelling the run cancels the helper. Its open calls fail in the log, and the `delegate` call gets a cancelled result on the next turn like any unanswered call.
+
+A helper's model calls cost like any call and are `explore` rows in `model_calls`.
 
 ### Tool events
 
@@ -242,6 +256,8 @@ Longer output is stored whole in the `artifacts` table, and the message keeps it
 | `packages/daemon/golem/tools/untrusted.py` | The wrapper for outside content |
 | `packages/daemon/golem/tools/artifacts.py` | `read_artifact` |
 | `packages/daemon/golem/tools/todos.py` | `todo_write` |
+| `packages/daemon/golem/tools/delegate.py` | `delegate` |
+| `packages/daemon/golem/graphs/child.py` | `run_child`: the helper's thread, tools, prompt, and limits |
 | `packages/daemon/golem/graphs/result_budget.py` | How much of one result the model reads, by window |
 | `packages/daemon/golem/graphs/tools_node.py` | The `tools` node: decide, run, results, artifacts, and state updates |
 | `packages/daemon/golem/store/artifacts.py` | `ArtifactStore`, the `artifacts` table |

@@ -327,6 +327,10 @@ class ToolRequestedData(BaseModel):
 
     ``message_id`` is the assistant message that asked. ``args`` are the
     arguments as the model wrote them.
+
+    ``parent_call_id`` is set on an event of a child run: the id of the ``delegate`` call
+    that started it. The event is in the parent's run, and a client that does not know
+    child runs ignores it. None for the run's own events.
     """
 
     model_config = _CONFIG
@@ -335,6 +339,7 @@ class ToolRequestedData(BaseModel):
     message_id: str = Field(min_length=1)
     name: str = Field(min_length=1)
     args: dict[str, Any]
+    parent_call_id: str | None = Field(default=None, min_length=1)
 
 
 class SessionChecksChangedData(BaseModel):
@@ -435,11 +440,17 @@ class CheckCompletedData(BaseModel):
 
 
 class ToolStartedData(BaseModel):
-    """A requested tool call is running."""
+    """A requested tool call is running.
+
+    ``parent_call_id`` is set on an event of a child run: the id of the ``delegate`` call
+    that started it. The event is in the parent's run, and a client that does not know
+    child runs ignores it. None for the run's own events.
+    """
 
     model_config = _CONFIG
 
     call_id: str = Field(min_length=1)
+    parent_call_id: str | None = Field(default=None, min_length=1)
 
 
 class ToolOutputData(BaseModel):
@@ -523,6 +534,10 @@ class ModelCallStartedData(BaseModel):
     ``message_ids`` order (its text and its tool calls as JSON). ``message_chars``
     and ``message_bytes`` have one number per message sent. Each is None on an
     event recorded before they existed.
+
+    ``parent_call_id`` is set on an event of a child run: the id of the ``delegate`` call
+    that started it. The event is in the parent's run, and a client that does not know
+    child runs ignores it. None for the run's own events.
     """
 
     model_config = _CONFIG
@@ -554,6 +569,7 @@ class ModelCallStartedData(BaseModel):
     estimated_tokens: int | None = Field(default=None, ge=0)
     """What golem estimated the prompt at, in tokens, before sending it. None when the window
     was unknown or on an older event."""
+    parent_call_id: str | None = Field(default=None, min_length=1)
 
 
 class ContextChangedData(BaseModel):
@@ -623,6 +639,10 @@ class ModelCallCompletedData(BaseModel):
     ``load_ms``, ``prompt_ms`` and ``reply_ms`` are the time the model server spent loading
     the model, reading the prompt and writing the reply. From the model server's own clock.
     Ollama only.
+
+    ``parent_call_id`` is set on an event of a child run: the id of the ``delegate`` call
+    that started it. The event is in the parent's run, and a client that does not know
+    child runs ignores it. None for the run's own events.
     """
 
     model_config = _CONFIG
@@ -640,6 +660,7 @@ class ModelCallCompletedData(BaseModel):
     load_ms: int | None = Field(default=None, ge=0)
     prompt_ms: int | None = Field(default=None, ge=0)
     reply_ms: int | None = Field(default=None, ge=0)
+    parent_call_id: str | None = Field(default=None, min_length=1)
 
 
 class ToolCompletedData(BaseModel):
@@ -658,6 +679,10 @@ class ToolCompletedData(BaseModel):
     result, without the wait for an approval. None means it was not measured.
 
     ``diff`` is the change a file tool made, as a unified diff.
+
+    ``parent_call_id`` is set on an event of a child run: the id of the ``delegate`` call
+    that started it. The event is in the parent's run, and a client that does not know
+    child runs ignores it. None for the run's own events.
     """
 
     model_config = _CONFIG
@@ -670,6 +695,7 @@ class ToolCompletedData(BaseModel):
     failed: bool = False
     duration_ms: int | None = Field(default=None, ge=0)
     diff: str | None = None
+    parent_call_id: str | None = Field(default=None, min_length=1)
 
 
 class ToolFailedData(BaseModel):
@@ -677,6 +703,10 @@ class ToolFailedData(BaseModel):
 
     ``duration_ms`` is how long the tool ran before it raised. None means a
     call that was denied or cut off, which never ran or was not timed.
+
+    ``parent_call_id`` is set on an event of a child run: the id of the ``delegate`` call
+    that started it. The event is in the parent's run, and a client that does not know
+    child runs ignores it. None for the run's own events.
     """
 
     model_config = _CONFIG
@@ -684,6 +714,7 @@ class ToolFailedData(BaseModel):
     call_id: str = Field(min_length=1)
     message: str = Field(min_length=1)
     duration_ms: int | None = Field(default=None, ge=0)
+    parent_call_id: str | None = Field(default=None, min_length=1)
 
 
 class FileChangedData(BaseModel):

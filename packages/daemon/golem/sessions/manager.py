@@ -875,6 +875,7 @@ class SessionManager:
                 permission_mode=session.permission_mode,
                 checks=session.checks,
                 plan_first=session.plan_first,
+                local_only=session.route == "local",
                 pins=session.pins,
                 routed=routed,
             )
@@ -1033,6 +1034,7 @@ class SessionManager:
                 permission_mode=session.permission_mode,
                 checks=session.checks,
                 plan_first=session.plan_first,
+                local_only=session.route == "local",
                 pins=session.pins,
             )
             control = RunControl()

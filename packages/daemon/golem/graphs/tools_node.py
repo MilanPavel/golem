@@ -27,7 +27,7 @@ import time
 from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from pathlib import Path
-from typing import Literal, cast
+from typing import Literal, Protocol, cast
 
 from langchain_core.messages import AIMessage, BaseMessage, ToolMessage
 from langchain_core.messages.tool import ToolCall
@@ -38,11 +38,13 @@ from langgraph.types import interrupt
 from golem.config import PERMISSION_MODES, PermissionMode
 from golem.graphs.adapter import (
     APPROVAL_KIND,
+    CHILD_FACT_KIND,
     FILE_CHANGED_KIND,
     PLAN_PROPOSED_KIND,
     SKILL_LOADED_KIND,
     STREAM_KEY,
 )
+from golem.graphs.child import ChildProgress, ChildResult
 from golem.graphs.result_budget import DEFAULT_BUDGET, ResultBudget
 from golem.graphs.state import AgentState
 from golem.permissions.engine import Allowance, session_allows
@@ -50,6 +52,7 @@ from golem.permissions.policy import Policy, describe, explain
 from golem.skills.registry import SkillRegistry
 from golem.tools.registry import (
     Artifacts,
+    Delegated,
     InvalidArguments,
     Preview,
     ToolContext,
@@ -82,6 +85,37 @@ MCP_KEY = "golem_mcp_servers"
 MCP_NOW_KEY = "golem_mcp_now"
 """``configurable`` key for a set the model's ``mcp_enable`` adds to during one run, so the
 servers it turned on are in scope for the next model call before the session list is read again."""
+
+CHILD_KEY = "golem_child"
+"""``configurable`` key of a child run, with its :class:`ChildScope`. Absent in a session's run."""
+
+LOCAL_ONLY_KEY = "golem_local_only"
+"""``configurable`` key for whether the session stays on this Mac, for the helper's model."""
+
+NO_ASK_REFUSAL = "a helper cannot ask for approval: this call needs it"
+
+
+@dataclass(frozen=True, slots=True)
+class ChildScope:
+    """What marks a run as a child run: its tools, and the model calls before it must answer."""
+
+    tools: frozenset[str]
+    max_calls: int
+
+
+class ChildHost(Protocol):
+    """What the tools node needs to start a helper. The chat runtime has it."""
+
+    async def delegate(
+        self,
+        *,
+        state: AgentState,
+        config: RunnableConfig,
+        call_id: str,
+        brief: str,
+        emit_fact: Callable[[object], None],
+    ) -> ChildResult: ...
+
 
 EnableMcp = Callable[[str, ToolScope, str], Awaitable[list[str]]]
 """``(session_id, scope, name)``: turns the on-demand server on for the session, waits until it
@@ -159,6 +193,7 @@ def tools_node(
     enable_mcp: Callable[[], EnableMcp | None] = lambda: None,
     skills: Callable[[], SkillRegistry | None] = lambda: None,
     budget_of: BudgetOf | None = None,
+    children: Callable[[], ChildHost | None] = lambda: None,
 ) -> Callable[[AgentState, RunnableConfig], Awaitable[dict[str, object]]]:
     async def tools(state: AgentState, config: RunnableConfig) -> dict[str, object]:
         last = state["messages"][-1]
@@ -193,6 +228,8 @@ def tools_node(
         allowed = _allowed(config)
         mode = _mode(config)
         plan_first = _plan_first(config)
+        helper = child_of(config) is not None
+        host = children()
         asked = _asked(config)
         ids = [call_id_of(call) for call in last.tool_calls]
         last_asked = max(
@@ -225,6 +262,7 @@ def tools_node(
                 mode,
                 asked=ids[index] in asked,
                 before_last_asked=index < last_asked,
+                never_ask=helper,
             )
             if verdict.run and verdict.args is not None:
                 edited = cast(ToolCall, {**call, "args": verdict.args})
@@ -247,9 +285,12 @@ def tools_node(
                 continue
             write({STREAM_KEY: "tool.started", "call_id": call_id})
             started = time.monotonic()
-            ctx = replace(
-                base, output=_streamer(write, call_id), approved_diff=verdict.approved_diff
-            )
+            output = _streamer(write, call_id)
+            ctx = replace(base, output=output, approved_diff=verdict.approved_diff)
+            if host is not None and not helper and call["name"] == "delegate" and session_id:
+                ctx = replace(
+                    ctx, delegate=_delegation(host, state, config, call_id, write, output)
+                )
             args = call["args"] if verdict.args is None else verdict.args
             try:
                 result = await session_tools.call(call["name"], args, ctx)
@@ -335,6 +376,7 @@ def _decide(
     *,
     asked: bool,
     before_last_asked: bool,
+    never_ask: bool = False,
 ) -> _Verdict:
     """``preview`` is what the call would change, or why it cannot, or None."""
     name = call["name"]
@@ -346,6 +388,8 @@ def _decide(
         if decision.action == "deny":
             log.info("tool %s denied by %s", name, decision.source)
             return _Verdict(run=False, message=explain(decision, name), kind="denied")
+        if never_ask:
+            return _Verdict(run=False, message=NO_ASK_REFUSAL, kind="denied")
         if session_allows(allowed, name, subject):
             return _Verdict(run=True)
         if before_last_asked:
@@ -479,6 +523,33 @@ def _result(
     )
 
 
+def _delegation(
+    host: ChildHost,
+    state: AgentState,
+    config: RunnableConfig,
+    call_id: str,
+    write: Callable[[object], None],
+    output: Callable[[str], None],
+) -> Callable[[str], Awaitable[Delegated]]:
+    """The way a ``delegate`` call runs its helper: its facts go out on the parent's stream."""
+
+    async def delegate(brief: str) -> Delegated:
+        progress = ChildProgress()
+
+        def emit(fact: object) -> None:
+            write({STREAM_KEY: CHILD_FACT_KIND, "parent_call_id": call_id, "fact": fact})
+            line = progress.see(fact)
+            if line is not None:
+                output(line + "\n")
+
+        done = await host.delegate(
+            state=state, config=config, call_id=call_id, brief=brief, emit_fact=emit
+        )
+        return Delegated(done.text, done.stopped)
+
+    return delegate
+
+
 def _streamer(write: Callable[[object], None], call_id: str) -> Callable[[str], None]:
     def output(text: str) -> None:
         if text:
@@ -532,9 +603,21 @@ def unavailable(name: str) -> str:
     return f"unknown tool {name!r}"
 
 
+def child_of(config: RunnableConfig) -> ChildScope | None:
+    """The scope of a child run, or None for a session's own run."""
+    raw = cast(Mapping[str, object], config.get("configurable", {})).get(CHILD_KEY)
+    return raw if isinstance(raw, ChildScope) else None
+
+
 def scope_of(config: RunnableConfig) -> ToolScope:
-    """The outside tools this run's session sees: its folder and its enabled servers."""
+    """The outside tools this run's session sees: its folder and its enabled servers.
+
+    A child run sees only its own fixed tools.
+    """
     configurable = cast(Mapping[str, object], config.get("configurable", {}))
+    child = child_of(config)
+    if child is not None:
+        return ToolScope(root=_root(config), only=child.tools)
     raw = configurable.get(MCP_KEY)
     names = list(cast(Sequence[object], raw)) if isinstance(raw, list | tuple) else []
     now = configurable.get(MCP_NOW_KEY)
@@ -568,12 +651,15 @@ __all__ = [
     "ASKED_KEY",
     "CANCELLED_RESULT",
     "CHANGED_RESULT",
+    "CHILD_KEY",
     "CWD_KEY",
     "DENIED_RESULT",
     "ERROR_KEY",
+    "LOCAL_ONLY_KEY",
     "MCP_KEY",
     "MCP_NOW_KEY",
     "MODE_KEY",
+    "NO_ASK_REFUSAL",
     "PINNED_FOLDERS_KEY",
     "PLAN_KEY",
     "PLAN_REFUSAL",
@@ -581,10 +667,13 @@ __all__ = [
     "STATE_KEYS",
     "Answer",
     "BudgetOf",
+    "ChildHost",
+    "ChildScope",
     "EnableMcp",
     "ErrorKind",
     "call_id_of",
     "cancelled_results",
+    "child_of",
     "scope_of",
     "tools_node",
     "unanswered_calls",

@@ -24,6 +24,7 @@ READ_ONLY = {
     "git_diff",
     "git_log",
     "read_artifact",
+    "delegate",
     "todo_write",
     "propose_plan",
     "load_skill",

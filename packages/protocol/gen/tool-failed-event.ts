@@ -3,6 +3,7 @@
 export type CallId = string;
 export type DurationMs = number | null;
 export type Message = string;
+export type ParentCallId = string | null;
 export type RunId = string;
 export type Seq = number;
 export type SessionId = string;
@@ -26,6 +27,10 @@ export interface ToolFailedEvent {
  * ``duration_ms`` is how long the tool ran before it raised. None means a
  * call that was denied or cut off, which never ran or was not timed.
  *
+ * ``parent_call_id`` is set on an event of a child run: the id of the ``delegate`` call
+ * that started it. The event is in the parent's run, and a client that does not know
+ * child runs ignores it. None for the run's own events.
+ *
  * This interface was referenced by `ToolFailedEvent`'s JSON-Schema
  * via the `definition` "ToolFailedData".
  */
@@ -33,4 +38,5 @@ export interface ToolFailedData {
   call_id: CallId;
   duration_ms?: DurationMs;
   message: Message;
+  parent_call_id?: ParentCallId;
 }
