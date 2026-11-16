@@ -36,6 +36,9 @@ FILE_CHANGED_KIND = "file.changed"
 APPROVAL_KIND = "approval"
 """``STREAM_KEY`` value of an interrupt that waits for a tool approval."""
 
+CHILD_FACT_KIND = "child.fact"
+"""``STREAM_KEY`` value of a fact of a child run, carried on its parent's stream."""
+
 
 @dataclass(frozen=True, slots=True)
 class ModelStarted:
@@ -305,6 +308,14 @@ class CheckCompleted:
     round: int = 0
 
 
+@dataclass(frozen=True, slots=True)
+class ChildFact:
+    """A fact of the child run started by the ``delegate`` call ``parent_call_id``."""
+
+    parent_call_id: str
+    fact: object
+
+
 Fact = (
     ModelStarted
     | ModelWaiting
@@ -329,6 +340,7 @@ Fact = (
     | CheckOffered
     | CheckStarted
     | CheckCompleted
+    | ChildFact
 )
 
 
@@ -813,6 +825,9 @@ def _custom(data: object) -> Fact | None:
         )
     if kind in (PIN_READ_KIND, PIN_SKIPPED_KIND):
         return _pin(kind, item)
+    if kind == CHILD_FACT_KIND:
+        parent, fact = item.get("parent_call_id"), item.get("fact")
+        return ChildFact(parent, fact) if isinstance(parent, str) and parent and fact else None
     if kind in ("check.offered", "check.started", "check.completed"):
         return _check(kind, item)
     if not isinstance(call_id, str):
@@ -1012,6 +1027,7 @@ def _pin(kind: object, item: Mapping[str, object]) -> PinRead | PinSkipped | Non
 
 __all__ = [
     "APPROVAL_KIND",
+    "CHILD_FACT_KIND",
     "FILE_CHANGED_KIND",
     "PIN_READ_KIND",
     "PIN_SKIPPED_KIND",
@@ -1019,6 +1035,7 @@ __all__ = [
     "SKILL_LOADED_KIND",
     "STREAM_KEY",
     "ApprovalAsked",
+    "ChildFact",
     "ContextChanged",
     "Fact",
     "FileChanged",

@@ -5,6 +5,7 @@ export type CallId = string;
 export type Diff = string | null;
 export type DurationMs = number | null;
 export type Failed = boolean;
+export type ParentCallId = string | null;
 export type Preview = string;
 export type Summary = string;
 export type Truncated = boolean;
@@ -25,6 +26,10 @@ export type Truncated = boolean;
  * result, without the wait for an approval. None means it was not measured.
  *
  * ``diff`` is the change a file tool made, as a unified diff.
+ *
+ * ``parent_call_id`` is set on an event of a child run: the id of the ``delegate`` call
+ * that started it. The event is in the parent's run, and a client that does not know
+ * child runs ignores it. None for the run's own events.
  */
 export interface ToolCompletedData {
   artifact_id?: ArtifactId;
@@ -32,6 +37,7 @@ export interface ToolCompletedData {
   diff?: Diff;
   duration_ms?: DurationMs;
   failed?: Failed;
+  parent_call_id?: ParentCallId;
   preview: Preview;
   summary: Summary;
   truncated?: Truncated;

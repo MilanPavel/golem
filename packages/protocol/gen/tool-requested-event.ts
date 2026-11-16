@@ -3,6 +3,7 @@
 export type CallId = string;
 export type MessageId = string;
 export type Name = string;
+export type ParentCallId = string | null;
 export type RunId = string;
 export type Seq = number;
 export type SessionId = string;
@@ -26,6 +27,10 @@ export interface ToolRequestedEvent {
  * ``message_id`` is the assistant message that asked. ``args`` are the
  * arguments as the model wrote them.
  *
+ * ``parent_call_id`` is set on an event of a child run: the id of the ``delegate`` call
+ * that started it. The event is in the parent's run, and a client that does not know
+ * child runs ignores it. None for the run's own events.
+ *
  * This interface was referenced by `ToolRequestedEvent`'s JSON-Schema
  * via the `definition` "ToolRequestedData".
  */
@@ -34,6 +39,7 @@ export interface ToolRequestedData {
   call_id: CallId;
   message_id: MessageId;
   name: Name;
+  parent_call_id?: ParentCallId;
 }
 export interface Args {
   [k: string]: unknown;

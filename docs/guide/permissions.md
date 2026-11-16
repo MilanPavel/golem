@@ -17,6 +17,7 @@ golem does its work through **tools**: small actions it asks the daemon to run, 
 | `grep` | Searches file contents with a regular expression | Allowed | Allowed | Allowed |
 | `git_status`, `git_diff`, `git_log` | The branch, the changes, and recent commits | Allowed | Allowed | Allowed |
 | `read_artifact` | Reads more of a long tool output that was cut | Allowed | Allowed | Allowed |
+| `delegate` | Hands a reading or searching job to a helper that starts with an empty context and returns a short answer. The helper only reads, and never asks you | Allowed | Allowed | Allowed |
 | `todo_write` | Keeps the agent's todo list, shown with `/todos` | Allowed | Allowed | Allowed |
 | `web_search` | Searches the web with DuckDuckGo | Asks | Allowed | Allowed |
 | `web_fetch` | Reads one web page | Asks | Allowed | Allowed |

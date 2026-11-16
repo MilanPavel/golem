@@ -156,6 +156,7 @@ def test_schemas_use_the_function_format() -> None:
         "web_fetch",
         "web_search",
         "read_artifact",
+        "delegate",
         "todo_write",
         "load_skill",
     ]
