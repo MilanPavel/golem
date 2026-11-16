@@ -1,4 +1,4 @@
-import { OLLAMA_FAILED, RpcError, type ApprovalChoice, type ConfigGetResult, type ConfigRawGetResult, type ConfigRawResult, type FsListDirsResult, type McpAddParams, type McpCallResult, type McpImportApplyParams, type McpImportApplyResult, type McpImportScanResult, type McpCatalogResult, type McpListResult, type McpLogsResult, type McpServerConfig, type McpServerDetail, type McpServerLog, type McpLoginDone, type McpTestProgress, type McpTestResult, type GolemClient, type RuntimeName, type SetupStatusResult, type SkillListResult, type TraceGetResult, type TraceSpanResult, type ArtifactReadResult, type ChangesDiffResult, type ChangesDiffTarget, type ChangesListResult, type ChangesRevertResult, type ChangesRevertTarget, type ChangesCommitResult, type ChangesCommitInfoResult, type ChangesSuggestMessageResult, type ModelOptionsGetResult, type ModelOptionsSetResult, type SessionSetOptionsResult, type SkillCreateResult, type SkillReadResult, type SkillWriteResult, type AuthListResult, type FileListResult, type FileReadResult, type CostGetResult, type SessionCompactResult, type ConsentChoice } from "@golem/client";
+import { OLLAMA_FAILED, RpcError, type ApprovalChoice, type ConfigGetResult, type ConfigRawGetResult, type ConfigRawResult, type FsListDirsResult, type McpAddParams, type McpCallResult, type McpImportApplyParams, type McpImportApplyResult, type McpImportScanResult, type McpCatalogResult, type McpListResult, type McpLogsResult, type McpServerConfig, type McpServerDetail, type McpServerLog, type McpLoginDone, type McpTestProgress, type McpTestResult, type GolemClient, type RuntimeName, type SetupStatusResult, type SkillListResult, type TraceGetResult, type TraceSpanResult, type ArtifactReadResult, type ChangesDiffResult, type ChangesDiffTarget, type ChangesListResult, type ChangesRevertResult, type ChangesRevertTarget, type ChangesCommitResult, type ChangesCommitInfoResult, type ChangesSuggestMessageResult, type ModelOptionsGetResult, type ModelOptionsSetResult, type SessionSetOptionsResult, type SkillCreateResult, type SkillReadResult, type SkillWriteResult, type AuthListResult, type FileListResult, type FileReadResult, type CostGetResult, type SessionCompactResult, type ConsentChoice, type RoutingGetResult, type RoutingSetParams, type RoutingSetResult } from "@golem/client";
 import { changeToolFilter, installEventOf, type InstallEvent, type PermissionMode, type CompactAction } from "@golem/view";
 import type { QueryClient } from "@tanstack/react-query";
 import { createDrafts, type Drafts } from "./drafts.ts";
@@ -9,6 +9,7 @@ import { createPageHost, type PageHostStore } from "./page-host.ts";
 import { createNewSession, type NewSessionStore } from "./new-session.ts";
 import { CONFIG_KEY } from "./config.ts";
 import { MCP_CATALOG_KEY, MCP_LIST_KEY, MCP_TOOLS_KEY, type McpToolsResult } from "./mcp.ts";
+import { ROUTING_KEY } from "./routing.ts";
 import { MODEL_LIST_ALL_KEY, MODEL_LIST_KEY, SETUP_STATUS_KEY, type ModelListResult } from "./models.ts";
 import { SKILL_LIST_KEY } from "./skills.ts";
 import { createPulls, type Pulls } from "./pulls.ts";
@@ -58,6 +59,8 @@ export type PageClient = Pick<
   | "mcpTools"
   | "getTrace"
   | "getCost"
+  | "getRouting"
+  | "setRouting"
   | "getTraceSpan"
   | "readArtifact"
   | "changesList"
@@ -170,6 +173,11 @@ export type PageActions = {
   /** Switches the session's model. The chip changes from the daemon's `model.selected` event. */
   useModel(sessionId: string, name: string): Promise<void>;
   setDefault(name: string): Promise<void>;
+  /**
+   * Changes keys of the routing, budget and context tables in `config.toml`. A refusal is in the result
+   * (`ok: false`, with an error for each wrong setting), not a rejection, and nothing is written then.
+   */
+  setRouting(params: RoutingSetParams): Promise<RoutingSetResult>;
   /** A local model's tunable options with its defaults, what is saved for it, and the session's overrides. */
   modelOptions(model: string, sessionId: string | null): Promise<ModelOptionsGetResult>;
   /** Saves options for the model in config.toml. A `null` value removes one. */
@@ -289,6 +297,8 @@ export type PageQueries = {
   mcpTools(name: string, sessionId: string | null): Promise<McpToolsResult>;
   /** What model calls cost, from `cost.get`. */
   cost(): Promise<CostGetResult>;
+  /** The routing, budget and context settings, from `routing.get`. */
+  routing(): Promise<RoutingGetResult>;
   /** A session's runs as a tree of spans. */
   trace(sessionId: string): Promise<TraceGetResult>;
   /** The servers golem offers to add, with what each needs here. */
@@ -395,6 +405,7 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
       mcpList: (sessionId) => client.listMcp(sessionId ?? undefined),
       mcpTools: (name, sessionId) => client.mcpTools(name, sessionId ?? undefined),
       cost: () => client.getCost(),
+      routing: () => client.getRouting(),
       trace: (sessionId) => client.getTrace(sessionId),
       traceSpan: (sessionId, spanId) => client.getTraceSpan(sessionId, spanId),
       artifact: (sessionId, artifactId, offset, limit) => client.readArtifact(sessionId, artifactId, offset, limit),
@@ -668,6 +679,15 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
         } finally {
           await queryClient.invalidateQueries({ queryKey: CONFIG_KEY });
         }
+      },
+      async setRouting(params) {
+        const result = await client.setRouting(params);
+        if (result.ok) {
+          // A new price limit moves models between tiers.
+          await queryClient.invalidateQueries({ queryKey: ROUTING_KEY });
+          await queryClient.invalidateQueries({ queryKey: MODEL_LIST_KEY });
+        }
+        return result;
       },
       async modelOptions(model, sessionId) {
         return client.getModelOptions(model, sessionId ?? undefined);

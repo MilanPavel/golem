@@ -1,0 +1,381 @@
+{
+  "$defs": {
+    "RoutingBudgetPatch": {
+      "additionalProperties": false,
+      "description": "Keys of ``[budget]`` to change. A null removes the key: no cap, or ``over = local``.",
+      "properties": {
+        "daily_usd": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Daily Usd"
+        },
+        "over": {
+          "anyOf": [
+            {
+              "enum": [
+                "local",
+                "ask"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Over"
+        },
+        "session_usd": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Session Usd"
+        }
+      },
+      "title": "RoutingBudgetPatch",
+      "type": "object"
+    },
+    "RoutingContextPatch": {
+      "additionalProperties": false,
+      "description": "Keys of ``[context]`` to change. A null removes the key.",
+      "properties": {
+        "clear_at": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Clear At"
+        },
+        "clear_to": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Clear To"
+        },
+        "compact_at": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Compact At"
+        },
+        "keep_alive": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Keep Alive"
+        },
+        "keep_results": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Keep Results"
+        },
+        "keep_turns": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Keep Turns"
+        },
+        "reply_reserve": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reply Reserve"
+        },
+        "window": {
+          "anyOf": [
+            {
+              "enum": [
+                "auto",
+                "ollama"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Window"
+        }
+      },
+      "title": "RoutingContextPatch",
+      "type": "object"
+    },
+    "RoutingLadderPatch": {
+      "additionalProperties": false,
+      "description": "Keys of ``[routing.ladder]`` to change. A null removes the key.",
+      "properties": {
+        "budget": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Budget"
+        },
+        "frontier": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Frontier"
+        },
+        "local": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Local"
+        }
+      },
+      "title": "RoutingLadderPatch",
+      "type": "object"
+    },
+    "RoutingPatch": {
+      "additionalProperties": false,
+      "description": "Keys of ``[routing]`` to change. A key left out stays; a null removes the key from the\nfile, so the default applies again.",
+      "properties": {
+        "budget_max_price": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Budget Max Price"
+        },
+        "local_only": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Local Only"
+        },
+        "mode": {
+          "anyOf": [
+            {
+              "enum": [
+                "pinned",
+                "local",
+                "auto"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Mode"
+        },
+        "paid": {
+          "anyOf": [
+            {
+              "enum": [
+                "ask",
+                "always_ask",
+                "never"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Paid"
+        }
+      },
+      "title": "RoutingPatch",
+      "type": "object"
+    },
+    "RoutingRolesPatch": {
+      "additionalProperties": false,
+      "description": "Keys of ``[routing.roles]`` to change. A null removes the key.",
+      "properties": {
+        "explore": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Explore"
+        },
+        "summarise": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Summarise"
+        },
+        "titles": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Titles"
+        }
+      },
+      "title": "RoutingRolesPatch",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "``routing.set``. Change keys of the five tables in the user's ``config.toml``.\n\nOnly the keys sent change, and the file keeps its comments. Every value is checked\nfirst, and when any is wrong nothing is written.",
+  "properties": {
+    "budget": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/RoutingBudgetPatch"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "context": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/RoutingContextPatch"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "ladder": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/RoutingLadderPatch"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "roles": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/RoutingRolesPatch"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "routing": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/RoutingPatch"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    }
+  },
+  "title": "RoutingSetParams",
+  "type": "object"
+}

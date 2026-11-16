@@ -1,0 +1,43 @@
+{
+  "additionalProperties": false,
+  "description": "``[budget]``. Caps in USD, null for no cap.",
+  "properties": {
+    "daily_usd": {
+      "anyOf": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Daily Usd"
+    },
+    "over": {
+      "enum": [
+        "local",
+        "ask"
+      ],
+      "title": "Over",
+      "type": "string"
+    },
+    "session_usd": {
+      "anyOf": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Session Usd"
+    }
+  },
+  "required": [
+    "over"
+  ],
+  "title": "RoutingBudget",
+  "type": "object"
+}

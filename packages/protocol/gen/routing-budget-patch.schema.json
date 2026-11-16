@@ -1,0 +1,48 @@
+{
+  "additionalProperties": false,
+  "description": "Keys of ``[budget]`` to change. A null removes the key: no cap, or ``over = local``.",
+  "properties": {
+    "daily_usd": {
+      "anyOf": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Daily Usd"
+    },
+    "over": {
+      "anyOf": [
+        {
+          "enum": [
+            "local",
+            "ask"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Over"
+    },
+    "session_usd": {
+      "anyOf": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Session Usd"
+    }
+  },
+  "title": "RoutingBudgetPatch",
+  "type": "object"
+}

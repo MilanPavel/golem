@@ -1,0 +1,25 @@
+{
+  "additionalProperties": false,
+  "description": "``[routing.roles]``. Each is ``session`` or a model name.",
+  "properties": {
+    "explore": {
+      "title": "Explore",
+      "type": "string"
+    },
+    "summarise": {
+      "title": "Summarise",
+      "type": "string"
+    },
+    "titles": {
+      "title": "Titles",
+      "type": "string"
+    }
+  },
+  "required": [
+    "titles",
+    "summarise",
+    "explore"
+  ],
+  "title": "RoutingRoles",
+  "type": "object"
+}

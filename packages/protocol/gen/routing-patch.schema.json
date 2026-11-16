@@ -1,0 +1,69 @@
+{
+  "additionalProperties": false,
+  "description": "Keys of ``[routing]`` to change. A key left out stays; a null removes the key from the\nfile, so the default applies again.",
+  "properties": {
+    "budget_max_price": {
+      "anyOf": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Budget Max Price"
+    },
+    "local_only": {
+      "anyOf": [
+        {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Local Only"
+    },
+    "mode": {
+      "anyOf": [
+        {
+          "enum": [
+            "pinned",
+            "local",
+            "auto"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Mode"
+    },
+    "paid": {
+      "anyOf": [
+        {
+          "enum": [
+            "ask",
+            "always_ask",
+            "never"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Paid"
+    }
+  },
+  "title": "RoutingPatch",
+  "type": "object"
+}

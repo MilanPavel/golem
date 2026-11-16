@@ -1,0 +1,7 @@
+{
+  "additionalProperties": false,
+  "description": "``routing.get``. The routing, budget and context settings as golem uses them.",
+  "properties": {},
+  "title": "RoutingGetParams",
+  "type": "object"
+}

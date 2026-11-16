@@ -19,6 +19,7 @@ export const GALLERY_SECTIONS = [
   "mcp-servers",
   "skills",
   "api-keys",
+  "routing",
   "usage",
   "tools-panel",
   "mcp-sign-in",

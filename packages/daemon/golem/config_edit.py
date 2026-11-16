@@ -270,6 +270,62 @@ def set_permission_mode(config_file: Path, mode: PermissionMode) -> int:
     return write_raw(config_file, tomlkit.dumps(document), mtime)
 
 
+def set_keys(config_file: Path, changes: dict[str, dict[str, Any]]) -> int:
+    """Set keys in tables of the file, keeping its comments, and return the new ``mtime_ns``.
+
+    ``changes`` maps a table path such as ``routing.ladder`` to its keys. A value of None
+    removes the key, so the default applies again. A table that ends up empty is removed.
+    Creates the file when it is missing. Raises :class:`RawConflictError` when the file
+    changed on disk between reading it and writing it, and ``ValueError`` when a path
+    names something that is not a table.
+    """
+    text, mtime = read_raw(config_file)
+    document = tomlkit.parse(text)
+    for path, keys in changes.items():
+        chain = _table_chain(
+            document, path, create=any(value is not None for value in keys.values())
+        )
+        if chain is None:
+            continue
+        table = chain[-1]
+        removed = False
+        for key, value in keys.items():
+            if value is None:
+                if key in table:
+                    del table[key]
+                    removed = True
+            else:
+                table[key] = value
+        if removed or len(table) == 0:
+            _prune(chain, path.split("."))
+    return write_raw(config_file, tomlkit.dumps(document), mtime)
+
+
+def _table_chain(document: TOMLDocument, path: str, *, create: bool) -> list[Any] | None:
+    """The document, then each table down ``path``. None when one is missing and not ``create``."""
+    chain: list[Any] = [document]
+    for part in path.split("."):
+        child = cast(object, chain[-1].get(part))
+        if child is None:
+            if not create:
+                return None
+            child = tomlkit.table()
+            chain[-1][part] = child
+            child = chain[-1][part]
+        if not isinstance(child, Table):
+            raise ValueError(f"[{path}] in the file is not a table")
+        chain.append(child)
+    return chain
+
+
+def _prune(chain: list[Any], parts: list[str]) -> None:
+    """Remove the tables down ``parts`` that are empty now, the deepest first."""
+    for depth in range(len(chain) - 1, 0, -1):
+        if len(chain[depth]) > 0:
+            return
+        del chain[depth - 1][parts[depth - 1]]
+
+
 def set_skill_disabled(config_file: Path, name: str, disabled: bool) -> None:
     """Add ``name`` to ``[skills] disabled``, or take it out. Creates the file when it is missing.
 

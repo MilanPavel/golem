@@ -107,6 +107,9 @@ import type { SessionCreateResult } from "../../protocol/gen/session-create-resu
 import type { SessionForkResult } from "../../protocol/gen/session-fork-result.ts";
 import type { SessionInspectResult } from "../../protocol/gen/session-inspect-result.ts";
 import type { CostGetResult } from "../../protocol/gen/cost-get-result.ts";
+import type { RoutingGetResult } from "../../protocol/gen/routing-get-result.ts";
+import type { RoutingSetParams } from "../../protocol/gen/routing-set-params.ts";
+import type { RoutingSetResult } from "../../protocol/gen/routing-set-result.ts";
 import type { TraceGetResult } from "../../protocol/gen/trace-get-result.ts";
 import type { TraceSpanResult } from "../../protocol/gen/trace-span-result.ts";
 import type { SessionListResult, SessionSummary } from "../../protocol/gen/session-list-result.ts";
@@ -185,6 +188,8 @@ import {
   isSessionForkResult,
   isSessionInspectResult,
   isCostGetResult,
+  isRoutingGetResult,
+  isRoutingSetResult,
   isTraceGetResult,
   isTraceSpanResult,
   isSessionListResult,
@@ -307,6 +312,13 @@ export interface GolemClient {
   /** A session's runs as a tree: run, then model call, then tool call. Oldest run first. */
   /** What model calls cost: today, the week, and with a session id that session. */
   getCost(sessionId?: string): Promise<CostGetResult>;
+  /** The routing, budget and context settings as golem uses them, and what it picks for an empty tier. */
+  getRouting(): Promise<RoutingGetResult>;
+  /**
+   * Changes keys of the five routing tables in `config.toml`. A null removes a key. A wrong value is in the
+   * result (`ok: false` with field errors) and writes nothing.
+   */
+  setRouting(params: RoutingSetParams): Promise<RoutingSetResult>;
   getTrace(sessionId: string): Promise<TraceGetResult>;
   /** The full input and output of one model or tool span, by the `id` that `getTrace` gave. */
   getTraceSpan(sessionId: string, spanId: string): Promise<TraceSpanResult>;
@@ -1285,6 +1297,22 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       const result = await call("cost.get", sessionId === undefined ? {} : { session_id: sessionId });
       if (!isCostGetResult(result)) {
         throw new Error("invalid cost.get result");
+      }
+      return result;
+    },
+    async getRouting(): Promise<RoutingGetResult> {
+      await ready;
+      const result = await call("routing.get", {});
+      if (!isRoutingGetResult(result)) {
+        throw new Error("invalid routing.get result");
+      }
+      return result;
+    },
+    async setRouting(params: RoutingSetParams): Promise<RoutingSetResult> {
+      await ready;
+      const result = await call("routing.set", { ...params });
+      if (!isRoutingSetResult(result)) {
+        throw new Error("invalid routing.set result");
       }
       return result;
     },

@@ -94,6 +94,15 @@ export type { TraceContextEvent } from "../../protocol/gen/trace-context-event.t
 export type { TraceContextItem } from "../../protocol/gen/trace-context-item.ts";
 export type { TraceContextPart } from "../../protocol/gen/trace-context-part.ts";
 export type { PromptSectionInfo } from "../../protocol/gen/prompt-section-info.ts";
+export type { RoutingGetResult } from "../../protocol/gen/routing-get-result.ts";
+export type { RoutingSetParams } from "../../protocol/gen/routing-set-params.ts";
+export type { RoutingSetResult } from "../../protocol/gen/routing-set-result.ts";
+export type { RoutingBudget } from "../../protocol/gen/routing-budget.ts";
+export type { RoutingContext } from "../../protocol/gen/routing-context.ts";
+export type { RoutingLadder } from "../../protocol/gen/routing-ladder.ts";
+export type { RoutingPicked } from "../../protocol/gen/routing-picked.ts";
+export type { RoutingRoles } from "../../protocol/gen/routing-roles.ts";
+export type { RoutingValues } from "../../protocol/gen/routing-values.ts";
 export type { CostDayRow, CostGetResult, CostModelRow, CostTotals } from "../../protocol/gen/cost-get-result.ts";
 export type { TraceGetResult } from "../../protocol/gen/trace-get-result.ts";
 export type { TraceMessage } from "../../protocol/gen/trace-message.ts";

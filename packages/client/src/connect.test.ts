@@ -1436,6 +1436,51 @@ test("getCost sends the session id when it has one and checks what comes back", 
   }
 });
 
+test("getRouting and setRouting send their params and check what comes back", async () => {
+  const sent: [string, Record<string, unknown>][] = [];
+  const values = {
+    routing: { mode: "auto", paid: "ask", budget_max_price: 1.5, local_only: [] },
+    ladder: {},
+    roles: { titles: "session", summarise: "session", explore: "session" },
+    budget: { over: "local" },
+    context: { window: "auto", reply_reserve: 4096, clear_at: 0.7, clear_to: 0.4, compact_at: 0.85, keep_results: 4, keep_turns: 4 },
+    picked: {},
+  };
+  const server = await listen((socket) => {
+    attach(socket, {
+      answerPing: true,
+      results: { "routing.get": values, "routing.set": { ok: true, errors: [], values } },
+      onRequest: (_socket, method, params) => {
+        if (method.startsWith("routing.")) sent.push([method, params]);
+      },
+    });
+  });
+  const client = connectGolem({ socketPath: server.socketPath, clientName: "web", reconnect: false, heartbeatMs: 60_000 });
+  try {
+    assert.deepEqual(await client.getRouting(), values);
+    const saved = await client.setRouting({ routing: { mode: "local" }, ladder: { local: null } });
+    assert.equal(saved.ok, true);
+    assert.deepEqual(sent, [
+      ["routing.get", {}],
+      ["routing.set", { routing: { mode: "local" }, ladder: { local: null } }],
+    ]);
+  } finally {
+    client.close();
+    await server.close();
+  }
+  const bad = await listen((socket) => {
+    attach(socket, { answerPing: true, results: { "routing.get": { routing: {} }, "routing.set": { errors: [] } } });
+  });
+  const refused = connectGolem({ socketPath: bad.socketPath, clientName: "web", reconnect: false, heartbeatMs: 60_000 });
+  try {
+    await assert.rejects(() => refused.getRouting(), /invalid routing.get result/);
+    await assert.rejects(() => refused.setRouting({}), /invalid routing.set result/);
+  } finally {
+    refused.close();
+    await bad.close();
+  }
+});
+
 test("getTrace and getTraceSpan send their ids and check what comes back", async () => {
   const sent: [string, Record<string, unknown>][] = [];
   const span = { id: "m_1", kind: "model", name: "model 1", start: "t", status: "ok" };

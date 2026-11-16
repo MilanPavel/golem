@@ -181,14 +181,13 @@ def _nothing(reason: Reason) -> str:
     return "no model fits this call"
 
 
-def ladder(
+def tier_picks(
     settings: LadderSettings, session_ref: str, all_facts: Sequence[ModelFacts]
-) -> list[ModelFacts]:
-    """The candidates for a session: its own model, plus one per tier."""
+) -> dict[Tier, ModelFacts | None]:
+    """The model for each tier: the one the ladder names, else the one golem would choose."""
     by_name = {facts.profile: facts for facts in all_facts}
     by_name.update({facts.ref: facts for facts in all_facts})
     session = by_name.get(session_ref)
-    found: list[ModelFacts] = [] if session is None else [session]
 
     local = None if settings.local is None else by_name.get(settings.local)
     if settings.local is None:
@@ -210,8 +209,18 @@ def ladder(
     frontier = None if settings.frontier is None else by_name.get(settings.frontier)
     if settings.frontier is None and session is not None and session.tier == "frontier":
         frontier = session
+    return {"local": local, "budget": budget, "frontier": frontier}
 
-    for model in (local, budget, frontier):
+
+def ladder(
+    settings: LadderSettings, session_ref: str, all_facts: Sequence[ModelFacts]
+) -> list[ModelFacts]:
+    """The candidates for a session: its own model, plus one per tier."""
+    by_name = {facts.profile: facts for facts in all_facts}
+    by_name.update({facts.ref: facts for facts in all_facts})
+    session = by_name.get(session_ref)
+    found: list[ModelFacts] = [] if session is None else [session]
+    for model in tier_picks(settings, session_ref, all_facts).values():
         if model is not None and all(model.ref != seen.ref for seen in found):
             found.append(model)
     return found

@@ -1,0 +1,43 @@
+{
+  "additionalProperties": false,
+  "description": "``[routing]``: the route mode of a new session, when to ask about paid models,\nthe price that splits budget from frontier, and the folders that stay on this Mac.",
+  "properties": {
+    "budget_max_price": {
+      "title": "Budget Max Price",
+      "type": "number"
+    },
+    "local_only": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Local Only",
+      "type": "array"
+    },
+    "mode": {
+      "enum": [
+        "pinned",
+        "local",
+        "auto"
+      ],
+      "title": "Mode",
+      "type": "string"
+    },
+    "paid": {
+      "enum": [
+        "ask",
+        "always_ask",
+        "never"
+      ],
+      "title": "Paid",
+      "type": "string"
+    }
+  },
+  "required": [
+    "mode",
+    "paid",
+    "budget_max_price",
+    "local_only"
+  ],
+  "title": "RoutingValues",
+  "type": "object"
+}

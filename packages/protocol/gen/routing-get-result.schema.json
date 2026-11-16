@@ -1,0 +1,303 @@
+{
+  "$defs": {
+    "RoutingBudget": {
+      "additionalProperties": false,
+      "description": "``[budget]``. Caps in USD, null for no cap.",
+      "properties": {
+        "daily_usd": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Daily Usd"
+        },
+        "over": {
+          "enum": [
+            "local",
+            "ask"
+          ],
+          "title": "Over",
+          "type": "string"
+        },
+        "session_usd": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Session Usd"
+        }
+      },
+      "required": [
+        "over"
+      ],
+      "title": "RoutingBudget",
+      "type": "object"
+    },
+    "RoutingContext": {
+      "additionalProperties": false,
+      "description": "``[context]``. ``window`` is ``auto``, ``ollama`` or a number of tokens.",
+      "properties": {
+        "clear_at": {
+          "title": "Clear At",
+          "type": "number"
+        },
+        "clear_to": {
+          "title": "Clear To",
+          "type": "number"
+        },
+        "compact_at": {
+          "title": "Compact At",
+          "type": "number"
+        },
+        "keep_alive": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Keep Alive"
+        },
+        "keep_results": {
+          "title": "Keep Results",
+          "type": "integer"
+        },
+        "keep_turns": {
+          "title": "Keep Turns",
+          "type": "integer"
+        },
+        "reply_reserve": {
+          "title": "Reply Reserve",
+          "type": "integer"
+        },
+        "window": {
+          "anyOf": [
+            {
+              "enum": [
+                "auto",
+                "ollama"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "integer"
+            }
+          ],
+          "title": "Window"
+        }
+      },
+      "required": [
+        "window",
+        "reply_reserve",
+        "clear_at",
+        "clear_to",
+        "compact_at",
+        "keep_results",
+        "keep_turns"
+      ],
+      "title": "RoutingContext",
+      "type": "object"
+    },
+    "RoutingLadder": {
+      "additionalProperties": false,
+      "description": "``[routing.ladder]``. The model named for each tier, null when golem chooses.",
+      "properties": {
+        "budget": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Budget"
+        },
+        "frontier": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Frontier"
+        },
+        "local": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Local"
+        }
+      },
+      "title": "RoutingLadder",
+      "type": "object"
+    },
+    "RoutingPicked": {
+      "additionalProperties": false,
+      "description": "The model golem would take for each tier when its ``[routing.ladder]`` line is empty,\nas ``provider/model``, or null when none is ready.",
+      "properties": {
+        "budget": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Budget"
+        },
+        "frontier": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Frontier"
+        },
+        "local": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Local"
+        }
+      },
+      "title": "RoutingPicked",
+      "type": "object"
+    },
+    "RoutingRoles": {
+      "additionalProperties": false,
+      "description": "``[routing.roles]``. Each is ``session`` or a model name.",
+      "properties": {
+        "explore": {
+          "title": "Explore",
+          "type": "string"
+        },
+        "summarise": {
+          "title": "Summarise",
+          "type": "string"
+        },
+        "titles": {
+          "title": "Titles",
+          "type": "string"
+        }
+      },
+      "required": [
+        "titles",
+        "summarise",
+        "explore"
+      ],
+      "title": "RoutingRoles",
+      "type": "object"
+    },
+    "RoutingValues": {
+      "additionalProperties": false,
+      "description": "``[routing]``: the route mode of a new session, when to ask about paid models,\nthe price that splits budget from frontier, and the folders that stay on this Mac.",
+      "properties": {
+        "budget_max_price": {
+          "title": "Budget Max Price",
+          "type": "number"
+        },
+        "local_only": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Local Only",
+          "type": "array"
+        },
+        "mode": {
+          "enum": [
+            "pinned",
+            "local",
+            "auto"
+          ],
+          "title": "Mode",
+          "type": "string"
+        },
+        "paid": {
+          "enum": [
+            "ask",
+            "always_ask",
+            "never"
+          ],
+          "title": "Paid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "mode",
+        "paid",
+        "budget_max_price",
+        "local_only"
+      ],
+      "title": "RoutingValues",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "The effective values of the five tables, and what golem picks for an empty tier.",
+  "properties": {
+    "budget": {
+      "$ref": "#/$defs/RoutingBudget"
+    },
+    "context": {
+      "$ref": "#/$defs/RoutingContext"
+    },
+    "ladder": {
+      "$ref": "#/$defs/RoutingLadder"
+    },
+    "picked": {
+      "$ref": "#/$defs/RoutingPicked"
+    },
+    "roles": {
+      "$ref": "#/$defs/RoutingRoles"
+    },
+    "routing": {
+      "$ref": "#/$defs/RoutingValues"
+    }
+  },
+  "required": [
+    "routing",
+    "ladder",
+    "roles",
+    "budget",
+    "context",
+    "picked"
+  ],
+  "title": "RoutingGetResult",
+  "type": "object"
+}

@@ -59,6 +59,8 @@ public enum MethodAccess {
         "routine.list",
         "routine.remove",
         "routine.update",
+        "routing.get",
+        "routing.set",
         "run.cancel",
         "runtime.install",
         "runtime.install_cancel",

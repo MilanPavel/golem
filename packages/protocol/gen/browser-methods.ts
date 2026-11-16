@@ -58,6 +58,8 @@ export const BROWSER_METHODS: ReadonlySet<string> = new Set([
   "routine.list",
   "routine.remove",
   "routine.update",
+  "routing.get",
+  "routing.set",
   "run.cancel",
   "runtime.install",
   "runtime.install_cancel",

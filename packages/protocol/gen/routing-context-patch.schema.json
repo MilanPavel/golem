@@ -1,0 +1,111 @@
+{
+  "additionalProperties": false,
+  "description": "Keys of ``[context]`` to change. A null removes the key.",
+  "properties": {
+    "clear_at": {
+      "anyOf": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Clear At"
+    },
+    "clear_to": {
+      "anyOf": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Clear To"
+    },
+    "compact_at": {
+      "anyOf": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Compact At"
+    },
+    "keep_alive": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Keep Alive"
+    },
+    "keep_results": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Keep Results"
+    },
+    "keep_turns": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Keep Turns"
+    },
+    "reply_reserve": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Reply Reserve"
+    },
+    "window": {
+      "anyOf": [
+        {
+          "enum": [
+            "auto",
+            "ollama"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Window"
+    }
+  },
+  "title": "RoutingContextPatch",
+  "type": "object"
+}

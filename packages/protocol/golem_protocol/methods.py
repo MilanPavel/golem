@@ -48,6 +48,8 @@ METHOD_ACCESS: Final[Mapping[str, Access]] = {
     "changes.commit_info": "browser",
     "changes.suggest_message": "browser",
     "cost.get": "browser",
+    "routing.get": "browser",
+    "routing.set": "browser",
     "trace.get": "browser",
     "trace.span": "browser",
     "auth.set": "local",

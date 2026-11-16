@@ -55,6 +55,9 @@ Some answers in the TUI and the web UI edit `config.toml` for you. golem keeps y
 - `/permissions` changes or removes a rule.
 - `/mcp` turns a server on or off with `enabled`.
 - `/mcp add` and `golem mcp add` add a `[mcp.<name>]` table, and `golem mcp remove` deletes one.
+- Settings → Routing in the web UI changes the routing, budget and context keys.
+
+The web page has a form for `[routing]`, `[routing.ladder]`, `[routing.roles]`, `[budget]` and `[context]`: Settings → Routing ([the web page](./web.md)). It writes the same keys, and a key set back to its default is removed from the file.
 
 ## Secrets stay out of the file
 
