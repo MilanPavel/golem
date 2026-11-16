@@ -253,6 +253,7 @@ export {
   type TryField,
 } from "./mcp-try.ts";
 export { applySuggestion, moveSuggestion, suggest, type Suggestion, type SuggestCommand } from "./suggest.ts";
+export { LOCAL_ONLY_HINT, LOCAL_ONLY_LABEL, localOnlyLabel } from "./local-only.ts";
 export { connectionLabel, serviceProblem, type ServiceProblem } from "./connection.ts";
 export {
   diffCounts,

@@ -51,7 +51,7 @@ class _Router(ModelRouter):
         self.fake = fake
         self.sent: list[object] = []
 
-    def chat_model(self, profile: str, overrides: Any = None) -> Any:
+    def chat_model(self, profile: str, overrides: Any = None, *, local_only: bool = False) -> Any:
         self.sent.append(super().chat_model(profile, overrides).num_ctx)  # type: ignore[attr-defined]
         return self.fake
 

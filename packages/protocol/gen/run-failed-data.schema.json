@@ -1,6 +1,6 @@
 {
   "additionalProperties": false,
-  "description": "Why a run stopped. No traceback.\n\n``code`` names a failure a client can act on. ``model_unreachable``: the\nmodel's server did not answer. ``not_installed``: the model needs a local\nserver that is not installed, such as Ollama. ``budget_spent``: a cap in\n``[budget]`` is spent, so a paid call was not made. ``provider`` is the\nprovider whose server it was, and ``hint`` says how to fix it, such as\n``run ollama serve``. ``context_full``: the prompt does not fit the model's window,\neven after clearing and summarising, and nothing was sent.",
+  "description": "Why a run stopped. No traceback.\n\n``code`` names a failure a client can act on. ``model_unreachable``: the\nmodel's server did not answer. ``not_installed``: the model needs a local\nserver that is not installed, such as Ollama. ``budget_spent``: a cap in\n``[budget]`` is spent, so a paid call was not made. ``provider`` is the\nprovider whose server it was, and ``hint`` says how to fix it, such as\n``run ollama serve``. ``context_full``: the prompt does not fit the model's window,\neven after clearing and summarising, and nothing was sent. ``local_only``: the chat's\nfolder stays on this Mac and a hosted model was about to be called, so nothing was sent.",
   "properties": {
     "code": {
       "anyOf": [
@@ -9,7 +9,8 @@
             "model_unreachable",
             "not_installed",
             "context_full",
-            "budget_spent"
+            "budget_spent",
+            "local_only"
           ],
           "type": "string"
         },

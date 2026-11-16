@@ -71,8 +71,13 @@ class _Router(ModelRouter):
         self.models: dict[str, ScriptedChatModel] = {}
 
     def chat_model(
-        self, profile: str, overrides: Mapping[str, float | str] | None = None
+        self,
+        profile: str,
+        overrides: Mapping[str, float | str] | None = None,
+        *,
+        local_only: bool = False,
     ) -> BaseChatModel:
+        del local_only
         ref = self.resolve(profile).ref
         model = self.models.setdefault(ref, ScriptedChatModel(replies=["done"] * 4))
         return model

@@ -215,6 +215,8 @@ export const KEY_UNCHECKED = -32015;
 export const OLLAMA_FAILED = -32016;
 /** A paid model was refused because a cap in `[budget]` is spent. The message says which and what to do. */
 export const BUDGET_SPENT = -32017;
+/** A chat in a local-only folder was refused a hosted model. The message says what to do. */
+export const LOCAL_ONLY = -32018;
 
 export type { ChatEvent, SessionSummary };
 /** The web gateway closes a link with this code when its token is missing or wrong. Retrying cannot help. */

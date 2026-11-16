@@ -179,7 +179,7 @@ A turn that would run on a paid model without the user's yes becomes a run that 
 
 ### Model errors
 
-A run ends in `run.failed` with a `message` and no traceback. A failure a client can act on also has a `code`. `model_unreachable`: the model's server did not answer. `not_installed`: the model needs a local Ollama, and no `ollama` binary is on `PATH` or at a known install path. Either comes with the `provider` and a `hint` that says how to fix it, such as `run ollama serve`. `budget_spent`: a cap in `[budget]` is spent, so a run stopped before its next paid call (see `models/budget.py`); it has a `hint` and no `provider`.
+A run ends in `run.failed` with a `message` and no traceback. A failure a client can act on also has a `code`. `model_unreachable`: the model's server did not answer. `not_installed`: the model needs a local Ollama, and no `ollama` binary is on `PATH` or at a known install path. Either comes with the `provider` and a `hint` that says how to fix it, such as `run ollama serve`. `budget_spent`: a cap in `[budget]` is spent, so a run stopped before its next paid call (see `models/budget.py`); it has a `hint` and no `provider`. `local_only`: the chat's folder stays on this Mac and a hosted model was about to be called, so nothing was sent (the backstop in `ModelRouter.chat_model(local_only=True)`; `message.send` refuses earlier with `-32018`).
 
 ### The local model server
 

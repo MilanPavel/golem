@@ -10281,7 +10281,8 @@ public struct Params: Codable {
 /// ``[budget]`` is spent, so a paid call was not made. ``provider`` is the
 /// provider whose server it was, and ``hint`` says how to fix it, such as
 /// ``run ollama serve``. ``context_full``: the prompt does not fit the model's window,
-/// even after clearing and summarising, and nothing was sent.
+/// even after clearing and summarising, and nothing was sent. ``local_only``: the chat's
+/// folder stays on this Mac and a hosted model was about to be called, so nothing was sent.
 ///
 /// Who stopped the run. ``user`` is ``run.cancel``, ``shutdown`` the daemon stopping.
 ///
@@ -10810,6 +10811,7 @@ public struct FluffyCheckInfo: Codable {
 public enum Code: String, Codable {
     case budgetSpent = "budget_spent"
     case contextFull = "context_full"
+    case localOnly = "local_only"
     case modelUnreachable = "model_unreachable"
     case notInstalled = "not_installed"
 }
@@ -11276,7 +11278,8 @@ public enum RunCompletedEventType: String, Codable {
 /// ``[budget]`` is spent, so a paid call was not made. ``provider`` is the
 /// provider whose server it was, and ``hint`` says how to fix it, such as
 /// ``run ollama serve``. ``context_full``: the prompt does not fit the model's window,
-/// even after clearing and summarising, and nothing was sent.
+/// even after clearing and summarising, and nothing was sent. ``local_only``: the chat's
+/// folder stays on this Mac and a hosted model was about to be called, so nothing was sent.
 // MARK: - RunFailedData
 public struct RunFailedData: Codable {
     public let code: Code?
@@ -11336,7 +11339,8 @@ public struct RunFailedEvent: Codable {
 /// ``[budget]`` is spent, so a paid call was not made. ``provider`` is the
 /// provider whose server it was, and ``hint`` says how to fix it, such as
 /// ``run ollama serve``. ``context_full``: the prompt does not fit the model's window,
-/// even after clearing and summarising, and nothing was sent.
+/// even after clearing and summarising, and nothing was sent. ``local_only``: the chat's
+/// folder stays on this Mac and a hosted model was about to be called, so nothing was sent.
 // MARK: - RunFailedEventData
 public struct RunFailedEventData: Codable {
     public let code: Code?
@@ -12329,12 +12333,16 @@ public struct SessionListResult: Codable {
 /// session: ``user``, ``cli``, ``routine:<name>``. A session never changes it.
 /// ``route`` is the session's route mode. An older daemon leaves it out.
 /// ``plan_first`` is true while the session is in plan first (``session.set_plan``).
+/// ``local_only`` is true while the session's folder stays on this Mac: only a local model
+/// reads its chat. It follows the settings of the moment, so it can change without an event.
+/// An older daemon leaves it out.
 // MARK: - SessionElement
 public struct SessionElement: Codable {
     public let createdAt: String
     public let cwd: String?
     public let forkedFrom: String?
     public let lastSeq: Int
+    public let localOnly: Bool?
     public let modelProfile: String
     public let origin: String?
     public let planFirst: Bool?
@@ -12349,6 +12357,7 @@ public struct SessionElement: Codable {
         case cwd = "cwd"
         case forkedFrom = "forked_from"
         case lastSeq = "last_seq"
+        case localOnly = "local_only"
         case modelProfile = "model_profile"
         case origin = "origin"
         case planFirst = "plan_first"
@@ -12359,11 +12368,12 @@ public struct SessionElement: Codable {
         case updatedAt = "updated_at"
     }
 
-    public init(createdAt: String, cwd: String?, forkedFrom: String?, lastSeq: Int, modelProfile: String, origin: String?, planFirst: Bool?, route: Route?, sessionID: String, status: SessionStatus, title: String?, updatedAt: String) {
+    public init(createdAt: String, cwd: String?, forkedFrom: String?, lastSeq: Int, localOnly: Bool?, modelProfile: String, origin: String?, planFirst: Bool?, route: Route?, sessionID: String, status: SessionStatus, title: String?, updatedAt: String) {
         self.createdAt = createdAt
         self.cwd = cwd
         self.forkedFrom = forkedFrom
         self.lastSeq = lastSeq
+        self.localOnly = localOnly
         self.modelProfile = modelProfile
         self.origin = origin
         self.planFirst = planFirst
@@ -12907,12 +12917,16 @@ public enum SessionSummaryNotificationMethod: String, Codable {
 /// session: ``user``, ``cli``, ``routine:<name>``. A session never changes it.
 /// ``route`` is the session's route mode. An older daemon leaves it out.
 /// ``plan_first`` is true while the session is in plan first (``session.set_plan``).
+/// ``local_only`` is true while the session's folder stays on this Mac: only a local model
+/// reads its chat. It follows the settings of the moment, so it can change without an event.
+/// An older daemon leaves it out.
 // MARK: - SessionSummaryNotificationParams
 public struct SessionSummaryNotificationParams: Codable {
     public let createdAt: String
     public let cwd: String?
     public let forkedFrom: String?
     public let lastSeq: Int
+    public let localOnly: Bool?
     public let modelProfile: String
     public let origin: String?
     public let planFirst: Bool?
@@ -12927,6 +12941,7 @@ public struct SessionSummaryNotificationParams: Codable {
         case cwd = "cwd"
         case forkedFrom = "forked_from"
         case lastSeq = "last_seq"
+        case localOnly = "local_only"
         case modelProfile = "model_profile"
         case origin = "origin"
         case planFirst = "plan_first"
@@ -12937,11 +12952,12 @@ public struct SessionSummaryNotificationParams: Codable {
         case updatedAt = "updated_at"
     }
 
-    public init(createdAt: String, cwd: String?, forkedFrom: String?, lastSeq: Int, modelProfile: String, origin: String?, planFirst: Bool?, route: Route?, sessionID: String, status: SessionStatus, title: String?, updatedAt: String) {
+    public init(createdAt: String, cwd: String?, forkedFrom: String?, lastSeq: Int, localOnly: Bool?, modelProfile: String, origin: String?, planFirst: Bool?, route: Route?, sessionID: String, status: SessionStatus, title: String?, updatedAt: String) {
         self.createdAt = createdAt
         self.cwd = cwd
         self.forkedFrom = forkedFrom
         self.lastSeq = lastSeq
+        self.localOnly = localOnly
         self.modelProfile = modelProfile
         self.origin = origin
         self.planFirst = planFirst
@@ -12966,12 +12982,16 @@ public struct SessionSummaryNotificationParams: Codable {
 /// session: ``user``, ``cli``, ``routine:<name>``. A session never changes it.
 /// ``route`` is the session's route mode. An older daemon leaves it out.
 /// ``plan_first`` is true while the session is in plan first (``session.set_plan``).
+/// ``local_only`` is true while the session's folder stays on this Mac: only a local model
+/// reads its chat. It follows the settings of the moment, so it can change without an event.
+/// An older daemon leaves it out.
 // MARK: - SessionSummary
 public struct SessionSummary: Codable {
     public let createdAt: String
     public let cwd: String?
     public let forkedFrom: String?
     public let lastSeq: Int
+    public let localOnly: Bool?
     public let modelProfile: String
     public let origin: String?
     public let planFirst: Bool?
@@ -12986,6 +13006,7 @@ public struct SessionSummary: Codable {
         case cwd = "cwd"
         case forkedFrom = "forked_from"
         case lastSeq = "last_seq"
+        case localOnly = "local_only"
         case modelProfile = "model_profile"
         case origin = "origin"
         case planFirst = "plan_first"
@@ -12996,11 +13017,12 @@ public struct SessionSummary: Codable {
         case updatedAt = "updated_at"
     }
 
-    public init(createdAt: String, cwd: String?, forkedFrom: String?, lastSeq: Int, modelProfile: String, origin: String?, planFirst: Bool?, route: Route?, sessionID: String, status: SessionStatus, title: String?, updatedAt: String) {
+    public init(createdAt: String, cwd: String?, forkedFrom: String?, lastSeq: Int, localOnly: Bool?, modelProfile: String, origin: String?, planFirst: Bool?, route: Route?, sessionID: String, status: SessionStatus, title: String?, updatedAt: String) {
         self.createdAt = createdAt
         self.cwd = cwd
         self.forkedFrom = forkedFrom
         self.lastSeq = lastSeq
+        self.localOnly = localOnly
         self.modelProfile = modelProfile
         self.origin = origin
         self.planFirst = planFirst

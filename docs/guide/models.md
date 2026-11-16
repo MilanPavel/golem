@@ -82,6 +82,24 @@ The question shows on every screen attached to the chat, and any of them may ans
 
 With `[budget] over = "ask"`, a spent cap asks the same question ("The daily budget ($2.00) is spent."), with only "Just this once" and "Stay local". The answer is not remembered. A chat pinned to a paid model is still refused when a cap is spent.
 
+## Keep a folder on this Mac
+
+List folders under `[routing] local_only` in `~/.golem/config.toml`, and a chat in one of them, or in a folder inside one, is read only by a local model:
+
+```toml
+[routing]
+local_only = ["~/work/private"]
+```
+
+- A chat pinned to a hosted model there is refused with `local_only` and the message "This folder is local only. Pick a local model with /model." Nothing is sent.
+- On `auto`, hosted models are never picked, whatever you agreed to and whatever the budget. If only a hosted model is left, the turn is refused.
+- Titles, summaries, `/compact` and the commit message the Changes screen suggests also use only a local model. When there is none, a title is the first line of your message and a summary is refused.
+- A project can mark itself private: put `[routing]` with `local_only = true` (a boolean, not a list) in its `.golem/config.toml`. It counts without trusting the project, because it can only make a chat more private. It applies to the folder holding the file and to every folder below it.
+- A chat whose folder is set by its first message becomes local only with that message.
+- The chat shows a `local only` tag next to its folder in the web app, and in the status line of the terminal.
+
+"Local only" is about which model reads your chat. Web fetch, web search and MCP servers are not model calls, and it does not block them. Turn them off in [Settings](./settings.md) if the folder needs that too.
+
 ## Short names, and other providers
 
 golem reads `~/.golem/config.toml`, and picks up model changes without a restart. A **profile** gives a model a short name:

@@ -87,6 +87,7 @@ async def summarise_now(
     session_id: str,
     profile: str,
     options: Mapping[str, float | str],
+    local_only: bool = False,
 ) -> Compaction:
     """Replace every turn but the last ``keep_turns`` (at least one) with a summary.
 
@@ -104,6 +105,7 @@ async def summarise_now(
         messages=messages[start:end],
         earlier=earlier,
         focus=focus,
+        local_only=local_only,
     )
     planned: ContextView = {
         **(ctx or {}),
@@ -120,5 +122,5 @@ async def summarise_now(
         max(0, used - round((before - after) * ratio)),
         turns,
         end - start,
-        model=summariser.model_name(profile),
+        model=summariser.model_name(profile, local_only),
     )

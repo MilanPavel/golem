@@ -61,6 +61,7 @@ from golem.graphs.tools_node import Answer
 from golem.models.cost import cost_usd
 from golem.models.errors import ContextFull, ModelUnreachable
 from golem.models.pick import Choice
+from golem.models.privacy import LOCAL_ONLY_HINT
 from golem.models.router import ModelConfigError, ModelIdentity
 from golem.models.tiers import Tier
 from golem.permissions.engine import Allowance
@@ -533,6 +534,13 @@ async def _failed(
     if isinstance(exc, ContextFull):
         log.warning("run %s failed: needs about %d of %d tokens", run_id, exc.need, exc.window)
         await emit("run.failed", RunFailedData(message=exc.message, code=exc.code, hint=exc.hint))
+        return
+    if isinstance(exc, ModelConfigError) and exc.code == "local_only":
+        log.warning("run %s failed: %s", run_id, exc)
+        await emit(
+            "run.failed",
+            RunFailedData(message=str(exc), code="local_only", hint=LOCAL_ONLY_HINT),
+        )
         return
     log.exception("run %s failed", run_id, exc_info=exc)
     message = str(exc).strip() or type(exc).__name__

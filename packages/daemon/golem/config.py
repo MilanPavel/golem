@@ -647,11 +647,17 @@ class _ProjectToml(TomlConfigSettingsSource):
     A list from a higher layer replaces the user's whole list, and this layer is read
     whether or not the folder is trusted. A project's routines reach the daemon only
     through ``golem.routine_files``, which checks trust (ADR-050).
+
+    ``[routing] local_only`` is a flag there (``true``), not the user's list of folders. The
+    flag is read by ``golem.models.project_privacy``, so it is dropped here.
     """
 
     def __call__(self) -> dict[str, Any]:
         data = dict(super().__call__())
         data.pop("routine", None)
+        routing = data.get("routing")
+        if isinstance(routing, dict) and "local_only" in routing:
+            data["routing"] = {k: v for k, v in routing.items() if k != "local_only"}  # pyright: ignore[reportUnknownVariableType]
         return data
 
 

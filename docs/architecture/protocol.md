@@ -281,6 +281,7 @@ Adding a message is the same every time. Add a class, run `just gen`, and the cl
 | `-32014`, `-32015` | key rejected, key unchecked | `auth.set` |
 | `-32016` | Ollama failed | |
 | `-32017` | budget spent | `message.send` on a paid model while a cap in `[budget]` is spent |
+| `-32018` | local only | `message.send` on a hosted model in a folder that stays on this Mac |
 | `-32020` | not allowed from the browser | Sent by the gateway, never by the daemon |
 
 ### Limits

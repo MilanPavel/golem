@@ -189,15 +189,17 @@ class RunFailedData(BaseModel):
     ``[budget]`` is spent, so a paid call was not made. ``provider`` is the
     provider whose server it was, and ``hint`` says how to fix it, such as
     ``run ollama serve``. ``context_full``: the prompt does not fit the model's window,
-    even after clearing and summarising, and nothing was sent.
+    even after clearing and summarising, and nothing was sent. ``local_only``: the chat's
+    folder stays on this Mac and a hosted model was about to be called, so nothing was sent.
     """
 
     model_config = _CONFIG
 
     message: str = Field(min_length=1)
-    code: Literal["model_unreachable", "not_installed", "context_full", "budget_spent"] | None = (
-        None
-    )
+    code: (
+        Literal["model_unreachable", "not_installed", "context_full", "budget_spent", "local_only"]
+        | None
+    ) = None
     provider: str | None = Field(default=None, min_length=1)
     hint: str | None = Field(default=None, min_length=1)
 

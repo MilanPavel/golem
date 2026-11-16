@@ -49,6 +49,7 @@ class TitleGenerator(Protocol):
         reply: str,
         options: Mapping[str, float | str] | None = None,
         session_id: str | None = None,
+        local_only: bool = False,
     ) -> str: ...
 
 
@@ -109,6 +110,7 @@ class ModelTitles:
         reply: str,
         options: Mapping[str, float | str] | None = None,
         session_id: str | None = None,
+        local_only: bool = False,
     ) -> str:
         role = for_role(
             "titles",
@@ -116,6 +118,7 @@ class ModelTitles:
             settings=self._router.roles(),
             tier_of_profile=self._tier_of_profile,
             budget_models=self._budget_refs(),
+            local_only=local_only,
         )
         ask = self._paid_ok
         paid = self._tier_of_profile(role.profile) not in (None, "local")
@@ -129,7 +132,7 @@ class ModelTitles:
             model_id = self._router.resolve(role.profile).model_id
             if "off" in (self._router.think_values(model_id) or ()):
                 overrides["think"] = "off"
-        model = self._router.chat_model(role.profile, overrides)
+        model = self._router.chat_model(role.profile, overrides, local_only=local_only)
         gate = self._gate or ServerGate()
         # A title waits behind the chat on the local server of the model it runs on.
         try:
@@ -202,11 +205,18 @@ async def choose_title(
     options: Mapping[str, float | str] | None = None,
     session_id: str | None = None,
     timeout: float = TITLE_TIMEOUT_SECONDS,
+    local_only: bool = False,
 ) -> str:
-    """A clean title from ``generator``, or from ``prompt`` when that fails."""
+    """A clean title from ``generator``, or from ``prompt`` when that fails.
+
+    With ``local_only`` the title is written by a local model, and a hosted one is never asked:
+    the first line of the prompt is the title instead.
+    """
     try:
         async with asyncio.timeout(timeout):
-            proposed = await generator.title(model_profile, prompt, reply, options, session_id)
+            proposed = await generator.title(
+                model_profile, prompt, reply, options, session_id, local_only
+            )
     except Exception:
         log.warning("title generation failed; using the first line", exc_info=True)
         proposed = ""

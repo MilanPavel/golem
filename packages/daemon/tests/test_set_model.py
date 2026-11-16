@@ -26,8 +26,13 @@ class _TwoModels(ModelRouter):
         self.models = models
 
     def chat_model(
-        self, profile: str, overrides: Mapping[str, float | str] | None = None
+        self,
+        profile: str,
+        overrides: Mapping[str, float | str] | None = None,
+        *,
+        local_only: bool = False,
     ) -> BaseChatModel:
+        del local_only
         ref = self.resolve(profile).ref
         model = self.models.get(ref)
         if model is None:

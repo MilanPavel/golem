@@ -10,7 +10,11 @@ from golem.config import Role, RoleSettings
 from golem.models.tiers import Tier
 
 RoleReason = Literal[
-    "configured", "session is local", "cheapest budget model", "no budget model ready"
+    "configured",
+    "session is local",
+    "cheapest budget model",
+    "no budget model ready",
+    "no local model",
 ]
 
 
@@ -28,6 +32,7 @@ def for_role(
     settings: RoleSettings,
     tier_of_profile: Callable[[str], Tier | None],
     budget_models: Sequence[str],
+    local_only: bool = False,
 ) -> RoleModel:
     """The model for ``role``.
 
@@ -35,8 +40,18 @@ def for_role(
     local model would compete for memory. 3. The first of ``budget_models`` when the session's
     model is hosted. ``budget_models`` are ready budget models that take tools, cheapest first.
     4. The session's model.
+
+    With ``local_only`` only a local model qualifies: a configured model or the session's own
+    when it is local, else the session's model with the reason ``no local model``. The caller
+    then asks for it with ``chat_model(..., local_only=True)``, which refuses a hosted one.
     """
     configured: str = getattr(settings, role)
+    if local_only:
+        if configured != "session" and tier_of_profile(configured) == "local":
+            return RoleModel(configured, configured == session_profile, "configured")
+        if tier_of_profile(session_profile) == "local":
+            return RoleModel(session_profile, True, "session is local")
+        return RoleModel(session_profile, True, "no local model")
     if configured != "session":
         return RoleModel(configured, configured == session_profile, "configured")
     if tier_of_profile(session_profile) == "local":
