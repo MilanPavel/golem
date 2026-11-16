@@ -10,6 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from golem.sessions.recovery import open_turn
+from golem_protocol.commands import PendingItem
 from golem_protocol.events import (
     ApprovalNeededEvent,
     ApprovalResolvedEvent,
@@ -31,6 +32,8 @@ class Pending:
     args: dict[str, object]
     subject: str | None
     diff: str | None
+    source: str
+    since: str
     user_message_id: str | None
     prompt: str | None
     open_calls: tuple[str, ...]
@@ -60,6 +63,8 @@ def pending_approval(events: list[ChatEvent]) -> Pending | None:
         args=dict(waiting.data.args),
         subject=waiting.data.subject,
         diff=waiting.data.diff,
+        source=waiting.data.source,
+        since=waiting.ts,
         user_message_id=turn.user_message_id,
         prompt=prompt,
         open_calls=tuple(turn.open_calls),
@@ -75,6 +80,7 @@ class PendingConsent:
     text: str
     skill: SkillCall | None
     alternatives: tuple[ConsentAnswer, ...]
+    since: str
 
 
 def pending_consent(events: list[ChatEvent]) -> PendingConsent | None:
@@ -95,7 +101,52 @@ def pending_consent(events: list[ChatEvent]) -> PendingConsent | None:
         text=user.data.text,
         skill=user.data.skill,
         alternatives=tuple(asked.data.alternatives),
+        since=asked.ts,
     )
 
 
-__all__ = ["Pending", "PendingConsent", "pending_approval", "pending_consent"]
+def diff_counts(diff: str) -> tuple[int, int]:
+    """The lines a unified diff adds and removes, without the ``+++`` and ``---`` headers."""
+    added = removed = 0
+    for line in diff.splitlines():
+        if line.startswith("+") and not line.startswith("+++"):
+            added += 1
+        elif line.startswith("-") and not line.startswith("---"):
+            removed += 1
+    return added, removed
+
+
+def pending_item(events: list[ChatEvent]) -> PendingItem | None:
+    """What the run of ``events`` waits for, as the session summary carries it.
+
+    An approval wins when both are open. The diff is counted, never copied.
+    """
+    approval = pending_approval(events)
+    if approval is not None:
+        added, removed = (None, None) if approval.diff is None else diff_counts(approval.diff)
+        return PendingItem(
+            kind="approval",
+            since=approval.since,
+            call_id=approval.call_id,
+            name=approval.name,
+            subject=approval.subject,
+            source=approval.source,
+            added=added,
+            removed=removed,
+        )
+    consent = pending_consent(events)
+    if consent is not None:
+        return PendingItem(
+            kind="consent", since=consent.since, alternatives=len(consent.alternatives)
+        )
+    return None
+
+
+__all__ = [
+    "Pending",
+    "PendingConsent",
+    "diff_counts",
+    "pending_approval",
+    "pending_consent",
+    "pending_item",
+]

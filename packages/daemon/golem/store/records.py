@@ -120,6 +120,15 @@ class SessionRecords:
         )
         return [_activity(row) for row in rows]
 
+    async def waiting_run_id(self, session_id: str) -> str | None:
+        """The newest run of ``session_id`` that waits for an answer, if any."""
+        row = await self._database.fetch_one(
+            "SELECT run_id FROM runs WHERE session_id = ? AND status = 'waiting'"
+            " ORDER BY started_at DESC LIMIT 1",
+            (session_id,),
+        )
+        return None if row is None else str(row[0])
+
 
 class RunRecords:
     def __init__(self, database: Database) -> None:

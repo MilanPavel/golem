@@ -13351,6 +13351,8 @@ public struct SessionListResult: Codable {
 /// ``local_only`` is true while the session's folder stays on this Mac: only a local model
 /// reads its chat. It follows the settings of the moment, so it can change without an event.
 /// An older daemon leaves it out.
+/// ``pending`` says what a ``waiting`` session waits for, null otherwise. An older daemon
+/// leaves it out.
 // MARK: - SessionElement
 public struct SessionElement: Codable {
     public let createdAt: String
@@ -13360,6 +13362,7 @@ public struct SessionElement: Codable {
     public let localOnly: Bool?
     public let modelProfile: String
     public let origin: String?
+    public let pending: SessionPendingItem?
     public let planFirst: Bool?
     public let route: RouteEnum?
     public let sessionID: String
@@ -13375,6 +13378,7 @@ public struct SessionElement: Codable {
         case localOnly = "local_only"
         case modelProfile = "model_profile"
         case origin = "origin"
+        case pending = "pending"
         case planFirst = "plan_first"
         case route = "route"
         case sessionID = "session_id"
@@ -13383,7 +13387,7 @@ public struct SessionElement: Codable {
         case updatedAt = "updated_at"
     }
 
-    public init(createdAt: String, cwd: String?, forkedFrom: String?, lastSeq: Int, localOnly: Bool?, modelProfile: String, origin: String?, planFirst: Bool?, route: RouteEnum?, sessionID: String, status: SessionStatus, title: String?, updatedAt: String) {
+    public init(createdAt: String, cwd: String?, forkedFrom: String?, lastSeq: Int, localOnly: Bool?, modelProfile: String, origin: String?, pending: SessionPendingItem?, planFirst: Bool?, route: RouteEnum?, sessionID: String, status: SessionStatus, title: String?, updatedAt: String) {
         self.createdAt = createdAt
         self.cwd = cwd
         self.forkedFrom = forkedFrom
@@ -13391,6 +13395,7 @@ public struct SessionElement: Codable {
         self.localOnly = localOnly
         self.modelProfile = modelProfile
         self.origin = origin
+        self.pending = pending
         self.planFirst = planFirst
         self.route = route
         self.sessionID = sessionID
@@ -13398,6 +13403,59 @@ public struct SessionElement: Codable {
         self.title = title
         self.updatedAt = updatedAt
     }
+}
+
+/// What a waiting session waits for, in a form a client can list without opening it.
+///
+/// ``kind`` is ``approval`` for a tool call that needs a yes, and ``consent`` for the paid
+/// step-up question. ``since`` is the ``ts`` of the event that asked
+/// (``approval.needed`` or ``route.consent.needed``). For an approval, ``call_id``,
+/// ``name``,
+/// ``subject`` and ``source`` are those of the ``approval.needed`` event, and ``added`` and
+/// ``removed`` count the lines its diff adds and removes (null when the call has no diff).
+/// For a consent, ``alternatives`` is the number of answers the user may give. The full diff
+/// stays in the session's events: a summary goes to every watcher on every event, so it
+/// carries counts only. An older daemon leaves ``pending`` out of the summary.
+// MARK: - SessionPendingItem
+public struct SessionPendingItem: Codable {
+    public let added: Int?
+    public let alternatives: Int?
+    public let callID: String?
+    public let kind: PendingItemKind
+    public let name: String?
+    public let removed: Int?
+    public let since: String
+    public let source: String?
+    public let subject: String?
+
+    public enum CodingKeys: String, CodingKey {
+        case added = "added"
+        case alternatives = "alternatives"
+        case callID = "call_id"
+        case kind = "kind"
+        case name = "name"
+        case removed = "removed"
+        case since = "since"
+        case source = "source"
+        case subject = "subject"
+    }
+
+    public init(added: Int?, alternatives: Int?, callID: String?, kind: PendingItemKind, name: String?, removed: Int?, since: String, source: String?, subject: String?) {
+        self.added = added
+        self.alternatives = alternatives
+        self.callID = callID
+        self.kind = kind
+        self.name = name
+        self.removed = removed
+        self.since = since
+        self.source = source
+        self.subject = subject
+    }
+}
+
+public enum PendingItemKind: String, Codable {
+    case approval = "approval"
+    case consent = "consent"
 }
 
 public enum SessionStatus: String, Codable {
@@ -13935,6 +13993,8 @@ public enum SessionSummaryNotificationMethod: String, Codable {
 /// ``local_only`` is true while the session's folder stays on this Mac: only a local model
 /// reads its chat. It follows the settings of the moment, so it can change without an event.
 /// An older daemon leaves it out.
+/// ``pending`` says what a ``waiting`` session waits for, null otherwise. An older daemon
+/// leaves it out.
 // MARK: - SessionSummaryNotificationParams
 public struct SessionSummaryNotificationParams: Codable {
     public let createdAt: String
@@ -13944,6 +14004,7 @@ public struct SessionSummaryNotificationParams: Codable {
     public let localOnly: Bool?
     public let modelProfile: String
     public let origin: String?
+    public let pending: ParamsPendingItem?
     public let planFirst: Bool?
     public let route: RouteEnum?
     public let sessionID: String
@@ -13959,6 +14020,7 @@ public struct SessionSummaryNotificationParams: Codable {
         case localOnly = "local_only"
         case modelProfile = "model_profile"
         case origin = "origin"
+        case pending = "pending"
         case planFirst = "plan_first"
         case route = "route"
         case sessionID = "session_id"
@@ -13967,7 +14029,7 @@ public struct SessionSummaryNotificationParams: Codable {
         case updatedAt = "updated_at"
     }
 
-    public init(createdAt: String, cwd: String?, forkedFrom: String?, lastSeq: Int, localOnly: Bool?, modelProfile: String, origin: String?, planFirst: Bool?, route: RouteEnum?, sessionID: String, status: SessionStatus, title: String?, updatedAt: String) {
+    public init(createdAt: String, cwd: String?, forkedFrom: String?, lastSeq: Int, localOnly: Bool?, modelProfile: String, origin: String?, pending: ParamsPendingItem?, planFirst: Bool?, route: RouteEnum?, sessionID: String, status: SessionStatus, title: String?, updatedAt: String) {
         self.createdAt = createdAt
         self.cwd = cwd
         self.forkedFrom = forkedFrom
@@ -13975,12 +14037,61 @@ public struct SessionSummaryNotificationParams: Codable {
         self.localOnly = localOnly
         self.modelProfile = modelProfile
         self.origin = origin
+        self.pending = pending
         self.planFirst = planFirst
         self.route = route
         self.sessionID = sessionID
         self.status = status
         self.title = title
         self.updatedAt = updatedAt
+    }
+}
+
+/// What a waiting session waits for, in a form a client can list without opening it.
+///
+/// ``kind`` is ``approval`` for a tool call that needs a yes, and ``consent`` for the paid
+/// step-up question. ``since`` is the ``ts`` of the event that asked
+/// (``approval.needed`` or ``route.consent.needed``). For an approval, ``call_id``,
+/// ``name``,
+/// ``subject`` and ``source`` are those of the ``approval.needed`` event, and ``added`` and
+/// ``removed`` count the lines its diff adds and removes (null when the call has no diff).
+/// For a consent, ``alternatives`` is the number of answers the user may give. The full diff
+/// stays in the session's events: a summary goes to every watcher on every event, so it
+/// carries counts only. An older daemon leaves ``pending`` out of the summary.
+// MARK: - ParamsPendingItem
+public struct ParamsPendingItem: Codable {
+    public let added: Int?
+    public let alternatives: Int?
+    public let callID: String?
+    public let kind: PendingItemKind
+    public let name: String?
+    public let removed: Int?
+    public let since: String
+    public let source: String?
+    public let subject: String?
+
+    public enum CodingKeys: String, CodingKey {
+        case added = "added"
+        case alternatives = "alternatives"
+        case callID = "call_id"
+        case kind = "kind"
+        case name = "name"
+        case removed = "removed"
+        case since = "since"
+        case source = "source"
+        case subject = "subject"
+    }
+
+    public init(added: Int?, alternatives: Int?, callID: String?, kind: PendingItemKind, name: String?, removed: Int?, since: String, source: String?, subject: String?) {
+        self.added = added
+        self.alternatives = alternatives
+        self.callID = callID
+        self.kind = kind
+        self.name = name
+        self.removed = removed
+        self.since = since
+        self.source = source
+        self.subject = subject
     }
 }
 
@@ -14000,6 +14111,8 @@ public struct SessionSummaryNotificationParams: Codable {
 /// ``local_only`` is true while the session's folder stays on this Mac: only a local model
 /// reads its chat. It follows the settings of the moment, so it can change without an event.
 /// An older daemon leaves it out.
+/// ``pending`` says what a ``waiting`` session waits for, null otherwise. An older daemon
+/// leaves it out.
 // MARK: - SessionSummary
 public struct SessionSummary: Codable {
     public let createdAt: String
@@ -14009,6 +14122,7 @@ public struct SessionSummary: Codable {
     public let localOnly: Bool?
     public let modelProfile: String
     public let origin: String?
+    public let pending: SessionSummaryPendingItem?
     public let planFirst: Bool?
     public let route: RouteEnum?
     public let sessionID: String
@@ -14024,6 +14138,7 @@ public struct SessionSummary: Codable {
         case localOnly = "local_only"
         case modelProfile = "model_profile"
         case origin = "origin"
+        case pending = "pending"
         case planFirst = "plan_first"
         case route = "route"
         case sessionID = "session_id"
@@ -14032,7 +14147,7 @@ public struct SessionSummary: Codable {
         case updatedAt = "updated_at"
     }
 
-    public init(createdAt: String, cwd: String?, forkedFrom: String?, lastSeq: Int, localOnly: Bool?, modelProfile: String, origin: String?, planFirst: Bool?, route: RouteEnum?, sessionID: String, status: SessionStatus, title: String?, updatedAt: String) {
+    public init(createdAt: String, cwd: String?, forkedFrom: String?, lastSeq: Int, localOnly: Bool?, modelProfile: String, origin: String?, pending: SessionSummaryPendingItem?, planFirst: Bool?, route: RouteEnum?, sessionID: String, status: SessionStatus, title: String?, updatedAt: String) {
         self.createdAt = createdAt
         self.cwd = cwd
         self.forkedFrom = forkedFrom
@@ -14040,12 +14155,61 @@ public struct SessionSummary: Codable {
         self.localOnly = localOnly
         self.modelProfile = modelProfile
         self.origin = origin
+        self.pending = pending
         self.planFirst = planFirst
         self.route = route
         self.sessionID = sessionID
         self.status = status
         self.title = title
         self.updatedAt = updatedAt
+    }
+}
+
+/// What a waiting session waits for, in a form a client can list without opening it.
+///
+/// ``kind`` is ``approval`` for a tool call that needs a yes, and ``consent`` for the paid
+/// step-up question. ``since`` is the ``ts`` of the event that asked
+/// (``approval.needed`` or ``route.consent.needed``). For an approval, ``call_id``,
+/// ``name``,
+/// ``subject`` and ``source`` are those of the ``approval.needed`` event, and ``added`` and
+/// ``removed`` count the lines its diff adds and removes (null when the call has no diff).
+/// For a consent, ``alternatives`` is the number of answers the user may give. The full diff
+/// stays in the session's events: a summary goes to every watcher on every event, so it
+/// carries counts only. An older daemon leaves ``pending`` out of the summary.
+// MARK: - SessionSummaryPendingItem
+public struct SessionSummaryPendingItem: Codable {
+    public let added: Int?
+    public let alternatives: Int?
+    public let callID: String?
+    public let kind: PendingItemKind
+    public let name: String?
+    public let removed: Int?
+    public let since: String
+    public let source: String?
+    public let subject: String?
+
+    public enum CodingKeys: String, CodingKey {
+        case added = "added"
+        case alternatives = "alternatives"
+        case callID = "call_id"
+        case kind = "kind"
+        case name = "name"
+        case removed = "removed"
+        case since = "since"
+        case source = "source"
+        case subject = "subject"
+    }
+
+    public init(added: Int?, alternatives: Int?, callID: String?, kind: PendingItemKind, name: String?, removed: Int?, since: String, source: String?, subject: String?) {
+        self.added = added
+        self.alternatives = alternatives
+        self.callID = callID
+        self.kind = kind
+        self.name = name
+        self.removed = removed
+        self.since = since
+        self.source = source
+        self.subject = subject
     }
 }
 
