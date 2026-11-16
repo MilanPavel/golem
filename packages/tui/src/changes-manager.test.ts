@@ -208,3 +208,13 @@ test("the hint lists the undo keys", () => {
   const hint = layoutChanges(openChangesManager(), data(), 120, 12).at(-1)?.text ?? "";
   assert.match(hint, /u undo hunk · U undo file/);
 });
+
+test("a folder too big to watch says so, wrapped, with no files and with some", () => {
+  const empty = layoutChanges(openChangesManager(), data({ files: [], shell: "off" }), 60, 8);
+  assert.equal(empty[1]?.text, "No changes yet.");
+  assert.equal(empty[2]?.text, "Changes made by shell commands are not listed: this folder");
+  assert.equal(empty[3]?.text, "is too big to watch and is not a git repository.");
+  const listed = layoutChanges(openChangesManager(), data({ shell: "off" }), 120, 8);
+  assert.equal(listed[1]?.text, "Changes made by shell commands are not listed: this folder is too big to watch and is not a git repository.");
+  assert.equal(layoutChanges(openChangesManager(), data({ files: [], shell: "files" }), 60, 8)[2]?.text, "");
+});

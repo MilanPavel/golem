@@ -5,6 +5,7 @@ import { useChangedFiles, useCommitInfo, useNotes, useSession } from "../../stor
 import type { ChangedFile } from "../../store/changes.ts";
 import { useDiffMode } from "../diff/index.ts";
 import { ChangesViewSwitch, useChangesView } from "./changes-view.tsx";
+import { ShellNote } from "./shell-note.tsx";
 import { CommitDialog } from "./commit-dialog.tsx";
 import { Counts, FileDiffPanel, Row, plural } from "./file-row.tsx";
 import { TurnsTab } from "./turns-view.tsx";
@@ -207,6 +208,7 @@ export function ChangesTab({ sessionId }: { sessionId: string }) {
   return (
     <div className="flex min-w-0 flex-col gap-3">
       <ChangesViewSwitch view={view} onChange={setView} />
+      <ShellNote sessionId={sessionId} />
       {view === "turn" ? <TurnsTab sessionId={sessionId} /> : <ByFileTab sessionId={sessionId} />}
     </div>
   );

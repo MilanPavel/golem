@@ -648,16 +648,23 @@ public struct ChangesListParams: Codable {
 }
 
 /// The changed files in order of first change. A session without a folder has none.
+///
+/// ``shell`` says how files a shell command changes are found: ``git`` in a repository,
+/// ``files`` by comparing the folder before and after, ``off`` when the folder is too big
+/// to watch and is not a repository.
 // MARK: - ChangesListResult
 public struct ChangesListResult: Codable {
     public let files: [FileElement]
+    public let shell: Shell?
 
     public enum CodingKeys: String, CodingKey {
         case files = "files"
+        case shell = "shell"
     }
 
-    public init(files: [FileElement]) {
+    public init(files: [FileElement], shell: Shell?) {
         self.files = files
+        self.shell = shell
     }
 }
 
@@ -691,6 +698,12 @@ public struct FileElement: Codable {
         self.stale = stale
         self.status = status
     }
+}
+
+public enum Shell: String, Codable {
+    case files = "files"
+    case git = "git"
+    case off = "off"
 }
 
 /// ``changes.revert``. Put back what a change, a file, a hunk or a turn wrote.

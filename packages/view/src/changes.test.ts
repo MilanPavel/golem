@@ -3,7 +3,7 @@ import { test } from "node:test";
 
 import type { ChatEvent } from "@golem/client";
 import type { ChatMessage } from "./chat-state.ts";
-import { changedPaths, changesLine, cutTitle, noChanges, reduceChanges, totals, turnCards, turnOf, type ChangesState, type TurnFile } from "./changes.ts";
+import { changedPaths, changesLine, cutTitle, noChanges, reduceChanges, shellTrackingNote, totals, turnCards, turnOf, type ChangesState, type TurnFile } from "./changes.ts";
 
 type Over = {
   id: string;
@@ -143,4 +143,10 @@ test("a title is one line and cut at 80 characters", () => {
   assert.equal(cut.length, 80);
   assert.ok(cut.endsWith("…"));
   assert.equal(cutTitle("y".repeat(80)).length, 80);
+});
+
+test("shellTrackingNote words only the folder that is not watched", () => {
+  assert.equal(shellTrackingNote("git"), null);
+  assert.equal(shellTrackingNote("files"), null);
+  assert.equal(shellTrackingNote("off"), "Changes made by shell commands are not listed: this folder is too big to watch and is not a git repository.");
 });

@@ -95,10 +95,11 @@ async def test_binary_and_ignored_files_are_skipped(repo: Path) -> None:
 
 
 @needs_sandbox
-async def test_a_folder_that_is_not_a_repository_records_nothing(tmp_path: Path) -> None:
+async def test_a_folder_that_is_not_a_repository_is_compared_by_its_files(tmp_path: Path) -> None:
     folder = tmp_path / "plain"
     folder.mkdir()
-    assert (await _shell(folder, "echo a > a.txt")).edits == ()
+    result = await _shell(folder, "echo a > a.txt")
+    assert result.edits == (FileEdit("a.txt", None, "a\n", "shell"),)
 
 
 async def test_nothing_is_recorded_without_a_sandbox(

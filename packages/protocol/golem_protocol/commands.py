@@ -2925,11 +2925,17 @@ class ChangedFile(BaseModel):
 
 
 class ChangesListResult(BaseModel):
-    """The changed files in order of first change. A session without a folder has none."""
+    """The changed files in order of first change. A session without a folder has none.
+
+    ``shell`` says how files a shell command changes are found: ``git`` in a repository,
+    ``files`` by comparing the folder before and after, ``off`` when the folder is too big
+    to watch and is not a repository.
+    """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     files: list[ChangedFile]
+    shell: Literal["git", "files", "off"] = "git"
 
 
 class ChangesDiffParams(BaseModel):

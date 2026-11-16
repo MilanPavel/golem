@@ -200,3 +200,11 @@ export function turnCards(state: ChangesState, messages: readonly ChatMessage[])
   }
   return cards.reverse();
 }
+
+/** How a session finds the files its shell commands change, as `changes.list` says it. */
+export type ShellTracking = "git" | "files" | "off";
+
+/** The quiet line for when shell changes are not listed, or null when they are. */
+export function shellTrackingNote(shell: ShellTracking): string | null {
+  return shell === "off" ? "Changes made by shell commands are not listed: this folder is too big to watch and is not a git repository." : null;
+}

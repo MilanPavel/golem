@@ -1,5 +1,5 @@
 import type { ChangedFile, ChangesRevertTarget } from "@golem/client";
-import { parseDiff, type DiffLine, type DiffTone } from "@golem/view";
+import { parseDiff, shellTrackingNote, type DiffLine, type DiffTone, type ShellTracking } from "@golem/view";
 
 import { layoutCommitBand, type CommitBand } from "./commit-band.ts";
 import { clampDiffOffset } from "./diff-view.ts";
@@ -33,6 +33,8 @@ export type ChangesData = {
   diffs: Readonly<Record<string, string>>;
   /** Why a file's diff could not be read, by path. */
   failed?: Readonly<Record<string, string>>;
+  /** How shell changes are found, from `changes.list`. Left out, they are. */
+  shell?: ShellTracking;
 };
 
 export type ChangesKey =
@@ -257,6 +259,8 @@ export function layoutChanges(
     ...extra,
   });
   const files = data.files;
+  const note = shellTrackingNote(data.shell ?? "git");
+  const noteLines = note === null ? [] : wrapWords(note, width).map((line) => plain(line, { dim: true }));
   const band =
     state.commit === null || state.commit === undefined
       ? null
@@ -274,7 +278,7 @@ export function layoutChanges(
   } else if (files === null) {
     body = [plain("asking the daemon…", { dim: true })];
   } else if (files.length === 0) {
-    body = [plain("No changes yet.")];
+    body = [plain("No changes yet."), ...noteLines];
   } else {
     title = titleOf(files);
     hint = state.note === undefined || state.note === null ? HINT : `${state.note} · ${HINT}`;
@@ -282,7 +286,7 @@ export function layoutChanges(
     const chosen = files[file];
     const path = chosen?.path ?? "";
     const rightWidth = wide ? width - LEFT_WIDTH - 1 : width;
-    const head: ChangesLine[] = [];
+    const head: ChangesLine[] = [...noteLines];
     if (!wide && chosen !== undefined) {
       const label = `‹ ${file + 1}/${files.length} ${chosen.path} ${counts(chosen.added, chosen.removed)} ›`;
       head.push(plain(label, { bold: true }));
@@ -363,4 +367,19 @@ function cut(text: string, width: number): string {
 
 function clamp(index: number, count: number): number {
   return Math.min(Math.max(index, 0), Math.max(0, count - 1));
+}
+
+/** The words of ``text`` in lines of at most ``width`` characters. */
+function wrapWords(text: string, width: number): string[] {
+  const lines: string[] = [];
+  let line = "";
+  for (const word of text.split(" ")) {
+    if (line !== "" && line.length + 1 + word.length > width) {
+      lines.push(line);
+      line = word;
+    } else {
+      line = line === "" ? word : `${line} ${word}`;
+    }
+  }
+  return line === "" ? lines : [...lines, line];
 }
