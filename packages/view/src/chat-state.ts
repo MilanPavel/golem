@@ -1,5 +1,6 @@
 import type { ApprovalChoice, ChatEvent, SkillCall } from "@golem/client";
 
+import { noChecks, reduceChecks, type ChecksState } from "./checks.ts";
 import { emptyPlan, reducePlan, type PlanState } from "./plan.ts";
 import { contextChangedNote, emptyLiveContext, foldLiveContext, type ContextChangeData, type LiveContextState } from "./context.ts";
 import { replyWasCut } from "./stop.ts";
@@ -90,10 +91,10 @@ export type ChatMessage = {
   tools?: ToolBlock[];
   /** A file the model is still writing, from `tool.writing`. Gone once the call is requested or the reply completes. */
   writing?: WritingBlock | null;
+  /** The run that wrote this reply, from the event that started or completed it. */
+  runId?: string;
   /** Set on a user message that ran a skill. `text` is then the filled-in body. */
   skill?: SkillCall;
-  /** The run that wrote this reply, so the changes of that turn can be shown after it. */
-  runId?: string;
 };
 
 /**
@@ -159,6 +160,8 @@ export type ChatState = {
   permissionMode: "careful" | "balanced" | "autopilot" | null;
   /** Whether the session is in plan first, and its newest plan, from `session.plan.changed` and `plan.proposed`. */
   plan: PlanState;
+  /** The project's checks per run, the question about running them, and the answer, from the `check.*` events. */
+  checks: ChecksState;
 };
 
 export const emptyChat: ChatState = {
@@ -183,6 +186,7 @@ export const emptyChat: ChatState = {
   options: {},
   permissionMode: null,
   plan: emptyPlan,
+  checks: noChecks,
 };
 
 /** What to do after a model server did not answer, besides fixing it. */
@@ -292,7 +296,8 @@ export function reduceChat(state: ChatState, event: ChatEvent): ChatState {
   const plan = reducePlan(state.plan, event);
   const next = plan === state.plan ? base : { ...base, plan };
   const context = foldLiveContext(state.context, event);
-  return context === state.context ? next : { ...next, context };
+  const checks = reduceChecks(next.checks, event);
+  return context === next.context && checks === next.checks ? next : { ...next, context, checks };
 }
 
 function reduceChatEvent(state: ChatState, event: ChatEvent): ChatState {
@@ -658,6 +663,8 @@ function upsertCompleted(
     return [...messages];
   }
   const durationMs = event.data.role === "assistant" ? answerDuration(runStartedAt, event.ts) : undefined;
+  const index = messages.findIndex((message) => message.id === event.data.message_id);
+  const runId = messages[index]?.runId ?? event.run_id;
   const next: ChatMessage = {
     id: event.data.message_id,
     role: event.data.role,
@@ -665,12 +672,11 @@ function upsertCompleted(
     streaming: false,
     interrupted: event.data.interrupted === true,
     at: event.ts,
-    ...(event.data.role === "assistant" && event.run_id != null ? { runId: event.run_id } : {}),
+    ...(runId === null || runId === undefined || event.data.role !== "assistant" ? {} : { runId }),
     ...(durationMs === undefined ? {} : { durationMs }),
     ...(event.data.skill == null ? {} : { skill: event.data.skill }),
     ...callOf({ calls }, event.data.message_id),
   };
-  const index = messages.findIndex((message) => message.id === next.id);
   if (index < 0) {
     return [...messages, withThinking(next, event.data.thinking, event.data.thinking_ms)];
   }

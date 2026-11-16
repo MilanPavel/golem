@@ -87,6 +87,8 @@ export type KeyPlace = {
   approvalDiff?: boolean;
   /** Its arguments are open in the editor. */
   approvalEdit?: boolean;
+  /** The question about running checks waits for an answer. */
+  question?: boolean;
 };
 
 export type ScrollToward = "up" | "down" | "start" | "end";
@@ -116,6 +118,7 @@ export type KeyEffect =
   | { kind: "approve"; decision: "allow" | "allow_session" | "allow_always" | "deny" }
   | { kind: "scroll-diff"; toward: ScrollToward; line: boolean }
   | { kind: "edit-args" }
+  | { kind: "checks"; on: boolean }
   | { kind: "args"; key: ArgsKey }
   | { kind: "insert"; text: string }
   | { kind: "ignore" };
@@ -139,6 +142,7 @@ type KeyWhen = {
   approval?: boolean;
   approvalDiff?: boolean;
   approvalEdit?: boolean;
+  question?: boolean;
 };
 
 export type KeyBinding = {
@@ -204,6 +208,7 @@ export const KEYS: readonly KeyBinding[] = [
   },
   ...argsEditKeys(),
   ...approvalKeys(),
+  ...checksKeys(),
   {
     id: "suggest-up",
     label: "Up",
@@ -541,6 +546,21 @@ function approvalKeys(): KeyBinding[] {
   ];
 }
 
+function checksKeys(): KeyBinding[] {
+  const answer = (id: string, input: string, description: string, on: boolean): KeyBinding => ({
+    id,
+    label: input,
+    contexts: ["composer"],
+    description,
+    when: { input, overlay: false, switcher: false, approval: false, question: true, draftEmpty: true, connected: true },
+    run: () => ({ kind: "checks", on }),
+  });
+  return [
+    answer("checks-yes", "y", "While golem asks about running checks, with no draft: runs them after its edits in this chat.", true),
+    answer("checks-no", "n", "While golem asks about running checks, with no draft: not in this chat.", false),
+  ];
+}
+
 function argsEditKeys(): KeyBinding[] {
   const key = (id: string, label: string, description: string, name: PressName, run: ArgsKey): KeyBinding => ({
     id,
@@ -828,6 +848,9 @@ function whenMatches(when: KeyWhen, place: KeyPlace, press: Press): boolean {
     return false;
   }
   if (when.approvalEdit !== undefined && when.approvalEdit !== (place.approvalEdit === true)) {
+    return false;
+  }
+  if (when.question !== undefined && when.question !== (place.question === true)) {
     return false;
   }
   if (when.draftEmpty !== undefined && when.draftEmpty !== place.draftEmpty) {

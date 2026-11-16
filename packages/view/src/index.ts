@@ -260,6 +260,24 @@ export {
   type NumberedLine,
 } from "./diff.ts";
 export {
+  CHECK_OUTPUT_ROWS,
+  checkMark,
+  checkSeconds,
+  checksChanged,
+  checksOf,
+  checksQuestion,
+  checksSummary,
+  latestRound,
+  noChecks,
+  outputTail,
+  reduceChecks,
+  type CheckRun,
+  type ChecksState,
+  type CheckStatus,
+  type ChecksTone,
+  type TurnChecks,
+} from "./checks.ts";
+export {
   changedPaths,
   CHANGES_ROW_WIDE,
   changesLine,

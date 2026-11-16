@@ -1,3 +1,4 @@
+export { ChecksQuestionView, DockedChecksQuestion } from "./checks-question.tsx";
 export { Composer, type ComposerProps } from "./composer.tsx";
 export { ContextChip, ContextChipView } from "./context-chip.tsx";
 export { PlanChip, PlanChipView, usePlanOn } from "./plan-chip.tsx";

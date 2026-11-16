@@ -3,6 +3,15 @@ import { Lexer, type Token, type Tokens } from "marked";
 
 import {
   changesRow,
+  CHECK_OUTPUT_ROWS,
+  checkMark,
+  checksOf,
+  checksSummary,
+  latestRound,
+  noChecks,
+  outputTail,
+  type ChecksState,
+  type TurnChecks,
   diffCounts,
   diffExcerpt,
   formatDuration,
@@ -39,6 +48,8 @@ export type Span = {
   tone?: "add" | "del";
   /** Drawn yellow: a file the model is still writing. */
   warn?: boolean;
+  /** Drawn in this colour: the dot of a check row. */
+  color?: "green" | "red";
 };
 
 export type LineRole = "user" | "assistant" | "plain";
@@ -91,6 +102,10 @@ export type TranscriptOptions = {
   notices?: readonly ChatNotice[];
   /** Whole seconds since the first `tool.writing` of the call a reply is writing. Unset counts 0. */
   writingSeconds?: (messageId: string) => number;
+  /** The checks of each run, drawn under the last reply of the run. */
+  checks?: ChecksState;
+  /** The run in progress, so a failure it is fixing reads as that. */
+  runId?: string | null;
   /** The files each turn changed. With it, a finished turn that changed files ends in one summary row. */
   changes?: ChangesState;
   /** The run still going. Its turn gets no summary row yet. */
@@ -198,6 +213,44 @@ export function layoutMessages(
       }
     }
     pushNotices(lines, noticesAfter(options?.notices ?? [], message.id), width);
+    const turn = message.runId === undefined || next?.runId === message.runId ? null : checksOf(options?.checks ?? noChecks, message.runId);
+    if (turn !== null) {
+      for (const spans of checkLines(turn, options?.runId === message.runId, width)) {
+        lines.push(wrappedLine(role, spans));
+      }
+    }
+  }
+  return lines;
+}
+
+/** Rows of failed output shown under a check line. */
+export const CHECK_ROWS = CHECK_OUTPUT_ROWS;
+
+/**
+ * The checks of a run: `◐ check ruff ✓ · tsc running`, then `● check ruff ✓ · tsc ✓ · 6.2s` in green or
+ * `● check ruff ✗ · fixing, round 1` in red. A failed run adds up to six dim rows from the end of its output.
+ */
+export function checkLines(turn: TurnChecks, running: boolean, width: number): Span[][] {
+  const summary = checksSummary(turn, running);
+  const round = latestRound(turn);
+  const marks = round.map((run) => `${run.name} ${run.status === "running" ? "running" : checkMark(run.status)}`);
+  const dot: Span =
+    summary.tone === "run" ? { text: "◐", warn: true } : { text: "●", color: summary.tone === "ok" ? "green" : "red" };
+  let tail: string;
+  if (summary.tone === "ok") {
+    const total = round.reduce((sum, run) => sum + (run.durationMs ?? 0), 0);
+    tail = ` · ${(total / 1000).toFixed(1)}s`;
+  } else if (summary.tone === "bad") {
+    tail = ` · ${summary.detail.replace("golem is fixing · round", "fixing, round")}`;
+  } else {
+    tail = "";
+  }
+  const lines = wrapSpans([dot, { text: ` check ${marks.join(" · ")}${tail}` }], width);
+  if (summary.tone === "bad") {
+    const failed = round.find((run) => run.status !== "passed");
+    for (const row of outputTail(failed?.output ?? "", CHECK_ROWS)) {
+      lines.push(...wrapSpans([{ text: `  │ ${visibleText(row)}`, dim: true }], width));
+    }
   }
   return lines;
 }
