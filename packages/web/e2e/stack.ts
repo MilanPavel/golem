@@ -62,6 +62,8 @@ export async function startStack(rig: Rig, options: StackOptions = {}): Promise<
 export const composer = (page: Page): Locator => page.getByRole("textbox", { name: "Message" });
 export const answers = (page: Page): Locator => page.getByRole("article", { name: "golem" });
 export const youSaid = (page: Page): Locator => page.getByRole("article", { name: "You" });
+/** The rail's golem, named `golem v<version> · connected` while the link is up. */
+export const railConnected = (page: Page): Locator => page.getByRole("img", { name: /· connected/ });
 export const sessionsPanel = (page: Page): Locator => page.getByRole("complementary", { name: "Sessions" });
 
 export async function send(page: Page, text: string): Promise<void> {
@@ -72,7 +74,7 @@ export async function send(page: Page, text: string): Promise<void> {
 /** Opens the gateway link, sends the first message from the empty screen, and returns the session's path. */
 export async function firstMessage(page: Page, url: string, text: string): Promise<string> {
   await page.goto(url);
-  await expect(page.getByText("connected", { exact: true })).toBeVisible();
+  await expect(railConnected(page)).toBeVisible();
   await send(page, text);
   await page.waitForURL(/\/s\/[^/]+$/);
   return new URL(page.url()).pathname;

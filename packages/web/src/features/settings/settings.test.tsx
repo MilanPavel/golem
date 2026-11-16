@@ -41,8 +41,8 @@ function mount(path: string, rows: typeof OK_ROWS | "fail" = OK_ROWS, extra: { k
   return { fake, page, user: userEvent.setup(), ...view };
 }
 
-const sidebar = () => screen.getByRole("complementary", { name: "Sessions" });
-const settingsButton = (name: string | RegExp = /^Settings/) => within(sidebar()).getByRole("button", { name });
+const rail = () => screen.getByRole("navigation", { name: "Sidebar rail" });
+const settingsButton = (name: string | RegExp = /^Settings/) => within(rail()).getByRole("button", { name });
 
 beforeEach(() => {
   localStorage.clear();
@@ -63,23 +63,20 @@ test("the Settings button has a gear, no dot, and the plain name when the setup 
   await waitFor(() => expect(fake.raw.setupStatus).toHaveBeenCalled());
   const button = settingsButton("Settings");
   expect(button.querySelector("svg")).not.toBeNull();
-  expect(button.querySelector(".bg-wait")).toBeNull();
+  expect(screen.queryByTestId("settings-dot")).toBeNull();
   expect(button.getAttribute("aria-current")).toBeNull();
 });
 
-test("with a setup problem the button shows a dot and the problem, in its name and its title", async () => {
+test("with a setup problem the button shows a dot", async () => {
   mount("/", STATUS_ROWS);
-  const button = await screen.findByRole("button", { name: `Settings, ${PROBLEM}` });
-  expect(button.querySelector(".bg-wait")).not.toBeNull();
-  expect(button.querySelector("[title]")?.getAttribute("title")).toBe(PROBLEM);
-  expect(within(button).getAllByText(PROBLEM).length).toBeGreaterThan(0);
+  const dot = await screen.findByTestId("settings-dot");
+  expect(settingsButton("Settings").contains(dot)).toBe(true);
 });
 
 test("a failed setup.status leaves the plain button", async () => {
   const { fake } = mount("/", "fail");
   await waitFor(() => expect(fake.raw.setupStatus).toHaveBeenCalled());
-  const button = settingsButton("Settings");
-  expect(button.querySelector(".bg-wait")).toBeNull();
+  expect(screen.queryByTestId("settings-dot")).toBeNull();
 });
 
 test("a click opens /settings without a page load, and the button is current there", async () => {
@@ -131,7 +128,7 @@ test("the Setup section reads all set when nothing is wrong", async () => {
 test("Appearance offers Match system, Light and Dark, and the sidebar has no theme switch", async () => {
   const { user } = mount("/settings/appearance", OK_ROWS);
   const main = screen.getByRole("main");
-  expect(within(sidebar()).queryByRole("group", { name: "Theme" })).toBeNull();
+  expect(within(rail()).queryByRole("group", { name: "Theme" })).toBeNull();
   expect(within(main).getByRole("button", { name: "Match system" }).getAttribute("aria-pressed")).toBe("true");
   await user.click(within(main).getByRole("button", { name: "Dark" }));
   expect(document.documentElement.dataset.theme).toBe("kiln");
@@ -185,7 +182,7 @@ test("setup.status is read again when Settings opens, and when the tab is seen a
 
 test("the palette has a Settings row in the View group, and it opens the page", async () => {
   const { user } = mount("/", OK_ROWS);
-  await user.click(within(sidebar()).getByRole("button", { name: /Search or run a command/ }));
+  await user.click(within(rail()).getByRole("button", { name: /^Search/ }));
   const palette = await screen.findByRole("dialog", { name: "Commands" });
   const row = within(palette).getByRole("option", { name: /^Settings/ });
   const group = row.closest("[role=group]");
@@ -263,7 +260,7 @@ for (const theme of ["slip", "kiln"] as const) {
   test(`no accessibility violations on the Settings screens and on the sidebar with a problem in ${theme}`, async () => {
     const { container, user } = mount("/settings", STATUS_ROWS);
     document.documentElement.dataset.theme = theme;
-    await screen.findByRole("button", { name: `Settings, ${PROBLEM}` });
+    await screen.findByTestId("settings-dot");
     expect((await axe.run(container, noContrast)).violations).toEqual([]);
     await user.click(within(screen.getByRole("navigation", { name: "Settings sections" })).getByRole("link", { name: "Appearance" }));
     expect((await axe.run(container, noContrast)).violations).toEqual([]);

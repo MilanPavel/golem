@@ -68,11 +68,11 @@ test("the sidebar groups sessions by folder, hides closed ones, and puts no fold
   expect(screen.getByText("waiting", { selector: ".sr-only" })).toBeTruthy();
 });
 
-test("the wordmark's state follows the sessions", () => {
-  const { fake } = setup("/");
-  expect(screen.getByText("idle", { selector: "span.font-mono" })).toBeTruthy();
+test("the rail's golem is drawn in the state of the sessions", () => {
+  const { fake, container } = setup("/");
+  expect(container.querySelector("nav svg[data-state]")?.getAttribute("data-state")).toBe("idle");
   seed(fake);
-  expect(screen.getByText("waiting for you")).toBeTruthy();
+  expect(container.querySelector("nav svg[data-state]")?.getAttribute("data-state")).toBe("waiting");
 });
 
 test("the selected session is current, and a click navigates without a page load", async () => {

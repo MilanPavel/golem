@@ -66,8 +66,9 @@ import { ToolsOfferView } from "../features/setup/tools-offer.tsx";
 import { TOOLS_CASES } from "../features/setup/tools-sample.ts";
 import { PullStatusView, pullSummary } from "../features/models/index.ts";
 import { NO_OLLAMA_LISTING, OLLAMA_DOWN_LISTING, SAMPLE_LISTING, SAMPLE_PULLS, THINKING_LISTING } from "../features/models/sample.ts";
-import { CloseSessionDialog, RenameField, SidebarView } from "../features/sessions/index.ts";
-import { Rail } from "../features/sidebar/index.ts";
+import { CloseSessionDialog, RenameField, SessionList } from "../features/sessions/index.ts";
+import { RoutinesInProgress, Rail, SidebarPanel } from "../features/sidebar/index.ts";
+import { ConnectionStrip } from "../features/connection/index.ts";
 import { InboxPanel } from "../features/inbox/index.ts";
 import { SAMPLE_INBOX } from "../features/inbox/sample.ts";
 import { inboxKey } from "../store/inbox.ts";
@@ -174,7 +175,7 @@ const SESSIONS: SessionSummary[] = [
   fakeSession("g", "Closed, so hidden", "/Users/you/notes", "closed", 5),
 ];
 
-const CONNECTED: ConnectionSnapshot = { state: { status: "connected" }, daemonVersion: "0.4.0" };
+const RECONNECTING: ConnectionSnapshot = { state: { status: "reconnecting", attempt: 1, delayMs: 1000 }, daemonVersion: "0.4.0" };
 
 const STATES: GolemState[] = ["idle", "thinking", "waiting", "failed", "offline"];
 
@@ -1446,18 +1447,34 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
       </section>
 
       <section className="mt-6" id={anchor("Sidebar")}>
-        <h3 className="mb-2 font-mono text-xs text-faint">Sidebar</h3>
-        <div className="h-96 overflow-hidden rounded-lg border border-line">
-          <SidebarView
-            label={`Sessions, ${theme}`}
-            sessions={SESSIONS}
-            selectedId="b"
-            connection={CONNECTED}
-            now={NOW}
-            onNavigate={() => {}}
-            actions={{ rename: () => Promise.resolve(), close: () => Promise.resolve() }}
-            onSearch={() => {}}
-          />
+        <h3 className="mb-2 font-mono text-xs text-faint">Sidebar panel</h3>
+        <div className="flex flex-wrap gap-4">
+          <div className="h-96 w-67 overflow-hidden rounded-lg border border-line">
+            <SidebarPanel
+              title="Sessions"
+              label={`Sessions, ${theme}`}
+              action={
+                <IconButton label="Start new session" className="size-7">
+                  <PlusIcon />
+                </IconButton>
+              }
+              onHide={() => {}}
+              foot={<ConnectionStrip snapshot={RECONNECTING} />}
+            >
+              <SessionList
+                sessions={SESSIONS}
+                selectedId="b"
+                now={NOW}
+                onNavigate={() => {}}
+                actions={{ rename: () => Promise.resolve(), close: () => Promise.resolve() }}
+              />
+            </SidebarPanel>
+          </div>
+          <div className="h-96 w-67 overflow-hidden rounded-lg border border-line">
+            <SidebarPanel title="Routines" label={`Routines, ${theme}`} onHide={() => {}}>
+              <RoutinesInProgress />
+            </SidebarPanel>
+          </div>
         </div>
       </section>
 

@@ -5,6 +5,7 @@ import type { Locator, Page } from "@playwright/test";
 import { startFakeModel, type FakeModel } from "./fake-model.ts";
 import { axeViolations } from "./axe.ts";
 import { expect, test } from "./fixtures.ts";
+import { railConnected } from "./stack.ts";
 import {
   startDaemon,
   startGateway,
@@ -68,9 +69,9 @@ function queueEdit(model: FakeModel): void {
 /** Opens the gateway, then the session, and sends a message that makes the model ask to edit. */
 async function askToEdit(page: Page, stack: Stack, project: Project): Promise<void> {
   await page.goto(stack.gateway.url);
-  await expect(page.getByText("connected", { exact: true })).toBeVisible();
+  await expect(railConnected(page)).toBeVisible();
   await page.goto(new URL(`/s/${project.sessionId}`, stack.gateway.url).href);
-  await expect(page.getByText("connected", { exact: true })).toBeVisible();
+  await expect(railConnected(page)).toBeVisible();
   await composer(page).fill("edit the notes");
   await composer(page).press("Enter");
   await expect(card(page)).toBeVisible();
@@ -101,9 +102,9 @@ test("opening an edit's diff below a long chat leaves the page where it is", asy
   stack.model.reply(Array.from({ length: 80 }, (_, line) => `Line ${String(line)}.`).join("\n\n"));
   queueEdit(stack.model);
   await page.goto(stack.gateway.url);
-  await expect(page.getByText("connected", { exact: true })).toBeVisible();
+  await expect(railConnected(page)).toBeVisible();
   await page.goto(new URL(`/s/${project.sessionId}`, stack.gateway.url).href);
-  await expect(page.getByText("connected", { exact: true })).toBeVisible();
+  await expect(railConnected(page)).toBeVisible();
   await composer(page).fill("say a lot");
   await composer(page).press("Enter");
   await expect(answers(page).last()).toContainText("Line 79.");

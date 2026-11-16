@@ -133,8 +133,8 @@ The sidebar is two parts: a narrow icon rail that is always there, and a panel b
 ### The connection
 
 - Nothing shows while connected.
-- Reconnecting: a wait-coloured strip at the panel's foot, "Reconnecting to golem…".
-- Offline: a deny-coloured strip, "golem is not running", with a Retry button.
+- Reconnecting, once the page has been connected: the page stays, with a wait-coloured strip at the panel's foot, "Reconnecting to golem…". The rail's golem and the Settings dot show it too.
+- The first connect and every other failure (closed, rejected, unauthorized) take the whole page with the connection screen.
 - The version also shows at the foot of the Settings section list.
 
 ### Sessions panel

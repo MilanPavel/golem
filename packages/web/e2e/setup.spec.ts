@@ -1,7 +1,7 @@
 import type { Page } from "@playwright/test";
 
 import { expect, test } from "./fixtures.ts";
-import { answers, composer, send, startStack } from "./stack.ts";
+import { answers, composer, railConnected, send, startStack } from "./stack.ts";
 
 /** A fresh home: no model chosen, and a stub Ollama with nothing installed. */
 const FRESH = { ollama: {}, chat: false } as const;
@@ -84,7 +84,7 @@ test("a send with no model goes to /welcome?from=send, and Ready comes back to t
 test("/setup opens Settings → Setup, whose Run setup again goes to /welcome", async ({ page, rig }) => {
   const { gateway } = await startStack(rig, { ollama: { installed: ["llama3.2:3b"] } });
   await page.goto(gateway.url);
-  await expect(page.getByText("connected", { exact: true })).toBeVisible();
+  await expect(railConnected(page)).toBeVisible();
   await send(page, "/setup");
   await expect(page).toHaveURL(/\/settings$/);
   await page.getByRole("button", { name: "Run setup again" }).click();

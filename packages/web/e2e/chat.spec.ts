@@ -5,6 +5,7 @@ import { startFakeModel, type FakeModel } from "./fake-model.ts";
 import { axeViolations } from "./axe.ts";
 import { expect, test } from "./fixtures.ts";
 import { startDaemon, startGateway, writeModelConfig, type Daemon, type Gateway, type Rig } from "./harness.ts";
+import { railConnected } from "./stack.ts";
 
 /** What Chrome logs when a test stops the gateway or the daemon on purpose. */
 const STOPPED = [/WebSocket connection to .* failed/, /ERR_CONNECTION_REFUSED/, /ERR_CONNECTION_RESET/];
@@ -40,7 +41,7 @@ async function send(page: Page, text: string): Promise<void> {
 /** Opens the gateway link, sends the first message from the empty screen, and returns the session's path. */
 async function firstMessage(page: Page, url: string, text: string): Promise<string> {
   await page.goto(url);
-  await expect(page.getByText("connected", { exact: true })).toBeVisible();
+  await expect(railConnected(page)).toBeVisible();
   await send(page, text);
   await page.waitForURL(/\/s\/[^/]+$/);
   return new URL(page.url()).pathname;
@@ -57,7 +58,7 @@ test("a message streams in and the Stop button comes and goes", async ({ page, r
   const { model, gateway } = await startStack(rig);
   model.reply(COUNTED, { delayMs: 150 });
   await page.goto(gateway.url);
-  await expect(page.getByText("connected", { exact: true })).toBeVisible();
+  await expect(railConnected(page)).toBeVisible();
   await send(page, "count for me");
   await page.waitForURL(/\/s\/[^/]+$/);
   await expect(youSaid(page)).toHaveText(/count for me/);
@@ -92,7 +93,7 @@ test("a second tab sees the answer stream in", async ({ page, rig }) => {
   await expect(stopButton(page)).toBeHidden();
   const other = await page.context().newPage();
   await other.goto(new URL(path, gateway.url).href);
-  await expect(other.getByText("connected", { exact: true })).toBeVisible();
+  await expect(railConnected(other)).toBeVisible();
   await expect(youSaid(other)).toHaveText(/first/);
   for (const tab of [page, other]) {
     await expect(tab.getByRole("complementary", { name: "Sessions" }).getByRole("link")).toHaveCount(1);
@@ -141,9 +142,9 @@ test("the daemon restarts and the chat carries on", async ({ page, rig, tolerate
   await expect(answers(page)).toContainText("The first answer.");
   await expect(stopButton(page)).toBeHidden();
   await daemon.stop();
-  await expect(page.getByRole("heading", { name: "golem's daemon is not running" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "golem's daemon is not running" })).toBeVisible({ timeout: 40_000 });
   rig.own(await startDaemon(home));
-  await expect(page.getByText("connected", { exact: true })).toBeVisible({ timeout: RECONNECT_MS });
+  await expect(railConnected(page)).toBeVisible({ timeout: RECONNECT_MS });
   await expect(youSaid(page)).toHaveText(/first question/);
   await expect(answers(page)).toContainText("The first answer.");
   model.reply("The second answer.");
@@ -181,7 +182,7 @@ test("a model's answer cannot run script or leave hostile markup in the page", a
     void dialog.dismiss();
   });
   await page.goto(gateway.url);
-  await expect(page.getByText("connected", { exact: true })).toBeVisible();
+  await expect(railConnected(page)).toBeVisible();
   for (const [index, entry] of XSS_CORPUS.entries()) {
     model.reply(entry.markdown);
     await send(page, `case ${index + 1}`);
@@ -226,7 +227,7 @@ for (const [theme, label] of [
   test(`no serious accessibility violations in the ${label} theme`, async ({ page, rig }) => {
     const { model, gateway } = await startStack(rig);
     await page.goto(gateway.url);
-    await expect(page.getByText("connected", { exact: true })).toBeVisible();
+    await expect(railConnected(page)).toBeVisible();
     await page.evaluate((t) => document.documentElement.setAttribute("data-theme", t), theme);
     expect(await axeViolations(page), "home screen").toEqual([]);
 
