@@ -77,6 +77,8 @@ from golem_protocol.events import (
     CheckInfo,
     CheckOfferedData,
     CheckStartedData,
+    ConsentAnswer,
+    ConsentCaps,
     ContextChangedData,
     EmptyEventData,
     EventType,
@@ -92,6 +94,7 @@ from golem_protocol.events import (
     ModelWaitingData,
     PlanProposedData,
     PromptSectionInfo,
+    RouteConsentNeededData,
     RunCancelledData,
     RunFailedData,
     SkillActivatedData,
@@ -144,6 +147,20 @@ class Turn:
     typed: str | None = None
     routed: Choice | None = field(default=None, compare=False)
     """The pick for this turn, None on a ``pinned`` session. ``model_profile`` is its model."""
+    begun: bool = False
+    """The run has its user message and ``run.started`` already: it waited on a question."""
+
+
+@dataclass(frozen=True, slots=True)
+class Consent:
+    """The paid step-up question to ask before a turn runs: the paid model, and why golem asks."""
+
+    profile: str
+    tier: Tier
+    why: str
+    estimated_usd: float | None
+    alternatives: tuple[ConsentAnswer, ...]
+    caps: ConsentCaps | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -274,29 +291,10 @@ async def run_turn(
     try:
         control.started.set()
         skill = turn.skill
-        if skill is not None:
-            await emit(
-                "skill.activated",
-                SkillActivatedData(
-                    name=skill.call.name,
-                    source=skill.source,
-                    how="invoked",
-                    path=str(skill.path),
-                    hash=skill.hash,
-                ),
-            )
-        await emit(
-            "message.completed",
-            MessageCompletedData(
-                message_id=turn.user_message_id,
-                role="user",
-                text=turn.text,
-                skill=None if skill is None else skill.call,
-            ),
-        )
-        # Emits are shielded: once one is awaited, it lands even if this task is cancelled.
-        progress.run_started = True
-        await emit("run.started", EmptyEventData())
+        if turn.begun:
+            progress.run_started = True
+        else:
+            await _begin(turn, emit, progress)
         if turn.routed is not None:
             await emit("model.routed", _routed(runtime, turn.model_profile, turn.routed))
         progress.open = turn.assistant_message_id
@@ -338,6 +336,68 @@ async def run_turn(
         raise
     except Exception as exc:
         return await _failed(turn.run_id, exc, progress, emit)
+
+
+async def _begin(
+    turn: Turn,
+    emit: Callable[[EventType, BaseModel], Awaitable[None]],
+    progress: _Progress | None = None,
+) -> None:
+    """The first events of a run: the skill it invoked, the user's message, ``run.started``."""
+    skill = turn.skill
+    if skill is not None:
+        await emit(
+            "skill.activated",
+            SkillActivatedData(
+                name=skill.call.name,
+                source=skill.source,
+                how="invoked",
+                path=str(skill.path),
+                hash=skill.hash,
+            ),
+        )
+    await emit(
+        "message.completed",
+        MessageCompletedData(
+            message_id=turn.user_message_id,
+            role="user",
+            text=turn.text,
+            skill=None if skill is None else skill.call,
+        ),
+    )
+    # Emits are shielded: once one is awaited, it lands even if this task is cancelled.
+    if progress is not None:
+        progress.run_started = True
+    await emit("run.started", EmptyEventData())
+
+
+async def ask_consent(
+    runtime: ChatRuntime, events: SessionLog, turn: Turn, consent: Consent
+) -> None:
+    """Start the run of ``turn`` and make it wait on the paid step-up question.
+
+    The run has no task while it waits, so it survives a daemon restart. The answer starts
+    a new task for the same run, with the turn's ``begun`` set.
+    """
+
+    async def emit(kind: EventType, data: BaseModel) -> None:
+        await events.emit(turn.session_id, turn.run_id, kind, data)
+
+    await _begin(turn, emit)
+    identity = runtime.router.identity(consent.profile)
+    await emit(
+        "route.consent.needed",
+        RouteConsentNeededData(
+            model_profile=consent.profile,
+            provider=identity.provider,
+            model=identity.name,
+            tier=consent.tier,
+            why=consent.why,
+            estimated_usd=consent.estimated_usd,
+            alternatives=list(consent.alternatives),
+            caps=consent.caps,
+        ),
+    )
 
 
 def _routed(runtime: ChatRuntime, profile: str, choice: Choice) -> ModelRoutedData:

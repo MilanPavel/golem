@@ -1,0 +1,32 @@
+{
+  "additionalProperties": false,
+  "description": "``route.consent.answer``. Answer the paid step-up question a session's run waits on.\n\n``session`` runs the turn on the paid model and allows paid models for the rest of the\nsession (not with ``[routing] paid = \"always_ask\"``, then it is ``once``). ``once`` runs\nthis turn on it. ``local`` runs the turn on a local model. The answer must be one the\nevent offered in ``alternatives``.",
+  "properties": {
+    "answer": {
+      "enum": [
+        "session",
+        "once",
+        "local"
+      ],
+      "title": "Answer",
+      "type": "string"
+    },
+    "run_id": {
+      "minLength": 1,
+      "title": "Run Id",
+      "type": "string"
+    },
+    "session_id": {
+      "minLength": 1,
+      "title": "Session Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "session_id",
+    "run_id",
+    "answer"
+  ],
+  "title": "RouteConsentAnswerParams",
+  "type": "object"
+}

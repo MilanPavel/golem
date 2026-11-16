@@ -12,6 +12,8 @@ public enum GolemEvent {
     case approvalResolved(ApprovalResolvedEvent)
     case messageCompleted(MessageCompletedEvent)
     case modelRouted(ModelRoutedEvent)
+    case routeConsentNeeded(RouteConsentNeededEvent)
+    case routeConsentAnswered(RouteConsentAnsweredEvent)
     case messageDelta(MessageDeltaEvent)
     case messageStarted(MessageStartedEvent)
     case messageThinkingDelta(MessageThinkingDeltaEvent)
@@ -71,6 +73,10 @@ extension GolemEvent: Decodable {
             self = .checkStarted(try CheckStartedEvent(from: decoder))
         case "model.routed":
             self = .modelRouted(try ModelRoutedEvent(from: decoder))
+        case "route.consent.needed":
+            self = .routeConsentNeeded(try RouteConsentNeededEvent(from: decoder))
+        case "route.consent.answered":
+            self = .routeConsentAnswered(try RouteConsentAnsweredEvent(from: decoder))
         case "approval.needed":
             self = .approvalNeeded(try ApprovalNeededEvent(from: decoder))
         case "approval.resolved":
@@ -146,6 +152,8 @@ extension GolemEvent: Decodable {
         case .approvalResolved(let event): return event.seq
         case .messageCompleted(let event): return event.seq
         case .modelRouted(let event): return event.seq
+        case .routeConsentNeeded(let event): return event.seq
+        case .routeConsentAnswered(let event): return event.seq
         case .messageDelta(let event): return event.seq
         case .messageStarted(let event): return event.seq
         case .messageThinkingDelta(let event): return event.seq

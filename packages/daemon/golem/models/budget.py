@@ -78,6 +78,15 @@ class Budget:
         self._settings = settings
         self._clock = clock
         self._seen: dict[str, tuple[float, bool]] = {}
+        self._exempt: set[str] = set()
+
+    def exempt(self, session_id: str) -> None:
+        """Let the session's run go on over a spent cap: the user said yes to this turn."""
+        self._exempt.add(session_id)
+
+    def restore(self, session_id: str) -> None:
+        """End :meth:`exempt` when the run ends."""
+        self._exempt.discard(session_id)
 
     async def room(self, session_id: str) -> Room:
         """The room now, from the table."""
@@ -86,6 +95,8 @@ class Budget:
     async def paid_ok(self, session_id: str | None) -> bool:
         """False when a cap is spent. The answer is kept for a few seconds."""
         key = session_id or ""
+        if key in self._exempt:
+            return True
         now = self._clock()
         found = self._seen.get(key)
         if found is not None and now - found[0] < CACHE_SECONDS:

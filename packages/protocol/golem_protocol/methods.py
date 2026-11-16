@@ -35,6 +35,7 @@ METHOD_ACCESS: Final[Mapping[str, Access]] = {
     "session.rename": "browser",
     "message.send": "browser",
     "approval.respond": "browser",
+    "route.consent.answer": "browser",
     "run.cancel": "browser",
     "artifact.read": "browser",
     "session.inspect": "browser",

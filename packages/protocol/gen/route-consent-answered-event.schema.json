@@ -1,0 +1,66 @@
+{
+  "$defs": {
+    "RouteConsentAnsweredData": {
+      "additionalProperties": false,
+      "description": "The user answered the paid step-up question, and the run goes on.",
+      "properties": {
+        "answer": {
+          "enum": [
+            "session",
+            "once",
+            "local"
+          ],
+          "title": "Answer",
+          "type": "string"
+        }
+      },
+      "required": [
+        "answer"
+      ],
+      "title": "RouteConsentAnsweredData",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "The paid step-up question was answered, and the run goes on.",
+  "properties": {
+    "data": {
+      "$ref": "#/$defs/RouteConsentAnsweredData"
+    },
+    "run_id": {
+      "minLength": 1,
+      "title": "Run Id",
+      "type": "string"
+    },
+    "seq": {
+      "minimum": 1,
+      "title": "Seq",
+      "type": "integer"
+    },
+    "session_id": {
+      "minLength": 1,
+      "title": "Session Id",
+      "type": "string"
+    },
+    "ts": {
+      "minLength": 1,
+      "title": "Ts",
+      "type": "string"
+    },
+    "type": {
+      "const": "route.consent.answered",
+      "title": "Type",
+      "type": "string"
+    }
+  },
+  "required": [
+    "seq",
+    "session_id",
+    "run_id",
+    "ts",
+    "type",
+    "data"
+  ],
+  "title": "RouteConsentAnsweredEvent",
+  "type": "object"
+}

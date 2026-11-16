@@ -556,6 +556,54 @@
       "title": "CheckStartedEvent",
       "type": "object"
     },
+    "ConsentCaps": {
+      "additionalProperties": false,
+      "description": "The caps of ``[budget]`` and what is spent, in USD. A cap that is not set is null.",
+      "properties": {
+        "daily_usd": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Daily Usd"
+        },
+        "session_usd": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Session Usd"
+        },
+        "spent_session": {
+          "minimum": 0,
+          "title": "Spent Session",
+          "type": "number"
+        },
+        "spent_today": {
+          "minimum": 0,
+          "title": "Spent Today",
+          "type": "number"
+        }
+      },
+      "required": [
+        "spent_session",
+        "spent_today"
+      ],
+      "title": "ConsentCaps",
+      "type": "object"
+    },
     "ContextChangedData": {
       "additionalProperties": false,
       "description": "What golem sends of the history changed before a model call.\n\n``cleared`` means old tool results are now sent as one line each: ``count`` is how\nmany, and ``before_tokens`` and ``after_tokens`` are rough sizes of the history before\nand after. For ``summarised``, ``count`` is the messages a summary now stands for.\n``grew`` is for a later change: ``window_from`` and ``window_to`` are the window\nbefore and after, and ``reload_ms`` the time the model took to load again. The\ncheckpoint keeps every message, so no transcript event changes. A field a change\ndoes not use is None.",
@@ -2233,6 +2281,208 @@
       "title": "PromptSectionInfo",
       "type": "object"
     },
+    "RouteConsentAnsweredData": {
+      "additionalProperties": false,
+      "description": "The user answered the paid step-up question, and the run goes on.",
+      "properties": {
+        "answer": {
+          "enum": [
+            "session",
+            "once",
+            "local"
+          ],
+          "title": "Answer",
+          "type": "string"
+        }
+      },
+      "required": [
+        "answer"
+      ],
+      "title": "RouteConsentAnsweredData",
+      "type": "object"
+    },
+    "RouteConsentAnsweredEvent": {
+      "additionalProperties": false,
+      "description": "The paid step-up question was answered, and the run goes on.",
+      "properties": {
+        "data": {
+          "$ref": "#/$defs/RouteConsentAnsweredData"
+        },
+        "run_id": {
+          "minLength": 1,
+          "title": "Run Id",
+          "type": "string"
+        },
+        "seq": {
+          "minimum": 1,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "session_id": {
+          "minLength": 1,
+          "title": "Session Id",
+          "type": "string"
+        },
+        "ts": {
+          "minLength": 1,
+          "title": "Ts",
+          "type": "string"
+        },
+        "type": {
+          "const": "route.consent.answered",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "seq",
+        "session_id",
+        "run_id",
+        "ts",
+        "type",
+        "data"
+      ],
+      "title": "RouteConsentAnsweredEvent",
+      "type": "object"
+    },
+    "RouteConsentNeededData": {
+      "additionalProperties": false,
+      "description": "The run waits for the user's yes to a paid model. It is paused until\n``route.consent.answer``.\n\n``model_profile``, ``provider``, ``model`` and ``tier`` name the paid model that would\nrun. ``why`` is one plain sentence on why golem asks. ``estimated_usd`` is golem's\nestimate for this turn, null when the price is unknown. ``caps`` is set when a cap is.\n``alternatives`` are the answers the user may give: a spent cap leaves out ``session``.",
+      "properties": {
+        "alternatives": {
+          "items": {
+            "enum": [
+              "session",
+              "once",
+              "local"
+            ],
+            "type": "string"
+          },
+          "title": "Alternatives",
+          "type": "array"
+        },
+        "caps": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ConsentCaps"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "estimated_usd": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Estimated Usd"
+        },
+        "model": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Model"
+        },
+        "model_profile": {
+          "minLength": 1,
+          "title": "Model Profile",
+          "type": "string"
+        },
+        "provider": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Provider"
+        },
+        "tier": {
+          "enum": [
+            "local",
+            "budget",
+            "frontier"
+          ],
+          "title": "Tier",
+          "type": "string"
+        },
+        "why": {
+          "title": "Why",
+          "type": "string"
+        }
+      },
+      "required": [
+        "model_profile",
+        "tier",
+        "why",
+        "alternatives"
+      ],
+      "title": "RouteConsentNeededData",
+      "type": "object"
+    },
+    "RouteConsentNeededEvent": {
+      "additionalProperties": false,
+      "description": "The run is waiting for an answer about a paid model.",
+      "properties": {
+        "data": {
+          "$ref": "#/$defs/RouteConsentNeededData"
+        },
+        "run_id": {
+          "minLength": 1,
+          "title": "Run Id",
+          "type": "string"
+        },
+        "seq": {
+          "minimum": 1,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "session_id": {
+          "minLength": 1,
+          "title": "Session Id",
+          "type": "string"
+        },
+        "ts": {
+          "minLength": 1,
+          "title": "Ts",
+          "type": "string"
+        },
+        "type": {
+          "const": "route.consent.needed",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "seq",
+        "session_id",
+        "run_id",
+        "ts",
+        "type",
+        "data"
+      ],
+      "title": "RouteConsentNeededEvent",
+      "type": "object"
+    },
     "RunCancelledData": {
       "additionalProperties": false,
       "description": "Who stopped the run. ``user`` is ``run.cancel``, ``shutdown`` the daemon stopping.",
@@ -2968,7 +3218,7 @@
     },
     "SessionUpdatedData": {
       "additionalProperties": false,
-      "description": "A session attribute changed: its title, folder, allowed tools, MCP servers, or route.\n\nA field left null did not change. ``route`` is the session's route mode after\n``session.set_route``. ``cwd`` is set once, on a session made\nbefore sessions had a folder, by the first ``message.send`` that names one.\n``allowed_tools`` is the whole list after ``session.revoke``, and\n``mcp_servers`` the on-demand MCP servers the session turned on, after\n``mcp.enable`` or ``mcp.disable``.",
+      "description": "A session attribute changed: its title, folder, allowed tools, MCP servers, or route.\n\nA field left null did not change. ``route`` is the session's route mode after\n``session.set_route``. ``cwd`` is set once, on a session made\nbefore sessions had a folder, by the first ``message.send`` that names one.\n``allowed_tools`` is the whole list after ``session.revoke``, and\n``mcp_servers`` the on-demand MCP servers the session turned on, after\n``mcp.enable`` or ``mcp.disable``. ``paid_ok`` true is the user's yes to paid\nmodels for the rest of the session (``route.consent.answer`` with ``session``).",
       "properties": {
         "allowed_tools": {
           "anyOf": [
@@ -3012,6 +3262,18 @@
           ],
           "default": null,
           "title": "Mcp Servers"
+        },
+        "paid_ok": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Paid Ok"
         },
         "route": {
           "anyOf": [
@@ -4129,6 +4391,8 @@
           "model.selected": "#/$defs/ModelSelectedEvent",
           "model.waiting": "#/$defs/ModelWaitingEvent",
           "plan.proposed": "#/$defs/PlanProposedEvent",
+          "route.consent.answered": "#/$defs/RouteConsentAnsweredEvent",
+          "route.consent.needed": "#/$defs/RouteConsentNeededEvent",
           "run.cancelled": "#/$defs/RunCancelledEvent",
           "run.completed": "#/$defs/RunCompletedEvent",
           "run.failed": "#/$defs/RunFailedEvent",
@@ -4243,6 +4507,12 @@
         },
         {
           "$ref": "#/$defs/ApprovalResolvedEvent"
+        },
+        {
+          "$ref": "#/$defs/RouteConsentNeededEvent"
+        },
+        {
+          "$ref": "#/$defs/RouteConsentAnsweredEvent"
         },
         {
           "$ref": "#/$defs/TodosUpdatedEvent"

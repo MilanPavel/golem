@@ -277,6 +277,8 @@ import {
   type Prompts,
   type UndoBand as UndoBandState,
 } from "./undo.ts";
+import { ConsentBand } from "./consent-band.tsx";
+import { consentRows } from "./consent.ts";
 import {
   ARGS_EDIT_ROWS,
   type ArgsEdit,
@@ -698,6 +700,8 @@ export function App({
   busyRef.current = chat.busy;
   const approvalRef = useRef(chat.approval);
   approvalRef.current = chat.approval;
+  const consentRef = useRef(chat.consent);
+  consentRef.current = chat.consent;
   const argsEdit = liveArgsEdit(argsEditState, chat.approval);
   const argsEditRef = useRef(argsEdit);
   argsEditRef.current = argsEdit;
@@ -784,13 +788,15 @@ export function App({
     debug: debug.open,
     suggestions: suggestMatches.length,
     approval:
-      chat.approval !== null
-        ? argsEdit !== null
-          ? APPROVAL_ROWS
-          : approvalRows(chat.approval, rows)
-        : undoBand !== null
-          ? undoRows(undoBand, rows)
-          : 0,
+      chat.consent !== null
+        ? consentRows(chat.consent)
+        : chat.approval !== null
+          ? argsEdit !== null
+            ? APPROVAL_ROWS
+            : approvalRows(chat.approval, rows)
+          : undoBand !== null
+            ? undoRows(undoBand, rows)
+            : 0,
     composerMax: argsEdit !== null ? ARGS_EDIT_ROWS : undefined,
     todos: showTodos ? todoRows(chat.todos) : 0,
     install: install === null ? 0 : installRows(install.state),
@@ -840,6 +846,7 @@ export function App({
   const starters =
     connection.status === "connected" &&
     chat.approval === null &&
+    chat.consent === null &&
     startersShown({ messages: chat.messages.length, draft: draft.text, busy: chat.busy })
       ? folderPrompts
       : [];
@@ -879,7 +886,12 @@ export function App({
   const versions = versionLabel(GOLEM_VERSION, daemonVersion);
   const writing = writingNow(chat.messages);
   const writingText = writing === null ? null : writingLabel(writing.writing, writingSeconds(writing.id));
-  const phase = meterPhase(chat.busy, assistantChars(chat.messages), chat.approval !== null, writing !== null);
+  const phase = meterPhase(
+    chat.busy,
+    assistantChars(chat.messages),
+    chat.approval !== null || chat.consent !== null,
+    writing !== null,
+  );
   const page = Math.max(1, (keysOpen ? budget.body : Math.max(1, chatHeight)) - 1);
   const debugPage = Math.max(1, budget.debug - 2);
 
@@ -4346,6 +4358,7 @@ export function App({
       approvalDiff: approvalRef.current !== null && approvalRef.current.diff !== null,
       approvalEdit: argsEditRef.current !== null,
       question: chatRef.current.checks.allowed === null && chatRef.current.checks.offered !== null,
+      consent: consentRef.current !== null,
     };
   }
 
@@ -4419,6 +4432,9 @@ export function App({
         return;
       case "checks":
         answerChecks(effect.on, false);
+        return;
+      case "consent":
+        answerConsent(effect.answer);
         return;
       case "edit-args":
         if (approvalRef.current !== null) {
@@ -4498,6 +4514,17 @@ export function App({
       return;
     }
     void client.respondApproval(current, pending.callId, decision).catch((error: unknown) => {
+      setChat((state) => ({ ...state, error: messageOf(error) }));
+    });
+  }
+
+  function answerConsent(answer: "session" | "once" | "local"): void {
+    const pending = consentRef.current;
+    const current = sessionRef.current;
+    if (pending === null || current === null || !pending.alternatives.includes(answer)) {
+      return;
+    }
+    void client.answerConsent(current, pending.runId, answer).catch((error: unknown) => {
       setChat((state) => ({ ...state, error: messageOf(error) }));
     });
   }
@@ -5103,7 +5130,9 @@ export function App({
         <ChecksBand offered={checksOffer} columns={columns} height={budget.checks} />
       ) : null}
       {budget.todos > 0 ? <TodoBand todos={chat.todos} columns={columns} height={budget.todos} /> : null}
-      {budget.approval > 0 && chat.approval !== null ? (
+      {budget.approval > 0 && chat.consent !== null ? (
+        <ConsentBand consent={chat.consent} columns={columns} height={budget.approval} />
+      ) : budget.approval > 0 && chat.approval !== null ? (
         <ApprovalBand
           approval={chat.approval}
           edit={argsEdit}

@@ -8,6 +8,7 @@ from typing import Any, Literal, Self
 from pydantic import BaseModel, ConfigDict, Field, SecretStr, model_validator
 
 from golem_protocol.events import (
+    ConsentAnswer,
     ModelRejection,
     PermissionMode,
     PromptSectionInfo,
@@ -2916,6 +2917,30 @@ class ApprovalRespondResult(BaseModel):
     run_id: str = Field(min_length=1)
 
 
+class RouteConsentAnswerParams(BaseModel):
+    """``route.consent.answer``. Answer the paid step-up question a session's run waits on.
+
+    ``session`` runs the turn on the paid model and allows paid models for the rest of the
+    session (not with ``[routing] paid = "always_ask"``, then it is ``once``). ``once`` runs
+    this turn on it. ``local`` runs the turn on a local model. The answer must be one the
+    event offered in ``alternatives``.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    session_id: str = Field(min_length=1)
+    run_id: str = Field(min_length=1)
+    answer: ConsentAnswer
+
+
+class RouteConsentAnswerResult(BaseModel):
+    """The run that goes on. Its events go to the attached connections."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    run_id: str = Field(min_length=1)
+
+
 SetupPart = Literal["service", "socket", "config", "engine", "model", "tools", "disk"]
 SetupState = Literal["ok", "warn", "fail"]
 SetupAction = Literal["install_ollama", "start_ollama", "pick_model", "set_key", "edit_config"]
@@ -3269,6 +3294,8 @@ __all__ = [
     "PolicyEditResult",
     "PolicyRemoveParams",
     "PolicyUpdateParams",
+    "RouteConsentAnswerParams",
+    "RouteConsentAnswerResult",
     "RoutineChanged",
     "RoutineConfig",
     "RoutineGetParams",

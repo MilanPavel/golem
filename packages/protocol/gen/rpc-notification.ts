@@ -33,6 +33,8 @@ export type Params =
   | ToolFailedEvent
   | ApprovalNeededEvent
   | ApprovalResolvedEvent
+  | RouteConsentNeededEvent
+  | RouteConsentAnsweredEvent
   | TodosUpdatedEvent
   | PlanProposedEvent
   | FileChangedEvent
@@ -60,6 +62,7 @@ export type Subject = string | null;
 export type Tool = string;
 export type Cwd1 = string | null;
 export type McpServers = string[] | null;
+export type PaidOk = boolean | null;
 export type Route1 = ('pinned' | 'local' | 'auto') | null;
 export type Title = string | null;
 export type RunId1 = null;
@@ -342,16 +345,38 @@ export type Seq29 = number;
 export type SessionId30 = string;
 export type Ts29 = string;
 export type Type29 = 'approval.resolved';
+export type Alternatives = ('session' | 'once' | 'local')[];
+export type DailyUsd = number | null;
+export type SessionUsd = number | null;
+export type SpentSession = number;
+export type SpentToday = number;
+export type EstimatedUsd = number | null;
+export type Model2 = string | null;
+export type ModelProfile3 = string;
+export type Provider3 = string | null;
+export type Tier3 = 'local' | 'budget' | 'frontier';
+export type Why1 = string;
+export type RunId31 = string;
+export type Seq30 = number;
+export type SessionId31 = string;
+export type Ts30 = string;
+export type Type30 = 'route.consent.needed';
+export type Answer = 'session' | 'once' | 'local';
+export type RunId32 = string;
+export type Seq31 = number;
+export type SessionId32 = string;
+export type Ts31 = string;
+export type Type31 = 'route.consent.answered';
 export type CallId7 = string | null;
 export type Id = string;
 export type Status1 = 'pending' | 'in_progress' | 'done';
 export type Text4 = string;
 export type Todos = Todo[];
-export type RunId31 = string | null;
-export type Seq30 = number;
-export type SessionId31 = string;
-export type Ts30 = string;
-export type Type30 = 'todos.updated';
+export type RunId33 = string | null;
+export type Seq32 = number;
+export type SessionId33 = string;
+export type Ts32 = string;
+export type Type32 = 'todos.updated';
 export type CallId8 = string;
 export type PlanId = string;
 /**
@@ -670,11 +695,11 @@ export type Files =
     ];
 export type Text5 = string;
 export type Title1 = string;
-export type RunId32 = string;
-export type Seq31 = number;
-export type SessionId32 = string;
-export type Ts31 = string;
-export type Type31 = 'plan.proposed';
+export type RunId34 = string;
+export type Seq33 = number;
+export type SessionId34 = string;
+export type Ts33 = string;
+export type Type33 = 'plan.proposed';
 export type Added = number;
 export type CallId9 = string | null;
 export type ChangeId = string;
@@ -683,53 +708,53 @@ export type Removed = number;
 export type Reverts = string | null;
 export type Source1 = 'tool' | 'shell' | 'revert';
 export type Status2 = 'created' | 'modified' | 'deleted';
-export type RunId33 = string | null;
-export type Seq32 = number;
-export type SessionId33 = string;
-export type Ts32 = string;
-export type Type32 = 'file.changed';
+export type RunId35 = string | null;
+export type Seq34 = number;
+export type SessionId35 = string;
+export type Ts34 = string;
+export type Type34 = 'file.changed';
 export type Hash = string;
 export type How = 'invoked' | 'pinned' | 'model';
 export type Name6 = string;
 export type Path2 = string;
 export type Source2 = 'project' | 'user' | 'bundled';
-export type RunId34 = string | null;
-export type Seq33 = number;
-export type SessionId34 = string;
-export type Ts33 = string;
-export type Type33 = 'skill.activated';
-export type Name7 = string;
-export type Reason3 = 'unpinned';
-export type RunId35 = string | null;
-export type Seq34 = number;
-export type SessionId35 = string;
-export type Ts34 = string;
-export type Type34 = 'skill.deactivated';
-export type Message2 = string;
-export type Name8 = string;
-export type Reason4 = 'missing' | 'disabled' | 'broken';
 export type RunId36 = string | null;
 export type Seq35 = number;
 export type SessionId36 = string;
 export type Ts35 = string;
-export type Type35 = 'skill.skipped';
-export type Command = string;
-export type Name9 = string;
-export type Checks = CheckInfo[];
-export type RunId37 = string;
+export type Type35 = 'skill.activated';
+export type Name7 = string;
+export type Reason3 = 'unpinned';
+export type RunId37 = string | null;
 export type Seq36 = number;
 export type SessionId37 = string;
 export type Ts36 = string;
-export type Type36 = 'check.offered';
+export type Type36 = 'skill.deactivated';
+export type Message2 = string;
+export type Name8 = string;
+export type Reason4 = 'missing' | 'disabled' | 'broken';
+export type RunId38 = string | null;
+export type Seq37 = number;
+export type SessionId38 = string;
+export type Ts37 = string;
+export type Type37 = 'skill.skipped';
+export type Command = string;
+export type Name9 = string;
+export type Checks = CheckInfo[];
+export type RunId39 = string;
+export type Seq38 = number;
+export type SessionId39 = string;
+export type Ts38 = string;
+export type Type38 = 'check.offered';
 export type CheckId = string;
 export type Command1 = string;
 export type Name10 = string;
 export type Round = number;
-export type RunId38 = string;
-export type Seq37 = number;
-export type SessionId38 = string;
-export type Ts37 = string;
-export type Type37 = 'check.started';
+export type RunId40 = string;
+export type Seq39 = number;
+export type SessionId40 = string;
+export type Ts39 = string;
+export type Type39 = 'check.started';
 export type ArtifactId1 = string | null;
 export type CheckId1 = string;
 export type DurationMs2 = number;
@@ -738,11 +763,11 @@ export type Name11 = string;
 export type Output2 = string;
 export type Round1 = number;
 export type Status3 = 'passed' | 'failed' | 'timed_out';
-export type RunId39 = string;
-export type Seq38 = number;
-export type SessionId39 = string;
-export type Ts38 = string;
-export type Type38 = 'check.completed';
+export type RunId41 = string;
+export type Seq40 = number;
+export type SessionId41 = string;
+export type Ts40 = string;
+export type Type40 = 'check.completed';
 
 /**
  * Server → client event. No ``id``; this is not a response to a request.
@@ -822,7 +847,8 @@ export interface SessionUpdatedEvent {
  * before sessions had a folder, by the first ``message.send`` that names one.
  * ``allowed_tools`` is the whole list after ``session.revoke``, and
  * ``mcp_servers`` the on-demand MCP servers the session turned on, after
- * ``mcp.enable`` or ``mcp.disable``.
+ * ``mcp.enable`` or ``mcp.disable``. ``paid_ok`` true is the user's yes to paid
+ * models for the rest of the session (``route.consent.answer`` with ``session``).
  *
  * This interface was referenced by `RpcNotification`'s JSON-Schema
  * via the `definition` "SessionUpdatedData".
@@ -831,6 +857,7 @@ export interface SessionUpdatedData {
   allowed_tools?: AllowedTools;
   cwd?: Cwd1;
   mcp_servers?: McpServers;
+  paid_ok?: PaidOk;
   route?: Route1;
   title?: Title;
 }
@@ -1802,6 +1829,77 @@ export interface ApprovalResolvedData {
   subject?: Subject2;
 }
 /**
+ * The run is waiting for an answer about a paid model.
+ *
+ * This interface was referenced by `RpcNotification`'s JSON-Schema
+ * via the `definition` "RouteConsentNeededEvent".
+ */
+export interface RouteConsentNeededEvent {
+  data: RouteConsentNeededData;
+  run_id: RunId31;
+  seq: Seq30;
+  session_id: SessionId31;
+  ts: Ts30;
+  type: Type30;
+}
+/**
+ * The run waits for the user's yes to a paid model. It is paused until
+ * ``route.consent.answer``.
+ *
+ * ``model_profile``, ``provider``, ``model`` and ``tier`` name the paid model that would
+ * run. ``why`` is one plain sentence on why golem asks. ``estimated_usd`` is golem's
+ * estimate for this turn, null when the price is unknown. ``caps`` is set when a cap is.
+ * ``alternatives`` are the answers the user may give: a spent cap leaves out ``session``.
+ *
+ * This interface was referenced by `RpcNotification`'s JSON-Schema
+ * via the `definition` "RouteConsentNeededData".
+ */
+export interface RouteConsentNeededData {
+  alternatives: Alternatives;
+  caps?: ConsentCaps | null;
+  estimated_usd?: EstimatedUsd;
+  model?: Model2;
+  model_profile: ModelProfile3;
+  provider?: Provider3;
+  tier: Tier3;
+  why: Why1;
+}
+/**
+ * The caps of ``[budget]`` and what is spent, in USD. A cap that is not set is null.
+ *
+ * This interface was referenced by `RpcNotification`'s JSON-Schema
+ * via the `definition` "ConsentCaps".
+ */
+export interface ConsentCaps {
+  daily_usd?: DailyUsd;
+  session_usd?: SessionUsd;
+  spent_session: SpentSession;
+  spent_today: SpentToday;
+}
+/**
+ * The paid step-up question was answered, and the run goes on.
+ *
+ * This interface was referenced by `RpcNotification`'s JSON-Schema
+ * via the `definition` "RouteConsentAnsweredEvent".
+ */
+export interface RouteConsentAnsweredEvent {
+  data: RouteConsentAnsweredData;
+  run_id: RunId32;
+  seq: Seq31;
+  session_id: SessionId32;
+  ts: Ts31;
+  type: Type31;
+}
+/**
+ * The user answered the paid step-up question, and the run goes on.
+ *
+ * This interface was referenced by `RpcNotification`'s JSON-Schema
+ * via the `definition` "RouteConsentAnsweredData".
+ */
+export interface RouteConsentAnsweredData {
+  answer: Answer;
+}
+/**
  * The agent's todo list changed. ``run_id`` is null for a list a fork copied.
  *
  * This interface was referenced by `RpcNotification`'s JSON-Schema
@@ -1809,11 +1907,11 @@ export interface ApprovalResolvedData {
  */
 export interface TodosUpdatedEvent {
   data: TodosUpdatedData;
-  run_id: RunId31;
-  seq: Seq30;
-  session_id: SessionId31;
-  ts: Ts30;
-  type: Type30;
+  run_id: RunId33;
+  seq: Seq32;
+  session_id: SessionId33;
+  ts: Ts32;
+  type: Type32;
 }
 /**
  * The agent's todo list, whole, after ``todo_write`` replaced it.
@@ -1847,11 +1945,11 @@ export interface Todo {
  */
 export interface PlanProposedEvent {
   data: PlanProposedData;
-  run_id: RunId32;
-  seq: Seq31;
-  session_id: SessionId32;
-  ts: Ts31;
-  type: Type31;
+  run_id: RunId34;
+  seq: Seq33;
+  session_id: SessionId34;
+  ts: Ts33;
+  type: Type33;
 }
 /**
  * The plan a plan first run ended with, sent for the user to read.
@@ -1887,11 +1985,11 @@ export interface PlanStep {
  */
 export interface FileChangedEvent {
   data: FileChangedData;
-  run_id: RunId33;
-  seq: Seq32;
-  session_id: SessionId33;
-  ts: Ts32;
-  type: Type32;
+  run_id: RunId35;
+  seq: Seq34;
+  session_id: SessionId35;
+  ts: Ts34;
+  type: Type34;
 }
 /**
  * One change to one file, recorded before this event was sent.
@@ -1924,11 +2022,11 @@ export interface FileChangedData {
  */
 export interface SkillActivatedEvent {
   data: SkillActivatedData;
-  run_id?: RunId34;
-  seq: Seq33;
-  session_id: SessionId34;
-  ts: Ts33;
-  type: Type33;
+  run_id?: RunId36;
+  seq: Seq35;
+  session_id: SessionId36;
+  ts: Ts35;
+  type: Type35;
 }
 /**
  * A skill is active in the session.
@@ -1961,11 +2059,11 @@ export interface SkillActivatedData {
  */
 export interface SkillDeactivatedEvent {
   data: SkillDeactivatedData;
-  run_id?: RunId35;
-  seq: Seq34;
-  session_id: SessionId35;
-  ts: Ts34;
-  type: Type34;
+  run_id?: RunId37;
+  seq: Seq36;
+  session_id: SessionId37;
+  ts: Ts36;
+  type: Type36;
 }
 /**
  * A pinned skill is off again. ``unpinned``: the user turned it off.
@@ -1987,11 +2085,11 @@ export interface SkillDeactivatedData {
  */
 export interface SkillSkippedEvent {
   data: SkillSkippedData;
-  run_id?: RunId36;
-  seq: Seq35;
-  session_id: SessionId36;
-  ts: Ts35;
-  type: Type35;
+  run_id?: RunId38;
+  seq: Seq37;
+  session_id: SessionId38;
+  ts: Ts37;
+  type: Type37;
 }
 /**
  * A pinned skill was left out of a model call. It stays pinned.
@@ -2017,11 +2115,11 @@ export interface SkillSkippedData {
  */
 export interface CheckOfferedEvent {
   data: CheckOfferedData;
-  run_id: RunId37;
-  seq: Seq36;
-  session_id: SessionId37;
-  ts: Ts36;
-  type: Type36;
+  run_id: RunId39;
+  seq: Seq38;
+  session_id: SessionId39;
+  ts: Ts38;
+  type: Type38;
 }
 /**
  * The turn changed files and the session has not said whether golem may run checks.
@@ -2052,11 +2150,11 @@ export interface CheckInfo {
  */
 export interface CheckStartedEvent {
   data: CheckStartedData;
-  run_id: RunId38;
-  seq: Seq37;
-  session_id: SessionId38;
-  ts: Ts37;
-  type: Type37;
+  run_id: RunId40;
+  seq: Seq39;
+  session_id: SessionId40;
+  ts: Ts39;
+  type: Type39;
 }
 /**
  * A check began. ``round`` is 0 for the first run after a turn.
@@ -2078,11 +2176,11 @@ export interface CheckStartedData {
  */
 export interface CheckCompletedEvent {
   data: CheckCompletedData;
-  run_id: RunId39;
-  seq: Seq38;
-  session_id: SessionId39;
-  ts: Ts38;
-  type: Type38;
+  run_id: RunId41;
+  seq: Seq40;
+  session_id: SessionId41;
+  ts: Ts40;
+  type: Type40;
 }
 /**
  * A check ended. ``exit_code`` is null when it timed out.

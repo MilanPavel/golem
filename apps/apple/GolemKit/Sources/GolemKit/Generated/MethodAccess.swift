@@ -54,6 +54,7 @@ public enum MethodAccess {
         "ping",
         "policy.remove",
         "policy.update",
+        "route.consent.answer",
         "routine.get",
         "routine.list",
         "routine.remove",

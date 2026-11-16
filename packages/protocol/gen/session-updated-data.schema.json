@@ -30,7 +30,7 @@
     }
   },
   "additionalProperties": false,
-  "description": "A session attribute changed: its title, folder, allowed tools, MCP servers, or route.\n\nA field left null did not change. ``route`` is the session's route mode after\n``session.set_route``. ``cwd`` is set once, on a session made\nbefore sessions had a folder, by the first ``message.send`` that names one.\n``allowed_tools`` is the whole list after ``session.revoke``, and\n``mcp_servers`` the on-demand MCP servers the session turned on, after\n``mcp.enable`` or ``mcp.disable``.",
+  "description": "A session attribute changed: its title, folder, allowed tools, MCP servers, or route.\n\nA field left null did not change. ``route`` is the session's route mode after\n``session.set_route``. ``cwd`` is set once, on a session made\nbefore sessions had a folder, by the first ``message.send`` that names one.\n``allowed_tools`` is the whole list after ``session.revoke``, and\n``mcp_servers`` the on-demand MCP servers the session turned on, after\n``mcp.enable`` or ``mcp.disable``. ``paid_ok`` true is the user's yes to paid\nmodels for the rest of the session (``route.consent.answer`` with ``session``).",
   "properties": {
     "allowed_tools": {
       "anyOf": [
@@ -74,6 +74,18 @@
       ],
       "default": null,
       "title": "Mcp Servers"
+    },
+    "paid_ok": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Paid Ok"
     },
     "route": {
       "anyOf": [

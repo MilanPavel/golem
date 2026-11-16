@@ -53,6 +53,7 @@ export const BROWSER_METHODS: ReadonlySet<string> = new Set([
   "ping",
   "policy.remove",
   "policy.update",
+  "route.consent.answer",
   "routine.get",
   "routine.list",
   "routine.remove",

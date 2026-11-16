@@ -21,29 +21,33 @@ from typing import Literal, cast
 
 from langchain_core.messages import BaseMessage
 
-from golem.config import PermissionMode, RouteMode
+from golem.config import ModelPrice, PermissionMode, RouteMode
 from golem.graphs.adapter import PlainMessage, plain_messages, trace_messages
 from golem.graphs.chat import ChatRuntime
 from golem.graphs.context_view import ContextView, view
 from golem.graphs.state import SCHEMA_VERSION
 from golem.models import options as model_options
 from golem.models.budget import Budget, Room, spent_text
+from golem.models.cost import cost_usd
 from golem.models.errors import BUDGET_HINT
 from golem.models.facts import FactsSource, ModelFacts
 from golem.models.pick import Choice, Rejected, Traits, ladder, pick
 from golem.models.router import ModelConfigError, ModelIdentity, ModelRouter
+from golem.models.tiers import Tier
 from golem.permissions.engine import MCP_ENABLE, Allowance, server_grant
 from golem.permissions.policy import explain
-from golem.sessions.approvals import pending_approval
+from golem.sessions.approvals import pending_approval, pending_consent
 from golem.sessions.bus import EventTarget, SummaryTarget
 from golem.sessions.context import context_breakdown
 from golem.sessions.ids import new_id
 from golem.sessions.log import SessionLog
 from golem.sessions.runner import (
     CancelReason,
+    Consent,
     Resume,
     RunControl,
     Turn,
+    ask_consent,
     fail_calls,
     resume_turn,
     run_turn,
@@ -72,6 +76,8 @@ from golem_protocol.commands import (
 from golem_protocol.events import (
     ApprovalDecision,
     ChatEvent,
+    ConsentAnswer,
+    ConsentCaps,
     ContextChangedData,
     EmptyEventData,
     FileChangedData,
@@ -79,7 +85,9 @@ from golem_protocol.events import (
     MessageCompletedEvent,
     ModelOptionsChangedData,
     ModelSelectedData,
+    RouteConsentAnsweredData,
     RunCancelledData,
+    RunFailedData,
     SessionAllowance,
     SessionChecksChangedData,
     SessionCompletedData,
@@ -114,6 +122,10 @@ class SessionBusyError(Exception):
 
 class ApprovalNotFoundError(Exception):
     """No run of this session waits on this tool call."""
+
+
+class ConsentAnswerError(Exception):
+    """The answer to the paid step-up question is not one the question offered."""
 
 
 class RuleWriteError(Exception):
@@ -189,7 +201,7 @@ class _LiveSession:
     route: RouteMode = "pinned"
     """How the session picks the model of each turn."""
     paid_ok: bool = False
-    """The user agreed to a paid model for this session. Nothing sets it yet."""
+    """The user agreed to paid models for this session. A fork does not copy it."""
     plan_first: bool = False
     """Whether the session is in plan first: its runs only read and end in a plan."""
     pins: PinMemory = field(default_factory=PinMemory)
@@ -216,6 +228,23 @@ def _schemas(text: str | None) -> list[dict[str, object]] | None:
     if not all(isinstance(item, dict) for item in items):
         return None
     return cast(list[dict[str, object]], items)
+
+
+@dataclass(frozen=True, slots=True)
+class _Routed:
+    """The pick of a turn: the profile that runs, why, and the question to ask first, if any."""
+
+    profile: str
+    choice: Choice | None
+    ask: Consent | None = None
+
+
+class _NoLocalFit(Exception):
+    """The user chose to stay local and no local model passes. ``choice`` says why."""
+
+    def __init__(self, choice: Choice) -> None:
+        super().__init__(choice.detail)
+        self.choice = choice
 
 
 @dataclass(frozen=True, slots=True)
@@ -844,11 +873,12 @@ class SessionManager:
             if await self._run_records.waiting(session_id) is not None:
                 raise SessionBusyError(session_id)
             room = None if self.budget is None else await self.budget.room(session_id)
-            profile, routed = session.model_profile, None
+            routed = _Routed(session.model_profile, None)
             if session.route != "pinned":
-                profile, routed = await self._route(session, text, room)
-            self._check_budget(profile, room)
-            self._runtime.router.chat_model(profile)
+                routed = await self._route(session, text, room)
+            if routed.ask is None:
+                self._check_budget(routed.profile, room)
+            self._runtime.router.chat_model(routed.profile)
             folder = session.cwd if session.cwd is not None else cwd
             invocation = None if skill is None else self._invoke(session_id, folder, skill)
             if session.cwd is None and cwd is not None:
@@ -856,90 +886,216 @@ class SessionManager:
                     session_id, None, "session.updated", SessionUpdatedData(cwd=cwd)
                 )
                 session.cwd = cwd
-            turn = Turn(
-                session_id=session.session_id,
+            turn = self._turn_of(
+                session,
+                routed,
                 run_id=new_id("r"),
+                user_message_id=new_id("m"),
                 text=text if invocation is None else invocation.text,
                 skill=invocation,
                 typed=None if invocation is None else text,
-                model_profile=profile,
-                schema_version=session.schema_version,
-                user_message_id=new_id("m"),
-                assistant_message_id=new_id("m"),
-                cwd=session.cwd,
-                allowed_tools=_ordered(session.allowed_tools),
-                mcp_servers=tuple(sorted(session.mcp_servers)),
-                pinned=tuple(session.skills),
-                pinned_folders=self._pinned_folders(session),
-                options=dict(session.options),
-                permission_mode=session.permission_mode,
-                checks=session.checks,
-                plan_first=session.plan_first,
-                local_only=session.route == "local",
-                pins=session.pins,
-                routed=routed,
             )
+            if routed.ask is not None:
+                await ask_consent(self._runtime, self._events, turn, routed.ask)
+                return turn.run_id
             control = RunControl()
             await self._start(session, turn.run_id, control, self._turn(session, turn, control))
             return turn.run_id
 
+    def _turn_of(
+        self,
+        session: _LiveSession,
+        routed: _Routed,
+        *,
+        run_id: str,
+        user_message_id: str,
+        text: str,
+        skill: Invocation | None,
+        typed: str | None,
+        begun: bool = False,
+    ) -> Turn:
+        return Turn(
+            session_id=session.session_id,
+            run_id=run_id,
+            text=text,
+            skill=skill,
+            typed=typed,
+            model_profile=routed.profile,
+            schema_version=session.schema_version,
+            user_message_id=user_message_id,
+            assistant_message_id=new_id("m"),
+            cwd=session.cwd,
+            allowed_tools=_ordered(session.allowed_tools),
+            mcp_servers=tuple(sorted(session.mcp_servers)),
+            pinned=tuple(session.skills),
+            pinned_folders=self._pinned_folders(session),
+            options=dict(session.options),
+            permission_mode=session.permission_mode,
+            checks=session.checks,
+            plan_first=session.plan_first,
+            local_only=session.route == "local",
+            pins=session.pins,
+            routed=routed.choice,
+            begun=begun,
+        )
+
+    async def answer_consent(self, session_id: str, run_id: str, answer: ConsentAnswer) -> str:
+        """Answer the paid step-up question ``run_id`` waits on, and go on with that run.
+
+        ``session`` allows paid models for the rest of the session (unless ``[routing] paid``
+        is ``always_ask``) and runs the turn on the paid model. ``once`` runs this turn on it.
+        ``local`` picks again among the local models. Returns the run's id.
+
+        Raises :class:`ApprovalNotFoundError`, :class:`ConsentAnswerError`,
+        :class:`SessionNotFoundError`, or :class:`SchemaMismatchError`.
+        """
+        async with self._lock:
+            session = await self._resolve(session_id)
+            waiting = await self._run_records.waiting(session_id)
+            pending = None
+            if waiting is not None and waiting.run_id == run_id:
+                pending = pending_consent(await self._events.for_run(run_id))
+            if pending is None:
+                raise ApprovalNotFoundError(run_id)
+            if answer not in pending.alternatives:
+                raise ConsentAnswerError(f"this question does not offer {answer}")
+            await self._events.emit(
+                session_id,
+                run_id,
+                "route.consent.answered",
+                RouteConsentAnsweredData(answer=answer),
+            )
+            if answer == "session" and self._runtime.router.routing_settings().paid != "always_ask":
+                await self._events.emit(
+                    session_id, None, "session.updated", SessionUpdatedData(paid_ok=True)
+                )
+                session.paid_ok = True
+            room = None if self.budget is None else await self.budget.room(session_id)
+            try:
+                routed = await self._route(session, pending.text, room, answer)
+                self._runtime.router.chat_model(routed.profile)
+            except _NoLocalFit as exc:
+                fit = exc.choice.reason == "fit"
+                failed = RunFailedData(
+                    message=f"No local model can take this turn: {exc.choice.detail}.",
+                    code="context_full" if fit else None,
+                    hint="Use a model with a larger window, or start a new session."
+                    if fit
+                    else None,
+                )
+                await self._fail_waiting(session_id, run_id, failed)
+                return run_id
+            except ModelConfigError as exc:
+                await self._fail_waiting(session_id, run_id, RunFailedData(message=str(exc)))
+                return run_id
+            invocation = None
+            if pending.skill is not None:
+                try:
+                    invocation = self._invoke(session_id, session.cwd, pending.skill)
+                except SkillInvokeError:
+                    invocation = None
+            turn = self._turn_of(
+                session,
+                routed,
+                run_id=run_id,
+                user_message_id=pending.user_message_id,
+                text=pending.text,
+                skill=invocation,
+                typed=None,
+                begun=True,
+            )
+            if answer == "once" and room is not None and room.spent and self.budget is not None:
+                self.budget.exempt(session_id)
+            control = RunControl()
+            await self._start(session, run_id, control, self._turn(session, turn, control))
+            return run_id
+
+    async def _fail_waiting(self, session_id: str, run_id: str, failed: RunFailedData) -> None:
+        await self._events.emit(session_id, run_id, "run.failed", failed)
+        await self._ended(session_id, run_id, None)
+
     def _check_budget(self, profile: str, room: Room | None) -> None:
         """Refuse a turn on a paid model while a cap is spent. A local model is never refused.
 
-        With ``over = "ask"`` the turn is refused too, until the question of a paid step-up
-        can be asked (ticket 9.3.6): that is the place to ask instead of raising.
+        A turn that waits on the paid question is not refused: its answer decides.
         """
         if room is None or not room.spent or self.budget is None:
             return
         tier = None if self._runtime.tier_of is None else self._runtime.tier_of(profile)
         if tier in (None, "local"):
             return
+        raise BudgetSpentError(self._spent_message(room))
+
+    def _spent_message(self, room: Room) -> str:
         spent = room.spent_today if room.cap == "day" else room.spent_session
         cap = self._runtime.router.budget_settings()
         limit = cap.daily_usd if room.cap == "day" else cap.session_usd
-        raise BudgetSpentError(
-            f"{spent_text(room)}: ${spent:.2f} of ${limit or 0:.2f}; {BUDGET_HINT}"
-        )
+        return f"{spent_text(room)}: ${spent:.2f} of ${limit or 0:.2f}; {BUDGET_HINT}"
 
     async def _route(
-        self, session: _LiveSession, text: str, room: Room | None = None
-    ) -> tuple[str, Choice]:
+        self,
+        session: _LiveSession,
+        text: str,
+        room: Room | None = None,
+        answer: ConsentAnswer | None = None,
+    ) -> _Routed:
         """The profile this turn runs on, and why. Reads cached facts, never the network.
 
+        A paid model needs the user's yes first, so a pick that lands on one comes back with
+        the question to ask (``ask``). ``answer`` is the user's answer to that question: a yes
+        takes the paid model and passes the caps, ``local`` leaves the paid models out. A
+        session of a routine never asks: its paid models are left out.
+
         Raises :class:`~golem.models.router.ModelConfigError` on route ``local`` when the
-        session's model is hosted and no local model passes.
+        session's model is hosted and no local model passes, and on ``auto`` when only a paid
+        model is left and paid models are off. Raises :class:`_NoLocalFit` for ``local``.
         """
         router = self._runtime.router
         settings = router.routing_settings()
+        over_ask = router.budget_settings().over == "ask"
+        interactive = not session.origin.startswith("routine:")
+        yes = answer in ("session", "once")
         everything = await self._facts_of(session, settings.ladder.model_dump().values())
         candidates = ladder(settings.ladder, session.model_profile, everything)
         own = next((m for m in candidates if session.model_profile in (m.profile, m.ref)), None)
         used = await self._records.last_input(session.session_id)
+        prompt = None if used is None else used + len(text) // 4
+        reserve = router.context_settings().reply_reserve
         traits = Traits(
-            prompt_tokens=None if used is None else used + len(text) // 4,
-            reply_reserve=router.context_settings().reply_reserve,
+            prompt_tokens=prompt,
+            reply_reserve=reserve,
             needs_tools=True,
             local_only=session.route == "local",
-            paid_allowed=session.paid_ok,
-            paid_room_usd=None if room is None else room.usd,
+            paid_allowed=yes or (session.paid_ok and settings.paid != "always_ask"),
+            paid_room_usd=None if room is None or yes or (over_ask and interactive) else room.usd,
         )
+        why_left = None
+        if answer == "local":
+            why_left = "you chose to stay local"
+        elif settings.paid == "never" or not interactive:
+            why_left = "paid models are turned off"
+        pool = candidates
+        held: list[Rejected] = []
+        if why_left is not None:
+            pool = [m for m in candidates if m.tier == "local"]
+            held = [Rejected(m.ref, m.tier, why_left) for m in candidates if m.tier != "local"]
         choice = Choice(None, "fallback", "no model facts", ())
         if own is not None:
-            choice = pick(session.route, own, candidates, traits)
-        if choice.needs_consent and own is not None:
-            # Until golem can ask about a paid model, a turn without a yes stays local.
-            held = [
-                Rejected(m.ref, m.tier, "a paid model needs your OK")
-                for m in candidates
-                if m.tier != "local"
-            ]
-            free = pick(session.route, own, [m for m in candidates if m.tier == "local"], traits)
-            choice = replace(free, rejected=(*free.rejected, *held))
+            choice = pick(session.route, own, pool, traits)
+        if held:
+            choice = replace(choice, rejected=(*choice.rejected, *held))
         picked = choice.model
         if picked is not None:
-            if choice.reason == "budget" and room is not None:
+            if answer == "local":
+                choice = replace(choice, detail="you chose to stay local")
+            elif choice.reason == "budget" and room is not None:
                 choice = replace(choice, detail=spent_text(room))
-            return picked.profile, choice
+            ask = None
+            if not yes:
+                ask = self._question(
+                    session, picked.profile, picked.tier, picked.price, room, choice, text, prompt
+                )
+            return _Routed(picked.profile, choice, ask)
         tier = own.tier if own is not None else None
         if tier is None and self._runtime.tier_of is not None:
             tier = self._runtime.tier_of(session.model_profile)
@@ -947,8 +1103,86 @@ class SessionManager:
             raise ModelConfigError(
                 "this session is local only and has no local model; pick one with /model"
             )
+        if answer == "local":
+            raise _NoLocalFit(choice)
         detail = f"no other model passed ({choice.detail}), so the session's model runs"
-        return session.model_profile, Choice(own, "fallback", detail, choice.rejected)
+        fallback = Choice(own, "fallback", detail, choice.rejected)
+        if tier not in (None, "local") and not yes:
+            if why_left is not None:
+                raise ModelConfigError(
+                    f"no local model can take this turn ({choice.detail}), and {why_left}"
+                )
+            price = None if own is None else own.price
+            ask = self._question(
+                session,
+                session.model_profile,
+                tier,
+                price,
+                room,
+                choice,
+                text,
+                prompt,
+                fallback=True,
+            )
+            return _Routed(session.model_profile, fallback, ask)
+        return _Routed(session.model_profile, fallback)
+
+    def _question(
+        self,
+        session: _LiveSession,
+        profile: str,
+        tier: Tier | None,
+        price: ModelPrice | None,
+        room: Room | None,
+        choice: Choice,
+        text: str,
+        prompt: int | None,
+        *,
+        fallback: bool = False,
+    ) -> Consent | None:
+        """The question to ask before a turn runs on ``profile``, None when none is needed.
+
+        A local model is never asked about. A spent cap with ``over = "ask"`` asks with only
+        ``once`` and ``local``. Otherwise the first paid model of a session asks, and every
+        one does with ``paid = "always_ask"``. A spent cap with ``over = "local"`` is
+        refused by :meth:`_check_budget`, not asked.
+        """
+        if tier in (None, "local"):
+            return None
+        router = self._runtime.router
+        settings = router.routing_settings()
+        budget = router.budget_settings()
+        caps = None
+        if room is not None and (budget.daily_usd is not None or budget.session_usd is not None):
+            caps = ConsentCaps(
+                session_usd=budget.session_usd,
+                daily_usd=budget.daily_usd,
+                spent_session=room.spent_session,
+                spent_today=room.spent_today,
+            )
+        answers: tuple[ConsentAnswer, ...] = ("session", "once", "local")
+        if room is not None and room.spent:
+            if budget.over != "ask":
+                return None
+            limit = budget.daily_usd if room.cap == "day" else budget.session_usd
+            word = "daily" if room.cap == "day" else "session"
+            why = f"The {word} budget (${limit or 0:.2f}) is spent."
+            answers = ("once", "local")
+        elif session.paid_ok and settings.paid != "always_ask":
+            return None
+        elif fallback:
+            why = (
+                f"No other model can take this turn ({choice.detail}),"
+                " so your own model, which is paid, would run."
+            )
+        else:
+            why = f"No local model can take this turn: {choice.detail}."
+        if price is None and self._runtime.price_of is not None:
+            price = self._runtime.price_of(profile)
+        tokens = len(text) // 4 if prompt is None else prompt
+        reserve = router.context_settings().reply_reserve
+        estimate = cost_usd({"input": tokens, "output": reserve}, price)
+        return Consent(profile, tier, why, estimate, answers, caps)
 
     async def _facts_of(self, session: _LiveSession, named: Iterable[object]) -> list[ModelFacts]:
         """The facts of the session's model, the ladder's names and every listed model."""
@@ -1262,6 +1496,9 @@ class SessionManager:
         except asyncio.CancelledError:
             await self._ended(session.session_id, turn.run_id, None)
             raise
+        finally:
+            if self.budget is not None:
+                self.budget.restore(session.session_id)
         await self._ended(session.session_id, turn.run_id, reply)
         self._title_after(session, turn.typed or turn.text, reply)
 
@@ -1382,6 +1619,7 @@ class SessionManager:
             permission_mode=None if record is None else record.permission_mode,
             checks=None if record is None else record.checks,
             route="pinned" if record is None else record.route,
+            paid_ok=False if record is None else record.paid_ok,
             plan_first=False if record is None else record.plan_first,
         )
         if session.skills:
