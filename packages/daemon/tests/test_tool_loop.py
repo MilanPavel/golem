@@ -915,3 +915,34 @@ async def test_a_local_model_is_never_asked_about_the_cap(
     session_id = await chat.manager.create(None, cwd=str(project))
     events = await chat.finished(await chat.manager.send(session_id, "hi"))
     assert events[-1].type == "run.completed"
+
+
+async def test_a_call_written_after_a_sentence_runs_and_the_sentence_stays(
+    database: Database, project: Path
+) -> None:
+    leaked = 'I will use the "read_file" function.\n\n'
+    leaked += '{"name": "read_file", "parameters": {"path": "notes.txt"}}'
+    model = ToolCallingChatModel(replies=[leaked, "It says 42."])
+    chat = _chat(database, model)
+    session_id = await chat.manager.create(None, cwd=str(project))
+    events = await chat.finished(await chat.manager.send(session_id, "what is in notes?"))
+
+    assert len([e for e in events if isinstance(e, ToolCompletedEvent)]) == 1
+    stored = _messages(await chat.runtime.values(session_id))
+    assistant = [m for m in stored if isinstance(m, AIMessage)]
+    assert assistant[0].text == 'I will use the "read_file" function.'
+    marks = [e.data.text_tool_calls for e in events if isinstance(e, ModelCallCompletedEvent)]
+    assert marks == ["recovered", None]
+
+
+async def test_a_real_call_whose_arguments_are_a_whole_call_is_unwrapped(
+    database: Database, project: Path
+) -> None:
+    wrapped = {"type": "function", "function": "read_file", "parameters": {"path": "notes.txt"}}
+    model = ToolCallingChatModel(replies=[[("read_file", wrapped)], "It says 42."])
+    chat = _chat(database, model)
+    session_id = await chat.manager.create(None, cwd=str(project))
+    events = await chat.finished(await chat.manager.send(session_id, "what is in notes?"))
+
+    assert len([e for e in events if isinstance(e, ToolCompletedEvent)]) == 1
+    assert events[-1].type == "run.completed"

@@ -71,7 +71,7 @@ from golem.graphs.state import SCHEMA_VERSION, AgentState
 from golem.graphs.step_up import NextModel, StepAsk, StepRequest, StepUp
 from golem.graphs.struggle import Struggle, detect
 from golem.graphs.summarise import Summariser
-from golem.graphs.text_calls import recover, recover_json
+from golem.graphs.text_calls import recover, recover_json_tail, unwrapped
 from golem.graphs.tools_node import (
     ALLOWED_KEY,
     ASKED_KEY,
@@ -944,7 +944,15 @@ def open_chat(
         if final:
             update["tool_calls"] = []
         elif response.tool_calls:
-            update["tool_calls"] = _with_ids(response.tool_calls)
+            calls = _with_ids(response.tool_calls)
+            for call in calls:
+                inner = unwrapped(call["name"], call["args"], schemas)
+                if inner is not None:
+                    call["args"] = inner
+                    log.info(
+                        "%s wrapped the arguments of %s in a call; unwrapped", profile, call["name"]
+                    )
+            update["tool_calls"] = calls
         elif schemas and binder.offers(profile):
             reply = message_text(response)
             if "<function=" in reply:
@@ -959,11 +967,11 @@ def open_chat(
                     text_tool_calls = "unread"
                     log.info("%s wrote a tool call as text that could not be read", profile)
             else:
-                found = recover_json(reply, schemas)
-                if isinstance(found, list):
-                    update["content"], update["tool_calls"] = "", found
+                found = recover_json_tail(reply, schemas)
+                if isinstance(found, tuple):
+                    update["content"], update["tool_calls"] = found
                     text_tool_calls = "recovered"
-                    log.info("%s wrote %d tool call(s) as JSON; recovered", profile, len(found))
+                    log.info("%s wrote %d tool call(s) as JSON; recovered", profile, len(found[1]))
                 elif found == "unread":
                     text_tool_calls = "unread"
                     log.info("%s wrote a tool call as JSON that could not be read", profile)
