@@ -1,13 +1,14 @@
-import { golemState, type PermissionMode } from "@golem/view";
+import { golemState, withNotes, type PermissionMode } from "@golem/view";
 import { useMutation } from "@tanstack/react-query";
 import { useConnection } from "../../store/connection-context.tsx";
 import { actionErrorText, sendErrorText } from "../../store/errors.ts";
-import { useDraft, useDraftPastes, usePageActions, useSession } from "../../store/page-context.tsx";
+import { useDraft, useDraftPastes, useNotes, usePageActions, useSession } from "../../store/page-context.tsx";
 import type { SessionView } from "../../store/session-store.ts";
 import { DockedApproval } from "../approval/docked-approval.tsx";
 import { Composer } from "./composer.tsx";
 import { ModeChip } from "./mode-chip.tsx";
 import { PlanChip } from "./plan-chip.tsx";
+import { NotesChip } from "./notes-chip.tsx";
 import { ContextChip } from "./context-chip.tsx";
 import { TuneChip } from "./tune-chip.tsx";
 import { useCommands } from "./use-commands.tsx";
@@ -65,6 +66,19 @@ export function SessionDock({ sessionId }: { sessionId: string }) {
     typing: text.startsWith("/"),
     send: (message, skill) => send.mutateAsync(skill === undefined ? { text: message } : { text: message, skill }),
   });
+  const notes = useNotes(sessionId);
+  const hasNotes = notes.state.notes.length > 0;
+  // A slash command runs as typed; any other text goes out behind the notes. They are dropped only once the send worked.
+  const sendWithNotes = async (raw: string) => {
+    const typed = raw.trimStart();
+    if (!hasNotes || (typed.startsWith("/") && !typed.startsWith("//"))) {
+      return commands.run(raw);
+    }
+    const sent = notes.state.notes.map((note) => note.id);
+    const result = await commands.run(withNotes(notes.state, raw));
+    if (result === "sent") notes.drop(sent);
+    return result;
+  };
   const stop = useMutation({
     mutationFn: async () => {
       if (run.runId !== null) {
@@ -93,6 +107,7 @@ export function SessionDock({ sessionId }: { sessionId: string }) {
         notice={commands.notice}
         meter={<Meter state={state} runStartedAt={run.runStartedAt} localWait={run.localWait} aside={
               <span className="flex items-center gap-2">
+                <NotesChip sessionId={sessionId} />
                 <TuneChip sessionId={sessionId} />
                 <PlanChip sessionId={sessionId} onToggle={(on) => setPlan.mutate(on)} />
                 <ModeChip sessionId={sessionId} onSelect={(mode) => setMode.mutate(mode)} />
@@ -108,7 +123,9 @@ export function SessionDock({ sessionId }: { sessionId: string }) {
             pastes={pastes}
             onPastesChange={setPastes}
             history={browserHistory}
-            onSend={commands.run}
+            onSend={sendWithNotes}
+            sendLabel={hasNotes ? "Send with notes" : "Send"}
+            allowEmpty={hasNotes}
             commands={commands.registry}
             onEdit={commands.clear}
             busy={run.busy}

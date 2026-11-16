@@ -68,7 +68,7 @@ export type StatusSegment = {
 
 /**
  * Connection never drops. After that, the right-hand segments leave first:
- * uptime, message count, folder, pinned skills, context, new lines, then model, then
+ * uptime, message count, folder, files changed, pinned skills, context, new lines, then model, then
  * the title, then an alert.
  */
 export const STATUS_PRIORITY = {
@@ -82,6 +82,7 @@ export const STATUS_PRIORITY = {
   context: 50,
   tune: 48,
   skills: 45,
+  changed: 42,
   folder: 40,
   cost: 30,
   messages: 20,
@@ -146,6 +147,11 @@ export function shownSessionTitle(
     return sessionTitleLabel(live.title);
   }
   return sessionTitleLabel(indexed);
+}
+
+/** `Δ 3 files`, or "" for none. */
+export function changedLabel(count: number): string {
+  return count > 0 ? `Δ ${count} ${count === 1 ? "file" : "files"}` : "";
 }
 
 export function formatMessageCount(count: number): string {
@@ -254,6 +260,8 @@ export function statusSegments(input: {
   plan?: boolean;
   /** The session's cost so far, as `$0.03`. Empty until a call has cost something. */
   cost?: string;
+  /** How many files the session changed. The segment is hidden at 0. */
+  changedFiles?: number;
 }): StatusSegment[] {
   return [
     segment("connection", input.connection, STATUS_PRIORITY.connection, "connection", true),
@@ -265,6 +273,7 @@ export function statusSegments(input: {
     segment("plan", input.plan === true ? "◇ plan" : "", STATUS_PRIORITY.plan, "fresh"),
     segment("tune", input.tune ?? "", STATUS_PRIORITY.tune, "dim"),
     segment("skills", skillsLabel(input.skills ?? [], input.skippedSkills ?? []), STATUS_PRIORITY.skills, "dim"),
+    segment("changed", changedLabel(input.changedFiles ?? 0), STATUS_PRIORITY.changed, "dim"),
     segment("folder", input.folder, STATUS_PRIORITY.folder, "dim"),
     segment(
       "messages",

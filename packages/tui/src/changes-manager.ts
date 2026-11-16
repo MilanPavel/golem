@@ -1,4 +1,4 @@
-import type { ChangedFile } from "@golem/client";
+import type { ChangedFile, ChangesRevertTarget } from "@golem/client";
 import { parseDiff, type DiffLine, type DiffTone } from "@golem/view";
 
 import { clampDiffOffset } from "./diff-view.ts";
@@ -9,7 +9,16 @@ import type { Press } from "./keys.ts";
  * selected one on the right. The files and the diffs are the app's data; this
  * state only says which file, which hunk, and how far down the diff the user is.
  */
-export type ChangesManagerState = { open: boolean; file: number; hunk: number; offset: number };
+export type ChangesManagerState = {
+  open: boolean;
+  file: number;
+  hunk: number;
+  offset: number;
+  /** An undo waits for `y` or `n` in the hint row. */
+  confirm: ChangesRevertTarget | null;
+  /** A line that replaces the hint until the next key. */
+  message: string | null;
+};
 
 export type ChangesData = {
   /** The list `changes.list` returned, or null while it is asked. */
@@ -21,9 +30,23 @@ export type ChangesData = {
   failed?: Readonly<Record<string, string>>;
 };
 
-export type ChangesKey = "up" | "down" | "next-hunk" | "prev-hunk" | "page-up" | "page-down" | "back";
+export type ChangesKey =
+  | "up"
+  | "down"
+  | "next-hunk"
+  | "prev-hunk"
+  | "page-up"
+  | "page-down"
+  | "back"
+  | "undo-hunk"
+  | "undo-file"
+  | "yes";
 
-export type ChangesAction = { kind: "none" } | { kind: "close" } | { kind: "load"; path: string };
+export type ChangesAction =
+  | { kind: "none" }
+  | { kind: "close" }
+  | { kind: "load"; path: string }
+  | { kind: "revert"; target: ChangesRevertTarget };
 
 export type ChangesTone = DiffTone | "plain";
 
@@ -44,13 +67,21 @@ export type ChangesLine = {
 export const WIDE_COLUMNS = 100;
 const LEFT_WIDTH = 28;
 const PAGE = 10;
-const HINT = "↑↓ file · n/p hunk · PgUp/PgDn scroll · esc back";
+const HINT = "↑↓ file · n/p hunk · PgUp/PgDn scroll · u undo hunk · U undo file · esc back";
+export const WAIT_MESSAGE = "Wait for golem to finish.";
 const BARE_HINT = "esc back";
 
-export const closedChangesManager: ChangesManagerState = { open: false, file: 0, hunk: 0, offset: 0 };
+export const closedChangesManager: ChangesManagerState = {
+  open: false,
+  file: 0,
+  hunk: 0,
+  offset: 0,
+  confirm: null,
+  message: null,
+};
 
 export function openChangesManager(): ChangesManagerState {
-  return { open: true, file: 0, hunk: 0, offset: 0 };
+  return { ...closedChangesManager, open: true };
 }
 
 export function changesKeyOf(press: Press): ChangesKey | null {
@@ -70,6 +101,15 @@ export function changesKeyOf(press: Press): ChangesKey | null {
     if (press.input === "p") {
       return "prev-hunk";
     }
+    if (press.input === "u") {
+      return "undo-hunk";
+    }
+    if (press.input === "U") {
+      return "undo-file";
+    }
+    if (press.input === "y") {
+      return "yes";
+    }
   }
   return null;
 }
@@ -85,14 +125,31 @@ export function hunkRows(lines: readonly DiffLine[]): number[] {
   return rows;
 }
 
-/** `page` is how many rows PgUp and PgDn move: the app passes the room it has. */
+/**
+ * `page` is how many rows PgUp and PgDn move: the app passes the room it has.
+ * `busy` is a run in progress: an undo then only says to wait.
+ */
 export function pressChanges(
   state: ChangesManagerState,
   data: ChangesData,
   key: ChangesKey,
   page = PAGE,
+  busy = false,
 ): { state: ChangesManagerState; action: ChangesAction } {
   const none = { kind: "none" } as const;
+  if (state.confirm !== null) {
+    // `y` asks the daemon. Any other key, `n` and esc included, only drops the question.
+    const cleared = { ...state, confirm: null, message: null };
+    return key === "yes"
+      ? { state: cleared, action: { kind: "revert", target: state.confirm } }
+      : { state: cleared, action: none };
+  }
+  if (state.message !== null) {
+    state = { ...state, message: null };
+  }
+  if (key === "yes") {
+    return { state, action: none };
+  }
   if (key === "back") {
     return { state: closedChangesManager, action: { kind: "close" } };
   }
@@ -112,6 +169,20 @@ export function pressChanges(
     const load = target !== undefined && data.diffs[target] === undefined;
     return { state: moved, action: load ? { kind: "load", path: target } : none };
   }
+  if (key === "undo-file" || key === "undo-hunk") {
+    if (busy) {
+      return { state: { ...state, message: WAIT_MESSAGE }, action: none };
+    }
+    if (key === "undo-file") {
+      return { state: { ...state, file, confirm: { kind: "file", path } }, action: none };
+    }
+    const hunks = hunkRows(parseDiff(data.diffs[path] ?? "")).length;
+    if (hunks === 0) {
+      return { state, action: none };
+    }
+    const hunk = Math.min(state.hunk, hunks - 1);
+    return { state: { ...state, file, confirm: { kind: "hunk", path, hunk } }, action: none };
+  }
   const lines = parseDiff(data.diffs[path] ?? "");
   const rows = hunkRows(lines);
   const at = (offset: number): ChangesManagerState => {
@@ -127,6 +198,13 @@ export function pressChanges(
     return { state: row === undefined ? state : at(row), action: none };
   }
   return { state: at(state.offset + (key === "page-up" ? -page : page)), action: none };
+}
+
+function confirmText(target: ChangesRevertTarget): string {
+  if (target.kind === "hunk") {
+    return `undo hunk ${target.hunk + 1} of ${target.path}? y/n`;
+  }
+  return `undo ${"path" in target ? target.path : "this change"}? y/n`;
 }
 
 /** `changes · 3 files +43 −4`. */
@@ -169,6 +247,7 @@ export function layoutChanges(
   let title = "changes";
   let body: ChangesLine[];
   let hint = BARE_HINT;
+  const asked = state.confirm;
   if (data.error !== null) {
     body = [plain(data.error)];
   } else if (files === null) {
@@ -202,6 +281,11 @@ export function layoutChanges(
     for (let index = right.length; left !== null && index < Math.min(left.length, diffRoom); index += 1) {
       body.push({ left: left[index]?.text ?? "", leftSelected: left[index]?.selected === true, text: "", tone: "plain" });
     }
+  }
+  if (asked !== null) {
+    hint = confirmText(asked);
+  } else if (state.message !== null) {
+    hint = state.message;
   }
   const lines = [
     plain(title, { bold: true }),

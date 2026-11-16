@@ -2,6 +2,7 @@ import type { SkillCall } from "@golem/client";
 import { Lexer, type Token, type Tokens } from "marked";
 
 import {
+  changesRow,
   diffCounts,
   diffExcerpt,
   formatDuration,
@@ -12,9 +13,11 @@ import {
   REPLY_CUT_NOTE,
   thinkingLine,
   turnFooterParts,
+  turnOf,
   turnTotals,
   visibleText,
   writingLabel,
+  type ChangesState,
   type ChatMessage,
   type Detail,
   type DiffExcerpt,
@@ -84,6 +87,12 @@ export type TranscriptOptions = {
   detail?: Detail;
   /** Whole seconds since the first `tool.writing` of the call a reply is writing. Unset counts 0. */
   writingSeconds?: (messageId: string) => number;
+  /** The files each turn changed. With it, a finished turn that changed files ends in one summary row. */
+  changes?: ChangesState;
+  /** The run still going. Its turn gets no summary row yet. */
+  liveRunId?: string | null;
+  /** The slash commands that exist, so the summary row names only those. Unset names none. */
+  commands?: readonly string[];
 };
 
 /** Output rows shown per tool call while Ctrl-O is on. */
@@ -158,6 +167,21 @@ export function layoutMessages(
     }
     if (message.interrupted === true) {
       lines.push(paint({ role, spans: [{ text: INTERRUPTED_MARK, italic: true }] }, width));
+    }
+    const next = messages[index + 1];
+    if (
+      options?.changes !== undefined &&
+      message.role === "assistant" &&
+      message.runId !== undefined &&
+      message.runId !== options.liveRunId &&
+      !(next?.role === "assistant" && next.runId === message.runId)
+    ) {
+      const row = changesRow(turnOf(options.changes, message.runId), width, options.commands ?? []);
+      if (row.length > 0) {
+        for (const spans of wrapSpans([{ text: row, dim: true }], width)) {
+          lines.push(wrappedLine(role, spans));
+        }
+      }
     }
   }
   return lines;

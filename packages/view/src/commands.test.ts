@@ -212,6 +212,12 @@ test("/changes takes no arguments", () => {
   assert.equal(applyComposer(closedDebug, "/changes x").kind, "unknown");
 });
 
+test("/undo takes no arguments and is in the session group", () => {
+  assert.deepEqual(applyComposer(closedDebug, "/undo"), { kind: "undo" });
+  assert.equal(applyComposer(closedDebug, "/undo now").kind, "unknown");
+  assert.equal(COMMANDS.find((command) => command.name === "/undo")?.group, "session");
+});
+
 test("/todos toggles the todo list and /artifact takes an optional id", () => {
   assert.deepEqual(applyComposer(closedDebug, "/todos"), { kind: "todos" });
   assert.deepEqual(applyComposer(closedDebug, "/artifact"), { kind: "artifact", id: null });

@@ -92,6 +92,8 @@ export type ChatMessage = {
   writing?: WritingBlock | null;
   /** Set on a user message that ran a skill. `text` is then the filled-in body. */
   skill?: SkillCall;
+  /** The run that wrote this reply, so the changes of that turn can be shown after it. */
+  runId?: string;
 };
 
 export type ChatState = {
@@ -302,6 +304,7 @@ function reduceChatEvent(state: ChatState, event: ChatEvent): ChatState {
             text: "",
             streaming: true,
             at: event.ts,
+            ...(event.run_id == null ? {} : { runId: event.run_id }),
             ...callOf(state, event.data.message_id),
           },
         ],
@@ -626,6 +629,7 @@ function upsertCompleted(
     streaming: false,
     interrupted: event.data.interrupted === true,
     at: event.ts,
+    ...(event.data.role === "assistant" && event.run_id != null ? { runId: event.run_id } : {}),
     ...(durationMs === undefined ? {} : { durationMs }),
     ...(event.data.skill == null ? {} : { skill: event.data.skill }),
     ...callOf({ calls }, event.data.message_id),

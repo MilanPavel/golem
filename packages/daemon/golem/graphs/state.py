@@ -46,3 +46,5 @@ class AgentState(MessagesState):
     """Fix rounds the checks sent back to the model in this turn. Reset to 0 each turn."""
     check_results: NotRequired[list[dict[str, object]]]
     """What the checks of the latest turn reported. Replaced each turn, empty when none ran."""
+    changes_seen: NotRequired[int]
+    """The highest ``file_changes.seq`` the model was told about. Missing or 0: none yet."""

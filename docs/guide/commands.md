@@ -138,7 +138,8 @@ The line under an answer ends with the model, `local` for a model on your machin
 
 | Command | What it does |
 |---|---|
-| `/changes` | Review the files this session changed. In the terminal: the files on the left, the diff on the right, `n` and `p` jump by hunk. In the web UI it opens the Changes tab |
+| `/changes` | Review the files this session changed. In the terminal: the files on the left, the diff on the right, `n` and `p` jump by hunk, `u` undoes the hunk under the cursor and `U` the selected file (each asks `y/n`). In the web UI it opens the Changes tab |
+| `/undo` | Take back the files the last turn changed. It lists them and asks; a file edited since golem wrote it is listed again, and `o` overwrites it or `k` keeps yours. `/undo` again goes one turn further back. Terminal only for now |
 | `/todos` | Show or hide the agent's todo list above the composer |
 | `/context` | See how full the model's context is, and what fills it. In the web UI it opens the trace |
 | `/cost` | What model calls cost: this session, today, the week, the week by model, and what running locally saved. In the web UI it opens Settings → Usage |
