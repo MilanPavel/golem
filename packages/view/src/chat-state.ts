@@ -291,7 +291,14 @@ function retryFor(messages: readonly ChatMessage[], data: RunFailure): ChatState
   return sent === undefined || sent.text.trim() === "" ? null : { text: sent.text, provider: data.provider ?? "ollama" };
 }
 
+/** An event of a child run: it names the `delegate` call that started it. Not drawn as a step yet. */
+function isChildEvent(event: ChatEvent): boolean {
+  const data: object = event.data;
+  return "parent_call_id" in data && typeof data.parent_call_id === "string";
+}
+
 export function reduceChat(state: ChatState, event: ChatEvent): ChatState {
+  if (isChildEvent(event)) return state;
   const base = reduceChatEvent(state, event);
   const plan = reducePlan(state.plan, event);
   const next = plan === state.plan ? base : { ...base, plan };

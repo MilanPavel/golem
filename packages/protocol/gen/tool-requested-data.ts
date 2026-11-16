@@ -3,18 +3,24 @@
 export type CallId = string;
 export type MessageId = string;
 export type Name = string;
+export type ParentCallId = string | null;
 
 /**
  * The model asked for one tool call.
  *
  * ``message_id`` is the assistant message that asked. ``args`` are the
  * arguments as the model wrote them.
+ *
+ * ``parent_call_id`` is set on an event of a child run: the id of the ``delegate`` call
+ * that started it. The event is in the parent's run, and a client that does not know
+ * child runs ignores it. None for the run's own events.
  */
 export interface ToolRequestedData {
   args: Args;
   call_id: CallId;
   message_id: MessageId;
   name: Name;
+  parent_call_id?: ParentCallId;
 }
 export interface Args {
   [k: string]: unknown;

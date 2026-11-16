@@ -60,7 +60,12 @@ log = logging.getLogger(__name__)
 
 
 def build_trace(events: Sequence[ChatEvent]) -> list[TraceRunSpan]:
-    """The runs found in ``events``, oldest first, each with its model and tool spans."""
+    """The runs found in ``events``, oldest first, each with its model and tool spans.
+
+    The events of a child run are left out until the trace nests them under their ``delegate``
+    call.
+    """
+    events = _own(events)
     order: list[str] = []
     by_run: dict[str, list[ChatEvent]] = {}
     for event in events:
@@ -80,7 +85,7 @@ def build_trace(events: Sequence[ChatEvent]) -> list[TraceRunSpan]:
 
 def context_events(events: Sequence[ChatEvent]) -> list[TraceContextEvent]:
     """The ``context.changed`` events, oldest first, each with the model call right after it."""
-    starts = [e for e in events if isinstance(e, ModelCallStartedEvent)]
+    starts = [e for e in _own(events) if isinstance(e, ModelCallStartedEvent)]
     found: list[TraceContextEvent] = []
     for event in events:
         if not isinstance(event, ContextChangedEvent):
@@ -89,6 +94,11 @@ def context_events(events: Sequence[ChatEvent]) -> list[TraceContextEvent]:
         fields = event.data.model_dump()
         found.append(TraceContextEvent(seq=event.seq, call_id=after, run_id=event.run_id, **fields))
     return found
+
+
+def _own(events: Sequence[ChatEvent]) -> list[ChatEvent]:
+    """``events`` without those of a child run, which name their ``delegate`` call."""
+    return [e for e in events if getattr(e.data, "parent_call_id", None) is None]
 
 
 def _with_cuts(runs: list[TraceRunSpan], events: Sequence[ChatEvent]) -> list[TraceRunSpan]:
@@ -462,6 +472,7 @@ def read_span(
     is a span too, but it has no input or output of its own: it comes back as
     the span alone.
     """
+    events = _own(events)
     flat = spans(runs)
     span = next((s for s in flat if s.id == span_id), None)
     if span is None:

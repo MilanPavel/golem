@@ -31,6 +31,14 @@ from golem.coding.changes import ChangeStore
 from golem.config import ContextSettings, ModelPrice, PermissionMode
 from golem.graphs.adapter import STREAM_KEY, message_text
 from golem.graphs.checks_node import CHECKS_KEY, checks_node
+from golem.graphs.child import (
+    CHILD_PROMPT,
+    EXPLORER_TOOLS,
+    FINAL_REQUEST,
+    ChildLimits,
+    ChildResult,
+    run_child,
+)
 from golem.graphs.compact import Compaction, clear_now, summarise_now
 from golem.graphs.context_view import (
     SUMMARY_ID,
@@ -48,13 +56,15 @@ from golem.graphs.fit import Fitted, fit_prompt, num_predict_of, prompt_estimate
 from golem.graphs.notes import is_note, note
 from golem.graphs.prompt import PINNED_KEY, PromptContext, SystemPrompt
 from golem.graphs.result_budget import ResultBudget, result_budget
-from golem.graphs.state import AgentState
+from golem.graphs.state import SCHEMA_VERSION, AgentState
 from golem.graphs.summarise import Summariser
 from golem.graphs.text_calls import recover
 from golem.graphs.tools_node import (
     ALLOWED_KEY,
     ASKED_KEY,
+    CHILD_KEY,
     CWD_KEY,
+    LOCAL_ONLY_KEY,
     MCP_KEY,
     MCP_NOW_KEY,
     MODE_KEY,
@@ -62,8 +72,10 @@ from golem.graphs.tools_node import (
     PLAN_KEY,
     Answer,
     BudgetOf,
+    ChildScope,
     EnableMcp,
     cancelled_results,
+    child_of,
     scope_of,
     tools_node,
     unanswered_calls,
@@ -72,6 +84,7 @@ from golem.models.discovery import Loaded
 from golem.models.errors import BUDGET_HINT, BudgetSpent
 from golem.models.gate import ServerGate
 from golem.models.ollama import LocalServers
+from golem.models.roles import RoleModel, for_role
 from golem.models.router import ModelRouter
 from golem.models.tiers import Tier
 from golem.models.window import ContextWindow, WindowOf
@@ -190,6 +203,10 @@ class ChatRuntime:
         """The ``[context]`` settings the graph was built with."""
         self.summariser: Summariser | None = None
         """Writes the summaries of the graph, and of a manual compaction."""
+        self.budget_refs: Callable[[], list[str]] | None = None
+        """Ready budget models that take tools, cheapest first, for the ``explore`` role."""
+        self.child_limits = ChildLimits()
+        """What stops a helper started by ``delegate``."""
 
     async def values(self, session_id: str) -> Mapping[str, object]:
         """Checkpoint values for ``session_id``, or an empty mapping."""
@@ -230,6 +247,7 @@ class ChatRuntime:
         permission_mode: PermissionMode | None = None,
         checks: bool | None = None,
         plan_first: bool = False,
+        local_only: bool = False,
     ) -> AsyncGenerator[object]:
         """Stream one user turn. The first turn writes the state fields.
 
@@ -259,6 +277,7 @@ class ChatRuntime:
                 MODE_KEY: permission_mode,
                 CHECKS_KEY: checks,
                 PLAN_KEY: plan_first,
+                LOCAL_ONLY_KEY: local_only,
             },
             "recursion_limit": _RECURSION_LIMIT,
         }
@@ -295,6 +314,7 @@ class ChatRuntime:
         permission_mode: PermissionMode | None = None,
         checks: bool | None = None,
         plan_first: bool = False,
+        local_only: bool = False,
     ) -> AsyncGenerator[object]:
         """Go on with a run paused on a tool approval, with the user's ``answer``.
 
@@ -316,6 +336,7 @@ class ChatRuntime:
                 MODE_KEY: permission_mode,
                 CHECKS_KEY: checks,
                 PLAN_KEY: plan_first,
+                LOCAL_ONLY_KEY: local_only,
             },
             "recursion_limit": _RECURSION_LIMIT,
         }
@@ -323,6 +344,90 @@ class ChatRuntime:
         async with aclosing(self._parts(command, config)) as parts:
             async for part in parts:
                 yield part
+
+    async def stream_child(
+        self,
+        *,
+        thread_id: str,
+        session_id: str,
+        brief: str,
+        model_profile: str,
+        cwd: str | None,
+        options: Mapping[str, float | str] | None,
+        max_calls: int,
+    ) -> AsyncGenerator[object]:
+        """Stream a child run: the same graph on ``thread_id``, with ``brief`` as its first message.
+
+        The run has the helper's tools only, the strictest permission mode, none of the
+        session's allowances, and no checks. Its state names ``session_id`` so that its
+        artifacts and its budget check are the session's. Close the generator when you stop early.
+        """
+        config: RunnableConfig = {
+            "configurable": {
+                "thread_id": thread_id,
+                CWD_KEY: cwd or "",
+                ALLOWED_KEY: [],
+                MCP_KEY: [],
+                MCP_NOW_KEY: set[str](),
+                PINNED_KEY: [],
+                PINNED_FOLDERS_KEY: [],
+                OPTIONS_KEY: dict(options or {}),
+                MODE_KEY: "careful",
+                CHECKS_KEY: False,
+                PLAN_KEY: False,
+                CHILD_KEY: ChildScope(tools=EXPLORER_TOOLS, max_calls=max_calls),
+            },
+            "recursion_limit": 2 * (max_calls + 2) + 6,
+        }
+        await self.answer_dangling(thread_id)
+        existing = await self.values(thread_id)
+        graph_input = _turn_input(
+            [HumanMessage(content=brief, id=new_id("m"))],
+            session_id=session_id,
+            model_profile=model_profile,
+            schema_version=SCHEMA_VERSION,
+            has_checkpoint=bool(existing),
+        )
+        async with aclosing(self._parts(graph_input, config)) as parts:
+            async for part in parts:
+                yield part
+
+    def explore_role(self, session_profile: str, *, local_only: bool = False) -> RoleModel:
+        """The model of the ``explore`` role. A session that stays local keeps a local one."""
+        role = for_role(
+            "explore",
+            session_profile=session_profile,
+            settings=self.router.roles(),
+            tier_of_profile=self.tier_of or (lambda _profile: None),
+            budget_models=self.budget_refs() if self.budget_refs is not None else [],
+        )
+        tier = None if self.tier_of is None else self.tier_of(role.profile)
+        if local_only and tier not in (None, "local"):
+            return RoleModel(session_profile, True, "session is local")
+        return role
+
+    async def delegate(
+        self,
+        *,
+        state: AgentState,
+        config: RunnableConfig,
+        call_id: str,
+        brief: str,
+        emit_fact: Callable[[object], None],
+    ) -> ChildResult:
+        """Run a helper for the ``delegate`` call ``call_id`` of the run that has ``state``."""
+        role = self.explore_role(state["model_profile"], local_only=_local_only(config))
+        return await run_child(
+            self,
+            session_id=state["session_id"],
+            call_id=call_id,
+            brief=brief,
+            model_profile=role.profile,
+            cwd=_cwd(config),
+            emit_fact=emit_fact,
+            limits=self.child_limits,
+            options=_options(config) if role.same_as_session else {},
+        )
 
     async def waiting(self, session_id: str) -> bool:
         """Whether the thread is paused on an interrupt."""
@@ -506,6 +611,7 @@ def open_chat(
     summariser: Summariser | None = None,
     ratios: TokenRatios | None = None,
     paid_ok: Callable[[str | None], Awaitable[bool]] | None = None,
+    budget_refs: Callable[[], list[str]] | None = None,
 ) -> ChatRuntime:
     """Compile the chat graph against ``checkpointer``.
 
@@ -534,7 +640,8 @@ def open_chat(
     the window is cleared and summarised harder, or the call raises ``ContextFull``.
     ``paid_ok`` is awaited with the session id before each call to a paid model. When it says
     no, a cap in ``[budget]`` is spent: the run fails with ``budget_spent`` before the call,
-    so every tool result of the run is stored by then.
+    so every tool result of the run is stored by then. ``budget_refs`` lists the ready budget
+    models, for the ``explore`` role of the helper that ``delegate`` starts.
     """
     clearing = context
     learned = TokenRatios() if ratios is None else ratios
@@ -555,11 +662,16 @@ def open_chat(
         message_id = _reply_id(messages, config)
         get_stream_writer()({STREAM_KEY: "model.started", "message_id": message_id})
         scope = scope_of(config)
+        child = child_of(config)
+        # A helper that used its calls makes one more, without tools, to give its answer.
+        final = child is not None and sum(isinstance(m, AIMessage) for m in messages) >= (
+            child.max_calls
+        )
         overrides = _options(config)
         await registry.prepare(scope)
         tools = registry.scoped(scope)
         plan_first = _plan(config)
-        schemas = tools.schemas(plan_first=plan_first)
+        schemas = [] if final else tools.schemas(plan_first=plan_first)
         context = PromptContext(
             state,
             _cwd(config),
@@ -568,12 +680,12 @@ def open_chat(
             tuple(sorted(scope.enabled)),
             plan_first=plan_first,
         )
-        parts = system_prompt.parts(context)
+        parts = [("helper", CHILD_PROMPT)] if child is not None else system_prompt.parts(context)
         text = "\n\n".join(t for _, t in parts)
         system = SystemMessage(content=text) if text else None
         # The system message is sent, never returned, so it stays out of the checkpoint.
         history = view(_without_thinking(messages), state.get("context_view"))
-        sent = history if system is None else [system, *history]
+        sent = _outgoing(system, history, final)
         async with _held(router, local, profile):
             if learn_window is not None:
                 try:
@@ -636,7 +748,7 @@ def open_chat(
                     get_stream_writer()(change)
             if current is not original:
                 history = view(plain, current)
-                sent = history if system is None else [system, *history]
+                sent = _outgoing(system, history, final)
             request: dict[str, object] = {STREAM_KEY: "model.request", "message_id": message_id}
             request["profile"] = profile
             request["message_ids"] = [m.id for m in history if m.id]
@@ -690,7 +802,9 @@ def open_chat(
                 ran = window.num_ctx
         update: dict[str, object] = {"id": message_id}
         text_tool_calls: str | None = None
-        if response.tool_calls:
+        if final:
+            update["tool_calls"] = []
+        elif response.tool_calls:
             update["tool_calls"] = _with_ids(response.tool_calls)
         elif schemas and binder.offers(profile) and "<function=" in message_text(response):
             recovered = recover(message_text(response), schemas)
@@ -741,6 +855,7 @@ def open_chat(
             lambda: runtime[0].enable_mcp if runtime else None,
             lambda: runtime[0].skills if runtime else None,
             _budget_by_window(window_of),
+            lambda: runtime[0] if runtime else None,
         ),
     )
     builder.add_edge(START, "call_model")
@@ -764,6 +879,7 @@ def open_chat(
     )
     runtime[0].context = context
     runtime[0].summariser = summariser
+    runtime[0].budget_refs = budget_refs
     return runtime[0]
 
 
@@ -1136,6 +1252,25 @@ def _options(config: RunnableConfig) -> dict[str, float | str]:
         for key, value in cast(dict[object, object], raw).items()
         if isinstance(key, str) and isinstance(value, (int, float, str))
     }
+
+
+def _outgoing(
+    system: SystemMessage | None, history: Sequence[BaseMessage], final: bool
+) -> list[BaseMessage]:
+    """What a call sends: the system message, the history, and for a last call a request to answer.
+
+    The request is sent and never stored, like the system message.
+    """
+    sent: list[BaseMessage] = [] if system is None else [system]
+    sent.extend(history)
+    if final:
+        sent.append(HumanMessage(content=FINAL_REQUEST))
+    return sent
+
+
+def _local_only(config: RunnableConfig) -> bool:
+    """Whether the session stays on this Mac."""
+    return cast(Mapping[str, object], config.get("configurable", {})).get(LOCAL_ONLY_KEY) is True
 
 
 def _plan(config: RunnableConfig) -> bool:

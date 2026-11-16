@@ -7,6 +7,7 @@ export type FirstTokenMs = number | null;
 export type LatencyMs = number;
 export type LoadMs = number | null;
 export type MessageId = string;
+export type ParentCallId = string | null;
 export type CachedInput = number | null;
 export type Input = number | null;
 export type Output = number | null;
@@ -40,6 +41,10 @@ export type Output1 = number | null;
  * ``load_ms``, ``prompt_ms`` and ``reply_ms`` are the time the model server spent loading
  * the model, reading the prompt and writing the reply. From the model server's own clock.
  * Ollama only.
+ *
+ * ``parent_call_id`` is set on an event of a child run: the id of the ``delegate`` call
+ * that started it. The event is in the parent's run, and a client that does not know
+ * child runs ignores it. None for the run's own events.
  */
 export interface ModelCallCompletedData {
   context_window?: ContextWindow;
@@ -49,6 +54,7 @@ export interface ModelCallCompletedData {
   latency_ms: LatencyMs;
   load_ms?: LoadMs;
   message_id: MessageId;
+  parent_call_id?: ParentCallId;
   price?: CallPrice | null;
   prompt_ms?: PromptMs;
   reply_ms?: ReplyMs;

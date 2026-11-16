@@ -545,6 +545,43 @@ test("a call that ran but failed is done and unsuccessful", () => {
   assert.deepEqual([tool?.status, tool?.summary, tool?.unsuccessful], ["done", "exit 1", true]);
 });
 
+test("events of a child run (parent_call_id) are not drawn as steps", () => {
+  const base = { session_id: "s", run_id: "r", ts: "t" } as const;
+  const own: ChatEvent[] = [
+    { ...base, seq: 1, type: "message.started", data: { message_id: "a", role: "assistant" } },
+    { ...base, seq: 2, type: "message.completed", data: { message_id: "a", role: "assistant", text: "" } },
+    {
+      ...base,
+      seq: 3,
+      type: "tool.requested",
+      data: { call_id: "d1", message_id: "a", name: "delegate", args: { brief: "look" } },
+    },
+  ];
+  const child: ChatEvent[] = [
+    {
+      ...base,
+      seq: 4,
+      type: "tool.requested",
+      data: { call_id: "k1", message_id: "m2", name: "read_file", args: { path: "a" }, parent_call_id: "d1" },
+    },
+    { ...base, seq: 5, type: "tool.started", data: { call_id: "k1", parent_call_id: "d1" } },
+    {
+      ...base,
+      seq: 6,
+      type: "tool.completed",
+      data: { call_id: "k1", summary: "1 line", preview: "x", parent_call_id: "d1" },
+    },
+    { ...base, seq: 7, type: "tool.failed", data: { call_id: "d1", message: "no", parent_call_id: "d1" } },
+  ];
+  const before = own.reduce(reduceChat, emptyChat);
+  const after = [...own, ...child].reduce(reduceChat, emptyChat);
+  assert.deepEqual(after, before);
+  assert.deepEqual(
+    after.messages[0]?.tools?.map((tool) => [tool.callId, tool.status]),
+    [["d1", "requested"]],
+  );
+});
+
 test("tool.completed with a diff replaces the approval diff, one without keeps it", () => {
   const base = { session_id: "s", run_id: "r", ts: "t" } as const;
   const head: ChatEvent[] = [

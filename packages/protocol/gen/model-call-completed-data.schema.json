@@ -109,7 +109,7 @@
     }
   },
   "additionalProperties": false,
-  "description": "A model call ended.\n\n``first_token_ms`` is the time from the request to the first text, and\nNone when no text came. ``latency_ms`` is the time to the end.\n``failed`` is true when the call raised or was stopped.\n\n``context_window`` is the window the call ran with, read from the model server\nafter the call. Exact. None when it could not be read.\n\n``text_tool_calls`` is set when the model wrote a tool call as text in its\nreply. ``recovered`` means golem turned the text into tool calls. ``unread``\nmeans the text held a call golem could not read, so the reply stayed text.\nNone when the reply had no such text.\n\n``cost_usd`` is the cost of this call at ``price``. Both are None when the\nprice is not known. A local model costs 0.\n\n``load_ms``, ``prompt_ms`` and ``reply_ms`` are the time the model server spent loading\nthe model, reading the prompt and writing the reply. From the model server's own clock.\nOllama only.",
+  "description": "A model call ended.\n\n``first_token_ms`` is the time from the request to the first text, and\nNone when no text came. ``latency_ms`` is the time to the end.\n``failed`` is true when the call raised or was stopped.\n\n``context_window`` is the window the call ran with, read from the model server\nafter the call. Exact. None when it could not be read.\n\n``text_tool_calls`` is set when the model wrote a tool call as text in its\nreply. ``recovered`` means golem turned the text into tool calls. ``unread``\nmeans the text held a call golem could not read, so the reply stayed text.\nNone when the reply had no such text.\n\n``cost_usd`` is the cost of this call at ``price``. Both are None when the\nprice is not known. A local model costs 0.\n\n``load_ms``, ``prompt_ms`` and ``reply_ms`` are the time the model server spent loading\nthe model, reading the prompt and writing the reply. From the model server's own clock.\nOllama only.\n\n``parent_call_id`` is set on an event of a child run: the id of the ``delegate`` call\nthat started it. The event is in the parent's run, and a client that does not know\nchild runs ignores it. None for the run's own events.",
   "properties": {
     "context_window": {
       "anyOf": [
@@ -177,6 +177,19 @@
       "minLength": 1,
       "title": "Message Id",
       "type": "string"
+    },
+    "parent_call_id": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Parent Call Id"
     },
     "price": {
       "anyOf": [
