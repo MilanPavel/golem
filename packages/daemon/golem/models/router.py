@@ -26,6 +26,7 @@ import httpx
 from langchain_core.language_models import BaseChatModel
 
 from golem.config import (
+    AgentSettings,
     BudgetSettings,
     ContextSettings,
     GolemSettings,
@@ -163,6 +164,7 @@ class _Catalog:
     routing: RoutingSettings = field(default_factory=RoutingSettings)
     context: ContextSettings = field(default_factory=ContextSettings)
     budget: BudgetSettings = field(default_factory=BudgetSettings)
+    agents: AgentSettings = field(default_factory=AgentSettings)
 
 
 class ModelRouter:
@@ -504,6 +506,11 @@ class ModelRouter:
         catalog = self._current()
         return BudgetSettings() if catalog is None else catalog.budget
 
+    def agent_settings(self) -> AgentSettings:
+        """``[agents]``, read from the current ``config.toml``."""
+        catalog = self._current()
+        return AgentSettings() if catalog is None else catalog.agents
+
     def budget_max_price(self) -> float:
         """``[routing] budget_max_price``, read from the current ``config.toml``."""
         catalog = self._current()
@@ -628,6 +635,7 @@ def _catalog(settings: GolemSettings) -> _Catalog:
         routing=settings.routing,
         context=settings.context,
         budget=settings.budget,
+        agents=settings.agents,
     )
 
 

@@ -29,7 +29,7 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Literal, Protocol, cast
 
-from langchain_core.messages import AIMessage, BaseMessage, ToolMessage
+from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, ToolMessage
 from langchain_core.messages.tool import ToolCall
 from langchain_core.runnables import RunnableConfig
 from langgraph.config import get_stream_writer
@@ -44,7 +44,8 @@ from golem.graphs.adapter import (
     SKILL_LOADED_KIND,
     STREAM_KEY,
 )
-from golem.graphs.child import ChildProgress, ChildResult
+from golem.graphs.child import ChildLimits, ChildProgress, ChildResult
+from golem.graphs.notes import is_note
 from golem.graphs.result_budget import DEFAULT_BUDGET, ResultBudget
 from golem.graphs.state import AgentState
 from golem.permissions.engine import Allowance, session_allows
@@ -105,6 +106,9 @@ class ChildScope:
 
 class ChildHost(Protocol):
     """What the tools node needs to start a helper. The chat runtime has it."""
+
+    @property
+    def child_limits(self) -> ChildLimits: ...
 
     async def delegate(
         self,
@@ -275,8 +279,15 @@ def tools_node(
         write = get_stream_writer()
         results: list[BaseMessage] = []
         updates: dict[str, object] = {}
+        # Helpers run one after the other: this loop awaits each call before the next.
+        delegated = _delegated_this_turn(state["messages"])
         for call, verdict in zip(last.tool_calls, verdicts, strict=True):
             call_id = call_id_of(call)
+            if verdict.run and call["name"] == "delegate" and host is not None and not helper:
+                if delegated >= host.child_limits.max_per_turn:
+                    verdict = _Verdict(run=False, message=NO_MORE_HELPERS, kind="denied")
+                else:
+                    delegated += 1
             if not verdict.run:
                 write({STREAM_KEY: "tool.failed", "call_id": call_id, "message": verdict.message})
                 results.append(
@@ -521,6 +532,23 @@ def _result(
         status="success" if error is None else "error",
         additional_kwargs={} if error is None else {ERROR_KEY: error},
     )
+
+
+NO_MORE_HELPERS = "no more helpers in this turn; continue with what you have"
+
+
+def _delegated_this_turn(messages: Sequence[BaseMessage]) -> int:
+    """How many ``delegate`` calls got a result since the last message of the user.
+
+    A note golem adds in a run is not the user speaking, so it does not start a new count.
+    """
+    found = 0
+    for message in reversed(messages):
+        if isinstance(message, HumanMessage) and not is_note(message):
+            break
+        if isinstance(message, ToolMessage) and message.name == "delegate":
+            found += 1
+    return found
 
 
 def _delegation(

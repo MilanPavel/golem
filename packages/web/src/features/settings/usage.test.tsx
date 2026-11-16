@@ -52,6 +52,22 @@ test("Usage shows the tiles, seven bars and the model table from cost.get", asyn
   expect(results.violations).toEqual([]);
 });
 
+test("with more than one job Usage adds a table by job", async () => {
+  mount({
+    ...SAMPLE_USAGE,
+    by_role: [
+      { role: "chat", calls: 80, input: 1_100_000, output: 100_000, cost_usd: 1.5 },
+      { role: "explore", calls: 16, input: 300_000, output: 20_000, cost_usd: 0.6 },
+    ],
+  });
+  const table = await screen.findByRole("table", { name: "By job, last 7 days" });
+  expect(
+    within(table)
+      .getAllByRole("row")
+      .map((row) => row.textContent),
+  ).toEqual(["JobCallsTokens inTokens outCost", "chat801.1M100.0K$1.50", "helper16300.0K20.0K$0.60"]);
+});
+
 test("the bars' heights are proportional to the day's tokens", async () => {
   mount(SAMPLE_USAGE);
   const items = within(await screen.findByRole("list", { name: "Tokens per day" })).getAllByRole("listitem");

@@ -115,6 +115,22 @@ test("costReportLines: a full result, columns aligned with spaces", () => {
   ]);
 });
 
+test("costReportLines: a by job block when more than one role has rows", () => {
+  const roles = [
+    { role: "chat", calls: 30, input: 900_000, output: 90_000, cost_usd: 1.5 },
+    { role: "explore", calls: 12, input: 300_000, output: 30_000, cost_usd: 0.6 },
+  ];
+  const lines = costReportLines({ ...FULL, by_role: roles });
+  const at = lines.indexOf("by job (7 days)");
+  assert.deepEqual(lines.slice(at, at + 3), [
+    "by job (7 days)",
+    "chat    990.0K  $1.50",
+    "helper  330.0K  $0.60",
+  ]);
+  const one = costReportLines({ ...FULL, by_role: roles.slice(0, 1) });
+  assert.equal(one.includes("by job (7 days)"), false);
+});
+
 test("costReportLines: no session row without a session, no saved line without a reference", () => {
   const lines = costReportLines({ ...FULL, session: null, saved_reference: null });
   assert.equal(lines.some((line) => line.startsWith("this session")), false);

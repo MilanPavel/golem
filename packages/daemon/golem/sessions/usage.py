@@ -58,6 +58,15 @@ class ModelUsage:
 
 
 @dataclass(frozen=True, slots=True)
+class RoleUsage:
+    role: str
+    calls: int
+    input: int
+    output: int
+    cost_usd: float
+
+
+@dataclass(frozen=True, slots=True)
 class DayUsage:
     day: str
     local_tokens: int
@@ -74,6 +83,7 @@ class UsageSummary:
     totals: Totals
     by_model: list[ModelUsage] = field(default_factory=list[ModelUsage])
     by_day: list[DayUsage] = field(default_factory=list[DayUsage])
+    by_role: list[RoleUsage] = field(default_factory=list[RoleUsage])
     saved_reference: str | None = None
 
 
@@ -219,6 +229,13 @@ class Usage:
             " ORDER BY spent DESC, COUNT(*) DESC, provider, model",
             args,
         )
+        roles = await self._database.fetch_all(
+            "SELECT role, COUNT(*), COALESCE(SUM(input), 0), COALESCE(SUM(output), 0),"
+            " COALESCE(SUM(cost_usd), 0) AS spent"
+            f" FROM model_calls WHERE {where} GROUP BY role"
+            " ORDER BY spent DESC, COUNT(*) DESC, role",
+            args,
+        )
         return UsageSummary(
             totals=totals,
             by_model=[
@@ -226,6 +243,7 @@ class Usage:
                 for r in models
             ],
             by_day=await self._by_day(where, args, since_day),
+            by_role=[RoleUsage(r[0], int(r[1]), int(r[2]), int(r[3]), float(r[4])) for r in roles],
             saved_reference=None if reference is None else reference.ref,
         )
 
@@ -278,6 +296,7 @@ __all__ = [
     "DayUsage",
     "ModelUsage",
     "Reference",
+    "RoleUsage",
     "Totals",
     "Usage",
     "UsageSummary",

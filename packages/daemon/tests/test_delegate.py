@@ -19,13 +19,21 @@ from langchain_core.outputs import ChatResult
 from langgraph.checkpoint.memory import InMemorySaver
 from pydantic import Field, PrivateAttr
 
-from golem.config import GolemSettings, ModelPrice, RoleSettings, RoutingSettings
+from golem.config import (
+    AgentSettings,
+    ExplorerSettings,
+    GolemSettings,
+    ModelPrice,
+    RoleSettings,
+    RoutingSettings,
+)
 from golem.graphs.adapter import plain_messages
 from golem.graphs.chat import ChatRuntime, open_chat
 from golem.graphs.child import CHILD_PROMPT, EXPLORER_TOOLS, FINAL_REQUEST, ChildLimits
 from golem.models.gate import ServerGate
 from golem.models.router import ModelRouter
 from golem.models.tiers import Tier
+from golem.models.window import ContextWindow
 from golem.permissions.policy import Policy
 from golem.sessions.bus import EventBus
 from golem.sessions.log import SessionLog
@@ -88,6 +96,9 @@ class _Chat:
         limits: ChildLimits | None = None,
         gate: ServerGate | None = None,
         policy: Policy | None = None,
+        tier_of: Callable[[str], Tier | None] | None = None,
+        paid_ok: Callable[[str | None], Awaitable[bool]] | None = None,
+        window_of: Callable[[str, Any], ContextWindow] | None = None,
     ) -> None:
         self.saver = InMemorySaver()
         self.runtime: ChatRuntime = open_chat(
@@ -97,6 +108,9 @@ class _Chat:
             policy,
             gate=gate,
             price_of=lambda _profile: ModelPrice(input=1.0, output=2.0),
+            tier_of=tier_of,
+            paid_ok=paid_ok,
+            window_of=window_of,
         )
         if limits is not None:
             self.runtime.child_limits = limits
@@ -467,3 +481,190 @@ def test_the_explore_role_on_a_local_session_is_the_same_model() -> None:
     )
     role = runtime.explore_role("ollama/qwen3:8b")
     assert (role.profile, role.same_as_session) == ("ollama/qwen3:8b", True)
+
+
+def _result_of(events: list[ChatEvent], call_id: str) -> str:
+    for event in events:
+        if event.type == "tool.completed" and event.data.call_id == call_id:
+            return event.data.preview
+        if event.type == "tool.failed" and event.data.call_id == call_id:
+            return event.data.message
+    raise AssertionError(f"no result for {call_id}")
+
+
+def test_the_explorer_settings_have_limits() -> None:
+    explorer = ExplorerSettings()
+    assert (explorer.max_calls, explorer.timeout_seconds) == (15, 300)
+    assert (explorer.answer_chars, explorer.max_per_turn) == (6_000, 3)
+    assert GolemSettings().agents == AgentSettings()
+    for bad in ({"max_calls": 0}, {"max_calls": 51}, {"timeout_seconds": 0}, {"max_per_turn": 0}):
+        with pytest.raises(ValueError):
+            ExplorerSettings(**bad)
+    with pytest.raises(ValueError):
+        ExplorerSettings(unknown=1)  # type: ignore[call-arg]
+
+
+async def test_the_settings_bound_the_helper(database: Database, project: Path) -> None:
+    settings = GolemSettings(
+        default_model="ollama/qwen3:8b",
+        agents=AgentSettings(explorer=ExplorerSettings(max_calls=2, answer_chars=7)),
+    )
+    model = ToolCallingChatModel(replies=[[("delegate", {"brief": "look"})], "x" * 50, "ok"])
+    chat = _Chat(database, model, settings=settings)
+    assert chat.runtime.child_limits.max_calls == 2
+    _, _, events = await chat.run(project)
+    assert _delegate_result(events) == "x" * 7
+
+
+async def test_the_fourth_delegate_of_a_run_gets_an_error_result(
+    database: Database, project: Path
+) -> None:
+    calls = [("delegate", {"brief": f"look {n}"}) for n in range(4)]
+    model = ToolCallingChatModel(replies=[calls, "one", "two", "three", "ok"])
+    chat = _Chat(database, model)
+    session_id, run_id, events = await chat.run(project)
+
+    run = await chat.runs.get(run_id)
+    assert run is not None
+    assert run.status == "completed"
+    assert _result_of(events, "call_3") == "three"
+    assert "no more helpers in this turn; continue with what you have" in _result_of(
+        events, "call_4"
+    )
+    # Only three helpers ran.
+    assert len([e for e in _child(events) if e.type == "model.call.started"]) == 3
+    tools = [m for m in plain_messages(await chat.runtime.values(session_id)) if m.role == "tool"]
+    assert len(tools) == 4
+
+
+async def test_a_new_turn_has_its_own_helpers(database: Database, project: Path) -> None:
+    replies: list[str | list[tuple[str, dict[str, str]]]] = [
+        [("delegate", {"brief": "a"}), ("delegate", {"brief": "b"})],
+        "one",
+        "two",
+        "first turn",
+        [("delegate", {"brief": "c"})],
+        "three",
+        "second turn",
+    ]
+    chat = _Chat(
+        database,
+        ToolCallingChatModel(replies=replies),  # type: ignore[arg-type]
+        settings=GolemSettings(
+            default_model="ollama/qwen3:8b",
+            agents=AgentSettings(explorer=ExplorerSettings(max_per_turn=2)),
+        ),
+    )
+    session_id, _, _ = await chat.run(project)
+    run_id = await chat.manager.send(session_id, "again")
+    events = await chat.finished(run_id)
+    assert _result_of(events, "call_3") == "three"
+
+
+async def test_two_delegates_in_one_reply_run_in_order(database: Database, project: Path) -> None:
+    calls = [("delegate", {"brief": "first"}), ("delegate", {"brief": "second"})]
+    model = ToolCallingChatModel(replies=[calls, "one", "two", "ok"])
+    chat = _Chat(database, model)
+    _, _, events = await chat.run(project)
+
+    parents = [_parent(e) for e in _child(events)]
+    assert set(parents) == {"call_1", "call_2"}
+    assert parents == sorted(parents, key=str)
+    assert _result_of(events, "call_1") == "one"
+    assert _result_of(events, "call_2") == "two"
+
+
+async def test_usage_rows_of_a_helper_are_explore_and_cost_get_groups_them(
+    database: Database, project: Path
+) -> None:
+    from golem.sessions.usage import EVER, Usage
+
+    model = ToolCallingChatModel(replies=[[("delegate", {"brief": "look"})], "found", "ok"])
+    chat = _Chat(database, model)
+    await chat.run(project)
+
+    summary = await Usage(database).summary(since_day=EVER)
+    by_role = {row.role: row.calls for row in summary.by_role}
+    assert by_role == {"chat": 2, "explore": 1}
+
+
+def _paid(profile: str) -> Tier:
+    del profile
+    return "budget"
+
+
+def _answers(*oks: bool) -> Callable[[str | None], Awaitable[bool]]:
+    left = list(oks)
+
+    async def paid_ok(session_id: str | None) -> bool:
+        del session_id
+        return left.pop(0) if left else True
+
+    return paid_ok
+
+
+async def test_a_spent_cap_stops_a_paid_helper_with_budget(
+    database: Database, project: Path
+) -> None:
+    model = ToolCallingChatModel(
+        replies=[
+            [("delegate", {"brief": "look"})],
+            [("list_dir", {"path": "."})],
+            "after the helper",
+        ],
+    )
+    # The parent's call, the helper's first call, then the cap is spent, then the parent again.
+    chat = _Chat(database, model, tier_of=_paid, paid_ok=_answers(True, True, False, True))
+    _, run_id, events = await chat.run(project)
+
+    run = await chat.runs.get(run_id)
+    assert run is not None
+    assert run.status == "completed"
+    assert _delegate_result(events).startswith("explorer finished: budget")
+
+
+async def test_a_local_helper_is_not_stopped_by_a_spent_cap(
+    database: Database, project: Path
+) -> None:
+    model = ToolCallingChatModel(replies=[[("delegate", {"brief": "look"})], "found it", "ok"])
+
+    async def spent(session_id: str | None) -> bool:
+        del session_id
+        return False
+
+    chat = _Chat(database, model, tier_of=lambda _profile: "local", paid_ok=spent)
+    _, _, events = await chat.run(project)
+    assert _delegate_result(events) == "found it"
+
+
+async def test_a_helper_that_reads_past_eight_windows_stops_with_tokens(
+    database: Database, project: Path
+) -> None:
+    model = ToolCallingChatModel(
+        replies=[
+            [("delegate", {"brief": "look"})],
+            [("read_file", {"path": "a.py"})],
+            [("read_file", {"path": "b.py"})],
+            "never reached",
+            "ok",
+        ],
+        usage=USAGE,
+    )
+    # Each call takes in 1,000 tokens: the window is 100, so the ceiling is 800.
+    chat = _Chat(database, model, window_of=lambda _profile, _options: ContextWindow(window=100))
+    _, _, events = await chat.run(project)
+
+    assert _delegate_result(events).startswith("explorer finished: tokens")
+    assert len([e for e in _child(events) if e.type == "model.call.started"]) == 1
+
+
+def test_a_note_of_golem_does_not_start_a_new_count_of_helpers() -> None:
+    from langchain_core.messages import HumanMessage, ToolMessage
+
+    from golem.graphs.notes import note
+    from golem.graphs.tools_node import _delegated_this_turn  # pyright: ignore
+
+    done = ToolMessage(content="x", tool_call_id="c1", name="delegate")
+    history = [HumanMessage(content="hi"), done, note("checks failed"), done]
+    assert _delegated_this_turn(history) == 2
+    assert _delegated_this_turn([*history, HumanMessage(content="next")]) == 0

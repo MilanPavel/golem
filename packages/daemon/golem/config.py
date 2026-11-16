@@ -368,6 +368,25 @@ class BudgetSettings(BaseModel):
     over: Literal["local", "ask"] = "local"
 
 
+class ExplorerSettings(BaseModel):
+    """``[agents.explorer]``. What bounds the helper that ``delegate`` starts."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    max_calls: int = Field(default=15, ge=1, le=50)
+    timeout_seconds: int = Field(default=300, ge=1)
+    answer_chars: int = Field(default=6_000, ge=1)
+    max_per_turn: int = Field(default=3, ge=1)
+
+
+class AgentSettings(BaseModel):
+    """``[agents]``. One table for each kind of helper."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    explorer: ExplorerSettings = Field(default_factory=ExplorerSettings)
+
+
 class WebSettings(BaseModel):
     """``[web]``. What ``web_fetch`` may reach and how much it reads, and who searches.
 
@@ -636,6 +655,7 @@ BROWSER_SETTINGS = frozenset(
         "routing",
         "context",
         "budget",
+        "agents",
     }
 )
 """Top-level settings the browser may edit. Every ``GolemSettings`` field is in one list."""
@@ -706,6 +726,7 @@ class GolemSettings(BaseSettings):
     routing: RoutingSettings = Field(default_factory=RoutingSettings)
     context: ContextSettings = Field(default_factory=ContextSettings)
     budget: BudgetSettings = Field(default_factory=BudgetSettings)
+    agents: AgentSettings = Field(default_factory=AgentSettings)
     routine: list[RoutineSettings] = Field(default_factory=list[RoutineSettings])
 
     @field_validator("routine")

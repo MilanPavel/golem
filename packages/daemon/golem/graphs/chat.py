@@ -245,10 +245,26 @@ class ChatRuntime:
         """Writes the summaries of the graph, and of a manual compaction."""
         self.budget_refs: Callable[[], list[str]] | None = None
         """Ready budget models that take tools, cheapest first, for the ``explore`` role."""
-        self.child_limits = ChildLimits()
-        """What stops a helper started by ``delegate``."""
+        self._child_limits: ChildLimits | None = None
         self.next_model: NextModel | None = None
         """Names the model a run steps up to. None: a run never steps up."""
+
+    @property
+    def child_limits(self) -> ChildLimits:
+        """What stops a helper started by ``delegate``: ``[agents.explorer]`` unless set."""
+        if self._child_limits is not None:
+            return self._child_limits
+        explorer = self.router.agent_settings().explorer
+        return ChildLimits(
+            max_calls=explorer.max_calls,
+            timeout_s=float(explorer.timeout_seconds),
+            answer_chars=explorer.answer_chars,
+            max_per_turn=explorer.max_per_turn,
+        )
+
+    @child_limits.setter
+    def child_limits(self, limits: ChildLimits) -> None:
+        self._child_limits = limits
 
     async def values(self, session_id: str) -> Mapping[str, object]:
         """Checkpoint values for ``session_id``, or an empty mapping."""

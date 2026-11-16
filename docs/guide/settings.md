@@ -185,6 +185,19 @@ The spend is what the `model_calls` table holds for paid models: chat calls, tit
 
 A cap is checked before a call, and a call costs what it costs only when it ends. So one call can pass a cap by its own cost. Golem does not guess the cost of the next call to block it. With `over = "ask"`, a chat on `auto` that would use a paid model over a spent cap asks first, and only "Just this once" and "Stay local" are offered. A chat pinned to a paid model is refused in both cases.
 
+### `[agents.explorer]`
+
+What bounds the helper that the `delegate` tool starts. A helper only reads: it never writes, runs a command or asks for approval.
+
+| Key | Default | Meaning |
+|---|---|---|
+| `max_calls` | `15` | Model calls before the helper must answer. 1 to 50 |
+| `timeout_seconds` | `300` | Wall time of one helper |
+| `answer_chars` | `6000` | The most characters its answer may have. The rest is cut |
+| `max_per_turn` | `3` | The most helpers one run may start. A further `delegate` call gets an error the model reads: `no more helpers in this turn; continue with what you have` |
+
+A helper also stops when its calls have taken in more than 8 times its model's window in all (`tokens`), or when a cap in `[budget]` is spent before one of its paid calls (`budget`). It then returns what it has, and the result starts with `explorer finished: <reason>`. Its calls count against the same caps as the chat's, and `golem cost` and Settings → Usage list them as `helper` under "by job".
+
 ### `[routing.roles]`
 
 The model for each internal job. A value is `"session"`, a profile name, or a `provider/model` ref.

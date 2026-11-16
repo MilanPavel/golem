@@ -23,6 +23,7 @@ from golem.graphs.adapter import (
     ToolStarted,
     Translator,
 )
+from golem.models.errors import BudgetSpent
 
 if TYPE_CHECKING:
     from golem.graphs.chat import ChatRuntime
@@ -53,7 +54,7 @@ FINAL_REQUEST = (
 )
 """Sent after the history, for the last call of a helper that ran out of calls. Not stored."""
 
-Stopped = Literal["done", "calls", "time", "cancelled"]
+Stopped = Literal["done", "calls", "time", "budget", "tokens", "cancelled"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -63,6 +64,8 @@ class ChildLimits:
     max_calls: int = 15
     timeout_s: float = 300.0
     answer_chars: int = 6_000
+    max_per_turn: int = 3
+    """How many helpers one run of the parent may start."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -79,6 +82,9 @@ def child_thread(session_id: str, call_id: str) -> str:
     """The checkpoint thread of the helper started by the ``delegate`` call ``call_id``."""
     return f"{session_id}/c/{call_id}"
 
+
+TOKEN_FACTOR = 8
+"""A helper stops when its calls took in more than this many times its window, in all."""
 
 _SHOWN = (ModelRequested, ModelResponded, TextCompleted, ToolStarted, ToolFinished, ToolErrored)
 """The facts of a helper that reach the log. Its text and thinking never do."""
@@ -139,7 +145,8 @@ async def run_child(
         max_calls=limits.max_calls,
     )
     translate = Translator()
-    calls = tool_calls = 0
+    calls = tool_calls = taken = 0
+    window: int | None = None
     text = ""
     stopped: Stopped = "done"
     clock = asyncio.timeout(limits.timeout_s)
@@ -149,16 +156,26 @@ async def run_child(
                 for fact in translate(part):
                     if isinstance(fact, ModelRequested):
                         calls += 1
+                        window = fact.context_window or window
                     elif isinstance(fact, TextCompleted):
                         tool_calls += len(fact.calls)
+                        taken += (fact.usage or {}).get("input", 0)
                         if fact.text.strip() or not fact.calls:
                             text = fact.text
                     if isinstance(fact, _SHOWN):
                         emit_fact(fact)
+                    more = isinstance(fact, TextCompleted) and bool(fact.calls)
+                    if more and window is not None and taken > TOKEN_FACTOR * window:
+                        stopped = "tokens"
+                        break
+                if stopped != "done":
+                    break
     except TimeoutError:
         if not clock.expired():
             raise
         stopped = "time"
+    except BudgetSpent:
+        stopped = "budget"
     if stopped == "done" and calls > limits.max_calls:
         stopped = "calls"
     return ChildResult(text[: limits.answer_chars], calls, tool_calls, stopped)

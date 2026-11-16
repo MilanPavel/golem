@@ -89,7 +89,8 @@ export {
   type WhyInput,
   type WhyRow,
 } from "./route.ts";
-export { costReportLines, formatCost, formatCount, referenceName, sessionCostLabel, turnFooterParts, turnTotals, type TurnTotals } from "./cost.ts";
+export { helperStop, helperStopWords, type HelperStop } from "./helper.ts";
+export { costReportLines, formatCost, formatCount, referenceName, roleName, sessionCostLabel, turnFooterParts, turnTotals, type TurnTotals } from "./cost.ts";
 export { groupTurns, turnFooter, type Turn } from "./turns.ts";
 export { editedArgs, parseArgs, type ParsedArgs } from "./approval-args.ts";
 export { inboxItems, type InboxItem, type InboxPending, type InboxSession } from "./inbox.ts";
