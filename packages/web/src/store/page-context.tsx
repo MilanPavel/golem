@@ -250,9 +250,9 @@ export function useKeys(enabled = true): UseQueryResult<AuthListResult> {
 }
 
 /** What model calls cost. Read again whenever Settings opens and the tab is seen: nothing pushes a change. */
-export function useCost(enabled = true): UseQueryResult<CostGetResult> {
+export function useCost(enabled = true, sessionId?: string): UseQueryResult<CostGetResult> {
   const { queries } = usePage();
-  return useQuery({ queryKey: ["cost.get"], queryFn: queries.cost, enabled, staleTime: 0, retry: false, refetchOnWindowFocus: true });
+  return useQuery({ queryKey: ["cost.get", sessionId ?? null], queryFn: () => queries.cost(sessionId), enabled, staleTime: 0, retry: false, refetchOnWindowFocus: true });
 }
 
 /** The routing, budget and context settings. Read again whenever the tab is seen: a terminal edit pushes nothing. */

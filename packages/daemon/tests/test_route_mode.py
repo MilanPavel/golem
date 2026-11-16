@@ -373,6 +373,8 @@ async def test_the_trace_of_a_routed_run_has_the_pick(short_home: Path) -> None:
         traced = rpc_result(await client.call("trace.get", {"session_id": session_id}))
         run = cast(list[dict[str, object]], traced["runs"])[0]
         assert run["route"] == {
+            "model": "small",
+            "tier": "local",
             "reason": "privacy",
             "detail": "this chat stays on this Mac",
             "rejected": [{"ref": BIG, "tier": "frontier", "why": "this chat stays on this Mac"}],

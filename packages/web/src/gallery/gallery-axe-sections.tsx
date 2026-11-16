@@ -41,6 +41,7 @@ export const GALLERY_SECTIONS = [
   "turn",
   "thinking",
   "cost",
+  "routed-answers",
   "cut-reply",
   "writing-a-file",
   "plan-card",

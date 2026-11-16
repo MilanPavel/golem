@@ -149,8 +149,10 @@ from golem_protocol.commands import (
     ConfigAllowance,
     ConfigGetParams,
     ConfigGetResult,
+    ConfigLadder,
     ConfigRawGetParams,
     ConfigRawSetParams,
+    ConfigRouting,
     ConfigRule,
     CostDayRow,
     CostGetParams,
@@ -1389,6 +1391,15 @@ async def _config_get(ctx: RequestContext, params: ConfigGetParams) -> ConfigGet
         project_trusted=None if root is None else policy.trusted(root),
         default_permission_mode=default_mode,
         permission_mode=mode,
+        routing=ConfigRouting(
+            ladder=ConfigLadder(
+                local=settings.routing.ladder.local,
+                budget=settings.routing.ladder.budget,
+                frontier=settings.routing.ladder.frontier,
+            ),
+            daily_usd=settings.budget.daily_usd,
+            session_usd=settings.budget.session_usd,
+        ),
         rules=[
             ConfigRule(
                 tool=rule.rule.tool,

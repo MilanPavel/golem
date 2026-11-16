@@ -166,6 +166,11 @@ export function contextLabel(ctx: number | null | undefined): string {
   return ctx >= 1000 ? `${Math.round(ctx / 1000)}k` : String(ctx);
 }
 
+/** The tier tag beside a model: `local`, `budget` or `frontier`. */
+export function tierLabel(model: ListedModel): string {
+  return model.tier;
+}
+
 export function priceLabel(model: ListedModel): string {
   const price = model.price;
   if (price === null || price === undefined) {

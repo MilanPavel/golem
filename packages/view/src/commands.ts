@@ -2,6 +2,7 @@ import type { ListedSkill, ModelOption } from "@golem/client";
 
 import { DETAILS, isDetail, type Detail } from "./activity.ts";
 import { isPermissionMode, type PermissionMode } from "./permission-mode.ts";
+import { isRouteMode, type RouteMode } from "./route.ts";
 import { TUNE_USAGE, tuneHints, tuneSet, type TuneValue } from "./tune.ts";
 
 
@@ -70,6 +71,8 @@ export type ComposerOutcome =
   | { kind: "mode"; mode: PermissionMode | null | "show" }
   /** `/plan` toggles plan first, `/plan on` and `/plan off` set it. */
   | { kind: "plan"; on: boolean | "toggle" }
+  /** Show the route mode ("show"), why the last model ("why"), or set the mode for this chat. */
+  | { kind: "route"; mode: RouteMode | "show" | "why" }
   | { kind: "model"; name: string | null }
   | { kind: "model-pull"; name: string }
   | { kind: "model-rm"; name: string }
@@ -323,6 +326,19 @@ export const COMMANDS: readonly Command[] = [
       if (word === undefined) return { kind: "plan", on: "toggle" };
       if (args.length === 1 && (word === "on" || word === "off")) return { kind: "plan", on: word === "on" };
       return { kind: "unknown", notice: "/plan, /plan on or /plan off" };
+    },
+  },
+  {
+    name: "/route",
+    group: "model",
+    args: "[pinned|local|auto|why]",
+    description: "Shows the route, ladder and spend, sets the route, or says why the last model ran.",
+    choices: ["pinned", "local", "auto", "why"],
+    run: (_debug, args) => {
+      const [word] = args;
+      if (word === undefined) return { kind: "route", mode: "show" };
+      if (args.length === 1 && (word === "why" || isRouteMode(word))) return { kind: "route", mode: word };
+      return { kind: "unknown", notice: "/route, or /route pinned, local, auto or why" };
     },
   },
   {

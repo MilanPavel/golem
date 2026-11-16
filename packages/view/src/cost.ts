@@ -39,10 +39,12 @@ export function turnTotals(steps: readonly ChatMessage[]): TurnTotals {
 
 /**
  * The parts after the time and steps in a turn's footer: model, tier word (only `local`),
- * tokens, cost. A part that is unknown is left out. `modelPrefix` goes before the model.
+ * tokens, cost. A part that is unknown is left out. `modelPrefix` goes before the model, and
+ * `routedNote` (from `routedNote` in route.ts) before that.
  */
-export function turnFooterParts(totals: TurnTotals, modelPrefix = ""): string[] {
+export function turnFooterParts(totals: TurnTotals, modelPrefix = "", routedNote = ""): string[] {
   const parts: string[] = [];
+  if (routedNote !== "") parts.push(routedNote);
   if (totals.model !== null && totals.model !== "") parts.push(`${modelPrefix}${totals.model}`);
   if (totals.tier === "local") parts.push("local");
   if (totals.tokens !== null) parts.push(`${formatTokens(totals.tokens)} tok`);

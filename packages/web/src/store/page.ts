@@ -1,5 +1,5 @@
 import { OLLAMA_FAILED, RpcError, type ApprovalChoice, type ConfigGetResult, type ConfigRawGetResult, type ConfigRawResult, type FsListDirsResult, type McpAddParams, type McpCallResult, type McpImportApplyParams, type McpImportApplyResult, type McpImportScanResult, type McpCatalogResult, type McpListResult, type McpLogsResult, type McpServerConfig, type McpServerDetail, type McpServerLog, type McpLoginDone, type McpTestProgress, type McpTestResult, type GolemClient, type RuntimeName, type SetupStatusResult, type SkillListResult, type TraceGetResult, type TraceSpanResult, type ArtifactReadResult, type ChangesDiffResult, type ChangesDiffTarget, type ChangesListResult, type ChangesRevertResult, type ChangesRevertTarget, type ChangesCommitResult, type ChangesCommitInfoResult, type ChangesSuggestMessageResult, type ModelOptionsGetResult, type ModelOptionsSetResult, type SessionSetOptionsResult, type SkillCreateResult, type SkillReadResult, type SkillWriteResult, type AuthListResult, type FileListResult, type FileReadResult, type CostGetResult, type SessionCompactResult, type ConsentChoice, type RoutingGetResult, type RoutingSetParams, type RoutingSetResult } from "@golem/client";
-import { changeToolFilter, installEventOf, type InstallEvent, type PermissionMode, type CompactAction } from "@golem/view";
+import { changeToolFilter, installEventOf, type InstallEvent, type PermissionMode, type CompactAction, type RouteMode } from "@golem/view";
 import type { QueryClient } from "@tanstack/react-query";
 import { createDrafts, type Drafts } from "./drafts.ts";
 import { createNotes, type Notes } from "./notes.ts";
@@ -53,6 +53,7 @@ export type PageClient = Pick<
   | "setSessionMode"
   | "setPlan"
   | "setChecks"
+  | "setRoute"
   | "compactSession"
   | "getConfig"
   | "listMcp"
@@ -144,6 +145,8 @@ export type PageActions = {
   setPlan(sessionId: string, on: boolean): Promise<void>;
   /** Says whether golem may run the project's checks after its edits in this session. The panel changes from `session.checks.changed`. */
   setChecks(sessionId: string, on: boolean): Promise<void>;
+  /** Sets how the session picks the model of each turn. The chip changes from `session.updated`. */
+  setRoute(sessionId: string, mode: RouteMode): Promise<void>;
   /**
    * Saves `[permissions] mode` in config.toml and shows it at once. A refused save puts the old
    * mode back and throws. Resolves with the file written.
@@ -295,8 +298,8 @@ export type PageQueries = {
   mcpList(sessionId: string | null): Promise<McpListResult>;
   /** One server's tools, with their descriptions. */
   mcpTools(name: string, sessionId: string | null): Promise<McpToolsResult>;
-  /** What model calls cost, from `cost.get`. */
-  cost(): Promise<CostGetResult>;
+  /** What model calls cost, from `cost.get`. With a session, its own spend is in the result too. */
+  cost(sessionId?: string): Promise<CostGetResult>;
   /** The routing, budget and context settings, from `routing.get`. */
   routing(): Promise<RoutingGetResult>;
   /** A session's runs as a tree of spans. */
@@ -404,7 +407,7 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
       config: (cwd, sessionId) => client.getConfig(cwd ?? undefined, sessionId ?? undefined),
       mcpList: (sessionId) => client.listMcp(sessionId ?? undefined),
       mcpTools: (name, sessionId) => client.mcpTools(name, sessionId ?? undefined),
-      cost: () => client.getCost(),
+      cost: (sessionId) => (sessionId === undefined ? client.getCost() : client.getCost(sessionId)),
       routing: () => client.getRouting(),
       trace: (sessionId) => client.getTrace(sessionId),
       traceSpan: (sessionId, spanId) => client.getTraceSpan(sessionId, spanId),
@@ -472,6 +475,9 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
         } finally {
           await queryClient.invalidateQueries({ queryKey: ["changes.commit_info", sessionId] });
         }
+      },
+      async setRoute(sessionId, mode) {
+        await client.setRoute(sessionId, mode);
       },
       async compact(sessionId, action, focus) {
         return client.compactSession(sessionId, action, focus ?? undefined);

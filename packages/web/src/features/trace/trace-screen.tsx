@@ -1,6 +1,7 @@
+import { routeForSpan } from "@golem/view";
 import type { UseQueryResult } from "@tanstack/react-query";
 import type { TraceContextEvent, TraceGetResult, TraceRunSpan, TraceSpanResult } from "../../store/trace.ts";
-import { useNavigate, useTrace, useTraceSpan } from "../../store/page-context.tsx";
+import { useNavigate, useTrace, useTraceSpan, useSession } from "../../store/page-context.tsx";
 import { sessionPath, tracePath } from "../../store/router.ts";
 import { Button } from "../../ui/button.tsx";
 import { RefreshIcon } from "../../ui/icons.tsx";
@@ -56,7 +57,8 @@ function Empty({ id, back }: { id: string; back: boolean }) {
 }
 
 /** The span's input and output, or why there are none yet. */
-function Detail({ id, span, query }: { id: string; span: string | null; query: UseQueryResult<TraceSpanResult> }) {
+function Detail({ id, span, query, runs }: { id: string; span: string | null; query: UseQueryResult<TraceSpanResult>; runs: readonly TraceRunSpan[] }) {
+  const mode = useSession(id, (view) => view.chat.route.mode);
   if (span === null) return <p className="m-auto p-5 text-center text-sm text-faint">{SELECT_A_SPAN}</p>;
   if (query.isPending) {
     return (
@@ -75,7 +77,7 @@ function Detail({ id, span, query }: { id: string; span: string | null; query: U
       </div>
     );
   }
-  return <SpanDetail result={query.data} sessionId={id} />;
+  return <SpanDetail result={query.data} sessionId={id} route={routeForSpan(runs, span)} routeMode={mode} />;
 }
 
 /** `split` puts the detail beside the tree, as the full page does; `stacked` puts it under the tree, for a narrow column. */
@@ -100,7 +102,7 @@ function Panes({ id, trace, span, query, layout, onSelect }: PanesProps) {
           <TraceTree runs={trace.runs} selected={span} onSelect={onSelect} compact />
         </div>
         <section aria-label="Span detail" className="flex min-h-0 flex-1 basis-1/2 flex-col border-t border-line">
-          <Detail id={id} span={span} query={query} />
+          <Detail id={id} span={span} query={query} runs={trace.runs} />
         </section>
       </div>
     );
@@ -122,12 +124,12 @@ function Panes({ id, trace, span, query, layout, onSelect }: PanesProps) {
                 Close
               </Button>
             </div>
-            <Detail id={id} span={span} query={query} />
+            <Detail id={id} span={span} query={query} runs={trace.runs} />
           </DialogContent>
         </Dialog>
       ) : (
         <section aria-label="Span detail" className="flex min-h-0 min-w-0 flex-1 flex-col">
-          <Detail id={id} span={span} query={query} />
+          <Detail id={id} span={span} query={query} runs={trace.runs} />
         </section>
       )}
     </div>

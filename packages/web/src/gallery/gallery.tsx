@@ -1,4 +1,5 @@
-import { checksSummary, COMMANDS, mcpStatusWord, noPastes, pickerGroups, withModelChoices, withSkillChoices, type CheckRun, type ChecksState, type ReviewNote, type TodoItem, type TurnChecks, type TurnCard } from "@golem/view";
+import { checksSummary, COMMANDS, mcpStatusWord, noPastes, pickerGroups, withModelChoices, withSkillChoices, type CheckRun, type ChecksState, type ReviewNote, type TodoItem, type TurnChecks, type TurnCard, ladderRows, spendRows } from "@golem/view";
+import type { ListedModel } from "@golem/client";
 import { createContext, useContext, useEffect, useId, useState, type ReactNode } from "react";
 import { Badge } from "../ui/badge.tsx";
 import { Button } from "../ui/button.tsx";
@@ -21,7 +22,7 @@ import type { McpServer } from "../store/mcp.ts";
 import { ConnectionScreen } from "../features/connection/connection-screen.tsx";
 import { connectionScreen, type ConnectionHost } from "../features/connection/connection-screen.ts";
 import { ChecksStrip, DetailSwitch, EditCards, ToolLine, TranscriptMessages, WritingRow } from "../features/chat/index.ts";
-import { COST_CASES, CUT_REPLY, SAMPLE_CHAT, SAMPLE_TOOLS, THINKING_CASES, TURN_CHAT, NOTICE_CHAT } from "../features/chat/sample.ts";
+import { COST_CASES, CUT_REPLY, SAMPLE_CHAT, SAMPLE_TOOLS, THINKING_CASES, TURN_CHAT, NOTICE_CHAT, ROUTED_CASES, ROUTED_SESSION } from "../features/chat/sample.ts";
 import { ApprovalBar } from "../features/approval/index.ts";
 import { ANSWERED, PENDING_EDIT, PENDING_SHELL } from "../features/approval/sample.ts";
 import { DiffModeSwitch, DiffView } from "../features/diff/index.ts";
@@ -29,7 +30,7 @@ import { SAMPLE_EDIT_DIFF, SAMPLE_LONG_LINE_DIFF, SAMPLE_NEW_FILE_DIFF } from ".
 import { TodoList } from "../features/drawer/index.ts";
 import { ChangesView, ChecksView, Workbench, type WorkbenchTab, CommitDialogView, TurnsView, FilesView } from "../features/workbench/index.ts";
 import type { ChangedFile } from "../store/changes.ts";
-import { Composer, ContextChipView, DockView, Meter, ModeChipView, NotesChipView, PlanChipView, TuneChipView, ChecksQuestionView } from "../features/composer/index.ts";
+import { Composer, ContextChipView, DockView, Meter, ModeChipView, NotesChipView, PlanChipView, TuneChipView, ChecksQuestionView, RouteChipView, WaitHintView } from "../features/composer/index.ts";
 import { PlanCardView } from "../features/chat/plan-card.tsx";
 import { createHistory } from "../features/composer/history.ts";
 import { CommandsDialog } from "../features/composer/help-dialog.tsx";
@@ -87,6 +88,22 @@ const SCREENS: [ConnectionSnapshot, ConnectionHost][] = [
   [GATEWAY_DOWN, { kept: true, overdue: true }],
   [GATEWAY_DOWN, { kept: false, overdue: false }],
 ];
+
+const GALLERY_MODELS: ListedModel[] = [
+  { ref: "ollama/qwen3:27b", label: "qwen3:27b", provider: "ollama", source: "installed", status: "ready", tier: "local", ctx: 32768, price: { input: 0, output: 0 } },
+  { ref: "deepseek/deepseek-chat", label: "deepseek-chat", provider: "deepseek", source: "remote", status: "ready", tier: "budget", tools: true, price: { input: 0.28, output: 1.1 } },
+];
+const GALLERY_COST = {
+  today: { calls: 4, input: 9000, output: 800, cost_usd: 0.42, saved_usd: 0.1 },
+  week: { calls: 9, input: 20000, output: 2000, cost_usd: 0.9, saved_usd: 0.3 },
+  session: { calls: 2, input: 3000, output: 300, cost_usd: 0.03, saved_usd: 0 },
+};
+const GALLERY_OWN = { profile: "local", provider: "ollama", name: "qwen3:27b", tier: "local" } as const;
+const ROUTE_CHIP_CASES = [
+  { label: "pinned, with caps", mode: "pinned", ladder: ladderRows(GALLERY_MODELS, null, GALLERY_OWN), spend: spendRows(GALLERY_COST, { ladder: {}, daily_usd: 2, session_usd: 0.5 }) },
+  { label: "local only, no caps", mode: "local", ladder: ladderRows(GALLERY_MODELS, null, GALLERY_OWN), spend: spendRows(GALLERY_COST, { ladder: {} }) },
+  { label: "auto, a tier without a key", mode: "auto", ladder: ladderRows([GALLERY_MODELS[0]!, { ...GALLERY_MODELS[1]!, status: "needs_key" }], null, GALLERY_OWN), spend: spendRows(GALLERY_COST, { ladder: {}, daily_usd: 2 }) },
+] as const;
 
 const NOW = Date.parse("2026-11-01T12:00:00Z");
 
@@ -1480,6 +1497,13 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
             <ModeChipView own="careful" fallback="balanced" onSelect={() => {}} />
             <ModeChipView own={null} fallback="balanced" onSelect={() => {}} />
           </div>
+          <div aria-label="Route chips" role="group" className="flex flex-wrap gap-2">
+            {ROUTE_CHIP_CASES.map(({ label, mode, ladder, spend }) => (
+              <RouteChipView key={label} mode={mode} ladder={ladder} spend={spend} onSelect={() => {}} onNavigate={() => {}} />
+            ))}
+          </div>
+          <WaitHintView text="≈ 3 min to first token on qwen3:27b" />
+          <WaitHintView text="≈ 3 min to first token on qwen3:27b · deepseek-chat ≈ 2 s for ≈ $0.01" />
           <DockView
             busy
             meter={<Meter state="thinking" runStartedAt={new Date(NOW - 12_000).toISOString()} />}
@@ -1649,6 +1673,18 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
             <div key={label} aria-label={`Cost, ${label}`} role="group" className="flex flex-col gap-1">
               <p className="font-mono text-xs text-faint">{label}</p>
               <TranscriptMessages chat={{ messages: [message], error: null, notice: null }} />
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="mt-6" id={anchor("Routed answers")}>
+        <h3 className="mb-2 font-mono text-xs text-faint">Routed answers</h3>
+        <div className="flex flex-col gap-6 rounded-lg border border-line bg-bg p-4">
+          {ROUTED_CASES.map(({ label, message, route }) => (
+            <div key={label} aria-label={`Routed, ${label}`} role="group" className="flex flex-col gap-1">
+              <p className="font-mono text-xs text-faint">{label}</p>
+              <TranscriptMessages chat={{ messages: [message], error: null, notice: null, route: { mode: "auto", last: null, ...route } }} session={ROUTED_SESSION} />
             </div>
           ))}
         </div>

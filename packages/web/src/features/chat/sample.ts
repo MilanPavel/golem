@@ -1,5 +1,5 @@
 import { SAMPLE_EDIT_DIFF } from "../diff/sample.ts";
-import type { ChatMessage, ChatNotice, ChatState, ToolBlock } from "@golem/view";
+import type { ChatMessage, ChatNotice, ChatState, ToolBlock, RouteState, SessionModelRef } from "@golem/view";
 
 const CODE = ["```ts", "export function clamp(n: number, lo: number, hi: number): number {", "  // keep n inside the range", '  return Math.min(Math.max(n, lo), hi);', "}", "```"].join("\n");
 
@@ -75,6 +75,74 @@ export const COST_CASES: { label: string; message: ChatMessage }[] = [
   {
     label: "unknown cost",
     message: { id: "q3", role: "assistant", text: "It is set in `socket.ts`.", streaming: false, durationMs: 8400, call: { model: "my-model", tier: null, tokens: 3200, costUsd: null, done: true } },
+  },
+];
+
+/** The model the routed answers below are measured against. */
+export const ROUTED_SESSION: SessionModelRef = { profile: "local", provider: "ollama", name: "qwen3:27b", tier: "local" };
+
+const routedAnswer = (id: string, model: string, tier: "local" | "budget" | "frontier"): ChatMessage => ({
+  id,
+  role: "assistant",
+  text: "It is set in `socket.ts`.",
+  streaming: false,
+  durationMs: 8400,
+  runId: id,
+  call: { model, tier, tokens: 12400, costUsd: tier === "local" ? 0 : 0.01, done: true },
+});
+
+/** Answers whose model was picked by the route, for the gallery and the tests. */
+export const ROUTED_CASES: { label: string; message: ChatMessage; route: Pick<RouteState, "routed"> }[] = [
+  {
+    label: "a higher tier",
+    message: routedAnswer("p1", "deepseek-chat", "budget"),
+    route: {
+      routed: {
+        p1: {
+          model_profile: "deepseek/deepseek-chat",
+          provider: "deepseek",
+          model: "deepseek-chat",
+          tier: "budget",
+          reason: "fit",
+          detail: "did not fit in 32K on ollama/qwen3:27b",
+          rejected: [{ ref: "ollama/qwen3:27b", tier: "local", why: "does not fit: 41.5K of 32K" }],
+        },
+      },
+    },
+  },
+  {
+    label: "another local model",
+    message: routedAnswer("p2", "qwen3:8b", "local"),
+    route: {
+      routed: {
+        p2: {
+          model_profile: "ollama/qwen3:8b",
+          provider: "ollama",
+          model: "qwen3:8b",
+          tier: "local",
+          reason: "budget",
+          detail: "the daily budget is spent",
+          rejected: [],
+        },
+      },
+    },
+  },
+  {
+    label: "the chat's own model",
+    message: routedAnswer("p3", "qwen3:27b", "local"),
+    route: {
+      routed: {
+        p3: {
+          model_profile: "local",
+          provider: "ollama",
+          model: "qwen3:27b",
+          tier: "local",
+          reason: "cheapest",
+          detail: "the cheapest model that fits",
+          rejected: [],
+        },
+      },
+    },
   },
 ];
 

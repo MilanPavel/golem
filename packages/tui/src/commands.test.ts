@@ -91,3 +91,13 @@ test("/context has summary, free, the reserve and cleared rows", () => {
   assert.match(text, /Cleared · 12 tool results · 11\.2K not sent/);
   assert.match(text, /\u25A8/);
 });
+
+test("/route shows, sets, or says why, and the help lists it", () => {
+  assert.deepEqual(applyComposer(closedDebug, "/route"), { kind: "route", mode: "show" });
+  assert.deepEqual(applyComposer(closedDebug, "/route auto"), { kind: "route", mode: "auto" });
+  assert.deepEqual(applyComposer(closedDebug, "/route pinned"), { kind: "route", mode: "pinned" });
+  assert.deepEqual(applyComposer(closedDebug, "/route why"), { kind: "route", mode: "why" });
+  assert.equal(applyComposer(closedDebug, "/route balanced").kind, "unknown");
+  const route = COMMANDS.find((command) => command.name === "/route");
+  assert.deepEqual(route?.choices, ["pinned", "local", "auto", "why"]);
+});

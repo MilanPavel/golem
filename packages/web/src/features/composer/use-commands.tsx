@@ -18,7 +18,9 @@ import {
   namesModel,
   pickerName,
   pinnableSkills,
+  routeReport,
   sessionMarkdown,
+  whySummary,
   withModelChoices,
   withSkillChoices,
   type Command,
@@ -272,6 +274,16 @@ export function useCommands({ session, cwd, typing, send }: UseCommandsOptions):
               return say(planChanged(on));
             } catch (err) {
               return fail(err, "Could not change plan first.");
+            }
+          }
+          case "route": {
+            if (found.mode === "show") return say(routeReport(view.chat.route.mode));
+            if (found.mode === "why") return say(whySummary(view.chat.route));
+            try {
+              await actions.setRoute(sessionId, found.mode);
+              return say(`Route: ${found.mode}. It applies from the next turn.`);
+            } catch (err) {
+              return fail(err, "Could not change the route.");
             }
           }
           case "changes":

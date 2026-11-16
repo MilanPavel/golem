@@ -1,0 +1,83 @@
+{
+  "$defs": {
+    "ConfigLadder": {
+      "additionalProperties": false,
+      "description": "``[routing.ladder]``: the model named for each tier. Null means golem chooses.",
+      "properties": {
+        "budget": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Budget"
+        },
+        "frontier": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Frontier"
+        },
+        "local": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Local"
+        }
+      },
+      "title": "ConfigLadder",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "What a route chip needs from ``[routing]`` and ``[budget]``.\n\n``daily_usd`` and ``session_usd`` are the caps on paid models, null for no cap.",
+  "properties": {
+    "daily_usd": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Daily Usd"
+    },
+    "ladder": {
+      "$ref": "#/$defs/ConfigLadder"
+    },
+    "session_usd": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Session Usd"
+    }
+  },
+  "title": "ConfigRouting",
+  "type": "object"
+}

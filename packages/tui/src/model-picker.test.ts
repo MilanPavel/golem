@@ -116,10 +116,10 @@ test("rows show profiles, facts, the current model, and provider notes", () => {
   assert.ok(qwen?.kind === "model");
   assert.equal(qwen.label, "qwen");
   assert.equal(qwen.detail, "ollama/qwen3:8b");
-  assert.equal(qwen.facts, "free  5.2 GB fits");
+  assert.equal(qwen.facts, "local  free  5.2 GB fits");
   assert.ok(qwen.current && qwen.selected);
   const download = rows.find((row) => row.kind === "model" && row.ref === "ollama/qwen3:30b-a3b");
-  assert.ok(download?.kind === "model" && download.facts === "free  18.6 GB tight  download" && !download.ready);
+  assert.ok(download?.kind === "model" && download.facts === "local  free  18.6 GB tight  download" && !download.ready);
   assert.deepEqual(rows.at(-1), { kind: "note", text: "groq: /login groq to list its models" });
 });
 
