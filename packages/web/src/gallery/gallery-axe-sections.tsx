@@ -75,7 +75,7 @@ export function sectionAxeTests(theme: "slip" | "kiln"): void {
       expect(section, id).toBeTruthy();
       // The trace demos repeat the same "Context window" landmark, and the welcome cases the same "Keep golem
       // one click away" one, and the two import demos the same app names, so unique landmark names are not checked in those.
-      const rules = id === "trace" || id === "workbench" || id === "welcome-page" || id === "mcp-servers" ? { ...DIALOG_RULES, "landmark-unique": { enabled: false } } : DIALOG_RULES;
+      const rules = id === "trace" || id === "routing" || id === "workbench" || id === "welcome-page" || id === "mcp-servers" ? { ...DIALOG_RULES, "landmark-unique": { enabled: false } } : DIALOG_RULES;
       await expectAxeClean(section as Element, rules);
     });
   }

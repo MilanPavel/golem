@@ -39,3 +39,38 @@ export const SAMPLE_ROUTING_ERRORS = {
 
 /** What Auto gives for the default local model on the sample Mac. */
 export const SAMPLE_WINDOW_NOTE = "Auto picks 32K for qwen3:27b on this Mac (36 GB).";
+
+/** A case of the page for the gallery: the settings, the errors, and how wide the page is drawn. */
+export type RoutingCase = {
+  label: string;
+  values: RoutingGetResult;
+  errors: Readonly<Record<string, string>>;
+  /** What Auto gives for the local model, or null. */
+  note: string | null;
+  narrow: boolean;
+};
+
+const AUTO: RoutingGetResult = { ...DEFAULT_ROUTING, routing: { ...DEFAULT_ROUTING.routing, mode: "auto" } };
+
+/** Settings › Routing in the states the page draws, for the gallery. */
+export const ROUTING_CASES: readonly RoutingCase[] = [
+  { label: "Auto with limits", values: SAMPLE_ROUTING, errors: {}, note: SAMPLE_WINDOW_NOTE, narrow: false },
+  { label: "Auto with no frontier model", values: AUTO, errors: {}, note: SAMPLE_WINDOW_NOTE, narrow: false },
+  {
+    label: "Paid never",
+    values: { ...AUTO, routing: { ...AUTO.routing, paid: "never" } },
+    errors: {},
+    note: SAMPLE_WINDOW_NOTE,
+    narrow: false,
+  },
+  {
+    label: "Local only",
+    values: { ...AUTO, routing: { ...AUTO.routing, mode: "local", local_only: ["/Users/me/private"] } },
+    errors: {},
+    note: SAMPLE_WINDOW_NOTE,
+    narrow: false,
+  },
+  { label: "Pinned", values: DEFAULT_ROUTING, errors: {}, note: SAMPLE_WINDOW_NOTE, narrow: false },
+  { label: "Save error", values: AUTO, errors: SAMPLE_ROUTING_ERRORS, note: null, narrow: false },
+  { label: "Narrow width", values: SAMPLE_ROUTING, errors: {}, note: SAMPLE_WINDOW_NOTE, narrow: true },
+];

@@ -18,7 +18,7 @@ test("the default route set in Settings is the route of the next new session", a
   await page.goto(stack.gateway.url);
   await expect(page.getByText("connected", { exact: true })).toBeVisible();
   await page.goto(new URL("/settings/routing", stack.gateway.url).href);
-  await expect(page.getByRole("heading", { name: "Default route" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "How a new chat picks its model" })).toBeVisible();
   await page.getByRole("radio", { name: /^Local only/ }).click();
   await expect(page.getByRole("radio", { name: /^Local only/ })).toBeChecked();
 

@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 import type { ListedModel, ModelListResult } from "../../store/models.ts";
 import type { PullsSnapshot } from "../../store/pulls.ts";
 import { Button } from "../../ui/button.tsx";
+import { cn } from "../../ui/cn.ts";
 import { Popover, PopoverClose, PopoverContent, PopoverTrigger } from "../../ui/popover.tsx";
 import { resolveActive } from "../../ui/search-list.tsx";
 import { listRows, ModelList } from "../models/index.ts";
@@ -16,18 +17,20 @@ export type ModelPickProps = {
   listing: ModelListResult | null;
   models: readonly ListedModel[];
   pulls: PullsSnapshot;
-  /** What an empty setting says: `Picked for you: qwen3:27b`, `Same as the session`. */
+  /** What an empty setting says: `Auto · qwen3:27b`, `Automatic`. */
   emptyText: string;
   onPick: (ref: string | null) => void;
   describedBy?: string;
   invalid?: boolean;
+  /** Extra classes of the button. */
+  className?: string;
 };
 
 /**
  * A setting that names a model: a button with the current choice, and under it a searchable list
  * of the models it may hold, with the empty choice first. Models of another kind are not listed.
  */
-export function ModelPick({ label, value, listing, models, pulls, emptyText, onPick, describedBy, invalid }: ModelPickProps) {
+export function ModelPick({ label, value, listing, models, pulls, emptyText, onPick, describedBy, invalid, className }: ModelPickProps) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -37,7 +40,7 @@ export function ModelPick({ label, value, listing, models, pulls, emptyText, onP
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button aria-label={`${label}: ${current}`} aria-describedby={describedBy} aria-invalid={invalid === true ? true : undefined} className="max-w-full justify-start">
+        <Button aria-label={`${label}: ${current}`} aria-describedby={describedBy} aria-invalid={invalid === true ? true : undefined} className={cn("max-w-full justify-start", className)}>
           <span className="truncate">{current}</span>
         </Button>
       </PopoverTrigger>
