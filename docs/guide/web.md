@@ -109,11 +109,22 @@ Click a row to read it in the panel beside it.
 - **A model call** has three tabs. **Context** is what was sent: the system prompt and the tools folded away, then the messages, with a line where the part new since the last call begins. **Reply** is what came back. **Metadata** is the model, the tokens, why it stopped, and the times.
 - Above the tabs, the **context meter** shows how full the window was, and what filled it: the system prompt, the tool definitions, your messages, the replies, and the tool results. The split is an estimate, so it says so. A local model's window shows with `≈` when golem did not send it and read it from Ollama instead: it is a good guess, not a number golem set. Tools that come from an MCP server are grouped by server, with the cost of each, so you can see which server's tools use the most. A `Summary` row shows the summary that stands for old turns. A `Reply reserve` row, drawn hatched at the end of the bar, is the room kept free for the answer, and `Free` is what is left outside it, so the parts, `Free` and the reserve add up to the window. A muted row such as `Cleared · 12 tool results · 11.2K not sent` says how many old tool results were sent as one line each at this call; those tokens are not in the window, so they are not in the bar. In the **Context** tab a result sent as a stub is tagged `cleared`, with a `Show original` button for the full result, and the first row of a call that was sent a summary reads `summary of 9 earlier messages`. The `ctx` chip in the chat adds `· 12 cleared` after a clear, until the next turn.
 
+The popover of the `ctx` chip is where you act when the context fills. It shows a thin bar, a line such as `18.6K of 32K · reply reserve 4K`, and where the window came from: `32K · planned by golem for this Mac`, `8K · set by you`, or `≈ 32K · Ollama's default`. Under them are the actions, each with what it costs before you choose it:
+
+- `Clear old tool results`: `frees ≈ 11K · no model call`. It needs more than the newest four tool results.
+- `Summarise earlier turns`: `frees ≈ 15K · one call to <model>`. It needs more than the last four turns.
+- `Grow the window to 64K`: `+1.9 GB memory · reloads the model`. Only for a local model. It is off, with the reason, when you set the window (`/tune`), when golem did not plan it, or when this Mac cannot hold more.
+- `Continue on a larger model`: `<model> · 128K · ≈ $0.02 a turn`. It shows when a ready model has a larger window, and turns the route to `auto`. A paid model asks first, in the card you already know from the paid question.
+
+The sizes are estimates, so they start with `≈`. A click runs the action, shows a spinner on the row, and closes the popover. A refusal, such as a Mac that cannot hold a larger window, is shown in the popover. From 80% full, the first action that can run is marked `suggested`. The `ctx` figure drops as soon as a clear or a summary is done. `Open the trace` at the bottom opens the trace at the latest model call. While an answer is running every action waits.
+
+When the model server cut the prompt of the last call of a local model, a banner above the composer says `The model no longer sees the start of this chat.` and offers the two best actions as buttons.
+
 In the chat, golem says what it did to keep the context small in one quiet line between the messages: `golem cleared 12 old tool results · ctx 71% → 38%`, `golem summarised 9 earlier turns · ctx 84% → 31%`, or `window grew 32K → 64K · reloaded in 8 s`. The percentages are of the room (the window less the reply reserve). In Quiet detail the `cleared` line is hidden; the other two always show. The lines are not messages: the model never sees them and an export leaves them out.
 - When Ollama cut a prompt that did not fit, a line under the bar says so, and the messages it dropped are dimmed and tagged. `not seen` means golem proved that Ollama dropped older messages, from the token counts of two calls. `probably not seen` means golem estimated it from the size of the prompt. The size of what was dropped is always an estimate, and a call with no line was not shown to be cut or to fit.
 - **A tool call** has **Args** (what the model asked for) and **Result** (what it got back). A long result opens in the full viewer. An **Approval** tab shows when you were asked.
 
-**Pretty** and **JSON** switch how a tab is shown, and **Copy** copies it. In the chat, the `ctx` chip at the end of the meter row shows the same fill, and opens the trace at the latest model call.
+**Pretty** and **JSON** switch how a tab is shown, and **Copy** copies it. In the chat, the `ctx` chip at the end of the meter row shows the same fill and opens a popover. It turns amber at 80% and red at 95%.
 
 ### What "not recorded" means
 

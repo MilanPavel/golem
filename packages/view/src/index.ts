@@ -171,6 +171,23 @@ export {
   type ToolsChange,
 } from "./mcp-tools.ts";
 export {
+  actionForKey,
+  bestActions,
+  contextActions,
+  contextFillLine,
+  contextKeyRow,
+  CUT_BANNER,
+  cutBanner,
+  GROW_STEPS,
+  suggestedAction,
+  windowSourceLine,
+  windowSourceOf,
+  type ContextAction,
+  type ContextActionId,
+  type ContextActionsInput,
+  type WindowSource,
+} from "./context-actions.ts";
+export {
   CHARS_PER_TOKEN,
   CONTEXT_KEYS,
   CONTEXT_LABELS,

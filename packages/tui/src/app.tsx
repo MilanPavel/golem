@@ -140,6 +140,7 @@ import {
   formatTestResult,
   formatTestStep,
   latestModelSpan,
+  type ContextAction,
   type ContextReport,
   tuneState,
   tuneChip,
@@ -177,6 +178,7 @@ import {
   type TryRun,
 } from "@golem/view";
 import { compactWaiting, runCompact } from "./compact.ts";
+import { contextKeyLine, contextRowForPress, readContextActions } from "./context-actions.ts";
 import { dropTry, startTry, tryLines } from "./try-again.ts";
 import { pressTune, tuneKeyOf, tuneLines, tuneLitLines, tuneMemorySpans, tuneOpening, type TuneAction } from "./tune-panel.ts";
 import { folderFacts } from "./folder-facts.ts";
@@ -572,6 +574,8 @@ export function App({
   const [switcher, setSwitcher] = useState<SwitcherState>(closedSwitcher);
   const [panel, setPanel] = useState<"help" | "context" | "cost" | null>(null);
   const [contextReport, setContextReport] = useState<ContextReport>({ kind: "loading" });
+  /** What `/context` offers under its report: the rows that can run, each on a key. */
+  const [contextRows, setContextRows] = useState<ContextAction[]>([]);
   const contextGen = useRef(0);
   /** The lines of the `/cost` panel, or a line saying it is loading or failed. */
   const [costText, setCostText] = useState<string[]>([]);
@@ -830,7 +834,10 @@ export function App({
         : panel === "cost"
           ? costText.map((line) => fitLine(line, columns))
         : panel === "context"
-          ? contextSegmentRows.map((line) => line.map((segment) => segment.text).join(""))
+          ? [
+              ...contextSegmentRows.map((line) => line.map((segment) => segment.text).join("")),
+              ...(contextKeyLine(contextRows) === null ? [] : ["", fitLine(contextKeyLine(contextRows) ?? "", columns)]),
+            ]
           : [];
   const tryRows = tune !== null && tryRun !== null ? tryLines(tryRun, columns) : [];
   const helpText = !keysOpen && !switcher.open ? panelLines : [];
@@ -1682,6 +1689,7 @@ export function App({
       return;
     }
     setContextReport({ kind: "loading" });
+    setContextRows([]);
     const current = (): boolean => gen === contextGen.current && sessionRef.current === id;
     void (async () => {
       try {
@@ -1693,6 +1701,15 @@ export function App({
         }
         const result = await client.getTraceSpan(id, span.id);
         if (current()) setContextReport({ kind: "ready", model: span.model ?? null, context: result.context ?? null, provider: result.provider ?? null });
+        const rows = await readContextActions(client, {
+          sessionId: id,
+          session: { profile: model.profile, provider: model.provider, name: model.name },
+          route: chatRef.current.route.mode,
+          busy: busyRef.current,
+          changed: chatRef.current.context.last?.adjusted === true,
+          span: result,
+        });
+        if (current()) setContextRows(rows);
       } catch (error) {
         if (current()) setContextReport({ kind: "error", message: messageOf(error) });
       }
@@ -4781,6 +4798,9 @@ export function App({
       buildPlan();
       return;
     }
+    if (onContextPress(press)) {
+      return;
+    }
     if (onStarterPress(press.name)) {
       return;
     }
@@ -4811,6 +4831,28 @@ export function App({
   }
 
   /** Down moves into the starter prompts, and Enter puts one in the composer. True when the key was theirs. */
+  /** The `/context` panel is open on an empty draft: c, s, g and m run the row they name. */
+  function onContextPress(press: Press): boolean {
+    if (panel !== "context" || tuneRef.current !== null || keysOpenRef.current || switcherRef.current.open) {
+      return false;
+    }
+    if (draftRef.current.text.length > 0) {
+      return false;
+    }
+    const row = contextRowForPress(contextRows, press);
+    const id = sessionRef.current;
+    if (row === null || id === null) {
+      return false;
+    }
+    setPanel(null);
+    if (row.id === "larger") {
+      changeRoute(id, "auto");
+    } else {
+      compactHere(row.id, null);
+    }
+    return true;
+  }
+
   function onStarterPress(name: string | null): boolean {
     const key: StarterKey | null =
       name === "up" || name === "down" || name === "escape" ? name : name === "return" ? "enter" : null;
