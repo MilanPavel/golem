@@ -1,11 +1,12 @@
+import { notesFor, type NotesState } from "@golem/view";
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { Badge } from "../../ui/badge.tsx";
 import { cn } from "../../ui/cn.ts";
 import { IconButton } from "../../ui/icon-button.tsx";
 import { ChevronDownIcon, OpenIcon } from "../../ui/icons.tsx";
-import { useChangedFiles, useFileDiff } from "../../store/page-context.tsx";
+import { useChangedFiles, useFileDiff, useNotes } from "../../store/page-context.tsx";
 import type { ChangedFile, FileDiff } from "../../store/changes.ts";
-import { DiffModeSwitch, DiffView, useDiffMode, type DiffMode } from "../diff/index.ts";
+import { DiffModeSwitch, DiffView, useDiffMode, type DiffMode, type NoteLine } from "../diff/index.ts";
 import { openFile, useRequestedChange } from "./workbench-state.ts";
 import { useWorkbenchWidth } from "./workbench-width.ts";
 
@@ -45,9 +46,11 @@ function Row({
   onToggle,
   onOpenFile,
   panel,
+  noteCount = 0,
   children,
 }: {
   file: ChangedFile;
+  noteCount?: number;
   open: boolean;
   onToggle: () => void;
   onOpenFile: ((path: string) => void) | undefined;
@@ -74,6 +77,7 @@ function Row({
         {file.status === "created" ? <Badge tone="allow" className={SMALL}>new</Badge> : null}
         {file.status === "deleted" ? <Badge tone="deny" className={SMALL}>deleted</Badge> : null}
         {file.stale ? <Badge tone="wait" className={SMALL}>changed on disk</Badge> : null}
+        {noteCount > 0 ? <Badge tone="wait" className={SMALL}>{plural(noteCount, "note")}</Badge> : null}
         <Counts added={file.added} removed={file.removed} />
       </button>
       {onOpenFile === undefined || file.status === "deleted" ? null : (
@@ -109,10 +113,17 @@ type ChangesViewProps = {
   canSplit: boolean;
   /** Shows a file in the Files tab. Without it the rows have no open button. */
   onOpenFile?: (path: string) => void;
+  /** With it, a diff in the unified layout takes review notes. */
+  notes?: {
+    state: NotesState;
+    onAdd: (line: NoteLine, text: string) => void;
+    onEdit: (id: string, text: string) => void;
+    onRemove: (id: string) => void;
+  };
 };
 
 /** The list of changed files, the open one with its diff, and the totals. It reads nothing itself. */
-export function ChangesView({ files, error, open, onOpen, diff, mode, onMode, canSplit, onOpenFile }: ChangesViewProps) {
+export function ChangesView({ files, error, open, onOpen, diff, mode, onMode, canSplit, onOpenFile, notes }: ChangesViewProps) {
   const panel = useId();
   if (files === null) {
     return <p className="text-sm text-muted">{error === null ? "Reading the changes." : `Could not read the changes. ${error}`}</p>;
@@ -133,6 +144,7 @@ export function ChangesView({ files, error, open, onOpen, diff, mode, onMode, ca
             open={file.path === open}
             panel={panel}
             onOpenFile={onOpenFile}
+            noteCount={notes === undefined ? 0 : notesFor(notes.state, file.path).length}
             onToggle={() => {
               onOpen(file.path === open ? null : file.path);
             }}
@@ -146,7 +158,20 @@ export function ChangesView({ files, error, open, onOpen, diff, mode, onMode, ca
               <p className="text-sm text-muted">Reading the diff.</p>
             ) : (
               <>
-                <DiffView diff={diff.diff} mode={shown} />
+                <DiffView
+                  diff={diff.diff}
+                  mode={shown}
+                  {...(notes === undefined
+                    ? {}
+                    : {
+                        notes: {
+                          notes: notesFor(notes.state, file.path),
+                          onAddNote: notes.onAdd,
+                          onEditNote: notes.onEdit,
+                          onRemoveNote: notes.onRemove,
+                        },
+                      })}
+                />
                 {diff.truncated ? <p className="mt-2 text-xs text-muted">This diff is cut. Open the file to see all of it.</p> : null}
               </>
             )}
@@ -181,6 +206,7 @@ export function ChangesTab({ sessionId }: { sessionId: string }) {
   // A file that left the list (an undo, say) is not open.
   const open = paths !== null && wanted !== null && paths.includes(wanted) ? wanted : null;
   const diff = useFileDiff(sessionId, open);
+  const notes = useNotes(sessionId);
 
   // A new request opens its row in this render; the effect below takes the request off the store.
   const [taken, setTaken] = useState<string | null>(null);
@@ -216,6 +242,14 @@ export function ChangesTab({ sessionId }: { sessionId: string }) {
         onMode={setMode}
         canSplit={width >= SPLIT_MIN_WIDTH}
         onOpenFile={openFile}
+        notes={{
+          state: notes.state,
+          onAdd: (line, text) => {
+            notes.add({ ...line, text });
+          },
+          onEdit: notes.edit,
+          onRemove: notes.remove,
+        }}
       />
     </div>
   );

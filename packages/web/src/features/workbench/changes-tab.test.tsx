@@ -159,3 +159,16 @@ test("the layout switch is off under 40 rem and on from 40", async () => {
 function head(row: HTMLElement): HTMLElement {
   return row.querySelector("button[aria-expanded]") as HTMLElement;
 }
+
+test("a note on a diff line is kept per session, and its file row counts it", async () => {
+  const { page } = setup();
+  await screen.findByRole("table");
+  await userEvent.click(screen.getByRole("button", { name: "Add a note on line 2" }));
+  await userEvent.type(screen.getByRole("textbox", { name: "Note on line 2" }), "Why?");
+  await userEvent.click(screen.getByRole("button", { name: "Save" }));
+  expect(page.notes.get("a").notes).toMatchObject([{ path: "src/socket.ts", line: 2, side: "new", text: "Why?" }]);
+  const rows = screen.getAllByRole("listitem");
+  expect(within(rows[0]!).getByText("1 note")).toBeTruthy();
+  expect(within(rows[1]!).queryByText("1 note")).toBeNull();
+  page.stop();
+});

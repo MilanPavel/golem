@@ -468,6 +468,7 @@ test("/mcp add opens the Add dialog in Settings, on the server named, or on the 
 
 const NOT_YET: [string, string][] = [
   ["/artifact", "Tool output opens in the terminal for now: run golem tui, then /artifact."],
+  ["/undo", "Undoing a turn is in the terminal for now: run golem tui, then /undo."],
   ["/sessions", "The sidebar lists your sessions."],
   ["/debug", "The debug panel is in the terminal for now: run golem tui, then /debug."],
 ];

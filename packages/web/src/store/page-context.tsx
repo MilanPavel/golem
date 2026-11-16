@@ -16,7 +16,7 @@ import type { Route } from "./router.ts";
 import type { AuthListResult, FileListResult, CostGetResult, McpListResult, SessionSummary, SetupStatusResult, SkillListResult } from "@golem/client";
 import { ARTIFACT_PAGE, artifactKey, traceKey, traceSpanKey, type ArtifactReadResult, type TraceGetResult, type TraceSpanResult } from "./trace.ts";
 import { mcpCatalogKey, mcpListKey, mcpToolsKey, type McpCatalogResult, type McpToolsResult } from "./mcp.ts";
-import type { Pastes } from "@golem/view";
+import type { NotesState, Pastes, ReviewNote } from "@golem/view";
 import { distinctFolders, resolveFolder } from "./new-session.ts";
 import type { SetupStart } from "./setup-start.ts";
 import { initialSessionView, type SessionView } from "./session-store.ts";
@@ -170,6 +170,27 @@ export function useDraftPastes(key: string): [Pastes, (pastes: Pastes) => void] 
   const pastes = useSyncExternalStore(drafts.subscribe, () => drafts.get(key).pastes);
   const set = useCallback((next: Pastes) => drafts.setPastes(key, next), [drafts, key]);
   return [pastes, set];
+}
+
+/** A session's review notes, and what changes them. */
+export function useNotes(sessionId: string): {
+  state: NotesState;
+  add: (note: Omit<ReviewNote, "id">) => void;
+  edit: (id: string, text: string) => void;
+  remove: (id: string) => void;
+  drop: (ids: readonly string[]) => void;
+  clear: () => void;
+} {
+  const { notes } = usePage();
+  const state = useSyncExternalStore(notes.subscribe, () => notes.get(sessionId));
+  return {
+    state,
+    add: useCallback((note) => notes.add(sessionId, note), [notes, sessionId]),
+    edit: useCallback((id, text) => notes.edit(sessionId, id, text), [notes, sessionId]),
+    remove: useCallback((id) => notes.remove(sessionId, id), [notes, sessionId]),
+    drop: useCallback((ids) => notes.drop(sessionId, ids), [notes, sessionId]),
+    clear: useCallback(() => notes.clear(sessionId), [notes, sessionId]),
+  };
 }
 
 /** Reads a session's draft text when called, without re-rendering when it changes. */

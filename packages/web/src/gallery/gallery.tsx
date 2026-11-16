@@ -1,4 +1,4 @@
-import { COMMANDS, mcpStatusWord, noPastes, pickerGroups, withModelChoices, withSkillChoices, type TodoItem } from "@golem/view";
+import { COMMANDS, mcpStatusWord, noPastes, pickerGroups, withModelChoices, withSkillChoices, type ReviewNote, type TodoItem } from "@golem/view";
 import { createContext, useContext, useEffect, useId, useState, type ReactNode } from "react";
 import { Badge } from "../ui/badge.tsx";
 import { Button } from "../ui/button.tsx";
@@ -29,7 +29,7 @@ import { SAMPLE_EDIT_DIFF, SAMPLE_LONG_LINE_DIFF, SAMPLE_NEW_FILE_DIFF } from ".
 import { TodoList } from "../features/drawer/index.ts";
 import { ChangesView, FilesView, Workbench, type WorkbenchTab } from "../features/workbench/index.ts";
 import type { ChangedFile } from "../store/changes.ts";
-import { Composer, ContextChipView, DockView, Meter, ModeChipView, TuneChipView } from "../features/composer/index.ts";
+import { Composer, ContextChipView, DockView, Meter, ModeChipView, NotesChipView, TuneChipView } from "../features/composer/index.ts";
 import { createHistory } from "../features/composer/history.ts";
 import { CommandsDialog } from "../features/composer/help-dialog.tsx";
 import { HomeView, NewSessionModelChipView, SessionTitle } from "../features/shell/index.ts";
@@ -165,6 +165,7 @@ function DemoComposer({
   disabledReason = null,
   initial = "",
   commands,
+  withNotes = false,
 }: {
   size?: "dock" | "large";
   busy?: boolean;
@@ -172,6 +173,8 @@ function DemoComposer({
   /** The draft to start with. A slash draft opens the suggestions when `commands` is set. */
   initial?: string;
   commands?: typeof GALLERY_COMMANDS;
+  /** Review notes wait: the send button says so. */
+  withNotes?: boolean;
 }) {
   const [text, setText] = useState(initial);
   const [pastes, setPastes] = useState(noPastes);
@@ -184,6 +187,8 @@ function DemoComposer({
       onPastesChange={setPastes}
       history={galleryHistory}
       onSend={async () => undefined}
+      sendLabel={withNotes ? "Send with notes" : "Send"}
+      allowEmpty={withNotes}
       commands={commands}
       busy={busy}
       onStop={() => {}}
@@ -212,6 +217,7 @@ function DiffDemo() {
           </div>
           <DiffView diff={SAMPLE_EDIT_DIFF} mode={mode} />
         </div>
+        <NotesDiffDemo />
         {samples.flatMap(([title, diff]) =>
           (["unified", "split"] as const).map((layout) => (
             <div key={`${title}-${layout}`}>
@@ -222,6 +228,34 @@ function DiffDemo() {
         )}
       </div>
     </section>
+  );
+}
+
+/** A diff that takes notes: one saved, and the box for a second one open. */
+function NotesDiffDemo() {
+  const [notes, setNotes] = useState<ReviewNote[]>([
+    { id: "n1", path: "src/socket.ts", line: 4, side: "new", code: "export function connect(url: string) {", text: "Should this retry on a failed connect?" },
+  ]);
+  return (
+    <div>
+      <p className="mb-1 text-xs text-muted">With review notes</p>
+      <DiffView
+        diff={SAMPLE_EDIT_DIFF}
+        mode="unified"
+        notes={{
+          notes,
+          onAddNote: (line, text) => {
+            setNotes((all) => [...all, { ...line, text, id: `n${all.length + 1}` }]);
+          },
+          onEditNote: (id, text) => {
+            setNotes((all) => all.map((note) => (note.id === id ? { ...note, text } : note)));
+          },
+          onRemoveNote: (id) => {
+            setNotes((all) => all.filter((note) => note.id !== id));
+          },
+        }}
+      />
+    </div>
   );
 }
 
@@ -1157,6 +1191,11 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
             busy={false}
             meter={<Meter state="idle" runStartedAt={null} aside={<ContextChipView used={32000} window={128000} onOpen={() => {}} />} />}
             composer={<DemoComposer />}
+          />
+          <DockView
+            busy={false}
+            meter={<Meter state="idle" runStartedAt={null} aside={<NotesChipView label="2 notes" onOpen={() => {}} onRemoveAll={() => {}} />} />}
+            composer={<DemoComposer withNotes />}
           />
           <DockView
             busy={false}
