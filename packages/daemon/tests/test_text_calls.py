@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from golem.graphs.text_calls import recover, recover_json
+from golem.graphs.text_calls import recover, recover_json, recover_json_tail, unwrapped
 from golem.tools import default_registry
 
 SCHEMAS = default_registry().schemas()
@@ -212,3 +212,52 @@ def test_a_call_cut_in_the_middle_is_unreadable() -> None:
 
 def test_broken_json_that_does_not_open_like_a_call_is_no_call() -> None:
     assert _json('{"answer": 42') is None
+
+
+def _tail(text: str) -> tuple[str, list[tuple[str, dict[str, object]]]] | str | None:
+    found = recover_json_tail(text, SCHEMAS)
+    if found is None or isinstance(found, str):
+        return found
+    return found[0], [(c["name"], c["args"]) for c in found[1]]
+
+
+def test_a_call_after_a_sentence_is_read_and_the_sentence_is_kept() -> None:
+    text = f'To read it, I will use the "read_file" function.\n\n{READ_JSON}'
+    assert _tail(text) == (
+        'To read it, I will use the "read_file" function.',
+        [("read_file", {"path": "a.txt"})],
+    )
+    fenced = f"Here it is:\n{FENCE}json\n{READ_JSON}\n{FENCE}"
+    assert _tail(fenced) == ("Here it is:", [("read_file", {"path": "a.txt"})])
+
+
+def test_a_call_after_a_sentence_to_an_unknown_tool_is_unreadable() -> None:
+    text = 'I will use the "explain-project" function.\n\n'
+    text += '{"name": "explain-project", "parameters": {"brief": "x"}}}'
+    assert _tail(text) == "unread"
+    assert _tail('Let me try.\n{"name": "format_disk", "parameters": {}}') == "unread"
+
+
+def test_a_whole_reply_reads_as_before() -> None:
+    assert _tail(READ_JSON) == ("", [("read_file", {"path": "a.txt"})])
+    assert _tail('{"answer": 42}') is None
+
+
+def test_a_call_inside_a_line_or_before_more_words_is_no_call() -> None:
+    assert _tail(f"I will call it now: {READ_JSON}") is None
+    assert _tail(f"First:\n{READ_JSON}\nThat reads the file.") is None
+    assert _tail('The result is:\n{"answer": 42}') is None
+
+
+def test_arguments_wrapped_in_a_call_are_unwrapped() -> None:
+    inner = {"path": "a.txt"}
+    wrapped: dict[str, object] = {"type": "function", "function": "read_file", "parameters": inner}
+    assert unwrapped("read_file", wrapped, SCHEMAS) == inner
+    assert unwrapped("read_file", {"name": "read_file", "arguments": '{"path": "a.txt"}'}, SCHEMAS)
+    assert unwrapped("read_file", inner, SCHEMAS) is None
+    assert unwrapped("read_file", {"parameters": {"file": "a.txt"}}, SCHEMAS) is None
+    assert unwrapped("format_disk", wrapped, SCHEMAS) is None
+
+
+def test_a_call_with_a_brace_too_many_is_read() -> None:
+    assert _json(READ_JSON + "}") == [("read_file", {"path": "a.txt"})]

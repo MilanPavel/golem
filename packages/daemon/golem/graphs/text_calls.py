@@ -109,6 +109,64 @@ def recover_json(text: str, schemas: list[dict[str, object]]) -> list[ToolCall] 
     return calls
 
 
+_LINE_START = re.compile(r"^[ \t]*(?:```[A-Za-z]*[ \t]*\n[ \t]*)?(?=\{)", re.MULTILINE)
+_ENVELOPE = frozenset({"type", "function", "name", "parameters", "arguments"})
+
+
+def recover_json_tail(
+    text: str, schemas: list[dict[str, object]]
+) -> tuple[str, list[ToolCall]] | Unread | None:
+    """Like :func:`recover_json`, for a reply that says something first and then writes the call.
+
+    Small models often write a sentence ("I will use the delegate function.") and then the
+    call object on its own line. The call must start a line and run to the end of the reply.
+    Returns the words before it and the calls, ``"unread"``, or None for no call.
+    """
+    whole = recover_json(text, schemas)
+    if isinstance(whole, list):
+        return "", whole
+    if whole is not None:
+        return whole
+    for start in _LINE_START.finditer(text):
+        if start.start() == 0 and not text[: start.end()].strip():
+            continue  # the whole reply: read above
+        tail = text[start.start() :]
+        if not _CALL_START.match(_unfenced(tail)):
+            continue
+        found = recover_json(tail, schemas)
+        if isinstance(found, list):
+            return text[: start.start()].rstrip(), found
+        if found is not None:
+            return found
+    return None
+
+
+def unwrapped(
+    name: str, args: Mapping[str, object], schemas: list[dict[str, object]]
+) -> dict[str, object] | None:
+    """The real arguments of a call whose arguments are a whole call object, else None.
+
+    A small model sometimes makes a real tool call but puts the call's envelope inside it:
+    ``{"type": "function", "function": "delegate", "parameters": {…}}``. When the tool has
+    no such keys of its own and the inner object fits the tool, the inner object is meant.
+    """
+    properties = _offered(schemas).get(name)
+    if properties is None or not args or not set(args) <= _ENVELOPE:
+        return None
+    if any(key in properties for key in args):
+        return None
+    inner = args.get("parameters", args.get("arguments"))
+    if isinstance(inner, str):
+        try:
+            inner = cast(object, json.loads(inner))
+        except ValueError:
+            return None
+    if not isinstance(inner, dict):
+        return None
+    found = cast(dict[str, object], inner)
+    return found if all(key in properties for key in found) else None
+
+
 def _unfenced(text: str) -> str:
     text = text.strip()
     fence = _FENCE.fullmatch(text)
@@ -150,6 +208,13 @@ def _closed(text: str) -> list[dict[str, object]]:
     """
     for missing in range(1, MAX_MISSING_BRACES + 1):
         objects = _objects(text + "}" * missing)
+        if objects:
+            return objects
+    # Or one or two too many.
+    for extra in range(1, MAX_MISSING_BRACES + 1):
+        if not text.endswith("}" * extra):
+            break
+        objects = _objects(text[:-extra])
         if objects:
             return objects
     return []
