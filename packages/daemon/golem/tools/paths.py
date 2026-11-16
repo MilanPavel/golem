@@ -60,10 +60,14 @@ class Readable:
         """``path`` resolved, following symlinks. Raises :class:`ToolError` outside every root."""
         if self.root is not None:
             try:
-                return inside(self.root, path)
+                inner = inside(self.root, path)
             except ToolError:
                 if not self.skills:
                     raise
+            else:
+                if in_secret_dir(inner, self.home):
+                    raise ToolError(CREDENTIALS.format(path=path))
+                return inner
         resolved = _resolve(path)
         if resolved is None:
             if self.root is None:
@@ -71,18 +75,11 @@ class Readable:
             raise ToolError(f"{path!r} is not a usable path")
         for folder in self.skills:
             if _within(resolved, folder):
-                if self._secret(resolved):
-                    raise ToolError(f"{path} is in a folder that holds credentials")
+                if in_secret_dir(resolved, self.home):
+                    raise ToolError(CREDENTIALS.format(path=path))
                 return resolved
         where = f"the project folder {self.root}" if self.root is not None else "every folder"
         raise ToolError(f"{path} is outside {where} and the folders of the skills this session ran")
-
-    def _secret(self, path: Path) -> bool:
-        """Whether ``path`` is in a folder the sandbox keeps from commands too."""
-        home = self.home.resolve()
-        if any(_within(path, (home / name).resolve()) for name in SKILL_DIRS):
-            return False
-        return any(_within(path, (home / name).resolve()) for name in SECRET_DIRS)
 
     def show(self, path: Path) -> str:
         """``path`` relative to the session folder, or absolute inside a skill folder."""
@@ -99,6 +96,35 @@ def readable(ctx: ToolContext) -> Readable:
     if ctx.root is None and not skills:
         raise ToolError(NO_FOLDER)
     return Readable(root=None if ctx.root is None else ctx.root.resolve(), skills=skills)
+
+
+CREDENTIALS = "{path} is in a folder that holds credentials"
+
+
+def secret_folders(home: Path | None = None) -> list[Path]:
+    """The resolved :data:`SECRET_DIRS` folders under ``home``."""
+    base = (Path.home() if home is None else home).resolve()
+    return [(base / name).resolve() for name in SECRET_DIRS]
+
+
+def in_secret_dir(path: Path, home: Path | None = None, folders: list[Path] | None = None) -> bool:
+    """Whether resolved ``path`` is in a folder the sandbox keeps from commands too.
+
+    ``folders`` is :func:`secret_folders` when a walk checks many paths.
+    """
+    base = (Path.home() if home is None else home).resolve()
+    if any(_within(path, (base / name).resolve()) for name in SKILL_DIRS):
+        return False
+    found = secret_folders(base) if folders is None else folders
+    return any(_within(path, folder) for folder in found)
+
+
+def is_secret_tree(path: Path, home: Path | None = None, folders: list[Path] | None = None) -> bool:
+    """Whether a walk should not enter folder ``path``: it is secret and holds no skill folder."""
+    base = (Path.home() if home is None else home).resolve()
+    if not in_secret_dir(path, base, folders):
+        return False
+    return not any(_within((base / name).resolve(), path) for name in SKILL_DIRS)
 
 
 def _within(path: Path, folder: Path) -> bool:
@@ -129,9 +155,11 @@ Matched without case, because the default macOS file system ignores it.
 """
 
 
-def writable(root: Path, path: str) -> Path:
-    """:func:`inside`, and not the folder itself or under a :data:`PROTECTED_DIRS` folder."""
+def writable(root: Path, path: str, home: Path | None = None) -> Path:
+    """:func:`inside`, and not the folder itself, a credentials folder or a protected one."""
     resolved = inside(root, path)
+    if in_secret_dir(resolved, home):
+        raise ToolError(CREDENTIALS.format(path=path))
     base = root.resolve()
     if resolved == base:
         raise ToolError(f"{path} is the project folder, not a file")
@@ -143,12 +171,16 @@ def writable(root: Path, path: str) -> Path:
 
 
 __all__ = [
+    "CREDENTIALS",
     "NO_FOLDER",
     "PROTECTED_DIRS",
     "Readable",
+    "in_secret_dir",
     "inside",
+    "is_secret_tree",
     "readable",
     "relative",
+    "secret_folders",
     "session_root",
     "writable",
 ]

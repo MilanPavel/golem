@@ -259,3 +259,23 @@ def test_a_far_miss_keeps_the_plain_hint(project: Path) -> None:
     args = EditFileArgs(path="src/a.py", old_string="zzzzzzzz\nqqqqqqqq", new_string="x")
     with pytest.raises(ToolError, match="read the file and copy it exactly"):
         plan_edit(project, args)
+
+
+def test_write_and_edit_refuse_credential_folders(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from golem.tools.paths import writable
+    from golem.tools.write import EditFileArgs, WriteFileArgs, plan_edit, plan_write
+
+    home = tmp_path.resolve()
+    (home / ".aws").mkdir()
+    (home / ".aws" / "config").write_text("x\n")
+    for name in (".aws/config", ".aws/new", ".netrc"):
+        with pytest.raises(ToolError, match="holds credentials"):
+            writable(home, name, home)
+    assert writable(home, "notes.txt", home) == home / "notes.txt"
+    monkeypatch.setenv("HOME", str(home))
+    with pytest.raises(ToolError, match="holds credentials"):
+        plan_write(home, WriteFileArgs(path=".aws/config", content="y"))
+    with pytest.raises(ToolError, match="holds credentials"):
+        plan_edit(home, EditFileArgs(path=".aws/config", old_string="x", new_string="y"))

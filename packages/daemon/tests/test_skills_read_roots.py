@@ -239,3 +239,54 @@ async def test_an_invoked_skill_reads_its_own_reference_file(
         if isinstance(message, ToolMessage)
     ]
     assert results == ["     1|the rules", "     1|the rules"]
+
+
+def _home_with_secrets(tmp_path: Path) -> Path:
+    home = tmp_path.resolve()
+    (home / ".aws").mkdir()
+    (home / ".aws" / "config").write_text("key=SECRETVALUE\n")
+    (home / ".netrc").write_text("password SECRETVALUE\n")
+    (home / ".golem" / "skills" / "x").mkdir(parents=True)
+    (home / ".golem" / "skills" / "x" / "SKILL.md").write_text("SECRETVALUE skill\n")
+    (home / "notes.txt").write_text("SECRETVALUE note\n")
+    return home
+
+
+def test_session_folder_home_refuses_credential_files(tmp_path: Path) -> None:
+    home = _home_with_secrets(tmp_path)
+    where = Readable(root=home, home=home)
+    for name in (".aws/config", ".netrc"):
+        with pytest.raises(ToolError, match="holds credentials"):
+            read_file(where, ReadFileArgs(path=name))
+    with pytest.raises(ToolError, match="holds credentials"):
+        list_dir(where, ListDirArgs(path=".aws"))
+    assert "SECRETVALUE" in read_file(where, ReadFileArgs(path="notes.txt")).output
+    assert "SECRETVALUE" in read_file(where, ReadFileArgs(path=".golem/skills/x/SKILL.md")).output
+
+
+def test_session_folder_home_hides_credentials_from_walks(tmp_path: Path) -> None:
+    home = _home_with_secrets(tmp_path)
+    where = Readable(root=home, home=home)
+    found = glob_files(where, GlobArgs(pattern="**/*", path=".")).output
+    assert "config" not in found.split() and ".netrc" not in found
+    assert "notes.txt" in found and ".golem/skills/x/SKILL.md" in found
+    hits = grep(where, GrepArgs(pattern="SECRETVALUE", path=".")).output
+    assert ".aws" not in hits and ".netrc" not in hits
+    assert "notes.txt" in hits and "SKILL.md" in hits
+    listing = list_dir(where, ListDirArgs(path=".")).output.split("\n")
+    assert ".aws/" not in listing and ".netrc" not in listing and "notes.txt" in listing
+
+
+def test_client_file_methods_refuse_credentials(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from golem.coding.files import list_paths, read_text
+
+    home = _home_with_secrets(tmp_path)
+    monkeypatch.setenv("HOME", str(home))
+    for name in (".aws/config", ".netrc"):
+        with pytest.raises(ToolError, match="holds credentials"):
+            read_text(home, name)
+    shown = list_paths(home, "", 100, hidden=True).paths
+    assert "notes.txt" in shown and ".golem/skills/x/SKILL.md" in shown
+    assert not any(".aws" in p or ".netrc" in p for p in shown)
