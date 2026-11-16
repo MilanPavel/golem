@@ -54,7 +54,7 @@ import { SkillList } from "../features/settings/skills-section.tsx";
 import { SkillOverview } from "../features/settings/skills/skill-detail.tsx";
 import { SAMPLE_BROKEN_SKILL_MD, SAMPLE_SKILLS } from "../features/settings/skills/sample.ts";
 import { RoutingView } from "../features/settings/routing-section.tsx";
-import { DEFAULT_ROUTING, ROUTING_LISTING, SAMPLE_ROUTING, SAMPLE_ROUTING_ERRORS, SAMPLE_WINDOW_NOTE } from "../features/settings/routing-sample.ts";
+import { ROUTING_CASES, ROUTING_LISTING } from "../features/settings/routing-sample.ts";
 import { UsageView } from "../features/settings/usage-section.tsx";
 import { EMPTY_USAGE, SAMPLE_USAGE } from "../features/settings/usage-sample.ts";
 import { CodeEditor } from "../features/settings/config/code-editor.tsx";
@@ -1114,28 +1114,27 @@ function ApiKeysDemo() {
   );
 }
 
-/** Settings → Routing: nothing set, everything set, and wrong values with their errors. */
+/** Settings → Routing in each state: auto with limits, no frontier model, never pay, local, pinned, a save error, a phone. */
 function RoutingDemo() {
   const none = () => {};
-  const cases = [
-    { label: "Routing, defaults", values: DEFAULT_ROUTING, errors: {}, note: SAMPLE_WINDOW_NOTE, adding: false },
-    { label: "Routing, everything set", values: SAMPLE_ROUTING, errors: {}, note: null, adding: false },
-    { label: "Routing, wrong values", values: DEFAULT_ROUTING, errors: SAMPLE_ROUTING_ERRORS, note: null, adding: false },
-  ] as const;
   return (
     <div className="flex flex-col gap-4">
-      {cases.map((item) => (
-        <section key={item.label} aria-label={item.label} className="flex flex-col gap-3 rounded-lg border border-line bg-bg p-4">
-          <span className="font-mono text-xs text-faint">{item.label}</span>
-          <RoutingView
-            values={item.values}
-            listing={ROUTING_LISTING}
-            pulls={{ active: new Map(), failed: new Map() }}
-            errors={item.errors}
-            windowNote={item.note}
-            onChange={none}
-            folderBrowser={() => <p className="p-3 text-sm text-muted">The folder browser opens here.</p>}
-          />
+      {ROUTING_CASES.map((item) => (
+        <section key={item.label} aria-label={`Routing, ${item.label}`} className="flex flex-col gap-3 rounded-lg border border-line bg-bg p-4">
+          <span className="font-mono text-xs text-faint">{`Routing, ${item.label}`}</span>
+          <div className={item.narrow ? "w-sm max-w-full" : undefined}>
+            <RoutingView
+              values={item.values}
+              listing={ROUTING_LISTING}
+              pulls={{ active: new Map(), failed: new Map() }}
+              errors={item.errors}
+              windowNote={item.note}
+              planned={item.note === null ? null : 32768}
+              spentToday={0.42}
+              onChange={none}
+              folderBrowser={() => <p className="p-3 text-sm text-muted">The folder browser opens here.</p>}
+            />
+          </div>
         </section>
       ))}
     </div>

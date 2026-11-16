@@ -64,6 +64,22 @@
   /* Below this the trace page is a single column: 760 px. */
   --breakpoint-narrow: 47.5rem;
 
+  /* Settings › Routing: from this container width its parts sit side by side (860 px). */
+  --container-route: 53.75rem;
+  /* Text sizes of that page: 11, 13 and 19 px, and the numbers on its chart (7.5 px). */
+  --text-micro: 0.6875rem;
+  --text-micro--line-height: 1;
+  --text-note: 0.8125rem;
+  --text-note--line-height: 1.5;
+  --text-lead: 1.1875rem;
+  --text-lead--line-height: 1.55;
+  --text-axis: 0.46875rem;
+  /* How far the steps of the routing path rise, and where the arrows into them sit. */
+  --spacing-rise-budget: 1.875rem;
+  --spacing-rise-frontier: 3.75rem;
+  --spacing-link-gate: 2.875rem;
+  --spacing-link-frontier: 4.75rem;
+
   --radius-xs: 2px;
   --radius-sm: 6px;
   --radius-md: 10px;
@@ -140,4 +156,27 @@
   body {
     @apply bg-bg font-ui text-ink;
   }
+}
+
+/* Column sets of Settings › Routing. */
+@utility cols-route-track {
+  grid-template-columns: minmax(0, 1fr) 150px minmax(0, 1fr) 84px minmax(0, 1fr);
+}
+@utility cols-route-card {
+  grid-template-columns: 3.5rem 1fr;
+}
+@utility cols-route-radio {
+  grid-template-columns: 1.125rem 1fr;
+}
+@utility cols-route-row {
+  grid-template-columns: 6rem 1fr;
+}
+@utility cols-route-lead {
+  grid-template-columns: auto 1fr;
+}
+@utility cols-route-job {
+  grid-template-columns: 1fr 12rem;
+}
+@utility cols-route-long {
+  grid-template-columns: 1fr 1.1fr;
 }
