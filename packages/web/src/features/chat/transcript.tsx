@@ -1,6 +1,6 @@
-import { BUILD_TEXT, openPlan, displayToolName, formatTurnTime, groupTurns, turnFooterParts, stepCount, stepMark, summarizeSteps, turnFooter, LIVE_OUTPUT_CHARS, thinkingLine, unreadCallNotice, writingLabel, REPLY_CUT_NOTE, type ChatMessage, type ChatState, type Detail, type StepMark, type ToolBlock, type WritingBlock, noticesAfter, type ChatNotice, checksOf, checksSummary, turnRoutedNote, sessionModelOf, type SessionModelRef } from "@golem/view";
+import { BUILD_TEXT, openPlan, displayToolName, formatTurnTime, groupTurns, turnFooterParts, stepCount, stepMark, summarizeSteps, turnFooter, LIVE_OUTPUT_CHARS, thinkingLine, unreadCallNotice, writingLabel, REPLY_CUT_NOTE, type ChatMessage, type ChatState, type Detail, type StepMark, type ToolBlock, type WritingBlock, noticesAfter, type ChatNotice, checksOf, checksSummary, turnRoutedNote, sessionModelOf, type SessionModelRef, rewoundLine, UNDO_WAIT } from "@golem/view";
 import { Fragment, memo, useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
-import { usePageActions, usePulls, useSession, useModelList } from "../../store/page-context.tsx";
+import { usePageActions, usePulls, useSession, useModelList, useTurnCards } from "../../store/page-context.tsx";
 import type { PullsSnapshot } from "../../store/pulls.ts";
 import type { SessionModel } from "../../store/session-store.ts";
 import { pullShare, shortName } from "../models/index.ts";
@@ -22,6 +22,7 @@ import { ChecksStrip } from "./checks-strip.tsx";
 import { EditCards, isEditCard } from "./edit-card.tsx";
 import { isPlanCard, PlanCard, type PlanActions } from "./plan-card.tsx";
 import { Markdown } from "./markdown-view.tsx";
+import { redoTargets, useUndo } from "../workbench/undo.tsx";
 
 function ToolResult({ tool }: { tool: ToolBlock }) {
   switch (tool.status) {
@@ -318,6 +319,32 @@ export function NoticeLine({ notice }: { notice: ChatNotice }) {
   );
 }
 
+function TurnUndoLink({ disabled, onClick, children }: { disabled: boolean; onClick: () => void; children: string }) {
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      title={disabled ? UNDO_WAIT : undefined}
+      onClick={onClick}
+      className="flex-none rounded-sm px-1 text-xs text-clay-ink underline outline-offset-2 outline-clay hover:text-ink focus-visible:outline-2 disabled:cursor-not-allowed disabled:no-underline disabled:opacity-50"
+    >
+      {children}
+    </button>
+  );
+}
+
+/** What a turn needs to offer undo: which runs changed files and were taken back, and the actions. */
+export type TurnUndo = {
+  /** By run id: the turns that changed files, with their file count and whether they were taken back. */
+  turns: Readonly<Record<string, { files: number; reverted: boolean }>>;
+  /** The run of the newest turn that changed files. Only it offers "Undo this turn". */
+  latest: string | null;
+  /** A run is active: nothing can be undone until it ends. */
+  disabled: boolean;
+  onUndo: (runId: string) => void;
+  onRedo: (runId: string) => void;
+};
+
 /** One run: one golem, each model step in order, one activity line for all their tools, and one footer once the run is done. */
 export function GolemTurn({
   steps,
@@ -328,11 +355,15 @@ export function GolemTurn({
   checks = null,
   notices = [],
   routedNote = "",
-}: { steps: readonly ChatMessage[]; pendingId?: string | null; thinkingShown?: boolean; detail?: Detail; plan?: PlanActions; checks?: ReturnType<typeof checksSummary> | null; notices?: readonly ChatNotice[]; routedNote?: string }) {
+  undo,
+}: { steps: readonly ChatMessage[]; pendingId?: string | null; thinkingShown?: boolean; detail?: Detail; plan?: PlanActions; checks?: ReturnType<typeof checksSummary> | null; notices?: readonly ChatNotice[]; routedNote?: string; undo?: TurnUndo }) {
   const chosenDetail = useDetail();
   const detail = detailOverride ?? chosenDetail;
   const footer = turnFooter(steps);
   const allTools = steps.flatMap((step) => step.tools ?? []);
+  const runId = [...steps].reverse().find((step) => step.runId !== undefined)?.runId;
+  const turnUndo = undo === undefined || runId === undefined ? undefined : undo.turns[runId];
+  const reverted = turnUndo?.reverted === true;
   const planCards = allTools.filter(isPlanCard);
   const tools = allTools.filter((tool) => !isPlanCard(tool));
   const foot = footer
@@ -352,8 +383,34 @@ export function GolemTurn({
       {planCards.map((tool) => (
         <PlanCard key={tool.callId} tool={tool} plan={plan} />
       ))}
-      {detail === "quiet" ? null : <EditCards tools={tools.filter(isEditCard)} />}
-      <ActivityLine tools={tools} detail={detail} streaming={steps.some((step) => step.streaming)} pendingId={pendingId} />
+      {detail === "quiet" ? null : reverted ? (
+        <div data-reverted="true" className="opacity-60">
+          <EditCards tools={tools.filter(isEditCard)} />
+        </div>
+      ) : (
+        <EditCards tools={tools.filter(isEditCard)} />
+      )}
+      {undo !== undefined && runId !== undefined && turnUndo !== undefined && !reverted && undo.latest === runId ? (
+        <div className="flex flex-wrap items-start justify-between gap-x-3">
+          <div className="min-w-0 flex-1">
+            <ActivityLine tools={tools} detail={detail} streaming={steps.some((step) => step.streaming)} pendingId={pendingId} />
+          </div>
+          <TurnUndoLink disabled={undo.disabled} onClick={() => undo.onUndo(runId)}>
+            Undo this turn
+          </TurnUndoLink>
+        </div>
+      ) : (
+        <ActivityLine tools={tools} detail={detail} streaming={steps.some((step) => step.streaming)} pendingId={pendingId} />
+      )}
+      {undo !== undefined && runId !== undefined && turnUndo !== undefined && reverted ? (
+        <p data-rewound className="flex flex-wrap items-center gap-x-1 font-mono text-xs text-muted">
+          <span>{rewoundLine(turnUndo.files)}</span>
+          <span aria-hidden="true">·</span>
+          <TurnUndoLink disabled={undo.disabled} onClick={() => undo.onRedo(runId)}>
+            Redo
+          </TurnUndoLink>
+        </p>
+      ) : null}
       {steps.map((step) => (step.writing == null ? null : <WritingRow key={step.id} writing={step.writing} />))}
       {checks === null ? null : <ChecksStrip {...checks} />}
       {foot.length > 0 ?<p className="font-mono text-xs text-faint">{foot.join(" · ")}</p> : null}
@@ -373,7 +430,7 @@ function turnChecks(chat: TranscriptChat, steps: readonly ChatMessage[]): Return
 }
 
 /** The messages and the closing error or notice. Pure: the page's stores are not read here. */
-export function TranscriptMessages({ chat, thinkingShown, detail, waiting = null, plan, session = null }: { session?: SessionModelRef | null; chat: TranscriptChat; thinkingShown?: boolean; detail?: Detail; waiting?: string | null; plan?: Omit<PlanActions, "open"> }) {
+export function TranscriptMessages({ chat, thinkingShown, detail, waiting = null, plan, session = null, undo }: { session?: SessionModelRef | null; chat: TranscriptChat; thinkingShown?: boolean; detail?: Detail; waiting?: string | null; plan?: Omit<PlanActions, "open">; undo?: TurnUndo }) {
   const pendingId = chat.approval?.callId ?? null;
   const planActions: PlanActions | undefined =
     plan === undefined || chat.plan === undefined ? undefined : { ...plan, open: openPlan(chat.plan)?.callId ?? null };
@@ -408,6 +465,7 @@ export function TranscriptMessages({ chat, thinkingShown, detail, waiting = null
             checks={turnChecks(chat, turn.steps)}
             notices={notices}
             routedNote={turnRoutedNote(turn.steps, chat.route, session)}
+            {...(undo === undefined ? {} : { undo })}
           />
         ),
       )}
@@ -422,7 +480,7 @@ export function TranscriptMessages({ chat, thinkingShown, detail, waiting = null
  * The scrolling column. While you are at the bottom it follows the text; once you scroll up it
  * stays where you are and offers a way back down.
  */
-export function TranscriptColumn({ chat, className, waiting = null, plan, session = null }: { session?: SessionModelRef | null; chat: TranscriptChat; className?: string; waiting?: string | null; plan?: Omit<PlanActions, "open"> }) {
+export function TranscriptColumn({ chat, className, waiting = null, plan, session = null, undo }: { session?: SessionModelRef | null; chat: TranscriptChat; className?: string; waiting?: string | null; plan?: Omit<PlanActions, "open">; undo?: TurnUndo }) {
   const scroller = useRef<HTMLDivElement>(null);
   const content = useRef<HTMLDivElement>(null);
   const stuck = useRef(true);
@@ -462,7 +520,7 @@ export function TranscriptColumn({ chat, className, waiting = null, plan, sessio
     <div className={cn("relative flex min-h-0 flex-1 flex-col", className)}>
       <div ref={scroller} onScroll={onScroll} className="relative min-h-0 flex-1 overflow-y-auto" data-transcript-scroller>
         <div ref={content} className="mx-auto flex max-w-column flex-col gap-8 px-5 py-7">
-          <TranscriptMessages chat={chat} waiting={waiting} plan={plan} session={session} />
+          <TranscriptMessages chat={chat} waiting={waiting} plan={plan} session={session} {...(undo === undefined ? {} : { undo })} />
         </div>
       </div>
       {atBottom ? null : (
@@ -511,5 +569,24 @@ export function Transcript({ id }: { id: string }) {
     },
     onChange: () => activeComposer()?.focus(),
   };
-  return <TranscriptColumn chat={chat} waiting={waitingLine(chat.busy, model, pulls)} plan={plan} session={session} />;
+  const cards = useTurnCards(id);
+  const undo = useUndo(id);
+  const turnUndo: TurnUndo = {
+    turns: Object.fromEntries(cards.map((card) => [card.runId, { files: card.files.length, reverted: card.reverted }])),
+    latest: cards[0]?.runId ?? null,
+    disabled: undo.disabled,
+    onUndo: (runId) => {
+      undo.rewind(cards, runId);
+    },
+    onRedo: (runId) => {
+      const card = cards.find((item) => item.runId === runId);
+      if (card !== undefined) undo.ask(redoTargets(card));
+    },
+  };
+  return (
+    <>
+      <TranscriptColumn chat={chat} waiting={waitingLine(chat.busy, model, pulls)} plan={plan} session={session} undo={turnUndo} />
+      {undo.dialogs}
+    </>
+  );
 }

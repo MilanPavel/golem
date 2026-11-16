@@ -1,6 +1,6 @@
 import "./diff.css";
 import { parseDiff, type ReviewNote } from "@golem/view";
-import { Fragment, useMemo, useState } from "react";
+import { Fragment, useMemo, useState, type ReactNode } from "react";
 import { Button } from "../../ui/button.tsx";
 import { cn } from "../../ui/cn.ts";
 import { Textarea } from "../../ui/textarea.tsx";
@@ -21,10 +21,11 @@ const SIGN = {
 
 const NUMBER = "select-none px-2 text-right align-top text-faint";
 
-function Note({ row, span }: { row: NoteRow; span: number }) {
+function Note({ row, span, action }: { row: NoteRow; span: number; action?: ReactNode }) {
   return (
     <tr data-row={row.kind}>
       <td colSpan={span} className={cn("whitespace-pre px-2 text-muted", row.kind === "hunk" && "bg-sunken")}>
+        {action === undefined || action === null ? null : <span className="sticky left-2 mr-3 inline-block">{action}</span>}
         {row.text}
       </td>
     </tr>
@@ -134,12 +135,30 @@ function Half({ cell, divider }: { cell: Cell | null; divider: boolean }) {
  * A unified diff as a table: the line numbers of both files, the sign in its own column, and
  * the text. Long lines scroll sideways. The text is React children, never markup.
  */
-export function DiffView({ diff, mode, notes }: { diff: string; mode: DiffMode; notes?: DiffNotes }) {
+export function DiffView({
+  diff,
+  mode,
+  notes,
+  onHunkAction,
+}: {
+  diff: string;
+  mode: DiffMode;
+  notes?: DiffNotes;
+  /** Draws a control in each hunk header. `index` is the hunk's place in this diff, from 0. */
+  onHunkAction?: (index: number) => ReactNode;
+}) {
   const { file, unified, split } = useMemo(() => {
     const lines = parseDiff(diff);
     return { file: diffFile(lines), unified: unifiedRows(lines), split: splitRows(lines) };
   }, [diff]);
   const isSplit = mode === "split";
+  // A hunk header's place among the hunk headers, for the control it may carry.
+  const hunkAction = (rows: readonly { kind: string }[], at: number): ReactNode => {
+    if (onHunkAction === undefined) return undefined;
+    let index = 0;
+    for (let i = 0; i < at; i += 1) if (rows[i]?.kind === "hunk") index += 1;
+    return onHunkAction(index);
+  };
   // The editor that is open: a new note is "add:<side>:<line>", an old one "edit:<id>".
   const [editing, setEditing] = useState<string | null>(null);
   const noting = notes !== undefined && !isSplit && file.path !== null;
@@ -199,11 +218,11 @@ export function DiffView({ diff, mode, notes }: { diff: string; mode: DiffMode; 
                       <Half cell={row.right} divider />
                     </tr>
                   ) : (
-                    <Note key={i} row={row} span={span} />
+                    <Note key={i} row={row} span={span} action={row.kind === "hunk" ? hunkAction(split, i) : undefined} />
                   ),
                 )
               : unified.map((row, i) => {
-                  if (row.kind !== "line") return <Note key={i} row={row} span={span} />;
+                  if (row.kind !== "line") return <Note key={i} row={row} span={span} action={row.kind === "hunk" ? hunkAction(unified, i) : undefined} />;
                   // A deleted line is on the old side; an added or unchanged one is on the new side.
                   const side = row.tone === "del" ? "old" : "new";
                   const line = side === "old" ? row.old : row.new;

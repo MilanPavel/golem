@@ -165,6 +165,11 @@ export type PageActions = {
    * the commit screen. A git failure resolves with `ok: false` and git's output. Never pushes.
    */
   commit(sessionId: string, paths: string[], message: string): Promise<ChangesCommitResult>;
+  /**
+   * Puts back what `target` wrote. Without `force`, a file that changed on disk since golem wrote it is
+   * left alone and comes back in `conflicts`. The lists refresh from the `file.changed` events. Rejects while a run is active.
+   */
+  revert(sessionId: string, target: ChangesRevertTarget, force?: boolean): Promise<ChangesRevertResult>;
   /** Sets the title. What the page shows afterwards comes from the daemon's summary. */
   rename(sessionId: string, title: string): Promise<void>;
   /** Forks at a message and resolves with the new session's id. */
@@ -476,6 +481,7 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
           await queryClient.invalidateQueries({ queryKey: ["changes.commit_info", sessionId] });
         }
       },
+      revert: (sessionId, target, force) => client.changesRevert(sessionId, target, force),
       async setRoute(sessionId, mode) {
         await client.setRoute(sessionId, mode);
       },

@@ -1,12 +1,14 @@
 import { useId, useState, type ReactNode } from "react";
-import type { TurnCard } from "@golem/view";
+import { UNDO_WAIT, type TurnCard } from "@golem/view";
 import { useTurnCards } from "../../store/page-context.tsx";
 import type { ChangedFile } from "../../store/changes.ts";
+import { Button } from "../../ui/button.tsx";
 import { cn } from "../../ui/cn.ts";
 import { useDiffMode } from "../diff/index.ts";
 import { timeAgo } from "../sessions/time-ago.ts";
 import { useNow } from "../sessions/use-now.ts";
 import { ChangeDiffPanel, Row } from "./file-row.tsx";
+import { redoTargets, useUndo } from "./undo.tsx";
 import { useWorkbenchWidth } from "./workbench-width.ts";
 
 /** From this panel width, in rem, a diff may be shown side by side. Narrower, it is unified. */
@@ -40,10 +42,12 @@ type TurnsViewProps = {
   /** The content of an open row: the diff of that turn's last change to the file. */
   renderDiff: (card: TurnCard, file: TurnCard["files"][number]) => ReactNode;
   now: number;
+  /** With it, a card has "Rewind to before this", or "Redo" when it is undone. `disabled` is true while a run is active. */
+  undo?: { disabled: boolean; onRewind: (card: TurnCard) => void; onRedo: (card: TurnCard) => void };
 };
 
 /** The timeline: a strip of one dot per turn, then a card per turn, newest first. It reads nothing itself. */
-export function TurnsView({ cards, open, onToggle, renderDiff, now }: TurnsViewProps) {
+export function TurnsView({ cards, open, onToggle, renderDiff, now, undo }: TurnsViewProps) {
   const prefix = useId();
   if (cards.length === 0) {
     return <p className="text-sm text-muted">No changes yet. Each request that edits files shows up here as a turn.</p>;
@@ -82,6 +86,22 @@ export function TurnsView({ cards, open, onToggle, renderDiff, now }: TurnsViewP
               {card.reverted ? <span className="ml-2 font-mono text-xs font-normal">undone</span> : null}
             </p>
             <p className="font-mono text-xs text-muted">{card.at === null ? card.line : `${agoText(card.at, now)} · ${card.line}`}</p>
+            {undo === undefined ? null : (
+              <div>
+                <Button
+                  size="sm"
+                  disabled={undo.disabled}
+                  title={undo.disabled ? UNDO_WAIT : undefined}
+                  onClick={() => {
+                    if (card.reverted) undo.onRedo(card);
+                    else undo.onRewind(card);
+                  }}
+                >
+                  {card.reverted ? "Redo" : "Rewind to before this"}
+                  <span className="sr-only"> (turn {card.number})</span>
+                </Button>
+              </div>
+            )}
             <ul className="flex flex-col gap-1">
               {card.files.map((file) => {
                 const isOpen = open.has(rowKey({ runId: card.runId, path: file.path }));
@@ -114,29 +134,42 @@ export function TurnsTab({ sessionId }: { sessionId: string }) {
   const [mode, setMode] = useDiffMode();
   const [width] = useWorkbenchWidth();
   const now = useNow();
+  const undo = useUndo(sessionId);
   const [open, setOpen] = useState<ReadonlySet<string>>(new Set());
   return (
-    <TurnsView
-      cards={cards}
-      open={open}
-      onToggle={(row) => {
-        const key = rowKey(row);
-        setOpen((current) => {
-          const next = new Set(current);
-          if (!next.delete(key)) next.add(key);
-          return next;
-        });
-      }}
-      renderDiff={(_card, file) => (
-        <ChangeDiffPanel
-          sessionId={sessionId}
-          changeId={file.changeIds[file.changeIds.length - 1] ?? null}
-          mode={mode}
-          onMode={setMode}
-          canSplit={width >= SPLIT_MIN_WIDTH}
-        />
-      )}
-      now={now}
-    />
+    <>
+      <TurnsView
+        cards={cards}
+        open={open}
+        onToggle={(row) => {
+          const key = rowKey(row);
+          setOpen((current) => {
+            const next = new Set(current);
+            if (!next.delete(key)) next.add(key);
+            return next;
+          });
+        }}
+        renderDiff={(_card, file) => (
+          <ChangeDiffPanel
+            sessionId={sessionId}
+            changeId={file.changeIds[file.changeIds.length - 1] ?? null}
+            mode={mode}
+            onMode={setMode}
+            canSplit={width >= SPLIT_MIN_WIDTH}
+          />
+        )}
+        now={now}
+        undo={{
+          disabled: undo.disabled,
+          onRewind: (card) => {
+            undo.rewind(cards, card.runId);
+          },
+          onRedo: (card) => {
+            undo.ask(redoTargets(card));
+          },
+        }}
+      />
+      {undo.dialogs}
+    </>
   );
 }

@@ -144,3 +144,9 @@ export const PlugIcon = (props: IconProps) => (
     <path d="M6 1.5v3M10 1.5v3M4 4.5h8V7a4 4 0 0 1-8 0zM8 11v3.5" />
   </Icon>
 );
+/** An arrow that turns back: the undo button. */
+export const UndoIcon = (props: IconProps) => (
+  <Icon {...props}>
+    <path d="M3.5 6.5H10a3 3 0 010 6H6M3.5 6.5l3-3M3.5 6.5l3 3" />
+  </Icon>
+);

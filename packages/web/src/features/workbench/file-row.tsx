@@ -1,8 +1,9 @@
+import { UNDO_WAIT } from "@golem/view";
 import { useId, type ComponentProps, type ReactNode } from "react";
 import { Badge } from "../../ui/badge.tsx";
 import { cn } from "../../ui/cn.ts";
 import { IconButton } from "../../ui/icon-button.tsx";
-import { ChevronDownIcon, OpenIcon } from "../../ui/icons.tsx";
+import { ChevronDownIcon, OpenIcon, UndoIcon } from "../../ui/icons.tsx";
 import { useChangeDiff, useFileDiff } from "../../store/page-context.tsx";
 import type { ChangedFile, FileDiff } from "../../store/changes.ts";
 import { DiffModeSwitch, DiffView, type DiffMode } from "../diff/index.ts";
@@ -40,6 +41,7 @@ export function Row({
   onToggle,
   onOpenFile,
   noteCount = 0,
+  undo,
   children,
 }: {
   file: ChangedFile;
@@ -48,6 +50,8 @@ export function Row({
   onToggle: () => void;
   /** Shows the file in the Files tab. Without it the row has no open button. */
   onOpenFile?: ((path: string) => void) | undefined;
+  /** With it, the row has an "Undo the changes" button. `disabled` is true while a run is active. */
+  undo?: { disabled: boolean; onUndo: () => void } | undefined;
   children: ReactNode;
 }) {
   const [folder, name] = splitPath(file.path);
@@ -74,6 +78,16 @@ export function Row({
         {noteCount > 0 ? <Badge tone="wait" className={SMALL}>{plural(noteCount, "note")}</Badge> : null}
         <Counts added={file.added} removed={file.removed} />
       </button>
+      {undo === undefined ? null : (
+        <IconButton
+          label={`Undo the changes to ${file.path}`}
+          disabled={undo.disabled}
+          title={undo.disabled ? UNDO_WAIT : undefined}
+          onClick={undo.onUndo}
+        >
+          <UndoIcon />
+        </IconButton>
+      )}
       {onOpenFile === undefined || file.status === "deleted" ? null : (
         <IconButton
           label={`Open ${name} in Files`}
@@ -101,12 +115,15 @@ export function DiffPanel({
   onMode,
   canSplit,
   notes,
+  onHunkAction,
 }: {
   diff: FileDiff;
   mode: DiffMode;
   onMode: (mode: DiffMode) => void;
   canSplit: boolean;
   notes?: NonNullable<ComponentProps<typeof DiffView>["notes"]>;
+  /** Draws a control in each hunk header. */
+  onHunkAction?: (index: number) => ReactNode;
 }) {
   const shown: DiffMode = canSplit ? mode : "unified";
   return (
@@ -120,7 +137,12 @@ export function DiffPanel({
         <p className="text-sm text-muted">Reading the diff.</p>
       ) : (
         <>
-          <DiffView diff={diff.diff} mode={shown} {...(notes === undefined ? {} : { notes })} />
+          <DiffView
+            diff={diff.diff}
+            mode={shown}
+            {...(notes === undefined ? {} : { notes })}
+            {...(onHunkAction === undefined ? {} : { onHunkAction })}
+          />
           {diff.truncated ? <p className="mt-2 text-xs text-muted">This diff is cut. Open the file to see all of it.</p> : null}
         </>
       )}

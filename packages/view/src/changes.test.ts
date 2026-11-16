@@ -3,7 +3,7 @@ import { test } from "node:test";
 
 import type { ChatEvent } from "@golem/client";
 import type { ChatMessage } from "./chat-state.ts";
-import { changedPaths, changesLine, cutTitle, noChanges, reduceChanges, shellTrackingNote, totals, turnCards, turnOf, type ChangesState, type TurnFile } from "./changes.ts";
+import { changedPaths, changesLine, cutTitle, noChanges, reduceChanges, rewindPlan, rewoundLine, shellTrackingNote, totals, turnCards, turnOf, type ChangesState, type TurnFile } from "./changes.ts";
 
 type Over = {
   id: string;
@@ -45,7 +45,7 @@ function file(added: number, removed: number): TurnFile {
 test("one change makes one turn with one file", () => {
   const state = fold([change("r1", { id: "c1", added: 3, removed: 1 })]);
   assert.deepEqual(state.turns, [
-    { runId: "r1", files: [{ path: "a.py", status: "modified", added: 3, removed: 1, changeIds: ["c1"] }], reverted: false },
+    { runId: "r1", files: [{ path: "a.py", status: "modified", added: 3, removed: 1, changeIds: ["c1"] }], reverted: false, revertIds: [] },
   ]);
   assert.equal(turnOf(state, "r1"), state.turns[0]);
   assert.equal(turnOf(state, "r2"), null);
@@ -95,6 +95,46 @@ test("a revert of the revert unmarks it", () => {
     change("r3", { id: "c10", source: "revert", reverts: "c9" }),
   ]);
   assert.equal(state.turns[0]?.reverted, false);
+});
+
+test("a revert of two files marks the turn once, and each redo takes its own revert out", () => {
+  const state = fold([
+    change("r1", { id: "c1" }),
+    change("r1", { id: "c2", path: "b.py" }),
+    change("rx", { id: "u1", source: "revert", reverts: "c2" }),
+    change("rx", { id: "u2", path: "b.py", source: "revert", reverts: "c1" }),
+  ]);
+  assert.equal(state.turns[0]?.reverted, true);
+  assert.deepEqual(state.turns[0]?.revertIds, ["u1", "u2"]);
+  const half = reduceChanges(state, change("rx", { id: "d1", source: "revert", reverts: "u1" }));
+  assert.equal(half.turns[0]?.reverted, true);
+  assert.deepEqual(half.turns[0]?.revertIds, ["u2"]);
+  const whole = reduceChanges(half, change("rx", { id: "d2", source: "revert", reverts: "u2" }));
+  assert.equal(whole.turns[0]?.reverted, false);
+  const again = reduceChanges(whole, change("rx", { id: "u3", source: "revert", reverts: "d1" }));
+  assert.equal(again.turns[0]?.reverted, true);
+  assert.deepEqual(again.turns[0]?.revertIds, ["u3"]);
+});
+
+test("a rewind plan is the turn and every newer one still standing, with their files once", () => {
+  const state = fold([
+    change("r1", { id: "c1", path: "a.py" }),
+    change("r2", { id: "c2", path: "a.py" }),
+    change("r2", { id: "c3", path: "b.py" }),
+    change("r3", { id: "c4", path: "c.py" }),
+    change("rx", { id: "u1", path: "c.py", source: "revert", reverts: "c4" }),
+  ]);
+  const cards = turnCards(state, []);
+  const plan = rewindPlan(cards, "r1");
+  assert.deepEqual(plan.turns.map((card) => card.runId), ["r2", "r1"]);
+  assert.deepEqual(plan.paths, ["a.py", "b.py"]);
+  assert.deepEqual(rewindPlan(cards, "r2").turns.map((card) => card.runId), ["r2"]);
+  assert.deepEqual(rewindPlan(cards, "nope"), { turns: [], paths: [] });
+});
+
+test("the rewound line counts the files", () => {
+  assert.equal(rewoundLine(1), "⟲ rewound · 1 file put back");
+  assert.equal(rewoundLine(2), "⟲ rewound · 2 files put back");
 });
 
 test("a revert of an unknown change leaves the state alone", () => {

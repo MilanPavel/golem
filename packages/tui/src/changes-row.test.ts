@@ -19,6 +19,7 @@ const editChanges: ChangesState = {
     {
       runId: "r1",
       reverted: false,
+      revertIds: [],
       files: [
         { path: "a.py", status: "modified", added: 40, removed: 4, changeIds: ["c1"] },
         { path: "b.py", status: "created", added: 3, removed: 0, changeIds: ["c2"] },

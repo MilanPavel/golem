@@ -1,4 +1,4 @@
-import { committedLine, notesFor, type NotesState } from "@golem/view";
+import { committedLine, notesFor, UNDO_WAIT, type NotesState } from "@golem/view";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Button } from "../../ui/button.tsx";
 import { useChangedFiles, useCommitInfo, useNotes, useSession } from "../../store/page-context.tsx";
@@ -10,6 +10,7 @@ import { CommitDialog } from "./commit-dialog.tsx";
 import { Counts, FileDiffPanel, Row, plural } from "./file-row.tsx";
 import { TurnsTab } from "./turns-view.tsx";
 import { openFile, useCommitRequest, useRequestedChange } from "./workbench-state.ts";
+import { useUndo } from "./undo.tsx";
 import { useWorkbenchWidth } from "./workbench-width.ts";
 
 /** From this panel width, in rem, a diff may be shown side by side. Narrower, it is unified. */
@@ -26,6 +27,8 @@ type ChangesViewProps = {
   renderDiff: (file: ChangedFile) => ReactNode;
   /** Shows a file in the Files tab. Without it the rows have no open button. */
   onOpenFile?: (path: string) => void;
+  /** With it, each row has an "Undo the changes" button. `disabled` is true while a run is active. */
+  undo?: { disabled: boolean; onFile: (path: string) => void };
   /** Beside the totals: the Commit button. */
   footer?: ReactNode;
   /** With it, a row shows how many notes its file has. */
@@ -33,7 +36,7 @@ type ChangesViewProps = {
 };
 
 /** The list of changed files, the open one with its diff, and the totals. It reads nothing itself. */
-export function ChangesView({ files, error, open, onToggle, renderDiff, onOpenFile, footer, notes }: ChangesViewProps) {
+export function ChangesView({ files, error, open, onToggle, renderDiff, onOpenFile, undo, footer, notes }: ChangesViewProps) {
   if (files === null) {
     return <p className="text-sm text-muted">{error === null ? "Reading the changes." : `Could not read the changes. ${error}`}</p>;
   }
@@ -51,6 +54,7 @@ export function ChangesView({ files, error, open, onToggle, renderDiff, onOpenFi
             file={file}
             open={open.has(file.path)}
             onOpenFile={onOpenFile}
+            undo={undo === undefined ? undefined : { disabled: undo.disabled, onUndo: () => undo.onFile(file.path) }}
             noteCount={notes === undefined ? 0 : notesFor(notes.state, file.path).length}
             onToggle={() => {
               onToggle(file.path);
@@ -87,6 +91,7 @@ function ByFileTab({ sessionId }: { sessionId: string }) {
   const root = useRef<HTMLDivElement>(null);
   const info = useCommitInfo(sessionId);
   const runActive = useSession(sessionId, (view) => view.chat.busy);
+  const undo = useUndo(sessionId);
   const [commitOpen, setCommitOpen] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [commitAsked, clearCommitAsked] = useCommitRequest();
@@ -158,6 +163,19 @@ function ByFileTab({ sessionId }: { sessionId: string }) {
             mode={mode}
             onMode={setMode}
             canSplit={width >= SPLIT_MIN_WIDTH}
+            onHunkAction={(index) => (
+              <Button
+                size="sm"
+                aria-label={`Undo hunk ${index + 1} of ${file.path}`}
+                disabled={undo.disabled}
+                title={undo.disabled ? UNDO_WAIT : undefined}
+                onClick={() => {
+                  undo.ask([{ kind: "hunk", path: file.path, hunk: index }]);
+                }}
+              >
+                Undo
+              </Button>
+            )}
             notes={{
               notes: notesFor(notes.state, file.path),
               onAddNote: (line, text) => {
@@ -169,6 +187,12 @@ function ByFileTab({ sessionId }: { sessionId: string }) {
           />
         )}
         onOpenFile={openFile}
+        undo={{
+          disabled: undo.disabled,
+          onFile: (path) => {
+            undo.ask([{ kind: "file", path }]);
+          },
+        }}
         notes={{ state: notes.state }}
         footer={
           commitPaths.length === 0 ? null : (
@@ -189,6 +213,7 @@ function ByFileTab({ sessionId }: { sessionId: string }) {
           {notice}
         </p>
       )}
+      {undo.dialogs}
       <CommitDialog
         sessionId={sessionId}
         open={commitOpen}

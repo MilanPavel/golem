@@ -1,4 +1,4 @@
-export { ThinkingLine, ToolLine, Transcript, TranscriptColumn, TranscriptMessages, WritingRow } from "./transcript.tsx";
+export { ThinkingLine, ToolLine, Transcript, TranscriptColumn, TranscriptMessages, WritingRow, type TurnUndo } from "./transcript.tsx";
 export { ChecksStrip } from "./checks-strip.tsx";
 export { EditCard, EditCards, isEditCard } from "./edit-card.tsx";
 export { DETAIL_KEY, detailStore, readDetail, setDetail, useDetail } from "./detail.ts";

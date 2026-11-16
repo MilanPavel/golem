@@ -55,6 +55,7 @@ export const GALLERY_SECTIONS = [
   "checks-tab",
   "checks-question",
   "commit-dialog",
+  "undo-dialogs",
   "command-palette-and-keys",
   "model-dialog",
   "model-list",

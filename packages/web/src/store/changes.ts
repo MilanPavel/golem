@@ -1,6 +1,6 @@
-import type { ChangedFile, ChangesCommitInfoResult, ChangesCommitResult, ChangesDiffResult, ChangesListResult } from "@golem/client";
+import type { ChangedFile, ChangesCommitInfoResult, ChangesCommitResult, ChangesDiffResult, ChangesListResult, ChangesRevertTarget } from "@golem/client";
 
-export type { ChangedFile, ChangesCommitInfoResult, ChangesCommitResult, ChangesDiffResult, ChangesListResult };
+export type { ChangedFile, ChangesCommitInfoResult, ChangesCommitResult, ChangesDiffResult, ChangesListResult, ChangesRevertTarget };
 
 /** How long a burst of `file.changed` events waits, so it makes one request. */
 export const CHANGES_REFETCH_MS = 150;

@@ -1,4 +1,4 @@
-import { checksSummary, COMMANDS, mcpStatusWord, noPastes, pickerGroups, withModelChoices, withSkillChoices, type CheckRun, type ChecksState, type ReviewNote, type TodoItem, type TurnChecks, type TurnCard, ladderRows, spendRows, contextActions, bestActions, windowSourceOf, type ContextActionsInput } from "@golem/view";
+import { checksSummary, COMMANDS, mcpStatusWord, noPastes, pickerGroups, withModelChoices, withSkillChoices, type CheckRun, type ChecksState, type ReviewNote, type TodoItem, type TurnChecks, type TurnCard, type ChatMessage, type ChatState, type RewindPlan, ladderRows, spendRows, contextActions, bestActions, windowSourceOf, type ContextActionsInput } from "@golem/view";
 import type { ListedModel } from "@golem/client";
 import { createContext, useContext, useEffect, useId, useState, type ReactNode } from "react";
 import { Badge } from "../ui/badge.tsx";
@@ -21,7 +21,7 @@ import { Dot, serverSummary, SignInPanel, type Login } from "../features/setting
 import type { McpServer } from "../store/mcp.ts";
 import { ConnectionScreen } from "../features/connection/connection-screen.tsx";
 import { connectionScreen, type ConnectionHost } from "../features/connection/connection-screen.ts";
-import { ChecksStrip, DetailSwitch, EditCards, ToolLine, TranscriptMessages, WritingRow } from "../features/chat/index.ts";
+import { ChecksStrip, DetailSwitch, EditCards, ToolLine, TranscriptMessages, WritingRow, type TurnUndo } from "../features/chat/index.ts";
 import { COST_CASES, CUT_REPLY, SAMPLE_CHAT, SAMPLE_TOOLS, THINKING_CASES, TURN_CHAT, NOTICE_CHAT, ROUTED_CASES, ROUTED_SESSION } from "../features/chat/sample.ts";
 import { ApprovalBar } from "../features/approval/index.ts";
 import { ANSWERED, PENDING_EDIT, PENDING_SHELL } from "../features/approval/sample.ts";
@@ -30,7 +30,7 @@ import { SAMPLE_EDIT_DIFF, SAMPLE_LONG_LINE_DIFF, SAMPLE_NEW_FILE_DIFF } from ".
 import { TodoList } from "../features/drawer/index.ts";
 import { DiffPanel } from "../features/workbench/file-row.tsx";
 import { rowKey } from "../features/workbench/turns-view.tsx";
-import { ChangesView, ChecksView, Workbench, type WorkbenchTab, CommitDialogView, TurnsView, FilesView } from "../features/workbench/index.ts";
+import { ChangesView, ChecksView, Workbench, type WorkbenchTab, CommitDialogView, ConflictDialogView, RewindDialogView, TurnsView, FilesView } from "../features/workbench/index.ts";
 import type { ChangedFile } from "../store/changes.ts";
 import { Composer, ContextBannerView, ContextChipView, DockView, Meter, ModeChipView, NotesChipView, PlanChipView, TuneChipView, ChecksQuestionView, RouteChipView, WaitHintView } from "../features/composer/index.ts";
 import { PlanCardView } from "../features/chat/plan-card.tsx";
@@ -413,8 +413,19 @@ function ChangesDemo() {
                   if (!next.delete(path)) next.add(path);
                   setOpen(next);
                 }}
+                undo={{ disabled: false, onFile: () => {} }}
                 renderDiff={() => (
-                  <DiffPanel diff={{ diff: SAMPLE_EDIT_DIFF, truncated: true, error: null }} mode={mode} onMode={setMode} canSplit={canSplit} />
+                  <DiffPanel
+                    diff={{ diff: SAMPLE_EDIT_DIFF, truncated: true, error: null }}
+                    mode={mode}
+                    onMode={setMode}
+                    canSplit={canSplit}
+                    onHunkAction={(index) => (
+                      <Button size="sm" aria-label={`Undo hunk ${index + 1} of src/socket.ts`}>
+                        Undo
+                      </Button>
+                    )}
+                  />
                 )}
               />
             </div>
@@ -445,6 +456,7 @@ const SAMPLE_CARDS: TurnCard[] = [
     ],
     line: "2 files +9 −3",
     reverted: false,
+    revertIds: [],
   },
   {
     runId: "r2",
@@ -454,6 +466,7 @@ const SAMPLE_CARDS: TurnCard[] = [
     files: [{ path: "src/fetch.py", status: "modified", added: 4, removed: 0, changeIds: ["c_4"] }],
     line: "1 file +4",
     reverted: true,
+    revertIds: ["u_1"],
   },
 ];
 
@@ -478,6 +491,7 @@ function TurnsDemo() {
             <DiffPanel diff={{ diff: SAMPLE_EDIT_DIFF, truncated: false, error: null }} mode="unified" onMode={() => {}} canSplit={false} />
           )}
           now={SAMPLE_NOW}
+          undo={{ disabled: false, onRewind: () => {}, onRedo: () => {} }}
         />
       </div>
     </section>
@@ -613,6 +627,66 @@ function ChecksQuestionDemo() {
           composer={<DemoComposer />}
         />
       </div>
+    </section>
+  );
+}
+
+const UNDO_CHAT: Pick<ChatState, "messages" | "error" | "notice"> = {
+  messages: [
+    { id: "uu1", role: "user", text: "Clamp the retry delay.", streaming: false, runId: "run-1" },
+    { id: "us1", role: "assistant", text: "Done: the delay is clamped.", streaming: false, runId: "run-1", tools: [{ callId: "ue1", name: "edit_file", args: { path: "src/socket.ts" }, status: "done", summary: "+3 -3 src/socket.ts", diff: SAMPLE_EDIT_DIFF }] },
+    { id: "uu2", role: "user", text: "Add a clamp helper.", streaming: false, runId: "run-2" },
+    { id: "us2", role: "assistant", text: "Added `clamp.ts`.", streaming: false, runId: "run-2", tools: [{ callId: "ue2", name: "write_file", args: { path: "src/clamp.ts" }, status: "done", summary: "new file +4 -0 src/clamp.ts", diff: SAMPLE_NEW_FILE_DIFF }] },
+  ] satisfies ChatMessage[],
+  error: null,
+  notice: null,
+};
+
+const UNDO_STATE: TurnUndo = {
+  turns: { "run-1": { files: 2, reverted: true }, "run-2": { files: 1, reverted: false } },
+  latest: "run-2",
+  disabled: false,
+  onUndo: () => {},
+  onRedo: () => {},
+};
+
+const UNDO_PLAN: RewindPlan = {
+  turns: [
+    { runId: "run-2", number: 2, title: "Add a clamp helper.", at: null, files: [], line: "", reverted: false, revertIds: [] },
+    { runId: "run-1", number: 1, title: "Clamp the retry delay.", at: null, files: [], line: "", reverted: false, revertIds: [] },
+  ],
+  paths: ["src/socket.ts", "src/clamp.ts"],
+};
+
+/** The two undo dialogs: a rewind of two turns, and the files that changed since golem wrote them. Each opens from a button. */
+function UndoDialogsDemo({ theme }: { theme: string }) {
+  const [shown, setShown] = useState<"rewind" | "conflicts" | null>(null);
+  const anchor = useAnchor();
+  return (
+    <section className="mt-6" id={anchor("Undo dialogs")}>
+      <h3 className="mb-2 font-mono text-xs text-faint">Undo dialogs</h3>
+      <div className="flex flex-wrap items-center gap-2">
+        {(
+          [
+            ["rewind", "Rewind dialog"],
+            ["conflicts", "Conflict dialog"],
+          ] as const
+        ).map(([kind, label]) => (
+          <Button key={kind} onClick={() => setShown(kind)}>
+            {label}
+            <span className="sr-only">, {theme}</span>
+          </Button>
+        ))}
+      </div>
+      <RewindDialogView open={shown === "rewind"} onOpenChange={(open) => setShown(open ? shown : null)} plan={UNDO_PLAN} working={false} onConfirm={() => setShown(null)} />
+      <ConflictDialogView
+        open={shown === "conflicts"}
+        onOpenChange={(open) => setShown(open ? shown : null)}
+        paths={["src/socket.ts", "docs/notes.md"]}
+        working={false}
+        onOverwrite={() => setShown(null)}
+        onKeep={() => setShown(null)}
+      />
     </section>
   );
 }
@@ -1700,6 +1774,10 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
               <TranscriptMessages chat={NOTICE_CHAT} detail={detail} />
             </div>
           ))}
+          <div aria-label="Undo in the chat" role="group" className="flex flex-col gap-6 rounded-lg border border-line bg-bg p-4">
+            <p className="font-mono text-xs text-faint">undo: the newest turn offers Undo this turn; a rewound one is muted and offers Redo</p>
+            <TranscriptMessages chat={UNDO_CHAT} undo={UNDO_STATE} />
+          </div>
           <div aria-label="Edit cards" role="group" className="flex flex-col gap-2 rounded-lg border border-line bg-bg p-4">
             <p className="font-mono text-xs text-faint">edit cards: an edit, a new file, an edit with no diff kept</p>
             <EditCards
@@ -1796,6 +1874,8 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
       <ChecksQuestionDemo />
 
       <CommitDialogDemo theme={theme} />
+
+      <UndoDialogsDemo theme={theme} />
 
       <section className="mt-6" id={anchor("Command palette and keys")}>
         <h3 className="mb-2 font-mono text-xs text-faint">Command palette and keys</h3>

@@ -14,7 +14,11 @@ export type TurnFile = {
   changeIds: string[];
 };
 
-export type TurnChanges = { runId: string | null; files: TurnFile[]; reverted: boolean };
+/**
+ * `revertIds` are the change ids of the reverts that stand: undoing a revert (a redo) takes its id out
+ * again. `reverted` is true while any stands.
+ */
+export type TurnChanges = { runId: string | null; files: TurnFile[]; reverted: boolean; revertIds: string[] };
 
 /** Turns in order of first change. `revertTurns` maps a revert's change id to the turn it marked. */
 export type ChangesState = { turns: TurnChanges[]; revertTurns: Record<string, number> };
@@ -32,7 +36,7 @@ export function reduceChanges(state: ChangesState, event: ChatEvent): ChangesSta
   }
   const runId = event.run_id ?? null;
   const index = state.turns.findIndex((turn) => turn.runId === runId);
-  const turn: TurnChanges = state.turns[index] ?? { runId, files: [], reverted: false };
+  const turn: TurnChanges = state.turns[index] ?? { runId, files: [], reverted: false, revertIds: [] };
   const files = addChange(turn.files, {
     path: data.path,
     status: data.status,
@@ -67,7 +71,7 @@ function addChange(files: readonly TurnFile[], change: TurnFile): TurnFile[] {
   return files.map((file, index) => (index === at ? merged : file));
 }
 
-/** The turn that holds the change, or the one a revert marked, flips its mark. */
+/** The turn that holds the change, or the one a revert marked, gains this revert, or loses the one it undoes. */
 function markReverted(state: ChangesState, target: string | null, revertId: string): ChangesState {
   if (target === null) {
     return state;
@@ -77,7 +81,14 @@ function markReverted(state: ChangesState, target: string | null, revertId: stri
   if (index < 0) {
     return state;
   }
-  const turns = state.turns.map((turn, at) => (at === index ? { ...turn, reverted: !turn.reverted } : turn));
+  const turns = state.turns.map((turn, at) => {
+    if (at !== index) {
+      return turn;
+    }
+    // A revert of a standing revert is a redo: that revert no longer stands, and the redo is not one.
+    const revertIds = turn.revertIds.includes(target) ? turn.revertIds.filter((id) => id !== target) : [...turn.revertIds, revertId];
+    return { ...turn, revertIds, reverted: revertIds.length > 0 };
+  });
   return { turns, revertTurns: { ...state.revertTurns, [revertId]: index } };
 }
 
@@ -163,6 +174,8 @@ export type TurnCard = {
   /** `2 files +9 −3`. */
   line: string;
   reverted: boolean;
+  /** The change ids of the reverts that stand. Reverting each of them is the redo. */
+  revertIds: string[];
 };
 
 /** One line, cut at `max` characters with an ellipsis. */
@@ -196,6 +209,7 @@ export function turnCards(state: ChangesState, messages: readonly ChatMessage[])
       files: turn.files,
       line: changesLine(turn.files),
       reverted: turn.reverted,
+      revertIds: turn.revertIds,
     });
   }
   return cards.reverse();
@@ -207,4 +221,35 @@ export type ShellTracking = "git" | "files" | "off";
 /** The quiet line for when shell changes are not listed, or null when they are. */
 export function shellTrackingNote(shell: ShellTracking): string | null {
   return shell === "off" ? "Changes made by shell commands are not listed: this folder is too big to watch and is not a git repository." : null;
+}
+
+/** The title of an undo button while a run is active. */
+export const UNDO_WAIT = "Wait for golem to finish";
+
+/** `⟲ rewound · 2 files put back`: the line under a turn that was taken back. Redo goes after it. */
+export function rewoundLine(files: number): string {
+  return `⟲ rewound · ${files} ${files === 1 ? "file" : "files"} put back`;
+}
+
+/** The question of the dialog that lists the files golem left alone. */
+export const UNDO_CONFLICT_TITLE = "These files changed since golem wrote them";
+export const UNDO_CONFLICT_QUESTION = "Overwrite them?";
+
+/** What a rewind to before a turn takes back: that turn and every newer one still standing, and their files once each. */
+export type RewindPlan = { turns: TurnCard[]; paths: string[] };
+
+/** `cards` are newest first, as {@link turnCards} gives them. An unknown run takes back nothing. */
+export function rewindPlan(cards: readonly TurnCard[], runId: string): RewindPlan {
+  const at = cards.findIndex((card) => card.runId === runId);
+  if (at < 0) {
+    return { turns: [], paths: [] };
+  }
+  const turns = cards.slice(0, at + 1).filter((card) => !card.reverted);
+  const paths = new Set<string>();
+  for (const card of turns) {
+    for (const file of card.files) {
+      paths.add(file.path);
+    }
+  }
+  return { turns, paths: [...paths] };
 }
