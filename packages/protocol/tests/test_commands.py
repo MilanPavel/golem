@@ -10,8 +10,10 @@ from golem_protocol.commands import (
     LocalServer,
     ModelOptionsSaved,
     ModelServerStatus,
+    PendingItem,
     PingParams,
     SessionInspectResult,
+    SessionSummary,
     TraceContextPart,
     TraceSpanResult,
 )
@@ -168,3 +170,47 @@ def test_trace_span_result_without_the_context_fields_validates() -> None:
 def test_a_context_part_with_an_unknown_key_is_rejected() -> None:
     with pytest.raises(ValidationError):
         TraceContextPart.model_validate({"key": "memory", "tokens": 1, "chars": 4})
+
+
+def _summary(**extra: object) -> SessionSummary:
+    return SessionSummary.model_validate(
+        {
+            "session_id": "s1",
+            "model_profile": "local",
+            "status": "waiting",
+            "created_at": "2026-01-01T00:00:00Z",
+            "updated_at": "2026-01-01T00:00:00Z",
+            "last_seq": 3,
+            **extra,
+        }
+    )
+
+
+def test_pending_item_and_summary_round_trip() -> None:
+    item = PendingItem(
+        kind="approval",
+        since="2026-01-01T00:00:01Z",
+        call_id="c1",
+        name="edit_file",
+        subject="a.py",
+        source="built-in default",
+        added=2,
+        removed=1,
+    )
+    assert PendingItem.model_validate_json(item.model_dump_json()) == item
+    summary = _summary(pending=item.model_dump())
+    assert SessionSummary.model_validate_json(summary.model_dump_json()) == summary
+    consent = PendingItem(kind="consent", since="t", alternatives=3)
+    assert PendingItem.model_validate_json(consent.model_dump_json()) == consent
+
+
+def test_summary_pending_defaults_to_none() -> None:
+    assert _summary().pending is None
+
+
+def test_pending_item_refuses_unknown_fields_and_negative_counts() -> None:
+    with pytest.raises(ValidationError):
+        PendingItem.model_validate({"kind": "consent", "since": "t", "diff": "x"})
+    for field in ("added", "removed", "alternatives"):
+        with pytest.raises(ValidationError):
+            PendingItem.model_validate({"kind": "approval", "since": "t", field: -1})

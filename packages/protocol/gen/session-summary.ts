@@ -7,6 +7,15 @@ export type LastSeq = number;
 export type LocalOnly = boolean;
 export type ModelProfile = string;
 export type Origin = string;
+export type Added = number | null;
+export type Alternatives = number | null;
+export type CallId = string | null;
+export type Kind = 'approval' | 'consent';
+export type Name = string | null;
+export type Removed = number | null;
+export type Since = string;
+export type Source = string | null;
+export type Subject = string | null;
 export type PlanFirst = boolean;
 export type Route = 'pinned' | 'local' | 'auto';
 export type SessionId = string;
@@ -30,6 +39,8 @@ export type UpdatedAt = string;
  * ``local_only`` is true while the session's folder stays on this Mac: only a local model
  * reads its chat. It follows the settings of the moment, so it can change without an event.
  * An older daemon leaves it out.
+ * ``pending`` says what a ``waiting`` session waits for, null otherwise. An older daemon
+ * leaves it out.
  */
 export interface SessionSummary {
   created_at: CreatedAt;
@@ -39,10 +50,37 @@ export interface SessionSummary {
   local_only?: LocalOnly;
   model_profile: ModelProfile;
   origin?: Origin;
+  pending?: PendingItem | null;
   plan_first?: PlanFirst;
   route?: Route;
   session_id: SessionId;
   status: Status;
   title?: Title;
   updated_at: UpdatedAt;
+}
+/**
+ * What a waiting session waits for, in a form a client can list without opening it.
+ *
+ * ``kind`` is ``approval`` for a tool call that needs a yes, and ``consent`` for the paid
+ * step-up question. ``since`` is the ``ts`` of the event that asked
+ * (``approval.needed`` or ``route.consent.needed``). For an approval, ``call_id``, ``name``,
+ * ``subject`` and ``source`` are those of the ``approval.needed`` event, and ``added`` and
+ * ``removed`` count the lines its diff adds and removes (null when the call has no diff).
+ * For a consent, ``alternatives`` is the number of answers the user may give. The full diff
+ * stays in the session's events: a summary goes to every watcher on every event, so it
+ * carries counts only. An older daemon leaves ``pending`` out of the summary.
+ *
+ * This interface was referenced by `SessionSummary`'s JSON-Schema
+ * via the `definition` "PendingItem".
+ */
+export interface PendingItem {
+  added?: Added;
+  alternatives?: Alternatives;
+  call_id?: CallId;
+  kind: Kind;
+  name?: Name;
+  removed?: Removed;
+  since: Since;
+  source?: Source;
+  subject?: Subject;
 }

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from golem.store.records import SessionActivity
-from golem_protocol.commands import SessionSummary
+from golem_protocol.commands import PendingItem, SessionSummary
 
 SUMMARY_CHARS = 280
 """How much of the last reply ``session.completed`` carries (ADR-050)."""
@@ -26,7 +26,9 @@ def cut_summary(reply: str | None) -> str | None:
     return f"{text}…" if cut else text
 
 
-def summarize(activity: SessionActivity, local_only: bool = False) -> SessionSummary:
+def summarize(
+    activity: SessionActivity, local_only: bool = False, pending: PendingItem | None = None
+) -> SessionSummary:
     session = activity.session
     return SessionSummary(
         session_id=session.session_id,
@@ -50,6 +52,7 @@ def summarize(activity: SessionActivity, local_only: bool = False) -> SessionSum
         route=session.route,
         plan_first=session.plan_first,
         local_only=local_only,
+        pending=pending,
     )
 
 

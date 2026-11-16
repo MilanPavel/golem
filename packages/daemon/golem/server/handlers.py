@@ -421,7 +421,10 @@ async def _session_list(ctx: RequestContext, params: SessionListParams) -> Sessi
     else:
         found = await sessions.recent(params.limit, params.cwd)
     return SessionListResult(
-        sessions=[summarize(item, sessions.local_only(item.session.cwd)) for item in found]
+        sessions=[
+            summarize(item, sessions.local_only(item.session.cwd), await sessions.pending(item))
+            for item in found
+        ]
     )
 
 

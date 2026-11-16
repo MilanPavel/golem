@@ -73,6 +73,7 @@ from golem.store.blobs import BlobStore
 from golem.store.records import RunRecords, SessionActivity, SessionRecords
 from golem.tools.registry import ToolError, ToolScope
 from golem_protocol.commands import (
+    PendingItem,
     SessionCompactResult,
     TraceContextEvent,
     TraceRunSpan,
@@ -442,6 +443,10 @@ class SessionManager:
     async def watch(self, limit: int, target: SummaryTarget) -> list[SessionActivity]:
         """Like :meth:`recent`, and ``target`` gets each later change as a summary."""
         return await self._events.watch(limit, target)
+
+    async def pending(self, activity: SessionActivity) -> PendingItem | None:
+        """What a waiting session waits for, read from its stored events."""
+        return await self._events.pending(activity)
 
     async def inspect(self, session_id: str) -> SessionView:
         """The messages the next model call would see, system prompt first. Does not start a run."""

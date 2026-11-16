@@ -23,6 +23,7 @@ from golem.sessions.bus import EventBus, EventTarget, SummaryTarget
 from golem.sessions.summaries import summarize
 from golem.store.events import EventLog
 from golem.store.records import SessionActivity, SessionRecords
+from golem_protocol.commands import PendingItem
 from golem_protocol.events import CHAT_EVENT, ChatEvent, EventType
 
 _DELTAS = (
@@ -85,6 +86,18 @@ class SessionLog:
         self._bus.watch(target)
         return await self._records.recent(limit)
 
+    async def pending(self, activity: SessionActivity) -> PendingItem | None:
+        """What the waiting run of a session waits for. Idle sessions read nothing."""
+        if not activity.waiting or activity.session.closed_at is not None:
+            return None
+        run_id = await self._records.waiting_run_id(activity.session.session_id)
+        if run_id is None:
+            return None
+        # approvals reaches this module through recovery, so it is imported here.
+        from golem.sessions.approvals import pending_item
+
+        return pending_item(await self._events.for_run(run_id))
+
     async def for_run(self, run_id: str) -> list[ChatEvent]:
         """Every stored event of one run, in order."""
         return await self._events.for_run(run_id)
@@ -128,7 +141,11 @@ class SessionLog:
                 activity = await self._records.activity(session_id)
                 if activity is not None:
                     self._bus.publish_summary(
-                        summarize(activity, self.local_only(activity.session.cwd))
+                        summarize(
+                            activity,
+                            self.local_only(activity.session.cwd),
+                            await self.pending(activity),
+                        )
                     )
             return event
 

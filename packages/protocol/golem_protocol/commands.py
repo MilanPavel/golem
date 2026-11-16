@@ -191,6 +191,32 @@ class SessionListParams(BaseModel):
         return self
 
 
+class PendingItem(BaseModel):
+    """What a waiting session waits for, in a form a client can list without opening it.
+
+    ``kind`` is ``approval`` for a tool call that needs a yes, and ``consent`` for the paid
+    step-up question. ``since`` is the ``ts`` of the event that asked
+    (``approval.needed`` or ``route.consent.needed``). For an approval, ``call_id``, ``name``,
+    ``subject`` and ``source`` are those of the ``approval.needed`` event, and ``added`` and
+    ``removed`` count the lines its diff adds and removes (null when the call has no diff).
+    For a consent, ``alternatives`` is the number of answers the user may give. The full diff
+    stays in the session's events: a summary goes to every watcher on every event, so it
+    carries counts only. An older daemon leaves ``pending`` out of the summary.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    kind: Literal["approval", "consent"]
+    since: str = Field(min_length=1)
+    call_id: str | None = Field(default=None, min_length=1)
+    name: str | None = Field(default=None, min_length=1)
+    subject: str | None = None
+    source: str | None = Field(default=None, min_length=1)
+    added: int | None = Field(default=None, ge=0)
+    removed: int | None = Field(default=None, ge=0)
+    alternatives: int | None = Field(default=None, ge=0)
+
+
 class SessionSummary(BaseModel):
     """One session as ``session.list`` reports it.
 
@@ -207,6 +233,8 @@ class SessionSummary(BaseModel):
     ``local_only`` is true while the session's folder stays on this Mac: only a local model
     reads its chat. It follows the settings of the moment, so it can change without an event.
     An older daemon leaves it out.
+    ``pending`` says what a ``waiting`` session waits for, null otherwise. An older daemon
+    leaves it out.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -224,6 +252,7 @@ class SessionSummary(BaseModel):
     route: RouteMode = "pinned"
     plan_first: bool = False
     local_only: bool = False
+    pending: PendingItem | None = None
 
 
 class SessionListResult(BaseModel):
@@ -3513,6 +3542,7 @@ __all__ = [
     "OllamaInstallResult",
     "OllamaStartParams",
     "OllamaStartResult",
+    "PendingItem",
     "PermissionsSetModeParams",
     "PermissionsSetModeResult",
     "PingParams",
