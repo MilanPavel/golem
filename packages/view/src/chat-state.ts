@@ -76,6 +76,9 @@ export type ChatMessage = {
   interrupted?: boolean;
   /** Event time. Completed messages use `message.completed`; a streaming reply uses `message.started`. */
   at?: string;
+  /** The run the message belongs to, from `message.completed`. A user message holds the request that started it,
+   * and a reply's run finds the changes of its turn. */
+  runId?: string;
   /** Milliseconds from `run.started` to this finished answer. */
   durationMs?: number;
   /** What the model thought before it answered, from `message.thinking.delta` and `message.completed`. */
@@ -90,8 +93,6 @@ export type ChatMessage = {
   tools?: ToolBlock[];
   /** A file the model is still writing, from `tool.writing`. Gone once the call is requested or the reply completes. */
   writing?: WritingBlock | null;
-  /** The run that wrote this reply, from the event that started or completed it. */
-  runId?: string;
   /** Set on a user message that ran a skill. `text` is then the filled-in body. */
   skill?: SkillCall;
 };
@@ -673,7 +674,7 @@ function upsertCompleted(
     streaming: false,
     interrupted: event.data.interrupted === true,
     at: event.ts,
-    ...(runId === null || runId === undefined || event.data.role !== "assistant" ? {} : { runId }),
+    ...(runId === null || runId === undefined ? {} : { runId }),
     ...(durationMs === undefined ? {} : { durationMs }),
     ...(event.data.skill == null ? {} : { skill: event.data.skill }),
     ...callOf({ calls }, event.data.message_id),

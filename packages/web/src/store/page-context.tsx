@@ -1,8 +1,8 @@
 import { keepPreviousData, QueryClientProvider, useInfiniteQuery, useQuery, type UseInfiniteQueryResult, type InfiniteData, type UseQueryResult } from "@tanstack/react-query";
-import { createContext, useCallback, useContext, useSyncExternalStore, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useMemo, useSyncExternalStore, type ReactNode } from "react";
 import { useSyncExternalStoreWithSelector } from "use-sync-external-store/with-selector";
 import { ConnectionProvider } from "./connection-context.tsx";
-import { changesDiffKey, changesListKey, commitInfoKey, type ChangedFiles, type ChangesCommitInfoResult, type FileDiff } from "./changes.ts";
+import { changeDiffKey, changesDiffKey, changesListKey, commitInfoKey, type ChangedFiles, type ChangesCommitInfoResult, type FileDiff } from "./changes.ts";
 import { configKey, type ConfigGetResult } from "./config.ts";
 import { KEYS_KEY } from "./keys.ts";
 import type { FsListDirsResult } from "./dirs.ts";
@@ -15,7 +15,7 @@ import type { Route } from "./router.ts";
 import type { AuthListResult, CostGetResult, McpListResult, SessionSummary, SetupStatusResult, SkillListResult } from "@golem/client";
 import { ARTIFACT_PAGE, artifactKey, traceKey, traceSpanKey, type ArtifactReadResult, type TraceGetResult, type TraceSpanResult } from "./trace.ts";
 import { mcpCatalogKey, mcpListKey, mcpToolsKey, type McpCatalogResult, type McpToolsResult } from "./mcp.ts";
-import type { NotesState, Pastes, ReviewNote } from "@golem/view";
+import { turnCards, type NotesState, type Pastes, type ReviewNote, type TurnCard } from "@golem/view";
 import { distinctFolders, resolveFolder } from "./new-session.ts";
 import type { SetupStart } from "./setup-start.ts";
 import { initialSessionView, type SessionView } from "./session-store.ts";
@@ -311,6 +311,28 @@ export function useFileDiff(sessionId: string, path: string | null): FileDiff {
     truncated: result.data?.truncated ?? false,
     error: result.error === null ? null : result.error.message,
   };
+}
+
+/** The diff of one change, as one turn made it. Not read for a null id. */
+export function useChangeDiff(sessionId: string, changeId: string | null): FileDiff {
+  const { queries } = usePage();
+  const result = useQuery({
+    queryKey: changeDiffKey(sessionId, changeId ?? ""),
+    queryFn: () => queries.changesDiff(sessionId, { changeId: changeId ?? "" }),
+    enabled: changeId !== null,
+  });
+  return {
+    diff: result.data?.diff ?? null,
+    truncated: result.data?.truncated ?? false,
+    error: result.error === null ? null : result.error.message,
+  };
+}
+
+/** The turns of a session that changed files, newest first, from the session store. */
+export function useTurnCards(sessionId: string): TurnCard[] {
+  const changes = useSession(sessionId, (view) => view.changes);
+  const messages = useSession(sessionId, (view) => view.chat.messages);
+  return useMemo(() => turnCards(changes, messages), [changes, messages]);
 }
 
 /** An artifact, a page of characters at a time. Fetched only once `enabled`, and `fetchNextPage` reads the next one. */

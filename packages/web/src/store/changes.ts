@@ -15,6 +15,11 @@ export function changesDiffKey(sessionId: string, path: string): readonly unknow
   return ["changes.diff", sessionId, path];
 }
 
+/** The query key of `changes.diff` for one change. A change never changes, but the key shares the prefix so a reset drops it too. */
+export function changeDiffKey(sessionId: string, changeId: string): readonly unknown[] {
+  return ["changes.diff", sessionId, "change", changeId];
+}
+
 /** The query key of `changes.commit_info`. A `file.changed` event for the session marks it stale. */
 export function commitInfoKey(sessionId: string): readonly unknown[] {
   return ["changes.commit_info", sessionId];
