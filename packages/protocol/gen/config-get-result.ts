@@ -7,6 +7,11 @@ export type LogLevel = string;
 export type PermissionMode = 'careful' | 'balanced' | 'autopilot';
 export type ProjectPolicy = string | null;
 export type ProjectTrusted = boolean | null;
+export type DailyUsd = number | null;
+export type Budget = string | null;
+export type Frontier = string | null;
+export type Local = string | null;
+export type SessionUsd = number | null;
 export type Action = 'allow' | 'ask' | 'deny';
 export type File = 'user' | 'project' | 'default';
 export type Ignored = string | null;
@@ -30,6 +35,7 @@ export type TrustedProjects = string[];
  * without a ``cwd``. ``default_permission_mode`` is ``[permissions] mode``,
  * and ``permission_mode`` the mode the ``rules`` were built for: the session's
  * when ``session_id`` is given, else the default. An older daemon leaves both out.
+ * ``routing`` is the ladder and the spending caps. An older daemon leaves it out.
  */
 export interface ConfigGetResult {
   config_file: ConfigFile;
@@ -39,10 +45,35 @@ export interface ConfigGetResult {
   permission_mode?: PermissionMode;
   project_policy?: ProjectPolicy;
   project_trusted?: ProjectTrusted;
+  routing?: ConfigRouting | null;
   rules: Rules;
   session_allowed?: SessionAllowed;
   session_titles: SessionTitles;
   trusted_projects: TrustedProjects;
+}
+/**
+ * What a route chip needs from ``[routing]`` and ``[budget]``.
+ *
+ * ``daily_usd`` and ``session_usd`` are the caps on paid models, null for no cap.
+ *
+ * This interface was referenced by `ConfigGetResult`'s JSON-Schema
+ * via the `definition` "ConfigRouting".
+ */
+export interface ConfigRouting {
+  daily_usd?: DailyUsd;
+  ladder?: ConfigLadder;
+  session_usd?: SessionUsd;
+}
+/**
+ * ``[routing.ladder]``: the model named for each tier. Null means golem chooses.
+ *
+ * This interface was referenced by `ConfigGetResult`'s JSON-Schema
+ * via the `definition` "ConfigLadder".
+ */
+export interface ConfigLadder {
+  budget?: Budget;
+  frontier?: Frontier;
+  local?: Local;
 }
 /**
  * One tool rule, in the order rules are checked.

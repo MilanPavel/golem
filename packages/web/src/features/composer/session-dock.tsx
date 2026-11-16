@@ -1,4 +1,4 @@
-import { golemState, loadingLine, withNotes, type PermissionMode } from "@golem/view";
+import { golemState, loadingLine, withNotes, type PermissionMode, type RouteMode } from "@golem/view";
 import { useMutation } from "@tanstack/react-query";
 import { useConnection } from "../../store/connection-context.tsx";
 import { actionErrorText, sendErrorText } from "../../store/errors.ts";
@@ -11,6 +11,8 @@ import { Composer } from "./composer.tsx";
 import { ModeChip } from "./mode-chip.tsx";
 import { PlanChip } from "./plan-chip.tsx";
 import { NotesChip } from "./notes-chip.tsx";
+import { RouteChip } from "./route-chip.tsx";
+import { WaitHint } from "./wait-hint.tsx";
 import { ContextChip } from "./context-chip.tsx";
 import { TuneChip } from "./tune-chip.tsx";
 import { useCommands } from "./use-commands.tsx";
@@ -100,10 +102,14 @@ export function SessionDock({ sessionId }: { sessionId: string }) {
     mutationFn: (on: boolean) => actions.setPlan(sessionId, on),
   });
 
+  const setRoute = useMutation({
+    mutationFn: (mode: RouteMode) => actions.setRoute(sessionId, mode),
+  });
+
   const phase = run.waiting ? "waiting" : run.busy ? "thinking" : null;
   const state = golemState({ connection, phase, error: run.failed });
   const failure = send.error ?? stop.error;
-  const line = commands.error ?? (setMode.error ? actionErrorText(setMode.error, "Could not change the mode.") : setPlan.error ? actionErrorText(setPlan.error, "Could not change plan first.") : failure ? sendErrorText(failure) : null);
+  const line = commands.error ?? (setMode.error ? actionErrorText(setMode.error, "Could not change the mode.") : setRoute.error ? actionErrorText(setRoute.error, "Could not change the route.") : setPlan.error ? actionErrorText(setPlan.error, "Could not change plan first.") : failure ? sendErrorText(failure) : null);
   return (
     <>
       <DockView
@@ -115,6 +121,7 @@ export function SessionDock({ sessionId }: { sessionId: string }) {
                 <NotesChip sessionId={sessionId} />
                 <TuneChip sessionId={sessionId} />
                 <PlanChip sessionId={sessionId} onToggle={(on) => setPlan.mutate(on)} />
+                <RouteChip sessionId={sessionId} onSelect={(mode) => setRoute.mutate(mode)} />
                 <ModeChip sessionId={sessionId} onSelect={(mode) => setMode.mutate(mode)} />
                 <ContextChip sessionId={sessionId} />
               </span>
@@ -126,6 +133,7 @@ export function SessionDock({ sessionId }: { sessionId: string }) {
           </>
         }
         question={<DockedChecksQuestion sessionId={sessionId} />}
+        hint={<WaitHint sessionId={sessionId} />}
         composer={
           <Composer
             forPalette

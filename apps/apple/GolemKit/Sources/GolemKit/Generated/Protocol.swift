@@ -1199,6 +1199,7 @@ public struct ConfigGetParams: Codable {
 /// without a ``cwd``. ``default_permission_mode`` is ``[permissions] mode``,
 /// and ``permission_mode`` the mode the ``rules`` were built for: the session's
 /// when ``session_id`` is given, else the default. An older daemon leaves both out.
+/// ``routing`` is the ladder and the spending caps. An older daemon leaves it out.
 // MARK: - ConfigGetResult
 public struct ConfigGetResult: Codable {
     public let configFile: String
@@ -1208,6 +1209,7 @@ public struct ConfigGetResult: Codable {
     public let permissionMode: DefaultPermissionModeEnum?
     public let projectPolicy: String?
     public let projectTrusted: Bool?
+    public let routing: ConfigRoutingClass?
     public let rules: [RuleElement]
     public let sessionAllowed: [SessionAllowedElement]?
     public let sessionTitles: Bool
@@ -1221,13 +1223,14 @@ public struct ConfigGetResult: Codable {
         case permissionMode = "permission_mode"
         case projectPolicy = "project_policy"
         case projectTrusted = "project_trusted"
+        case routing = "routing"
         case rules = "rules"
         case sessionAllowed = "session_allowed"
         case sessionTitles = "session_titles"
         case trustedProjects = "trusted_projects"
     }
 
-    public init(configFile: String, defaultModel: String?, defaultPermissionMode: DefaultPermissionModeEnum?, logLevel: String, permissionMode: DefaultPermissionModeEnum?, projectPolicy: String?, projectTrusted: Bool?, rules: [RuleElement], sessionAllowed: [SessionAllowedElement]?, sessionTitles: Bool, trustedProjects: [String]) {
+    public init(configFile: String, defaultModel: String?, defaultPermissionMode: DefaultPermissionModeEnum?, logLevel: String, permissionMode: DefaultPermissionModeEnum?, projectPolicy: String?, projectTrusted: Bool?, routing: ConfigRoutingClass?, rules: [RuleElement], sessionAllowed: [SessionAllowedElement]?, sessionTitles: Bool, trustedProjects: [String]) {
         self.configFile = configFile
         self.defaultModel = defaultModel
         self.defaultPermissionMode = defaultPermissionMode
@@ -1235,6 +1238,7 @@ public struct ConfigGetResult: Codable {
         self.permissionMode = permissionMode
         self.projectPolicy = projectPolicy
         self.projectTrusted = projectTrusted
+        self.routing = routing
         self.rules = rules
         self.sessionAllowed = sessionAllowed
         self.sessionTitles = sessionTitles
@@ -1246,6 +1250,48 @@ public enum DefaultPermissionModeEnum: String, Codable {
     case autopilot = "autopilot"
     case balanced = "balanced"
     case careful = "careful"
+}
+
+/// What a route chip needs from ``[routing]`` and ``[budget]``.
+///
+/// ``daily_usd`` and ``session_usd`` are the caps on paid models, null for no cap.
+// MARK: - ConfigRoutingClass
+public struct ConfigRoutingClass: Codable {
+    public let dailyUsd: Double?
+    public let ladder: PurpleConfigLadder?
+    public let sessionUsd: Double?
+
+    public enum CodingKeys: String, CodingKey {
+        case dailyUsd = "daily_usd"
+        case ladder = "ladder"
+        case sessionUsd = "session_usd"
+    }
+
+    public init(dailyUsd: Double?, ladder: PurpleConfigLadder?, sessionUsd: Double?) {
+        self.dailyUsd = dailyUsd
+        self.ladder = ladder
+        self.sessionUsd = sessionUsd
+    }
+}
+
+/// ``[routing.ladder]``: the model named for each tier. Null means golem chooses.
+// MARK: - PurpleConfigLadder
+public struct PurpleConfigLadder: Codable {
+    public let budget: String?
+    public let frontier: String?
+    public let local: String?
+
+    public enum CodingKeys: String, CodingKey {
+        case budget = "budget"
+        case frontier = "frontier"
+        case local = "local"
+    }
+
+    public init(budget: String?, frontier: String?, local: String?) {
+        self.budget = budget
+        self.frontier = frontier
+        self.local = local
+    }
 }
 
 /// One tool rule, in the order rules are checked.
@@ -1313,6 +1359,26 @@ public struct SessionAllowedElement: Codable {
     public init(subject: String?, tool: String) {
         self.subject = subject
         self.tool = tool
+    }
+}
+
+/// ``[routing.ladder]``: the model named for each tier. Null means golem chooses.
+// MARK: - ConfigLadder
+public struct ConfigLadder: Codable {
+    public let budget: String?
+    public let frontier: String?
+    public let local: String?
+
+    public enum CodingKeys: String, CodingKey {
+        case budget = "budget"
+        case frontier = "frontier"
+        case local = "local"
+    }
+
+    public init(budget: String?, frontier: String?, local: String?) {
+        self.budget = budget
+        self.frontier = frontier
+        self.local = local
     }
 }
 
@@ -1444,6 +1510,48 @@ public struct ConfigRawSetParams: Codable {
         self.scope = scope
         self.sessionID = sessionID
         self.text = text
+    }
+}
+
+/// What a route chip needs from ``[routing]`` and ``[budget]``.
+///
+/// ``daily_usd`` and ``session_usd`` are the caps on paid models, null for no cap.
+// MARK: - ConfigRouting
+public struct ConfigRouting: Codable {
+    public let dailyUsd: Double?
+    public let ladder: FluffyConfigLadder?
+    public let sessionUsd: Double?
+
+    public enum CodingKeys: String, CodingKey {
+        case dailyUsd = "daily_usd"
+        case ladder = "ladder"
+        case sessionUsd = "session_usd"
+    }
+
+    public init(dailyUsd: Double?, ladder: FluffyConfigLadder?, sessionUsd: Double?) {
+        self.dailyUsd = dailyUsd
+        self.ladder = ladder
+        self.sessionUsd = sessionUsd
+    }
+}
+
+/// ``[routing.ladder]``: the model named for each tier. Null means golem chooses.
+// MARK: - FluffyConfigLadder
+public struct FluffyConfigLadder: Codable {
+    public let budget: String?
+    public let frontier: String?
+    public let local: String?
+
+    public enum CodingKeys: String, CodingKey {
+        case budget = "budget"
+        case frontier = "frontier"
+        case local = "local"
+    }
+
+    public init(budget: String?, frontier: String?, local: String?) {
+        self.budget = budget
+        self.frontier = frontier
+        self.local = local
     }
 }
 
@@ -2102,20 +2210,26 @@ public enum FileChangedEventType: String, Codable {
     case fileChanged = "file.changed"
 }
 
-/// ``file.list``. Files of the session's folder whose path holds ``query``, case-insensitive.
+/// ``file.list``. Files of the session's folder whose path holds ``query``,
+/// case-insensitive.
+///
+/// Dot files and files in dot folders are listed only when ``hidden`` is true.
 // MARK: - FileListParams
 public struct FileListParams: Codable {
+    public let hidden: Bool?
     public let limit: Int?
     public let query: String?
     public let sessionID: String
 
     public enum CodingKeys: String, CodingKey {
+        case hidden = "hidden"
         case limit = "limit"
         case query = "query"
         case sessionID = "session_id"
     }
 
-    public init(limit: Int?, query: String?, sessionID: String) {
+    public init(hidden: Bool?, limit: Int?, query: String?, sessionID: String) {
+        self.hidden = hidden
         self.limit = limit
         self.query = query
         self.sessionID = sessionID
@@ -16324,23 +16438,30 @@ public struct RunTraceTokens: Codable {
 /// Why a run used the model it did: the pick of a session that is not ``pinned``.
 ///
 /// ``reason`` and ``detail`` are those of ``model.routed``, and ``rejected`` the
-/// candidates the pick dropped.
+/// candidates the pick dropped. ``model`` and ``tier`` are the pick itself. An older
+/// daemon leaves them out.
 // MARK: - RunTraceRoute
 public struct RunTraceRoute: Codable {
     public let detail: String
+    public let model: String?
     public let reason: ModelRoutedDataReason
     public let rejected: [TentacledModelRejection]?
+    public let tier: Tier?
 
     public enum CodingKeys: String, CodingKey {
         case detail = "detail"
+        case model = "model"
         case reason = "reason"
         case rejected = "rejected"
+        case tier = "tier"
     }
 
-    public init(detail: String, reason: ModelRoutedDataReason, rejected: [TentacledModelRejection]?) {
+    public init(detail: String, model: String?, reason: ModelRoutedDataReason, rejected: [TentacledModelRejection]?, tier: Tier?) {
         self.detail = detail
+        self.model = model
         self.reason = reason
         self.rejected = rejected
+        self.tier = tier
     }
 }
 
@@ -16580,23 +16701,30 @@ public struct TraceModelSpanTraceTokens: Codable {
 /// Why a run used the model it did: the pick of a session that is not ``pinned``.
 ///
 /// ``reason`` and ``detail`` are those of ``model.routed``, and ``rejected`` the
-/// candidates the pick dropped.
+/// candidates the pick dropped. ``model`` and ``tier`` are the pick itself. An older
+/// daemon leaves them out.
 // MARK: - TraceRoute
 public struct TraceRoute: Codable {
     public let detail: String
+    public let model: String?
     public let reason: ModelRoutedDataReason
     public let rejected: [StickyModelRejection]?
+    public let tier: Tier?
 
     public enum CodingKeys: String, CodingKey {
         case detail = "detail"
+        case model = "model"
         case reason = "reason"
         case rejected = "rejected"
+        case tier = "tier"
     }
 
-    public init(detail: String, reason: ModelRoutedDataReason, rejected: [StickyModelRejection]?) {
+    public init(detail: String, model: String?, reason: ModelRoutedDataReason, rejected: [StickyModelRejection]?, tier: Tier?) {
         self.detail = detail
+        self.model = model
         self.reason = reason
         self.rejected = rejected
+        self.tier = tier
     }
 }
 
@@ -16856,23 +16984,30 @@ public struct TraceRunSpanTraceTokens: Codable {
 /// Why a run used the model it did: the pick of a session that is not ``pinned``.
 ///
 /// ``reason`` and ``detail`` are those of ``model.routed``, and ``rejected`` the
-/// candidates the pick dropped.
+/// candidates the pick dropped. ``model`` and ``tier`` are the pick itself. An older
+/// daemon leaves them out.
 // MARK: - TraceRunSpanTraceRoute
 public struct TraceRunSpanTraceRoute: Codable {
     public let detail: String
+    public let model: String?
     public let reason: ModelRoutedDataReason
     public let rejected: [IndigoModelRejection]?
+    public let tier: Tier?
 
     public enum CodingKeys: String, CodingKey {
         case detail = "detail"
+        case model = "model"
         case reason = "reason"
         case rejected = "rejected"
+        case tier = "tier"
     }
 
-    public init(detail: String, reason: ModelRoutedDataReason, rejected: [IndigoModelRejection]?) {
+    public init(detail: String, model: String?, reason: ModelRoutedDataReason, rejected: [IndigoModelRejection]?, tier: Tier?) {
         self.detail = detail
+        self.model = model
         self.reason = reason
         self.rejected = rejected
+        self.tier = tier
     }
 }
 

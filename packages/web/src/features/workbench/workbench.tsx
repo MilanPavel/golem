@@ -1,5 +1,6 @@
 import { useRef, type ReactNode } from "react";
 import { cn } from "../../ui/cn.ts";
+import { HEADER_ROW } from "../../ui/header-row.ts";
 import { IconButton } from "../../ui/icon-button.tsx";
 import { CloseIcon } from "../../ui/icons.tsx";
 import { ResizeHandle } from "../../ui/resize-handle.tsx";
@@ -56,7 +57,7 @@ export function Workbench({ tabs, onClose, id = WORKBENCH_ID, floating = true }:
         className={floating ? "max-wide:hidden" : undefined}
       />
       <Tabs value={active} onValueChange={setTab} className="flex min-h-0 flex-1 flex-col">
-        <div className="flex items-center justify-between gap-2 border-b border-line px-3 py-2">
+        <div className={cn(HEADER_ROW, "justify-between gap-2 px-3 py-2")}>
           <TabsList className="min-w-0 border-b-0">
             {tabs.map((tab) => (
               <TabsTrigger

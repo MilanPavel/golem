@@ -6,6 +6,7 @@ import { createPage } from "../../store/page.ts";
 import { PageProvider } from "../../store/page-context.tsx";
 import { fakeClient, fakeFrame } from "../../store/test-support.ts";
 import { FilesTab } from "./files-tab.tsx";
+import { hiddenFilesStore } from "./hidden-files.ts";
 import { openFile } from "./workbench-state.ts";
 
 const CHANGED: ChangedFile[] = [
@@ -35,6 +36,7 @@ function setup() {
 
 beforeEach(() => {
   localStorage.clear();
+  hiddenFilesStore.set(false);
 });
 afterEach(() => {
   vi.restoreAllMocks();
@@ -45,8 +47,21 @@ test("with an empty box the changed files come first, then the folder's files", 
   await screen.findByText("README.md");
   const names = screen.getAllByRole("button").map((button) => button.getAttribute("title"));
   expect(names).toEqual(["src/socket.ts", "src/fetch.py", "README.md"]);
-  expect(fake.raw.listFiles).toHaveBeenCalledWith("a", "", 50);
+  expect(fake.raw.listFiles).toHaveBeenCalledWith("a", "", 50, false);
   expect(screen.getByText("Changed in this session")).toBeTruthy();
+  page.stop();
+});
+
+test("hidden files are off at first, and turning the box on asks for them and is kept", async () => {
+  const { fake, page } = setup();
+  await screen.findByText("README.md");
+  const box = screen.getByRole("checkbox", { name: "Show hidden files" });
+  expect((box as HTMLInputElement).checked).toBe(false);
+  expect(fake.raw.listFiles).not.toHaveBeenCalledWith("a", "", 50, true);
+  await userEvent.click(box);
+  await waitFor(() => expect(fake.raw.listFiles).toHaveBeenCalledWith("a", "", 50, true));
+  expect((screen.getByRole("checkbox", { name: "Show hidden files" }) as HTMLInputElement).checked).toBe(true);
+  expect(localStorage.getItem("golem.files.hidden")).toBe("1");
   page.stop();
 });
 
@@ -54,7 +69,7 @@ test("typing asks for the list once, after a pause", async () => {
   const { fake, page } = setup();
   await screen.findByText("README.md");
   await userEvent.type(screen.getByRole("textbox", { name: "Find a file" }), "fetch");
-  await waitFor(() => expect(fake.raw.listFiles).toHaveBeenCalledWith("a", "fetch", 50));
+  await waitFor(() => expect(fake.raw.listFiles).toHaveBeenCalledWith("a", "fetch", 50, false));
   expect(fake.raw.listFiles.mock.calls.filter(([, query]) => query !== "")).toHaveLength(1);
   await waitFor(() => expect(screen.queryByText("README.md")).toBeNull());
   expect(screen.queryByText("Changed in this session")).toBeNull();

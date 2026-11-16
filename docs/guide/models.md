@@ -100,6 +100,15 @@ local_only = ["~/work/private"]
 
 "Local only" is about which model reads your chat. Web fetch, web search and MCP servers are not model calls, and it does not block them. Turn them off in [Settings](./settings.md) if the folder needs that too.
 
+### See and change the route
+
+A chat's route mode says how it picks the model of each turn: `pinned` (the model you chose), `local` (never a hosted model), or `auto` (local first, a hosted model only when the routing rules allow it). The new mode applies from the next turn.
+
+- **Web:** the route chip next to the permission chip. Its popover has the switch, the ladder of tiers with each model's state, and today's spend against the `[budget]` caps.
+- **Terminal:** `/route` prints the mode, the ladder, and the spend. `/route pinned`, `/route local`, and `/route auto` set the mode. `/route why` prints why the last answer used its model: the picked one, then each model that was left out and why. The status line shows the mode after the model, and hides it on `pinned`.
+
+An answer that ran on a model other than the chat's own starts its footer with a note, such as `↑ deepseek-chat · did not fit in 32K`. The arrow is there when the model is in a higher tier than the chat's. The model pickers show each model's tier: `local`, `budget`, or `frontier`.
+
 ## Short names, and other providers
 
 golem reads `~/.golem/config.toml`, and picks up model changes without a restart. A **profile** gives a model a short name:

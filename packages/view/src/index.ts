@@ -31,6 +31,39 @@ export {
   type RouteMode,
   type RoutingChoice,
 } from "./routing.ts";
+export {
+  emptyRoute,
+  foldRoute,
+  inputPrice,
+  isRouteMode,
+  ladderLine,
+  ladderRows,
+  HOSTED_FIRST_TOKEN_SECONDS,
+  ROUTE_CHOICES,
+  ROUTE_MODE_NAMES,
+  routedNote,
+  routeHeadline,
+  routeForSpan,
+  routeLabel,
+  routeReport,
+  routeReportLines,
+  routeStatus,
+  sessionModelOf,
+  spendRows,
+  turnRoutedNote,
+  waitHint,
+  WAIT_HINT_SECONDS,
+  whyLines,
+  whyRows,
+  whySummary,
+  type LadderRow,
+  type RouteState,
+  type SessionModelRef,
+  type SpendRow,
+  type Tier,
+  type WhyInput,
+  type WhyRow,
+} from "./route.ts";
 export { costReportLines, formatCost, formatCount, referenceName, sessionCostLabel, turnFooterParts, turnTotals, type TurnTotals } from "./cost.ts";
 export { groupTurns, turnFooter, type Turn } from "./turns.ts";
 export { editedArgs, parseArgs, type ParsedArgs } from "./approval-args.ts";
@@ -500,6 +533,7 @@ export {
   type Category,
   type PickerGroup,
   type PullState,
+  tierLabel,
 } from "./model-list.ts";
 export {
   copyAnswer,

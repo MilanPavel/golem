@@ -1,7 +1,12 @@
 {
   "additionalProperties": false,
-  "description": "``file.list``. Files of the session's folder whose path holds ``query``, case-insensitive.",
+  "description": "``file.list``. Files of the session's folder whose path holds ``query``, case-insensitive.\n\nDot files and files in dot folders are listed only when ``hidden`` is true.",
   "properties": {
+    "hidden": {
+      "default": false,
+      "title": "Hidden",
+      "type": "boolean"
+    },
     "limit": {
       "default": 50,
       "maximum": 200,

@@ -149,6 +149,8 @@ def _run(run_id: str, events: list[ChatEvent]) -> TraceRunSpan | None:
     for event in events:
         if isinstance(event, ModelRoutedEvent):
             route = TraceRoute(
+                model=event.data.model or event.data.model_profile,
+                tier=event.data.tier,
                 reason=event.data.reason,
                 detail=event.data.detail,
                 rejected=list(event.data.rejected),

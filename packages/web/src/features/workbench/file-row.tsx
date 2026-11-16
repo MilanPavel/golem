@@ -1,8 +1,9 @@
-import type { ComponentProps, ReactNode } from "react";
+import { useId, type ComponentProps, type ReactNode } from "react";
 import { Badge } from "../../ui/badge.tsx";
 import { cn } from "../../ui/cn.ts";
 import { IconButton } from "../../ui/icon-button.tsx";
 import { ChevronDownIcon, OpenIcon } from "../../ui/icons.tsx";
+import { useChangeDiff, useFileDiff } from "../../store/page-context.tsx";
 import type { ChangedFile, FileDiff } from "../../store/changes.ts";
 import { DiffModeSwitch, DiffView, type DiffMode } from "../diff/index.ts";
 
@@ -38,7 +39,6 @@ export function Row({
   open,
   onToggle,
   onOpenFile,
-  panel,
   noteCount = 0,
   children,
 }: {
@@ -48,10 +48,10 @@ export function Row({
   onToggle: () => void;
   /** Shows the file in the Files tab. Without it the row has no open button. */
   onOpenFile?: ((path: string) => void) | undefined;
-  panel: string;
   children: ReactNode;
 }) {
   const [folder, name] = splitPath(file.path);
+  const panel = useId();
   return (
     <li data-path={file.path} className="flex flex-col gap-2">
       <div className="flex items-center gap-1">
@@ -126,4 +126,16 @@ export function DiffPanel({
       )}
     </>
   );
+}
+
+type PanelProps = Omit<ComponentProps<typeof DiffPanel>, "diff">;
+
+/** The diff panel of one file's current change. Only an open row mounts it, so a closed row reads nothing. */
+export function FileDiffPanel({ sessionId, path, ...rest }: PanelProps & { sessionId: string; path: string }) {
+  return <DiffPanel diff={useFileDiff(sessionId, path)} {...rest} />;
+}
+
+/** The diff panel of one change, as one turn made it. */
+export function ChangeDiffPanel({ sessionId, changeId, ...rest }: PanelProps & { sessionId: string; changeId: string | null }) {
+  return <DiffPanel diff={useChangeDiff(sessionId, changeId)} {...rest} />;
 }

@@ -6,6 +6,7 @@ import { CopyButton } from "../../ui/copy-command.tsx";
 import { Input } from "../../ui/input.tsx";
 import type { LanguageId } from "../chat/languages.ts";
 import { languageForPath } from "../chat/languages.ts";
+import { useHiddenFiles } from "./hidden-files.ts";
 import { useRequestedFile, type FileRequest } from "./workbench-state.ts";
 
 /** How long typing waits before the list is asked for, in ms. */
@@ -153,6 +154,9 @@ export type FilesViewProps = {
   /** What is typed in the filter box. */
   typed: string;
   onTyped: (typed: string) => void;
+  /** Whether dot files are listed. */
+  hidden: boolean;
+  onHidden: (hidden: boolean) => void;
   /** Files of the change set, shown first while the box is empty. */
   changed: readonly string[];
   /** The paths that answer the filter, or null before the first answer. */
@@ -169,7 +173,7 @@ export type FilesViewProps = {
 };
 
 /** The filter box and its list, or one file under its header. It reads nothing itself. */
-export function FilesView({ typed, onTyped, changed, found, more, listError, open, file, line, onOpen, onBack }: FilesViewProps) {
+export function FilesView({ typed, onTyped, hidden, onHidden, changed, found, more, listError, open, file, line, onOpen, onBack }: FilesViewProps) {
   if (open !== null) {
     const count = file.file?.lines;
     return (
@@ -222,6 +226,17 @@ export function FilesView({ typed, onTyped, changed, found, more, listError, ope
           }
         }}
       />
+      <label className="flex w-fit items-center gap-2 text-sm text-muted">
+        <input
+          type="checkbox"
+          checked={hidden}
+          onChange={(event) => {
+            onHidden(event.target.checked);
+          }}
+          className="size-4 accent-clay outline-offset-2 outline-clay focus-visible:outline-2"
+        />
+        Show hidden files
+      </label>
       {listError !== null ? <p className="text-sm text-muted">{`Could not list the files. ${listError}`}</p> : null}
       {asking ? null : <PathGroup title="Changed in this session" paths={changed} onOpen={onOpen} />}
       <PathGroup title={asking ? null : changed.length === 0 ? null : "All files"} paths={rest} onOpen={onOpen} />
@@ -269,7 +284,8 @@ export function FilesTab({ sessionId }: { sessionId: string }) {
   }, [requested, clearRequest]);
 
   const changedFiles = useChangedFiles(sessionId).files;
-  const list = useFileList(sessionId, query, FILE_LIST_LIMIT);
+  const [hidden, setHidden] = useHiddenFiles();
+  const list = useFileList(sessionId, query, FILE_LIST_LIMIT, hidden);
   const file = useFileRead(sessionId, open);
   const changed = (changedFiles ?? []).filter((entry) => entry.status !== "deleted").map((entry) => entry.path);
 
@@ -278,6 +294,8 @@ export function FilesTab({ sessionId }: { sessionId: string }) {
       <FilesView
         typed={typed}
         onTyped={setTyped}
+        hidden={hidden}
+        onHidden={setHidden}
         changed={changed}
         found={list.data?.paths ?? null}
         more={list.data?.more ?? false}

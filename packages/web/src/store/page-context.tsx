@@ -250,9 +250,9 @@ export function useKeys(enabled = true): UseQueryResult<AuthListResult> {
 }
 
 /** What model calls cost. Read again whenever Settings opens and the tab is seen: nothing pushes a change. */
-export function useCost(enabled = true): UseQueryResult<CostGetResult> {
+export function useCost(enabled = true, sessionId?: string): UseQueryResult<CostGetResult> {
   const { queries } = usePage();
-  return useQuery({ queryKey: ["cost.get"], queryFn: queries.cost, enabled, staleTime: 0, retry: false, refetchOnWindowFocus: true });
+  return useQuery({ queryKey: ["cost.get", sessionId ?? null], queryFn: () => queries.cost(sessionId), enabled, staleTime: 0, retry: false, refetchOnWindowFocus: true });
 }
 
 /** The routing, budget and context settings. Read again whenever the tab is seen: a terminal edit pushes nothing. */
@@ -321,12 +321,12 @@ export function useFileDiff(sessionId: string, path: string | null): FileDiff {
   };
 }
 
-/** The paths of the session's folder that hold `query`, at most `limit`. The last answer stays while a new one is read. */
-export function useFileList(sessionId: string, query: string, limit: number): UseQueryResult<FileListResult> {
+/** The paths of the session's folder that hold `query`, at most `limit`; dot files only when `hidden`. The last answer stays while a new one is read. */
+export function useFileList(sessionId: string, query: string, limit: number, hidden: boolean): UseQueryResult<FileListResult> {
   const { queries } = usePage();
   return useQuery({
-    queryKey: fileListKey(sessionId, query),
-    queryFn: () => queries.listFiles(sessionId, query, limit),
+    queryKey: fileListKey(sessionId, query, hidden),
+    queryFn: () => queries.listFiles(sessionId, query, limit, hidden),
     placeholderData: keepPreviousData,
     retry: false,
   });

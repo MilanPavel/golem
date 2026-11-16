@@ -43,20 +43,28 @@ def read_text(folder: Path, path: str) -> FileReadResult:
     )
 
 
-def list_paths(folder: Path, query: str, limit: int) -> FileListResult:
-    """Files of ``folder`` whose path holds ``query``, shortest first, then alphabetical."""
+def _has_dot_part(rel: Path) -> bool:
+    return any(part.startswith(".") for part in rel.parts)
+
+
+def list_paths(folder: Path, query: str, limit: int, hidden: bool = False) -> FileListResult:
+    """Files of ``folder`` whose path holds ``query``, shortest first, then alphabetical.
+
+    Dot files and files in dot folders are left out unless ``hidden`` is true.
+    Dot folders are not walked then.
+    """
     base = folder.resolve()
     needle = query.casefold()
     found: list[str] = []
     walked = 0
     cut = False
-    for file in walk_files(base):
+    for file in walk_files(base, hidden=hidden):
         walked += 1
         if walked > MAX_WALKED:
             cut = True
             break
         rel = file.relative_to(base)
-        if in_skipped_dir(rel):
+        if in_skipped_dir(rel) or (not hidden and _has_dot_part(rel)):
             continue
         shown = rel.as_posix()
         if needle in shown.casefold():

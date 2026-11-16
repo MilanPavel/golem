@@ -3,6 +3,7 @@ import { INSPECTOR_ID, InspectorPanel } from "../trace/index.ts";
 import { useEffect, useMemo, useRef, type ReactNode, type Ref, type RefObject } from "react";
 import { Badge, badgeVariants } from "../../ui/badge.tsx";
 import { cn } from "../../ui/cn.ts";
+import { HEADER_ROW } from "../../ui/header-row.ts";
 import { Button } from "../../ui/button.tsx";
 import { FolderIcon, InspectIcon, LockIcon, PanelIcon } from "../../ui/icons.tsx";
 import { PixelGolem } from "../../ui/pixel-golem.tsx";
@@ -115,7 +116,7 @@ function SessionModelDialog({
 
 export function TopBar({ title, children }: { title: ReactNode; children?: ReactNode }) {
   return (
-    <header className="flex min-h-13 items-center gap-2.5 border-b border-line px-4 py-2.5">
+    <header className={cn(HEADER_ROW, "gap-2.5 px-4")}>
       {title}
       <div className="flex-1" />
       <div className="flex min-w-0 gap-1.5">{children}</div>

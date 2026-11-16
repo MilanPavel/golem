@@ -100,6 +100,26 @@ test("a file opens the diff of that turn's last change to it", async () => {
   page.stop();
 });
 
+test("files of two turns stay open together, and a click closes only its own", async () => {
+  const { fake, page } = setup(THREE);
+  await waitFor(() => expect(cards()).toHaveLength(3));
+  const turn2 = (): HTMLElement => within(cards()[1]!).getByRole("button", { name: /fetch\.py/ });
+  const turn1 = (): HTMLElement => within(cards()[0]!).getByRole("button", { name: /fetch\.py/ });
+  await userEvent.click(turn2());
+  await waitFor(() => expect(screen.getAllByRole("table")).toHaveLength(1));
+  await userEvent.click(turn1());
+  await waitFor(() => expect(screen.getAllByRole("table")).toHaveLength(2));
+  expect(fake.raw.changesDiff).toHaveBeenCalledWith("a", { changeId: "c2" });
+  expect(fake.raw.changesDiff).toHaveBeenCalledWith("a", { changeId: "c3" });
+  expect(turn1().getAttribute("aria-expanded")).toBe("true");
+  expect(turn2().getAttribute("aria-expanded")).toBe("true");
+  await userEvent.click(turn1());
+  expect(screen.getAllByRole("table")).toHaveLength(1);
+  expect(turn1().getAttribute("aria-expanded")).toBe("false");
+  expect(turn2().getAttribute("aria-expanded")).toBe("true");
+  page.stop();
+});
+
 test("a reverted turn is muted and says undone; an undo draws no card", async () => {
   const { page } = setup([...THREE, changed(null, "u1", "src/fetch.py", { source: "revert", reverts: "c2", added: 0, removed: 4 })]);
   await waitFor(() => expect(cards()).toHaveLength(3));

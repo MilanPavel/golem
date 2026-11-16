@@ -3,6 +3,7 @@ import type { ApprovalChoice, ChatEvent, ConsentChoice, SkillCall } from "@golem
 import { noChecks, reduceChecks, type ChecksState } from "./checks.ts";
 import { emptyPlan, reducePlan, type PlanState } from "./plan.ts";
 import { contextChangedNote, emptyLiveContext, foldLiveContext, type ContextChangeData, type LiveContextState } from "./context.ts";
+import { emptyRoute, foldRoute, type RouteState } from "./route.ts";
 import { replyWasCut } from "./stop.ts";
 import type { TodoItem } from "./todos.ts";
 
@@ -190,6 +191,8 @@ export type ChatState = {
   plan: PlanState;
   /** The project's checks per run, the question about running them, and the answer, from the `check.*` events. */
   checks: ChecksState;
+  /** The session's route mode and the pick of each run, from `session.updated` and `model.routed`. */
+  route: RouteState;
 };
 
 export const emptyChat: ChatState = {
@@ -217,6 +220,7 @@ export const emptyChat: ChatState = {
   permissionMode: null,
   plan: emptyPlan,
   checks: noChecks,
+  route: emptyRoute,
 };
 
 /** What to do after a model server did not answer, besides fixing it. */
@@ -334,7 +338,9 @@ export function reduceChat(state: ChatState, event: ChatEvent): ChatState {
   const next = plan === state.plan ? base : { ...base, plan };
   const context = foldLiveContext(state.context, event);
   const checks = reduceChecks(next.checks, event);
-  return context === next.context && checks === next.checks ? next : { ...next, context, checks };
+  const route = foldRoute(next.route, event);
+  if (context === next.context && checks === next.checks && route === next.route) return next;
+  return { ...next, context, checks, route };
 }
 
 function reduceChatEvent(state: ChatState, event: ChatEvent): ChatState {

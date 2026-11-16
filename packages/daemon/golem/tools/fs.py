@@ -222,8 +222,11 @@ def _grep_file(where: Readable, path: Path, regex: re.Pattern[str]) -> list[str]
     return hits
 
 
-def walk_files(base: Path, home: Path | None = None) -> Iterator[Path]:
-    """Files under ``base``, less :data:`SKIPPED_DIRS` and the credentials folders of ``home``."""
+def walk_files(base: Path, home: Path | None = None, *, hidden: bool = True) -> Iterator[Path]:
+    """Files under ``base``, less :data:`SKIPPED_DIRS` and the credentials folders of ``home``.
+
+    With ``hidden`` false, dot folders and dot files are left out too.
+    """
     secret = secret_folders(home)
     for folder, dirs, names in os.walk(base):
         here = Path(folder)
@@ -231,9 +234,12 @@ def walk_files(base: Path, home: Path | None = None) -> Iterator[Path]:
             name
             for name in dirs
             if name not in SKIPPED_DIRS
+            and (hidden or not name.startswith("."))
             and not is_secret_tree((here / name).resolve(), home, secret)
         )
         for name in sorted(names):
+            if not hidden and name.startswith("."):
+                continue
             path = here / name
             if not in_secret_dir(path, home, secret):
                 yield path

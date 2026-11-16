@@ -1,19 +1,24 @@
-import { useId, useState } from "react";
+import { useId, useState, type ReactNode } from "react";
 import type { TurnCard } from "@golem/view";
-import { useChangeDiff, useTurnCards } from "../../store/page-context.tsx";
-import type { ChangedFile, FileDiff } from "../../store/changes.ts";
+import { useTurnCards } from "../../store/page-context.tsx";
+import type { ChangedFile } from "../../store/changes.ts";
 import { cn } from "../../ui/cn.ts";
-import { useDiffMode, type DiffMode } from "../diff/index.ts";
+import { useDiffMode } from "../diff/index.ts";
 import { timeAgo } from "../sessions/time-ago.ts";
 import { useNow } from "../sessions/use-now.ts";
-import { DiffPanel, Row } from "./file-row.tsx";
+import { ChangeDiffPanel, Row } from "./file-row.tsx";
 import { useWorkbenchWidth } from "./workbench-width.ts";
 
 /** From this panel width, in rem, a diff may be shown side by side. Narrower, it is unified. */
 const SPLIT_MIN_WIDTH = 40;
 
-/** The open row: a turn and a path in it. */
+/** A row of the list: a turn and a path in it. */
 export type OpenRow = { runId: string; path: string };
+
+/** The key of a row in the set of open rows. */
+export function rowKey(row: OpenRow): string {
+  return JSON.stringify([row.runId, row.path]);
+}
 
 /** `now` becomes "just now"; `2m`, `3h` and `5d` get "ago"; an older change shows its date. */
 function agoText(iso: string, now: number): string {
@@ -28,20 +33,18 @@ function titleOf(card: TurnCard): string {
 
 type TurnsViewProps = {
   cards: readonly TurnCard[];
-  open: OpenRow | null;
-  onOpen: (row: OpenRow | null) => void;
-  /** The diff of the open row's change. */
-  diff: FileDiff;
-  mode: DiffMode;
-  onMode: (mode: DiffMode) => void;
-  canSplit: boolean;
+  /** The keys (`rowKey`) of the open rows. */
+  open: ReadonlySet<string>;
+  /** Opens a closed row and closes an open one. */
+  onToggle: (row: OpenRow) => void;
+  /** The content of an open row: the diff of that turn's last change to the file. */
+  renderDiff: (card: TurnCard, file: TurnCard["files"][number]) => ReactNode;
   now: number;
 };
 
 /** The timeline: a strip of one dot per turn, then a card per turn, newest first. It reads nothing itself. */
-export function TurnsView({ cards, open, onOpen, diff, mode, onMode, canSplit, now }: TurnsViewProps) {
+export function TurnsView({ cards, open, onToggle, renderDiff, now }: TurnsViewProps) {
   const prefix = useId();
-  const panel = useId();
   if (cards.length === 0) {
     return <p className="text-sm text-muted">No changes yet. Each request that edits files shows up here as a turn.</p>;
   }
@@ -70,8 +73,7 @@ export function TurnsView({ cards, open, onOpen, diff, mode, onMode, canSplit, n
       <ul className="flex flex-col gap-4">
         {cards.map((card) => (
           <li
-            key={card.runId}
-            id={cardId(card.runId)}
+              id={cardId(card.runId)}
             data-reverted={card.reverted ? "true" : undefined}
             className={cn("flex flex-col gap-1 rounded-md border border-line p-2", card.reverted && "opacity-70")}
           >
@@ -82,19 +84,18 @@ export function TurnsView({ cards, open, onOpen, diff, mode, onMode, canSplit, n
             <p className="font-mono text-xs text-muted">{card.at === null ? card.line : `${agoText(card.at, now)} · ${card.line}`}</p>
             <ul className="flex flex-col gap-1">
               {card.files.map((file) => {
-                const isOpen = open?.runId === card.runId && open.path === file.path;
+                const isOpen = open.has(rowKey({ runId: card.runId, path: file.path }));
                 const row: ChangedFile = { ...file, change_ids: file.changeIds, stale: false };
                 return (
                   <Row
                     key={file.path}
                     file={row}
                     open={isOpen}
-                    panel={panel}
                     onToggle={() => {
-                      onOpen(isOpen ? null : { runId: card.runId, path: file.path });
+                      onToggle({ runId: card.runId, path: file.path });
                     }}
                   >
-                    <DiffPanel diff={diff} mode={mode} onMode={onMode} canSplit={canSplit} />
+                    {renderDiff(card, file)}
                   </Row>
                 );
               })}
@@ -107,25 +108,34 @@ export function TurnsView({ cards, open, onOpen, diff, mode, onMode, canSplit, n
   );
 }
 
-/** The by-turn view of a session. One file is open at a time, and its diff is that turn's change. */
+/** The by-turn view of a session. Any number of files may be open; each shows its turn's change. */
 export function TurnsTab({ sessionId }: { sessionId: string }) {
   const cards = useTurnCards(sessionId);
   const [mode, setMode] = useDiffMode();
   const [width] = useWorkbenchWidth();
   const now = useNow();
-  const [open, setOpen] = useState<OpenRow | null>(null);
-  const card = open === null ? undefined : cards.find((item) => item.runId === open.runId);
-  const file = card?.files.find((item) => item.path === open?.path);
-  const diff = useChangeDiff(sessionId, file?.changeIds[file.changeIds.length - 1] ?? null);
+  const [open, setOpen] = useState<ReadonlySet<string>>(new Set());
   return (
     <TurnsView
       cards={cards}
-      open={file === undefined ? null : open}
-      onOpen={setOpen}
-      diff={diff}
-      mode={mode}
-      onMode={setMode}
-      canSplit={width >= SPLIT_MIN_WIDTH}
+      open={open}
+      onToggle={(row) => {
+        const key = rowKey(row);
+        setOpen((current) => {
+          const next = new Set(current);
+          if (!next.delete(key)) next.add(key);
+          return next;
+        });
+      }}
+      renderDiff={(_card, file) => (
+        <ChangeDiffPanel
+          sessionId={sessionId}
+          changeId={file.changeIds[file.changeIds.length - 1] ?? null}
+          mode={mode}
+          onMode={setMode}
+          canSplit={width >= SPLIT_MIN_WIDTH}
+        />
+      )}
       now={now}
     />
   );
