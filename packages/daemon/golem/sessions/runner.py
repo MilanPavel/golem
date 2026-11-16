@@ -39,6 +39,7 @@ from golem.graphs.adapter import (
     FileChanged,
     ModelRequested,
     ModelResponded,
+    ModelRouted,
     ModelStarted,
     ModelWaiting,
     PinRead,
@@ -152,6 +153,8 @@ class Turn:
     """The run has its user message and ``run.started`` already: it waited on a question."""
     growth: Growth | None = field(default=None, compare=False)
     """The window growth this turn's first call loads and reports, None when none."""
+    step_up: bool = False
+    """The run may move to a stronger model once (route ``auto``)."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -324,6 +327,7 @@ async def run_turn(
             plan_first=turn.plan_first,
             local_only=turn.local_only,
             growth=turn.growth,
+            step_up=turn.step_up,
             skill_folder=None if skill is None else str(skill.path),
         )
         return await _finish(stream, progress, emit)
@@ -560,6 +564,20 @@ async def _apply(
         _reset_thinking(progress)
         await emit(
             "message.started", MessageStartedData(message_id=fact.message_id, role="assistant")
+        )
+    elif isinstance(fact, ModelRouted):
+        identity = progress.identify(fact.profile) if progress.identify is not None else None
+        await emit(
+            "model.routed",
+            ModelRoutedData(
+                model_profile=fact.profile,
+                provider=None if identity is None else identity.provider,
+                model=None if identity is None else identity.name,
+                tier=fact.tier,
+                reason=fact.reason,
+                detail=fact.detail,
+                rejected=[ModelRejection(ref=r, tier=t, why=w) for r, t, w in fact.rejected],
+            ),
         )
     elif isinstance(fact, ModelWaiting):
         await emit(

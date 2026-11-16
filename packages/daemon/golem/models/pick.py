@@ -43,7 +43,7 @@ class Choice:
     needs_consent: bool = False  # the best candidate is paid and the user has not agreed yet
 
 
-def _size(count: int) -> str:
+def size_text(count: int) -> str:
     """A token count the way the UI writes it: ``612``, ``32K``, ``41.5K``."""
     if count < 1000:
         return str(count)
@@ -63,7 +63,7 @@ def _unfit(model: ModelFacts, traits: Traits) -> str | None:
         return "cannot read images"
     window, prompt = model.window, traits.prompt_tokens
     if window is not None and prompt is not None and prompt + traits.reply_reserve > window:
-        return f"does not fit: {_size(prompt)} of {_size(window)}"
+        return f"does not fit: {size_text(prompt)} of {size_text(window)}"
     return None
 
 
@@ -160,7 +160,7 @@ def pick(
     if outranked:
         first = outranked[0]
         if first.window is not None and first.ready:
-            detail = f"did not fit in {_size(first.window)} on {first.ref}"
+            detail = f"did not fit in {size_text(first.window)} on {first.ref}"
         else:
             detail = f"{first.ref} {rejected_why(rejected, first.ref)}"
         return Choice(winner, "fit", detail, tuple(rejected), consent)

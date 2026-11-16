@@ -1,5 +1,7 @@
 """The chat graph: ``START → call_model``, then ``tools → call_model`` while
-the reply asks for tools, then ``checks`` and ``END``.
+the reply asks for tools, then ``checks`` and ``END``. On route ``auto`` a struggling
+model or a prompt that cannot fit sends the run through ``step_up`` once: the rest of the run
+goes on a stronger model.
 
 Checkpoint messages carry the protocol ``message_id`` as their LangChain
 ``id``, so the event log and the checkpoint name the same message. The first
@@ -18,7 +20,14 @@ from dataclasses import dataclass, replace
 from typing import Literal, Protocol, cast
 
 from langchain_core.language_models import BaseChatModel
-from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage, ToolMessage
+from langchain_core.messages import (
+    AIMessage,
+    BaseMessage,
+    HumanMessage,
+    RemoveMessage,
+    SystemMessage,
+    ToolMessage,
+)
 from langchain_core.messages.tool import ToolCall
 from langchain_core.runnables import RunnableConfig
 from langgraph.checkpoint.base import BaseCheckpointSaver
@@ -29,7 +38,7 @@ from langgraph.types import Command
 
 from golem.coding.changes import ChangeStore
 from golem.config import ContextSettings, ModelPrice, PermissionMode
-from golem.graphs.adapter import STREAM_KEY, message_text
+from golem.graphs.adapter import STREAM_KEY, message_text, stop_reason_of
 from golem.graphs.checks_node import CHECKS_KEY, checks_node
 from golem.graphs.child import (
     CHILD_PROMPT,
@@ -57,6 +66,8 @@ from golem.graphs.notes import is_note, note
 from golem.graphs.prompt import PINNED_KEY, PromptContext, SystemPrompt
 from golem.graphs.result_budget import ResultBudget, result_budget
 from golem.graphs.state import SCHEMA_VERSION, AgentState
+from golem.graphs.step_up import NextModel, StepRequest
+from golem.graphs.struggle import Struggle, detect
 from golem.graphs.summarise import Summariser
 from golem.graphs.text_calls import recover
 from golem.graphs.tools_node import (
@@ -81,9 +92,10 @@ from golem.graphs.tools_node import (
     unanswered_calls,
 )
 from golem.models.discovery import Loaded
-from golem.models.errors import BUDGET_HINT, BudgetSpent
+from golem.models.errors import BUDGET_HINT, BudgetSpent, ContextFull
 from golem.models.gate import ServerGate
 from golem.models.ollama import LocalServers
+from golem.models.pick import size_text
 from golem.models.roles import RoleModel, for_role
 from golem.models.router import ModelRouter
 from golem.models.tiers import Tier
@@ -222,6 +234,8 @@ class ChatRuntime:
         """Ready budget models that take tools, cheapest first, for the ``explore`` role."""
         self.child_limits = ChildLimits()
         """What stops a helper started by ``delegate``."""
+        self.next_model: NextModel | None = None
+        """Names the model a run steps up to. None: a run never steps up."""
 
     async def values(self, session_id: str) -> Mapping[str, object]:
         """Checkpoint values for ``session_id``, or an empty mapping."""
@@ -264,6 +278,7 @@ class ChatRuntime:
         plan_first: bool = False,
         local_only: bool = False,
         growth: Growth | None = None,
+        step_up: bool = False,
     ) -> AsyncGenerator[object]:
         """Stream one user turn. The first turn writes the state fields.
 
@@ -307,6 +322,7 @@ class ChatRuntime:
             model_profile=model_profile,
             schema_version=schema_version,
             has_checkpoint=bool(existing),
+            step_up=step_up,
         )
         if undone[1] is not None:
             graph_input["changes_seen"] = undone[1]
@@ -631,6 +647,7 @@ def open_chat(
     ratios: TokenRatios | None = None,
     paid_ok: Callable[[str | None], Awaitable[bool]] | None = None,
     budget_refs: Callable[[], list[str]] | None = None,
+    next_model: NextModel | None = None,
 ) -> ChatRuntime:
     """Compile the chat graph against ``checkpointer``.
 
@@ -661,6 +678,8 @@ def open_chat(
     no, a cap in ``[budget]`` is spent: the run fails with ``budget_spent`` before the call,
     so every tool result of the run is stored by then. ``budget_refs`` lists the ready budget
     models, for the ``explore`` role of the helper that ``delegate`` starts.
+    ``next_model`` is awaited when a run on route ``auto`` struggles or its prompt cannot fit:
+    it names the model the rest of the run moves to, once, or None when none is allowed.
     """
     clearing = context
     learned = TokenRatios() if ratios is None else ratios
@@ -678,8 +697,10 @@ def open_chat(
                 "a budget cap is spent, so the run stopped before its next paid call",
                 hint=BUDGET_HINT,
             )
-        message_id = _reply_id(messages, config)
-        get_stream_writer()({STREAM_KEY: "model.started", "message_id": message_id})
+        carried = _carried_id(state)
+        message_id = carried or _reply_id(messages, config)
+        if carried is None:
+            get_stream_writer()({STREAM_KEY: "model.started", "message_id": message_id})
         scope = scope_of(config)
         child = child_of(config)
         # A helper that used its calls makes one more, without tools, to give its answer.
@@ -762,11 +783,26 @@ def open_chat(
                         if used >= clearing.compact_at * room:
                             log.info("the prompt is still at %d of %d tokens", used, room)
             if clearing is not None and window.window is not None:
-                fitted = await _fit(
-                    learned, router, profile, plain, current, system_chars + tools_chars,
-                    window.window, clearing, summariser, state.get("session_id"), overrides,
-                    local_only,
-                )  # fmt: skip
+                try:
+                    fitted = await _fit(
+                        learned, router, profile, plain, current, system_chars + tools_chars,
+                        window.window, clearing, summariser, state.get("session_id"), overrides,
+                        local_only,
+                    )  # fmt: skip
+                except ContextFull as full:
+                    if not _may_step_up(state):
+                        raise
+                    # No call is made: the router sends the run to the step-up.
+                    return {
+                        "last_call": {
+                            "context_full": {
+                                "need": full.need,
+                                "window": full.window,
+                                "model": profile,
+                                "message_id": message_id,
+                            }
+                        }
+                    }
                 current = fitted.view
                 for change in fitted.items:
                     get_stream_writer()(change)
@@ -880,15 +916,86 @@ def open_chat(
                 }
             )
         result: dict[str, object] = {"messages": [response.model_copy(update=update)]}
+        result["last_call"] = {
+            "stop_reason": stop_reason_of(response),
+            "text_tool_calls": text_tool_calls,
+        }
         if current is not original:
             result["context_view"] = current
         return result
 
-    def route(state: AgentState) -> Literal["tools", "end"]:
+    def route(state: AgentState) -> Literal["tools", "step_up", "end"]:
+        if _may_step_up(state) and (state.get("last_call") or {}).get("context_full"):
+            return "step_up"
         last = state["messages"][-1] if state["messages"] else None
         if isinstance(last, AIMessage) and last.tool_calls:
             return "tools"
-        return "end"
+        # A reply with tool calls goes to the tools first: its calls need their results.
+        return "step_up" if _struggles(state) is not None else "end"
+
+    def route_after_tools(state: AgentState) -> Literal["call_model", "step_up"]:
+        return "step_up" if _struggles(state) is not None else "call_model"
+
+    def route_after_step_up(state: AgentState) -> Literal["call_model", "end"]:
+        # No stronger model on a plain reply: the run ends as it would have.
+        last = state["messages"][-1] if state["messages"] else None
+        stepped = (state.get("last_call") or {}).get("stepped") is True
+        plain = isinstance(last, AIMessage) and not last.tool_calls
+        return "end" if plain and not stepped else "call_model"
+
+    async def step_up(state: AgentState, config: RunnableConfig) -> dict[str, object]:
+        profile = state["model_profile"]
+        call = dict(state.get("last_call") or {})
+        old = router.identity(profile).name or profile
+        full = cast("dict[str, object] | None", call.get("context_full"))
+        need: int | None = None
+        if full:
+            need, window = _count(full.get("need")), _count(full.get("window"))
+            signal = "context_full"
+            detail = f"did not fit in {size_text(window or 0)} on {old}"
+        else:
+            found = _struggles(state)
+            if found is None:
+                return {}
+            signal, detail = found.signal, f"{found.detail} on {old}"
+        ask = runtime[0].next_model if runtime else None
+        stepped = None
+        if ask is not None:
+            stepped = await ask(state.get("session_id", ""), profile, StepRequest(signal, need))
+        writer = get_stream_writer()
+        if stepped is None:
+            if full:
+                raise ContextFull(need or 0, _count(full.get("window")) or 0, profile)
+            writer(
+                {
+                    STREAM_KEY: "model.routed",
+                    "profile": profile,
+                    "tier": (tier_of(profile) if tier_of is not None else None) or "frontier",
+                    "reason": "fallback",
+                    "detail": f"no stronger model is available ({detail})",
+                }
+            )
+            return {"stepped_up": True, "last_call": {**call, "stepped": False}}
+        writer(
+            {
+                STREAM_KEY: "model.routed",
+                "profile": stepped.profile,
+                "tier": stepped.tier,
+                "reason": "escalated",
+                "detail": detail,
+                "rejected": [(r.ref, r.tier, r.why) for r in stepped.choice.rejected],
+            }
+        )
+        result: dict[str, object] = {
+            "model_profile": stepped.profile,
+            "stepped_up": True,
+            "last_call": {**call, "stepped": True},
+        }
+        last = state["messages"][-1] if state["messages"] else None
+        if signal == "empty_reply" and last is not None and last.id:
+            # The stronger model answers the request itself, so the empty reply goes.
+            result["messages"] = [RemoveMessage(id=last.id)]
+        return result
 
     def route_after_checks(state: AgentState) -> Literal["call_model", "end"]:
         # The checks node adds a note only when a check failed and a round is left.
@@ -912,8 +1019,16 @@ def open_chat(
     )
     builder.add_edge(START, "call_model")
     builder.add_node("checks", checks_node(rules, artifacts))
-    builder.add_conditional_edges("call_model", route, {"tools": "tools", "end": "checks"})
-    builder.add_edge("tools", "call_model")
+    builder.add_node("step_up", step_up)
+    builder.add_conditional_edges(
+        "call_model", route, {"tools": "tools", "step_up": "step_up", "end": "checks"}
+    )
+    builder.add_conditional_edges(
+        "tools", route_after_tools, {"call_model": "call_model", "step_up": "step_up"}
+    )
+    builder.add_conditional_edges(
+        "step_up", route_after_step_up, {"call_model": "call_model", "end": "checks"}
+    )
     builder.add_conditional_edges(
         "checks", route_after_checks, {"call_model": "call_model", "end": END}
     )
@@ -932,7 +1047,37 @@ def open_chat(
     runtime[0].context = context
     runtime[0].summariser = summariser
     runtime[0].budget_refs = budget_refs
+    runtime[0].next_model = next_model
     return runtime[0]
+
+
+def _may_step_up(state: AgentState) -> bool:
+    """Whether the run is on route ``auto`` and has not stepped up yet."""
+    return state.get("can_step_up") is True and state.get("stepped_up") is not True
+
+
+def _struggles(state: AgentState) -> Struggle | None:
+    """The struggle that sends the run to the step-up, or None."""
+    if not _may_step_up(state):
+        return None
+    call = state.get("last_call") or {}
+    reason, text_calls = call.get("stop_reason"), call.get("text_tool_calls")
+    return detect(
+        state["messages"],
+        stop_reason=reason if isinstance(reason, str) else None,
+        text_tool_calls=text_calls if isinstance(text_calls, str) else None,
+    )
+
+
+def _carried_id(state: AgentState) -> str | None:
+    """The reply id of a call that did not fit, which the step-up's call goes on with."""
+    full = (state.get("last_call") or {}).get("context_full")
+    found = cast(dict[str, object], full).get("message_id") if isinstance(full, dict) else None
+    return found if isinstance(found, str) else None
+
+
+def _count(value: object) -> int | None:
+    return value if isinstance(value, int) and not isinstance(value, bool) else None
 
 
 def _timings(message: AIMessage) -> dict[str, int]:
@@ -1378,16 +1523,19 @@ def _turn_input(
     model_profile: str,
     schema_version: int,
     has_checkpoint: bool,
+    step_up: bool = False,
 ) -> AgentState:
+    fresh: dict[str, object] = {"can_step_up": step_up, "stepped_up": False, "last_call": {}}
     if has_checkpoint:
         # model_profile rides along so that session.set_model applies from this turn.
         return cast(
             AgentState,
-            {"messages": messages, "model_profile": model_profile, "check_round": 0},
+            {"messages": messages, "model_profile": model_profile, "check_round": 0, **fresh},
         )
     return cast(
         AgentState,
         {
+            **fresh,
             "messages": messages,
             "check_round": 0,
             "session_id": session_id,

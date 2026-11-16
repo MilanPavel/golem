@@ -121,6 +121,20 @@ class ContextChanged:
 
 
 @dataclass(frozen=True, slots=True)
+class ModelRouted:
+    """The run moved to another model in the middle of a call sequence.
+
+    ``rejected`` is ``(ref, tier, why)`` for each candidate the pick dropped.
+    """
+
+    profile: str
+    tier: Literal["local", "budget", "frontier"]
+    reason: Literal["escalated", "fallback"]
+    detail: str
+    rejected: tuple[tuple[str, Literal["local", "budget", "frontier"], str], ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
 class ModelResponded:
     """The model call with this ``message_id`` returned.
 
@@ -327,6 +341,7 @@ class ChildFact:
 Fact = (
     ModelStarted
     | ModelWaiting
+    | ModelRouted
     | ModelRequested
     | ModelResponded
     | ContextChanged
@@ -719,7 +734,7 @@ def _completed(data: object) -> TextCompleted | ApprovalAsked | None:
                 message.id,
                 calls,
                 _usage(message),
-                _stop_reason(message),
+                stop_reason_of(message),
                 (kept + thinking) or None,
             )
     return None
@@ -744,7 +759,7 @@ def _usage(message: AIMessage) -> dict[str, int] | None:
     return usage or None
 
 
-def _stop_reason(message: AIMessage) -> str | None:
+def stop_reason_of(message: AIMessage) -> str | None:
     """Why the model stopped.
 
     Anthropic's ``stop_reason``, OpenAI's ``finish_reason``, or Ollama's ``done_reason``,
@@ -785,6 +800,32 @@ def _approval(paused: object) -> ApprovalAsked | None:
     return None
 
 
+_TIERS = ("local", "budget", "frontier")
+_TierName = Literal["local", "budget", "frontier"]
+
+
+def _routed_fact(item: dict[str, object]) -> ModelRouted | None:
+    profile, tier, reason = item.get("profile"), item.get("tier"), item.get("reason")
+    detail = item.get("detail")
+    if not isinstance(profile, str) or tier not in _TIERS:
+        return None
+    if reason not in ("escalated", "fallback"):
+        return None
+    rejected: list[tuple[str, _TierName, str]] = []
+    raw = item.get("rejected")
+    for entry in cast(list[object], raw) if isinstance(raw, list) else []:
+        row = cast(tuple[object, ...], entry) if isinstance(entry, tuple) else ()
+        if len(row) == 3 and row[1] in _TIERS:
+            rejected.append(cast(tuple[str, _TierName, str], row))
+    return ModelRouted(
+        profile,
+        tier,
+        reason,
+        detail if isinstance(detail, str) else "",
+        tuple(rejected),
+    )
+
+
 def _text_calls(value: object) -> Literal["recovered", "unread"] | None:
     if value == "recovered":
         return "recovered"
@@ -819,6 +860,8 @@ def _custom(data: object) -> Fact | None:
             model if isinstance(model, str) and model else None,
             _positive(item.get("window")),
         )
+    if kind == "model.routed":
+        return _routed_fact(item)
     if kind == "model.request" and isinstance(message_id, str):
         return _request(message_id, item)
     if kind == "model.response" and isinstance(message_id, str):
@@ -1059,6 +1102,7 @@ __all__ = [
     "FileChanged",
     "ModelRequested",
     "ModelResponded",
+    "ModelRouted",
     "ModelStarted",
     "ModelWaiting",
     "PinRead",

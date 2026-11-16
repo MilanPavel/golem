@@ -161,6 +161,15 @@ A session has a route mode: `pinned`, `local` or `auto` ([ADR-055](../adr/055-mo
 
 The turn runs on the picked profile. `sessions.model_profile` stays the user's choice: it is the pinned model and the start of the ladder, and routing never stores `model.selected`. The runner emits `model.routed` right after `run.started`, with the profile, what it resolved to, the tier, the `reason`, a one-line `detail`, and the `rejected` candidates with why. A `pinned` session emits nothing. The run span of `trace.get` carries the same `reason`, `detail` and `rejected` as `route`. Only the model that was picked is waited for while it downloads.
 
+### Stepping up inside a run
+
+On route `auto` a run may move to a stronger model once, when its model struggles or its prompt cannot fit (see [The agent loop](./agent-loop.md)). `SessionManager._next_model` answers the graph's ask:
+- A struggle asks for the tier above the current model's (`Traits.min_tier`). `ContextFull` asks for any model whose window takes the prompt estimate the failed call made.
+- Privacy, caps and the paid yes are the pick's own: a local-only folder and route `local` keep it on this Mac, a spent cap leaves the paid models out, and `paid = "never"` and routines allow none.
+- A paid model needs a yes the session already gave (`paid_ok`, and `paid = "ask"`). A run in progress does not ask: without the yes it stays on its model, and the run logs `model.routed` with the reason `fallback` and "no stronger model is available". For `ContextFull` it fails with `context_full`.
+- A success logs `model.routed` with the reason `escalated`, the struggle's detail and the old model's name ("2 invalid tool calls in a row on qwen3:27b", "did not fit in 4K on qwen3:27b").
+- The session counts in memory (not stored) the runs each signal stepped up. At the second one the session's later picks start at the stepped-up tier (`_LiveSession.step_floor`).
+
 ### The paid question
 
 A turn that would run on a paid model without the user's yes becomes a run that starts waiting ([ADR-055](../adr/055-model-routing.md), section 7). `SessionManager.send` makes the run as usual, with the skill, the user's `message.completed` and `run.started`, then stores `route.consent.needed` and stops: no graph runs, no model is called, and the run has no task. The projection marks the run `waiting`, as for an approval, so the session is busy, `session.list` says `waiting`, a reattach replays the question, `run.cancel` ends it with `run.cancelled`, and a restart leaves it waiting (recovery closes only `running` runs).
