@@ -52,6 +52,9 @@ class AgentState(MessagesState):
     """Whether this run may move to a stronger model once. Set each turn, true on route ``auto``."""
     stepped_up: NotRequired[bool]
     """A step-up was tried in this run, so no second one is. Reset each turn."""
+    fallbacks: NotRequired[int]
+    """Times this run left a failing provider for another model. At most two. Reset each turn."""
     last_call: NotRequired[dict[str, object]]
     """What the router needs of the last model call: ``stop_reason``, ``text_tool_calls``,
-    ``context_full`` (``need``, ``window``, ``model``, ``message_id``), ``stepped``."""
+    ``context_full`` (``need``, ``window``, ``model``, ``message_id``), ``stepped``,
+    ``fell_back`` (``message_id``, ``streamed``)."""

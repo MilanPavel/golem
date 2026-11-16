@@ -242,7 +242,18 @@ export type Seq18 = number;
 export type SessionId19 = string;
 export type Ts18 = string;
 export type Type18 = 'run.completed';
-export type Code = ('model_unreachable' | 'not_installed' | 'context_full' | 'budget_spent' | 'local_only') | null;
+export type Code =
+  | (
+      | 'model_unreachable'
+      | 'not_installed'
+      | 'context_full'
+      | 'budget_spent'
+      | 'local_only'
+      | 'rate_limited'
+      | 'no_credit'
+      | 'auth_failed'
+    )
+  | null;
 export type Hint = string | null;
 export type Message = string;
 export type Provider2 = string | null;
@@ -1499,6 +1510,8 @@ export interface RunFailedEvent {
  * ``run ollama serve``. ``context_full``: the prompt does not fit the model's window,
  * even after clearing and summarising, and nothing was sent. ``local_only``: the chat's
  * folder stays on this Mac and a hosted model was about to be called, so nothing was sent.
+ * ``rate_limited``, ``no_credit`` and ``auth_failed``: a hosted provider answered with a
+ * rate limit, no credit left, or a refused key, and no other model was allowed.
  *
  * This interface was referenced by `RpcNotification`'s JSON-Schema
  * via the `definition` "RunFailedData".

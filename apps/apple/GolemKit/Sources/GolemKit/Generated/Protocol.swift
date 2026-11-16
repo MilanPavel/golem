@@ -11295,6 +11295,8 @@ public struct Params: Codable {
 /// ``run ollama serve``. ``context_full``: the prompt does not fit the model's window,
 /// even after clearing and summarising, and nothing was sent. ``local_only``: the chat's
 /// folder stays on this Mac and a hosted model was about to be called, so nothing was sent.
+/// ``rate_limited``, ``no_credit`` and ``auth_failed``: a hosted provider answered with a
+/// rate limit, no credit left, or a refused key, and no other model was allowed.
 ///
 /// Who stopped the run. ``user`` is ``run.cancel``, ``shutdown`` the daemon stopping.
 ///
@@ -11821,11 +11823,14 @@ public struct FluffyCheckInfo: Codable {
 }
 
 public enum Code: String, Codable {
+    case authFailed = "auth_failed"
     case budgetSpent = "budget_spent"
     case contextFull = "context_full"
     case localOnly = "local_only"
     case modelUnreachable = "model_unreachable"
+    case noCredit = "no_credit"
     case notInstalled = "not_installed"
+    case rateLimited = "rate_limited"
 }
 
 /// The session and message a fork was copied from.
@@ -12286,6 +12291,8 @@ public enum RunCompletedEventType: String, Codable {
 /// ``run ollama serve``. ``context_full``: the prompt does not fit the model's window,
 /// even after clearing and summarising, and nothing was sent. ``local_only``: the chat's
 /// folder stays on this Mac and a hosted model was about to be called, so nothing was sent.
+/// ``rate_limited``, ``no_credit`` and ``auth_failed``: a hosted provider answered with a
+/// rate limit, no credit left, or a refused key, and no other model was allowed.
 // MARK: - RunFailedData
 public struct RunFailedData: Codable {
     public let code: Code?
@@ -12347,6 +12354,8 @@ public struct RunFailedEvent: Codable {
 /// ``run ollama serve``. ``context_full``: the prompt does not fit the model's window,
 /// even after clearing and summarising, and nothing was sent. ``local_only``: the chat's
 /// folder stays on this Mac and a hosted model was about to be called, so nothing was sent.
+/// ``rate_limited``, ``no_credit`` and ``auth_failed``: a hosted provider answered with a
+/// rate limit, no credit left, or a refused key, and no other model was allowed.
 // MARK: - RunFailedEventData
 public struct RunFailedEventData: Codable {
     public let code: Code?

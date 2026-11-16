@@ -1,7 +1,8 @@
 """The chat graph: ``START → call_model``, then ``tools → call_model`` while
 the reply asks for tools, then ``checks`` and ``END``. On route ``auto`` a struggling
 model or a prompt that cannot fit sends the run through ``step_up`` once: the rest of the run
-goes on a stronger model.
+goes on a stronger model. A provider that fails sends the run back to ``call_model`` on
+another model, at most twice.
 
 Checkpoint messages carry the protocol ``message_id`` as their LangChain
 ``id``, so the event log and the checkpoint name the same message. The first
@@ -17,8 +18,9 @@ import logging
 from collections.abc import AsyncGenerator, AsyncIterator, Awaitable, Callable, Mapping, Sequence
 from contextlib import AbstractAsyncContextManager, aclosing, nullcontext
 from dataclasses import dataclass, replace
-from typing import Literal, Protocol, cast
+from typing import Any, Literal, Protocol, cast
 
+from langchain_core.callbacks import BaseCallbackHandler
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import (
     AIMessage,
@@ -92,12 +94,22 @@ from golem.graphs.tools_node import (
     unanswered_calls,
 )
 from golem.models.discovery import Loaded
-from golem.models.errors import BUDGET_HINT, BudgetSpent, ContextFull
+from golem.models.errors import (
+    BUDGET_HINT,
+    BudgetSpent,
+    ContextFull,
+    Failure,
+    ModelUnreachable,
+    failure_note,
+    failure_of,
+    provider_error,
+    retry_delay,
+)
 from golem.models.gate import ServerGate
 from golem.models.ollama import LocalServers
 from golem.models.pick import size_text
 from golem.models.roles import RoleModel, for_role
-from golem.models.router import ModelRouter
+from golem.models.router import ModelConfigError, ModelRouter
 from golem.models.tiers import Tier
 from golem.models.window import ContextWindow, WindowOf
 from golem.models.window_plan import spilled
@@ -134,6 +146,7 @@ class Growth:
 
 
 MAX_MODEL_CALLS = 25
+MAX_FALLBACKS = 2
 """Model calls in one run before it stops. Each tool round is one more."""
 
 _RECURSION_LIMIT = 2 * MAX_MODEL_CALLS
@@ -698,7 +711,8 @@ def open_chat(
                 hint=BUDGET_HINT,
             )
         carried = _carried_id(state)
-        message_id = carried or _reply_id(messages, config)
+        # Text of a failed call was shown, so the call that follows is a new reply.
+        message_id = carried or (new_id("m") if _fell_back(state) else _reply_id(messages, config))
         if carried is None:
             get_stream_writer()({STREAM_KEY: "model.started", "message_id": message_id})
         scope = scope_of(config)
@@ -833,6 +847,12 @@ def open_chat(
             request.update(_sizes(system, history, schemas if binder.offers(profile) else []))
             get_stream_writer()(request)
             growth = _growth(config)
+            failed: tuple[Exception, ModelUnreachable | None, Failure, bool] | None = None
+            response: AIMessage | None = None
+            streamed = _Streamed()
+            chat = router.chat_model(profile, overrides, local_only=local_only)
+            before = chat.callbacks
+            chat.callbacks = [streamed]
             try:
                 async with _gated(router, gate, profile, message_id):
                     if growth is not None:
@@ -845,17 +865,21 @@ def open_chat(
                                 "window": growth.window_to,
                             }
                         )
-                    response = await binder.invoke(
-                        profile,
-                        router.chat_model(profile, overrides, local_only=local_only),
-                        sent,
-                        schemas,
+                    response = await _retrying(
+                        lambda: binder.invoke(profile, chat, sent, schemas), streamed, router.sleep
                     )
             except Exception as exc:
                 down = router.unreachable(profile, exc) or await router.refused(profile, exc)
-                if down is None:
+                failure = "unreachable" if down is not None else failure_of(exc)
+                if failure == "other":
                     raise
-                raise down from exc
+                failed = (exc, down, failure, streamed.seen)
+            finally:
+                chat.callbacks = before
+        if failed is not None:
+            return await fall_back(state, profile, message_id, *failed)
+        if response is None:
+            raise AssertionError("a call that did not fail has a reply")
         _learn(learned, profile, history, system_chars + tools_chars, response, window.window)
         loaded: int | None = None
         if note_loaded is not None:
@@ -924,7 +948,53 @@ def open_chat(
             result["context_view"] = current
         return result
 
-    def route(state: AgentState) -> Literal["tools", "step_up", "end"]:
+    async def fall_back(
+        state: AgentState,
+        profile: str,
+        message_id: str,
+        exc: Exception,
+        down: ModelUnreachable | None,
+        failure: Failure,
+        streamed: bool,
+    ) -> dict[str, object]:
+        """Move the run to another model after ``profile`` failed, or raise the error.
+
+        Only a run on route ``auto`` moves, at most :data:`MAX_FALLBACKS` times. The provider
+        is marked, so the next pick skips it too. The failed call stored no reply.
+        """
+        try:
+            provider = router.resolve(profile).provider_name
+        except ModelConfigError:
+            provider = router.identity(profile).provider or "the provider"
+        router.health.mark(provider, failure)
+        error = down if down is not None else provider_error(provider, failure)
+        made = state.get("fallbacks", 0)
+        ask = runtime[0].next_model if runtime else None
+        if state.get("can_step_up") is not True or made >= MAX_FALLBACKS or ask is None:
+            raise error from exc
+        found = await ask(state.get("session_id", ""), profile, StepRequest("fallback"))
+        if found is None:
+            raise error from exc
+        log.warning("%s failed (%s); falling back to %s", profile, failure, found.profile)
+        get_stream_writer()(
+            {
+                STREAM_KEY: "model.routed",
+                "profile": found.profile,
+                "tier": found.tier,
+                "reason": "fallback",
+                "detail": failure_note(provider, failure),
+                "rejected": [(r.ref, r.tier, r.why) for r in found.choice.rejected],
+            }
+        )
+        return {
+            "model_profile": found.profile,
+            "fallbacks": made + 1,
+            "last_call": {"fell_back": {"message_id": message_id, "streamed": streamed}},
+        }
+
+    def route(state: AgentState) -> Literal["call_model", "tools", "step_up", "end"]:
+        if _fell_back(state) is not None:
+            return "call_model"
         if _may_step_up(state) and (state.get("last_call") or {}).get("context_full"):
             return "step_up"
         last = state["messages"][-1] if state["messages"] else None
@@ -1021,7 +1091,9 @@ def open_chat(
     builder.add_node("checks", checks_node(rules, artifacts))
     builder.add_node("step_up", step_up)
     builder.add_conditional_edges(
-        "call_model", route, {"tools": "tools", "step_up": "step_up", "end": "checks"}
+        "call_model",
+        route,
+        {"call_model": "call_model", "tools": "tools", "step_up": "step_up", "end": "checks"},
     )
     builder.add_conditional_edges(
         "tools", route_after_tools, {"call_model": "call_model", "step_up": "step_up"}
@@ -1070,10 +1142,53 @@ def _struggles(state: AgentState) -> Struggle | None:
 
 
 def _carried_id(state: AgentState) -> str | None:
-    """The reply id of a call that did not fit, which the step-up's call goes on with."""
-    full = (state.get("last_call") or {}).get("context_full")
+    """The reply id the next call goes on with: one that did not fit, or failed before any text."""
+    call = state.get("last_call") or {}
+    full = call.get("context_full")
     found = cast(dict[str, object], full).get("message_id") if isinstance(full, dict) else None
+    fell = _fell_back(state)
+    if fell is not None and fell.get("streamed") is not True:
+        found = fell.get("message_id")
     return found if isinstance(found, str) else None
+
+
+def _fell_back(state: AgentState) -> dict[str, object] | None:
+    """``last_call["fell_back"]``: the call that failed and sent the run to another model."""
+    found = (state.get("last_call") or {}).get("fell_back")
+    return cast("dict[str, object]", found) if isinstance(found, dict) else None
+
+
+class _Streamed(BaseCallbackHandler):
+    """Notes that a model call has streamed a token, so its text may have reached the user."""
+
+    run_inline = True
+
+    def __init__(self) -> None:
+        self.seen = False
+
+    def on_llm_new_token(self, token: str | list[str | dict[str, Any]], **kwargs: Any) -> None:
+        del kwargs
+        if token:
+            self.seen = True
+
+
+async def _retrying(
+    call: Callable[[], Awaitable[AIMessage]],
+    streamed: _Streamed,
+    sleep: Callable[[float], Awaitable[None]],
+) -> AIMessage:
+    """Run ``call``; when it is rate-limited or fails on the server's side, once more.
+
+    The retry waits 2 seconds, or what ``retry-after`` asks for up to 10. A call that already
+    streamed text is not retried: the user saw it.
+    """
+    try:
+        return await call()
+    except Exception as exc:
+        if failure_of(exc) not in ("rate_limited", "server_error") or streamed.seen:
+            raise
+        await sleep(retry_delay(exc))
+    return await call()
 
 
 def _count(value: object) -> int | None:
@@ -1525,7 +1640,12 @@ def _turn_input(
     has_checkpoint: bool,
     step_up: bool = False,
 ) -> AgentState:
-    fresh: dict[str, object] = {"can_step_up": step_up, "stepped_up": False, "last_call": {}}
+    fresh: dict[str, object] = {
+        "can_step_up": step_up,
+        "stepped_up": False,
+        "fallbacks": 0,
+        "last_call": {},
+    }
     if has_checkpoint:
         # model_profile rides along so that session.set_model applies from this turn.
         return cast(

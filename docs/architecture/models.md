@@ -190,6 +190,25 @@ A turn that would run on a paid model without the user's yes becomes a run that 
 
 A run ends in `run.failed` with a `message` and no traceback. A failure a client can act on also has a `code`. `model_unreachable`: the model's server did not answer. `not_installed`: the model needs a local Ollama, and no `ollama` binary is on `PATH` or at a known install path. Either comes with the `provider` and a `hint` that says how to fix it, such as `run ollama serve`. `budget_spent`: a cap in `[budget]` is spent, so a run stopped before its next paid call (see `models/budget.py`); it has a `hint` and no `provider`. `local_only`: the chat's folder stays on this Mac and a hosted model was about to be called, so nothing was sent (the backstop in `ModelRouter.chat_model(local_only=True)`; `message.send` refuses earlier with `-32018`).
 
+A hosted provider can also fail with an answer. `failure_of` (`models/errors.py`) reads it by `status_code` or by type, without importing a provider SDK:
+
+| Failure | Read from |
+|---|---|
+| `rate_limited` | 429 |
+| `server_error` | 500 to 599 |
+| `auth` | 401, 403 |
+| `no_credit` | 402, or a 4xx whose body says `quota`, `credit` or `billing` |
+| `unreachable` | a failed connect, or a timeout |
+| `other` | anything else; the run fails with the error as it came |
+
+`rate_limited`, `no_credit` and `auth_failed` are `run.failed` codes next to `model_unreachable`. Their hints are `wait a minute and try again`, `add credit at <provider>` and `/login <provider>`.
+
+**Retry and fallback.** In `call_model`, a `rate_limited` or `server_error` call is tried once more after 2 seconds, or after `retry-after` up to 10. A call that already streamed text is never retried. When the retry fails, or at once for `unreachable`, `auth` and `no_credit`, a run on route `auto` asks `next_model` (the step-up's path) with the signal `fallback`. It answers with another model of the same tier, then the tier above, then, from a hosted model, a local one. The failed model is left out; privacy, a spent cap and the paid question are the pick's own, so a more expensive tier needs the yes the session already gave. The run switches `model_profile` for the rest of the run and sends `model.routed` with `reason: "fallback"` and a `detail` such as `deepseek is rate-limited`. A run falls back at most twice, then fails with the last error. A `pinned` or `local` session fails at once with the better message.
+
+**Text already shown.** A call that failed after it streamed text ends as failed, and the reply it was building is closed as `interrupted`. It is never stored as a message. The next call is a new reply with a new id.
+
+**Health.** `ModelRouter.health` remembers a provider that failed for 60 seconds, in memory. `ListedFacts` reads it: a model of that provider is `ready=False` with `why_not_ready` `rate-limited` (or `server is down`, `key rejected`, `out of credit`), so the next turn's pick skips it.
+
 ### The local model server
 
 ![A local Ollama's life: when something needs it, golem checks whether one answers. If not, it runs ollama serve and waits up to 60 seconds, holds it while calls use it, and stops it after 30 idle minutes or when golem stops. A server that already answered is external: golem uses it and never stops it](../images/models-local-server.svg)
