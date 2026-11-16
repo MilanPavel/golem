@@ -117,10 +117,19 @@ def tokens_per_char(earlier: Sequence[CallFacts], model: str | None) -> float:
 
 
 def _grown_from(call: CallFacts, here: CallFacts, used: int) -> bool:
+    """Rule 2: ``here`` sent all of ``call`` unchanged and more, yet used fewer tokens.
+
+    The shared messages must have the same sizes. Clearing keeps a message's id and stubs
+    its content, so the same ids with smaller sizes is golem's own work, not a cut.
+    """
     before = call.started.message_ids
     now = here.started.message_ids
+    sizes, sizes_now = call.started.message_bytes, here.started.message_bytes
     return (
-        call.model == here.model
+        sizes is not None
+        and sizes_now is not None
+        and sizes_now[: len(sizes)] == sizes
+        and call.model == here.model
         and call.window == here.window
         and call.used is not None
         and call.used > used

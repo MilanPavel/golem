@@ -4,12 +4,21 @@ from __future__ import annotations
 
 import asyncio
 import json
-from collections.abc import AsyncIterator, Iterator
+from collections.abc import AsyncIterator, Callable, Iterator
+from dataclasses import dataclass
 from typing import Any
 
 from langchain_core.callbacks import AsyncCallbackManagerForLLMRun, CallbackManagerForLLMRun
 from langchain_core.language_models.chat_models import BaseChatModel
-from langchain_core.messages import AIMessage, AIMessageChunk, BaseMessage, ToolCall, ToolMessage
+from langchain_core.messages import (
+    AIMessage,
+    AIMessageChunk,
+    BaseMessage,
+    HumanMessage,
+    SystemMessage,
+    ToolCall,
+    ToolMessage,
+)
 from langchain_core.outputs import ChatGeneration, ChatGenerationChunk, ChatResult
 from pydantic import Field, PrivateAttr
 
@@ -112,6 +121,112 @@ class ToolCallingChatModel(BaseChatModel):
         message.usage_metadata = self.usage  # type: ignore[assignment]
         message.response_metadata = dict(self.response_metadata)
         return ChatResult(generations=[ChatGeneration(message=message)])
+
+
+def _no_calls() -> list[WindowCall]:
+    return []
+
+
+@dataclass(frozen=True, slots=True)
+class WindowCall:
+    """One request a :class:`WindowedChatModel` took: what it counted and what it reported."""
+
+    chars: int
+    tokens: int
+    cut: bool
+    messages: list[BaseMessage]
+
+
+Script = Callable[[int, int], "str | Calls"]
+"""``(turn, done)`` to the reply: ``done`` is the tool results of this turn so far."""
+
+SUMMARISER_ASK = "Reply with one JSON object"
+
+
+class WindowedChatModel(ToolCallingChatModel):
+    """A model that knows its window and reports ``input_tokens`` from what it was sent.
+
+    It counts the characters of the messages, the tool calls in them, the system text and the
+    bound tool schemas. It reports ``min(round(chars * tokens_per_char), window)`` and marks a
+    call as cut when ``chars * tokens_per_char`` is over the window. The turn number is the
+    ``N`` of the last message that starts ``ask N``. A summary request is answered with a valid
+    summary and kept in ``summaries``, apart from ``calls``.
+    """
+
+    window: int
+    tokens_per_char: float = 0.3
+    script: Script
+    calls: list[WindowCall] = Field(default_factory=_no_calls)
+    summaries: list[WindowCall] = Field(default_factory=_no_calls)
+    schema_chars: int = 0
+
+    def bind_tools(self, tools: Any, **kwargs: Any) -> Any:
+        self.schema_chars = len(json.dumps(tools, sort_keys=True))
+        return super().bind_tools(tools, **kwargs)
+
+    def _generate(
+        self,
+        messages: list[BaseMessage],
+        stop: list[str] | None = None,
+        run_manager: CallbackManagerForLLMRun | None = None,
+        **kwargs: Any,
+    ) -> ChatResult:
+        del stop, run_manager, kwargs
+        _check_answered(messages)
+        summing = any(isinstance(m, SystemMessage) and SUMMARISER_ASK in m.text for m in messages)
+        chars = sum(len(m.text) for m in messages)
+        chars += sum(
+            len(json.dumps(call["args"])) + len(call["name"])
+            for m in messages
+            if isinstance(m, AIMessage)
+            for call in m.tool_calls
+        )
+        chars += 0 if summing else self.schema_chars
+        wanted = chars * self.tokens_per_char
+        tokens = min(round(wanted), self.window)
+        record = WindowCall(chars, tokens, wanted > self.window, list(messages))
+        if summing:
+            self.summaries.append(record)
+            body = {
+                "request": f"SUMMARY-{len(self.summaries)}",
+                "done": ["did things"],
+                "files": [],
+                "facts": [],
+                "open": [],
+            }
+            message = AIMessage(content=json.dumps(body))
+        else:
+            self.calls.append(record)
+            turn, done = _turn_of(messages)
+            reply = self.script(turn, done)
+            if isinstance(reply, str):
+                message = AIMessage(content=reply)
+            else:
+                calls: list[ToolCall] = []
+                for name, args in reply:
+                    self.calls_made += 1
+                    calls.append(ToolCall(name=name, args=args, id=f"call_{self.calls_made}"))
+                message = AIMessage(content="", tool_calls=calls)
+        message.usage_metadata = {  # type: ignore[assignment]
+            "input_tokens": tokens,
+            "output_tokens": 1,
+            "total_tokens": tokens + 1,
+        }
+        return ChatResult(generations=[ChatGeneration(message=message)])
+
+    def with_structured_output(self, schema: Any, **kwargs: Any) -> Any:
+        raise NotImplementedError
+
+
+def _turn_of(messages: list[BaseMessage]) -> tuple[int, int]:
+    """The number ``N`` of the last ``ask N`` message and the tool results after it."""
+    done = 0
+    for message in reversed(messages):
+        if isinstance(message, ToolMessage):
+            done += 1
+        elif isinstance(message, HumanMessage) and message.text.startswith("ask "):
+            return int(message.text.split()[1]), done
+    raise RuntimeError("no ask in the request")
 
 
 class StreamingToolChatModel(ToolCallingChatModel):

@@ -114,6 +114,14 @@ def test_a_grown_prompt_with_fewer_tokens_is_a_proven_cut() -> None:
     assert (second.prompt_cut, second.prompt_cut_kind) == ("yes", "older_messages")
 
 
+def test_cleared_results_with_fewer_tokens_do_not_prove_a_cut() -> None:
+    log = _Log()
+    log.call("m1", window=400, used=390, ids=["a", "b"], chars=[300, 300])
+    # Clearing kept the ids and stubbed "a": fewer tokens for a longer list is golem's work.
+    log.call("m2", window=400, used=300, ids=["a", "b", "c"], chars=[20, 300, 300])
+    assert log.spans()[1].prompt_cut != "yes"
+
+
 def test_a_cut_is_proven_from_an_earlier_run() -> None:
     log = _Log()
     log.call("m1", run="r1", window=400, used=390, ids=["a", "b"], chars=[300, 300])
