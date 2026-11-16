@@ -1,5 +1,6 @@
-export type { ApprovalChoice } from "@golem/client";
+export type { ApprovalChoice, ConsentChoice } from "@golem/client";
 export { formatDuration, formatElapsed, formatTurnTime } from "./duration.ts";
+export { CONSENT_LABELS, CONSENT_TITLE, consentAnswers, consentCapsLine, consentLine } from "./consent.ts";
 export { approvalQuestion, DETAILS, displayToolName, isDetail, stepCount, stepFailed, stepMark, summarizeSteps, writingLabel, type Detail, type StepMark } from "./activity.ts";
 export {
   COMPACTING,
@@ -42,7 +43,9 @@ export {
   type ChatState,
   type DeltaBatcher,
   type MessageCall,
+  type ConsentCaps,
   type PendingApproval,
+  type PendingConsent,
   type ToolApproval,
   type ToolBlock,
   type ToolStatus,

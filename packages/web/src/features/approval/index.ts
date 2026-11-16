@@ -1,4 +1,4 @@
-export { ApprovalBar } from "./approval-bar.tsx";
+export { ApprovalBar, Seal } from "./approval-bar.tsx";
 export { ApprovalChip } from "./approval-chip.tsx";
 export { DockedApproval } from "./docked-approval.tsx";
 export { APPROVAL_KEYS, approvalKey, approvalTarget, chipText, keyDecision, verdictText } from "./text.ts";

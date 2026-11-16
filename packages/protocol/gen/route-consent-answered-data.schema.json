@@ -1,0 +1,20 @@
+{
+  "additionalProperties": false,
+  "description": "The user answered the paid step-up question, and the run goes on.",
+  "properties": {
+    "answer": {
+      "enum": [
+        "session",
+        "once",
+        "local"
+      ],
+      "title": "Answer",
+      "type": "string"
+    }
+  },
+  "required": [
+    "answer"
+  ],
+  "title": "RouteConsentAnsweredData",
+  "type": "object"
+}

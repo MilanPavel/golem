@@ -107,6 +107,8 @@ const EVENT_TYPES = new Set([
   "tool.failed",
   "approval.needed",
   "approval.resolved",
+  "route.consent.needed",
+  "route.consent.answered",
   "skill.activated",
   "skill.deactivated",
   "skill.skipped",

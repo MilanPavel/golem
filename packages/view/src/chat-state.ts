@@ -1,4 +1,4 @@
-import type { ApprovalChoice, ChatEvent, SkillCall } from "@golem/client";
+import type { ApprovalChoice, ChatEvent, ConsentChoice, SkillCall } from "@golem/client";
 
 import { noChecks, reduceChecks, type ChecksState } from "./checks.ts";
 import { emptyPlan, reducePlan, type PlanState } from "./plan.ts";
@@ -17,6 +17,29 @@ export type PendingApproval = {
   source: string;
   /** The change a file tool would make, as a unified diff. */
   diff: string | null;
+};
+
+/** The caps of `[budget]` and what is spent, for the line under the paid question. A cap not set is null. */
+export type ConsentCaps = {
+  sessionUsd: number | null;
+  dailyUsd: number | null;
+  spentSession: number;
+  spentToday: number;
+};
+
+/** The paid step-up question the run waits on, from `route.consent.needed`. */
+export type PendingConsent = {
+  runId: string;
+  modelProfile: string;
+  model: string | null;
+  tier: "local" | "budget" | "frontier";
+  /** One plain sentence on why golem asks. */
+  why: string;
+  /** golem's estimate for this turn in USD. Null when the price is unknown. */
+  estimatedUsd: number | null;
+  /** The answers the question offers. A spent cap leaves out `session`. */
+  alternatives: readonly ConsentChoice[];
+  caps: ConsentCaps | null;
 };
 
 /** How a question about a tool call was answered. */
@@ -130,6 +153,8 @@ export type ChatState = {
   runId: string | null;
   /** Set while the run waits for an answer about a tool call. */
   approval: PendingApproval | null;
+  /** Set while the run waits for an answer about a paid model. */
+  consent: PendingConsent | null;
   /** The agent's todo list, from the newest `todos.updated`. */
   todos: TodoItem[];
   /** The skills pinned in the session, in pin order, from `skill.activated` and `skill.deactivated`. */
@@ -175,6 +200,7 @@ export const emptyChat: ChatState = {
   runStartedAt: null,
   runId: null,
   approval: null,
+  consent: null,
   todos: [],
   activeSkills: [],
   skippedSkills: [],
@@ -401,7 +427,7 @@ function reduceChatEvent(state: ChatState, event: ChatEvent): ChatState {
       };
     }
     case "run.completed":
-      return { ...notWaiting(stopWriting(state)), busy: false, runStartedAt: null, runId: null, approval: null, down: null, retry: null };
+      return { ...notWaiting(stopWriting(state)), busy: false, runStartedAt: null, runId: null, approval: null, consent: null, down: null, retry: null };
     case "run.failed":
       return {
         ...notWaiting(stopWriting(state)),
@@ -412,6 +438,7 @@ function reduceChatEvent(state: ChatState, event: ChatEvent): ChatState {
         runStartedAt: null,
         runId: null,
         approval: null,
+        consent: null,
       };
     case "run.cancelled":
       return {
@@ -420,6 +447,7 @@ function reduceChatEvent(state: ChatState, event: ChatEvent): ChatState {
         runStartedAt: null,
         runId: null,
         approval: null,
+        consent: null,
         // A cancel you asked for shows as a hint. One from a daemon shutdown stays in the banner.
         notice: event.data.reason === "user" ? state.notice : SHUTDOWN_NOTICE,
       };
@@ -479,6 +507,34 @@ function reduceChatEvent(state: ChatState, event: ChatEvent): ChatState {
         },
       };
     }
+    case "route.consent.needed": {
+      const caps = event.data.caps ?? null;
+      return {
+        ...state,
+        busy: true,
+        runId: event.run_id,
+        consent: {
+          runId: event.run_id,
+          modelProfile: event.data.model_profile,
+          model: event.data.model ?? null,
+          tier: event.data.tier,
+          why: event.data.why,
+          estimatedUsd: event.data.estimated_usd ?? null,
+          alternatives: event.data.alternatives,
+          caps:
+            caps === null
+              ? null
+              : {
+                  sessionUsd: caps.session_usd ?? null,
+                  dailyUsd: caps.daily_usd ?? null,
+                  spentSession: caps.spent_session,
+                  spentToday: caps.spent_today,
+                },
+        },
+      };
+    }
+    case "route.consent.answered":
+      return { ...state, consent: null };
     case "approval.resolved": {
       const edited = event.data.args ?? null;
       const answered = updateTool(state, event.data.call_id, (tool) => {

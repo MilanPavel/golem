@@ -1,0 +1,48 @@
+{
+  "additionalProperties": false,
+  "description": "The caps of ``[budget]`` and what is spent, in USD. A cap that is not set is null.",
+  "properties": {
+    "daily_usd": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Daily Usd"
+    },
+    "session_usd": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Session Usd"
+    },
+    "spent_session": {
+      "minimum": 0,
+      "title": "Spent Session",
+      "type": "number"
+    },
+    "spent_today": {
+      "minimum": 0,
+      "title": "Spent Today",
+      "type": "number"
+    }
+  },
+  "required": [
+    "spent_session",
+    "spent_today"
+  ],
+  "title": "ConsentCaps",
+  "type": "object"
+}

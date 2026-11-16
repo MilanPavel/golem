@@ -1486,6 +1486,29 @@ public struct ConfigRule: Codable {
     }
 }
 
+/// The caps of ``[budget]`` and what is spent, in USD. A cap that is not set is null.
+// MARK: - ConsentCaps
+public struct ConsentCaps: Codable {
+    public let dailyUsd: Double?
+    public let sessionUsd: Double?
+    public let spentSession: Double
+    public let spentToday: Double
+
+    public enum CodingKeys: String, CodingKey {
+        case dailyUsd = "daily_usd"
+        case sessionUsd = "session_usd"
+        case spentSession = "spent_session"
+        case spentToday = "spent_today"
+    }
+
+    public init(dailyUsd: Double?, sessionUsd: Double?, spentSession: Double, spentToday: Double) {
+        self.dailyUsd = dailyUsd
+        self.sessionUsd = sessionUsd
+        self.spentSession = spentSession
+        self.spentToday = spentToday
+    }
+}
+
 /// What golem sends of the history changed before a model call.
 ///
 /// ``cleared`` means old tool results are now sent as one line each: ``count`` is how
@@ -8543,6 +8566,273 @@ public struct RevertTarget: Codable {
     }
 }
 
+/// ``route.consent.answer``. Answer the paid step-up question a session's run waits on.
+///
+/// ``session`` runs the turn on the paid model and allows paid models for the rest of the
+/// session (not with ``[routing] paid = "always_ask"``, then it is ``once``). ``once`` runs
+/// this turn on it. ``local`` runs the turn on a local model. The answer must be one the
+/// event offered in ``alternatives``.
+// MARK: - RouteConsentAnswerParams
+public struct RouteConsentAnswerParams: Codable {
+    public let answer: Answer
+    public let runID: String
+    public let sessionID: String
+
+    public enum CodingKeys: String, CodingKey {
+        case answer = "answer"
+        case runID = "run_id"
+        case sessionID = "session_id"
+    }
+
+    public init(answer: Answer, runID: String, sessionID: String) {
+        self.answer = answer
+        self.runID = runID
+        self.sessionID = sessionID
+    }
+}
+
+public enum Answer: String, Codable {
+    case local = "local"
+    case once = "once"
+    case session = "session"
+}
+
+/// The run that goes on. Its events go to the attached connections.
+// MARK: - RouteConsentAnswerResult
+public struct RouteConsentAnswerResult: Codable {
+    public let runID: String
+
+    public enum CodingKeys: String, CodingKey {
+        case runID = "run_id"
+    }
+
+    public init(runID: String) {
+        self.runID = runID
+    }
+}
+
+/// The user answered the paid step-up question, and the run goes on.
+// MARK: - RouteConsentAnsweredData
+public struct RouteConsentAnsweredData: Codable {
+    public let answer: Answer
+
+    public enum CodingKeys: String, CodingKey {
+        case answer = "answer"
+    }
+
+    public init(answer: Answer) {
+        self.answer = answer
+    }
+}
+
+/// The paid step-up question was answered, and the run goes on.
+// MARK: - RouteConsentAnsweredEvent
+public struct RouteConsentAnsweredEvent: Codable {
+    public let data: RouteConsentAnsweredEventData
+    public let runID: String
+    public let seq: Int
+    public let sessionID: String
+    public let ts: String
+    public let type: RouteConsentAnsweredEventType
+
+    public enum CodingKeys: String, CodingKey {
+        case data = "data"
+        case runID = "run_id"
+        case seq = "seq"
+        case sessionID = "session_id"
+        case ts = "ts"
+        case type = "type"
+    }
+
+    public init(data: RouteConsentAnsweredEventData, runID: String, seq: Int, sessionID: String, ts: String, type: RouteConsentAnsweredEventType) {
+        self.data = data
+        self.runID = runID
+        self.seq = seq
+        self.sessionID = sessionID
+        self.ts = ts
+        self.type = type
+    }
+}
+
+/// The user answered the paid step-up question, and the run goes on.
+// MARK: - RouteConsentAnsweredEventData
+public struct RouteConsentAnsweredEventData: Codable {
+    public let answer: Answer
+
+    public enum CodingKeys: String, CodingKey {
+        case answer = "answer"
+    }
+
+    public init(answer: Answer) {
+        self.answer = answer
+    }
+}
+
+public enum RouteConsentAnsweredEventType: String, Codable {
+    case routeConsentAnswered = "route.consent.answered"
+}
+
+/// The run waits for the user's yes to a paid model. It is paused until
+/// ``route.consent.answer``.
+///
+/// ``model_profile``, ``provider``, ``model`` and ``tier`` name the paid model that would
+/// run. ``why`` is one plain sentence on why golem asks. ``estimated_usd`` is golem's
+/// estimate for this turn, null when the price is unknown. ``caps`` is set when a cap is.
+/// ``alternatives`` are the answers the user may give: a spent cap leaves out ``session``.
+// MARK: - RouteConsentNeededData
+public struct RouteConsentNeededData: Codable {
+    public let alternatives: [Answer]
+    public let caps: RouteConsentNeededDataConsentCaps?
+    public let estimatedUsd: Double?
+    public let model: String?
+    public let modelProfile: String
+    public let provider: String?
+    public let tier: Tier
+    public let why: String
+
+    public enum CodingKeys: String, CodingKey {
+        case alternatives = "alternatives"
+        case caps = "caps"
+        case estimatedUsd = "estimated_usd"
+        case model = "model"
+        case modelProfile = "model_profile"
+        case provider = "provider"
+        case tier = "tier"
+        case why = "why"
+    }
+
+    public init(alternatives: [Answer], caps: RouteConsentNeededDataConsentCaps?, estimatedUsd: Double?, model: String?, modelProfile: String, provider: String?, tier: Tier, why: String) {
+        self.alternatives = alternatives
+        self.caps = caps
+        self.estimatedUsd = estimatedUsd
+        self.model = model
+        self.modelProfile = modelProfile
+        self.provider = provider
+        self.tier = tier
+        self.why = why
+    }
+}
+
+/// The caps of ``[budget]`` and what is spent, in USD. A cap that is not set is null.
+// MARK: - RouteConsentNeededDataConsentCaps
+public struct RouteConsentNeededDataConsentCaps: Codable {
+    public let dailyUsd: Double?
+    public let sessionUsd: Double?
+    public let spentSession: Double
+    public let spentToday: Double
+
+    public enum CodingKeys: String, CodingKey {
+        case dailyUsd = "daily_usd"
+        case sessionUsd = "session_usd"
+        case spentSession = "spent_session"
+        case spentToday = "spent_today"
+    }
+
+    public init(dailyUsd: Double?, sessionUsd: Double?, spentSession: Double, spentToday: Double) {
+        self.dailyUsd = dailyUsd
+        self.sessionUsd = sessionUsd
+        self.spentSession = spentSession
+        self.spentToday = spentToday
+    }
+}
+
+/// The run is waiting for an answer about a paid model.
+// MARK: - RouteConsentNeededEvent
+public struct RouteConsentNeededEvent: Codable {
+    public let data: RouteConsentNeededEventData
+    public let runID: String
+    public let seq: Int
+    public let sessionID: String
+    public let ts: String
+    public let type: RouteConsentNeededEventType
+
+    public enum CodingKeys: String, CodingKey {
+        case data = "data"
+        case runID = "run_id"
+        case seq = "seq"
+        case sessionID = "session_id"
+        case ts = "ts"
+        case type = "type"
+    }
+
+    public init(data: RouteConsentNeededEventData, runID: String, seq: Int, sessionID: String, ts: String, type: RouteConsentNeededEventType) {
+        self.data = data
+        self.runID = runID
+        self.seq = seq
+        self.sessionID = sessionID
+        self.ts = ts
+        self.type = type
+    }
+}
+
+/// The run waits for the user's yes to a paid model. It is paused until
+/// ``route.consent.answer``.
+///
+/// ``model_profile``, ``provider``, ``model`` and ``tier`` name the paid model that would
+/// run. ``why`` is one plain sentence on why golem asks. ``estimated_usd`` is golem's
+/// estimate for this turn, null when the price is unknown. ``caps`` is set when a cap is.
+/// ``alternatives`` are the answers the user may give: a spent cap leaves out ``session``.
+// MARK: - RouteConsentNeededEventData
+public struct RouteConsentNeededEventData: Codable {
+    public let alternatives: [Answer]
+    public let caps: PurpleConsentCaps?
+    public let estimatedUsd: Double?
+    public let model: String?
+    public let modelProfile: String
+    public let provider: String?
+    public let tier: Tier
+    public let why: String
+
+    public enum CodingKeys: String, CodingKey {
+        case alternatives = "alternatives"
+        case caps = "caps"
+        case estimatedUsd = "estimated_usd"
+        case model = "model"
+        case modelProfile = "model_profile"
+        case provider = "provider"
+        case tier = "tier"
+        case why = "why"
+    }
+
+    public init(alternatives: [Answer], caps: PurpleConsentCaps?, estimatedUsd: Double?, model: String?, modelProfile: String, provider: String?, tier: Tier, why: String) {
+        self.alternatives = alternatives
+        self.caps = caps
+        self.estimatedUsd = estimatedUsd
+        self.model = model
+        self.modelProfile = modelProfile
+        self.provider = provider
+        self.tier = tier
+        self.why = why
+    }
+}
+
+/// The caps of ``[budget]`` and what is spent, in USD. A cap that is not set is null.
+// MARK: - PurpleConsentCaps
+public struct PurpleConsentCaps: Codable {
+    public let dailyUsd: Double?
+    public let sessionUsd: Double?
+    public let spentSession: Double
+    public let spentToday: Double
+
+    public enum CodingKeys: String, CodingKey {
+        case dailyUsd = "daily_usd"
+        case sessionUsd = "session_usd"
+        case spentSession = "spent_session"
+        case spentToday = "spent_today"
+    }
+
+    public init(dailyUsd: Double?, sessionUsd: Double?, spentSession: Double, spentToday: Double) {
+        self.dailyUsd = dailyUsd
+        self.sessionUsd = sessionUsd
+        self.spentSession = spentSession
+        self.spentToday = spentToday
+    }
+}
+
+public enum RouteConsentNeededEventType: String, Codable {
+    case routeConsentNeeded = "route.consent.needed"
+}
+
 /// Server → every connection: a routine was added, changed or removed. Not stored.
 // MARK: - RoutineChangedNotification
 public struct RoutineChangedNotification: Codable {
@@ -9760,6 +10050,10 @@ public enum RPCNotificationMethod: String, Codable {
 ///
 /// The waiting tool call was answered, and the run goes on.
 ///
+/// The run is waiting for an answer about a paid model.
+///
+/// The paid step-up question was answered, and the run goes on.
+///
 /// The agent's todo list changed. ``run_id`` is null for a list a fork copied.
 ///
 /// A plan first run proposed its plan with ``propose_plan``.
@@ -9830,7 +10124,8 @@ public struct Params: Codable {
 /// before sessions had a folder, by the first ``message.send`` that names one.
 /// ``allowed_tools`` is the whole list after ``session.revoke``, and
 /// ``mcp_servers`` the on-demand MCP servers the session turned on, after
-/// ``mcp.enable`` or ``mcp.disable``.
+/// ``mcp.enable`` or ``mcp.disable``. ``paid_ok`` true is the user's yes to paid
+/// models for the rest of the session (``route.consent.answer`` with ``session``).
 ///
 /// No payload. Used by ``run.started``, ``run.completed``, and ``session.closed``.
 ///
@@ -10044,6 +10339,16 @@ public struct Params: Codable {
 /// ``allow_always`` wrote an allow rule, and ``rule`` names it. ``args`` are
 /// the arguments the user edited the call to, when they did.
 ///
+/// The run waits for the user's yes to a paid model. It is paused until
+/// ``route.consent.answer``.
+///
+/// ``model_profile``, ``provider``, ``model`` and ``tier`` name the paid model that would
+/// run. ``why`` is one plain sentence on why golem asks. ``estimated_usd`` is golem's
+/// estimate for this turn, null when the price is unknown. ``caps`` is set when a cap is.
+/// ``alternatives`` are the answers the user may give: a spent cap leaves out ``session``.
+///
+/// The user answered the paid step-up question, and the run goes on.
+///
 /// The agent's todo list, whole, after ``todo_write`` replaced it.
 ///
 /// ``call_id`` is the call that wrote it. It is null for a list a fork copied.
@@ -10101,6 +10406,7 @@ public struct ParamsData: Codable {
     public let route: Route?
     public let allowedTools: [PurpleSessionAllowance]?
     public let mcpServers: [String]?
+    public let paidOk: Bool?
     public let title: String?
     public let runID: String?
     public let status: PurpleStatus?
@@ -10179,6 +10485,11 @@ public struct ParamsData: Codable {
     public let subject: String?
     public let decision: Decision?
     public let rule: String?
+    public let alternatives: [Answer]?
+    public let caps: FluffyConsentCaps?
+    public let estimatedUsd: Double?
+    public let why: String?
+    public let answer: Answer?
     public let todos: [PurpleTodo]?
     public let planID: String?
     public let steps: [FluffyPlanStep]?
@@ -10205,6 +10516,7 @@ public struct ParamsData: Codable {
         case route = "route"
         case allowedTools = "allowed_tools"
         case mcpServers = "mcp_servers"
+        case paidOk = "paid_ok"
         case title = "title"
         case runID = "run_id"
         case status = "status"
@@ -10283,6 +10595,11 @@ public struct ParamsData: Codable {
         case subject = "subject"
         case decision = "decision"
         case rule = "rule"
+        case alternatives = "alternatives"
+        case caps = "caps"
+        case estimatedUsd = "estimated_usd"
+        case why = "why"
+        case answer = "answer"
         case todos = "todos"
         case planID = "plan_id"
         case steps = "steps"
@@ -10300,7 +10617,7 @@ public struct ParamsData: Codable {
         case output = "output"
     }
 
-    public init(cwd: String?, forkedFrom: PurpleForkedFrom?, modelName: String?, modelProfile: String?, modelProvider: String?, origin: String?, route: Route?, allowedTools: [PurpleSessionAllowance]?, mcpServers: [String]?, title: String?, runID: String?, status: PurpleStatus?, summary: String?, reason: PurpleReason?, detail: String?, model: String?, provider: String?, rejected: [FluffyModelRejection]?, tier: Tier?, options: [String: Option]?, mode: Mode?, on: Bool?, messageID: String?, role: MessageCompletedDataRole?, text: String?, interrupted: Bool?, skill: FluffySkillCall?, thinking: String?, thinkingMS: Int?, clearedIDS: [String]?, contextWindow: Int?, estimatedTokens: Int?, index: Int?, messageBytes: [Int]?, messageChars: [Int]?, messageIDS: [String]?, numCtx: Int?, parentCallID: String?, profile: String?, summaryChars: Int?, systemBytes: Int?, systemChars: Int?, systemPromptSHA: String?, systemSections: [TentacledPromptSectionInfo]?, toolsBytes: Int?, toolsChars: Int?, toolsSHA: String?, windowEstimated: Bool?, windowPlanned: Bool?, costUsd: Double?, failed: Bool?, firstTokenMS: Int?, latencyMS: Int?, loadMS: Int?, price: FluffyCallPrice?, promptMS: Int?, replyMS: Int?, stopReason: String?, textToolCalls: TextToolCalls?, usage: FluffyTokenUsage?, action: ContextChangedDataAction?, afterTokens: Int?, beforeTokens: Int?, count: Int?, reloadMS: Int?, room: Int?, windowFrom: Int?, windowTo: Int?, code: Code?, hint: String?, message: String?, args: [String: JSONAny]?, callID: String?, name: String?, chars: Int?, lines: Int?, path: String?, waiting: Bool?, artifactID: String?, diff: String?, durationMS: Int?, preview: String?, truncated: Bool?, source: String?, subject: String?, decision: Decision?, rule: String?, todos: [PurpleTodo]?, planID: String?, steps: [FluffyPlanStep]?, added: Int?, changeID: String?, removed: Int?, reverts: String?, hash: String?, how: How?, checks: [FluffyCheckInfo]?, checkID: String?, command: String?, round: Int?, exitCode: Int?, output: String?) {
+    public init(cwd: String?, forkedFrom: PurpleForkedFrom?, modelName: String?, modelProfile: String?, modelProvider: String?, origin: String?, route: Route?, allowedTools: [PurpleSessionAllowance]?, mcpServers: [String]?, paidOk: Bool?, title: String?, runID: String?, status: PurpleStatus?, summary: String?, reason: PurpleReason?, detail: String?, model: String?, provider: String?, rejected: [FluffyModelRejection]?, tier: Tier?, options: [String: Option]?, mode: Mode?, on: Bool?, messageID: String?, role: MessageCompletedDataRole?, text: String?, interrupted: Bool?, skill: FluffySkillCall?, thinking: String?, thinkingMS: Int?, clearedIDS: [String]?, contextWindow: Int?, estimatedTokens: Int?, index: Int?, messageBytes: [Int]?, messageChars: [Int]?, messageIDS: [String]?, numCtx: Int?, parentCallID: String?, profile: String?, summaryChars: Int?, systemBytes: Int?, systemChars: Int?, systemPromptSHA: String?, systemSections: [TentacledPromptSectionInfo]?, toolsBytes: Int?, toolsChars: Int?, toolsSHA: String?, windowEstimated: Bool?, windowPlanned: Bool?, costUsd: Double?, failed: Bool?, firstTokenMS: Int?, latencyMS: Int?, loadMS: Int?, price: FluffyCallPrice?, promptMS: Int?, replyMS: Int?, stopReason: String?, textToolCalls: TextToolCalls?, usage: FluffyTokenUsage?, action: ContextChangedDataAction?, afterTokens: Int?, beforeTokens: Int?, count: Int?, reloadMS: Int?, room: Int?, windowFrom: Int?, windowTo: Int?, code: Code?, hint: String?, message: String?, args: [String: JSONAny]?, callID: String?, name: String?, chars: Int?, lines: Int?, path: String?, waiting: Bool?, artifactID: String?, diff: String?, durationMS: Int?, preview: String?, truncated: Bool?, source: String?, subject: String?, decision: Decision?, rule: String?, alternatives: [Answer]?, caps: FluffyConsentCaps?, estimatedUsd: Double?, why: String?, answer: Answer?, todos: [PurpleTodo]?, planID: String?, steps: [FluffyPlanStep]?, added: Int?, changeID: String?, removed: Int?, reverts: String?, hash: String?, how: How?, checks: [FluffyCheckInfo]?, checkID: String?, command: String?, round: Int?, exitCode: Int?, output: String?) {
         self.cwd = cwd
         self.forkedFrom = forkedFrom
         self.modelName = modelName
@@ -10310,6 +10627,7 @@ public struct ParamsData: Codable {
         self.route = route
         self.allowedTools = allowedTools
         self.mcpServers = mcpServers
+        self.paidOk = paidOk
         self.title = title
         self.runID = runID
         self.status = status
@@ -10388,6 +10706,11 @@ public struct ParamsData: Codable {
         self.subject = subject
         self.decision = decision
         self.rule = rule
+        self.alternatives = alternatives
+        self.caps = caps
+        self.estimatedUsd = estimatedUsd
+        self.why = why
+        self.answer = answer
         self.todos = todos
         self.planID = planID
         self.steps = steps
@@ -10420,6 +10743,29 @@ public struct PurpleSessionAllowance: Codable {
     public init(subject: String?, tool: String) {
         self.subject = subject
         self.tool = tool
+    }
+}
+
+/// The caps of ``[budget]`` and what is spent, in USD. A cap that is not set is null.
+// MARK: - FluffyConsentCaps
+public struct FluffyConsentCaps: Codable {
+    public let dailyUsd: Double?
+    public let sessionUsd: Double?
+    public let spentSession: Double
+    public let spentToday: Double
+
+    public enum CodingKeys: String, CodingKey {
+        case dailyUsd = "daily_usd"
+        case sessionUsd = "session_usd"
+        case spentSession = "spent_session"
+        case spentToday = "spent_today"
+    }
+
+    public init(dailyUsd: Double?, sessionUsd: Double?, spentSession: Double, spentToday: Double) {
+        self.dailyUsd = dailyUsd
+        self.sessionUsd = sessionUsd
+        self.spentSession = spentSession
+        self.spentToday = spentToday
     }
 }
 
@@ -10667,6 +11013,8 @@ public enum ParamsType: String, Codable {
     case modelSelected = "model.selected"
     case modelWaiting = "model.waiting"
     case planProposed = "plan.proposed"
+    case routeConsentAnswered = "route.consent.answered"
+    case routeConsentNeeded = "route.consent.needed"
     case runCancelled = "run.cancelled"
     case runCompleted = "run.completed"
     case runFailed = "run.failed"
@@ -12635,12 +12983,14 @@ public struct SessionSummary: Codable {
 /// before sessions had a folder, by the first ``message.send`` that names one.
 /// ``allowed_tools`` is the whole list after ``session.revoke``, and
 /// ``mcp_servers`` the on-demand MCP servers the session turned on, after
-/// ``mcp.enable`` or ``mcp.disable``.
+/// ``mcp.enable`` or ``mcp.disable``. ``paid_ok`` true is the user's yes to paid
+/// models for the rest of the session (``route.consent.answer`` with ``session``).
 // MARK: - SessionUpdatedData
 public struct SessionUpdatedData: Codable {
     public let allowedTools: [FluffySessionAllowance]?
     public let cwd: String?
     public let mcpServers: [String]?
+    public let paidOk: Bool?
     public let route: Route?
     public let title: String?
 
@@ -12648,14 +12998,16 @@ public struct SessionUpdatedData: Codable {
         case allowedTools = "allowed_tools"
         case cwd = "cwd"
         case mcpServers = "mcp_servers"
+        case paidOk = "paid_ok"
         case route = "route"
         case title = "title"
     }
 
-    public init(allowedTools: [FluffySessionAllowance]?, cwd: String?, mcpServers: [String]?, route: Route?, title: String?) {
+    public init(allowedTools: [FluffySessionAllowance]?, cwd: String?, mcpServers: [String]?, paidOk: Bool?, route: Route?, title: String?) {
         self.allowedTools = allowedTools
         self.cwd = cwd
         self.mcpServers = mcpServers
+        self.paidOk = paidOk
         self.route = route
         self.title = title
     }
@@ -12714,12 +13066,14 @@ public struct SessionUpdatedEvent: Codable {
 /// before sessions had a folder, by the first ``message.send`` that names one.
 /// ``allowed_tools`` is the whole list after ``session.revoke``, and
 /// ``mcp_servers`` the on-demand MCP servers the session turned on, after
-/// ``mcp.enable`` or ``mcp.disable``.
+/// ``mcp.enable`` or ``mcp.disable``. ``paid_ok`` true is the user's yes to paid
+/// models for the rest of the session (``route.consent.answer`` with ``session``).
 // MARK: - SessionUpdatedEventData
 public struct SessionUpdatedEventData: Codable {
     public let allowedTools: [TentacledSessionAllowance]?
     public let cwd: String?
     public let mcpServers: [String]?
+    public let paidOk: Bool?
     public let route: Route?
     public let title: String?
 
@@ -12727,14 +13081,16 @@ public struct SessionUpdatedEventData: Codable {
         case allowedTools = "allowed_tools"
         case cwd = "cwd"
         case mcpServers = "mcp_servers"
+        case paidOk = "paid_ok"
         case route = "route"
         case title = "title"
     }
 
-    public init(allowedTools: [TentacledSessionAllowance]?, cwd: String?, mcpServers: [String]?, route: Route?, title: String?) {
+    public init(allowedTools: [TentacledSessionAllowance]?, cwd: String?, mcpServers: [String]?, paidOk: Bool?, route: Route?, title: String?) {
         self.allowedTools = allowedTools
         self.cwd = cwd
         self.mcpServers = mcpServers
+        self.paidOk = paidOk
         self.route = route
         self.title = title
     }

@@ -14,7 +14,11 @@ from golem_protocol.events import (
     ApprovalNeededEvent,
     ApprovalResolvedEvent,
     ChatEvent,
+    ConsentAnswer,
     MessageCompletedEvent,
+    RouteConsentAnsweredEvent,
+    RouteConsentNeededEvent,
+    SkillCall,
 )
 
 
@@ -63,4 +67,35 @@ def pending_approval(events: list[ChatEvent]) -> Pending | None:
     )
 
 
-__all__ = ["Pending", "pending_approval"]
+@dataclass(frozen=True, slots=True)
+class PendingConsent:
+    """The unanswered paid step-up question of a run, and the user's message it holds back."""
+
+    user_message_id: str
+    text: str
+    skill: SkillCall | None
+    alternatives: tuple[ConsentAnswer, ...]
+
+
+def pending_consent(events: list[ChatEvent]) -> PendingConsent | None:
+    """The newest ``route.consent.needed`` without a ``route.consent.answered`` after it."""
+    asked: RouteConsentNeededEvent | None = None
+    user: MessageCompletedEvent | None = None
+    for event in events:
+        if isinstance(event, RouteConsentNeededEvent):
+            asked = event
+        elif isinstance(event, RouteConsentAnsweredEvent):
+            asked = None
+        elif isinstance(event, MessageCompletedEvent) and event.data.role == "user":
+            user = event
+    if asked is None or user is None:
+        return None
+    return PendingConsent(
+        user_message_id=user.data.message_id,
+        text=user.data.text,
+        skill=user.data.skill,
+        alternatives=tuple(asked.data.alternatives),
+    )
+
+
+__all__ = ["Pending", "PendingConsent", "pending_approval", "pending_consent"]

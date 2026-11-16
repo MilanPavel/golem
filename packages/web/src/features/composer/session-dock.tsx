@@ -6,6 +6,7 @@ import { useDraft, useDraftPastes, useNotes, usePageActions, useSession } from "
 import type { SessionView } from "../../store/session-store.ts";
 import { DockedApproval } from "../approval/docked-approval.tsx";
 import { DockedChecksQuestion } from "./checks-question.tsx";
+import { DockedConsent } from "../consent/docked-consent.tsx";
 import { Composer } from "./composer.tsx";
 import { ModeChip } from "./mode-chip.tsx";
 import { PlanChip } from "./plan-chip.tsx";
@@ -30,7 +31,7 @@ const selectRun = ({ chat }: SessionView): Run => ({
   busy: chat.busy,
   runId: chat.runId,
   runStartedAt: chat.runStartedAt,
-  waiting: chat.approval !== null,
+  waiting: chat.approval !== null || chat.consent !== null,
   localWait: chat.localWait,
   failed: chat.error !== null,
 });
@@ -115,7 +116,12 @@ export function SessionDock({ sessionId }: { sessionId: string }) {
                 <ContextChip sessionId={sessionId} />
               </span>
             } />}
-        approval={<DockedApproval sessionId={sessionId} />}
+        approval={
+          <>
+            <DockedApproval sessionId={sessionId} />
+            <DockedConsent sessionId={sessionId} />
+          </>
+        }
         question={<DockedChecksQuestion sessionId={sessionId} />}
         composer={
           <Composer

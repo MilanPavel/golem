@@ -21,6 +21,7 @@ export {
   SESSION_BUSY,
   SESSION_NOT_FOUND,
   type ApprovalChoice,
+  type ConsentChoice,
   type ChangesDiffTarget,
   type ChangesRevertTarget,
   type SendOptions,

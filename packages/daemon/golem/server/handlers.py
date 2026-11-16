@@ -98,6 +98,7 @@ from golem.sessions.manager import (
     ApprovalNotFoundError,
     BlankTitleError,
     BudgetSpentError,
+    ConsentAnswerError,
     InvalidToolArgsError,
     MessageNotFoundError,
     RuleWriteError,
@@ -225,6 +226,8 @@ from golem_protocol.commands import (
     PolicyUpdateParams,
     RevertConflict,
     RevertTarget,
+    RouteConsentAnswerParams,
+    RouteConsentAnswerResult,
     RoutineGetParams,
     RoutineListParams,
     RoutineRemoveParams,
@@ -474,6 +477,24 @@ async def _fs_list_dirs(ctx: RequestContext, params: FsListDirsParams) -> FsList
         return list_dirs(None if params.path is None else Path(params.path), Path.home())
     except FolderError as exc:
         raise RpcCallError(INVALID_PARAMS, str(exc)) from exc
+
+
+async def _route_consent_answer(
+    ctx: RequestContext, params: RouteConsentAnswerParams
+) -> RouteConsentAnswerResult:
+    try:
+        run_id = await _sessions(ctx).answer_consent(
+            params.session_id, params.run_id, params.answer
+        )
+    except ApprovalNotFoundError as exc:
+        raise RpcCallError(APPROVAL_NOT_FOUND, "no run waits on this question") from exc
+    except ConsentAnswerError as exc:
+        raise RpcCallError(INVALID_PARAMS, str(exc)) from exc
+    except SessionNotFoundError as exc:
+        raise RpcCallError(SESSION_NOT_FOUND, "session not found") from exc
+    except SchemaMismatchError as exc:
+        raise RpcCallError(SESSION_NOT_FOUND, str(exc)) from exc
+    return RouteConsentAnswerResult(run_id=run_id)
 
 
 async def _approval_respond(
@@ -1706,6 +1727,9 @@ def standard_methods() -> dict[str, Method]:
         "message.send": Method("message.send", MessageSendParams, True, _message_send),
         "approval.respond": Method(
             "approval.respond", ApprovalRespondParams, True, _approval_respond
+        ),
+        "route.consent.answer": Method(
+            "route.consent.answer", RouteConsentAnswerParams, True, _route_consent_answer
         ),
         "run.cancel": Method("run.cancel", RunCancelParams, True, _run_cancel),
         "artifact.read": Method("artifact.read", ArtifactReadParams, True, _artifact_read),
