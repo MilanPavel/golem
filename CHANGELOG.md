@@ -2,6 +2,89 @@
 
 What changed in each release of golem, newest first. `just release` writes each section from the commit messages on `main` ([CONTRIBUTING.md](CONTRIBUTING.md)), and the release pull request is the place to edit it. The GitHub release shows the same section. How a release is made is in [docs/sre.md](docs/sre.md), section 5.
 
+## [0.15.0] - 2026-11-16
+
+### Features
+
+- **skills:** read, write, create and disable a skill through the daemon ([#859](https://github.com/MilanPavel/golem/pull/859))
+- **web:** sign in to a hosted MCP server from Settings ([#863](https://github.com/MilanPavel/golem/pull/863))
+- **daemon:** headless sessions get an origin and a session.completed event ([#861](https://github.com/MilanPavel/golem/pull/861))
+- **skills:** the model sees an index of the skills it may load ([#917](https://github.com/MilanPavel/golem/pull/917))
+- **models:** plan the context window golem asks Ollama for ([#923](https://github.com/MilanPavel/golem/pull/923))
+- **models:** a helper asks a chat model for an answer in a given shape ([#927](https://github.com/MilanPavel/golem/pull/927))
+- **models:** every model call records its cost and the model it ran on ([#932](https://github.com/MilanPavel/golem/pull/932))
+- **daemon:** a context view can shorten what a model call sends ([#929](https://github.com/MilanPavel/golem/pull/929))
+- **web:** a reply cut at the length limit says so ([#925](https://github.com/MilanPavel/golem/pull/925))
+- **client:** GolemKit, and just gen writes the Swift types ([#862](https://github.com/MilanPavel/golem/pull/862))
+- **models:** every model has a tier: local, budget or frontier ([#931](https://github.com/MilanPavel/golem/pull/931))
+- **tools:** an edit's old text can match when only spacing or indentation differs ([#988](https://github.com/MilanPavel/golem/pull/988))
+- **web:** the details drawer is a workbench panel with tabs ([#992](https://github.com/MilanPavel/golem/pull/992))
+- **daemon:** config.toml has a [coding] section, and golem finds a project's checks ([#990](https://github.com/MilanPavel/golem/pull/990))
+- **tui:** a finished edit shows its diff inline in the transcript ([#993](https://github.com/MilanPavel/golem/pull/993))
+- **models:** one call gives each model's routing facts ([#997](https://github.com/MilanPavel/golem/pull/997))
+- **models:** one generation at a time on a local server, chat before jobs ([#996](https://github.com/MilanPavel/golem/pull/996))
+- **web:** the details panel is resized by dragging its edge ([#1003](https://github.com/MilanPavel/golem/pull/1003))
+- **daemon:** the daemon records each change to a file, with the text before and after ([#991](https://github.com/MilanPavel/golem/pull/991))
+- **models:** each internal job has a model, and session titles use it ([#998](https://github.com/MilanPavel/golem/pull/998))
+- **sessions:** every model call is recorded with its tokens and cost ([#999](https://github.com/MilanPavel/golem/pull/999))
+- **models:** local models get a planned context window on every call ([#1001](https://github.com/MilanPavel/golem/pull/1001))
+- **cli:** golem skills new and golem skills edit make and edit a skill from a shell ([#1005](https://github.com/MilanPavel/golem/pull/1005))
+- **tools:** write_file and edit_file answer the model in one line ([#995](https://github.com/MilanPavel/golem/pull/995))
+- **models:** routing rules as a pure function, and the [routing] and [budget] settings ([#1004](https://github.com/MilanPavel/golem/pull/1004))
+- **daemon:** the daemon notifies you when a detached session needs you or fails ([#1010](https://github.com/MilanPavel/golem/pull/1010))
+- **tui:** /skills gets actions, a new-skill form, and $EDITOR on SKILL.md ([#1012](https://github.com/MilanPavel/golem/pull/1012))
+- **daemon:** every file a tool writes is recorded and sends file.changed ([#1016](https://github.com/MilanPavel/golem/pull/1016))
+- **daemon:** changes.list and changes.diff tell a client what a session changed ([#1017](https://github.com/MilanPavel/golem/pull/1017))
+- **models:** local calls record how long loading, reading and replying took ([#1011](https://github.com/MilanPavel/golem/pull/1011))
+- **cli:** golem ask runs a prompt from the shell, and golem open returns to its session ([#1006](https://github.com/MilanPavel/golem/pull/1006))
+- **web:** Settings lists, edits and creates skills, and shows where API keys are kept ([#1009](https://github.com/MilanPavel/golem/pull/1009))
+- **daemon:** routines are config, and routine.list, get, update and remove read and edit them ([#1018](https://github.com/MilanPavel/golem/pull/1018))
+- **daemon:** golem runs the project's checks after a turn that changed files ([#1015](https://github.com/MilanPavel/golem/pull/1015))
+- **tools:** a tool result the model reads is sized to its context window ([#1013](https://github.com/MilanPavel/golem/pull/1013))
+- **sessions:** old tool results are sent as one line once the history fills the window ([#1014](https://github.com/MilanPavel/golem/pull/1014))
+- **daemon:** tool.writing says how far the model is with a file it is writing ([#1019](https://github.com/MilanPavel/golem/pull/1019))
+- **sessions:** old turns are summarised once the history still fills the window ([#1023](https://github.com/MilanPavel/golem/pull/1023))
+- **web:** the trace says how many tool results were cleared at the selected call ([#1022](https://github.com/MilanPavel/golem/pull/1022))
+- **web:** each answer shows its model, tier, tokens and cost ([#1026](https://github.com/MilanPavel/golem/pull/1026))
+- **sessions:** a session has a route mode, and each turn can pick its model ([#1024](https://github.com/MilanPavel/golem/pull/1024))
+- **models:** a chat call that waits for the local model says so ([#1025](https://github.com/MilanPavel/golem/pull/1025))
+- **tui:** /changes reviews the files a session changed, in the terminal ([#1027](https://github.com/MilanPavel/golem/pull/1027))
+- **web:** a slow file write shows its path, lines and seconds, in the web and the terminal ([#1028](https://github.com/MilanPavel/golem/pull/1028))
+- **daemon:** changes.revert takes back a change, a file, a hunk or a run ([#1031](https://github.com/MilanPavel/golem/pull/1031))
+- **sessions:** a prompt that will not fit is shrunk before it is sent ([#1039](https://github.com/MilanPavel/golem/pull/1039))
+- **web:** an edit in the chat is a card that opens the file's change ([#1030](https://github.com/MilanPavel/golem/pull/1030))
+- **daemon:** a failed check goes back to the model, at most fix_rounds times a turn ([#1035](https://github.com/MilanPavel/golem/pull/1035))
+- **web:** the Changes tab lists the files a session changed, with their diffs ([#1040](https://github.com/MilanPavel/golem/pull/1040))
+- **daemon:** files a shell command changed in a git repository are recorded ([#1041](https://github.com/MilanPavel/golem/pull/1041))
+- **web:** the API keys page groups model and MCP keys, with their marks ([#1042](https://github.com/MilanPavel/golem/pull/1042))
+- **daemon:** file.read and file.list give a client the files of the session folder ([#1029](https://github.com/MilanPavel/golem/pull/1029))
+- **daemon:** plan first, a read-only run that ends in a proposed plan ([#1032](https://github.com/MilanPavel/golem/pull/1032))
+- **web:** the Skills and Config file editors fill the settings panel ([#1044](https://github.com/MilanPavel/golem/pull/1044))
+- **daemon:** changes.commit commits a session's files with the user's git, and suggests the message ([#1033](https://github.com/MilanPavel/golem/pull/1033))
+- the shared view folds file.changed into the files each turn changed ([#1046](https://github.com/MilanPavel/golem/pull/1046))
+- **daemon:** shell changes in a git worktree inside the session folder are recorded ([#1047](https://github.com/MilanPavel/golem/pull/1047))
+- /cost shows a usage report, and Settings has a Usage tab ([#1037](https://github.com/MilanPavel/golem/pull/1037))
+- **sessions:** a budget cap stops paid calls once it is spent ([#1038](https://github.com/MilanPavel/golem/pull/1038))
+- **sessions:** /compact shrinks what the next model call sends ([#1036](https://github.com/MilanPavel/golem/pull/1036))
+
+### Fixes
+
+- **client:** file.changed and three other events reach the screens ([#1049](https://github.com/MilanPavel/golem/pull/1049))
+- **web:** opening a diff in the chat no longer scrolls the whole page ([#1051](https://github.com/MilanPavel/golem/pull/1051))
+
+### Docs
+
+- **models:** ADR-055 picks a model by fixed rules: three tiers, route modes, spend caps ([#921](https://github.com/MilanPavel/golem/pull/921))
+- golem plans a local model's window and sends a view, never a shorter history ([#926](https://github.com/MilanPavel/golem/pull/926))
+- a chapter on routing and context ([#930](https://github.com/MilanPavel/golem/pull/930))
+- **web:** trace notes that on-demand MCP servers can also send a system prompt ([#922](https://github.com/MilanPavel/golem/pull/922))
+- the ADR index lists 056 in the table again ([#933](https://github.com/MilanPavel/golem/pull/933))
+- the TUI demo types golem tui ([#986](https://github.com/MilanPavel/golem/pull/986))
+- ADR 057, golem keeps a snapshot of every file it changes ([#987](https://github.com/MilanPavel/golem/pull/987))
+- a chapter on how golem records, checks and undoes an edit ([#989](https://github.com/MilanPavel/golem/pull/989))
+- ADR-051 settles the relay wire, with AES-GCM Noise on native primitives ([#1007](https://github.com/MilanPavel/golem/pull/1007))
+- ADR-058, a helper is a child run on its own thread, with its steps in the parent's log ([#1021](https://github.com/MilanPavel/golem/pull/1021))
+
 ## [0.14.0] - 2026-11-14
 
 ### Features
