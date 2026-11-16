@@ -27,6 +27,7 @@ from golem.graphs.adapter import PlainMessage, plain_messages, trace_messages
 from golem.graphs.chat import ChatRuntime, Growth
 from golem.graphs.context_view import ContextView, view
 from golem.graphs.state import SCHEMA_VERSION
+from golem.graphs.step_up import StepRequest, StepUp
 from golem.models import options as model_options
 from golem.models.budget import Budget, Room, spent_text
 from golem.models.cost import cost_usd
@@ -36,7 +37,7 @@ from golem.models.pick import Choice, Rejected, Traits, ladder, pick
 from golem.models.privacy import LOCAL_ONLY_REFUSAL, is_local_only
 from golem.models.project_privacy import project_local_only
 from golem.models.router import ModelConfigError, ModelIdentity, ModelRouter
-from golem.models.tiers import Tier
+from golem.models.tiers import TIERS, Tier
 from golem.models.window_plan import should_grow
 from golem.permissions.engine import MCP_ENABLE, Allowance, server_grant
 from golem.permissions.policy import explain
@@ -240,6 +241,10 @@ class _LiveSession:
     """When the session last grew the window, on the manager's clock."""
     growth: Growth | None = None
     """A growth the user asked for, which the next turn's first call reports."""
+    step_ups: dict[str, int] = field(default_factory=dict[str, int])
+    """How many runs of this session stepped up on each signal. In memory only."""
+    step_floor: Tier | None = None
+    """The tier the picks of this session start at, after one signal stepped up in two runs."""
 
 
 def _schemas(text: str | None) -> list[dict[str, object]] | None:
@@ -303,6 +308,7 @@ class SessionManager:
         self._run_records = runs
         self._titles = titles
         events.local_only = self.local_only
+        runtime.next_model = self._next_model
         self.facts: FactsSource | None = None
         """Where a routed turn reads the facts of the models. None: it has none."""
         self.budget: Budget | None = None
@@ -986,6 +992,7 @@ class SessionManager:
             routed=routed.choice,
             begun=begun,
             growth=growth,
+            step_up=session.route == "auto",
         )
 
     async def answer_consent(self, session_id: str, run_id: str, answer: ConsentAnswer) -> str:
@@ -1234,6 +1241,7 @@ class SessionManager:
             local_only=local_only or session.route == "local",
             paid_allowed=yes or (session.paid_ok and settings.paid != "always_ask"),
             paid_room_usd=None if room is None or yes or (over_ask and interactive) else room.usd,
+            min_tier=None if local_only else session.step_floor,
         )
         why_left = None
         if local_only:
@@ -1296,6 +1304,53 @@ class SessionManager:
             )
             return _Routed(session.model_profile, fallback, ask)
         return _Routed(session.model_profile, fallback)
+
+    async def _next_model(self, session_id: str, profile: str, ask: StepRequest) -> StepUp | None:
+        """The model the rest of a run moves to, or None when it stays on ``profile``.
+
+        A struggle asks for the tier above the current one, a prompt that does not fit for a
+        model with a larger window. The privacy, the caps and the paid question are the pick's
+        own. A paid model needs a yes the session already gave: without it the run stays, since
+        a run in progress has no one to ask.
+        """
+        session = await self._resolve(session_id)
+        router = self._runtime.router
+        settings = router.routing_settings()
+        local_only = self.local_only(session.cwd) or session.route == "local"
+        tier = None if self._runtime.tier_of is None else self._runtime.tier_of(profile)
+        floor: Tier | None = None
+        if ask.signal != "context_full":
+            if tier is None or tier == TIERS[-1]:
+                return None
+            floor = TIERS[TIERS.index(tier) + 1]
+        interactive = not session.origin.startswith("routine:")
+        room = None if self.budget is None else await self.budget.room(session_id)
+        everything = await self._facts_of(session, settings.ladder.model_dump().values())
+        candidates = ladder(settings.ladder, profile, everything)
+        own = next((m for m in candidates if profile in (m.profile, m.ref)), None)
+        if own is None:
+            return None
+        if local_only or settings.paid == "never" or not interactive:
+            candidates = [m for m in candidates if m.tier == "local"]
+        traits = Traits(
+            prompt_tokens=ask.need,
+            reply_reserve=router.context_settings().reply_reserve,
+            local_only=local_only,
+            paid_allowed=session.paid_ok and settings.paid == "ask",
+            paid_room_usd=None if room is None else room.usd,
+            min_tier=floor,
+        )
+        choice = pick("auto", own, candidates, traits)
+        found = choice.model
+        if found is None or choice.needs_consent or found.ref == own.ref:
+            return None
+        if local_only and found.tier != "local":
+            return None
+        count = session.step_ups.get(ask.signal, 0) + 1
+        session.step_ups[ask.signal] = count
+        if count >= 2 and not local_only and found.tier != "local":
+            session.step_floor = found.tier
+        return StepUp(found.profile, found.tier, choice)
 
     def _question(
         self,

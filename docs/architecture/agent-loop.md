@@ -52,7 +52,7 @@ Every version has to answer the same open questions:
 
 ::: golem In golem
 
-golem uses a graph library, LangGraph, for the loop itself, and keeps everything around the loop in its own code. The graph has two steps, `call_model` and `tools`, and it runs inside the daemon, the background process that owns your chats.
+golem uses a graph library, LangGraph, for the loop itself, and keeps everything around the loop in its own code. The loop has two steps, `call_model` and `tools`, and a third, `step_up`, that a run reaches only on route `auto` (see below the list). The graph runs inside the daemon, the background process that owns your chats.
 
 ![golem's graph: message.send starts a run, call_model asks for tools, the tools node returns their results, twice, and run.completed ends it](../images/agent-loop-golem.svg)
 
@@ -64,6 +64,8 @@ One message, in the order it runs:
 4. **`tools` runs the calls.** Each one is checked against your rules first, and may wait for your approval ([Tools and permissions](../guide/permissions.md)). Each result is added to the conversation as a *tool message*.
 5. **Back to `call_model`,** with the results. This is step 2 again, as often as the model asks, up to 25 model calls in one run.
 6. **The run ends** with a reply that asks for nothing. The graph saves its state as a *checkpoint*, and the daemon sends `run.completed`.
+
+**The step-up.** On route `auto` ([ADR-055](../adr/055-model-routing.md)), a run may move to a stronger model once. After `tools` (and after a reply with no tool call), a router function runs `detect` on the run's messages and on the last call's stop reason. A struggle (two invalid tool calls in a row, a tool call written as text that could not be read, the same call three times, an empty reply, a reply cut at the length limit) sends the run to the `step_up` node. `call_model` also sends it there, without calling the model, when the prompt cannot be made to fit the window (`ContextFull`). `step_up` asks `next_model`, which the session manager implements with `pick`: the tier above the current one, with the same privacy, caps and paid yes. It stores the new `model_profile` in the state and the stream carries a `model.routed` with the reason `escalated`. Then `call_model` goes on with the whole history on the new model. An empty reply is removed first, so the stronger model answers the request itself. A cut reply stays, and the stronger model continues after it. When no model passes, the run goes on as it was, and a `model.routed` with the reason `fallback` says so. A run never steps up twice (`stepped_up` in the state), and `MAX_MODEL_CALLS` bounds it across both models. The state keeps `can_step_up`, `stepped_up` and `last_call`, and `_turn_input` resets them each turn.
 
 LangGraph never talks to the chat. Its stream goes through an adapter, which turns it into golem's own events. Those events are the only thing a screen ever sees.
 
@@ -88,8 +90,9 @@ Two model calls, one tool call, one answer. Lines 4 to 8 are one trip round the 
 
 **Where it lives in the code:**
 
-- `packages/daemon/golem/graphs/chat.py`: `open_chat` builds the graph, `call_model` and `route` are its step and its fork, and `MAX_MODEL_CALLS` is the cap.
+- `packages/daemon/golem/graphs/chat.py`: `open_chat` builds the graph, `call_model`, `route` and `step_up` are its steps and its fork, and `MAX_MODEL_CALLS` is the cap.
 - `packages/daemon/golem/graphs/tools_node.py`: `tools_node`, the `tools` step.
+- `packages/daemon/golem/graphs/struggle.py` and `step_up.py`: the signals, and the ask a run makes of the router.
 - `packages/daemon/golem/graphs/state.py`: `AgentState`, what the checkpoint holds.
 - `packages/daemon/golem/graphs/adapter.py`: turns LangGraph's stream into facts for the runner.
 - `packages/daemon/golem/sessions/runner.py`: `run_turn` runs one answer and writes its events.

@@ -48,3 +48,10 @@ class AgentState(MessagesState):
     """What the checks of the latest turn reported. Replaced each turn, empty when none ran."""
     changes_seen: NotRequired[int]
     """The highest ``file_changes.seq`` the model was told about. Missing or 0: none yet."""
+    can_step_up: NotRequired[bool]
+    """Whether this run may move to a stronger model once. Set each turn, true on route ``auto``."""
+    stepped_up: NotRequired[bool]
+    """A step-up was tried in this run, so no second one is. Reset each turn."""
+    last_call: NotRequired[dict[str, object]]
+    """What the router needs of the last model call: ``stop_reason``, ``text_tool_calls``,
+    ``context_full`` (``need``, ``window``, ``model``, ``message_id``), ``stepped``."""
