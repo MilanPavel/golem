@@ -5,6 +5,7 @@ import { actionErrorText, sendErrorText } from "../../store/errors.ts";
 import { useDraft, useDraftPastes, useNotes, usePageActions, useSession } from "../../store/page-context.tsx";
 import type { SessionView } from "../../store/session-store.ts";
 import { DockedApproval } from "../approval/docked-approval.tsx";
+import { DockedChecksQuestion } from "./checks-question.tsx";
 import { Composer } from "./composer.tsx";
 import { ModeChip } from "./mode-chip.tsx";
 import { NotesChip } from "./notes-chip.tsx";
@@ -109,6 +110,7 @@ export function SessionDock({ sessionId }: { sessionId: string }) {
               </span>
             } />}
         approval={<DockedApproval sessionId={sessionId} />}
+        question={<DockedChecksQuestion sessionId={sessionId} />}
         composer={
           <Composer
             forPalette
