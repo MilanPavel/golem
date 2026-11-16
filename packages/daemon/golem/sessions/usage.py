@@ -18,11 +18,14 @@ from golem.config import ModelPrice
 from golem.models.cost import cost_usd
 from golem.store.database import Database
 from golem.store.events import EventLog
-from golem.store.projection import local_day, project_model_call
+from golem.store.projection import local_day, project_model_call, project_tool_outcome
 from golem_protocol.events import (
     ModelCallCompletedEvent,
     ModelCallStartedEvent,
+    ModelRoutedEvent,
     TokenUsage,
+    ToolFailedEvent,
+    ToolRequestedEvent,
 )
 
 EVER = "0000-00-00"
@@ -271,7 +274,7 @@ class Usage:
 
 
 async def backfill(database: Database) -> int:
-    """Fill an empty ``model_calls`` from the stored ``model.call.*`` events.
+    """Fill an empty ``model_calls`` from the stored model call, tool and routing events.
 
     Does nothing when the table has a row. Returns the number of events replayed. Old calls
     have no cost, but their tokens count.
@@ -281,13 +284,29 @@ async def backfill(database: Database) -> int:
     found = [
         event
         for event in await EventLog(database).of_types(
-            ("model.call.started", "model.call.completed")
+            (
+                "model.call.started",
+                "model.call.completed",
+                "tool.requested",
+                "tool.failed",
+                "model.routed",
+            )
         )
-        if isinstance(event, ModelCallStartedEvent | ModelCallCompletedEvent)
+        if isinstance(
+            event,
+            ModelCallStartedEvent
+            | ModelCallCompletedEvent
+            | ToolRequestedEvent
+            | ToolFailedEvent
+            | ModelRoutedEvent,
+        )
     ]
     async with database.transaction() as tx:
         for event in found:
-            await project_model_call(tx, event)
+            if isinstance(event, ModelCallStartedEvent | ModelCallCompletedEvent):
+                await project_model_call(tx, event)
+            else:
+                await project_tool_outcome(tx, event)
     return len(found)
 
 

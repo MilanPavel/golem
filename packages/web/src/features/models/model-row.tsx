@@ -1,4 +1,4 @@
-import { type Category, categoryName, contextLabel, priceLabel, recommendedLabel, sizeLabel, statusLabel, tierLabel } from "@golem/view";
+import { type Category, categoryName, contextLabel, priceLabel, recommendedLabel, scoreLabel, sizeLabel, statusLabel, tierLabel } from "@golem/view";
 import type { ReactNode } from "react";
 import type { ListedModel } from "../../store/models.ts";
 import type { PullEntry } from "../../store/pulls.ts";
@@ -86,6 +86,7 @@ export function ModelRow({ model, providerMissing, current, isDefault, category,
   const categories = (model.categories ?? []).filter((category) => category !== "general");
   const recommended = recommendedLabel(model, category);
   const why = reason(model, providerMissing);
+  const score = scoreLabel(model);
   const ready = model.status === "ready";
   return (
     <div className="flex items-start gap-2">
@@ -112,6 +113,8 @@ export function ModelRow({ model, providerMissing, current, isDefault, category,
           ))}
         </div>
         {note === undefined || note === "" ? null : <p className="mt-0.5 text-xs text-muted">{note}</p>}
+        {score === "" ? null : <p className="mt-0.5 text-xs text-muted">{score}</p>}
+        {score === "" ? null : <p className="mt-0.5 text-xs text-muted">{score}</p>}
         {why === null ? null : <p className="mt-0.5 text-xs text-muted">{why}</p>}
         {model.status === "pulling" ? <Progress model={model} entry={pull} /> : null}
         {failed === undefined ? null : <p className="mt-0.5 text-xs text-deny">Download failed: {failed}</p>}

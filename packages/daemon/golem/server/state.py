@@ -18,6 +18,7 @@ from golem.models.facts import FactsSource
 from golem.models.install import BrewInstaller, OllamaInstaller
 from golem.models.ollama import LocalServers
 from golem.models.pulls import PullManager
+from golem.models.scores import Scores
 from golem.notify import Notifier
 from golem.paths import GolemPaths
 from golem.permissions.policy import Policy
@@ -47,6 +48,7 @@ class DaemonState:
     artifacts: ArtifactStore | None = None
     changes: ChangeStore | None = None
     usage: Usage | None = None
+    scores: Scores | None = None
     mcp: McpSupervisor | None = None
     secrets: SecretStore | None = None
     skills: SkillRegistry | None = None

@@ -2765,7 +2765,8 @@ public struct KeychainWait: Codable {
 /// ``tier`` is ``local`` for Ollama, ``budget`` for a hosted model whose blended price is at
 /// or below ``[routing] budget_max_price``, and ``frontier`` otherwise.
 /// ``stale`` means a cached list was shown because the provider did not
-/// answer in time. ``speed`` is set for a local model golem has timed.
+/// answer in time. ``speed`` is set for a local model golem has timed. ``score`` is set
+/// for a model golem has used on this Mac.
 // MARK: - ListedModel
 public struct ListedModel: Codable {
     public let categories: [Category]?
@@ -2779,6 +2780,7 @@ public struct ListedModel: Codable {
     public let recommended: Bool?
     public let recommendedFor: [Category]?
     public let ref: String
+    public let score: ListedModelModelScoreInfo?
     public let sizeGB: Double?
     public let source: ListedModelSource
     public let speed: ListedModelModelSpeedInfo?
@@ -2801,6 +2803,7 @@ public struct ListedModel: Codable {
         case recommended = "recommended"
         case recommendedFor = "recommended_for"
         case ref = "ref"
+        case score = "score"
         case sizeGB = "size_gb"
         case source = "source"
         case speed = "speed"
@@ -2812,7 +2815,7 @@ public struct ListedModel: Codable {
         case tools = "tools"
     }
 
-    public init(categories: [Category]?, ctx: Int?, fit: Fit?, label: String, price: ListedModelModelPriceInfo?, profiles: [String]?, progress: Double?, provider: String, recommended: Bool?, recommendedFor: [Category]?, ref: String, sizeGB: Double?, source: ListedModelSource, speed: ListedModelModelSpeedInfo?, stale: Bool?, status: ListedModelStatus, tags: [String]?, thinkValues: [String]?, tier: Tier, tools: Bool?) {
+    public init(categories: [Category]?, ctx: Int?, fit: Fit?, label: String, price: ListedModelModelPriceInfo?, profiles: [String]?, progress: Double?, provider: String, recommended: Bool?, recommendedFor: [Category]?, ref: String, score: ListedModelModelScoreInfo?, sizeGB: Double?, source: ListedModelSource, speed: ListedModelModelSpeedInfo?, stale: Bool?, status: ListedModelStatus, tags: [String]?, thinkValues: [String]?, tier: Tier, tools: Bool?) {
         self.categories = categories
         self.ctx = ctx
         self.fit = fit
@@ -2824,6 +2827,7 @@ public struct ListedModel: Codable {
         self.recommended = recommended
         self.recommendedFor = recommendedFor
         self.ref = ref
+        self.score = score
         self.sizeGB = sizeGB
         self.source = source
         self.speed = speed
@@ -2868,6 +2872,41 @@ public struct ListedModelModelPriceInfo: Codable {
         self.cachedInput = cachedInput
         self.input = input
         self.output = output
+    }
+}
+
+/// How a model did on this Mac, from real use.
+///
+/// ``tool_score`` is the share of its last 200 tool calls that were valid, or null with
+/// fewer than 20. ``calls`` is its model calls, ``runs`` the runs that used it,
+/// ``stepped_up``
+/// the runs that left it for a stronger model, and ``retried`` the answers the user asked a
+/// stronger model to redo.
+// MARK: - ListedModelModelScoreInfo
+public struct ListedModelModelScoreInfo: Codable {
+    public let calls: Int
+    public let retried: Int
+    public let runs: Int
+    public let steppedUp: Int
+    public let toolCalls: Int
+    public let toolScore: Double?
+
+    public enum CodingKeys: String, CodingKey {
+        case calls = "calls"
+        case retried = "retried"
+        case runs = "runs"
+        case steppedUp = "stepped_up"
+        case toolCalls = "tool_calls"
+        case toolScore = "tool_score"
+    }
+
+    public init(calls: Int, retried: Int, runs: Int, steppedUp: Int, toolCalls: Int, toolScore: Double?) {
+        self.calls = calls
+        self.retried = retried
+        self.runs = runs
+        self.steppedUp = steppedUp
+        self.toolCalls = toolCalls
+        self.toolScore = toolScore
     }
 }
 
@@ -6950,7 +6989,8 @@ public struct ModelListResult: Codable {
 /// ``tier`` is ``local`` for Ollama, ``budget`` for a hosted model whose blended price is at
 /// or below ``[routing] budget_max_price``, and ``frontier`` otherwise.
 /// ``stale`` means a cached list was shown because the provider did not
-/// answer in time. ``speed`` is set for a local model golem has timed.
+/// answer in time. ``speed`` is set for a local model golem has timed. ``score`` is set
+/// for a model golem has used on this Mac.
 // MARK: - ModelElement
 public struct ModelElement: Codable {
     public let categories: [Category]?
@@ -6964,6 +7004,7 @@ public struct ModelElement: Codable {
     public let recommended: Bool?
     public let recommendedFor: [Category]?
     public let ref: String
+    public let score: ModelModelScoreInfo?
     public let sizeGB: Double?
     public let source: ListedModelSource
     public let speed: ModelModelSpeedInfo?
@@ -6986,6 +7027,7 @@ public struct ModelElement: Codable {
         case recommended = "recommended"
         case recommendedFor = "recommended_for"
         case ref = "ref"
+        case score = "score"
         case sizeGB = "size_gb"
         case source = "source"
         case speed = "speed"
@@ -6997,7 +7039,7 @@ public struct ModelElement: Codable {
         case tools = "tools"
     }
 
-    public init(categories: [Category]?, ctx: Int?, fit: Fit?, label: String, price: ModelModelPriceInfo?, profiles: [String]?, progress: Double?, provider: String, recommended: Bool?, recommendedFor: [Category]?, ref: String, sizeGB: Double?, source: ListedModelSource, speed: ModelModelSpeedInfo?, stale: Bool?, status: ListedModelStatus, tags: [String]?, thinkValues: [String]?, tier: Tier, tools: Bool?) {
+    public init(categories: [Category]?, ctx: Int?, fit: Fit?, label: String, price: ModelModelPriceInfo?, profiles: [String]?, progress: Double?, provider: String, recommended: Bool?, recommendedFor: [Category]?, ref: String, score: ModelModelScoreInfo?, sizeGB: Double?, source: ListedModelSource, speed: ModelModelSpeedInfo?, stale: Bool?, status: ListedModelStatus, tags: [String]?, thinkValues: [String]?, tier: Tier, tools: Bool?) {
         self.categories = categories
         self.ctx = ctx
         self.fit = fit
@@ -7009,6 +7051,7 @@ public struct ModelElement: Codable {
         self.recommended = recommended
         self.recommendedFor = recommendedFor
         self.ref = ref
+        self.score = score
         self.sizeGB = sizeGB
         self.source = source
         self.speed = speed
@@ -7038,6 +7081,41 @@ public struct ModelModelPriceInfo: Codable {
         self.cachedInput = cachedInput
         self.input = input
         self.output = output
+    }
+}
+
+/// How a model did on this Mac, from real use.
+///
+/// ``tool_score`` is the share of its last 200 tool calls that were valid, or null with
+/// fewer than 20. ``calls`` is its model calls, ``runs`` the runs that used it,
+/// ``stepped_up``
+/// the runs that left it for a stronger model, and ``retried`` the answers the user asked a
+/// stronger model to redo.
+// MARK: - ModelModelScoreInfo
+public struct ModelModelScoreInfo: Codable {
+    public let calls: Int
+    public let retried: Int
+    public let runs: Int
+    public let steppedUp: Int
+    public let toolCalls: Int
+    public let toolScore: Double?
+
+    public enum CodingKeys: String, CodingKey {
+        case calls = "calls"
+        case retried = "retried"
+        case runs = "runs"
+        case steppedUp = "stepped_up"
+        case toolCalls = "tool_calls"
+        case toolScore = "tool_score"
+    }
+
+    public init(calls: Int, retried: Int, runs: Int, steppedUp: Int, toolCalls: Int, toolScore: Double?) {
+        self.calls = calls
+        self.retried = retried
+        self.runs = runs
+        self.steppedUp = steppedUp
+        self.toolCalls = toolCalls
+        self.toolScore = toolScore
     }
 }
 
@@ -8037,6 +8115,71 @@ public struct PurpleModelRejection: Codable {
 
 public enum ModelRoutedEventType: String, Codable {
     case modelRouted = "model.routed"
+}
+
+/// How a model did on this Mac, from real use.
+///
+/// ``tool_score`` is the share of its last 200 tool calls that were valid, or null with
+/// fewer than 20. ``calls`` is its model calls, ``runs`` the runs that used it,
+/// ``stepped_up``
+/// the runs that left it for a stronger model, and ``retried`` the answers the user asked a
+/// stronger model to redo.
+// MARK: - ModelScoreInfo
+public struct ModelScoreInfo: Codable {
+    public let calls: Int
+    public let retried: Int
+    public let runs: Int
+    public let steppedUp: Int
+    public let toolCalls: Int
+    public let toolScore: Double?
+
+    public enum CodingKeys: String, CodingKey {
+        case calls = "calls"
+        case retried = "retried"
+        case runs = "runs"
+        case steppedUp = "stepped_up"
+        case toolCalls = "tool_calls"
+        case toolScore = "tool_score"
+    }
+
+    public init(calls: Int, retried: Int, runs: Int, steppedUp: Int, toolCalls: Int, toolScore: Double?) {
+        self.calls = calls
+        self.retried = retried
+        self.runs = runs
+        self.steppedUp = steppedUp
+        self.toolCalls = toolCalls
+        self.toolScore = toolScore
+    }
+}
+
+/// ``model.score_reset``. Start a model's score from nothing.
+///
+/// The score ignores the model's calls before now. Usage rows stay.
+// MARK: - ModelScoreResetParams
+public struct ModelScoreResetParams: Codable {
+    public let ref: String
+
+    public enum CodingKeys: String, CodingKey {
+        case ref = "ref"
+    }
+
+    public init(ref: String) {
+        self.ref = ref
+    }
+}
+
+/// ``ref`` is the model whose score was reset.
+// MARK: - ModelScoreResetResult
+public struct ModelScoreResetResult: Codable {
+    public let ref: String
+
+    public enum CodingKeys: String, CodingKey {
+        case ref = "ref"
+    }
+
+    public init(ref: String) {
+        self.ref = ref
+    }
 }
 
 /// The model the session's next run uses.

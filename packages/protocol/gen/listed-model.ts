@@ -13,6 +13,12 @@ export type Provider = string;
 export type Recommended = boolean;
 export type RecommendedFor = ('general' | 'coding' | 'reasoning' | 'vision' | 'fast' | 'long-context')[];
 export type Ref = string;
+export type Calls = number;
+export type Retried = number;
+export type Runs = number;
+export type SteppedUp = number;
+export type ToolCalls = number;
+export type ToolScore = number | null;
 export type SizeGb = number | null;
 export type Source = 'installed' | 'catalog' | 'remote' | 'profile';
 export type PromptTps = number | null;
@@ -45,7 +51,8 @@ export type Tools = boolean | null;
  * ``tier`` is ``local`` for Ollama, ``budget`` for a hosted model whose blended price is at
  * or below ``[routing] budget_max_price``, and ``frontier`` otherwise.
  * ``stale`` means a cached list was shown because the provider did not
- * answer in time. ``speed`` is set for a local model golem has timed.
+ * answer in time. ``speed`` is set for a local model golem has timed. ``score`` is set
+ * for a model golem has used on this Mac.
  */
 export interface ListedModel {
   categories?: Categories;
@@ -59,6 +66,7 @@ export interface ListedModel {
   recommended?: Recommended;
   recommended_for?: RecommendedFor;
   ref: Ref;
+  score?: ModelScoreInfo | null;
   size_gb?: SizeGb;
   source: Source;
   speed?: ModelSpeedInfo | null;
@@ -79,6 +87,25 @@ export interface ModelPriceInfo {
   cached_input?: CachedInput;
   input: Input;
   output: Output;
+}
+/**
+ * How a model did on this Mac, from real use.
+ *
+ * ``tool_score`` is the share of its last 200 tool calls that were valid, or null with
+ * fewer than 20. ``calls`` is its model calls, ``runs`` the runs that used it, ``stepped_up``
+ * the runs that left it for a stronger model, and ``retried`` the answers the user asked a
+ * stronger model to redo.
+ *
+ * This interface was referenced by `ListedModel`'s JSON-Schema
+ * via the `definition` "ModelScoreInfo".
+ */
+export interface ModelScoreInfo {
+  calls: Calls;
+  retried: Retried;
+  runs: Runs;
+  stepped_up: SteppedUp;
+  tool_calls: ToolCalls;
+  tool_score?: ToolScore;
 }
 /**
  * Typical speed of a local model: the median of its recent calls.

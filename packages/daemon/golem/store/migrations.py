@@ -146,4 +146,25 @@ MIGRATIONS: tuple[tuple[str, ...], ...] = (
     ("ALTER TABLE sessions ADD COLUMN route TEXT NOT NULL DEFAULT 'pinned'",),
     ("ALTER TABLE sessions ADD COLUMN plan_first INTEGER",),
     ("ALTER TABLE sessions ADD COLUMN paid_ok INTEGER NOT NULL DEFAULT 0",),
+    (
+        "ALTER TABLE model_calls ADD COLUMN tool_calls INTEGER",
+        "ALTER TABLE model_calls ADD COLUMN bad_tool_calls INTEGER",
+        "ALTER TABLE model_calls ADD COLUMN recovered_text_calls INTEGER",
+        """
+        CREATE TABLE model_outcomes (
+            run_id TEXT,
+            provider TEXT,
+            model TEXT,
+            outcome TEXT NOT NULL,
+            at TEXT NOT NULL
+        )
+        """,
+        "CREATE INDEX model_outcomes_model ON model_outcomes (provider, model)",
+        """
+        CREATE TABLE model_score_resets (
+            ref TEXT PRIMARY KEY,
+            reset_at TEXT NOT NULL
+        )
+        """,
+    ),
 )

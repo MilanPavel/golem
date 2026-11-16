@@ -46,6 +46,7 @@ public enum MethodAccess {
         "model.probe",
         "model.pull",
         "model.pull_cancel",
+        "model.score_reset",
         "model.set_default",
         "ollama.install",
         "ollama.install_cancel",

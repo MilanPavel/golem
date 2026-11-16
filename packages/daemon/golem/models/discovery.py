@@ -56,6 +56,7 @@ from golem.models.router import (
     ModelRouter,
     Provider,
 )
+from golem.models.scores import Score, Scores
 from golem.models.speed import Speed, SpeedBook
 from golem.models.tiers import Tier, blended, tier_of
 
@@ -122,6 +123,8 @@ class ListedModel:
     tier: Tier = "frontier"
     # The typical speed of an installed local model, filled from the speed book.
     speed: Speed | None = None
+    # How the model did on this Mac, filled from the scoreboard.
+    score: Score | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -254,6 +257,8 @@ class ModelDiscovery:
     ) -> None:
         # Set by the server too, so a discovery made elsewhere shares its book.
         self.speeds = speeds
+        # Set by the server once the database is open.
+        self.scores: Scores | None = None
         self._fetch_prices_enabled = fetch_prices
         self._ollama_installed = ollama_installed or ollama.installed
         self.pulling: Callable[[], dict[str, float | None]] = pulling or dict
@@ -475,7 +480,7 @@ class ModelDiscovery:
             self._merge(providers, profiles, default, keys, results, states, show_all),
             self.pulling(),
         )
-        models = self._with_speeds(models)
+        models = await self._with_scores(self._with_speeds(models))
         self._last = tuple(models)
         self._ctx = {m.ref: m.ctx for m in models if m.ctx is not None}
         for result in results.values():
@@ -627,6 +632,13 @@ class ModelDiscovery:
             else model
             for model in models
         ]
+
+    async def _with_scores(self, models: list[ListedModel]) -> list[ListedModel]:
+        """Each model with its score, when golem has used it on this Mac."""
+        if self.scores is None:
+            return models
+        scored = await self.scores.all()
+        return [replace(model, score=scored.get(model.ref)) for model in models]
 
     def _offered(self, name: str, live: list[_Found], *, show_all: bool) -> list[_Found]:
         """The live models of a hosted provider that golem puts in the picker."""

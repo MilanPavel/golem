@@ -1,0 +1,16 @@
+{
+  "additionalProperties": false,
+  "description": "``ref`` is the model whose score was reset.",
+  "properties": {
+    "ref": {
+      "minLength": 3,
+      "title": "Ref",
+      "type": "string"
+    }
+  },
+  "required": [
+    "ref"
+  ],
+  "title": "ModelScoreResetResult",
+  "type": "object"
+}

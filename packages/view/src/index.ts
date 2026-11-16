@@ -582,6 +582,7 @@ export {
   pickerModels,
   pickerName,
   priceLabel,
+  scoreLabel,
   keyMissing,
   providerMissing,
   sizeLabel,

@@ -958,6 +958,25 @@ class ModelSpeedInfo(BaseModel):
     samples: int = Field(ge=0)
 
 
+class ModelScoreInfo(BaseModel):
+    """How a model did on this Mac, from real use.
+
+    ``tool_score`` is the share of its last 200 tool calls that were valid, or null with
+    fewer than 20. ``calls`` is its model calls, ``runs`` the runs that used it, ``stepped_up``
+    the runs that left it for a stronger model, and ``retried`` the answers the user asked a
+    stronger model to redo.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    tool_score: float | None = Field(default=None, ge=0, le=1)
+    calls: int = Field(ge=0)
+    runs: int = Field(ge=0)
+    stepped_up: int = Field(ge=0)
+    retried: int = Field(ge=0)
+    tool_calls: int = Field(ge=0)
+
+
 class ListedModel(BaseModel):
     """One model, by ``provider/model`` ref.
 
@@ -978,7 +997,8 @@ class ListedModel(BaseModel):
     ``tier`` is ``local`` for Ollama, ``budget`` for a hosted model whose blended price is at
     or below ``[routing] budget_max_price``, and ``frontier`` otherwise.
     ``stale`` means a cached list was shown because the provider did not
-    answer in time. ``speed`` is set for a local model golem has timed.
+    answer in time. ``speed`` is set for a local model golem has timed. ``score`` is set
+    for a model golem has used on this Mac.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -1003,6 +1023,7 @@ class ListedModel(BaseModel):
     think_values: list[str] = Field(default_factory=list[str])
     tier: Literal["local", "budget", "frontier"]
     speed: ModelSpeedInfo | None = None
+    score: ModelScoreInfo | None = None
 
 
 class ListedProvider(BaseModel):
@@ -1403,6 +1424,25 @@ class ModelSetDefaultResult(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     default: str = Field(min_length=1)
+
+
+class ModelScoreResetParams(BaseModel):
+    """``model.score_reset``. Start a model's score from nothing.
+
+    The score ignores the model's calls before now. Usage rows stay.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    ref: str = Field(min_length=3)
+
+
+class ModelScoreResetResult(BaseModel):
+    """``ref`` is the model whose score was reset."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    ref: str = Field(min_length=3)
 
 
 class ModelProbeParams(BaseModel):
@@ -3607,6 +3647,9 @@ __all__ = [
     "ModelPullParams",
     "ModelPullProgress",
     "ModelPullResult",
+    "ModelScoreInfo",
+    "ModelScoreResetParams",
+    "ModelScoreResetResult",
     "ModelSetDefaultParams",
     "ModelSetDefaultResult",
     "ModelSpeedInfo",

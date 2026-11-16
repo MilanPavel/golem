@@ -13,6 +13,7 @@ from golem.models.discovery import ListedModel
 from golem.models.health import Health
 from golem.models.keys import KeyStoreError
 from golem.models.router import KeyStatus, ModelRouter
+from golem.models.scores import Score
 from golem.models.tiers import Tier, blended, tier_of
 from golem.models.window import ContextWindow, WindowOf
 
@@ -51,7 +52,7 @@ class ModelFacts:
     blended: float | None
     prompt_tps: float | None
     reply_tps: float | None
-    tool_score: float | None  # filled by 9.4.5; None until then
+    tool_score: float | None  # share of tool calls that were valid on this Mac; None unknown
 
 
 def facts_of(
@@ -109,6 +110,12 @@ class FactsDiscovery(Protocol):
     async def list(self, *, refresh: bool = False, show_all: bool = False) -> object: ...
 
 
+class ScoreSource(Protocol):
+    """What ``ListedFacts`` reads of the scoreboard. ``Scores`` gives this."""
+
+    async def all(self) -> dict[str, Score]: ...
+
+
 SpeedOf = Callable[[str], Speed | None]
 """The speed of a ref. The daemon passes ``SpeedBook.speed``."""
 
@@ -128,7 +135,9 @@ class ListedFacts:
         window_of: WindowOf,
         speed_of: SpeedOf | None = None,
         health: Health | None = None,
+        scores: ScoreSource | None = None,
     ) -> None:
+        self._scores = scores
         self._health = router.health if health is None else health
         self._discovery = discovery
         self._router = router
@@ -140,6 +149,7 @@ class ListedFacts:
         self, refs: Sequence[str], *, overrides: Mapping[str, float | str] | None = None
     ) -> list[ModelFacts]:
         cached = {listed.ref: listed for listed in self._discovery.cached()}
+        scored = {} if self._scores is None else await self._scores.all()
         if not cached:
             self._start_listing()
         keys = None if cached else self._keys()
@@ -153,7 +163,16 @@ class ListedFacts:
             profile = listed.profiles[0] if listed.profiles else ref
             window = self._window_of(profile, overrides) if ollama else None
             speed = None if self._speed_of is None else self._speed_of(ref)
-            found.append(facts_of(listed, window=window, speed=speed, ollama=ollama))
+            score = scored.get(ref)
+            found.append(
+                facts_of(
+                    listed,
+                    window=window,
+                    speed=speed,
+                    tool_score=None if score is None else score.tool_score,
+                    ollama=ollama,
+                )
+            )
         return [self._checked(model) for model in found]
 
     def _checked(self, model: ModelFacts) -> ModelFacts:

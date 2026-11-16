@@ -344,3 +344,33 @@ def test_ladder_has_no_duplicates() -> None:
     settings = LadderSettings(local="ollama/qwen3:27b", budget="anthropic/big")
     found = ladder(settings, "ollama/qwen3:27b", ALL)
     assert [m.ref for m in found] == ["ollama/qwen3:27b", "anthropic/big"]
+
+
+def test_a_local_model_with_a_poor_tool_score_loses_to_a_model_that_passes() -> None:
+    weak = replace(LOCAL, tool_score=0.4)
+    choice = pick("auto", weak, [weak, CHEAP], Traits(paid_allowed=True))
+    assert ref(choice.model) == "openrouter/cheap"
+    assert choice.reason == "fit"
+    assert [(r.ref, r.why) for r in choice.rejected] == [
+        ("ollama/qwen3:27b", "its tool calls fail too often on this Mac (40% ok)")
+    ]
+    assert "fail too often" in choice.detail
+
+
+def test_a_local_model_with_a_poor_tool_score_is_used_when_nothing_else_passes() -> None:
+    weak = replace(LOCAL, tool_score=0.4)
+    choice = pick("auto", weak, [weak, CHEAP], Traits(paid_room_usd=0.0))
+    assert ref(choice.model) == "ollama/qwen3:27b"
+    assert pick("auto", weak, [weak], Traits()).model == weak
+
+
+def test_a_poor_tool_score_does_not_matter_for_a_call_without_tools() -> None:
+    weak = replace(LOCAL, tool_score=0.4)
+    choice = pick("auto", weak, [weak, CHEAP], Traits(needs_tools=False))
+    assert ref(choice.model) == "ollama/qwen3:27b"
+
+
+def test_a_good_or_unknown_tool_score_is_not_rejected() -> None:
+    for score in (0.5, 0.9, None):
+        model = replace(LOCAL, tool_score=score)
+        assert ref(pick("auto", model, [model, CHEAP], Traits()).model) == "ollama/qwen3:27b"

@@ -171,6 +171,28 @@ export function tierLabel(model: ListedModel): string {
   return model.tier;
 }
 
+/**
+ * One line on how a model did on this Mac, such as `tool calls 96% ok · stepped up 2 of 41 runs`.
+ * Empty for a model golem has not used. The tool part waits for 20 tool calls.
+ */
+export function scoreLabel(model: ListedModel): string {
+  const score = model.score;
+  if (score === null || score === undefined) {
+    return "";
+  }
+  const parts: string[] = [];
+  if (score.tool_score !== null && score.tool_score !== undefined) {
+    parts.push(`tool calls ${Math.round(score.tool_score * 100)}% ok`);
+  }
+  if (score.runs > 0) {
+    parts.push(`stepped up ${score.stepped_up} of ${score.runs} ${score.runs === 1 ? "run" : "runs"}`);
+  }
+  if (score.retried > 0) {
+    parts.push(`retried ${score.retried} ${score.retried === 1 ? "time" : "times"}`);
+  }
+  return parts.join(" · ");
+}
+
 export function priceLabel(model: ListedModel): string {
   const price = model.price;
   if (price === null || price === undefined) {
