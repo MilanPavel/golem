@@ -112,6 +112,8 @@ export type TranscriptOptions = {
   liveRunId?: string | null;
   /** The slash commands that exist, so the summary row names only those. Unset names none. */
   commands?: readonly string[];
+  /** The note before the model in a turn's footer, such as `↑ deepseek-chat · did not fit in 32K`. */
+  routedNote?: (run: readonly ChatMessage[]) => string;
 };
 
 /** Output rows shown per tool call while Ctrl-O is on. */
@@ -187,7 +189,7 @@ export function layoutMessages(
         lines.push(wrappedLine(role, spans));
       }
     }
-    const duration = tools.length > 0 ? null : answerDuration(message, messages.slice(runStart, index + 1));
+    const duration = tools.length > 0 ? null : answerDuration(message, messages.slice(runStart, index + 1), options?.routedNote);
     if (duration !== null) {
       lines.push(paint({ role, spans: [{ text: duration, dim: true }] }, width));
     }
@@ -595,12 +597,16 @@ function labelSpans(label: string, message: ChatMessage, options: TranscriptOpti
 }
 
 /** The footer of an answer: its time, then the model, tokens and cost of the run's calls. */
-function answerDuration(message: ChatMessage, run: readonly ChatMessage[]): string | null {
+function answerDuration(
+  message: ChatMessage,
+  run: readonly ChatMessage[],
+  routedNote?: (run: readonly ChatMessage[]) => string,
+): string | null {
   if (message.role !== "assistant" || message.streaming || message.durationMs === undefined) {
     return null;
   }
   const time = formatDuration(message.durationMs);
-  const text = [time, ...turnFooterParts(turnTotals(run))].filter((part) => part.length > 0).join(" · ");
+  const text = [time, ...turnFooterParts(turnTotals(run), "", routedNote?.(run) ?? "")].filter((part) => part.length > 0).join(" · ");
   return text.length > 0 ? text : null;
 }
 

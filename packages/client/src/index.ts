@@ -120,6 +120,11 @@ export type { SkillSetDisabledResult } from "../../protocol/gen/skill-set-disabl
 export type { SkillIssue, SkillWriteResult } from "../../protocol/gen/skill-write-result.ts";
 export type { AuthKeyStatus, AuthListResult } from "../../protocol/gen/auth-list-result.ts";
 export type { ConfigAllowance, ConfigGetResult, ConfigRule } from "../../protocol/gen/config-get-result.ts";
+export type { ConfigLadder } from "../../protocol/gen/config-ladder.ts";
+export type { ConfigRouting } from "../../protocol/gen/config-routing.ts";
+export type { ModelRejection, ModelRoutedData } from "../../protocol/gen/model-routed-data.ts";
+export type { SessionSetRouteParams } from "../../protocol/gen/session-set-route-params.ts";
+export type { TraceRoute } from "../../protocol/gen/trace-route.ts";
 export type { ListedModel, ModelListResult } from "../../protocol/gen/model-list-result.ts";
 export type { DirEntry, FsListDirsResult } from "../../protocol/gen/fs-list-dirs-result.ts";
 export type { SetupRow, SetupStatusResult } from "../../protocol/gen/setup-status-result.ts";

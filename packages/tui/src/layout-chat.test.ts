@@ -501,3 +501,14 @@ test("a notice is one dim row after the message it followed, and the messages ar
   assert.equal(lines[at]?.spans[0]?.dim, true);
   assert.equal(layoutMessages(messages, 80, { times: false, now: 0 }).length, lines.length - 1);
 });
+
+test("an answer's footer puts the routed note before the model", () => {
+  const call = { model: "deepseek-chat", tier: "budget" as const, tokens: 1200, costUsd: 0.004, done: true };
+  const lines = layoutMessages(
+    [message("u", "user", "hello"), { ...message("a", "assistant", "ok"), durationMs: 2_000, call }],
+    100,
+    { times: false, now: 0, routedNote: () => "\u2191 deepseek-chat \u00b7 did not fit in 32K" },
+  );
+  const footer = lines.find((line) => textOf(line.spans).includes("did not fit"));
+  assert.match(textOf(footer?.spans ?? []), /^0m 02\.0s \u00b7 \u2191 deepseek-chat \u00b7 did not fit in 32K \u00b7 deepseek-chat \u00b7 1\.2K tok \u00b7 \$0\.004$/);
+});

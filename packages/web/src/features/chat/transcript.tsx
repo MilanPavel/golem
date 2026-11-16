@@ -1,6 +1,6 @@
-import { BUILD_TEXT, openPlan, displayToolName, formatTurnTime, groupTurns, turnFooterParts, stepCount, stepMark, summarizeSteps, turnFooter, LIVE_OUTPUT_CHARS, thinkingLine, unreadCallNotice, writingLabel, REPLY_CUT_NOTE, type ChatMessage, type ChatState, type Detail, type StepMark, type ToolBlock, type WritingBlock, noticesAfter, type ChatNotice, checksOf, checksSummary } from "@golem/view";
+import { BUILD_TEXT, openPlan, displayToolName, formatTurnTime, groupTurns, turnFooterParts, stepCount, stepMark, summarizeSteps, turnFooter, LIVE_OUTPUT_CHARS, thinkingLine, unreadCallNotice, writingLabel, REPLY_CUT_NOTE, type ChatMessage, type ChatState, type Detail, type StepMark, type ToolBlock, type WritingBlock, noticesAfter, type ChatNotice, checksOf, checksSummary, turnRoutedNote, sessionModelOf, type SessionModelRef } from "@golem/view";
 import { Fragment, memo, useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
-import { usePageActions, usePulls, useSession } from "../../store/page-context.tsx";
+import { usePageActions, usePulls, useSession, useModelList } from "../../store/page-context.tsx";
 import type { PullsSnapshot } from "../../store/pulls.ts";
 import type { SessionModel } from "../../store/session-store.ts";
 import { pullShare, shortName } from "../models/index.ts";
@@ -327,7 +327,8 @@ export function GolemTurn({
   plan,
   checks = null,
   notices = [],
-}: { steps: readonly ChatMessage[]; pendingId?: string | null; thinkingShown?: boolean; detail?: Detail; plan?: PlanActions; checks?: ReturnType<typeof checksSummary> | null; notices?: readonly ChatNotice[] }) {
+  routedNote = "",
+}: { steps: readonly ChatMessage[]; pendingId?: string | null; thinkingShown?: boolean; detail?: Detail; plan?: PlanActions; checks?: ReturnType<typeof checksSummary> | null; notices?: readonly ChatNotice[]; routedNote?: string }) {
   const chosenDetail = useDetail();
   const detail = detailOverride ?? chosenDetail;
   const footer = turnFooter(steps);
@@ -335,7 +336,7 @@ export function GolemTurn({
   const planCards = allTools.filter(isPlanCard);
   const tools = allTools.filter((tool) => !isPlanCard(tool));
   const foot = footer
-    ? [footer.durationMs === undefined ? "" : formatTurnTime(footer.durationMs), footer.tools > 0 ? stepCount(footer.tools) : "", ...turnFooterParts(footer)].filter(Boolean)
+    ? [footer.durationMs === undefined ? "" : formatTurnTime(footer.durationMs), footer.tools > 0 ? stepCount(footer.tools) : "", ...turnFooterParts(footer, "", routedNote)].filter(Boolean)
     : [];
   return (
     <article aria-label="golem" className="flex min-w-0 flex-col gap-2.5">
@@ -361,7 +362,7 @@ export function GolemTurn({
 }
 
 /** What the transcript draws of the chat. `approval` names the call whose approval waits in the dock. */
-export type TranscriptChat = Pick<ChatState, "messages" | "error" | "notice"> & Partial<Pick<ChatState, "approval" | "unreadCall" | "plan" | "checks" | "busy" | "runId" | "notices">>;
+export type TranscriptChat = Pick<ChatState, "messages" | "error" | "notice"> & Partial<Pick<ChatState, "approval" | "unreadCall" | "plan" | "checks" | "busy" | "runId" | "notices" | "route">>;
 
 /** How a turn's checks went, or null when its run ran none. It is being fixed while that run goes on. */
 function turnChecks(chat: TranscriptChat, steps: readonly ChatMessage[]): ReturnType<typeof checksSummary> | null {
@@ -372,7 +373,7 @@ function turnChecks(chat: TranscriptChat, steps: readonly ChatMessage[]): Return
 }
 
 /** The messages and the closing error or notice. Pure: the page's stores are not read here. */
-export function TranscriptMessages({ chat, thinkingShown, detail, waiting = null, plan }: { chat: TranscriptChat; thinkingShown?: boolean; detail?: Detail; waiting?: string | null; plan?: Omit<PlanActions, "open"> }) {
+export function TranscriptMessages({ chat, thinkingShown, detail, waiting = null, plan, session = null }: { session?: SessionModelRef | null; chat: TranscriptChat; thinkingShown?: boolean; detail?: Detail; waiting?: string | null; plan?: Omit<PlanActions, "open"> }) {
   const pendingId = chat.approval?.callId ?? null;
   const planActions: PlanActions | undefined =
     plan === undefined || chat.plan === undefined ? undefined : { ...plan, open: openPlan(chat.plan)?.callId ?? null };
@@ -406,6 +407,7 @@ export function TranscriptMessages({ chat, thinkingShown, detail, waiting = null
             plan={planActions}
             checks={turnChecks(chat, turn.steps)}
             notices={notices}
+            routedNote={turnRoutedNote(turn.steps, chat.route, session)}
           />
         ),
       )}
@@ -420,7 +422,7 @@ export function TranscriptMessages({ chat, thinkingShown, detail, waiting = null
  * The scrolling column. While you are at the bottom it follows the text; once you scroll up it
  * stays where you are and offers a way back down.
  */
-export function TranscriptColumn({ chat, className, waiting = null, plan }: { chat: TranscriptChat; className?: string; waiting?: string | null; plan?: Omit<PlanActions, "open"> }) {
+export function TranscriptColumn({ chat, className, waiting = null, plan, session = null }: { session?: SessionModelRef | null; chat: TranscriptChat; className?: string; waiting?: string | null; plan?: Omit<PlanActions, "open"> }) {
   const scroller = useRef<HTMLDivElement>(null);
   const content = useRef<HTMLDivElement>(null);
   const stuck = useRef(true);
@@ -460,7 +462,7 @@ export function TranscriptColumn({ chat, className, waiting = null, plan }: { ch
     <div className={cn("relative flex min-h-0 flex-1 flex-col", className)}>
       <div ref={scroller} onScroll={onScroll} className="relative min-h-0 flex-1 overflow-y-auto" data-transcript-scroller>
         <div ref={content} className="mx-auto flex max-w-column flex-col gap-8 px-5 py-7">
-          <TranscriptMessages chat={chat} waiting={waiting} plan={plan} />
+          <TranscriptMessages chat={chat} waiting={waiting} plan={plan} session={session} />
         </div>
       </div>
       {atBottom ? null : (
@@ -497,6 +499,9 @@ export function Transcript({ id }: { id: string }) {
   const chat = useSession(id, (view) => view.chat);
   const model = useSession(id, (view) => view.model);
   const pulls = usePulls();
+  // The tier of the session's model comes from the listing, read only once a turn has been routed.
+  const models = useModelList(chat.route.last !== null);
+  const session = sessionModelOf({ profile: model?.profile ?? null, provider: model?.provider ?? null, name: model?.name ?? null }, models.data?.models);
   const actions = usePageActions();
   const plan = {
     // "Build it" takes plan first off, then sends the build message like any other.
@@ -506,5 +511,5 @@ export function Transcript({ id }: { id: string }) {
     },
     onChange: () => activeComposer()?.focus(),
   };
-  return <TranscriptColumn chat={chat} waiting={waitingLine(chat.busy, model, pulls)} plan={plan} />;
+  return <TranscriptColumn chat={chat} waiting={waitingLine(chat.busy, model, pulls)} plan={plan} session={session} />;
 }

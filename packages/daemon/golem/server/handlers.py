@@ -150,8 +150,10 @@ from golem_protocol.commands import (
     ConfigAllowance,
     ConfigGetParams,
     ConfigGetResult,
+    ConfigLadder,
     ConfigRawGetParams,
     ConfigRawSetParams,
+    ConfigRouting,
     ConfigRule,
     CostDayRow,
     CostGetParams,
@@ -796,7 +798,7 @@ async def _file_read(ctx: RequestContext, params: FileReadParams) -> FileReadRes
 
 async def _file_list(ctx: RequestContext, params: FileListParams) -> FileListResult:
     folder = await _session_files(ctx, params.session_id)
-    return await asyncio.to_thread(list_paths, folder, params.query, params.limit)
+    return await asyncio.to_thread(list_paths, folder, params.query, params.limit, params.hidden)
 
 
 async def _commit_folder(ctx: RequestContext, session_id: str) -> str:
@@ -1391,6 +1393,15 @@ async def _config_get(ctx: RequestContext, params: ConfigGetParams) -> ConfigGet
         project_trusted=None if root is None else policy.trusted(root),
         default_permission_mode=default_mode,
         permission_mode=mode,
+        routing=ConfigRouting(
+            ladder=ConfigLadder(
+                local=settings.routing.ladder.local,
+                budget=settings.routing.ladder.budget,
+                frontier=settings.routing.ladder.frontier,
+            ),
+            daily_usd=settings.budget.daily_usd,
+            session_usd=settings.budget.session_usd,
+        ),
         rules=[
             ConfigRule(
                 tool=rule.rule.tool,

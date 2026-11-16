@@ -64,16 +64,20 @@ test("it lists the files with their counts, a badge, and the totals, the first o
   page.stop();
 });
 
-test("a click opens another file, one at a time, and a second click closes it", async () => {
+test("a click opens another file beside the first, and a second click closes only it", async () => {
   const { fake, page } = setup();
   await screen.findByRole("table");
   const rows = screen.getAllByRole("listitem");
   await userEvent.click(head(rows[1]!));
   expect(fake.raw.changesDiff).toHaveBeenCalledWith("a", { path: "src/clamp.ts" });
   await screen.findByRole("table", { name: "Change to src/clamp.ts" });
-  expect(screen.getAllByRole("table")).toHaveLength(1);
+  expect(screen.getAllByRole("table")).toHaveLength(2);
+  expect(head(rows[0]!).getAttribute("aria-expanded")).toBe("true");
+  expect(head(rows[1]!).getAttribute("aria-expanded")).toBe("true");
   await userEvent.click(head(rows[1]!));
-  expect(screen.queryByRole("table")).toBeNull();
+  expect(screen.getAllByRole("table")).toHaveLength(1);
+  expect(screen.getByRole("table", { name: "Change to src/socket.ts" })).toBeTruthy();
+  expect(head(rows[1]!).getAttribute("aria-expanded")).toBe("false");
   page.stop();
 });
 
@@ -129,7 +133,7 @@ test("openChange opens that file's row and clears the request", async () => {
   await waitFor(() => expect(fake.raw.changesDiff).toHaveBeenCalledWith("a", { path: "old.md" }));
   const rows = screen.getAllByRole("listitem");
   expect(head(rows[2]!).getAttribute("aria-expanded")).toBe("true");
-  expect(head(rows[0]!).getAttribute("aria-expanded")).toBe("false");
+  expect(head(rows[0]!).getAttribute("aria-expanded")).toBe("true");
   page.stop();
 });
 

@@ -153,6 +153,7 @@ import {
   modeReport,
   nextMode,
   type PermissionMode,
+  type RouteMode,
   withSaved,
   withSession,
   type TuneState,
@@ -163,6 +164,14 @@ import {
   tryHeading,
   sessionCostLabel,
   costReportLines,
+  ladderRows,
+  routeReportLines,
+  routeStatus,
+  sessionModelOf,
+  spendRows,
+  turnRoutedNote,
+  whyLines,
+  type ChatMessage,
   tryTitle,
   loadingLine,
   type TryRun,
@@ -876,6 +885,7 @@ export function App({
     liveRunId: chat.busy ? chat.runId : null,
     commands: COMMANDS.map((command) => command.name),
     notices: chat.notices,
+    routedNote: (run: readonly ChatMessage[]) => turnRoutedNote(run, chat.route, sessionModelOf(model, listing?.models)),
   };
   const measured = layoutTranscript(chat.messages, columns, chatHeight, offset, transcriptOptions);
   const widthKey = measured.overflow ? Math.max(1, columns - 1) : columns;
@@ -1045,6 +1055,7 @@ export function App({
       skills: sessionId === null ? [] : chat.activeSkills,
       skippedSkills: chat.skippedSkills,
       context: sessionId === null ? null : chat.context.last,
+      route: sessionId === null ? "" : routeStatus(chat.route.mode),
       mode: sessionId === null ? "" : effectiveMode(chat.permissionMode, defaultMode),
       plan: sessionId !== null && chat.plan.on,
       cost: sessionId === null ? "" : sessionCostLabel(chat.messages),
@@ -2081,6 +2092,33 @@ export function App({
           setChat((state) => ({ ...state, notice: messageOf(error) }));
         },
       );
+      return;
+    }
+    if (outcome.kind === "route") {
+      setDraft(draftAt(""));
+      const current = sessionRef.current;
+      if (current === null) {
+        setChat((state) => ({ ...state, notice: "open a session first" }));
+        return;
+      }
+      if (outcome.mode === "why") {
+        const last = chatRef.current.route.last;
+        if (last === null) {
+          setChat((state) => ({ ...state, notice: "No model was routed in this session yet." }));
+          return;
+        }
+        costGen.current += 1;
+        setCostText(whyLines(last, chatRef.current.route.mode).map((line) => fitLine(line, columns)));
+      } else if (outcome.mode === "show") {
+        loadRoute(current);
+      } else {
+        changeRoute(current, outcome.mode);
+        return;
+      }
+      setPanel("cost");
+      setKeysOpen(false);
+      setSwitcher(closedSwitcher);
+      setChat((state) => ({ ...state, notice: null }));
       return;
     }
     if (outcome.kind === "skill-pin") {
@@ -3572,6 +3610,41 @@ export function App({
         setChat((state) => ({ ...state, notice: messageOf(error) }));
       },
     );
+  }
+
+  function changeRoute(id: string, mode: RouteMode): void {
+    client.setRoute(id, mode).then(
+      () => {
+        setChat((state) => ({ ...state, notice: `Route: ${mode}. It applies from the next turn.` }));
+      },
+      (error: unknown) => {
+        setChat((state) => ({ ...state, notice: messageOf(error) }));
+      },
+    );
+  }
+
+  /** `/route`: the mode, the ladder, and the spend, printed as a panel. */
+  function loadRoute(id: string): void {
+    const gen = ++costGen.current;
+    setCostText(["loading…"]);
+    void (async () => {
+      try {
+        const [models, config, cost] = await Promise.all([
+          client.listModels(false),
+          client.getConfig(sessionCwdRef.current ?? process.cwd(), id),
+          client.getCost(id),
+        ]);
+        const own = sessionModelOf(preferModel(sessionModelRef.current, daemonModel), models.models);
+        const lines = routeReportLines(
+          chatRef.current.route.mode,
+          ladderRows(models.models, config.routing, own),
+          spendRows(cost, config.routing),
+        );
+        if (gen === costGen.current) setCostText(lines);
+      } catch (error) {
+        if (gen === costGen.current) setCostText([messageOf(error)]);
+      }
+    })();
   }
 
   function loadPermissions(): void {

@@ -1,13 +1,13 @@
 import { committedLine, notesFor, type NotesState } from "@golem/view";
-import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Button } from "../../ui/button.tsx";
-import { useChangedFiles, useCommitInfo, useFileDiff, useNotes, useSession } from "../../store/page-context.tsx";
-import type { ChangedFile, FileDiff } from "../../store/changes.ts";
-import { useDiffMode, type DiffMode, type NoteLine } from "../diff/index.ts";
+import { useChangedFiles, useCommitInfo, useNotes, useSession } from "../../store/page-context.tsx";
+import type { ChangedFile } from "../../store/changes.ts";
+import { useDiffMode } from "../diff/index.ts";
 import { ChangesViewSwitch, useChangesView } from "./changes-view.tsx";
 import { ShellNote } from "./shell-note.tsx";
 import { CommitDialog } from "./commit-dialog.tsx";
-import { Counts, DiffPanel, Row, plural } from "./file-row.tsx";
+import { Counts, FileDiffPanel, Row, plural } from "./file-row.tsx";
 import { TurnsTab } from "./turns-view.tsx";
 import { openFile, useCommitRequest, useRequestedChange } from "./workbench-state.ts";
 import { useWorkbenchWidth } from "./workbench-width.ts";
@@ -18,30 +18,22 @@ export const SPLIT_MIN_WIDTH = 40;
 type ChangesViewProps = {
   files: readonly ChangedFile[] | null;
   error: string | null;
-  /** The path of the open row, or null for none. */
-  open: string | null;
-  onOpen: (path: string | null) => void;
-  diff: FileDiff;
-  mode: DiffMode;
-  onMode: (mode: DiffMode) => void;
-  /** Whether the panel has room for the split layout. */
-  canSplit: boolean;
+  /** The paths of the open rows. */
+  open: ReadonlySet<string>;
+  /** Opens a closed row and closes an open one. */
+  onToggle: (path: string) => void;
+  /** The content of an open row: the diff of the file, with its review notes. */
+  renderDiff: (file: ChangedFile) => ReactNode;
   /** Shows a file in the Files tab. Without it the rows have no open button. */
   onOpenFile?: (path: string) => void;
   /** Beside the totals: the Commit button. */
   footer?: ReactNode;
-  /** With it, a diff in the unified layout takes review notes. */
-  notes?: {
-    state: NotesState;
-    onAdd: (line: NoteLine, text: string) => void;
-    onEdit: (id: string, text: string) => void;
-    onRemove: (id: string) => void;
-  };
+  /** With it, a row shows how many notes its file has. */
+  notes?: { state: NotesState };
 };
 
 /** The list of changed files, the open one with its diff, and the totals. It reads nothing itself. */
-export function ChangesView({ files, error, open, onOpen, diff, mode, onMode, canSplit, onOpenFile, footer, notes }: ChangesViewProps) {
-  const panel = useId();
+export function ChangesView({ files, error, open, onToggle, renderDiff, onOpenFile, footer, notes }: ChangesViewProps) {
   if (files === null) {
     return <p className="text-sm text-muted">{error === null ? "Reading the changes." : `Could not read the changes. ${error}`}</p>;
   }
@@ -57,30 +49,14 @@ export function ChangesView({ files, error, open, onOpen, diff, mode, onMode, ca
           <Row
             key={file.path}
             file={file}
-            open={file.path === open}
-            panel={panel}
+            open={open.has(file.path)}
             onOpenFile={onOpenFile}
             noteCount={notes === undefined ? 0 : notesFor(notes.state, file.path).length}
             onToggle={() => {
-              onOpen(file.path === open ? null : file.path);
+              onToggle(file.path);
             }}
           >
-            <DiffPanel
-              diff={diff}
-              mode={mode}
-              onMode={onMode}
-              canSplit={canSplit}
-              {...(notes === undefined
-                ? {}
-                : {
-                    notes: {
-                      notes: notesFor(notes.state, file.path),
-                      onAddNote: notes.onAdd,
-                      onEditNote: notes.onEdit,
-                      onRemoveNote: notes.onRemove,
-                    },
-                  })}
-            />
+            {renderDiff(file)}
           </Row>
         ))}
       </ul>
@@ -97,8 +73,8 @@ export function ChangesView({ files, error, open, onOpen, diff, mode, onMode, ca
 }
 
 /**
- * The Changes tab: every file the session changed, and a click opens one to its diff. One file is
- * open at a time, the first at the start. `openChange` from the chat opens the file it names.
+ * The Changes tab: every file the session changed, and a click opens one to its diff. Any number may be
+ * open, the first at the start. `openChange` from the chat opens the file it names.
  */
 function ByFileTab({ sessionId }: { sessionId: string }) {
   const { files, error } = useChangedFiles(sessionId);
@@ -106,7 +82,7 @@ function ByFileTab({ sessionId }: { sessionId: string }) {
   const [width] = useWorkbenchWidth();
   const [requested, clearRequest] = useRequestedChange();
   // undefined until the person chooses: then the first file is open.
-  const [chosen, setChosen] = useState<string | null | undefined>(undefined);
+  const [chosen, setChosen] = useState<ReadonlySet<string> | undefined>(undefined);
   const reveal = useRef<string | null>(null);
   const root = useRef<HTMLDivElement>(null);
   const info = useCommitInfo(sessionId);
@@ -116,18 +92,24 @@ function ByFileTab({ sessionId }: { sessionId: string }) {
   const [commitAsked, clearCommitAsked] = useCommitRequest();
   const commitPaths = info?.repository === true ? info.paths : [];
 
-  const paths = files?.map((file) => file.path) ?? null;
-  const wanted = chosen === undefined ? (paths?.[0] ?? null) : chosen;
   // A file that left the list (an undo, say) is not open.
-  const open = paths !== null && wanted !== null && paths.includes(wanted) ? wanted : null;
-  const diff = useFileDiff(sessionId, open);
+  const open = useMemo(() => {
+    const listed = files?.map((file) => file.path) ?? [];
+    const wanted: ReadonlySet<string> = chosen ?? new Set(listed.slice(0, 1));
+    return new Set(listed.filter((path) => wanted.has(path)));
+  }, [files, chosen]);
+  const toggle = (path: string): void => {
+    const next = new Set(open);
+    if (!next.delete(path)) next.add(path);
+    setChosen(next);
+  };
   const notes = useNotes(sessionId);
 
   // A new request opens its row in this render; the effect below takes the request off the store.
   const [taken, setTaken] = useState<string | null>(null);
   if (requested !== taken) {
     setTaken(requested);
-    if (requested !== null) setChosen(requested);
+    if (requested !== null) setChosen(new Set([...open, requested]));
   }
   useEffect(() => {
     if (requested === null) return;
@@ -155,7 +137,7 @@ function ByFileTab({ sessionId }: { sessionId: string }) {
   // The row of a requested file may only appear once the list has it.
   useEffect(() => {
     const path = reveal.current;
-    if (path === null || open !== path) return;
+    if (path === null || !open.has(path)) return;
     const row = Array.from(root.current?.querySelectorAll<HTMLElement>("[data-path]") ?? []).find((el) => el.dataset["path"] === path);
     if (row === undefined) return;
     reveal.current = null;
@@ -168,20 +150,26 @@ function ByFileTab({ sessionId }: { sessionId: string }) {
         files={files}
         error={error}
         open={open}
-        onOpen={setChosen}
-        diff={diff}
-        mode={mode}
-        onMode={setMode}
-        canSplit={width >= SPLIT_MIN_WIDTH}
+        onToggle={toggle}
+        renderDiff={(file) => (
+          <FileDiffPanel
+            sessionId={sessionId}
+            path={file.path}
+            mode={mode}
+            onMode={setMode}
+            canSplit={width >= SPLIT_MIN_WIDTH}
+            notes={{
+              notes: notesFor(notes.state, file.path),
+              onAddNote: (line, text) => {
+                notes.add({ ...line, text });
+              },
+              onEditNote: notes.edit,
+              onRemoveNote: notes.remove,
+            }}
+          />
+        )}
         onOpenFile={openFile}
-        notes={{
-          state: notes.state,
-          onAdd: (line, text) => {
-            notes.add({ ...line, text });
-          },
-          onEdit: notes.edit,
-          onRemove: notes.remove,
-        }}
+        notes={{ state: notes.state }}
         footer={
           commitPaths.length === 0 ? null : (
             <Button
