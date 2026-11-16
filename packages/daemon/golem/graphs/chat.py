@@ -36,11 +36,11 @@ from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.config import get_stream_writer
 from langgraph.errors import GraphRecursionError
 from langgraph.graph import END, START, StateGraph  # pyright: ignore[reportMissingTypeStubs]
-from langgraph.types import Command
+from langgraph.types import Command, interrupt
 
 from golem.coding.changes import ChangeStore
 from golem.config import ContextSettings, ModelPrice, PermissionMode
-from golem.graphs.adapter import STREAM_KEY, message_text, stop_reason_of
+from golem.graphs.adapter import CONSENT_KIND, STREAM_KEY, message_text, stop_reason_of
 from golem.graphs.checks_node import CHECKS_KEY, checks_node
 from golem.graphs.child import (
     CHILD_PROMPT,
@@ -68,7 +68,7 @@ from golem.graphs.notes import is_note, note
 from golem.graphs.prompt import PINNED_KEY, PromptContext, SystemPrompt
 from golem.graphs.result_budget import ResultBudget, result_budget
 from golem.graphs.state import SCHEMA_VERSION, AgentState
-from golem.graphs.step_up import NextModel, StepRequest
+from golem.graphs.step_up import NextModel, StepAsk, StepRequest, StepUp
 from golem.graphs.struggle import Struggle, detect
 from golem.graphs.summarise import Summariser
 from golem.graphs.text_calls import recover, recover_json
@@ -1027,7 +1027,7 @@ def open_chat(
         if state.get("can_step_up") is not True or made >= MAX_FALLBACKS or ask is None:
             raise error from exc
         found = await ask(state.get("session_id", ""), profile, StepRequest("fallback"))
-        if found is None:
+        if not isinstance(found, StepUp):
             raise error from exc
         log.warning("%s failed (%s); falling back to %s", profile, failure, found.profile)
         get_stream_writer()(
@@ -1083,11 +1083,38 @@ def open_chat(
                 return {}
             signal, detail = found.signal, f"{found.detail} on {old}"
         ask = runtime[0].next_model if runtime else None
-        stepped = None
+        stepped: StepUp | StepAsk | None = None
+        session_id = state.get("session_id", "")
         if ask is not None:
-            stepped = await ask(state.get("session_id", ""), profile, StepRequest(signal, need))
+            tokens = sum(len(message_text(m)) for m in state["messages"]) // 4
+            request = StepRequest(signal, need, tokens, detail)
+            stepped = await ask(session_id, profile, request)
+            if isinstance(stepped, StepAsk):
+                # The paid model needs a yes. The run waits here, as it does for a tool approval,
+                # and this node runs again from its top with the answer.
+                answer = interrupt(
+                    {
+                        STREAM_KEY: CONSENT_KIND,
+                        "question": {
+                            "model_profile": stepped.profile,
+                            "tier": stepped.tier,
+                            "why": stepped.question.why,
+                            "estimated_usd": stepped.question.estimated_usd,
+                            "alternatives": list(stepped.question.alternatives),
+                            "caps": None
+                            if stepped.question.caps is None
+                            else stepped.question.caps.model_dump(),
+                            "signal": signal,
+                        },
+                    }
+                )
+                stepped = None
+                said = Answer.parse(answer).decision
+                if said == "session" or said == "once":
+                    again = replace(request, answer=said)
+                    stepped = await ask(session_id, profile, again)
         writer = get_stream_writer()
-        if stepped is None:
+        if not isinstance(stepped, StepUp):
             if full:
                 raise ContextFull(need or 0, _count(full.get("window")) or 0, profile)
             writer(

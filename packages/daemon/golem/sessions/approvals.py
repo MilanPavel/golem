@@ -81,6 +81,8 @@ class PendingConsent:
     skill: SkillCall | None
     alternatives: tuple[ConsentAnswer, ...]
     since: str
+    signal: str | None = None
+    """The struggle that made the run ask in its middle, None for the question before a turn."""
 
 
 def pending_consent(events: list[ChatEvent]) -> PendingConsent | None:
@@ -102,6 +104,7 @@ def pending_consent(events: list[ChatEvent]) -> PendingConsent | None:
         skill=user.data.skill,
         alternatives=tuple(asked.data.alternatives),
         since=asked.ts,
+        signal=asked.data.signal,
     )
 
 

@@ -41,6 +41,8 @@ export type PendingConsent = {
   /** The answers the question offers. A spent cap leaves out `session`. */
   alternatives: readonly ConsentChoice[];
   caps: ConsentCaps | null;
+  /** The struggle that made the run ask in its middle. Null for the question before a turn. */
+  signal: string | null;
 };
 
 /** How a question about a tool call was answered. */
@@ -536,6 +538,7 @@ function reduceChatEvent(state: ChatState, event: ChatEvent): ChatState {
           why: event.data.why,
           estimatedUsd: event.data.estimated_usd ?? null,
           alternatives: event.data.alternatives,
+          signal: event.data.signal ?? null,
           caps:
             caps === null
               ? null

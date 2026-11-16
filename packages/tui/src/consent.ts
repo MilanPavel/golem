@@ -4,6 +4,7 @@ import {
   consentAnswers,
   consentCapsLine,
   consentLine,
+  consentReason,
   type ConsentChoice,
   type PendingConsent,
 } from "@golem/view";
@@ -27,7 +28,7 @@ export function consentLines(consent: PendingConsent, columns: number): ConsentL
     .join(" · ");
   return [
     { text: fit(CONSENT_TITLE, width), bold: true, tone: "question" },
-    { text: fit(consent.why, width) },
+    { text: fit(consentReason(consent), width) },
     { text: fit(consentLine(consent), width) },
     ...(caps === "" ? [] : [{ text: fit(caps, width), dim: true }]),
     { text: fit(keys, width) },

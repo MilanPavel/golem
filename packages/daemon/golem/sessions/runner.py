@@ -35,6 +35,7 @@ from golem.graphs.adapter import (
     CheckOffered,
     CheckStarted,
     ChildFact,
+    ConsentAsked,
     ContextChanged,
     FileChanged,
     ModelRequested,
@@ -58,6 +59,7 @@ from golem.graphs.adapter import (
     Translator,
 )
 from golem.graphs.chat import ChatRuntime, Growth
+from golem.graphs.step_up import Consent
 from golem.graphs.tools_node import Answer
 from golem.models.cost import cost_usd
 from golem.models.errors import ContextFull, ModelUnreachable
@@ -80,7 +82,6 @@ from golem_protocol.events import (
     CheckOfferedData,
     CheckStartedData,
     ConsentAnswer,
-    ConsentCaps,
     ContextChangedData,
     EmptyEventData,
     EventType,
@@ -158,18 +159,6 @@ class Turn:
 
 
 @dataclass(frozen=True, slots=True)
-class Consent:
-    """The paid step-up question to ask before a turn runs: the paid model, and why golem asks."""
-
-    profile: str
-    tier: Tier
-    why: str
-    estimated_usd: float | None
-    alternatives: tuple[ConsentAnswer, ...]
-    caps: ConsentCaps | None = None
-
-
-@dataclass(frozen=True, slots=True)
 class Resume:
     """The answer to the tool call a run waits on, and what the run's events say about it.
 
@@ -187,6 +176,8 @@ class Resume:
     decision: ApprovalDecision
     user_message_id: str | None
     open_calls: tuple[str, ...]
+    consent: ConsentAnswer | None = None
+    """Set when the run waits on the paid question of a struggling model, not on a tool call."""
     cwd: str | None = None
     allowed_tools: tuple[Allowance, ...] = ()
     asked: tuple[str, ...] = ()
@@ -404,6 +395,7 @@ async def ask_consent(
             estimated_usd=consent.estimated_usd,
             alternatives=list(consent.alternatives),
             caps=consent.caps,
+            signal=consent.signal,
         ),
     )
 
@@ -463,20 +455,24 @@ async def resume_turn(
 
     try:
         control.started.set()
-        await emit(
-            "approval.resolved",
-            ApprovalResolvedData(
-                call_id=resume.call_id,
-                name=resume.name,
-                decision=resume.decision,
-                subject=resume.subject,
-                rule=resume.rule,
-                args=resume.args,
-            ),
-        )
+        if resume.consent is None:
+            await emit(
+                "approval.resolved",
+                ApprovalResolvedData(
+                    call_id=resume.call_id,
+                    name=resume.name,
+                    decision=resume.decision,
+                    subject=resume.subject,
+                    rule=resume.rule,
+                    args=resume.args,
+                ),
+            )
+            answer = Answer(decision=resume.decision, diff=resume.diff, args=resume.args)
+        else:
+            answer = Answer(decision=resume.consent)
         stream = runtime.resume(
             session_id=resume.session_id,
-            answer=Answer(decision=resume.decision, diff=resume.diff, args=resume.args),
+            answer=answer,
             cwd=resume.cwd,
             allowed_tools=resume.allowed_tools,
             asked=resume.asked,
@@ -812,6 +808,23 @@ async def _apply(
                     "artifact_id": fact.artifact_id,
                     "round": fact.round,
                 }
+            ),
+        )
+    elif isinstance(fact, ConsentAsked):
+        progress.waiting = True
+        identity = progress.identify(fact.profile) if progress.identify is not None else None
+        await emit(
+            "route.consent.needed",
+            RouteConsentNeededData(
+                model_profile=fact.profile,
+                provider=None if identity is None else identity.provider,
+                model=None if identity is None else identity.name,
+                tier=fact.tier,
+                why=fact.why,
+                estimated_usd=fact.estimated_usd,
+                alternatives=list(fact.alternatives),
+                caps=fact.caps,
+                signal=fact.signal,
             ),
         )
     elif isinstance(fact, ApprovalAsked):

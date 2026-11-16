@@ -96,6 +96,7 @@ The rules for stepping up:
 - It holds until the run ends. The next turn picks from the bottom again.
 - It only happens in a session on `auto`. It never happens on `local` or `pinned`.
 - It follows the same rules as a pick: privacy, fit, consent and caps still apply.
+- When the next model is paid and the session has no yes yet, a struggle asks the paid question in the middle of the run, once, and the run waits for the answer like a tool approval. A prompt that does not fit and a failing provider do not ask.
 - The stronger model sees the failed calls and their errors. Nothing is removed from history.
 
 A provider that fails (unreachable, rate-limited, a server error) is replaced by the next candidate of the same tier, then by the next tier. The event has the reason `fallback`.

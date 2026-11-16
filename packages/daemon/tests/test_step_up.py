@@ -211,25 +211,6 @@ async def test_a_run_steps_up_only_once(short_home: Path) -> None:
         await stop_daemon(app, task)
 
 
-async def test_a_paid_step_up_needs_the_sessions_yes(short_home: Path) -> None:
-    router = _router([*BAD_TWICE, "done"], ["nope"])
-    app, task = await start_daemon(short_home, router=router, facts=_facts_all())
-    client = await RpcClient.connect(app.paths.socket_path)
-    try:
-        await _send(client, await _start(app, client, "auto", paid=False))
-        await _ended(client)
-        assert "run.completed" in _types(client)
-        assert "route.consent.needed" not in _types(client)
-        assert _models(client) == ["small", "small", "small"]
-        assert not router.models[CHEAP].seen
-        # The run says it stayed.
-        notes = [r for r in _of(client, "model.routed") if r["reason"] == "fallback"]
-        assert "no stronger model" in cast(str, notes[-1]["detail"])
-    finally:
-        await client.close()
-        await stop_daemon(app, task)
-
-
 async def test_a_local_only_session_never_steps_up_to_a_hosted_model(short_home: Path) -> None:
     router = _router([*BAD_TWICE, "done"], ["nope"], local_only=True)
     app, task = await start_daemon(short_home, router=router, facts=_facts_all())

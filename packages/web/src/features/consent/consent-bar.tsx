@@ -4,6 +4,7 @@ import {
   consentAnswers,
   consentCapsLine,
   consentLine,
+  consentReason,
   type ConsentChoice,
   type PendingConsent,
 } from "@golem/view";
@@ -36,7 +37,7 @@ export function ConsentBar({
         <Seal />
         <div className="min-w-0">
           <p className="text-sm leading-snug font-semibold wrap-anywhere">{CONSENT_TITLE}</p>
-          <p className="mt-0.5 text-sm leading-snug text-muted wrap-anywhere">{consent.why}</p>
+          <p className="mt-0.5 text-sm leading-snug text-muted wrap-anywhere">{consentReason(consent)}</p>
           <p className="mt-1 font-mono text-xs leading-snug wrap-anywhere" data-consent-line="">
             {consentLine(consent)}
           </p>

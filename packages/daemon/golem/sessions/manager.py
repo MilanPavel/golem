@@ -27,7 +27,7 @@ from golem.graphs.adapter import PlainMessage, plain_messages, trace_messages
 from golem.graphs.chat import ChatRuntime, Growth
 from golem.graphs.context_view import ContextView, view
 from golem.graphs.state import SCHEMA_VERSION
-from golem.graphs.step_up import StepRequest, StepUp
+from golem.graphs.step_up import Consent, StepAsk, StepRequest, StepUp
 from golem.models import options as model_options
 from golem.models.budget import Budget, Room, spent_text
 from golem.models.cost import cost_usd
@@ -48,7 +48,6 @@ from golem.sessions.ids import new_id
 from golem.sessions.log import SessionLog
 from golem.sessions.runner import (
     CancelReason,
-    Consent,
     Resume,
     RunControl,
     Turn,
@@ -1048,6 +1047,33 @@ class SessionManager:
                     session_id, None, "session.updated", SessionUpdatedData(paid_ok=True)
                 )
                 session.paid_ok = True
+            if pending.signal is not None:
+                # The run is paused in its middle: it goes on with the answer, not a new turn.
+                resume = Resume(
+                    session_id=session_id,
+                    run_id=run_id,
+                    call_id="",
+                    name="",
+                    decision="deny",
+                    user_message_id=pending.user_message_id,
+                    open_calls=(),
+                    consent=answer,
+                    cwd=session.cwd,
+                    allowed_tools=_ordered(session.allowed_tools),
+                    mcp_servers=tuple(sorted(session.mcp_servers)),
+                    pinned=tuple(session.skills),
+                    pinned_folders=self._pinned_folders(session),
+                    options=dict(session.options),
+                    permission_mode=session.permission_mode,
+                    checks=session.checks,
+                    plan_first=session.plan_first,
+                    local_only=self.local_only(session.cwd) or session.route == "local",
+                    pins=session.pins,
+                )
+                control = RunControl()
+                work = self._resumed(session, resume, control, None)
+                await self._start(session, run_id, control, work)
+                return run_id
             room = None if self.budget is None else await self.budget.room(session_id)
             try:
                 local_only = self.local_only(session.cwd)
@@ -1327,7 +1353,9 @@ class SessionManager:
             return _Routed(session.model_profile, fallback, ask)
         return _Routed(session.model_profile, fallback)
 
-    async def _next_model(self, session_id: str, profile: str, ask: StepRequest) -> StepUp | None:
+    async def _next_model(
+        self, session_id: str, profile: str, ask: StepRequest
+    ) -> StepUp | StepAsk | None:
         """The model the rest of a run moves to, or None when it stays on ``profile``.
 
         A struggle asks for the tier above the current one, a prompt that does not fit for a
@@ -1335,7 +1363,9 @@ class SessionManager:
         the same tier first, then the tier above, then, from a hosted model, a local one. The
         failed model and the providers marked in ``router.health`` are left out. The privacy,
         the caps and the paid question are the pick's own. A paid model needs a yes the session
-        already gave: without it the run stays, since a run in progress has no one to ask.
+        already gave (or ``ask.answer``). A struggle in an interactive session that may ask
+        gets a :class:`StepAsk` instead: the run waits for the answer. A failing provider and
+        a prompt that does not fit never ask: the run stays.
         """
         session = await self._resolve(session_id)
         router = self._runtime.router
@@ -1366,7 +1396,8 @@ class SessionManager:
             prompt_tokens=ask.need,
             reply_reserve=router.context_settings().reply_reserve,
             local_only=local_only,
-            paid_allowed=session.paid_ok and settings.paid == "ask",
+            paid_allowed=ask.answer in ("session", "once")
+            or (session.paid_ok and settings.paid == "ask"),
             paid_room_usd=None if room is None else room.usd,
             min_tier=floor,
         )
@@ -1377,8 +1408,30 @@ class SessionManager:
             local = [m for m in candidates if m.tier == "local"]
             choice = pick("auto", own, local, replace(traits, min_tier=None))
             found = choice.model
-        if found is None or choice.needs_consent or found.ref == own.ref:
+        if found is None or found.ref == own.ref:
             return None
+        if choice.needs_consent:
+            if fallback or ask.signal == "context_full" or ask.answer is not None:
+                return None
+            if local_only or not interactive or settings.paid == "never":
+                return None
+            if ask.detail is None:
+                return None
+            question = self._question(
+                session,
+                found.profile,
+                found.tier,
+                found.price,
+                room,
+                choice,
+                "",
+                ask.prompt,
+                why=ask.detail,
+                signal=ask.signal,
+            )
+            if question is None:
+                return None
+            return StepAsk(found.profile, found.tier, choice, question)
         if local_only and found.tier != "local":
             return None
         if fallback:
@@ -1411,6 +1464,8 @@ class SessionManager:
         prompt: int | None,
         *,
         fallback: bool = False,
+        why: str | None = None,
+        signal: str | None = None,
     ) -> Consent | None:
         """The question to ask before a turn runs on ``profile``, None when none is needed.
 
@@ -1442,6 +1497,8 @@ class SessionManager:
             answers = ("once", "local")
         elif session.paid_ok and settings.paid != "always_ask":
             return None
+        elif why is not None:
+            pass
         elif fallback:
             why = (
                 f"No other model can take this turn ({choice.detail}),"
@@ -1454,7 +1511,7 @@ class SessionManager:
         tokens = len(text) // 4 if prompt is None else prompt
         reserve = router.context_settings().reply_reserve
         estimate = cost_usd({"input": tokens, "output": reserve}, price)
-        return Consent(profile, tier, why, estimate, answers, caps)
+        return Consent(profile, tier, why, estimate, answers, caps, signal)
 
     async def _facts_of(self, session: _LiveSession, named: Iterable[object]) -> list[ModelFacts]:
         """The facts of the session's model, the ladder's names and every listed model."""

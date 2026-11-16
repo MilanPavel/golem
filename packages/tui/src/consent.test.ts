@@ -15,6 +15,7 @@ const CONSENT: PendingConsent = {
   estimatedUsd: 0.0213,
   alternatives: ["session", "once", "local"],
   caps: { sessionUsd: 0.5, dailyUsd: 2, spentSession: 0.1, spentToday: 0.42 },
+  signal: null,
 };
 
 test("the band says the question, why, the model, the caps, and the keys", () => {
