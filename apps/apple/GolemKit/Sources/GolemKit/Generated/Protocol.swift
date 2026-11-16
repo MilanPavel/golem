@@ -1203,9 +1203,9 @@ public struct ConfigGetParams: Codable {
 public struct ConfigGetResult: Codable {
     public let configFile: String
     public let defaultModel: String?
-    public let defaultPermissionMode: Mode?
+    public let defaultPermissionMode: DefaultPermissionModeEnum?
     public let logLevel: String
-    public let permissionMode: Mode?
+    public let permissionMode: DefaultPermissionModeEnum?
     public let projectPolicy: String?
     public let projectTrusted: Bool?
     public let rules: [RuleElement]
@@ -1227,7 +1227,7 @@ public struct ConfigGetResult: Codable {
         case trustedProjects = "trusted_projects"
     }
 
-    public init(configFile: String, defaultModel: String?, defaultPermissionMode: Mode?, logLevel: String, permissionMode: Mode?, projectPolicy: String?, projectTrusted: Bool?, rules: [RuleElement], sessionAllowed: [SessionAllowedElement]?, sessionTitles: Bool, trustedProjects: [String]) {
+    public init(configFile: String, defaultModel: String?, defaultPermissionMode: DefaultPermissionModeEnum?, logLevel: String, permissionMode: DefaultPermissionModeEnum?, projectPolicy: String?, projectTrusted: Bool?, rules: [RuleElement], sessionAllowed: [SessionAllowedElement]?, sessionTitles: Bool, trustedProjects: [String]) {
         self.configFile = configFile
         self.defaultModel = defaultModel
         self.defaultPermissionMode = defaultPermissionMode
@@ -1242,7 +1242,7 @@ public struct ConfigGetResult: Codable {
     }
 }
 
-public enum Mode: String, Codable {
+public enum DefaultPermissionModeEnum: String, Codable {
     case autopilot = "autopilot"
     case balanced = "balanced"
     case careful = "careful"
@@ -1370,7 +1370,7 @@ public struct ConfigRawGetResult: Codable {
 /// only when the daemon starts. ``mtime_ns`` is the new file's.
 // MARK: - ConfigRawResult
 public struct ConfigRawResult: Codable {
-    public let errors: [ErrorElement]?
+    public let errors: [ConfigRawResultError]?
     public let mtimeNS: Int?
     public let ok: Bool
     public let restartNeeded: [String]?
@@ -1382,7 +1382,7 @@ public struct ConfigRawResult: Codable {
         case restartNeeded = "restart_needed"
     }
 
-    public init(errors: [ErrorElement]?, mtimeNS: Int?, ok: Bool, restartNeeded: [String]?) {
+    public init(errors: [ConfigRawResultError]?, mtimeNS: Int?, ok: Bool, restartNeeded: [String]?) {
         self.errors = errors
         self.mtimeNS = mtimeNS
         self.ok = ok
@@ -1393,8 +1393,8 @@ public struct ConfigRawResult: Codable {
 /// One problem in a config text. ``line`` and ``column`` count from 1, when known.
 ///
 /// ``path`` is the setting, as ``mcp.github.headers.Authorization``.
-// MARK: - ErrorElement
-public struct ErrorElement: Codable {
+// MARK: - ConfigRawResultError
+public struct ConfigRawResultError: Codable {
     public let column: Int?
     public let line: Int?
     public let message: String
@@ -8258,13 +8258,13 @@ public struct OllamaStartResult: Codable {
 /// while it was being written is refused.
 // MARK: - PermissionsSetModeParams
 public struct PermissionsSetModeParams: Codable {
-    public let mode: Mode
+    public let mode: DefaultPermissionModeEnum
 
     public enum CodingKeys: String, CodingKey {
         case mode = "mode"
     }
 
-    public init(mode: Mode) {
+    public init(mode: DefaultPermissionModeEnum) {
         self.mode = mode
     }
 }
@@ -8272,7 +8272,7 @@ public struct PermissionsSetModeParams: Codable {
 /// The default mode as stored, and the file it was written to.
 // MARK: - PermissionsSetModeResult
 public struct PermissionsSetModeResult: Codable {
-    public let mode: Mode
+    public let mode: DefaultPermissionModeEnum
     public let path: String
 
     public enum CodingKeys: String, CodingKey {
@@ -8280,7 +8280,7 @@ public struct PermissionsSetModeResult: Codable {
         case path = "path"
     }
 
-    public init(mode: Mode, path: String) {
+    public init(mode: DefaultPermissionModeEnum, path: String) {
         self.mode = mode
         self.path = path
     }
@@ -9880,6 +9880,891 @@ public struct RoutineWatchConfig: Codable {
     }
 }
 
+/// Keys of ``[budget]`` to change. A null removes the key: no cap, or ``over = local``.
+// MARK: - RoutingBudgetPatch
+public struct RoutingBudgetPatch: Codable {
+    public let dailyUsd: Double?
+    public let over: Over?
+    public let sessionUsd: Double?
+
+    public enum CodingKeys: String, CodingKey {
+        case dailyUsd = "daily_usd"
+        case over = "over"
+        case sessionUsd = "session_usd"
+    }
+
+    public init(dailyUsd: Double?, over: Over?, sessionUsd: Double?) {
+        self.dailyUsd = dailyUsd
+        self.over = over
+        self.sessionUsd = sessionUsd
+    }
+}
+
+public enum Over: String, Codable {
+    case ask = "ask"
+    case local = "local"
+}
+
+/// ``[budget]``. Caps in USD, null for no cap.
+// MARK: - RoutingBudget
+public struct RoutingBudget: Codable {
+    public let dailyUsd: Double?
+    public let over: Over
+    public let sessionUsd: Double?
+
+    public enum CodingKeys: String, CodingKey {
+        case dailyUsd = "daily_usd"
+        case over = "over"
+        case sessionUsd = "session_usd"
+    }
+
+    public init(dailyUsd: Double?, over: Over, sessionUsd: Double?) {
+        self.dailyUsd = dailyUsd
+        self.over = over
+        self.sessionUsd = sessionUsd
+    }
+}
+
+/// Keys of ``[context]`` to change. A null removes the key.
+// MARK: - RoutingContextPatch
+public struct RoutingContextPatch: Codable {
+    public let clearAt: Double?
+    public let clearTo: Double?
+    public let compactAt: Double?
+    public let keepAlive: String?
+    public let keepResults: Int?
+    public let keepTurns: Int?
+    public let replyReserve: Int?
+    public let window: RoutingContextPatchWindow?
+
+    public enum CodingKeys: String, CodingKey {
+        case clearAt = "clear_at"
+        case clearTo = "clear_to"
+        case compactAt = "compact_at"
+        case keepAlive = "keep_alive"
+        case keepResults = "keep_results"
+        case keepTurns = "keep_turns"
+        case replyReserve = "reply_reserve"
+        case window = "window"
+    }
+
+    public init(clearAt: Double?, clearTo: Double?, compactAt: Double?, keepAlive: String?, keepResults: Int?, keepTurns: Int?, replyReserve: Int?, window: RoutingContextPatchWindow?) {
+        self.clearAt = clearAt
+        self.clearTo = clearTo
+        self.compactAt = compactAt
+        self.keepAlive = keepAlive
+        self.keepResults = keepResults
+        self.keepTurns = keepTurns
+        self.replyReserve = replyReserve
+        self.window = window
+    }
+}
+
+public enum RoutingContextPatchWindow: Codable {
+    case enumeration(WindowEnum)
+    case integer(Int)
+    case null
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        if let x = try? container.decode(Int.self) {
+            self = .integer(x)
+            return
+        }
+        if let x = try? container.decode(WindowEnum.self) {
+            self = .enumeration(x)
+            return
+        }
+        if container.decodeNil() {
+            self = .null
+            return
+        }
+        throw DecodingError.typeMismatch(RoutingContextPatchWindow.self, DecodingError.Context(codingPath: decoder.codingPath, debugDescription: "Wrong type for RoutingContextPatchWindow"))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        switch self {
+        case .enumeration(let x):
+            try container.encode(x)
+        case .integer(let x):
+            try container.encode(x)
+        case .null:
+            try container.encodeNil()
+        }
+    }
+}
+
+public enum WindowEnum: String, Codable {
+    case auto = "auto"
+    case ollama = "ollama"
+}
+
+/// ``[context]``. ``window`` is ``auto``, ``ollama`` or a number of tokens.
+// MARK: - RoutingContext
+public struct RoutingContext: Codable {
+    public let clearAt: Double
+    public let clearTo: Double
+    public let compactAt: Double
+    public let keepAlive: String?
+    public let keepResults: Int
+    public let keepTurns: Int
+    public let replyReserve: Int
+    public let window: RoutingContextWindow
+
+    public enum CodingKeys: String, CodingKey {
+        case clearAt = "clear_at"
+        case clearTo = "clear_to"
+        case compactAt = "compact_at"
+        case keepAlive = "keep_alive"
+        case keepResults = "keep_results"
+        case keepTurns = "keep_turns"
+        case replyReserve = "reply_reserve"
+        case window = "window"
+    }
+
+    public init(clearAt: Double, clearTo: Double, compactAt: Double, keepAlive: String?, keepResults: Int, keepTurns: Int, replyReserve: Int, window: RoutingContextWindow) {
+        self.clearAt = clearAt
+        self.clearTo = clearTo
+        self.compactAt = compactAt
+        self.keepAlive = keepAlive
+        self.keepResults = keepResults
+        self.keepTurns = keepTurns
+        self.replyReserve = replyReserve
+        self.window = window
+    }
+}
+
+public enum RoutingContextWindow: Codable {
+    case enumeration(WindowEnum)
+    case integer(Int)
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        if let x = try? container.decode(Int.self) {
+            self = .integer(x)
+            return
+        }
+        if let x = try? container.decode(WindowEnum.self) {
+            self = .enumeration(x)
+            return
+        }
+        throw DecodingError.typeMismatch(RoutingContextWindow.self, DecodingError.Context(codingPath: decoder.codingPath, debugDescription: "Wrong type for RoutingContextWindow"))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        switch self {
+        case .enumeration(let x):
+            try container.encode(x)
+        case .integer(let x):
+            try container.encode(x)
+        }
+    }
+}
+
+/// ``routing.get``. The routing, budget and context settings as golem uses them.
+// MARK: - RoutingGetParams
+public struct RoutingGetParams: Codable {
+
+    public init() {
+    }
+}
+
+/// The effective values of the five tables, and what golem picks for an empty tier.
+// MARK: - RoutingGetResult
+public struct RoutingGetResult: Codable {
+    public let budget: PurpleRoutingBudget
+    public let context: PurpleRoutingContext
+    public let ladder: PurpleRoutingLadder
+    public let picked: PurpleRoutingPicked
+    public let roles: PurpleRoutingRoles
+    public let routing: PurpleRoutingValues
+
+    public enum CodingKeys: String, CodingKey {
+        case budget = "budget"
+        case context = "context"
+        case ladder = "ladder"
+        case picked = "picked"
+        case roles = "roles"
+        case routing = "routing"
+    }
+
+    public init(budget: PurpleRoutingBudget, context: PurpleRoutingContext, ladder: PurpleRoutingLadder, picked: PurpleRoutingPicked, roles: PurpleRoutingRoles, routing: PurpleRoutingValues) {
+        self.budget = budget
+        self.context = context
+        self.ladder = ladder
+        self.picked = picked
+        self.roles = roles
+        self.routing = routing
+    }
+}
+
+/// ``[budget]``. Caps in USD, null for no cap.
+// MARK: - PurpleRoutingBudget
+public struct PurpleRoutingBudget: Codable {
+    public let dailyUsd: Double?
+    public let over: Over
+    public let sessionUsd: Double?
+
+    public enum CodingKeys: String, CodingKey {
+        case dailyUsd = "daily_usd"
+        case over = "over"
+        case sessionUsd = "session_usd"
+    }
+
+    public init(dailyUsd: Double?, over: Over, sessionUsd: Double?) {
+        self.dailyUsd = dailyUsd
+        self.over = over
+        self.sessionUsd = sessionUsd
+    }
+}
+
+/// ``[context]``. ``window`` is ``auto``, ``ollama`` or a number of tokens.
+// MARK: - PurpleRoutingContext
+public struct PurpleRoutingContext: Codable {
+    public let clearAt: Double
+    public let clearTo: Double
+    public let compactAt: Double
+    public let keepAlive: String?
+    public let keepResults: Int
+    public let keepTurns: Int
+    public let replyReserve: Int
+    public let window: RoutingContextWindow
+
+    public enum CodingKeys: String, CodingKey {
+        case clearAt = "clear_at"
+        case clearTo = "clear_to"
+        case compactAt = "compact_at"
+        case keepAlive = "keep_alive"
+        case keepResults = "keep_results"
+        case keepTurns = "keep_turns"
+        case replyReserve = "reply_reserve"
+        case window = "window"
+    }
+
+    public init(clearAt: Double, clearTo: Double, compactAt: Double, keepAlive: String?, keepResults: Int, keepTurns: Int, replyReserve: Int, window: RoutingContextWindow) {
+        self.clearAt = clearAt
+        self.clearTo = clearTo
+        self.compactAt = compactAt
+        self.keepAlive = keepAlive
+        self.keepResults = keepResults
+        self.keepTurns = keepTurns
+        self.replyReserve = replyReserve
+        self.window = window
+    }
+}
+
+/// ``[routing.ladder]``. The model named for each tier, null when golem chooses.
+// MARK: - PurpleRoutingLadder
+public struct PurpleRoutingLadder: Codable {
+    public let budget: String?
+    public let frontier: String?
+    public let local: String?
+
+    public enum CodingKeys: String, CodingKey {
+        case budget = "budget"
+        case frontier = "frontier"
+        case local = "local"
+    }
+
+    public init(budget: String?, frontier: String?, local: String?) {
+        self.budget = budget
+        self.frontier = frontier
+        self.local = local
+    }
+}
+
+/// The model golem would take for each tier when its ``[routing.ladder]`` line is empty,
+/// as ``provider/model``, or null when none is ready.
+// MARK: - PurpleRoutingPicked
+public struct PurpleRoutingPicked: Codable {
+    public let budget: String?
+    public let frontier: String?
+    public let local: String?
+
+    public enum CodingKeys: String, CodingKey {
+        case budget = "budget"
+        case frontier = "frontier"
+        case local = "local"
+    }
+
+    public init(budget: String?, frontier: String?, local: String?) {
+        self.budget = budget
+        self.frontier = frontier
+        self.local = local
+    }
+}
+
+/// ``[routing.roles]``. Each is ``session`` or a model name.
+// MARK: - PurpleRoutingRoles
+public struct PurpleRoutingRoles: Codable {
+    public let explore: String
+    public let summarise: String
+    public let titles: String
+
+    public enum CodingKeys: String, CodingKey {
+        case explore = "explore"
+        case summarise = "summarise"
+        case titles = "titles"
+    }
+
+    public init(explore: String, summarise: String, titles: String) {
+        self.explore = explore
+        self.summarise = summarise
+        self.titles = titles
+    }
+}
+
+/// ``[routing]``: the route mode of a new session, when to ask about paid models,
+/// the price that splits budget from frontier, and the folders that stay on this Mac.
+// MARK: - PurpleRoutingValues
+public struct PurpleRoutingValues: Codable {
+    public let budgetMaxPrice: Double
+    public let localOnly: [String]
+    public let mode: RouteEnum
+    public let paid: Paid
+
+    public enum CodingKeys: String, CodingKey {
+        case budgetMaxPrice = "budget_max_price"
+        case localOnly = "local_only"
+        case mode = "mode"
+        case paid = "paid"
+    }
+
+    public init(budgetMaxPrice: Double, localOnly: [String], mode: RouteEnum, paid: Paid) {
+        self.budgetMaxPrice = budgetMaxPrice
+        self.localOnly = localOnly
+        self.mode = mode
+        self.paid = paid
+    }
+}
+
+public enum RouteEnum: String, Codable {
+    case auto = "auto"
+    case local = "local"
+    case pinned = "pinned"
+}
+
+public enum Paid: String, Codable {
+    case alwaysAsk = "always_ask"
+    case ask = "ask"
+    case never = "never"
+}
+
+/// Keys of ``[routing.ladder]`` to change. A null removes the key.
+// MARK: - RoutingLadderPatch
+public struct RoutingLadderPatch: Codable {
+    public let budget: String?
+    public let frontier: String?
+    public let local: String?
+
+    public enum CodingKeys: String, CodingKey {
+        case budget = "budget"
+        case frontier = "frontier"
+        case local = "local"
+    }
+
+    public init(budget: String?, frontier: String?, local: String?) {
+        self.budget = budget
+        self.frontier = frontier
+        self.local = local
+    }
+}
+
+/// ``[routing.ladder]``. The model named for each tier, null when golem chooses.
+// MARK: - RoutingLadder
+public struct RoutingLadder: Codable {
+    public let budget: String?
+    public let frontier: String?
+    public let local: String?
+
+    public enum CodingKeys: String, CodingKey {
+        case budget = "budget"
+        case frontier = "frontier"
+        case local = "local"
+    }
+
+    public init(budget: String?, frontier: String?, local: String?) {
+        self.budget = budget
+        self.frontier = frontier
+        self.local = local
+    }
+}
+
+/// Keys of ``[routing]`` to change. A key left out stays; a null removes the key from the
+/// file, so the default applies again.
+// MARK: - RoutingPatch
+public struct RoutingPatch: Codable {
+    public let budgetMaxPrice: Double?
+    public let localOnly: [String]?
+    public let mode: RouteEnum?
+    public let paid: Paid?
+
+    public enum CodingKeys: String, CodingKey {
+        case budgetMaxPrice = "budget_max_price"
+        case localOnly = "local_only"
+        case mode = "mode"
+        case paid = "paid"
+    }
+
+    public init(budgetMaxPrice: Double?, localOnly: [String]?, mode: RouteEnum?, paid: Paid?) {
+        self.budgetMaxPrice = budgetMaxPrice
+        self.localOnly = localOnly
+        self.mode = mode
+        self.paid = paid
+    }
+}
+
+/// The model golem would take for each tier when its ``[routing.ladder]`` line is empty,
+/// as ``provider/model``, or null when none is ready.
+// MARK: - RoutingPicked
+public struct RoutingPicked: Codable {
+    public let budget: String?
+    public let frontier: String?
+    public let local: String?
+
+    public enum CodingKeys: String, CodingKey {
+        case budget = "budget"
+        case frontier = "frontier"
+        case local = "local"
+    }
+
+    public init(budget: String?, frontier: String?, local: String?) {
+        self.budget = budget
+        self.frontier = frontier
+        self.local = local
+    }
+}
+
+/// Keys of ``[routing.roles]`` to change. A null removes the key.
+// MARK: - RoutingRolesPatch
+public struct RoutingRolesPatch: Codable {
+    public let explore: String?
+    public let summarise: String?
+    public let titles: String?
+
+    public enum CodingKeys: String, CodingKey {
+        case explore = "explore"
+        case summarise = "summarise"
+        case titles = "titles"
+    }
+
+    public init(explore: String?, summarise: String?, titles: String?) {
+        self.explore = explore
+        self.summarise = summarise
+        self.titles = titles
+    }
+}
+
+/// ``[routing.roles]``. Each is ``session`` or a model name.
+// MARK: - RoutingRoles
+public struct RoutingRoles: Codable {
+    public let explore: String
+    public let summarise: String
+    public let titles: String
+
+    public enum CodingKeys: String, CodingKey {
+        case explore = "explore"
+        case summarise = "summarise"
+        case titles = "titles"
+    }
+
+    public init(explore: String, summarise: String, titles: String) {
+        self.explore = explore
+        self.summarise = summarise
+        self.titles = titles
+    }
+}
+
+/// ``routing.set``. Change keys of the five tables in the user's ``config.toml``.
+///
+/// Only the keys sent change, and the file keeps its comments. Every value is checked
+/// first, and when any is wrong nothing is written.
+// MARK: - RoutingSetParams
+public struct RoutingSetParams: Codable {
+    public let budget: RoutingBudgetPatchClass?
+    public let context: RoutingContextPatchClass?
+    public let ladder: RoutingLadderPatchClass?
+    public let roles: RoutingRolesPatchClass?
+    public let routing: RoutingPatchClass?
+
+    public enum CodingKeys: String, CodingKey {
+        case budget = "budget"
+        case context = "context"
+        case ladder = "ladder"
+        case roles = "roles"
+        case routing = "routing"
+    }
+
+    public init(budget: RoutingBudgetPatchClass?, context: RoutingContextPatchClass?, ladder: RoutingLadderPatchClass?, roles: RoutingRolesPatchClass?, routing: RoutingPatchClass?) {
+        self.budget = budget
+        self.context = context
+        self.ladder = ladder
+        self.roles = roles
+        self.routing = routing
+    }
+}
+
+/// Keys of ``[budget]`` to change. A null removes the key: no cap, or ``over = local``.
+// MARK: - RoutingBudgetPatchClass
+public struct RoutingBudgetPatchClass: Codable {
+    public let dailyUsd: Double?
+    public let over: Over?
+    public let sessionUsd: Double?
+
+    public enum CodingKeys: String, CodingKey {
+        case dailyUsd = "daily_usd"
+        case over = "over"
+        case sessionUsd = "session_usd"
+    }
+
+    public init(dailyUsd: Double?, over: Over?, sessionUsd: Double?) {
+        self.dailyUsd = dailyUsd
+        self.over = over
+        self.sessionUsd = sessionUsd
+    }
+}
+
+/// Keys of ``[context]`` to change. A null removes the key.
+// MARK: - RoutingContextPatchClass
+public struct RoutingContextPatchClass: Codable {
+    public let clearAt: Double?
+    public let clearTo: Double?
+    public let compactAt: Double?
+    public let keepAlive: String?
+    public let keepResults: Int?
+    public let keepTurns: Int?
+    public let replyReserve: Int?
+    public let window: RoutingContextPatchWindow?
+
+    public enum CodingKeys: String, CodingKey {
+        case clearAt = "clear_at"
+        case clearTo = "clear_to"
+        case compactAt = "compact_at"
+        case keepAlive = "keep_alive"
+        case keepResults = "keep_results"
+        case keepTurns = "keep_turns"
+        case replyReserve = "reply_reserve"
+        case window = "window"
+    }
+
+    public init(clearAt: Double?, clearTo: Double?, compactAt: Double?, keepAlive: String?, keepResults: Int?, keepTurns: Int?, replyReserve: Int?, window: RoutingContextPatchWindow?) {
+        self.clearAt = clearAt
+        self.clearTo = clearTo
+        self.compactAt = compactAt
+        self.keepAlive = keepAlive
+        self.keepResults = keepResults
+        self.keepTurns = keepTurns
+        self.replyReserve = replyReserve
+        self.window = window
+    }
+}
+
+/// Keys of ``[routing.ladder]`` to change. A null removes the key.
+// MARK: - RoutingLadderPatchClass
+public struct RoutingLadderPatchClass: Codable {
+    public let budget: String?
+    public let frontier: String?
+    public let local: String?
+
+    public enum CodingKeys: String, CodingKey {
+        case budget = "budget"
+        case frontier = "frontier"
+        case local = "local"
+    }
+
+    public init(budget: String?, frontier: String?, local: String?) {
+        self.budget = budget
+        self.frontier = frontier
+        self.local = local
+    }
+}
+
+/// Keys of ``[routing.roles]`` to change. A null removes the key.
+// MARK: - RoutingRolesPatchClass
+public struct RoutingRolesPatchClass: Codable {
+    public let explore: String?
+    public let summarise: String?
+    public let titles: String?
+
+    public enum CodingKeys: String, CodingKey {
+        case explore = "explore"
+        case summarise = "summarise"
+        case titles = "titles"
+    }
+
+    public init(explore: String?, summarise: String?, titles: String?) {
+        self.explore = explore
+        self.summarise = summarise
+        self.titles = titles
+    }
+}
+
+/// Keys of ``[routing]`` to change. A key left out stays; a null removes the key from the
+/// file, so the default applies again.
+// MARK: - RoutingPatchClass
+public struct RoutingPatchClass: Codable {
+    public let budgetMaxPrice: Double?
+    public let localOnly: [String]?
+    public let mode: RouteEnum?
+    public let paid: Paid?
+
+    public enum CodingKeys: String, CodingKey {
+        case budgetMaxPrice = "budget_max_price"
+        case localOnly = "local_only"
+        case mode = "mode"
+        case paid = "paid"
+    }
+
+    public init(budgetMaxPrice: Double?, localOnly: [String]?, mode: RouteEnum?, paid: Paid?) {
+        self.budgetMaxPrice = budgetMaxPrice
+        self.localOnly = localOnly
+        self.mode = mode
+        self.paid = paid
+    }
+}
+
+/// ``ok`` is false when a value was wrong, and the file is then untouched. Each error's
+/// ``path`` is the setting, as ``context.clear_to``. ``values`` is what ``routing.get``
+/// would now answer, set when ``ok``.
+// MARK: - RoutingSetResult
+public struct RoutingSetResult: Codable {
+    public let errors: [RoutingSetResultError]?
+    public let ok: Bool
+    public let values: RoutingGetResultClass?
+
+    public enum CodingKeys: String, CodingKey {
+        case errors = "errors"
+        case ok = "ok"
+        case values = "values"
+    }
+
+    public init(errors: [RoutingSetResultError]?, ok: Bool, values: RoutingGetResultClass?) {
+        self.errors = errors
+        self.ok = ok
+        self.values = values
+    }
+}
+
+/// One problem in a config text. ``line`` and ``column`` count from 1, when known.
+///
+/// ``path`` is the setting, as ``mcp.github.headers.Authorization``.
+// MARK: - RoutingSetResultError
+public struct RoutingSetResultError: Codable {
+    public let column: Int?
+    public let line: Int?
+    public let message: String
+    public let path: String?
+
+    public enum CodingKeys: String, CodingKey {
+        case column = "column"
+        case line = "line"
+        case message = "message"
+        case path = "path"
+    }
+
+    public init(column: Int?, line: Int?, message: String, path: String?) {
+        self.column = column
+        self.line = line
+        self.message = message
+        self.path = path
+    }
+}
+
+/// The effective values of the five tables, and what golem picks for an empty tier.
+// MARK: - RoutingGetResultClass
+public struct RoutingGetResultClass: Codable {
+    public let budget: FluffyRoutingBudget
+    public let context: FluffyRoutingContext
+    public let ladder: FluffyRoutingLadder
+    public let picked: FluffyRoutingPicked
+    public let roles: FluffyRoutingRoles
+    public let routing: FluffyRoutingValues
+
+    public enum CodingKeys: String, CodingKey {
+        case budget = "budget"
+        case context = "context"
+        case ladder = "ladder"
+        case picked = "picked"
+        case roles = "roles"
+        case routing = "routing"
+    }
+
+    public init(budget: FluffyRoutingBudget, context: FluffyRoutingContext, ladder: FluffyRoutingLadder, picked: FluffyRoutingPicked, roles: FluffyRoutingRoles, routing: FluffyRoutingValues) {
+        self.budget = budget
+        self.context = context
+        self.ladder = ladder
+        self.picked = picked
+        self.roles = roles
+        self.routing = routing
+    }
+}
+
+/// ``[budget]``. Caps in USD, null for no cap.
+// MARK: - FluffyRoutingBudget
+public struct FluffyRoutingBudget: Codable {
+    public let dailyUsd: Double?
+    public let over: Over
+    public let sessionUsd: Double?
+
+    public enum CodingKeys: String, CodingKey {
+        case dailyUsd = "daily_usd"
+        case over = "over"
+        case sessionUsd = "session_usd"
+    }
+
+    public init(dailyUsd: Double?, over: Over, sessionUsd: Double?) {
+        self.dailyUsd = dailyUsd
+        self.over = over
+        self.sessionUsd = sessionUsd
+    }
+}
+
+/// ``[context]``. ``window`` is ``auto``, ``ollama`` or a number of tokens.
+// MARK: - FluffyRoutingContext
+public struct FluffyRoutingContext: Codable {
+    public let clearAt: Double
+    public let clearTo: Double
+    public let compactAt: Double
+    public let keepAlive: String?
+    public let keepResults: Int
+    public let keepTurns: Int
+    public let replyReserve: Int
+    public let window: RoutingContextWindow
+
+    public enum CodingKeys: String, CodingKey {
+        case clearAt = "clear_at"
+        case clearTo = "clear_to"
+        case compactAt = "compact_at"
+        case keepAlive = "keep_alive"
+        case keepResults = "keep_results"
+        case keepTurns = "keep_turns"
+        case replyReserve = "reply_reserve"
+        case window = "window"
+    }
+
+    public init(clearAt: Double, clearTo: Double, compactAt: Double, keepAlive: String?, keepResults: Int, keepTurns: Int, replyReserve: Int, window: RoutingContextWindow) {
+        self.clearAt = clearAt
+        self.clearTo = clearTo
+        self.compactAt = compactAt
+        self.keepAlive = keepAlive
+        self.keepResults = keepResults
+        self.keepTurns = keepTurns
+        self.replyReserve = replyReserve
+        self.window = window
+    }
+}
+
+/// ``[routing.ladder]``. The model named for each tier, null when golem chooses.
+// MARK: - FluffyRoutingLadder
+public struct FluffyRoutingLadder: Codable {
+    public let budget: String?
+    public let frontier: String?
+    public let local: String?
+
+    public enum CodingKeys: String, CodingKey {
+        case budget = "budget"
+        case frontier = "frontier"
+        case local = "local"
+    }
+
+    public init(budget: String?, frontier: String?, local: String?) {
+        self.budget = budget
+        self.frontier = frontier
+        self.local = local
+    }
+}
+
+/// The model golem would take for each tier when its ``[routing.ladder]`` line is empty,
+/// as ``provider/model``, or null when none is ready.
+// MARK: - FluffyRoutingPicked
+public struct FluffyRoutingPicked: Codable {
+    public let budget: String?
+    public let frontier: String?
+    public let local: String?
+
+    public enum CodingKeys: String, CodingKey {
+        case budget = "budget"
+        case frontier = "frontier"
+        case local = "local"
+    }
+
+    public init(budget: String?, frontier: String?, local: String?) {
+        self.budget = budget
+        self.frontier = frontier
+        self.local = local
+    }
+}
+
+/// ``[routing.roles]``. Each is ``session`` or a model name.
+// MARK: - FluffyRoutingRoles
+public struct FluffyRoutingRoles: Codable {
+    public let explore: String
+    public let summarise: String
+    public let titles: String
+
+    public enum CodingKeys: String, CodingKey {
+        case explore = "explore"
+        case summarise = "summarise"
+        case titles = "titles"
+    }
+
+    public init(explore: String, summarise: String, titles: String) {
+        self.explore = explore
+        self.summarise = summarise
+        self.titles = titles
+    }
+}
+
+/// ``[routing]``: the route mode of a new session, when to ask about paid models,
+/// the price that splits budget from frontier, and the folders that stay on this Mac.
+// MARK: - FluffyRoutingValues
+public struct FluffyRoutingValues: Codable {
+    public let budgetMaxPrice: Double
+    public let localOnly: [String]
+    public let mode: RouteEnum
+    public let paid: Paid
+
+    public enum CodingKeys: String, CodingKey {
+        case budgetMaxPrice = "budget_max_price"
+        case localOnly = "local_only"
+        case mode = "mode"
+        case paid = "paid"
+    }
+
+    public init(budgetMaxPrice: Double, localOnly: [String], mode: RouteEnum, paid: Paid) {
+        self.budgetMaxPrice = budgetMaxPrice
+        self.localOnly = localOnly
+        self.mode = mode
+        self.paid = paid
+    }
+}
+
+/// ``[routing]``: the route mode of a new session, when to ask about paid models,
+/// the price that splits budget from frontier, and the folders that stay on this Mac.
+// MARK: - RoutingValues
+public struct RoutingValues: Codable {
+    public let budgetMaxPrice: Double
+    public let localOnly: [String]
+    public let mode: RouteEnum
+    public let paid: Paid
+
+    public enum CodingKeys: String, CodingKey {
+        case budgetMaxPrice = "budget_max_price"
+        case localOnly = "local_only"
+        case mode = "mode"
+        case paid = "paid"
+    }
+
+    public init(budgetMaxPrice: Double, localOnly: [String], mode: RouteEnum, paid: Paid) {
+        self.budgetMaxPrice = budgetMaxPrice
+        self.localOnly = localOnly
+        self.mode = mode
+        self.paid = paid
+    }
+}
+
 /// JSON-RPC error object.
 // MARK: - RPCErrorBody
 public struct RPCErrorBody: Codable {
@@ -10281,7 +11166,8 @@ public struct Params: Codable {
 /// ``[budget]`` is spent, so a paid call was not made. ``provider`` is the
 /// provider whose server it was, and ``hint`` says how to fix it, such as
 /// ``run ollama serve``. ``context_full``: the prompt does not fit the model's window,
-/// even after clearing and summarising, and nothing was sent.
+/// even after clearing and summarising, and nothing was sent. ``local_only``: the chat's
+/// folder stays on this Mac and a hosted model was about to be called, so nothing was sent.
 ///
 /// Who stopped the run. ``user`` is ``run.cancel``, ``shutdown`` the daemon stopping.
 ///
@@ -10421,7 +11307,7 @@ public struct ParamsData: Codable {
     public let modelProfile: String?
     public let modelProvider: String?
     public let origin: String?
-    public let route: Route?
+    public let route: RouteEnum?
     public let allowedTools: [PurpleSessionAllowance]?
     public let mcpServers: [String]?
     public let paidOk: Bool?
@@ -10436,7 +11322,7 @@ public struct ParamsData: Codable {
     public let rejected: [FluffyModelRejection]?
     public let tier: Tier?
     public let options: [String: Option]?
-    public let mode: Mode?
+    public let mode: DefaultPermissionModeEnum?
     public let on: Bool?
     public let messageID: String?
     public let role: MessageCompletedDataRole?
@@ -10637,7 +11523,7 @@ public struct ParamsData: Codable {
         case output = "output"
     }
 
-    public init(cwd: String?, forkedFrom: PurpleForkedFrom?, modelName: String?, modelProfile: String?, modelProvider: String?, origin: String?, route: Route?, allowedTools: [PurpleSessionAllowance]?, mcpServers: [String]?, paidOk: Bool?, title: String?, runID: String?, status: PurpleStatus?, summary: String?, reason: PurpleReason?, detail: String?, model: String?, provider: String?, rejected: [FluffyModelRejection]?, tier: Tier?, options: [String: Option]?, mode: Mode?, on: Bool?, messageID: String?, role: MessageCompletedDataRole?, text: String?, interrupted: Bool?, skill: FluffySkillCall?, thinking: String?, thinkingMS: Int?, clearedIDS: [String]?, contextWindow: Int?, estimatedTokens: Int?, index: Int?, messageBytes: [Int]?, messageChars: [Int]?, messageIDS: [String]?, numCtx: Int?, parentCallID: String?, profile: String?, summaryChars: Int?, systemBytes: Int?, systemChars: Int?, systemPromptSHA: String?, systemSections: [TentacledPromptSectionInfo]?, toolsBytes: Int?, toolsChars: Int?, toolsSHA: String?, windowEstimated: Bool?, windowPlanned: Bool?, costUsd: Double?, failed: Bool?, firstTokenMS: Int?, latencyMS: Int?, loadMS: Int?, price: FluffyCallPrice?, promptMS: Int?, replyMS: Int?, stopReason: String?, textToolCalls: TextToolCalls?, usage: FluffyTokenUsage?, action: ContextChangedDataAction?, afterTokens: Int?, beforeTokens: Int?, count: Int?, reloadMS: Int?, room: Int?, windowFrom: Int?, windowTo: Int?, code: Code?, hint: String?, message: String?, args: [String: JSONAny]?, callID: String?, name: String?, chars: Int?, lines: Int?, path: String?, waiting: Bool?, window: Int?, artifactID: String?, diff: String?, durationMS: Int?, preview: String?, truncated: Bool?, source: String?, subject: String?, decision: Decision?, rule: String?, alternatives: [Answer]?, caps: FluffyConsentCaps?, estimatedUsd: Double?, why: String?, answer: Answer?, todos: [PurpleTodo]?, planID: String?, steps: [FluffyPlanStep]?, added: Int?, changeID: String?, removed: Int?, reverts: String?, hash: String?, how: How?, checks: [FluffyCheckInfo]?, checkID: String?, command: String?, round: Int?, exitCode: Int?, output: String?) {
+    public init(cwd: String?, forkedFrom: PurpleForkedFrom?, modelName: String?, modelProfile: String?, modelProvider: String?, origin: String?, route: RouteEnum?, allowedTools: [PurpleSessionAllowance]?, mcpServers: [String]?, paidOk: Bool?, title: String?, runID: String?, status: PurpleStatus?, summary: String?, reason: PurpleReason?, detail: String?, model: String?, provider: String?, rejected: [FluffyModelRejection]?, tier: Tier?, options: [String: Option]?, mode: DefaultPermissionModeEnum?, on: Bool?, messageID: String?, role: MessageCompletedDataRole?, text: String?, interrupted: Bool?, skill: FluffySkillCall?, thinking: String?, thinkingMS: Int?, clearedIDS: [String]?, contextWindow: Int?, estimatedTokens: Int?, index: Int?, messageBytes: [Int]?, messageChars: [Int]?, messageIDS: [String]?, numCtx: Int?, parentCallID: String?, profile: String?, summaryChars: Int?, systemBytes: Int?, systemChars: Int?, systemPromptSHA: String?, systemSections: [TentacledPromptSectionInfo]?, toolsBytes: Int?, toolsChars: Int?, toolsSHA: String?, windowEstimated: Bool?, windowPlanned: Bool?, costUsd: Double?, failed: Bool?, firstTokenMS: Int?, latencyMS: Int?, loadMS: Int?, price: FluffyCallPrice?, promptMS: Int?, replyMS: Int?, stopReason: String?, textToolCalls: TextToolCalls?, usage: FluffyTokenUsage?, action: ContextChangedDataAction?, afterTokens: Int?, beforeTokens: Int?, count: Int?, reloadMS: Int?, room: Int?, windowFrom: Int?, windowTo: Int?, code: Code?, hint: String?, message: String?, args: [String: JSONAny]?, callID: String?, name: String?, chars: Int?, lines: Int?, path: String?, waiting: Bool?, window: Int?, artifactID: String?, diff: String?, durationMS: Int?, preview: String?, truncated: Bool?, source: String?, subject: String?, decision: Decision?, rule: String?, alternatives: [Answer]?, caps: FluffyConsentCaps?, estimatedUsd: Double?, why: String?, answer: Answer?, todos: [PurpleTodo]?, planID: String?, steps: [FluffyPlanStep]?, added: Int?, changeID: String?, removed: Int?, reverts: String?, hash: String?, how: How?, checks: [FluffyCheckInfo]?, checkID: String?, command: String?, round: Int?, exitCode: Int?, output: String?) {
         self.cwd = cwd
         self.forkedFrom = forkedFrom
         self.modelName = modelName
@@ -10810,6 +11696,7 @@ public struct FluffyCheckInfo: Codable {
 public enum Code: String, Codable {
     case budgetSpent = "budget_spent"
     case contextFull = "context_full"
+    case localOnly = "local_only"
     case modelUnreachable = "model_unreachable"
     case notInstalled = "not_installed"
 }
@@ -10891,12 +11778,6 @@ public struct FluffyModelRejection: Codable {
         self.tier = tier
         self.why = why
     }
-}
-
-public enum Route: String, Codable {
-    case auto = "auto"
-    case local = "local"
-    case pinned = "pinned"
 }
 
 /// A skill run once by name, with what was typed after it.
@@ -11276,7 +12157,8 @@ public enum RunCompletedEventType: String, Codable {
 /// ``[budget]`` is spent, so a paid call was not made. ``provider`` is the
 /// provider whose server it was, and ``hint`` says how to fix it, such as
 /// ``run ollama serve``. ``context_full``: the prompt does not fit the model's window,
-/// even after clearing and summarising, and nothing was sent.
+/// even after clearing and summarising, and nothing was sent. ``local_only``: the chat's
+/// folder stays on this Mac and a hosted model was about to be called, so nothing was sent.
 // MARK: - RunFailedData
 public struct RunFailedData: Codable {
     public let code: Code?
@@ -11336,7 +12218,8 @@ public struct RunFailedEvent: Codable {
 /// ``[budget]`` is spent, so a paid call was not made. ``provider`` is the
 /// provider whose server it was, and ``hint`` says how to fix it, such as
 /// ``run ollama serve``. ``context_full``: the prompt does not fit the model's window,
-/// even after clearing and summarising, and nothing was sent.
+/// even after clearing and summarising, and nothing was sent. ``local_only``: the chat's
+/// folder stays on this Mac and a hosted model was about to be called, so nothing was sent.
 // MARK: - RunFailedEventData
 public struct RunFailedEventData: Codable {
     public let code: Code?
@@ -12023,7 +12906,7 @@ public struct SessionCreatedData: Codable {
     public let modelProfile: String
     public let modelProvider: String?
     public let origin: String?
-    public let route: Route?
+    public let route: RouteEnum?
 
     public enum CodingKeys: String, CodingKey {
         case cwd = "cwd"
@@ -12035,7 +12918,7 @@ public struct SessionCreatedData: Codable {
         case route = "route"
     }
 
-    public init(cwd: String?, forkedFrom: SessionCreatedDataForkedFrom?, modelName: String?, modelProfile: String, modelProvider: String?, origin: String?, route: Route?) {
+    public init(cwd: String?, forkedFrom: SessionCreatedDataForkedFrom?, modelName: String?, modelProfile: String, modelProvider: String?, origin: String?, route: RouteEnum?) {
         self.cwd = cwd
         self.forkedFrom = forkedFrom
         self.modelName = modelName
@@ -12110,7 +12993,7 @@ public struct SessionCreatedEventData: Codable {
     public let modelProfile: String
     public let modelProvider: String?
     public let origin: String?
-    public let route: Route?
+    public let route: RouteEnum?
 
     public enum CodingKeys: String, CodingKey {
         case cwd = "cwd"
@@ -12122,7 +13005,7 @@ public struct SessionCreatedEventData: Codable {
         case route = "route"
     }
 
-    public init(cwd: String?, forkedFrom: FluffyForkedFrom?, modelName: String?, modelProfile: String, modelProvider: String?, origin: String?, route: Route?) {
+    public init(cwd: String?, forkedFrom: FluffyForkedFrom?, modelName: String?, modelProfile: String, modelProvider: String?, origin: String?, route: RouteEnum?) {
         self.cwd = cwd
         self.forkedFrom = forkedFrom
         self.modelName = modelName
@@ -12329,16 +13212,20 @@ public struct SessionListResult: Codable {
 /// session: ``user``, ``cli``, ``routine:<name>``. A session never changes it.
 /// ``route`` is the session's route mode. An older daemon leaves it out.
 /// ``plan_first`` is true while the session is in plan first (``session.set_plan``).
+/// ``local_only`` is true while the session's folder stays on this Mac: only a local model
+/// reads its chat. It follows the settings of the moment, so it can change without an event.
+/// An older daemon leaves it out.
 // MARK: - SessionElement
 public struct SessionElement: Codable {
     public let createdAt: String
     public let cwd: String?
     public let forkedFrom: String?
     public let lastSeq: Int
+    public let localOnly: Bool?
     public let modelProfile: String
     public let origin: String?
     public let planFirst: Bool?
-    public let route: Route?
+    public let route: RouteEnum?
     public let sessionID: String
     public let status: SessionStatus
     public let title: String?
@@ -12349,6 +13236,7 @@ public struct SessionElement: Codable {
         case cwd = "cwd"
         case forkedFrom = "forked_from"
         case lastSeq = "last_seq"
+        case localOnly = "local_only"
         case modelProfile = "model_profile"
         case origin = "origin"
         case planFirst = "plan_first"
@@ -12359,11 +13247,12 @@ public struct SessionElement: Codable {
         case updatedAt = "updated_at"
     }
 
-    public init(createdAt: String, cwd: String?, forkedFrom: String?, lastSeq: Int, modelProfile: String, origin: String?, planFirst: Bool?, route: Route?, sessionID: String, status: SessionStatus, title: String?, updatedAt: String) {
+    public init(createdAt: String, cwd: String?, forkedFrom: String?, lastSeq: Int, localOnly: Bool?, modelProfile: String, origin: String?, planFirst: Bool?, route: RouteEnum?, sessionID: String, status: SessionStatus, title: String?, updatedAt: String) {
         self.createdAt = createdAt
         self.cwd = cwd
         self.forkedFrom = forkedFrom
         self.lastSeq = lastSeq
+        self.localOnly = localOnly
         self.modelProfile = modelProfile
         self.origin = origin
         self.planFirst = planFirst
@@ -12389,13 +13278,13 @@ public enum SessionStatus: String, Codable {
 /// tool call, so a replayed session gets its mode back.
 // MARK: - SessionModeChangedData
 public struct SessionModeChangedData: Codable {
-    public let mode: Mode?
+    public let mode: DefaultPermissionModeEnum?
 
     public enum CodingKeys: String, CodingKey {
         case mode = "mode"
     }
 
-    public init(mode: Mode?) {
+    public init(mode: DefaultPermissionModeEnum?) {
         self.mode = mode
     }
 }
@@ -12436,13 +13325,13 @@ public struct SessionModeChangedEvent: Codable {
 /// tool call, so a replayed session gets its mode back.
 // MARK: - SessionModeChangedEventData
 public struct SessionModeChangedEventData: Codable {
-    public let mode: Mode?
+    public let mode: DefaultPermissionModeEnum?
 
     public enum CodingKeys: String, CodingKey {
         case mode = "mode"
     }
 
-    public init(mode: Mode?) {
+    public init(mode: DefaultPermissionModeEnum?) {
         self.mode = mode
     }
 }
@@ -12628,7 +13517,7 @@ public struct SessionSetChecksResult: Codable {
 /// call. It is kept with the session and is not written to ``config.toml``.
 // MARK: - SessionSetModeParams
 public struct SessionSetModeParams: Codable {
-    public let mode: Mode?
+    public let mode: DefaultPermissionModeEnum?
     public let sessionID: String
 
     public enum CodingKeys: String, CodingKey {
@@ -12636,7 +13525,7 @@ public struct SessionSetModeParams: Codable {
         case sessionID = "session_id"
     }
 
-    public init(mode: Mode?, sessionID: String) {
+    public init(mode: DefaultPermissionModeEnum?, sessionID: String) {
         self.mode = mode
         self.sessionID = sessionID
     }
@@ -12648,7 +13537,7 @@ public struct SessionSetModeParams: Codable {
 /// set it, false when it is the default from ``config.toml``.
 // MARK: - SessionSetModeResult
 public struct SessionSetModeResult: Codable {
-    public let mode: Mode
+    public let mode: DefaultPermissionModeEnum
     public let sessionSetModeResultOverride: Bool
     public let sessionID: String
 
@@ -12658,7 +13547,7 @@ public struct SessionSetModeResult: Codable {
         case sessionID = "session_id"
     }
 
-    public init(mode: Mode, sessionSetModeResultOverride: Bool, sessionID: String) {
+    public init(mode: DefaultPermissionModeEnum, sessionSetModeResultOverride: Bool, sessionID: String) {
         self.mode = mode
         self.sessionSetModeResultOverride = sessionSetModeResultOverride
         self.sessionID = sessionID
@@ -12795,7 +13684,7 @@ public struct SessionSetPlanResult: Codable {
 /// written to ``config.toml``.
 // MARK: - SessionSetRouteParams
 public struct SessionSetRouteParams: Codable {
-    public let mode: Route
+    public let mode: RouteEnum
     public let sessionID: String
 
     public enum CodingKeys: String, CodingKey {
@@ -12803,7 +13692,7 @@ public struct SessionSetRouteParams: Codable {
         case sessionID = "session_id"
     }
 
-    public init(mode: Route, sessionID: String) {
+    public init(mode: RouteEnum, sessionID: String) {
         self.mode = mode
         self.sessionID = sessionID
     }
@@ -12812,7 +13701,7 @@ public struct SessionSetRouteParams: Codable {
 /// The session's route mode after the change.
 // MARK: - SessionSetRouteResult
 public struct SessionSetRouteResult: Codable {
-    public let mode: Route
+    public let mode: RouteEnum
     public let sessionID: String
 
     public enum CodingKeys: String, CodingKey {
@@ -12820,7 +13709,7 @@ public struct SessionSetRouteResult: Codable {
         case sessionID = "session_id"
     }
 
-    public init(mode: Route, sessionID: String) {
+    public init(mode: RouteEnum, sessionID: String) {
         self.mode = mode
         self.sessionID = sessionID
     }
@@ -12907,16 +13796,20 @@ public enum SessionSummaryNotificationMethod: String, Codable {
 /// session: ``user``, ``cli``, ``routine:<name>``. A session never changes it.
 /// ``route`` is the session's route mode. An older daemon leaves it out.
 /// ``plan_first`` is true while the session is in plan first (``session.set_plan``).
+/// ``local_only`` is true while the session's folder stays on this Mac: only a local model
+/// reads its chat. It follows the settings of the moment, so it can change without an event.
+/// An older daemon leaves it out.
 // MARK: - SessionSummaryNotificationParams
 public struct SessionSummaryNotificationParams: Codable {
     public let createdAt: String
     public let cwd: String?
     public let forkedFrom: String?
     public let lastSeq: Int
+    public let localOnly: Bool?
     public let modelProfile: String
     public let origin: String?
     public let planFirst: Bool?
-    public let route: Route?
+    public let route: RouteEnum?
     public let sessionID: String
     public let status: SessionStatus
     public let title: String?
@@ -12927,6 +13820,7 @@ public struct SessionSummaryNotificationParams: Codable {
         case cwd = "cwd"
         case forkedFrom = "forked_from"
         case lastSeq = "last_seq"
+        case localOnly = "local_only"
         case modelProfile = "model_profile"
         case origin = "origin"
         case planFirst = "plan_first"
@@ -12937,11 +13831,12 @@ public struct SessionSummaryNotificationParams: Codable {
         case updatedAt = "updated_at"
     }
 
-    public init(createdAt: String, cwd: String?, forkedFrom: String?, lastSeq: Int, modelProfile: String, origin: String?, planFirst: Bool?, route: Route?, sessionID: String, status: SessionStatus, title: String?, updatedAt: String) {
+    public init(createdAt: String, cwd: String?, forkedFrom: String?, lastSeq: Int, localOnly: Bool?, modelProfile: String, origin: String?, planFirst: Bool?, route: RouteEnum?, sessionID: String, status: SessionStatus, title: String?, updatedAt: String) {
         self.createdAt = createdAt
         self.cwd = cwd
         self.forkedFrom = forkedFrom
         self.lastSeq = lastSeq
+        self.localOnly = localOnly
         self.modelProfile = modelProfile
         self.origin = origin
         self.planFirst = planFirst
@@ -12966,16 +13861,20 @@ public struct SessionSummaryNotificationParams: Codable {
 /// session: ``user``, ``cli``, ``routine:<name>``. A session never changes it.
 /// ``route`` is the session's route mode. An older daemon leaves it out.
 /// ``plan_first`` is true while the session is in plan first (``session.set_plan``).
+/// ``local_only`` is true while the session's folder stays on this Mac: only a local model
+/// reads its chat. It follows the settings of the moment, so it can change without an event.
+/// An older daemon leaves it out.
 // MARK: - SessionSummary
 public struct SessionSummary: Codable {
     public let createdAt: String
     public let cwd: String?
     public let forkedFrom: String?
     public let lastSeq: Int
+    public let localOnly: Bool?
     public let modelProfile: String
     public let origin: String?
     public let planFirst: Bool?
-    public let route: Route?
+    public let route: RouteEnum?
     public let sessionID: String
     public let status: SessionStatus
     public let title: String?
@@ -12986,6 +13885,7 @@ public struct SessionSummary: Codable {
         case cwd = "cwd"
         case forkedFrom = "forked_from"
         case lastSeq = "last_seq"
+        case localOnly = "local_only"
         case modelProfile = "model_profile"
         case origin = "origin"
         case planFirst = "plan_first"
@@ -12996,11 +13896,12 @@ public struct SessionSummary: Codable {
         case updatedAt = "updated_at"
     }
 
-    public init(createdAt: String, cwd: String?, forkedFrom: String?, lastSeq: Int, modelProfile: String, origin: String?, planFirst: Bool?, route: Route?, sessionID: String, status: SessionStatus, title: String?, updatedAt: String) {
+    public init(createdAt: String, cwd: String?, forkedFrom: String?, lastSeq: Int, localOnly: Bool?, modelProfile: String, origin: String?, planFirst: Bool?, route: RouteEnum?, sessionID: String, status: SessionStatus, title: String?, updatedAt: String) {
         self.createdAt = createdAt
         self.cwd = cwd
         self.forkedFrom = forkedFrom
         self.lastSeq = lastSeq
+        self.localOnly = localOnly
         self.modelProfile = modelProfile
         self.origin = origin
         self.planFirst = planFirst
@@ -13027,7 +13928,7 @@ public struct SessionUpdatedData: Codable {
     public let cwd: String?
     public let mcpServers: [String]?
     public let paidOk: Bool?
-    public let route: Route?
+    public let route: RouteEnum?
     public let title: String?
 
     public enum CodingKeys: String, CodingKey {
@@ -13039,7 +13940,7 @@ public struct SessionUpdatedData: Codable {
         case title = "title"
     }
 
-    public init(allowedTools: [FluffySessionAllowance]?, cwd: String?, mcpServers: [String]?, paidOk: Bool?, route: Route?, title: String?) {
+    public init(allowedTools: [FluffySessionAllowance]?, cwd: String?, mcpServers: [String]?, paidOk: Bool?, route: RouteEnum?, title: String?) {
         self.allowedTools = allowedTools
         self.cwd = cwd
         self.mcpServers = mcpServers
@@ -13110,7 +14011,7 @@ public struct SessionUpdatedEventData: Codable {
     public let cwd: String?
     public let mcpServers: [String]?
     public let paidOk: Bool?
-    public let route: Route?
+    public let route: RouteEnum?
     public let title: String?
 
     public enum CodingKeys: String, CodingKey {
@@ -13122,7 +14023,7 @@ public struct SessionUpdatedEventData: Codable {
         case title = "title"
     }
 
-    public init(allowedTools: [TentacledSessionAllowance]?, cwd: String?, mcpServers: [String]?, paidOk: Bool?, route: Route?, title: String?) {
+    public init(allowedTools: [TentacledSessionAllowance]?, cwd: String?, mcpServers: [String]?, paidOk: Bool?, route: RouteEnum?, title: String?) {
         self.allowedTools = allowedTools
         self.cwd = cwd
         self.mcpServers = mcpServers
@@ -14046,10 +14947,10 @@ public struct SkillWriteParams: Codable {
 /// ``dry_run`` is set, and then lists as broken. ``mtime_ns`` is the file's now.
 // MARK: - SkillWriteResult
 public struct SkillWriteResult: Codable {
-    public let errors: [WarningElement]?
+    public let errors: [ErrorElement]?
     public let mtimeNS: Int?
     public let ok: Bool
-    public let warnings: [WarningElement]?
+    public let warnings: [ErrorElement]?
     public let written: Bool
 
     public enum CodingKeys: String, CodingKey {
@@ -14060,7 +14961,7 @@ public struct SkillWriteResult: Codable {
         case written = "written"
     }
 
-    public init(errors: [WarningElement]?, mtimeNS: Int?, ok: Bool, warnings: [WarningElement]?, written: Bool) {
+    public init(errors: [ErrorElement]?, mtimeNS: Int?, ok: Bool, warnings: [ErrorElement]?, written: Bool) {
         self.errors = errors
         self.mtimeNS = mtimeNS
         self.ok = ok
@@ -14070,8 +14971,8 @@ public struct SkillWriteResult: Codable {
 }
 
 /// One problem in a ``SKILL.md``. ``line`` counts from 1, when known.
-// MARK: - WarningElement
-public struct WarningElement: Codable {
+// MARK: - ErrorElement
+public struct ErrorElement: Codable {
     public let line: Int?
     public let message: String
 

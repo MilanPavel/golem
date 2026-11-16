@@ -76,6 +76,7 @@ export const STATUS_PRIORITY = {
   alert: 90,
   title: 80,
   model: 60,
+  local: 59,
   mode: 58,
   plan: 59,
   fresh: 55,
@@ -262,6 +263,8 @@ export function statusSegments(input: {
   cost?: string;
   /** How many files the session changed. The segment is hidden at 0. */
   changedFiles?: number;
+  /** `local only` while the session's folder stays on this Mac. */
+  localOnly?: string;
 }): StatusSegment[] {
   return [
     segment("connection", input.connection, STATUS_PRIORITY.connection, "connection", true),
@@ -271,6 +274,7 @@ export function statusSegments(input: {
     segment("mode", input.mode ?? "", STATUS_PRIORITY.mode, "dim"),
     segment("context", contextLabel(input.context ?? null), STATUS_PRIORITY.context, contextTone(input.context ?? null)),
     segment("plan", input.plan === true ? "◇ plan" : "", STATUS_PRIORITY.plan, "fresh"),
+    segment("local", input.localOnly ?? "", STATUS_PRIORITY.local, "warn"),
     segment("tune", input.tune ?? "", STATUS_PRIORITY.tune, "dim"),
     segment("skills", skillsLabel(input.skills ?? [], input.skippedSkills ?? []), STATUS_PRIORITY.skills, "dim"),
     segment("changed", changedLabel(input.changedFiles ?? 0), STATUS_PRIORITY.changed, "dim"),

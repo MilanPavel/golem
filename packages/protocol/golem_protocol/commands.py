@@ -204,6 +204,9 @@ class SessionSummary(BaseModel):
     session: ``user``, ``cli``, ``routine:<name>``. A session never changes it.
     ``route`` is the session's route mode. An older daemon leaves it out.
     ``plan_first`` is true while the session is in plan first (``session.set_plan``).
+    ``local_only`` is true while the session's folder stays on this Mac: only a local model
+    reads its chat. It follows the settings of the moment, so it can change without an event.
+    An older daemon leaves it out.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -220,6 +223,7 @@ class SessionSummary(BaseModel):
     origin: str = Field(default="user", min_length=1)
     route: RouteMode = "pinned"
     plan_first: bool = False
+    local_only: bool = False
 
 
 class SessionListResult(BaseModel):
@@ -2622,6 +2626,178 @@ class ConfigGetResult(BaseModel):
     permission_mode: PermissionMode = "balanced"
     rules: list[ConfigRule]
     session_allowed: list[ConfigAllowance] = Field(default_factory=list[ConfigAllowance])
+
+
+class RoutingGetParams(BaseModel):
+    """``routing.get``. The routing, budget and context settings as golem uses them."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+
+class RoutingValues(BaseModel):
+    """``[routing]``: the route mode of a new session, when to ask about paid models,
+    the price that splits budget from frontier, and the folders that stay on this Mac."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    mode: Literal["pinned", "local", "auto"]
+    paid: Literal["ask", "always_ask", "never"]
+    budget_max_price: float
+    local_only: list[str]
+
+
+class RoutingLadder(BaseModel):
+    """``[routing.ladder]``. The model named for each tier, null when golem chooses."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    local: str | None = None
+    budget: str | None = None
+    frontier: str | None = None
+
+
+class RoutingRoles(BaseModel):
+    """``[routing.roles]``. Each is ``session`` or a model name."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    titles: str
+    summarise: str
+    explore: str
+
+
+class RoutingBudget(BaseModel):
+    """``[budget]``. Caps in USD, null for no cap."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    daily_usd: float | None = None
+    session_usd: float | None = None
+    over: Literal["local", "ask"]
+
+
+class RoutingContext(BaseModel):
+    """``[context]``. ``window`` is ``auto``, ``ollama`` or a number of tokens."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    window: Literal["auto", "ollama"] | int
+    keep_alive: str | None = None
+    reply_reserve: int
+    clear_at: float
+    clear_to: float
+    compact_at: float
+    keep_results: int
+    keep_turns: int
+
+
+class RoutingPicked(BaseModel):
+    """The model golem would take for each tier when its ``[routing.ladder]`` line is empty,
+    as ``provider/model``, or null when none is ready."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    local: str | None = None
+    budget: str | None = None
+    frontier: str | None = None
+
+
+class RoutingGetResult(BaseModel):
+    """The effective values of the five tables, and what golem picks for an empty tier."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    routing: RoutingValues
+    ladder: RoutingLadder
+    roles: RoutingRoles
+    budget: RoutingBudget
+    context: RoutingContext
+    picked: RoutingPicked
+
+
+class RoutingPatch(BaseModel):
+    """Keys of ``[routing]`` to change. A key left out stays; a null removes the key from the
+    file, so the default applies again."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    mode: Literal["pinned", "local", "auto"] | None = None
+    paid: Literal["ask", "always_ask", "never"] | None = None
+    budget_max_price: float | None = None
+    local_only: list[str] | None = None
+
+
+class RoutingLadderPatch(BaseModel):
+    """Keys of ``[routing.ladder]`` to change. A null removes the key."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    local: str | None = None
+    budget: str | None = None
+    frontier: str | None = None
+
+
+class RoutingRolesPatch(BaseModel):
+    """Keys of ``[routing.roles]`` to change. A null removes the key."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    titles: str | None = None
+    summarise: str | None = None
+    explore: str | None = None
+
+
+class RoutingBudgetPatch(BaseModel):
+    """Keys of ``[budget]`` to change. A null removes the key: no cap, or ``over = local``."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    daily_usd: float | None = None
+    session_usd: float | None = None
+    over: Literal["local", "ask"] | None = None
+
+
+class RoutingContextPatch(BaseModel):
+    """Keys of ``[context]`` to change. A null removes the key."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    window: Literal["auto", "ollama"] | int | None = None
+    keep_alive: str | None = None
+    reply_reserve: int | None = None
+    clear_at: float | None = None
+    clear_to: float | None = None
+    compact_at: float | None = None
+    keep_results: int | None = None
+    keep_turns: int | None = None
+
+
+class RoutingSetParams(BaseModel):
+    """``routing.set``. Change keys of the five tables in the user's ``config.toml``.
+
+    Only the keys sent change, and the file keeps its comments. Every value is checked
+    first, and when any is wrong nothing is written.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    routing: RoutingPatch | None = None
+    ladder: RoutingLadderPatch | None = None
+    roles: RoutingRolesPatch | None = None
+    budget: RoutingBudgetPatch | None = None
+    context: RoutingContextPatch | None = None
+
+
+class RoutingSetResult(BaseModel):
+    """``ok`` is false when a value was wrong, and the file is then untouched. Each error's
+    ``path`` is the setting, as ``context.clear_to``. ``values`` is what ``routing.get``
+    would now answer, set when ``ok``."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    ok: bool
+    errors: list[ConfigError] = Field(default_factory=list[ConfigError])
+    values: RoutingGetResult | None = None
 
 
 class PolicyUpdateParams(BaseModel):

@@ -508,6 +508,7 @@ class ChatRuntime:
         focus: str | None,
         system_chars: int,
         tools_chars: int,
+        local_only: bool = False,
     ) -> Compaction:
         """Clear or summarise the history of an idle session, and store the new context view.
 
@@ -539,6 +540,7 @@ class ChatRuntime:
                 session_id=session_id,
                 profile=profile,
                 options=options,
+                local_only=local_only,
             )
         done = replace(done, window=room)
         if done.view is not None:
@@ -685,6 +687,9 @@ def open_chat(
             child.max_calls
         )
         overrides = _options(config)
+        local_only = _local_only(config)
+        if local_only:
+            router.ensure_local(profile)
         await registry.prepare(scope)
         tools = registry.scoped(scope)
         plan_first = _plan(config)
@@ -738,6 +743,7 @@ def open_chat(
                         session_id=state.get("session_id"),
                         profile=profile,
                         options=overrides,
+                        local_only=local_only,
                     )
                     if summed is not None:
                         current = summed.view
@@ -759,6 +765,7 @@ def open_chat(
                 fitted = await _fit(
                     learned, router, profile, plain, current, system_chars + tools_chars,
                     window.window, clearing, summariser, state.get("session_id"), overrides,
+                    local_only,
                 )  # fmt: skip
                 current = fitted.view
                 for change in fitted.items:
@@ -803,7 +810,10 @@ def open_chat(
                             }
                         )
                     response = await binder.invoke(
-                        profile, router.chat_model(profile, overrides), sent, schemas
+                        profile,
+                        router.chat_model(profile, overrides, local_only=local_only),
+                        sent,
+                        schemas,
                     )
             except Exception as exc:
                 down = router.unreachable(profile, exc) or await router.refused(profile, exc)
@@ -1021,6 +1031,7 @@ async def _summarise_old(
     session_id: str | None,
     profile: str,
     options: Mapping[str, float | str],
+    local_only: bool = False,
 ) -> _Cleared | None:
     """The view that sends a summary of the old turns and its ``context.changed`` item.
 
@@ -1041,6 +1052,7 @@ async def _summarise_old(
             options=options,
             messages=messages[start:end],
             earlier=earlier,
+            local_only=local_only,
         )
     except Exception:
         log.warning("summarising old turns failed", exc_info=True)
@@ -1075,6 +1087,7 @@ async def _fit(
     summariser: Summariser | None,
     session_id: str | None,
     options: Mapping[str, float | str],
+    local_only: bool = False,
 ) -> Fitted:
     """The view that fits ``window`` with the reply reserve, or raises ``ContextFull``."""
 
@@ -1082,7 +1095,7 @@ async def _fit(
         last_turn = settings.model_copy(update={"keep_turns": 1})
         found = await _summarise_old(
             summariser, plain, ctx, last_turn, 0, 1.0,
-            session_id=session_id, profile=profile, options=options,
+            session_id=session_id, profile=profile, options=options, local_only=local_only,
         )  # fmt: skip
         return None if found is None else (found.view, cast(int, found.item["count"]))
 

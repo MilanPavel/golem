@@ -4,6 +4,7 @@ export type CreatedAt = string;
 export type Cwd = string | null;
 export type ForkedFrom = string | null;
 export type LastSeq = number;
+export type LocalOnly = boolean;
 export type ModelProfile = string;
 export type Origin = string;
 export type PlanFirst = boolean;
@@ -26,12 +27,16 @@ export type UpdatedAt = string;
  * session: ``user``, ``cli``, ``routine:<name>``. A session never changes it.
  * ``route`` is the session's route mode. An older daemon leaves it out.
  * ``plan_first`` is true while the session is in plan first (``session.set_plan``).
+ * ``local_only`` is true while the session's folder stays on this Mac: only a local model
+ * reads its chat. It follows the settings of the moment, so it can change without an event.
+ * An older daemon leaves it out.
  */
 export interface SessionSummary {
   created_at: CreatedAt;
   cwd?: Cwd;
   forked_from?: ForkedFrom;
   last_seq: LastSeq;
+  local_only?: LocalOnly;
   model_profile: ModelProfile;
   origin?: Origin;
   plan_first?: PlanFirst;

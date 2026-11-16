@@ -11,6 +11,7 @@ import { ConfigSection } from "./config-section.tsx";
 import { useSettingsContext } from "./context.ts";
 import { KeysSection } from "./keys-section.tsx";
 import { McpSection } from "./mcp-section.tsx";
+import { RoutingSection } from "./routing-section.tsx";
 import { RulesSection } from "./rules-section.tsx";
 import { SECTIONS } from "./sections.ts";
 import { UsageSection } from "./usage-section.tsx";
@@ -44,6 +45,8 @@ function Body({ section }: { section: string }) {
       return <SkillsSection />;
     case "keys":
       return <KeysSection />;
+    case "routing":
+      return <RoutingSection />;
     case "usage":
       return <UsageSection />;
     case "rules":

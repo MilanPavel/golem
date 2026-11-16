@@ -218,8 +218,13 @@ class _KeyedRouter(ModelRouter):
     """Real name resolution, and a scripted model for every name, as if each key were set."""
 
     def chat_model(
-        self, profile: str, overrides: Mapping[str, float | str] | None = None
+        self,
+        profile: str,
+        overrides: Mapping[str, float | str] | None = None,
+        *,
+        local_only: bool = False,
     ) -> BaseChatModel:
+        del local_only
         self.resolve(profile)
         return ScriptedChatModel(replies=[])
 
@@ -685,8 +690,9 @@ class _OneTitle:
         reply: str,
         options: Mapping[str, float | str] | None = None,
         session_id: str | None = None,
+        local_only: bool = False,
     ) -> str:
-        del model_profile, prompt, reply, options, session_id
+        del model_profile, prompt, reply, options, session_id, local_only
         return "Greeting"
 
 

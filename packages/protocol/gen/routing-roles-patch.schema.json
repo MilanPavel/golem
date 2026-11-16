@@ -1,0 +1,44 @@
+{
+  "additionalProperties": false,
+  "description": "Keys of ``[routing.roles]`` to change. A null removes the key.",
+  "properties": {
+    "explore": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Explore"
+    },
+    "summarise": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Summarise"
+    },
+    "titles": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Titles"
+    }
+  },
+  "title": "RoutingRolesPatch",
+  "type": "object"
+}

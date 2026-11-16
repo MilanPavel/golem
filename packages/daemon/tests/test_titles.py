@@ -46,6 +46,7 @@ class _Titles:
         reply: str,
         options: Mapping[str, float | str] | None = None,
         session_id: str | None = None,
+        local_only: bool = False,
     ) -> str:
         self.asked.append((model_profile, prompt, reply))
         proposal = self._proposals.pop(0)
@@ -67,8 +68,9 @@ class _Gated:
         reply: str,
         options: Mapping[str, float | str] | None = None,
         session_id: str | None = None,
+        local_only: bool = False,
     ) -> str:
-        del model_profile, prompt, reply, options, session_id
+        del model_profile, prompt, reply, options, session_id, local_only
         self.asked.set()
         await self.release.wait()
         return self.proposal
@@ -85,8 +87,9 @@ class _Never:
         reply: str,
         options: Mapping[str, float | str] | None = None,
         session_id: str | None = None,
+        local_only: bool = False,
     ) -> str:
-        del model_profile, prompt, reply, options, session_id
+        del model_profile, prompt, reply, options, session_id, local_only
         self.asked.set()
         await asyncio.Event().wait()
         return ""
@@ -290,8 +293,13 @@ class _RecordingRouter(ModelRouter):
         self.model = ScriptedChatModel(replies=["A title"])
 
     def chat_model(
-        self, profile: str, overrides: Mapping[str, float | str] | None = None
+        self,
+        profile: str,
+        overrides: Mapping[str, float | str] | None = None,
+        *,
+        local_only: bool = False,
     ) -> BaseChatModel:
+        del local_only
         self.asked.append((profile, dict(overrides or {})))
         return self.model
 
@@ -386,8 +394,13 @@ async def test_the_title_request_carries_the_session_num_ctx() -> None:
 
     class _Router(ModelRouter):
         def chat_model(
-            self, profile: str, overrides: Mapping[str, float | str] | None = None
+            self,
+            profile: str,
+            overrides: Mapping[str, float | str] | None = None,
+            *,
+            local_only: bool = False,
         ) -> BaseChatModel:
+            del local_only
             model = super().chat_model(profile, overrides)
             object.__setattr__(model, "_async_client", _Client())
             return model
@@ -410,7 +423,10 @@ async def test_a_title_call_sends_the_same_num_ctx_as_the_chat_call() -> None:
     seen: list[object] = []
 
     class _Router(ModelRouter):
-        def chat_model(self, profile: str, overrides: object = None) -> BaseChatModel:
+        def chat_model(
+            self, profile: str, overrides: object = None, *, local_only: bool = False
+        ) -> BaseChatModel:
+            del local_only
             made = super().chat_model(profile, overrides)  # type: ignore[arg-type]
             seen.append(getattr(made, "num_ctx", None))
             return ScriptedChatModel(replies=["A title"])

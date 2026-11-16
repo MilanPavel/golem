@@ -26,7 +26,7 @@ def cut_summary(reply: str | None) -> str | None:
     return f"{text}…" if cut else text
 
 
-def summarize(activity: SessionActivity) -> SessionSummary:
+def summarize(activity: SessionActivity, local_only: bool = False) -> SessionSummary:
     session = activity.session
     return SessionSummary(
         session_id=session.session_id,
@@ -49,6 +49,7 @@ def summarize(activity: SessionActivity) -> SessionSummary:
         origin=session.origin,
         route=session.route,
         plan_first=session.plan_first,
+        local_only=local_only,
     )
 
 

@@ -55,6 +55,9 @@ Some answers in the TUI and the web UI edit `config.toml` for you. golem keeps y
 - `/permissions` changes or removes a rule.
 - `/mcp` turns a server on or off with `enabled`.
 - `/mcp add` and `golem mcp add` add a `[mcp.<name>]` table, and `golem mcp remove` deletes one.
+- Settings → Routing in the web UI changes the routing, budget and context keys.
+
+The web page has a form for `[routing]`, `[routing.ladder]`, `[routing.roles]`, `[budget]` and `[context]`: Settings → Routing ([the web page](./web.md)). It writes the same keys, and a key set back to its default is removed from the file.
 
 ## Secrets stay out of the file
 
@@ -155,7 +158,7 @@ The providers are `openai`, `anthropic`, `google`, `deepseek`, `xai`, `moonshot`
 |---|---|---|
 | `mode` | `"pinned"` | How a chat picks its model. `pinned` uses the model the chat names. `local` uses only models on this Mac. `auto` picks the cheapest model that fits the call |
 | `paid` | `"ask"` | When `auto` wants a paid model: `ask` asks once per chat, `always_ask` asks every time, `never` never uses one |
-| `local_only` | `[]` | Folders whose chats stay on this Mac. Only local models are used there |
+| `local_only` | `[]` | Folders whose chats stay on this Mac, and the folders inside them. Only local models read the chat there: no hosted model is picked, called, or used for a title or summary. In a project's `.golem/config.toml` it is `true` instead of a list, and makes that project's folder local only. See [Keep a folder on this Mac](./models.md#keep-a-folder-on-this-mac). Web tools and MCP servers are not blocked |
 | `budget_max_price` | `1.50` | The most a hosted model may cost, in USD per million tokens, to be in the `budget` tier. The price is blended as `(3 × input + output) / 4`. A model above it, or with no known price, is `frontier`. Ollama models are `local` |
 
 ### `[routing.ladder]`

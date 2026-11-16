@@ -1,0 +1,44 @@
+{
+  "additionalProperties": false,
+  "description": "The model golem would take for each tier when its ``[routing.ladder]`` line is empty,\nas ``provider/model``, or null when none is ready.",
+  "properties": {
+    "budget": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Budget"
+    },
+    "frontier": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Frontier"
+    },
+    "local": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Local"
+    }
+  },
+  "title": "RoutingPicked",
+  "type": "object"
+}

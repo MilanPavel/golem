@@ -257,7 +257,7 @@ export function failureText(data: RunFailure): string {
   if (data.hint != null) {
     parts.push(data.hint);
   }
-  if (data.code != null && data.code !== "budget_spent") {
+  if (data.code != null && data.code !== "budget_spent" && data.code !== "local_only") {
     parts.push(SWITCH_HINT);
   }
   return parts.join(" · ");
@@ -442,7 +442,7 @@ function reduceChatEvent(state: ChatState, event: ChatEvent): ChatState {
         ...notWaiting(stopWriting(state)),
         busy: false,
         error: failureText(event.data),
-        down: event.data.code != null && event.data.code !== "budget_spent" ? (event.data.provider ?? "model") : state.down,
+        down: event.data.code != null && event.data.code !== "budget_spent" && event.data.code !== "local_only" ? (event.data.provider ?? "model") : state.down,
         retry: retryFor(state.messages, event.data),
         runStartedAt: null,
         runId: null,

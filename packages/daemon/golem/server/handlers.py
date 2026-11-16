@@ -58,6 +58,7 @@ from golem.server.dispatcher import (
     KEY_REJECTED,
     KEY_UNCHECKED,
     KEYCHAIN_UNAVAILABLE,
+    LOCAL_ONLY,
     MESSAGE_NOT_FOUND,
     MODEL_NOT_CONFIGURED,
     MODEL_PULL_FAILED,
@@ -86,6 +87,7 @@ from golem.server.mcp_login import mcp_login, mcp_logout
 from golem.server.mcp_model import turn_on
 from golem.server.mcp_try import mcp_call, mcp_logs, mcp_test
 from golem.server.routines import routine_get, routine_list, routine_remove, routine_update
+from golem.server.routing_edit import routing_get, routing_set
 from golem.server.skills_edit import (
     skill_create,
     skill_create_protected,
@@ -233,6 +235,8 @@ from golem_protocol.commands import (
     RoutineListParams,
     RoutineRemoveParams,
     RoutineUpdateParams,
+    RoutingGetParams,
+    RoutingSetParams,
     RunCancelParams,
     RunCancelResult,
     RuntimeInstallCancelParams,
@@ -413,7 +417,9 @@ async def _session_list(ctx: RequestContext, params: SessionListParams) -> Sessi
         found = await sessions.watch(params.limit, ctx.connection)
     else:
         found = await sessions.recent(params.limit, params.cwd)
-    return SessionListResult(sessions=[summarize(item) for item in found])
+    return SessionListResult(
+        sessions=[summarize(item, sessions.local_only(item.session.cwd)) for item in found]
+    )
 
 
 async def _session_fork(ctx: RequestContext, params: SessionForkParams) -> SessionForkResult:
@@ -462,7 +468,8 @@ async def _message_send(ctx: RequestContext, params: MessageSendParams) -> Messa
     except SchemaMismatchError as exc:
         raise RpcCallError(SESSION_NOT_FOUND, str(exc)) from exc
     except ModelConfigError as exc:
-        raise RpcCallError(MODEL_NOT_CONFIGURED, str(exc)) from exc
+        code = LOCAL_ONLY if exc.code == "local_only" else MODEL_NOT_CONFIGURED
+        raise RpcCallError(code, str(exc)) from exc
     except BudgetSpentError as exc:
         raise RpcCallError(BUDGET_SPENT, str(exc)) from exc
     except SkillInvokeError as exc:
@@ -832,7 +839,9 @@ async def _changes_suggest_message(
     try:
         profile = await sessions.model_profile(params.session_id)
         model = sessions.router.chat_model(
-            profile, await sessions.session_options(params.session_id)
+            profile,
+            await sessions.session_options(params.session_id),
+            local_only=sessions.local_only(await sessions.cwd_of(params.session_id)),
         )
         message = await commit_git.suggest(folder, params.paths, model)
     except ToolError as exc:
@@ -840,7 +849,8 @@ async def _changes_suggest_message(
     except commit_git.SuggestError as exc:
         raise RpcCallError(INTERNAL_ERROR, str(exc)) from exc
     except ModelConfigError as exc:
-        raise RpcCallError(MODEL_NOT_CONFIGURED, str(exc)) from exc
+        code = LOCAL_ONLY if exc.code == "local_only" else MODEL_NOT_CONFIGURED
+        raise RpcCallError(code, str(exc)) from exc
     except SessionNotFoundError as exc:
         raise RpcCallError(SESSION_NOT_FOUND, "session not found") from exc
     except SchemaMismatchError as exc:
@@ -1785,6 +1795,8 @@ def standard_methods() -> dict[str, Method]:
         "config.raw.set_protected": Method(
             "config.raw.set_protected", ConfigRawSetParams, True, config_raw_set_protected
         ),
+        "routing.get": Method("routing.get", RoutingGetParams, True, routing_get),
+        "routing.set": Method("routing.set", RoutingSetParams, True, routing_set),
         "skill.list": Method("skill.list", SkillListParams, True, _skill_list),
         "skill.read": Method("skill.read", SkillReadParams, True, skill_read),
         "skill.write": Method("skill.write", SkillWriteParams, True, skill_write),

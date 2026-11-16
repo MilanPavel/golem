@@ -248,6 +248,8 @@ The default model and `model.list` are in [Talking to models](./models.md#the-mo
 
 `cost.get` answers "what did I spend", from the `model_calls` table ([The usage table](./sessions.md#the-usage-table)). It takes an optional `session_id` and does not call a model. The result has `today` and `week` (the last 7 local days), and `session` when a session was asked for. Each is `{calls, input, output, cost_usd, saved_usd}`. `by_model` lists `{provider, model, tier, calls, input, output, cost_usd}` for the week, the dearest first. `by_day` has `{day, local_tokens, paid_tokens, cost_usd}` for each of the 7 days, oldest first. `saved_usd` prices the tokens of `local` calls at a reference model, the cheapest `budget`-tier model in the model list that does not refuse tools, and `saved_reference` names it, or is null when there is none. A browser may call it. `model.call.started` has a `tier`.
 
+`routing.get` and `routing.set` are the typed way to read and change `[routing]`, `[routing.ladder]`, `[routing.roles]`, `[budget]` and `[context]`, and a browser may call both. `routing.get` takes no params. Its result has the five tables as `routing`, `ladder`, `roles`, `budget` and `context` (the values golem uses, defaults included), and `picked`, the model golem would take in each tier, as `provider/model` or null, when the `ladder` line is empty. `routing.set` takes a partial of each table. A key left out stays, and a null removes the key from the file so its default applies again. Every value is checked with the same models the settings load with, and a model named in the ladder or in a role must exist, and a ladder line must hold a model of its own tier. When anything is wrong the result is `{ok: false, errors}`, each error a `{path, message}` with the setting's path such as `context.clear_to`, and nothing is written. Otherwise the file is edited with its comments kept, and the result is `{ok: true, values}` with what `routing.get` would now answer. The router reads the file again at its next call, so no restart is needed.
+
 The `model.call.started` and `model.call.completed` events, and the `trace.get` and `trace.span` commands, are in [Tracing](./tracing.md#the-details).
 
 ### Why a protocol package
@@ -281,6 +283,7 @@ Adding a message is the same every time. Add a class, run `just gen`, and the cl
 | `-32014`, `-32015` | key rejected, key unchecked | `auth.set` |
 | `-32016` | Ollama failed | |
 | `-32017` | budget spent | `message.send` on a paid model while a cap in `[budget]` is spent |
+| `-32018` | local only | `message.send` on a hosted model in a folder that stays on this Mac |
 | `-32020` | not allowed from the browser | Sent by the gateway, never by the daemon |
 
 ### Limits

@@ -14,6 +14,7 @@ event except deltas, read in the same lock, so summaries arrive in order.
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Callable
 from datetime import UTC, datetime
 
 from pydantic import BaseModel
@@ -41,6 +42,8 @@ class SessionLog:
         self._events = events
         self._bus = bus
         self._records = records
+        self.local_only: Callable[[str | None], bool] = lambda _cwd: False
+        """Says whether a folder stays on this Mac, for the summaries."""
         self._seq: dict[str, int] = {}
         self._locks: dict[str, asyncio.Lock] = {}
 
@@ -124,7 +127,9 @@ class SessionLog:
             if event.type not in _DELTAS and self._bus.watched:
                 activity = await self._records.activity(session_id)
                 if activity is not None:
-                    self._bus.publish_summary(summarize(activity))
+                    self._bus.publish_summary(
+                        summarize(activity, self.local_only(activity.session.cwd))
+                    )
             return event
 
     async def _last(self, session_id: str) -> int:

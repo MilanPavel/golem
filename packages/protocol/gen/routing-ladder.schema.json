@@ -1,0 +1,44 @@
+{
+  "additionalProperties": false,
+  "description": "``[routing.ladder]``. The model named for each tier, null when golem chooses.",
+  "properties": {
+    "budget": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Budget"
+    },
+    "frontier": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Frontier"
+    },
+    "local": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Local"
+    }
+  },
+  "title": "RoutingLadder",
+  "type": "object"
+}

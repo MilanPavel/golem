@@ -1,10 +1,10 @@
-import { forkPoint, type TodoItem } from "@golem/view";
+import { forkPoint, LOCAL_ONLY_HINT, localOnlyLabel, type TodoItem } from "@golem/view";
 import { INSPECTOR_ID, InspectorPanel } from "../trace/index.ts";
 import { useEffect, useMemo, useRef, type ReactNode, type Ref, type RefObject } from "react";
 import { Badge, badgeVariants } from "../../ui/badge.tsx";
 import { cn } from "../../ui/cn.ts";
 import { Button } from "../../ui/button.tsx";
-import { FolderIcon, InspectIcon, PanelIcon } from "../../ui/icons.tsx";
+import { FolderIcon, InspectIcon, LockIcon, PanelIcon } from "../../ui/icons.tsx";
 import { PixelGolem } from "../../ui/pixel-golem.tsx";
 import { useChangedFiles, useNavigate, useRememberOpenedFolder, useRoute, useSession, useSessionList } from "../../store/page-context.tsx";
 import { inspectPath, sessionPath } from "../../store/router.ts";
@@ -290,6 +290,12 @@ export function SessionFrame({ id, children }: { id: string; children: ReactNode
             <Badge title={cwd ?? undefined}>
               <FolderIcon className="size-3" />
               {folderName(cwd)}
+            </Badge>
+          )}
+          {localOnlyLabel(summary) === "" ? null : (
+            <Badge title={LOCAL_ONLY_HINT}>
+              <LockIcon className="size-3" />
+              {localOnlyLabel(summary)}
             </Badge>
           )}
           {route.name === "session" ? (

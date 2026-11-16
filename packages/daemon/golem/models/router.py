@@ -55,7 +55,15 @@ NO_MODEL = "no model chosen yet"
 
 
 class ModelConfigError(Exception):
-    """The model name, provider, or API key is missing or unknown."""
+    """The model name, provider, or API key is missing or unknown.
+
+    ``code`` is ``local_only`` when a chat that stays on this Mac was about to use a hosted
+    model. It is None for every other failure.
+    """
+
+    def __init__(self, message: str = "", *, code: Literal["local_only"] | None = None) -> None:
+        super().__init__(message)
+        self.code = code
 
 
 @dataclass(frozen=True, slots=True)
@@ -245,17 +253,43 @@ class ModelRouter:
             profile=active, provider=resolved.provider_name, name=resolved.model_id
         )
 
+    def ensure_local(self, profile: str) -> None:
+        """Raise a ``local_only`` :class:`ModelConfigError` when ``profile`` is a hosted model.
+
+        A test double and a name that does not resolve pass here: the double never reaches
+        a provider, and the name fails on its own in :meth:`chat_model`.
+        """
+        if self._model is not None:
+            return
+        try:
+            resolved = self.resolve(profile)
+        except ModelConfigError:
+            return
+        if resolved.provider_name != "ollama" and resolved.provider.kind != "ollama":
+            raise ModelConfigError(
+                f"this chat stays on this Mac: {resolved.ref} is a hosted model",
+                code="local_only",
+            )
+
     def chat_model(
-        self, profile: str, overrides: Mapping[str, float | str] | None = None
+        self,
+        profile: str,
+        overrides: Mapping[str, float | str] | None = None,
+        *,
+        local_only: bool = False,
     ) -> BaseChatModel:
         """Return the chat model for ``profile``.
 
         An Ollama model gets the options saved for it in ``config.toml``, and
         then ``overrides``, which win. Other providers ignore both.
 
-        Raises :class:`ModelConfigError` when the name does not resolve or the
-        provider's API key is not set.
+        With ``local_only`` a hosted model is refused, whatever asked for it.
+
+        Raises :class:`ModelConfigError` when the name does not resolve, the
+        provider's API key is not set, or ``local_only`` meets a hosted model.
         """
+        if local_only:
+            self.ensure_local(profile)
         if self._model is not None:
             if profile != self.profile_name:
                 raise ModelConfigError(f"unknown model: {profile}")

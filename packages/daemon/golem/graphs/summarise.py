@@ -229,18 +229,19 @@ class Summariser:
         self._window_of = window_of
         self._paid_ok = paid_ok
 
-    def _role(self, session_profile: str) -> RoleModel:
+    def _role(self, session_profile: str, local_only: bool = False) -> RoleModel:
         return for_role(
             "summarise",
             session_profile=session_profile,
             settings=self._router.roles(),
             tier_of_profile=self._tier_of or (lambda _profile: None),
             budget_models=self._budget_refs() if self._budget_refs else [],
+            local_only=local_only,
         )
 
-    def model_name(self, session_profile: str) -> str:
+    def model_name(self, session_profile: str, local_only: bool = False) -> str:
         """The name of the model that would write a summary for a session on this profile."""
-        profile = self._role(session_profile).profile
+        profile = self._role(session_profile, local_only).profile
         return self._router.identity(profile).name or profile
 
     async def make(
@@ -252,9 +253,16 @@ class Summariser:
         messages: Sequence[BaseMessage],
         earlier: str | None,
         focus: str | None = None,
+        local_only: bool = False,
     ) -> str:
-        """The summary of ``messages``, built on ``earlier``. Raises when the call fails."""
-        role = self._role(session_profile)
+        """The summary of ``messages``, built on ``earlier``. Raises when the call fails.
+
+        With ``local_only`` only a local model writes it. When there is none, this raises a
+        ``local_only`` :class:`~golem.models.router.ModelConfigError` before anything is sent.
+        """
+        role = self._role(session_profile, local_only)
+        if local_only:
+            self._router.ensure_local(role.profile)
         paid = self._tier_of is not None and self._tier_of(role.profile) not in (None, "local")
         if paid and self._paid_ok is not None and not await self._paid_ok(session_id):
             raise BudgetSpent(
@@ -269,7 +277,7 @@ class Summariser:
         window = None if self._window_of is None else self._window_of(role.profile, overrides)
         reserve = self._router.context_settings().reply_reserve
         room = None if window is None else max(1, window - reserve)
-        model = self._router.chat_model(role.profile, overrides)
+        model = self._router.chat_model(role.profile, overrides, local_only=local_only)
         held = None if self._gate is None or server is None else server[1]
         gate = self._gate or ServerGate()
         try:

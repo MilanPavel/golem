@@ -12,6 +12,25 @@ export {
 } from "./compact.ts";
 export { branchLine, COMMIT_NOTE, commitTitle, committedLine, failureTail, FAILURE_LINES, SUGGESTING, withSuggestion } from "./commit.ts";
 export { REPLY_CUT_NOTE, replyWasCut } from "./stop.ts";
+export {
+  LADDER_TIERS,
+  LOCAL_ONLY_CAPTION,
+  OVER_CHOICES,
+  PAID_CHOICES,
+  ROLES,
+  ROUTE_MODES,
+  parseAmount,
+  parsePercent,
+  pickedLine,
+  toPercent,
+  windowCaption,
+  windowSize,
+  type OverChoice,
+  type PaidChoice,
+  type Parsed,
+  type RouteMode,
+  type RoutingChoice,
+} from "./routing.ts";
 export { costReportLines, formatCost, formatCount, referenceName, sessionCostLabel, turnFooterParts, turnTotals, type TurnTotals } from "./cost.ts";
 export { groupTurns, turnFooter, type Turn } from "./turns.ts";
 export { editedArgs, parseArgs, type ParsedArgs } from "./approval-args.ts";
@@ -253,6 +272,7 @@ export {
   type TryField,
 } from "./mcp-try.ts";
 export { applySuggestion, moveSuggestion, suggest, type Suggestion, type SuggestCommand } from "./suggest.ts";
+export { LOCAL_ONLY_HINT, LOCAL_ONLY_LABEL, localOnlyLabel } from "./local-only.ts";
 export { connectionLabel, serviceProblem, type ServiceProblem } from "./connection.ts";
 export {
   diffCounts,

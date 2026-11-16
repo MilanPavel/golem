@@ -33,6 +33,8 @@ from golem.models.cost import cost_usd
 from golem.models.errors import BUDGET_HINT
 from golem.models.facts import FactsSource, ModelFacts
 from golem.models.pick import Choice, Rejected, Traits, ladder, pick
+from golem.models.privacy import LOCAL_ONLY_REFUSAL, is_local_only
+from golem.models.project_privacy import project_local_only
 from golem.models.router import ModelConfigError, ModelIdentity, ModelRouter
 from golem.models.tiers import Tier
 from golem.models.window_plan import should_grow
@@ -300,6 +302,7 @@ class SessionManager:
         self._records = records
         self._run_records = runs
         self._titles = titles
+        events.local_only = self.local_only
         self.facts: FactsSource | None = None
         """Where a routed turn reads the facts of the models. None: it has none."""
         self.budget: Budget | None = None
@@ -490,6 +493,7 @@ class SessionManager:
                 focus=focus,
                 system_chars=len(system),
                 tools_chars=len(json.dumps(schemas, sort_keys=True, separators=(",", ":"))),
+                local_only=self.local_only(session.cwd),
             )
             if done.view is not None:
                 await self._events.emit(
@@ -906,16 +910,20 @@ class SessionManager:
             if await self._run_records.waiting(session_id) is not None:
                 raise SessionBusyError(session_id)
             room = None if self.budget is None else await self.budget.room(session_id)
+            # The folder may come with this message, so it is known before the model is chosen.
+            folder = session.cwd if session.cwd is not None else cwd
+            local_only = self.local_only(folder)
             routed = _Routed(session.model_profile, None)
             if session.route != "pinned":
-                routed = await self._route(session, text, room)
+                routed = await self._route(session, text, room, local_only=local_only)
+            elif local_only:
+                self._refuse_hosted(routed.profile)
             if routed.ask is None:
                 self._check_budget(routed.profile, room)
-            self._runtime.router.chat_model(routed.profile)
+            self._runtime.router.chat_model(routed.profile, local_only=local_only)
             growth = None
             if routed.ask is None:
                 growth = await self._growth_for(session, routed.profile)
-            folder = session.cwd if session.cwd is not None else cwd
             invocation = None if skill is None else self._invoke(session_id, folder, skill)
             if session.cwd is None and cwd is not None:
                 await self._events.emit(
@@ -931,6 +939,7 @@ class SessionManager:
                 skill=invocation,
                 typed=None if invocation is None else text,
                 growth=growth,
+                local_only=local_only,
             )
             if routed.ask is not None:
                 await ask_consent(self._runtime, self._events, turn, routed.ask)
@@ -951,6 +960,7 @@ class SessionManager:
         typed: str | None,
         begun: bool = False,
         growth: Growth | None = None,
+        local_only: bool = False,
     ) -> Turn:
         return Turn(
             session_id=session.session_id,
@@ -971,7 +981,7 @@ class SessionManager:
             permission_mode=session.permission_mode,
             checks=session.checks,
             plan_first=session.plan_first,
-            local_only=session.route == "local",
+            local_only=local_only or session.route == "local",
             pins=session.pins,
             routed=routed.choice,
             begun=begun,
@@ -1011,8 +1021,9 @@ class SessionManager:
                 session.paid_ok = True
             room = None if self.budget is None else await self.budget.room(session_id)
             try:
-                routed = await self._route(session, pending.text, room, answer)
-                self._runtime.router.chat_model(routed.profile)
+                local_only = self.local_only(session.cwd)
+                routed = await self._route(session, pending.text, room, answer, local_only)
+                self._runtime.router.chat_model(routed.profile, local_only=local_only)
             except _NoLocalFit as exc:
                 fit = exc.choice.reason == "fit"
                 failed = RunFailedData(
@@ -1043,6 +1054,7 @@ class SessionManager:
                 typed=None,
                 begun=True,
                 growth=await self._growth_for(session, routed.profile),
+                local_only=local_only,
             )
             if answer == "once" and room is not None and room.spent and self.budget is not None:
                 self.budget.exempt(session_id)
@@ -1166,12 +1178,30 @@ class SessionManager:
         limit = cap.daily_usd if room.cap == "day" else cap.session_usd
         return f"{spent_text(room)}: ${spent:.2f} of ${limit or 0:.2f}; {BUDGET_HINT}"
 
+    def local_only(self, cwd: str | None) -> bool:
+        """Whether chats in ``cwd`` stay on this Mac.
+
+        True when ``[routing] local_only`` lists the folder or one above it, or a project
+        file at or above it sets the flag. Read from the current files, so a change applies
+        to the next turn.
+        """
+        listed = self._runtime.router.routing_settings().local_only
+        return is_local_only(cwd, listed, project_local_only(cwd))
+
+    def _refuse_hosted(self, profile: str) -> None:
+        """Raise a ``local_only`` error when ``profile`` is a hosted model."""
+        try:
+            self._runtime.router.ensure_local(profile)
+        except ModelConfigError as exc:
+            raise ModelConfigError(LOCAL_ONLY_REFUSAL, code="local_only") from exc
+
     async def _route(
         self,
         session: _LiveSession,
         text: str,
         room: Room | None = None,
         answer: ConsentAnswer | None = None,
+        local_only: bool = False,
     ) -> _Routed:
         """The profile this turn runs on, and why. Reads cached facts, never the network.
 
@@ -1183,6 +1213,8 @@ class SessionManager:
         Raises :class:`~golem.models.router.ModelConfigError` on route ``local`` when the
         session's model is hosted and no local model passes, and on ``auto`` when only a paid
         model is left and paid models are off. Raises :class:`_NoLocalFit` for ``local``.
+        In a local-only folder it raises with the code ``local_only`` when only a hosted
+        model is left.
         """
         router = self._runtime.router
         settings = router.routing_settings()
@@ -1199,12 +1231,14 @@ class SessionManager:
             prompt_tokens=prompt,
             reply_reserve=reserve,
             needs_tools=True,
-            local_only=session.route == "local",
+            local_only=local_only or session.route == "local",
             paid_allowed=yes or (session.paid_ok and settings.paid != "always_ask"),
             paid_room_usd=None if room is None or yes or (over_ask and interactive) else room.usd,
         )
         why_left = None
-        if answer == "local":
+        if local_only:
+            why_left = "this folder is local only"
+        elif answer == "local":
             why_left = "you chose to stay local"
         elif settings.paid == "never" or not interactive:
             why_left = "paid models are turned off"
@@ -1233,6 +1267,8 @@ class SessionManager:
         tier = own.tier if own is not None else None
         if tier is None and self._runtime.tier_of is not None:
             tier = self._runtime.tier_of(session.model_profile)
+        if local_only:
+            self._refuse_hosted(session.model_profile)
         if session.route == "local" and tier != "local":
             raise ModelConfigError(
                 "this session is local only and has no local model; pick one with /model"
@@ -1402,7 +1438,7 @@ class SessionManager:
                 permission_mode=session.permission_mode,
                 checks=session.checks,
                 plan_first=session.plan_first,
-                local_only=session.route == "local",
+                local_only=self.local_only(session.cwd) or session.route == "local",
                 pins=session.pins,
             )
             control = RunControl()
@@ -1634,7 +1670,14 @@ class SessionManager:
             if self.budget is not None:
                 self.budget.restore(session.session_id)
         await self._ended(session.session_id, turn.run_id, reply)
-        self._title_after(session, turn.typed or turn.text, reply)
+        self._title_after(
+            session,
+            turn.typed or turn.text,
+            reply,
+            local_only=turn.local_only,
+            # A routed turn may run on another model than the session's own.
+            profile=turn.model_profile if turn.local_only else None,
+        )
 
     async def _resumed(
         self, session: _LiveSession, resume: Resume, control: RunControl, prompt: str | None
@@ -1646,7 +1689,7 @@ class SessionManager:
             raise
         await self._ended(resume.session_id, resume.run_id, reply)
         if prompt is not None:
-            self._title_after(session, prompt, reply)
+            self._title_after(session, prompt, reply, local_only=resume.local_only)
 
     async def _ended(self, session_id: str, run_id: str, reply: str | None) -> None:
         """Store ``session.completed`` when a run of a headless session ended.
@@ -1677,28 +1720,43 @@ class SessionManager:
             ),
         )
 
-    def _title_after(self, session: _LiveSession, prompt: str, reply: str | None) -> None:
+    def _title_after(
+        self,
+        session: _LiveSession,
+        prompt: str,
+        reply: str | None,
+        *,
+        local_only: bool = False,
+        profile: str | None = None,
+    ) -> None:
         if reply is None or self._titles is None or session.title is not None or session.titling:
             return
         session.titling = True
         task = asyncio.create_task(
-            self._name(session, self._titles, prompt, reply),
+            self._name(session, self._titles, prompt, reply, local_only, profile),
             name=f"golem-title-{session.session_id}",
         )
         self._naming.add(task)
         task.add_done_callback(self._named)
 
     async def _name(
-        self, session: _LiveSession, titles: TitleGenerator, prompt: str, reply: str
+        self,
+        session: _LiveSession,
+        titles: TitleGenerator,
+        prompt: str,
+        reply: str,
+        local_only: bool,
+        profile: str | None,
     ) -> None:
         try:
             title = await choose_title(
                 titles,
-                model_profile=session.model_profile,
+                model_profile=profile or session.model_profile,
                 prompt=prompt,
                 reply=reply,
                 options=dict(session.options),
                 session_id=session.session_id,
+                local_only=local_only,
             )
             async with self._lock:
                 if session.title is None and not session.closed:
