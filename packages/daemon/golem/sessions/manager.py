@@ -50,14 +50,25 @@ from golem.sessions.runner import (
 )
 from golem.sessions.summaries import cut_summary
 from golem.sessions.titles import TitleGenerator, choose_title, clean_title, fork_title
-from golem.sessions.trace import build_trace, filled_window, read_span, with_windows
+from golem.sessions.trace import (
+    build_trace,
+    context_events,
+    filled_window,
+    read_span,
+    with_windows,
+)
 from golem.skills.invoke import Invocation, SkillInvokeError, invoke
 from golem.skills.pinned import PinMemory, SkillPinError, pinnable, pinned_folders
 from golem.skills.registry import SkillRegistry
 from golem.store.blobs import BlobStore
 from golem.store.records import RunRecords, SessionActivity, SessionRecords
 from golem.tools.registry import ToolError, ToolScope
-from golem_protocol.commands import SessionCompactResult, TraceRunSpan, TraceSpanResult
+from golem_protocol.commands import (
+    SessionCompactResult,
+    TraceContextEvent,
+    TraceRunSpan,
+    TraceSpanResult,
+)
 from golem_protocol.events import (
     ApprovalDecision,
     ChatEvent,
@@ -428,6 +439,7 @@ class SessionManager:
                         before_tokens=done.before_tokens,
                         after_tokens=done.after_tokens,
                         count=done.messages,
+                        room=done.window,
                     ),
                 )
         finally:
@@ -458,6 +470,15 @@ class SessionManager:
                     runs, lambda name: window_of(name, None).window, session.model_profile
                 )
             return session.title, runs
+
+    async def trace_context_events(self, session_id: str) -> list[TraceContextEvent]:
+        """The session's ``context.changed`` events, for the trace.
+
+        Raises :class:`SessionNotFoundError` and :class:`SchemaMismatchError`.
+        """
+        async with self._lock:
+            await self._resolve(session_id)
+            return context_events(await self._events.stored(session_id))
 
     async def trace_span(self, session_id: str, span_id: str) -> TraceSpanResult:
         """The input and output of one span, with the stored system prompt and tools.
@@ -506,6 +527,8 @@ class SessionManager:
                 messages=found.result.messages,
                 cleared_ids=found.cleared_ids,
                 summary_chars=found.summary_chars,
+                window_planned=found.window_planned,
+                reserve=self._reply_reserve(),
             )
             updates["context"] = context.model_copy(
                 update={
@@ -517,6 +540,13 @@ class SessionManager:
             )
             updates["messages"] = sized
         return found.result.model_copy(update=updates)
+
+    def _reply_reserve(self) -> int:
+        runtime = self._runtime
+        settings = runtime.context
+        if settings is None:
+            settings = runtime.router.context_settings()
+        return settings.reply_reserve
 
     async def _blob(self, sha256: str | None) -> str | None:
         if sha256 is None or self._blobs is None:

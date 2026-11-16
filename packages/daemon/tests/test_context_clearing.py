@@ -211,6 +211,8 @@ async def test_the_trace_counts_a_cleared_result_as_its_stub(
     assert result.context.cleared.tokens > 0
     stubs = [m for m in result.messages if m.id in set(last.cleared_ids)]
     assert all(m.text.startswith("[cleared to save context: read_file") for m in stubs)
+    assert all(m.original is not None and len(m.original) > len(m.text) for m in stubs)
+    assert result.context.reserve == SETTINGS.reply_reserve
 
     first = await chat.manager.trace_span(chat.session_id, starts[0].message_id)
     assert first.context is not None
@@ -239,3 +241,22 @@ async def test_each_call_shows_only_the_results_cleared_at_that_call(
         ids = set(start.cleared_ids)
         for m in span.messages:
             assert m.text.startswith("[cleared to save") == (m.id in ids)
+
+
+async def test_the_trace_lists_each_change_with_the_call_right_after_it(
+    database: Database, project: Path
+) -> None:
+    model = _Counting(replies=[*_reads(13), "done"])
+    chat = _chat(database, model, SETTINGS)
+    events = await _run(chat, project)
+
+    changed = [e for e in events if isinstance(e, ContextChangedEvent)]
+    listed = await chat.manager.trace_context_events(chat.session_id)
+    assert [e.seq for e in listed] == [e.seq for e in changed]
+    assert listed[0].action == "cleared"
+    assert listed[0].room == WINDOW - SETTINGS.reply_reserve
+    after = next(
+        e for e in events if isinstance(e, ModelCallStartedEvent) and e.seq > listed[0].seq
+    )
+    assert listed[0].call_id == after.data.message_id
+    assert listed[0].run_id == changed[0].run_id

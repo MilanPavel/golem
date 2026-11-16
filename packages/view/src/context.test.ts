@@ -7,6 +7,10 @@ import {
   clearedNote,
   cutNote,
   contextCells,
+  contextChangedNote,
+  contextRoom,
+  PLANNED_CUT_NOTE,
+  summaryOfLine,
   contextGrid,
   contextReportLines,
   contextLevel,
@@ -351,4 +355,61 @@ test("clearedNote: says how many results were cleared at the call, nothing when 
   assert.equal(clearedNote({ cleared: { count: 0, tokens: 0 } }), null);
   assert.equal(clearedNote({ cleared: { count: 1, tokens: 900 } }), "1 old tool result was sent as one line at this call, saving ≈900.");
   assert.equal(clearedNote({ cleared: { count: 5, tokens: 1200 } }), "5 old tool results were sent as one line at this call, saving ≈1.2K.");
+});
+
+test("contextChangedNote: cleared, summarised and grew, in percent of the room or in tokens", () => {
+  assert.equal(
+    contextChangedNote({ action: "cleared", before_tokens: 7100, after_tokens: 3800, count: 12, room: 10000 }),
+    "golem cleared 12 old tool results · ctx 71% → 38%",
+  );
+  assert.equal(
+    contextChangedNote({ action: "summarised", before_tokens: 8400, after_tokens: 3100, count: 9, room: 10000 }),
+    "golem summarised 9 earlier turns · ctx 84% → 31%",
+  );
+  assert.equal(
+    contextChangedNote({ action: "cleared", before_tokens: 22700, after_tokens: 12100, count: 1 }),
+    "golem cleared 1 old tool result · ctx 22.7K → 12.1K",
+  );
+  assert.equal(
+    contextChangedNote({ action: "grew", window_from: 32768, window_to: 65536, reload_ms: 8200 }),
+    "window grew 32K → 64K · reloaded in 8 s",
+  );
+  assert.equal(contextChangedNote({ action: "grew", window_from: 32000, window_to: 64000 }), "window grew 32K → 64K");
+});
+
+test("contextRoom and contextCells: parts, free and the reply reserve add up to the window", () => {
+  const ctx = context({ used: 600, window: 1000, reserve: 100, parts: [part("user", 600)] });
+  assert.deepEqual(contextRoom(ctx), { free: 300, reserve: 100 });
+  const cells = contextCells(ctx.parts, 1000, 10, 100);
+  assert.equal(cells.reduce((sum, cell) => sum + cell.cells, 0), 10);
+  assert.deepEqual(cells.filter((cell) => cell.cells > 0), [
+    { key: "user", cells: 6 },
+    { key: "free", cells: 3 },
+    { key: "reserve", cells: 1 },
+  ]);
+  assert.equal(contextBar(ctx.parts, 1000, 10, 100), "██████░░░▒");
+  assert.equal(contextRoom(context({ used: 900, window: 1000, reserve: 400, parts: [part("user", 900)] }))?.reserve, 100);
+  assert.equal(contextRoom(context({ window: null })), null);
+});
+
+test("/context lists summary, cleared and the reserve", () => {
+  const ctx = context({
+    used: 6000,
+    window: 10000,
+    reserve: 1000,
+    parts: [part("system", 1000), part("tool_results", 4000), part("summary", 1000)],
+    cleared: { count: 12, tokens: 11200 },
+  });
+  const text = contextReport({ kind: "ready", model: "m", context: ctx }, 60).join("\n");
+  assert.match(text, /Summary\s+1\.0K/);
+  assert.match(text, /Free\s+3\.0K/);
+  assert.match(text, /Reply reserve\s+1\.0K/);
+  assert.match(text, /Cleared · 12 tool results · 11\.2K not sent/);
+});
+
+test("cutNote says it should not happen when the window was planned", () => {
+  assert.equal(cutNote({ prompt_cut: "yes", dropped_message_ids: [] }, true)?.text, PLANNED_CUT_NOTE);
+  assert.match(cutNote({ prompt_cut: "yes", dropped_message_ids: [] })?.text ?? "", /Ollama dropped older messages/);
+  assert.equal(cutNote({ prompt_cut: "no" }, true), null);
+  assert.equal(summaryOfLine(9), "summary of 9 earlier messages");
 });

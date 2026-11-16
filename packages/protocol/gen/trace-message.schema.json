@@ -26,6 +26,18 @@
       "default": null,
       "title": "Id"
     },
+    "original": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Original"
+    },
     "role": {
       "enum": [
         "user",

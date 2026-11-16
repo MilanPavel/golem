@@ -6,6 +6,7 @@ import type { ChatEvent } from "@golem/client";
 import {
   appendDelta,
   forkPoint,
+  noticesAfter,
   downloadEnded,
   SHUTDOWN_NOTICE,
   skippedNotice,
@@ -1060,4 +1061,37 @@ test("model.waiting shows the local-model wait, and the first token, the end of 
     assert.equal(reduceChat(on, { ...base, seq: 3, type, data: type === "run.cancelled" ? { reason: "user" } : {} } as ChatEvent).localWait, false);
   }
   assert.equal(emptyChat.localWait, false);
+});
+
+function contextEvent(seq: number, data: Extract<ChatEvent, { type: "context.changed" }>["data"]): ChatEvent {
+  return event({ seq, session_id: "s", run_id: null, ts: "t", type: "context.changed", data });
+}
+
+test("context.changed becomes a notice after the message it followed, and no message", () => {
+  let state = reduceChat(
+    emptyChat,
+    event({ seq: 1, session_id: "s", run_id: "r", ts: "t", type: "message.completed", data: { message_id: "u", role: "user", text: "hi" } }),
+  );
+  state = reduceChat(state, contextEvent(2, { action: "cleared", before_tokens: 710, after_tokens: 380, count: 12, room: 1000 }));
+  state = reduceChat(state, contextEvent(3, { action: "summarised", before_tokens: 840, after_tokens: 310, count: 9, room: 1000 }));
+  assert.equal(state.messages.length, 1);
+  assert.deepEqual(
+    state.notices.map((n) => [n.afterId, n.action, n.text]),
+    [
+      ["u", "cleared", "golem cleared 12 old tool results · ctx 71% → 38%"],
+      ["u", "summarised", "golem summarised 9 earlier turns · ctx 84% → 31%"],
+    ],
+  );
+  assert.equal(state.clearedNow, 12);
+  assert.deepEqual(noticesAfter(state.notices, "u", true).map((n) => n.action), ["summarised"]);
+  assert.equal(noticesAfter(state.notices, null).length, 0);
+  state = reduceChat(state, event({ seq: 4, session_id: "s", run_id: "r2", ts: "t", type: "run.started", data: {} } as ChatEvent));
+  assert.equal(state.clearedNow, 0);
+  assert.equal(state.notices.length, 2);
+});
+
+test("a notice before any message is at the top", () => {
+  const state = reduceChat(emptyChat, contextEvent(1, { action: "grew", window_from: 32768, window_to: 65536, reload_ms: 8000 }));
+  assert.equal(state.notices[0]?.afterId, null);
+  assert.equal(state.notices[0]?.text, "window grew 32K → 64K · reloaded in 8 s");
 });

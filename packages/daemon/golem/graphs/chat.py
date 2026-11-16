@@ -572,7 +572,7 @@ def open_chat(
                 if cleared is not None:
                     current = cleared.view
                     used = cast(int, cleared.item["after_tokens"])
-                    get_stream_writer()(cleared.item)
+                    get_stream_writer()({**cleared.item, "room": room})
                 if used >= clearing.compact_at * room:
                     summed = await _summarise_old(
                         summariser,
@@ -588,7 +588,7 @@ def open_chat(
                     if summed is not None:
                         current = summed.view
                         used = cast(int, summed.item["after_tokens"])
-                        get_stream_writer()(summed.item)
+                        get_stream_writer()({**summed.item, "room": room})
                     else:
                         # Nothing to summarise, or it failed: clear all but the newest two.
                         harder = clearing.model_copy(
@@ -598,7 +598,7 @@ def open_chat(
                         if again is not None:
                             current = again.view
                             used = cast(int, again.item["after_tokens"])
-                            get_stream_writer()(again.item)
+                            get_stream_writer()({**again.item, "room": room})
                         if used >= clearing.compact_at * room:
                             log.info("the prompt is still at %d of %d tokens", used, room)
             if clearing is not None and window.window is not None:
@@ -910,6 +910,7 @@ async def _fit(
             "before_tokens": before,
             "after_tokens": after,
             "count": count,
+            "room": window - reserve,
         }
 
     reserve = reply_reserve(settings.reply_reserve, _num_predict(router, profile, options), window)

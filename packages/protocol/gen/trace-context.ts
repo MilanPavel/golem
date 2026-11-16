@@ -16,9 +16,11 @@ export type Tokens2 = number;
 export type Parts = TraceContextPart[];
 export type PromptCut = ('no' | 'yes' | 'likely') | null;
 export type PromptCutKind = ('older_messages' | 'middle') | null;
+export type Reserve = number | null;
 export type Used = number | null;
 export type Window = number | null;
 export type WindowEstimated = boolean;
+export type WindowPlanned = boolean;
 
 /**
  * What filled one model call's context, and how big the window was.
@@ -40,9 +42,11 @@ export interface TraceContext {
   parts: Parts;
   prompt_cut?: PromptCut;
   prompt_cut_kind?: PromptCutKind;
+  reserve?: Reserve;
   used?: Used;
   window?: Window;
   window_estimated?: WindowEstimated;
+  window_planned?: WindowPlanned;
 }
 /**
  * Tool results the call sent as a one-line stub, and the tokens that saved.
