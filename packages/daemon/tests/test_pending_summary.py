@@ -84,6 +84,15 @@ class _Chat:
         events: list[ChatEvent] = await self.events.for_run(run_id)
         return next(e for e in events if isinstance(e, ApprovalNeededEvent))
 
+    async def watched_waiting(self) -> bool:
+        """Whether the watchers' newest summary waits on something.
+
+        The stored status turns to waiting first and the summary goes out after it, so a test
+        that reads the summary right after the status can see the one before.
+        """
+        last = self.watch.summaries[-1] if self.watch.summaries else None
+        return last is not None and last.status == "waiting" and last.pending is not None
+
     async def idle(self, session_id: str) -> bool:
         return (await self.summary(session_id)).status == "idle"
 
@@ -151,8 +160,7 @@ async def test_watchers_hear_when_it_appears_and_when_it_is_allowed(
     session_id = await chat.manager.create(None, cwd=str(_project(tmp_path)))
     run_id = await chat.manager.send(session_id, "shout two")
     asked = await chat.asked(run_id)
-    assert chat.watch.summaries[-1].status == "waiting"
-    assert chat.watch.summaries[-1].pending is not None
+    await _wait(chat.watched_waiting)
 
     await chat.manager.respond(session_id, asked.data.call_id, "allow")
     await _wait(lambda: chat.idle(session_id))
@@ -174,7 +182,7 @@ async def test_a_cancelled_run_clears_it(database: Database, tmp_path: Path) -> 
     session_id = await chat.manager.create(None, cwd=str(_project(tmp_path)))
     run_id = await chat.manager.send(session_id, "shout two")
     await chat.asked(run_id)
-    assert chat.watch.summaries[-1].pending is not None
+    await _wait(chat.watched_waiting)
     await chat.manager.cancel(run_id)
     await _wait(lambda: chat.idle(session_id))
     assert chat.watch.summaries[-1].pending is None
