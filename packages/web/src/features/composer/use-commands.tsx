@@ -184,6 +184,8 @@ export function useCommands({ session, cwd, typing, send }: UseCommandsOptions):
             return say(NOT_YET.artifact);
           case "tune":
             return say(NOT_YET.tune);
+          case "undo":
+            return say(NOT_YET.undo);
           case "setup":
             navigate(settingsPath("setup"));
             return "handled";

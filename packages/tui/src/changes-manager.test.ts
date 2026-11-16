@@ -39,6 +39,9 @@ test("keys map", () => {
   assert.equal(changesKeyOf(press("page-up")), "page-up");
   assert.equal(changesKeyOf(press("page-down")), "page-down");
   assert.equal(changesKeyOf(press("escape")), "back");
+  assert.equal(changesKeyOf(press(null, "u")), "undo-hunk");
+  assert.equal(changesKeyOf(press(null, "U")), "undo-file");
+  assert.equal(changesKeyOf(press(null, "y")), "yes");
   assert.equal(changesKeyOf(press(null, "x")), null);
   assert.equal(changesKeyOf({ ...press(null, "n"), ctrl: true }), null);
 });
@@ -55,7 +58,7 @@ test("moving files stops at the ends and resets hunk and offset", () => {
   assert.equal(top.state.file, 0);
   assert.deepEqual(top.action, { kind: "none" });
   const next = pressChanges(state, data(), "down");
-  assert.deepEqual({ ...next.state }, { open: true, file: 1, hunk: 0, offset: 0 });
+  assert.deepEqual({ ...next.state }, { open: true, file: 1, hunk: 0, offset: 0, confirm: null, message: null });
   state = { ...state, file: 2 };
   assert.equal(pressChanges(state, data(), "down").state.file, 2);
 });
@@ -92,7 +95,7 @@ test("layout at 120 columns puts the files beside the diff", () => {
   const rows = layoutChanges(openChangesManager(), data(), 120, 12);
   assert.equal(rows.length, 12);
   assert.equal(rows[0]?.text, "changes · 3 files +5 −4");
-  assert.equal(rows[11]?.text, "↑↓ file · n/p hunk · PgUp/PgDn scroll · g commit · esc back");
+  assert.equal(rows[11]?.text, "↑↓ file · n/p hunk · PgUp/PgDn scroll · u undo hunk · U undo file · g commit · esc back");
   assert.equal(rows[1]?.left?.length, 28);
   assert.equal(rows[1]?.left, "M a.py                 +2 −2 ".slice(0, 28).padEnd(28));
   assert.equal(rows[1]?.leftSelected, true);
@@ -152,4 +155,56 @@ test("long paths are cut from the left", () => {
   assert.equal(left.startsWith("M …"), true);
   assert.equal(left.includes("module.py"), true);
   assert.equal(left.trimEnd().endsWith("+10 −2"), true);
+});
+
+test("u asks, and y undoes the hunk under the cursor", () => {
+  const first = pressChanges(openChangesManager(), data(), "next-hunk").state;
+  const second = pressChanges(first, data(), "next-hunk").state;
+  const asked = pressChanges(second, data(), "undo-hunk");
+  assert.deepEqual(asked.state.confirm, { kind: "hunk", path: "a.py", hunk: 1 });
+  assert.deepEqual(asked.action, { kind: "none" });
+  assert.match(layoutChanges(asked.state, data(), 120, 12).at(-1)?.text ?? "", /^undo hunk 2 of a\.py\? y\/n/);
+  const yes = pressChanges(asked.state, data(), "yes");
+  assert.deepEqual(yes.action, { kind: "revert", target: { kind: "hunk", path: "a.py", hunk: 1 } });
+  assert.equal(yes.state.confirm, null);
+});
+
+test("U asks, and y undoes the selected file", () => {
+  const state = pressChanges(openChangesManager(), data(), "down").state;
+  const asked = pressChanges(state, data(), "undo-file");
+  assert.deepEqual(asked.state.confirm, { kind: "file", path: "src/config.py" });
+  assert.deepEqual(pressChanges(asked.state, data(), "yes").action, {
+    kind: "revert",
+    target: { kind: "file", path: "src/config.py" },
+  });
+});
+
+test("n, esc, or any other key drops the question and sends nothing", () => {
+  const asked = pressChanges(openChangesManager(), data(), "undo-file").state;
+  for (const key of ["next-hunk", "back", "up", "undo-file"] as const) {
+    const pressed = pressChanges(asked, data(), key);
+    assert.deepEqual(pressed.action, { kind: "none" });
+    assert.equal(pressed.state.confirm, null);
+    assert.equal(pressed.state.open, true);
+  }
+});
+
+test("a hunk undo needs a loaded diff with a hunk", () => {
+  const state = pressChanges(openChangesManager(), data({ diffs: {} }), "undo-hunk");
+  assert.equal(state.state.confirm, null);
+});
+
+test("while golem runs, u and U only say to wait", () => {
+  for (const key of ["undo-hunk", "undo-file"] as const) {
+    const pressed = pressChanges(openChangesManager(), data(), key, 10, true);
+    assert.equal(pressed.state.confirm, null);
+    assert.equal(pressed.state.message, "Wait for golem to finish.");
+    assert.equal(layoutChanges(pressed.state, data(), 120, 12).at(-1)?.text, "Wait for golem to finish.");
+    assert.equal(pressChanges(pressed.state, data(), "down").state.message, null);
+  }
+});
+
+test("the hint lists the undo keys", () => {
+  const hint = layoutChanges(openChangesManager(), data(), 120, 12).at(-1)?.text ?? "";
+  assert.match(hint, /u undo hunk · U undo file/);
 });

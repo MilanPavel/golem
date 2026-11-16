@@ -10,6 +10,7 @@ import {
   RpcError,
   SESSION_NOT_FOUND,
   type ApprovalChoice,
+  type ChangesRevertTarget,
   type ConfigGetResult,
   type ConnectionState,
   type GolemClient,
@@ -114,6 +115,10 @@ import {
   type SetupWindow,
   providersUp,
   reduceChat,
+  reduceChanges,
+  changedPaths,
+  noChanges,
+  type ChangesState,
   unreadCallNotice,
   RETRY_QUESTION,
   serverUp,
@@ -251,6 +256,21 @@ import { RESTARTING, type ServiceControl, type WindowDaemon } from "./service.ts
 import { installEventOf, type InstallState, installRows, reduceInstall, startedInstall } from "./ollama-install.ts";
 import { APPROVAL_ROWS, approvalRows, diffLineCount } from "./approval.ts";
 import { ApprovalBand } from "./approval-band.tsx";
+import { UndoBand } from "./undo-band.tsx";
+import {
+  foldPrompts,
+  NOTHING_TO_UNDO,
+  nextUndo,
+  noPrompts,
+  openUndo,
+  pressUndo,
+  undoAnswered,
+  undoKeyOf,
+  undoRows,
+  WAIT_FOR_GOLEM,
+  type Prompts,
+  type UndoBand as UndoBandState,
+} from "./undo.ts";
 import {
   ARGS_EDIT_ROWS,
   type ArgsEdit,
@@ -470,6 +490,7 @@ export function App({
     }
   }, [connection, service]);
   const [chat, setChat] = useState<ChatState>(emptyChat);
+  const [changesState, setChangesState] = useState<ChangesState>(noChanges);
   const [hint, setHint] = useState<Hint | null>(null);
   useEffect(() => {
     if (hint === null) {
@@ -568,6 +589,12 @@ export function App({
   const [changesManager, setChangesManager] = useState<ChangesManagerState>(closedChangesManager);
   const changesManagerRef = useRef(changesManager);
   changesManagerRef.current = changesManager;
+  // What each turn changed and asked, folded from every event, for /undo.
+  const changesFold = useRef<ChangesState>(noChanges);
+  const promptsFold = useRef<Prompts>(noPrompts);
+  const [undoBand, setUndoBand] = useState<UndoBandState | null>(null);
+  const undoRef = useRef(undoBand);
+  undoRef.current = undoBand;
   const [changes, setChanges] = useState<ChangesData>({ files: null, error: null, diffs: {} });
   const changesRef = useRef(changes);
   changesRef.current = changes;
@@ -722,6 +749,7 @@ export function App({
     mcpManager.open ||
     skillsManager.open ||
     changesManager.open ||
+    undoBand !== null ||
     picker.open ||
     keysOpen ||
     suggestDismissed ||
@@ -746,7 +774,14 @@ export function App({
     banner: (banner !== null && banner.length > 0) || hintText !== null,
     debug: debug.open,
     suggestions: suggestMatches.length,
-    approval: chat.approval === null ? 0 : argsEdit !== null ? APPROVAL_ROWS : approvalRows(chat.approval, rows),
+    approval:
+      chat.approval !== null
+        ? argsEdit !== null
+          ? APPROVAL_ROWS
+          : approvalRows(chat.approval, rows)
+        : undoBand !== null
+          ? undoRows(undoBand, rows)
+          : 0,
     composerMax: argsEdit !== null ? ARGS_EDIT_ROWS : undefined,
     todos: showTodos ? todoRows(chat.todos) : 0,
     install: install === null ? 0 : installRows(install.state),
@@ -810,7 +845,16 @@ export function App({
     }
   }
   const writingSeconds = (id: string) => Math.max(0, Math.floor((Date.now() - (writingSince.get(id) ?? Date.now())) / 1000));
-  const transcriptOptions = { times: showTimes, now, toolOutput, thinking: showThinking, writingSeconds };
+  const transcriptOptions = {
+    times: showTimes,
+    now,
+    toolOutput,
+    thinking: showThinking,
+    writingSeconds,
+    changes: changesState,
+    liveRunId: chat.busy ? chat.runId : null,
+    commands: COMMANDS.map((command) => command.name),
+  };
   const measured = layoutTranscript(chat.messages, columns, chatHeight, offset, transcriptOptions);
   const widthKey = measured.overflow ? Math.max(1, columns - 1) : columns;
   const followed = followTail(tail, measured.lineCount, widthKey, offset);
@@ -851,7 +895,11 @@ export function App({
       setKeysOpen(false);
       historyCursorRef.current = null;
       setHistoryCursor(null);
+      changesFold.current = noChanges;
+      promptsFold.current = noPrompts;
+      setUndoBand(null);
       setChat((current) => ({ ...emptyChat, notice: current.notice }));
+      setChangesState(noChanges);
       setSessionModel(null);
       setSessionCwd(null);
       setModelMessages([]);
@@ -962,6 +1010,7 @@ export function App({
       model: chip,
       folder: cwd,
       messageCount: sessionId === null ? null : chat.messages.length,
+      changedFiles: sessionId === null ? 0 : changedPaths(changesState).length,
       uptimeSeconds,
       freshLines: followed.fresh,
       alert: alertLabel(chat.down, mcpAlert(mcp.servers)),
@@ -1181,6 +1230,8 @@ export function App({
       if (event.session_id !== sessionRef.current) {
         return;
       }
+      changesFold.current = reduceChanges(changesFold.current, event);
+      promptsFold.current = foldPrompts(promptsFold.current, event);
       if (event.type === "session.created") {
         setSessionCwd(event.data.cwd ?? null);
       }
@@ -1220,6 +1271,7 @@ export function App({
         batcher.current?.flush();
       }
       setChat((current) => reduceChat(current, event));
+      setChangesState((current) => reduceChanges(current, event));
       if (event.type === "run.cancelled" && event.data.reason === "user") {
         showHint(CANCELLED_NOTICE);
       }
@@ -1912,6 +1964,11 @@ export function App({
       showChangesManager(openChangesManager());
       loadChanges(id, null);
       openCommit(id);
+      return;
+    }
+    if (outcome.kind === "undo") {
+      setDraft(draftAt(""));
+      startUndo();
       return;
     }
     if (outcome.kind === "skills") {
@@ -3622,6 +3679,66 @@ export function App({
     }
   }
 
+  function say(notice: string): void {
+    setChat((state) => ({ ...state, error: null, notice }));
+  }
+
+  /** `/undo`: ask about the newest turn that is not undone. */
+  function startUndo(): void {
+    if (sessionRef.current === null) {
+      say("open a session first");
+      return;
+    }
+    if (busyRef.current) {
+      say(WAIT_FOR_GOLEM);
+      return;
+    }
+    const offer = nextUndo(changesFold.current, promptsFold.current);
+    if (offer === null) {
+      say(NOTHING_TO_UNDO);
+      return;
+    }
+    setChat((state) => ({ ...state, error: null, notice: null }));
+    showUndo(openUndo(offer));
+  }
+
+  function showUndo(next: UndoBandState | null): void {
+    undoRef.current = next;
+    setUndoBand(next);
+  }
+
+  function onUndoPress(press: Press): void {
+    const band = undoRef.current;
+    const key = undoKeyOf(press);
+    if (band === null || key === null) {
+      return;
+    }
+    const pressed = pressUndo(band, key);
+    showUndo(pressed.band);
+    const action = pressed.action;
+    const id = sessionRef.current;
+    if (action.kind !== "revert" || pressed.band === null || id === null) {
+      return;
+    }
+    void client.changesRevert(id, { kind: "run", runId: action.runId }, action.force).then(
+      (result) => {
+        const current = undoRef.current;
+        if (current === null) {
+          return;
+        }
+        const answered = undoAnswered(current, result);
+        showUndo(answered.band);
+        if (answered.notice !== null) {
+          say(answered.notice);
+        }
+      },
+      (error: unknown) => {
+        showUndo(null);
+        setChat((state) => ({ ...state, notice: null, error: messageOf(error) }));
+      },
+    );
+  }
+
   function showChangesManager(next: ChangesManagerState): void {
     changesManagerRef.current = next;
     setChangesManager(next);
@@ -3748,7 +3865,30 @@ export function App({
       showChanges({ files: null, error: null, diffs: {} });
     } else if (action.kind === "load" && sessionRef.current !== null) {
       loadChangesDiff(sessionRef.current, action.path);
+    } else if (action.kind === "revert" && sessionRef.current !== null) {
+      revertFromChanges(sessionRef.current, action.target);
     }
+  }
+
+  function revertFromChanges(id: string, target: ChangesRevertTarget): void {
+    const tell = (message: string): void => {
+      if (changesManagerRef.current.open) {
+        showChangesManager({ ...changesManagerRef.current, message });
+      }
+    };
+    client.changesRevert(id, target).then(
+      (result) => {
+        const left = result.conflicts.map((conflict) => conflict.path);
+        if (left.length > 0) {
+          tell(`${left.join(", ")} changed since golem wrote it, so it was left alone.`);
+        } else {
+          const count = result.reverted.length;
+          tell(`Undone: ${count} ${count === 1 ? "file" : "files"} put back.`);
+        }
+        loadChanges(id, "path" in target ? target.path : null);
+      },
+      (error: unknown) => tell(messageOf(error)),
+    );
   }
 
   function onChangesManagerPress(press: Press): void {
@@ -3761,7 +3901,13 @@ export function App({
     if (key === null) {
       return;
     }
-    const pressed = pressChanges(changesManagerRef.current, changesRef.current, key, Math.max(1, budgetBodyRef.current - 3));
+    const pressed = pressChanges(
+      changesManagerRef.current,
+      changesRef.current,
+      key,
+      Math.max(1, budgetBodyRef.current - 3),
+      busyRef.current,
+    );
     showChangesManager(pressed.state);
     runChangesAction(pressed.action);
   }
@@ -4432,6 +4578,10 @@ export function App({
       onSkillsManagerPress(press);
       return;
     }
+    if (undoRef.current !== null && !keysOpenRef.current && press.name !== "f1" && press.name !== "ctrl-c") {
+      onUndoPress(press);
+      return;
+    }
     if (changesManagerRef.current.open && !keysOpenRef.current && press.name !== "f1" && press.name !== "ctrl-c") {
       onChangesManagerPress(press);
       return;
@@ -4867,6 +5017,8 @@ export function App({
           height={budget.approval}
           offset={diffOffset}
         />
+      ) : budget.approval > 0 && undoBand !== null ? (
+        <UndoBand band={undoBand} columns={columns} height={budget.approval} />
       ) : budget.suggestions > 0 ? (
         <SuggestionBand
           items={suggestMatches}

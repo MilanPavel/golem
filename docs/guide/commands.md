@@ -138,7 +138,8 @@ The line under an answer ends with the model, `local` for a model on your machin
 
 | Command | What it does |
 |---|---|
-| `/changes` | Review the files this session changed. In the terminal: the files on the left, the diff on the right, `n` and `p` jump by hunk. In the web UI it opens the Changes tab |
+| `/changes` | Review the files this session changed. In the terminal: the files on the left, the diff on the right, `n` and `p` jump by hunk, `u` undoes the hunk under the cursor and `U` the selected file (each asks `y/n`). In the web UI it opens the Changes tab |
+| `/undo` | Take back the files the last turn changed. It lists them and asks; a file edited since golem wrote it is listed again, and `o` overwrites it or `k` keeps yours. `/undo` again goes one turn further back. Terminal only for now |
 | `/commit` | Commit the files this session changed, with your own git and your hooks. golem suggests the message and you can edit it. In the terminal it opens a band under `/changes` (`g` does the same there): `enter` commits all the files, `ctrl+r` suggests again. In the web UI it opens a dialog where you can leave files out. Nothing is committed until you press commit, and nothing is pushed |
 | `/todos` | Show or hide the agent's todo list above the composer |
 | `/context` | See how full the model's context is, and what fills it. In the web UI it opens the trace |

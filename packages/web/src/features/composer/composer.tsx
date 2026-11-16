@@ -50,6 +50,10 @@ export type ComposerProps = {
   label?: string;
   autoFocus?: boolean;
   describedBy?: string;
+  /** The send button's name. Review notes make it "Send with notes". */
+  sendLabel?: string;
+  /** An empty text may be sent, as when review notes go alone. */
+  allowEmpty?: boolean;
   /** The command palette runs its commands in this composer, and fills its draft. */
   forPalette?: boolean;
 };
@@ -92,6 +96,8 @@ export function Composer({
   autoFocus = false,
   describedBy,
   forPalette = false,
+  sendLabel = "Send",
+  allowEmpty = false,
 }: ComposerProps) {
   const field = useRef<HTMLTextAreaElement>(null);
   const [hint, setHint] = useState<string | null>(null);
@@ -195,7 +201,7 @@ export function Composer({
   async function submit(): Promise<void> {
     const raw = text;
     const sent = expandPastes(raw, pastes);
-    if (sent.trim() === "" || pending || disabled) {
+    if ((sent.trim() === "" && !allowEmpty) || pending || disabled) {
       return;
     }
     const savedPastes = pastes;
@@ -388,8 +394,8 @@ export function Composer({
           ) : (
             <button
               type="button"
-              aria-label="Send"
-              disabled={disabled || pending || busy || text.trim() === ""}
+              aria-label={sendLabel}
+              disabled={disabled || pending || busy || (text.trim() === "" && !allowEmpty)}
               onClick={() => void submit()}
               className="grid size-9 place-items-center rounded-md border border-clay bg-clay text-on-clay outline-offset-2 outline-clay hover:brightness-105 focus-visible:outline-2 disabled:pointer-events-none disabled:opacity-50"
             >

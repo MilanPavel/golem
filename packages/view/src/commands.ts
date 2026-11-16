@@ -60,6 +60,8 @@ export type ComposerOutcome =
   | { kind: "changes" }
   /** `/commit` opens the commit screen: a dialog on the web, a band under `/changes` in the terminal. */
   | { kind: "commit" }
+  /** `/undo`: take back the files the last turn changed. */
+  | { kind: "undo" }
   | { kind: "thinking" }
   | { kind: "detail"; level: Detail | null }
   /** Show the permission mode ("show"), or set it for this chat. A null `mode` returns to the default. */
@@ -419,6 +421,13 @@ export const COMMANDS: readonly Command[] = [
     args: "",
     description: "Commits the files this session changed, with a message you can edit.",
     run: withoutArgs({ kind: "commit" }),
+  },
+  {
+    name: "/undo",
+    group: "session",
+    args: "",
+    description: "Takes back the files the last turn changed.",
+    run: withoutArgs({ kind: "undo" }),
   },
   {
     name: "/todos",
