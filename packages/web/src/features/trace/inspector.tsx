@@ -1,6 +1,8 @@
 import { useRef } from "react";
 import { useNavigate } from "../../store/page-context.tsx";
 import { inspectPath, tracePath } from "../../store/router.ts";
+import { cn } from "../../ui/cn.ts";
+import { HEADER_ROW } from "../../ui/header-row.ts";
 import { CloseIcon, RefreshIcon } from "../../ui/icons.tsx";
 import { IconButton } from "../../ui/icon-button.tsx";
 import { Link } from "../../ui/link.tsx";
@@ -48,7 +50,7 @@ export function InspectorPanel({ id, span, onClose }: { id: string; span: string
         panel={panel}
         className="max-narrow:hidden"
       />
-      <div className="flex items-center gap-1 border-b border-line px-3 py-2">
+      <div className={cn(HEADER_ROW, "gap-1 px-3 py-2")}>
         <h2 className="text-sm font-medium">Trace</h2>
         <div className="flex-1" />
         <Link href={tracePath(id, span)} onNavigate={navigate} className="px-1.5 text-xs text-clay-ink underline underline-offset-2">
