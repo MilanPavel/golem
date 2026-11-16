@@ -1,6 +1,6 @@
-import { checksOf, checksSummary, displayToolName, formatTurnTime, groupTurns, turnFooterParts, stepCount, stepMark, summarizeSteps, turnFooter, LIVE_OUTPUT_CHARS, thinkingLine, unreadCallNotice, writingLabel, REPLY_CUT_NOTE, type ChatMessage, type ChatState, type Detail, type StepMark, type ToolBlock, type WritingBlock, noticesAfter, type ChatNotice } from "@golem/view";
-import { memo, useCallback, useEffect, useId, useLayoutEffect, useRef, useState, Fragment } from "react";
-import { usePulls, useSession } from "../../store/page-context.tsx";
+import { BUILD_TEXT, openPlan, displayToolName, formatTurnTime, groupTurns, turnFooterParts, stepCount, stepMark, summarizeSteps, turnFooter, LIVE_OUTPUT_CHARS, thinkingLine, unreadCallNotice, writingLabel, REPLY_CUT_NOTE, type ChatMessage, type ChatState, type Detail, type StepMark, type ToolBlock, type WritingBlock, noticesAfter, type ChatNotice, checksOf, checksSummary } from "@golem/view";
+import { Fragment, memo, useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import { usePageActions, usePulls, useSession } from "../../store/page-context.tsx";
 import type { PullsSnapshot } from "../../store/pulls.ts";
 import type { SessionModel } from "../../store/session-store.ts";
 import { pullShare, shortName } from "../models/index.ts";
@@ -17,8 +17,10 @@ import type { DiffMode } from "../diff/diff-mode.ts";
 import { DiffModeSwitch } from "../diff/diff-mode-switch.tsx";
 import { useDiffMode } from "../diff/diff-mode.ts";
 import { DiffView } from "../diff/diff-view.tsx";
+import { activeComposer } from "../composer/active-composer.ts";
 import { ChecksStrip } from "./checks-strip.tsx";
 import { EditCards, isEditCard } from "./edit-card.tsx";
+import { isPlanCard, PlanCard, type PlanActions } from "./plan-card.tsx";
 import { Markdown } from "./markdown-view.tsx";
 
 function ToolResult({ tool }: { tool: ToolBlock }) {
@@ -322,13 +324,16 @@ export function GolemTurn({
   pendingId = null,
   thinkingShown,
   detail: detailOverride,
+  plan,
   checks = null,
   notices = [],
-}: { steps: readonly ChatMessage[]; pendingId?: string | null; thinkingShown?: boolean; detail?: Detail; checks?: ReturnType<typeof checksSummary> | null; notices?: readonly ChatNotice[] }) {
+}: { steps: readonly ChatMessage[]; pendingId?: string | null; thinkingShown?: boolean; detail?: Detail; plan?: PlanActions; checks?: ReturnType<typeof checksSummary> | null; notices?: readonly ChatNotice[] }) {
   const chosenDetail = useDetail();
   const detail = detailOverride ?? chosenDetail;
   const footer = turnFooter(steps);
-  const tools = steps.flatMap((step) => step.tools ?? []);
+  const allTools = steps.flatMap((step) => step.tools ?? []);
+  const planCards = allTools.filter(isPlanCard);
+  const tools = allTools.filter((tool) => !isPlanCard(tool));
   const foot = footer
     ? [footer.durationMs === undefined ? "" : formatTurnTime(footer.durationMs), footer.tools > 0 ? stepCount(footer.tools) : "", ...turnFooterParts(footer)].filter(Boolean)
     : [];
@@ -343,6 +348,9 @@ export function GolemTurn({
           ))}
         </Fragment>
       ))}
+      {planCards.map((tool) => (
+        <PlanCard key={tool.callId} tool={tool} plan={plan} />
+      ))}
       {detail === "quiet" ? null : <EditCards tools={tools.filter(isEditCard)} />}
       <ActivityLine tools={tools} detail={detail} streaming={steps.some((step) => step.streaming)} pendingId={pendingId} />
       {steps.map((step) => (step.writing == null ? null : <WritingRow key={step.id} writing={step.writing} />))}
@@ -353,7 +361,7 @@ export function GolemTurn({
 }
 
 /** What the transcript draws of the chat. `approval` names the call whose approval waits in the dock. */
-export type TranscriptChat = Pick<ChatState, "messages" | "error" | "notice"> & Partial<Pick<ChatState, "approval" | "unreadCall" | "checks" | "busy" | "runId" | "notices">>;
+export type TranscriptChat = Pick<ChatState, "messages" | "error" | "notice"> & Partial<Pick<ChatState, "approval" | "unreadCall" | "plan" | "checks" | "busy" | "runId" | "notices">>;
 
 /** How a turn's checks went, or null when its run ran none. It is being fixed while that run goes on. */
 function turnChecks(chat: TranscriptChat, steps: readonly ChatMessage[]): ReturnType<typeof checksSummary> | null {
@@ -364,8 +372,10 @@ function turnChecks(chat: TranscriptChat, steps: readonly ChatMessage[]): Return
 }
 
 /** The messages and the closing error or notice. Pure: the page's stores are not read here. */
-export function TranscriptMessages({ chat, thinkingShown, detail, waiting = null }: { chat: TranscriptChat; thinkingShown?: boolean; detail?: Detail; waiting?: string | null }) {
+export function TranscriptMessages({ chat, thinkingShown, detail, waiting = null, plan }: { chat: TranscriptChat; thinkingShown?: boolean; detail?: Detail; waiting?: string | null; plan?: Omit<PlanActions, "open"> }) {
   const pendingId = chat.approval?.callId ?? null;
+  const planActions: PlanActions | undefined =
+    plan === undefined || chat.plan === undefined ? undefined : { ...plan, open: openPlan(chat.plan)?.callId ?? null };
   const chosenDetail = useDetail();
   const quiet = (detail ?? chosenDetail) === "quiet";
   const notices = chat.notices ?? [];
@@ -393,6 +403,7 @@ export function TranscriptMessages({ chat, thinkingShown, detail, waiting = null
             pendingId={pendingId}
             thinkingShown={thinkingShown}
             detail={detail}
+            plan={planActions}
             checks={turnChecks(chat, turn.steps)}
             notices={notices}
           />
@@ -409,7 +420,7 @@ export function TranscriptMessages({ chat, thinkingShown, detail, waiting = null
  * The scrolling column. While you are at the bottom it follows the text; once you scroll up it
  * stays where you are and offers a way back down.
  */
-export function TranscriptColumn({ chat, className, waiting = null }: { chat: TranscriptChat; className?: string; waiting?: string | null }) {
+export function TranscriptColumn({ chat, className, waiting = null, plan }: { chat: TranscriptChat; className?: string; waiting?: string | null; plan?: Omit<PlanActions, "open"> }) {
   const scroller = useRef<HTMLDivElement>(null);
   const content = useRef<HTMLDivElement>(null);
   const stuck = useRef(true);
@@ -449,7 +460,7 @@ export function TranscriptColumn({ chat, className, waiting = null }: { chat: Tr
     <div className={cn("relative flex min-h-0 flex-1 flex-col", className)}>
       <div ref={scroller} onScroll={onScroll} className="relative min-h-0 flex-1 overflow-y-auto" data-transcript-scroller>
         <div ref={content} className="mx-auto flex max-w-column flex-col gap-8 px-5 py-7">
-          <TranscriptMessages chat={chat} waiting={waiting} />
+          <TranscriptMessages chat={chat} waiting={waiting} plan={plan} />
         </div>
       </div>
       {atBottom ? null : (
@@ -486,5 +497,14 @@ export function Transcript({ id }: { id: string }) {
   const chat = useSession(id, (view) => view.chat);
   const model = useSession(id, (view) => view.model);
   const pulls = usePulls();
-  return <TranscriptColumn chat={chat} waiting={waitingLine(chat.busy, model, pulls)} />;
+  const actions = usePageActions();
+  const plan = {
+    // "Build it" takes plan first off, then sends the build message like any other.
+    onBuild: async () => {
+      await actions.setPlan(id, false);
+      await activeComposer()?.run(BUILD_TEXT);
+    },
+    onChange: () => activeComposer()?.focus(),
+  };
+  return <TranscriptColumn chat={chat} waiting={waitingLine(chat.busy, model, pulls)} plan={plan} />;
 }

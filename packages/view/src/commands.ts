@@ -68,6 +68,8 @@ export type ComposerOutcome =
   | { kind: "detail"; level: Detail | null }
   /** Show the permission mode ("show"), or set it for this chat. A null `mode` returns to the default. */
   | { kind: "mode"; mode: PermissionMode | null | "show" }
+  /** `/plan` toggles plan first, `/plan on` and `/plan off` set it. */
+  | { kind: "plan"; on: boolean | "toggle" }
   | { kind: "model"; name: string | null }
   | { kind: "model-pull"; name: string }
   | { kind: "model-rm"; name: string }
@@ -307,6 +309,19 @@ export const COMMANDS: readonly Command[] = [
       if (args.length === 1 && word === "default") return { kind: "mode", mode: null };
       if (args.length === 1 && isPermissionMode(word)) return { kind: "mode", mode: word };
       return { kind: "unknown", notice: "/mode, or /mode careful, balanced, autopilot or default" };
+    },
+  },
+  {
+    name: "/plan",
+    group: "tools",
+    args: "[on|off]",
+    description: "Plan first: golem only reads, then shows a plan to build. Alone it toggles.",
+    choices: ["on", "off"],
+    run: (_debug, args) => {
+      const [word] = args;
+      if (word === undefined) return { kind: "plan", on: "toggle" };
+      if (args.length === 1 && (word === "on" || word === "off")) return { kind: "plan", on: word === "on" };
+      return { kind: "unknown", notice: "/plan, /plan on or /plan off" };
     },
   },
   {

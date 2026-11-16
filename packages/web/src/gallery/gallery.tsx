@@ -29,7 +29,8 @@ import { SAMPLE_EDIT_DIFF, SAMPLE_LONG_LINE_DIFF, SAMPLE_NEW_FILE_DIFF } from ".
 import { TodoList } from "../features/drawer/index.ts";
 import { ChangesView, ChecksView, Workbench, type WorkbenchTab, CommitDialogView, TurnsView } from "../features/workbench/index.ts";
 import type { ChangedFile } from "../store/changes.ts";
-import { ChecksQuestionView, Composer, ContextChipView, DockView, Meter, ModeChipView, NotesChipView, TuneChipView } from "../features/composer/index.ts";
+import { Composer, ContextChipView, DockView, Meter, ModeChipView, NotesChipView, PlanChipView, TuneChipView, ChecksQuestionView } from "../features/composer/index.ts";
+import { PlanCardView } from "../features/chat/plan-card.tsx";
 import { createHistory } from "../features/composer/history.ts";
 import { CommandsDialog } from "../features/composer/help-dialog.tsx";
 import { HomeView, NewSessionModelChipView, SessionTitle } from "../features/shell/index.ts";
@@ -136,6 +137,12 @@ function useAnchor(): (title: string) => string {
   const prefix = useContext(AnchorPrefix);
   return (title) => prefix + slug(title);
 }
+
+const PLAN_DEMO_STEPS = [
+  { text: "Add with_retry to the fetcher", files: ["src/fetch.py"] },
+  { text: "Add fetch_retries to settings", files: ["src/config.py"] },
+  { text: "Test three failures then success", files: ["tests/test_fetch.py"] },
+];
 
 function Group({ title, children }: { title: string; children: ReactNode }) {
   const anchor = useAnchor();
@@ -1577,6 +1584,18 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
           <WritingRow writing={{ name: "write_file", path: "tests/test_fetch.py", lines: 14, chars: 420 }} />
           <WritingRow writing={{ name: "write_file", path: null, lines: 0, chars: 0 }} />
           <WritingRow writing={{ name: "edit_file", path: "src/fetch.py", lines: 6, chars: 180 }} />
+        </div>
+      </section>
+
+      <section className="mt-6" id={anchor("Plan card")}>
+        <h3 className="mb-2 font-mono text-xs text-faint">Plan card</h3>
+        <div className="flex flex-col gap-3 rounded-lg border border-line bg-bg p-4">
+          <PlanCardView title="retry with backoff" steps={PLAN_DEMO_STEPS} actions={{ onBuild: async () => {}, onChange: () => {} }} />
+          <PlanCardView title="retry with backoff" steps={PLAN_DEMO_STEPS} actions={null} />
+          <div aria-label="Plan first switch" role="group" className="flex flex-wrap gap-2">
+            <PlanChipView on={false} onToggle={() => {}} />
+            <PlanChipView on onToggle={() => {}} />
+          </div>
         </div>
       </section>
 

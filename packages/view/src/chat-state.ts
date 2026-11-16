@@ -1,6 +1,7 @@
 import type { ApprovalChoice, ChatEvent, SkillCall } from "@golem/client";
 
 import { noChecks, reduceChecks, type ChecksState } from "./checks.ts";
+import { emptyPlan, reducePlan, type PlanState } from "./plan.ts";
 import { contextChangedNote, emptyLiveContext, foldLiveContext, type ContextChangeData, type LiveContextState } from "./context.ts";
 import { replyWasCut } from "./stop.ts";
 import type { TodoItem } from "./todos.ts";
@@ -158,6 +159,8 @@ export type ChatState = {
   options: Readonly<Record<string, number | string>>;
   /** The session's permission mode override, from the newest `session.mode.changed`. Null follows config.toml. */
   permissionMode: "careful" | "balanced" | "autopilot" | null;
+  /** Whether the session is in plan first, and its newest plan, from `session.plan.changed` and `plan.proposed`. */
+  plan: PlanState;
   /** The project's checks per run, the question about running them, and the answer, from the `check.*` events. */
   checks: ChecksState;
 };
@@ -183,6 +186,7 @@ export const emptyChat: ChatState = {
   calls: {},
   options: {},
   permissionMode: null,
+  plan: emptyPlan,
   checks: noChecks,
 };
 
@@ -296,7 +300,9 @@ function isChildEvent(event: ChatEvent): boolean {
 
 export function reduceChat(state: ChatState, event: ChatEvent): ChatState {
   if (isChildEvent(event)) return state;
-  const next = reduceChatEvent(state, event);
+  const base = reduceChatEvent(state, event);
+  const plan = reducePlan(state.plan, event);
+  const next = plan === state.plan ? base : { ...base, plan };
   const context = foldLiveContext(state.context, event);
   const checks = reduceChecks(next.checks, event);
   return context === next.context && checks === next.checks ? next : { ...next, context, checks };

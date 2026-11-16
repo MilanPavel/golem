@@ -50,6 +50,7 @@ export type PageClient = Pick<
   | "listKeys"
   | "setSkills"
   | "setSessionMode"
+  | "setPlan"
   | "setChecks"
   | "compactSession"
   | "getConfig"
@@ -135,6 +136,8 @@ export type PageActions = {
   setSkillDisabled(name: string, disabled: boolean): Promise<void>;
   /** Sets the session's permission mode, or with null follows config.toml. The chip changes from `session.mode.changed`. */
   setMode(sessionId: string, mode: PermissionMode | null): Promise<void>;
+  /** Puts a session in plan first, or takes it out. */
+  setPlan(sessionId: string, on: boolean): Promise<void>;
   /** Says whether golem may run the project's checks after its edits in this session. The panel changes from `session.checks.changed`. */
   setChecks(sessionId: string, on: boolean): Promise<void>;
   /**
@@ -439,6 +442,9 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
           // The rules were built for a mode, so Settings reads them again.
           await queryClient.invalidateQueries({ queryKey: CONFIG_KEY });
         }
+      },
+      async setPlan(sessionId, on) {
+        await client.setPlan(sessionId, on);
       },
       async setChecks(sessionId, on) {
         await client.setChecks(sessionId, on);
