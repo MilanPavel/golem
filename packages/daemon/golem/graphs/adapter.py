@@ -16,6 +16,7 @@ from langchain_core.messages import AIMessage, AIMessageChunk, BaseMessage, Tool
 
 from golem.graphs.partial_args import partial_field, partial_string
 from golem_protocol.commands import TraceMessage
+from golem_protocol.events import ConsentAnswer, ConsentCaps, RouteConsentNeededData
 
 STREAM_KEY = "golem"
 """Key of every golem item on the custom stream. The graph writes, the adapter reads."""
@@ -35,6 +36,9 @@ FILE_CHANGED_KIND = "file.changed"
 
 APPROVAL_KIND = "approval"
 """``STREAM_KEY`` value of an interrupt that waits for a tool approval."""
+
+CONSENT_KIND = "consent"
+"""``STREAM_KEY`` value of an interrupt that waits for the paid question's answer."""
 
 CHILD_FACT_KIND = "child.fact"
 """``STREAM_KEY`` value of a fact of a child run, carried on its parent's stream."""
@@ -263,6 +267,19 @@ class ApprovalAsked:
 
 
 @dataclass(frozen=True, slots=True)
+class ConsentAsked:
+    """The run paused on the paid question: its model struggles and the next one is paid."""
+
+    profile: str
+    tier: _TierName
+    why: str
+    estimated_usd: float | None
+    alternatives: tuple[ConsentAnswer, ...]
+    caps: ConsentCaps | None = None
+    signal: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
 class PlanProposed:
     """``propose_plan`` ended a plan first run with this plan."""
 
@@ -354,6 +371,7 @@ Fact = (
     | ToolFinished
     | ToolErrored
     | ApprovalAsked
+    | ConsentAsked
     | TodosChanged
     | PlanProposed
     | FileChanged
@@ -705,12 +723,12 @@ def _writing_fact(index: int, call: _Writing) -> ToolWriting:
     )
 
 
-def _completed(data: object) -> TextCompleted | ApprovalAsked | None:
+def _completed(data: object) -> TextCompleted | ApprovalAsked | ConsentAsked | None:
     if not isinstance(data, dict):
         return None
     paused = cast(dict[object, object], data).get("__interrupt__")
     if paused is not None:
-        return _approval(paused)
+        return _consent(paused) or _approval(paused)
     update = cast(dict[object, object], data).get("call_model")
     if not isinstance(update, dict):
         return None
@@ -772,6 +790,35 @@ def stop_reason_of(message: AIMessage) -> str | None:
     return None
 
 
+_TIERS = ("local", "budget", "frontier")
+_TierName = Literal["local", "budget", "frontier"]
+
+
+def _consent(paused: object) -> ConsentAsked | None:
+    items = cast(tuple[object, ...], paused) if isinstance(paused, tuple | list) else ()
+    for item in items:
+        value = getattr(item, "value", None)
+        if not isinstance(value, dict):
+            continue
+        raw = cast(dict[str, object], value)
+        if raw.get(STREAM_KEY) != CONSENT_KIND:
+            continue
+        try:
+            asked = RouteConsentNeededData.model_validate(raw.get("question"))
+        except ValueError:
+            continue
+        return ConsentAsked(
+            profile=asked.model_profile,
+            tier=asked.tier,
+            why=asked.why,
+            estimated_usd=asked.estimated_usd,
+            alternatives=tuple(asked.alternatives),
+            caps=asked.caps,
+            signal=asked.signal,
+        )
+    return None
+
+
 def _approval(paused: object) -> ApprovalAsked | None:
     items = cast(tuple[object, ...], paused) if isinstance(paused, tuple | list) else ()
     for item in items:
@@ -798,10 +845,6 @@ def _approval(paused: object) -> ApprovalAsked | None:
             diff=diff if isinstance(diff, str) else None,
         )
     return None
-
-
-_TIERS = ("local", "budget", "frontier")
-_TierName = Literal["local", "budget", "frontier"]
 
 
 def _routed_fact(item: dict[str, object]) -> ModelRouted | None:
@@ -1097,6 +1140,7 @@ __all__ = [
     "STREAM_KEY",
     "ApprovalAsked",
     "ChildFact",
+    "ConsentAsked",
     "ContextChanged",
     "Fact",
     "FileChanged",

@@ -367,6 +367,7 @@ export type EstimatedUsd = number | null;
 export type Model3 = string | null;
 export type ModelProfile3 = string;
 export type Provider3 = string | null;
+export type Signal = string | null;
 export type Tier3 = 'local' | 'budget' | 'frontier';
 export type Why1 = string;
 export type RunId31 = string;
@@ -1870,6 +1871,8 @@ export interface RouteConsentNeededEvent {
  * run. ``why`` is one plain sentence on why golem asks. ``estimated_usd`` is golem's
  * estimate for this turn, null when the price is unknown. ``caps`` is set when a cap is.
  * ``alternatives`` are the answers the user may give: a spent cap leaves out ``session``.
+ * ``signal`` is set when the question comes in the middle of a run, because the model
+ * struggled (a struggle signal of the daemon); ``why`` then says how. It is null before a turn.
  *
  * This interface was referenced by `RpcNotification`'s JSON-Schema
  * via the `definition` "RouteConsentNeededData".
@@ -1881,6 +1884,7 @@ export interface RouteConsentNeededData {
   model?: Model3;
   model_profile: ModelProfile3;
   provider?: Provider3;
+  signal?: Signal;
   tier: Tier3;
   why: Why1;
 }

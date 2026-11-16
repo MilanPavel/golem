@@ -50,7 +50,7 @@
     },
     "RouteConsentNeededData": {
       "additionalProperties": false,
-      "description": "The run waits for the user's yes to a paid model. It is paused until\n``route.consent.answer``.\n\n``model_profile``, ``provider``, ``model`` and ``tier`` name the paid model that would\nrun. ``why`` is one plain sentence on why golem asks. ``estimated_usd`` is golem's\nestimate for this turn, null when the price is unknown. ``caps`` is set when a cap is.\n``alternatives`` are the answers the user may give: a spent cap leaves out ``session``.",
+      "description": "The run waits for the user's yes to a paid model. It is paused until\n``route.consent.answer``.\n\n``model_profile``, ``provider``, ``model`` and ``tier`` name the paid model that would\nrun. ``why`` is one plain sentence on why golem asks. ``estimated_usd`` is golem's\nestimate for this turn, null when the price is unknown. ``caps`` is set when a cap is.\n``alternatives`` are the answers the user may give: a spent cap leaves out ``session``.\n``signal`` is set when the question comes in the middle of a run, because the model\nstruggled (a struggle signal of the daemon); ``why`` then says how. It is null before a turn.",
       "properties": {
         "alternatives": {
           "items": {
@@ -118,6 +118,19 @@
           ],
           "default": null,
           "title": "Provider"
+        },
+        "signal": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Signal"
         },
         "tier": {
           "enum": [

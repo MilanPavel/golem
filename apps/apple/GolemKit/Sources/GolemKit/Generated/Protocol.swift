@@ -8852,6 +8852,9 @@ public enum RouteConsentAnsweredEventType: String, Codable {
 /// run. ``why`` is one plain sentence on why golem asks. ``estimated_usd`` is golem's
 /// estimate for this turn, null when the price is unknown. ``caps`` is set when a cap is.
 /// ``alternatives`` are the answers the user may give: a spent cap leaves out ``session``.
+/// ``signal`` is set when the question comes in the middle of a run, because the model
+/// struggled (a struggle signal of the daemon); ``why`` then says how. It is null before a
+/// turn.
 // MARK: - RouteConsentNeededData
 public struct RouteConsentNeededData: Codable {
     public let alternatives: [Answer]
@@ -8860,6 +8863,7 @@ public struct RouteConsentNeededData: Codable {
     public let model: String?
     public let modelProfile: String
     public let provider: String?
+    public let signal: String?
     public let tier: Tier
     public let why: String
 
@@ -8870,17 +8874,19 @@ public struct RouteConsentNeededData: Codable {
         case model = "model"
         case modelProfile = "model_profile"
         case provider = "provider"
+        case signal = "signal"
         case tier = "tier"
         case why = "why"
     }
 
-    public init(alternatives: [Answer], caps: RouteConsentNeededDataConsentCaps?, estimatedUsd: Double?, model: String?, modelProfile: String, provider: String?, tier: Tier, why: String) {
+    public init(alternatives: [Answer], caps: RouteConsentNeededDataConsentCaps?, estimatedUsd: Double?, model: String?, modelProfile: String, provider: String?, signal: String?, tier: Tier, why: String) {
         self.alternatives = alternatives
         self.caps = caps
         self.estimatedUsd = estimatedUsd
         self.model = model
         self.modelProfile = modelProfile
         self.provider = provider
+        self.signal = signal
         self.tier = tier
         self.why = why
     }
@@ -8945,6 +8951,9 @@ public struct RouteConsentNeededEvent: Codable {
 /// run. ``why`` is one plain sentence on why golem asks. ``estimated_usd`` is golem's
 /// estimate for this turn, null when the price is unknown. ``caps`` is set when a cap is.
 /// ``alternatives`` are the answers the user may give: a spent cap leaves out ``session``.
+/// ``signal`` is set when the question comes in the middle of a run, because the model
+/// struggled (a struggle signal of the daemon); ``why`` then says how. It is null before a
+/// turn.
 // MARK: - RouteConsentNeededEventData
 public struct RouteConsentNeededEventData: Codable {
     public let alternatives: [Answer]
@@ -8953,6 +8962,7 @@ public struct RouteConsentNeededEventData: Codable {
     public let model: String?
     public let modelProfile: String
     public let provider: String?
+    public let signal: String?
     public let tier: Tier
     public let why: String
 
@@ -8963,17 +8973,19 @@ public struct RouteConsentNeededEventData: Codable {
         case model = "model"
         case modelProfile = "model_profile"
         case provider = "provider"
+        case signal = "signal"
         case tier = "tier"
         case why = "why"
     }
 
-    public init(alternatives: [Answer], caps: PurpleConsentCaps?, estimatedUsd: Double?, model: String?, modelProfile: String, provider: String?, tier: Tier, why: String) {
+    public init(alternatives: [Answer], caps: PurpleConsentCaps?, estimatedUsd: Double?, model: String?, modelProfile: String, provider: String?, signal: String?, tier: Tier, why: String) {
         self.alternatives = alternatives
         self.caps = caps
         self.estimatedUsd = estimatedUsd
         self.model = model
         self.modelProfile = modelProfile
         self.provider = provider
+        self.signal = signal
         self.tier = tier
         self.why = why
     }
@@ -11409,6 +11421,9 @@ public struct Params: Codable {
 /// run. ``why`` is one plain sentence on why golem asks. ``estimated_usd`` is golem's
 /// estimate for this turn, null when the price is unknown. ``caps`` is set when a cap is.
 /// ``alternatives`` are the answers the user may give: a spent cap leaves out ``session``.
+/// ``signal`` is set when the question comes in the middle of a run, because the model
+/// struggled (a struggle signal of the daemon); ``why`` then says how. It is null before a
+/// turn.
 ///
 /// The user answered the paid step-up question, and the run goes on.
 ///
@@ -11552,6 +11567,7 @@ public struct ParamsData: Codable {
     public let alternatives: [Answer]?
     public let caps: FluffyConsentCaps?
     public let estimatedUsd: Double?
+    public let signal: String?
     public let why: String?
     public let answer: Answer?
     public let todos: [PurpleTodo]?
@@ -11663,6 +11679,7 @@ public struct ParamsData: Codable {
         case alternatives = "alternatives"
         case caps = "caps"
         case estimatedUsd = "estimated_usd"
+        case signal = "signal"
         case why = "why"
         case answer = "answer"
         case todos = "todos"
@@ -11682,7 +11699,7 @@ public struct ParamsData: Codable {
         case output = "output"
     }
 
-    public init(cwd: String?, forkedFrom: PurpleForkedFrom?, modelName: String?, modelProfile: String?, modelProvider: String?, origin: String?, route: RouteEnum?, allowedTools: [PurpleSessionAllowance]?, mcpServers: [String]?, paidOk: Bool?, title: String?, runID: String?, status: PurpleStatus?, summary: String?, reason: PurpleReason?, detail: String?, model: String?, provider: String?, rejected: [FluffyModelRejection]?, tier: Tier?, options: [String: Option]?, mode: DefaultPermissionModeEnum?, on: Bool?, messageID: String?, role: MessageCompletedDataRole?, text: String?, interrupted: Bool?, skill: FluffySkillCall?, thinking: String?, thinkingMS: Int?, clearedIDS: [String]?, contextWindow: Int?, estimatedTokens: Int?, index: Int?, messageBytes: [Int]?, messageChars: [Int]?, messageIDS: [String]?, numCtx: Int?, parentCallID: String?, profile: String?, summaryChars: Int?, systemBytes: Int?, systemChars: Int?, systemPromptSHA: String?, systemSections: [TentacledPromptSectionInfo]?, toolsBytes: Int?, toolsChars: Int?, toolsSHA: String?, windowEstimated: Bool?, windowPlanned: Bool?, costUsd: Double?, failed: Bool?, firstTokenMS: Int?, latencyMS: Int?, loadMS: Int?, price: FluffyCallPrice?, promptMS: Int?, replyMS: Int?, stopReason: String?, textToolCalls: TextToolCalls?, usage: FluffyTokenUsage?, action: ContextChangedDataAction?, afterTokens: Int?, beforeTokens: Int?, count: Int?, reloadMS: Int?, room: Int?, windowFrom: Int?, windowTo: Int?, code: Code?, hint: String?, message: String?, args: [String: JSONAny]?, callID: String?, name: String?, chars: Int?, lines: Int?, path: String?, waiting: Bool?, window: Int?, artifactID: String?, diff: String?, durationMS: Int?, preview: String?, truncated: Bool?, source: String?, subject: String?, decision: Decision?, rule: String?, alternatives: [Answer]?, caps: FluffyConsentCaps?, estimatedUsd: Double?, why: String?, answer: Answer?, todos: [PurpleTodo]?, planID: String?, steps: [FluffyPlanStep]?, added: Int?, changeID: String?, removed: Int?, reverts: String?, hash: String?, how: How?, checks: [FluffyCheckInfo]?, checkID: String?, command: String?, round: Int?, exitCode: Int?, output: String?) {
+    public init(cwd: String?, forkedFrom: PurpleForkedFrom?, modelName: String?, modelProfile: String?, modelProvider: String?, origin: String?, route: RouteEnum?, allowedTools: [PurpleSessionAllowance]?, mcpServers: [String]?, paidOk: Bool?, title: String?, runID: String?, status: PurpleStatus?, summary: String?, reason: PurpleReason?, detail: String?, model: String?, provider: String?, rejected: [FluffyModelRejection]?, tier: Tier?, options: [String: Option]?, mode: DefaultPermissionModeEnum?, on: Bool?, messageID: String?, role: MessageCompletedDataRole?, text: String?, interrupted: Bool?, skill: FluffySkillCall?, thinking: String?, thinkingMS: Int?, clearedIDS: [String]?, contextWindow: Int?, estimatedTokens: Int?, index: Int?, messageBytes: [Int]?, messageChars: [Int]?, messageIDS: [String]?, numCtx: Int?, parentCallID: String?, profile: String?, summaryChars: Int?, systemBytes: Int?, systemChars: Int?, systemPromptSHA: String?, systemSections: [TentacledPromptSectionInfo]?, toolsBytes: Int?, toolsChars: Int?, toolsSHA: String?, windowEstimated: Bool?, windowPlanned: Bool?, costUsd: Double?, failed: Bool?, firstTokenMS: Int?, latencyMS: Int?, loadMS: Int?, price: FluffyCallPrice?, promptMS: Int?, replyMS: Int?, stopReason: String?, textToolCalls: TextToolCalls?, usage: FluffyTokenUsage?, action: ContextChangedDataAction?, afterTokens: Int?, beforeTokens: Int?, count: Int?, reloadMS: Int?, room: Int?, windowFrom: Int?, windowTo: Int?, code: Code?, hint: String?, message: String?, args: [String: JSONAny]?, callID: String?, name: String?, chars: Int?, lines: Int?, path: String?, waiting: Bool?, window: Int?, artifactID: String?, diff: String?, durationMS: Int?, preview: String?, truncated: Bool?, source: String?, subject: String?, decision: Decision?, rule: String?, alternatives: [Answer]?, caps: FluffyConsentCaps?, estimatedUsd: Double?, signal: String?, why: String?, answer: Answer?, todos: [PurpleTodo]?, planID: String?, steps: [FluffyPlanStep]?, added: Int?, changeID: String?, removed: Int?, reverts: String?, hash: String?, how: How?, checks: [FluffyCheckInfo]?, checkID: String?, command: String?, round: Int?, exitCode: Int?, output: String?) {
         self.cwd = cwd
         self.forkedFrom = forkedFrom
         self.modelName = modelName
@@ -11775,6 +11792,7 @@ public struct ParamsData: Codable {
         self.alternatives = alternatives
         self.caps = caps
         self.estimatedUsd = estimatedUsd
+        self.signal = signal
         self.why = why
         self.answer = answer
         self.todos = todos

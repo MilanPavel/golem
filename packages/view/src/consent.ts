@@ -6,6 +6,13 @@ import { formatCost } from "./cost.ts";
 /** The title of the paid step-up question, in the web card and the TUI band. */
 export const CONSENT_TITLE = "Use a paid model for this?";
 
+/** Why golem asks: the sentence of the daemon, or how the model struggles in a run. */
+export function consentReason(consent: PendingConsent): string {
+  if (consent.signal === null) return consent.why;
+  const detail = consent.why.replace(/\.$/, "");
+  return `The model is struggling: ${detail}.`;
+}
+
 /** The label of each answer, in the order they are offered. */
 export const CONSENT_LABELS: Readonly<Record<ConsentChoice, string>> = {
   session: "Allow for this session",

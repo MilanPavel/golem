@@ -357,6 +357,8 @@ class RouteConsentNeededData(BaseModel):
     run. ``why`` is one plain sentence on why golem asks. ``estimated_usd`` is golem's
     estimate for this turn, null when the price is unknown. ``caps`` is set when a cap is.
     ``alternatives`` are the answers the user may give: a spent cap leaves out ``session``.
+    ``signal`` is set when the question comes in the middle of a run, because the model
+    struggled (a struggle signal of the daemon); ``why`` then says how. It is null before a turn.
     """
 
     model_config = _CONFIG
@@ -369,6 +371,7 @@ class RouteConsentNeededData(BaseModel):
     estimated_usd: float | None = Field(default=None, ge=0)
     alternatives: list[ConsentAnswer]
     caps: ConsentCaps | None = None
+    signal: str | None = Field(default=None, min_length=1)
 
 
 class RouteConsentAnsweredData(BaseModel):

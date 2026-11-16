@@ -4,7 +4,7 @@ import { test } from "node:test";
 import type { ChatEvent } from "@golem/client";
 
 import { emptyChat, reduceChat, type PendingConsent } from "./chat-state.ts";
-import { CONSENT_LABELS, CONSENT_TITLE, consentAnswers, consentCapsLine, consentLine } from "./consent.ts";
+import { CONSENT_LABELS, CONSENT_TITLE, consentAnswers, consentCapsLine, consentLine, consentReason } from "./consent.ts";
 
 function ev(type: string, data: Record<string, unknown>, run = "r1"): ChatEvent {
   return { seq: 1, session_id: "s", run_id: run, ts: "t", type, data } as ChatEvent;
@@ -40,6 +40,7 @@ test("route.consent.needed opens the question on the run, and the answer closes 
     why: "This turn does not fit qwen3.8:27b's 32K window.",
     estimatedUsd: 0.0213,
     alternatives: ["session", "once", "local"],
+    signal: null,
     caps: { sessionUsd: 0.5, dailyUsd: 2.0, spentSession: 0.1, spentToday: 0.42 },
   });
   state = reduceChat(state, ev("route.consent.answered", { answer: "once" }));
@@ -94,4 +95,18 @@ test("a daily cap alone, and the answers of a spent cap", () => {
   };
   assert.equal(consentCapsLine(consent), "today $2.00 of $2.00");
   assert.deepEqual(consentAnswers(consent), ["once", "local"]);
+});
+
+test("a question from a struggling model says so, and one before a turn keeps its words", () => {
+  assert.equal(consentReason(asked()), ASKED.why);
+  const state = reduceChat(
+    emptyChat,
+    ev("route.consent.needed", { ...ASKED, why: "a tool call written as text could not be read on small.", signal: "unread_text_call" }),
+  );
+  assert.ok(state.consent);
+  assert.equal(state.consent.signal, "unread_text_call");
+  assert.equal(
+    consentReason(state.consent),
+    "The model is struggling: a tool call written as text could not be read on small.",
+  );
 });
