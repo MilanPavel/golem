@@ -74,3 +74,20 @@ test("contextSegments colours the grid by part, and the glyphs are one cell wide
     assert.equal(fitLine(`${glyph}${glyph}${glyph}`, 3), `${glyph}${glyph}${glyph}`);
   }
 });
+
+test("/context has summary, free, the reserve and cleared rows", () => {
+  const report = {
+    ...CONTEXT_REPORT,
+    context: {
+      ...CONTEXT_REPORT.context,
+      reserve: 4096,
+      cleared: { count: 12, tokens: 11_200 },
+      parts: [...CONTEXT_REPORT.context.parts, { key: "summary" as const, tokens: 1000, chars: 4000, items: [] }],
+    },
+  };
+  const text = contextLines(report, 100).join("\n");
+  assert.match(text, /Summary\s+1\.0K/);
+  assert.match(text, /Reply reserve\s+4\.1K/);
+  assert.match(text, /Cleared · 12 tool results · 11\.2K not sent/);
+  assert.match(text, /\u25A8/);
+});

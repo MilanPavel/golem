@@ -7,6 +7,7 @@ export {
   NOTHING_TO_COMPACT,
   type CompactAction,
 } from "./compact.ts";
+export { branchLine, COMMIT_NOTE, commitTitle, committedLine, failureTail, FAILURE_LINES, SUGGESTING, withSuggestion } from "./commit.ts";
 export { REPLY_CUT_NOTE, replyWasCut } from "./stop.ts";
 export { costReportLines, formatCost, formatCount, referenceName, sessionCostLabel, turnFooterParts, turnTotals, type TurnTotals } from "./cost.ts";
 export { groupTurns, turnFooter, type Turn } from "./turns.ts";
@@ -21,6 +22,7 @@ export {
   failureText,
   forkPoint,
   INSTALL_HINT,
+  noticesAfter,
   LIVE_OUTPUT_CHARS,
   providersUp,
   reduceChat,
@@ -36,6 +38,7 @@ export {
   thinkingLine,
   type ApprovalAnswer,
   type ChatMessage,
+  type ChatNotice,
   type ChatState,
   type DeltaBatcher,
   type MessageCall,
@@ -115,7 +118,14 @@ export {
   CONTEXT_KEYS,
   CONTEXT_LABELS,
   contextBar,
+  clearedLegend,
   clearedNote,
+  contextChangedNote,
+  summaryOfLine,
+  contextRoom,
+  PLANNED_CUT_NOTE,
+  type ContextCell,
+  type ContextChangeData,
   cutNote,
   type CutFields,
   contextCells,

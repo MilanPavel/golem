@@ -1,7 +1,7 @@
 import type { ApprovalChoice, ChatEvent, SkillCall } from "@golem/client";
 
 import { emptyPlan, reducePlan, type PlanState } from "./plan.ts";
-import { emptyLiveContext, foldLiveContext, type LiveContextState } from "./context.ts";
+import { contextChangedNote, emptyLiveContext, foldLiveContext, type ContextChangeData, type LiveContextState } from "./context.ts";
 import { replyWasCut } from "./stop.ts";
 import type { TodoItem } from "./todos.ts";
 
@@ -96,8 +96,30 @@ export type ChatMessage = {
   runId?: string;
 };
 
+/**
+ * One quiet line in the transcript for a change golem made to what it sends: old tool results
+ * cleared, old turns summarised, or the window grown. It is not a message: the model never sees
+ * it and an export does not hold it. `afterId` is the message the line follows, null at the top.
+ */
+export type ChatNotice = {
+  id: string;
+  afterId: string | null;
+  action: ContextChangeData["action"];
+  text: string;
+  at: string;
+};
+
+/** The notices that follow message `id`, or the ones at the top for null. In Quiet, a clear is hidden. */
+export function noticesAfter(notices: readonly ChatNotice[], id: string | null, quiet = false): ChatNotice[] {
+  return notices.filter((notice) => notice.afterId === id && !(quiet && notice.action === "cleared"));
+}
+
 export type ChatState = {
   messages: ChatMessage[];
+  /** What golem did to keep the context small, each placed after the message it followed. */
+  notices: ChatNotice[];
+  /** Tool results cleared since the last run began, for the composer chip. 0 when none. */
+  clearedNow: number;
   busy: boolean;
   error: string | null;
   notice: string | null;
@@ -141,6 +163,8 @@ export type ChatState = {
 
 export const emptyChat: ChatState = {
   messages: [],
+  notices: [],
+  clearedNow: 0,
   busy: false,
   error: null,
   notice: null,
@@ -317,9 +341,21 @@ function reduceChatEvent(state: ChatState, event: ChatEvent): ChatState {
       return event.data.waiting === state.localWait ? state : { ...state, localWait: event.data.waiting };
     case "message.completed":
       return { ...notWaiting(state), messages: upsertCompleted(state.messages, event, state.runStartedAt, state.calls) };
+    case "context.changed": {
+      const notice: ChatNotice = {
+        id: `context-${event.seq}`,
+        afterId: state.messages[state.messages.length - 1]?.id ?? null,
+        action: event.data.action,
+        text: contextChangedNote(event.data),
+        at: event.ts,
+      };
+      const cleared = event.data.action === "cleared" ? state.clearedNow + (event.data.count ?? 0) : state.clearedNow;
+      return { ...state, notices: [...state.notices, notice], clearedNow: cleared };
+    }
     case "run.started":
       return {
         ...state,
+        clearedNow: 0,
         busy: true,
         error: null,
         retry: null,

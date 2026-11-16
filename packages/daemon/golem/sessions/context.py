@@ -77,7 +77,7 @@ def _stubbed(
     for m in messages:
         if m.role == "tool" and m.id is not None and m.id in cleared_ids:
             note = stub_text(names.get(m.call_id or ""), len(m.text))
-            shown.append(m.model_copy(update={"text": note}))
+            shown.append(m.model_copy(update={"text": note, "original": m.text}))
             saved.append(max(0, len(m.text) - len(note)))
         else:
             shown.append(m)
@@ -97,6 +97,8 @@ def context_breakdown(
     messages: Sequence[TraceMessage],
     cleared_ids: Collection[str] = (),
     summary_chars: int = 0,
+    window_planned: bool = False,
+    reserve: int | None = None,
 ) -> tuple[TraceContext, list[TraceMessage]]:
     """The context of one model call, and ``messages`` with ``tokens`` set on each.
 
@@ -167,5 +169,7 @@ def context_breakdown(
         num_ctx=num_ctx,
         estimated=True,
         parts=parts,
+        window_planned=window_planned,
+        reserve=None if window is None else reserve,
     )
     return context, sized

@@ -6,6 +6,7 @@ import {
   diffCounts,
   diffExcerpt,
   formatDuration,
+  noticesAfter,
   parseDiff,
   planFooter,
   planOfCall,
@@ -19,6 +20,7 @@ import {
   writingLabel,
   type ChangesState,
   type ChatMessage,
+  type ChatNotice,
   type Detail,
   type DiffExcerpt,
   type DiffLine,
@@ -85,6 +87,8 @@ export type TranscriptOptions = {
   thinking?: boolean;
   /** How many diff rows an edit shows under its line: none, 10 or 30. Unset is `normal`. */
   detail?: Detail;
+  /** What golem cleared or summarised, each drawn dim after the message it followed. */
+  notices?: readonly ChatNotice[];
   /** Whole seconds since the first `tool.writing` of the call a reply is writing. Unset counts 0. */
   writingSeconds?: (messageId: string) => number;
   /** The files each turn changed. With it, a finished turn that changed files ends in one summary row. */
@@ -108,6 +112,15 @@ const TOOL_MARKS: Record<ToolBlock["status"], string> = {
 
 export const INTERRUPTED_MARK = "· interrupted";
 
+/** One dim row for each notice: `⊖ golem cleared 12 old tool results · ctx 71% → 38%`. */
+function pushNotices(lines: LayoutLine[], notices: readonly ChatNotice[], width: number): void {
+  for (const notice of notices) {
+    for (const spans of wrapSpans([{ text: `⊖ ${notice.text}`, dim: true }], width)) {
+      lines.push(wrappedLine("plain", spans));
+    }
+  }
+}
+
 export function layoutMessages(
   messages: readonly ChatMessage[],
   columns: number,
@@ -115,6 +128,7 @@ export function layoutMessages(
 ): LayoutLine[] {
   const width = Math.max(1, columns);
   const lines: LayoutLine[] = [];
+  pushNotices(lines, noticesAfter(options?.notices ?? [], null), width);
   let previous: ChatMessage | undefined;
   let runStart = 0;
   for (const [index, message] of messages.entries()) {
@@ -183,6 +197,7 @@ export function layoutMessages(
         }
       }
     }
+    pushNotices(lines, noticesAfter(options?.notices ?? [], message.id), width);
   }
   return lines;
 }

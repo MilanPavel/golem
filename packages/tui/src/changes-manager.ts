@@ -1,6 +1,7 @@
 import type { ChangedFile, ChangesRevertTarget } from "@golem/client";
 import { parseDiff, type DiffLine, type DiffTone } from "@golem/view";
 
+import { layoutCommitBand, type CommitBand } from "./commit-band.ts";
 import { clampDiffOffset } from "./diff-view.ts";
 import type { Press } from "./keys.ts";
 
@@ -14,6 +15,10 @@ export type ChangesManagerState = {
   file: number;
   hunk: number;
   offset: number;
+  /** The commit band, while it is open. */
+  commit?: CommitBand | null;
+  /** A line of news, such as the hash of a commit, shown in front of the key hint. */
+  note?: string | null;
   /** An undo waits for `y` or `n` in the hint row. */
   confirm: ChangesRevertTarget | null;
   /** A line that replaces the hint until the next key. */
@@ -40,13 +45,16 @@ export type ChangesKey =
   | "back"
   | "undo-hunk"
   | "undo-file"
-  | "yes";
+  | "yes"
+  | "commit";
 
 export type ChangesAction =
   | { kind: "none" }
   | { kind: "close" }
   | { kind: "load"; path: string }
-  | { kind: "revert"; target: ChangesRevertTarget };
+  | { kind: "revert"; target: ChangesRevertTarget }
+  /** `g`: ask git about the folder, then open the commit band. */
+  | { kind: "commit-info" };
 
 export type ChangesTone = DiffTone | "plain";
 
@@ -67,7 +75,7 @@ export type ChangesLine = {
 export const WIDE_COLUMNS = 100;
 const LEFT_WIDTH = 28;
 const PAGE = 10;
-const HINT = "↑↓ file · n/p hunk · PgUp/PgDn scroll · u undo hunk · U undo file · esc back";
+const HINT = "↑↓ file · n/p hunk · PgUp/PgDn scroll · u undo hunk · U undo file · g commit · esc back";
 export const WAIT_MESSAGE = "Wait for golem to finish.";
 const BARE_HINT = "esc back";
 
@@ -100,6 +108,9 @@ export function changesKeyOf(press: Press): ChangesKey | null {
     }
     if (press.input === "p") {
       return "prev-hunk";
+    }
+    if (press.input === "g") {
+      return "commit";
     }
     if (press.input === "u") {
       return "undo-hunk";
@@ -158,6 +169,9 @@ export function pressChanges(
   const path = files[file]?.path;
   if (path === undefined) {
     return { state, action: none };
+  }
+  if (key === "commit") {
+    return { state, action: { kind: "commit-info" } };
   }
   if (key === "up" || key === "down") {
     const next = clamp(file + (key === "up" ? -1 : 1), files.length);
@@ -243,7 +257,14 @@ export function layoutChanges(
     ...extra,
   });
   const files = data.files;
-  const room = Math.max(0, rows - 2);
+  const band =
+    state.commit === null || state.commit === undefined
+      ? null
+      : layoutCommitBand(state.commit, width).map(
+          (row): ChangesLine => ({ left: null, text: row.text, tone: row.tone === "del" ? "del" : "plain", bold: row.bold === true, dim: row.dim === true }),
+        );
+  // The band takes the rows of the key hint and more.
+  const room = Math.max(0, rows - 1 - (band === null ? 1 : band.length));
   let title = "changes";
   let body: ChangesLine[];
   let hint = BARE_HINT;
@@ -256,7 +277,7 @@ export function layoutChanges(
     body = [plain("No changes yet.")];
   } else {
     title = titleOf(files);
-    hint = HINT;
+    hint = state.note === undefined || state.note === null ? HINT : `${state.note} · ${HINT}`;
     const file = clamp(state.file, files.length);
     const chosen = files[file];
     const path = chosen?.path ?? "";
@@ -291,7 +312,7 @@ export function layoutChanges(
     plain(title, { bold: true }),
     ...body.slice(0, room),
     ...Array.from({ length: Math.max(0, room - body.length) }, () => plain("")),
-    plain(hint, { dim: true }),
+    ...(band ?? [plain(hint, { dim: true })]),
   ];
   return lines.slice(0, Math.max(0, rows));
 }

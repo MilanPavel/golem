@@ -11,15 +11,19 @@ export function ContextChipView({
   used,
   window,
   windowEstimated = false,
+  cleared = 0,
   onOpen,
 }: {
   used: number;
   window: number | null;
   windowEstimated?: boolean;
+  /** Tool results golem cleared since the last turn began. */
+  cleared?: number;
   onOpen: () => void;
 }) {
   const share = contextShare(used, window);
-  const text = share === null ? `ctx ${formatTokens(used)}` : `ctx ${windowEstimated ? "≈" : ""}${contextPercent(share)}%`;
+  const base = share === null ? `ctx ${formatTokens(used)}` : `ctx ${windowEstimated ? "≈" : ""}${contextPercent(share)}%`;
+  const text = cleared > 0 ? `${base} · ${cleared} cleared` : base;
   const summary = contextSummary(used, window, windowEstimated);
   const why = windowEstimated && share !== null ? " golem read this window from Ollama. It was not sent." : "";
   return (
@@ -38,7 +42,8 @@ export function ContextChipView({
 /** The chip for a session, from its live events. Nothing until a model call has reported its input. */
 export function ContextChip({ sessionId }: { sessionId: string }) {
   const last = useSession(sessionId, (view) => view.context.last);
+  const cleared = useSession(sessionId, (view) => view.chat.clearedNow);
   const navigate = useNavigate();
   if (last === null) return null;
-  return <ContextChipView used={last.used} window={last.window} windowEstimated={last.windowEstimated} onOpen={() => navigate(inspectPath(sessionId, last.spanId), { replace: true })} />;
+  return <ContextChipView used={last.used} window={last.window} windowEstimated={last.windowEstimated} cleared={cleared} onOpen={() => navigate(inspectPath(sessionId, last.spanId), { replace: true })} />;
 }

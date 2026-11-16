@@ -1,6 +1,6 @@
-import type { ArtifactReadResult, TraceGetResult, TraceMessage, TraceModelSpan, TraceRunSpan, TraceSpan, TraceSpanResult, TraceTokens, TraceToolSpan } from "@golem/client";
+import type { ArtifactReadResult, TraceContextEvent, TraceGetResult, TraceMessage, TraceModelSpan, TraceRunSpan, TraceSpan, TraceSpanResult, TraceTokens, TraceToolSpan } from "@golem/client";
 
-export type { ArtifactReadResult, TraceGetResult, TraceMessage, TraceModelSpan, TraceRunSpan, TraceSpan, TraceSpanResult, TraceTokens, TraceToolSpan };
+export type { ArtifactReadResult, TraceContextEvent, TraceGetResult, TraceMessage, TraceModelSpan, TraceRunSpan, TraceSpan, TraceSpanResult, TraceTokens, TraceToolSpan };
 
 /** Any span of the tree. */
 export type TraceNode = TraceRunSpan | TraceModelSpan | TraceToolSpan;

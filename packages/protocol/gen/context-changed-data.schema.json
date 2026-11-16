@@ -63,6 +63,19 @@
       "default": null,
       "title": "Reload Ms"
     },
+    "room": {
+      "anyOf": [
+        {
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Room"
+    },
     "window_from": {
       "anyOf": [
         {

@@ -132,6 +132,9 @@ export function fakeClient() {
     changesList: vi.fn<PageClient["changesList"]>(async () => ({ files: [] })),
     changesDiff: vi.fn<PageClient["changesDiff"]>(async () => ({ diff: "", truncated: false })),
     changesRevert: vi.fn<PageClient["changesRevert"]>(async () => ({ reverted: [], conflicts: [] })),
+    changesCommit: vi.fn<PageClient["changesCommit"]>(async () => ({ ok: true, sha: "a1b2c3d", output: "" })),
+    changesCommitInfo: vi.fn<PageClient["changesCommitInfo"]>(async () => ({ repository: false, branch: null, paths: [] })),
+    changesSuggestMessage: vi.fn<PageClient["changesSuggestMessage"]>(async () => ({ message: "" })),
     readFile: vi.fn<PageClient["readFile"]>(async (_id, path) => ({ path, text: "", truncated: false, lines: 0 })),
     listFiles: vi.fn<PageClient["listFiles"]>(async () => ({ paths: [], more: false })),
     getCost: vi.fn<PageClient["getCost"]>(async () => ({
