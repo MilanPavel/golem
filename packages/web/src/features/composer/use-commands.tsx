@@ -14,6 +14,7 @@ import {
   modeChanged,
   modeReport,
   modelNames,
+  planChanged,
   namesModel,
   pickerName,
   pinnableSkills,
@@ -262,6 +263,15 @@ export function useCommands({ session, cwd, typing, send }: UseCommandsOptions):
               return say(modeChanged(found.mode, fallback));
             } catch (err) {
               return fail(err, "Could not change the mode.");
+            }
+          }
+          case "plan": {
+            const on = found.on === "toggle" ? !view.chat.plan.on : found.on;
+            try {
+              await actions.setPlan(sessionId, on);
+              return say(planChanged(on));
+            } catch (err) {
+              return fail(err, "Could not change plan first.");
             }
           }
           case "changes":

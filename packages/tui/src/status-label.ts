@@ -77,6 +77,7 @@ export const STATUS_PRIORITY = {
   title: 80,
   model: 60,
   mode: 58,
+  plan: 59,
   fresh: 55,
   context: 50,
   tune: 48,
@@ -255,6 +256,8 @@ export function statusSegments(input: {
   tune?: string;
   /** The permission mode the session runs in: `balanced`. */
   mode?: string;
+  /** The session is in plan first. */
+  plan?: boolean;
   /** The session's cost so far, as `$0.03`. Empty until a call has cost something. */
   cost?: string;
   /** How many files the session changed. The segment is hidden at 0. */
@@ -267,6 +270,7 @@ export function statusSegments(input: {
     segment("model", input.model, STATUS_PRIORITY.model, "model"),
     segment("mode", input.mode ?? "", STATUS_PRIORITY.mode, "dim"),
     segment("context", contextLabel(input.context ?? null), STATUS_PRIORITY.context, contextTone(input.context ?? null)),
+    segment("plan", input.plan === true ? "◇ plan" : "", STATUS_PRIORITY.plan, "fresh"),
     segment("tune", input.tune ?? "", STATUS_PRIORITY.tune, "dim"),
     segment("skills", skillsLabel(input.skills ?? [], input.skippedSkills ?? []), STATUS_PRIORITY.skills, "dim"),
     segment("changed", changedLabel(input.changedFiles ?? 0), STATUS_PRIORITY.changed, "dim"),

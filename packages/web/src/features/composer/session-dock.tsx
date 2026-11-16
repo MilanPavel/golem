@@ -8,6 +8,7 @@ import { DockedApproval } from "../approval/docked-approval.tsx";
 import { DockedChecksQuestion } from "./checks-question.tsx";
 import { Composer } from "./composer.tsx";
 import { ModeChip } from "./mode-chip.tsx";
+import { PlanChip } from "./plan-chip.tsx";
 import { NotesChip } from "./notes-chip.tsx";
 import { ContextChip } from "./context-chip.tsx";
 import { TuneChip } from "./tune-chip.tsx";
@@ -91,10 +92,14 @@ export function SessionDock({ sessionId }: { sessionId: string }) {
     mutationFn: (mode: PermissionMode | null) => actions.setMode(sessionId, mode),
   });
 
+  const setPlan = useMutation({
+    mutationFn: (on: boolean) => actions.setPlan(sessionId, on),
+  });
+
   const phase = run.waiting ? "waiting" : run.busy ? "thinking" : null;
   const state = golemState({ connection, phase, error: run.failed });
   const failure = send.error ?? stop.error;
-  const line = commands.error ?? (setMode.error ? actionErrorText(setMode.error, "Could not change the mode.") : failure ? sendErrorText(failure) : null);
+  const line = commands.error ?? (setMode.error ? actionErrorText(setMode.error, "Could not change the mode.") : setPlan.error ? actionErrorText(setPlan.error, "Could not change plan first.") : failure ? sendErrorText(failure) : null);
   return (
     <>
       <DockView
@@ -105,6 +110,7 @@ export function SessionDock({ sessionId }: { sessionId: string }) {
               <span className="flex items-center gap-2">
                 <NotesChip sessionId={sessionId} />
                 <TuneChip sessionId={sessionId} />
+                <PlanChip sessionId={sessionId} onToggle={(on) => setPlan.mutate(on)} />
                 <ModeChip sessionId={sessionId} onSelect={(mode) => setMode.mutate(mode)} />
                 <ContextChip sessionId={sessionId} />
               </span>

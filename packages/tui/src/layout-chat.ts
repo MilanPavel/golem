@@ -17,6 +17,9 @@ import {
   formatDuration,
   noticesAfter,
   parseDiff,
+  planFooter,
+  planOfCall,
+  PROPOSE_PLAN_TOOL,
   REPLY_CUT_NOTE,
   thinkingLine,
   turnFooterParts,
@@ -30,6 +33,7 @@ import {
   type Detail,
   type DiffExcerpt,
   type DiffLine,
+  type PlanStepView,
   type ToolBlock,
 } from "@golem/view";
 import { formatMessageTime } from "./transcript.ts";
@@ -345,6 +349,10 @@ export const UNSUCCESSFUL_MARK = "✗";
 
 /** `read_file src/a.ts ✓  12 lines`, then the output while Ctrl-O is on. */
 export function toolLines(tool: ToolBlock, width: number, expanded: boolean, detail: Detail = "normal"): Span[][] {
+  const plan = tool.name === PROPOSE_PLAN_TOOL && tool.status !== "failed" ? planOfCall(tool.args) : null;
+  if (plan !== null) {
+    return planLines(plan, width);
+  }
   if (isFinishedEdit(tool)) {
     return editLines(tool, tool.diff, width, expanded, detail);
   }
@@ -384,6 +392,25 @@ export function toolLines(tool: ToolBlock, width: number, expanded: boolean, det
   if (tool.artifactId !== undefined) {
     lines.push(...wrapSpans([{ text: `  │ all of it: /artifact ${tool.artifactId}`, dim: true }], width));
   }
+  return lines;
+}
+
+/**
+ * A plan as rows, in place of the `propose_plan` call's line:
+ * `◇ plan  title`, then each step numbered with its files dim, then the footer.
+ */
+export function planLines(plan: { title: string; steps: readonly PlanStepView[] }, width: number): Span[][] {
+  const lines = wrapSpans([{ text: "◇ plan", warn: true }, { text: `  ${visibleText(plan.title)}`, bold: true }], width);
+  const digits = String(plan.steps.length).length;
+  for (const [index, step] of plan.steps.entries()) {
+    const number = `${String(index + 1).padStart(digits)}. `;
+    const spans: Span[] = [{ text: `  ${number}${visibleText(step.text)}` }];
+    if (step.files.length > 0) {
+      spans.push({ text: `  ${step.files.map(visibleText).join(" · ")}`, dim: true });
+    }
+    lines.push(...wrapSpans(spans, width));
+  }
+  lines.push(...wrapSpans([{ text: `  ${planFooter(plan)}`, dim: true }], width));
   return lines;
 }
 

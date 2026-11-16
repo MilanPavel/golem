@@ -144,8 +144,11 @@ import {
   tuneState,
   tuneChip,
   effectiveMode,
+  BUILD_TEXT,
   checksChanged,
   modeChanged,
+  PLAN_KEYS,
+  planChanged,
   modeReport,
   nextMode,
   type PermissionMode,
@@ -232,6 +235,7 @@ import {
 } from "./suggest.ts";
 import { frameBudget, frameColumns, layoutComposer, moveRow } from "./chrome.ts";
 import { peekTip, takeTip, tipCounterPath } from "./tip-counter.ts";
+import { planOffered as planOfferedAt } from "./plan-offer.ts";
 import { bannerRow, EXPORT_HINT_MS, hintFor, liveHint, type BannerRow, type Hint } from "./hint.ts";
 import { holdDebugOffset, layoutDebug, type CheckpointMessage, type DebugTone } from "./debug-view.ts";
 import { Header } from "./header.tsx";
@@ -740,9 +744,10 @@ export function App({
     warmModels.current.add(chip);
   }
   const unreadNotice = chat.unreadCall ? unreadCallNotice("tui") : null;
+  const planNotice = planOffered() && panel === null ? PLAN_KEYS : null;
   const banner = asking
     ? RETRY_QUESTION
-    : (keychainNotice(keychainWaiting) ?? chat.error ?? serviceText ?? warming ?? chat.notice ?? unreadNotice ?? setupLine ?? welcomeLine);
+    : (keychainNotice(keychainWaiting) ?? chat.error ?? serviceText ?? warming ?? chat.notice ?? unreadNotice ?? planNotice ?? setupLine ?? welcomeLine);
   const hintText = liveHint(hint, Date.now())?.text ?? null;
   const suggestMatches =
     chat.busy ||
@@ -1026,6 +1031,7 @@ export function App({
       skippedSkills: chat.skippedSkills,
       context: sessionId === null ? null : chat.context.last,
       mode: sessionId === null ? "" : effectiveMode(chat.permissionMode, defaultMode),
+      plan: sessionId !== null && chat.plan.on,
       cost: sessionId === null ? "" : sessionCostLabel(chat.messages),
       tune: sessionId === null || chipTune === null ? "" : tuneChip(withSession(chipTune, chat.options), model.provider),
     }),
@@ -2041,6 +2047,25 @@ export function App({
         return;
       }
       changeMode(current, outcome.mode);
+      return;
+    }
+    if (outcome.kind === "plan") {
+      setDraft(draftAt(""));
+      const current = sessionRef.current;
+      if (current === null) {
+        setChat((state) => ({ ...state, notice: "open a session first" }));
+        return;
+      }
+      const on = outcome.on === "toggle" ? !chatRef.current.plan.on : outcome.on;
+      client.setPlan(current, on).then(
+        () => {
+          const notice = planChanged(on);
+          setChat((state) => ({ ...state, notice }));
+        },
+        (error: unknown) => {
+          setChat((state) => ({ ...state, notice: messageOf(error) }));
+        },
+      );
       return;
     }
     if (outcome.kind === "skill-pin") {
@@ -4649,11 +4674,38 @@ export function App({
       }
       return;
     }
+    if (press.name === "return" && !keysOpenRef.current && planOffered()) {
+      buildPlan();
+      return;
+    }
     if (onStarterPress(press.name)) {
       return;
     }
     applyKeyEffect(pressKey(currentPlace(), press));
   });
+
+  /** The newest plan waits for an answer and nothing else has the keys: Enter on an empty composer builds it. */
+  function planOffered(): boolean {
+    return planOfferedAt(chatRef.current.plan, currentPlace(), {
+      retry: retryOffer() !== null,
+      install: installRef.current !== null,
+      setup: setupRef.current !== null,
+    });
+  }
+
+  /** "Build it": plan first goes off, then the build message is sent as any other. */
+  function buildPlan(): void {
+    const current = sessionRef.current;
+    if (current === null) {
+      return;
+    }
+    client.setPlan(current, false).then(
+      () => sendText(BUILD_TEXT),
+      (error: unknown) => {
+        setChat((state) => ({ ...state, notice: messageOf(error) }));
+      },
+    );
+  }
 
   /** Down moves into the starter prompts, and Enter puts one in the composer. True when the key was theirs. */
   function onStarterPress(name: string | null): boolean {

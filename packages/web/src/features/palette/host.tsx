@@ -1,6 +1,6 @@
-import { COMMANDS } from "@golem/view";
+import { COMMANDS, planPaletteLabel } from "@golem/view";
 import { useEffect, useRef } from "react";
-import { useNavigate, useRoute } from "../../store/page-context.tsx";
+import { useNavigate, useRoute, useSessionSlice } from "../../store/page-context.tsx";
 import { settingsPath, tracePath } from "../../store/router.ts";
 import { hasMod } from "../../ui/platform.ts";
 import { requestNewSkill } from "../settings/index.ts";
@@ -57,6 +57,9 @@ export function PaletteHost() {
   const navigate = useNavigate();
   const route = useRoute();
   const sessionId = route.name === "session" || route.name === "trace" ? route.id : null;
+  const planOn = useSessionSlice(sessionId, (view) => view.chat.plan.on);
+  // The row for /plan says whether plan first is on in the open session.
+  const commands = sessionId === null ? COMMANDS : COMMANDS.map((command) => (command.name === "/plan" ? { ...command, description: `${planPaletteLabel(planOn)}. Choosing it turns it ${planOn ? "off" : "on"}.` } : command));
   const then = useRef<(() => void) | null>(null);
   // Kept while a dialog closes, when `open` is already null.
   const returnTo = useRef<HTMLElement | null>(null);
@@ -126,7 +129,7 @@ export function PaletteHost() {
         hasComposer={hasComposer}
         hasSession={sessionId !== null}
         onPick={pick}
-        commands={COMMANDS}
+        commands={commands}
       />
       <KeysDialog
         open={open?.dialog === "keys"}
