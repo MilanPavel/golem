@@ -71,7 +71,7 @@ from golem.graphs.state import SCHEMA_VERSION, AgentState
 from golem.graphs.step_up import NextModel, StepRequest
 from golem.graphs.struggle import Struggle, detect
 from golem.graphs.summarise import Summariser
-from golem.graphs.text_calls import recover
+from golem.graphs.text_calls import recover, recover_json
 from golem.graphs.tools_node import (
     ALLOWED_KEY,
     ASKED_KEY,
@@ -945,15 +945,28 @@ def open_chat(
             update["tool_calls"] = []
         elif response.tool_calls:
             update["tool_calls"] = _with_ids(response.tool_calls)
-        elif schemas and binder.offers(profile) and "<function=" in message_text(response):
-            recovered = recover(message_text(response), schemas)
-            if recovered is not None:
-                update["content"], update["tool_calls"] = recovered
-                text_tool_calls = "recovered"
-                log.info("%s wrote %d tool call(s) as text; recovered", profile, len(recovered[1]))
+        elif schemas and binder.offers(profile):
+            reply = message_text(response)
+            if "<function=" in reply:
+                recovered = recover(reply, schemas)
+                if recovered is not None:
+                    update["content"], update["tool_calls"] = recovered
+                    text_tool_calls = "recovered"
+                    log.info(
+                        "%s wrote %d tool call(s) as text; recovered", profile, len(recovered[1])
+                    )
+                else:
+                    text_tool_calls = "unread"
+                    log.info("%s wrote a tool call as text that could not be read", profile)
             else:
-                text_tool_calls = "unread"
-                log.info("%s wrote a tool call as text that could not be read", profile)
+                found = recover_json(reply, schemas)
+                if isinstance(found, list):
+                    update["content"], update["tool_calls"] = "", found
+                    text_tool_calls = "recovered"
+                    log.info("%s wrote %d tool call(s) as JSON; recovered", profile, len(found))
+                elif found == "unread":
+                    text_tool_calls = "unread"
+                    log.info("%s wrote a tool call as JSON that could not be read", profile)
         response_item: dict[str, object] = {
             STREAM_KEY: "model.response",
             "message_id": message_id,

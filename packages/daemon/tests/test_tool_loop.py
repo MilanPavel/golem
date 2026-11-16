@@ -221,6 +221,49 @@ async def test_a_call_written_as_text_that_cannot_be_read_is_marked_unread(
     assert [m.text for m in stored if isinstance(m, AIMessage)] == [leaked]
 
 
+async def test_a_call_written_as_json_runs_as_a_tool_call(
+    database: Database, project: Path
+) -> None:
+    leaked = '{"type":"function","function":{"name":"read_file","parameters":{"path":"notes.txt"}}}'
+    model = ToolCallingChatModel(replies=[leaked, "It says 42."])
+    chat = _chat(database, model)
+    session_id = await chat.manager.create(None, cwd=str(project))
+    events = await chat.finished(await chat.manager.send(session_id, "what is in notes?"))
+
+    assert len([e for e in events if isinstance(e, ToolCompletedEvent)]) == 1
+    assert events[-1].type == "run.completed"
+    stored = _messages(await chat.runtime.values(session_id))
+    assistant = [m for m in stored if isinstance(m, AIMessage)]
+    assert assistant[0].text == ""
+    assert [(c["name"], c["args"]) for c in assistant[0].tool_calls] == [
+        ("read_file", {"path": "notes.txt"})
+    ]
+    marks = [e.data.text_tool_calls for e in events if isinstance(e, ModelCallCompletedEvent)]
+    assert marks == ["recovered", None]
+
+
+async def test_a_call_written_as_json_that_cannot_be_read_is_marked_unread(
+    database: Database, project: Path
+) -> None:
+    leaked = '{"name": "format_disk", "parameters": {}}'
+    chat = _chat(database, ToolCallingChatModel(replies=[leaked]))
+    session_id = await chat.manager.create(None, cwd=str(project))
+    events = await chat.finished(await chat.manager.send(session_id, "what is in notes?"))
+
+    assert not [event for event in events if isinstance(event, ToolCompletedEvent)]
+    (done,) = [e for e in events if isinstance(e, ModelCallCompletedEvent)]
+    assert done.data.text_tool_calls == "unread"
+
+
+async def test_json_that_is_not_a_call_stays_an_answer(database: Database, project: Path) -> None:
+    chat = _chat(database, ToolCallingChatModel(replies=['{"answer": 42}']))
+    session_id = await chat.manager.create(None, cwd=str(project))
+    events = await chat.finished(await chat.manager.send(session_id, "give me json"))
+
+    (done,) = [e for e in events if isinstance(e, ModelCallCompletedEvent)]
+    assert done.data.text_tool_calls is None
+
+
 async def test_a_path_outside_the_folder_fails_and_the_model_hears_why(
     database: Database, project: Path
 ) -> None:

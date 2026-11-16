@@ -5,6 +5,9 @@ instead of a real tool call. Ollama only reads such a call after the model's
 opening ``<tool_call>`` token, so a reply that leaves it out comes back as plain
 text with no tool calls. :func:`recover` turns well-formed markup for an offered
 tool back into calls. It is strict: a reply is recovered whole or not at all.
+
+Small Llama models write the JSON form instead, a reply that is nothing but call
+objects. :func:`recover_json` reads that form the same strict way.
 """
 
 from __future__ import annotations
@@ -12,7 +15,7 @@ from __future__ import annotations
 import json
 import re
 from collections.abc import Mapping
-from typing import cast
+from typing import Literal, cast
 
 from langchain_core.messages.tool import ToolCall
 
@@ -25,6 +28,16 @@ _BLOCK = re.compile(
     re.DOTALL,
 )
 _PARAMETERS = re.compile(_PARAMETER, re.DOTALL)
+_FENCE = re.compile(r"```[A-Za-z]*[ \t]*\n?(.*?)\s*```", re.DOTALL)
+
+# A reply that opens like a call object: broken JSON after this is a call that cannot be read.
+_CALL_START = re.compile(
+    r'\{\s*"(?:type"\s*:\s*"function"|function"\s*:\s*\{|name"\s*:\s*"[^"]*"\s*,\s*"(?:parameters|arguments)")'
+)
+MAX_MISSING_BRACES = 3
+
+Unread = Literal["unread"]
+"""The reply is shaped like a call, but its tool or a key is not offered."""
 
 
 def recover(text: str, schemas: list[dict[str, object]]) -> tuple[str, list[ToolCall]] | None:
@@ -54,6 +67,108 @@ def recover(text: str, schemas: list[dict[str, object]]) -> tuple[str, list[Tool
     if not calls or "<function=" in rest:
         return None
     return rest.rstrip(), calls
+
+
+def recover_json(text: str, schemas: list[dict[str, object]]) -> list[ToolCall] | Unread | None:
+    """The calls a reply wrote as JSON objects, ``"unread"``, or None for no call.
+
+    The whole reply, after trimming and removing one code fence, must be one
+    object or several in a row, each shaped like ``{"type": "function",
+    "function": {"name": …, "parameters": {…}}}`` or ``{"name": …, "parameters":
+    {…}}``; ``arguments`` means ``parameters`` and may be a JSON string. Any
+    other reply is no call. Calls are recovered whole: when one names a tool
+    that was not offered or a key the tool does not have, the result is
+    ``"unread"``. A reply that leaves out its last closing braces is read with
+    them added; one that opens like a call but is broken JSON is ``"unread"``.
+    """
+    body = _unfenced(text)
+    objects = _objects(body) or _closed(body)
+    if not objects:
+        return "unread" if _CALL_START.match(body) and _broken(body) else None
+    shaped: list[tuple[str, object]] = []
+    for obj in objects:
+        found = _shaped(obj)
+        if found is None:
+            return None
+        shaped.append(found)
+    offered = _offered(schemas)
+    calls: list[ToolCall] = []
+    for name, raw in shaped:
+        properties = offered.get(name)
+        if isinstance(raw, str):
+            try:
+                raw = cast(object, json.loads(raw))
+            except ValueError:
+                return "unread"
+        if properties is None or not isinstance(raw, dict):
+            return "unread"
+        args = cast(dict[str, object], raw)
+        if any(key not in properties for key in args):
+            return "unread"
+        calls.append(ToolCall(name=name, args=args, id=new_id("c")))
+    return calls
+
+
+def _unfenced(text: str) -> str:
+    text = text.strip()
+    fence = _FENCE.fullmatch(text)
+    return fence.group(1) if fence else text
+
+
+def _objects(text: str) -> list[dict[str, object]]:
+    """The JSON objects ``text`` is made of, or none when it holds anything else."""
+    decoder = json.JSONDecoder()
+    objects: list[dict[str, object]] = []
+    at = 0
+    while at < len(text):
+        if text[at].isspace():
+            at += 1
+            continue
+        try:
+            value, at = cast(tuple[object, int], decoder.raw_decode(text, at))
+        except ValueError:
+            return []
+        if not isinstance(value, dict):
+            return []
+        objects.append(cast(dict[str, object], value))
+    return objects
+
+
+def _broken(text: str) -> bool:
+    """Whether ``text`` does not even start with one whole JSON value."""
+    try:
+        json.JSONDecoder().raw_decode(text)
+    except ValueError:
+        return True
+    return False
+
+
+def _closed(text: str) -> list[dict[str, object]]:
+    """``text`` read with its missing closing braces added, for a reply that stops early.
+
+    Small models often leave out the last brace or two of a call. Up to three are added.
+    """
+    for missing in range(1, MAX_MISSING_BRACES + 1):
+        objects = _objects(text + "}" * missing)
+        if objects:
+            return objects
+    return []
+
+
+def _shaped(obj: dict[str, object]) -> tuple[str, object] | None:
+    """The tool name and raw arguments of a call-shaped object, else None."""
+    if "function" in obj:
+        inner = obj["function"]
+        if set(obj) != {"type", "function"} or obj["type"] != "function":
+            return None
+        if not isinstance(inner, dict):
+            return None
+        obj = cast(dict[str, object], inner)
+    name = obj.get("name")
+    keys = set(obj) - {"name"}
+    if not isinstance(name, str) or len(keys) != 1 or not keys <= {"parameters", "arguments"}:
+        return None
+    return name, obj[keys.pop()]
 
 
 def _args(body: str, properties: Mapping[str, object]) -> dict[str, object] | None:

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from golem.graphs.text_calls import recover
+from golem.graphs.text_calls import recover, recover_json
 from golem.tools import default_registry
 
 SCHEMAS = default_registry().schemas()
@@ -129,3 +129,86 @@ def test_text_without_markup_recovers_nothing() -> None:
 
 def test_no_offered_tools_recovers_nothing() -> None:
     assert recover(LIST, []) is None
+
+
+READ_JSON = '{"name": "read_file", "parameters": {"path": "a.txt"}}'
+FENCE = "`" * 3
+
+
+def _json(text: str) -> list[tuple[str, dict[str, object]]] | str | None:
+    found = recover_json(text, SCHEMAS)
+    if found is None or isinstance(found, str):
+        return found
+    return [(c["name"], c["args"]) for c in found]
+
+
+def test_the_function_shape_is_recovered() -> None:
+    text = '{"type":"function","function":{"name":"read_file","parameters":{"path":"a.txt"}}}'
+    assert _json(text) == [("read_file", {"path": "a.txt"})]
+
+
+def test_the_name_and_parameters_shape_is_recovered() -> None:
+    assert _json(READ_JSON) == [("read_file", {"path": "a.txt"})]
+    found = recover_json(READ_JSON, SCHEMAS)
+    assert isinstance(found, list) and found[0]["id"]
+
+
+def test_the_name_and_arguments_shape_is_recovered() -> None:
+    assert _json('{"name": "list_dir", "arguments": {}}') == [("list_dir", {})]
+
+
+def test_a_fenced_call_is_recovered() -> None:
+    assert _json(f"{FENCE}json\n{READ_JSON}\n{FENCE}\n") == [("read_file", {"path": "a.txt"})]
+
+
+def test_two_objects_in_a_row_are_two_calls() -> None:
+    text = f'{READ_JSON}\n{{"name": "list_dir", "parameters": {{}}}}'
+    assert _json(text) == [("read_file", {"path": "a.txt"}), ("list_dir", {})]
+
+
+def test_arguments_as_a_string_are_parsed() -> None:
+    text = '{"name": "read_file", "arguments": "{\\"path\\": \\"a.txt\\"}"}'
+    assert _json(text) == [("read_file", {"path": "a.txt"})]
+
+
+def test_a_json_call_to_an_unknown_tool_is_unreadable() -> None:
+    assert _json('{"name": "format_disk", "parameters": {}}') == "unread"
+
+
+def test_a_json_call_with_an_unknown_key_is_unreadable() -> None:
+    assert _json('{"name": "read_file", "parameters": {"file": "a.txt"}}') == "unread"
+
+
+def test_one_bad_json_call_makes_the_whole_reply_unreadable() -> None:
+    assert _json(f'{READ_JSON}\n{{"name": "format_disk", "parameters": {{}}}}') == "unread"
+
+
+def test_json_that_is_not_a_call_is_no_call() -> None:
+    assert _json('{"answer": 42}') is None
+    assert _json('{"name": "read_file"}') is None
+    assert _json('[{"name": "read_file", "parameters": {}}]') is None
+    assert _json("42") is None
+    assert _json("") is None
+
+
+def test_prose_with_json_inside_is_no_call() -> None:
+    assert _json(f"I will call it now: {READ_JSON}") is None
+    assert _json(f"{READ_JSON}\nThat reads the file.") is None
+    assert _json(f"{FENCE}json\n{READ_JSON}\n{FENCE}\nDone.") is None
+
+
+def test_a_call_that_leaves_out_its_last_braces_is_read() -> None:
+    text = '{"type":"function","function":{"name":"read_file","parameters":{"path":"a.txt"}}'
+    assert _json(text) == [("read_file", {"path": "a.txt"})]
+    assert _json('{"name": "read_file", "parameters": {"path": "a.txt"') == [
+        ("read_file", {"path": "a.txt"})
+    ]
+
+
+def test_a_call_cut_in_the_middle_is_unreadable() -> None:
+    assert _json('{"type":"function","function":{"name":"read_file","parameters":{"pa') == "unread"
+    assert _json('{"name": "read_file", "parameters": {"path": ') == "unread"
+
+
+def test_broken_json_that_does_not_open_like_a_call_is_no_call() -> None:
+    assert _json('{"answer": 42') is None
