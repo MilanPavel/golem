@@ -13,6 +13,7 @@ import { PlanChip } from "./plan-chip.tsx";
 import { NotesChip } from "./notes-chip.tsx";
 import { RouteChip } from "./route-chip.tsx";
 import { WaitHint } from "./wait-hint.tsx";
+import { ContextBanner } from "./context-banner.tsx";
 import { ContextChip } from "./context-chip.tsx";
 import { TuneChip } from "./tune-chip.tsx";
 import { useCommands } from "./use-commands.tsx";
@@ -133,7 +134,12 @@ export function SessionDock({ sessionId }: { sessionId: string }) {
           </>
         }
         question={<DockedChecksQuestion sessionId={sessionId} />}
-        hint={<WaitHint sessionId={sessionId} />}
+        hint={
+          <>
+            <ContextBanner sessionId={sessionId} />
+            <WaitHint sessionId={sessionId} />
+          </>
+        }
         composer={
           <Composer
             forPalette

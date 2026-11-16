@@ -1,4 +1,4 @@
-import { checksSummary, COMMANDS, mcpStatusWord, noPastes, pickerGroups, withModelChoices, withSkillChoices, type CheckRun, type ChecksState, type ReviewNote, type TodoItem, type TurnChecks, type TurnCard, ladderRows, spendRows } from "@golem/view";
+import { checksSummary, COMMANDS, mcpStatusWord, noPastes, pickerGroups, withModelChoices, withSkillChoices, type CheckRun, type ChecksState, type ReviewNote, type TodoItem, type TurnChecks, type TurnCard, ladderRows, spendRows, contextActions, bestActions, windowSourceOf, type ContextActionsInput } from "@golem/view";
 import type { ListedModel } from "@golem/client";
 import { createContext, useContext, useEffect, useId, useState, type ReactNode } from "react";
 import { Badge } from "../ui/badge.tsx";
@@ -30,7 +30,7 @@ import { SAMPLE_EDIT_DIFF, SAMPLE_LONG_LINE_DIFF, SAMPLE_NEW_FILE_DIFF } from ".
 import { TodoList } from "../features/drawer/index.ts";
 import { ChangesView, ChecksView, Workbench, type WorkbenchTab, CommitDialogView, TurnsView, FilesView } from "../features/workbench/index.ts";
 import type { ChangedFile } from "../store/changes.ts";
-import { Composer, ContextChipView, DockView, Meter, ModeChipView, NotesChipView, PlanChipView, TuneChipView, ChecksQuestionView, RouteChipView, WaitHintView } from "../features/composer/index.ts";
+import { Composer, ContextBannerView, ContextChipView, DockView, Meter, ModeChipView, NotesChipView, PlanChipView, TuneChipView, ChecksQuestionView, RouteChipView, WaitHintView } from "../features/composer/index.ts";
 import { PlanCardView } from "../features/chat/plan-card.tsx";
 import { createHistory } from "../features/composer/history.ts";
 import { CommandsDialog } from "../features/composer/help-dialog.tsx";
@@ -104,6 +104,41 @@ const ROUTE_CHIP_CASES = [
   { label: "local only, no caps", mode: "local", ladder: ladderRows(GALLERY_MODELS, null, GALLERY_OWN), spend: spendRows(GALLERY_COST, { ladder: {} }) },
   { label: "auto, a tier without a key", mode: "auto", ladder: ladderRows([GALLERY_MODELS[0]!, { ...GALLERY_MODELS[1]!, status: "needs_key" }], null, GALLERY_OWN), spend: spendRows(GALLERY_COST, { ladder: {}, daily_usd: 2 }) },
 ] as const;
+
+/** Six turns with a 3K tool result each: enough to clear and to summarise. */
+const CTX_MESSAGES: ContextActionsInput["messages"] = Array.from({ length: 6 }, () => [
+  { role: "user" as const, text: "read it", tokens: 100 },
+  { role: "assistant" as const, text: "reading", tokens: 100 },
+  { role: "tool" as const, text: "file", tokens: 3000 },
+]).flat();
+const CTX_BIG_MODEL: ListedModel = { ref: "ollama/qwen3:27b", label: "qwen3:27b", provider: "ollama", source: "installed", status: "ready", tier: "local", ctx: 131072, price: { input: 0, output: 0 } };
+const CTX_MEMORY = { ram_gb: 32, size_gb: 16, kv_gb_per_1k_tokens: 0.06, overhead_gb: 1, fits_share: 0.5, tight_share: 0.75 };
+function ctxCase(label: string, used: number, window: number | null, extra: Partial<ContextActionsInput> = {}) {
+  const planned = extra.session?.provider !== "deepseek" && window !== null;
+  const source = extra.source ?? windowSourceOf({ window, planned, numCtx: null });
+  const actions = contextActions({
+    used,
+    window,
+    source,
+    session: { profile: null, provider: "ollama", name: "qwen3:27b" },
+    models: [CTX_BIG_MODEL, ...GALLERY_MODELS.slice(1)],
+    messages: CTX_MESSAGES,
+    keepResults: 4,
+    keepTurns: 4,
+    memory: CTX_MEMORY,
+    route: "pinned",
+    busy: false,
+    ...extra,
+  });
+  return { label, used, window, source, actions };
+}
+const CONTEXT_CHIP_CASES = [
+  ctxCase("normal", 14000, 32768),
+  ctxCase("high, with a suggestion", 27000, 32768),
+  ctxCase("full", 31500, 32768),
+  ctxCase("hosted model, no grow row", 90000, 128000, { session: { profile: null, provider: "deepseek", name: "deepseek-chat" } }),
+  ctxCase("unknown window", 1300, null),
+];
 
 const NOW = Date.parse("2026-11-01T12:00:00Z");
 
@@ -1502,6 +1537,18 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
               <RouteChipView key={label} mode={mode} ladder={ladder} spend={spend} onSelect={() => {}} onNavigate={() => {}} />
             ))}
           </div>
+          <div aria-label="Context chips" role="group" className="flex flex-wrap gap-2">
+            {CONTEXT_CHIP_CASES.map(({ label, used, window, source, actions }) => (
+              <ContextChipView
+                key={label}
+                used={used}
+                window={window}
+                onOpen={() => {}}
+                panel={{ reserve: window === null ? null : 4096, source, actions, onRun: async () => {}, onOpenTrace: () => {} }}
+              />
+            ))}
+          </div>
+          <ContextBannerView text="The model no longer sees the start of this chat." actions={bestActions(CONTEXT_CHIP_CASES[1]!.actions)} onRun={async () => {}} />
           <WaitHintView text="≈ 3 min to first token on qwen3:27b" />
           <WaitHintView text="≈ 3 min to first token on qwen3:27b · deepseek-chat ≈ 2 s for ≈ $0.01" />
           <DockView

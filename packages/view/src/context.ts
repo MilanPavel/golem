@@ -222,7 +222,16 @@ export function contextBar(parts: readonly TraceContextPart[], window: number | 
 }
 
 /** The context of the latest model call that reported its input tokens. */
-export type LiveContext = { spanId: string; used: number; window: number | null; windowEstimated: boolean; windowPlanned: boolean; numCtx: number | null };
+export type LiveContext = {
+  spanId: string;
+  used: number;
+  window: number | null;
+  windowEstimated: boolean;
+  windowPlanned: boolean;
+  numCtx: number | null;
+  /** Set when a clear or a summary moved `used` after that call: the call's own messages are out of date. */
+  adjusted?: true;
+};
 
 /** `pending` is the call that started and has not ended: its window waits for its usage. */
 export type LiveContextState = {
@@ -234,6 +243,7 @@ export const emptyLiveContext: LiveContextState = { last: null, pending: null };
 
 /**
  * Fold one event into the live context. A call that ends with no usage keeps the previous `last`.
+ * A clear or a summary lowers `used` by what it freed, so the chip drops before the next call.
  * Any event that changes nothing returns `state` itself.
  */
 export function foldLiveContext(state: LiveContextState, event: ChatEvent): LiveContextState {
@@ -248,6 +258,11 @@ export function foldLiveContext(state: LiveContextState, event: ChatEvent): Live
         numCtx: event.data.num_ctx ?? null,
       },
     };
+  }
+  if (event.type === "context.changed") {
+    const { action, before_tokens: before, after_tokens: after } = event.data;
+    if (state.last === null || action === "grew" || before == null || after == null) return state;
+    return { ...state, last: { ...state.last, used: Math.max(0, state.last.used - Math.max(0, before - after)), adjusted: true } };
   }
   if (event.type === "model.call.completed") {
     const pending = state.pending;

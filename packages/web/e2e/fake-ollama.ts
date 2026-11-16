@@ -15,6 +15,8 @@ export interface FakeOllama {
   holdPulls(): void;
   /** Lets the held pulls finish, and stops holding later ones. */
   releasePulls(): void;
+  /** Queue a reply that is one tool call. Calls are answered in order; after that the plain answer is used. */
+  toolCall(name: string, args: Record<string, unknown>): void;
   /** How many times a call loaded a model at a different `num_ctx` than the one it held. */
   readonly reloads: number;
   /** What each model is loaded at right now, by name. */
@@ -91,6 +93,7 @@ export async function startFakeOllama(options: FakeOllamaOptions = {}): Promise<
   const defaultContext = options.defaultContext ?? 32768;
   const maxContext = options.maxContext ?? 131072;
   const loaded = new Map<string, { contextLength: number }>();
+  const toolCalls: Array<{ name: string; args: Record<string, unknown> }> = [];
   let reloads = 0;
   const sockets = new Set<Socket>();
   let held = false;
@@ -148,7 +151,12 @@ export async function startFakeOllama(options: FakeOllamaOptions = {}): Promise<
       const lastUser = [...messages].reverse().find((m) => m.role === "user");
       const cut = lastUser !== undefined && text(lastUser).includes("[[cut]]");
       res.writeHead(200, { "content-type": "application/x-ndjson" });
-      res.write(`${JSON.stringify({ model: name, message: { role: "assistant", content: options.answer ?? "The stub answers." }, done: false })}\n`);
+      const tool = toolCalls.shift();
+      const message =
+        tool === undefined
+          ? { role: "assistant", content: options.answer ?? "The stub answers." }
+          : { role: "assistant", content: "", tool_calls: [{ function: { name: tool.name, arguments: tool.args } }] };
+      res.write(`${JSON.stringify({ model: name, message, done: false })}\n`);
       res.end(
         `${JSON.stringify({ model: name, message: { role: "assistant", content: "" }, done: true, done_reason: cut ? "length" : "stop", prompt_eval_count: Math.min(Math.ceil(totalChars / 4), contextLength), eval_count: 4 })}\n`,
       );
@@ -183,6 +191,9 @@ export async function startFakeOllama(options: FakeOllamaOptions = {}): Promise<
     installed,
     pulls,
     requests,
+    toolCall(name, args) {
+      toolCalls.push({ name, args });
+    },
     get reloads() {
       return reloads;
     },

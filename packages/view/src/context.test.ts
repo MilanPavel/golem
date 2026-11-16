@@ -413,3 +413,19 @@ test("cutNote says it should not happen when the window was planned", () => {
   assert.equal(cutNote({ prompt_cut: "no" }, true), null);
   assert.equal(summaryOfLine(9), "summary of 9 earlier messages");
 });
+
+test("foldLiveContext: a clear or a summary lowers the used tokens and marks the call as out of date", () => {
+  const base = foldLiveContext(foldLiveContext(emptyLiveContext, started("m1")), completed("m1", { input: 32000, output: 10 }));
+  const cleared = foldLiveContext(base, event("context.changed", { action: "cleared", before_tokens: 14000, after_tokens: 3000, count: 5 }));
+  assert.equal(cleared.last?.used, 21000);
+  assert.equal(cleared.last?.adjusted, true);
+  // Nothing before the first call, nothing for a growth, and nothing without sizes.
+  const before = event("context.changed", { action: "cleared", before_tokens: 14000, after_tokens: 3000 });
+  assert.equal(foldLiveContext(emptyLiveContext, before), emptyLiveContext);
+  assert.equal(foldLiveContext(base, event("context.changed", { action: "grew", window_from: 32768, window_to: 65536 })), base);
+  assert.equal(foldLiveContext(base, event("context.changed", { action: "summarised", count: 3 })), base);
+  // The next call starts again from what the provider counted.
+  const next = foldLiveContext(foldLiveContext(cleared, started("m2")), completed("m2", { input: 20000, output: 10 }));
+  assert.equal(next.last?.used, 20000);
+  assert.equal(next.last?.adjusted, undefined);
+});

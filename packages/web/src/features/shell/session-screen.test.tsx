@@ -152,7 +152,7 @@ test("the chat has no accessibility violations", async () => {
   expect((await axe.run(container, noContrast)).violations).toEqual([]);
 });
 
-test("the chat shows ctx after a model call, and the chip opens the trace panel on that call", async () => {
+test("the chat shows ctx after a model call, and the chip opens a popover whose footer opens the trace on that call", async () => {
   const { fake, container } = await open();
   act(() => {
     fake.emitEvent(ev("a", "model.call.started", { message_id: "m_1", index: 1, profile: "default", context_window: 128000 }));
@@ -161,7 +161,10 @@ test("the chat shows ctx after a model call, and the chip opens the trace panel 
   const chip = screen.getByRole("button", { name: /^Context 32\.0K \/ 128K · 25%/ });
   expect(chip.textContent).toBe("ctx 25%");
   expect((await axe.run(container, noContrast)).violations).toEqual([]);
-  await userEvent.setup().click(chip);
+  const user = userEvent.setup();
+  await user.click(chip);
+  expect(location.search).toBe("");
+  await user.click(await screen.findByRole("button", { name: "Open the trace" }));
   expect(location.pathname).toBe("/s/a");
   expect(location.search).toBe("?inspect=m_1");
   expect(screen.getByRole("complementary", { name: "Trace inspector" })).toBeTruthy();
@@ -179,7 +182,9 @@ test("with the panel already open on another span, the chip switches it to the l
     window.dispatchEvent(new PopStateEvent("popstate"));
   });
   expect(location.search).toBe("?inspect=other");
-  await userEvent.setup().click(screen.getByRole("button", { name: /^Context 32\.0K/ }));
+  const user = userEvent.setup();
+  await user.click(screen.getByRole("button", { name: /^Context 32\.0K/ }));
+  await user.click(await screen.findByRole("button", { name: "Open the trace" }));
   expect(location.pathname).toBe("/s/a");
   expect(location.search).toBe("?inspect=m_1");
   expect(screen.getAllByRole("complementary", { name: "Trace inspector" })).toHaveLength(1);

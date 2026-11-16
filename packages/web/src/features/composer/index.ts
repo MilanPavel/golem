@@ -1,6 +1,7 @@
 export { ChecksQuestionView, DockedChecksQuestion } from "./checks-question.tsx";
 export { Composer, type ComposerProps } from "./composer.tsx";
-export { ContextChip, ContextChipView } from "./context-chip.tsx";
+export { ContextBannerView } from "./context-banner.tsx";
+export { ContextChip, ContextChipView, type ContextPanel } from "./context-chip.tsx";
 export { PlanChip, PlanChipView, usePlanOn } from "./plan-chip.tsx";
 export { ModeChip, ModeChipView, useSessionMode } from "./mode-chip.tsx";
 export { NotesChip, NotesChipView } from "./notes-chip.tsx";
