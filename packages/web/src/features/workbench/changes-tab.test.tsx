@@ -8,6 +8,7 @@ import { ev, fakeClient, fakeFrame } from "../../store/test-support.ts";
 import { diffModeStore } from "../diff/diff-mode.ts";
 import { SAMPLE_EDIT_DIFF, SAMPLE_NEW_FILE_DIFF } from "../diff/sample.ts";
 import { ChangesTab } from "./changes-tab.tsx";
+import { changesViewStore } from "./changes-view.tsx";
 import { openChange, tabStore, useRequestedFile } from "./workbench-state.ts";
 import { WORKBENCH_DEFAULT, workbenchWidthStore } from "./workbench-width.ts";
 
@@ -170,5 +171,38 @@ test("a note on a diff line is kept per session, and its file row counts it", as
   const rows = screen.getAllByRole("listitem");
   expect(within(rows[0]!).getByText("1 note")).toBeTruthy();
   expect(within(rows[1]!).queryByText("1 note")).toBeNull();
+  page.stop();
+});
+
+const OFF_NOTE = "Changes made by shell commands are not listed: this folder is too big to watch and is not a git repository.";
+
+function setupShell(shell: "git" | "files" | "off", files: ChangedFile[]) {
+  const fake = fakeClient();
+  fake.raw.changesList.mockImplementation(async () => ({ files, shell }));
+  const page = createPage(fake.client, { frame: fakeFrame(), doc: Object.assign(new EventTarget(), { visibilityState: "visible" }) as unknown as Document });
+  page.start();
+  render(
+    <PageProvider page={page}>
+      <ChangesTab sessionId="a" />
+    </PageProvider>,
+  );
+  return page;
+}
+
+test("a folder too big to watch says shell changes are not listed, by file and by turn, also when empty", async () => {
+  const page = setupShell("off", []);
+  expect(await screen.findByText(OFF_NOTE)).toBeTruthy();
+  page.stop();
+  changesViewStore.set("turn");
+  const turn = setupShell("off", FILES);
+  expect((await screen.findAllByText(OFF_NOTE)).length).toBeGreaterThan(0);
+  turn.stop();
+  changesViewStore.set("file");
+});
+
+test("there is no note when the folder is watched", async () => {
+  const page = setupShell("files", FILES);
+  await screen.findAllByRole("listitem");
+  expect(screen.queryByText(OFF_NOTE)).toBeNull();
   page.stop();
 });

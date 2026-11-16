@@ -14,6 +14,7 @@ from pydantic import BaseModel, ConfigDict
 
 from golem import __version__, install_info
 from golem.coding import commit as commit_git
+from golem.coding import plain_changes
 from golem.coding.changes import (
     ChangeStore,
     FileChange,
@@ -625,7 +626,8 @@ async def _changes_list(ctx: RequestContext, params: ChangesListParams) -> Chang
                 stale=on_disk != net.after_sha,
             )
         )
-    return ChangesListResult(files=files)
+    shell = await asyncio.to_thread(plain_changes.tracking, Path(folder))
+    return ChangesListResult(files=files, shell=shell)
 
 
 async def _changes_diff(ctx: RequestContext, params: ChangesDiffParams) -> ChangesDiffResult:

@@ -7,12 +7,18 @@ export type Removed = number;
 export type Stale = boolean;
 export type Status = 'created' | 'modified' | 'deleted';
 export type Files = ChangedFile[];
+export type Shell = 'git' | 'files' | 'off';
 
 /**
  * The changed files in order of first change. A session without a folder has none.
+ *
+ * ``shell`` says how files a shell command changes are found: ``git`` in a repository,
+ * ``files`` by comparing the folder before and after, ``off`` when the folder is too big
+ * to watch and is not a repository.
  */
 export interface ChangesListResult {
   files: Files;
+  shell?: Shell;
 }
 /**
  * One changed file: first before against last after, as counts and flags.

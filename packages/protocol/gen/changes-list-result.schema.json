@@ -52,7 +52,7 @@
     }
   },
   "additionalProperties": false,
-  "description": "The changed files in order of first change. A session without a folder has none.",
+  "description": "The changed files in order of first change. A session without a folder has none.\n\n``shell`` says how files a shell command changes are found: ``git`` in a repository,\n``files`` by comparing the folder before and after, ``off`` when the folder is too big\nto watch and is not a repository.",
   "properties": {
     "files": {
       "items": {
@@ -60,6 +60,16 @@
       },
       "title": "Files",
       "type": "array"
+    },
+    "shell": {
+      "default": "git",
+      "enum": [
+        "git",
+        "files",
+        "off"
+      ],
+      "title": "Shell",
+      "type": "string"
     }
   },
   "required": [

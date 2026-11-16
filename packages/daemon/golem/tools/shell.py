@@ -15,6 +15,7 @@ external diff drivers, and text conversion.
 
 from __future__ import annotations
 
+import asyncio
 import os
 import re
 import shlex
@@ -24,7 +25,7 @@ from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from golem.coding import shell_changes
+from golem.coding import plain_changes, shell_changes
 from golem.tools import sandbox
 from golem.tools.paths import inside, relative, session_root
 from golem.tools.registry import Tool, ToolContext, ToolError, ToolResult
@@ -120,6 +121,9 @@ async def _login_shell(
     login = os.environ.get("SHELL") or "/bin/zsh"
     run_git = git_runner(ctx, root)
     seen = await shell_changes.look(root, run_git)
+    plain = None
+    if seen is None and not sandbox.git_dirs(root):
+        plain = await asyncio.to_thread(plain_changes.look, root)
     done = await sandbox.run(
         [login, "-lc", args.command],
         root=root,
@@ -143,6 +147,8 @@ async def _login_shell(
         lines.append(f"[{NO_NETWORK_HINT}]")
     tail = "\n".join(lines)
     edits = await shell_changes.changed(seen, run_git) if seen else []
+    if plain:
+        edits = await asyncio.to_thread(plain_changes.changed, plain)
     return ToolResult(
         output=f"{output}\n{tail}" if output else tail,
         summary=summary,

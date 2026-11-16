@@ -10,8 +10,10 @@ from typing import cast
 import pytest
 from test_server import HELLO, RpcClient, error_code, rpc_result, start_daemon, stop_daemon
 
+from golem.coding import plain_changes
 from golem.coding.changes import ChangeStore
 from golem.server.dispatcher import INVALID_PARAMS, SESSION_NOT_FOUND
+from golem.tools import sandbox
 from golem.tools.write import DIFF_CHARS
 
 
@@ -223,3 +225,29 @@ async def test_an_unknown_path_or_another_sessions_change_is_refused(setup: Setu
 
     assert error_code(unknown) == INVALID_PARAMS
     assert error_code(not_ours) == INVALID_PARAMS
+
+
+async def _shell_of(setup: Setup) -> object:
+    result = rpc_result(await setup.client.call("changes.list", {"session_id": setup.session_id}))
+    return result["shell"]
+
+
+async def test_list_says_files_for_a_folder_without_a_repository(setup: Setup) -> None:
+    assert await _shell_of(setup) == "files"
+
+
+async def test_list_says_off_for_a_folder_too_big_to_watch(
+    setup: Setup, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(plain_changes, "MAX_FILES", 1)
+    (setup.folder / "a").write_text("a", "utf-8")
+    (setup.folder / "b").write_text("b", "utf-8")
+    assert await _shell_of(setup) == "off"
+
+
+async def test_list_says_git_for_a_repository(
+    setup: Setup, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    (setup.folder / ".git").mkdir()
+    monkeypatch.setattr(sandbox, "available", lambda: True)
+    assert await _shell_of(setup) == "git"

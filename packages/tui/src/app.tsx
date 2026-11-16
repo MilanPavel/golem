@@ -3819,7 +3819,7 @@ export function App({
         if (!changesManagerRef.current.open) {
           return;
         }
-        showChanges({ ...changesRef.current, files: result.files, error: null });
+        showChanges({ ...changesRef.current, files: result.files, shell: result.shell ?? "git", error: null });
         const path = result.files[Math.min(changesManagerRef.current.file, result.files.length - 1)]?.path;
         if (path !== undefined) {
           loadChangesDiff(id, path);

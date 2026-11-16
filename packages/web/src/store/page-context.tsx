@@ -17,7 +17,7 @@ import type { Route } from "./router.ts";
 import type { AuthListResult, FileListResult, CostGetResult, RoutingGetResult, McpListResult, SessionSummary, SetupStatusResult, SkillListResult } from "@golem/client";
 import { ARTIFACT_PAGE, artifactKey, traceKey, traceSpanKey, type ArtifactReadResult, type TraceGetResult, type TraceSpanResult } from "./trace.ts";
 import { mcpCatalogKey, mcpListKey, mcpToolsKey, type McpCatalogResult, type McpToolsResult } from "./mcp.ts";
-import { turnCards, type NotesState, type Pastes, type ReviewNote, type TurnCard } from "@golem/view";
+import { turnCards, type NotesState, type Pastes, type ReviewNote, type ShellTracking, type TurnCard } from "@golem/view";
 import { distinctFolders, resolveFolder } from "./new-session.ts";
 import type { SetupStart } from "./setup-start.ts";
 import { initialSessionView, type SessionView } from "./session-store.ts";
@@ -290,9 +290,19 @@ export function useChangedFiles(sessionId: string): ChangedFiles {
   const { queries } = usePage();
   const result = useQuery({
     queryKey: changesListKey(sessionId),
-    queryFn: async () => (await queries.changesList(sessionId)).files,
+    queryFn: () => queries.changesList(sessionId),
   });
-  return { files: result.data ?? null, error: result.error === null ? null : result.error.message };
+  return { files: result.data?.files ?? null, error: result.error === null ? null : result.error.message };
+}
+
+/** How the session finds the files its shell commands change. Shares the read of `useChangedFiles`. */
+export function useShellTracking(sessionId: string): ShellTracking {
+  const { queries } = usePage();
+  const result = useQuery({
+    queryKey: changesListKey(sessionId),
+    queryFn: () => queries.changesList(sessionId),
+  });
+  return result.data?.shell ?? "git";
 }
 
 /** What git says about the session folder: whether it is a repository, its branch, and the changed paths it sees. */
