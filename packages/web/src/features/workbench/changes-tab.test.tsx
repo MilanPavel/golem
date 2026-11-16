@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor, within } from "@testing-library/react";
+import { act, render, renderHook, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import type { ChangedFile } from "../../store/changes.ts";
@@ -8,7 +8,7 @@ import { ev, fakeClient, fakeFrame } from "../../store/test-support.ts";
 import { diffModeStore } from "../diff/diff-mode.ts";
 import { SAMPLE_EDIT_DIFF, SAMPLE_NEW_FILE_DIFF } from "../diff/sample.ts";
 import { ChangesTab } from "./changes-tab.tsx";
-import { openChange } from "./workbench-state.ts";
+import { openChange, tabStore, useRequestedFile } from "./workbench-state.ts";
 import { WORKBENCH_DEFAULT, workbenchWidthStore } from "./workbench-width.ts";
 
 const FILES: ChangedFile[] = [
@@ -129,6 +129,17 @@ test("openChange opens that file's row and clears the request", async () => {
   const rows = screen.getAllByRole("listitem");
   expect(head(rows[2]!).getAttribute("aria-expanded")).toBe("true");
   expect(head(rows[0]!).getAttribute("aria-expanded")).toBe("false");
+  page.stop();
+});
+
+test("a row's open button shows the file in the Files tab, and a deleted file has none", async () => {
+  const { page } = setup();
+  await screen.findByRole("table");
+  expect(screen.getAllByRole("button", { name: /^Open .* in Files$/ })).toHaveLength(2);
+  expect(screen.queryByRole("button", { name: "Open old.md in Files" })).toBeNull();
+  await userEvent.click(screen.getByRole("button", { name: "Open clamp.ts in Files" }));
+  expect(tabStore.getSnapshot()).toBe("files");
+  expect(renderHook(() => useRequestedFile()).result.current[0]).toEqual({ path: "src/clamp.ts", line: null });
   page.stop();
 });
 

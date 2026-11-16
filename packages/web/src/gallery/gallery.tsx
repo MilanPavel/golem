@@ -27,7 +27,7 @@ import { ANSWERED, PENDING_EDIT, PENDING_SHELL } from "../features/approval/samp
 import { DiffModeSwitch, DiffView } from "../features/diff/index.ts";
 import { SAMPLE_EDIT_DIFF, SAMPLE_LONG_LINE_DIFF, SAMPLE_NEW_FILE_DIFF } from "../features/diff/sample.ts";
 import { TodoList } from "../features/drawer/index.ts";
-import { ChangesView, Workbench, type WorkbenchTab } from "../features/workbench/index.ts";
+import { ChangesView, FilesView, Workbench, type WorkbenchTab } from "../features/workbench/index.ts";
 import type { ChangedFile } from "../store/changes.ts";
 import { Composer, ContextChipView, DockView, Meter, ModeChipView, TuneChipView } from "../features/composer/index.ts";
 import { createHistory } from "../features/composer/history.ts";
@@ -326,6 +326,54 @@ function ChangesDemo() {
             <ChangesView files={[]} error={null} open={null} onOpen={() => {}} diff={{ diff: null, truncated: false, error: null }} mode="unified" onMode={() => {}} canSplit={false} />
           </div>
         </div>
+      </div>
+    </section>
+  );
+}
+
+const SAMPLE_FILE = `import { clamp } from "./utils/clamp";
+
+/** Keeps a retry delay inside its bounds. */
+export function delay(attempt: number): number {
+  return clamp(100 * 2 ** attempt, 100, 5000);
+}
+`;
+
+/** The Files tab: its list with the change set first, a short file, and a file that failed to open. */
+function FilesDemo() {
+  const anchor = useAnchor();
+  const [typed, setTyped] = useState("");
+  const none = { file: null, error: null };
+  return (
+    <section className="mt-6" id={anchor("Files tab")}>
+      <h3 className="mb-2 font-mono text-xs text-faint">Files tab</h3>
+      <div className="flex flex-wrap items-start gap-4">
+        {(
+          [
+            ["List", null, none],
+            ["A file", "src/fetch.ts", { file: { path: "src/fetch.ts", text: SAMPLE_FILE, truncated: true, lines: 7 }, error: null }],
+            ["A file that cannot be shown", "logo.png", { file: null, error: "logo.png looks like a binary file" }],
+          ] as const
+        ).map(([title, open, file]) => (
+          <div key={title} className="flex w-80 flex-col gap-3">
+            <p className="text-xs text-muted">{title}</p>
+            <div className="flex h-96 flex-col rounded-lg border border-line bg-surface p-4">
+              <FilesView
+                typed={typed}
+                onTyped={setTyped}
+                changed={["src/socket.ts", "src/utils/clamp.ts"]}
+                found={["src/fetch.ts", "src/socket.ts", "src/utils/clamp.ts", "docs/notes.md"]}
+                more={false}
+                listError={null}
+                open={open}
+                file={file}
+                line={null}
+                onOpen={() => {}}
+                onBack={() => {}}
+              />
+            </div>
+          </div>
+        ))}
       </div>
     </section>
   );
@@ -1352,6 +1400,7 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
       <WorkbenchDemo />
 
       <ChangesDemo />
+      <FilesDemo />
 
       <section className="mt-6" id={anchor("Command palette and keys")}>
         <h3 className="mb-2 font-mono text-xs text-faint">Command palette and keys</h3>

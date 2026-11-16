@@ -1,11 +1,12 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { Badge } from "../../ui/badge.tsx";
 import { cn } from "../../ui/cn.ts";
-import { ChevronDownIcon } from "../../ui/icons.tsx";
+import { IconButton } from "../../ui/icon-button.tsx";
+import { ChevronDownIcon, OpenIcon } from "../../ui/icons.tsx";
 import { useChangedFiles, useFileDiff } from "../../store/page-context.tsx";
 import type { ChangedFile, FileDiff } from "../../store/changes.ts";
 import { DiffModeSwitch, DiffView, useDiffMode, type DiffMode } from "../diff/index.ts";
-import { useRequestedChange } from "./workbench-state.ts";
+import { openFile, useRequestedChange } from "./workbench-state.ts";
 import { useWorkbenchWidth } from "./workbench-width.ts";
 
 /** From this panel width, in rem, a diff may be shown side by side. Narrower, it is unified. */
@@ -42,25 +43,28 @@ function Row({
   file,
   open,
   onToggle,
+  onOpenFile,
   panel,
   children,
 }: {
   file: ChangedFile;
   open: boolean;
   onToggle: () => void;
+  onOpenFile: ((path: string) => void) | undefined;
   panel: string;
   children: ReactNode;
 }) {
   const [folder, name] = splitPath(file.path);
   return (
     <li data-path={file.path} className="flex flex-col gap-2">
+      <div className="flex items-center gap-1">
       <button
         type="button"
         aria-expanded={open}
         aria-controls={open ? panel : undefined}
         title={file.path}
         onClick={onToggle}
-        className="flex w-full min-w-0 items-center gap-2 rounded-sm px-1.5 py-1 text-left font-mono text-xs outline-offset-2 outline-clay hover:bg-sunken focus-visible:outline-2"
+        className="flex min-w-0 flex-1 items-center gap-2 rounded-sm px-1.5 py-1 text-left font-mono text-xs outline-offset-2 outline-clay hover:bg-sunken focus-visible:outline-2"
       >
         <ChevronDownIcon aria-hidden="true" className={cn("size-3.5 flex-none text-muted", !open && "-rotate-90")} />
         <span className="flex min-w-0 flex-1 items-baseline">
@@ -72,6 +76,17 @@ function Row({
         {file.stale ? <Badge tone="wait" className={SMALL}>changed on disk</Badge> : null}
         <Counts added={file.added} removed={file.removed} />
       </button>
+      {onOpenFile === undefined || file.status === "deleted" ? null : (
+        <IconButton
+          label={`Open ${name} in Files`}
+          onClick={() => {
+            onOpenFile(file.path);
+          }}
+        >
+          <OpenIcon />
+        </IconButton>
+      )}
+      </div>
       {open ? (
         <div id={panel} className="min-w-0">
           {children}
@@ -92,10 +107,12 @@ type ChangesViewProps = {
   onMode: (mode: DiffMode) => void;
   /** Whether the panel has room for the split layout. */
   canSplit: boolean;
+  /** Shows a file in the Files tab. Without it the rows have no open button. */
+  onOpenFile?: (path: string) => void;
 };
 
 /** The list of changed files, the open one with its diff, and the totals. It reads nothing itself. */
-export function ChangesView({ files, error, open, onOpen, diff, mode, onMode, canSplit }: ChangesViewProps) {
+export function ChangesView({ files, error, open, onOpen, diff, mode, onMode, canSplit, onOpenFile }: ChangesViewProps) {
   const panel = useId();
   if (files === null) {
     return <p className="text-sm text-muted">{error === null ? "Reading the changes." : `Could not read the changes. ${error}`}</p>;
@@ -115,6 +132,7 @@ export function ChangesView({ files, error, open, onOpen, diff, mode, onMode, ca
             file={file}
             open={file.path === open}
             panel={panel}
+            onOpenFile={onOpenFile}
             onToggle={() => {
               onOpen(file.path === open ? null : file.path);
             }}
@@ -197,6 +215,7 @@ export function ChangesTab({ sessionId }: { sessionId: string }) {
         mode={mode}
         onMode={setMode}
         canSplit={width >= SPLIT_MIN_WIDTH}
+        onOpenFile={openFile}
       />
     </div>
   );
