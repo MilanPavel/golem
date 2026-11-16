@@ -13,7 +13,7 @@ import type { SessionModel, SessionView } from "../../store/session-store.ts";
 import { Transcript } from "../chat/index.ts";
 import { SessionDock } from "../composer/index.ts";
 import { TodoList, useDrawerOpen } from "../drawer/index.ts";
-import { ChangesTab, Workbench, WORKBENCH_ID, type WorkbenchTab } from "../workbench/index.ts";
+import { ChangesTab, checksBadge, ChecksTab, Workbench, WORKBENCH_ID, type WorkbenchTab } from "../workbench/index.ts";
 import { closeModelDialog, ModelDialog, openModelDialog, useModelDialogOpen } from "../models/index.ts";
 import { folderName, useSessionActions } from "../sessions/index.ts";
 import { useRememberSettingsContext } from "../settings/index.ts";
@@ -26,6 +26,8 @@ function sameHeader(a: Header, b: Header): boolean {
 }
 
 const selectTodos = (view: SessionView) => view.chat.todos;
+
+const selectChecksMark = (view: SessionView) => checksBadge(view.chat.checks, view.chat.busy ? view.chat.runId : null);
 
 const selectForkPoint = (view: SessionView) => forkPoint(view.chat.messages);
 
@@ -203,6 +205,7 @@ export function SessionFrame({ id, children }: { id: string; children: ReactNode
   const todos = useSession(id, selectTodos);
   const [drawerOpen, setDrawerOpen] = useDrawerOpen();
   const changed = useChangedFiles(id).files;
+  const checksMark = useSession(id, selectChecksMark);
   const hasFolder = typeof summary?.cwd === "string" || (summary === undefined && typeof header.cwd === "string");
   const tabs = useMemo<readonly WorkbenchTab[]>(
     () => [
@@ -214,6 +217,12 @@ export function SessionFrame({ id, children }: { id: string; children: ReactNode
               ...(changed !== null && changed.length > 0 ? { badge: String(changed.length) } : {}),
               render: () => <ChangesTab sessionId={id} />,
             },
+            {
+              id: "checks",
+              label: "Checks",
+              ...(checksMark === undefined ? {} : { badge: checksMark }),
+              render: () => <ChecksTab sessionId={id} />,
+            },
           ]
         : []),
       {
@@ -223,7 +232,7 @@ export function SessionFrame({ id, children }: { id: string; children: ReactNode
         render: () => <TodoList todos={todos} />,
       },
     ],
-    [todos, hasFolder, changed, id],
+    [todos, hasFolder, changed, checksMark, id],
   );
   const toggle = useRef<HTMLButtonElement>(null);
   const inspectToggle = useRef<HTMLButtonElement>(null);
