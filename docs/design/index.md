@@ -6,7 +6,7 @@ The look of golem's web UI: the idea, the pixel golem, the type, the tokens, the
 
 The design is minimal: one accent colour, a quiet reading column, and few borders. What makes it golem's is the figure itself.
 
-- **The pixel golem is the status light.** The 9×6 figure from the TUI's logo (`packages/tui/src/logo.ts`) appears in the sidebar, on every answer, in the meter, on the empty screen, and as the favicon. Its eyes say what golem is doing.
+- **The pixel golem is the status light.** The 9×6 figure from the TUI's logo (`packages/tui/src/logo.ts`) lives in the rail, and appears on every answer, in the meter, on the empty screen, and as the favicon. Its eyes say what golem is doing.
 - **Clay is the only accent.** It marks what is golem's or what needs you: the send button, the streaming cursor, the seal on an approval, the eyes while golem works.
 - **Golem's answers read like a page,** in a book serif. Everything else (the interface, code, tools) is a quiet sans or mono.
 - **An approval reads like the shem,** the scroll that tells the golem what it may do. It is a card with a clay seal, the question, the rule that asked, and the diff.
@@ -23,9 +23,9 @@ It borrows the calm, centred reading column and generous input from Claude's cha
 | failed | brick | `last run failed` | The last run ended in `run.failed` |
 | disconnected | grey, and the body grey | `offline` | The link is down |
 
-- **Every state has a word as well as a colour,** so colour is never the only sign.
+- **Every state has a word as well as a colour,** so colour is never the only sign. The rail's golem has no word beside it: it is the status light, and a chip or a strip shows only when something waits or the link is lost.
 - **The golem on an answer shows only that answer's state.** It is plain when the answer is done, has clay eyes while it streams, and has amber eyes while a tool call in it waits for you.
-- **The favicon and the tab title** follow the sidebar's state, from the same state the TUI's `window-title.ts` uses. They update outside the animation frame, so a hidden tab still shows it.
+- **The favicon and the tab title** follow the golem's state, not the sidebar's, from the same state the TUI's `window-title.ts` uses. They update outside the animation frame, so a hidden tab still shows it.
 - **Motion** lasts 150 to 200 ms. `prefers-reduced-motion` turns off every animation: the eyes, the cursor, and the dots.
 
 ## Type
@@ -50,7 +50,7 @@ These become `packages/web/src/styles/tokens.css` in step 10.6. The names say wh
 |---|---|---|---|
 | `bg` | `#F3F2EF` | `#15120F` | The page, the diff |
 | `surface` | `#FBFAF8` | `#1D1915` | Cards, the composer, the drawer |
-| `sunken` | `#EAE8E3` | `#110E0C` | The sidebar, hunk headers |
+| `sunken` | `#EAE8E3` | `#110E0C` | The rail, the panel, hunk headers |
 | `ink` | `#1D1A17` | `#EEE7DF` | Text, the primary button |
 | `ink-soft` | `#2B2724` | `#E2DAD1` | Golem's answers, a little softer than `ink` |
 | `muted` | `#57524C` | `#B5ACA2` | Secondary text |
@@ -100,9 +100,68 @@ Checked with the WCAG 2.2 formula. 4.5:1 for text, 3:1 for fills and focus rings
 |---|---|
 | Radius | 6 px (small), 10 px (controls), 16 px (cards, the shem), 18 px (the composer), round for chips |
 | Shadow | One soft shadow, for the composer, the shem, and the palette only |
-| Sidebar, drawer, column | 268 px, 320 px, 46 rem |
+| Rail, panel, drawer, column | 52 px, 268 px, 320 px, 46 rem |
 | Gutter | At least 16 px, and the safe-area insets on a phone |
 | Grid | 4 px steps. The empty screen's faint grid is 20 px, one pixel of the golem |
+
+## Sidebar: rail and panel
+
+The sidebar is two parts: a narrow icon rail that is always there, and a panel beside it that shows what the rail picked.
+
+### The rail
+
+- 52 px wide (`--spacing-rail`), always there from 760 px up.
+- Top to bottom: the pixel golem (state; the tooltip says `golem v<version> · connected`), New session (+, bordered), a divider, Sessions, Inbox (a dot and the count when there are items), a divider, Routines, Workflows, Runs, a spacer, Search (opens the palette, ⌘K), Settings (a dot for a setup problem or a lost connection).
+- Every icon has a tooltip with its name and shortcut, and an accessible name.
+- The picked item has a clay bar on its left. Clicking it again hides or shows the panel.
+- The picked item is panel state, not a route: the URL still names the session or page in the main area.
+- There is no state word, no connection line and no version in the footer.
+
+### The panel
+
+- Beside the rail from 1100 px up, 200 to 420 px wide (12.5 to 26.25 rem), 268 px by default (`--spacing-sidebar`).
+- The header has the title, the "N waiting" chip on Sessions (it opens the Inbox), an action (+ on Sessions) and a hide button (⌘B).
+- The resize handle is on the right edge. Dragging below 150 px hides the panel, double-click resets it to 268 px, and the arrow keys, Home and End work.
+- Width and open state are kept in `localStorage` (`golem.sidebar.width`, `golem.sidebar.open`), and so is the picked item (`golem.sidebar.item`).
+
+| Window | Rail | Panel |
+|---|---|---|
+| At least 1100 px | 52 px, shown | Beside the rail and the page |
+| 760 to 1099 px | 52 px, shown | Hidden by default. It floats over the page with a scrim. Picking a session closes it |
+| Under 760 px | None | ☰ in the page's top bar opens rail and panel together. Picking a session closes them |
+
+### The connection
+
+- Nothing shows while connected.
+- Reconnecting: a wait-coloured strip at the panel's foot, "Reconnecting to golem…".
+- Offline: a deny-coloured strip, "golem is not running", with a Retry button.
+- The version also shows at the foot of the Settings section list.
+
+### Sessions panel
+
+- A filter field at the top.
+- Groups: Today, Yesterday, Previous 7 days, Earlier.
+- A row has the status square, the title, a fixed slot with the time that gives way to the ⋯ button on hover or focus, and the folder name in mono. A session that a routine started has a clock mark.
+- Right-click on a row opens the same menu as ⋯.
+
+### Inbox panel
+
+- One card per waiting item: the headline, the session title, the age, and the rule that asked, in faint text.
+- Buttons on an approval: Allow once, Allow for this session, Deny, Open.
+- A consent card has Open only.
+- Empty state: "Nothing is waiting for you."
+
+### Routines, Workflows, Runs
+
+Each shows an "In progress" panel. There is no fake data.
+
+### New tokens
+
+| Token | Value | Use |
+|---|---|---|
+| `--spacing-rail` | 52 px (3.25 rem) | The rail's width. Ticket 17.1.2 adds it to `tokens.css` |
+
+The panel keeps `--spacing-sidebar` (268 px, 16.75 rem). The breakpoints stay `--breakpoint-wide` (1100 px) and `--breakpoint-narrow` (760 px).
 
 ## Pages and dialogs
 
