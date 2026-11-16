@@ -49,6 +49,7 @@ export type PageClient = Pick<
   | "listKeys"
   | "setSkills"
   | "setSessionMode"
+  | "setPlan"
   | "compactSession"
   | "getConfig"
   | "listMcp"
@@ -130,6 +131,8 @@ export type PageActions = {
   setSkillDisabled(name: string, disabled: boolean): Promise<void>;
   /** Sets the session's permission mode, or with null follows config.toml. The chip changes from `session.mode.changed`. */
   setMode(sessionId: string, mode: PermissionMode | null): Promise<void>;
+  /** Puts a session in plan first, or takes it out. */
+  setPlan(sessionId: string, on: boolean): Promise<void>;
   /**
    * Saves `[permissions] mode` in config.toml and shows it at once. A refused save puts the old
    * mode back and throws. Resolves with the file written.
@@ -419,6 +422,9 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
           // The rules were built for a mode, so Settings reads them again.
           await queryClient.invalidateQueries({ queryKey: CONFIG_KEY });
         }
+      },
+      async setPlan(sessionId, on) {
+        await client.setPlan(sessionId, on);
       },
       async compact(sessionId, action, focus) {
         return client.compactSession(sessionId, action, focus ?? undefined);

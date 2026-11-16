@@ -7,6 +7,7 @@ import type { SessionView } from "../../store/session-store.ts";
 import { DockedApproval } from "../approval/docked-approval.tsx";
 import { Composer } from "./composer.tsx";
 import { ModeChip } from "./mode-chip.tsx";
+import { PlanChip } from "./plan-chip.tsx";
 import { ContextChip } from "./context-chip.tsx";
 import { TuneChip } from "./tune-chip.tsx";
 import { useCommands } from "./use-commands.tsx";
@@ -76,10 +77,14 @@ export function SessionDock({ sessionId }: { sessionId: string }) {
     mutationFn: (mode: PermissionMode | null) => actions.setMode(sessionId, mode),
   });
 
+  const setPlan = useMutation({
+    mutationFn: (on: boolean) => actions.setPlan(sessionId, on),
+  });
+
   const phase = run.waiting ? "waiting" : run.busy ? "thinking" : null;
   const state = golemState({ connection, phase, error: run.failed });
   const failure = send.error ?? stop.error;
-  const line = commands.error ?? (setMode.error ? actionErrorText(setMode.error, "Could not change the mode.") : failure ? sendErrorText(failure) : null);
+  const line = commands.error ?? (setMode.error ? actionErrorText(setMode.error, "Could not change the mode.") : setPlan.error ? actionErrorText(setPlan.error, "Could not change plan first.") : failure ? sendErrorText(failure) : null);
   return (
     <>
       <DockView
@@ -89,6 +94,7 @@ export function SessionDock({ sessionId }: { sessionId: string }) {
         meter={<Meter state={state} runStartedAt={run.runStartedAt} localWait={run.localWait} aside={
               <span className="flex items-center gap-2">
                 <TuneChip sessionId={sessionId} />
+                <PlanChip sessionId={sessionId} onToggle={(on) => setPlan.mutate(on)} />
                 <ModeChip sessionId={sessionId} onSelect={(mode) => setMode.mutate(mode)} />
                 <ContextChip sessionId={sessionId} />
               </span>

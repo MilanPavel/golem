@@ -450,6 +450,22 @@ export {
   sessionMarkdown,
   type CopyMessage,
 } from "./transcript-text.ts";
+export {
+  BUILD_TEXT,
+  emptyPlan,
+  openPlan,
+  PLAN_HINT,
+  PLAN_KEYS,
+  planChanged,
+  planFooter,
+  planOfCall,
+  planPaletteLabel,
+  PROPOSE_PLAN_TOOL,
+  reducePlan,
+  type PlanState,
+  type PlanStepView,
+  type PlanView,
+} from "./plan.ts";
 export { golemState, type GolemState, type RunPhase } from "./golem-state.ts";
 export { appendInstallOutput, installEventOf, type InstallEvent, type InstallTail } from "./ollama-install.ts";
 export { visibleText } from "./sanitize.ts";
