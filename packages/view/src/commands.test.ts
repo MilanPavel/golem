@@ -372,9 +372,20 @@ test("every command has a group and the names are unique", () => {
   assert.equal(new Set(names).size, names.length);
 });
 
-test("/context opens the context panel and takes no argument", () => {
+test("/context opens the context panel, and /context clear clears old tool results", () => {
   assert.deepEqual(applyComposer(closedDebug, "/context"), { kind: "context" });
+  assert.deepEqual(applyComposer(closedDebug, "/context clear"), { kind: "compact", action: "clear", focus: null });
   assert.equal(applyComposer(closedDebug, "/context x").kind, "unknown");
+  assert.equal(applyComposer(closedDebug, "/context clear x").kind, "unknown");
+});
+
+test("/compact summarises, with the rest of the line as the focus", () => {
+  assert.deepEqual(applyComposer(closedDebug, "/compact"), { kind: "compact", action: "summarise", focus: null });
+  assert.deepEqual(applyComposer(closedDebug, "/compact the file names  and the plan"), {
+    kind: "compact",
+    action: "summarise",
+    focus: "the file names and the plan",
+  });
 });
 
 test("/cost opens the cost report and takes no argument", () => {

@@ -221,7 +221,7 @@ export type Count = number | null;
 export type ReloadMs = number | null;
 export type WindowFrom = number | null;
 export type WindowTo = number | null;
-export type RunId17 = string;
+export type RunId17 = string | null;
 export type Seq16 = number;
 export type SessionId17 = string;
 export type Ts16 = string;
@@ -1362,12 +1362,14 @@ export interface TokenUsage {
 /**
  * What golem sends of the history changed, before the model call that follows.
  *
+ * ``run_id`` is null when ``session.compact`` made the change: no run owns it.
+ *
  * This interface was referenced by `RpcNotification`'s JSON-Schema
  * via the `definition` "ContextChangedEvent".
  */
 export interface ContextChangedEvent {
   data: ContextChangedData;
-  run_id: RunId17;
+  run_id?: RunId17;
   seq: Seq16;
   session_id: SessionId17;
   ts: Ts16;

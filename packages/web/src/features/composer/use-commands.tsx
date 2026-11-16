@@ -2,6 +2,8 @@ import {
   applyComposer,
   closedDebug,
   COMMANDS,
+  COMPACTING,
+  compactLine,
   copyAnswer,
   effectiveMode,
   copyCode,
@@ -262,6 +264,16 @@ export function useCommands({ session, cwd, typing, send }: UseCommandsOptions):
           case "changes":
             openWorkbench("changes");
             return "handled";
+          case "compact": {
+            const started = Date.now();
+            say(found.action === "summarise" ? COMPACTING : "Clearing \u2026");
+            try {
+              const result = await actions.compact(sessionId, found.action, found.focus);
+              return say(compactLine(found.action, result, Date.now() - started));
+            } catch (err) {
+              return fail(err, "Could not compact the session.");
+            }
+          }
           case "todos": {
             const next = !drawerOpenStore.getSnapshot();
             setDrawerOpen(next);

@@ -1,0 +1,53 @@
+{
+  "additionalProperties": false,
+  "description": "What the compaction did.\n\n``count`` is the tool results cleared, or the turns summarised, and 0 when there was\nnothing to do (``before_tokens`` and ``after_tokens`` are then equal, and no event is\nstored). ``window`` is the tokens the history may fill (the model's window less the\nreply reserve), None when it is unknown. ``model`` is the model that wrote a summary.",
+  "properties": {
+    "after_tokens": {
+      "minimum": 0,
+      "title": "After Tokens",
+      "type": "integer"
+    },
+    "before_tokens": {
+      "minimum": 0,
+      "title": "Before Tokens",
+      "type": "integer"
+    },
+    "count": {
+      "minimum": 0,
+      "title": "Count",
+      "type": "integer"
+    },
+    "model": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Model"
+    },
+    "window": {
+      "anyOf": [
+        {
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Window"
+    }
+  },
+  "required": [
+    "before_tokens",
+    "after_tokens",
+    "count"
+  ],
+  "title": "SessionCompactResult",
+  "type": "object"
+}

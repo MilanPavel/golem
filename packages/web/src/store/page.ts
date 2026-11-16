@@ -1,5 +1,5 @@
-import { OLLAMA_FAILED, RpcError, type ApprovalChoice, type ConfigGetResult, type ConfigRawGetResult, type ConfigRawResult, type FsListDirsResult, type McpAddParams, type McpCallResult, type McpImportApplyParams, type McpImportApplyResult, type McpImportScanResult, type McpCatalogResult, type McpListResult, type McpLogsResult, type McpServerConfig, type McpServerDetail, type McpServerLog, type McpLoginDone, type McpTestProgress, type McpTestResult, type GolemClient, type RuntimeName, type SetupStatusResult, type SkillListResult, type TraceGetResult, type TraceSpanResult, type ArtifactReadResult, type ChangesDiffResult, type ChangesDiffTarget, type ChangesListResult, type ChangesRevertResult, type ChangesRevertTarget, type ModelOptionsGetResult, type ModelOptionsSetResult, type SessionSetOptionsResult, type SkillCreateResult, type SkillReadResult, type SkillWriteResult, type AuthListResult, type FileListResult, type FileReadResult, type CostGetResult } from "@golem/client";
-import { changeToolFilter, installEventOf, type InstallEvent, type PermissionMode } from "@golem/view";
+import { OLLAMA_FAILED, RpcError, type ApprovalChoice, type ConfigGetResult, type ConfigRawGetResult, type ConfigRawResult, type FsListDirsResult, type McpAddParams, type McpCallResult, type McpImportApplyParams, type McpImportApplyResult, type McpImportScanResult, type McpCatalogResult, type McpListResult, type McpLogsResult, type McpServerConfig, type McpServerDetail, type McpServerLog, type McpLoginDone, type McpTestProgress, type McpTestResult, type GolemClient, type RuntimeName, type SetupStatusResult, type SkillListResult, type TraceGetResult, type TraceSpanResult, type ArtifactReadResult, type ChangesDiffResult, type ChangesDiffTarget, type ChangesListResult, type ChangesRevertResult, type ChangesRevertTarget, type ModelOptionsGetResult, type ModelOptionsSetResult, type SessionSetOptionsResult, type SkillCreateResult, type SkillReadResult, type SkillWriteResult, type AuthListResult, type FileListResult, type FileReadResult, type CostGetResult, type SessionCompactResult } from "@golem/client";
+import { changeToolFilter, installEventOf, type InstallEvent, type PermissionMode, type CompactAction } from "@golem/view";
 import type { QueryClient } from "@tanstack/react-query";
 import { createDrafts, type Drafts } from "./drafts.ts";
 import { createConnectionStore, type ConnectionStore } from "./connection.ts";
@@ -49,6 +49,7 @@ export type PageClient = Pick<
   | "listKeys"
   | "setSkills"
   | "setSessionMode"
+  | "compactSession"
   | "getConfig"
   | "listMcp"
   | "mcpTools"
@@ -135,6 +136,11 @@ export type PageActions = {
    */
   setDefaultMode(mode: PermissionMode): Promise<string>;
   cancel(runId: string): Promise<void>;
+  /**
+   * Clears old tool results, or summarises old turns with `focus` kept, so the next call sends less.
+   * The summary can take a minute. Nothing leaves the transcript. Rejects with `SESSION_BUSY` while a run is open.
+   */
+  compact(sessionId: string, action: CompactAction, focus: string | null): Promise<SessionCompactResult>;
   /** Sets the title. What the page shows afterwards comes from the daemon's summary. */
   rename(sessionId: string, title: string): Promise<void>;
   /** Forks at a message and resolves with the new session's id. */
@@ -413,6 +419,9 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
           // The rules were built for a mode, so Settings reads them again.
           await queryClient.invalidateQueries({ queryKey: CONFIG_KEY });
         }
+      },
+      async compact(sessionId, action, focus) {
+        return client.compactSession(sessionId, action, focus ?? undefined);
       },
       async setDefaultMode(mode) {
         const before = queryClient.getQueriesData<ConfigGetResult>({ queryKey: CONFIG_KEY });

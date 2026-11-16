@@ -142,6 +142,8 @@ The line under an answer ends with the model, `local` for a model on your machin
 | `/todos` | Show or hide the agent's todo list above the composer |
 | `/context` | See how full the model's context is, and what fills it. In the web UI it opens the trace |
 | `/cost` | What model calls cost: this session, today, the week, the week by model, and what running locally saved. In the web UI it opens Settings → Usage |
+| `/compact [focus]` | Replace the old turns with a summary, so the next call sends less. `focus` is what the summary must keep, such as `/compact the file names and the plan`. The last turns stay as they are |
+| `/context clear` | Send old tool results as one line each, keeping the newest few, so the next call sends less |
 | `/time` | Show or hide the time beside each message |
 | `/thinking` | Show or hide the thinking line above each answer. It only changes what you see; the `think` setting in `/tune` is what the model is asked to do |
 | `/detail [quiet\|normal\|verbose]` | Web UI: how much of a turn's tool steps shows. Quiet is the step count, Normal a one-line summary you can open, Verbose opens every step with its arguments and output. Alone, it says the current level |
@@ -149,6 +151,8 @@ The line under an answer ends with the model, `local` for a model on your machin
 | `/debug wire`, `/debug model` | Show the protocol messages, or exactly what the model sees |
 | `/debug hold`, `/debug go` | Hold your next message, to look at it in the model tab before it is sent, then send it |
 | `/help` | List every command |
+
+`/compact` and `/context clear` run between turns, without waiting for the context to fill. Each prints one line when it is done, such as `summarised 9 earlier turns with qwen3:27b · ctx 84% → 31% · 6.2 s` or `cleared 12 old tool results · ctx 71% → 38%`, and `nothing to compact yet` when there is nothing to do. A summary can take a minute with a local model, and the line says it is working meanwhile. They are refused while an answer is running. Nothing is deleted: the chat on screen and the saved session stay whole, and only what the next call sends gets shorter. `/compact` keeps the last `keep_turns` turns and `/context clear` keeps the newest `keep_results` tool results, from `[context]` in the settings.
 
 `/context` draws the model's window as a grid of cells, coloured by what fills them, with a legend beside it (or under it in a narrow terminal). One cell is 0.5% of the window.
 

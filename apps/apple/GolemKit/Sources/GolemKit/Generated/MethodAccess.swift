@@ -63,6 +63,7 @@ public enum MethodAccess {
         "runtime.install_cancel",
         "session.attach",
         "session.close",
+        "session.compact",
         "session.create",
         "session.detach",
         "session.fork",

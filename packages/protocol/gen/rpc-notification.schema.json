@@ -656,15 +656,23 @@
     },
     "ContextChangedEvent": {
       "additionalProperties": false,
-      "description": "What golem sends of the history changed, before the model call that follows.",
+      "description": "What golem sends of the history changed, before the model call that follows.\n\n``run_id`` is null when ``session.compact`` made the change: no run owns it.",
       "properties": {
         "data": {
           "$ref": "#/$defs/ContextChangedData"
         },
         "run_id": {
-          "minLength": 1,
-          "title": "Run Id",
-          "type": "string"
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Run Id"
         },
         "seq": {
           "minimum": 1,
@@ -690,7 +698,6 @@
       "required": [
         "seq",
         "session_id",
-        "run_id",
         "ts",
         "type",
         "data"

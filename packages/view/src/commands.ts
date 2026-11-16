@@ -27,6 +27,8 @@ export type ComposerOutcome =
   | { kind: "help" }
   | { kind: "context" }
   | { kind: "cost" }
+  /** `/compact [focus]` summarises old turns, `/context clear` clears old tool results. */
+  | { kind: "compact"; action: "clear" | "summarise"; focus: string | null }
   | { kind: "tune" }
   /** Set one option for this session, or with a null `value` remove its override. `notice` is what to print. */
   | { kind: "tune-set"; name: string; value: TuneValue | null; notice: string }
@@ -174,9 +176,26 @@ export const COMMANDS: readonly Command[] = [
   {
     name: "/context",
     group: "view",
-    args: "",
-    description: "Shows what fills the model's context: the prompt, the tools, and the messages.",
-    run: withoutArgs({ kind: "context" }),
+    args: "[clear]",
+    description: "Shows what fills the context. clear drops old tool results from it.",
+    choices: ["clear"],
+    run: (_debug, args) => {
+      if (args.length === 0) return { kind: "context" };
+      return args.length === 1 && args[0] === "clear"
+        ? { kind: "compact", action: "clear", focus: null }
+        : { kind: "unknown", notice: "/context or /context clear" };
+    },
+  },
+  {
+    name: "/compact",
+    group: "session",
+    args: "[focus]",
+    description: "Summarises the old turns, so the next call sends less. focus is what to keep.",
+    run: (_debug, args) => ({
+      kind: "compact",
+      action: "summarise",
+      focus: args.length === 0 ? null : args.join(" "),
+    }),
   },
   {
     name: "/cost",
