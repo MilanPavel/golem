@@ -65,7 +65,9 @@ PROJECT_EDIT = "a project routine is edited in the project's .golem/config.toml,
 
 async def routine_list(ctx: RequestContext, params: RoutineListParams) -> RoutineListResult:
     now = ctx.state.clock()
-    routines, issues = await asyncio.to_thread(_collect, ctx, _folders(params.folders), now)
+    folders = _folders(params.folders)
+    routines, issues = await asyncio.to_thread(_collect, ctx, folders, now)
+    issues = [*issues, *_watch_problems(ctx, folders)]
     shown: list[RoutineInfo] = []
     for info in routines:
         rows = await _rows(ctx, info, 1)
@@ -147,6 +149,8 @@ async def routine_update(ctx: RequestContext, params: RoutineUpdateParams) -> Ro
     )
     if ctx.state.routines is not None:
         ctx.state.routines.reload()
+    if ctx.state.watcher is not None:
+        ctx.state.watcher.reload()
     log.info("wrote routine %s to %s", checked.name, path)
     now = ctx.state.clock()
     return RoutineUpdateResult(routine=_info(ctx, checked, "user", None, path, False, now))
@@ -167,6 +171,8 @@ async def routine_remove(ctx: RequestContext, params: RoutineRemoveParams) -> Ro
     )
     if ctx.state.routines is not None:
         ctx.state.routines.reload()
+    if ctx.state.watcher is not None:
+        ctx.state.watcher.reload()
     return RoutineRemoveResult(name=params.name)
 
 
@@ -258,6 +264,14 @@ def _info(
         next_at=next_at,
         blocked=blocked,
     )
+
+
+def _watch_problems(ctx: RequestContext, folders: list[Path]) -> list[RoutineProblem]:
+    """The watched folders that cannot be read, of the routines ``routine.list`` shows."""
+    if ctx.state.watcher is None:
+        return []
+    shown = {str(ctx.state.paths.config_file), *(str(project_config(f)) for f in folders)}
+    return [p for p in ctx.state.watcher.problems() if p.file in shown]
 
 
 def _issue(problem: RoutineProblem) -> RoutineIssue:

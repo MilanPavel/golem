@@ -24,6 +24,7 @@ from golem.notify import Notifier
 from golem.paths import GolemPaths
 from golem.permissions.policy import Policy
 from golem.routine_scheduler import RoutineScheduler
+from golem.routine_watcher import FileWatcher
 from golem.routines import local_zone
 from golem.secrets import SecretStore
 from golem.sessions.manager import SessionManager
@@ -45,6 +46,8 @@ class DaemonState:
     notifier: Notifier | None = None
     routines: RoutineScheduler | None = None
     """The routine scheduler, once the daemon serves. ``routine.run`` fires through it."""
+    watcher: FileWatcher | None = None
+    """The file watcher of the ``on`` routines, once the daemon serves."""
     routine_runs: RoutineRuns | None = None
     models: ModelDiscovery | None = None
     facts: FactsSource | None = None

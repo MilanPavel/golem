@@ -317,6 +317,7 @@ class ChatRuntime:
         allowed_tools: Sequence[Allowance] = (),
         mcp_servers: Sequence[str] = (),
         skill_folder: str | None = None,
+        read_folders: Sequence[str] = (),
         pinned: Sequence[str] = (),
         pinned_folders: Sequence[str] = (),
         options: Mapping[str, float | str] | None = None,
@@ -333,7 +334,8 @@ class ChatRuntime:
         first, so the provider accepts the history. ``cwd`` is the folder the
         file tools work in, and ``mcp_servers`` the on-demand MCP servers the
         session turned on. ``skill_folder`` is the folder of the skill this turn
-        runs, which the read tools may read from then on. ``pinned`` are the
+        runs, which the read tools may read from then on, as may the ``read_folders`` a
+        routine firing adds for its own session. ``pinned`` are the
         skills pinned in the session, for the system prompt, and
         ``pinned_folders`` their folders, which the read tools may read. Raises
         :class:`TooManyStepsError` when the model keeps calling tools.
@@ -373,8 +375,9 @@ class ChatRuntime:
         )
         if undone[1] is not None:
             graph_input["changes_seen"] = undone[1]
-        if skill_folder is not None:
-            graph_input["skill_folders"] = [skill_folder]
+        folders = [*([] if skill_folder is None else [skill_folder]), *read_folders]
+        if folders:
+            graph_input["skill_folders"] = folders
         async with aclosing(self._parts(graph_input, config)) as parts:
             async for part in parts:
                 yield part

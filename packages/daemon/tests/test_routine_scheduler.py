@@ -56,6 +56,7 @@ class FakeLauncher:
     def __init__(self) -> None:
         self.created: list[str] = []
         self.sent: list[tuple[str, str]] = []
+        self.read_folders: list[tuple[str, ...]] = []
         self.fail_create = False
 
     async def create(self, routine: Planned) -> str:
@@ -64,8 +65,11 @@ class FakeLauncher:
         self.created.append(routine.name)
         return f"s_{len(self.created)}"
 
-    async def send(self, routine: Planned, session_id: str) -> None:
+    async def send(
+        self, routine: Planned, session_id: str, read_folders: tuple[str, ...] = ()
+    ) -> None:
         self.sent.append((session_id, routine.settings.prompt))
+        self.read_folders.append(read_folders)
 
 
 def _write(home: Path, *tables: str, trusted: list[Path] | None = None) -> Path:
@@ -413,8 +417,10 @@ class Live:
     """A session manager with fake models, a scheduler over it, and a fake clock."""
 
     def __init__(self, database: Database, home: Path, replies: list[Any]) -> None:
-        router = ModelRouter(model=ToolCallingChatModel(replies=replies))
+        self.model = ToolCallingChatModel(replies=replies)
+        router = ModelRouter(model=self.model)
         runtime = open_chat(router, InMemorySaver(), _registry(), Policy(None, home=home))
+        self.runtime = runtime
         self.router = router
         self.bus = EventBus()
         self.records = SessionRecords(database)
@@ -531,3 +537,36 @@ def test_a_routine_folder_is_its_own_or_the_projects(tmp_path: Path) -> None:
     assert folder_of(Planned(plain)) is None
     assert folder_of(Planned(plain, tmp_path)) == str(tmp_path)
     assert folder_of(Planned(inside, tmp_path)) == str(tmp_path / "sub")
+
+
+async def test_a_watch_firing_sends_the_path_and_may_read_the_watched_folder(
+    database: Database, tmp_path: Path
+) -> None:
+    inbox = tmp_path / "in"
+    inbox.mkdir()
+    receipt = inbox / "receipt.pdf"
+    receipt.write_text("x", encoding="utf-8")
+    live = Live(database, tmp_path, ["Done."])
+    _write(
+        tmp_path,
+        '[[routine]]\nname = "receipts"\nprompt = "Summarize {path}"\n'
+        f'on = {{ watch = "{inbox}", glob = "*.pdf" }}\n',
+    )
+    [routine] = await live.scheduler.watched()
+    info = receipt.stat()
+    assert await live.scheduler.fire_watch(routine, receipt, info.st_size, info.st_mtime_ns)
+    (row,) = await live.runs.recent("receipts", "user")
+    assert row.trigger == "watch" and row.session_id is not None
+
+    async def ended() -> bool:
+        got = await live.runs.get(row.routine_run_id)
+        return got is not None and got.status != "running"
+
+    await live.until(ended)
+    record = await live.records.get(row.session_id)
+    assert record is not None and record.origin == "routine:receipts"
+    first = live.model.seen[0][-1]
+    assert f"Summarize {receipt}" in str(first.content)
+    state = await live.runtime.values(row.session_id)
+    assert state.get("skill_folders") == [str(inbox)]
+    await live.scheduler.aclose()

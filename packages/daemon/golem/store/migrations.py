@@ -196,4 +196,10 @@ MIGRATIONS: tuple[tuple[str, ...], ...] = (
         "CREATE INDEX routine_runs_routine ON routine_runs (scope, routine, started_at)",
         "CREATE INDEX routine_runs_session ON routine_runs (session_id)",
     ),
+    (
+        "ALTER TABLE routine_runs ADD COLUMN watch_path TEXT",
+        "ALTER TABLE routine_runs ADD COLUMN watch_size INTEGER",
+        "ALTER TABLE routine_runs ADD COLUMN watch_mtime_ns INTEGER",
+        "CREATE INDEX routine_runs_watch ON routine_runs (scope, routine, watch_path)",
+    ),
 )

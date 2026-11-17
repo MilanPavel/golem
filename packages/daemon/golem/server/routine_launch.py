@@ -54,6 +54,10 @@ class SessionLauncher:
                     await turn_on(self._sessions, self._mcp, session_id, scope, server)
         return session_id
 
-    async def send(self, routine: Planned, session_id: str) -> None:
+    async def send(
+        self, routine: Planned, session_id: str, read_folders: tuple[str, ...] = ()
+    ) -> None:
         prompt = routine.settings.prompt
-        await self._sessions.send(session_id, prompt, skill=skill_of(prompt))
+        await self._sessions.send(
+            session_id, prompt, skill=skill_of(prompt), read_folders=read_folders
+        )
