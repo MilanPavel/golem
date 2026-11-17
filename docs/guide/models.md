@@ -109,6 +109,12 @@ A chat's route mode says how it picks the model of each turn: `pinned` (the mode
 
 An answer that ran on a model other than the chat's own starts its footer with a note, such as `↑ deepseek-chat · did not fit in 32K`. The arrow is there when the model is in a higher tier than the chat's. The model pickers show each model's tier: `local`, `budget`, or `frontier`.
 
+### How a model did
+
+golem counts, on this Mac, how often a model's tool calls were invalid, how often a run had to step up to a stronger model, and how often you asked for another model. The model list shows a line such as `tool calls 96% ok · stepped up 2 of 41 runs`. The tool part appears after 20 tool calls and reads the last 200.
+
+On route `auto`, a local model below 50% valid tool calls is left out of calls that need tools while another model can take them, and `/route why` says so. A model you update recovers by itself as new calls come in. To start a model's score again, run `golem models score --reset <ref>`; your usage and costs are kept.
+
 ## Short names, and other providers
 
 golem reads `~/.golem/config.toml`, and picks up model changes without a restart. A **profile** gives a model a short name:

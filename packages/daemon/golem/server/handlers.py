@@ -215,6 +215,9 @@ from golem_protocol.commands import (
     ModelPullCancelResult,
     ModelPullParams,
     ModelPullResult,
+    ModelScoreInfo,
+    ModelScoreResetParams,
+    ModelScoreResetResult,
     ModelSetDefaultParams,
     ModelSetDefaultResult,
     ModelSetup,
@@ -1117,6 +1120,16 @@ async def _model_list(ctx: RequestContext, params: ModelListParams) -> ModelList
                     reply_tps=model.speed.reply_tps,
                     samples=model.speed.samples,
                 ),
+                score=None
+                if model.score is None
+                else ModelScoreInfo(
+                    tool_score=model.score.tool_score,
+                    calls=model.score.calls,
+                    runs=model.score.runs,
+                    stepped_up=model.score.stepped_up,
+                    retried=model.score.retried,
+                    tool_calls=model.score.tool_calls,
+                ),
             )
             for model in listing.models
         ],
@@ -1153,6 +1166,17 @@ async def _session_set_model(
         model_provider=identity.provider,
         model_name=identity.name,
     )
+
+
+async def _model_score_reset(
+    ctx: RequestContext, params: ModelScoreResetParams
+) -> ModelScoreResetResult:
+    scores = ctx.state.scores
+    if scores is None:
+        raise RpcCallError(INTERNAL_ERROR, "the scoreboard is not ready")
+    await scores.reset(params.ref)
+    log.info("score reset ref=%s", params.ref)
+    return ModelScoreResetResult(ref=params.ref)
 
 
 async def _model_set_default(
@@ -1860,6 +1884,9 @@ def standard_methods() -> dict[str, Method]:
             "model.pull_cancel", ModelPullCancelParams, True, _model_pull_cancel
         ),
         "model.delete": Method("model.delete", ModelDeleteParams, True, _model_delete),
+        "model.score_reset": Method(
+            "model.score_reset", ModelScoreResetParams, True, _model_score_reset
+        ),
         "model.set_default": Method(
             "model.set_default", ModelSetDefaultParams, True, _model_set_default
         ),

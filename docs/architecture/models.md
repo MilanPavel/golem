@@ -170,6 +170,17 @@ On route `auto` a run may move to a stronger model once, when its model struggle
 - A success logs `model.routed` with the reason `escalated`, the struggle's detail and the old model's name ("2 invalid tool calls in a row on qwen3:27b", "did not fit in 4K on qwen3:27b").
 - The session counts in memory (not stored) the runs each signal stepped up. At the second one the session's later picks start at the stepped-up tier (`_LiveSession.step_floor`).
 
+### The scoreboard
+
+golem remembers how each model did on this Mac. The projection of the event log fills three columns of `model_calls` (`tool_calls`, `bad_tool_calls`, `recovered_text_calls`) and the table `model_outcomes`:
+- `tool.requested` adds a tool call to the model call named by its `message_id`. A `tool.failed` for invalid arguments or an unknown tool adds a bad one. A reply whose `text_tool_calls` is `unread` adds a bad call too; `recovered` is only counted. A tool that raised, a denied call and a cancelled call are the world's fault and never count.
+- `model.routed` with the reason `escalated` writes a `stepped_up` row for the model that was answering the run.
+- A `retried_by_user` row is for the retry on a stronger model; nothing writes it until that retry carries the model it replaces on `model.routed`.
+
+`Scores` (`golem/models/scores.py`) reads them, kept in memory for a minute. `tool_score` is `1 − bad / tool_calls` over the newest 200 tool calls, and unknown under 20. `golem models score --reset <ref>` (`model.score_reset`) stores a `reset_at` for the ref in `model_score_resets`; the score ignores older rows, and no usage row is deleted.
+
+`ListedFacts` gives `pick` the `tool_score`. `pick` leaves out a local model below `MIN_LOCAL_TOOL_SCORE` (0.5) for a call that needs tools, only when another candidate passes. `model.list` carries `score` on each model, and the pickers show one line from `scoreLabel` in `packages/view`.
+
 ### The paid question
 
 A turn that would run on a paid model without the user's yes becomes a run that starts waiting ([ADR-055](../adr/055-model-routing.md), section 7). `SessionManager.send` makes the run as usual, with the skill, the user's `message.completed` and `run.started`, then stores `route.consent.needed` and stops: no graph runs, no model is called, and the run has no task. The projection marks the run `waiting`, as for an approval, so the session is busy, `session.list` says `waiting`, a reattach replays the question, `run.cancel` ends it with `run.cancelled`, and a restart leaves it waiting (recovery closes only `running` runs).
@@ -270,6 +281,7 @@ Downloads go through Ollama (`golem/models/pulls.py`):
 | `packages/daemon/golem/models/pulls.py`, `registry.py` | Downloads, and sizes from the registry |
 | `packages/daemon/golem/models/discovery.py` | `model.list`: every model, with status, price, and size |
 | `packages/daemon/golem/models/speed.py` | `SpeedBook`: the typical load, prompt and reply speed of each local model |
+| `packages/daemon/golem/models/scores.py` | `Scores`: tool score, step-ups and retries of each model, from real use |
 | `packages/daemon/golem/models/prices.py`, `catalog.py`, `hardware.py` | Prices from LiteLLM, the local catalog, and this Mac's memory |
 | `packages/daemon/golem/models/errors.py` | `ModelUnreachable`, `BudgetSpent` and their codes |
 | `packages/daemon/golem/models/budget.py` | What the `[budget]` caps leave: `room`, and `Budget.paid_ok` |

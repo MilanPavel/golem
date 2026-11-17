@@ -12,6 +12,10 @@ from golem.models.tiers import TIERS, Tier
 
 Reason = Literal["pinned", "privacy", "fit", "budget", "cheapest", "escalated", "fallback", "user"]
 
+MIN_LOCAL_TOOL_SCORE = 0.5
+"""A local model whose measured tool score is below this does not take a call that needs tools,
+while another candidate can. See ADR-055."""
+
 _RANK = {tier: rank for rank, tier in enumerate(TIERS)}
 
 
@@ -65,6 +69,16 @@ def _unfit(model: ModelFacts, traits: Traits) -> str | None:
     if window is not None and prompt is not None and prompt + traits.reply_reserve > window:
         return f"does not fit: {size_text(prompt)} of {size_text(window)}"
     return None
+
+
+def _weak_tools(model: ModelFacts) -> bool:
+    score = model.tool_score
+    return model.tier == "local" and score is not None and score < MIN_LOCAL_TOOL_SCORE
+
+
+def _weak_why(model: ModelFacts) -> str:
+    ok = round((model.tool_score or 0.0) * 100)
+    return f"its tool calls fail too often on this Mac ({ok}% ok)"
 
 
 def _order(model: ModelFacts) -> tuple[float, ...]:
@@ -149,6 +163,18 @@ def pick(
             budget, last = True, "budget"
         left = kept
 
+    weak: list[ModelFacts] = []  # local models left out for failing tool calls
+    if traits.needs_tools:
+        weak = [m for m in left if _weak_tools(m)]
+        if weak and len(weak) < len(left):
+            for model in weak:
+                drop(model, _weak_why(model))
+            left = [m for m in left if m not in weak]
+            last = "fit"
+            unfit.extend(weak)
+        else:
+            weak = []
+
     if not left:
         return Choice(None, last, _nothing(last), tuple(rejected))
 
@@ -159,7 +185,9 @@ def pick(
         return Choice(winner, "privacy", "this chat stays on this Mac", tuple(rejected), consent)
     if outranked:
         first = outranked[0]
-        if first.window is not None and first.ready:
+        if first in weak:
+            detail = f"{first.ref} {_weak_why(first)}"
+        elif first.window is not None and first.ready:
             detail = f"did not fit in {size_text(first.window)} on {first.ref}"
         else:
             detail = f"{first.ref} {rejected_why(rejected, first.ref)}"

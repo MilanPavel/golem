@@ -14,6 +14,7 @@ import {
   priceLabel,
   recommendedLabel,
   providerMissing,
+  scoreLabel,
   sizeLabel,
   statusLabel,
   tierLabel,
@@ -372,6 +373,10 @@ export function layoutPicker(input: {
     for (const model of group.models) {
       const missing = providerMissing(listing, model.provider);
       lines.push(modelRow(model, model.ref === selectedRef, namesModel(model, input.current), input.columns, missing, category));
+      // The selected model's score is its detail line.
+      if (model.ref === selectedRef && scoreLabel(model) !== "") {
+        lines.push({ kind: "note", text: `  ${scoreLabel(model)}` });
+      }
     }
   }
   if (models.length === 0) {

@@ -35,6 +35,60 @@
       "title": "ModelPriceInfo",
       "type": "object"
     },
+    "ModelScoreInfo": {
+      "additionalProperties": false,
+      "description": "How a model did on this Mac, from real use.\n\n``tool_score`` is the share of its last 200 tool calls that were valid, or null with\nfewer than 20. ``calls`` is its model calls, ``runs`` the runs that used it, ``stepped_up``\nthe runs that left it for a stronger model, and ``retried`` the answers the user asked a\nstronger model to redo.",
+      "properties": {
+        "calls": {
+          "minimum": 0,
+          "title": "Calls",
+          "type": "integer"
+        },
+        "retried": {
+          "minimum": 0,
+          "title": "Retried",
+          "type": "integer"
+        },
+        "runs": {
+          "minimum": 0,
+          "title": "Runs",
+          "type": "integer"
+        },
+        "stepped_up": {
+          "minimum": 0,
+          "title": "Stepped Up",
+          "type": "integer"
+        },
+        "tool_calls": {
+          "minimum": 0,
+          "title": "Tool Calls",
+          "type": "integer"
+        },
+        "tool_score": {
+          "anyOf": [
+            {
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tool Score"
+        }
+      },
+      "required": [
+        "calls",
+        "runs",
+        "stepped_up",
+        "retried",
+        "tool_calls"
+      ],
+      "title": "ModelScoreInfo",
+      "type": "object"
+    },
     "ModelSpeedInfo": {
       "additionalProperties": false,
       "description": "Typical speed of a local model: the median of its recent calls.\n\nFrom the model server's own clock. ``samples`` is how many calls it rests on.",
@@ -79,7 +133,7 @@
     }
   },
   "additionalProperties": false,
-  "description": "One model, by ``provider/model`` ref.\n\n``source`` is where golem found it: ``installed`` on a local server,\n``catalog`` for a local model to download, ``remote`` from a provider's\nlist, or ``profile`` when only config names it. ``progress`` is set while\nit is ``pulling``. ``profiles`` are the profile names that point at it.\n``fit`` says whether a local model fits in this machine's memory.\n``tags`` are a catalog model's tags, such as ``coding``, and\n``recommended`` marks the one catalog model golem suggests for this Mac.\n``categories`` say what the model is for, in a fixed order: the catalog's\nown for a model it lists, else what Ollama's ``capabilities`` and\nLiteLLM's ``supports_*`` fields and context size show.\n``recommended_for`` lists the categories this catalog model is the pick for on\nthis Mac: the largest model of that category it has the memory for.\n``think_values`` is what the ``think`` option takes for this model: ``off`` and\n``on``, or ``low``, ``medium`` and ``high``. It is empty when the model cannot think.\n``tier`` is ``local`` for Ollama, ``budget`` for a hosted model whose blended price is at\nor below ``[routing] budget_max_price``, and ``frontier`` otherwise.\n``stale`` means a cached list was shown because the provider did not\nanswer in time. ``speed`` is set for a local model golem has timed.",
+  "description": "One model, by ``provider/model`` ref.\n\n``source`` is where golem found it: ``installed`` on a local server,\n``catalog`` for a local model to download, ``remote`` from a provider's\nlist, or ``profile`` when only config names it. ``progress`` is set while\nit is ``pulling``. ``profiles`` are the profile names that point at it.\n``fit`` says whether a local model fits in this machine's memory.\n``tags`` are a catalog model's tags, such as ``coding``, and\n``recommended`` marks the one catalog model golem suggests for this Mac.\n``categories`` say what the model is for, in a fixed order: the catalog's\nown for a model it lists, else what Ollama's ``capabilities`` and\nLiteLLM's ``supports_*`` fields and context size show.\n``recommended_for`` lists the categories this catalog model is the pick for on\nthis Mac: the largest model of that category it has the memory for.\n``think_values`` is what the ``think`` option takes for this model: ``off`` and\n``on``, or ``low``, ``medium`` and ``high``. It is empty when the model cannot think.\n``tier`` is ``local`` for Ollama, ``budget`` for a hosted model whose blended price is at\nor below ``[routing] budget_max_price``, and ``frontier`` otherwise.\n``stale`` means a cached list was shown because the provider did not\nanswer in time. ``speed`` is set for a local model golem has timed. ``score`` is set\nfor a model golem has used on this Mac.",
   "properties": {
     "categories": {
       "items": {
@@ -192,6 +246,17 @@
       "minLength": 3,
       "title": "Ref",
       "type": "string"
+    },
+    "score": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ModelScoreInfo"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
     },
     "size_gb": {
       "anyOf": [

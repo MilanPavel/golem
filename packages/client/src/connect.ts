@@ -84,6 +84,7 @@ import type { ModelPullCancelResult } from "../../protocol/gen/model-pull-cancel
 import type { ModelPullDone } from "../../protocol/gen/model-pull-done.ts";
 import type { ModelPullProgress } from "../../protocol/gen/model-pull-progress.ts";
 import type { ModelPullResult } from "../../protocol/gen/model-pull-result.ts";
+import type { ModelScoreResetResult } from "../../protocol/gen/model-score-reset-result.ts";
 import type { ModelSetDefaultResult } from "../../protocol/gen/model-set-default-result.ts";
 import type { ModelOptionsGetResult } from "../../protocol/gen/model-options-get-result.ts";
 import type { ModelOptionsSaved } from "../../protocol/gen/model-options-saved.ts";
@@ -163,6 +164,7 @@ import {
   isModelOptionsGetResult,
   isModelOptionsSaved,
   isModelOptionsSetResult,
+  isModelScoreResetResult,
   isModelSetDefaultResult,
   isPermissionsSetModeResult,
   isSessionCompactResult,
@@ -385,6 +387,8 @@ export interface GolemClient {
   /** Use `model` (a profile or a ref) from the session's next run. The daemon emits `model.selected`. */
   setSessionModel(sessionId: string, model: string): Promise<SessionSetModelResult>;
   /** Write `default_model` to the user's config.toml. New sessions start on it. */
+  /** Starts a model's score from nothing. Usage rows stay. */
+  resetModelScore(ref: string): Promise<ModelScoreResetResult>;
   setDefaultModel(model: string): Promise<ModelSetDefaultResult>;
   /** Write `[permissions] mode` to the user's config.toml, keeping its comments. New chats start in it. */
   setDefaultPermissionMode(mode: PermissionsSetModeParams["mode"]): Promise<PermissionsSetModeResult>;
@@ -1535,6 +1539,14 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       const result = await call("session.set_model", { session_id: sessionId, model });
       if (!isSessionSetModelResult(result)) {
         throw new Error("invalid session.set_model result");
+      }
+      return result;
+    },
+    async resetModelScore(ref: string): Promise<ModelScoreResetResult> {
+      await ready;
+      const result = await call("model.score_reset", { ref });
+      if (!isModelScoreResetResult(result)) {
+        throw new Error("invalid model.score_reset result");
       }
       return result;
     },

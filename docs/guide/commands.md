@@ -38,6 +38,7 @@ golem has commands in two places: `golem …` in your shell, and `/…` inside t
 | `golem mcp remove <name>` | Removes the server from `config.toml`, stops it, and deletes its token |
 | `golem auth list` | Which providers have a key |
 | `golem models` | Every model you can use or download, with size, price, and context. `--refresh` asks the providers again |
+| `golem models score --reset <ref>` | Starts a model's score from nothing. The score is how often its tool calls were valid and how often runs stepped up from it. Usage and cost stay |
 | `golem cost` | What model calls cost: tokens and money for today and the last 7 days, the week by model, and what running locally saved. Same report as `/cost`, without the session row |
 | `golem eval routing [--days 14] [--session <id>]` | What the sessions recorded on this Mac would have cost on a frontier model, on a local model and on `auto`: cost, prompts that would not fit the window, step-ups and the largest share of a window. It also lists the five sessions where `auto` would have spent most. It is a calculation over the stored events, so it calls no model and costs nothing. Sessions from before sizes were recorded are skipped, and the report says how many. See [Replaying recorded sessions](../vision/routing.md#replaying-recorded-sessions) |
 | `golem config edit [--project]` | Opens `config.toml` (or the project's) in `$EDITOR`, and saves it only when the daemon accepts it. If a setting needs a restart, it offers one |

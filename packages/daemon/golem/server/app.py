@@ -34,6 +34,7 @@ from golem.models.keys import ProviderKeys
 from golem.models.ollama import LocalServer, LocalServers, ServerState
 from golem.models.pulls import PullManager
 from golem.models.router import ModelConfigError, ModelRouter
+from golem.models.scores import Scores
 from golem.models.speed import SpeedBook
 from golem.models.tiers import Tier
 from golem.models.window import resolve_window
@@ -261,6 +262,9 @@ class DaemonApp:
                 self.state.artifacts = ArtifactStore(database)
                 self.state.changes = ChangeStore(database, BlobStore(database))
                 usage = Usage(database)
+                scores = Scores(database)
+                models.scores = scores
+                self.state.scores = scores
                 replayed = await backfill(database)
                 if replayed:
                     log.info("filled model_calls from %d stored model call events", replayed)
@@ -357,6 +361,7 @@ class DaemonApp:
                         router, profile, models, overrides=overrides
                     ),
                     speeds.speed,
+                    scores=scores,
                 )
                 sessions.facts = self.state.facts
                 sessions.listed_refs = lambda: [listed.ref for listed in models.cached()]

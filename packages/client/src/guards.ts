@@ -55,6 +55,7 @@ import type { ModelListResult } from "../../protocol/gen/model-list-result.ts";
 import type { ModelProbeResult } from "../../protocol/gen/model-probe-result.ts";
 import type { ModelPullDone } from "../../protocol/gen/model-pull-done.ts";
 import type { ModelPullProgress } from "../../protocol/gen/model-pull-progress.ts";
+import type { ModelScoreResetResult } from "../../protocol/gen/model-score-reset-result.ts";
 import type { ModelSetDefaultResult } from "../../protocol/gen/model-set-default-result.ts";
 import type { SessionSetModelResult } from "../../protocol/gen/session-set-model-result.ts";
 import type { Ping } from "../../protocol/gen/ping.ts";
@@ -390,6 +391,10 @@ export function isPermissionsSetModeResult(value: unknown): value is Permissions
 
 export function isModelSetDefaultResult(value: unknown): value is ModelSetDefaultResult {
   return isRecord(value) && typeof value["default"] === "string";
+}
+
+export function isModelScoreResetResult(value: unknown): value is ModelScoreResetResult {
+  return isRecord(value) && typeof value["ref"] === "string";
 }
 
 export function isAuthSetResult(value: unknown): value is AuthSetResult {

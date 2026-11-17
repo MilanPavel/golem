@@ -18,6 +18,7 @@ import {
   priceLabel,
   providerMissing,
   recommendedLabel,
+  scoreLabel,
   sizeLabel,
   statusLabel,
   tierLabel,
@@ -215,4 +216,14 @@ test("tierLabel is the tier word the picker shows", () => {
   assert.equal(tierLabel(model("ollama/qwen3:8b")), "local");
   assert.equal(tierLabel(model("anthropic/opus")), "frontier");
   assert.equal(tierLabel(model("deepseek/chat", { tier: "budget" })), "budget");
+});
+
+test("scoreLabel is one line on how a model did on this Mac", () => {
+  const score = { tool_score: 0.96, calls: 120, runs: 41, stepped_up: 2, retried: 0, tool_calls: 200 };
+  assert.equal(scoreLabel(model("ollama/a", { score })), "tool calls 96% ok · stepped up 2 of 41 runs");
+  assert.equal(scoreLabel(model("ollama/a", { score: { ...score, tool_score: null, runs: 1, stepped_up: 0 } })), "stepped up 0 of 1 run");
+  assert.equal(scoreLabel(model("ollama/a", { score: { ...score, retried: 3 } })), "tool calls 96% ok · stepped up 2 of 41 runs · retried 3 times");
+  assert.equal(scoreLabel(model("ollama/a", { score: { ...score, tool_score: null, runs: 0 } })), "");
+  assert.equal(scoreLabel(model("ollama/a")), "");
+  assert.equal(scoreLabel(model("ollama/a", { score: null })), "");
 });

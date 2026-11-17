@@ -197,6 +197,11 @@ This is the AutoMix approach.
 - A model with a wrong or missing price lands in the wrong tier. A catalog entry can set `tier` to fix this.
 - The caps read spend from a table of finished calls. A call that is still running is not counted until it ends, so one call can go a little over a cap.
 
+## Changed by 9.4.5
+
+- `pick` has one more rule in its fit step, `MIN_LOCAL_TOOL_SCORE = 0.5` in `golem/models/pick.py`. A local model whose measured tool score is below it is left out of a call that needs tools, with the reason "its tool calls fail too often on this Mac (41% ok)". It is left out only when another candidate still passes every other rule, so the model is never locked out for good. The score reads the last 200 tool calls, so a model the user updates recovers.
+- `ModelFacts.tool_score` is filled from the scoreboard (`golem/models/scores.py`), which counts invalid arguments, unknown tools, and unread text calls. A tool that raised, a denied call and a cancelled call never count.
+
 ## References
 
 - [ADR-013: Approvals](013-approvals.md)

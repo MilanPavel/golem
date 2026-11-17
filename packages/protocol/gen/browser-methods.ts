@@ -45,6 +45,7 @@ export const BROWSER_METHODS: ReadonlySet<string> = new Set([
   "model.probe",
   "model.pull",
   "model.pull_cancel",
+  "model.score_reset",
   "model.set_default",
   "ollama.install",
   "ollama.install_cancel",

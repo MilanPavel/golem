@@ -1,0 +1,16 @@
+{
+  "additionalProperties": false,
+  "description": "``model.score_reset``. Start a model's score from nothing.\n\nThe score ignores the model's calls before now. Usage rows stay.",
+  "properties": {
+    "ref": {
+      "minLength": 3,
+      "title": "Ref",
+      "type": "string"
+    }
+  },
+  "required": [
+    "ref"
+  ],
+  "title": "ModelScoreResetParams",
+  "type": "object"
+}

@@ -123,6 +123,16 @@ test("rows show profiles, facts, the current model, and provider notes", () => {
   assert.deepEqual(rows.at(-1), { kind: "note", text: "groq: /login groq to list its models" });
 });
 
+test("the selected model's score is a line under it", () => {
+  const score = { tool_score: 0.96, calls: 120, runs: 41, stepped_up: 2, retried: 0, tool_calls: 200 };
+  const models = LISTING.models.map((item) => (item.ref === "ollama/qwen3:8b" ? { ...item, score } : item));
+  const rows = layoutPicker({ state: openPicker(null), listing: { ...LISTING, models }, current: null, columns: 100, rows: 40 });
+  const at = rows.findIndex((row) => row.kind === "model" && row.ref === "ollama/qwen3:8b");
+  assert.deepEqual(rows[at + 1], { kind: "note", text: "  tool calls 96% ok · stepped up 2 of 41 runs" });
+  const other = layoutPicker({ state: keyed(openPicker(null), press("down")), listing: { ...LISTING, models }, current: null, columns: 100, rows: 40 });
+  assert.ok(!other.some((row) => row.kind === "note" && row.text.includes("tool calls")));
+});
+
 test("a provider that is not installed says so", () => {
   const listing = { ...LISTING, providers: [{ provider: "ollama", status: "not_installed" as const }] };
   const rows = layoutPicker({ state: openPicker(null), listing, current: "qwen", columns: 100, rows: 40 });

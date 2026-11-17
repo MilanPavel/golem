@@ -96,6 +96,7 @@ METHOD_ACCESS: Final[Mapping[str, Access]] = {
     "model.pull": "browser",
     "model.pull_cancel": "browser",
     "model.delete": "browser",
+    "model.score_reset": "browser",
     "model.set_default": "browser",
     "permissions.set_mode": "browser",
     "session.set_model": "browser",

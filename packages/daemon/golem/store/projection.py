@@ -10,6 +10,7 @@ import json
 from collections.abc import Callable
 from datetime import datetime, tzinfo
 
+from golem.models.scores import is_model_fault
 from golem.store.database import Transaction
 from golem.store.records import decode_allowances, decode_names, encode_allowances
 from golem_protocol.events import (
@@ -21,6 +22,7 @@ from golem_protocol.events import (
     ModelCallCompletedEvent,
     ModelCallStartedEvent,
     ModelOptionsChangedEvent,
+    ModelRoutedEvent,
     ModelSelectedEvent,
     RouteConsentAnsweredEvent,
     RouteConsentNeededEvent,
@@ -36,7 +38,9 @@ from golem_protocol.events import (
     SessionUpdatedEvent,
     SkillActivatedEvent,
     SkillDeactivatedEvent,
+    ToolFailedEvent,
     ToolOutputEvent,
+    ToolRequestedEvent,
 )
 
 
@@ -126,6 +130,8 @@ async def project(tx: Transaction, event: ChatEvent) -> None:
         )
     elif isinstance(event, ModelCallStartedEvent | ModelCallCompletedEvent):
         await project_model_call(tx, event)
+    elif isinstance(event, ToolRequestedEvent | ToolFailedEvent | ModelRoutedEvent):
+        await project_tool_outcome(tx, event)
     elif isinstance(event, SessionClosedEvent):
         await tx.execute(
             "UPDATE sessions SET closed_at = ? WHERE session_id = ? AND closed_at IS NULL",
@@ -212,6 +218,56 @@ async def project_model_call(
             done.message_id,
         ),
     )
+    if done.text_tool_calls == "recovered":
+        await tx.execute(
+            "UPDATE model_calls SET recovered_text_calls = 1 WHERE call_id = ?",
+            (done.message_id,),
+        )
+    elif done.text_tool_calls == "unread":
+        # A call written as text that golem could not read is a tool call that failed.
+        await tx.execute(
+            "UPDATE model_calls SET tool_calls = COALESCE(tool_calls, 0) + 1,"
+            " bad_tool_calls = COALESCE(bad_tool_calls, 0) + 1 WHERE call_id = ?",
+            (done.message_id,),
+        )
+
+
+async def project_tool_outcome(
+    tx: Transaction, event: ToolRequestedEvent | ToolFailedEvent | ModelRoutedEvent
+) -> None:
+    """Count what became of the tool calls of a model call, and when a run stepped up.
+
+    A tool call counts for the call that asked (``tool.requested.message_id``). It is bad when
+    it failed because the model got it wrong (see :func:`is_model_fault`). A step-up counts
+    against the model that was answering the run.
+    """
+    if isinstance(event, ToolRequestedEvent):
+        await tx.execute(
+            "UPDATE model_calls SET tool_calls = COALESCE(tool_calls, 0) + 1 WHERE call_id = ?",
+            (event.data.message_id,),
+        )
+    elif isinstance(event, ToolFailedEvent):
+        if not is_model_fault(event.data.message):
+            return
+        await tx.execute(
+            "UPDATE model_calls SET bad_tool_calls = COALESCE(bad_tool_calls, 0) + 1"
+            " WHERE call_id = (SELECT json_extract(data, '$.message_id') FROM events"
+            " WHERE run_id = ? AND type = 'tool.requested'"
+            " AND json_extract(data, '$.call_id') = ? LIMIT 1)",
+            (event.run_id, event.data.call_id),
+        )
+    elif event.data.reason == "escalated":
+        rows = await tx.fetch_all(
+            "SELECT provider, model FROM model_calls WHERE run_id = ? AND role = 'chat'"
+            " AND model IS NOT NULL ORDER BY rowid DESC LIMIT 1",
+            (event.run_id,),
+        )
+        if rows:
+            await tx.execute(
+                "INSERT INTO model_outcomes (run_id, provider, model, outcome, at)"
+                " VALUES (?, ?, ?, 'stepped_up', ?)",
+                (event.run_id, rows[0]["provider"], rows[0]["model"], event.ts),
+            )
 
 
 async def _allow_tool(tx: Transaction, session_id: str, name: str, subject: str | None) -> None:
@@ -240,7 +296,7 @@ async def _finish_run(
     )
 
 
-__all__ = ["local_day", "project", "project_model_call"]
+__all__ = ["local_day", "project", "project_model_call", "project_tool_outcome"]
 
 
 async def _set_skills(
