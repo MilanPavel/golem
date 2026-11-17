@@ -86,6 +86,12 @@ export const PanelIcon = (props: IconProps) => (
     <path d="M10 3v10" />
   </Icon>
 );
+/** Three bars: the menu that opens the sidebar on a narrow window. */
+export const MenuIcon = (props: IconProps) => (
+  <Icon {...props}>
+    <path d="M2.5 4h11M2.5 8h11M2.5 12h11" />
+  </Icon>
+);
 /** Three bars of different reach, as a trace's waterfall. */
 export const InspectIcon = (props: IconProps) => (
   <Icon {...props}>

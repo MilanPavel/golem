@@ -2,6 +2,9 @@ export { Rail, golemName, type RailConnection, type RailItem, type RailProps } f
 export { PANELS } from "./panels.tsx";
 export { SidebarPanel, WaitingChip, type SidebarPanelProps } from "./sidebar-panel.tsx";
 export { SidebarShell } from "./sidebar-shell.tsx";
+export { MENU_BUTTON_ATTR, MenuBar, MenuButton } from "./menu-button.tsx";
+export { layoutMode, useLayoutMode, type LayoutMode } from "./layout-mode.ts";
+export { sidebarOverlayStore, useSidebarOverlay } from "./sidebar-overlay.ts";
 export { SIDEBAR_ITEM_KEY, sidebarItemStore, useSidebarItem } from "./sidebar-item.ts";
 export { AUTOMATION_ROADMAP, RoutinesInProgress, RunsInProgress, WorkflowsInProgress } from "./in-progress.tsx";
 export { SIDEBAR_OPEN_KEY, sidebarOpenStore, useSidebarOpen } from "./sidebar-open.ts";
