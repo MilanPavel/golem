@@ -120,6 +120,10 @@ test:
 test-py:
     uv run pytest
 
+# Print the routing cases as a Markdown table, for "Routing a turn" in docs/architecture/models.md.
+routing-table:
+    @uv run python packages/daemon/tests/routing_table.py
+
 # The tests of every TypeScript package but the web app.
 test-js:
     pnpm -r --filter '!@golem/web' --if-present test

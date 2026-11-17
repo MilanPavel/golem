@@ -161,6 +161,66 @@ A session has a route mode: `pinned`, `local` or `auto` ([ADR-055](../adr/055-mo
 
 The turn runs on the picked profile. `sessions.model_profile` stays the user's choice: it is the pinned model and the start of the ladder, and routing never stores `model.selected`. The runner emits `model.routed` right after `run.started`, with the profile, what it resolved to, the tier, the `reason`, a one-line `detail`, and the `rejected` candidates with why. A `pinned` session emits nothing. The run span of `trace.get` carries the same `reason`, `detail` and `rejected` as `route`. Only the model that was picked is waited for while it downloads.
 
+The table below lists situations and the decision each must lead to. It is made from `packages/daemon/tests/data/routing_cases.toml`, which `packages/daemon/tests/test_routing_table.py` runs through `SessionManager.send` (and, for the mid-run cases, the graph) on a daemon with fake facts and scripted models. A change to a rule that moves a decision fails the case that names it. After you change a case, run `just routing-table` and paste its output between the two markers; a test fails while the table here differs. A case that asks the paid question shows the model and reason the answer "once" runs.
+
+<!-- routing-table:begin -->
+| Case | Route | Session model | Situation | Model | Reason |
+| --- | --- | --- | --- | --- | --- |
+| pinned keeps its model, whatever the prompt | `pinned` | `ollama/qwen3:27b` | prompt 41K; models qwen3:27b, deepseek-chat, opus | `ollama/qwen3:27b` | `pinned` |
+| pinned runs a paid model the user chose, with no question | `pinned` | `anthropic/opus` | models qwen3:27b, opus | `anthropic/opus` | `pinned` |
+| auto, everything fits | `auto` | `ollama/qwen3:27b` | prompt 1K; models qwen3:27b, deepseek-chat, opus | `ollama/qwen3:27b` | `cheapest` |
+| auto on a paid session model still starts on the cheapest model that fits | `auto` | `anthropic/opus` | paid yes; models qwen3:27b, deepseek-chat, opus | `ollama/qwen3:27b` | `cheapest` |
+| local keeps hosted models out | `local` | `ollama/qwen3:27b` | prompt 1K; models qwen3:27b, deepseek-chat, opus | `ollama/qwen3:27b` | `privacy` |
+| local runs a local model when the session model is hosted | `local` | `anthropic/opus` | models qwen3:27b, opus | `ollama/qwen3:27b` | `privacy` |
+| local, nothing local fits: the session's model runs anyway | `local` | `ollama/qwen3:27b` | prompt 41K; models qwen3:27b, deepseek-chat | `ollama/qwen3:27b` | `fallback` |
+| local with no local model is refused | `local` | `anthropic/opus` | models opus | refused: `model_not_configured` |  |
+| too big for local, no yes yet: the paid question comes first | `auto` | `ollama/qwen3:27b` | prompt 41K; models qwen3:27b, deepseek-chat, opus | `deepseek/deepseek-chat` after the paid question | `fit` |
+| too big for local, consent given | `auto` | `ollama/qwen3:27b` | prompt 41K; paid yes; daily cap $2.00; models qwen3:27b, deepseek-chat, opus | `deepseek/deepseek-chat` | `fit` |
+| too big for local, paid is never: the local model runs and the paid one is listed | `auto` | `ollama/qwen3:27b` | prompt 41K; paid yes; paid = never; models qwen3:27b, deepseek-chat | `ollama/qwen3:27b` | `fallback` |
+| too big for local, paid is always_ask: asks even after a session yes | `auto` | `ollama/qwen3:27b` | prompt 41K; paid yes; paid = always_ask; models qwen3:27b, deepseek-chat | `deepseek/deepseek-chat` after the paid question | `fit` |
+| no local model passes and the session model is hosted: asks about it | `auto` | `deepseek/deepseek-chat` | prompt 200K; models qwen3:8b, deepseek-chat | `deepseek/deepseek-chat` after the paid question | `fallback` |
+| the daily cap is spent: auto runs local and says so | `auto` | `ollama/qwen3:27b` | paid yes; spent $2.00; daily cap $2.00; models qwen3:27b, deepseek-chat, opus | `ollama/qwen3:27b` | `budget` |
+| the session cap is spent: auto runs local | `auto` | `ollama/qwen3:27b` | paid yes; spent $0.60; daily cap $100.00; session cap $0.50; models qwen3:27b, deepseek-chat | `ollama/qwen3:27b` | `budget` |
+| a spent cap with over = ask: the question offers this turn only | `auto` | `ollama/qwen3:8b` | prompt 20K; spent $2.00; daily cap $2.00; over = ask; models qwen3:8b, deepseek-chat | `deepseek/deepseek-chat` after the paid question | `fit` |
+| a spent cap and a prompt too big for local: the session model runs | `auto` | `ollama/qwen3:8b` | prompt 20K; paid yes; spent $2.00; daily cap $2.00; models qwen3:8b, deepseek-chat | `ollama/qwen3:8b` | `fallback` |
+| pinned paid model over a spent cap is refused | `pinned` | `anthropic/opus` | spent $0.02; daily cap $0.01; models qwen3:27b, opus | refused: `budget_spent` |  |
+| pinned local model ignores a spent cap | `pinned` | `ollama/qwen3:27b` | spent $5.00; daily cap $0.00; models qwen3:27b, opus | `ollama/qwen3:27b` | `pinned` |
+| the session model is not ready: the next tier takes the turn | `auto` | `ollama/down` | paid yes; models down, deepseek-chat | `deepseek/deepseek-chat` | `fit` |
+| an unknown window passes the fit rule | `auto` | `ollama/mystery` | prompt 41K; models mystery, deepseek-chat | `ollama/mystery` | `cheapest` |
+| no model call yet: the prompt size is unknown and the local model runs | `auto` | `ollama/qwen3:8b` | models qwen3:8b, deepseek-chat | `ollama/qwen3:8b` | `cheapest` |
+| after two step-ups the session starts at the budget tier | `auto` | `ollama/qwen3:27b` | paid yes; floor budget; models qwen3:27b, deepseek-chat | `deepseek/deepseek-chat` | `cheapest` |
+| a local model that fails tool calls is left out when a budget model can take over | `auto` | `ollama/flaky` | paid yes; models flaky, deepseek-chat | `deepseek/deepseek-chat` | `fit` |
+| a local model that fails tool calls still runs when it is the only one | `auto` | `ollama/flaky` | models flaky | `ollama/flaky` | `cheapest` |
+| a local model that fails tool calls still runs on local when it is the only local one | `local` | `ollama/flaky` | models flaky, deepseek-chat | `ollama/flaky` | `privacy` |
+| local-only folder, pinned hosted model: refused | `pinned` | `anthropic/opus` | local-only folder; models qwen3:27b, opus | refused: `local_only` |  |
+| local-only folder, pinned local model runs | `pinned` | `ollama/qwen3:27b` | local-only folder; models qwen3:27b, opus | `ollama/qwen3:27b` | `pinned` |
+| local-only folder, local route with hosted models only: refused | `local` | `anthropic/opus` | local-only folder; models deepseek-chat, opus | refused: `local_only` |  |
+| local-only folder, local route runs the local model | `local` | `ollama/qwen3:27b` | local-only folder; models qwen3:27b, deepseek-chat | `ollama/qwen3:27b` |  |
+| local-only folder, auto with a yes and room for paid models stays local | `auto` | `anthropic/opus` | prompt 20K; paid yes; local-only folder; daily cap $100.00; models qwen3:27b, deepseek-chat, opus | `ollama/qwen3:27b` |  |
+| local-only folder, auto with hosted models only: refused | `auto` | `anthropic/opus` | paid yes; local-only folder; models deepseek-chat, opus | refused: `local_only` |  |
+| a struggling run steps up one tier | `auto` | `ollama/qwen3:27b` | paid yes; struggle; models qwen3:27b, deepseek-chat, opus | `deepseek/deepseek-chat` | `escalated` |
+| a struggling run asks the paid question in the middle of the run | `auto` | `ollama/qwen3:27b` | struggle; models qwen3:27b, deepseek-chat, opus | `deepseek/deepseek-chat` after the paid question | `escalated` |
+| a struggling run on local does not step up | `local` | `ollama/qwen3:27b` | paid yes; struggle; models qwen3:27b, deepseek-chat | `ollama/qwen3:27b` | `privacy` |
+| a struggling pinned run does not step up | `pinned` | `ollama/qwen3:27b` | paid yes; struggle; models qwen3:27b, deepseek-chat | `ollama/qwen3:27b` | `pinned` |
+| a struggling run with paid never stays on its model | `auto` | `ollama/qwen3:27b` | paid yes; paid = never; struggle; models qwen3:27b, deepseek-chat | `ollama/qwen3:27b` | `fallback` |
+| a struggling run in a local-only folder stays on its model | `auto` | `ollama/qwen3:27b` | paid yes; local-only folder; struggle; models qwen3:27b, deepseek-chat | `ollama/qwen3:27b` | `fallback` |
+| a hosted provider that is down falls back to a local model | `auto` | `deepseek/deepseek-chat` | paid yes; floor budget; provider down; models qwen3:27b, deepseek-chat | `ollama/qwen3:27b` | `fallback` |
+| two rate limits fall back to another model of the same tier | `auto` | `deepseek/deepseek-chat` | paid yes; floor budget; rate limited; models qwen3:27b, deepseek-chat, kimi | `moonshot/kimi` | `fallback` |
+| a pinned session does not fall back: the run fails with the code | `pinned` | `deepseek/deepseek-chat` | paid yes; rate limited; models qwen3:27b, deepseek-chat, kimi | refused: `rate_limited` |  |
+| try again stronger from local asks, then runs the budget model | `auto` | `ollama/qwen3:27b` | stronger; models qwen3:27b, deepseek-chat | `deepseek/deepseek-chat` after the paid question | `user` |
+| try again stronger with a session yes runs at once | `auto` | `ollama/qwen3:27b` | paid yes; stronger; models qwen3:27b, deepseek-chat | `deepseek/deepseek-chat` | `user` |
+| try again stronger on pinned is refused | `pinned` | `ollama/qwen3:27b` | stronger; models qwen3:27b, deepseek-chat | refused: `model_not_configured` |  |
+| try again stronger with paid never is refused | `auto` | `ollama/qwen3:27b` | paid = never; stronger; models qwen3:27b, deepseek-chat | refused: `model_not_configured` |  |
+| try again stronger in a local-only folder is refused | `auto` | `ollama/qwen3:27b` | local-only folder; stronger; models qwen3:27b, deepseek-chat | refused: `local_only` |  |
+| a title on a local session uses the session's model |  | `ollama/qwen3:27b` | models qwen3:27b, deepseek-chat | `ollama/qwen3:27b` | `session is local` |
+| a title on a hosted session uses the cheapest budget model |  | `anthropic/opus` | models qwen3:27b, deepseek-chat, kimi, opus | `deepseek/deepseek-chat` | `cheapest budget model` |
+| a title on a hosted session with no budget model uses the session's model |  | `anthropic/opus` | models opus | `anthropic/opus` | `no budget model ready` |
+| a title in a local-only folder with no local model falls to the session's model |  | `anthropic/opus` | local-only folder; models deepseek-chat, opus | `anthropic/opus` | `no local model` |
+| a title takes the model the settings name |  | `ollama/qwen3:27b` | titles = deepseek/deepseek-chat; models qwen3:27b, deepseek-chat | `deepseek/deepseek-chat` | `configured` |
+| a helper in a local-only session stays on the local model |  | `ollama/qwen3:27b` | local-only folder; explore = anthropic/opus; models qwen3:27b, opus | `ollama/qwen3:27b` | `session is local` |
+| a helper that the settings send to a hosted model, outside a local-only folder |  | `ollama/qwen3:27b` | explore = anthropic/opus; models qwen3:27b, opus | `anthropic/opus` | `configured` |
+<!-- routing-table:end -->
+
 ### Stepping up inside a run
 
 On route `auto` a run may move to a stronger model once, when its model struggles or its prompt cannot fit (see [The agent loop](./agent-loop.md)). `SessionManager._next_model` answers the graph's ask:
