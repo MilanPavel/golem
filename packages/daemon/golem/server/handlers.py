@@ -1477,6 +1477,7 @@ async def _config_get(ctx: RequestContext, params: ConfigGetParams) -> ConfigGet
             for rule in rules
         ],
         session_allowed=allowed,
+        notifications_open_in=settings.notifications.open_in,
     )
 
 

@@ -368,6 +368,15 @@ class BudgetSettings(BaseModel):
     over: Literal["local", "ask"] = "local"
 
 
+class NotificationSettings(BaseModel):
+    """``[notifications]``. ``open_in`` is where a click on a notice lands: the web page
+    on that session (``web``, the default) or the terminal chat (``terminal``)."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    open_in: Literal["web", "terminal"] = "web"
+
+
 class ExplorerSettings(BaseModel):
     """``[agents.explorer]``. What bounds the helper that ``delegate`` starts."""
 
@@ -653,6 +662,7 @@ BROWSER_SETTINGS = frozenset(
         "skills",
         "ollama",
         "routing",
+        "notifications",
         "context",
         "budget",
         "agents",
@@ -727,6 +737,7 @@ class GolemSettings(BaseSettings):
     context: ContextSettings = Field(default_factory=ContextSettings)
     budget: BudgetSettings = Field(default_factory=BudgetSettings)
     agents: AgentSettings = Field(default_factory=AgentSettings)
+    notifications: NotificationSettings = Field(default_factory=NotificationSettings)
     routine: list[RoutineSettings] = Field(default_factory=list[RoutineSettings])
 
     @field_validator("routine")

@@ -59,6 +59,7 @@ import { readSecret } from "./read-secret.ts";
 import { type Gate, gateService, type SessionDaemon } from "./service-gate.ts";
 import { DEFAULT_WEB_PORT, parseWebArgs, parseWebJobArgs, type WebArgs } from "./web.ts";
 import { DEFAULT_WEB_DEPS, launchDeps, runWeb, runWebLogout } from "./web-command.ts";
+import { chooseTarget, readOpenIn } from "./open-target.ts";
 import { noBrowser, routeDefault, TUI_HINT } from "./dispatch.ts";
 import { findLiveQuietly, type WebDeps } from "./web-live.ts";
 import {
@@ -92,7 +93,7 @@ const USAGE =
   "       golem eval routing [--days N] [--session ID]\n" +
   "       golem mcp add <name> -- <command…> [--token-env VAR] | golem mcp add <name> --url <url> [--token] [--env K=V] [--header K=V] [--cwd D] [--on-demand] [--project] [--timeout S] [--approval allow] | golem mcp add --catalog <id> [--input <id>=<value>] | golem mcp remove <name> | golem mcp export [--format claude|vscode] [--scope user|project]\n" +
   "       golem mcp list [--json] | show <name> [--json] | test <name> | test --catalog <id> | edit <name> [--project] | import [--from <app>|<file>] [--all] | logs <name> [-f] | enable <name> [--on-demand] | disable <name> | restart <name> | login <name> | logout <name> | tools <name> [--hide <glob>] [--show <glob>]\n" +
-  "       golem ask \"<prompt>\" [--folder <dir>] [--model <profile>] [--skill <name>] [--detach] | golem open <id> [--web]\n" +
+  "       golem ask \"<prompt>\" [--folder <dir>] [--model <profile>] [--skill <name>] [--detach] | golem open <id> [--web | --notified]\n" +
   "       golem config show [--resolved] | golem config edit [--project] | golem skills [list] | golem skills check <path>\n" +
   "       golem skills new <name> [--project] [--description \"…\"] | golem skills edit <name>\n" +
   "       golem routines [list] | golem routines run <name> [--folder <dir>] [--wait] | golem routines pause <name> | golem routines resume <name> | golem routines edit\n" +
@@ -307,7 +308,11 @@ async function runAskCommand(given: string[]): Promise<number> {
   );
 }
 
-/** `golem open <id>`: the terminal chat on that session, or with `--web` the page at that session. */
+/**
+ * `golem open <id>`: the terminal chat on that session, or with `--web` the page at that session.
+ * With `--notified` (a click on a notification) `[notifications] open_in` picks, and a web page that
+ * has no web job behind it opens the terminal instead.
+ */
 async function runOpen(given: string[]): Promise<number> {
   const parsed = parseOpenArgs(given);
   if (parsed === null) {
@@ -315,18 +320,29 @@ async function runOpen(given: string[]): Promise<number> {
     return 1;
   }
   // With a daemon up, an unknown id is said here, not inside the chat screen.
+  let openIn: "web" | "terminal" = "web";
   if ((await daemonDown()) === null) {
     const known = await runWithClient(async (client) => {
       await client.inspectSession(parsed.sessionId);
+      if (parsed.notified) openIn = readOpenIn((await client.getConfig()).notifications_open_in);
       return 0;
     });
     if (known !== 0) return known;
   }
+  if (parsed.notified) {
+    const target = chooseTarget(parsed.sessionId, openIn, existsSync(webPlistPath(launchDeps())));
+    return target.kind === "web" ? openSessionPage(target.path) : openTui(parsed.sessionId);
+  }
   if (parsed.web) {
-    const args: WebArgs = { port: DEFAULT_WEB_PORT, portGiven: false, open: true, json: false, serve: false, path: sessionPath(parsed.sessionId) };
-    return openWeb(noBrowser(process.env) ? { ...args, open: false } : args);
+    return openSessionPage(sessionPath(parsed.sessionId));
   }
   return openTui(parsed.sessionId);
+}
+
+/** The web page at `path` on the gateway, in the browser. */
+function openSessionPage(path: string): Promise<number> {
+  const args: WebArgs = { port: DEFAULT_WEB_PORT, portGiven: false, open: true, json: false, serve: false, path };
+  return openWeb(noBrowser(process.env) ? { ...args, open: false } : args);
 }
 
 /** Runs `body` with a client, says what went wrong, and always closes the client. */

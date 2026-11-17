@@ -202,7 +202,7 @@
     }
   },
   "additionalProperties": false,
-  "description": "Resolved settings. Keys are never included.\n\n``project_policy`` is the project's ``.golem/policy.toml`` when it exists,\nand ``project_trusted`` whether its allow rules count. Both are null\nwithout a ``cwd``. ``default_permission_mode`` is ``[permissions] mode``,\nand ``permission_mode`` the mode the ``rules`` were built for: the session's\nwhen ``session_id`` is given, else the default. An older daemon leaves both out.\n``routing`` is the ladder and the spending caps. An older daemon leaves it out.",
+  "description": "Resolved settings. Keys are never included.\n\n``project_policy`` is the project's ``.golem/policy.toml`` when it exists,\nand ``project_trusted`` whether its allow rules count. Both are null\nwithout a ``cwd``. ``default_permission_mode`` is ``[permissions] mode``,\nand ``permission_mode`` the mode the ``rules`` were built for: the session's\nwhen ``session_id`` is given, else the default. An older daemon leaves both out.\n``routing`` is the ladder and the spending caps. ``notifications_open_in`` is\n``[notifications] open_in``. An older daemon leaves both out.",
   "properties": {
     "config_file": {
       "minLength": 1,
@@ -235,6 +235,22 @@
       "minLength": 1,
       "title": "Log Level",
       "type": "string"
+    },
+    "notifications_open_in": {
+      "anyOf": [
+        {
+          "enum": [
+            "web",
+            "terminal"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Notifications Open In"
     },
     "permission_mode": {
       "default": "balanced",

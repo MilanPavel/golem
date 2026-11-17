@@ -2926,7 +2926,8 @@ class ConfigGetResult(BaseModel):
     without a ``cwd``. ``default_permission_mode`` is ``[permissions] mode``,
     and ``permission_mode`` the mode the ``rules`` were built for: the session's
     when ``session_id`` is given, else the default. An older daemon leaves both out.
-    ``routing`` is the ladder and the spending caps. An older daemon leaves it out.
+    ``routing`` is the ladder and the spending caps. ``notifications_open_in`` is
+    ``[notifications] open_in``. An older daemon leaves both out.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -2943,6 +2944,7 @@ class ConfigGetResult(BaseModel):
     rules: list[ConfigRule]
     session_allowed: list[ConfigAllowance] = Field(default_factory=list[ConfigAllowance])
     routing: ConfigRouting | None = None
+    notifications_open_in: Literal["web", "terminal"] | None = None
 
 
 class RoutingGetParams(BaseModel):

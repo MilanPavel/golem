@@ -1212,13 +1212,15 @@ public struct ConfigGetParams: Codable {
 /// without a ``cwd``. ``default_permission_mode`` is ``[permissions] mode``,
 /// and ``permission_mode`` the mode the ``rules`` were built for: the session's
 /// when ``session_id`` is given, else the default. An older daemon leaves both out.
-/// ``routing`` is the ladder and the spending caps. An older daemon leaves it out.
+/// ``routing`` is the ladder and the spending caps. ``notifications_open_in`` is
+/// ``[notifications] open_in``. An older daemon leaves both out.
 // MARK: - ConfigGetResult
 public struct ConfigGetResult: Codable {
     public let configFile: String
     public let defaultModel: String?
     public let defaultPermissionMode: DefaultPermissionModeEnum?
     public let logLevel: String
+    public let notificationsOpenIn: NotificationsOpenIn?
     public let permissionMode: DefaultPermissionModeEnum?
     public let projectPolicy: String?
     public let projectTrusted: Bool?
@@ -1233,6 +1235,7 @@ public struct ConfigGetResult: Codable {
         case defaultModel = "default_model"
         case defaultPermissionMode = "default_permission_mode"
         case logLevel = "log_level"
+        case notificationsOpenIn = "notifications_open_in"
         case permissionMode = "permission_mode"
         case projectPolicy = "project_policy"
         case projectTrusted = "project_trusted"
@@ -1243,11 +1246,12 @@ public struct ConfigGetResult: Codable {
         case trustedProjects = "trusted_projects"
     }
 
-    public init(configFile: String, defaultModel: String?, defaultPermissionMode: DefaultPermissionModeEnum?, logLevel: String, permissionMode: DefaultPermissionModeEnum?, projectPolicy: String?, projectTrusted: Bool?, routing: ConfigRoutingClass?, rules: [RuleElement], sessionAllowed: [SessionAllowedElement]?, sessionTitles: Bool, trustedProjects: [String]) {
+    public init(configFile: String, defaultModel: String?, defaultPermissionMode: DefaultPermissionModeEnum?, logLevel: String, notificationsOpenIn: NotificationsOpenIn?, permissionMode: DefaultPermissionModeEnum?, projectPolicy: String?, projectTrusted: Bool?, routing: ConfigRoutingClass?, rules: [RuleElement], sessionAllowed: [SessionAllowedElement]?, sessionTitles: Bool, trustedProjects: [String]) {
         self.configFile = configFile
         self.defaultModel = defaultModel
         self.defaultPermissionMode = defaultPermissionMode
         self.logLevel = logLevel
+        self.notificationsOpenIn = notificationsOpenIn
         self.permissionMode = permissionMode
         self.projectPolicy = projectPolicy
         self.projectTrusted = projectTrusted
@@ -1263,6 +1267,11 @@ public enum DefaultPermissionModeEnum: String, Codable {
     case autopilot = "autopilot"
     case balanced = "balanced"
     case careful = "careful"
+}
+
+public enum NotificationsOpenIn: String, Codable {
+    case terminal = "terminal"
+    case web = "web"
 }
 
 /// What a route chip needs from ``[routing]`` and ``[budget]``.

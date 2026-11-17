@@ -55,7 +55,7 @@ golem has commands in two places: `golem …` in your shell, and `/…` inside t
 | `golem coding bench <profile-or-model> [--task <name>]` | Runs twelve small edit tasks (Python and TypeScript) on a model in a temporary folder and prints, for each, whether it was solved, how many `edit_file` calls it took, how many failed, and which match rung applied them. The last line sums it up: `solved 9/12 · first-try edits 71% · fuzzy matches 3`. It calls the model for real, so a hosted model costs money. Needs no daemon, and exits with 0 whatever the score (1 only for an unknown task or model) |
 | `golem ask "<prompt>" [--folder <dir>] [--model <profile>] [--skill <name>]` | Starts a session, waits, and prints the answer. If the run stops to ask you about a tool, it prints the question and exits with 3: answer it with `golem open <id>`. A failed run exits with 1 |
 | `golem ask --detach "<prompt>"` | Starts the session and prints its id at once. The work goes on without this window. Open it later with `golem open <id>` |
-| `golem open <id> [--web]` | Opens the terminal chat on that session. With `--web`, opens the web page at that session |
+| `golem open <id> [--web \| --notified]` | Opens the terminal chat on that session. With `--web`, opens the web page at that session. With `--notified`, opens the place `[notifications] open_in` names (the web page by default, the terminal when the web service is not installed). A notification banner shows this command, because clicking the banner does not open golem |
 | `golem web` | The same as `golem`, kept as an alias |
 | `golem web install` / `uninstall` | Keeps the web page running at login (a launchd job), or removes that job |
 | `golem web logout` | Signs every browser out of the web UI |

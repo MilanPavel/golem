@@ -134,16 +134,18 @@ export async function runAsk(client: AskClient, args: AskArgs, io: AskOut, cwd: 
 export interface OpenArgs {
   sessionId: string;
   web: boolean;
+  /** `--notified`: a click on a notification. The place comes from `[notifications] open_in`. */
+  notified: boolean;
 }
 
-/** `golem open <id> [--web]`, or null for anything else. */
+/** `golem open <id> [--web | --notified]`, or null for anything else. */
 export function parseOpenArgs(given: string[]): OpenArgs | null {
   const ids = given.filter((arg) => !arg.startsWith("--"));
   const flags = given.filter((arg) => arg.startsWith("--"));
   const id = ids[0];
   if (ids.length !== 1 || id === undefined || id === "") return null;
-  if (flags.length > 1 || (flags.length === 1 && flags[0] !== "--web")) return null;
-  return { sessionId: id, web: flags.length === 1 };
+  if (flags.length > 1 || (flags.length === 1 && flags[0] !== "--web" && flags[0] !== "--notified")) return null;
+  return { sessionId: id, web: flags[0] === "--web", notified: flags[0] === "--notified" };
 }
 
 /** The page of a session on the gateway, as the web app routes it. */

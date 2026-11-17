@@ -19,6 +19,14 @@ _SCRIPT = (
 _TIMEOUT_SECONDS = 10.0
 
 
+def with_open_hint(notice: Notice) -> str:
+    """The body, plus the command that opens the session. A click on this banner opens
+    Script Editor, not golem, so the way in is written on it (ADR-050's fallback)."""
+    if notice.session_id == "test":
+        return notice.body
+    return f"{notice.body}\ngolem open {notice.session_id}"
+
+
 class NullPoster:
     """Shows nothing. Used in tests, off macOS, and under a temporary ``GOLEM_HOME``."""
 
@@ -31,6 +39,8 @@ class NullPoster:
 class OsascriptPoster:
     """The fallback of ADR-050: ``osascript display notification``, with no click.
 
+    The body ends with ``golem open <id>``, since the banner cannot open the session itself.
+
     The text goes in as script arguments, never into the script source.
     """
 
@@ -40,7 +50,7 @@ class OsascriptPoster:
         args = ["osascript"]
         for line in _SCRIPT:
             args += ["-e", line]
-        args += ["--", notice.title, notice.body]
+        args += ["--", notice.title, with_open_hint(notice)]
         try:
             process = await asyncio.create_subprocess_exec(
                 *args,
@@ -65,4 +75,4 @@ def default_poster(home: Path) -> Poster:
     return OsascriptPoster()
 
 
-__all__ = ["NullPoster", "OsascriptPoster", "default_poster"]
+__all__ = ["NullPoster", "OsascriptPoster", "default_poster", "with_open_hint"]
