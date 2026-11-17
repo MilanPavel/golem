@@ -106,7 +106,8 @@ export function SettingsScreen({ section }: { section: string }) {
           <span className="my-auto ml-auto shrink-0 pl-4 font-mono text-xs whitespace-nowrap text-faint">golem v{version}</span>
         )}
       </nav>
-      <section className="flex min-h-0 min-w-0 flex-1 flex-col gap-3 overflow-y-auto px-7 py-5">
+      {/* `relative`: a visually hidden input is positioned against this pane, so it scrolls with it and cannot make the window taller. */}
+      <section className="relative flex min-h-0 min-w-0 flex-1 flex-col gap-3 overflow-y-auto px-7 py-5">
         {current === undefined ? (
           <>
             <p>There is no such section.</p>

@@ -38,6 +38,8 @@ export const ROUTING_WORDS = {
       "Pinned: the steps are not used. Each chat stays on the model in its model chip. A pinned hosted model is paid without a question; the spending limits still stop it.",
     noFrontier: "No model is ready for this step, so the path ends at Budget.",
     addKey: "Add an API key",
+    notChosen: "No model is chosen for this step, so the path ends at Budget.",
+    choose: "Choose a model",
     gateGo: "Go to the paid gate settings",
   },
   try: { title: "Try it.", line: "Pick a situation and see where the turn goes with these settings.", idle: "Nothing picked yet." },
