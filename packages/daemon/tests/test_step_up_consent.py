@@ -97,6 +97,7 @@ async def test_a_struggling_run_asks_and_a_session_yes_moves_it(short_home: Path
         assert cast(float, asked["estimated_usd"]) > 0
         assert "run.completed" not in _types(client)
         assert _models(client) == ["small", "small"]
+        await _waits(app, session_id)
         await _answer(client, session_id, _run_of(client), "session")
         await _ended(client)
         assert _of(client, "route.consent.answered") == [{"answer": "session"}]
@@ -119,6 +120,7 @@ async def test_only_this_turn_moves_the_run_and_the_next_turn_starts_local(
         session_id = await _start(app, client, "auto", paid=False)
         await _send(client, session_id)
         await _asked(client)
+        await _waits(app, session_id)
         await _answer(client, session_id, _run_of(client), "once")
         await _ended(client)
         assert _models(client) == ["small", "small", "cheap"]
@@ -140,6 +142,7 @@ async def test_stay_local_goes_on_with_the_model_and_does_not_ask_again(short_ho
         session_id = await _start(app, client, "auto", paid=False)
         await _send(client, session_id)
         await _asked(client)
+        await _waits(app, session_id)
         await _answer(client, session_id, _run_of(client), "local")
         await _ended(client)
         assert "run.completed" in _types(client)
@@ -194,6 +197,7 @@ async def test_always_ask_asks_even_when_the_session_said_yes(short_home: Path) 
         session_id = await _start(app, client, "auto", paid=True)
         await _send(client, session_id)
         await _asked(client)
+        await _waits(app, session_id)
         await _answer(client, session_id, _run_of(client), "once")
         await _ended(client)
         assert _models(client) == ["small", "small", "cheap"]
