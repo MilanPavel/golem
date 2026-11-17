@@ -140,6 +140,7 @@ A setting that needs a secret names it as `keychain:<name>` and the daemon resol
 - It stores `model.selected`, with the name asked for, what it resolved to, and `reason: user`. The projection updates `sessions.model_profile`.
 - The switch applies from the next run, and a run in progress keeps its model. Each turn passes the session's current model into graph state.
 - The conversation in the checkpoint carries over unchanged, so the new model sees the whole history.
+- A hosted model may answer with parts only its own provider reads, such as OpenAI's `reasoning` and `function_call` parts. A call to another provider sends such a reply as its text, with its tool calls (`_portable` in `graphs/chat.py`). The checkpoint keeps the parts. This holds for every change of model: a switch, a step up, a fallback, and the next turn on route `auto`.
 - Choosing the model the session already has stores nothing.
 
 `model.set_default` writes `default_model` into the user's `config.toml` with `tomlkit`, which keeps comments and layout (`golem/config_edit.py`). The router picks the change up on its next read.
