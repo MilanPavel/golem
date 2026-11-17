@@ -25,7 +25,7 @@
     }
   },
   "additionalProperties": false,
-  "description": "``message.send``. Starts one graph run for this session.\n\nThe run's events go to the connections attached to the session.\n``cwd`` is the sender's folder, an absolute path. A session without a\nproject folder takes it, and keeps it. A session with one ignores it.\n\n``skill`` runs a skill once: the model gets the skill's body with\n``skill.args`` filled in, instead of ``text``. ``text`` is then what the\nuser typed, such as ``/ship fix the mcp restart``. A skill the session\ndoes not see, or one that is disabled, broken, or not user-invocable, is\nerror ``-32013``.",
+  "description": "``message.send``. Starts one graph run for this session.\n\nThe run's events go to the connections attached to the session.\n``cwd`` is the sender's folder, an absolute path. A session without a\nproject folder takes it, and keeps it. A session with one ignores it.\n\n``skill`` runs a skill once: the model gets the skill's body with\n``skill.args`` filled in, instead of ``text``. ``text`` is then what the\nuser typed, such as ``/ship fix the mcp restart``. A skill the session\ndoes not see, or one that is disabled, broken, or not user-invocable, is\nerror ``-32013``.\n\n``stronger`` runs this one turn on the tier above the model that wrote the last\nanswer (ADR-055). The session's model and route do not change. It needs route\n``auto``. When no stronger model may be used, the send fails and no turn starts.",
   "properties": {
     "cwd": {
       "anyOf": [
@@ -55,6 +55,11 @@
         }
       ],
       "default": null
+    },
+    "stronger": {
+      "default": false,
+      "title": "Stronger",
+      "type": "boolean"
     },
     "text": {
       "maxLength": 100000,

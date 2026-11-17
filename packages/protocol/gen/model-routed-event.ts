@@ -9,6 +9,7 @@ export type Ref = string;
 export type Tier = 'local' | 'budget' | 'frontier';
 export type Why = string;
 export type Rejected = ModelRejection[];
+export type ReplacesModel = string | null;
 export type Tier1 = 'local' | 'budget' | 'frontier';
 export type RunId = string;
 export type Seq = number;
@@ -36,6 +37,9 @@ export interface ModelRoutedEvent {
  * (ADR-055), ``detail`` one short sentence, and ``rejected`` the candidates the
  * pick dropped. The session's own model does not change.
  *
+ * ``replaces_model`` (``provider/model``) is set when the user asked to try the last
+ * question again on a stronger model: it is the model that wrote the answer before.
+ *
  * This interface was referenced by `ModelRoutedEvent`'s JSON-Schema
  * via the `definition` "ModelRoutedData".
  */
@@ -46,6 +50,7 @@ export interface ModelRoutedData {
   provider?: Provider;
   reason: Reason;
   rejected?: Rejected;
+  replaces_model?: ReplacesModel;
   tier: Tier1;
 }
 /**

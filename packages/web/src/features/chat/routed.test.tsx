@@ -1,6 +1,6 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import type { ListedModel } from "../../store/models.ts";
-import { expect, test } from "vitest";
+import { expect, test, vi } from "vitest";
 import { ModelRow } from "../models/model-row.tsx";
 import { ROUTED_CASES, ROUTED_SESSION } from "./sample.ts";
 import { TranscriptMessages } from "./transcript.tsx";
@@ -49,4 +49,30 @@ test("the model dialog's rows carry the tier tag", () => {
     expect(screen.getAllByText(tier).length).toBeGreaterThan(1);
     unmount();
   }
+});
+
+test("the last answer's footer ends with the stronger-model action, and a click runs it", () => {
+  const found = ROUTED_CASES.find((item) => item.label === "the chat's own model")!;
+  const onClick = vi.fn();
+  const { container } = render(
+    <TranscriptMessages
+      chat={{ messages: [found.message], error: null, notice: null, route: { mode: "auto", last: null, ...found.route } }}
+      session={ROUTED_SESSION}
+      stronger={{ title: "Try again on deepseek-chat", onClick }}
+    />,
+  );
+  expect(footers(container)).toEqual(["8.4s · qwen3:27b · local · 12.4K tok · $0.00 · ↑ stronger model"]);
+  const action = screen.getByRole("button", { name: "↑ stronger model" });
+  expect(action.getAttribute("title")).toBe("Try again on deepseek-chat");
+  fireEvent.click(action);
+  expect(onClick).toHaveBeenCalledOnce();
+});
+
+test("a turn that was tried again says on which model", () => {
+  const found = ROUTED_CASES.find((item) => item.label === "a higher tier")!;
+  const routed = Object.fromEntries(Object.entries(found.route.routed ?? {}).map(([id, pick]) => [id, { ...pick, replaces_model: "ollama/qwen3:27b" }]));
+  const { container } = render(
+    <TranscriptMessages chat={{ messages: [found.message], error: null, notice: null, route: { mode: "auto", last: null, ...found.route, routed } }} session={ROUTED_SESSION} />,
+  );
+  expect(footers(container)[0]).toContain("tried again on deepseek-chat");
 });

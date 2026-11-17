@@ -94,6 +94,7 @@ from golem_protocol.events import (
     ForkedFrom,
     MessageCompletedEvent,
     ModelOptionsChangedData,
+    ModelRoutedEvent,
     ModelSelectedData,
     RouteConsentAnsweredData,
     RunCancelledData,
@@ -114,6 +115,8 @@ from golem_protocol.events import (
 )
 
 NOT_APPROVED = "cancelled before it was approved"
+
+NO_STRONGER = "No stronger model is ready. Add a key in Settings."
 
 GROW_EVERY = 600.0
 """Seconds between two growths of the window in one session."""
@@ -275,6 +278,7 @@ class _Routed:
     profile: str
     choice: Choice | None
     ask: Consent | None = None
+    replaces: str | None = None
 
 
 class _NoLocalFit(Exception):
@@ -958,6 +962,7 @@ class SessionManager:
         *,
         cwd: str | None = None,
         skill: SkillCall | None = None,
+        stronger: bool = False,
     ) -> str:
         """Start one graph run. Returns ``run_id`` before the model finishes.
 
@@ -965,6 +970,9 @@ class SessionManager:
         session without a folder takes ``cwd`` first, with ``session.updated``.
         With ``skill``, the model gets that skill's filled-in body instead of
         ``text``, and ``text`` is kept as what the user typed.
+
+        With ``stronger``, this one turn runs on the tier above the model that wrote the
+        last answer: only on route ``auto``, and the session's model and route stay.
 
         Raises :class:`SessionNotFoundError`, :class:`SessionBusyError`,
         :class:`SchemaMismatchError`, :class:`~golem.skills.invoke.SkillInvokeError`,
@@ -983,8 +991,19 @@ class SessionManager:
             folder = session.cwd if session.cwd is not None else cwd
             local_only = self.local_only(folder)
             routed = _Routed(session.model_profile, None)
+            replaces = None
+            if stronger:
+                if local_only:
+                    raise ModelConfigError(LOCAL_ONLY_REFUSAL, code="local_only")
+                if session.route != "auto":
+                    raise ModelConfigError(NO_STRONGER)
+                replaces = await self._last_model(session_id)
+                if replaces is None:
+                    raise ModelConfigError(NO_STRONGER)
             if session.route != "pinned":
-                routed = await self._route(session, text, room, local_only=local_only)
+                routed = await self._route(
+                    session, text, room, local_only=local_only, replaces=replaces
+                )
             elif local_only:
                 self._refuse_hosted(routed.profile)
             if routed.ask is None:
@@ -1056,6 +1075,7 @@ class SessionManager:
             begun=begun,
             growth=growth,
             step_up=session.route == "auto",
+            replaces=routed.replaces,
         )
 
     async def answer_consent(self, session_id: str, run_id: str, answer: ConsentAnswer) -> str:
@@ -1119,7 +1139,9 @@ class SessionManager:
             room = None if self.budget is None else await self.budget.room(session_id)
             try:
                 local_only = self.local_only(session.cwd)
-                routed = await self._route(session, pending.text, room, answer, local_only)
+                routed = await self._route(
+                    session, pending.text, room, answer, local_only, replaces=pending.replaces
+                )
                 self._runtime.router.chat_model(routed.profile, local_only=local_only)
             except _NoLocalFit as exc:
                 fit = exc.choice.reason == "fit"
@@ -1299,8 +1321,12 @@ class SessionManager:
         room: Room | None = None,
         answer: ConsentAnswer | None = None,
         local_only: bool = False,
+        replaces: str | None = None,
     ) -> _Routed:
         """The profile this turn runs on, and why. Reads cached facts, never the network.
+
+        ``replaces`` is the model whose answer the user asked to redo: the pick takes the
+        tier above it, for this turn only, and raises ``NO_STRONGER`` when nothing may run.
 
         A paid model needs the user's yes first, so a pick that lands on one comes back with
         the question to ask (``ask``). ``answer`` is the user's answer to that question: a yes
@@ -1321,6 +1347,11 @@ class SessionManager:
         everything = await self._facts_of(session, settings.ladder.model_dump().values())
         candidates = ladder(settings.ladder, session.model_profile, everything)
         own = next((m for m in candidates if session.model_profile in (m.profile, m.ref)), None)
+        floor = None if local_only else session.step_floor
+        if replaces is not None:
+            floor = self._above(replaces, everything)
+            if floor is None:
+                raise ModelConfigError(NO_STRONGER)
         used = await self._records.last_input(session.session_id)
         prompt = None if used is None else used + len(text) // 4
         reserve = router.context_settings().reply_reserve
@@ -1331,7 +1362,7 @@ class SessionManager:
             local_only=local_only or session.route == "local",
             paid_allowed=yes or (session.paid_ok and settings.paid != "always_ask"),
             paid_room_usd=None if room is None or yes or (over_ask and interactive) else room.usd,
-            min_tier=None if local_only else session.step_floor,
+            min_tier=floor,
         )
         why_left = None
         if local_only:
@@ -1351,6 +1382,27 @@ class SessionManager:
         if held:
             choice = replace(choice, rejected=(*choice.rejected, *held))
         picked = choice.model
+        if replaces is not None:
+            if picked is None:
+                if answer == "local":
+                    raise ModelConfigError("You chose to stay local, so no stronger model runs.")
+                raise ModelConfigError(NO_STRONGER)
+            choice = replace(choice, reason="user", detail="you asked for a stronger model")
+            ask = None
+            if not yes:
+                ask = self._question(
+                    session,
+                    picked.profile,
+                    picked.tier,
+                    picked.price,
+                    room,
+                    choice,
+                    text,
+                    prompt,
+                    why="You asked for a stronger model.",
+                    replaces=replaces,
+                )
+            return _Routed(picked.profile, choice, ask, replaces)
         if picked is not None:
             if answer == "local":
                 choice = replace(choice, detail="you chose to stay local")
@@ -1508,6 +1560,7 @@ class SessionManager:
         fallback: bool = False,
         why: str | None = None,
         signal: str | None = None,
+        replaces: str | None = None,
     ) -> Consent | None:
         """The question to ask before a turn runs on ``profile``, None when none is needed.
 
@@ -1553,7 +1606,26 @@ class SessionManager:
         tokens = len(text) // 4 if prompt is None else prompt
         reserve = router.context_settings().reply_reserve
         estimate = cost_usd({"input": tokens, "output": reserve}, price)
-        return Consent(profile, tier, why, estimate, answers, caps, signal)
+        return Consent(profile, tier, why, estimate, answers, caps, signal, replaces)
+
+    async def _last_model(self, session_id: str) -> str | None:
+        """The ``provider/model`` that wrote the last answer, from the newest ``model.routed``."""
+        for event in reversed(await self._events.stored(session_id)):
+            if isinstance(event, ModelRoutedEvent):
+                data = event.data
+                if data.provider is not None and data.model is not None:
+                    return f"{data.provider}/{data.model}"
+                return data.model_profile
+        return None
+
+    def _above(self, ref: str, facts: Sequence[ModelFacts]) -> Tier | None:
+        """The tier above ``ref``'s, None when it is the top one or its tier is not known."""
+        known = next((m.tier for m in facts if ref in (m.ref, m.profile)), None)
+        if known is None and self._runtime.tier_of is not None:
+            known = self._runtime.tier_of(ref)
+        if known is None or known == TIERS[-1]:
+            return None
+        return TIERS[TIERS.index(known) + 1]
 
     async def _facts_of(self, session: _LiveSession, named: Iterable[object]) -> list[ModelFacts]:
         """The facts of the session's model, the ladder's names and every listed model."""

@@ -6116,24 +6116,31 @@ public enum MessageDeltaEventType: String, Codable {
 /// user typed, such as ``/ship fix the mcp restart``. A skill the session
 /// does not see, or one that is disabled, broken, or not user-invocable, is
 /// error ``-32013``.
+///
+/// ``stronger`` runs this one turn on the tier above the model that wrote the last
+/// answer (ADR-055). The session's model and route do not change. It needs route
+/// ``auto``. When no stronger model may be used, the send fails and no turn starts.
 // MARK: - MessageSendParams
 public struct MessageSendParams: Codable {
     public let cwd: String?
     public let sessionID: String
     public let skill: MessageSendParamsSkillCall?
+    public let stronger: Bool?
     public let text: String
 
     public enum CodingKeys: String, CodingKey {
         case cwd = "cwd"
         case sessionID = "session_id"
         case skill = "skill"
+        case stronger = "stronger"
         case text = "text"
     }
 
-    public init(cwd: String?, sessionID: String, skill: MessageSendParamsSkillCall?, text: String) {
+    public init(cwd: String?, sessionID: String, skill: MessageSendParamsSkillCall?, stronger: Bool?, text: String) {
         self.cwd = cwd
         self.sessionID = sessionID
         self.skill = skill
+        self.stronger = stronger
         self.text = text
     }
 }
@@ -7964,6 +7971,9 @@ public struct ModelRejection: Codable {
 /// it resolves to, null when it does not resolve. ``reason`` is why this model
 /// (ADR-055), ``detail`` one short sentence, and ``rejected`` the candidates the
 /// pick dropped. The session's own model does not change.
+///
+/// ``replaces_model`` (``provider/model``) is set when the user asked to try the last
+/// question again on a stronger model: it is the model that wrote the answer before.
 // MARK: - ModelRoutedData
 public struct ModelRoutedData: Codable {
     public let detail: String
@@ -7972,6 +7982,7 @@ public struct ModelRoutedData: Codable {
     public let provider: String?
     public let reason: ModelRoutedDataReason
     public let rejected: [ModelRoutedDataRejected]?
+    public let replacesModel: String?
     public let tier: Tier
 
     public enum CodingKeys: String, CodingKey {
@@ -7981,16 +7992,18 @@ public struct ModelRoutedData: Codable {
         case provider = "provider"
         case reason = "reason"
         case rejected = "rejected"
+        case replacesModel = "replaces_model"
         case tier = "tier"
     }
 
-    public init(detail: String, model: String?, modelProfile: String, provider: String?, reason: ModelRoutedDataReason, rejected: [ModelRoutedDataRejected]?, tier: Tier) {
+    public init(detail: String, model: String?, modelProfile: String, provider: String?, reason: ModelRoutedDataReason, rejected: [ModelRoutedDataRejected]?, replacesModel: String?, tier: Tier) {
         self.detail = detail
         self.model = model
         self.modelProfile = modelProfile
         self.provider = provider
         self.reason = reason
         self.rejected = rejected
+        self.replacesModel = replacesModel
         self.tier = tier
     }
 }
@@ -8062,6 +8075,9 @@ public struct ModelRoutedEvent: Codable {
 /// it resolves to, null when it does not resolve. ``reason`` is why this model
 /// (ADR-055), ``detail`` one short sentence, and ``rejected`` the candidates the
 /// pick dropped. The session's own model does not change.
+///
+/// ``replaces_model`` (``provider/model``) is set when the user asked to try the last
+/// question again on a stronger model: it is the model that wrote the answer before.
 // MARK: - ModelRoutedEventData
 public struct ModelRoutedEventData: Codable {
     public let detail: String
@@ -8070,6 +8086,7 @@ public struct ModelRoutedEventData: Codable {
     public let provider: String?
     public let reason: ModelRoutedDataReason
     public let rejected: [PurpleModelRejection]?
+    public let replacesModel: String?
     public let tier: Tier
 
     public enum CodingKeys: String, CodingKey {
@@ -8079,16 +8096,18 @@ public struct ModelRoutedEventData: Codable {
         case provider = "provider"
         case reason = "reason"
         case rejected = "rejected"
+        case replacesModel = "replaces_model"
         case tier = "tier"
     }
 
-    public init(detail: String, model: String?, modelProfile: String, provider: String?, reason: ModelRoutedDataReason, rejected: [PurpleModelRejection]?, tier: Tier) {
+    public init(detail: String, model: String?, modelProfile: String, provider: String?, reason: ModelRoutedDataReason, rejected: [PurpleModelRejection]?, replacesModel: String?, tier: Tier) {
         self.detail = detail
         self.model = model
         self.modelProfile = modelProfile
         self.provider = provider
         self.reason = reason
         self.rejected = rejected
+        self.replacesModel = replacesModel
         self.tier = tier
     }
 }
@@ -9181,6 +9200,8 @@ public enum RouteConsentAnsweredEventType: String, Codable {
 /// ``signal`` is set when the question comes in the middle of a run, because the model
 /// struggled (a struggle signal of the daemon); ``why`` then says how. It is null before a
 /// turn.
+/// ``replaces_model`` is set when the question is for a turn the user asked to run on a
+/// stronger model; the turn's ``model.routed`` then carries it too.
 // MARK: - RouteConsentNeededData
 public struct RouteConsentNeededData: Codable {
     public let alternatives: [Answer]
@@ -9189,6 +9210,7 @@ public struct RouteConsentNeededData: Codable {
     public let model: String?
     public let modelProfile: String
     public let provider: String?
+    public let replacesModel: String?
     public let signal: String?
     public let tier: Tier
     public let why: String
@@ -9200,18 +9222,20 @@ public struct RouteConsentNeededData: Codable {
         case model = "model"
         case modelProfile = "model_profile"
         case provider = "provider"
+        case replacesModel = "replaces_model"
         case signal = "signal"
         case tier = "tier"
         case why = "why"
     }
 
-    public init(alternatives: [Answer], caps: RouteConsentNeededDataConsentCaps?, estimatedUsd: Double?, model: String?, modelProfile: String, provider: String?, signal: String?, tier: Tier, why: String) {
+    public init(alternatives: [Answer], caps: RouteConsentNeededDataConsentCaps?, estimatedUsd: Double?, model: String?, modelProfile: String, provider: String?, replacesModel: String?, signal: String?, tier: Tier, why: String) {
         self.alternatives = alternatives
         self.caps = caps
         self.estimatedUsd = estimatedUsd
         self.model = model
         self.modelProfile = modelProfile
         self.provider = provider
+        self.replacesModel = replacesModel
         self.signal = signal
         self.tier = tier
         self.why = why
@@ -9280,6 +9304,8 @@ public struct RouteConsentNeededEvent: Codable {
 /// ``signal`` is set when the question comes in the middle of a run, because the model
 /// struggled (a struggle signal of the daemon); ``why`` then says how. It is null before a
 /// turn.
+/// ``replaces_model`` is set when the question is for a turn the user asked to run on a
+/// stronger model; the turn's ``model.routed`` then carries it too.
 // MARK: - RouteConsentNeededEventData
 public struct RouteConsentNeededEventData: Codable {
     public let alternatives: [Answer]
@@ -9288,6 +9314,7 @@ public struct RouteConsentNeededEventData: Codable {
     public let model: String?
     public let modelProfile: String
     public let provider: String?
+    public let replacesModel: String?
     public let signal: String?
     public let tier: Tier
     public let why: String
@@ -9299,18 +9326,20 @@ public struct RouteConsentNeededEventData: Codable {
         case model = "model"
         case modelProfile = "model_profile"
         case provider = "provider"
+        case replacesModel = "replaces_model"
         case signal = "signal"
         case tier = "tier"
         case why = "why"
     }
 
-    public init(alternatives: [Answer], caps: PurpleConsentCaps?, estimatedUsd: Double?, model: String?, modelProfile: String, provider: String?, signal: String?, tier: Tier, why: String) {
+    public init(alternatives: [Answer], caps: PurpleConsentCaps?, estimatedUsd: Double?, model: String?, modelProfile: String, provider: String?, replacesModel: String?, signal: String?, tier: Tier, why: String) {
         self.alternatives = alternatives
         self.caps = caps
         self.estimatedUsd = estimatedUsd
         self.model = model
         self.modelProfile = modelProfile
         self.provider = provider
+        self.replacesModel = replacesModel
         self.signal = signal
         self.tier = tier
         self.why = why
@@ -11546,6 +11575,9 @@ public struct Params: Codable {
 /// (ADR-055), ``detail`` one short sentence, and ``rejected`` the candidates the
 /// pick dropped. The session's own model does not change.
 ///
+/// ``replaces_model`` (``provider/model``) is set when the user asked to try the last
+/// question again on a stronger model: it is the model that wrote the answer before.
+///
 /// The session's option overrides, whole, after a change.
 ///
 /// The last event holds what applies from the next run, so a replayed session
@@ -11750,6 +11782,8 @@ public struct Params: Codable {
 /// ``signal`` is set when the question comes in the middle of a run, because the model
 /// struggled (a struggle signal of the daemon); ``why`` then says how. It is null before a
 /// turn.
+/// ``replaces_model`` is set when the question is for a turn the user asked to run on a
+/// stronger model; the turn's ``model.routed`` then carries it too.
 ///
 /// The user answered the paid step-up question, and the run goes on.
 ///
@@ -11820,6 +11854,7 @@ public struct ParamsData: Codable {
     public let model: String?
     public let provider: String?
     public let rejected: [FluffyModelRejection]?
+    public let replacesModel: String?
     public let tier: Tier?
     public let options: [String: Option]?
     public let mode: DefaultPermissionModeEnum?
@@ -11932,6 +11967,7 @@ public struct ParamsData: Codable {
         case model = "model"
         case provider = "provider"
         case rejected = "rejected"
+        case replacesModel = "replaces_model"
         case tier = "tier"
         case options = "options"
         case mode = "mode"
@@ -12025,7 +12061,7 @@ public struct ParamsData: Codable {
         case output = "output"
     }
 
-    public init(cwd: String?, forkedFrom: PurpleForkedFrom?, modelName: String?, modelProfile: String?, modelProvider: String?, origin: String?, route: RouteEnum?, allowedTools: [PurpleSessionAllowance]?, mcpServers: [String]?, paidOk: Bool?, title: String?, runID: String?, status: PurpleStatus?, summary: String?, reason: PurpleReason?, detail: String?, model: String?, provider: String?, rejected: [FluffyModelRejection]?, tier: Tier?, options: [String: Option]?, mode: DefaultPermissionModeEnum?, on: Bool?, messageID: String?, role: MessageCompletedDataRole?, text: String?, interrupted: Bool?, skill: FluffySkillCall?, thinking: String?, thinkingMS: Int?, clearedIDS: [String]?, contextWindow: Int?, estimatedTokens: Int?, index: Int?, messageBytes: [Int]?, messageChars: [Int]?, messageIDS: [String]?, numCtx: Int?, parentCallID: String?, profile: String?, summaryChars: Int?, systemBytes: Int?, systemChars: Int?, systemPromptSHA: String?, systemSections: [TentacledPromptSectionInfo]?, toolsBytes: Int?, toolsChars: Int?, toolsSHA: String?, windowEstimated: Bool?, windowPlanned: Bool?, costUsd: Double?, failed: Bool?, firstTokenMS: Int?, latencyMS: Int?, loadMS: Int?, price: FluffyCallPrice?, promptMS: Int?, replyMS: Int?, stopReason: String?, textToolCalls: TextToolCalls?, usage: FluffyTokenUsage?, action: ContextChangedDataAction?, afterTokens: Int?, beforeTokens: Int?, count: Int?, reloadMS: Int?, room: Int?, windowFrom: Int?, windowTo: Int?, code: Code?, hint: String?, message: String?, args: [String: JSONAny]?, callID: String?, name: String?, chars: Int?, lines: Int?, path: String?, waiting: Bool?, window: Int?, artifactID: String?, diff: String?, durationMS: Int?, preview: String?, truncated: Bool?, source: String?, subject: String?, decision: Decision?, rule: String?, alternatives: [Answer]?, caps: FluffyConsentCaps?, estimatedUsd: Double?, signal: String?, why: String?, answer: Answer?, todos: [PurpleTodo]?, planID: String?, steps: [FluffyPlanStep]?, added: Int?, changeID: String?, removed: Int?, reverts: String?, hash: String?, how: How?, checks: [FluffyCheckInfo]?, checkID: String?, command: String?, round: Int?, exitCode: Int?, output: String?) {
+    public init(cwd: String?, forkedFrom: PurpleForkedFrom?, modelName: String?, modelProfile: String?, modelProvider: String?, origin: String?, route: RouteEnum?, allowedTools: [PurpleSessionAllowance]?, mcpServers: [String]?, paidOk: Bool?, title: String?, runID: String?, status: PurpleStatus?, summary: String?, reason: PurpleReason?, detail: String?, model: String?, provider: String?, rejected: [FluffyModelRejection]?, replacesModel: String?, tier: Tier?, options: [String: Option]?, mode: DefaultPermissionModeEnum?, on: Bool?, messageID: String?, role: MessageCompletedDataRole?, text: String?, interrupted: Bool?, skill: FluffySkillCall?, thinking: String?, thinkingMS: Int?, clearedIDS: [String]?, contextWindow: Int?, estimatedTokens: Int?, index: Int?, messageBytes: [Int]?, messageChars: [Int]?, messageIDS: [String]?, numCtx: Int?, parentCallID: String?, profile: String?, summaryChars: Int?, systemBytes: Int?, systemChars: Int?, systemPromptSHA: String?, systemSections: [TentacledPromptSectionInfo]?, toolsBytes: Int?, toolsChars: Int?, toolsSHA: String?, windowEstimated: Bool?, windowPlanned: Bool?, costUsd: Double?, failed: Bool?, firstTokenMS: Int?, latencyMS: Int?, loadMS: Int?, price: FluffyCallPrice?, promptMS: Int?, replyMS: Int?, stopReason: String?, textToolCalls: TextToolCalls?, usage: FluffyTokenUsage?, action: ContextChangedDataAction?, afterTokens: Int?, beforeTokens: Int?, count: Int?, reloadMS: Int?, room: Int?, windowFrom: Int?, windowTo: Int?, code: Code?, hint: String?, message: String?, args: [String: JSONAny]?, callID: String?, name: String?, chars: Int?, lines: Int?, path: String?, waiting: Bool?, window: Int?, artifactID: String?, diff: String?, durationMS: Int?, preview: String?, truncated: Bool?, source: String?, subject: String?, decision: Decision?, rule: String?, alternatives: [Answer]?, caps: FluffyConsentCaps?, estimatedUsd: Double?, signal: String?, why: String?, answer: Answer?, todos: [PurpleTodo]?, planID: String?, steps: [FluffyPlanStep]?, added: Int?, changeID: String?, removed: Int?, reverts: String?, hash: String?, how: How?, checks: [FluffyCheckInfo]?, checkID: String?, command: String?, round: Int?, exitCode: Int?, output: String?) {
         self.cwd = cwd
         self.forkedFrom = forkedFrom
         self.modelName = modelName
@@ -12045,6 +12081,7 @@ public struct ParamsData: Codable {
         self.model = model
         self.provider = provider
         self.rejected = rejected
+        self.replacesModel = replacesModel
         self.tier = tier
         self.options = options
         self.mode = mode

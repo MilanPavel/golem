@@ -101,6 +101,7 @@ export type Ref = string;
 export type Tier = 'local' | 'budget' | 'frontier';
 export type Why = string;
 export type Rejected = ModelRejection[];
+export type ReplacesModel = string | null;
 export type Tier1 = 'local' | 'budget' | 'frontier';
 export type RunId6 = string;
 export type Seq5 = number;
@@ -367,6 +368,7 @@ export type EstimatedUsd = number | null;
 export type Model3 = string | null;
 export type ModelProfile3 = string;
 export type Provider3 = string | null;
+export type ReplacesModel1 = string | null;
 export type Signal = string | null;
 export type Tier3 = 'local' | 'budget' | 'frontier';
 export type Why1 = string;
@@ -993,6 +995,9 @@ export interface ModelRoutedEvent {
  * (ADR-055), ``detail`` one short sentence, and ``rejected`` the candidates the
  * pick dropped. The session's own model does not change.
  *
+ * ``replaces_model`` (``provider/model``) is set when the user asked to try the last
+ * question again on a stronger model: it is the model that wrote the answer before.
+ *
  * This interface was referenced by `RpcNotification`'s JSON-Schema
  * via the `definition` "ModelRoutedData".
  */
@@ -1003,6 +1008,7 @@ export interface ModelRoutedData {
   provider?: Provider;
   reason: Reason1;
   rejected?: Rejected;
+  replaces_model?: ReplacesModel;
   tier: Tier1;
 }
 /**
@@ -1873,6 +1879,8 @@ export interface RouteConsentNeededEvent {
  * ``alternatives`` are the answers the user may give: a spent cap leaves out ``session``.
  * ``signal`` is set when the question comes in the middle of a run, because the model
  * struggled (a struggle signal of the daemon); ``why`` then says how. It is null before a turn.
+ * ``replaces_model`` is set when the question is for a turn the user asked to run on a
+ * stronger model; the turn's ``model.routed`` then carries it too.
  *
  * This interface was referenced by `RpcNotification`'s JSON-Schema
  * via the `definition` "RouteConsentNeededData".
@@ -1884,6 +1892,7 @@ export interface RouteConsentNeededData {
   model?: Model3;
   model_profile: ModelProfile3;
   provider?: Provider3;
+  replaces_model?: ReplacesModel1;
   signal?: Signal;
   tier: Tier3;
   why: Why1;

@@ -75,6 +75,8 @@ export type ComposerOutcome =
   | { kind: "plan"; on: boolean | "toggle" }
   /** Show the route mode ("show"), why the last model ("why"), or set the mode for this chat. */
   | { kind: "route"; mode: RouteMode | "show" | "why" }
+  /** Ask the last question again as a new turn on the tier above the last answer's model. */
+  | { kind: "stronger" }
   | { kind: "model"; name: string | null }
   | { kind: "model-pull"; name: string }
   | { kind: "model-rm"; name: string }
@@ -342,6 +344,13 @@ export const COMMANDS: readonly Command[] = [
       if (args.length === 1 && (word === "why" || isRouteMode(word))) return { kind: "route", mode: word };
       return { kind: "unknown", notice: "/route, or /route pinned, local, auto or why" };
     },
+  },
+  {
+    name: "/stronger",
+    group: "model",
+    args: "",
+    description: "Asks the last question again on the next tier up, for this one turn. Route auto only.",
+    run: withoutArgs({ kind: "stronger" }),
   },
   {
     name: "/model",

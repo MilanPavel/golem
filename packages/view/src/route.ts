@@ -98,11 +98,54 @@ function plainDetail(routed: ModelRoutedData, session: SessionModelRef): string 
  * else `↑ deepseek-chat · did not fit in 32K`. The arrow is there when the tier is above the session's.
  */
 export function routedNote(routed: ModelRoutedData | null | undefined, session: SessionModelRef): string {
+  if (routed?.replaces_model != null) return `tried again on ${routed.model ?? routed.model_profile}`;
   if (routed == null || routed.reason === "pinned" || isSessionModel(routed, session)) return "";
   const up = session.tier !== null && RANK[routed.tier] > RANK[session.tier];
   const model = routed.model ?? routed.model_profile;
   const detail = plainDetail(routed, session);
   return `${up ? "↑ " : ""}${model}${detail === "" ? "" : ` · ${detail}`}`;
+}
+
+// --- try again on a stronger model ---
+
+/** The small action at the end of the last answer's footer. */
+export const STRONGER_ACTION = "↑ stronger model";
+/** What the daemon says when no stronger model may run. */
+export const NO_STRONGER_NOTICE = "No stronger model is ready. Add a key in Settings.";
+
+/** The ready model the ladder holds above the tier of the model that wrote the last answer. */
+function strongerRow(models: readonly ListedModel[], routing: ConfigRouting | null | undefined, last: ModelRoutedData | null): LadderRow | undefined {
+  if (last === null) return undefined;
+  return ladderRows(models, routing).find((row) => row.ready && row.model !== null && RANK[row.tier] > RANK[last.tier]);
+}
+
+/**
+ * `Try again on deepseek-chat`: the tooltip of the action and the words of `/stronger`, or null when
+ * no ready model is above the model that wrote the last answer.
+ */
+export function strongerLabel(models: readonly ListedModel[], routing: ConfigRouting | null | undefined, last: ModelRoutedData | null): string | null {
+  const row = strongerRow(models, routing, last);
+  return row === undefined ? null : `Try again on ${row.model ?? ""}`;
+}
+
+/**
+ * Whether the last answer offers `↑ stronger model`: the chat is idle, the route is `auto`, and a
+ * ready model is above the one that wrote the answer. `/stronger` follows the same rule.
+ */
+export function canTryStronger(input: {
+  mode: RouteMode;
+  idle: boolean;
+  models: readonly ListedModel[];
+  routing: ConfigRouting | null | undefined;
+  last: ModelRoutedData | null;
+}): boolean {
+  return input.mode === "auto" && input.idle && strongerLabel(input.models, input.routing, input.last) !== null;
+}
+
+/** The text of the last question the user asked, or null when there is none to send again. */
+export function lastQuestion(messages: readonly { role: string; text: string }[]): string | null {
+  const asked = [...messages].reverse().find((message) => message.role === "user" && message.text.trim() !== "");
+  return asked === undefined ? null : asked.text;
 }
 
 // --- the ladder ---

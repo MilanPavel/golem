@@ -4,6 +4,7 @@ export type Cwd = string | null;
 export type SessionId = string;
 export type Args = string;
 export type Name = string;
+export type Stronger = boolean;
 export type Text = string;
 
 /**
@@ -18,11 +19,16 @@ export type Text = string;
  * user typed, such as ``/ship fix the mcp restart``. A skill the session
  * does not see, or one that is disabled, broken, or not user-invocable, is
  * error ``-32013``.
+ *
+ * ``stronger`` runs this one turn on the tier above the model that wrote the last
+ * answer (ADR-055). The session's model and route do not change. It needs route
+ * ``auto``. When no stronger model may be used, the send fails and no turn starts.
  */
 export interface MessageSendParams {
   cwd?: Cwd;
   session_id: SessionId;
   skill?: SkillCall | null;
+  stronger?: Stronger;
   text: Text;
 }
 /**

@@ -34,7 +34,7 @@
     },
     "ModelRoutedData": {
       "additionalProperties": false,
-      "description": "Which model a run uses, and why golem picked it.\n\nSent right after ``run.started`` in a session whose route is not ``pinned``.\n``model_profile`` is the profile that runs. ``provider`` and ``model`` are what\nit resolves to, null when it does not resolve. ``reason`` is why this model\n(ADR-055), ``detail`` one short sentence, and ``rejected`` the candidates the\npick dropped. The session's own model does not change.",
+      "description": "Which model a run uses, and why golem picked it.\n\nSent right after ``run.started`` in a session whose route is not ``pinned``.\n``model_profile`` is the profile that runs. ``provider`` and ``model`` are what\nit resolves to, null when it does not resolve. ``reason`` is why this model\n(ADR-055), ``detail`` one short sentence, and ``rejected`` the candidates the\npick dropped. The session's own model does not change.\n\n``replaces_model`` (``provider/model``) is set when the user asked to try the last\nquestion again on a stronger model: it is the model that wrote the answer before.",
       "properties": {
         "detail": {
           "title": "Detail",
@@ -91,6 +91,19 @@
           },
           "title": "Rejected",
           "type": "array"
+        },
+        "replaces_model": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Replaces Model"
         },
         "tier": {
           "enum": [

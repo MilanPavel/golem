@@ -177,6 +177,9 @@ import {
   ladderRows,
   routeReportLines,
   routeStatus,
+  canTryStronger,
+  lastQuestion,
+  NO_STRONGER_NOTICE,
   sessionModelOf,
   spendRows,
   turnRoutedNote,
@@ -2161,6 +2164,11 @@ export function App({
       setChat((state) => ({ ...state, notice: null }));
       return;
     }
+    if (outcome.kind === "stronger") {
+      setDraft(draftAt(""));
+      tryStronger();
+      return;
+    }
     if (outcome.kind === "skill-pin") {
       setDraft(draftAt(""));
       const current = sessionRef.current;
@@ -3670,6 +3678,40 @@ export function App({
         setChat((state) => ({ ...state, notice: messageOf(error) }));
       },
     );
+  }
+
+  /** `/stronger`: send the last question again as a new turn on the tier above the last answer. */
+  function tryStronger(): void {
+    const id = sessionRef.current;
+    const chat = chatRef.current;
+    const question = lastQuestion(chat.messages);
+    if (id === null || connectionRef.current.status !== "connected") return;
+    if (chat.route.mode !== "auto") {
+      setChat((state) => ({ ...state, notice: "/stronger needs route auto: /route auto" }));
+      return;
+    }
+    if (chat.busy || question === null) {
+      setChat((state) => ({ ...state, notice: "Wait for the answer, then try again." }));
+      return;
+    }
+    void (async () => {
+      try {
+        const [models, config] = await Promise.all([
+          client.listModels(false),
+          client.getConfig(sessionCwdRef.current ?? process.cwd(), id),
+        ]);
+        const idle = !chatRef.current.busy;
+        const routing = config.routing;
+        if (!canTryStronger({ mode: chat.route.mode, idle, models: models.models, routing, last: chat.route.last })) {
+          setChat((state) => ({ ...state, notice: NO_STRONGER_NOTICE }));
+          return;
+        }
+        setChat((state) => ({ ...state, notice: null }));
+        await client.sendMessage(id, question, { cwd: process.cwd(), stronger: true });
+      } catch (error: unknown) {
+        setChat((state) => ({ ...state, notice: messageOf(error) }));
+      }
+    })();
   }
 
   /** `/route`: the mode, the ladder, and the spend, printed as a panel. */

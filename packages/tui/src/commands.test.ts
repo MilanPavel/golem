@@ -92,6 +92,12 @@ test("/context has summary, free, the reserve and cleared rows", () => {
   assert.match(text, /\u25A8/);
 });
 
+test("/stronger takes no arguments", () => {
+  assert.deepEqual(applyComposer(closedDebug, "/stronger"), { kind: "stronger" });
+  assert.equal(applyComposer(closedDebug, "/stronger now").kind, "unknown");
+  assert.equal(COMMANDS.some((command) => command.name === "/stronger"), true);
+});
+
 test("/route shows, sets, or says why, and the help lists it", () => {
   assert.deepEqual(applyComposer(closedDebug, "/route"), { kind: "route", mode: "show" });
   assert.deepEqual(applyComposer(closedDebug, "/route auto"), { kind: "route", mode: "auto" });
