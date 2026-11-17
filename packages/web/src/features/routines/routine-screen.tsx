@@ -5,7 +5,8 @@ import { actionErrorText } from "../../store/errors.ts";
 import { routinePath } from "../../store/router.ts";
 import { useNow } from "../sessions/use-now.ts";
 import { RoutineDetail } from "./routine-detail.tsx";
-import { RoutinesEmpty } from "./routines-empty.tsx";
+import { LiveRoutineEditor } from "./routine-editor-live.tsx";
+import { RoutinesEmpty, starterDraft } from "./routines-empty.tsx";
 
 function Frame({ children }: { children: ReactNode }) {
   return (
@@ -18,6 +19,7 @@ function Frame({ children }: { children: ReactNode }) {
 /** `/routines`: the empty state when there are no routines, else a hint to pick one from the panel. */
 export function RoutinesScreen() {
   const list = useRoutineList();
+  const navigate = useNavigate();
   const now = useNow();
   if (list.data === undefined) {
     return (
@@ -30,7 +32,7 @@ export function RoutinesScreen() {
   if (routines.length === 0) {
     return (
       <Frame>
-        <RoutinesEmpty />
+        <RoutinesEmpty onNavigate={navigate} />
       </Frame>
     );
   }
@@ -82,7 +84,33 @@ export function RoutineScreen({ name, folder }: { name: string; folder: string |
               }
             : undefined
         }
+        editor={
+          routine.source === "user"
+            ? (done) => <LiveRoutineEditor create={false} draft={routine.config} now={now} onSaved={() => done(true)} onCancel={() => done(false)} />
+            : undefined
+        }
       />
+    </Frame>
+  );
+}
+
+/** `/routines?new`: the form for a new routine, empty or filled from the starter in `?new=`. Saving opens the routine. */
+export function RoutineNewScreen({ starter }: { starter: string | null }) {
+  const navigate = useNavigate();
+  const now = useNow();
+  return (
+    <Frame>
+      <div className="flex max-w-3xl flex-col gap-2">
+        <h1 className="font-sans text-lg font-semibold">New routine</h1>
+        <LiveRoutineEditor
+          key={starter ?? ""}
+          create
+          draft={starterDraft(starter) ?? {}}
+          now={now}
+          onSaved={(name) => navigate(routinePath(name))}
+          onCancel={() => navigate(routinePath())}
+        />
+      </div>
     </Frame>
   );
 }

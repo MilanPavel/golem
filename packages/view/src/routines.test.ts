@@ -4,13 +4,16 @@ import { test } from "node:test";
 import {
   lastResultText,
   nextRunText,
+  nextTimesText,
   routineHeadline,
   routineRowLine,
   routineState,
   routineToml,
   runWhenText,
+  scheduleToWhen,
   scheduleWords,
   triggerWords,
+  whenToSchedule,
   type RoutineLike,
 } from "./routines.ts";
 
@@ -117,4 +120,41 @@ test("the TOML shows what is set and the prompt last", () => {
   assert.ok(text.includes("enabled = false"));
   assert.ok(text.includes("notify_failed = true"));
   assert.ok(text.endsWith('prompt = """\na\nb\n"""'));
+});
+
+test("each schedule option writes its schedule", () => {
+  const base = { kind: "daily", time: "08:30", day: 1, hours: "2", cron: "" } as const;
+  assert.equal(whenToSchedule({ ...base, kind: "daily" }), "30 8 * * *");
+  assert.equal(whenToSchedule({ ...base, kind: "weekdays" }), "30 8 * * 1-5");
+  assert.equal(whenToSchedule({ ...base, kind: "weekly", day: 0, time: "06:00" }), "0 6 * * 0");
+  assert.equal(whenToSchedule({ ...base, kind: "hours" }), "every 2h");
+  assert.equal(whenToSchedule({ ...base, kind: "cron", cron: "  0 17  * * 5 " }), "0 17 * * 5");
+  assert.equal(whenToSchedule({ ...base, kind: "cron" }), null);
+  assert.equal(whenToSchedule({ ...base, kind: "hours", hours: "" }), null);
+  assert.equal(whenToSchedule({ ...base, kind: "weekdays", time: "" }), null);
+  assert.equal(whenToSchedule({ ...base, kind: "weekdays", time: "25:00" }), null);
+});
+
+test("a written schedule fills the builder, plain or cron, and a strange one is Cron", () => {
+  assert.deepEqual(scheduleToWhen("30 8 * * 1-5"), { kind: "weekdays", time: "08:30", day: 1, hours: "1", cron: "" });
+  assert.equal(scheduleToWhen("weekdays 08:30").kind, "weekdays");
+  assert.equal(scheduleToWhen("daily 7:05").time, "07:05");
+  assert.deepEqual([scheduleToWhen("weekly mon 06:00").kind, scheduleToWhen("weekly mon 06:00").day], ["weekly", 1]);
+  assert.equal(scheduleToWhen("0 6 * * sun").day, 0);
+  assert.equal(scheduleToWhen("every 6h").hours, "6");
+  assert.equal(scheduleToWhen("45 9 * * *").kind, "daily");
+  for (const text of ["0 17 * * 1,3", "*/5 * * * *", "every 15m", "0 0 1 * *", "99 99 * * *"]) {
+    assert.deepEqual(scheduleToWhen(text).kind, "cron", text);
+    assert.equal(scheduleToWhen(text).cron, text);
+  }
+  assert.equal(scheduleToWhen(null).kind, "weekdays");
+});
+
+test("the next times read as one line, with the date once a week away", () => {
+  const now = Date.parse("2026-11-17T18:00:00");
+  const local = (day: number, time: string): string => new Date(`2026-11-${day}T${time}:00`).toISOString();
+  assert.equal(nextTimesText([local(18, "08:30"), local(19, "08:30"), local(20, "08:30")], now), "Next: Wed 08:30 · Thu 08:30 · Fri 08:30");
+  assert.equal(nextTimesText([local(24, "08:30")], now), "Next: Tue 24 Nov 08:30");
+  assert.equal(nextTimesText(["soon"], now), "");
+  assert.equal(nextTimesText([], now), "");
 });

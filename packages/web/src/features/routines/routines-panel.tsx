@@ -1,10 +1,11 @@
 import { useId, useMemo, useState } from "react";
 import { routineRowLine, routineState } from "@golem/view";
+import { Button } from "../../ui/button.tsx";
 import { cn } from "../../ui/cn.ts";
 import { Input } from "../../ui/input.tsx";
 import { Link } from "../../ui/link.tsx";
 import { useNavigate, useRoute, useRoutineList } from "../../store/page-context.tsx";
-import { routinePath } from "../../store/router.ts";
+import { routineNewPath, routinePath } from "../../store/router.ts";
 import type { RoutineInfo, RoutineListResult } from "../../store/routines.ts";
 import { folderName } from "../sessions/folder.ts";
 import { useNow } from "../sessions/use-now.ts";
@@ -102,6 +103,11 @@ export function RoutinesPanel({ list, error = null, selected, now, onNavigate }:
   else if (shown.length === 0) note = "No routines match.";
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2">
+      <div>
+        <Button kind="primary" size="sm" onClick={() => onNavigate(routineNewPath())}>
+          <span aria-hidden="true">+</span> New routine
+        </Button>
+      </div>
       <Input
         type="text"
         aria-label="Filter routines"

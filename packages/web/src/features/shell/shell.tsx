@@ -2,7 +2,7 @@ import { Link } from "../../ui/link.tsx";
 import { useNavigate, useRoute } from "../../store/page-context.tsx";
 import { PaletteHost } from "../palette/index.ts";
 import { MenuBar, SidebarShell } from "../sidebar/index.ts";
-import { RoutineScreen, RoutinesScreen } from "../routines/index.ts";
+import { RoutineNewScreen, RoutineScreen, RoutinesScreen } from "../routines/index.ts";
 import { SettingsScreen } from "../settings/index.ts";
 import { TraceScreen } from "../trace/index.ts";
 import { SetupAtStart, WelcomeScreen } from "../welcome/index.ts";
@@ -43,6 +43,8 @@ function Content() {
       return <SettingsScreen section={route.section} />;
     case "routines":
       return <RoutinesScreen />;
+    case "routine-new":
+      return <RoutineNewScreen starter={route.starter} />;
     case "routine":
       return <RoutineScreen name={route.routine} folder={route.folder} />;
     case "welcome":

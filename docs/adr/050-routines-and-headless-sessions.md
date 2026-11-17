@@ -24,7 +24,7 @@ The UI uses these four words and never says "flow".
 |---|---|---|---|
 | **Skill** | Instructions (`SKILL.md`) the model follows | files | `skill.*` |
 | **Workflow** | Python code, durable, resumable ([workflows.md](../vision/workflows.md)) | `workflow_runs` | `workflow.*` (designed in 3.0) |
-| **Routine** | A trigger plus a target | `[[routine]]` in `config.toml` | `routine.list`, `routine.get`, `routine.run`, `routine.update` |
+| **Routine** | A trigger plus a target | `[[routine]]` in `config.toml` | `routine.list`, `routine.get`, `routine.run`, `routine.update`, `routine.preview` |
 | **Run** | One execution of a routine or a workflow | `routine_runs`, `workflow_runs` | `routine.fired`, `routine.finished` |
 
 - `runs` and `run.*` **stay agent turns.** Nothing is renamed. A routine firing is a `routine_run`, and it has one session, which has one or more `runs`.

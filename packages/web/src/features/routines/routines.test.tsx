@@ -11,8 +11,8 @@ import { fakeClient, fakeFrame } from "../../store/test-support.ts";
 import { sidebarItemStore } from "../sidebar/sidebar-item.ts";
 import { RoutineDetail } from "./routine-detail.tsx";
 import { RoutinesPanel } from "./routines-panel.tsx";
-import { ROUTINES_NOW, SAMPLE_LIST, SAMPLE_MORNING_BRIEF, SAMPLE_RUNS } from "./sample.ts";
-import { runWhenText } from "@golem/view";
+import { ROUTINES_NOW, SAMPLE_LIST, SAMPLE_MORNING_BRIEF, SAMPLE_ROUTINES, SAMPLE_RUNS } from "./sample.ts";
+import { nextTimesText, runWhenText } from "@golem/view";
 
 const noContrast = { rules: { "color-contrast": { enabled: false } } };
 const CONNECTED: ConnectionSnapshot = { state: { status: "connected" }, daemonVersion: "0.9.1" };
@@ -75,7 +75,9 @@ test("a detail shows the header, what it runs, its History, and the Config as TO
   expect(history.getByText("skipped: paused")).toBeTruthy();
   expect(history.getAllByRole("link", { name: /Open session/ })[0]?.getAttribute("href")).toBe("/s/s_5");
   expect((screen.getByRole("button", { name: "Pause" }) as HTMLButtonElement).disabled).toBe(true);
-  expect((screen.getByRole("button", { name: "Edit" }) as HTMLButtonElement).disabled).toBe(true);
+  // Without an editor, a routine of yours has no Edit.
+  expect(screen.queryByRole("button", { name: "Edit" })).toBeNull();
+  expect(screen.queryByRole("tab", { name: "Edit" })).toBeNull();
   await user.click(screen.getByRole("tab", { name: "Config" }));
   expect(screen.getByLabelText("Config as TOML").textContent).toContain('schedule = "weekdays 08:30"');
   expect((await axe.run(container, noContrast)).violations).toEqual([]);
@@ -116,14 +118,101 @@ function mount(path: string, setup?: (fake: ReturnType<typeof fakeClient>) => vo
   return fake;
 }
 
-test("/routines with nothing set up shows the empty state, with starters that wait for the editor", async () => {
-  mount("/routines");
+const TIMES = ["2026-11-18T08:30:00+01:00", "2026-11-19T08:30:00+01:00", "2026-11-20T08:30:00+01:00"];
+
+test("/routines with nothing set up shows the empty state; the morning brief starter opens the editor filled, and Save makes the routine", async () => {
+  const user = userEvent.setup();
+  const fake = mount("/routines", ({ raw }) => {
+    raw.previewRoutine.mockResolvedValue({ next: TIMES });
+  });
   expect(await screen.findByRole("heading", { name: "Nothing runs by itself yet" })).toBeTruthy();
   expect(screen.getByRole("heading", { name: "Morning brief" })).toBeTruthy();
   expect(screen.getByRole("heading", { name: "Watch a folder" })).toBeTruthy();
-  for (const button of screen.getAllByRole("button", { name: "Use this starter" })) {
-    expect((button as HTMLButtonElement).disabled).toBe(true);
-  }
+  // The starter that needs file watching waits for it.
+  const [brief, watch] = screen.getAllByRole("button", { name: "Use this starter" }) as HTMLButtonElement[];
+  expect(brief?.disabled).toBe(false);
+  expect(watch?.disabled).toBe(true);
+  await user.click(brief as HTMLButtonElement);
+  expect(location.pathname + location.search).toBe("/routines?new=morning-brief");
+  expect(await screen.findByRole("heading", { name: "New routine" })).toBeTruthy();
+  expect((screen.getByRole("textbox", { name: "Name" }) as HTMLInputElement).value).toBe("morning-brief");
+  expect(screen.getByRole("radio", { name: "Weekdays", checked: true })).toBeTruthy();
+  expect(await screen.findByText(nextTimesText(TIMES, Date.now()))).toBeTruthy();
+  expect(fake.raw.previewRoutine).toHaveBeenCalledWith("30 8 * * 1-5");
+  await user.click(screen.getByRole("button", { name: "Save" }));
+  await waitFor(() =>
+    expect(fake.raw.updateRoutine).toHaveBeenCalledWith(
+      "morning-brief",
+      { schedule: "30 8 * * 1-5", prompt: "Read my open pull requests and failing checks and leave a summary in the Inbox.", missed: "skip" },
+      { create: true },
+    ),
+  );
+  await waitFor(() => expect(location.pathname).toBe("/routines/morning-brief"));
+});
+
+test("a refused save shows the daemon's reason next to the field and stays in the form", async () => {
+  const user = userEvent.setup();
+  const fake = mount("/routines?new", ({ raw }) => {
+    raw.updateRoutine.mockRejectedValue(new Error("/h/config.toml already has a routine called brief"));
+  });
+  await user.type(await screen.findByRole("textbox", { name: "Name" }), "brief");
+  await user.type(screen.getByRole("textbox", { name: "Prompt" }), "Do it");
+  await user.click(screen.getByRole("button", { name: "Save" }));
+  const row = screen.getByRole("textbox", { name: "Name" }).closest("li") as HTMLElement;
+  expect((await within(row).findByRole("alert")).textContent).toContain("already has a routine called brief");
+  expect(location.search).toBe("?new");
+  expect(fake.raw.updateRoutine).toHaveBeenCalledOnce();
+});
+
+test("Edit opens the Edit tab, and Save writes the changes through routine.update and goes back to History", async () => {
+  const user = userEvent.setup();
+  const fake = mount("/routines/morning-brief", ({ raw }) => {
+    raw.listRoutines.mockResolvedValue(SAMPLE_LIST);
+    raw.getRoutine.mockResolvedValue({ routine: SAMPLE_MORNING_BRIEF, runs: SAMPLE_RUNS });
+    raw.listSkills.mockResolvedValue({ skills: [{ name: "morning-brief", description: "Brief.", path: "/s", source: "user", usable: true }] });
+    raw.previewRoutine.mockResolvedValue({ next: TIMES });
+  });
+  await user.click(await screen.findByRole("button", { name: "Edit" }));
+  expect(await screen.findByRole("form", { name: "Edit morning-brief" })).toBeTruthy();
+  expect(screen.getByRole("radio", { name: "Weekdays", checked: true })).toBeTruthy();
+  await user.click(screen.getByRole("radio", { name: "Every day" }));
+  await waitFor(() => expect(fake.raw.previewRoutine).toHaveBeenLastCalledWith("30 8 * * *"));
+  await user.click(screen.getByRole("button", { name: "Save" }));
+  await waitFor(() =>
+    expect(fake.raw.updateRoutine).toHaveBeenCalledWith(
+      "morning-brief",
+      { schedule: "30 8 * * *", prompt: "/morning-brief", folder: "~/repos/golem", model: null, mcp: ["linear", "github"], missed: "run_once" },
+      { create: false },
+    ),
+  );
+  expect(await screen.findByText("Saved to config.toml.")).toBeTruthy();
+  expect(screen.getByRole("list", { name: "History" })).toBeTruthy();
+});
+
+test("a project's routine is read-only in the Edit tab, with Open config", async () => {
+  const user = userEvent.setup();
+  const project = SAMPLE_ROUTINES.find((routine) => routine.source === "project");
+  mount("/routines/release-notes?folder=%2FUsers%2Fyou%2Frepos%2Fsite", ({ raw }) => {
+    raw.listRoutines.mockResolvedValue(SAMPLE_LIST);
+    if (project !== undefined) raw.getRoutine.mockResolvedValue({ routine: project, runs: [] });
+  });
+  await user.click(await screen.findByRole("button", { name: "Edit" }));
+  expect(await screen.findByText(/edited in the project's config file/)).toBeTruthy();
+  expect(screen.queryByRole("form")).toBeNull();
+  await user.click(screen.getByRole("button", { name: "Open config" }));
+  expect(screen.getByLabelText("Config as TOML").textContent).toContain('schedule = "0 17 * * 5"');
+});
+
+test("+ New routine in the panel opens the empty form", async () => {
+  const user = userEvent.setup();
+  sidebarItemStore.set("routines");
+  mount("/", ({ raw }) => {
+    raw.listRoutines.mockResolvedValue(SAMPLE_LIST);
+  });
+  const panel = await screen.findByRole("complementary", { name: "Routines" });
+  await user.click(within(panel).getByRole("button", { name: /New routine/ }));
+  expect(location.search).toBe("?new");
+  expect((await screen.findByRole("textbox", { name: "Name" }) as HTMLInputElement).value).toBe("");
 });
 
 test("/routines/:name loads the routine and its runs, and Run now sends routine.run", async () => {

@@ -143,18 +143,38 @@ export type RoutineDetailProps = {
   onRun: () => Promise<RoutineRunResult>;
   /** Deletes the routine. Without it, Remove is not offered (a project's routine is edited in its project). */
   onRemove?: () => Promise<void>;
+  /**
+   * The Edit tab's form, given what to do when it is closed (`saved` is true after a save). Without it a routine of yours
+   * has no Edit tab. A project's routine always has one, which says it is edited in the project.
+   */
+  editor?: (done: (saved: boolean) => void) => ReactNode;
 };
 
-type Tab = "history" | "config";
+type Tab = "history" | "edit" | "config";
 
-/** One routine in the main area: what it runs, when, its actions, and the History and Config tabs. */
-export function RoutineDetail({ routine, runs, now, onNavigate, onRun, onRemove }: RoutineDetailProps) {
+/** The Edit tab of a project's routine: its file is committed with the project, so it is read here and edited there. */
+function ProjectNote({ path, onOpenConfig }: { path: string; onOpenConfig: () => void }) {
+  return (
+    <div className="flex flex-col items-start gap-2">
+      <p className="text-sm text-muted">This routine is in its project, so it is edited in the project's config file, which is committed with the project.</p>
+      <p className="font-mono text-xs text-faint wrap-anywhere">{path}</p>
+      <Button size="sm" onClick={onOpenConfig}>
+        Open config
+      </Button>
+    </div>
+  );
+}
+
+/** One routine in the main area: what it runs, when, its actions, and the History, Edit and Config tabs. */
+export function RoutineDetail({ routine, runs, now, onNavigate, onRun, onRemove, editor }: RoutineDetailProps) {
   const { config } = routine;
   const [tab, setTab] = useState<Tab>("history");
   const [running, setRunning] = useState(false);
   const [started, setStarted] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [removing, setRemoving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const editable = editor !== undefined || routine.source === "project";
   const state = routineState(routine);
 
   function run(): void {
@@ -188,7 +208,18 @@ export function RoutineDetail({ routine, runs, now, onNavigate, onRun, onRemove 
             {running ? "Starting…" : "Run now"}
           </Button>
           <PendingButton reason="Comes with pause">Pause</PendingButton>
-          <PendingButton reason="Comes with the routine editor">Edit</PendingButton>
+          {editable ? (
+            <Button
+              kind="secondary"
+              size="sm"
+              onClick={() => {
+                setSaved(false);
+                setTab("edit");
+              }}
+            >
+              Edit
+            </Button>
+          ) : null}
           <Menu>
             <MenuTrigger asChild>
               <IconButton label="More actions">
@@ -219,6 +250,11 @@ export function RoutineDetail({ routine, runs, now, onNavigate, onRun, onRemove 
           </Link>
         </p>
       )}
+      {saved ? (
+        <p role="status" className="text-sm text-muted">
+          Saved to config.toml.
+        </p>
+      ) : null}
       {routine.blocked === true ? <p className="text-sm text-muted">This project is not trusted, so its routines are listed and never run.</p> : null}
       <dl className="flex flex-col gap-1.5 text-sm">
         <Fact label="Runs">
@@ -233,11 +269,24 @@ export function RoutineDetail({ routine, runs, now, onNavigate, onRun, onRemove 
       <Tabs value={tab} onValueChange={(next) => setTab(next as Tab)} className="flex flex-col gap-4">
         <TabsList aria-label={`${config.name} details`}>
           <TabsTrigger value="history">History</TabsTrigger>
+          {editable ? <TabsTrigger value="edit">Edit</TabsTrigger> : null}
           <TabsTrigger value="config">Config</TabsTrigger>
         </TabsList>
         <TabsContent value="history">
           <History runs={runs} now={now} onNavigate={onNavigate} />
         </TabsContent>
+        {editable ? (
+          <TabsContent value="edit">
+            {routine.source === "project" || editor === undefined ? (
+              <ProjectNote path={routine.path} onOpenConfig={() => setTab("config")} />
+            ) : (
+              editor((wasSaved) => {
+                setSaved(wasSaved);
+                setTab("history");
+              })
+            )}
+          </TabsContent>
+        ) : null}
         <TabsContent value="config" className="flex flex-col gap-2">
           <p className="font-mono text-xs text-faint wrap-anywhere">{routine.path}</p>
           <pre aria-label="Config as TOML" className="overflow-x-auto rounded-lg border border-line bg-surface p-3 font-mono text-xs whitespace-pre-wrap">

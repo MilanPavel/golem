@@ -61,6 +61,7 @@ public enum MethodAccess {
         "route.consent.answer",
         "routine.get",
         "routine.list",
+        "routine.preview",
         "routine.remove",
         "routine.run",
         "routine.update",

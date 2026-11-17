@@ -47,6 +47,10 @@ Drop a PDF in `~/Downloads` and one session starts for it.
 - A routine starts one file at a time. A file that settles while the previous run is still going waits, and fires when that run ends.
 - If the folder is missing or cannot be read, the routine shows in the `issues` of `routine.list` and the log says why. It starts working when the folder does.
 
+## In the web page
+
+Open **Routines** in the sidebar. **+ New routine** opens a form, and **Edit** on a routine opens the same form. Under **When**, pick Every day, Weekdays, Weekly, Every N hours or Cron, and the page shows the next three times, which the daemon works out, so a wrong cron line is clear before you save. **What** is the prompt, with a **/ Skill** picker. **Where and with what** is the folder, the model and the MCP servers. Save writes the `[[routine]]` table into your `config.toml`. A project's routine is shown but not edited here; use **Open config**.
+
 ## From a shell
 
 | Command | What it does |

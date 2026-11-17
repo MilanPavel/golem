@@ -13,7 +13,7 @@ import { NOTIFICATIONS_KEY } from "./notifications.ts";
 import { ROUTING_KEY } from "./routing.ts";
 import { MODEL_LIST_ALL_KEY, MODEL_LIST_KEY, SETUP_STATUS_KEY, type ModelListResult } from "./models.ts";
 import { SKILL_LIST_KEY } from "./skills.ts";
-import { ROUTINE_GET_KEY, ROUTINE_LIST_KEY, type RoutineGetResult, type RoutineListResult, type RoutineRunResult } from "./routines.ts";
+import { ROUTINE_GET_KEY, ROUTINE_LIST_KEY, type RoutineGetResult, type RoutineInfo, type RoutineListResult, type RoutineRunResult } from "./routines.ts";
 import { createPulls, type Pulls } from "./pulls.ts";
 import { createQueryClient, keepQueriesHonest } from "./query.ts";
 import { createRouter, type Router } from "./router.ts";
@@ -36,6 +36,8 @@ export type PageClient = Pick<
   | "getRoutine"
   | "runRoutine"
   | "removeRoutine"
+  | "updateRoutine"
+  | "previewRoutine"
   | "onMcpStatus"
   | "onPull"
   | "onModelServer"
@@ -260,6 +262,10 @@ export type PageActions = {
   runRoutine(name: string, folder: string | null): Promise<RoutineRunResult>;
   /** Deletes a user routine from config.toml. */
   removeRoutine(name: string): Promise<void>;
+  /** Writes a user routine: merges `fields` into `name` (a null removes a key), or with `create` makes it. Rejects with the daemon's reason. */
+  saveRoutine(name: string, fields: Record<string, unknown>, create: boolean): Promise<RoutineInfo>;
+  /** The next three times a schedule fires, as ISO times. Rejects with the daemon's reason when the schedule does not parse. */
+  previewRoutine(schedule: string): Promise<readonly string[]>;
   /** One server's whole config, with secrets as Keychain references, and the file that names it. */
   getMcp(name: string, sessionId: string | null): Promise<McpServerDetail>;
   /** Replaces the server's `[mcp.<name>]`. `secrets` (by reference) are stored first, and only those sent change. */
@@ -621,6 +627,17 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
           await queryClient.invalidateQueries({ queryKey: ROUTINE_LIST_KEY });
           await queryClient.invalidateQueries({ queryKey: ROUTINE_GET_KEY });
         }
+      },
+      async saveRoutine(name, fields, create) {
+        try {
+          return (await client.updateRoutine(name, fields, { create })).routine;
+        } finally {
+          await queryClient.invalidateQueries({ queryKey: ROUTINE_LIST_KEY });
+          await queryClient.invalidateQueries({ queryKey: ROUTINE_GET_KEY });
+        }
+      },
+      async previewRoutine(schedule) {
+        return (await client.previewRoutine(schedule)).next;
       },
       async removeRoutine(name) {
         try {

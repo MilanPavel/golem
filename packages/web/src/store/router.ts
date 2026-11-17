@@ -6,6 +6,7 @@ export type Route =
   | { name: "trace"; id: string; span: string | null }
   | { name: "settings"; section: string }
   | { name: "routines" }
+  | { name: "routine-new"; starter: string | null }
   | { name: "routine"; routine: string; folder: string | null }
   | { name: "welcome"; step: WelcomeStep; from: "send" | null }
   | { name: "not-found" };
@@ -32,7 +33,8 @@ export type Router = StoreSource<Route> & {
  * The router does not know which sections exist; the page says so for a name it does not list.
  * `/s/:id/trace` is a session's trace, and `?span=` in `search` names the selected span.
  * `/routines` is the routines page with none picked, `/routines/:routine` one routine (name decoded, no further `/`),
- * and `?folder=` in `search` names the project of a project routine.
+ * and `?folder=` in `search` names the project of a project routine. `/routines?new` is the form for a new routine,
+ * and `?new=<starter>` fills it from a starter.
  * `/welcome` is first run: `?step=engine|model|tools|ready` (engine when missing or unknown) and `?from=send`.
  * On `/s/:id`, `?inspect` opens the inspector panel and `?inspect=<span>` opens it at that span.
  */
@@ -50,7 +52,8 @@ export function parseRoute(pathname: string, search = ""): Route {
     return { name: "settings", section: DEFAULT_SETTINGS_SECTION };
   }
   if (pathname === "/routines") {
-    return { name: "routines" };
+    const make = new URLSearchParams(search).get("new");
+    return make === null ? { name: "routines" } : { name: "routine-new", starter: make === "" ? null : make };
   }
   const routine = /^\/routines\/([^/]+)$/.exec(pathname)?.[1];
   if (routine !== undefined) {
@@ -117,6 +120,11 @@ export function routinePath(name?: string, folder?: string | null): string {
   return folder === undefined || folder === null ? base : `${base}?folder=${encodeURIComponent(folder)}`;
 }
 
+/** The path of the form for a new routine, filled from `starter` when given. */
+export function routineNewPath(starter?: string | null): string {
+  return starter === undefined || starter === null ? "/routines?new" : `/routines?new=${encodeURIComponent(starter)}`;
+}
+
 /** The path of `/welcome` at a step. The first step and no origin are the bare path. */
 export function welcomePath(step: WelcomeStep = "engine", from: "send" | null = null): string {
   const params = new URLSearchParams();
@@ -132,6 +140,7 @@ function sameRoute(a: Route, b: Route): boolean {
   }
   if (a.name === "trace") return b.name === "trace" && a.id === b.id && a.span === b.span;
   if (a.name === "welcome") return b.name === "welcome" && a.step === b.step && a.from === b.from;
+  if (a.name === "routine-new") return b.name === "routine-new" && a.starter === b.starter;
   if (a.name === "routine") return b.name === "routine" && a.routine === b.routine && a.folder === b.folder;
   if (a.name === "settings") return b.name === "settings" && a.section === b.section;
   return a.name === b.name;

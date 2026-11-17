@@ -2032,6 +2032,26 @@ class RoutineUpdateResult(BaseModel):
     routine: RoutineInfo
 
 
+class RoutinePreviewParams(BaseModel):
+    """``routine.preview``. The next three times a schedule fires, so the browser never parses cron.
+
+    ``schedule`` is cron or a plain form, as in ``RoutineConfig``. A schedule that does not parse
+    is refused with the reason, in words for a person.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    schedule: str
+
+
+class RoutinePreviewResult(BaseModel):
+    """The next three firings after now, soonest first, as ISO 8601 times with an offset."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    next: list[str]
+
+
 class RoutineRemoveParams(BaseModel):
     """``routine.remove``. Delete a user routine from ``config.toml``."""
 
@@ -3890,6 +3910,8 @@ __all__ = [
     "RoutineIssue",
     "RoutineListParams",
     "RoutineListResult",
+    "RoutinePreviewParams",
+    "RoutinePreviewResult",
     "RoutineRemoveParams",
     "RoutineRemoveResult",
     "RoutineRunParams",

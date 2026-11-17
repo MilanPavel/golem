@@ -58,6 +58,7 @@ import type { McpServer } from "../../protocol/gen/mcp-server.ts";
 import type { ModelServerStatus } from "../../protocol/gen/model-server-status.ts";
 import type { RoutineGetResult } from "../../protocol/gen/routine-get-result.ts";
 import type { RoutineListResult } from "../../protocol/gen/routine-list-result.ts";
+import type { RoutinePreviewResult } from "../../protocol/gen/routine-preview-result.ts";
 import type { RoutineRemoveResult } from "../../protocol/gen/routine-remove-result.ts";
 import type { RoutineRunResult } from "../../protocol/gen/routine-run-result.ts";
 import type { SkillCall } from "../../protocol/gen/skill-call.ts";
@@ -192,6 +193,7 @@ import {
   isRefResult,
   isRoutineGetResult,
   isRoutineListResult,
+  isRoutinePreviewResult,
   isRoutineRemoveResult,
   isRoutineRunResult,
   isSkillCreateResult,
@@ -570,7 +572,9 @@ export interface GolemClient {
   /** `routine.run`: fire a routine now. It returns the run and the session it started. */
   runRoutine(name: string, folder?: string): Promise<RoutineRunResult>;
   /** `routine.update`: merge `fields` into the user's routine `name` in `config.toml`; a field set to null is removed. */
-  updateRoutine(name: string, fields: Record<string, unknown>): Promise<RoutineUpdateResult>;
+  updateRoutine(name: string, fields: Record<string, unknown>, options?: { create?: boolean }): Promise<RoutineUpdateResult>;
+  /** `routine.preview`: the next three times a schedule fires, as ISO times. Rejects with the daemon's reason for a schedule that does not parse. */
+  previewRoutine(schedule: string): Promise<RoutinePreviewResult>;
   /** `skill.set_disabled`: turn a skill off, or on again, in `config.toml`. */
   setSkillDisabled(name: string, disabled: boolean): Promise<SkillSetDisabledResult>;
   /**
@@ -2142,11 +2146,19 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       }
       return result;
     },
-    async updateRoutine(name: string, fields: Record<string, unknown>): Promise<RoutineUpdateResult> {
+    async updateRoutine(name: string, fields: Record<string, unknown>, options?: { create?: boolean }): Promise<RoutineUpdateResult> {
       await ready;
-      const result = await call("routine.update", { name, fields });
+      const result = await call("routine.update", options?.create === true ? { name, fields, create: true } : { name, fields });
       if (!isRoutineUpdateResult(result)) {
         throw new Error("invalid routine.update result");
+      }
+      return result;
+    },
+    async previewRoutine(schedule: string): Promise<RoutinePreviewResult> {
+      await ready;
+      const result = await call("routine.preview", { schedule });
+      if (!isRoutinePreviewResult(result)) {
+        throw new Error("invalid routine.preview result");
       }
       return result;
     },

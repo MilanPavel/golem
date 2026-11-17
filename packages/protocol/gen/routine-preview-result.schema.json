@@ -1,0 +1,18 @@
+{
+  "additionalProperties": false,
+  "description": "The next three firings after now, soonest first, as ISO 8601 times with an offset.",
+  "properties": {
+    "next": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Next",
+      "type": "array"
+    }
+  },
+  "required": [
+    "next"
+  ],
+  "title": "RoutinePreviewResult",
+  "type": "object"
+}
