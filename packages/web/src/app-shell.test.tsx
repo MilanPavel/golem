@@ -52,18 +52,15 @@ test("the empty screen: golem, the line, the folder chip, and no accessibility v
   expect((await axe.run(container, noContrast)).violations).toEqual([]);
 });
 
-test("the sidebar groups sessions by folder, hides closed ones, and puts no folder last", () => {
+test("the sidebar groups sessions by time, hides closed ones, and shows the folder as a label", () => {
   const { fake } = setup("/");
   seed(fake);
-  const lists = screen.getAllByRole("list");
-  expect(lists.map((list) => list.getAttribute("aria-labelledby") && document.getElementById(list.getAttribute("aria-labelledby")!)?.textContent)).toEqual([
-    "golem",
-    "notes",
-    "No folder",
-  ]);
+  const lists = within(screen.getByRole("complementary", { name: "Sessions" })).getAllByRole("list");
+  // The seeded sessions are all long past, so they sit in one group.
+  expect(lists.map((list) => document.getElementById(list.getAttribute("aria-labelledby")!)?.textContent)).toEqual(["Earlier"]);
   expect(screen.queryByText("Hidden")).toBeNull();
-  const notes = within(lists[1]!);
-  expect(notes.getAllByRole("link")).toHaveLength(1);
+  expect(within(lists[0]!).getAllByRole("link")).toHaveLength(3);
+  expect(screen.getByText("notes").getAttribute("title")).toBe("/Users/you/notes");
   expect(screen.getByText("Untitled")).toBeTruthy();
   expect(screen.getByText("waiting", { selector: ".sr-only" })).toBeTruthy();
 });
@@ -112,7 +109,7 @@ test("a session shows its title, model, and folder, and attaches", async () => {
   expect(fake.raw.attachSession).toHaveBeenCalledWith("a");
   expect(screen.getByRole("heading", { level: 1, name: "UTF-8 split" })).toBeTruthy();
   expect(screen.getByText("qwen3-coder:30b")).toBeTruthy();
-  const folder = screen.getByText("golem", { selector: "[title]" });
+  const folder = screen.getAllByText("golem", { selector: "[title]" }).find((el) => !el.closest("aside"))!;
   expect(folder.getAttribute("title")).toBe("/Users/you/repos/golem");
   expect((await axe.run(container, noContrast)).violations).toEqual([]);
 });

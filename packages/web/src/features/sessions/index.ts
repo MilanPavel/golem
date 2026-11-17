@@ -1,4 +1,3 @@
-export { LiveSessionList, SessionList, type SessionListProps, type SidebarActions } from "./session-list.tsx";
 export { CloseSessionDialog } from "./close-dialog.tsx";
 export { RenameField, type RenameEnd } from "./rename-field.tsx";
 export { useSessionActions } from "./use-session-actions.ts";

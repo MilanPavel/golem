@@ -264,7 +264,7 @@ test("Rename in the sidebar edits the row's title and saves with Enter", async (
   expect(document.activeElement).toBe(field);
   await user.keyboard("Later work{Enter}");
   expect(fake.raw.renameSession).toHaveBeenCalledWith("b", "Later work");
-  await waitFor(() => expect(within(sidebar()).queryByRole("textbox")).toBeNull());
+  await waitFor(() => expect(within(sidebar()).queryByRole("textbox", { name: /^Rename/ })).toBeNull());
   expect(within(sidebar()).getByRole("link", { name: /Other work/ })).toBeTruthy();
   act(() => {
     fake.emitSummary({ ...summary("b", "2026-11-01T11:59:40Z", CWD), title: "Later work", last_seq: 3 });

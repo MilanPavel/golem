@@ -138,7 +138,8 @@ test("Run in a new chat opens the empty screen with /name in the composer", asyn
   await user.click(row("ship", "usable"));
   await user.click(screen.getByRole("button", { name: "Run in a new chat" }));
   expect(location.pathname).toBe("/");
-  expect((await screen.findByRole("textbox")).textContent || (screen.getByRole("textbox") as HTMLTextAreaElement).value).toContain("/ship ");
+  const composer = (await screen.findByRole("textbox", { name: /message/i })) as HTMLTextAreaElement;
+  expect(composer.textContent || composer.value).toContain("/ship ");
 });
 
 test("Pin in this chat calls session.set_skills for the session Settings came from", async () => {

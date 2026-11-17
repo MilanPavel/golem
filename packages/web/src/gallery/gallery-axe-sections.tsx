@@ -13,6 +13,7 @@ export const GALLERY_SECTIONS = [
   "icon-button",
   "copy",
   "connection-screens",
+  "sessions-panel",
   "sidebar",
   "rail",
   "inbox-panel",

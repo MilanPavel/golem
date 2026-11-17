@@ -66,8 +66,8 @@ import { ToolsOfferView } from "../features/setup/tools-offer.tsx";
 import { TOOLS_CASES } from "../features/setup/tools-sample.ts";
 import { PullStatusView, pullSummary } from "../features/models/index.ts";
 import { NO_OLLAMA_LISTING, OLLAMA_DOWN_LISTING, SAMPLE_LISTING, SAMPLE_PULLS, THINKING_LISTING } from "../features/models/sample.ts";
-import { CloseSessionDialog, RenameField, SessionList } from "../features/sessions/index.ts";
-import { RoutinesInProgress, Rail, SidebarPanel, WaitingChip } from "../features/sidebar/index.ts";
+import { CloseSessionDialog, RenameField } from "../features/sessions/index.ts";
+import { RoutinesInProgress, Rail, SessionsPanel, SidebarPanel, WaitingChip } from "../features/sidebar/index.ts";
 import { ConnectionStrip } from "../features/connection/index.ts";
 import { InboxPanel } from "../features/inbox/index.ts";
 import { SAMPLE_INBOX } from "../features/inbox/sample.ts";
@@ -156,10 +156,12 @@ function fakeSession(
   status: SessionSummary["status"],
   minutesAgo: number,
   forkedFrom?: string,
+  origin?: string,
 ): SessionSummary {
   const at = new Date(NOW - minutesAgo * 60_000).toISOString();
   const base = { session_id: id, created_at: at, updated_at: at, last_seq: 1, model_profile: "default", status, cwd, title };
-  return forkedFrom === undefined ? base : { ...base, forked_from: forkedFrom };
+  const forked = forkedFrom === undefined ? base : { ...base, forked_from: forkedFrom };
+  return origin === undefined ? forked : { ...forked, origin };
 }
 
 const SESSIONS: SessionSummary[] = [
@@ -169,7 +171,8 @@ const SESSIONS: SessionSummary[] = [
   fakeSession("h", "Same fix, as a table", "/Users/you/repos/golem", "idle", 30, "a"),
   fakeSession("i", "Table with a decoder test", "/Users/you/repos/golem", "idle", 20, "h"),
   fakeSession("j", "Gateway ADR, shorter", "/Users/you/repos/golem", "idle", 90, "gone"),
-  fakeSession("d", "Weekday PR digest, draft", "/Users/you/notes", "idle", 60 * 26),
+  fakeSession("d", "Weekday PR digest, draft", "/Users/you/notes", "idle", 60 * 26, undefined, "routine:pr-digest"),
+  fakeSession("k", "A very long session title that has to be cut off before it reaches the time", "/Users/you/repos/golem-docs", "idle", 60 * 27),
   fakeSession("e", null, "/Users/you/notes", "idle", 60 * 24 * 12),
   fakeSession("f", "A scratch session", null, "idle", 60 * 24 * 5),
   fakeSession("g", "Closed, so hidden", "/Users/you/notes", "closed", 5),
@@ -1446,8 +1449,8 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
         </div>
       </section>
 
-      <section className="mt-6" id={anchor("Sidebar")}>
-        <h3 className="mb-2 font-mono text-xs text-faint">Sidebar panel</h3>
+      <section className="mt-6" id={anchor("Sessions panel")}>
+        <h3 className="mb-2 font-mono text-xs text-faint">Sessions panel</h3>
         <div className="flex flex-wrap gap-4">
           <div className="h-96 w-67 overflow-hidden rounded-lg border border-line">
             <SidebarPanel
@@ -1462,7 +1465,7 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
               onHide={() => {}}
               foot={<ConnectionStrip snapshot={RECONNECTING} />}
             >
-              <SessionList
+              <SessionsPanel
                 sessions={SESSIONS}
                 selectedId="b"
                 now={NOW}
@@ -1471,6 +1474,17 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
               />
             </SidebarPanel>
           </div>
+          <div className="h-96 w-67 overflow-hidden rounded-lg border border-line">
+            <SidebarPanel title="Sessions" label={`Sessions, empty, ${theme}`} onHide={() => {}}>
+              <SessionsPanel sessions={[]} selectedId={null} now={NOW} onNavigate={() => {}} />
+            </SidebarPanel>
+          </div>
+        </div>
+      </section>
+
+      <section className="mt-6" id={anchor("Sidebar")}>
+        <h3 className="mb-2 font-mono text-xs text-faint">Sidebar panel</h3>
+        <div className="flex flex-wrap gap-4">
           <div className="h-96 w-67 overflow-hidden rounded-lg border border-line">
             <SidebarPanel title="Routines" label={`Routines, ${theme}`} onHide={() => {}}>
               <RoutinesInProgress />

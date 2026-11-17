@@ -16,3 +16,4 @@ export {
   sidebarWidthStore,
   useSidebarWidth,
 } from "./sidebar-width.ts";
+export { LiveSessionsPanel, SessionsPanel, type SessionsPanelProps, type SidebarActions } from "./sessions-panel.tsx";

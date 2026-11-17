@@ -1,7 +1,7 @@
 import type { ComponentType } from "react";
 import { useInbox } from "../../store/inbox.ts";
 import { InboxPanel } from "../inbox/index.ts";
-import { LiveSessionList } from "../sessions/index.ts";
+import { LiveSessionsPanel } from "./sessions-panel.tsx";
 import { RoutinesInProgress, RunsInProgress, WorkflowsInProgress } from "./in-progress.tsx";
 import type { RailItem } from "./rail.tsx";
 
@@ -13,7 +13,7 @@ function InboxBody() {
 
 /** What each rail item shows in the panel. Mounting a real panel for an item is a change to its line. */
 export const PANELS: Record<RailItem, { title: string; Body: ComponentType }> = {
-  sessions: { title: "Sessions", Body: LiveSessionList },
+  sessions: { title: "Sessions", Body: LiveSessionsPanel },
   inbox: { title: "Inbox", Body: InboxBody },
   routines: { title: "Routines", Body: RoutinesInProgress },
   workflows: { title: "Workflows", Body: WorkflowsInProgress },
