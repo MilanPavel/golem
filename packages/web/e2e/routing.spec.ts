@@ -19,7 +19,8 @@ test("the default route set in Settings is the route of the next new session", a
   await expect(railConnected(page)).toBeVisible();
   await page.goto(new URL("/settings/routing", stack.gateway.url).href);
   await expect(page.getByRole("heading", { name: "How a new chat picks its model" })).toBeVisible();
-  await page.getByRole("radio", { name: /^Local only/ }).click();
+  // The radio itself is visually hidden: a person clicks its card.
+  await page.locator("label").filter({ has: page.getByRole("radio", { name: /^Local only/ }) }).click();
   await expect(page.getByRole("radio", { name: /^Local only/ })).toBeChecked();
 
   await expect.poll(() => readFileSync(config, "utf8")).toContain('mode = "local"');
@@ -33,4 +34,21 @@ test("the default route set in Settings is the route of the next new session", a
   // The page shows the saved value again after a reload.
   await page.reload();
   await expect(page.getByRole("radio", { name: /^Local only/ })).toBeChecked();
+});
+
+test("the routing page scrolls inside the settings pane, never the window", async ({ page, rig }) => {
+  const stack = await startStack(rig);
+  await page.goto(stack.gateway.url);
+  await expect(railConnected(page)).toBeVisible();
+  await page.goto(new URL("/settings/routing", stack.gateway.url).href);
+  await expect(page.getByRole("heading", { name: "How a new chat picks its model" })).toBeVisible();
+
+  // Nothing on the page may make the window itself taller than the screen.
+  const sizes = await page.evaluate(() => ({ page: document.documentElement.scrollHeight, screen: window.innerHeight }));
+  expect(sizes.page).toBe(sizes.screen);
+
+  // Going to the gate scrolls the pane; the window and the rail stay where they are.
+  await page.getByRole("button", { name: /^Paid gate/ }).click();
+  await page.waitForTimeout(600);
+  expect(await page.evaluate(() => window.scrollY)).toBe(0);
 });

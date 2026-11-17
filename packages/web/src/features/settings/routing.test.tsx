@@ -303,6 +303,18 @@ test("the empty Frontier step opens Settings › API keys", async () => {
   expect(location.pathname).toBe("/settings/keys");
 });
 
+test("the Frontier step offers its ready models when none is chosen, not an API key", async () => {
+  const listing = {
+    ...ROUTING_LISTING,
+    models: ROUTING_LISTING.models.map((model) => (model.tier === "frontier" ? { ...model, status: "ready" as const } : model)),
+  };
+  mount(DEFAULT_ROUTING, (fake) => fake.raw.listModels.mockResolvedValue(listing));
+  await screen.findByRole("heading", { name: READY });
+  await waitFor(() => expect(screen.getByRole("button", { name: "Frontier: Choose a model" })).toBeTruthy());
+  expect(screen.getByText("No model is chosen for this step, so the path ends at Budget.")).toBeTruthy();
+  expect(screen.queryByRole("button", { name: "Add an API key" })).toBeNull();
+});
+
 test("the gate on the path says what it does", async () => {
   mount(SAMPLE_ROUTING);
   await screen.findByRole("heading", { name: READY });

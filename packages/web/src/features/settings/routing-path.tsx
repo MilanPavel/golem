@@ -70,6 +70,7 @@ function Station({
   const title = words?.title ?? tier;
   const path = `routing.ladder.${tier}`;
   const errorId = `ladder-${tier}-error`;
+  const choosable = tier === "frontier" && models.some((item) => item.status === "ready");
   const tokens = tier === "local" ? windowTokens(values, planned) : (model?.ctx ?? null);
   const empties: Record<Tier, string> = {
     local: "No model is ready for this step.",
@@ -108,7 +109,24 @@ function Station({
         </span>
       </div>
       <p className="mb-2.5 mt-0.5 text-note text-muted">{words?.line}</p>
-      {empty ? (
+      {empty && choosable ? (
+        // Models are ready for this step, but none is chosen and golem picks none by itself.
+        <div className="flex flex-col items-stretch gap-2.5">
+          <p className="text-note text-muted">{ROUTING_WORDS.path.notChosen}</p>
+          <ModelPick
+            label={title}
+            value={null}
+            listing={listing}
+            models={models}
+            pulls={pulls}
+            emptyText={ROUTING_WORDS.path.choose}
+            onPick={(ref) => onChange({ ladder: { [tier]: ref } })}
+            describedBy={errors[path] === undefined ? undefined : errorId}
+            invalid={errors[path] !== undefined}
+            className="w-full font-mono"
+          />
+        </div>
+      ) : empty ? (
         <div className="flex flex-col items-start gap-2.5">
           <p className="text-note text-muted">{empties[tier]}</p>
           {tier === "local" ? null : (
