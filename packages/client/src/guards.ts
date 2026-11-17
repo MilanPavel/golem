@@ -38,6 +38,10 @@ import type { SessionSetOptionsResult } from "../../protocol/gen/session-set-opt
 import type { ListedSkill, SkillListResult } from "../../protocol/gen/skill-list-result.ts";
 import type { SkillCreateResult } from "../../protocol/gen/skill-create-result.ts";
 import type { SkillReadResult } from "../../protocol/gen/skill-read-result.ts";
+import type { RoutineGetResult } from "../../protocol/gen/routine-get-result.ts";
+import type { RoutineListResult } from "../../protocol/gen/routine-list-result.ts";
+import type { RoutineRunResult } from "../../protocol/gen/routine-run-result.ts";
+import type { RoutineUpdateResult } from "../../protocol/gen/routine-update-result.ts";
 import type { SkillSetDisabledResult } from "../../protocol/gen/skill-set-disabled-result.ts";
 import type { SkillWriteResult } from "../../protocol/gen/skill-write-result.ts";
 import type { McpRemoveResult } from "../../protocol/gen/mcp-remove-result.ts";
@@ -901,4 +905,24 @@ export function isMcpCatalogResult(value: unknown): value is McpCatalogResult {
         typeof entry["description"] === "string",
     )
   );
+}
+
+function isRoutineInfo(value: unknown): boolean {
+  return isRecord(value) && isRecord(value["config"]) && typeof value["config"]["name"] === "string" && typeof value["path"] === "string";
+}
+
+export function isRoutineListResult(value: unknown): value is RoutineListResult {
+  return isRecord(value) && Array.isArray(value["routines"]) && value["routines"].every(isRoutineInfo);
+}
+
+export function isRoutineGetResult(value: unknown): value is RoutineGetResult {
+  return isRecord(value) && isRoutineInfo(value["routine"]) && (value["runs"] === undefined || Array.isArray(value["runs"]));
+}
+
+export function isRoutineRunResult(value: unknown): value is RoutineRunResult {
+  return isRecord(value) && typeof value["routine_run_id"] === "string" && typeof value["session_id"] === "string";
+}
+
+export function isRoutineUpdateResult(value: unknown): value is RoutineUpdateResult {
+  return isRecord(value) && isRoutineInfo(value["routine"]);
 }

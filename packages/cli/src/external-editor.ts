@@ -39,14 +39,25 @@ export async function editInEditor(
   }
 }
 
-/** Runs the editor on the file itself, with no copy. Returns false when the editor failed or could not start. */
+/** Editors that open a file at a line with `+N` before the file name. */
+const PLUS_LINE_EDITORS = ["vi", "vim", "nvim", "nano", "emacs", "pico"];
+
+/** The editor command, with `+line` added when the editor is one that takes it. */
+export function editorCommandAt(line: number | undefined, env: NodeJS.ProcessEnv = process.env): string[] {
+  const command = editorCommand(env);
+  const name = (command[0] ?? "").split("/").at(-1) ?? "";
+  return line !== undefined && PLUS_LINE_EDITORS.includes(name) ? [...command, `+${line}`] : command;
+}
+
+/** Runs the editor on the file itself, with no copy, at `line` when the editor takes one. Returns false when the editor failed or could not start. */
 export async function editFile(
   path: string,
   run: (command: readonly string[], file: string) => Promise<number> = runEditor,
   env: NodeJS.ProcessEnv = process.env,
+  line?: number,
 ): Promise<boolean> {
   try {
-    return (await run(editorCommand(env), path)) === 0;
+    return (await run(editorCommandAt(line, env), path)) === 0;
   } catch {
     return false;
   }
