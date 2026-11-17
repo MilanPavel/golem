@@ -116,10 +116,11 @@ test("parseAskArgs: prompt and options", () => {
 });
 
 test("parseOpenArgs: an id, and --web", () => {
-  assert.deepEqual(parseOpenArgs(["abc"]), { sessionId: "abc", web: false });
-  assert.deepEqual(parseOpenArgs(["abc", "--web"]), { sessionId: "abc", web: true });
-  assert.deepEqual(parseOpenArgs(["--web", "abc"]), { sessionId: "abc", web: true });
-  for (const bad of [[], ["--web"], ["a", "b"], ["a", "--json"], ["a", "--web", "--web"]]) {
+  assert.deepEqual(parseOpenArgs(["abc"]), { sessionId: "abc", web: false, notified: false });
+  assert.deepEqual(parseOpenArgs(["abc", "--web"]), { sessionId: "abc", web: true, notified: false });
+  assert.deepEqual(parseOpenArgs(["--web", "abc"]), { sessionId: "abc", web: true, notified: false });
+  assert.deepEqual(parseOpenArgs(["abc", "--notified"]), { sessionId: "abc", web: false, notified: true });
+  for (const bad of [[], ["--web"], ["a", "b"], ["a", "--json"], ["a", "--web", "--web"], ["a", "--web", "--notified"]]) {
     assert.equal(parseOpenArgs(bad), null, bad.join(" "));
   }
 });

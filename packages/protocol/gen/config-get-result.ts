@@ -4,6 +4,7 @@ export type ConfigFile = string;
 export type DefaultModel = string | null;
 export type DefaultPermissionMode = 'careful' | 'balanced' | 'autopilot';
 export type LogLevel = string;
+export type NotificationsOpenIn = ('web' | 'terminal') | null;
 export type PermissionMode = 'careful' | 'balanced' | 'autopilot';
 export type ProjectPolicy = string | null;
 export type ProjectTrusted = boolean | null;
@@ -35,13 +36,15 @@ export type TrustedProjects = string[];
  * without a ``cwd``. ``default_permission_mode`` is ``[permissions] mode``,
  * and ``permission_mode`` the mode the ``rules`` were built for: the session's
  * when ``session_id`` is given, else the default. An older daemon leaves both out.
- * ``routing`` is the ladder and the spending caps. An older daemon leaves it out.
+ * ``routing`` is the ladder and the spending caps. ``notifications_open_in`` is
+ * ``[notifications] open_in``. An older daemon leaves both out.
  */
 export interface ConfigGetResult {
   config_file: ConfigFile;
   default_model: DefaultModel;
   default_permission_mode?: DefaultPermissionMode;
   log_level: LogLevel;
+  notifications_open_in?: NotificationsOpenIn;
   permission_mode?: PermissionMode;
   project_policy?: ProjectPolicy;
   project_trusted?: ProjectTrusted;

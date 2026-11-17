@@ -9,6 +9,7 @@ import pytest
 from fakes import ScriptedChatModel
 from test_server import HELLO, RpcClient, rpc_result, start_daemon, stop_daemon
 
+from golem.config import GolemSettings, NotificationSettings
 from golem.models.router import ModelRouter
 from golem.notify import (
     Notice,
@@ -18,6 +19,7 @@ from golem.notify import (
     SessionFacts,
     default_poster,
 )
+from golem.notify.posters import with_open_hint
 from golem.sessions.bus import EventBus
 from golem_protocol.events import CHAT_EVENT, ChatEvent
 
@@ -217,6 +219,22 @@ async def test_test_posts_a_sample() -> None:
 def test_only_the_real_golem_home_gets_a_real_poster(tmp_path: Path) -> None:
     assert isinstance(default_poster(tmp_path), NullPoster)
     assert isinstance(default_poster(tmp_path / ".golem"), NullPoster)
+
+
+def test_the_osascript_banner_says_how_to_open_the_session() -> None:
+    notice = Notice("needs_you", "s1", "nightly", "Allow bash")
+    assert with_open_hint(notice) == "Allow bash\ngolem open s1"
+    sample = Notice("needs_you", "test", "golem", "Notifications work.")
+    assert with_open_hint(sample) == "Notifications work."
+
+
+def test_open_in_defaults_to_web_and_is_checked() -> None:
+    assert GolemSettings().notifications.open_in == "web"
+    assert NotificationSettings(open_in="terminal").open_in == "terminal"
+    with pytest.raises(ValueError):
+        NotificationSettings(open_in="window")  # type: ignore[arg-type]
+    with pytest.raises(ValueError):
+        NotificationSettings(nope=1)  # type: ignore[call-arg]
 
 
 @pytest.mark.parametrize("kind", ["needs_you", "failed", "finished"])

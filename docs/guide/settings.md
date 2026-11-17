@@ -187,6 +187,22 @@ The spend is what the `model_calls` table holds for paid models: chat calls, tit
 
 A cap is checked before a call, and a call costs what it costs only when it ends. So one call can pass a cap by its own cost. Golem does not guess the cost of the next call to block it. With `over = "ask"`, a chat on `auto` that would use a paid model over a spent cap asks first, and only "Just this once" and "Stay local" are offered. A chat pinned to a paid model is refused in both cases.
 
+### `[notifications]`
+
+Where a notification lands.
+
+| Key | Default | Meaning |
+|---|---|---|
+| `open_in` | `"web"` | `web` opens the web page on the session. `terminal` opens the chat in the terminal. With `web`, a Mac that has no web service (`golem web install`) opens the terminal instead |
+
+The banner golem posts today is a plain macOS notification, and macOS gives it to Script Editor: **clicking it does not open golem.** So the banner ends with the command that does. Run it in any terminal:
+
+```
+golem open <id>
+```
+
+It opens the chat on that session, with a waiting approval on screen. `golem open <id> --notified` picks the place from `open_in`, as a click will once golem posts its own notifications (a small signed helper app is planned for that). `golem open <id> --web` always opens the page.
+
 ### `[agents.explorer]`
 
 What bounds the helper that the `delegate` tool starts. A helper only reads: it never writes, runs a command or asks for approval.
