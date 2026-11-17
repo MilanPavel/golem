@@ -107,6 +107,8 @@ A chat's route mode says how it picks the model of each turn: `pinned` (the mode
 - **Web:** the route chip next to the permission chip. Its popover has the switch, the ladder of tiers with each model's state, and today's spend against the `[budget]` caps.
 - **Terminal:** `/route` prints the mode, the ladder, and the spend. `/route pinned`, `/route local`, and `/route auto` set the mode. `/route why` prints why the last answer used its model: the picked one, then each model that was left out and why. The status line shows the mode after the model, and hides it on `pinned`.
 
+On `auto`, the model chip shows the model golem picks, such as `auto · llama3.2:3b`: the model that wrote the last answer, and before any answer the first ready model of the ladder, which is the model the next turn starts on. Each tier has one model, the one `[routing.ladder]` names or the one golem chooses, so the chip, the ladder in the route popover, and the answer's footer name the same model. Your chat's own model is used only when no other model passes. Choosing a model by hand, in the model chip or with `/model`, switches the chat to `pinned`; the terminal says `pinned to <model>`. On the new-chat screen, a chosen model starts the new chat `pinned`, and with no choice the chip shows the model `auto` starts on.
+
 An answer that ran on a model other than the chat's own starts its footer with a note, such as `↑ deepseek-chat · did not fit in 32K`. The arrow is there when the model is in a higher tier than the chat's. The model pickers show each model's tier: `local`, `budget`, or `frontier`.
 
 ### How a model did

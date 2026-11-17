@@ -153,7 +153,7 @@ A setting that needs a secret names it as `keychain:<name>` and the daemon resol
 A session has a route mode: `pinned`, `local` or `auto` ([ADR-055](../adr/055-model-routing.md)). A new session takes `[routing] mode`, which is `pinned` by default, and a fork copies the mode of its source. `session.set_route` changes it. The daemon stores `session.updated` with `route`, the projection sets `sessions.route`, and the mode applies from the next turn.
 
 `SessionManager.send` picks the model of a turn when the mode is not `pinned`:
-- The candidates come from `ladder`: the session's own model, plus one local, one budget and one frontier model. Their facts are the cached ones from `ListedFacts`, so `send` never waits for the network.
+- The candidates come from `ladder`: one local, one budget and one frontier model (the tier picks). The session's own model joins only when its tier has no pick; `_route` still finds it among all the facts, for the last-resort path. Their facts are the cached ones from `ListedFacts`, so `send` never waits for the network.
 - The traits are the input tokens of the session's last chat model call plus `len(text) // 4` (none before the first call), `[context] reply_reserve`, tools needed, and `local_only` on mode `local`. `paid_allowed` is true when the session has `paid_ok` and `[routing] paid` is not `always_ask`.
 - With `paid = "never"` (and for the sessions of routines), `_route` takes the paid candidates out before the pick and lists each as rejected ("paid models are turned off").
 - `pick` returns the choice. When its best model is paid, `_route` returns it with a question to ask first (see the paid question below).
@@ -170,6 +170,9 @@ The table below lists situations and the decision each must lead to. It is made 
 | pinned runs a paid model the user chose, with no question | `pinned` | `anthropic/opus` | models qwen3:27b, opus | `anthropic/opus` | `pinned` |
 | auto, everything fits | `auto` | `ollama/qwen3:27b` | prompt 1K; models qwen3:27b, deepseek-chat, opus | `ollama/qwen3:27b` | `cheapest` |
 | auto on a paid session model still starts on the cheapest model that fits | `auto` | `anthropic/opus` | paid yes; models qwen3:27b, deepseek-chat, opus | `ollama/qwen3:27b` | `cheapest` |
+| auto, the ladder names another local model: it starts the turn, not the session's | `auto` | `ollama/qwen3:27b` | prompt 1K; models qwen3:27b, qwen3:8b | `ollama/qwen3:8b` | `cheapest` |
+| auto, the ladder names nothing: the session's local model is the local step | `auto` | `ollama/qwen3:27b` | prompt 1K; models qwen3:27b, qwen3:8b | `ollama/qwen3:27b` | `cheapest` |
+| auto, the ladder's model does not fit and no paid model may run: the session's model | `auto` | `ollama/qwen3:27b` | prompt 41K; paid = never; models qwen3:27b, qwen3:8b | `ollama/qwen3:27b` | `fallback` |
 | local keeps hosted models out | `local` | `ollama/qwen3:27b` | prompt 1K; models qwen3:27b, deepseek-chat, opus | `ollama/qwen3:27b` | `privacy` |
 | local runs a local model when the session model is hosted | `local` | `anthropic/opus` | models qwen3:27b, opus | `ollama/qwen3:27b` | `privacy` |
 | local, nothing local fits: the session's model runs anyway | `local` | `ollama/qwen3:27b` | prompt 41K; models qwen3:27b, deepseek-chat | `ollama/qwen3:27b` | `fallback` |

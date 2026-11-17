@@ -352,6 +352,9 @@ class SessionManager:
         else:
             self._runtime.router.chat_model(model_profile)
             profile = model_profile
+        route = self._runtime.router.routing_settings().mode
+        if model_profile is not None and route == "auto":
+            route = "pinned"  # a model chosen for the new chat pins it, as set_model does
         async with self._lock:
             session = _LiveSession(
                 session_id=new_id("s"),
@@ -359,7 +362,7 @@ class SessionManager:
                 schema_version=SCHEMA_VERSION,
                 cwd=cwd,
                 origin="user" if origin is None else origin,
-                route=self._runtime.router.routing_settings().mode,
+                route=route,
             )
             await self._announce(session)
             self._sessions[session.session_id] = session
@@ -754,7 +757,8 @@ class SessionManager:
         """Use ``model`` from the session's next run, and store ``model.selected``.
 
         A run in progress keeps the model it started with. Choosing the
-        model the session already uses stores nothing.
+        model the session already uses stores nothing. On route ``auto`` the choice also
+        stores ``session.updated`` with route ``pinned``.
 
         Raises :class:`SessionNotFoundError`, :class:`SchemaMismatchError`, or
         :class:`~golem.models.router.ModelConfigError` when ``model`` does not
@@ -765,7 +769,13 @@ class SessionManager:
             router = self._runtime.router
             router.chat_model(model)
             identity = router.identity(model)
+            if session.model_profile == model and session.route != "auto":
+                return identity
             if session.model_profile == model:
+                await self._events.emit(
+                    session_id, None, "session.updated", SessionUpdatedData(route="pinned")
+                )
+                session.route = "pinned"
                 return identity
             await self._events.emit(
                 session_id,
@@ -779,6 +789,12 @@ class SessionManager:
                 ),
             )
             session.model_profile = model
+            if session.route == "auto":
+                # Choosing a model by hand on auto pins the chat to it.
+                await self._events.emit(
+                    session_id, None, "session.updated", SessionUpdatedData(route="pinned")
+                )
+                session.route = "pinned"
             return identity
 
     async def session_options(self, session_id: str) -> dict[str, float | str]:
@@ -1346,7 +1362,7 @@ class SessionManager:
         yes = answer in ("session", "once")
         everything = await self._facts_of(session, settings.ladder.model_dump().values())
         candidates = ladder(settings.ladder, session.model_profile, everything)
-        own = next((m for m in candidates if session.model_profile in (m.profile, m.ref)), None)
+        own = next((m for m in everything if session.model_profile in (m.profile, m.ref)), None)
         floor = None if local_only else session.step_floor
         if replaces is not None:
             floor = self._above(replaces, everything)
@@ -1476,7 +1492,7 @@ class SessionManager:
         room = None if self.budget is None else await self.budget.room(session_id)
         everything = await self._facts_of(session, settings.ladder.model_dump().values())
         candidates = everything if fallback else ladder(settings.ladder, profile, everything)
-        own = next((m for m in candidates if profile in (m.profile, m.ref)), None)
+        own = next((m for m in everything if profile in (m.profile, m.ref)), None)
         if fallback:
             tier = tier if own is None else own.tier
             floor = tier

@@ -243,6 +243,45 @@ export function ladderRows(
   });
 }
 
+/** The model a chip shows, and whether golem picks it (route `auto`) or the user chose it. */
+export type ShownModel = { name: string | null; pick: boolean };
+
+/** `qwen3:27b` from `ollama/qwen3:27b`. */
+function nameOfRef(ref: string): string {
+  const at = ref.indexOf("/");
+  return at < 0 ? ref : ref.slice(at + 1);
+}
+
+/** The words a chip shows next to the model: `auto · llama3.2:3b`, and the model alone when it is chosen. */
+export function shownModelText(shown: ShownModel): string {
+  return shown.pick ? `auto · ${shown.name ?? "?"}` : (shown.name ?? "");
+}
+
+/** The tooltip of a chip on `auto`. */
+export const AUTO_MODEL_HINT = "golem picks the model on auto. Choose one to pin this chat.";
+
+/**
+ * The model a chip shows. On `pinned` and `local` it is the session's model. On `auto` it is the model
+ * of the newest `model.routed` of an auto turn, else the first ready row of the ladder, which is the model
+ * the next turn starts on. Until the model list is known, `auto` shows the session's own model.
+ */
+export function shownModel(input: {
+  mode: RouteMode;
+  session: SessionModelRef | null;
+  last: ModelRoutedData | null;
+  models: readonly ListedModel[] | null | undefined;
+  routing: ConfigRouting | null | undefined;
+}): ShownModel {
+  const { mode, session, last, models, routing } = input;
+  const own = session === null ? null : (session.name ?? session.profile);
+  if (mode !== "auto") return { name: own, pick: false };
+  // A turn that ran pinned says nothing about where the next one starts.
+  if (last !== null && last.reason !== "pinned") return { name: last.model ?? last.model_profile, pick: true };
+  if (models == null) return { name: own, pick: false };
+  const row = ladderRows(models, routing, session).find((item) => item.ready && item.ref !== null);
+  return row === undefined || row.ref === null ? { name: own, pick: false } : { name: nameOfRef(row.ref), pick: true };
+}
+
 /** A ladder row as one line: `local     qwen3:27b   ready · free`. */
 export function ladderLine(row: LadderRow): string {
   return `${row.tier.padEnd(8)}  ${(row.model ?? "-").padEnd(20)}  ${row.state}`.trimEnd();

@@ -1,9 +1,10 @@
-import { namesModel } from "@golem/view";
+import { AUTO_MODEL_HINT, namesModel, sessionModelOf, shownModel, shownModelText } from "@golem/view";
+import type { RoutingGetResult } from "../../store/routing.ts";
 import { badgeVariants } from "../../ui/badge.tsx";
 import { cn } from "../../ui/cn.ts";
 import { ChevronDownIcon } from "../../ui/icons.tsx";
 import type { ModelListResult } from "../../store/models.ts";
-import { useModelList, useNewSessionModel } from "../../store/page-context.tsx";
+import { useModelList, useNewSessionModel, useRouting } from "../../store/page-context.tsx";
 import { openModelDialog } from "../models/index.ts";
 
 /** What the chip says: the pick, else the default with a tag, else a question. `loading` until the list is known. */
@@ -11,10 +12,18 @@ export type NewSessionModelLabel =
   | { kind: "loading" }
   | { kind: "pick"; text: string }
   | { kind: "default"; text: string }
+  | { kind: "auto"; text: string }
   | { kind: "none" };
 
-/** The pick's label (its ref if the list has no such model), else the default's label, else none. */
-export function newSessionModelLabel(listing: ModelListResult | null, pick: string | null): NewSessionModelLabel {
+/**
+ * The pick's label (its ref if the list has no such model), else, when the new chat starts on `auto`,
+ * the model auto starts on, else the default's label, else none.
+ */
+export function newSessionModelLabel(
+  listing: ModelListResult | null,
+  pick: string | null,
+  routing: RoutingGetResult | null = null,
+): NewSessionModelLabel {
   if (pick !== null) {
     const model = listing?.models.find((item) => namesModel(item, pick));
     return { kind: "pick", text: model?.label ?? pick };
@@ -26,6 +35,11 @@ export function newSessionModelLabel(listing: ModelListResult | null, pick: stri
     return { kind: "none" };
   }
   const name = listing.default;
+  if (routing?.routing.mode === "auto") {
+    const session = sessionModelOf({ profile: name, provider: null, name: null }, listing.models);
+    const shown = shownModel({ mode: "auto", session, last: null, models: listing.models, routing: { ladder: routing.ladder } });
+    if (shown.pick) return { kind: "auto", text: shownModelText(shown) };
+  }
   return { kind: "default", text: listing.models.find((item) => item.ref === name)?.label ?? name };
 }
 
@@ -36,7 +50,8 @@ export function NewSessionModelChipView({ label, onOpen }: { label: NewSessionMo
     <button
       type="button"
       aria-haspopup="dialog"
-      aria-label={label.kind === "default" ? `Model: ${text}, default` : label.kind === "pick" ? `Model: ${text}` : text}
+      {...(label.kind === "auto" ? { title: AUTO_MODEL_HINT } : {})}
+      aria-label={label.kind === "default" ? `Model: ${text}, default` : label.kind === "pick" || label.kind === "auto" ? `Model: ${text}` : text}
       onClick={(event) => onOpen(event.currentTarget)}
       className={cn(
         badgeVariants({ tone: label.kind === "none" ? "wait" : "neutral" }),
@@ -56,9 +71,10 @@ export function NewSessionModelChipView({ label, onOpen }: { label: NewSessionMo
 export function NewSessionModelChip() {
   const [pick] = useNewSessionModel();
   const listing = useModelList();
+  const routing = useRouting();
   return (
     <NewSessionModelChipView
-      label={newSessionModelLabel(listing.data ?? null, pick)}
+      label={newSessionModelLabel(listing.data ?? null, pick, routing.data ?? null)}
       onOpen={(trigger) => openModelDialog({ sessionId: null, returnTo: trigger })}
     />
   );

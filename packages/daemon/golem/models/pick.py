@@ -243,12 +243,16 @@ def tier_picks(
 def ladder(
     settings: LadderSettings, session_ref: str, all_facts: Sequence[ModelFacts]
 ) -> list[ModelFacts]:
-    """The candidates for a session: its own model, plus one per tier."""
+    """The candidates for a session: one model per tier. Its own model joins only when its tier
+    has no pick."""
     by_name = {facts.profile: facts for facts in all_facts}
     by_name.update({facts.ref: facts for facts in all_facts})
     session = by_name.get(session_ref)
-    found: list[ModelFacts] = [] if session is None else [session]
-    for model in tier_picks(settings, session_ref, all_facts).values():
+    picks = tier_picks(settings, session_ref, all_facts)
+    found: list[ModelFacts] = (
+        [] if session is None or picks[session.tier] is not None else [session]
+    )
+    for model in picks.values():
         if model is not None and all(model.ref != seen.ref for seen in found):
             found.append(model)
     return found

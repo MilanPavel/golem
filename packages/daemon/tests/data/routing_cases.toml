@@ -110,6 +110,43 @@ model = "ollama/qwen3:27b"
 reason = "cheapest"
 
 [[case]]
+name = "auto, the ladder names another local model: it starts the turn, not the session's"
+route = "auto"
+session_model = "local-32k"
+models = ["local-32k", "local-8k"]
+prompt_tokens = 1000
+[case.settings.routing.ladder]
+local = "ollama/qwen3:8b"
+[case.expect]
+model = "ollama/qwen3:8b"
+reason = "cheapest"
+
+[[case]]
+name = "auto, the ladder names nothing: the session's local model is the local step"
+route = "auto"
+session_model = "local-32k"
+models = ["local-32k", "local-8k"]
+prompt_tokens = 1000
+[case.expect]
+model = "ollama/qwen3:27b"
+reason = "cheapest"
+
+[[case]]
+name = "auto, the ladder's model does not fit and no paid model may run: the session's model"
+route = "auto"
+session_model = "local-32k"
+models = ["local-32k", "local-8k"]
+prompt_tokens = 41000
+[case.settings.routing]
+paid = "never"
+[case.settings.routing.ladder]
+local = "ollama/qwen3:8b"
+[case.expect]
+model = "ollama/qwen3:27b"
+reason = "fallback"
+rejected = ["ollama/qwen3:8b"]
+
+[[case]]
 name = "local keeps hosted models out"
 route = "local"
 session_model = "local-32k"

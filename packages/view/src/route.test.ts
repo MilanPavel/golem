@@ -19,6 +19,8 @@ import {
   routeReportLines,
   routeStatus,
   routedNote,
+  shownModel,
+  shownModelText,
   sessionModelOf,
   spendRows,
   strongerLabel,
@@ -303,4 +305,49 @@ test("lastQuestion is the newest user text", () => {
   ];
   assert.equal(lastQuestion(messages), "second");
   assert.equal(lastQuestion([{ role: "assistant", text: "a" }]), null);
+});
+
+const AUTO_ROUTED = routed({
+  model_profile: "ollama/qwen3:8b",
+  provider: "ollama",
+  model: "qwen3:8b",
+  tier: "local",
+  reason: "cheapest",
+  detail: "",
+  rejected: [],
+});
+
+test("shownModel: pinned shows the session's model", () => {
+  const shown = shownModel({ mode: "pinned", session: SESSION, last: null, models: [QWEN, SMALL], routing: null });
+  assert.deepEqual(shown, { name: "qwen3:27b", pick: false });
+  assert.equal(shownModelText(shown), "qwen3:27b");
+});
+
+test("shownModel: auto before a turn shows the first ready ladder row", () => {
+  const routing: ConfigRouting = { ladder: { local: "ollama/qwen3:8b" } };
+  const shown = shownModel({ mode: "auto", session: SESSION, last: null, models: [QWEN, SMALL], routing });
+  assert.deepEqual(shown, { name: "qwen3:8b", pick: true });
+  assert.equal(shownModelText(shown), "auto \u00b7 qwen3:8b");
+});
+
+test("shownModel: auto skips a ladder row that is not ready", () => {
+  const down = listed("ollama/big", { tier: "local", status: "server_down" });
+  const shown = shownModel({ mode: "auto", session: SESSION, last: null, models: [down, DEEPSEEK], routing: { ladder: { local: "ollama/big" } } });
+  assert.deepEqual(shown, { name: "deepseek-chat", pick: true });
+});
+
+test("shownModel: auto after a turn shows the model that ran", () => {
+  const shown = shownModel({ mode: "auto", session: SESSION, last: AUTO_ROUTED, models: [QWEN, SMALL], routing: null });
+  assert.deepEqual(shown, { name: "qwen3:8b", pick: true });
+});
+
+test("shownModel: a turn that ran pinned does not decide where auto starts", () => {
+  const last = routed({ ...AUTO_ROUTED, reason: "pinned", model: "opus" });
+  const shown = shownModel({ mode: "auto", session: SESSION, last, models: [QWEN, SMALL], routing: null });
+  assert.deepEqual(shown, { name: "qwen3:27b", pick: true });
+});
+
+test("shownModel: auto before the list is known shows the session's model, not as a pick", () => {
+  const shown = shownModel({ mode: "auto", session: SESSION, last: null, models: null, routing: null });
+  assert.deepEqual(shown, { name: "qwen3:27b", pick: false });
 });
