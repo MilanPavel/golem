@@ -36,11 +36,12 @@ import type { SessionSetPlanResult } from "../../protocol/gen/session-set-plan-r
 import type { SessionSetModeResult } from "../../protocol/gen/session-set-mode-result.ts";
 import type { SessionSetOptionsResult } from "../../protocol/gen/session-set-options-result.ts";
 import type { ListedSkill, SkillListResult } from "../../protocol/gen/skill-list-result.ts";
+import type { RoutineGetResult } from "../../protocol/gen/routine-get-result.ts";
+import type { RoutineInfo, RoutineListResult } from "../../protocol/gen/routine-list-result.ts";
+import type { RoutineRemoveResult } from "../../protocol/gen/routine-remove-result.ts";
+import type { RoutineRunResult } from "../../protocol/gen/routine-run-result.ts";
 import type { SkillCreateResult } from "../../protocol/gen/skill-create-result.ts";
 import type { SkillReadResult } from "../../protocol/gen/skill-read-result.ts";
-import type { RoutineGetResult } from "../../protocol/gen/routine-get-result.ts";
-import type { RoutineListResult } from "../../protocol/gen/routine-list-result.ts";
-import type { RoutineRunResult } from "../../protocol/gen/routine-run-result.ts";
 import type { RoutineUpdateResult } from "../../protocol/gen/routine-update-result.ts";
 import type { SkillSetDisabledResult } from "../../protocol/gen/skill-set-disabled-result.ts";
 import type { SkillWriteResult } from "../../protocol/gen/skill-write-result.ts";
@@ -214,6 +215,41 @@ export function isModelServerStatus(value: unknown): value is ModelServerStatus 
 
 export function isMcpListResult(value: unknown): value is McpListResult {
   return isRecord(value) && Array.isArray(value["servers"]) && value["servers"].every(isMcpServer);
+}
+
+export function isRoutineInfo(value: unknown): value is RoutineInfo {
+  return (
+    isRecord(value) &&
+    isRecord(value["config"]) &&
+    typeof value["config"]["name"] === "string" &&
+    typeof value["config"]["prompt"] === "string" &&
+    typeof value["path"] === "string" &&
+    typeof value["source"] === "string"
+  );
+}
+
+function isRoutineRun(value: unknown): boolean {
+  return isRecord(value) && typeof value["routine_run_id"] === "string" && typeof value["status"] === "string";
+}
+
+export function isRoutineListResult(value: unknown): value is RoutineListResult {
+  return isRecord(value) && Array.isArray(value["routines"]) && value["routines"].every(isRoutineInfo);
+}
+
+export function isRoutineGetResult(value: unknown): value is RoutineGetResult {
+  return (
+    isRecord(value) &&
+    isRoutineInfo(value["routine"]) &&
+    (value["runs"] === undefined || (Array.isArray(value["runs"]) && value["runs"].every(isRoutineRun)))
+  );
+}
+
+export function isRoutineRunResult(value: unknown): value is RoutineRunResult {
+  return isRecord(value) && typeof value["routine_run_id"] === "string" && typeof value["session_id"] === "string";
+}
+
+export function isRoutineRemoveResult(value: unknown): value is RoutineRemoveResult {
+  return isRecord(value) && typeof value["name"] === "string";
 }
 
 export function isListedSkill(value: unknown): value is ListedSkill {
@@ -905,22 +941,6 @@ export function isMcpCatalogResult(value: unknown): value is McpCatalogResult {
         typeof entry["description"] === "string",
     )
   );
-}
-
-function isRoutineInfo(value: unknown): boolean {
-  return isRecord(value) && isRecord(value["config"]) && typeof value["config"]["name"] === "string" && typeof value["path"] === "string";
-}
-
-export function isRoutineListResult(value: unknown): value is RoutineListResult {
-  return isRecord(value) && Array.isArray(value["routines"]) && value["routines"].every(isRoutineInfo);
-}
-
-export function isRoutineGetResult(value: unknown): value is RoutineGetResult {
-  return isRecord(value) && isRoutineInfo(value["routine"]) && (value["runs"] === undefined || Array.isArray(value["runs"]));
-}
-
-export function isRoutineRunResult(value: unknown): value is RoutineRunResult {
-  return isRecord(value) && typeof value["routine_run_id"] === "string" && typeof value["session_id"] === "string";
 }
 
 export function isRoutineUpdateResult(value: unknown): value is RoutineUpdateResult {

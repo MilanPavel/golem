@@ -67,7 +67,9 @@ import { TOOLS_CASES } from "../features/setup/tools-sample.ts";
 import { PullStatusView, pullSummary } from "../features/models/index.ts";
 import { NO_OLLAMA_LISTING, OLLAMA_DOWN_LISTING, SAMPLE_LISTING, SAMPLE_PULLS, THINKING_LISTING } from "../features/models/sample.ts";
 import { CloseSessionDialog, RenameField } from "../features/sessions/index.ts";
-import { RoutinesInProgress, Rail, SessionsPanel, SidebarPanel, WaitingChip } from "../features/sidebar/index.ts";
+import { RoutineDetail, RoutinesEmpty, RoutinesPanel } from "../features/routines/index.ts";
+import { SAMPLE_LIST, SAMPLE_MORNING_BRIEF, ROUTINES_NOW, SAMPLE_RUNS } from "../features/routines/sample.ts";
+import { Rail, SessionsPanel, SidebarPanel, WaitingChip } from "../features/sidebar/index.ts";
 import { ConnectionStrip } from "../features/connection/index.ts";
 import { InboxPanel } from "../features/inbox/index.ts";
 import { SAMPLE_INBOX } from "../features/inbox/sample.ts";
@@ -1482,14 +1484,32 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
         </div>
       </section>
 
-      <section className="mt-6" id={anchor("Sidebar")}>
-        <h3 className="mb-2 font-mono text-xs text-faint">Sidebar panel</h3>
+      <section className="mt-6" id={anchor("Routines")}>
+        <h3 className="mb-2 font-mono text-xs text-faint">Routines</h3>
         <div className="flex flex-wrap gap-4">
           <div className="h-96 w-67 overflow-hidden rounded-lg border border-line">
             <SidebarPanel title="Routines" label={`Routines, ${theme}`} onHide={() => {}}>
-              <RoutinesInProgress />
+              <RoutinesPanel list={SAMPLE_LIST} selected={{ name: "morning-brief", folder: null }} now={ROUTINES_NOW} onNavigate={() => {}} />
             </SidebarPanel>
           </div>
+          <div className="h-96 w-67 overflow-hidden rounded-lg border border-line">
+            <SidebarPanel title="Routines" label={`Routines, empty, ${theme}`} onHide={() => {}}>
+              <RoutinesPanel list={{ routines: [] }} selected={null} now={ROUTINES_NOW} onNavigate={() => {}} />
+            </SidebarPanel>
+          </div>
+        </div>
+        <div className="mt-4 rounded-lg border border-line bg-bg p-5" role="region" aria-label={`Routine detail, ${theme}`}>
+          <RoutineDetail
+            routine={SAMPLE_MORNING_BRIEF}
+            runs={SAMPLE_RUNS}
+            now={ROUTINES_NOW}
+            onNavigate={() => {}}
+            onRun={() => Promise.resolve({ routine_run_id: "rr_6", session_id: "s_6" })}
+            onRemove={() => Promise.resolve()}
+          />
+        </div>
+        <div className="mt-4 rounded-lg border border-line bg-bg p-5" role="region" aria-label={`Routines, nothing set up, ${theme}`}>
+          <RoutinesEmpty />
         </div>
       </section>
 

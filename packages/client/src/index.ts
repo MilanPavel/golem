@@ -57,7 +57,7 @@ export type { McpServerLog } from "../../protocol/gen/mcp-server-log.ts";
 export type { McpTestProgress } from "../../protocol/gen/mcp-test-progress.ts";
 export type { McpTestResult } from "../../protocol/gen/mcp-test-result.ts";
 export type { McpUpdateParams } from "../../protocol/gen/mcp-update-params.ts";
-export type { RoutineConfig } from "../../protocol/gen/routine-config.ts";
+export type { RoutineConfig, RoutineWatchConfig } from "../../protocol/gen/routine-config.ts";
 export type { RoutineGetResult } from "../../protocol/gen/routine-get-result.ts";
 export type { RoutineInfo } from "../../protocol/gen/routine-info.ts";
 export type { RoutineIssue } from "../../protocol/gen/routine-issue.ts";

@@ -12,6 +12,7 @@ import { MCP_CATALOG_KEY, MCP_LIST_KEY, MCP_TOOLS_KEY, type McpToolsResult } fro
 import { ROUTING_KEY } from "./routing.ts";
 import { MODEL_LIST_ALL_KEY, MODEL_LIST_KEY, SETUP_STATUS_KEY, type ModelListResult } from "./models.ts";
 import { SKILL_LIST_KEY } from "./skills.ts";
+import { ROUTINE_GET_KEY, ROUTINE_LIST_KEY, type RoutineGetResult, type RoutineListResult, type RoutineRunResult } from "./routines.ts";
 import { createPulls, type Pulls } from "./pulls.ts";
 import { createQueryClient, keepQueriesHonest } from "./query.ts";
 import { createRouter, type Router } from "./router.ts";
@@ -29,6 +30,11 @@ export type PageClient = Pick<
   | "onEvent"
   | "onSessionSummary"
   | "onSkillsChanged"
+  | "onRoutinesChanged"
+  | "listRoutines"
+  | "getRoutine"
+  | "runRoutine"
+  | "removeRoutine"
   | "onMcpStatus"
   | "onPull"
   | "onModelServer"
@@ -239,6 +245,10 @@ export type PageActions = {
   setMcpToolHidden(name: string, tool: string, hide: boolean, sessionId: string | null): Promise<void>;
   /** Removes a server from the user's config, with the token it stored. */
   removeMcp(name: string): Promise<void>;
+  /** Fires a routine now. Resolves with the run and the headless session it started; its History row arrives with `routine.fired`. */
+  runRoutine(name: string, folder: string | null): Promise<RoutineRunResult>;
+  /** Deletes a user routine from config.toml. */
+  removeRoutine(name: string): Promise<void>;
   /** One server's whole config, with secrets as Keychain references, and the file that names it. */
   getMcp(name: string, sessionId: string | null): Promise<McpServerDetail>;
   /** Replaces the server's `[mcp.<name>]`. `secrets` (by reference) are stored first, and only those sent change. */
@@ -299,6 +309,10 @@ export type PageQueries = {
   keys(): Promise<AuthListResult>;
   /** The skills a folder sees. `null` is no folder. */
   skillList(cwd: string | null): Promise<SkillListResult>;
+  /** The routines, with each one's next and last run. */
+  routineList(): Promise<RoutineListResult>;
+  /** One routine and its recent runs, newest first. `folder` is a project routine's project, null a user routine. */
+  routineGet(name: string, folder: string | null): Promise<RoutineGetResult>;
   /** The tool rules in check order, and what the session allows. `null` is no folder or no session. */
   config(cwd: string | null, sessionId: string | null): Promise<ConfigGetResult>;
   /** The MCP servers a session sees. `null` is no session. */
@@ -411,6 +425,8 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
         providers: (await client.listKeys()).providers.map(({ provider, takes_key, needs_key, source, env_var }) => ({ provider, takes_key, needs_key, source, env_var })),
       }),
       skillList: (cwd) => (cwd === null ? client.listSkills() : client.listSkills(cwd)),
+      routineList: () => client.listRoutines(),
+      routineGet: (name, folder) => (folder === null ? client.getRoutine(name) : client.getRoutine(name, folder)),
       config: (cwd, sessionId) => client.getConfig(cwd ?? undefined, sessionId ?? undefined),
       mcpList: (sessionId) => client.listMcp(sessionId ?? undefined),
       mcpTools: (name, sessionId) => client.mcpTools(name, sessionId ?? undefined),
@@ -582,6 +598,22 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
         } finally {
           await queryClient.invalidateQueries({ queryKey: MCP_TOOLS_KEY });
           await queryClient.invalidateQueries({ queryKey: MCP_LIST_KEY });
+        }
+      },
+      async runRoutine(name, folder) {
+        try {
+          return await (folder === null ? client.runRoutine(name) : client.runRoutine(name, folder));
+        } finally {
+          await queryClient.invalidateQueries({ queryKey: ROUTINE_LIST_KEY });
+          await queryClient.invalidateQueries({ queryKey: ROUTINE_GET_KEY });
+        }
+      },
+      async removeRoutine(name) {
+        try {
+          await client.removeRoutine(name);
+        } finally {
+          await queryClient.invalidateQueries({ queryKey: ROUTINE_LIST_KEY });
+          await queryClient.invalidateQueries({ queryKey: ROUTINE_GET_KEY });
         }
       },
       async removeMcp(name) {

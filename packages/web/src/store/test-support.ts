@@ -78,6 +78,7 @@ export function fakeClient() {
   const event = listeners<ChatEvent>();
   const summaries = listeners<SessionSummary>();
   const skills = listeners<string | null>();
+  const routines = listeners<"changed" | "fired" | "finished">();
   const mcp = listeners<unknown>();
   const mcpLog = listeners<McpServerLog>();
   const mcpLogin = listeners<McpLoginDone>();
@@ -96,6 +97,11 @@ export function fakeClient() {
     onEvent: event.on,
     onSessionSummary: summaries.on,
     onSkillsChanged: skills.on,
+    onRoutinesChanged: routines.on,
+    listRoutines: vi.fn<PageClient["listRoutines"]>(async () => ({ routines: [] })),
+    getRoutine: vi.fn<PageClient["getRoutine"]>(async (name) => ({ routine: { config: { name, prompt: "" }, path: "/Users/me/.golem/config.toml", source: "user" }, runs: [] })),
+    runRoutine: vi.fn<PageClient["runRoutine"]>(async () => ({ routine_run_id: "rr_1", session_id: "s_run" })),
+    removeRoutine: vi.fn<PageClient["removeRoutine"]>(async (name) => ({ name })),
     onMcpStatus: mcp.on,
     onPull: pull.on,
     onModelServer: server.on,
@@ -209,6 +215,9 @@ export function fakeClient() {
     emitSummary: summaries.emit,
     emitSkills: (root: string | null = null) => {
       skills.emit(root);
+    },
+    emitRoutines: (kind: "changed" | "fired" | "finished" = "changed") => {
+      routines.emit(kind);
     },
     emitMcpLog: mcpLog.emit,
     emitMcpLoginDone: mcpLogin.emit,

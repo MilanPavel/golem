@@ -14,7 +14,7 @@ export const GALLERY_SECTIONS = [
   "copy",
   "connection-screens",
   "sessions-panel",
-  "sidebar",
+  "routines",
   "rail",
   "sessions-flyout",
   "inbox-panel",

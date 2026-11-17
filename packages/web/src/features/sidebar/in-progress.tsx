@@ -19,10 +19,6 @@ function InProgress({ title, line }: { title: string; line: string }) {
   );
 }
 
-export const RoutinesInProgress = () => (
-  <InProgress title="Routines" line="A routine will start a session on a schedule or when something happens, and leave its result in the Inbox." />
-);
-
 export const WorkflowsInProgress = () => (
   <InProgress title="Workflows" line="A workflow will chain steps that run one after another, each with its own model and tools." />
 );

@@ -10,7 +10,7 @@ import { PageProvider } from "../../store/page-context.tsx";
 import { fakeClient, fakeFrame, summary } from "../../store/test-support.ts";
 import { ConnectionStrip } from "../connection/index.ts";
 import { closePalette } from "../palette/index.ts";
-import { AUTOMATION_ROADMAP, RoutinesInProgress, RunsInProgress, WorkflowsInProgress } from "./in-progress.tsx";
+import { AUTOMATION_ROADMAP, RunsInProgress, WorkflowsInProgress } from "./in-progress.tsx";
 import { PANELS } from "./panels.tsx";
 import { SIDEBAR_ITEM_KEY, sidebarItemStore } from "./sidebar-item.ts";
 import { SIDEBAR_OPEN_KEY, sidebarOpenStore } from "./sidebar-open.ts";
@@ -178,9 +178,8 @@ test("the + in the Sessions panel starts a new session", async () => {
   expect(location.pathname).toBe("/");
 });
 
-test("Routines, Workflows and Runs say they are in progress and link to the roadmap", () => {
+test("Workflows and Runs say they are in progress and link to the roadmap", () => {
   for (const [Panel, name] of [
-    [RoutinesInProgress, "Routines"],
     [WorkflowsInProgress, "Workflows"],
     [RunsInProgress, "Runs"],
   ] as const) {

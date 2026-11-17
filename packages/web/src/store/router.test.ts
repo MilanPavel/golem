@@ -1,5 +1,5 @@
 import { afterEach, expect, test, vi } from "vitest";
-import { createRouter, inspectPath, parseRoute, sessionPath, settingsPath, tracePath, welcomePath } from "./router.ts";
+import { createRouter, inspectPath, parseRoute, routinePath, sessionPath, settingsPath, tracePath, welcomePath } from "./router.ts";
 
 afterEach(() => {
   history.replaceState(null, "", "/");
@@ -45,6 +45,23 @@ test("opening, moving and closing the inspector are route changes of the same se
   router.navigate(sessionPath("one"), { replace: true });
   expect(router.getSnapshot()).toEqual(closed);
   router.stop();
+});
+
+test("parseRoute reads the routines page and one routine", () => {
+  expect(parseRoute("/routines")).toEqual({ name: "routines" });
+  expect(parseRoute("/routines/morning-brief")).toEqual({ name: "routine", routine: "morning-brief", folder: null });
+  expect(parseRoute("/routines/morning-brief", "?folder=%2FUsers%2Fme%2Fgolem")).toEqual({ name: "routine", routine: "morning-brief", folder: "/Users/me/golem" });
+  for (const bad of ["/routines/", "/routines/a/b", "/routines/a%2Fb", "/routinesx", "/runs"]) {
+    expect(parseRoute(bad)).toEqual({ name: "not-found" });
+  }
+});
+
+test("routinePath round-trips through parseRoute", () => {
+  expect(routinePath()).toBe("/routines");
+  const path = routinePath("morning-brief", "/Users/me/my golem");
+  const [pathname, search] = path.split("?");
+  expect(parseRoute(pathname ?? "", `?${search}`)).toEqual({ name: "routine", routine: "morning-brief", folder: "/Users/me/my golem" });
+  expect(routinePath("a", null)).toBe("/routines/a");
 });
 
 test("parseRoute reads the settings page and its sections", () => {

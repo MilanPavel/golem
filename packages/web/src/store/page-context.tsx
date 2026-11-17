@@ -16,6 +16,7 @@ import type { PullsSnapshot } from "./pulls.ts";
 import type { Route } from "./router.ts";
 import type { AuthListResult, FileListResult, CostGetResult, RoutingGetResult, McpListResult, SessionSummary, SetupStatusResult, SkillListResult } from "@golem/client";
 import { ARTIFACT_PAGE, artifactKey, traceKey, traceSpanKey, type ArtifactReadResult, type TraceGetResult, type TraceSpanResult } from "./trace.ts";
+import { ROUTINE_LIST_KEY, routineGetKey, type RoutineGetResult, type RoutineListResult } from "./routines.ts";
 import { mcpCatalogKey, mcpListKey, mcpToolsKey, type McpCatalogResult, type McpToolsResult } from "./mcp.ts";
 import { turnCards, type NotesState, type Pastes, type ReviewNote, type ShellTracking, type TurnCard } from "@golem/view";
 import { distinctFolders, resolveFolder } from "./new-session.ts";
@@ -428,4 +429,16 @@ export function usePulls(): PullsSnapshot {
 /** Whether the page has decided what setup does at its start, kept across the shell's remounts. */
 export function useSetupStart(): SetupStart {
   return usePage().setupStart;
+}
+
+/** The routines, with each one's next and last run. Marked stale by the pushed `routine.*` notifications. */
+export function useRoutineList(): UseQueryResult<RoutineListResult> {
+  const { queries } = usePage();
+  return useQuery({ queryKey: [...ROUTINE_LIST_KEY], queryFn: queries.routineList, retry: false });
+}
+
+/** One routine with its recent runs. Marked stale by the same notifications, so a firing shows in its History. */
+export function useRoutine(name: string, folder: string | null): UseQueryResult<RoutineGetResult> {
+  const { queries } = usePage();
+  return useQuery({ queryKey: routineGetKey(name, folder), queryFn: () => queries.routineGet(name, folder), retry: false });
 }
