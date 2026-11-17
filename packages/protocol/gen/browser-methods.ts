@@ -47,6 +47,9 @@ export const BROWSER_METHODS: ReadonlySet<string> = new Set([
   "model.pull_cancel",
   "model.score_reset",
   "model.set_default",
+  "notifications.get",
+  "notifications.set",
+  "notify.test",
   "ollama.install",
   "ollama.install_cancel",
   "ollama.start",
@@ -98,7 +101,6 @@ export const LOCAL_ONLY_METHODS: ReadonlySet<string> = new Set([
   "config.raw.set_protected",
   "eval.routing",
   "model.check",
-  "notify.test",
   "skill.create_protected",
   "skill.write_protected",
 ]);

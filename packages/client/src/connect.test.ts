@@ -1552,6 +1552,57 @@ test("getRouting and setRouting send their params and check what comes back", as
   }
 });
 
+test("the notification calls send their params and check what comes back", async () => {
+  const sent: [string, Record<string, unknown>][] = [];
+  const values = {
+    needs_you: true,
+    failed: true,
+    finished: false,
+    open_in: "web",
+    terminal_app: "Terminal",
+    terminal_apps: ["Terminal", "iTerm", "Ghostty"],
+  };
+  const server = await listen((socket) => {
+    attach(socket, {
+      answerPing: true,
+      results: {
+        "notifications.get": values,
+        "notifications.set": { ok: true, errors: [], values },
+        "notify.test": { posted: false, mechanism: "none" },
+      },
+      onRequest: (_socket, method, params) => {
+        if (method.startsWith("notif") || method === "notify.test") sent.push([method, params]);
+      },
+    });
+  });
+  const client = connectGolem({ socketPath: server.socketPath, clientName: "web", reconnect: false, heartbeatMs: 60_000 });
+  try {
+    assert.deepEqual(await client.getNotifications(), values);
+    assert.equal((await client.setNotifications({ finished: true })).ok, true);
+    assert.deepEqual(await client.notifyTest(), { posted: false, mechanism: "none" });
+    assert.deepEqual(sent, [
+      ["notifications.get", {}],
+      ["notifications.set", { finished: true }],
+      ["notify.test", {}],
+    ]);
+  } finally {
+    client.close();
+    await server.close();
+  }
+  const bad = await listen((socket) => {
+    attach(socket, { answerPing: true, results: { "notifications.get": {}, "notifications.set": {}, "notify.test": {} } });
+  });
+  const refused = connectGolem({ socketPath: bad.socketPath, clientName: "web", reconnect: false, heartbeatMs: 60_000 });
+  try {
+    await assert.rejects(() => refused.getNotifications(), /invalid notifications.get result/);
+    await assert.rejects(() => refused.setNotifications({}), /invalid notifications.set result/);
+    await assert.rejects(() => refused.notifyTest(), /invalid notify.test result/);
+  } finally {
+    refused.close();
+    await bad.close();
+  }
+});
+
 test("getTrace and getTraceSpan send their ids and check what comes back", async () => {
   const sent: [string, Record<string, unknown>][] = [];
   const span = { id: "m_1", kind: "model", name: "model 1", start: "t", status: "ok" };

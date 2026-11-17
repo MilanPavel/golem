@@ -2947,6 +2947,56 @@ class ConfigGetResult(BaseModel):
     notifications_open_in: Literal["web", "terminal"] | None = None
 
 
+class NotificationsGetParams(BaseModel):
+    """``notifications.get``. The ``[notifications]`` settings as golem uses them."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+
+class NotificationsValues(BaseModel):
+    """``[notifications]``. ``needs_you`` is always true: it cannot be turned off.
+    ``terminal_apps`` are the names ``terminal_app`` may take. ``finished_routines`` and
+    ``failed_routines`` name the routines whose own ``notify_finished`` or ``notify_failed``
+    says yes while the global setting says no, so the page can point to them."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    needs_you: bool
+    failed: bool
+    finished: bool
+    open_in: Literal["web", "terminal"]
+    terminal_app: str
+    terminal_apps: list[str]
+    finished_routines: list[str] = Field(default_factory=list[str])
+    failed_routines: list[str] = Field(default_factory=list[str])
+
+
+class NotificationsSetParams(BaseModel):
+    """``notifications.set``. Change keys of ``[notifications]`` in the user's ``config.toml``.
+
+    Only the keys sent change, and the file keeps its comments. A key set to its default
+    stays in the file. Every value is checked first, and when any is wrong nothing is written.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    failed: bool | None = None
+    finished: bool | None = None
+    open_in: Literal["web", "terminal"] | None = None
+    terminal_app: str | None = None
+
+
+class NotificationsSetResult(BaseModel):
+    """``ok`` is false when a value was wrong, and the file is then untouched. ``values`` is
+    what ``notifications.get`` would now answer, set when ``ok``."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    ok: bool
+    errors: list[ConfigError] = Field(default_factory=list[ConfigError])
+    values: NotificationsValues | None = None
+
+
 class RoutingGetParams(BaseModel):
     """``routing.get``. The routing, budget and context settings as golem uses them."""
 
@@ -3807,6 +3857,10 @@ __all__ = [
     "ModelSetDefaultParams",
     "ModelSetDefaultResult",
     "ModelSpeedInfo",
+    "NotificationsGetParams",
+    "NotificationsSetParams",
+    "NotificationsSetResult",
+    "NotificationsValues",
     "NotifyTestParams",
     "NotifyTestResult",
     "OllamaInstallCancelParams",

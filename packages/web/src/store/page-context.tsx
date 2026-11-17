@@ -5,6 +5,7 @@ import { ConnectionProvider } from "./connection-context.tsx";
 import { changeDiffKey, changesDiffKey, changesListKey, commitInfoKey, type ChangedFiles, type ChangesCommitInfoResult, type FileDiff } from "./changes.ts";
 import { fileListKey, fileReadKey, type FileRead } from "./files.ts";
 import { configKey, type ConfigGetResult } from "./config.ts";
+import { NOTIFICATIONS_KEY } from "./notifications.ts";
 import { ROUTING_KEY } from "./routing.ts";
 import { KEYS_KEY } from "./keys.ts";
 import type { FsListDirsResult } from "./dirs.ts";
@@ -14,7 +15,7 @@ import type { AppInstallSnapshot } from "./app-install.ts";
 import type { PageHostSnapshot } from "./page-host.ts";
 import type { PullsSnapshot } from "./pulls.ts";
 import type { Route } from "./router.ts";
-import type { AuthListResult, FileListResult, CostGetResult, RoutingGetResult, McpListResult, SessionSummary, SetupStatusResult, SkillListResult } from "@golem/client";
+import type { AuthListResult, FileListResult, CostGetResult, NotificationsValues, RoutingGetResult, McpListResult, SessionSummary, SetupStatusResult, SkillListResult } from "@golem/client";
 import { ARTIFACT_PAGE, artifactKey, traceKey, traceSpanKey, type ArtifactReadResult, type TraceGetResult, type TraceSpanResult } from "./trace.ts";
 import { mcpCatalogKey, mcpListKey, mcpToolsKey, type McpCatalogResult, type McpToolsResult } from "./mcp.ts";
 import { turnCards, type NotesState, type Pastes, type ReviewNote, type ShellTracking, type TurnCard } from "@golem/view";
@@ -259,6 +260,12 @@ export function useCost(enabled = true, sessionId?: string): UseQueryResult<Cost
 export function useRouting(enabled = true): UseQueryResult<RoutingGetResult> {
   const { queries } = usePage();
   return useQuery({ queryKey: [...ROUTING_KEY], queryFn: queries.routing, enabled, staleTime: 0, retry: false, refetchOnWindowFocus: true });
+}
+
+/** The `[notifications]` settings. Read again whenever the tab is seen: a terminal edit pushes nothing. */
+export function useNotifications(enabled = true): UseQueryResult<NotificationsValues> {
+  const { queries } = usePage();
+  return useQuery({ queryKey: [...NOTIFICATIONS_KEY], queryFn: queries.notifications, enabled, staleTime: 0, retry: false, refetchOnWindowFocus: true });
 }
 
 /** The skills a folder sees (all of them for null). Fetched only once `enabled`, and again after a skills change. */

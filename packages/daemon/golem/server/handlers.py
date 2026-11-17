@@ -88,6 +88,7 @@ from golem.server.mcp_import import mcp_import_apply, mcp_import_scan
 from golem.server.mcp_login import mcp_login, mcp_logout
 from golem.server.mcp_model import turn_on
 from golem.server.mcp_try import mcp_call, mcp_logs, mcp_test
+from golem.server.notifications_edit import notifications_get, notifications_set
 from golem.server.routines import (
     routine_get,
     routine_list,
@@ -231,6 +232,8 @@ from golem_protocol.commands import (
     ModelSetDefaultResult,
     ModelSetup,
     ModelSpeedInfo,
+    NotificationsGetParams,
+    NotificationsSetParams,
     NotifyTestParams,
     NotifyTestResult,
     OllamaInstallCancelParams,
@@ -1881,6 +1884,12 @@ def standard_methods() -> dict[str, Method]:
         "config.raw.set": Method("config.raw.set", ConfigRawSetParams, True, config_raw_set),
         "config.raw.set_protected": Method(
             "config.raw.set_protected", ConfigRawSetParams, True, config_raw_set_protected
+        ),
+        "notifications.get": Method(
+            "notifications.get", NotificationsGetParams, True, notifications_get
+        ),
+        "notifications.set": Method(
+            "notifications.set", NotificationsSetParams, True, notifications_set
         ),
         "routing.get": Method("routing.get", RoutingGetParams, True, routing_get),
         "routing.set": Method("routing.set", RoutingSetParams, True, routing_set),

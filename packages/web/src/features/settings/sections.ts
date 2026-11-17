@@ -9,6 +9,7 @@ export const SECTIONS: readonly SettingsSection[] = [
   { id: "routing", title: "Routing" },
   { id: "usage", title: "Usage" },
   { id: "rules", title: "Tool rules" },
+  { id: "notifications", title: "Notifications" },
   { id: "config", title: "Config file" },
   { id: "appearance", title: "Appearance" },
 ];

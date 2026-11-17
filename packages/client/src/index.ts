@@ -103,6 +103,10 @@ export type { TraceContextEvent } from "../../protocol/gen/trace-context-event.t
 export type { TraceContextItem } from "../../protocol/gen/trace-context-item.ts";
 export type { TraceContextPart } from "../../protocol/gen/trace-context-part.ts";
 export type { PromptSectionInfo } from "../../protocol/gen/prompt-section-info.ts";
+export type { NotificationsSetParams } from "../../protocol/gen/notifications-set-params.ts";
+export type { NotificationsSetResult } from "../../protocol/gen/notifications-set-result.ts";
+export type { NotificationsValues } from "../../protocol/gen/notifications-values.ts";
+export type { NotifyTestResult } from "../../protocol/gen/notify-test-result.ts";
 export type { RoutingGetResult } from "../../protocol/gen/routing-get-result.ts";
 export type { RoutingSetParams } from "../../protocol/gen/routing-set-params.ts";
 export type { RoutingSetResult } from "../../protocol/gen/routing-set-result.ts";

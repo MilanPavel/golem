@@ -1,4 +1,4 @@
-import { OLLAMA_FAILED, RpcError, type ApprovalChoice, type ConfigGetResult, type ConfigRawGetResult, type ConfigRawResult, type FsListDirsResult, type McpAddParams, type McpCallResult, type McpImportApplyParams, type McpImportApplyResult, type McpImportScanResult, type McpCatalogResult, type McpListResult, type McpLogsResult, type McpServerConfig, type McpServerDetail, type McpServerLog, type McpLoginDone, type McpTestProgress, type McpTestResult, type GolemClient, type RuntimeName, type SetupStatusResult, type SkillListResult, type TraceGetResult, type TraceSpanResult, type ArtifactReadResult, type ChangesDiffResult, type ChangesDiffTarget, type ChangesListResult, type ChangesRevertResult, type ChangesRevertTarget, type ChangesCommitResult, type ChangesCommitInfoResult, type ChangesSuggestMessageResult, type ModelOptionsGetResult, type ModelOptionsSetResult, type SessionSetOptionsResult, type SkillCreateResult, type SkillReadResult, type SkillWriteResult, type AuthListResult, type FileListResult, type FileReadResult, type CostGetResult, type SessionCompactResult, type ConsentChoice, type RoutingGetResult, type RoutingSetParams, type RoutingSetResult } from "@golem/client";
+import { OLLAMA_FAILED, RpcError, type ApprovalChoice, type ConfigGetResult, type ConfigRawGetResult, type ConfigRawResult, type FsListDirsResult, type McpAddParams, type McpCallResult, type McpImportApplyParams, type McpImportApplyResult, type McpImportScanResult, type McpCatalogResult, type McpListResult, type McpLogsResult, type McpServerConfig, type McpServerDetail, type McpServerLog, type McpLoginDone, type McpTestProgress, type McpTestResult, type GolemClient, type RuntimeName, type SetupStatusResult, type SkillListResult, type TraceGetResult, type TraceSpanResult, type ArtifactReadResult, type ChangesDiffResult, type ChangesDiffTarget, type ChangesListResult, type ChangesRevertResult, type ChangesRevertTarget, type ChangesCommitResult, type ChangesCommitInfoResult, type ChangesSuggestMessageResult, type ModelOptionsGetResult, type ModelOptionsSetResult, type SessionSetOptionsResult, type SkillCreateResult, type SkillReadResult, type SkillWriteResult, type AuthListResult, type FileListResult, type FileReadResult, type CostGetResult, type SessionCompactResult, type ConsentChoice, type RoutingGetResult, type RoutingSetParams, type RoutingSetResult, type NotificationsValues, type NotificationsSetParams, type NotificationsSetResult, type NotifyTestResult } from "@golem/client";
 import { changeToolFilter, installEventOf, type InstallEvent, type PermissionMode, type CompactAction, type RouteMode } from "@golem/view";
 import type { QueryClient } from "@tanstack/react-query";
 import { createDrafts, type Drafts } from "./drafts.ts";
@@ -9,6 +9,7 @@ import { createPageHost, type PageHostStore } from "./page-host.ts";
 import { createNewSession, type NewSessionStore } from "./new-session.ts";
 import { CONFIG_KEY } from "./config.ts";
 import { MCP_CATALOG_KEY, MCP_LIST_KEY, MCP_TOOLS_KEY, type McpToolsResult } from "./mcp.ts";
+import { NOTIFICATIONS_KEY } from "./notifications.ts";
 import { ROUTING_KEY } from "./routing.ts";
 import { MODEL_LIST_ALL_KEY, MODEL_LIST_KEY, SETUP_STATUS_KEY, type ModelListResult } from "./models.ts";
 import { SKILL_LIST_KEY } from "./skills.ts";
@@ -61,6 +62,9 @@ export type PageClient = Pick<
   | "getTrace"
   | "getCost"
   | "getRouting"
+  | "getNotifications"
+  | "setNotifications"
+  | "notifyTest"
   | "setRouting"
   | "getTraceSpan"
   | "readArtifact"
@@ -188,6 +192,13 @@ export type PageActions = {
    * (`ok: false`, with an error for each wrong setting), not a rejection, and nothing is written then.
    */
   setRouting(params: RoutingSetParams): Promise<RoutingSetResult>;
+  /**
+   * Changes keys of `[notifications]` in `config.toml`. A refusal is in the result (`ok: false`, with an
+   * error for each wrong setting), not a rejection, and nothing is written then.
+   */
+  setNotifications(params: NotificationsSetParams): Promise<NotificationsSetResult>;
+  /** Posts a sample notification (`notify.test`). `posted` is false when nothing could be shown. */
+  notifyTest(): Promise<NotifyTestResult>;
   /** A local model's tunable options with its defaults, what is saved for it, and the session's overrides. */
   modelOptions(model: string, sessionId: string | null): Promise<ModelOptionsGetResult>;
   /** Saves options for the model in config.toml. A `null` value removes one. */
@@ -309,6 +320,8 @@ export type PageQueries = {
   cost(sessionId?: string): Promise<CostGetResult>;
   /** The routing, budget and context settings, from `routing.get`. */
   routing(): Promise<RoutingGetResult>;
+  /** The `[notifications]` settings, from `notifications.get`. */
+  notifications(): Promise<NotificationsValues>;
   /** A session's runs as a tree of spans. */
   trace(sessionId: string): Promise<TraceGetResult>;
   /** The servers golem offers to add, with what each needs here. */
@@ -416,6 +429,7 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
       mcpTools: (name, sessionId) => client.mcpTools(name, sessionId ?? undefined),
       cost: (sessionId) => (sessionId === undefined ? client.getCost() : client.getCost(sessionId)),
       routing: () => client.getRouting(),
+      notifications: () => client.getNotifications(),
       trace: (sessionId) => client.getTrace(sessionId),
       traceSpan: (sessionId, spanId) => client.getTraceSpan(sessionId, spanId),
       artifact: (sessionId, artifactId, offset, limit) => client.readArtifact(sessionId, artifactId, offset, limit),
@@ -706,6 +720,12 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
         }
         return result;
       },
+      async setNotifications(params) {
+        const result = await client.setNotifications(params);
+        if (result.ok) await queryClient.invalidateQueries({ queryKey: NOTIFICATIONS_KEY });
+        return result;
+      },
+      notifyTest: () => client.notifyTest(),
       async modelOptions(model, sessionId) {
         return client.getModelOptions(model, sessionId ?? undefined);
       },

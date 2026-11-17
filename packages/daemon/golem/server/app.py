@@ -40,7 +40,7 @@ from golem.models.speed import SpeedBook
 from golem.models.tiers import Tier
 from golem.models.window import resolve_window
 from golem.models.window_plans import WindowPlans
-from golem.notify import Notifier, Poster, SessionFacts, default_poster
+from golem.notify import Notifier, NotifierKinds, Poster, SessionFacts, default_poster
 from golem.paths import GolemPaths, resolve_paths
 from golem.permissions.policy import Policy
 from golem.routine_scheduler import RoutineScheduler
@@ -339,6 +339,7 @@ class DaemonApp:
                     SessionRecords(database),
                     bus,
                     self._poster or default_poster(self.paths.home),
+                    self.paths.home,
                 )
                 self.state.routine_runs = RoutineRuns(database)
                 routines = RoutineScheduler(
@@ -627,14 +628,34 @@ def _tier_of(router: ModelRouter, models: ModelDiscovery, profile: str) -> Tier 
     return models.tier_of_ref(ref)
 
 
-def _open_notifier(records: SessionRecords, bus: EventBus, poster: Poster) -> Notifier:
+def _notifier_kinds(home: Path) -> Callable[[str | None], NotifierKinds]:
+    """Which kinds are on, read from the config at each notice. A routine's own
+    ``notify_finished`` and ``notify_failed`` win over ``[notifications]``."""
+
+    def kinds(routine: str | None) -> NotifierKinds:
+        try:
+            settings = load_settings(home=home, project_dir=home)
+        except ValueError:
+            log.warning("config.toml does not load; notifications use the defaults")
+            return NotifierKinds()
+        failed, finished = settings.notifications.failed, settings.notifications.finished
+        for item in settings.routine if routine is not None else ():
+            if item.name == routine:
+                failed = failed if item.notify_failed is None else item.notify_failed
+                finished = finished if item.notify_finished is None else item.notify_finished
+        return NotifierKinds(failed=failed, finished=finished)
+
+    return kinds
+
+
+def _open_notifier(records: SessionRecords, bus: EventBus, poster: Poster, home: Path) -> Notifier:
     """The notifier, watching ``bus`` for sessions no client follows."""
 
     async def lookup(session_id: str) -> SessionFacts | None:
         record = await records.get(session_id)
         return None if record is None else SessionFacts(record.title, record.origin)
 
-    notifier = Notifier(poster, lookup, bus.attached)
+    notifier = Notifier(poster, lookup, bus.attached, _notifier_kinds(home))
     bus.observe(notifier.on_event)
     return notifier
 

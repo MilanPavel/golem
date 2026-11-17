@@ -1,0 +1,61 @@
+{
+  "additionalProperties": false,
+  "description": "``[notifications]``. ``needs_you`` is always true: it cannot be turned off.\n``terminal_apps`` are the names ``terminal_app`` may take. ``finished_routines`` and\n``failed_routines`` name the routines whose own ``notify_finished`` or ``notify_failed``\nsays yes while the global setting says no, so the page can point to them.",
+  "properties": {
+    "failed": {
+      "title": "Failed",
+      "type": "boolean"
+    },
+    "failed_routines": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Failed Routines",
+      "type": "array"
+    },
+    "finished": {
+      "title": "Finished",
+      "type": "boolean"
+    },
+    "finished_routines": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Finished Routines",
+      "type": "array"
+    },
+    "needs_you": {
+      "title": "Needs You",
+      "type": "boolean"
+    },
+    "open_in": {
+      "enum": [
+        "web",
+        "terminal"
+      ],
+      "title": "Open In",
+      "type": "string"
+    },
+    "terminal_app": {
+      "title": "Terminal App",
+      "type": "string"
+    },
+    "terminal_apps": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Terminal Apps",
+      "type": "array"
+    }
+  },
+  "required": [
+    "needs_you",
+    "failed",
+    "finished",
+    "open_in",
+    "terminal_app",
+    "terminal_apps"
+  ],
+  "title": "NotificationsValues",
+  "type": "object"
+}

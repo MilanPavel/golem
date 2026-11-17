@@ -368,13 +368,35 @@ class BudgetSettings(BaseModel):
     over: Literal["local", "ask"] = "local"
 
 
+TerminalApp = Literal["Terminal", "iTerm", "Ghostty"]
+TERMINAL_APPS: tuple[TerminalApp, ...] = ("Terminal", "iTerm", "Ghostty")
+"""The terminal apps a click can open a session in."""
+
+
 class NotificationSettings(BaseModel):
-    """``[notifications]``. ``open_in`` is where a click on a notice lands: the web page
-    on that session (``web``, the default) or the terminal chat (``terminal``)."""
+    """``[notifications]``. What tells you, and where a click on a notice lands.
+
+    ``needs_you`` cannot be turned off: ``false`` is an error. ``failed`` and ``finished``
+    say whether a failed or a finished run of a session nobody watches is announced. A
+    ``[[routine]]`` may override those two with ``notify_failed`` and ``notify_finished``.
+    ``open_in`` is where a click lands: the web page on that session (``web``, the default)
+    or the terminal chat (``terminal``), opened in ``terminal_app``.
+    """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
+    needs_you: bool = True
+    failed: bool = True
+    finished: bool = False
     open_in: Literal["web", "terminal"] = "web"
+    terminal_app: TerminalApp = "Terminal"
+
+    @field_validator("needs_you")
+    @classmethod
+    def _needs_you_stays_on(cls, value: bool) -> bool:
+        if not value:
+            raise ValueError("needs_you cannot be turned off; a session that waits for you says so")
+        return value
 
 
 class ExplorerSettings(BaseModel):
