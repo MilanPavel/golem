@@ -203,6 +203,18 @@ export {
 } from "./mcp-catalog.ts";
 export { changedOnDisk, problemLine, problemLines, unifiedDiff, type RawProblem } from "./config-diff.ts";
 export {
+  CONTEXT_WORDS,
+  contextRightNow,
+  handoffChips,
+  hostedNote,
+  windowBar,
+  type ContextRightNowInput,
+  type ContextSpan,
+  type WindowBar,
+  type WindowZone,
+  type WindowZoneKind,
+} from "./context-settings.ts";
+export {
   applyParams,
   candidateNotes,
   candidateTarget,
