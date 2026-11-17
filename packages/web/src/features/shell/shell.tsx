@@ -1,7 +1,7 @@
 import { Link } from "../../ui/link.tsx";
 import { useNavigate, useRoute } from "../../store/page-context.tsx";
 import { PaletteHost } from "../palette/index.ts";
-import { SidebarShell } from "../sidebar/index.ts";
+import { MenuBar, SidebarShell } from "../sidebar/index.ts";
 import { SettingsScreen } from "../settings/index.ts";
 import { TraceScreen } from "../trace/index.ts";
 import { SetupAtStart, WelcomeScreen } from "../welcome/index.ts";
@@ -50,11 +50,15 @@ function Content() {
 /** The connected page: the sidebar (not on the welcome page), and the main area for the route. */
 export function Shell() {
   // The welcome page has no sidebar: it is laid out like home, on its own.
-  const welcome = useRoute().name === "welcome";
+  const route = useRoute().name;
+  const welcome = route === "welcome";
+  // A session has its own top bar, with the ☰ in it; the other pages get a slim one when the window is narrow.
+  const ownBar = route === "session" || route === "trace";
   return (
     <div className="flex h-dvh bg-bg text-ink">
       {welcome ? null : <SidebarShell />}
       <main className="flex min-w-0 flex-1 flex-col">
+        {welcome || ownBar ? null : <MenuBar />}
         <Content />
       </main>
       <PaletteHost />

@@ -18,6 +18,7 @@ import { ChangesTab, checksBadge, ChecksTab, FilesTab, Workbench, WORKBENCH_ID, 
 import { closeModelDialog, ModelDialog, openModelDialog, useModelDialogOpen } from "../models/index.ts";
 import { folderName, useSessionActions } from "../sessions/index.ts";
 import { useRememberSettingsContext } from "../settings/index.ts";
+import { MenuBar, MenuButton } from "../sidebar/index.ts";
 import { SessionTitle } from "./session-title.tsx";
 
 type Header = Pick<SessionView, "title" | "cwd" | "model" | "status">;
@@ -117,6 +118,7 @@ function SessionModelDialog({
 export function TopBar({ title, children }: { title: ReactNode; children?: ReactNode }) {
   return (
     <header className={cn(HEADER_ROW, "gap-2.5 px-4")}>
+      <MenuButton />
       {title}
       <div className="flex-1" />
       <div className="flex min-w-0 gap-1.5">{children}</div>
@@ -128,12 +130,15 @@ export function TopBar({ title, children }: { title: ReactNode; children?: React
 export function GoneScreen() {
   const navigate = useNavigate();
   return (
-    <div data-screen="gone" className="grid min-h-0 flex-1 place-items-center overflow-y-auto p-5">
-      <div className="flex max-w-lg flex-col items-center gap-4 text-center">
-        <PixelGolem state="offline" size="lg" />
-        <h1 className="font-prose text-2xl font-normal tracking-tight text-balance">This session is gone</h1>
-        <p className="text-pretty text-muted">The daemon no longer has it. It may have been closed.</p>
-        <Button onClick={() => navigate("/")}>Back to start</Button>
+    <div className="flex min-h-0 flex-1 flex-col">
+      <MenuBar />
+      <div data-screen="gone" className="grid min-h-0 flex-1 place-items-center overflow-y-auto p-5">
+        <div className="flex max-w-lg flex-col items-center gap-4 text-center">
+          <PixelGolem state="offline" size="lg" />
+          <h1 className="font-prose text-2xl font-normal tracking-tight text-balance">This session is gone</h1>
+          <p className="text-pretty text-muted">The daemon no longer has it. It may have been closed.</p>
+          <Button onClick={() => navigate("/")}>Back to start</Button>
+        </div>
       </div>
     </div>
   );
