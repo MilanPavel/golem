@@ -1,0 +1,666 @@
+# Routing cases: a situation, and the decision it must lead to (ticket 9.9.1, ADR-055).
+#
+# `test_routing_table.py` runs each case through a daemon with fake facts and scripted models,
+# and `just routing-table` prints them for docs/architecture/models.md. A change to a rule that
+# moves a decision fails the case that names it.
+#
+# Model fixtures: `ref` is `provider/name`; `tier` is local, budget or frontier. Left out, a
+# model is ready, takes tools, reads no images, and has an unknown window and no price.
+#
+# A case:
+#   route          pinned, local or auto (the session's route mode)
+#   session_model  the ref of the session's model (a fixture)
+#   models         the fixtures the daemon knows (the ladder picks its candidates from them)
+#   prompt_tokens  input tokens of the session's last model call (left out: none yet)
+#   paid_ok        the session already said yes to paid models
+#   spent_today    USD that a paid call of this session cost today (counts for the session too)
+#   step_floor     the tier the session starts at after two step-ups
+#   local_only_folder  the session's folder is listed in [routing] local_only
+#   action         send (default), stronger, struggle, provider_down, rate_limited,
+#                  title_role or helper_role
+#   settings       the same tables as the settings file
+#   expect         decisions only: model, reason, rejected (refs), asks (the paid question comes
+#                  first; model and reason are then the ones the "once" answer runs), error (the
+#                  code of a refusal, or of the run that failed)
+
+[model.local-32k]
+ref = "ollama/qwen3:27b"
+tier = "local"
+window = 32000
+
+[model.local-8k]
+ref = "ollama/qwen3:8b"
+tier = "local"
+window = 8000
+
+[model.local-unknown]
+ref = "ollama/mystery"
+tier = "local"
+
+[model.local-weak]
+ref = "ollama/flaky"
+tier = "local"
+window = 32000
+tool_score = 0.3
+
+[model.local-down]
+ref = "ollama/down"
+tier = "local"
+window = 32000
+ready = false
+why_not_ready = "not pulled"
+
+[model.budget-128k]
+ref = "deepseek/deepseek-chat"
+tier = "budget"
+window = 128000
+price = 0.5
+
+[model.budget-other]
+ref = "moonshot/kimi"
+tier = "budget"
+window = 128000
+price = 0.7
+
+[model.frontier-200k]
+ref = "anthropic/opus"
+tier = "frontier"
+window = 200000
+price = 5.0
+
+# The rows of the pick's rule table
+
+[[case]]
+name = "pinned keeps its model, whatever the prompt"
+route = "pinned"
+session_model = "local-32k"
+models = ["local-32k", "budget-128k", "frontier-200k"]
+prompt_tokens = 41000
+[case.expect]
+model = "ollama/qwen3:27b"
+reason = "pinned"
+
+[[case]]
+name = "pinned runs a paid model the user chose, with no question"
+route = "pinned"
+session_model = "frontier-200k"
+models = ["local-32k", "frontier-200k"]
+[case.expect]
+model = "anthropic/opus"
+reason = "pinned"
+
+[[case]]
+name = "auto, everything fits"
+route = "auto"
+session_model = "local-32k"
+models = ["local-32k", "budget-128k", "frontier-200k"]
+prompt_tokens = 1000
+[case.expect]
+model = "ollama/qwen3:27b"
+reason = "cheapest"
+
+[[case]]
+name = "auto on a paid session model still starts on the cheapest model that fits"
+route = "auto"
+session_model = "frontier-200k"
+models = ["local-32k", "budget-128k", "frontier-200k"]
+paid_ok = true
+[case.expect]
+model = "ollama/qwen3:27b"
+reason = "cheapest"
+
+[[case]]
+name = "local keeps hosted models out"
+route = "local"
+session_model = "local-32k"
+models = ["local-32k", "budget-128k", "frontier-200k"]
+prompt_tokens = 1000
+[case.expect]
+model = "ollama/qwen3:27b"
+reason = "privacy"
+rejected = ["deepseek/deepseek-chat"]
+
+[[case]]
+name = "local runs a local model when the session model is hosted"
+route = "local"
+session_model = "frontier-200k"
+models = ["local-32k", "frontier-200k"]
+[case.expect]
+model = "ollama/qwen3:27b"
+reason = "privacy"
+rejected = ["anthropic/opus"]
+
+[[case]]
+name = "local, nothing local fits: the session's model runs anyway"
+route = "local"
+session_model = "local-32k"
+models = ["local-32k", "budget-128k"]
+prompt_tokens = 41000
+[case.expect]
+model = "ollama/qwen3:27b"
+reason = "fallback"
+rejected = ["deepseek/deepseek-chat", "ollama/qwen3:27b"]
+
+[[case]]
+name = "local with no local model is refused"
+route = "local"
+session_model = "frontier-200k"
+models = ["frontier-200k"]
+[case.expect]
+error = "model_not_configured"
+
+[[case]]
+name = "too big for local, no yes yet: the paid question comes first"
+route = "auto"
+session_model = "local-32k"
+models = ["local-32k", "budget-128k", "frontier-200k"]
+prompt_tokens = 41000
+[case.expect]
+asks = true
+model = "deepseek/deepseek-chat"
+reason = "fit"
+rejected = ["ollama/qwen3:27b"]
+
+[[case]]
+name = "too big for local, consent given"
+route = "auto"
+session_model = "local-32k"
+models = ["local-32k", "budget-128k", "frontier-200k"]
+prompt_tokens = 41000
+paid_ok = true
+[case.settings.budget]
+daily_usd = 2.0
+[case.expect]
+model = "deepseek/deepseek-chat"
+reason = "fit"
+rejected = ["ollama/qwen3:27b"]
+
+[[case]]
+name = "too big for local, paid is never: the local model runs and the paid one is listed"
+route = "auto"
+session_model = "local-32k"
+models = ["local-32k", "budget-128k"]
+prompt_tokens = 41000
+paid_ok = true
+[case.settings.routing]
+paid = "never"
+[case.expect]
+model = "ollama/qwen3:27b"
+reason = "fallback"
+rejected = ["deepseek/deepseek-chat", "ollama/qwen3:27b"]
+
+[[case]]
+name = "too big for local, paid is always_ask: asks even after a session yes"
+route = "auto"
+session_model = "local-32k"
+models = ["local-32k", "budget-128k"]
+prompt_tokens = 41000
+paid_ok = true
+[case.settings.routing]
+paid = "always_ask"
+[case.expect]
+asks = true
+model = "deepseek/deepseek-chat"
+reason = "fit"
+
+[[case]]
+name = "no local model passes and the session model is hosted: asks about it"
+route = "auto"
+session_model = "budget-128k"
+models = ["local-8k", "budget-128k"]
+prompt_tokens = 200000
+[case.expect]
+asks = true
+model = "deepseek/deepseek-chat"
+reason = "fallback"
+
+[[case]]
+name = "the daily cap is spent: auto runs local and says so"
+route = "auto"
+session_model = "local-32k"
+models = ["local-32k", "budget-128k", "frontier-200k"]
+spent_today = 2.0
+paid_ok = true
+[case.settings.budget]
+daily_usd = 2.0
+[case.expect]
+model = "ollama/qwen3:27b"
+reason = "budget"
+
+[[case]]
+name = "the session cap is spent: auto runs local"
+route = "auto"
+session_model = "local-32k"
+models = ["local-32k", "budget-128k"]
+spent_today = 0.6
+paid_ok = true
+[case.settings.budget]
+daily_usd = 100.0
+session_usd = 0.5
+[case.expect]
+model = "ollama/qwen3:27b"
+reason = "budget"
+
+[[case]]
+name = "a spent cap with over = ask: the question offers this turn only"
+route = "auto"
+session_model = "local-8k"
+models = ["local-8k", "budget-128k"]
+prompt_tokens = 20000
+spent_today = 2.0
+[case.settings.budget]
+daily_usd = 2.0
+over = "ask"
+[case.expect]
+asks = true
+model = "deepseek/deepseek-chat"
+reason = "fit"
+
+[[case]]
+name = "a spent cap and a prompt too big for local: the session model runs"
+route = "auto"
+session_model = "local-8k"
+models = ["local-8k", "budget-128k"]
+prompt_tokens = 20000
+spent_today = 2.0
+paid_ok = true
+[case.settings.budget]
+daily_usd = 2.0
+[case.expect]
+model = "ollama/qwen3:8b"
+reason = "fallback"
+
+[[case]]
+name = "pinned paid model over a spent cap is refused"
+route = "pinned"
+session_model = "frontier-200k"
+models = ["local-32k", "frontier-200k"]
+spent_today = 0.02
+[case.settings.budget]
+daily_usd = 0.01
+[case.expect]
+error = "budget_spent"
+
+[[case]]
+name = "pinned local model ignores a spent cap"
+route = "pinned"
+session_model = "local-32k"
+models = ["local-32k", "frontier-200k"]
+spent_today = 5.0
+[case.settings.budget]
+daily_usd = 0.0
+[case.expect]
+model = "ollama/qwen3:27b"
+reason = "pinned"
+
+[[case]]
+name = "the session model is not ready: the next tier takes the turn"
+route = "auto"
+session_model = "local-down"
+models = ["local-down", "budget-128k"]
+paid_ok = true
+[case.expect]
+model = "deepseek/deepseek-chat"
+reason = "fit"
+rejected = ["ollama/down"]
+
+[[case]]
+name = "an unknown window passes the fit rule"
+route = "auto"
+session_model = "local-unknown"
+models = ["local-unknown", "budget-128k"]
+prompt_tokens = 41000
+[case.expect]
+model = "ollama/mystery"
+reason = "cheapest"
+
+[[case]]
+name = "no model call yet: the prompt size is unknown and the local model runs"
+route = "auto"
+session_model = "local-8k"
+models = ["local-8k", "budget-128k"]
+[case.expect]
+model = "ollama/qwen3:8b"
+reason = "cheapest"
+
+[[case]]
+name = "after two step-ups the session starts at the budget tier"
+route = "auto"
+session_model = "local-32k"
+models = ["local-32k", "budget-128k"]
+step_floor = "budget"
+paid_ok = true
+[case.expect]
+model = "deepseek/deepseek-chat"
+reason = "cheapest"
+rejected = ["ollama/qwen3:27b"]
+
+# The scoreboard
+
+[[case]]
+name = "a local model that fails tool calls is left out when a budget model can take over"
+route = "auto"
+session_model = "local-weak"
+models = ["local-weak", "budget-128k"]
+paid_ok = true
+[case.expect]
+model = "deepseek/deepseek-chat"
+reason = "fit"
+rejected = ["ollama/flaky"]
+
+[[case]]
+name = "a local model that fails tool calls still runs when it is the only one"
+route = "auto"
+session_model = "local-weak"
+models = ["local-weak"]
+[case.expect]
+model = "ollama/flaky"
+reason = "cheapest"
+
+[[case]]
+name = "a local model that fails tool calls still runs on local when it is the only local one"
+route = "local"
+session_model = "local-weak"
+models = ["local-weak", "budget-128k"]
+[case.expect]
+model = "ollama/flaky"
+reason = "privacy"
+
+# Local-only folders, against every route mode
+#
+# Left out: local route and auto in a local-only folder with hosted models around. The manager
+# drops the hosted models before the pick, so the reason is `cheapest`; ADR-055 rule 2 says
+# `privacy`. (Open question for review: the two cases below pin the model, not the reason.)
+
+[[case]]
+name = "local-only folder, pinned hosted model: refused"
+route = "pinned"
+session_model = "frontier-200k"
+models = ["local-32k", "frontier-200k"]
+local_only_folder = true
+[case.expect]
+error = "local_only"
+
+[[case]]
+name = "local-only folder, pinned local model runs"
+route = "pinned"
+session_model = "local-32k"
+models = ["local-32k", "frontier-200k"]
+local_only_folder = true
+[case.expect]
+model = "ollama/qwen3:27b"
+reason = "pinned"
+
+[[case]]
+name = "local-only folder, local route with hosted models only: refused"
+route = "local"
+session_model = "frontier-200k"
+models = ["budget-128k", "frontier-200k"]
+local_only_folder = true
+[case.expect]
+error = "local_only"
+
+[[case]]
+name = "local-only folder, local route runs the local model"
+route = "local"
+session_model = "local-32k"
+models = ["local-32k", "budget-128k"]
+local_only_folder = true
+[case.expect]
+model = "ollama/qwen3:27b"
+
+[[case]]
+name = "local-only folder, auto with a yes and room for paid models stays local"
+route = "auto"
+session_model = "frontier-200k"
+models = ["local-32k", "budget-128k", "frontier-200k"]
+prompt_tokens = 20000
+paid_ok = true
+local_only_folder = true
+[case.settings.budget]
+daily_usd = 100.0
+[case.expect]
+model = "ollama/qwen3:27b"
+rejected = ["anthropic/opus", "deepseek/deepseek-chat"]
+
+[[case]]
+name = "local-only folder, auto with hosted models only: refused"
+route = "auto"
+session_model = "frontier-200k"
+models = ["budget-128k", "frontier-200k"]
+paid_ok = true
+local_only_folder = true
+[case.expect]
+error = "local_only"
+
+# Struggling and failing runs
+
+[[case]]
+name = "a struggling run steps up one tier"
+route = "auto"
+session_model = "local-32k"
+models = ["local-32k", "budget-128k", "frontier-200k"]
+action = "struggle"
+paid_ok = true
+[case.expect]
+model = "deepseek/deepseek-chat"
+reason = "escalated"
+
+[[case]]
+name = "a struggling run asks the paid question in the middle of the run"
+route = "auto"
+session_model = "local-32k"
+models = ["local-32k", "budget-128k", "frontier-200k"]
+action = "struggle"
+[case.expect]
+asks = true
+model = "deepseek/deepseek-chat"
+reason = "escalated"
+
+[[case]]
+name = "a struggling run on local does not step up"
+route = "local"
+session_model = "local-32k"
+models = ["local-32k", "budget-128k"]
+action = "struggle"
+paid_ok = true
+[case.expect]
+model = "ollama/qwen3:27b"
+reason = "privacy"
+
+[[case]]
+name = "a struggling pinned run does not step up"
+route = "pinned"
+session_model = "local-32k"
+models = ["local-32k", "budget-128k"]
+action = "struggle"
+paid_ok = true
+[case.expect]
+model = "ollama/qwen3:27b"
+reason = "pinned"
+
+[[case]]
+name = "a struggling run with paid never stays on its model"
+route = "auto"
+session_model = "local-32k"
+models = ["local-32k", "budget-128k"]
+action = "struggle"
+paid_ok = true
+[case.settings.routing]
+paid = "never"
+[case.expect]
+model = "ollama/qwen3:27b"
+reason = "fallback"
+
+[[case]]
+name = "a struggling run in a local-only folder stays on its model"
+route = "auto"
+session_model = "local-32k"
+models = ["local-32k", "budget-128k"]
+action = "struggle"
+paid_ok = true
+local_only_folder = true
+[case.expect]
+model = "ollama/qwen3:27b"
+reason = "fallback"
+
+[[case]]
+name = "a hosted provider that is down falls back to a local model"
+route = "auto"
+session_model = "budget-128k"
+models = ["local-32k", "budget-128k"]
+action = "provider_down"
+step_floor = "budget"
+paid_ok = true
+[case.expect]
+model = "ollama/qwen3:27b"
+reason = "fallback"
+
+[[case]]
+name = "two rate limits fall back to another model of the same tier"
+route = "auto"
+session_model = "budget-128k"
+models = ["local-32k", "budget-128k", "budget-other"]
+action = "rate_limited"
+step_floor = "budget"
+paid_ok = true
+[case.expect]
+model = "moonshot/kimi"
+reason = "fallback"
+
+[[case]]
+name = "a pinned session does not fall back: the run fails with the code"
+route = "pinned"
+session_model = "budget-128k"
+models = ["local-32k", "budget-128k", "budget-other"]
+action = "rate_limited"
+paid_ok = true
+[case.expect]
+error = "rate_limited"
+
+# Try again on a stronger model
+
+[[case]]
+name = "try again stronger from local asks, then runs the budget model"
+route = "auto"
+session_model = "local-32k"
+models = ["local-32k", "budget-128k"]
+action = "stronger"
+[case.expect]
+asks = true
+model = "deepseek/deepseek-chat"
+reason = "user"
+
+[[case]]
+name = "try again stronger with a session yes runs at once"
+route = "auto"
+session_model = "local-32k"
+models = ["local-32k", "budget-128k"]
+action = "stronger"
+paid_ok = true
+[case.expect]
+model = "deepseek/deepseek-chat"
+reason = "user"
+
+[[case]]
+name = "try again stronger on pinned is refused"
+route = "pinned"
+session_model = "local-32k"
+models = ["local-32k", "budget-128k"]
+action = "stronger"
+[case.expect]
+error = "model_not_configured"
+
+[[case]]
+name = "try again stronger with paid never is refused"
+route = "auto"
+session_model = "local-32k"
+models = ["local-32k", "budget-128k"]
+action = "stronger"
+[case.settings.routing]
+paid = "never"
+[case.expect]
+error = "model_not_configured"
+
+[[case]]
+name = "try again stronger in a local-only folder is refused"
+route = "auto"
+session_model = "local-32k"
+models = ["local-32k", "budget-128k"]
+action = "stronger"
+local_only_folder = true
+[case.expect]
+error = "local_only"
+
+# Roles and helpers
+
+[[case]]
+name = "a title on a local session uses the session's model"
+session_model = "local-32k"
+models = ["local-32k", "budget-128k"]
+action = "title_role"
+[case.expect]
+model = "ollama/qwen3:27b"
+reason = "session is local"
+
+[[case]]
+name = "a title on a hosted session uses the cheapest budget model"
+session_model = "frontier-200k"
+models = ["local-32k", "budget-128k", "budget-other", "frontier-200k"]
+action = "title_role"
+[case.expect]
+model = "deepseek/deepseek-chat"
+reason = "cheapest budget model"
+
+[[case]]
+name = "a title on a hosted session with no budget model uses the session's model"
+session_model = "frontier-200k"
+models = ["frontier-200k"]
+action = "title_role"
+[case.expect]
+model = "anthropic/opus"
+reason = "no budget model ready"
+
+[[case]]
+name = "a title in a local-only folder with no local model falls to the session's model"
+session_model = "frontier-200k"
+models = ["budget-128k", "frontier-200k"]
+action = "title_role"
+local_only_folder = true
+[case.expect]
+model = "anthropic/opus"
+reason = "no local model"
+
+[[case]]
+name = "a title takes the model the settings name"
+session_model = "local-32k"
+models = ["local-32k", "budget-128k"]
+action = "title_role"
+[case.settings.routing.roles]
+titles = "deepseek/deepseek-chat"
+[case.expect]
+model = "deepseek/deepseek-chat"
+reason = "configured"
+
+[[case]]
+name = "a helper in a local-only session stays on the local model"
+session_model = "local-32k"
+models = ["local-32k", "frontier-200k"]
+action = "helper_role"
+local_only_folder = true
+[case.settings.routing.roles]
+explore = "anthropic/opus"
+[case.expect]
+model = "ollama/qwen3:27b"
+reason = "session is local"
+
+[[case]]
+name = "a helper that the settings send to a hosted model, outside a local-only folder"
+session_model = "local-32k"
+models = ["local-32k", "frontier-200k"]
+action = "helper_role"
+[case.settings.routing.roles]
+explore = "anthropic/opus"
+[case.expect]
+model = "anthropic/opus"
+reason = "configured"
