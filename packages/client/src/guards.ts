@@ -53,6 +53,8 @@ import type { HelloResult } from "../../protocol/gen/hello-result.ts";
 import type { MessageSendResult } from "../../protocol/gen/message-send-result.ts";
 import type { ModelListResult } from "../../protocol/gen/model-list-result.ts";
 import type { ModelProbeResult } from "../../protocol/gen/model-probe-result.ts";
+import type { ModelCheckDone } from "../../protocol/gen/model-check-done.ts";
+import type { ModelCheckProgress } from "../../protocol/gen/model-check-progress.ts";
 import type { ModelPullDone } from "../../protocol/gen/model-pull-done.ts";
 import type { ModelPullProgress } from "../../protocol/gen/model-pull-progress.ts";
 import type { ModelScoreResetResult } from "../../protocol/gen/model-score-reset-result.ts";
@@ -290,6 +292,20 @@ export function isPullProgress(value: unknown): value is ModelPullProgress {
 }
 
 export function isPullDone(value: unknown): value is ModelPullDone {
+  return isRecord(value) && typeof value["ref"] === "string" && typeof value["ok"] === "boolean";
+}
+
+export function isCheckProgress(value: unknown): value is ModelCheckProgress {
+  return (
+    isRecord(value) &&
+    typeof value["ref"] === "string" &&
+    typeof value["index"] === "number" &&
+    typeof value["total"] === "number" &&
+    isRecord(value["result"])
+  );
+}
+
+export function isCheckDone(value: unknown): value is ModelCheckDone {
   return isRecord(value) && typeof value["ref"] === "string" && typeof value["ok"] === "boolean";
 }
 

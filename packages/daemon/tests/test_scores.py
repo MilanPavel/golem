@@ -241,3 +241,50 @@ async def test_the_listing_and_the_facts_carry_the_score(
     (found,) = await source.facts([REF])
     assert found.tool_score == 0.5
     await discovery.aclose()
+
+
+async def test_a_check_seeds_the_tool_score_until_there_are_real_tool_calls(
+    database: Database,
+) -> None:
+    scores = Scores(database)
+    await scores.seed(REF, 8, 10)
+    seeded = await scores.of(REF)
+    assert seeded is not None and seeded.tool_score == 0.8 and seeded.seeded
+    assert seeded.calls == 0 and seeded.tool_calls == 0
+    log = _log(database)
+    await _session(log)
+    await _call(log, "m_1", good=MIN_TOOL_CALLS - 1)
+    still = await Scores(database).of(REF)
+    assert still is not None and still.tool_score == 0.8 and still.seeded
+    await _call(log, "m_2", good=1)
+    real = await Scores(database).of(REF)
+    assert real is not None and real.tool_score == 1.0 and not real.seeded
+
+
+async def test_a_new_check_replaces_the_seed_and_a_reset_drops_it(database: Database) -> None:
+    later = datetime.now(UTC) + timedelta(seconds=5)
+    scores = Scores(database)
+    await scores.seed(REF, 3, 10)
+    await scores.seed(REF, 9, 10)
+    found = await scores.of(REF)
+    assert found is not None and found.tool_score == 0.9
+    await Scores(database, now=lambda: later).reset(REF)
+    assert await Scores(database).of(REF) is None
+    await Scores(database, now=lambda: later + timedelta(seconds=5)).seed(REF, 10, 10)
+    fresh = await Scores(database).of(REF)
+    assert fresh is not None and fresh.tool_score == 1.0
+
+
+async def test_the_seed_reaches_the_facts(database: Database, tmp_path: Path) -> None:
+    scores = Scores(database)
+    await scores.seed(REF, 6, 10)
+    router = ModelRouter(GolemSettings(), keys=MemoryKeyStore())
+    discovery = _discovery(router, Network(_ollama_routes()), tmp_path)
+    discovery.scores = scores
+    await discovery.list()
+    source = ListedFacts(
+        discovery, router, lambda profile, overrides: ContextWindow(16384, 16384), scores=scores
+    )
+    (found,) = await source.facts([REF])
+    assert found.tool_score == 0.6
+    await discovery.aclose()

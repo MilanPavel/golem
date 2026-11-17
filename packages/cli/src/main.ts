@@ -26,6 +26,7 @@ import { type Check, doctorExitCode, formatDoctor, parseChecks, runDoctor, webCh
 import { formatConfig } from "./format-config.ts";
 import { formatKeys } from "./format-keys.ts";
 import { formatModels } from "./format-models.ts";
+import { runModelsCheck } from "./models-check.ts";
 import { formatSkills } from "./format-skills.ts";
 import { formatStatus } from "./format-status.ts";
 import { formatCliVersion } from "./format-version.ts";
@@ -78,7 +79,7 @@ const USAGE =
   "       golem install | golem uninstall\n" +
   "       golem --version | golem --help | golem status | golem doctor [--mcp]\n" +
   "       golem daemon install|start|stop|restart|uninstall|logs\n" +
-  "       golem auth set <provider> [--no-check] | golem auth remove <provider> | golem auth list | golem models [--refresh] | golem models score --reset <ref> | golem cost\n" +
+  "       golem auth set <provider> [--no-check] | golem auth remove <provider> | golem auth list | golem models [--refresh] | golem models score --reset <ref> | golem models check <model> | golem cost\n" +
   "       golem eval routing [--days N] [--session ID]\n" +
   "       golem mcp add <name> -- <command…> [--token-env VAR] | golem mcp add <name> --url <url> [--token] [--env K=V] [--header K=V] [--cwd D] [--on-demand] [--project] [--timeout S] [--approval allow] | golem mcp add --catalog <id> [--input <id>=<value>] | golem mcp remove <name> | golem mcp export [--format claude|vscode] [--scope user|project]\n" +
   "       golem mcp list [--json] | show <name> [--json] | test <name> | test --catalog <id> | edit <name> [--project] | import [--from <app>|<file>] [--all] | logs <name> [-f] | enable <name> [--on-demand] | disable <name> | restart <name> | login <name> | logout <name> | tools <name> [--hide <glob>] [--show <glob>]\n" +
@@ -144,6 +145,21 @@ async function run(args: string[]): Promise<number> {
       process.stdout.write(`The score of ${done.ref} starts from nothing.\n`);
       return 0;
     });
+  }
+  if (command === "models" && rest[0] === "check") {
+    const name = rest.length === 2 ? rest[1] : undefined;
+    if (name === undefined || name.startsWith("-")) {
+      process.stderr.write(`${USAGE}\n`);
+      return 1;
+    }
+    return runWithClient((client) =>
+      runModelsCheck(
+        client,
+        name,
+        (line) => process.stdout.write(`${line}\n`),
+        (line) => process.stderr.write(`${line}\n`),
+      ),
+    );
   }
   if (command === "cost" && rest.length === 0) {
     return runCost();

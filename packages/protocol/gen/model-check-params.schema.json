@@ -1,0 +1,16 @@
+{
+  "additionalProperties": false,
+  "description": "``model.check``. Run golem's tool-calling test against a model.\n\n``name`` is a profile, a ref (``ollama/qwen3:8b``), or an Ollama name. Each case's result\narrives as ``model.check.progress`` and the end as ``model.check.done``. No tool is run.",
+  "properties": {
+    "name": {
+      "minLength": 1,
+      "title": "Name",
+      "type": "string"
+    }
+  },
+  "required": [
+    "name"
+  ],
+  "title": "ModelCheckParams",
+  "type": "object"
+}

@@ -115,6 +115,20 @@ golem counts, on this Mac, how often a model's tool calls were invalid, how ofte
 
 On route `auto`, a local model below 50% valid tool calls is left out of calls that need tools while another model can take them, and `/route why` says so. A model you update recovers by itself as new calls come in. To start a model's score again, run `golem models score --reset <ref>`; your usage and costs are kept.
 
+### Test a model before you trust it
+
+`golem models check <model>` asks a model ten small tool tasks and prints how each went, one line per task, then a verdict. The tasks read a file, search, list a folder, answer without a tool, read two files, write a nested todo list, handle a missing argument, use a tool result, pick the right tool from the whole list, and finish a call under a small reply limit. No tool runs: the results it sees are made up, and nothing is written outside golem's home. Each call is judged by the same check golem applies in a real run. A call the model writes as text that golem can read counts as recovered (`~`).
+
+```
+qwen3:27b on this Mac
+✓ read a file             1.2 s
+~ nested arguments        2.0 s   written as text, recovered
+✗ missing argument        1.1 s   invalid arguments for read_file: path: Field required
+8 of 10 passed · 1 recovered · tool calls look reliable
+```
+
+Nine or ten tasks working (passed or recovered) is `reliable`, seven or eight is `usable; golem will step up when it fails`, fewer is `not recommended for tool work`. The result also seeds the score above: until a model has 20 real tool calls, its tool score is the share of tasks that worked. Checking a hosted model works too and costs a few cents; the cost is printed at the end.
+
 ## Short names, and other providers
 
 golem reads `~/.golem/config.toml`, and picks up model changes without a restart. A **profile** gives a model a short name:

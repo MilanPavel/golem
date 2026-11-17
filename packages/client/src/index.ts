@@ -32,6 +32,7 @@ export {
   type GolemClient,
   type OllamaInstallUpdate,
   type RuntimeInstallUpdate,
+  type CheckUpdate,
   type PullUpdate,
   type SessionSummary,
 } from "./connect.ts";

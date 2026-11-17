@@ -13,6 +13,7 @@ from pydantic import BaseModel
 from golem.coding.changes import ChangeStore
 from golem.mcp import McpSupervisor
 from golem.mcp.importer import ScanStore
+from golem.models.check import CheckManager
 from golem.models.discovery import ModelDiscovery
 from golem.models.facts import FactsSource
 from golem.models.install import BrewInstaller, OllamaInstaller
@@ -43,6 +44,7 @@ class DaemonState:
     models: ModelDiscovery | None = None
     facts: FactsSource | None = None
     pulls: PullManager | None = None
+    checks: CheckManager | None = None
     policy: Policy | None = None
     tools: ToolRegistry | None = None
     artifacts: ArtifactStore | None = None

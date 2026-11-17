@@ -1,0 +1,50 @@
+{
+  "additionalProperties": false,
+  "description": "How one case went. ``recovered``: the model wrote its call as text and golem read it.",
+  "properties": {
+    "detail": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Detail"
+    },
+    "id": {
+      "minLength": 1,
+      "title": "Id",
+      "type": "string"
+    },
+    "ms": {
+      "minimum": 0,
+      "title": "Ms",
+      "type": "integer"
+    },
+    "outcome": {
+      "enum": [
+        "pass",
+        "fail",
+        "recovered"
+      ],
+      "title": "Outcome",
+      "type": "string"
+    },
+    "title": {
+      "minLength": 1,
+      "title": "Title",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "title",
+    "outcome",
+    "ms"
+  ],
+  "title": "ModelCheckCase",
+  "type": "object"
+}
