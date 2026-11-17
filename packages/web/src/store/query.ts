@@ -4,7 +4,7 @@ import { CHANGES_REFETCH_MS } from "./changes.ts";
 
 export type QueryWiringClient = Pick<
   GolemClient,
-  "state" | "onState" | "onEvent" | "onSessionSummary" | "onSkillsChanged" | "onMcpStatus" | "onPull" | "onModelServer"
+  "state" | "onState" | "onEvent" | "onSessionSummary" | "onSkillsChanged" | "onRoutinesChanged" | "onMcpStatus" | "onPull" | "onModelServer"
 >;
 
 /** Answers stay fresh until a pushed event says otherwise. Keys are `[method, ...params]`. */
@@ -43,6 +43,10 @@ export function keepQueriesHonest(client: QueryWiringClient, queryClient: QueryC
   const offs = [
     client.onSkillsChanged(() => {
       stale("skill.list");
+    }),
+    client.onRoutinesChanged(() => {
+      stale("routine.list");
+      stale("routine.get");
     }),
     client.onMcpStatus(() => {
       stale("mcp.list");

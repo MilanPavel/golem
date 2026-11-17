@@ -5,6 +5,8 @@ export type Route =
   | { name: "session"; id: string; inspect: Inspect | null }
   | { name: "trace"; id: string; span: string | null }
   | { name: "settings"; section: string }
+  | { name: "routines" }
+  | { name: "routine"; routine: string; folder: string | null }
   | { name: "welcome"; step: WelcomeStep; from: "send" | null }
   | { name: "not-found" };
 
@@ -29,6 +31,8 @@ export type Router = StoreSource<Route> & {
  * `/settings/:section` (lowercase letters and dashes) the settings page, anything else is not found.
  * The router does not know which sections exist; the page says so for a name it does not list.
  * `/s/:id/trace` is a session's trace, and `?span=` in `search` names the selected span.
+ * `/routines` is the routines page with none picked, `/routines/:routine` one routine (name decoded, no further `/`),
+ * and `?folder=` in `search` names the project of a project routine.
  * `/welcome` is first run: `?step=engine|model|tools|ready` (engine when missing or unknown) and `?from=send`.
  * On `/s/:id`, `?inspect` opens the inspector panel and `?inspect=<span>` opens it at that span.
  */
@@ -44,6 +48,21 @@ export function parseRoute(pathname: string, search = ""): Route {
   }
   if (pathname === "/settings") {
     return { name: "settings", section: DEFAULT_SETTINGS_SECTION };
+  }
+  if (pathname === "/routines") {
+    return { name: "routines" };
+  }
+  const routine = /^\/routines\/([^/]+)$/.exec(pathname)?.[1];
+  if (routine !== undefined) {
+    try {
+      const name = decodeURIComponent(routine);
+      if (name !== "" && !name.includes("/")) {
+        const folder = new URLSearchParams(search).get("folder");
+        return { name: "routine", routine: name, folder: folder === null || folder === "" ? null : folder };
+      }
+    } catch {
+      // A malformed escape is not a routine.
+    }
   }
   const section = /^\/settings\/([a-z-]+)$/.exec(pathname)?.[1];
   if (section !== undefined) {
@@ -91,6 +110,13 @@ export function settingsPath(section: string = DEFAULT_SETTINGS_SECTION): string
   return section === DEFAULT_SETTINGS_SECTION ? "/settings" : `/settings/${section}`;
 }
 
+/** The path of the routines page, or of one routine on it. A project routine names its project. */
+export function routinePath(name?: string, folder?: string | null): string {
+  if (name === undefined) return "/routines";
+  const base = `/routines/${encodeURIComponent(name)}`;
+  return folder === undefined || folder === null ? base : `${base}?folder=${encodeURIComponent(folder)}`;
+}
+
 /** The path of `/welcome` at a step. The first step and no origin are the bare path. */
 export function welcomePath(step: WelcomeStep = "engine", from: "send" | null = null): string {
   const params = new URLSearchParams();
@@ -106,6 +132,7 @@ function sameRoute(a: Route, b: Route): boolean {
   }
   if (a.name === "trace") return b.name === "trace" && a.id === b.id && a.span === b.span;
   if (a.name === "welcome") return b.name === "welcome" && a.step === b.step && a.from === b.from;
+  if (a.name === "routine") return b.name === "routine" && a.routine === b.routine && a.folder === b.folder;
   if (a.name === "settings") return b.name === "settings" && a.section === b.section;
   return a.name === b.name;
 }

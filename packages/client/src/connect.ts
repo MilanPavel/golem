@@ -56,13 +56,14 @@ import type { DaemonStatus } from "../../protocol/gen/daemon-status.ts";
 import type { McpListResult } from "../../protocol/gen/mcp-list-result.ts";
 import type { McpServer } from "../../protocol/gen/mcp-server.ts";
 import type { ModelServerStatus } from "../../protocol/gen/model-server-status.ts";
+import type { RoutineGetResult } from "../../protocol/gen/routine-get-result.ts";
+import type { RoutineListResult } from "../../protocol/gen/routine-list-result.ts";
+import type { RoutineRemoveResult } from "../../protocol/gen/routine-remove-result.ts";
+import type { RoutineRunResult } from "../../protocol/gen/routine-run-result.ts";
 import type { SkillCall } from "../../protocol/gen/skill-call.ts";
 import type { SkillCreateResult } from "../../protocol/gen/skill-create-result.ts";
 import type { SkillListResult } from "../../protocol/gen/skill-list-result.ts";
 import type { SkillReadResult } from "../../protocol/gen/skill-read-result.ts";
-import type { RoutineGetResult } from "../../protocol/gen/routine-get-result.ts";
-import type { RoutineListResult } from "../../protocol/gen/routine-list-result.ts";
-import type { RoutineRunResult } from "../../protocol/gen/routine-run-result.ts";
 import type { RoutineUpdateResult } from "../../protocol/gen/routine-update-result.ts";
 import type { SkillSetDisabledResult } from "../../protocol/gen/skill-set-disabled-result.ts";
 import type { SkillWriteResult } from "../../protocol/gen/skill-write-result.ts";
@@ -189,12 +190,13 @@ import {
   isPullDone,
   isPullProgress,
   isRefResult,
+  isRoutineGetResult,
+  isRoutineListResult,
+  isRoutineRemoveResult,
+  isRoutineRunResult,
   isSkillCreateResult,
   isSkillListResult,
   isSkillReadResult,
-  isRoutineGetResult,
-  isRoutineListResult,
-  isRoutineRunResult,
   isRoutineUpdateResult,
   isSkillSetDisabledResult,
   isSkillWriteResult,
@@ -576,6 +578,13 @@ export interface GolemClient {
    * whose project skills changed, or `null` when every folder's did.
    */
   onSkillsChanged(listener: (root: string | null) => void): () => void;
+  /** `routine.remove`: delete a user routine from `config.toml`. */
+  removeRoutine(name: string): Promise<RoutineRemoveResult>;
+  /**
+   * `routine.changed`, `routine.fired` and `routine.finished`: the routines or their runs changed, so
+   * a list or a history read before is stale. The listener is told which one arrived.
+   */
+  onRoutinesChanged(listener: (kind: "changed" | "fired" | "finished") => void): () => void;
   /** Ping the daemon now, with the heartbeat's timeout. A dead link then closes and reconnects. Does nothing unless the link is open. */
   checkNow(): void;
   close(): void;
@@ -633,6 +642,7 @@ export function connectGolem(options: ConnectOptions): GolemClient {
   const testListeners = new Set<(progress: McpTestProgress) => void>();
   const logListeners = new Set<(log: McpServerLog) => void>();
   const skillListeners = new Set<(root: string | null) => void>();
+  const routineListeners = new Set<(kind: "changed" | "fired" | "finished") => void>();
   const serverListeners = new Set<(status: ModelServerStatus) => void>();
   const optionsSavedListeners = new Set<(saved: ModelOptionsSaved) => void>();
   const installListeners = new Set<(update: OllamaInstallUpdate) => void>();
@@ -976,6 +986,21 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       for (const listener of skillListeners) {
         try {
           listener(root);
+        } catch {
+          // A listener must not tear the socket down.
+        }
+      }
+      return;
+    }
+    if (
+      isRecord(message) &&
+      (message["method"] === "routine.changed" || message["method"] === "routine.fired" || message["method"] === "routine.finished")
+    ) {
+      const kind = message["method"].slice("routine.".length) as "changed" | "fired" | "finished";
+      record({ direction: "in", kind: message["method"], detail: kind, json: line });
+      for (const listener of routineListeners) {
+        try {
+          listener(kind);
         } catch {
           // A listener must not tear the socket down.
         }
@@ -2137,6 +2162,20 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       skillListeners.add(listener);
       return () => {
         skillListeners.delete(listener);
+      };
+    },
+    async removeRoutine(name: string): Promise<RoutineRemoveResult> {
+      await ready;
+      const result = await call("routine.remove", { name });
+      if (!isRoutineRemoveResult(result)) {
+        throw new Error("invalid routine.remove result");
+      }
+      return result;
+    },
+    onRoutinesChanged(listener: (kind: "changed" | "fired" | "finished") => void): () => void {
+      routineListeners.add(listener);
+      return () => {
+        routineListeners.delete(listener);
       };
     },
     close(): void {
