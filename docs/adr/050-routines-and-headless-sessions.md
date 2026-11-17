@@ -127,7 +127,7 @@ Not holding the assertion (alternative: let the OS sleep) makes a one-hour local
 
 ### What the code does today
 
-Nothing of the above is built. `SessionManager.send` starts a run for a session no client is attached to. A run that hits an `ask` ends its task, is stored as `waiting`, and survives a restart ([ADR-013](013-approvals.md)). `SessionSummary.status` can be `waiting`. There is no `origin`, no `routine_runs`, no clock in the daemon, no notifier, and no cron code beyond 4.2.1's `next_after`. 4.0.2 adds the first two, 4.2.1 and 4.2.2 the rest.
+Built so far: the `origin` column and `session.completed` (4.0.2), the cron code, `[[routine]]` and the `routine.*` methods that read and edit them (4.2.1), the notifier (4.1), and the scheduler (4.2.2, `golem/routine_scheduler.py`). The scheduler wakes at least every 60 seconds and reads the routines again on each pass. It fires a due routine as a headless session, writes a `routine_runs` row (with a `summary`, the last reply cut short) before the session starts, skips a firing while the previous one is running or waiting (`still running`), and drops or runs once a due time that is more than two minutes late (`missed`). `routine.run` fires one now, and `routine.get` lists the last 50 firings. Not built yet: pause and `routine_state`, quiet hours, the cap of 2 routine runs at once, the power assertion, `watch` triggers (4.3), and retention.
 
 ## Alternatives Considered
 

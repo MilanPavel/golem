@@ -1,0 +1,29 @@
+{
+  "additionalProperties": false,
+  "description": "``routine.run``. Fire a routine now, with ``trigger`` ``manual``.\n\nIt works while the routine is paused and still obeys trust. It is refused while\nthe routine's previous run is still running or waiting.",
+  "properties": {
+    "folder": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Folder"
+    },
+    "name": {
+      "minLength": 1,
+      "title": "Name",
+      "type": "string"
+    }
+  },
+  "required": [
+    "name"
+  ],
+  "title": "RoutineRunParams",
+  "type": "object"
+}

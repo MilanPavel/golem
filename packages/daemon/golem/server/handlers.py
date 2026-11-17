@@ -88,7 +88,13 @@ from golem.server.mcp_import import mcp_import_apply, mcp_import_scan
 from golem.server.mcp_login import mcp_login, mcp_logout
 from golem.server.mcp_model import turn_on
 from golem.server.mcp_try import mcp_call, mcp_logs, mcp_test
-from golem.server.routines import routine_get, routine_list, routine_remove, routine_update
+from golem.server.routines import (
+    routine_get,
+    routine_list,
+    routine_remove,
+    routine_run,
+    routine_update,
+)
 from golem.server.routing_edit import routing_get, routing_set
 from golem.server.skills_edit import (
     skill_create,
@@ -246,6 +252,7 @@ from golem_protocol.commands import (
     RoutineGetParams,
     RoutineListParams,
     RoutineRemoveParams,
+    RoutineRunParams,
     RoutineUpdateParams,
     RoutingGetParams,
     RoutingSetParams,
@@ -1893,6 +1900,7 @@ def standard_methods() -> dict[str, Method]:
         "routine.get": Method("routine.get", RoutineGetParams, True, routine_get),
         "routine.update": Method("routine.update", RoutineUpdateParams, True, routine_update),
         "routine.remove": Method("routine.remove", RoutineRemoveParams, True, routine_remove),
+        "routine.run": Method("routine.run", RoutineRunParams, True, routine_run),
         "session.set_skills": Method(
             "session.set_skills", SessionSetSkillsParams, True, _session_set_skills
         ),

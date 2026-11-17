@@ -1864,8 +1864,9 @@ class RoutineRunSummary(BaseModel):
 
     The times are ISO 8601 with an offset. ``reason`` says why a firing was
     ``skipped``: ``missed``, ``paused``, ``untrusted``, ``still running`` or ``quiet``.
-    ``scope`` is ``user`` or the project folder. Nothing fills these until the
-    scheduler (4.2.2), so a list has none yet.
+    ``scope`` is ``user`` or the project folder. ``summary`` is the last reply of a
+    finished firing, cut short. ``status`` ``waiting`` is read from the session, it is
+    never stored.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -1880,6 +1881,7 @@ class RoutineRunSummary(BaseModel):
     ended_at: str | None = None
     status: RoutineRunStatus
     reason: str | None = None
+    summary: str | None = None
 
 
 class RoutineInfo(BaseModel):
@@ -1954,6 +1956,56 @@ class RoutineGetResult(BaseModel):
 
     routine: RoutineInfo
     runs: list[RoutineRunSummary] = Field(default_factory=list[RoutineRunSummary])
+
+
+class RoutineRunParams(BaseModel):
+    """``routine.run``. Fire a routine now, with ``trigger`` ``manual``.
+
+    It works while the routine is paused and still obeys trust. It is refused while
+    the routine's previous run is still running or waiting.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    name: str = Field(min_length=1)
+    folder: str | None = Field(default=None, min_length=1)
+
+
+class RoutineRunResult(BaseModel):
+    """The firing ``routine.run`` started, and the session it runs in."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    routine_run_id: str = Field(min_length=1)
+    session_id: str = Field(min_length=1)
+
+
+class RoutineFired(BaseModel):
+    """A routine started a run. ``scope`` is ``user`` or the project folder."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    routine: str = Field(min_length=1)
+    routine_run_id: str = Field(min_length=1)
+    session_id: str = Field(min_length=1)
+    trigger: RoutineTrigger
+    scope: str = Field(min_length=1)
+
+
+class RoutineFinished(BaseModel):
+    """A routine's run ended, or a due firing was skipped (then ``reason`` says why).
+
+    ``status`` is ``succeeded``, ``failed``, ``cancelled`` or ``skipped``. A skipped
+    firing sends this and no ``routine.fired``.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    routine: str = Field(min_length=1)
+    routine_run_id: str = Field(min_length=1)
+    status: RoutineRunStatus
+    reason: str | None = None
+    summary: str | None = None
 
 
 class RoutineUpdateParams(BaseModel):
@@ -3774,6 +3826,8 @@ __all__ = [
     "RouteConsentAnswerResult",
     "RoutineChanged",
     "RoutineConfig",
+    "RoutineFinished",
+    "RoutineFired",
     "RoutineGetParams",
     "RoutineGetResult",
     "RoutineInfo",
@@ -3782,6 +3836,8 @@ __all__ = [
     "RoutineListResult",
     "RoutineRemoveParams",
     "RoutineRemoveResult",
+    "RoutineRunParams",
+    "RoutineRunResult",
     "RoutineRunSummary",
     "RoutineUpdateParams",
     "RoutineUpdateResult",

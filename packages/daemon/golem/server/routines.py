@@ -3,9 +3,10 @@
 A routine is a ``[[routine]]`` in the user's ``config.toml`` or in a trusted
 project's ``.golem/config.toml`` (ADR-050). The browser may read every routine
 and edit the user's, with the daemon refusing to edit a project's: a project's
-file is committed with the project, and is edited there. Nothing here runs a
-routine. Runs and pause are 4.2.2, so ``last`` is null, ``paused`` is false and
-a routine has no runs yet.
+file is committed with the project, and is edited there. ``routine.run``
+fires one now through the scheduler (:mod:`golem.routine_scheduler`). ``last`` and
+the runs of ``routine.get`` come from ``routine_runs``. Pause is not built, so
+``paused`` is false.
 """
 
 from __future__ import annotations
@@ -18,7 +19,7 @@ from typing import Any
 
 from pydantic import ValidationError
 
-from golem.config import RoutineSettings, load_mcp
+from golem.config import RoutineSettings
 from golem.config_edit import (
     RoutineExistsError,
     RoutineTableError,
@@ -27,9 +28,16 @@ from golem.config_edit import (
     replace_routine,
     set_routine_enabled,
 )
-from golem.routine_files import RoutineFile, RoutineProblem, project_config, read_routines
+from golem.routine_files import (
+    RoutineProblem,
+    project_config,
+    read_project_routines,
+    read_routines,
+)
+from golem.routine_scheduler import RoutineBlockedError, RoutineBusyError, RoutineNotFoundError
 from golem.routines import ScheduleError, next_after
 from golem.server.dispatcher import INTERNAL_ERROR, INVALID_PARAMS, RequestContext, RpcCallError
+from golem.store.routine_runs import RoutineRunRecord
 from golem_protocol.commands import (
     RoutineChanged,
     RoutineConfig,
@@ -41,6 +49,9 @@ from golem_protocol.commands import (
     RoutineListResult,
     RoutineRemoveParams,
     RoutineRemoveResult,
+    RoutineRunParams,
+    RoutineRunResult,
+    RoutineRunSummary,
     RoutineSource,
     RoutineUpdateParams,
     RoutineUpdateResult,
@@ -55,7 +66,32 @@ PROJECT_EDIT = "a project routine is edited in the project's .golem/config.toml,
 async def routine_list(ctx: RequestContext, params: RoutineListParams) -> RoutineListResult:
     now = ctx.state.clock()
     routines, issues = await asyncio.to_thread(_collect, ctx, _folders(params.folders), now)
-    return RoutineListResult(routines=routines, issues=[_issue(p) for p in issues])
+    shown: list[RoutineInfo] = []
+    for info in routines:
+        rows = await _rows(ctx, info, 1)
+        shown.append(info.model_copy(update={"last": _summary(rows[0]) if rows else None}))
+    return RoutineListResult(routines=shown, issues=[_issue(p) for p in issues])
+
+
+async def routine_run(ctx: RequestContext, params: RoutineRunParams) -> RoutineRunResult:
+    scheduler = ctx.state.routines
+    if scheduler is None:
+        raise RpcCallError(INTERNAL_ERROR, "the routine scheduler is not ready")
+    folder = None if params.folder is None else _folders([params.folder])[0]
+    try:
+        run_id, session_id = await scheduler.run(params.name, folder)
+    except RoutineNotFoundError as exc:
+        where = "the user's config.toml" if folder is None else str(folder)
+        raise RpcCallError(
+            INVALID_PARAMS, f"there is no routine called {params.name} in {where}"
+        ) from exc
+    except RoutineBlockedError as exc:
+        raise RpcCallError(INVALID_PARAMS, f"{exc}: trust the folder first") from exc
+    except RoutineBusyError as exc:
+        raise RpcCallError(INVALID_PARAMS, str(exc)) from exc
+    except Exception as exc:
+        raise RpcCallError(INTERNAL_ERROR, f"{params.name} could not start: {exc}") from exc
+    return RoutineRunResult(routine_run_id=run_id, session_id=session_id)
 
 
 async def routine_get(ctx: RequestContext, params: RoutineGetParams) -> RoutineGetResult:
@@ -65,7 +101,9 @@ async def routine_get(ctx: RequestContext, params: RoutineGetParams) -> RoutineG
     wanted = None if params.folder is None else str(folders[0])
     for info in routines:
         if info.config.name == params.name and info.folder == wanted:
-            return RoutineGetResult(routine=info, runs=[])
+            rows = await _rows(ctx, info, 50)
+            shown = info.model_copy(update={"last": _summary(rows[0]) if rows else None})
+            return RoutineGetResult(routine=shown, runs=[_summary(row) for row in rows])
     where = "the user's config.toml" if wanted is None else wanted
     raise RpcCallError(INVALID_PARAMS, f"there is no routine called {params.name} in {where}")
 
@@ -107,6 +145,8 @@ async def routine_update(ctx: RequestContext, params: RoutineUpdateParams) -> Ro
             params=RoutineChanged(name=checked.name, change="added" if params.create else "updated")
         )
     )
+    if ctx.state.routines is not None:
+        ctx.state.routines.reload()
     log.info("wrote routine %s to %s", checked.name, path)
     now = ctx.state.clock()
     return RoutineUpdateResult(routine=_info(ctx, checked, "user", None, path, False, now))
@@ -125,7 +165,35 @@ async def routine_remove(ctx: RequestContext, params: RoutineRemoveParams) -> Ro
     ctx.state.broadcast(
         RoutineChangedNotification(params=RoutineChanged(name=params.name, change="removed"))
     )
+    if ctx.state.routines is not None:
+        ctx.state.routines.reload()
     return RoutineRemoveResult(name=params.name)
+
+
+async def _rows(ctx: RequestContext, info: RoutineInfo, limit: int) -> list[RoutineRunRecord]:
+    runs = ctx.state.routine_runs
+    if runs is None:
+        return []
+    scope = "user" if info.folder is None else info.folder
+    return await runs.recent(info.config.name, scope, limit)
+
+
+def _summary(row: RoutineRunRecord) -> RoutineRunSummary:
+    return RoutineRunSummary.model_validate(
+        {
+            "routine_run_id": row.routine_run_id,
+            "routine": row.routine,
+            "scope": row.scope,
+            "session_id": row.session_id,
+            "trigger": row.trigger,
+            "due_at": row.due_at,
+            "started_at": row.started_at,
+            "ended_at": row.ended_at,
+            "status": row.status,
+            "reason": row.reason,
+            "summary": row.summary,
+        }
+    )
 
 
 def _check(table: dict[str, Any]) -> RoutineSettings:
@@ -161,25 +229,10 @@ def _collect(
         path = project_config(folder)
         policy = ctx.state.policy
         trusted = policy is not None and policy.trusted(folder)
-        found = _project(user_file, path, folder, trusted)
+        found = read_project_routines(user_file, folder, trusted)
         problems += found.problems
         infos += [_info(ctx, r, "project", folder, path, not trusted, now) for r in found.routines]
     return infos, problems
-
-
-def _project(user_file: Path, path: Path, folder: Path, trusted: bool) -> RoutineFile:
-    if not trusted:
-        # Read to show what is blocked. Nothing from it is ever scheduled.
-        return read_routines(path)
-    known = frozenset(_mcp_names(user_file) | _mcp_names(path))
-    return read_routines(path, project=folder, known_mcp=known)
-
-
-def _mcp_names(path: Path) -> set[str]:
-    try:
-        return set(load_mcp(path))
-    except ValueError:
-        return set()
 
 
 def _info(

@@ -19,6 +19,8 @@ from golem_protocol.commands import (
     OllamaInstallDone,
     OllamaInstallOutput,
     RoutineChanged,
+    RoutineFinished,
+    RoutineFired,
     RuntimeInstallDone,
     RuntimeInstallOutput,
     SessionSummary,
@@ -241,6 +243,26 @@ class RoutineChangedNotification(BaseModel):
     params: RoutineChanged
 
 
+class RoutineFiredNotification(BaseModel):
+    """Server → every connection: a routine started a run. Not stored."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    jsonrpc: Literal["2.0"] = "2.0"
+    method: Literal["routine.fired"] = "routine.fired"
+    params: RoutineFired
+
+
+class RoutineFinishedNotification(BaseModel):
+    """Server → every connection: a routine's run ended, or a firing was skipped. Not stored."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    jsonrpc: Literal["2.0"] = "2.0"
+    method: Literal["routine.finished"] = "routine.finished"
+    params: RoutineFinished
+
+
 __all__ = [
     "KeychainWaitNotification",
     "McpLoginDoneNotification",
@@ -254,6 +276,8 @@ __all__ = [
     "ModelPullProgressNotification",
     "ModelServerStatusNotification",
     "RoutineChangedNotification",
+    "RoutineFinishedNotification",
+    "RoutineFiredNotification",
     "RpcErrorBody",
     "RpcFailure",
     "RpcId",

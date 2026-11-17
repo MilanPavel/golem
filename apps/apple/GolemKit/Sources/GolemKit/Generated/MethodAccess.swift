@@ -59,6 +59,7 @@ public enum MethodAccess {
         "routine.get",
         "routine.list",
         "routine.remove",
+        "routine.run",
         "routine.update",
         "routing.get",
         "routing.set",

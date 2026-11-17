@@ -1,0 +1,88 @@
+{
+  "$defs": {
+    "RoutineFinished": {
+      "additionalProperties": false,
+      "description": "A routine's run ended, or a due firing was skipped (then ``reason`` says why).\n\n``status`` is ``succeeded``, ``failed``, ``cancelled`` or ``skipped``. A skipped\nfiring sends this and no ``routine.fired``.",
+      "properties": {
+        "reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reason"
+        },
+        "routine": {
+          "minLength": 1,
+          "title": "Routine",
+          "type": "string"
+        },
+        "routine_run_id": {
+          "minLength": 1,
+          "title": "Routine Run Id",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "queued",
+            "running",
+            "waiting",
+            "succeeded",
+            "failed",
+            "skipped",
+            "cancelled"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "summary": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Summary"
+        }
+      },
+      "required": [
+        "routine",
+        "routine_run_id",
+        "status"
+      ],
+      "title": "RoutineFinished",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Server → every connection: a routine's run ended, or a firing was skipped. Not stored.",
+  "properties": {
+    "jsonrpc": {
+      "const": "2.0",
+      "default": "2.0",
+      "title": "Jsonrpc",
+      "type": "string"
+    },
+    "method": {
+      "const": "routine.finished",
+      "default": "routine.finished",
+      "title": "Method",
+      "type": "string"
+    },
+    "params": {
+      "$ref": "#/$defs/RoutineFinished"
+    }
+  },
+  "required": [
+    "params"
+  ],
+  "title": "RoutineFinishedNotification",
+  "type": "object"
+}

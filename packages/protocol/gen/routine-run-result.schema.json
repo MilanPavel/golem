@@ -1,0 +1,22 @@
+{
+  "additionalProperties": false,
+  "description": "The firing ``routine.run`` started, and the session it runs in.",
+  "properties": {
+    "routine_run_id": {
+      "minLength": 1,
+      "title": "Routine Run Id",
+      "type": "string"
+    },
+    "session_id": {
+      "minLength": 1,
+      "title": "Session Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "routine_run_id",
+    "session_id"
+  ],
+  "title": "RoutineRunResult",
+  "type": "object"
+}
