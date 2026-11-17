@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import axe from "axe-core";
 import { afterEach, expect, test } from "vitest";
@@ -66,7 +66,7 @@ test("each pill saves the right window", async () => {
   const { fake, user } = mount();
   await heading();
   expect(radio("Auto").checked).toBe(true);
-  expect(await screen.findByText("Auto picks 32K for qwen3:8b on this Mac (36 GB).")).toBeTruthy();
+  expect((await screen.findAllByText("32K · planned by golem for this Mac")).length).toBeGreaterThan(0);
   await user.click(radio("Ollama's"));
   await waitFor(() => expect(fake.raw.setRouting).toHaveBeenCalledWith({ context: { window: "ollama" } }));
   await user.click(radio("Fixed"));
@@ -102,8 +102,62 @@ test("the switch redraws the bar for the hosted window", async () => {
 test("with no hosted model there is no switch, and with no window the bar says so", async () => {
   mount({ ...DEFAULT_ROUTING, picked: { local: null, budget: null, frontier: null } });
   await heading();
-  expect(screen.queryByRole("group", { name: "Show it on" })).toBeNull();
+  expect(screen.queryByRole("group", { name: "Example:" })).toBeNull();
   expect(screen.getAllByText("The chart shows once the window size is known.").length).toBeGreaterThan(0);
+  // The bar is still drawn, as shares, with its own words.
+  expect(screen.getByText("reply · 4K")).toBeTruthy();
+  const axis = screen.getByText("the chat grows →").parentElement as HTMLElement;
+  expect(axis.textContent).toBe("0the chat grows →the window");
+});
+
+function options(from: string | undefined, num: number | undefined, saved: Record<string, number> = {}) {
+  return {
+    model: "qwen3:8b",
+    options: [],
+    defaults: (num === undefined ? {} : { num_ctx: num }) as Record<string, number>,
+    default_from: (from === undefined ? {} : { num_ctx: from }) as Record<string, "golem" | "modelfile" | "ollama">,
+    saved,
+    session: {},
+    memory: { ram_gb: 36, size_gb: 5, kv_gb_per_1k_tokens: 0.1, overhead_gb: 1, fits_share: 0.7, tight_share: 0.85 },
+  };
+}
+
+test("a window from the Modelfile shows with ≈, why golem has no plan, and in Right now", async () => {
+  mount(DEFAULT_ROUTING, (fake) => fake.raw.getModelOptions.mockResolvedValue(options("modelfile", 8192)));
+  await heading();
+  expect((await screen.findAllByText("≈ 8K · from the model's Modelfile")).length).toBeGreaterThan(0);
+  expect(screen.getByText("Golem could not plan one.")).toBeTruthy();
+  expect(screen.getByRole("region", { name: "Right now" }).textContent).toContain("qwen3:8b gets a ≈ 8K window (from the model's Modelfile)");
+  const axis = screen.getByText("the chat grows →").parentElement as HTMLElement;
+  expect(axis.textContent).toContain("≈ 8K");
+});
+
+test("Ollama's default and a saved window each say where they come from", async () => {
+  mount(DEFAULT_ROUTING, (fake) => fake.raw.getModelOptions.mockResolvedValue(options("ollama", 4096)));
+  await heading();
+  expect((await screen.findAllByText("≈ 4K · Ollama's default")).length).toBeGreaterThan(0);
+  cleanup();
+  mount(DEFAULT_ROUTING, (fake) => fake.raw.getModelOptions.mockResolvedValue(options("golem", 32768, { num_ctx: 8192 })));
+  await heading();
+  expect((await screen.findAllByText("8K · set for this model")).length).toBeGreaterThan(0);
+});
+
+test("with no window the page says why, and when it will show", async () => {
+  mount(DEFAULT_ROUTING, (fake) => fake.raw.getModelOptions.mockResolvedValue(options(undefined, undefined)));
+  await heading();
+  expect(await screen.findByText("Golem could not plan one.")).toBeTruthy();
+  expect(screen.getByText("Ollama's window shows after the first chat on this model.")).toBeTruthy();
+});
+
+test("the switch reads Example and the page says it holds rules", async () => {
+  mount();
+  await heading();
+  await screen.findAllByText("32K · planned by golem for this Mac");
+  expect(screen.getByText(/This page holds the rules for every chat\. A chat's live fill is the/).textContent).toBe(
+    "This page holds the rules for every chat. A chat's live fill is the ctx chip in the chat.",
+  );
+  expect(screen.getAllByText("Example:").length).toBeGreaterThan(0);
+  expect(screen.queryByText("Show it on")).toBeNull();
 });
 
 test("the sliders and steppers save the same keys, and step 2 never starts before step 1", async () => {

@@ -28,7 +28,7 @@ function Mark({ at, label, tone }: { at: number; label: string; tone: "wait" | "
 }
 
 /** The window as one bar: room to work, step 1, step 2 and the reply, with the two settings as markers. It is a picture; the controls under it carry the labels. */
-export function WindowBarView({ bar, window }: { bar: WindowBar; window: number }) {
+export function WindowBarView({ bar, window, reserve, estimated = false }: { bar: WindowBar; window: number | null; reserve: number; estimated?: boolean }) {
   return (
     <div>
       <div className="relative pt-7 pb-1">
@@ -39,7 +39,7 @@ export function WindowBarView({ bar, window }: { bar: WindowBar; window: number 
               className={cn("flex items-center overflow-hidden px-2.5 font-mono text-micro font-semibold whitespace-nowrap", zone.kind === "reply" ? "text-faint" : "text-ink-soft", ZONE[zone.kind])}
               style={{ width: `${zone.to - zone.from}%` }}
             >
-              {WORDS[zone.kind]}
+              {window === null && zone.kind === "reply" ? `reply · ${windowSize(reserve)}` : WORDS[zone.kind]}
             </div>
           ))}
         </div>
@@ -49,7 +49,7 @@ export function WindowBarView({ bar, window }: { bar: WindowBar; window: number 
       <div aria-hidden="true" className="mt-1.5 flex justify-between font-mono text-micro text-faint">
         <span>0</span>
         <span>the chat grows →</span>
-        <span>{windowSize(window)}</span>
+        <span>{window === null ? "the window" : `${estimated ? "≈ " : ""}${windowSize(window)}`}</span>
       </div>
     </div>
   );

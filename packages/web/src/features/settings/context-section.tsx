@@ -3,6 +3,8 @@ import {
   CONTEXT_WORDS,
   contextChart,
   hostedNote,
+  localSize,
+  localWindowLine,
   namesModel,
   parseAmount,
   parsePercent,
@@ -12,6 +14,8 @@ import {
   toPercent,
   windowBar,
   windowSize,
+  NO_LOCAL_WINDOW,
+  type LocalWindow,
 } from "@golem/view";
 import { useMemo, useState, type ReactNode } from "react";
 import { actionErrorText } from "../../store/errors.ts";
@@ -24,19 +28,17 @@ import { WindowBarView } from "./context-bar.tsx";
 import { HEAD, ShareSlider, Stage } from "./context-controls.tsx";
 import { ContextRightNow } from "./context-right-now.tsx";
 import { Saw } from "./context-saw.tsx";
-import { usableModels, windowKind, windowTokens } from "./routing-derive.ts";
+import { usableModels, windowKind } from "./routing-derive.ts";
 import { Box, CARD, FieldError, More, Part, PillChoices, Stepper, type RoutingErrors } from "./routing-parts.tsx";
-import { usePlannedWindow } from "./use-planned-window.ts";
+import { useLocalWindow } from "./use-local-window.ts";
 import { useRoutingSave } from "./use-routing-save.ts";
 
 export type ContextViewProps = {
   values: RoutingGetResult;
   listing: ModelListResult | null;
   errors: RoutingErrors;
-  /** What Auto gives for the local model on this Mac, or null when golem has no plan to name. */
-  windowNote: string | null;
-  /** The planned window of the local model in tokens, or null when golem has no plan to name. */
-  planned?: number | null;
+  /** The window the local model gets, and where it comes from. */
+  window?: LocalWindow;
   /** Saves these keys. The daemon's answer comes back as `errors` and `values`. */
   onChange: (patch: RoutingSetParams) => void;
 };
@@ -70,13 +72,13 @@ function SliderError({ id, message }: { id: string; message: string | undefined 
 /** Window size: Auto, Fixed or Ollama's. Only a model on this Mac reads it. */
 function WindowSize({
   context,
-  windowNote,
+  window,
   errors,
   commit,
   onChange,
 }: {
   context: Context;
-  windowNote: string | null;
+  window: LocalWindow;
   errors: RoutingErrors;
   commit: Commit;
   onChange: (patch: RoutingSetParams) => void;
@@ -118,7 +120,7 @@ function WindowSize({
               <p className="max-w-prose rounded-sm bg-wait-soft px-3 py-2 text-note text-wait">{words.fixedWarning}</p>
             </>
           ) : (
-            <p className="text-note text-muted">{kind === "ollama" ? words.captions.ollama : (windowNote ?? "golem plans the window from the model and this Mac's memory.")}</p>
+            <WindowSource kind={kind} window={window} />
           )}
           <p className="text-note text-muted">{words.chipWins}</p>
         </div>
@@ -126,6 +128,33 @@ function WindowSize({
         <div />
       </div>
     </Part>
+  );
+}
+
+const sentence = (text: string) => `${text.charAt(0).toUpperCase()}${text.slice(1)}`;
+
+/** Under the window choice: the window the model gets, where it comes from, and why golem has no plan. */
+function WindowSource({ kind, window }: { kind: "auto" | "fixed" | "ollama"; window: LocalWindow }) {
+  const line = localWindowLine(window);
+  return (
+    <div className="flex flex-col gap-1 text-note text-muted">
+      {kind === "ollama" ? <p>{CONTEXT_WORDS.window.captions.ollama}</p> : <p>golem plans the window from the model and this Mac's memory.</p>}
+      {line === null ? null : <p className="font-mono">{line}</p>}
+      {window.reason === null || kind !== "auto" ? null : <p>{`${sentence(window.reason)}.`}</p>}
+      {window.tokens === null ? <p>{CONTEXT_WORDS.windowAfterChat}</p> : null}
+    </div>
+  );
+}
+
+/** The line under the bar: this page holds rules, not a live view. `ctx` is set in code. */
+function RulesLine() {
+  const [before = "", code = "", after = ""] = CONTEXT_WORDS.rules.split("`");
+  return (
+    <p className="text-note text-muted">
+      {before}
+      <code className="font-mono text-ink-soft">{code}</code>
+      {after}
+    </p>
   );
 }
 
@@ -142,7 +171,7 @@ function hostedModel(values: RoutingGetResult, listing: ModelListResult | null):
 }
 
 /** Settings › Context: the window size, and where clearing and summarising start. */
-export function ContextView({ values, listing, errors: saved, windowNote, planned = null, onChange }: ContextViewProps) {
+export function ContextView({ values, listing, errors: saved, window = NO_LOCAL_WINDOW, onChange }: ContextViewProps) {
   const { context } = values;
   const words = CONTEXT_WORDS;
   const [typed, setTyped] = useState<Readonly<Record<string, string>>>({});
@@ -150,7 +179,7 @@ export function ContextView({ values, listing, errors: saved, windowNote, planne
   const errors = { ...saved, ...typed };
   const kind = windowKind(context);
   const localName = values.picked.local == null ? null : shortModel(values.picked.local);
-  const localTokens = kind === "ollama" ? null : windowTokens(values, planned);
+  const localTokens = window.tokens;
   const hosted = useMemo(() => hostedModel(values, listing), [values, listing]);
   const onHosted = hosted !== null && (showOn === "hosted" || localName === null);
   const tokens = onHosted ? hosted.tokens : localTokens;
@@ -189,11 +218,11 @@ export function ContextView({ values, listing, errors: saved, windowNote, planne
         input={{
           context,
           mode: values.routing.mode,
-          local: localName === null ? null : { model: localName, tokens: localTokens, kind },
+          local: localName === null ? null : { model: localName, kind, ...window },
           hosted,
         }}
       />
-      <WindowSize context={context} windowNote={windowNote} errors={errors} commit={commit} onChange={onChange} />
+      <WindowSize context={context} window={window} errors={errors} commit={commit} onChange={onChange} />
       <Part title={words.fill.title} tag={<ScopeTag tone="all">{words.fill.scope}</ScopeTag>} line={words.fill.line}>
         <div className={cn(CARD, "flex flex-col gap-4 p-5")}>
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-note text-muted">
@@ -204,7 +233,7 @@ export function ContextView({ values, listing, errors: saved, windowNote, planne
                   legend={words.fill.showOn}
                   path="context.show_on"
                   choices={[
-                    { value: "local", title: `${localName}${localTokens === null ? "" : ` · ${windowSize(localTokens)}`}` },
+                    { value: "local", title: `${localName}${localTokens === null ? "" : ` · ${localSize(localTokens, window.estimated)}`}` },
                     { value: "hosted", title: `${hosted.model} · ${windowSize(hosted.tokens)}` },
                   ]}
                   value={onHosted ? "hosted" : "local"}
@@ -215,11 +244,12 @@ export function ContextView({ values, listing, errors: saved, windowNote, planne
             ) : null}
             {hosted === null ? null : <span className="min-w-60 flex-1">{onHosted ? hostedNote(hosted.provider, hosted.tokens, context) : words.fill.same}</span>}
           </div>
-          {bar === null || tokens === null ? (
+          {bar === null ? (
             <p className="rounded-md border border-line bg-bg p-4 text-sm text-muted">{words.noWindow}</p>
           ) : (
-            <WindowBarView bar={bar} window={tokens} />
+            <WindowBarView bar={bar} window={tokens} reserve={context.reply_reserve} estimated={!onHosted && window.estimated} />
           )}
+          <RulesLine />
           <div className="grid grid-cols-1 gap-6 border-t border-line pt-5 @route:grid-cols-3">
             <Stage when={stages.one} tone="wait">
               <b className="text-sm font-semibold">{words.clear}</b>
@@ -331,7 +361,7 @@ export function ContextSection() {
   const routing = useRouting();
   const listing = useModelList().data ?? null;
   const { errors, failure, save } = useRoutingSave();
-  const { planned, note } = usePlannedWindow(routing.data?.picked.local ?? null);
+  const window = useLocalWindow(routing.data?.picked.local ?? null);
 
   if (routing.isError) {
     return (
@@ -353,7 +383,7 @@ export function ContextSection() {
           {failure}
         </p>
       )}
-      <ContextView values={routing.data} listing={listing} errors={errors} windowNote={note} planned={planned} onChange={(patch) => void save(patch)} />
+      <ContextView values={routing.data} listing={listing} errors={errors} window={window} onChange={(patch) => void save(patch)} />
     </div>
   );
 }
