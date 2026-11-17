@@ -763,7 +763,8 @@ def open_chat(
         tools = registry.scoped(scope)
         plan_first = _plan(config)
         schemas = [] if final else tools.schemas(plan_first=plan_first)
-        history = view(_without_thinking(messages), state.get("context_view"))
+        plain = _portable(_without_thinking(messages), router.kind(profile))
+        history = view(plain, state.get("context_view"))
         async with _held(router, local, profile):
             if learn_window is not None:
                 try:
@@ -793,7 +794,6 @@ def open_chat(
             sent = _outgoing(system, history, final)
             current = state.get("context_view")
             original = current
-            plain = _without_thinking(messages)
             system_chars = 0 if system is None else len(message_text(system))
             tools_chars = (
                 len(json.dumps(schemas, sort_keys=True, separators=(",", ":")))
@@ -1520,6 +1520,32 @@ def _without_thinking(messages: Sequence[BaseMessage]) -> list[BaseMessage]:
         if isinstance(message, AIMessage) and "reasoning_content" in message.additional_kwargs:
             extra = {k: v for k, v in message.additional_kwargs.items() if k != "reasoning_content"}
             message = message.model_copy(update={"additional_kwargs": extra})
+        kept.append(message)
+    return kept
+
+
+_MAKERS = {"google_genai": "google"}
+"""The library's name for a provider, where it differs from golem's kind."""
+
+
+def _portable(messages: Sequence[BaseMessage], kind: str | None) -> list[BaseMessage]:
+    """``messages`` as a model of provider ``kind`` can read them.
+
+    A hosted model may answer with parts only its own provider reads, such as the
+    ``reasoning`` and ``function_call`` parts of OpenAI. Another provider refuses them,
+    so on route ``auto`` the next turn on a local model would fail. A reply written by
+    another provider is sent as its text; its tool calls are kept on the message. A reply
+    with no known writer, and a call with no known ``kind``, stay as they are. The
+    messages in the checkpoint keep their parts.
+    """
+    if kind is None:
+        return list(messages)
+    kept: list[BaseMessage] = []
+    for message in messages:
+        if isinstance(message, AIMessage) and not isinstance(message.content, str):
+            maker = message.response_metadata.get("model_provider")
+            if isinstance(maker, str) and _MAKERS.get(maker, maker) != kind:
+                message = message.model_copy(update={"content": message_text(message)})
         kept.append(message)
     return kept
 

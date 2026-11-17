@@ -261,6 +261,15 @@ class ModelRouter:
             profile=active, provider=resolved.provider_name, name=resolved.model_id
         )
 
+    def kind(self, profile: str) -> str | None:
+        """The provider kind ``profile`` runs on, or None for a test double or an unknown name."""
+        if self._model is not None:
+            return None
+        try:
+            return self.resolve(profile).provider.kind
+        except ModelConfigError:
+            return None
+
     def ensure_local(self, profile: str) -> None:
         """Raise a ``local_only`` :class:`ModelConfigError` when ``profile`` is a hosted model.
 
