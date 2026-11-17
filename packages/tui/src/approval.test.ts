@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import { APPROVAL_ROWS, approvalLines, approvalRows } from "./approval.ts";
-import type { PendingApproval } from "@golem/view";
+import type { ChatEvent } from "@golem/client";
+import { emptyChat, reduceChat, type PendingApproval } from "@golem/view";
 
 const DIFF = "--- a/a.py\n+++ b/a.py\n@@ -1,2 +1,2 @@\n one\n-two\n+TWO\n";
 
@@ -49,4 +50,18 @@ test("a long diff gets at most half the screen and scrolls by offset", () => {
   );
   assert.ok(lines.at(-1)?.text.endsWith("↑↓ scroll"));
   assert.ok(lines.at(-2)?.text.endsWith("diff 6 lines"));
+});
+
+test("attaching to a waiting headless session replays into the approval band", () => {
+  const base = { session_id: "s_h", run_id: "r1", ts: "2026-11-17T08:00:00Z" } as const;
+  const replay = [
+    { ...base, seq: 1, type: "run.started", data: {} },
+    { ...base, seq: 2, type: "message.started", data: { message_id: "m1", role: "assistant" } },
+    { ...base, seq: 3, type: "message.completed", data: { message_id: "m1", role: "assistant", text: "" } },
+    { ...base, seq: 4, type: "tool.requested", data: { call_id: "c1", message_id: "m1", name: "edit_file", args: { path: "a.py" } } },
+    { ...base, seq: 5, type: "approval.needed", data: { call_id: "c1", name: "edit_file", args: { path: "a.py" }, source: "built-in default", subject: "a.py" } },
+  ] as unknown as ChatEvent[];
+  const state = replay.reduce(reduceChat, emptyChat);
+  assert.ok(state.approval !== null);
+  assert.equal(approvalLines(state.approval, 80)[0]?.text, "Allow edit_file a.py?");
 });

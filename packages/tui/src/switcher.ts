@@ -1,4 +1,5 @@
 import type { SessionSummary } from "@golem/client";
+import { isRoutineSession, isWaiting } from "@golem/view";
 
 /** The selection is a session id, so it stays put while live summaries reorder the list. */
 export type SwitcherState = {
@@ -37,6 +38,8 @@ export type SwitcherRow = {
   running: boolean;
   /** A run waits for a tool approval. */
   waiting: boolean;
+  /** A routine started the session. */
+  routine: boolean;
   title: string;
   age: string;
 };
@@ -154,8 +157,9 @@ export function layoutSwitcher(input: {
       selected: start + offset === index,
       current: summary.session_id === input.current,
       running: summary.status === "running",
-      waiting: summary.status === "waiting",
-      title: fit(summary.title ?? UNTITLED, input.columns - ROW_CHROME - age.length),
+      waiting: isWaiting(summary),
+      routine: isRoutineSession(summary),
+      title: fit(summary.title ?? UNTITLED, input.columns - ROW_CHROME - age.length - (isRoutineSession(summary) ? 2 : 0)),
       age,
     };
   });
