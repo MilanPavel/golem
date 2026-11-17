@@ -1,6 +1,6 @@
 ---
 title: Routines
-description: Run a prompt on a schedule, and list, run, pause, resume, and edit those routines from a shell.
+description: Run a prompt on a schedule or when a file arrives, and list, run, pause, resume, and edit those routines from a shell.
 ---
 
 # Routines
@@ -25,6 +25,27 @@ A schedule is a cron line (`30 8 * * 1-5`) or one of these:
 | `weekly mon 06:00` | every Monday at 06:00 |
 
 Times are the Mac's local time. A routine that is due while the Mac sleeps follows its `missed` key: `skip` (the default) or `run_once`.
+
+## When a file arrives
+
+Instead of `schedule`, a routine can watch a folder with `on`:
+
+```toml
+[[routine]]
+name = "receipts"
+on = { watch = "~/Downloads", glob = "*.pdf" }
+prompt = "/receipt-to-csv {path}"
+```
+
+Drop a PDF in `~/Downloads` and one session starts for it.
+
+- A file fires when it is **new**, matches `glob` (matched on the file name, ignoring case; `*` if you leave it out), and has stayed **unchanged for 2 seconds**, so a download or a slow copy fires once, when it is done. A file moved in counts as new.
+- Folders, dotfiles, and files ending in `.crdownload`, `.download` or `.part` are ignored.
+- Files already in the folder when golem starts watching are ignored, and a restart does not fire old files again. Each file fires once.
+- `{path}` (absolute), `{name}` and `{dir}` in the prompt are filled in. When the prompt is a `/skill` with arguments they are quoted for the shell, so a name with spaces stays one word.
+- The session may read from the watched folder, and nothing else changes: the routine's folder, trust and tools apply as for a scheduled firing. The routine's origin is `routine:<name>`.
+- A routine starts one file at a time. A file that settles while the previous run is still going waits, and fires when that run ends.
+- If the folder is missing or cannot be read, the routine shows in the `issues` of `routine.list` and the log says why. It starts working when the folder does.
 
 ## From a shell
 

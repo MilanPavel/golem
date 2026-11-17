@@ -44,6 +44,7 @@ from golem.notify import Notifier, NotifierKinds, Poster, SessionFacts, default_
 from golem.paths import GolemPaths, resolve_paths
 from golem.permissions.policy import Policy
 from golem.routine_scheduler import RoutineScheduler
+from golem.routine_watcher import FileWatcher
 from golem.secrets import KeychainSecrets, SecretStore
 from golem.server.connection import ClientConnection
 from golem.server.dispatcher import (
@@ -351,6 +352,8 @@ class DaemonApp:
                 )
                 bus.observe(routines.on_event)
                 self.state.routines = routines
+                watcher = FileWatcher(routines)
+                self.state.watcher = watcher
 
                 async def enable_mcp(session_id: str, scope: ToolScope, name: str) -> list[str]:
                     return await turn_on_for_model(sessions, mcp, session_id, scope, name)
@@ -408,6 +411,7 @@ class DaemonApp:
                     mcp.start()
                     self.state.skills.start()
                     routines.start()
+                    watcher.start()
                     idle = asyncio.create_task(_stop_idle(local), name="golem-ollama-idle")
                     watch = asyncio.create_task(self._watch_socket(), name="golem-socket-watch")
                     await self._stop.wait()
@@ -451,6 +455,7 @@ class DaemonApp:
             self.state.usage = None
             self.state.notifier = None
             self.state.routines = None
+            self.state.watcher = None
             self.state.routine_runs = None
             self.state.sessions = None
             self._lock.release()
@@ -544,6 +549,8 @@ class DaemonApp:
         self._draining = True
         if self._server is not None:
             self._server.close()
+        if self.state.watcher is not None:
+            await self.state.watcher.aclose()
         if self.state.routines is not None:
             await self.state.routines.aclose()
         if self.state.sessions is not None:

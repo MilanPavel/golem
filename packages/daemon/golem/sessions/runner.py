@@ -158,6 +158,8 @@ class Turn:
     """The run may move to a stronger model once (route ``auto``)."""
     replaces: str | None = None
     """The model whose answer the user asked to try again on a stronger one."""
+    read_folders: tuple[str, ...] = ()
+    """Folders the read tools may read from this turn on (a watch firing's folder)."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -323,6 +325,7 @@ async def run_turn(
             growth=turn.growth,
             step_up=turn.step_up,
             skill_folder=None if skill is None else str(skill.path),
+            read_folders=turn.read_folders,
         )
         return await _finish(stream, progress, emit)
     except asyncio.CancelledError:

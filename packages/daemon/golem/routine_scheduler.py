@@ -20,7 +20,7 @@ import asyncio
 import logging
 import tomllib
 from collections.abc import Awaitable, Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta, tzinfo
 from pathlib import Path
 from typing import Literal, Protocol, cast
@@ -28,10 +28,11 @@ from typing import Literal, Protocol, cast
 from pydantic import BaseModel
 
 from golem.config import RoutineSettings
-from golem.routine_files import read_project_routines, read_routines
+from golem.routine_files import project_config, read_project_routines, read_routines
+from golem.routine_watcher import fill_prompt
 from golem.routines import ScheduleError, local_zone, next_after
 from golem.sessions.summaries import cut_summary
-from golem.store.routine_runs import RoutineRunRecord, RoutineRuns
+from golem.store.routine_runs import RoutineRunRecord, RoutineRuns, WatchedFile
 from golem_protocol.commands import RoutineFinished, RoutineFired
 from golem_protocol.events import ChatEvent, SessionCompletedEvent
 from golem_protocol.rpc import RoutineFinishedNotification, RoutineFiredNotification
@@ -101,8 +102,13 @@ class Launcher(Protocol):
         """Make the routine's session (origin, folder, model, MCP servers). Returns its id."""
         ...
 
-    async def send(self, routine: Planned, session_id: str) -> None:
-        """Send the routine's prompt, or its ``/skill``, the way the composer does."""
+    async def send(
+        self, routine: Planned, session_id: str, read_folders: tuple[str, ...] = ()
+    ) -> None:
+        """Send the routine's prompt, or its ``/skill``, the way the composer does.
+
+        ``read_folders`` are folders the session may read from (a watched folder).
+        """
         ...
 
 
@@ -230,6 +236,42 @@ class RoutineScheduler:
             raise RoutineBlockedError(f"{folder} is not in trusted_projects")
         raise RoutineNotFoundError(name)
 
+    async def watched(self) -> list[Planned]:
+        """The enabled routines with an ``on`` trigger, of the user's file and trusted projects."""
+        found = await asyncio.to_thread(self._load)
+        return [r for r in found if r.settings.enabled and r.settings.on is not None]
+
+    def config_file(self, routine: Planned) -> Path:
+        """The file a routine is written in."""
+        return self._user_file if routine.folder is None else project_config(routine.folder)
+
+    async def fire_watch(self, routine: Planned, path: Path, size: int, mtime_ns: int) -> bool:
+        """Fire a ``watch`` routine for one settled file (4.3.1).
+
+        ``{path}``, ``{name}`` and ``{dir}`` are filled into the prompt, and the file's folder
+        is a read root of the new session. Returns False when the firing must wait (the
+        routine's previous run is still going, or the folder is not trusted): the watcher
+        offers the file again later. True means the file is taken, fired now or fired before.
+        """
+        file = WatchedFile(str(path), size, mtime_ns)
+        async with self._lock:
+            if await self._runs.has_fired_for(routine.name, routine.scope, file):
+                return True
+            if await self._runs.active(routine.name, routine.scope) is not None:
+                return False
+            if routine.folder is not None and routine.folder not in trusted_folders(
+                self._user_file
+            ):
+                return False
+            filled = replace(
+                routine,
+                settings=routine.settings.model_copy(
+                    update={"prompt": fill_prompt(routine.settings.prompt, path)}
+                ),
+            )
+            await self._fire(filled, "watch", None, watched=file, read_folders=(str(path.parent),))
+            return True
+
     async def reconcile(self) -> None:
         """End the firings a stopped daemon left open, when their session has finished."""
         for row in await self._runs.open_runs():
@@ -332,7 +374,14 @@ class RoutineScheduler:
             await self._skipped(routine, "schedule", due, "missed")
 
     async def _fire(
-        self, routine: Planned, trigger: Trigger, due: datetime | None, *, manual: bool = False
+        self,
+        routine: Planned,
+        trigger: Trigger,
+        due: datetime | None,
+        *,
+        manual: bool = False,
+        watched: WatchedFile | None = None,
+        read_folders: tuple[str, ...] = (),
     ) -> tuple[str, str] | None:
         """Start a run. Returns the row and session ids, or None when the firing was skipped."""
         if await self._runs.active(routine.name, routine.scope) is not None:
@@ -347,7 +396,7 @@ class RoutineScheduler:
             return None
         at = self._now()
         run_id = await self._runs.start(
-            routine.name, routine.scope, trigger, _stamp(due), _stamp(at) or ""
+            routine.name, routine.scope, trigger, _stamp(due), _stamp(at) or "", watched
         )
         try:
             session_id = await self._launcher.create(routine)
@@ -376,7 +425,10 @@ class RoutineScheduler:
             )
         )
         try:
-            await self._launcher.send(routine, session_id)
+            if read_folders:
+                await self._launcher.send(routine, session_id, read_folders)
+            else:
+                await self._launcher.send(routine, session_id)
         except Exception as exc:
             await self._failed(run_id, routine, exc)
         return run_id, session_id

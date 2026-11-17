@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from golem.sessions.ids import new_id
 from golem.store.database import Database, Params
 
-__all__ = ["RoutineRunRecord", "RoutineRuns"]
+__all__ = ["RoutineRunRecord", "RoutineRuns", "WatchedFile"]
 
 _COLUMNS = (
     "r.routine_run_id, r.routine, r.scope, r.session_id, r.trigger, r.due_at, r.started_at,"
@@ -22,6 +22,15 @@ _COLUMNS = (
     "SELECT 1 FROM runs WHERE runs.session_id = r.session_id AND runs.status = 'waiting')"
     " THEN 'waiting' ELSE r.status END AS status"
 )
+
+
+@dataclass(frozen=True, slots=True)
+class WatchedFile:
+    """A file a ``watch`` firing is for: its absolute path, size and mtime (ns) when it fired."""
+
+    path: str | None
+    size: int | None
+    mtime_ns: int | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -64,17 +73,37 @@ class RoutineRuns:
             return await tx.execute(sql, params)
 
     async def start(
-        self, routine: str, scope: str, trigger: str, due_at: str | None, at: str
+        self,
+        routine: str,
+        scope: str,
+        trigger: str,
+        due_at: str | None,
+        at: str,
+        watched: WatchedFile | None = None,
     ) -> str:
-        """Write a ``running`` row before its session exists. Returns its id."""
+        """Write a ``running`` row before its session exists. Returns its id.
+
+        ``watched`` is the file a ``watch`` firing is for.
+        """
         run_id = new_id("rr")
+        file = watched or WatchedFile(None, None, None)
         await self._write(
             "INSERT INTO routine_runs"
-            " (routine_run_id, routine, scope, trigger, due_at, started_at, status)"
-            " VALUES (?, ?, ?, ?, ?, ?, 'running')",
-            (run_id, routine, scope, trigger, due_at, at),
+            " (routine_run_id, routine, scope, trigger, due_at, started_at, status,"
+            " watch_path, watch_size, watch_mtime_ns)"
+            " VALUES (?, ?, ?, ?, ?, ?, 'running', ?, ?, ?)",
+            (run_id, routine, scope, trigger, due_at, at, file.path, file.size, file.mtime_ns),
         )
         return run_id
+
+    async def has_fired_for(self, routine: str, scope: str, file: WatchedFile) -> bool:
+        """Whether a ``watch`` firing of this routine already took this file as it is now."""
+        row = await self._database.fetch_one(
+            "SELECT 1 FROM routine_runs WHERE routine = ? AND scope = ? AND trigger = 'watch'"
+            " AND watch_path = ? AND watch_size = ? AND watch_mtime_ns = ? LIMIT 1",
+            (routine, scope, file.path, file.size, file.mtime_ns),
+        )
+        return row is not None
 
     async def skip(
         self, routine: str, scope: str, trigger: str, due_at: str | None, at: str, reason: str

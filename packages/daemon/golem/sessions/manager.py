@@ -979,6 +979,7 @@ class SessionManager:
         cwd: str | None = None,
         skill: SkillCall | None = None,
         stronger: bool = False,
+        read_folders: tuple[str, ...] = (),
     ) -> str:
         """Start one graph run. Returns ``run_id`` before the model finishes.
 
@@ -986,6 +987,9 @@ class SessionManager:
         session without a folder takes ``cwd`` first, with ``session.updated``.
         With ``skill``, the model gets that skill's filled-in body instead of
         ``text``, and ``text`` is kept as what the user typed.
+
+        ``read_folders`` are folders the read tools may read from, for this session
+        (a watched folder of a routine firing).
 
         With ``stronger``, this one turn runs on the tier above the model that wrote the
         last answer: only on route ``auto``, and the session's model and route stay.
@@ -1044,6 +1048,7 @@ class SessionManager:
                 typed=None if invocation is None else text,
                 growth=growth,
                 local_only=local_only,
+                read_folders=read_folders,
             )
             if routed.ask is not None:
                 await ask_consent(self._runtime, self._events, turn, routed.ask)
@@ -1065,6 +1070,7 @@ class SessionManager:
         begun: bool = False,
         growth: Growth | None = None,
         local_only: bool = False,
+        read_folders: tuple[str, ...] = (),
     ) -> Turn:
         return Turn(
             session_id=session.session_id,
@@ -1092,6 +1098,7 @@ class SessionManager:
             growth=growth,
             step_up=session.route == "auto",
             replaces=routed.replaces,
+            read_folders=read_folders,
         )
 
     async def answer_consent(self, session_id: str, run_id: str, answer: ConsentAnswer) -> str:
