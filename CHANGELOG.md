@@ -2,6 +2,86 @@
 
 What changed in each release of golem, newest first. `just release` writes each section from the commit messages on `main` ([CONTRIBUTING.md](CONTRIBUTING.md)), and the release pull request is the place to edit it. The GitHub release shows the same section. How a release is made is in [docs/sre.md](docs/sre.md), section 5.
 
+## [0.16.0] - 2026-11-17
+
+### Features
+
+- **tui:** a finished turn ends in a row of its changes, and the status line shows Δ files ([#1053](https://github.com/MilanPavel/golem/pull/1053))
+- **tui:** /undo takes back the last turn, and /changes undoes a hunk or file ([#1054](https://github.com/MilanPavel/golem/pull/1054))
+- **web:** review notes on diff lines in the Changes tab ([#1055](https://github.com/MilanPavel/golem/pull/1055))
+- **tools:** edit_file forgives spacing and indentation, and a miss quotes the closest lines ([#1056](https://github.com/MilanPavel/golem/pull/1056))
+- **sessions:** the model is told when its changes were undone ([#1062](https://github.com/MilanPavel/golem/pull/1062))
+- **web:** Commit… in the Changes tab and g in /changes commit the session's files ([#1058](https://github.com/MilanPavel/golem/pull/1058))
+- **web:** the chat, the meter and the trace show when golem changes the context ([#1063](https://github.com/MilanPavel/golem/pull/1063))
+- checks show under the turn, in a Checks tab, and as a question before they run ([#1057](https://github.com/MilanPavel/golem/pull/1057))
+- **tools:** delegate hands a reading job to an explorer with an empty context ([#1066](https://github.com/MilanPavel/golem/pull/1066))
+- **web:** the Changes tab groups changes by turn ([#1059](https://github.com/MilanPavel/golem/pull/1059))
+- **web:** Plan first on screen, with a switch and a plan card ([#1060](https://github.com/MilanPavel/golem/pull/1060))
+- **models:** auto asks before a turn uses a paid model ([#1065](https://github.com/MilanPavel/golem/pull/1065))
+- **models:** auto asks before a turn uses a paid model ([#1065](https://github.com/MilanPavel/golem/pull/1065))
+- **web:** the Files tab reads any file of the project ([#1061](https://github.com/MilanPavel/golem/pull/1061))
+- **sessions:** a local model's window can grow between turns ([#1064](https://github.com/MilanPavel/golem/pull/1064))
+- **web:** settings has a Routing section for routing, budget and context ([#1068](https://github.com/MilanPavel/golem/pull/1068))
+- **web:** the route chip, /route, and why golem picked this model ([#1069](https://github.com/MilanPavel/golem/pull/1069))
+- **web:** the ctx chip and /context offer clear, summarise, grow and a larger model ([#1082](https://github.com/MilanPavel/golem/pull/1082))
+- **models:** a run on auto steps up to a stronger model when it struggles ([#1081](https://github.com/MilanPavel/golem/pull/1081))
+- **web:** Settings › Routing shows the path of a turn and says what the settings mean ([#1087](https://github.com/MilanPavel/golem/pull/1087))
+- **web:** undo a hunk, a file or a turn in the browser, and redo it ([#1086](https://github.com/MilanPavel/golem/pull/1086))
+- **tui:** review notes in /changes go out with the next message ([#1084](https://github.com/MilanPavel/golem/pull/1084))
+- **cli:** golem coding bench measures how often a model's edits apply ([#1085](https://github.com/MilanPavel/golem/pull/1085))
+- **models:** a run on auto falls back to another model when a provider fails ([#1088](https://github.com/MilanPavel/golem/pull/1088))
+- **web:** the resize handle works on either edge; sidebar width and open stores ([#1113](https://github.com/MilanPavel/golem/pull/1113))
+- **web:** inboxItems lists what the sessions wait for, with its words ([#1112](https://github.com/MilanPavel/golem/pull/1112))
+- **daemon:** a session summary says what the session waits for ([#1116](https://github.com/MilanPavel/golem/pull/1116))
+- **web:** sessions can be grouped by time, in one place for the web and the terminal ([#1114](https://github.com/MilanPavel/golem/pull/1114))
+- **web:** the icon rail is a component with tooltips, dots and the golem's version ([#1115](https://github.com/MilanPavel/golem/pull/1115))
+- **web:** the Inbox panel shows what waits and answers it through the store ([#1117](https://github.com/MilanPavel/golem/pull/1117))
+- **web:** the rail and the panel replace the sidebar ([#1125](https://github.com/MilanPavel/golem/pull/1125))
+- **daemon:** a model with a small window is told when to use a helper ([#1120](https://github.com/MilanPavel/golem/pull/1120))
+- **daemon:** a helper has limits you can set, and its cost shows by job ([#1123](https://github.com/MilanPavel/golem/pull/1123))
+- **models:** a struggling run on auto asks before it moves to a paid model ([#1121](https://github.com/MilanPavel/golem/pull/1121))
+- **cli:** golem eval routing says what recorded sessions would have cost on another route ([#1126](https://github.com/MilanPavel/golem/pull/1126))
+- **web:** the Inbox is mounted in the rail, with a count and a waiting chip ([#1133](https://github.com/MilanPavel/golem/pull/1133))
+- **web:** the Sessions panel groups by time, with a filter and a fixed time and menu slot ([#1135](https://github.com/MilanPavel/golem/pull/1135))
+- **models:** a scoreboard from real use, and the pick skips a local model whose tool calls fail ([#1127](https://github.com/MilanPavel/golem/pull/1127))
+- **web:** the side panel floats under 1100 px and the rail hides behind a menu under 760 px ([#1136](https://github.com/MilanPavel/golem/pull/1136))
+- **web:** a helper shows as one line in the chat and as a nested run in the trace ([#1128](https://github.com/MilanPavel/golem/pull/1128))
+- **models:** the last answer can be tried again on a stronger model ([#1134](https://github.com/MilanPavel/golem/pull/1134))
+- **models:** golem models check asks a model ten tool tasks and says how reliable it is ([#1138](https://github.com/MilanPavel/golem/pull/1138))
+- **web:** the Sessions list shows in a flyout when the panel is hidden ([#1144](https://github.com/MilanPavel/golem/pull/1144))
+- **tui:** the session switcher marks routine sessions and the ones waiting for you ([#1159](https://github.com/MilanPavel/golem/pull/1159))
+- **daemon:** routines fire on schedule as headless sessions, and routine_runs records each firing ([#1160](https://github.com/MilanPavel/golem/pull/1160))
+- **web:** the words and the window bar of Settings › Context ([#1162](https://github.com/MilanPavel/golem/pull/1162))
+- **cli:** golem routines lists, runs, pauses and edits routines from a shell ([#1164](https://github.com/MilanPavel/golem/pull/1164))
+- **cli:** golem open --notified picks the web page or the terminal from settings ([#778](https://github.com/MilanPavel/golem/pull/778)) ([#1163](https://github.com/MilanPavel/golem/pull/1163))
+- **web:** Settings › Context, and Routing links to it ([#1166](https://github.com/MilanPavel/golem/pull/1166))
+- **web:** Settings › Notifications and the [notifications] keys with routine overrides ([#1167](https://github.com/MilanPavel/golem/pull/1167))
+- **web:** a Routines panel lists routines, and each one's page shows its runs ([#1165](https://github.com/MilanPavel/golem/pull/1165))
+- **daemon:** a routine with on = {watch, glob} fires once per new, settled file ([#1170](https://github.com/MilanPavel/golem/pull/1170))
+- **web:** Settings › Context lists the window each local model gets ([#1172](https://github.com/MilanPavel/golem/pull/1172))
+- **web:** make and edit a routine in the web page, with a schedule builder ([#786](https://github.com/MilanPavel/golem/pull/786)) ([#1171](https://github.com/MilanPavel/golem/pull/1171))
+
+### Fixes
+
+- **web:** the top bar and the panel headers have one height ([#1078](https://github.com/MilanPavel/golem/pull/1078))
+- **web:** several changes can be expanded at once in the Changes tab ([#1077](https://github.com/MilanPavel/golem/pull/1077))
+- **web:** the Files tab hides dot files unless a checkbox is on ([#1080](https://github.com/MilanPavel/golem/pull/1080))
+- **daemon:** shell changes are recorded in a folder without git ([#1079](https://github.com/MilanPavel/golem/pull/1079))
+- **tools:** file tools refuse credential folders inside the session folder ([#1076](https://github.com/MilanPavel/golem/pull/1076))
+- **sessions:** a cleared tool result no longer reads as a cut prompt, proven by a 200-turn check ([#1122](https://github.com/MilanPavel/golem/pull/1122))
+- **daemon:** a tool call written as JSON text is read, or counts as a struggle ([#1124](https://github.com/MilanPavel/golem/pull/1124))
+- **daemon:** a tool call after a sentence, or wrapped in its own arguments, is read ([#1132](https://github.com/MilanPavel/golem/pull/1132))
+- **models:** on auto a turn starts on the ladder's model, and the model chip shows it ([#1147](https://github.com/MilanPavel/golem/pull/1147))
+- **web:** Settings › Routing scrolls in its pane, and Frontier offers its ready models ([#1149](https://github.com/MilanPavel/golem/pull/1149))
+- **daemon:** a switch to another provider no longer breaks the next turn ([#1151](https://github.com/MilanPavel/golem/pull/1151))
+- **web:** the route popover shows the ladder only on auto ([#1153](https://github.com/MilanPavel/golem/pull/1153))
+- **web:** Settings › Context shows the window a model really gets ([#1168](https://github.com/MilanPavel/golem/pull/1168))
+
+### Docs
+
+- **web:** design page describes the sidebar as a rail and a panel ([#1111](https://github.com/MilanPavel/golem/pull/1111))
+- **web:** the context settings move to Settings › Context ([#1161](https://github.com/MilanPavel/golem/pull/1161))
+
 ## [0.15.0] - 2026-11-16
 
 ### Features
