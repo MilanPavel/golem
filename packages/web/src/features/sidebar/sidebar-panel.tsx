@@ -52,3 +52,17 @@ export function SidebarPanel({ title, label = title, chip, action, onHide, handl
     </aside>
   );
 }
+
+/** "2 waiting" in the Sessions header. It opens the Inbox. */
+export function WaitingChip({ count, onOpen }: { count: number; onOpen: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      className="inline-flex items-center gap-1 rounded-sm border border-line px-1.5 py-0.5 text-xs text-muted outline-offset-2 outline-clay hover:bg-line hover:text-ink focus-visible:outline-2"
+    >
+      <span aria-hidden className="size-1.5 rounded-xs bg-wait" />
+      {count} waiting
+    </button>
+  );
+}
