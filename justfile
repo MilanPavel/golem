@@ -156,9 +156,10 @@ demo-tui:
 demo-web:
     sh scripts/demo/web.sh
 
-# Run the golem CLI (--version, status, daemon install|start|stop|logs).
+# Run the golem CLI (--version, status, daemon install|start|stop|logs). Quoted arguments stay one argument.
+[positional-arguments]
 golem *args:
-    pnpm exec golem {{args}}
+    pnpm exec golem "$@"
 
 # Open the TUI in the folder just was run from, so its session works there.
 [no-cd]
