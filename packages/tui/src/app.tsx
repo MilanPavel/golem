@@ -12,6 +12,7 @@ import {
   type ApprovalChoice,
   type ChangesRevertTarget,
   type ConfigGetResult,
+  type ConfigRouting,
   type ConnectionState,
   type GolemClient,
   type ListedModel,
@@ -177,6 +178,8 @@ import {
   ladderRows,
   routeReportLines,
   routeStatus,
+  shownModel,
+  shownModelText,
   canTryStronger,
   lastQuestion,
   NO_STRONGER_NOTICE,
@@ -602,6 +605,7 @@ export function App({
   const [chipTune, setChipTune] = useState<TuneState | null>(null);
   /** `[permissions] mode` from config.toml, which a session without a mode of its own follows. */
   const [defaultMode, setDefaultMode] = useState<PermissionMode>("balanced");
+  const [ladderConfig, setLadderConfig] = useState<ConfigRouting | null>(null);
   const chipTuneRef = useRef(chipTune);
   chipTuneRef.current = chipTune;
   /** Changes sent and not yet answered. Live updates wait for them, or they would undo the newest key. */
@@ -765,7 +769,19 @@ export function App({
   // Something wrong wins over the greeting.
   const model = preferModel(sessionModel, daemonModel);
   // Before any model is chosen the session's name is only a placeholder.
-  const chip = listing?.default === null && model.provider === null ? "no model" : modelChip(model.name, model.profile);
+  const ownChip = listing?.default === null && model.provider === null ? "no model" : modelChip(model.name, model.profile);
+  // On auto golem picks the model: the chip says which one the next turn starts on.
+  const picked =
+    chat.route.mode !== "auto"
+      ? null
+      : shownModel({
+          mode: "auto",
+          session: sessionModelOf(model, listing?.models),
+          last: chat.route.last,
+          models: listing?.models,
+          routing: ladderConfig,
+        });
+  const chip = picked !== null && picked.pick ? shownModelText(picked) : ownChip;
   const answering = assistantChars(chat.messages) > 0;
   const warming = warmingLine({
     busy: chat.busy,
@@ -1011,6 +1027,7 @@ export function App({
       (config: ConfigGetResult) => {
         if (live) {
           setDefaultMode(effectiveMode(null, config.default_permission_mode));
+          setLadderConfig(config.routing ?? null);
         }
       },
       () => undefined,
@@ -3482,10 +3499,12 @@ export function App({
         setPicker(closedPicker);
         refreshBand();
         const label = result?.model_name ?? name;
+        // The daemon pins an auto chat to a model chosen by hand.
+        const pinned = current !== null && chatRef.current.route.mode === "auto";
         setChat((state) => ({
           ...state,
           error: null,
-          notice: notice ?? (setDefault ? `${label} for this session and new ones` : `${label} from the next message`),
+          notice: notice ?? (pinned ? `pinned to ${label}` : setDefault ? `${label} for this session and new ones` : `${label} from the next message`),
         }));
       })
       .catch((error: unknown) => {

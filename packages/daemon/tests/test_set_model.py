@@ -12,7 +12,7 @@ from fakes import ScriptedChatModel
 from langchain_core.language_models import BaseChatModel
 from test_server import HELLO, RpcClient, error_code, rpc_result, start_daemon, stop_daemon
 
-from golem.config import GolemSettings, ModelSettings, load_settings
+from golem.config import GolemSettings, ModelSettings, RoutingSettings, load_settings
 from golem.config_edit import set_default_model
 from golem.models.router import ModelConfigError, ModelRouter
 from golem.server.dispatcher import MODEL_NOT_CONFIGURED, SESSION_NOT_FOUND
@@ -181,6 +181,99 @@ async def test_choosing_the_current_model_stores_nothing(short_home: Path) -> No
             await client.call("session.set_model", {"session_id": session_id, "model": "local"})
         )
         assert "model.selected" not in [_type(e) for e in client.events]
+    finally:
+        await client.close()
+        await stop_daemon(app, task)
+
+
+async def _route_of(client: RpcClient) -> object:
+    listed = rpc_result(await client.call("session.list", {}))
+    return cast(list[dict[str, object]], listed["sessions"])[0]["route"]
+
+
+async def test_choosing_a_model_on_auto_pins_the_chat(short_home: Path) -> None:
+    models: dict[str, BaseChatModel] = {
+        "ollama/qwen3:8b": ScriptedChatModel(replies=[]),
+        "anthropic/claude-test": ScriptedChatModel(replies=[]),
+    }
+    app, task = await start_daemon(short_home, router=_TwoModels(SETTINGS, models))
+    client = await RpcClient.connect(app.paths.socket_path)
+    try:
+        await client.call("hello", HELLO)
+        session_id = await _open(client)
+        rpc_result(
+            await client.call("session.set_route", {"session_id": session_id, "mode": "auto"})
+        )
+        rpc_result(
+            await client.call("session.set_model", {"session_id": session_id, "model": "remote"})
+        )
+        assert await _route_of(client) == "pinned"
+        await client.wait_for_event("model.selected")
+    finally:
+        await client.close()
+        await stop_daemon(app, task)
+
+
+async def test_choosing_the_same_model_on_auto_pins_the_chat(short_home: Path) -> None:
+    router = _TwoModels(SETTINGS, {"ollama/qwen3:8b": ScriptedChatModel(replies=[])})
+    app, task = await start_daemon(short_home, router=router)
+    client = await RpcClient.connect(app.paths.socket_path)
+    try:
+        await client.call("hello", HELLO)
+        session_id = await _open(client)
+        rpc_result(
+            await client.call("session.set_route", {"session_id": session_id, "mode": "auto"})
+        )
+        rpc_result(
+            await client.call("session.set_model", {"session_id": session_id, "model": "local"})
+        )
+        assert await _route_of(client) == "pinned"
+        assert "model.selected" not in [_type(e) for e in client.events]
+    finally:
+        await client.close()
+        await stop_daemon(app, task)
+
+
+async def test_choosing_a_model_on_local_keeps_the_route(short_home: Path) -> None:
+    models: dict[str, BaseChatModel] = {
+        "ollama/qwen3:8b": ScriptedChatModel(replies=[]),
+        "anthropic/claude-test": ScriptedChatModel(replies=[]),
+    }
+    app, task = await start_daemon(short_home, router=_TwoModels(SETTINGS, models))
+    client = await RpcClient.connect(app.paths.socket_path)
+    try:
+        await client.call("hello", HELLO)
+        session_id = await _open(client)
+        rpc_result(
+            await client.call("session.set_route", {"session_id": session_id, "mode": "local"})
+        )
+        rpc_result(
+            await client.call("session.set_model", {"session_id": session_id, "model": "remote"})
+        )
+        assert await _route_of(client) == "local"
+    finally:
+        await client.close()
+        await stop_daemon(app, task)
+
+
+async def test_a_model_chosen_for_a_new_chat_on_auto_starts_it_pinned(short_home: Path) -> None:
+    settings = SETTINGS.model_copy(update={"routing": RoutingSettings(mode="auto")})
+    models: dict[str, BaseChatModel] = {
+        "ollama/qwen3:8b": ScriptedChatModel(replies=[]),
+        "anthropic/claude-test": ScriptedChatModel(replies=[]),
+    }
+    app, task = await start_daemon(short_home, router=_TwoModels(settings, models))
+    client = await RpcClient.connect(app.paths.socket_path)
+    try:
+        await client.call("hello", HELLO)
+        rpc_result(await client.call("session.create", {}))
+        rpc_result(await client.call("session.create", {"model_profile": "remote"}))
+        listed = rpc_result(await client.call("session.list", {}))
+        routes = {
+            row["model_profile"]: row["route"]
+            for row in cast(list[dict[str, str]], listed["sessions"])
+        }
+        assert routes == {"local": "auto", "remote": "pinned"}
     finally:
         await client.close()
         await stop_daemon(app, task)

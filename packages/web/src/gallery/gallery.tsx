@@ -36,7 +36,7 @@ import { Composer, ContextBannerView, ContextChipView, DockView, Meter, ModeChip
 import { PlanCardView } from "../features/chat/plan-card.tsx";
 import { createHistory } from "../features/composer/history.ts";
 import { CommandsDialog } from "../features/composer/help-dialog.tsx";
-import { HomeView, NewSessionModelChipView, SessionTitle } from "../features/shell/index.ts";
+import { HomeView, ModelChipView, NewSessionModelChipView, SessionTitle } from "../features/shell/index.ts";
 import { FolderBrowserView } from "../features/shell/folder-browser.tsx";
 import { CommandPaletteView, KeysDialog } from "../features/palette/index.ts";
 import { ModelDialogView, ModelList, withActivePulls, type ModelDialogViewProps, type ModelListNote } from "../features/models/index.ts";
@@ -1653,6 +1653,7 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
         <div className="mt-2 flex flex-wrap gap-2 rounded-lg border border-line bg-bg p-4">
           <NewSessionModelChipView label={{ kind: "default", text: "Gemma 4 E4B" }} onOpen={() => {}} />
           <NewSessionModelChipView label={{ kind: "pick", text: "Qwen3 8B" }} onOpen={() => {}} />
+          <NewSessionModelChipView label={{ kind: "auto", text: "auto · llama3.2:3b" }} onOpen={() => {}} />
           <NewSessionModelChipView label={{ kind: "none" }} onOpen={() => {}} />
         </div>
       </section>
@@ -1726,6 +1727,10 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
           <div aria-label="Mode chips" role="group" className="flex flex-wrap gap-2">
             <ModeChipView own="careful" fallback="balanced" onSelect={() => {}} />
             <ModeChipView own={null} fallback="balanced" onSelect={() => {}} />
+          </div>
+          <div aria-label="Model chips" role="group" className="flex flex-wrap gap-2">
+            <ModelChipView shown={{ name: "qwen3:27b", pick: false }} title="local · ollama" onOpen={() => {}} />
+            <ModelChipView shown={{ name: "llama3.2:3b", pick: true }} title="local · ollama" onOpen={() => {}} />
           </div>
           <div aria-label="Route chips" role="group" className="flex flex-wrap gap-2">
             {ROUTE_CHIP_CASES.map(({ label, mode, ladder, spend }) => (

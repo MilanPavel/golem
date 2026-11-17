@@ -1,7 +1,7 @@
 import { forkPoint, LOCAL_ONLY_HINT, localOnlyLabel, type TodoItem } from "@golem/view";
 import { INSPECTOR_ID, InspectorPanel } from "../trace/index.ts";
 import { useEffect, useMemo, useRef, type ReactNode, type Ref, type RefObject } from "react";
-import { Badge, badgeVariants } from "../../ui/badge.tsx";
+import { Badge } from "../../ui/badge.tsx";
 import { cn } from "../../ui/cn.ts";
 import { HEADER_ROW } from "../../ui/header-row.ts";
 import { Button } from "../../ui/button.tsx";
@@ -15,10 +15,11 @@ import { Transcript } from "../chat/index.ts";
 import { SessionDock } from "../composer/index.ts";
 import { TodoList, useDrawerOpen } from "../drawer/index.ts";
 import { ChangesTab, checksBadge, ChecksTab, FilesTab, Workbench, WORKBENCH_ID, type WorkbenchTab } from "../workbench/index.ts";
-import { closeModelDialog, ModelDialog, openModelDialog, useModelDialogOpen } from "../models/index.ts";
+import { closeModelDialog, ModelDialog, useModelDialogOpen } from "../models/index.ts";
 import { folderName, useSessionActions } from "../sessions/index.ts";
 import { useRememberSettingsContext } from "../settings/index.ts";
 import { MenuBar, MenuButton } from "../sidebar/index.ts";
+import { ModelChip } from "./model-chip.tsx";
 import { SessionTitle } from "./session-title.tsx";
 
 type Header = Pick<SessionView, "title" | "cwd" | "model" | "status">;
@@ -48,34 +49,6 @@ export function TranscriptSlot({ id }: { id: string }) {
 /** The meter, the composer, and the key hints. */
 export function DockSlot({ id }: { id: string }) {
   return <SessionDock key={id} sessionId={id} />;
-}
-
-/** The session's model. It opens the dialog that switches it. */
-function ModelChip({
-  sessionId,
-  model,
-  buttonRef,
-}: {
-  sessionId: string;
-  model: SessionModel;
-  buttonRef: RefObject<HTMLButtonElement | null>;
-}) {
-  const detail = [model.profile, model.provider].filter((part) => part !== null).join(" · ");
-  const name = model.name ?? model.profile;
-  return (
-    <button
-      ref={buttonRef}
-      type="button"
-      title={detail}
-      aria-label={`Model: ${name}`}
-      aria-haspopup="dialog"
-      onClick={() => openModelDialog({ sessionId, returnTo: "chip" })}
-      className={cn(badgeVariants(), "cursor-pointer outline-offset-2 outline-clay hover:border-ink hover:text-ink focus-visible:outline-2")}
-    >
-      <span aria-hidden="true" className="size-1.5 rounded-full bg-allow" />
-      {name}
-    </button>
-  );
 }
 
 /** The one model dialog of the session. The chip and `/model` open it; it closes with the session. */

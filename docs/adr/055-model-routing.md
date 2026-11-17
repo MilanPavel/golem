@@ -33,6 +33,8 @@ The goal of the product is that the cheapest model that can do a job does it, an
 | `local` | Hosted models are never used |
 | `auto` | Local first; a hosted model only when a rule below allows it |
 
+On `auto` the candidates are one model per tier: the one `[routing.ladder]` names, else the one golem chooses. The session's own model is an extra candidate only when its tier has no pick (or it is the pick), and it stays the last resort when no other model passes. So the model the ladder shows is the model a turn starts on. Choosing a model by hand on `auto` (the model chip, `/model`, or a model chosen for a new chat) moves the session to `pinned`, in the daemon, with `session.updated` and the route; no new event.
+
 `[routing] mode` is the mode of a new session. It stays `pinned` until the end-to-end checks of routing pass. The user can change the mode of a session at any time.
 
 ### 3. The pick is a pure function with a fixed order

@@ -310,7 +310,18 @@ def test_ladder_local_is_the_largest_window_for_a_hosted_session() -> None:
     other = facts("ollama/small", "local", window=8192)
     down = facts("ollama/huge", "local", window=999999, ready=False, why="server is down")
     found = ladder(LadderSettings(), "anthropic/big", [other, LOCAL, down, CHEAP, BIG])
-    assert [m.ref for m in found] == ["anthropic/big", "ollama/qwen3:27b", "openrouter/cheap"]
+    assert [m.ref for m in found] == ["ollama/qwen3:27b", "openrouter/cheap", "anthropic/big"]
+
+
+def test_ladder_own_model_is_no_extra_candidate_when_its_tier_has_a_pick() -> None:
+    other = facts("ollama/small", "local", window=8192)
+    found = ladder(LadderSettings(local="ollama/small"), "ollama/qwen3:27b", [LOCAL, other])
+    assert [m.ref for m in found] == ["ollama/small"]
+
+
+def test_ladder_own_model_joins_when_its_tier_has_no_pick() -> None:
+    found = ladder(LadderSettings(), "anthropic/big", [CHEAP, BIG])
+    assert [m.ref for m in found] == ["openrouter/cheap", "anthropic/big"]
 
 
 def test_ladder_budget_needs_tools_and_the_lowest_price() -> None:
@@ -329,7 +340,7 @@ def test_ladder_has_no_frontier_by_default() -> None:
 def test_ladder_frontier_when_configured_or_the_session_model() -> None:
     settings = LadderSettings(frontier="anthropic/big")
     assert "anthropic/big" in [m.ref for m in ladder(settings, "ollama/qwen3:27b", ALL)]
-    assert ladder(LadderSettings(), "anthropic/big", ALL)[0].ref == "anthropic/big"
+    assert ladder(LadderSettings(), "anthropic/big", ALL)[-1].ref == "anthropic/big"
 
 
 def test_ladder_uses_configured_refs() -> None:
@@ -337,7 +348,7 @@ def test_ladder_uses_configured_refs() -> None:
     settings = LadderSettings(local="ollama/small", budget="x/mine")
     mine = facts("x/mine", "budget", price=1.4)
     found = ladder(settings, "anthropic/big", [LOCAL, other, CHEAP, BIG, mine])
-    assert [m.ref for m in found] == ["anthropic/big", "ollama/small", "x/mine"]
+    assert [m.ref for m in found] == ["ollama/small", "x/mine", "anthropic/big"]
 
 
 def test_ladder_has_no_duplicates() -> None:
