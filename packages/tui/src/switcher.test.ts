@@ -170,3 +170,26 @@ test("ages read as now, minutes, hours, days, then a date", () => {
     assert.equal(relativeAge(iso, NOW), expected, iso);
   }
 });
+
+test("a routine's session carries the routine mark, and a waiting one the waiting flag", () => {
+  const routine = { ...summary("s_r", "Digest"), origin: "routine:digest" };
+  const waiting = { ...summary("s_w", "Needs you"), status: "waiting" as const, origin: "routine:digest" };
+  const rows = layoutSwitcher({
+    state: openSwitcher("s_a"),
+    sessions: [...SESSIONS, routine, waiting],
+    current: null,
+    now: NOW,
+    columns: 40,
+    rows: 10,
+  });
+  assert.deepEqual(
+    rows.map((row) => [row.sessionId, row.routine, row.waiting]),
+    [
+      ["s_a", false, false],
+      ["s_b", false, false],
+      ["s_c", false, false],
+      ["s_r", true, false],
+      ["s_w", true, true],
+    ],
+  );
+});

@@ -1,5 +1,7 @@
 import { Box, Text } from "ink";
 
+import { ROUTINE_MARK } from "@golem/view";
+
 import { type SwitcherRow } from "./switcher.ts";
 import { CLAY } from "./theme.ts";
 
@@ -24,7 +26,8 @@ export function SwitcherView({
       </Text>
       {rows.length === 0 ? <Text dimColor>{empty}</Text> : null}
       {rows.map((row) => {
-        const pad = " ".repeat(Math.max(1, columns - row.title.length - row.age.length - 5));
+        const mark = row.routine ? `${ROUTINE_MARK} ` : "";
+        const pad = " ".repeat(Math.max(1, columns - mark.length - row.title.length - row.age.length - 5));
         return (
           <Text key={row.sessionId} wrap="truncate-end" inverse={row.selected}>
             <Text color={CLAY}>{row.selected ? "›" : " "}</Text>
@@ -34,6 +37,7 @@ export function SwitcherView({
             >
               {` ${row.waiting ? "?" : row.running ? "●" : "○"} `}
             </Text>
+            {row.routine ? <Text dimColor>{mark}</Text> : null}
             <Text bold={row.current}>{row.title}</Text>
             <Text dimColor>{`${pad}${row.age}`}</Text>
           </Text>

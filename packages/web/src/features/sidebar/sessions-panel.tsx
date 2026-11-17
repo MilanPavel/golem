@@ -1,5 +1,5 @@
 import { useId, useMemo, useRef, useState } from "react";
-import { groupByTime } from "@golem/view";
+import { groupByTime, isRoutineSession } from "@golem/view";
 import { cn } from "../../ui/cn.ts";
 import { IconButton } from "../../ui/icon-button.tsx";
 import { ClockIcon, MoreIcon } from "../../ui/icons.tsx";
@@ -80,7 +80,7 @@ function SessionRow({
   const chose = useRef(false);
   const name = session.title ?? "Untitled";
   const hasMenu = onRename !== undefined && onAskClose !== undefined;
-  const routine = session.origin?.startsWith("routine:") === true;
+  const routine = isRoutineSession(session);
   return (
     <li
       aria-level={row.depth + 1}

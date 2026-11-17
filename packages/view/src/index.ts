@@ -118,6 +118,7 @@ export {
 export { groupTurns, turnFooter, type Turn } from "./turns.ts";
 export { editedArgs, parseArgs, type ParsedArgs } from "./approval-args.ts";
 export { inboxItems, type InboxItem, type InboxPending, type InboxSession } from "./inbox.ts";
+export { isRoutineSession, isWaiting, originLabel, ROUTINE_MARK, routineName, type OriginSession } from "./origin.ts";
 export {
   appendDelta,
   appendThinking,
