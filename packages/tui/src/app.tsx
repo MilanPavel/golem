@@ -175,7 +175,7 @@ import {
   tryHeading,
   sessionCostLabel,
   costReportLines,
-  ladderRows,
+  routeRows,
   routeReportLines,
   routeStatus,
   shownModel,
@@ -3747,7 +3747,7 @@ export function App({
         const own = sessionModelOf(preferModel(sessionModelRef.current, daemonModel), models.models);
         const lines = routeReportLines(
           chatRef.current.route.mode,
-          ladderRows(models.models, config.routing, own),
+          routeRows(chatRef.current.route.mode, models.models, config.routing, own),
           spendRows(cost, config.routing),
         );
         if (gen === costGen.current) setCostText(lines);

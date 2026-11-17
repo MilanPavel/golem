@@ -2,7 +2,7 @@ import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import axe from "axe-core";
 import type { ListedModel } from "../../store/models.ts";
-import { ladderRows, spendRows } from "@golem/view";
+import { ladderRows, routeRows, spendRows } from "@golem/view";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { App } from "../../app.tsx";
 import { createPage } from "../../store/page.ts";
@@ -101,7 +101,7 @@ test("the chip sits left of the permission chip and follows the session's route"
   expect(chip().getAttribute("aria-label")).toBe("Route: auto. Change it.");
 });
 
-test("opening the popover reads the spend once, shows the ladder, and Auto sets the route", async () => {
+test("opening the popover reads the spend once, shows the pinned model, and Auto sets the route", async () => {
   const fake = await setup();
   const user = userEvent.setup();
   expect(fake.raw.getCost).not.toHaveBeenCalled();
@@ -112,7 +112,10 @@ test("opening the popover reads the spend once, shows the ladder, and Auto sets 
   expect(fake.raw.getCost).toHaveBeenCalledWith("a");
   expect(within(popover).getAllByRole("progressbar")).toHaveLength(2);
   const rows = within(popover).getAllByRole("listitem").map((row) => row.textContent);
-  expect(rows).toEqual(["localqwen3:27bready · free", "budgetdeepseek-chatready · $0.28 / M in", "frontiernoneno model"]);
+  // The chat is pinned: its own model, and no ladder.
+  expect(rows).toEqual(["localqwen3:27bready · free"]);
+  expect(within(popover).getByRole("heading", { name: "The model" })).toBeTruthy();
+  expect(within(popover).queryByText("The ladder")).toBeNull();
   const radios = within(popover).getAllByRole("radio");
   expect(radios.map((item) => item.textContent)).toEqual(["Pinned", "Local only", "Auto"]);
   expect(radios[0]?.getAttribute("aria-checked")).toBe("true");
@@ -180,6 +183,24 @@ test("without caps the popover shows the amounts only", () => {
       expect(within(popover).queryByRole("progressbar")).toBeNull();
       expect(within(popover).getByRole("radio", { name: "Local only" }).getAttribute("aria-checked")).toBe("true");
     });
+});
+
+test("only auto shows the ladder: local shows its local model, pinned the chat's own", async () => {
+  const own = { profile: "local", provider: "ollama", name: "qwen3:27b", tier: "local" } as const;
+  const user = userEvent.setup();
+  for (const [mode, title, count] of [
+    ["auto", "The ladder", 3],
+    ["local", "The model", 1],
+    ["pinned", "The model", 1],
+  ] as const) {
+    const view = render(<RouteChipView mode={mode} ladder={routeRows(mode, MODELS, null, own)} spend={[]} onSelect={() => {}} onNavigate={() => {}} />);
+    await user.click(chip());
+    const popover = await screen.findByRole("dialog");
+    expect(within(popover).getByRole("heading", { name: title })).toBeTruthy();
+    expect(within(popover).getByRole("list", { name: title })).toBeTruthy();
+    expect(within(popover).getAllByRole("listitem")).toHaveLength(count);
+    view.unmount();
+  }
 });
 
 test("a tier that is not ready is grey and offers Add key", async () => {

@@ -197,6 +197,12 @@ function named(models: readonly ListedModel[], name: string | null | undefined):
   return models.find((model) => model.ref === name || (model.profiles ?? []).includes(name));
 }
 
+/** The listed model a chat has as its own, by profile or by provider and name. */
+function ownModel(models: readonly ListedModel[], session: SessionModelRef | null): ListedModel | undefined {
+  if (session === null) return undefined;
+  return named(models, session.profile) ?? named(models, session.provider != null && session.name != null ? `${session.provider}/${session.name}` : null);
+}
+
 const blended = (model: ListedModel): number => (model.price == null ? Number.POSITIVE_INFINITY : (3 * model.price.input + model.price.output) / 4);
 
 /**
@@ -209,7 +215,7 @@ export function ladderRows(
   routing: ConfigRouting | null | undefined,
   session: SessionModelRef | null = null,
 ): LadderRow[] {
-  const own = session === null ? undefined : (named(models, session.profile) ?? named(models, session.provider != null && session.name != null ? `${session.provider}/${session.name}` : null));
+  const own = ownModel(models, session);
   const set = routing?.ladder;
   const chosen: Record<Tier, ListedModel | undefined> = {
     local: named(models, set?.local),
@@ -226,21 +232,45 @@ export function ladderRows(
     chosen.budget = best(cheap.filter((model) => model.status === "ready")) ?? best(cheap.filter((model) => model.status === "needs_key"));
   }
   if (chosen.frontier === undefined && own?.tier === "frontier") chosen.frontier = own;
-  return TIERS.map((tier) => {
-    const model = chosen[tier];
-    if (model === undefined) {
-      return { tier, model: null, ref: null, provider: null, state: "no model", ready: false, needsKey: false };
-    }
-    return {
-      tier,
-      model: model.label,
-      ref: model.ref,
-      provider: model.provider,
-      state: stateOf(model),
-      ready: model.status === "ready",
-      needsKey: model.status === "needs_key",
-    };
-  });
+  return TIERS.map((tier) => rowOf(tier, chosen[tier]));
+}
+
+function rowOf(tier: Tier, model: ListedModel | undefined): LadderRow {
+  if (model === undefined) {
+    return { tier, model: null, ref: null, provider: null, state: "no model", ready: false, needsKey: false };
+  }
+  return {
+    tier,
+    model: model.label,
+    ref: model.ref,
+    provider: model.provider,
+    state: stateOf(model),
+    ready: model.status === "ready",
+    needsKey: model.status === "needs_key",
+  };
+}
+
+/**
+ * The models a chat on route `mode` may run on, for the route popover and `/route`. `auto` climbs the
+ * whole ladder. `local` never leaves its local row. `pinned` has the chat's own model and no ladder.
+ */
+export function routeRows(
+  mode: RouteMode,
+  models: readonly ListedModel[],
+  routing: ConfigRouting | null | undefined,
+  session: SessionModelRef | null = null,
+): LadderRow[] {
+  if (mode === "pinned") {
+    const own = ownModel(models, session);
+    return own === undefined ? [] : [rowOf(own.tier, own)];
+  }
+  const rows = ladderRows(models, routing, session);
+  return mode === "local" ? rows.filter((row) => row.tier === "local") : rows;
+}
+
+/** The heading over `routeRows`: only `auto` has a ladder. */
+export function routeRowsTitle(mode: RouteMode): string {
+  return mode === "auto" ? "The ladder" : "The model";
 }
 
 /** The model a chip shows, and whether golem picks it (route `auto`) or the user chose it. */
@@ -386,10 +416,10 @@ export function whySummary(route: Pick<RouteState, "last" | "mode">): string {
   return left.length === 0 ? head : `${head}. Left out: ${left.map((row) => `${row.model} (${row.result})`).join(", ")}`;
 }
 
-/** What `/route` alone prints: the mode, the ladder, and the spend. */
+/** What `/route` alone prints: the mode, the models of that mode (`routeRows`), and the spend. */
 export function routeReportLines(mode: RouteMode, ladder: readonly LadderRow[], spend: readonly SpendRow[]): string[] {
   const lines = [`Route: ${routeLabel(mode)}. /route pinned, local or auto sets it; /route why says why the last model.`];
-  if (ladder.length > 0) lines.push("", "The ladder", ...ladder.map(ladderLine));
+  if (ladder.length > 0) lines.push("", routeRowsTitle(mode), ...ladder.map(ladderLine));
   if (spend.length > 0) lines.push("", ...spend.map((row) => row.text));
   return lines;
 }
