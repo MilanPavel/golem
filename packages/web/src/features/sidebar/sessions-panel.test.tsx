@@ -1,0 +1,139 @@
+import { fireEvent, render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import axe from "axe-core";
+import { expect, test, vi } from "vitest";
+import type { SessionSummary } from "../../store/session-list.ts";
+import { SessionsPanel } from "./sessions-panel.tsx";
+
+const NOW = new Date(2026, 10, 17, 12, 0).getTime();
+const at = (days: number, hour = 11) => new Date(2026, 10, 17 - days, hour, 0).toISOString();
+
+function session(id: string, title: string | null, cwd: string | null, updated: string, extra: Partial<SessionSummary> = {}): SessionSummary {
+  return { session_id: id, created_at: updated, updated_at: updated, last_seq: 1, model_profile: "default", status: "idle", cwd, title, ...extra };
+}
+
+const SESSIONS: SessionSummary[] = [
+  session("a", "Fix the socket", "/Users/you/repos/golem", at(0)),
+  session("b", "Weekday digest", "/Users/you/notes", at(1), { origin: "routine:digest" }),
+  session("c", "Older idea", "/Users/you/notes", at(3)),
+  session("d", "Ancient work", null, at(30)),
+  session("e", "Closed one", "/Users/you/notes", at(0), { status: "closed" }),
+];
+
+function setup(sessions: SessionSummary[] = SESSIONS, actions = { rename: vi.fn(() => Promise.resolve()), close: vi.fn(() => Promise.resolve()) }) {
+  const onNavigate = vi.fn();
+  const view = render(<SessionsPanel sessions={sessions} selectedId="a" now={NOW} onNavigate={onNavigate} actions={actions} />);
+  return { ...view, actions, onNavigate };
+}
+
+const headings = (container: HTMLElement) =>
+  [...container.querySelectorAll("ul")].map((list) => document.getElementById(list.getAttribute("aria-labelledby")!)?.textContent);
+
+test("groups come in order with their headings, and closed sessions are left out", () => {
+  const { container } = setup();
+  expect(headings(container)).toEqual(["Today", "Yesterday", "Previous 7 days", "Earlier"]);
+  expect(screen.queryByText("Closed one")).toBeNull();
+  expect(screen.getAllByRole("link")).toHaveLength(4);
+});
+
+test("a group with no sessions is left out", () => {
+  const { container } = setup([SESSIONS[0]!, SESSIONS[3]!]);
+  expect(headings(container)).toEqual(["Today", "Earlier"]);
+});
+
+test("a fork sits under its parent, in the parent's group", () => {
+  const sessions = [
+    session("p", "Parent", "/x/y", at(0, 11)),
+    session("f", "The fork", "/x/y", at(5), { forked_from: "p" }),
+    session("o", "Other", "/x/y", at(0, 9)),
+  ];
+  const { container } = setup(sessions);
+  expect(headings(container)).toEqual(["Today"]);
+  const names = screen.getAllByRole("link").map((link) => link.textContent);
+  expect(names[0]).toContain("Parent");
+  expect(names[1]).toContain("The fork");
+  expect(names[2]).toContain("Other");
+  expect(screen.getByRole("link", { name: /fork of Parent/ })).toBeTruthy();
+});
+
+test("the filter narrows by title and by folder name, and Esc clears it", async () => {
+  const user = userEvent.setup();
+  setup();
+  const field = screen.getByRole("textbox", { name: "Filter sessions" });
+  await user.type(field, "SOCKET");
+  expect(screen.getAllByRole("link")).toHaveLength(1);
+  expect(screen.getByRole("link", { name: /Fix the socket/ })).toBeTruthy();
+  await user.clear(field);
+  await user.type(field, "notes");
+  expect(screen.getAllByRole("link").map((link) => link.textContent)).toEqual([
+    expect.stringContaining("Weekday digest"),
+    expect.stringContaining("Older idea"),
+  ]);
+  await user.keyboard("{Escape}");
+  expect((field as HTMLInputElement).value).toBe("");
+  expect(screen.getAllByRole("link")).toHaveLength(4);
+});
+
+test("no match and no sessions say so", async () => {
+  const user = userEvent.setup();
+  const first = setup();
+  await user.type(screen.getByRole("textbox", { name: "Filter sessions" }), "zzz");
+  expect(screen.getByText("No sessions match.")).toBeTruthy();
+  first.unmount();
+  setup([]);
+  expect(screen.getByText("No sessions yet.")).toBeTruthy();
+});
+
+test("the time and the menu button share one slot, so the title cannot move", async () => {
+  const user = userEvent.setup();
+  setup();
+  const row = screen.getByRole("link", { name: /Fix the socket/ }).closest("li")!;
+  const time = row.querySelector("time")!;
+  const button = within(row).getByRole("button", { name: "Actions for Fix the socket" });
+  expect(time.textContent).toBe("1h");
+  expect(time.parentElement).toBe(button.parentElement);
+  expect(time.parentElement?.getAttribute("data-slot")).toBe("row-end");
+  // The title is in the link, outside the slot, and the link reserves the slot's room.
+  expect(row.querySelector("a")?.contains(time)).toBe(false);
+  expect(time.className).toContain("group-hover:opacity-0");
+  expect(time.className).toContain("group-focus-within:opacity-0");
+  expect(button.className).toContain("group-hover:opacity-100");
+  // It stays in the tab order, and holds the same slot when focused.
+  await user.tab();
+  await user.tab();
+  await user.tab();
+  expect(document.activeElement).toBe(button);
+  expect(time.parentElement).toBe(button.parentElement);
+});
+
+test("the folder shows as its basename, with the full path in the title; no folder shows none", () => {
+  setup();
+  const label = screen.getByText("golem");
+  expect(label.getAttribute("title")).toBe("/Users/you/repos/golem");
+  expect(label.className).toContain("font-mono");
+  expect(label.className).toContain("text-xs");
+  expect(label.className).toContain("text-faint");
+  const none = screen.getByRole("link", { name: /Ancient work/ });
+  expect(none.querySelector("[title]")).toBeNull();
+});
+
+test("a routine session shows a clock mark named for screen readers", () => {
+  setup();
+  expect(screen.getByRole("link", { name: /Weekday digest/ }).textContent).toContain("started by a routine");
+  expect(screen.getByRole("link", { name: /Fix the socket/ }).textContent).not.toContain("started by a routine");
+});
+
+test("right-click opens the same menu as the button, with Rename and Close", () => {
+  setup();
+  const row = screen.getByRole("link", { name: /Older idea/ }).closest("li")!;
+  const notPrevented = fireEvent.contextMenu(row);
+  expect(notPrevented).toBe(false);
+  expect(within(screen.getByRole("menu")).getAllByRole("menuitem").map((item) => item.textContent)).toEqual(["Rename", "Close"]);
+});
+
+test("the selected row is current, and the panel has no accessibility violations", async () => {
+  const { container } = setup();
+  expect(screen.getByRole("link", { name: /Fix the socket/ }).getAttribute("aria-current")).toBe("page");
+  const result = await axe.run(container, { rules: { "color-contrast": { enabled: false }, region: { enabled: false } } });
+  expect(result.violations).toEqual([]);
+});

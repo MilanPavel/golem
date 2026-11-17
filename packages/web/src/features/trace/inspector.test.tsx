@@ -60,7 +60,7 @@ test("Inspect opens the panel and puts it in the address; pressing it again clos
   expect(within(aside).getByRole("heading", { name: "Trace" })).toBeTruthy();
   expect(within(aside).getAllByRole("treeitem")).toHaveLength(5);
   // The chat stays beside it.
-  expect(screen.getByRole("textbox")).toBeTruthy();
+  expect(screen.getByRole("textbox", { name: /message/i })).toBeTruthy();
   await user.click(inspectButton());
   expect(panel()).toBeNull();
   expect(location.pathname + location.search).toBe("/s/a");

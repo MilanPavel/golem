@@ -75,6 +75,13 @@ export const SearchIcon = (props: IconProps) => (
     <path d="M10 10l3.5 3.5" />
   </Icon>
 );
+/** A clock face: something that started on a schedule. */
+export const ClockIcon = (props: IconProps) => (
+  <Icon {...props}>
+    <circle cx="8" cy="8" r="5.5" />
+    <path d="M8 5v3.2l2 1.3" />
+  </Icon>
+);
 export const FolderIcon = (props: IconProps) => (
   <Icon {...props}>
     <path d="M2 4.5c0-.6.4-1 1-1h3l1.5 1.5H13c.6 0 1 .4 1 1V12c0 .6-.4 1-1 1H3c-.6 0-1-.4-1-1z" />

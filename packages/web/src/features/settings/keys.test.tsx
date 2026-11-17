@@ -174,8 +174,9 @@ test("the page has no input, and says keys are set in a terminal", async () => {
   mount();
   await screen.findByRole("list", { name: "Model providers" });
   expect(screen.getByText("Keys are set and removed in a terminal. This page never sees, stores or sends one; it only shows where each key is.")).toBeTruthy();
-  expect(screen.queryByRole("textbox")).toBeNull();
-  expect(document.querySelector("input")).toBeNull();
+  const main = within(screen.getByRole("main"));
+  expect(main.queryByRole("textbox")).toBeNull();
+  expect(document.querySelector("main input")).toBeNull();
 });
 
 test("Refresh and a tab that is seen again read auth.list again", async () => {
