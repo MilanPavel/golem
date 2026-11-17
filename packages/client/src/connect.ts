@@ -116,6 +116,10 @@ import type { SessionForkResult } from "../../protocol/gen/session-fork-result.t
 import type { SessionInspectResult } from "../../protocol/gen/session-inspect-result.ts";
 import type { CostGetResult } from "../../protocol/gen/cost-get-result.ts";
 import type { EvalRoutingResult } from "../../protocol/gen/eval-routing-result.ts";
+import type { NotificationsSetParams } from "../../protocol/gen/notifications-set-params.ts";
+import type { NotificationsSetResult } from "../../protocol/gen/notifications-set-result.ts";
+import type { NotificationsValues } from "../../protocol/gen/notifications-values.ts";
+import type { NotifyTestResult } from "../../protocol/gen/notify-test-result.ts";
 import type { RoutingGetResult } from "../../protocol/gen/routing-get-result.ts";
 import type { RoutingSetParams } from "../../protocol/gen/routing-set-params.ts";
 import type { RoutingSetResult } from "../../protocol/gen/routing-set-result.ts";
@@ -205,6 +209,9 @@ import {
   isSessionInspectResult,
   isCostGetResult,
   isEvalRoutingResult,
+  isNotificationsSetResult,
+  isNotificationsValues,
+  isNotifyTestResult,
   isRoutingGetResult,
   isRoutingSetResult,
   isTraceGetResult,
@@ -332,6 +339,9 @@ export interface GolemClient {
   /** What the recorded sessions of the last `days` days would have cost on each route. A calculation, no model call. */
   evalRouting(days?: number, sessionId?: string): Promise<EvalRoutingResult>;
   /** The routing, budget and context settings as golem uses them, and what it picks for an empty tier. */
+  getNotifications(): Promise<NotificationsValues>;
+  setNotifications(params: NotificationsSetParams): Promise<NotificationsSetResult>;
+  notifyTest(): Promise<NotifyTestResult>;
   getRouting(): Promise<RoutingGetResult>;
   /**
    * Changes keys of the five routing tables in `config.toml`. A null removes a key. A wrong value is in the
@@ -1370,6 +1380,30 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       const result = await call("eval.routing", params);
       if (!isEvalRoutingResult(result)) {
         throw new Error("invalid eval.routing result");
+      }
+      return result;
+    },
+    async getNotifications(): Promise<NotificationsValues> {
+      await ready;
+      const result = await call("notifications.get", {});
+      if (!isNotificationsValues(result)) {
+        throw new Error("invalid notifications.get result");
+      }
+      return result;
+    },
+    async setNotifications(params: NotificationsSetParams): Promise<NotificationsSetResult> {
+      await ready;
+      const result = await call("notifications.set", { ...params });
+      if (!isNotificationsSetResult(result)) {
+        throw new Error("invalid notifications.set result");
+      }
+      return result;
+    },
+    async notifyTest(): Promise<NotifyTestResult> {
+      await ready;
+      const result = await call("notify.test", {});
+      if (!isNotifyTestResult(result)) {
+        throw new Error("invalid notify.test result");
       }
       return result;
     },

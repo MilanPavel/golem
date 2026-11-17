@@ -49,6 +49,8 @@ METHOD_ACCESS: Final[Mapping[str, Access]] = {
     "changes.suggest_message": "browser",
     "cost.get": "browser",
     "eval.routing": "local",
+    "notifications.get": "browser",
+    "notifications.set": "browser",
     "routing.get": "browser",
     "routing.set": "browser",
     "trace.get": "browser",
@@ -115,7 +117,7 @@ METHOD_ACCESS: Final[Mapping[str, Access]] = {
     "ollama.install_cancel": "browser",
     "ollama.start": "browser",
     "fs.list_dirs": "browser",
-    "notify.test": "local",
+    "notify.test": "browser",
 }
 
 BROWSER_METHODS: Final[frozenset[str]] = frozenset(

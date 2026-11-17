@@ -189,11 +189,17 @@ A cap is checked before a call, and a call costs what it costs only when it ends
 
 ### `[notifications]`
 
-Where a notification lands.
+What tells you, and where a notification lands. Settings › Notifications in the web page sets the same keys.
 
 | Key | Default | Meaning |
 |---|---|---|
+| `needs_you` | `true` | An approval or a question is waiting in a session nobody watches. It cannot be turned off: `false` is a config error that names the line |
+| `failed` | `true` | A run of a session nobody watches stopped with an error |
+| `finished` | `false` | A run of a session nobody watches finished |
 | `open_in` | `"web"` | `web` opens the web page on the session. `terminal` opens the chat in the terminal. With `web`, a Mac that has no web service (`golem web install`) opens the terminal instead |
+| `terminal_app` | `"Terminal"` | The app `terminal` opens in: `"Terminal"`, `"iTerm"` or `"Ghostty"`. Any other name is a config error that names the line. golem keeps it for the helper app that will open a click; nothing uses it yet |
+
+A `[[routine]]` can override `failed` and `finished` for its own runs with `notify_failed` and `notify_finished`. A routine that sets `notify_finished = true` tells you when it is done even with `finished = false`, and `notify_failed = false` silences its failures. There is no override for `needs_you`.
 
 The banner golem posts today is a plain macOS notification, and macOS gives it to Script Editor: **clicking it does not open golem.** So the banner ends with the command that does. Run it in any terminal:
 

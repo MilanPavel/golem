@@ -1,0 +1,7 @@
+{
+  "additionalProperties": false,
+  "description": "``notifications.get``. The ``[notifications]`` settings as golem uses them.",
+  "properties": {},
+  "title": "NotificationsGetParams",
+  "type": "object"
+}

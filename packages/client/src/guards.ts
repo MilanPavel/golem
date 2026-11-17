@@ -73,6 +73,9 @@ import type { SessionCreateResult } from "../../protocol/gen/session-create-resu
 import type { SessionForkResult } from "../../protocol/gen/session-fork-result.ts";
 import type { CostGetResult } from "../../protocol/gen/cost-get-result.ts";
 import type { EvalRoutingResult } from "../../protocol/gen/eval-routing-result.ts";
+import type { NotificationsSetResult } from "../../protocol/gen/notifications-set-result.ts";
+import type { NotificationsValues } from "../../protocol/gen/notifications-values.ts";
+import type { NotifyTestResult } from "../../protocol/gen/notify-test-result.ts";
 import type { RoutingGetResult } from "../../protocol/gen/routing-get-result.ts";
 import type { RoutingSetResult } from "../../protocol/gen/routing-set-result.ts";
 import type { TraceGetResult } from "../../protocol/gen/trace-get-result.ts";
@@ -701,6 +704,31 @@ export function isEvalRoutingResult(value: unknown): value is EvalRoutingResult 
       (Array.isArray(value["scenarios"]) && value["scenarios"].every(isEvalRow))) &&
     (value["top"] === undefined || Array.isArray(value["top"]))
   );
+}
+
+export function isNotificationsValues(value: unknown): value is NotificationsValues {
+  return (
+    isRecord(value) &&
+    typeof value["needs_you"] === "boolean" &&
+    typeof value["failed"] === "boolean" &&
+    typeof value["finished"] === "boolean" &&
+    (value["open_in"] === "web" || value["open_in"] === "terminal") &&
+    typeof value["terminal_app"] === "string" &&
+    Array.isArray(value["terminal_apps"])
+  );
+}
+
+export function isNotificationsSetResult(value: unknown): value is NotificationsSetResult {
+  return (
+    isRecord(value) &&
+    typeof value["ok"] === "boolean" &&
+    (value["errors"] === undefined || Array.isArray(value["errors"])) &&
+    (value["values"] == null || isNotificationsValues(value["values"]))
+  );
+}
+
+export function isNotifyTestResult(value: unknown): value is NotifyTestResult {
+  return isRecord(value) && typeof value["posted"] === "boolean" && typeof value["mechanism"] === "string";
 }
 
 export function isRoutingGetResult(value: unknown): value is RoutingGetResult {

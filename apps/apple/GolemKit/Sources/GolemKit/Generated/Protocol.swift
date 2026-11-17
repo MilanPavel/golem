@@ -1220,7 +1220,7 @@ public struct ConfigGetResult: Codable {
     public let defaultModel: String?
     public let defaultPermissionMode: DefaultPermissionModeEnum?
     public let logLevel: String
-    public let notificationsOpenIn: NotificationsOpenIn?
+    public let notificationsOpenIn: OpenIn?
     public let permissionMode: DefaultPermissionModeEnum?
     public let projectPolicy: String?
     public let projectTrusted: Bool?
@@ -1246,7 +1246,7 @@ public struct ConfigGetResult: Codable {
         case trustedProjects = "trusted_projects"
     }
 
-    public init(configFile: String, defaultModel: String?, defaultPermissionMode: DefaultPermissionModeEnum?, logLevel: String, notificationsOpenIn: NotificationsOpenIn?, permissionMode: DefaultPermissionModeEnum?, projectPolicy: String?, projectTrusted: Bool?, routing: ConfigRoutingClass?, rules: [RuleElement], sessionAllowed: [SessionAllowedElement]?, sessionTitles: Bool, trustedProjects: [String]) {
+    public init(configFile: String, defaultModel: String?, defaultPermissionMode: DefaultPermissionModeEnum?, logLevel: String, notificationsOpenIn: OpenIn?, permissionMode: DefaultPermissionModeEnum?, projectPolicy: String?, projectTrusted: Bool?, routing: ConfigRoutingClass?, rules: [RuleElement], sessionAllowed: [SessionAllowedElement]?, sessionTitles: Bool, trustedProjects: [String]) {
         self.configFile = configFile
         self.defaultModel = defaultModel
         self.defaultPermissionMode = defaultPermissionMode
@@ -1269,7 +1269,7 @@ public enum DefaultPermissionModeEnum: String, Codable {
     case careful = "careful"
 }
 
-public enum NotificationsOpenIn: String, Codable {
+public enum OpenIn: String, Codable {
     case terminal = "terminal"
     case web = "web"
 }
@@ -8903,6 +8903,162 @@ public struct ModelWaitingEventData: Codable {
 
 public enum ModelWaitingEventType: String, Codable {
     case modelWaiting = "model.waiting"
+}
+
+/// ``notifications.get``. The ``[notifications]`` settings as golem uses them.
+// MARK: - NotificationsGetParams
+public struct NotificationsGetParams: Codable {
+
+    public init() {
+    }
+}
+
+/// ``notifications.set``. Change keys of ``[notifications]`` in the user's ``config.toml``.
+///
+/// Only the keys sent change, and the file keeps its comments. A key set to its default
+/// stays in the file. Every value is checked first, and when any is wrong nothing is written.
+// MARK: - NotificationsSetParams
+public struct NotificationsSetParams: Codable {
+    public let failed: Bool?
+    public let finished: Bool?
+    public let openIn: OpenIn?
+    public let terminalApp: String?
+
+    public enum CodingKeys: String, CodingKey {
+        case failed = "failed"
+        case finished = "finished"
+        case openIn = "open_in"
+        case terminalApp = "terminal_app"
+    }
+
+    public init(failed: Bool?, finished: Bool?, openIn: OpenIn?, terminalApp: String?) {
+        self.failed = failed
+        self.finished = finished
+        self.openIn = openIn
+        self.terminalApp = terminalApp
+    }
+}
+
+/// ``ok`` is false when a value was wrong, and the file is then untouched. ``values`` is
+/// what ``notifications.get`` would now answer, set when ``ok``.
+// MARK: - NotificationsSetResult
+public struct NotificationsSetResult: Codable {
+    public let errors: [NotificationsSetResultError]?
+    public let ok: Bool
+    public let values: NotificationsValuesClass?
+
+    public enum CodingKeys: String, CodingKey {
+        case errors = "errors"
+        case ok = "ok"
+        case values = "values"
+    }
+
+    public init(errors: [NotificationsSetResultError]?, ok: Bool, values: NotificationsValuesClass?) {
+        self.errors = errors
+        self.ok = ok
+        self.values = values
+    }
+}
+
+/// One problem in a config text. ``line`` and ``column`` count from 1, when known.
+///
+/// ``path`` is the setting, as ``mcp.github.headers.Authorization``.
+// MARK: - NotificationsSetResultError
+public struct NotificationsSetResultError: Codable {
+    public let column: Int?
+    public let line: Int?
+    public let message: String
+    public let path: String?
+
+    public enum CodingKeys: String, CodingKey {
+        case column = "column"
+        case line = "line"
+        case message = "message"
+        case path = "path"
+    }
+
+    public init(column: Int?, line: Int?, message: String, path: String?) {
+        self.column = column
+        self.line = line
+        self.message = message
+        self.path = path
+    }
+}
+
+/// ``[notifications]``. ``needs_you`` is always true: it cannot be turned off.
+/// ``terminal_apps`` are the names ``terminal_app`` may take. ``finished_routines`` and
+/// ``failed_routines`` name the routines whose own ``notify_finished`` or ``notify_failed``
+/// says yes while the global setting says no, so the page can point to them.
+// MARK: - NotificationsValuesClass
+public struct NotificationsValuesClass: Codable {
+    public let failed: Bool
+    public let failedRoutines: [String]?
+    public let finished: Bool
+    public let finishedRoutines: [String]?
+    public let needsYou: Bool
+    public let openIn: OpenIn
+    public let terminalApp: String
+    public let terminalApps: [String]
+
+    public enum CodingKeys: String, CodingKey {
+        case failed = "failed"
+        case failedRoutines = "failed_routines"
+        case finished = "finished"
+        case finishedRoutines = "finished_routines"
+        case needsYou = "needs_you"
+        case openIn = "open_in"
+        case terminalApp = "terminal_app"
+        case terminalApps = "terminal_apps"
+    }
+
+    public init(failed: Bool, failedRoutines: [String]?, finished: Bool, finishedRoutines: [String]?, needsYou: Bool, openIn: OpenIn, terminalApp: String, terminalApps: [String]) {
+        self.failed = failed
+        self.failedRoutines = failedRoutines
+        self.finished = finished
+        self.finishedRoutines = finishedRoutines
+        self.needsYou = needsYou
+        self.openIn = openIn
+        self.terminalApp = terminalApp
+        self.terminalApps = terminalApps
+    }
+}
+
+/// ``[notifications]``. ``needs_you`` is always true: it cannot be turned off.
+/// ``terminal_apps`` are the names ``terminal_app`` may take. ``finished_routines`` and
+/// ``failed_routines`` name the routines whose own ``notify_finished`` or ``notify_failed``
+/// says yes while the global setting says no, so the page can point to them.
+// MARK: - NotificationsValues
+public struct NotificationsValues: Codable {
+    public let failed: Bool
+    public let failedRoutines: [String]?
+    public let finished: Bool
+    public let finishedRoutines: [String]?
+    public let needsYou: Bool
+    public let openIn: OpenIn
+    public let terminalApp: String
+    public let terminalApps: [String]
+
+    public enum CodingKeys: String, CodingKey {
+        case failed = "failed"
+        case failedRoutines = "failed_routines"
+        case finished = "finished"
+        case finishedRoutines = "finished_routines"
+        case needsYou = "needs_you"
+        case openIn = "open_in"
+        case terminalApp = "terminal_app"
+        case terminalApps = "terminal_apps"
+    }
+
+    public init(failed: Bool, failedRoutines: [String]?, finished: Bool, finishedRoutines: [String]?, needsYou: Bool, openIn: OpenIn, terminalApp: String, terminalApps: [String]) {
+        self.failed = failed
+        self.failedRoutines = failedRoutines
+        self.finished = finished
+        self.finishedRoutines = finishedRoutines
+        self.needsYou = needsYou
+        self.openIn = openIn
+        self.terminalApp = terminalApp
+        self.terminalApps = terminalApps
+    }
 }
 
 /// ``notify.test``. Post a sample notification, for Settings and ``golem doctor``.

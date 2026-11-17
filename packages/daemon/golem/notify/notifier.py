@@ -69,6 +69,9 @@ class SessionFacts:
 
 
 Lookup = Callable[[str], Awaitable[SessionFacts | None]]
+KindsFor = Callable[[str | None], NotifierKinds]
+"""Which kinds are on for a routine (its name), or None for any other session. Called for
+each notice, so a change in Settings counts at once."""
 
 
 def _cut(text: str) -> str:
@@ -84,12 +87,16 @@ class Notifier:
         poster: Poster,
         lookup: Lookup,
         attached: Callable[[str], bool],
-        kinds: NotifierKinds | None = None,
+        kinds: NotifierKinds | KindsFor | None = None,
     ) -> None:
         self._poster = poster
         self._lookup = lookup
         self._attached = attached
-        self._kinds = NotifierKinds() if kinds is None else kinds
+        if kinds is None:
+            kinds = NotifierKinds()
+        self._kinds: KindsFor = (
+            (lambda _routine: kinds) if isinstance(kinds, NotifierKinds) else kinds
+        )
         self._said: dict[tuple[str, Kind], str] = {}
         self._tasks: set[asyncio.Task[None]] = set()
 
@@ -149,7 +156,8 @@ class Notifier:
             key = origin if routine else session_id
             if clears is not None:
                 self._said.pop((key, clears), None)
-            if not self._kinds.on(kind) or self._said.get((key, kind)) == fingerprint:
+            on = self._kinds(origin.removeprefix("routine:") if routine else None).on(kind)
+            if not on or self._said.get((key, kind)) == fingerprint:
                 return
             self._said[(key, kind)] = fingerprint
             if facts is not None and facts.title:
