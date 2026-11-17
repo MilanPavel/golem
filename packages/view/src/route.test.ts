@@ -11,6 +11,8 @@ import {
   foldRoute,
   isRouteMode,
   ladderRows,
+  routeRows,
+  routeRowsTitle,
   lastQuestion,
   routeForSpan,
   routeHeadline,
@@ -160,6 +162,34 @@ test("ladderRows: the ladder in config wins, and a frontier session fills its ti
   const own = { profile: null, provider: "anthropic", name: "opus", tier: "frontier" } as const;
   assert.equal(ladderRows([QWEN, OPUS], null, own)[2]?.model, "opus");
   assert.equal(ladderRows([QWEN, SMALL], null, null)[0]?.model, "qwen3:27b");
+});
+
+test("routeRows: auto has the whole ladder, local its local row, pinned the chat's own model", () => {
+  const models = [QWEN, SMALL, DEEPSEEK, OPUS];
+  assert.deepEqual(routeRows("auto", models, null, SESSION), ladderRows(models, null, SESSION));
+  assert.deepEqual(
+    routeRows("local", models, null, SESSION).map((row) => [row.tier, row.model]),
+    [["local", "qwen3:27b"]],
+  );
+  const hosted: SessionModelRef = { profile: "anthropic/opus", provider: "anthropic", name: "opus", tier: "frontier" };
+  const pinned = routeRows("pinned", models, { ladder: { local: "ollama/qwen3:8b" } }, hosted);
+  assert.deepEqual(
+    pinned.map((row) => [row.tier, row.model, row.ready]),
+    [["frontier", "opus", true]],
+  );
+  // A chat whose model golem does not list has no row to show.
+  assert.deepEqual(routeRows("pinned", models, null, null), []);
+  assert.equal(routeRowsTitle("auto"), "The ladder");
+  assert.equal(routeRowsTitle("local"), "The model");
+  assert.equal(routeRowsTitle("pinned"), "The model");
+});
+
+test("routeReportLines: off auto the heading is the model, not the ladder", () => {
+  const lines = routeReportLines("pinned", routeRows("pinned", [QWEN, DEEPSEEK], null, SESSION), []);
+  assert.ok(lines.includes("The model"));
+  assert.ok(!lines.includes("The ladder"));
+  assert.equal(lines.filter((line) => line.startsWith("local")).length, 1);
+  assert.equal(lines.filter((line) => line.startsWith("budget")).length, 0);
 });
 
 test("ladderRows: a model that is not installed or running says so", () => {

@@ -91,7 +91,7 @@ Type `/` and suggestions appear, with each command's arguments. `/help` lists ev
 | `/model` | Open the model picker |
 | `/model <name>` | Switch this chat to a model or a profile |
 | `/model pull <name>`, `/model rm <name>` | Download or remove a local model |
-| `/route`, `/route pinned\|local\|auto`, `/route why` | Show how this chat picks its model (the mode, the ladder of tiers, and today's spend), set the mode, or say why the last answer used its model and which models were left out |
+| `/route`, `/route pinned\|local\|auto`, `/route why` | Show how this chat picks its model (the mode, the ladder of tiers on `auto` or the one model on `local` and `pinned`, and today's spend), set the mode, or say why the last answer used its model and which models were left out |
 | `/stronger` | On route `auto`, ask the last question again as a new turn on the next tier up, for this one turn. The old answer stays and the new one follows. A paid model asks first. It fails with `No stronger model is ready. Add a key in Settings.` when none may run (a local-only folder, `paid = "never"`, a spent budget, or no key) |
 | `/tune` | Tune a local model: a slider and an explanation for each option, such as temperature and context size |
 | `/login [provider]`, `/logout <provider>` | Add an API key, checked with the provider, or remove one |

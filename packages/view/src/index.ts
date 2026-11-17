@@ -63,6 +63,8 @@ export {
   isRouteMode,
   ladderLine,
   ladderRows,
+  routeRows,
+  routeRowsTitle,
   HOSTED_FIRST_TOKEN_SECONDS,
   canTryStronger,
   lastQuestion,

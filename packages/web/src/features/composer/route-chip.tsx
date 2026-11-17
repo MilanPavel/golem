@@ -1,5 +1,6 @@
 import {
-  ladderRows,
+  routeRows,
+  routeRowsTitle,
   ROUTE_CHOICES,
   routeLabel,
   sessionModelOf,
@@ -31,9 +32,9 @@ function Bar({ row }: { row: SpendRow }) {
 }
 
 /** The ladder: a row for each tier. A row that is not ready is grey and, for a missing key, offers `Add key`. */
-function Ladder({ rows, onNavigate }: { rows: readonly LadderRow[]; onNavigate: (path: string) => void }) {
+function Ladder({ title, rows, onNavigate }: { title: string; rows: readonly LadderRow[]; onNavigate: (path: string) => void }) {
   return (
-    <ul aria-label="The ladder" className="m-0 flex list-none flex-col gap-1 p-0">
+    <ul aria-label={title} className="m-0 flex list-none flex-col gap-1 p-0">
       {rows.map((row) => (
         <li key={row.tier} data-ready={row.ready} className={cn("flex items-baseline gap-2 text-xs", row.ready ? "text-ink" : "text-faint")}>
           <span className="w-16 shrink-0 font-mono">{row.tier}</span>
@@ -51,8 +52,8 @@ function Ladder({ rows, onNavigate }: { rows: readonly LadderRow[]; onNavigate: 
 }
 
 /**
- * The route of a chat: a chip with the mode, and a popover with the three-way switch, the ladder, and
- * today's spend. `ladder` and `spend` are empty until what the popover reads has arrived.
+ * The route of a chat: a chip with the mode, and a popover with the three-way switch, the models of
+ * that mode (`routeRows`: the whole ladder only on `auto`), and today's spend. `ladder` and `spend` are empty until what the popover reads has arrived.
  */
 export function RouteChipView({
   mode,
@@ -109,8 +110,8 @@ export function RouteChipView({
         <p className="text-xs text-muted">{ROUTE_CHOICES.find((choice) => choice.mode === mode)?.hint}</p>
         {ladder.length === 0 ? null : (
           <section className="flex flex-col gap-1.5">
-            <h3 className="font-mono text-xs text-faint">The ladder</h3>
-            <Ladder rows={ladder} onNavigate={onNavigate} />
+            <h3 className="font-mono text-xs text-faint">{routeRowsTitle(mode)}</h3>
+            <Ladder title={routeRowsTitle(mode)} rows={ladder} onNavigate={onNavigate} />
           </section>
         )}
         {spend.length === 0 ? null : (
@@ -150,7 +151,7 @@ export function RouteChip({ sessionId, onSelect }: { sessionId: string; onSelect
   return (
     <RouteChipView
       mode={mode}
-      ladder={models.data === undefined ? [] : ladderRows(listed, config.data?.routing, own)}
+      ladder={models.data === undefined ? [] : routeRows(mode, listed, config.data?.routing, own)}
       spend={spendRows(cost.data, config.data?.routing)}
       onSelect={onSelect}
       onOpenChange={setOpen}

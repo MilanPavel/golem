@@ -1,4 +1,4 @@
-import { checksSummary, COMMANDS, mcpStatusWord, noPastes, pickerGroups, withModelChoices, withSkillChoices, type CheckRun, type ChecksState, type ReviewNote, type TodoItem, type TurnChecks, type TurnCard, type ChatMessage, type ChatState, type RewindPlan, ladderRows, spendRows, contextActions, bestActions, windowSourceOf, type ContextActionsInput } from "@golem/view";
+import { checksSummary, COMMANDS, mcpStatusWord, noPastes, pickerGroups, withModelChoices, withSkillChoices, type CheckRun, type ChecksState, type ReviewNote, type TodoItem, type TurnChecks, type TurnCard, type ChatMessage, type ChatState, type RewindPlan, ladderRows, routeRows, spendRows, contextActions, bestActions, windowSourceOf, type ContextActionsInput } from "@golem/view";
 import type { ListedModel } from "@golem/client";
 import { createContext, useContext, useEffect, useId, useState, type ReactNode } from "react";
 import { Badge } from "../ui/badge.tsx";
@@ -107,8 +107,8 @@ const GALLERY_COST = {
 };
 const GALLERY_OWN = { profile: "local", provider: "ollama", name: "qwen3:27b", tier: "local" } as const;
 const ROUTE_CHIP_CASES = [
-  { label: "pinned, with caps", mode: "pinned", ladder: ladderRows(GALLERY_MODELS, null, GALLERY_OWN), spend: spendRows(GALLERY_COST, { ladder: {}, daily_usd: 2, session_usd: 0.5 }) },
-  { label: "local only, no caps", mode: "local", ladder: ladderRows(GALLERY_MODELS, null, GALLERY_OWN), spend: spendRows(GALLERY_COST, { ladder: {} }) },
+  { label: "pinned, with caps", mode: "pinned", ladder: routeRows("pinned", GALLERY_MODELS, null, GALLERY_OWN), spend: spendRows(GALLERY_COST, { ladder: {}, daily_usd: 2, session_usd: 0.5 }) },
+  { label: "local only, no caps", mode: "local", ladder: routeRows("local", GALLERY_MODELS, null, GALLERY_OWN), spend: spendRows(GALLERY_COST, { ladder: {} }) },
   { label: "auto, a tier without a key", mode: "auto", ladder: ladderRows([GALLERY_MODELS[0]!, { ...GALLERY_MODELS[1]!, status: "needs_key" }], null, GALLERY_OWN), spend: spendRows(GALLERY_COST, { ladder: {}, daily_usd: 2 }) },
 ] as const;
 
