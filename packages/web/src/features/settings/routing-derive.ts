@@ -1,4 +1,4 @@
-import { namesModel, shortModel, turnCost, windowSize, type RoutingState } from "@golem/view";
+import { localSize, namesModel, shortModel, turnCost, type LocalWindow, type RoutingState } from "@golem/view";
 import type { ListedModel, ModelListResult } from "../../store/models.ts";
 import type { RoutingGetResult } from "../../store/routing.ts";
 
@@ -28,21 +28,15 @@ export function tierInfo(values: RoutingGetResult, listing: ModelListResult | nu
   return { tier, chosen, ref, model, empty: ref === null };
 }
 
-/** The planned window of the local model: the number the person set, else what Auto plans. */
-export function windowTokens(values: RoutingGetResult, planned: number | null): number | null {
-  return typeof values.context.window === "number" ? values.context.window : planned;
-}
-
 /** The kind of the window setting: a number is Fixed, `"ollama"` is Ollama's, anything else is Auto. */
 export function windowKind(context: RoutingGetResult["context"]): "auto" | "fixed" | "ollama" {
   return typeof context.window === "number" ? "fixed" : context.window === "ollama" ? "ollama" : "auto";
 }
 
 /** The settings as the shared rules read them. */
-export function routingState(values: RoutingGetResult, listing: ModelListResult | null, planned: number | null): RoutingState {
+export function routingState(values: RoutingGetResult, listing: ModelListResult | null, window: LocalWindow): RoutingState {
   const [local, budget, frontier] = TIERS.map((tier) => tierInfo(values, listing, tier));
   const name = (info: TierInfo | undefined) => (info?.ref == null ? null : shortModel(info.ref));
-  const tokens = windowTokens(values, planned);
   const price = budget?.model?.price ?? null;
   return {
     mode: values.routing.mode,
@@ -54,6 +48,6 @@ export function routingState(values: RoutingGetResult, listing: ModelListResult 
     budget: name(budget),
     frontier: name(frontier),
     budgetCost: price === null ? null : turnCost(price),
-    window: tokens === null ? null : windowSize(tokens),
+    window: window.tokens === null ? null : localSize(window.tokens, window.estimated),
   };
 }

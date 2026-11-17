@@ -6,8 +6,10 @@ import {
   gateLabel,
   pathClosed,
   pickedBy,
+  localSize,
   priceTag,
   windowSize,
+  type LocalWindow,
   type PartState,
   type PathPart,
   type RoutingState,
@@ -20,7 +22,7 @@ import { Button } from "../../ui/button.tsx";
 import { cn } from "../../ui/cn.ts";
 import { ModelPick } from "./routing-model-pick.tsx";
 import { CARD, FieldError, Part, type RoutingErrors } from "./routing-parts.tsx";
-import { tierInfo, usableModels, windowTokens, type Tier, type TierInfo } from "./routing-derive.ts";
+import { tierInfo, usableModels, type Tier, type TierInfo } from "./routing-derive.ts";
 
 /** What the try-it playback has lit so far: a state for each part of the path it passes. */
 export type Lit = Partial<Record<PathPart, PartState>>;
@@ -43,7 +45,7 @@ function Station({
   listing,
   pulls,
   errors,
-  planned,
+  window,
   ramGb,
   off,
   lit,
@@ -57,7 +59,7 @@ function Station({
   listing: ModelListResult | null;
   pulls: PullsSnapshot;
   errors: RoutingErrors;
-  planned: number | null;
+  window: LocalWindow;
   ramGb: number | null;
   off: boolean;
   lit: PartState | undefined;
@@ -71,7 +73,7 @@ function Station({
   const path = `routing.ladder.${tier}`;
   const errorId = `ladder-${tier}-error`;
   const choosable = tier === "frontier" && models.some((item) => item.status === "ready");
-  const tokens = tier === "local" ? windowTokens(values, planned) : (model?.ctx ?? null);
+  const tokens = tier === "local" ? window.tokens : (model?.ctx ?? null);
   const empties: Record<Tier, string> = {
     local: "No model is ready for this step.",
     budget: "No model is ready for this step, so the path ends at Local.",
@@ -151,7 +153,7 @@ function Station({
           />
           <div className="mt-2 flex flex-wrap gap-x-2.5 gap-y-1 text-note text-faint">
             <span className="text-clay-ink">{pickedBy(chosen !== null)}</span>
-            {tokens === null ? null : <span>{`${windowSize(tokens)} window`}</span>}
+            {tokens === null ? null : <span>{`${tier === "local" ? localSize(tokens, window.estimated) : windowSize(tokens)} window`}</span>}
             {model === null ? null : <span>{model.provider}</span>}
             {tier === "local" && ramGb !== null ? <span>{`${Math.round(ramGb)} GB Mac`}</span> : null}
           </div>
@@ -196,7 +198,7 @@ export function RoutingPath({
   pulls,
   errors,
   state,
-  planned,
+  window,
   lit,
   onChange,
   onOpenKeys,
@@ -209,7 +211,7 @@ export function RoutingPath({
   pulls: PullsSnapshot;
   errors: RoutingErrors;
   state: RoutingState;
-  planned: number | null;
+  window: LocalWindow;
   lit: Lit;
   onChange: (patch: RoutingSetParams) => void;
   onOpenKeys: () => void;
@@ -231,7 +233,7 @@ export function RoutingPath({
       listing={listing}
       pulls={pulls}
       errors={errors}
-      planned={planned}
+      window={window}
       ramGb={listing?.ram_gb ?? null}
       off={pinned || (tier !== "local" && closed)}
       lit={lit[tier]}

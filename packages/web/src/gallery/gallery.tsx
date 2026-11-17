@@ -1,4 +1,4 @@
-import { checksSummary, COMMANDS, mcpStatusWord, noPastes, pickerGroups, withModelChoices, withSkillChoices, type CheckRun, type ChecksState, type ReviewNote, type TodoItem, type TurnChecks, type TurnCard, type ChatMessage, type ChatState, type RewindPlan, ladderRows, routeRows, spendRows, contextActions, bestActions, windowSourceOf, type ContextActionsInput } from "@golem/view";
+import { checksSummary, COMMANDS, mcpStatusWord, noPastes, pickerGroups, withModelChoices, withSkillChoices, type CheckRun, type ChecksState, type ReviewNote, type TodoItem, type TurnChecks, type TurnCard, type ChatMessage, type ChatState, type RewindPlan, ladderRows, NO_LOCAL_WINDOW, routeRows, spendRows, contextActions, bestActions, windowSourceOf, type ContextActionsInput } from "@golem/view";
 import type { ListedModel } from "@golem/client";
 import { createContext, useContext, useEffect, useId, useState, type ReactNode } from "react";
 import { Badge } from "../ui/badge.tsx";
@@ -54,7 +54,7 @@ import { SkillList } from "../features/settings/skills-section.tsx";
 import { SkillOverview } from "../features/settings/skills/skill-detail.tsx";
 import { SAMPLE_BROKEN_SKILL_MD, SAMPLE_SKILLS } from "../features/settings/skills/sample.ts";
 import { ContextView } from "../features/settings/context-section.tsx";
-import { CONTEXT_CASES } from "../features/settings/context-sample.ts";
+import { CONTEXT_CASES, PLANNED_WINDOW } from "../features/settings/context-sample.ts";
 import { RoutingView } from "../features/settings/routing-section.tsx";
 import { ROUTING_CASES, ROUTING_LISTING } from "../features/settings/routing-sample.ts";
 import { UsageView } from "../features/settings/usage-section.tsx";
@@ -1214,7 +1214,7 @@ function RoutingDemo() {
               listing={ROUTING_LISTING}
               pulls={{ active: new Map(), failed: new Map() }}
               errors={item.errors}
-              planned={item.note === null ? null : 32768}
+              window={item.note === null ? NO_LOCAL_WINDOW : PLANNED_WINDOW}
               spentToday={0.42}
               onChange={none}
               onOpenContext={none}
@@ -1234,7 +1234,7 @@ function ContextDemo() {
       {CONTEXT_CASES.map((item) => (
         <section key={item.label} aria-label={`Context, ${item.label}`} className="flex flex-col gap-3 rounded-lg border border-line bg-bg p-4">
           <span className="font-mono text-xs text-faint">{`Context, ${item.label}`}</span>
-          <ContextView values={item.values} listing={ROUTING_LISTING} errors={item.errors} windowNote={item.note} planned={item.planned} onChange={() => {}} />
+          <ContextView values={item.values} listing={ROUTING_LISTING} errors={item.errors} window={item.window} onChange={() => {}} />
         </section>
       ))}
     </div>
