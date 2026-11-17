@@ -28,6 +28,7 @@ import { WindowBarView } from "./context-bar.tsx";
 import { HEAD, ShareSlider, Stage } from "./context-controls.tsx";
 import { ContextRightNow } from "./context-right-now.tsx";
 import { Saw } from "./context-saw.tsx";
+import { WindowTable, useWindowRows, type WindowRow } from "./context-window-table.tsx";
 import { usableModels, windowKind } from "./routing-derive.ts";
 import { Box, CARD, FieldError, More, Part, PillChoices, Stepper, type RoutingErrors } from "./routing-parts.tsx";
 import { useLocalWindow } from "./use-local-window.ts";
@@ -39,6 +40,8 @@ export type ContextViewProps = {
   errors: RoutingErrors;
   /** The window the local model gets, and where it comes from. */
   window?: LocalWindow;
+  /** The local models on this Mac and the window each gets. Empty: no table. */
+  models?: readonly WindowRow[];
   /** Saves these keys. The daemon's answer comes back as `errors` and `values`. */
   onChange: (patch: RoutingSetParams) => void;
 };
@@ -76,7 +79,9 @@ function WindowSize({
   errors,
   commit,
   onChange,
+  models,
 }: {
+  models: readonly WindowRow[];
   context: Context;
   window: LocalWindow;
   errors: RoutingErrors;
@@ -89,7 +94,7 @@ function WindowSize({
   const fixed = kind === "fixed";
   return (
     <Part title={words.title} tag={<ScopeTag tone="local">{words.scope}</ScopeTag>} line={words.line}>
-      <div className={cn(CARD, "grid grid-cols-1 items-start gap-x-7 gap-y-4 p-5 @route:cols-route-long")}>
+      <div className={cn(CARD, "grid grid-cols-1 items-start gap-x-7 gap-y-4 p-5", models.length > 0 && "@route:cols-route-long")}>
         <div className="flex flex-col gap-2">
           <PillChoices
             legend={words.title}
@@ -124,8 +129,12 @@ function WindowSize({
           )}
           <p className="text-note text-muted">{words.chipWins}</p>
         </div>
-        {/* The table of the window each local model gets sits here. */}
-        <div />
+        {models.length === 0 ? null : (
+          <div className="flex flex-col gap-2">
+            <WindowTable rows={models} />
+            <p className="text-note text-muted">A model's own setting in its model chip wins over this choice.</p>
+          </div>
+        )}
       </div>
     </Part>
   );
@@ -171,7 +180,7 @@ function hostedModel(values: RoutingGetResult, listing: ModelListResult | null):
 }
 
 /** Settings › Context: the window size, and where clearing and summarising start. */
-export function ContextView({ values, listing, errors: saved, window = NO_LOCAL_WINDOW, onChange }: ContextViewProps) {
+export function ContextView({ values, listing, errors: saved, window = NO_LOCAL_WINDOW, models = [], onChange }: ContextViewProps) {
   const { context } = values;
   const words = CONTEXT_WORDS;
   const [typed, setTyped] = useState<Readonly<Record<string, string>>>({});
@@ -222,7 +231,7 @@ export function ContextView({ values, listing, errors: saved, window = NO_LOCAL_
           hosted,
         }}
       />
-      <WindowSize context={context} window={window} errors={errors} commit={commit} onChange={onChange} />
+      <WindowSize context={context} window={window} errors={errors} commit={commit} onChange={onChange} models={models} />
       <Part title={words.fill.title} tag={<ScopeTag tone="all">{words.fill.scope}</ScopeTag>} line={words.fill.line}>
         <div className={cn(CARD, "flex flex-col gap-4 p-5")}>
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-note text-muted">
@@ -362,6 +371,7 @@ export function ContextSection() {
   const listing = useModelList().data ?? null;
   const { errors, failure, save } = useRoutingSave();
   const window = useLocalWindow(routing.data?.picked.local ?? null);
+  const models = useWindowRows(routing.data?.picked.local ?? null, listing);
 
   if (routing.isError) {
     return (
@@ -383,7 +393,7 @@ export function ContextSection() {
           {failure}
         </p>
       )}
-      <ContextView values={routing.data} listing={listing} errors={errors} window={window} onChange={(patch) => void save(patch)} />
+      <ContextView values={routing.data} listing={listing} errors={errors} window={window} models={models} onChange={(patch) => void save(patch)} />
     </div>
   );
 }

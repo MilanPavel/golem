@@ -1234,7 +1234,7 @@ function ContextDemo() {
       {CONTEXT_CASES.map((item) => (
         <section key={item.label} aria-label={`Context, ${item.label}`} className="flex flex-col gap-3 rounded-lg border border-line bg-bg p-4">
           <span className="font-mono text-xs text-faint">{`Context, ${item.label}`}</span>
-          <ContextView values={item.values} listing={ROUTING_LISTING} errors={item.errors} window={item.window} onChange={() => {}} />
+          <ContextView values={item.values} listing={ROUTING_LISTING} errors={item.errors} window={item.window} models={item.models} onChange={() => {}} />
         </section>
       ))}
     </div>
