@@ -20,6 +20,7 @@ import { useSidebarItem } from "./sidebar-item.ts";
 import { useSidebarOpen } from "./sidebar-open.ts";
 import { useSidebarOverlay } from "./sidebar-overlay.ts";
 import { COLLAPSE_BELOW, SIDEBAR_DEFAULT, SIDEBAR_MAX, SIDEBAR_MIN, SIDEBAR_STEP, useSidebarWidth } from "./sidebar-width.ts";
+import { SessionsFlyout } from "./sessions-flyout.tsx";
 import { SidebarPanel, WaitingChip } from "./sidebar-panel.tsx";
 
 const EDITABLE_RICH = "[contenteditable]:not([contenteditable='false'])";
@@ -127,6 +128,7 @@ export function SidebarShell() {
       }}
       onSettings={() => navigate(settingsPath())}
       settingsOpen={route.name === "settings"}
+      wrap={{ sessions: (button) => <SessionsFlyout enabled={wide && !open} width={width}>{button}</SessionsFlyout> }}
     />
   );
   const sidebarPanel = (
