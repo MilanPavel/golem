@@ -55,9 +55,9 @@ Some answers in the TUI and the web UI edit `config.toml` for you. golem keeps y
 - `/permissions` changes or removes a rule.
 - `/mcp` turns a server on or off with `enabled`.
 - `/mcp add` and `golem mcp add` add a `[mcp.<name>]` table, and `golem mcp remove` deletes one.
-- Settings → Routing in the web UI changes the routing, budget and context keys.
+- Settings → Routing in the web UI changes the routing and budget keys, and Settings → Context changes the context keys.
 
-The web page has a form for `[routing]`, `[routing.ladder]`, `[routing.roles]`, `[budget]` and `[context]`: Settings → Routing ([the web page](./web.md)). It writes the same keys, and a key set back to its default is removed from the file.
+The web page has two forms. Settings → Routing has `[routing]`, `[routing.ladder]`, `[routing.roles]` and `[budget]`. Settings → Context has `[context]` ([the web page](./web.md)). They write the same keys, and a key set back to its default is removed from the file.
 
 ## Secrets stay out of the file
 
@@ -140,6 +140,8 @@ The providers are `openai`, `anthropic`, `google`, `deepseek`, `xai`, `moonshot`
 | `parallel` | `1` | How many generations golem sends to a local server at once (1 to 8). Raise it only if you also set `OLLAMA_NUM_PARALLEL` |
 
 ### `[context]`
+
+Settings → Context in the web UI changes these keys. `window` and `keep_alive` are for Ollama only. The shares, the reply reserve and the keep counts apply to every model with a known window, hosted ones too, and the shares are of the window less the reply reserve.
 
 | Key | Default | Meaning |
 |---|---|---|
