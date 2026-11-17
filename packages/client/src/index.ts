@@ -62,6 +62,7 @@ export type { RoutineGetResult } from "../../protocol/gen/routine-get-result.ts"
 export type { RoutineInfo } from "../../protocol/gen/routine-info.ts";
 export type { RoutineIssue } from "../../protocol/gen/routine-issue.ts";
 export type { RoutineListResult } from "../../protocol/gen/routine-list-result.ts";
+export type { RoutinePreviewResult } from "../../protocol/gen/routine-preview-result.ts";
 export type { RoutineRunResult } from "../../protocol/gen/routine-run-result.ts";
 export type { RoutineRunSummary } from "../../protocol/gen/routine-run-summary.ts";
 export type { RoutineUpdateResult } from "../../protocol/gen/routine-update-result.ts";

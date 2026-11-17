@@ -94,6 +94,7 @@ METHOD_ACCESS: Final[Mapping[str, Access]] = {
     "routine.update": "browser",
     "routine.remove": "browser",
     "routine.run": "browser",
+    "routine.preview": "browser",
     "session.set_skills": "browser",
     "model.probe": "browser",
     "model.pull": "browser",

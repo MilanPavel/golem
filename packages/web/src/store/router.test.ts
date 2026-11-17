@@ -1,5 +1,5 @@
 import { afterEach, expect, test, vi } from "vitest";
-import { createRouter, inspectPath, parseRoute, routinePath, sessionPath, settingsPath, tracePath, welcomePath } from "./router.ts";
+import { createRouter, inspectPath, parseRoute, routineNewPath, routinePath, sessionPath, settingsPath, tracePath, welcomePath } from "./router.ts";
 
 afterEach(() => {
   history.replaceState(null, "", "/");
@@ -62,6 +62,15 @@ test("routinePath round-trips through parseRoute", () => {
   const [pathname, search] = path.split("?");
   expect(parseRoute(pathname ?? "", `?${search}`)).toEqual({ name: "routine", routine: "morning-brief", folder: "/Users/me/my golem" });
   expect(routinePath("a", null)).toBe("/routines/a");
+});
+
+test("/routines?new is the form for a new routine, with a starter when named", () => {
+  expect(parseRoute("/routines", "?new")).toEqual({ name: "routine-new", starter: null });
+  expect(parseRoute("/routines", "?new=morning-brief")).toEqual({ name: "routine-new", starter: "morning-brief" });
+  for (const path of [routineNewPath(), routineNewPath("morning-brief"), routineNewPath(null)]) {
+    const [pathname, search] = path.split("?");
+    expect(parseRoute(pathname ?? "", `?${search}`).name).toBe("routine-new");
+  }
 });
 
 test("parseRoute reads the settings page and its sections", () => {

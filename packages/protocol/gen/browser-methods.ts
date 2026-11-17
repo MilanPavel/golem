@@ -60,6 +60,7 @@ export const BROWSER_METHODS: ReadonlySet<string> = new Set([
   "route.consent.answer",
   "routine.get",
   "routine.list",
+  "routine.preview",
   "routine.remove",
   "routine.run",
   "routine.update",

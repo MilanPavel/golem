@@ -240,3 +240,101 @@ export function routineToml(config: RoutineConfigLike): string {
   lines.push(config.prompt.includes("\n") ? `prompt = """\n${config.prompt.replaceAll("\\", "\\\\").replaceAll('"""', '\\"""')}\n"""` : `prompt = ${quote(config.prompt)}`);
   return lines.join("\n");
 }
+
+/** The five ways the schedule builder offers (a sixth, a new file, is built with file watching). */
+export type WhenKind = "daily" | "weekdays" | "weekly" | "hours" | "cron";
+
+/** What the builder holds: the kind, and the field of each kind. `hours` is text so it can be typed. `day` is 0 for Sunday. */
+export type RoutineWhen = { kind: WhenKind; time: string; day: number; hours: string; cron: string };
+
+export const WHEN_KINDS: readonly { kind: WhenKind; label: string }[] = [
+  { kind: "daily", label: "Every day" },
+  { kind: "weekdays", label: "Weekdays" },
+  { kind: "weekly", label: "Weekly" },
+  { kind: "hours", label: "Every N hours" },
+  { kind: "cron", label: "Cron" },
+];
+
+/** The days of the Weekly picker, Monday first, with the cron number of each. */
+export const WEEK_DAYS: readonly { day: number; label: string }[] = [
+  { day: 1, label: "Mon" },
+  { day: 2, label: "Tue" },
+  { day: 3, label: "Wed" },
+  { day: 4, label: "Thu" },
+  { day: 5, label: "Fri" },
+  { day: 6, label: "Sat" },
+  { day: 0, label: "Sun" },
+];
+
+/** A new routine starts on weekdays at 08:30. */
+export const DEFAULT_WHEN: RoutineWhen = { kind: "weekdays", time: "08:30", day: 1, hours: "1", cron: "" };
+
+function timeParts(time: string): [number, number] | null {
+  const found = /^(\d{1,2}):(\d{2})$/.exec(time.trim());
+  if (found?.[1] === undefined || found[2] === undefined) return null;
+  const hour = Number(found[1]);
+  const minute = Number(found[2]);
+  return hour < 24 && minute < 60 ? [hour, minute] : null;
+}
+
+/**
+ * The `schedule` the builder writes: a cron line for a time of day (`30 8 * * 1-5` for weekdays at 08:30),
+ * `every 2h` for every N hours, and the cron text as typed. Null when a field is not filled in. The daemon
+ * checks the rest, and says what is wrong.
+ */
+export function whenToSchedule(when: RoutineWhen): string | null {
+  if (when.kind === "cron") return when.cron.trim() === "" ? null : when.cron.trim().replace(/\s+/g, " ");
+  if (when.kind === "hours") return /^\d+$/.test(when.hours.trim()) && Number(when.hours) >= 1 ? `every ${Number(when.hours)}h` : null;
+  const parts = timeParts(when.time);
+  if (parts === null) return null;
+  const [hour, minute] = parts;
+  const days = when.kind === "daily" ? "*" : when.kind === "weekdays" ? "1-5" : String(when.day);
+  return `${minute} ${hour} * * ${days}`;
+}
+
+/**
+ * The builder's fields for a schedule that is already written: `weekdays 08:30` and `30 8 * * 1-5` are both
+ * Weekdays at 08:30. A line that is none of the builder's kinds is Cron, as written.
+ */
+export function scheduleToWhen(schedule: string | null | undefined): RoutineWhen {
+  const text = (schedule ?? "").trim().replace(/\s+/g, " ");
+  if (text === "") return { ...DEFAULT_WHEN };
+  const cron: RoutineWhen = { ...DEFAULT_WHEN, kind: "cron", cron: text };
+  const hours = /^every (\d+)\s*h$/i.exec(text);
+  if (hours?.[1] !== undefined) return { ...DEFAULT_WHEN, kind: "hours", hours: String(Number(hours[1])) };
+  const plain = /^(daily|weekdays|weekly [a-z]{3}|[a-z]{3}) (\d{1,2}):(\d{2})$/i.exec(text);
+  if (plain?.[1] !== undefined && plain[2] !== undefined && plain[3] !== undefined) {
+    const time = clock(Number(plain[2]), Number(plain[3]));
+    const kind = plain[1].toLowerCase();
+    if (kind === "daily" || kind === "weekdays") return { ...DEFAULT_WHEN, kind, time };
+    const day = dayIndex(kind.split(" ").at(-1) ?? "");
+    return day === null ? cron : { ...DEFAULT_WHEN, kind: "weekly", time, day };
+  }
+  const fields = text.split(" ");
+  if (fields.length !== 5) return cron;
+  const [minute, hour, dom, month, dow] = fields as [string, string, string, string, string];
+  if (dom !== "*" || month !== "*" || !/^\d{1,2}$/.test(minute) || !/^\d{1,2}$/.test(hour)) return cron;
+  const time = clock(Number(hour), Number(minute));
+  if (timeParts(time) === null) return cron;
+  if (dow === "*") return { ...DEFAULT_WHEN, kind: "daily", time };
+  if (/^(1-5|mon-fri)$/i.test(dow)) return { ...DEFAULT_WHEN, kind: "weekdays", time };
+  const day = dayIndex(dow);
+  return day === null ? cron : { ...DEFAULT_WHEN, kind: "weekly", time, day };
+}
+
+/**
+ * The daemon's next times of a schedule as one line, in local time: `Next: Mon 08:30 · Tue 08:30 · Wed 08:30`.
+ * A time a week or more away also says its date. A time that cannot be read is left out.
+ */
+export function nextTimesText(times: readonly string[], now: number): string {
+  const midnight = (time: Date): number => new Date(time.getFullYear(), time.getMonth(), time.getDate()).getTime();
+  const words: string[] = [];
+  for (const iso of times) {
+    const at = new Date(iso);
+    if (Number.isNaN(at.getTime())) continue;
+    const day = DAY_NAMES[at.getDay()]?.replace(/^./, (c) => c.toUpperCase()) ?? "";
+    const far = Math.round((midnight(at) - midnight(new Date(now))) / DAY) >= 7;
+    words.push(`${day}${far ? ` ${at.getDate()} ${MONTH_SHORT[at.getMonth()]}` : ""} ${clock(at.getHours(), at.getMinutes())}`);
+  }
+  return words.length === 0 ? "" : `Next: ${words.join(" · ")}`;
+}

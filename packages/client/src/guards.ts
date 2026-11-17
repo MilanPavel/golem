@@ -38,6 +38,7 @@ import type { SessionSetOptionsResult } from "../../protocol/gen/session-set-opt
 import type { ListedSkill, SkillListResult } from "../../protocol/gen/skill-list-result.ts";
 import type { RoutineGetResult } from "../../protocol/gen/routine-get-result.ts";
 import type { RoutineInfo, RoutineListResult } from "../../protocol/gen/routine-list-result.ts";
+import type { RoutinePreviewResult } from "../../protocol/gen/routine-preview-result.ts";
 import type { RoutineRemoveResult } from "../../protocol/gen/routine-remove-result.ts";
 import type { RoutineRunResult } from "../../protocol/gen/routine-run-result.ts";
 import type { SkillCreateResult } from "../../protocol/gen/skill-create-result.ts";
@@ -249,6 +250,10 @@ export function isRoutineGetResult(value: unknown): value is RoutineGetResult {
 
 export function isRoutineRunResult(value: unknown): value is RoutineRunResult {
   return isRecord(value) && typeof value["routine_run_id"] === "string" && typeof value["session_id"] === "string";
+}
+
+export function isRoutinePreviewResult(value: unknown): value is RoutinePreviewResult {
+  return isRecord(value) && Array.isArray(value["next"]) && value["next"].every((time) => typeof time === "string");
 }
 
 export function isRoutineRemoveResult(value: unknown): value is RoutineRemoveResult {

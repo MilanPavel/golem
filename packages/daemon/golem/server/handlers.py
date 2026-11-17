@@ -92,6 +92,7 @@ from golem.server.notifications_edit import notifications_get, notifications_set
 from golem.server.routines import (
     routine_get,
     routine_list,
+    routine_preview,
     routine_remove,
     routine_run,
     routine_update,
@@ -254,6 +255,7 @@ from golem_protocol.commands import (
     RouteConsentAnswerResult,
     RoutineGetParams,
     RoutineListParams,
+    RoutinePreviewParams,
     RoutineRemoveParams,
     RoutineRunParams,
     RoutineUpdateParams,
@@ -1911,6 +1913,7 @@ def standard_methods() -> dict[str, Method]:
         "routine.update": Method("routine.update", RoutineUpdateParams, True, routine_update),
         "routine.remove": Method("routine.remove", RoutineRemoveParams, True, routine_remove),
         "routine.run": Method("routine.run", RoutineRunParams, True, routine_run),
+        "routine.preview": Method("routine.preview", RoutinePreviewParams, True, routine_preview),
         "session.set_skills": Method(
             "session.set_skills", SessionSetSkillsParams, True, _session_set_skills
         ),

@@ -102,6 +102,8 @@ export function fakeClient() {
     getRoutine: vi.fn<PageClient["getRoutine"]>(async (name) => ({ routine: { config: { name, prompt: "" }, path: "/Users/me/.golem/config.toml", source: "user" }, runs: [] })),
     runRoutine: vi.fn<PageClient["runRoutine"]>(async () => ({ routine_run_id: "rr_1", session_id: "s_run" })),
     removeRoutine: vi.fn<PageClient["removeRoutine"]>(async (name) => ({ name })),
+    updateRoutine: vi.fn<PageClient["updateRoutine"]>(async (name, fields) => ({ routine: { config: { name, prompt: "", ...fields }, path: "/Users/me/.golem/config.toml", source: "user" } })),
+    previewRoutine: vi.fn<PageClient["previewRoutine"]>(async () => ({ next: [] })),
     onMcpStatus: mcp.on,
     onPull: pull.on,
     onModelServer: server.on,

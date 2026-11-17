@@ -1,20 +1,28 @@
 export type { ApprovalChoice, ConsentChoice } from "@golem/client";
 export { formatDuration, formatElapsed, formatTurnTime } from "./duration.ts";
 export {
+  DEFAULT_WHEN,
   lastResultText,
   nextRunText,
+  nextTimesText,
   routineHeadline,
   routineRowLine,
   routineState,
   routineToml,
   runStatusWords,
   runWhenText,
+  scheduleToWhen,
   scheduleWords,
   triggerWords,
+  WEEK_DAYS,
+  WHEN_KINDS,
+  whenToSchedule,
   type RoutineConfigLike,
   type RoutineLike,
   type RoutineRunLike,
   type RoutineState,
+  type RoutineWhen,
+  type WhenKind,
 } from "./routines.ts";
 export { groupByTime, type TimeGroup, type TimeGroupLabel } from "./time-groups.ts";
 export { CONSENT_LABELS, CONSENT_TITLE, consentAnswers, consentCapsLine, consentLine, consentReason } from "./consent.ts";

@@ -1,4 +1,4 @@
-"""Handlers for ``routine.list``, ``routine.get``, ``routine.update`` and ``routine.remove``.
+"""Handlers for ``routine.list|get|update|preview|remove`` and ``routine.run``.
 
 A routine is a ``[[routine]]`` in the user's ``config.toml`` or in a trusted
 project's ``.golem/config.toml`` (ADR-050). The browser may read every routine
@@ -35,7 +35,7 @@ from golem.routine_files import (
     read_routines,
 )
 from golem.routine_scheduler import RoutineBlockedError, RoutineBusyError, RoutineNotFoundError
-from golem.routines import ScheduleError, next_after
+from golem.routines import ScheduleError, next_after, parse_schedule
 from golem.server.dispatcher import INTERNAL_ERROR, INVALID_PARAMS, RequestContext, RpcCallError
 from golem.store.routine_runs import RoutineRunRecord
 from golem_protocol.commands import (
@@ -47,6 +47,8 @@ from golem_protocol.commands import (
     RoutineIssue,
     RoutineListParams,
     RoutineListResult,
+    RoutinePreviewParams,
+    RoutinePreviewResult,
     RoutineRemoveParams,
     RoutineRemoveResult,
     RoutineRunParams,
@@ -59,6 +61,8 @@ from golem_protocol.commands import (
 from golem_protocol.rpc import RoutineChangedNotification
 
 log = logging.getLogger("golem.server")
+
+PREVIEW_COUNT = 3
 
 PROJECT_EDIT = "a project routine is edited in the project's .golem/config.toml, not from here"
 
@@ -154,6 +158,22 @@ async def routine_update(ctx: RequestContext, params: RoutineUpdateParams) -> Ro
     log.info("wrote routine %s to %s", checked.name, path)
     now = ctx.state.clock()
     return RoutineUpdateResult(routine=_info(ctx, checked, "user", None, path, False, now))
+
+
+async def routine_preview(
+    ctx: RequestContext, params: RoutinePreviewParams
+) -> RoutinePreviewResult:
+    """The next three firings of a schedule, so the editor shows them before it saves."""
+    try:
+        schedule = parse_schedule(params.schedule)
+        found: list[str] = []
+        at = ctx.state.clock()
+        for _ in range(PREVIEW_COUNT):
+            at = next_after(schedule, at)
+            found.append(at.isoformat())
+    except ScheduleError as exc:
+        raise RpcCallError(INVALID_PARAMS, str(exc)) from exc
+    return RoutinePreviewResult(next=found)
 
 
 async def routine_remove(ctx: RequestContext, params: RoutineRemoveParams) -> RoutineRemoveResult:

@@ -1525,7 +1525,7 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
           />
         </div>
         <div className="mt-4 rounded-lg border border-line bg-bg p-5" role="region" aria-label={`Routines, nothing set up, ${theme}`}>
-          <RoutinesEmpty />
+          <RoutinesEmpty onNavigate={() => {}} />
         </div>
       </section>
 

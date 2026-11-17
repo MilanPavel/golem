@@ -1,4 +1,4 @@
-"""routine.list, routine.get, routine.update and routine.remove over the daemon's socket."""
+"""The routine.* methods over the daemon's socket."""
 
 from __future__ import annotations
 
@@ -169,6 +169,36 @@ async def test_update_refuses_what_is_wrong_and_a_project_routine(short_home: Pa
         for method, params in bad:
             assert error_code(await client.call(method, params)) == INVALID_PARAMS, (method, params)
         assert "weekdays 08:30" in (short_home / "config.toml").read_text(encoding="utf-8")
+    finally:
+        await client.close()
+        await stop_daemon(app, task)
+
+
+async def test_preview_gives_the_next_three_times_or_the_reason_a_schedule_is_wrong(
+    short_home: Path,
+) -> None:
+    app, task = await start_daemon(short_home)
+    app.state.clock = lambda: NOW
+    client = await RpcClient.connect(app.paths.socket_path)
+    try:
+        await client.call("hello", HELLO)
+        got = rpc_result(await client.call("routine.preview", {"schedule": "weekdays 08:30"}))
+        assert got["next"] == [
+            "2026-02-09T08:30:00+01:00",
+            "2026-02-10T08:30:00+01:00",
+            "2026-02-11T08:30:00+01:00",
+        ]
+        cron = rpc_result(await client.call("routine.preview", {"schedule": "0 17 * * 5"}))
+        assert cron["next"] == [
+            "2026-02-06T17:00:00+01:00",
+            "2026-02-13T17:00:00+01:00",
+            "2026-02-20T17:00:00+01:00",
+        ]
+        for bad in ("every 7m", "61 * * * *", "", "soon"):
+            reply = await client.call("routine.preview", {"schedule": bad})
+            assert error_code(reply) == INVALID_PARAMS, bad
+        error = cast(dict[str, object], reply["error"])
+        assert "not a schedule" in str(error["message"])
     finally:
         await client.close()
         await stop_daemon(app, task)
