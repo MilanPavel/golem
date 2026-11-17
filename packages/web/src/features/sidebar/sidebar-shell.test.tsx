@@ -7,7 +7,7 @@ import type { ConnectionSnapshot } from "../../store/connection.ts";
 import { ConnectionProvider } from "../../store/connection-context.tsx";
 import { createPage } from "../../store/page.ts";
 import { PageProvider } from "../../store/page-context.tsx";
-import { fakeClient, fakeFrame } from "../../store/test-support.ts";
+import { fakeClient, fakeFrame, summary } from "../../store/test-support.ts";
 import { ConnectionStrip } from "../connection/index.ts";
 import { closePalette } from "../palette/index.ts";
 import { AUTOMATION_ROADMAP, RoutinesInProgress, RunsInProgress, WorkflowsInProgress } from "./in-progress.tsx";
@@ -224,4 +224,42 @@ test("the strip shows at the panel's foot when the link is lost after a connect"
     for (const listener of listeners) listener();
   });
   expect(within(panel()!).getByText("Reconnecting to golem…")).toBeTruthy();
+});
+
+function mountWaiting() {
+  const fake = fakeClient();
+  const page = createPage(fake.client, { frame: fakeFrame(), doc: new EventTarget() as unknown as Document });
+  page.start();
+  const source = { subscribe: () => () => {}, getSnapshot: () => CONNECTED };
+  render(
+    <PageProvider page={page}>
+      <ConnectionProvider source={source}>
+        <App />
+      </ConnectionProvider>
+    </PageProvider>,
+  );
+  act(() => {
+    fake.emitSummary({
+      ...summary("w1", "2026-11-16T09:00:00Z", null, 2),
+      title: "Fix the socket",
+      status: "waiting",
+      pending: { kind: "approval", since: "2026-11-16T09:00:00Z", call_id: "c1", name: "shell", subject: "git push", source: "built-in default" },
+    });
+  });
+}
+
+test("a waiting session shows the rail count and the chip, and the chip opens the Inbox", async () => {
+  const user = userEvent.setup();
+  mountWaiting();
+  expect(railButton("Inbox, 1 waiting")).toBeTruthy();
+  await user.click(within(panel()!).getByRole("button", { name: "1 waiting" }));
+  expect(panel()?.getAttribute("aria-label")).toBe("Inbox");
+  expect(within(panel()!).getByRole("button", { name: "Allow once, Fix the socket" })).toBeTruthy();
+  expect(within(panel()!).queryByRole("button", { name: "1 waiting" })).toBeNull();
+  expect((await axe.run(panel()!, noContrast)).violations).toEqual([]);
+});
+
+test("with nothing waiting the Sessions header has no chip", () => {
+  mount();
+  expect(within(panel()!).queryByText(/waiting/)).toBeNull();
 });

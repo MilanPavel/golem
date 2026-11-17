@@ -1,17 +1,20 @@
 import type { ComponentType } from "react";
+import { useInbox } from "../../store/inbox.ts";
+import { InboxPanel } from "../inbox/index.ts";
 import { LiveSessionList } from "../sessions/index.ts";
 import { RoutinesInProgress, RunsInProgress, WorkflowsInProgress } from "./in-progress.tsx";
 import type { RailItem } from "./rail.tsx";
 
-/** Until the Inbox panel is mounted here, it says there is nothing to answer. */
-function InboxPlaceholder() {
-  return <p className="px-2 py-3 text-sm text-muted">Nothing is waiting for you.</p>;
+/** The Inbox item's body: what waits for you, answered through the store. */
+function InboxBody() {
+  const inbox = useInbox();
+  return <InboxPanel items={inbox.items} busy={inbox.busy} errors={inbox.errors} onAnswer={inbox.answer} onOpen={inbox.open} />;
 }
 
 /** What each rail item shows in the panel. Mounting a real panel for an item is a change to its line. */
 export const PANELS: Record<RailItem, { title: string; Body: ComponentType }> = {
   sessions: { title: "Sessions", Body: LiveSessionList },
-  inbox: { title: "Inbox", Body: InboxPlaceholder },
+  inbox: { title: "Inbox", Body: InboxBody },
   routines: { title: "Routines", Body: RoutinesInProgress },
   workflows: { title: "Workflows", Body: WorkflowsInProgress },
   runs: { title: "Runs", Body: RunsInProgress },

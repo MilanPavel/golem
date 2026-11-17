@@ -2,6 +2,7 @@ import { setupProblem } from "@golem/view";
 import { useEffect, useRef } from "react";
 import { useConnection } from "../../store/connection-context.tsx";
 import { useNavigate, useRoute, useSessionList, useSetupStatus } from "../../store/page-context.tsx";
+import { useInbox } from "../../store/inbox.ts";
 import { settingsPath } from "../../store/router.ts";
 import { IconButton } from "../../ui/icon-button.tsx";
 import { PlusIcon } from "../../ui/icons.tsx";
@@ -16,7 +17,7 @@ import { Rail, type RailItem } from "./rail.tsx";
 import { useSidebarItem } from "./sidebar-item.ts";
 import { useSidebarOpen } from "./sidebar-open.ts";
 import { COLLAPSE_BELOW, SIDEBAR_DEFAULT, SIDEBAR_MAX, SIDEBAR_MIN, SIDEBAR_STEP, useSidebarWidth } from "./sidebar-width.ts";
-import { SidebarPanel } from "./sidebar-panel.tsx";
+import { SidebarPanel, WaitingChip } from "./sidebar-panel.tsx";
 
 const EDITABLE_RICH = "[contenteditable]:not([contenteditable='false'])";
 
@@ -36,6 +37,8 @@ export function SidebarShell() {
   // The wide layout opens the panel until the person chooses.
   const open = stored ?? true;
   const toggle = () => setOpen(!open);
+
+  const waiting = useInbox().items.length;
 
   const status = useSetupStatus();
   const problem = status.isError || status.data === undefined ? null : setupProblem(status.data.rows);
@@ -73,8 +76,7 @@ export function SidebarShell() {
         version={connection.daemonVersion}
         connected={connected ? "connected" : "reconnecting"}
         picked={open ? item : null}
-        // The Inbox panel counts these once it is mounted here.
-        inboxCount={0}
+        inboxCount={waiting}
         settingsDot={problem !== null || !connected}
         onPick={pick}
         onNew={() => navigate("/")}
@@ -90,6 +92,7 @@ export function SidebarShell() {
         >
           <SidebarPanel
             title={title}
+            chip={item === "sessions" && waiting > 0 ? <WaitingChip count={waiting} onOpen={() => pick("inbox")} /> : null}
             action={
               item === "sessions" ? (
                 <IconButton label="Start new session" className="size-7" onClick={() => navigate("/")}>

@@ -67,7 +67,7 @@ import { TOOLS_CASES } from "../features/setup/tools-sample.ts";
 import { PullStatusView, pullSummary } from "../features/models/index.ts";
 import { NO_OLLAMA_LISTING, OLLAMA_DOWN_LISTING, SAMPLE_LISTING, SAMPLE_PULLS, THINKING_LISTING } from "../features/models/sample.ts";
 import { CloseSessionDialog, RenameField, SessionList } from "../features/sessions/index.ts";
-import { RoutinesInProgress, Rail, SidebarPanel } from "../features/sidebar/index.ts";
+import { RoutinesInProgress, Rail, SidebarPanel, WaitingChip } from "../features/sidebar/index.ts";
 import { ConnectionStrip } from "../features/connection/index.ts";
 import { InboxPanel } from "../features/inbox/index.ts";
 import { SAMPLE_INBOX } from "../features/inbox/sample.ts";
@@ -1453,6 +1453,7 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
             <SidebarPanel
               title="Sessions"
               label={`Sessions, ${theme}`}
+              chip={<WaitingChip count={2} onOpen={() => {}} />}
               action={
                 <IconButton label="Start new session" className="size-7">
                   <PlusIcon />
