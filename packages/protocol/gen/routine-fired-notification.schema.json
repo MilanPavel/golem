@@ -1,0 +1,73 @@
+{
+  "$defs": {
+    "RoutineFired": {
+      "additionalProperties": false,
+      "description": "A routine started a run. ``scope`` is ``user`` or the project folder.",
+      "properties": {
+        "routine": {
+          "minLength": 1,
+          "title": "Routine",
+          "type": "string"
+        },
+        "routine_run_id": {
+          "minLength": 1,
+          "title": "Routine Run Id",
+          "type": "string"
+        },
+        "scope": {
+          "minLength": 1,
+          "title": "Scope",
+          "type": "string"
+        },
+        "session_id": {
+          "minLength": 1,
+          "title": "Session Id",
+          "type": "string"
+        },
+        "trigger": {
+          "enum": [
+            "schedule",
+            "watch",
+            "manual",
+            "hook"
+          ],
+          "title": "Trigger",
+          "type": "string"
+        }
+      },
+      "required": [
+        "routine",
+        "routine_run_id",
+        "session_id",
+        "trigger",
+        "scope"
+      ],
+      "title": "RoutineFired",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Server → every connection: a routine started a run. Not stored.",
+  "properties": {
+    "jsonrpc": {
+      "const": "2.0",
+      "default": "2.0",
+      "title": "Jsonrpc",
+      "type": "string"
+    },
+    "method": {
+      "const": "routine.fired",
+      "default": "routine.fired",
+      "title": "Method",
+      "type": "string"
+    },
+    "params": {
+      "$ref": "#/$defs/RoutineFired"
+    }
+  },
+  "required": [
+    "params"
+  ],
+  "title": "RoutineFiredNotification",
+  "type": "object"
+}

@@ -9867,6 +9867,181 @@ public struct RoutineConfigRoutineWatchConfig: Codable {
     }
 }
 
+/// Server → every connection: a routine's run ended, or a firing was skipped. Not stored.
+// MARK: - RoutineFinishedNotification
+public struct RoutineFinishedNotification: Codable {
+    public let jsonrpc: Jsonrpc?
+    public let method: RoutineFinishedNotificationMethod?
+    public let params: RoutineFinishedNotificationParams
+
+    public enum CodingKeys: String, CodingKey {
+        case jsonrpc = "jsonrpc"
+        case method = "method"
+        case params = "params"
+    }
+
+    public init(jsonrpc: Jsonrpc?, method: RoutineFinishedNotificationMethod?, params: RoutineFinishedNotificationParams) {
+        self.jsonrpc = jsonrpc
+        self.method = method
+        self.params = params
+    }
+}
+
+public enum RoutineFinishedNotificationMethod: String, Codable {
+    case routineFinished = "routine.finished"
+}
+
+/// A routine's run ended, or a due firing was skipped (then ``reason`` says why).
+///
+/// ``status`` is ``succeeded``, ``failed``, ``cancelled`` or ``skipped``. A skipped
+/// firing sends this and no ``routine.fired``.
+// MARK: - RoutineFinishedNotificationParams
+public struct RoutineFinishedNotificationParams: Codable {
+    public let reason: String?
+    public let routine: String
+    public let routineRunID: String
+    public let status: RoutineFinishedStatus
+    public let summary: String?
+
+    public enum CodingKeys: String, CodingKey {
+        case reason = "reason"
+        case routine = "routine"
+        case routineRunID = "routine_run_id"
+        case status = "status"
+        case summary = "summary"
+    }
+
+    public init(reason: String?, routine: String, routineRunID: String, status: RoutineFinishedStatus, summary: String?) {
+        self.reason = reason
+        self.routine = routine
+        self.routineRunID = routineRunID
+        self.status = status
+        self.summary = summary
+    }
+}
+
+public enum RoutineFinishedStatus: String, Codable {
+    case cancelled = "cancelled"
+    case failed = "failed"
+    case queued = "queued"
+    case running = "running"
+    case skipped = "skipped"
+    case succeeded = "succeeded"
+    case waiting = "waiting"
+}
+
+/// A routine's run ended, or a due firing was skipped (then ``reason`` says why).
+///
+/// ``status`` is ``succeeded``, ``failed``, ``cancelled`` or ``skipped``. A skipped
+/// firing sends this and no ``routine.fired``.
+// MARK: - RoutineFinished
+public struct RoutineFinished: Codable {
+    public let reason: String?
+    public let routine: String
+    public let routineRunID: String
+    public let status: RoutineFinishedStatus
+    public let summary: String?
+
+    public enum CodingKeys: String, CodingKey {
+        case reason = "reason"
+        case routine = "routine"
+        case routineRunID = "routine_run_id"
+        case status = "status"
+        case summary = "summary"
+    }
+
+    public init(reason: String?, routine: String, routineRunID: String, status: RoutineFinishedStatus, summary: String?) {
+        self.reason = reason
+        self.routine = routine
+        self.routineRunID = routineRunID
+        self.status = status
+        self.summary = summary
+    }
+}
+
+/// Server → every connection: a routine started a run. Not stored.
+// MARK: - RoutineFiredNotification
+public struct RoutineFiredNotification: Codable {
+    public let jsonrpc: Jsonrpc?
+    public let method: RoutineFiredNotificationMethod?
+    public let params: RoutineFiredNotificationParams
+
+    public enum CodingKeys: String, CodingKey {
+        case jsonrpc = "jsonrpc"
+        case method = "method"
+        case params = "params"
+    }
+
+    public init(jsonrpc: Jsonrpc?, method: RoutineFiredNotificationMethod?, params: RoutineFiredNotificationParams) {
+        self.jsonrpc = jsonrpc
+        self.method = method
+        self.params = params
+    }
+}
+
+public enum RoutineFiredNotificationMethod: String, Codable {
+    case routineFired = "routine.fired"
+}
+
+/// A routine started a run. ``scope`` is ``user`` or the project folder.
+// MARK: - RoutineFiredNotificationParams
+public struct RoutineFiredNotificationParams: Codable {
+    public let routine: String
+    public let routineRunID: String
+    public let scope: String
+    public let sessionID: String
+    public let trigger: Trigger
+
+    public enum CodingKeys: String, CodingKey {
+        case routine = "routine"
+        case routineRunID = "routine_run_id"
+        case scope = "scope"
+        case sessionID = "session_id"
+        case trigger = "trigger"
+    }
+
+    public init(routine: String, routineRunID: String, scope: String, sessionID: String, trigger: Trigger) {
+        self.routine = routine
+        self.routineRunID = routineRunID
+        self.scope = scope
+        self.sessionID = sessionID
+        self.trigger = trigger
+    }
+}
+
+public enum Trigger: String, Codable {
+    case hook = "hook"
+    case manual = "manual"
+    case schedule = "schedule"
+    case watch = "watch"
+}
+
+/// A routine started a run. ``scope`` is ``user`` or the project folder.
+// MARK: - RoutineFired
+public struct RoutineFired: Codable {
+    public let routine: String
+    public let routineRunID: String
+    public let scope: String
+    public let sessionID: String
+    public let trigger: Trigger
+
+    public enum CodingKeys: String, CodingKey {
+        case routine = "routine"
+        case routineRunID = "routine_run_id"
+        case scope = "scope"
+        case sessionID = "session_id"
+        case trigger = "trigger"
+    }
+
+    public init(routine: String, routineRunID: String, scope: String, sessionID: String, trigger: Trigger) {
+        self.routine = routine
+        self.routineRunID = routineRunID
+        self.scope = scope
+        self.sessionID = sessionID
+        self.trigger = trigger
+    }
+}
+
 /// ``routine.get``. A routine by name. ``folder`` picks a project routine.
 // MARK: - RoutineGetParams
 public struct RoutineGetParams: Codable {
@@ -10016,8 +10191,9 @@ public struct PurpleRoutineWatchConfig: Codable {
 ///
 /// The times are ISO 8601 with an offset. ``reason`` says why a firing was
 /// ``skipped``: ``missed``, ``paused``, ``untrusted``, ``still running`` or ``quiet``.
-/// ``scope`` is ``user`` or the project folder. Nothing fills these until the
-/// scheduler (4.2.2), so a list has none yet.
+/// ``scope`` is ``user`` or the project folder. ``summary`` is the last reply of a
+/// finished firing, cut short. ``status`` ``waiting`` is read from the session, it is
+/// never stored.
 // MARK: - RoutineRunSummaryElement
 public struct RoutineRunSummaryElement: Codable {
     public let dueAt: String?
@@ -10028,7 +10204,8 @@ public struct RoutineRunSummaryElement: Codable {
     public let scope: String
     public let sessionID: String?
     public let startedAt: String?
-    public let status: RoutineRunSummaryStatus
+    public let status: RoutineFinishedStatus
+    public let summary: String?
     public let trigger: Trigger
 
     public enum CodingKeys: String, CodingKey {
@@ -10041,10 +10218,11 @@ public struct RoutineRunSummaryElement: Codable {
         case sessionID = "session_id"
         case startedAt = "started_at"
         case status = "status"
+        case summary = "summary"
         case trigger = "trigger"
     }
 
-    public init(dueAt: String?, endedAt: String?, reason: String?, routine: String, routineRunID: String, scope: String, sessionID: String?, startedAt: String?, status: RoutineRunSummaryStatus, trigger: Trigger) {
+    public init(dueAt: String?, endedAt: String?, reason: String?, routine: String, routineRunID: String, scope: String, sessionID: String?, startedAt: String?, status: RoutineFinishedStatus, summary: String?, trigger: Trigger) {
         self.dueAt = dueAt
         self.endedAt = endedAt
         self.reason = reason
@@ -10054,25 +10232,9 @@ public struct RoutineRunSummaryElement: Codable {
         self.sessionID = sessionID
         self.startedAt = startedAt
         self.status = status
+        self.summary = summary
         self.trigger = trigger
     }
-}
-
-public enum RoutineRunSummaryStatus: String, Codable {
-    case cancelled = "cancelled"
-    case failed = "failed"
-    case queued = "queued"
-    case running = "running"
-    case skipped = "skipped"
-    case succeeded = "succeeded"
-    case waiting = "waiting"
-}
-
-public enum Trigger: String, Codable {
-    case hook = "hook"
-    case manual = "manual"
-    case schedule = "schedule"
-    case watch = "watch"
 }
 
 /// A routine and what the daemon knows about it.
@@ -10190,8 +10352,9 @@ public struct FluffyRoutineWatchConfig: Codable {
 ///
 /// The times are ISO 8601 with an offset. ``reason`` says why a firing was
 /// ``skipped``: ``missed``, ``paused``, ``untrusted``, ``still running`` or ``quiet``.
-/// ``scope`` is ``user`` or the project folder. Nothing fills these until the
-/// scheduler (4.2.2), so a list has none yet.
+/// ``scope`` is ``user`` or the project folder. ``summary`` is the last reply of a
+/// finished firing, cut short. ``status`` ``waiting`` is read from the session, it is
+/// never stored.
 // MARK: - RoutineInfoRoutineRunSummary
 public struct RoutineInfoRoutineRunSummary: Codable {
     public let dueAt: String?
@@ -10202,7 +10365,8 @@ public struct RoutineInfoRoutineRunSummary: Codable {
     public let scope: String
     public let sessionID: String?
     public let startedAt: String?
-    public let status: RoutineRunSummaryStatus
+    public let status: RoutineFinishedStatus
+    public let summary: String?
     public let trigger: Trigger
 
     public enum CodingKeys: String, CodingKey {
@@ -10215,10 +10379,11 @@ public struct RoutineInfoRoutineRunSummary: Codable {
         case sessionID = "session_id"
         case startedAt = "started_at"
         case status = "status"
+        case summary = "summary"
         case trigger = "trigger"
     }
 
-    public init(dueAt: String?, endedAt: String?, reason: String?, routine: String, routineRunID: String, scope: String, sessionID: String?, startedAt: String?, status: RoutineRunSummaryStatus, trigger: Trigger) {
+    public init(dueAt: String?, endedAt: String?, reason: String?, routine: String, routineRunID: String, scope: String, sessionID: String?, startedAt: String?, status: RoutineFinishedStatus, summary: String?, trigger: Trigger) {
         self.dueAt = dueAt
         self.endedAt = endedAt
         self.reason = reason
@@ -10228,6 +10393,7 @@ public struct RoutineInfoRoutineRunSummary: Codable {
         self.sessionID = sessionID
         self.startedAt = startedAt
         self.status = status
+        self.summary = summary
         self.trigger = trigger
     }
 }
@@ -10422,8 +10588,9 @@ public struct TentacledRoutineWatchConfig: Codable {
 ///
 /// The times are ISO 8601 with an offset. ``reason`` says why a firing was
 /// ``skipped``: ``missed``, ``paused``, ``untrusted``, ``still running`` or ``quiet``.
-/// ``scope`` is ``user`` or the project folder. Nothing fills these until the
-/// scheduler (4.2.2), so a list has none yet.
+/// ``scope`` is ``user`` or the project folder. ``summary`` is the last reply of a
+/// finished firing, cut short. ``status`` ``waiting`` is read from the session, it is
+/// never stored.
 // MARK: - PurpleRoutineRunSummary
 public struct PurpleRoutineRunSummary: Codable {
     public let dueAt: String?
@@ -10434,7 +10601,8 @@ public struct PurpleRoutineRunSummary: Codable {
     public let scope: String
     public let sessionID: String?
     public let startedAt: String?
-    public let status: RoutineRunSummaryStatus
+    public let status: RoutineFinishedStatus
+    public let summary: String?
     public let trigger: Trigger
 
     public enum CodingKeys: String, CodingKey {
@@ -10447,10 +10615,11 @@ public struct PurpleRoutineRunSummary: Codable {
         case sessionID = "session_id"
         case startedAt = "started_at"
         case status = "status"
+        case summary = "summary"
         case trigger = "trigger"
     }
 
-    public init(dueAt: String?, endedAt: String?, reason: String?, routine: String, routineRunID: String, scope: String, sessionID: String?, startedAt: String?, status: RoutineRunSummaryStatus, trigger: Trigger) {
+    public init(dueAt: String?, endedAt: String?, reason: String?, routine: String, routineRunID: String, scope: String, sessionID: String?, startedAt: String?, status: RoutineFinishedStatus, summary: String?, trigger: Trigger) {
         self.dueAt = dueAt
         self.endedAt = endedAt
         self.reason = reason
@@ -10460,6 +10629,7 @@ public struct PurpleRoutineRunSummary: Codable {
         self.sessionID = sessionID
         self.startedAt = startedAt
         self.status = status
+        self.summary = summary
         self.trigger = trigger
     }
 }
@@ -10494,12 +10664,50 @@ public struct RoutineRemoveResult: Codable {
     }
 }
 
+/// ``routine.run``. Fire a routine now, with ``trigger`` ``manual``.
+///
+/// It works while the routine is paused and still obeys trust. It is refused while
+/// the routine's previous run is still running or waiting.
+// MARK: - RoutineRunParams
+public struct RoutineRunParams: Codable {
+    public let folder: String?
+    public let name: String
+
+    public enum CodingKeys: String, CodingKey {
+        case folder = "folder"
+        case name = "name"
+    }
+
+    public init(folder: String?, name: String) {
+        self.folder = folder
+        self.name = name
+    }
+}
+
+/// The firing ``routine.run`` started, and the session it runs in.
+// MARK: - RoutineRunResult
+public struct RoutineRunResult: Codable {
+    public let routineRunID: String
+    public let sessionID: String
+
+    public enum CodingKeys: String, CodingKey {
+        case routineRunID = "routine_run_id"
+        case sessionID = "session_id"
+    }
+
+    public init(routineRunID: String, sessionID: String) {
+        self.routineRunID = routineRunID
+        self.sessionID = sessionID
+    }
+}
+
 /// One firing of a routine: a ``routine_run`` (ADR-050).
 ///
 /// The times are ISO 8601 with an offset. ``reason`` says why a firing was
 /// ``skipped``: ``missed``, ``paused``, ``untrusted``, ``still running`` or ``quiet``.
-/// ``scope`` is ``user`` or the project folder. Nothing fills these until the
-/// scheduler (4.2.2), so a list has none yet.
+/// ``scope`` is ``user`` or the project folder. ``summary`` is the last reply of a
+/// finished firing, cut short. ``status`` ``waiting`` is read from the session, it is
+/// never stored.
 // MARK: - RoutineRunSummary
 public struct RoutineRunSummary: Codable {
     public let dueAt: String?
@@ -10510,7 +10718,8 @@ public struct RoutineRunSummary: Codable {
     public let scope: String
     public let sessionID: String?
     public let startedAt: String?
-    public let status: RoutineRunSummaryStatus
+    public let status: RoutineFinishedStatus
+    public let summary: String?
     public let trigger: Trigger
 
     public enum CodingKeys: String, CodingKey {
@@ -10523,10 +10732,11 @@ public struct RoutineRunSummary: Codable {
         case sessionID = "session_id"
         case startedAt = "started_at"
         case status = "status"
+        case summary = "summary"
         case trigger = "trigger"
     }
 
-    public init(dueAt: String?, endedAt: String?, reason: String?, routine: String, routineRunID: String, scope: String, sessionID: String?, startedAt: String?, status: RoutineRunSummaryStatus, trigger: Trigger) {
+    public init(dueAt: String?, endedAt: String?, reason: String?, routine: String, routineRunID: String, scope: String, sessionID: String?, startedAt: String?, status: RoutineFinishedStatus, summary: String?, trigger: Trigger) {
         self.dueAt = dueAt
         self.endedAt = endedAt
         self.reason = reason
@@ -10536,6 +10746,7 @@ public struct RoutineRunSummary: Codable {
         self.sessionID = sessionID
         self.startedAt = startedAt
         self.status = status
+        self.summary = summary
         self.trigger = trigger
     }
 }
@@ -10697,8 +10908,9 @@ public struct StickyRoutineWatchConfig: Codable {
 ///
 /// The times are ISO 8601 with an offset. ``reason`` says why a firing was
 /// ``skipped``: ``missed``, ``paused``, ``untrusted``, ``still running`` or ``quiet``.
-/// ``scope`` is ``user`` or the project folder. Nothing fills these until the
-/// scheduler (4.2.2), so a list has none yet.
+/// ``scope`` is ``user`` or the project folder. ``summary`` is the last reply of a
+/// finished firing, cut short. ``status`` ``waiting`` is read from the session, it is
+/// never stored.
 // MARK: - FluffyRoutineRunSummary
 public struct FluffyRoutineRunSummary: Codable {
     public let dueAt: String?
@@ -10709,7 +10921,8 @@ public struct FluffyRoutineRunSummary: Codable {
     public let scope: String
     public let sessionID: String?
     public let startedAt: String?
-    public let status: RoutineRunSummaryStatus
+    public let status: RoutineFinishedStatus
+    public let summary: String?
     public let trigger: Trigger
 
     public enum CodingKeys: String, CodingKey {
@@ -10722,10 +10935,11 @@ public struct FluffyRoutineRunSummary: Codable {
         case sessionID = "session_id"
         case startedAt = "started_at"
         case status = "status"
+        case summary = "summary"
         case trigger = "trigger"
     }
 
-    public init(dueAt: String?, endedAt: String?, reason: String?, routine: String, routineRunID: String, scope: String, sessionID: String?, startedAt: String?, status: RoutineRunSummaryStatus, trigger: Trigger) {
+    public init(dueAt: String?, endedAt: String?, reason: String?, routine: String, routineRunID: String, scope: String, sessionID: String?, startedAt: String?, status: RoutineFinishedStatus, summary: String?, trigger: Trigger) {
         self.dueAt = dueAt
         self.endedAt = endedAt
         self.reason = reason
@@ -10735,6 +10949,7 @@ public struct FluffyRoutineRunSummary: Codable {
         self.sessionID = sessionID
         self.startedAt = startedAt
         self.status = status
+        self.summary = summary
         self.trigger = trigger
     }
 }

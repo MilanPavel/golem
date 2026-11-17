@@ -177,4 +177,23 @@ MIGRATIONS: tuple[tuple[str, ...], ...] = (
         )
         """,
     ),
+    (
+        """
+        CREATE TABLE routine_runs (
+            routine_run_id TEXT PRIMARY KEY,
+            routine TEXT NOT NULL,
+            scope TEXT NOT NULL,
+            session_id TEXT,
+            trigger TEXT NOT NULL,
+            due_at TEXT,
+            started_at TEXT,
+            ended_at TEXT,
+            status TEXT NOT NULL,
+            reason TEXT,
+            summary TEXT
+        )
+        """,
+        "CREATE INDEX routine_runs_routine ON routine_runs (scope, routine, started_at)",
+        "CREATE INDEX routine_runs_session ON routine_runs (session_id)",
+    ),
 )

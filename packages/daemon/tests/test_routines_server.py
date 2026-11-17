@@ -2,13 +2,16 @@
 
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime
 from pathlib import Path
 from typing import cast
 from zoneinfo import ZoneInfo
 
+from fakes import ToolCallingChatModel
 from test_server import HELLO, RpcClient, error_code, rpc_result, start_daemon, stop_daemon
 
+from golem.models.router import ModelRouter
 from golem.server.dispatcher import INVALID_PARAMS
 
 NOW = datetime(2026, 2, 6, 9, 0, tzinfo=ZoneInfo("Europe/Prague"))  # a Friday
@@ -166,6 +169,48 @@ async def test_update_refuses_what_is_wrong_and_a_project_routine(short_home: Pa
         for method, params in bad:
             assert error_code(await client.call(method, params)) == INVALID_PARAMS, (method, params)
         assert "weekdays 08:30" in (short_home / "config.toml").read_text(encoding="utf-8")
+    finally:
+        await client.close()
+        await stop_daemon(app, task)
+
+
+async def test_run_fires_a_headless_session_and_get_lists_the_firing(short_home: Path) -> None:
+    (short_home / "config.toml").write_text(
+        BRIEF.replace('folder = "~/work"\n', "").replace("/brief", "Brief me."), "utf-8"
+    )
+    router = ModelRouter(model=ToolCallingChatModel(replies=["Three PRs need you."]))
+    app, task = await start_daemon(short_home, router=router)
+    client = await RpcClient.connect(app.paths.socket_path)
+    try:
+        await client.call("hello", HELLO)
+        run = rpc_result(await client.call("routine.run", {"name": "morning-brief"}))
+        session_id = run["session_id"]
+
+        sessions = rpc_result(await client.call("session.list", {}))["sessions"]
+        (summary,) = [s for s in cast(Rows, sessions) if s["session_id"] == session_id]
+        assert summary["origin"] == "routine:morning-brief"
+
+        async with asyncio.timeout(5):
+            while True:
+                got = rpc_result(await client.call("routine.get", {"name": "morning-brief"}))
+                (row,) = cast(Rows, got["runs"])
+                if row["status"] != "running":
+                    break
+                await asyncio.sleep(0.02)
+        assert (row["routine_run_id"], row["trigger"], row["status"]) == (
+            run["routine_run_id"],
+            "manual",
+            "succeeded",
+        )
+        assert row["summary"] == "Three PRs need you."
+        last = cast(dict[str, object], cast(dict[str, object], got["routine"])["last"])
+        assert last["routine_run_id"] == run["routine_run_id"]
+
+        await client.take_events()
+        methods = [n.get("method") for n in client.notices]
+        assert "routine.fired" in methods and "routine.finished" in methods
+
+        assert error_code(await client.call("routine.run", {"name": "nope"})) == INVALID_PARAMS
     finally:
         await client.close()
         await stop_daemon(app, task)

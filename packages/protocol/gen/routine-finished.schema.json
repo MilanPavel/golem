@@ -1,0 +1,60 @@
+{
+  "additionalProperties": false,
+  "description": "A routine's run ended, or a due firing was skipped (then ``reason`` says why).\n\n``status`` is ``succeeded``, ``failed``, ``cancelled`` or ``skipped``. A skipped\nfiring sends this and no ``routine.fired``.",
+  "properties": {
+    "reason": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Reason"
+    },
+    "routine": {
+      "minLength": 1,
+      "title": "Routine",
+      "type": "string"
+    },
+    "routine_run_id": {
+      "minLength": 1,
+      "title": "Routine Run Id",
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "queued",
+        "running",
+        "waiting",
+        "succeeded",
+        "failed",
+        "skipped",
+        "cancelled"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "summary": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Summary"
+    }
+  },
+  "required": [
+    "routine",
+    "routine_run_id",
+    "status"
+  ],
+  "title": "RoutineFinished",
+  "type": "object"
+}

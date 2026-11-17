@@ -23,6 +23,7 @@ export type Scope = string;
 export type SessionId = string | null;
 export type StartedAt = string | null;
 export type Status = 'queued' | 'running' | 'waiting' | 'succeeded' | 'failed' | 'skipped' | 'cancelled';
+export type Summary = string | null;
 export type Trigger = 'schedule' | 'watch' | 'manual' | 'hook';
 export type NextAt = string | null;
 export type Path = string;
@@ -97,8 +98,9 @@ export interface RoutineWatchConfig {
  *
  * The times are ISO 8601 with an offset. ``reason`` says why a firing was
  * ``skipped``: ``missed``, ``paused``, ``untrusted``, ``still running`` or ``quiet``.
- * ``scope`` is ``user`` or the project folder. Nothing fills these until the
- * scheduler (4.2.2), so a list has none yet.
+ * ``scope`` is ``user`` or the project folder. ``summary`` is the last reply of a
+ * finished firing, cut short. ``status`` ``waiting`` is read from the session, it is
+ * never stored.
  *
  * This interface was referenced by `RoutineUpdateResult`'s JSON-Schema
  * via the `definition` "RoutineRunSummary".
@@ -113,5 +115,6 @@ export interface RoutineRunSummary {
   session_id?: SessionId;
   started_at?: StartedAt;
   status: Status;
+  summary?: Summary;
   trigger: Trigger;
 }

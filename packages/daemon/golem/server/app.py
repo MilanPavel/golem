@@ -43,6 +43,7 @@ from golem.models.window_plans import WindowPlans
 from golem.notify import Notifier, Poster, SessionFacts, default_poster
 from golem.paths import GolemPaths, resolve_paths
 from golem.permissions.policy import Policy
+from golem.routine_scheduler import RoutineScheduler
 from golem.secrets import KeychainSecrets, SecretStore
 from golem.server.connection import ClientConnection
 from golem.server.dispatcher import (
@@ -54,6 +55,7 @@ from golem.server.dispatcher import (
 from golem.server.framing import MAX_LINE_BYTES, FrameTooLong, read_frame
 from golem.server.handlers import standard_methods
 from golem.server.mcp_model import turn_on_for_model
+from golem.server.routine_launch import SessionLauncher
 from golem.server.start_error import (
     clear_start_error,
     describe_database_too_new,
@@ -78,6 +80,7 @@ from golem.store.checkpoints import open_checkpoints
 from golem.store.database import Database, DatabaseTooNewError
 from golem.store.events import EventLog
 from golem.store.records import RunRecords, SessionRecords
+from golem.store.routine_runs import RoutineRuns
 from golem.tools import default_registry
 from golem.tools.registry import ToolScope
 from golem_protocol.commands import KeychainWait, ModelServerStatus
@@ -337,6 +340,16 @@ class DaemonApp:
                     bus,
                     self._poster or default_poster(self.paths.home),
                 )
+                self.state.routine_runs = RoutineRuns(database)
+                routines = RoutineScheduler(
+                    runs=self.state.routine_runs,
+                    launcher=SessionLauncher(sessions, mcp),
+                    user_file=self.paths.config_file,
+                    broadcast=self._broadcast,
+                    now=lambda: self.state.clock(),
+                )
+                bus.observe(routines.on_event)
+                self.state.routines = routines
 
                 async def enable_mcp(session_id: str, scope: ToolScope, name: str) -> list[str]:
                     return await turn_on_for_model(sessions, mcp, session_id, scope, name)
@@ -393,6 +406,7 @@ class DaemonApp:
                     log.info("listening on %s", self.paths.socket_path)
                     mcp.start()
                     self.state.skills.start()
+                    routines.start()
                     idle = asyncio.create_task(_stop_idle(local), name="golem-ollama-idle")
                     watch = asyncio.create_task(self._watch_socket(), name="golem-socket-watch")
                     await self._stop.wait()
@@ -435,6 +449,8 @@ class DaemonApp:
             self.state.local_servers = None
             self.state.usage = None
             self.state.notifier = None
+            self.state.routines = None
+            self.state.routine_runs = None
             self.state.sessions = None
             self._lock.release()
 
@@ -527,6 +543,8 @@ class DaemonApp:
         self._draining = True
         if self._server is not None:
             self._server.close()
+        if self.state.routines is not None:
+            await self.state.routines.aclose()
         if self.state.sessions is not None:
             await self.state.sessions.cancel_all()
         await self._dispatcher.drain()

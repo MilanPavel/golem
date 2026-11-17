@@ -27,6 +27,9 @@ class JsonFormatter(logging.Formatter):
             "logger": record.name,
             "message": record.getMessage(),
         }
+        routine = getattr(record, "routine", None)
+        if isinstance(routine, str):
+            payload["routine"] = routine
         if record.exc_info:
             payload["exc_info"] = self.formatException(record.exc_info)
         return json.dumps(payload, ensure_ascii=False)

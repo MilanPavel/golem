@@ -17,10 +17,16 @@ from typing import Any, cast
 
 from pydantic import ValidationError
 
-from golem.config import RoutineSettings
+from golem.config import RoutineSettings, load_mcp
 from golem.config_raw import line_of
 
-__all__ = ["RoutineFile", "RoutineProblem", "project_config", "read_routines"]
+__all__ = [
+    "RoutineFile",
+    "RoutineProblem",
+    "project_config",
+    "read_project_routines",
+    "read_routines",
+]
 
 
 def project_config(folder: Path) -> Path:
@@ -91,6 +97,25 @@ def read_routines(
         else:
             problems.extend(found)
     return RoutineFile(routines, problems)
+
+
+def read_project_routines(user_file: Path, folder: Path, trusted: bool) -> RoutineFile:
+    """The routines of a project's file, held to the project rules only when ``trusted``.
+
+    An untrusted folder is read to show what is blocked. Nothing from it is scheduled.
+    """
+    path = project_config(folder)
+    if not trusted:
+        return read_routines(path)
+    known = frozenset(_mcp_names(user_file) | _mcp_names(path))
+    return read_routines(path, project=folder, known_mcp=known)
+
+
+def _mcp_names(path: Path) -> set[str]:
+    try:
+        return set(load_mcp(path))
+    except ValueError:
+        return set()
 
 
 def _one(
