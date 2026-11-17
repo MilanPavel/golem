@@ -16,6 +16,7 @@ export const GALLERY_SECTIONS = [
   "sessions-panel",
   "sidebar",
   "rail",
+  "sessions-flyout",
   "inbox-panel",
   "folder-browser",
   "setup-form",

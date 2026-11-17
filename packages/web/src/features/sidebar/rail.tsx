@@ -1,4 +1,4 @@
-import type { ComponentProps, ReactNode } from "react";
+import type { ComponentProps, ReactElement, ReactNode } from "react";
 import { cn } from "../../ui/cn.ts";
 import type { GolemState } from "../../ui/golem-state.ts";
 import { GearIcon, InboxIcon, PlusIcon, RoutinesIcon, RunsIcon, SearchIcon, SessionsIcon, WorkflowsIcon } from "../../ui/icons.tsx";
@@ -31,6 +31,8 @@ export type RailProps = {
   onSettings: () => void;
   /** The settings page is the one in view. */
   settingsOpen?: boolean;
+  /** Wraps an item's button, for a flyout that opens from it. */
+  wrap?: Partial<Record<RailItem, (button: ReactElement) => ReactElement>>;
   /** The landmark's name. A page has one rail; the gallery shows several and names each. */
   label?: string;
 };
@@ -53,12 +55,14 @@ type RailButtonProps = Omit<ComponentProps<"button">, "aria-label" | "children">
   bar?: boolean;
   /** The icon holds the current item. */
   on?: boolean;
+  /** Keep the tooltip closed, such as while a flyout from the icon is open. */
+  hideTooltip?: boolean;
   children: ReactNode;
 };
 
-function RailButton({ label, bar = false, on = false, className, children, type = "button", ...props }: RailButtonProps) {
+function RailButton({ label, bar = false, on = false, hideTooltip = false, className, children, type = "button", ...props }: RailButtonProps) {
   return (
-    <Tooltip>
+    <Tooltip open={hideTooltip ? false : undefined}>
       <TooltipTrigger asChild>
         <button
           type={type}
@@ -103,6 +107,7 @@ export function Rail({
   onSearch,
   onSettings,
   settingsOpen = false,
+  wrap,
   label = "Sidebar rail",
 }: RailProps) {
   const golem = golemName(version, connected);
@@ -110,7 +115,8 @@ export function Rail({
     const [name, Icon] = ITEMS[id];
     const waiting = id === "inbox" && inboxCount > 0;
     const isPicked = picked === id;
-    return (
+    const wrapper = wrap?.[id];
+    const button = (
       <RailButton
         label={waiting ? `Inbox, ${inboxCount} waiting` : name}
         on={isPicked}
@@ -131,6 +137,7 @@ export function Rail({
         ) : null}
       </RailButton>
     );
+    return wrapper ? wrapper(button) : button;
   };
   return (
     <nav aria-label={label} className="flex h-full w-rail shrink-0 flex-col items-center gap-1 border-r border-line bg-sunken py-2.5">

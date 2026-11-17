@@ -1522,6 +1522,26 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
         </div>
       </section>
 
+      <section className="mt-6" id={anchor("Sessions flyout")}>
+        <h3 className="mb-2 font-mono text-xs text-faint">Sessions flyout</h3>
+        <figure className="m-0">
+          <div
+            role="dialog"
+            aria-label={`Sessions, flyout, ${theme}`}
+            className="max-h-96 w-67 overflow-y-auto rounded-lg border border-line-strong bg-surface p-2 text-sm text-ink shadow-soft"
+          >
+            <SessionsPanel
+              sessions={SESSIONS}
+              selectedId="b"
+              now={NOW}
+              onNavigate={() => {}}
+              actions={{ rename: () => Promise.resolve(), close: () => Promise.resolve() }}
+            />
+          </div>
+          <figcaption className="mt-1 font-mono text-xs text-faint">opens beside the Sessions icon while the panel is hidden</figcaption>
+        </figure>
+      </section>
+
       <section className="mt-6" id={anchor("Inbox panel")}>
         <h3 className="mb-2 font-mono text-xs text-faint">Inbox panel</h3>
         <div className="flex flex-wrap items-start gap-4">
