@@ -94,6 +94,7 @@ export const LOCAL_ONLY_METHODS: ReadonlySet<string> = new Set([
   "auth.remove",
   "auth.set",
   "config.raw.set_protected",
+  "eval.routing",
   "notify.test",
   "skill.create_protected",
   "skill.write_protected",

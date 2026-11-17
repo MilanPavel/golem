@@ -1436,6 +1436,40 @@ test("getCost sends the session id when it has one and checks what comes back", 
   }
 });
 
+test("evalRouting sends days and the session id and checks what comes back", async () => {
+  const sent: Record<string, unknown>[] = [];
+  const row = { name: "auto", calls: 1, input: 2, output: 3, cost_usd: 0.5, cuts: 0, clears: 0, summaries: 0 };
+  const result = { days: 14, sessions: 1, calls: 1, skipped: 0, scenarios: [row], actual: row, top: [] };
+  const server = await listen((socket) => {
+    attach(socket, {
+      answerPing: true,
+      results: { "eval.routing": result },
+      onRequest: (_socket, method, params) => {
+        if (method === "eval.routing") sent.push(params);
+      },
+    });
+  });
+  const client = connectGolem({ socketPath: server.socketPath, clientName: "web", reconnect: false, heartbeatMs: 60_000 });
+  try {
+    assert.deepEqual(await client.evalRouting(), result);
+    await client.evalRouting(7, "s_test");
+    assert.deepEqual(sent, [{}, { days: 7, session_id: "s_test" }]);
+  } finally {
+    client.close();
+    await server.close();
+  }
+  const bad = await listen((socket) => {
+    attach(socket, { answerPing: true, results: { "eval.routing": { days: 14 } } });
+  });
+  const refused = connectGolem({ socketPath: bad.socketPath, clientName: "web", reconnect: false, heartbeatMs: 60_000 });
+  try {
+    await assert.rejects(() => refused.evalRouting(), /invalid eval.routing result/);
+  } finally {
+    refused.close();
+    await bad.close();
+  }
+});
+
 test("getRouting and setRouting send their params and check what comes back", async () => {
   const sent: [string, Record<string, unknown>][] = [];
   const values = {

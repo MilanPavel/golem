@@ -107,6 +107,7 @@ import type { SessionCreateResult } from "../../protocol/gen/session-create-resu
 import type { SessionForkResult } from "../../protocol/gen/session-fork-result.ts";
 import type { SessionInspectResult } from "../../protocol/gen/session-inspect-result.ts";
 import type { CostGetResult } from "../../protocol/gen/cost-get-result.ts";
+import type { EvalRoutingResult } from "../../protocol/gen/eval-routing-result.ts";
 import type { RoutingGetResult } from "../../protocol/gen/routing-get-result.ts";
 import type { RoutingSetParams } from "../../protocol/gen/routing-set-params.ts";
 import type { RoutingSetResult } from "../../protocol/gen/routing-set-result.ts";
@@ -188,6 +189,7 @@ import {
   isSessionForkResult,
   isSessionInspectResult,
   isCostGetResult,
+  isEvalRoutingResult,
   isRoutingGetResult,
   isRoutingSetResult,
   isTraceGetResult,
@@ -312,6 +314,8 @@ export interface GolemClient {
   /** A session's runs as a tree: run, then model call, then tool call. Oldest run first. */
   /** What model calls cost: today, the week, and with a session id that session. */
   getCost(sessionId?: string): Promise<CostGetResult>;
+  /** What the recorded sessions of the last `days` days would have cost on each route. A calculation, no model call. */
+  evalRouting(days?: number, sessionId?: string): Promise<EvalRoutingResult>;
   /** The routing, budget and context settings as golem uses them, and what it picks for an empty tier. */
   getRouting(): Promise<RoutingGetResult>;
   /**
@@ -1297,6 +1301,17 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       const result = await call("cost.get", sessionId === undefined ? {} : { session_id: sessionId });
       if (!isCostGetResult(result)) {
         throw new Error("invalid cost.get result");
+      }
+      return result;
+    },
+    async evalRouting(days?: number, sessionId?: string): Promise<EvalRoutingResult> {
+      await ready;
+      const params: Record<string, unknown> = {};
+      if (days !== undefined) params["days"] = days;
+      if (sessionId !== undefined) params["session_id"] = sessionId;
+      const result = await call("eval.routing", params);
+      if (!isEvalRoutingResult(result)) {
+        throw new Error("invalid eval.routing result");
       }
       return result;
     },

@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import sqlite3
 from dataclasses import dataclass, field
+from datetime import datetime
 from typing import Literal, cast
 
 from golem.config import PERMISSION_MODES, PermissionMode, RouteMode
@@ -119,6 +120,23 @@ class SessionRecords:
             (cwd, cwd, limit),
         )
         return [_activity(row) for row in rows]
+
+    async def updated_since(self, cutoff: datetime) -> list[str]:
+        """Ids of the sessions, closed ones too, with an event at or after ``cutoff``."""
+        rows = await self._database.fetch_all(
+            "SELECT session_id, updated_at FROM sessions ORDER BY updated_at, session_id", ()
+        )
+        found: list[str] = []
+        for row in rows:
+            try:
+                when = datetime.fromisoformat(str(row["updated_at"]))
+            except ValueError:
+                continue
+            if when.tzinfo is None:
+                when = when.replace(tzinfo=cutoff.tzinfo)
+            if when >= cutoff:
+                found.append(str(row["session_id"]))
+        return found
 
     async def waiting_run_id(self, session_id: str) -> str | None:
         """The newest run of ``session_id`` that waits for an answer, if any."""

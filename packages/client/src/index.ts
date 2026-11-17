@@ -104,6 +104,7 @@ export type { RoutingPicked } from "../../protocol/gen/routing-picked.ts";
 export type { RoutingRoles } from "../../protocol/gen/routing-roles.ts";
 export type { RoutingValues } from "../../protocol/gen/routing-values.ts";
 export type { CostDayRow, CostGetResult, CostModelRow, CostTotals } from "../../protocol/gen/cost-get-result.ts";
+export type { EvalRoutingResult, EvalScenarioRow, EvalTopSession } from "../../protocol/gen/eval-routing-result.ts";
 export type { TraceGetResult } from "../../protocol/gen/trace-get-result.ts";
 export type { TraceMessage } from "../../protocol/gen/trace-message.ts";
 export type { TraceModelSpan } from "../../protocol/gen/trace-model-span.ts";

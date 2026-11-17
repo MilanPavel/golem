@@ -65,6 +65,7 @@ import type { SessionCloseResult } from "../../protocol/gen/session-close-result
 import type { SessionCreateResult } from "../../protocol/gen/session-create-result.ts";
 import type { SessionForkResult } from "../../protocol/gen/session-fork-result.ts";
 import type { CostGetResult } from "../../protocol/gen/cost-get-result.ts";
+import type { EvalRoutingResult } from "../../protocol/gen/eval-routing-result.ts";
 import type { RoutingGetResult } from "../../protocol/gen/routing-get-result.ts";
 import type { RoutingSetResult } from "../../protocol/gen/routing-set-result.ts";
 import type { TraceGetResult } from "../../protocol/gen/trace-get-result.ts";
@@ -653,6 +654,27 @@ export function isCostGetResult(value: unknown): value is CostGetResult {
     (value["session"] == null || isCostTotals(value["session"])) &&
     (value["by_model"] === undefined || Array.isArray(value["by_model"])) &&
     (value["by_day"] === undefined || Array.isArray(value["by_day"]))
+  );
+}
+
+function isEvalRow(value: unknown): boolean {
+  return (
+    isRecord(value) &&
+    typeof value["name"] === "string" &&
+    ["calls", "input", "output", "cost_usd", "cuts", "clears", "summaries"].every(
+      (key) => typeof value[key] === "number",
+    )
+  );
+}
+
+export function isEvalRoutingResult(value: unknown): value is EvalRoutingResult {
+  return (
+    isRecord(value) &&
+    ["days", "sessions", "calls", "skipped"].every((key) => typeof value[key] === "number") &&
+    isEvalRow(value["actual"]) &&
+    (value["scenarios"] === undefined ||
+      (Array.isArray(value["scenarios"]) && value["scenarios"].every(isEvalRow))) &&
+    (value["top"] === undefined || Array.isArray(value["top"]))
   );
 }
 

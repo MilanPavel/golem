@@ -1,0 +1,167 @@
+{
+  "$defs": {
+    "EvalScenarioRow": {
+      "additionalProperties": false,
+      "description": "One scenario over every session asked for.\n\n``cuts`` are prompts that would not fit the model's window. ``step_ups`` is null for a\nscenario that never steps up. ``peak_share`` is the largest share of a window one prompt\ntook, from 0 to 1, and null when no window was known.",
+      "properties": {
+        "calls": {
+          "minimum": 0,
+          "title": "Calls",
+          "type": "integer"
+        },
+        "clears": {
+          "minimum": 0,
+          "title": "Clears",
+          "type": "integer"
+        },
+        "cost_usd": {
+          "minimum": 0,
+          "title": "Cost Usd",
+          "type": "number"
+        },
+        "cuts": {
+          "minimum": 0,
+          "title": "Cuts",
+          "type": "integer"
+        },
+        "input": {
+          "minimum": 0,
+          "title": "Input",
+          "type": "integer"
+        },
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "output": {
+          "minimum": 0,
+          "title": "Output",
+          "type": "integer"
+        },
+        "peak_share": {
+          "anyOf": [
+            {
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Peak Share"
+        },
+        "step_ups": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Step Ups"
+        },
+        "summaries": {
+          "minimum": 0,
+          "title": "Summaries",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "name",
+        "calls",
+        "input",
+        "output",
+        "cost_usd",
+        "cuts",
+        "clears",
+        "summaries"
+      ],
+      "title": "EvalScenarioRow",
+      "type": "object"
+    },
+    "EvalTopSession": {
+      "additionalProperties": false,
+      "description": "A session where ``auto`` would have spent much. No title and no text.",
+      "properties": {
+        "calls": {
+          "minimum": 0,
+          "title": "Calls",
+          "type": "integer"
+        },
+        "cost_usd": {
+          "minimum": 0,
+          "title": "Cost Usd",
+          "type": "number"
+        },
+        "session_id": {
+          "minLength": 1,
+          "title": "Session Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "session_id",
+        "calls",
+        "cost_usd"
+      ],
+      "title": "EvalTopSession",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "``scenarios`` are the what-if rows, ``actual`` is what really ran. ``skipped`` counts the\nmodel calls that could not be sized (an old event, or a failed call) and are in no row.\n``top`` are the sessions where ``auto`` would have spent most, the dearest first.",
+  "properties": {
+    "actual": {
+      "$ref": "#/$defs/EvalScenarioRow"
+    },
+    "calls": {
+      "minimum": 0,
+      "title": "Calls",
+      "type": "integer"
+    },
+    "days": {
+      "minimum": 1,
+      "title": "Days",
+      "type": "integer"
+    },
+    "scenarios": {
+      "items": {
+        "$ref": "#/$defs/EvalScenarioRow"
+      },
+      "title": "Scenarios",
+      "type": "array"
+    },
+    "sessions": {
+      "minimum": 0,
+      "title": "Sessions",
+      "type": "integer"
+    },
+    "skipped": {
+      "minimum": 0,
+      "title": "Skipped",
+      "type": "integer"
+    },
+    "top": {
+      "items": {
+        "$ref": "#/$defs/EvalTopSession"
+      },
+      "title": "Top",
+      "type": "array"
+    }
+  },
+  "required": [
+    "days",
+    "sessions",
+    "calls",
+    "skipped",
+    "actual"
+  ],
+  "title": "EvalRoutingResult",
+  "type": "object"
+}

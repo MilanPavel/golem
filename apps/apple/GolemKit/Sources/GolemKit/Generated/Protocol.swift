@@ -2134,6 +2134,189 @@ public struct EmptyEventData: Codable {
     }
 }
 
+/// ``eval.routing``. What the recorded sessions of the last ``days`` days would have cost
+/// on a frontier model, on a local model and on ``auto``. A calculation over the stored
+/// events: it calls no model. With ``session_id``, only that session. Not for a browser.
+// MARK: - EvalRoutingParams
+public struct EvalRoutingParams: Codable {
+    public let days: Int?
+    public let sessionID: String?
+
+    public enum CodingKeys: String, CodingKey {
+        case days = "days"
+        case sessionID = "session_id"
+    }
+
+    public init(days: Int?, sessionID: String?) {
+        self.days = days
+        self.sessionID = sessionID
+    }
+}
+
+/// ``scenarios`` are the what-if rows, ``actual`` is what really ran. ``skipped`` counts the
+/// model calls that could not be sized (an old event, or a failed call) and are in no row.
+/// ``top`` are the sessions where ``auto`` would have spent most, the dearest first.
+// MARK: - EvalRoutingResult
+public struct EvalRoutingResult: Codable {
+    public let actual: ActualClass
+    public let calls: Int
+    public let days: Int
+    public let scenarios: [ActualClass]?
+    public let sessions: Int
+    public let skipped: Int
+    public let top: [TopElement]?
+
+    public enum CodingKeys: String, CodingKey {
+        case actual = "actual"
+        case calls = "calls"
+        case days = "days"
+        case scenarios = "scenarios"
+        case sessions = "sessions"
+        case skipped = "skipped"
+        case top = "top"
+    }
+
+    public init(actual: ActualClass, calls: Int, days: Int, scenarios: [ActualClass]?, sessions: Int, skipped: Int, top: [TopElement]?) {
+        self.actual = actual
+        self.calls = calls
+        self.days = days
+        self.scenarios = scenarios
+        self.sessions = sessions
+        self.skipped = skipped
+        self.top = top
+    }
+}
+
+/// One scenario over every session asked for.
+///
+/// ``cuts`` are prompts that would not fit the model's window. ``step_ups`` is null for a
+/// scenario that never steps up. ``peak_share`` is the largest share of a window one prompt
+/// took, from 0 to 1, and null when no window was known.
+// MARK: - ActualClass
+public struct ActualClass: Codable {
+    public let calls: Int
+    public let clears: Int
+    public let costUsd: Double
+    public let cuts: Int
+    public let input: Int
+    public let name: String
+    public let output: Int
+    public let peakShare: Double?
+    public let stepUPS: Int?
+    public let summaries: Int
+
+    public enum CodingKeys: String, CodingKey {
+        case calls = "calls"
+        case clears = "clears"
+        case costUsd = "cost_usd"
+        case cuts = "cuts"
+        case input = "input"
+        case name = "name"
+        case output = "output"
+        case peakShare = "peak_share"
+        case stepUPS = "step_ups"
+        case summaries = "summaries"
+    }
+
+    public init(calls: Int, clears: Int, costUsd: Double, cuts: Int, input: Int, name: String, output: Int, peakShare: Double?, stepUPS: Int?, summaries: Int) {
+        self.calls = calls
+        self.clears = clears
+        self.costUsd = costUsd
+        self.cuts = cuts
+        self.input = input
+        self.name = name
+        self.output = output
+        self.peakShare = peakShare
+        self.stepUPS = stepUPS
+        self.summaries = summaries
+    }
+}
+
+/// A session where ``auto`` would have spent much. No title and no text.
+// MARK: - TopElement
+public struct TopElement: Codable {
+    public let calls: Int
+    public let costUsd: Double
+    public let sessionID: String
+
+    public enum CodingKeys: String, CodingKey {
+        case calls = "calls"
+        case costUsd = "cost_usd"
+        case sessionID = "session_id"
+    }
+
+    public init(calls: Int, costUsd: Double, sessionID: String) {
+        self.calls = calls
+        self.costUsd = costUsd
+        self.sessionID = sessionID
+    }
+}
+
+/// One scenario over every session asked for.
+///
+/// ``cuts`` are prompts that would not fit the model's window. ``step_ups`` is null for a
+/// scenario that never steps up. ``peak_share`` is the largest share of a window one prompt
+/// took, from 0 to 1, and null when no window was known.
+// MARK: - EvalScenarioRow
+public struct EvalScenarioRow: Codable {
+    public let calls: Int
+    public let clears: Int
+    public let costUsd: Double
+    public let cuts: Int
+    public let input: Int
+    public let name: String
+    public let output: Int
+    public let peakShare: Double?
+    public let stepUPS: Int?
+    public let summaries: Int
+
+    public enum CodingKeys: String, CodingKey {
+        case calls = "calls"
+        case clears = "clears"
+        case costUsd = "cost_usd"
+        case cuts = "cuts"
+        case input = "input"
+        case name = "name"
+        case output = "output"
+        case peakShare = "peak_share"
+        case stepUPS = "step_ups"
+        case summaries = "summaries"
+    }
+
+    public init(calls: Int, clears: Int, costUsd: Double, cuts: Int, input: Int, name: String, output: Int, peakShare: Double?, stepUPS: Int?, summaries: Int) {
+        self.calls = calls
+        self.clears = clears
+        self.costUsd = costUsd
+        self.cuts = cuts
+        self.input = input
+        self.name = name
+        self.output = output
+        self.peakShare = peakShare
+        self.stepUPS = stepUPS
+        self.summaries = summaries
+    }
+}
+
+/// A session where ``auto`` would have spent much. No title and no text.
+// MARK: - EvalTopSession
+public struct EvalTopSession: Codable {
+    public let calls: Int
+    public let costUsd: Double
+    public let sessionID: String
+
+    public enum CodingKeys: String, CodingKey {
+        case calls = "calls"
+        case costUsd = "cost_usd"
+        case sessionID = "session_id"
+    }
+
+    public init(calls: Int, costUsd: Double, sessionID: String) {
+        self.calls = calls
+        self.costUsd = costUsd
+        self.sessionID = sessionID
+    }
+}
+
 /// One change to one file, recorded before this event was sent.
 ///
 /// ``path`` is relative to the session folder. ``call_id`` is the tool call that

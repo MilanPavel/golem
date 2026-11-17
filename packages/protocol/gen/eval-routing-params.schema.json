@@ -1,0 +1,28 @@
+{
+  "additionalProperties": false,
+  "description": "``eval.routing``. What the recorded sessions of the last ``days`` days would have cost\non a frontier model, on a local model and on ``auto``. A calculation over the stored\nevents: it calls no model. With ``session_id``, only that session. Not for a browser.",
+  "properties": {
+    "days": {
+      "default": 14,
+      "maximum": 3650,
+      "minimum": 1,
+      "title": "Days",
+      "type": "integer"
+    },
+    "session_id": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Session Id"
+    }
+  },
+  "title": "EvalRoutingParams",
+  "type": "object"
+}
