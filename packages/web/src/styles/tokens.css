@@ -38,6 +38,7 @@
   --color-ctx-replies: light-dark(#95752F, #D9B45E);
   --color-ctx-results: light-dark(#8A5A86, #B98BB4);
   --color-ctx-summary: light-dark(#3F8A8A, #6FB5B5);
+  --color-ctx-summary-soft: light-dark(#D8EBEA, #182A2A);
 
   /* A user message in the chat: 15 px. */
   --text-chat: 0.9375rem;
@@ -178,6 +179,11 @@
 }
 @utility cols-route-job {
   grid-template-columns: 1fr 12rem;
+}
+/* The reply zone of the window bar: the sunken ground with thin diagonal lines. */
+@utility bg-hatch {
+  background-color: var(--color-sunken);
+  background-image: repeating-linear-gradient(135deg, transparent 0 6px, color-mix(in srgb, var(--color-line-strong) 55%, transparent) 6px 7px);
 }
 @utility cols-route-long {
   grid-template-columns: 1fr 1.1fr;

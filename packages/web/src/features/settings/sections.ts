@@ -7,6 +7,7 @@ export const SECTIONS: readonly SettingsSection[] = [
   { id: "skills", title: "Skills" },
   { id: "keys", title: "API keys" },
   { id: "routing", title: "Routing" },
+  { id: "context", title: "Context" },
   { id: "usage", title: "Usage" },
   { id: "rules", title: "Tool rules" },
   { id: "config", title: "Config file" },

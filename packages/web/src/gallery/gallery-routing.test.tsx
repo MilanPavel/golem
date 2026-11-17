@@ -20,6 +20,10 @@ for (const theme of ["slip", "kiln"] as const) {
       if (label === "Local only") expect(group.getByRole("button", { name: /^Paid gate: closed · local only/ })).toBeTruthy();
       if (label === "Paid never") expect(group.getByRole("button", { name: /^Paid gate: closed\./ })).toBeTruthy();
       if (label === "Auto with no frontier model") expect(group.getAllByText(/the path ends at Budget/).length).toBe(2);
+      const card = group.getByRole("region", { name: "Context window and long chats" });
+      expect(within(card).getByRole("button", { name: "Settings › Context →" })).toBeTruthy();
+      expect(group.queryByText("Long chats on a local model")).toBeNull();
+      expect(group.queryByRole("img", { name: "How full the window gets during a long chat" })).toBeNull();
       if (Object.keys(errors).length > 0) expect(group.getAllByRole("alert").length).toBeGreaterThan(0);
       await expectAxeClean(region, DIALOG_RULES);
     });

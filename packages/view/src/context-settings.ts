@@ -1,7 +1,5 @@
-import { ROUTING_WORDS, toPercent, windowSize, type ContextSettings, type RouteMode } from "./routing.ts";
+import { toPercent, windowSize, type ContextSettings, type RouteMode } from "./routing.ts";
 import { providerName } from "./setup-window.ts";
-
-const LONG = ROUTING_WORDS.long;
 
 /** The words of Settings › Context. */
 export const CONTEXT_WORDS = {
@@ -28,16 +26,18 @@ export const CONTEXT_WORDS = {
     same: "The same settings apply to every model; they are shares of each model's window.",
     zones: { work: "room to work", clear: "1 · clear", summarise: "2 · summarise", reply: "reply" },
   },
-  reply: LONG.reply,
-  clear: LONG.clear,
-  clearLine: LONG.clearLine,
-  keepResults: LONG.keepResults,
-  summarise: LONG.summarise,
-  summariseLine: LONG.summariseLine,
-  keepTurns: LONG.keepTurns,
-  nothingDeleted: LONG.nothingDeleted,
-  nothingDeletedMore: LONG.nothingDeletedMore,
-  noWindow: LONG.noWindow,
+  reply: "Room kept for the reply",
+  clear: "Clear old tool results",
+  clearLine:
+    "A tool result is what a tool gave back: a file golem read, the output of a command. Old ones shrink to one line, like read_file src/app.py · 412 lines · cleared. The model can read the file again.",
+  keepResults: "Newest results left whole",
+  summarise: "Summarise earlier turns",
+  summariseLine:
+    "Only when clearing was not enough. A turn is one message of yours and everything golem did to answer it. Older turns are replaced by one short summary.",
+  keepTurns: "Newest turns kept word for word",
+  nothingDeleted: "Nothing is deleted.",
+  nothingDeletedMore: " The whole chat stays in the transcript. Only what the model is sent gets shorter.",
+  noWindow: "The chart shows once the window size is known.",
   summariseAt: "Summarise at",
   playsOut: "How a long chat plays out",
   playsOutLine: "the chart, with these settings",
@@ -133,7 +133,7 @@ export function contextRightNow(input: ContextRightNowInput): ContextSpan[][] {
     mode === "local"
       ? "When a chat still does not fit, it stops with a message."
       : "When a local chat still does not fit, the routing path steps up to a hosted model.";
-  return [first, [text(`${LONG.nothingDeleted}${LONG.nothingDeletedMore} ${ending}`)]];
+  return [first, [text(`${CONTEXT_WORDS.nothingDeleted}${CONTEXT_WORDS.nothingDeletedMore} ${ending}`)]];
 }
 
 /** Where step 1 starts on a hosted model, to two figures: 137127 tokens is about 140K. */

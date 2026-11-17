@@ -1,4 +1,4 @@
-import type { RoutingChoice, Span } from "@golem/view";
+import type { ContextSpan, RoutingChoice, Span } from "@golem/view";
 import { useId, type ReactNode } from "react";
 import { cn } from "../../ui/cn.ts";
 import { Input } from "../../ui/input.tsx";
@@ -16,7 +16,7 @@ export function FieldError({ id, path, errors }: { id: string; path: string; err
 }
 
 /** A part of the page: a heading with a line beside it, then the body. */
-export function Part({ id, title, line, children }: { id?: string; title: string; line?: string; children: ReactNode }) {
+export function Part({ id, title, tag, line, children }: { id?: string; title: string; tag?: ReactNode; line?: string; children: ReactNode }) {
   const heading = useId();
   return (
     <section id={id} aria-labelledby={heading} className="flex scroll-mt-6 flex-col gap-3">
@@ -24,6 +24,7 @@ export function Part({ id, title, line, children }: { id?: string; title: string
         <h3 id={heading} className="text-base font-semibold">
           {title}
         </h3>
+        {tag}
         {line === undefined ? null : <p className="text-sm text-muted">{line}</p>}
       </div>
       {children}
@@ -34,17 +35,20 @@ export function Part({ id, title, line, children }: { id?: string; title: string
 export const CARD = "rounded-lg border border-line bg-surface shadow-soft";
 
 /** A closed disclosure for the settings the picture does not show. It opens when one of them has an error. */
-export function More({ label, forceOpen, children }: { label: string; forceOpen?: boolean; children: ReactNode }) {
+export function More({ label, note, forceOpen, children }: { label: string; note?: string; forceOpen?: boolean; children: ReactNode }) {
   return (
     <details open={forceOpen === true ? true : undefined}>
-      <summary className="cursor-pointer text-sm font-medium text-muted hover:text-ink">{label}</summary>
+      <summary className="cursor-pointer text-sm font-medium text-muted hover:text-ink">
+        {label}
+        {note === undefined ? null : <small className="ml-2 font-normal text-faint">{`— ${note}`}</small>}
+      </summary>
       <div className="mt-3 flex flex-col gap-4">{children}</div>
     </details>
   );
 }
 
-/** Text with the chips, the money and the free of a summary styled. */
-export function Spans({ spans }: { spans: readonly Span[] }) {
+/** Text with the chips, the money, the free and the two steps of a summary styled. */
+export function Spans({ spans }: { spans: readonly (Span | ContextSpan)[] }) {
   return (
     <>
       {spans.map((span, index) => {
@@ -64,6 +68,18 @@ export function Spans({ spans }: { spans: readonly Span[] }) {
           case "free":
             return (
               <span key={index} className="font-semibold text-allow">
+                {span.text}
+              </span>
+            );
+          case "wait":
+            return (
+              <span key={index} className="font-semibold text-wait">
+                {span.text}
+              </span>
+            );
+          case "summary":
+            return (
+              <span key={index} className="font-semibold text-ctx-summary">
                 {span.text}
               </span>
             );

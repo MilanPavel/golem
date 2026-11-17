@@ -1,16 +1,17 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { CONTEXT_WORDS, contextRightNow, handoffChips, hostedNote, windowBar, type ContextSpan } from "./context-settings.ts";
-import { ROUTING_WORDS, type ContextSettings } from "./routing.ts";
+import { type ContextSettings } from "./routing.ts";
 
 const context: ContextSettings = { reply_reserve: 4096, clear_at: 0.7, clear_to: 0.4, compact_at: 0.85 };
 const flat = (paragraphs: ContextSpan[][]) => paragraphs.map((spans) => spans.map((s) => s.text).join(""));
 const local = { model: "qwen3:14b", tokens: 32768, kind: "auto" as const };
 const hosted = { model: "claude-sonnet-4.5", tokens: 200_000, provider: "anthropic" };
 
-test("the step words are copied from the routing page", () => {
-  assert.equal(CONTEXT_WORDS.clearLine, ROUTING_WORDS.long.clearLine);
-  assert.equal(CONTEXT_WORDS.keepTurns, ROUTING_WORDS.long.keepTurns);
+test("the step words are the ones the long-chat part of Routing used to hold", () => {
+  assert.match(CONTEXT_WORDS.clearLine, /^A tool result is what a tool gave back/);
+  assert.equal(CONTEXT_WORDS.keepTurns, "Newest turns kept word for word");
+  assert.equal(CONTEXT_WORDS.nothingDeleted, "Nothing is deleted.");
 });
 
 test("the window bar is null without a usable window", () => {

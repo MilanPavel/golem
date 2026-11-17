@@ -33,6 +33,11 @@ export function windowTokens(values: RoutingGetResult, planned: number | null): 
   return typeof values.context.window === "number" ? values.context.window : planned;
 }
 
+/** The kind of the window setting: a number is Fixed, `"ollama"` is Ollama's, anything else is Auto. */
+export function windowKind(context: RoutingGetResult["context"]): "auto" | "fixed" | "ollama" {
+  return typeof context.window === "number" ? "fixed" : context.window === "ollama" ? "ollama" : "auto";
+}
+
 /** The settings as the shared rules read them. */
 export function routingState(values: RoutingGetResult, listing: ModelListResult | null, planned: number | null): RoutingState {
   const [local, budget, frontier] = TIERS.map((tier) => tierInfo(values, listing, tier));
