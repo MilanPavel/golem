@@ -9,6 +9,8 @@ export type TurnTotals = {
   tier: "local" | "budget" | "frontier" | null;
   tokens: number | null;
   costUsd: number | null;
+  /** Helpers the turn started with `delegate`. Their tokens and cost are in the totals. */
+  helpers?: number;
 };
 
 /** golem's estimate of a cost: `$0.00`, `$0.004` below a cent, `$0.31`. Empty when unknown. */
@@ -18,7 +20,7 @@ export function formatCost(usd: number | null): string {
   return usd < 0.01 ? `$${usd.toFixed(3)}` : `$${usd.toFixed(2)}`;
 }
 
-/** The sum over the finished calls of these steps. A total is null when no call had that number. */
+/** The sum over the finished calls of these steps, helpers' calls included. A total is null when no call had that number. */
 export function turnTotals(steps: readonly ChatMessage[]): TurnTotals {
   let tokens: number | null = null;
   let costUsd: number | null = null;
@@ -34,12 +36,19 @@ export function turnTotals(steps: readonly ChatMessage[]): TurnTotals {
     if (call.tokens !== null) tokens = (tokens ?? 0) + call.tokens;
     if (call.costUsd !== null) costUsd = (costUsd ?? 0) + call.costUsd;
   }
-  return { model, tier, tokens, costUsd };
+  let helpers = 0;
+  for (const { child } of steps.flatMap((step) => step.tools ?? [])) {
+    if (child === undefined) continue;
+    helpers += 1;
+    if (child.tokens !== null) tokens = (tokens ?? 0) + child.tokens;
+    if (child.costUsd !== null) costUsd = (costUsd ?? 0) + child.costUsd;
+  }
+  return { model, tier, tokens, costUsd, ...(helpers > 0 ? { helpers } : {}) };
 }
 
 /**
  * The parts after the time and steps in a turn's footer: model, tier word (only `local`),
- * tokens, cost. A part that is unknown is left out. `modelPrefix` goes before the model, and
+ * tokens, cost, helpers. A part that is unknown is left out. `modelPrefix` goes before the model, and
  * `routedNote` (from `routedNote` in route.ts) before that.
  */
 export function turnFooterParts(totals: TurnTotals, modelPrefix = "", routedNote = ""): string[] {
@@ -50,6 +59,8 @@ export function turnFooterParts(totals: TurnTotals, modelPrefix = "", routedNote
   if (totals.tokens !== null) parts.push(`${formatTokens(totals.tokens)} tok`);
   const cost = formatCost(totals.costUsd);
   if (cost !== "") parts.push(cost);
+  const helpers = totals.helpers ?? 0;
+  if (helpers > 0) parts.push(`${helpers} ${helpers === 1 ? "helper" : "helpers"}`);
   return parts;
 }
 

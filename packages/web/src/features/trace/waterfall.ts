@@ -1,5 +1,5 @@
 import { formatElapsed } from "@golem/view";
-import { modelsOf, toolsOf, type TraceNode, type TraceRunSpan } from "../../store/trace.ts";
+import { toolsOf, withHelperModels, type TraceNode, type TraceRunSpan } from "../../store/trace.ts";
 
 /** A bar's smallest width, in percent of its run, so a 3 ms tool still shows. */
 export const MIN_WIDTH = 0.5;
@@ -28,7 +28,7 @@ export function runExtent(run: TraceRunSpan): number {
   if (run.duration_ms !== null && run.duration_ms !== undefined) return Math.max(run.duration_ms, 1);
   const start = at(run.start);
   let extent = 0;
-  for (const model of modelsOf(run)) {
+  for (const model of withHelperModels(run)) {
     extent = Math.max(extent, reach(model, start));
     for (const tool of toolsOf(model)) extent = Math.max(extent, reach(tool, start));
   }

@@ -556,41 +556,117 @@ test("a call that ran but failed is done and unsuccessful", () => {
   assert.deepEqual([tool?.status, tool?.summary, tool?.unsuccessful], ["done", "exit 1", true]);
 });
 
-test("events of a child run (parent_call_id) are not drawn as steps", () => {
-  const base = { session_id: "s", run_id: "r", ts: "t" } as const;
-  const own: ChatEvent[] = [
-    { ...base, seq: 1, type: "message.started", data: { message_id: "a", role: "assistant" } },
-    { ...base, seq: 2, type: "message.completed", data: { message_id: "a", role: "assistant", text: "" } },
+const helperBase = { session_id: "s", run_id: "r" } as const;
+
+function delegateTurn(...ids: string[]): ChatEvent[] {
+  const head: ChatEvent[] = [
+    { ...helperBase, ts: "2026-11-01T10:00:00.000Z", seq: 1, type: "message.started", data: { message_id: "a", role: "assistant" } },
+    { ...helperBase, ts: "2026-11-01T10:00:00.100Z", seq: 2, type: "message.completed", data: { message_id: "a", role: "assistant", text: "" } },
+  ];
+  return [
+    ...head,
+    ...ids.map(
+      (id, at): ChatEvent => ({
+        ...helperBase,
+        ts: "2026-11-01T10:00:01.000Z",
+        seq: 3 + at,
+        type: "tool.requested",
+        data: { call_id: id, message_id: "a", name: "delegate", args: { brief: `look ${id}` } },
+      }),
+    ),
+  ];
+}
+
+function childRead(id: string, call: string, path: string, seq: number, finish = true): ChatEvent[] {
+  const data = { parent_call_id: id };
+  const at = `2026-11-01T10:00:0${String(seq % 10)}.000Z`;
+  const opened: ChatEvent[] = [
+    { ...helperBase, ts: at, seq, type: "tool.requested", data: { call_id: call, message_id: "m", name: "read_file", args: { path }, ...data } },
+    { ...helperBase, ts: at, seq: seq + 1, type: "tool.started", data: { call_id: call, ...data } },
+  ];
+  const closed: ChatEvent[] = [
+    { ...helperBase, ts: at, seq: seq + 2, type: "tool.completed", data: { call_id: call, summary: "3 lines", preview: "x", ...data } },
+  ];
+  return finish ? [...opened, ...closed] : opened;
+}
+
+function childCall(id: string, seq: number, usage: { input: number; output: number }, cost: number): ChatEvent[] {
+  const data = { parent_call_id: id };
+  return [
     {
-      ...base,
-      seq: 3,
-      type: "tool.requested",
-      data: { call_id: "d1", message_id: "a", name: "delegate", args: { brief: "look" } },
+      ...helperBase,
+      ts: "2026-11-01T10:00:02.000Z",
+      seq,
+      type: "model.call.started",
+      data: { message_id: `m${String(seq)}`, index: 1, profile: "p", model: "qwen3:27b", tier: "local", ...data },
+    },
+    {
+      ...helperBase,
+      ts: "2026-11-01T10:00:03.000Z",
+      seq: seq + 1,
+      type: "model.call.completed",
+      data: { message_id: `m${String(seq)}`, latency_ms: 10, usage, cost_usd: cost, ...data },
     },
   ];
-  const child: ChatEvent[] = [
-    {
-      ...base,
-      seq: 4,
-      type: "tool.requested",
-      data: { call_id: "k1", message_id: "m2", name: "read_file", args: { path: "a" }, parent_call_id: "d1" },
-    },
-    { ...base, seq: 5, type: "tool.started", data: { call_id: "k1", parent_call_id: "d1" } },
-    {
-      ...base,
-      seq: 6,
-      type: "tool.completed",
-      data: { call_id: "k1", summary: "1 line", preview: "x", parent_call_id: "d1" },
-    },
-    { ...base, seq: 7, type: "tool.failed", data: { call_id: "d1", message: "no", parent_call_id: "d1" } },
+}
+
+test("events of a child run fold into the delegate step, in order, and not into the chat", () => {
+  const own = delegateTurn("d1");
+  const child = [
+    ...childCall("d1", 10, { input: 100, output: 20 }, 0),
+    ...childRead("d1", "k1", "a.py", 12),
+    ...childRead("d1", "k2", "b.py", 15),
+    ...childCall("d1", 20, { input: 300, output: 620 }, 0.5),
   ];
   const before = own.reduce(reduceChat, emptyChat);
   const after = [...own, ...child].reduce(reduceChat, emptyChat);
-  assert.deepEqual(after, before);
-  assert.deepEqual(
-    after.messages[0]?.tools?.map((tool) => [tool.callId, tool.status]),
-    [["d1", "requested"]],
-  );
+  assert.equal(after.messages.length, before.messages.length);
+  assert.deepEqual(after.context, before.context);
+  assert.deepEqual(after.calls, before.calls);
+  const step = after.messages[0]?.tools?.[0];
+  assert.equal(step?.status, "requested");
+  assert.deepEqual(step?.child?.toolSteps.map((tool) => [tool.callId, tool.name, tool.status]), [
+    ["k1", "read_file", "done"],
+    ["k2", "read_file", "done"],
+  ]);
+  assert.equal(step?.child?.model, "qwen3:27b");
+  assert.equal(step?.child?.modelCalls, 2);
+  assert.equal(step?.child?.tokens, 1040);
+  assert.equal(step?.child?.costUsd, 0.5);
+  assert.equal(step?.child?.answerTokens, 620);
+  assert.equal(step?.child?.status, "running");
+});
+
+test("a helper still running has its open call, and ends with the delegate call", () => {
+  const events = [...delegateTurn("d1"), ...childCall("d1", 10, { input: 1, output: 1 }, 0), ...childRead("d1", "k1", "a.py", 12, false)];
+  const running = events.reduce(reduceChat, emptyChat).messages[0]?.tools?.[0];
+  assert.deepEqual([running?.child?.status, running?.child?.toolSteps[0]?.status], ["running", "running"]);
+  const end: ChatEvent = {
+    ...helperBase,
+    ts: "2026-11-01T10:01:13.000Z",
+    seq: 40,
+    type: "tool.completed",
+    data: { call_id: "d1", summary: "explorer finished", preview: "found it" },
+  };
+  const done = reduceChat(events.reduce(reduceChat, emptyChat), end).messages[0]?.tools?.[0];
+  assert.deepEqual([done?.status, done?.child?.status, done?.preview], ["done", "done", "found it"]);
+  assert.equal(done?.child?.durationMs, 71000);
+});
+
+test("two delegates in one turn stay apart", () => {
+  const events = [
+    ...delegateTurn("d1", "d2"),
+    ...childRead("d1", "k1", "a.py", 10),
+    ...childRead("d2", "k2", "b.py", 20),
+    ...childRead("d1", "k3", "c.py", 30),
+  ];
+  const tools = events.reduce(reduceChat, emptyChat).messages[0]?.tools ?? [];
+  assert.deepEqual(tools.map((tool) => tool.child?.toolSteps.map((step) => step.callId)), [["k1", "k3"], ["k2"]]);
+});
+
+test("a child event for a delegate call that is not there changes nothing", () => {
+  const state = reduceChat(emptyChat, childRead("nope", "k1", "a.py", 1)[0]!);
+  assert.deepEqual(state, emptyChat);
 });
 
 test("tool.completed with a diff replaces the approval diff, one without keeps it", () => {

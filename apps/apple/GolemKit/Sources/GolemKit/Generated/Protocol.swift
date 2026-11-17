@@ -16808,18 +16808,8 @@ public struct RunElement: Codable {
 
 /// A model call, with the tool calls it asked for, in request order.
 ///
-/// ``prompt_cut`` says whether Ollama cut the prompt that did not fit: "no"
-/// and "yes" are proven from exact numbers, "likely" is an estimate, and null
-/// means golem cannot tell. ``prompt_cut_kind`` is set with "yes" and
-/// "likely". ``dropped_message_ids`` are the messages the model probably did
-/// not see (older messages only), and ``dropped_tokens`` is an estimate of
-/// their size.
-///
-/// ``cost_usd`` is what the call cost, as its ``model.call.completed`` recorded
-/// it. Null when the price was not known or the call has no token counts.
-///
-/// ``load_ms``, ``prompt_ms`` and ``reply_ms`` are from the model server's own clock.
-/// Ollama only.
+/// The tool calls are the run's own, so a ``delegate`` call has its helper's model calls
+/// under it.
 // MARK: - RunChild
 public struct RunChild: Codable {
     public let approvalWaitMS: Int?
@@ -16908,9 +16898,157 @@ public struct RunChild: Codable {
     }
 }
 
-/// A tool call. It has no children.
+/// A tool call.
+///
+/// A ``delegate`` call has the model calls of its helper in ``children``, in order, each
+/// with
+/// the helper's own tool calls. Any other tool call has none. A helper's calls have a
+/// context
+/// of their own, so they are not part of the run's context series.
 // MARK: - PurpleTraceToolSpan
 public struct PurpleTraceToolSpan: Codable {
+    public let approvalWaitMS: Int?
+    public let children: [PurpleTraceHelperModelSpan]?
+    public let durationMS: Int?
+    public let end: String?
+    public let firstTokenMS: Int?
+    public let id: String
+    public let kind: ChildKind
+    public let model: String?
+    public let name: String
+    public let preview: String?
+    public let recorded: Bool?
+    public let start: String
+    public let status: ChildStatus
+    public let tokens: RunTraceTokens?
+
+    public enum CodingKeys: String, CodingKey {
+        case approvalWaitMS = "approval_wait_ms"
+        case children = "children"
+        case durationMS = "duration_ms"
+        case end = "end"
+        case firstTokenMS = "first_token_ms"
+        case id = "id"
+        case kind = "kind"
+        case model = "model"
+        case name = "name"
+        case preview = "preview"
+        case recorded = "recorded"
+        case start = "start"
+        case status = "status"
+        case tokens = "tokens"
+    }
+
+    public init(approvalWaitMS: Int?, children: [PurpleTraceHelperModelSpan]?, durationMS: Int?, end: String?, firstTokenMS: Int?, id: String, kind: ChildKind, model: String?, name: String, preview: String?, recorded: Bool?, start: String, status: ChildStatus, tokens: RunTraceTokens?) {
+        self.approvalWaitMS = approvalWaitMS
+        self.children = children
+        self.durationMS = durationMS
+        self.end = end
+        self.firstTokenMS = firstTokenMS
+        self.id = id
+        self.kind = kind
+        self.model = model
+        self.name = name
+        self.preview = preview
+        self.recorded = recorded
+        self.start = start
+        self.status = status
+        self.tokens = tokens
+    }
+}
+
+/// A model call of a helper, with the helper's tool calls it asked for, in request order.
+// MARK: - PurpleTraceHelperModelSpan
+public struct PurpleTraceHelperModelSpan: Codable {
+    public let approvalWaitMS: Int?
+    public let children: [PurpleTraceHelperToolSpan]?
+    public let contextWindow: Int?
+    public let contextWindowEstimated: Bool?
+    public let costUsd: Double?
+    public let droppedMessageIDS: [String]?
+    public let droppedTokens: Int?
+    public let durationMS: Int?
+    public let end: String?
+    public let firstTokenMS: Int?
+    public let id: String
+    public let kind: ChildKind
+    public let loadMS: Int?
+    public let model: String?
+    public let name: String
+    public let numCtx: Int?
+    public let preview: String?
+    public let promptCut: PromptCut?
+    public let promptCutKind: PromptCutKind?
+    public let promptMS: Int?
+    public let recorded: Bool?
+    public let replyMS: Int?
+    public let start: String
+    public let status: ChildStatus
+    public let tokens: RunTraceTokens?
+    public let windowPlanned: Bool?
+
+    public enum CodingKeys: String, CodingKey {
+        case approvalWaitMS = "approval_wait_ms"
+        case children = "children"
+        case contextWindow = "context_window"
+        case contextWindowEstimated = "context_window_estimated"
+        case costUsd = "cost_usd"
+        case droppedMessageIDS = "dropped_message_ids"
+        case droppedTokens = "dropped_tokens"
+        case durationMS = "duration_ms"
+        case end = "end"
+        case firstTokenMS = "first_token_ms"
+        case id = "id"
+        case kind = "kind"
+        case loadMS = "load_ms"
+        case model = "model"
+        case name = "name"
+        case numCtx = "num_ctx"
+        case preview = "preview"
+        case promptCut = "prompt_cut"
+        case promptCutKind = "prompt_cut_kind"
+        case promptMS = "prompt_ms"
+        case recorded = "recorded"
+        case replyMS = "reply_ms"
+        case start = "start"
+        case status = "status"
+        case tokens = "tokens"
+        case windowPlanned = "window_planned"
+    }
+
+    public init(approvalWaitMS: Int?, children: [PurpleTraceHelperToolSpan]?, contextWindow: Int?, contextWindowEstimated: Bool?, costUsd: Double?, droppedMessageIDS: [String]?, droppedTokens: Int?, durationMS: Int?, end: String?, firstTokenMS: Int?, id: String, kind: ChildKind, loadMS: Int?, model: String?, name: String, numCtx: Int?, preview: String?, promptCut: PromptCut?, promptCutKind: PromptCutKind?, promptMS: Int?, recorded: Bool?, replyMS: Int?, start: String, status: ChildStatus, tokens: RunTraceTokens?, windowPlanned: Bool?) {
+        self.approvalWaitMS = approvalWaitMS
+        self.children = children
+        self.contextWindow = contextWindow
+        self.contextWindowEstimated = contextWindowEstimated
+        self.costUsd = costUsd
+        self.droppedMessageIDS = droppedMessageIDS
+        self.droppedTokens = droppedTokens
+        self.durationMS = durationMS
+        self.end = end
+        self.firstTokenMS = firstTokenMS
+        self.id = id
+        self.kind = kind
+        self.loadMS = loadMS
+        self.model = model
+        self.name = name
+        self.numCtx = numCtx
+        self.preview = preview
+        self.promptCut = promptCut
+        self.promptCutKind = promptCutKind
+        self.promptMS = promptMS
+        self.recorded = recorded
+        self.replyMS = replyMS
+        self.start = start
+        self.status = status
+        self.tokens = tokens
+        self.windowPlanned = windowPlanned
+    }
+}
+
+/// A tool call of a helper. It has no children.
+// MARK: - PurpleTraceHelperToolSpan
+public struct PurpleTraceHelperToolSpan: Codable {
     public let approvalWaitMS: Int?
     public let durationMS: Int?
     public let end: String?
@@ -17045,6 +17183,241 @@ public struct TentacledModelRejection: Codable {
     }
 }
 
+/// A model call of a helper, with the helper's tool calls it asked for, in request order.
+// MARK: - TraceHelperModelSpan
+public struct TraceHelperModelSpan: Codable {
+    public let approvalWaitMS: Int?
+    public let children: [TraceHelperModelSpanChild]?
+    public let contextWindow: Int?
+    public let contextWindowEstimated: Bool?
+    public let costUsd: Double?
+    public let droppedMessageIDS: [String]?
+    public let droppedTokens: Int?
+    public let durationMS: Int?
+    public let end: String?
+    public let firstTokenMS: Int?
+    public let id: String
+    public let kind: ChildKind
+    public let loadMS: Int?
+    public let model: String?
+    public let name: String
+    public let numCtx: Int?
+    public let preview: String?
+    public let promptCut: PromptCut?
+    public let promptCutKind: PromptCutKind?
+    public let promptMS: Int?
+    public let recorded: Bool?
+    public let replyMS: Int?
+    public let start: String
+    public let status: ChildStatus
+    public let tokens: TraceHelperModelSpanTraceTokens?
+    public let windowPlanned: Bool?
+
+    public enum CodingKeys: String, CodingKey {
+        case approvalWaitMS = "approval_wait_ms"
+        case children = "children"
+        case contextWindow = "context_window"
+        case contextWindowEstimated = "context_window_estimated"
+        case costUsd = "cost_usd"
+        case droppedMessageIDS = "dropped_message_ids"
+        case droppedTokens = "dropped_tokens"
+        case durationMS = "duration_ms"
+        case end = "end"
+        case firstTokenMS = "first_token_ms"
+        case id = "id"
+        case kind = "kind"
+        case loadMS = "load_ms"
+        case model = "model"
+        case name = "name"
+        case numCtx = "num_ctx"
+        case preview = "preview"
+        case promptCut = "prompt_cut"
+        case promptCutKind = "prompt_cut_kind"
+        case promptMS = "prompt_ms"
+        case recorded = "recorded"
+        case replyMS = "reply_ms"
+        case start = "start"
+        case status = "status"
+        case tokens = "tokens"
+        case windowPlanned = "window_planned"
+    }
+
+    public init(approvalWaitMS: Int?, children: [TraceHelperModelSpanChild]?, contextWindow: Int?, contextWindowEstimated: Bool?, costUsd: Double?, droppedMessageIDS: [String]?, droppedTokens: Int?, durationMS: Int?, end: String?, firstTokenMS: Int?, id: String, kind: ChildKind, loadMS: Int?, model: String?, name: String, numCtx: Int?, preview: String?, promptCut: PromptCut?, promptCutKind: PromptCutKind?, promptMS: Int?, recorded: Bool?, replyMS: Int?, start: String, status: ChildStatus, tokens: TraceHelperModelSpanTraceTokens?, windowPlanned: Bool?) {
+        self.approvalWaitMS = approvalWaitMS
+        self.children = children
+        self.contextWindow = contextWindow
+        self.contextWindowEstimated = contextWindowEstimated
+        self.costUsd = costUsd
+        self.droppedMessageIDS = droppedMessageIDS
+        self.droppedTokens = droppedTokens
+        self.durationMS = durationMS
+        self.end = end
+        self.firstTokenMS = firstTokenMS
+        self.id = id
+        self.kind = kind
+        self.loadMS = loadMS
+        self.model = model
+        self.name = name
+        self.numCtx = numCtx
+        self.preview = preview
+        self.promptCut = promptCut
+        self.promptCutKind = promptCutKind
+        self.promptMS = promptMS
+        self.recorded = recorded
+        self.replyMS = replyMS
+        self.start = start
+        self.status = status
+        self.tokens = tokens
+        self.windowPlanned = windowPlanned
+    }
+}
+
+/// A tool call of a helper. It has no children.
+// MARK: - TraceHelperModelSpanChild
+public struct TraceHelperModelSpanChild: Codable {
+    public let approvalWaitMS: Int?
+    public let durationMS: Int?
+    public let end: String?
+    public let firstTokenMS: Int?
+    public let id: String
+    public let kind: ChildKind
+    public let model: String?
+    public let name: String
+    public let preview: String?
+    public let recorded: Bool?
+    public let start: String
+    public let status: ChildStatus
+    public let tokens: TraceHelperModelSpanTraceTokens?
+
+    public enum CodingKeys: String, CodingKey {
+        case approvalWaitMS = "approval_wait_ms"
+        case durationMS = "duration_ms"
+        case end = "end"
+        case firstTokenMS = "first_token_ms"
+        case id = "id"
+        case kind = "kind"
+        case model = "model"
+        case name = "name"
+        case preview = "preview"
+        case recorded = "recorded"
+        case start = "start"
+        case status = "status"
+        case tokens = "tokens"
+    }
+
+    public init(approvalWaitMS: Int?, durationMS: Int?, end: String?, firstTokenMS: Int?, id: String, kind: ChildKind, model: String?, name: String, preview: String?, recorded: Bool?, start: String, status: ChildStatus, tokens: TraceHelperModelSpanTraceTokens?) {
+        self.approvalWaitMS = approvalWaitMS
+        self.durationMS = durationMS
+        self.end = end
+        self.firstTokenMS = firstTokenMS
+        self.id = id
+        self.kind = kind
+        self.model = model
+        self.name = name
+        self.preview = preview
+        self.recorded = recorded
+        self.start = start
+        self.status = status
+        self.tokens = tokens
+    }
+}
+
+/// Tokens one model call used. A field is null when the provider did not report it.
+// MARK: - TraceHelperModelSpanTraceTokens
+public struct TraceHelperModelSpanTraceTokens: Codable {
+    public let cacheRead: Int?
+    public let cacheWrite: Int?
+    public let input: Int?
+    public let output: Int?
+
+    public enum CodingKeys: String, CodingKey {
+        case cacheRead = "cache_read"
+        case cacheWrite = "cache_write"
+        case input = "input"
+        case output = "output"
+    }
+
+    public init(cacheRead: Int?, cacheWrite: Int?, input: Int?, output: Int?) {
+        self.cacheRead = cacheRead
+        self.cacheWrite = cacheWrite
+        self.input = input
+        self.output = output
+    }
+}
+
+/// A tool call of a helper. It has no children.
+// MARK: - TraceHelperToolSpan
+public struct TraceHelperToolSpan: Codable {
+    public let approvalWaitMS: Int?
+    public let durationMS: Int?
+    public let end: String?
+    public let firstTokenMS: Int?
+    public let id: String
+    public let kind: ChildKind
+    public let model: String?
+    public let name: String
+    public let preview: String?
+    public let recorded: Bool?
+    public let start: String
+    public let status: ChildStatus
+    public let tokens: TraceHelperToolSpanTraceTokens?
+
+    public enum CodingKeys: String, CodingKey {
+        case approvalWaitMS = "approval_wait_ms"
+        case durationMS = "duration_ms"
+        case end = "end"
+        case firstTokenMS = "first_token_ms"
+        case id = "id"
+        case kind = "kind"
+        case model = "model"
+        case name = "name"
+        case preview = "preview"
+        case recorded = "recorded"
+        case start = "start"
+        case status = "status"
+        case tokens = "tokens"
+    }
+
+    public init(approvalWaitMS: Int?, durationMS: Int?, end: String?, firstTokenMS: Int?, id: String, kind: ChildKind, model: String?, name: String, preview: String?, recorded: Bool?, start: String, status: ChildStatus, tokens: TraceHelperToolSpanTraceTokens?) {
+        self.approvalWaitMS = approvalWaitMS
+        self.durationMS = durationMS
+        self.end = end
+        self.firstTokenMS = firstTokenMS
+        self.id = id
+        self.kind = kind
+        self.model = model
+        self.name = name
+        self.preview = preview
+        self.recorded = recorded
+        self.start = start
+        self.status = status
+        self.tokens = tokens
+    }
+}
+
+/// Tokens one model call used. A field is null when the provider did not report it.
+// MARK: - TraceHelperToolSpanTraceTokens
+public struct TraceHelperToolSpanTraceTokens: Codable {
+    public let cacheRead: Int?
+    public let cacheWrite: Int?
+    public let input: Int?
+    public let output: Int?
+
+    public enum CodingKeys: String, CodingKey {
+        case cacheRead = "cache_read"
+        case cacheWrite = "cache_write"
+        case input = "input"
+        case output = "output"
+    }
+
+    public init(cacheRead: Int?, cacheWrite: Int?, input: Int?, output: Int?) {
+        self.cacheRead = cacheRead
+        self.cacheWrite = cacheWrite
+        self.input = input
+        self.output = output
+    }
+}
+
 /// One checkpoint message with its id, as plain text.
 // MARK: - TraceMessage
 public struct TraceMessage: Codable {
@@ -17085,18 +17458,8 @@ public enum TraceMessageRole: String, Codable {
 
 /// A model call, with the tool calls it asked for, in request order.
 ///
-/// ``prompt_cut`` says whether Ollama cut the prompt that did not fit: "no"
-/// and "yes" are proven from exact numbers, "likely" is an estimate, and null
-/// means golem cannot tell. ``prompt_cut_kind`` is set with "yes" and
-/// "likely". ``dropped_message_ids`` are the messages the model probably did
-/// not see (older messages only), and ``dropped_tokens`` is an estimate of
-/// their size.
-///
-/// ``cost_usd`` is what the call cost, as its ``model.call.completed`` recorded
-/// it. Null when the price was not known or the call has no token counts.
-///
-/// ``load_ms``, ``prompt_ms`` and ``reply_ms`` are from the model server's own clock.
-/// Ollama only.
+/// The tool calls are the run's own, so a ``delegate`` call has its helper's model calls
+/// under it.
 // MARK: - TraceModelSpan
 public struct TraceModelSpan: Codable {
     public let approvalWaitMS: Int?
@@ -17185,9 +17548,157 @@ public struct TraceModelSpan: Codable {
     }
 }
 
-/// A tool call. It has no children.
+/// A tool call.
+///
+/// A ``delegate`` call has the model calls of its helper in ``children``, in order, each
+/// with
+/// the helper's own tool calls. Any other tool call has none. A helper's calls have a
+/// context
+/// of their own, so they are not part of the run's context series.
 // MARK: - TraceModelSpanChild
 public struct TraceModelSpanChild: Codable {
+    public let approvalWaitMS: Int?
+    public let children: [FluffyTraceHelperModelSpan]?
+    public let durationMS: Int?
+    public let end: String?
+    public let firstTokenMS: Int?
+    public let id: String
+    public let kind: ChildKind
+    public let model: String?
+    public let name: String
+    public let preview: String?
+    public let recorded: Bool?
+    public let start: String
+    public let status: ChildStatus
+    public let tokens: TraceModelSpanTraceTokens?
+
+    public enum CodingKeys: String, CodingKey {
+        case approvalWaitMS = "approval_wait_ms"
+        case children = "children"
+        case durationMS = "duration_ms"
+        case end = "end"
+        case firstTokenMS = "first_token_ms"
+        case id = "id"
+        case kind = "kind"
+        case model = "model"
+        case name = "name"
+        case preview = "preview"
+        case recorded = "recorded"
+        case start = "start"
+        case status = "status"
+        case tokens = "tokens"
+    }
+
+    public init(approvalWaitMS: Int?, children: [FluffyTraceHelperModelSpan]?, durationMS: Int?, end: String?, firstTokenMS: Int?, id: String, kind: ChildKind, model: String?, name: String, preview: String?, recorded: Bool?, start: String, status: ChildStatus, tokens: TraceModelSpanTraceTokens?) {
+        self.approvalWaitMS = approvalWaitMS
+        self.children = children
+        self.durationMS = durationMS
+        self.end = end
+        self.firstTokenMS = firstTokenMS
+        self.id = id
+        self.kind = kind
+        self.model = model
+        self.name = name
+        self.preview = preview
+        self.recorded = recorded
+        self.start = start
+        self.status = status
+        self.tokens = tokens
+    }
+}
+
+/// A model call of a helper, with the helper's tool calls it asked for, in request order.
+// MARK: - FluffyTraceHelperModelSpan
+public struct FluffyTraceHelperModelSpan: Codable {
+    public let approvalWaitMS: Int?
+    public let children: [FluffyTraceHelperToolSpan]?
+    public let contextWindow: Int?
+    public let contextWindowEstimated: Bool?
+    public let costUsd: Double?
+    public let droppedMessageIDS: [String]?
+    public let droppedTokens: Int?
+    public let durationMS: Int?
+    public let end: String?
+    public let firstTokenMS: Int?
+    public let id: String
+    public let kind: ChildKind
+    public let loadMS: Int?
+    public let model: String?
+    public let name: String
+    public let numCtx: Int?
+    public let preview: String?
+    public let promptCut: PromptCut?
+    public let promptCutKind: PromptCutKind?
+    public let promptMS: Int?
+    public let recorded: Bool?
+    public let replyMS: Int?
+    public let start: String
+    public let status: ChildStatus
+    public let tokens: TraceModelSpanTraceTokens?
+    public let windowPlanned: Bool?
+
+    public enum CodingKeys: String, CodingKey {
+        case approvalWaitMS = "approval_wait_ms"
+        case children = "children"
+        case contextWindow = "context_window"
+        case contextWindowEstimated = "context_window_estimated"
+        case costUsd = "cost_usd"
+        case droppedMessageIDS = "dropped_message_ids"
+        case droppedTokens = "dropped_tokens"
+        case durationMS = "duration_ms"
+        case end = "end"
+        case firstTokenMS = "first_token_ms"
+        case id = "id"
+        case kind = "kind"
+        case loadMS = "load_ms"
+        case model = "model"
+        case name = "name"
+        case numCtx = "num_ctx"
+        case preview = "preview"
+        case promptCut = "prompt_cut"
+        case promptCutKind = "prompt_cut_kind"
+        case promptMS = "prompt_ms"
+        case recorded = "recorded"
+        case replyMS = "reply_ms"
+        case start = "start"
+        case status = "status"
+        case tokens = "tokens"
+        case windowPlanned = "window_planned"
+    }
+
+    public init(approvalWaitMS: Int?, children: [FluffyTraceHelperToolSpan]?, contextWindow: Int?, contextWindowEstimated: Bool?, costUsd: Double?, droppedMessageIDS: [String]?, droppedTokens: Int?, durationMS: Int?, end: String?, firstTokenMS: Int?, id: String, kind: ChildKind, loadMS: Int?, model: String?, name: String, numCtx: Int?, preview: String?, promptCut: PromptCut?, promptCutKind: PromptCutKind?, promptMS: Int?, recorded: Bool?, replyMS: Int?, start: String, status: ChildStatus, tokens: TraceModelSpanTraceTokens?, windowPlanned: Bool?) {
+        self.approvalWaitMS = approvalWaitMS
+        self.children = children
+        self.contextWindow = contextWindow
+        self.contextWindowEstimated = contextWindowEstimated
+        self.costUsd = costUsd
+        self.droppedMessageIDS = droppedMessageIDS
+        self.droppedTokens = droppedTokens
+        self.durationMS = durationMS
+        self.end = end
+        self.firstTokenMS = firstTokenMS
+        self.id = id
+        self.kind = kind
+        self.loadMS = loadMS
+        self.model = model
+        self.name = name
+        self.numCtx = numCtx
+        self.preview = preview
+        self.promptCut = promptCut
+        self.promptCutKind = promptCutKind
+        self.promptMS = promptMS
+        self.recorded = recorded
+        self.replyMS = replyMS
+        self.start = start
+        self.status = status
+        self.tokens = tokens
+        self.windowPlanned = windowPlanned
+    }
+}
+
+/// A tool call of a helper. It has no children.
+// MARK: - FluffyTraceHelperToolSpan
+public struct FluffyTraceHelperToolSpan: Codable {
     public let approvalWaitMS: Int?
     public let durationMS: Int?
     public let end: String?
@@ -17368,18 +17879,8 @@ public struct TraceRunSpan: Codable {
 
 /// A model call, with the tool calls it asked for, in request order.
 ///
-/// ``prompt_cut`` says whether Ollama cut the prompt that did not fit: "no"
-/// and "yes" are proven from exact numbers, "likely" is an estimate, and null
-/// means golem cannot tell. ``prompt_cut_kind`` is set with "yes" and
-/// "likely". ``dropped_message_ids`` are the messages the model probably did
-/// not see (older messages only), and ``dropped_tokens`` is an estimate of
-/// their size.
-///
-/// ``cost_usd`` is what the call cost, as its ``model.call.completed`` recorded
-/// it. Null when the price was not known or the call has no token counts.
-///
-/// ``load_ms``, ``prompt_ms`` and ``reply_ms`` are from the model server's own clock.
-/// Ollama only.
+/// The tool calls are the run's own, so a ``delegate`` call has its helper's model calls
+/// under it.
 // MARK: - TraceRunSpanChild
 public struct TraceRunSpanChild: Codable {
     public let approvalWaitMS: Int?
@@ -17468,9 +17969,157 @@ public struct TraceRunSpanChild: Codable {
     }
 }
 
-/// A tool call. It has no children.
+/// A tool call.
+///
+/// A ``delegate`` call has the model calls of its helper in ``children``, in order, each
+/// with
+/// the helper's own tool calls. Any other tool call has none. A helper's calls have a
+/// context
+/// of their own, so they are not part of the run's context series.
 // MARK: - FluffyTraceToolSpan
 public struct FluffyTraceToolSpan: Codable {
+    public let approvalWaitMS: Int?
+    public let children: [TentacledTraceHelperModelSpan]?
+    public let durationMS: Int?
+    public let end: String?
+    public let firstTokenMS: Int?
+    public let id: String
+    public let kind: ChildKind
+    public let model: String?
+    public let name: String
+    public let preview: String?
+    public let recorded: Bool?
+    public let start: String
+    public let status: ChildStatus
+    public let tokens: TraceRunSpanTraceTokens?
+
+    public enum CodingKeys: String, CodingKey {
+        case approvalWaitMS = "approval_wait_ms"
+        case children = "children"
+        case durationMS = "duration_ms"
+        case end = "end"
+        case firstTokenMS = "first_token_ms"
+        case id = "id"
+        case kind = "kind"
+        case model = "model"
+        case name = "name"
+        case preview = "preview"
+        case recorded = "recorded"
+        case start = "start"
+        case status = "status"
+        case tokens = "tokens"
+    }
+
+    public init(approvalWaitMS: Int?, children: [TentacledTraceHelperModelSpan]?, durationMS: Int?, end: String?, firstTokenMS: Int?, id: String, kind: ChildKind, model: String?, name: String, preview: String?, recorded: Bool?, start: String, status: ChildStatus, tokens: TraceRunSpanTraceTokens?) {
+        self.approvalWaitMS = approvalWaitMS
+        self.children = children
+        self.durationMS = durationMS
+        self.end = end
+        self.firstTokenMS = firstTokenMS
+        self.id = id
+        self.kind = kind
+        self.model = model
+        self.name = name
+        self.preview = preview
+        self.recorded = recorded
+        self.start = start
+        self.status = status
+        self.tokens = tokens
+    }
+}
+
+/// A model call of a helper, with the helper's tool calls it asked for, in request order.
+// MARK: - TentacledTraceHelperModelSpan
+public struct TentacledTraceHelperModelSpan: Codable {
+    public let approvalWaitMS: Int?
+    public let children: [TentacledTraceHelperToolSpan]?
+    public let contextWindow: Int?
+    public let contextWindowEstimated: Bool?
+    public let costUsd: Double?
+    public let droppedMessageIDS: [String]?
+    public let droppedTokens: Int?
+    public let durationMS: Int?
+    public let end: String?
+    public let firstTokenMS: Int?
+    public let id: String
+    public let kind: ChildKind
+    public let loadMS: Int?
+    public let model: String?
+    public let name: String
+    public let numCtx: Int?
+    public let preview: String?
+    public let promptCut: PromptCut?
+    public let promptCutKind: PromptCutKind?
+    public let promptMS: Int?
+    public let recorded: Bool?
+    public let replyMS: Int?
+    public let start: String
+    public let status: ChildStatus
+    public let tokens: TraceRunSpanTraceTokens?
+    public let windowPlanned: Bool?
+
+    public enum CodingKeys: String, CodingKey {
+        case approvalWaitMS = "approval_wait_ms"
+        case children = "children"
+        case contextWindow = "context_window"
+        case contextWindowEstimated = "context_window_estimated"
+        case costUsd = "cost_usd"
+        case droppedMessageIDS = "dropped_message_ids"
+        case droppedTokens = "dropped_tokens"
+        case durationMS = "duration_ms"
+        case end = "end"
+        case firstTokenMS = "first_token_ms"
+        case id = "id"
+        case kind = "kind"
+        case loadMS = "load_ms"
+        case model = "model"
+        case name = "name"
+        case numCtx = "num_ctx"
+        case preview = "preview"
+        case promptCut = "prompt_cut"
+        case promptCutKind = "prompt_cut_kind"
+        case promptMS = "prompt_ms"
+        case recorded = "recorded"
+        case replyMS = "reply_ms"
+        case start = "start"
+        case status = "status"
+        case tokens = "tokens"
+        case windowPlanned = "window_planned"
+    }
+
+    public init(approvalWaitMS: Int?, children: [TentacledTraceHelperToolSpan]?, contextWindow: Int?, contextWindowEstimated: Bool?, costUsd: Double?, droppedMessageIDS: [String]?, droppedTokens: Int?, durationMS: Int?, end: String?, firstTokenMS: Int?, id: String, kind: ChildKind, loadMS: Int?, model: String?, name: String, numCtx: Int?, preview: String?, promptCut: PromptCut?, promptCutKind: PromptCutKind?, promptMS: Int?, recorded: Bool?, replyMS: Int?, start: String, status: ChildStatus, tokens: TraceRunSpanTraceTokens?, windowPlanned: Bool?) {
+        self.approvalWaitMS = approvalWaitMS
+        self.children = children
+        self.contextWindow = contextWindow
+        self.contextWindowEstimated = contextWindowEstimated
+        self.costUsd = costUsd
+        self.droppedMessageIDS = droppedMessageIDS
+        self.droppedTokens = droppedTokens
+        self.durationMS = durationMS
+        self.end = end
+        self.firstTokenMS = firstTokenMS
+        self.id = id
+        self.kind = kind
+        self.loadMS = loadMS
+        self.model = model
+        self.name = name
+        self.numCtx = numCtx
+        self.preview = preview
+        self.promptCut = promptCut
+        self.promptCutKind = promptCutKind
+        self.promptMS = promptMS
+        self.recorded = recorded
+        self.replyMS = replyMS
+        self.start = start
+        self.status = status
+        self.tokens = tokens
+        self.windowPlanned = windowPlanned
+    }
+}
+
+/// A tool call of a helper. It has no children.
+// MARK: - TentacledTraceHelperToolSpan
+public struct TentacledTraceHelperToolSpan: Codable {
     public let approvalWaitMS: Int?
     public let durationMS: Int?
     public let end: String?
@@ -18033,9 +18682,157 @@ public struct TraceTokens: Codable {
     }
 }
 
-/// A tool call. It has no children.
+/// A tool call.
+///
+/// A ``delegate`` call has the model calls of its helper in ``children``, in order, each
+/// with
+/// the helper's own tool calls. Any other tool call has none. A helper's calls have a
+/// context
+/// of their own, so they are not part of the run's context series.
 // MARK: - TraceToolSpan
 public struct TraceToolSpan: Codable {
+    public let approvalWaitMS: Int?
+    public let children: [TraceToolSpanChild]?
+    public let durationMS: Int?
+    public let end: String?
+    public let firstTokenMS: Int?
+    public let id: String
+    public let kind: ChildKind
+    public let model: String?
+    public let name: String
+    public let preview: String?
+    public let recorded: Bool?
+    public let start: String
+    public let status: ChildStatus
+    public let tokens: TraceToolSpanTraceTokens?
+
+    public enum CodingKeys: String, CodingKey {
+        case approvalWaitMS = "approval_wait_ms"
+        case children = "children"
+        case durationMS = "duration_ms"
+        case end = "end"
+        case firstTokenMS = "first_token_ms"
+        case id = "id"
+        case kind = "kind"
+        case model = "model"
+        case name = "name"
+        case preview = "preview"
+        case recorded = "recorded"
+        case start = "start"
+        case status = "status"
+        case tokens = "tokens"
+    }
+
+    public init(approvalWaitMS: Int?, children: [TraceToolSpanChild]?, durationMS: Int?, end: String?, firstTokenMS: Int?, id: String, kind: ChildKind, model: String?, name: String, preview: String?, recorded: Bool?, start: String, status: ChildStatus, tokens: TraceToolSpanTraceTokens?) {
+        self.approvalWaitMS = approvalWaitMS
+        self.children = children
+        self.durationMS = durationMS
+        self.end = end
+        self.firstTokenMS = firstTokenMS
+        self.id = id
+        self.kind = kind
+        self.model = model
+        self.name = name
+        self.preview = preview
+        self.recorded = recorded
+        self.start = start
+        self.status = status
+        self.tokens = tokens
+    }
+}
+
+/// A model call of a helper, with the helper's tool calls it asked for, in request order.
+// MARK: - TraceToolSpanChild
+public struct TraceToolSpanChild: Codable {
+    public let approvalWaitMS: Int?
+    public let children: [StickyTraceHelperToolSpan]?
+    public let contextWindow: Int?
+    public let contextWindowEstimated: Bool?
+    public let costUsd: Double?
+    public let droppedMessageIDS: [String]?
+    public let droppedTokens: Int?
+    public let durationMS: Int?
+    public let end: String?
+    public let firstTokenMS: Int?
+    public let id: String
+    public let kind: ChildKind
+    public let loadMS: Int?
+    public let model: String?
+    public let name: String
+    public let numCtx: Int?
+    public let preview: String?
+    public let promptCut: PromptCut?
+    public let promptCutKind: PromptCutKind?
+    public let promptMS: Int?
+    public let recorded: Bool?
+    public let replyMS: Int?
+    public let start: String
+    public let status: ChildStatus
+    public let tokens: TraceToolSpanTraceTokens?
+    public let windowPlanned: Bool?
+
+    public enum CodingKeys: String, CodingKey {
+        case approvalWaitMS = "approval_wait_ms"
+        case children = "children"
+        case contextWindow = "context_window"
+        case contextWindowEstimated = "context_window_estimated"
+        case costUsd = "cost_usd"
+        case droppedMessageIDS = "dropped_message_ids"
+        case droppedTokens = "dropped_tokens"
+        case durationMS = "duration_ms"
+        case end = "end"
+        case firstTokenMS = "first_token_ms"
+        case id = "id"
+        case kind = "kind"
+        case loadMS = "load_ms"
+        case model = "model"
+        case name = "name"
+        case numCtx = "num_ctx"
+        case preview = "preview"
+        case promptCut = "prompt_cut"
+        case promptCutKind = "prompt_cut_kind"
+        case promptMS = "prompt_ms"
+        case recorded = "recorded"
+        case replyMS = "reply_ms"
+        case start = "start"
+        case status = "status"
+        case tokens = "tokens"
+        case windowPlanned = "window_planned"
+    }
+
+    public init(approvalWaitMS: Int?, children: [StickyTraceHelperToolSpan]?, contextWindow: Int?, contextWindowEstimated: Bool?, costUsd: Double?, droppedMessageIDS: [String]?, droppedTokens: Int?, durationMS: Int?, end: String?, firstTokenMS: Int?, id: String, kind: ChildKind, loadMS: Int?, model: String?, name: String, numCtx: Int?, preview: String?, promptCut: PromptCut?, promptCutKind: PromptCutKind?, promptMS: Int?, recorded: Bool?, replyMS: Int?, start: String, status: ChildStatus, tokens: TraceToolSpanTraceTokens?, windowPlanned: Bool?) {
+        self.approvalWaitMS = approvalWaitMS
+        self.children = children
+        self.contextWindow = contextWindow
+        self.contextWindowEstimated = contextWindowEstimated
+        self.costUsd = costUsd
+        self.droppedMessageIDS = droppedMessageIDS
+        self.droppedTokens = droppedTokens
+        self.durationMS = durationMS
+        self.end = end
+        self.firstTokenMS = firstTokenMS
+        self.id = id
+        self.kind = kind
+        self.loadMS = loadMS
+        self.model = model
+        self.name = name
+        self.numCtx = numCtx
+        self.preview = preview
+        self.promptCut = promptCut
+        self.promptCutKind = promptCutKind
+        self.promptMS = promptMS
+        self.recorded = recorded
+        self.replyMS = replyMS
+        self.start = start
+        self.status = status
+        self.tokens = tokens
+        self.windowPlanned = windowPlanned
+    }
+}
+
+/// A tool call of a helper. It has no children.
+// MARK: - StickyTraceHelperToolSpan
+public struct StickyTraceHelperToolSpan: Codable {
     public let approvalWaitMS: Int?
     public let durationMS: Int?
     public let end: String?

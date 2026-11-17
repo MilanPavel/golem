@@ -10,6 +10,7 @@ import {
   layoutTranscript,
   SKILL_MARK,
   toolLabel,
+  toolLines,
   type Span,
 } from "./layout-chat.ts";
 
@@ -511,4 +512,66 @@ test("an answer's footer puts the routed note before the model", () => {
   );
   const footer = lines.find((line) => textOf(line.spans).includes("did not fit"));
   assert.match(textOf(footer?.spans ?? []), /^0m 02\.0s \u00b7 \u2191 deepseek-chat \u00b7 did not fit in 32K \u00b7 deepseek-chat \u00b7 1\.2K tok \u00b7 \$0\.004$/);
+});
+
+function delegateBlock(over: Partial<ToolBlock> = {}): ToolBlock {
+  const steps: ToolBlock[] = [
+    ...Array.from({ length: 14 }, (_, at): ToolBlock => ({ callId: `r${String(at)}`, name: "read_file", args: { path: `f${String(at)}.py` }, status: "done" })),
+    ...Array.from({ length: 3 }, (_, at): ToolBlock => ({ callId: `g${String(at)}`, name: "grep", args: { pattern: "x" }, status: "done" })),
+  ];
+  return {
+    callId: "d1",
+    name: "delegate",
+    args: { brief: "look" },
+    status: "done",
+    preview: "The router is in src/router.py.",
+    child: {
+      model: "qwen3:27b",
+      modelCalls: 3,
+      toolSteps: steps,
+      tokens: 5000,
+      costUsd: 0,
+      status: "done",
+      answerTokens: 620,
+      startedAt: null,
+      durationMs: 72_000,
+    },
+    ...over,
+  };
+}
+
+test("a delegate call is one line until it is expanded", () => {
+  const rows = toolLines(delegateBlock(), 80, false).map(textOf);
+  assert.equal(rows.length, 1);
+  assert.match(rows[0] ?? "", /^▸ delegate · explorer · qwen3:27b · 1m 12s · \$0\.00 ✓/);
+});
+
+test("an expanded delegate call is a tree of its calls by name, what came back, and its steps", () => {
+  const rows = toolLines(delegateBlock(), 80, true).map(textOf);
+  assert.match(rows[0] ?? "", /^▾ delegate · explorer · qwen3:27b · 1m 12s · \$0\.00/);
+  assert.equal(rows[1], "    read_file ×14 · grep ×3");
+  assert.equal(rows[2], "    ↳ returned 620 tokens");
+  assert.ok(rows.some((row) => row.includes("read_file f0.py")));
+  assert.ok(rows.some((row) => row.includes("The router is in src/router.py.")));
+});
+
+test("a running delegate call says what its helper does", () => {
+  const running = delegateBlock({
+    status: "running",
+    preview: undefined,
+    child: {
+      model: "qwen3:27b",
+      modelCalls: 1,
+      toolSteps: [{ callId: "k", name: "read_file", args: { path: "src/router.py" }, status: "running" }],
+      tokens: null,
+      costUsd: null,
+      status: "running",
+      answerTokens: null,
+      startedAt: null,
+      durationMs: null,
+    },
+  });
+  const rows = toolLines(running, 80, true).map(textOf);
+  assert.equal(rows[0]?.startsWith("▾ delegate · explorer · qwen3:27b"), true);
+  assert.equal(rows[2], "    ↳ reading src/router.py…");
 });

@@ -175,9 +175,425 @@
       "title": "TraceContextEvent",
       "type": "object"
     },
+    "TraceHelperModelSpan": {
+      "additionalProperties": false,
+      "description": "A model call of a helper, with the helper's tool calls it asked for, in request order.",
+      "properties": {
+        "approval_wait_ms": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Approval Wait Ms"
+        },
+        "children": {
+          "items": {
+            "$ref": "#/$defs/TraceHelperToolSpan"
+          },
+          "title": "Children",
+          "type": "array"
+        },
+        "context_window": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Context Window"
+        },
+        "context_window_estimated": {
+          "default": false,
+          "title": "Context Window Estimated",
+          "type": "boolean"
+        },
+        "cost_usd": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cost Usd"
+        },
+        "dropped_message_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Dropped Message Ids",
+          "type": "array"
+        },
+        "dropped_tokens": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Dropped Tokens"
+        },
+        "duration_ms": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Duration Ms"
+        },
+        "end": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "End"
+        },
+        "first_token_ms": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "First Token Ms"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "run",
+            "model",
+            "tool"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "load_ms": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Load Ms"
+        },
+        "model": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Model"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "num_ctx": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Num Ctx"
+        },
+        "preview": {
+          "default": "",
+          "maxLength": 200,
+          "title": "Preview",
+          "type": "string"
+        },
+        "prompt_cut": {
+          "anyOf": [
+            {
+              "enum": [
+                "no",
+                "yes",
+                "likely"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Prompt Cut"
+        },
+        "prompt_cut_kind": {
+          "anyOf": [
+            {
+              "enum": [
+                "older_messages",
+                "middle"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Prompt Cut Kind"
+        },
+        "prompt_ms": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Prompt Ms"
+        },
+        "recorded": {
+          "default": true,
+          "title": "Recorded",
+          "type": "boolean"
+        },
+        "reply_ms": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reply Ms"
+        },
+        "start": {
+          "minLength": 1,
+          "title": "Start",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "ok",
+            "failed",
+            "cancelled",
+            "denied",
+            "running"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "tokens": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TraceTokens"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "window_planned": {
+          "default": false,
+          "title": "Window Planned",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "name",
+        "start",
+        "status"
+      ],
+      "title": "TraceHelperModelSpan",
+      "type": "object"
+    },
+    "TraceHelperToolSpan": {
+      "additionalProperties": false,
+      "description": "A tool call of a helper. It has no children.",
+      "properties": {
+        "approval_wait_ms": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Approval Wait Ms"
+        },
+        "duration_ms": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Duration Ms"
+        },
+        "end": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "End"
+        },
+        "first_token_ms": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "First Token Ms"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "run",
+            "model",
+            "tool"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "model": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Model"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "preview": {
+          "default": "",
+          "maxLength": 200,
+          "title": "Preview",
+          "type": "string"
+        },
+        "recorded": {
+          "default": true,
+          "title": "Recorded",
+          "type": "boolean"
+        },
+        "start": {
+          "minLength": 1,
+          "title": "Start",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "ok",
+            "failed",
+            "cancelled",
+            "denied",
+            "running"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "tokens": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TraceTokens"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "name",
+        "start",
+        "status"
+      ],
+      "title": "TraceHelperToolSpan",
+      "type": "object"
+    },
     "TraceModelSpan": {
       "additionalProperties": false,
-      "description": "A model call, with the tool calls it asked for, in request order.\n\n``prompt_cut`` says whether Ollama cut the prompt that did not fit: \"no\"\nand \"yes\" are proven from exact numbers, \"likely\" is an estimate, and null\nmeans golem cannot tell. ``prompt_cut_kind`` is set with \"yes\" and\n\"likely\". ``dropped_message_ids`` are the messages the model probably did\nnot see (older messages only), and ``dropped_tokens`` is an estimate of\ntheir size.\n\n``cost_usd`` is what the call cost, as its ``model.call.completed`` recorded\nit. Null when the price was not known or the call has no token counts.\n\n``load_ms``, ``prompt_ms`` and ``reply_ms`` are from the model server's own clock.\nOllama only.",
+      "description": "A model call, with the tool calls it asked for, in request order.\n\nThe tool calls are the run's own, so a ``delegate`` call has its helper's model calls\nunder it.",
       "properties": {
         "approval_wait_ms": {
           "anyOf": [
@@ -734,7 +1150,7 @@
     },
     "TraceToolSpan": {
       "additionalProperties": false,
-      "description": "A tool call. It has no children.",
+      "description": "A tool call.\n\nA ``delegate`` call has the model calls of its helper in ``children``, in order, each with\nthe helper's own tool calls. Any other tool call has none. A helper's calls have a context\nof their own, so they are not part of the run's context series.",
       "properties": {
         "approval_wait_ms": {
           "anyOf": [
@@ -748,6 +1164,13 @@
           ],
           "default": null,
           "title": "Approval Wait Ms"
+        },
+        "children": {
+          "items": {
+            "$ref": "#/$defs/TraceHelperModelSpan"
+          },
+          "title": "Children",
+          "type": "array"
         },
         "duration_ms": {
           "anyOf": [

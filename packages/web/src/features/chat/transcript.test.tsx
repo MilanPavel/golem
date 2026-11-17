@@ -562,3 +562,73 @@ test("notices draw as one muted line after the step they followed, and Quiet hid
   rerender(<TranscriptMessages chat={NOTICE_CHAT} detail="quiet" />);
   expect(screen.getAllByRole("note").map((n) => n.getAttribute("data-notice"))).toEqual(["summarised", "grew"]);
 });
+
+
+const helperRun = (over: Partial<NonNullable<ToolBlock["child"]>> = {}): NonNullable<ToolBlock["child"]> => ({
+  model: "qwen3:27b",
+  modelCalls: 2,
+  toolSteps: [
+    { callId: "k1", name: "read_file", args: { path: "src/router.py" }, status: "done", summary: "40 lines" },
+    { callId: "k2", name: "grep", args: { pattern: "route" }, status: "done", summary: "3 matches" },
+  ],
+  tokens: 5000,
+  costUsd: 0,
+  status: "done",
+  answerTokens: 620,
+  startedAt: null,
+  durationMs: 72_000,
+  ...over,
+});
+const delegateTool = (over: Partial<ToolBlock> = {}): ToolBlock => ({
+  callId: "d1",
+  name: "delegate",
+  args: { brief: "look" },
+  status: "done",
+  preview: "The router is in src/router.py.",
+  child: helperRun(),
+  ...over,
+});
+
+test("a delegate step is one line about its helper, and opens into the helper's steps and answer", () => {
+  render(<ul><ToolLine tool={delegateTool()} /></ul>);
+  const head = screen.getByRole("button");
+  expect(head.textContent).toContain("explorer · qwen3:27b · read 1 file, 1 search · 1m 12s · returned 620 tokens");
+  expect(head.getAttribute("aria-expanded")).toBe("false");
+  expect(screen.queryByText("read_file")).toBeNull();
+  fireEvent.click(head);
+  expect(head.getAttribute("aria-expanded")).toBe("true");
+  const steps = within(screen.getByRole("list", { name: "Helper steps" }));
+  expect(steps.getAllByRole("button").map((button) => button.textContent)).toEqual([
+    expect.stringContaining("read_file"),
+    expect.stringContaining("grep"),
+  ]);
+  expect(screen.getByText("The router is in src/router.py.")).toBeTruthy();
+  fireEvent.click(head);
+  expect(screen.queryByRole("list", { name: "Helper steps" })).toBeNull();
+});
+
+test("a running helper says what it is reading", () => {
+  const running = delegateTool({
+    status: "running",
+    preview: undefined,
+    child: helperRun({ status: "running", toolSteps: [{ callId: "k", name: "read_file", args: { path: "src/router.py" }, status: "running" }] }),
+  });
+  render(<ul><ToolLine tool={running} /></ul>);
+  expect(screen.getByRole("button").textContent).toContain("explorer · qwen3:27b · reading src/router.py…");
+});
+
+test("in Quiet a delegate step is only its line", () => {
+  render(<ul><ToolLine tool={delegateTool()} detail="quiet" /></ul>);
+  const head = screen.getByRole("button");
+  expect((head as HTMLButtonElement).disabled).toBe(true);
+  fireEvent.click(head);
+  expect(screen.queryByRole("list", { name: "Helper steps" })).toBeNull();
+  expect(head.textContent).toContain("explorer · qwen3:27b");
+});
+
+test("the turn's footer counts the helper's tokens and says how many helpers", () => {
+  render(<TranscriptMessages chat={chat([answer({ tools: [delegateTool()], durationMs: 42_100, call: { model: "m", tier: "local", tokens: 100, costUsd: 0, done: true } })])} />);
+  const footer = document.body.textContent ?? "";
+  expect(footer).toContain("5.1K tok");
+  expect(footer).toContain("1 helper");
+});

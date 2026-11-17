@@ -3,7 +3,8 @@ import userEvent from "@testing-library/user-event";
 import axe from "axe-core";
 import { useState } from "react";
 import { expect, test } from "vitest";
-import { FAILED_TRACE, LONG_TRACE, OLD_TRACE, SHORT_TRACE } from "./sample.ts";
+import { inputSeries, totalTokens } from "./format.ts";
+import { FAILED_TRACE, LONG_TRACE, OLD_TRACE, SHORT_TRACE, sampleModel, sampleRun, sampleTool } from "./sample.ts";
 import { TraceTree } from "./trace-tree.tsx";
 import type { TraceRunSpan } from "../../store/trace.ts";
 
@@ -135,4 +136,67 @@ test("a run row has its total and its end context, and a track with ticks", () =
   expect(run.querySelectorAll("[data-part=tick]")).toHaveLength(1);
   expect(run.querySelector("[data-part=tick-label]")?.textContent).toBe("0m 02s");
   expect(items()[1]?.querySelector("[data-part=tick]")).toBeNull();
+});
+
+
+const HELPER_TRACE: TraceRunSpan[] = [
+  sampleRun("r_1", "Look around", 0, 9000, [
+    sampleModel(
+      "m_1",
+      1,
+      0,
+      1000,
+      [
+        {
+          ...sampleTool("d_1", "delegate", 1000, 6000),
+          children: [
+            sampleModel("k_1", 1, 1100, 900, [sampleTool("kc_1", "read_file", 2000, 30)], { tokens: [4000, 50], window: 8000 }),
+            sampleModel("k_2", 2, 2100, 800, [], { tokens: [4500, 600], window: 8000 }),
+          ],
+        },
+      ],
+      { tokens: [2000, 40], window: 32000 },
+    ),
+    sampleModel("m_2", 2, 7100, 1500, [], { tokens: [2600, 200], window: 32000 }),
+  ]),
+];
+
+test("a helper's calls draw as two more levels under the delegate tool", () => {
+  render(<Tree runs={HELPER_TRACE} />);
+  expect(items().map((item) => item.getAttribute("aria-level"))).toEqual(["1", "2", "3", "4", "5", "4", "2"]);
+  expect(names().map((name) => name.slice(0, 12))).toEqual([
+    expect.stringContaining("Run"),
+    expect.stringContaining("model 1"),
+    expect.stringContaining("delegate"),
+    expect.stringContaining("model 1"),
+    expect.stringContaining("read_file"),
+    expect.stringContaining("model 2"),
+    expect.stringContaining("model 2"),
+  ]);
+  // A helper's call has its own context meter against its own window.
+  const helperCall = items()[3] as HTMLElement;
+  expect(helperCall.textContent).toContain("4.0K · 50%");
+  expect(items()[2]?.getAttribute("aria-expanded")).toBe("true");
+});
+
+test("a helper's rows fold with the delegate row and a helper's model call is selectable", async () => {
+  const user = userEvent.setup();
+  render(<Tree runs={HELPER_TRACE} />);
+  await user.click(within(items()[2] as HTMLElement).getByText("▾"));
+  expect(items().map((item) => item.getAttribute("aria-level"))).toEqual(["1", "2", "3", "2"]);
+  await user.click(within(items()[2] as HTMLElement).getByText("▸"));
+  await user.click(items()[3] as HTMLElement);
+  expect(items()[3]?.getAttribute("aria-selected")).toBe("true");
+});
+
+test("a run holding a helper's span is open, and the run's totals count the helper", () => {
+  render(<Tree runs={[...SHORT_TRACE, ...HELPER_TRACE]} start="kc_1" />);
+  expect(screen.getByRole("treeitem", { name: /read_file/, selected: true })).toBeTruthy();
+  // 2.0K + 40 + 4.0K + 50 + 4.5K + 600 + 2.6K + 200 = 14.0K
+  expect(items().find((item) => item.getAttribute("aria-level") === "1" && item.textContent?.includes("Look around"))?.textContent).toContain("14.0K");
+});
+
+test("the context series leaves the helper out, and the token total counts it", () => {
+  expect(inputSeries(HELPER_TRACE)).toEqual([2000, 2600]);
+  expect(totalTokens(HELPER_TRACE)).toBe(2040 + 4050 + 5100 + 2800);
 });

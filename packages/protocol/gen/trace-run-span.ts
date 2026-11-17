@@ -3,6 +3,8 @@
 export type ApprovalWaitMs = number | null;
 export type ApprovalWaitMs1 = number | null;
 export type ApprovalWaitMs2 = number | null;
+export type ApprovalWaitMs3 = number | null;
+export type ApprovalWaitMs4 = number | null;
 export type DurationMs = number | null;
 export type End = string | null;
 export type FirstTokenMs = number | null;
@@ -18,7 +20,7 @@ export type CacheRead = number | null;
 export type CacheWrite = number | null;
 export type Input = number | null;
 export type Output = number | null;
-export type Children1 = TraceToolSpan[];
+export type Children3 = TraceHelperToolSpan[];
 export type ContextWindow = number | null;
 export type ContextWindowEstimated = boolean;
 export type CostUsd = number | null;
@@ -42,7 +44,7 @@ export type ReplyMs = number | null;
 export type Start1 = string;
 export type Status1 = 'ok' | 'failed' | 'cancelled' | 'denied' | 'running';
 export type WindowPlanned = boolean;
-export type Children = TraceModelSpan[];
+export type Children2 = TraceHelperModelSpan[];
 export type DurationMs2 = number | null;
 export type End2 = string | null;
 export type FirstTokenMs2 = number | null;
@@ -52,16 +54,52 @@ export type Model2 = string | null;
 export type Name2 = string;
 export type Preview2 = string;
 export type Recorded2 = boolean;
-export type Detail = string;
+export type Start2 = string;
+export type Status2 = 'ok' | 'failed' | 'cancelled' | 'denied' | 'running';
+export type Children1 = TraceToolSpan[];
+export type ContextWindow1 = number | null;
+export type ContextWindowEstimated1 = boolean;
+export type CostUsd1 = number | null;
+export type DroppedMessageIds1 = string[];
+export type DroppedTokens1 = number | null;
+export type DurationMs3 = number | null;
+export type End3 = string | null;
+export type FirstTokenMs3 = number | null;
+export type Id3 = string;
+export type Kind3 = 'run' | 'model' | 'tool';
+export type LoadMs1 = number | null;
 export type Model3 = string | null;
+export type Name3 = string;
+export type NumCtx1 = number | null;
+export type Preview3 = string;
+export type PromptCut1 = ('no' | 'yes' | 'likely') | null;
+export type PromptCutKind1 = ('older_messages' | 'middle') | null;
+export type PromptMs1 = number | null;
+export type Recorded3 = boolean;
+export type ReplyMs1 = number | null;
+export type Start3 = string;
+export type Status3 = 'ok' | 'failed' | 'cancelled' | 'denied' | 'running';
+export type WindowPlanned1 = boolean;
+export type Children = TraceModelSpan[];
+export type DurationMs4 = number | null;
+export type End4 = string | null;
+export type FirstTokenMs4 = number | null;
+export type Id4 = string;
+export type Kind4 = 'run' | 'model' | 'tool';
+export type Model4 = string | null;
+export type Name4 = string;
+export type Preview4 = string;
+export type Recorded4 = boolean;
+export type Detail = string;
+export type Model5 = string | null;
 export type Reason = 'pinned' | 'privacy' | 'fit' | 'budget' | 'cheapest' | 'escalated' | 'fallback' | 'user';
 export type Ref = string;
 export type Tier = 'local' | 'budget' | 'frontier';
 export type Why = string;
 export type Rejected = ModelRejection[];
 export type Tier1 = ('local' | 'budget' | 'frontier') | null;
-export type Start2 = string;
-export type Status2 = 'ok' | 'failed' | 'cancelled' | 'denied' | 'running';
+export type Start4 = string;
+export type Status4 = 'ok' | 'failed' | 'cancelled' | 'denied' | 'running';
 
 /**
  * A run, with its model calls in order.
@@ -71,6 +109,70 @@ export type Status2 = 'ok' | 'failed' | 'cancelled' | 'denied' | 'running';
 export interface TraceRunSpan {
   approval_wait_ms?: ApprovalWaitMs;
   children?: Children;
+  duration_ms?: DurationMs4;
+  end?: End4;
+  first_token_ms?: FirstTokenMs4;
+  id: Id4;
+  kind: Kind4;
+  model?: Model4;
+  name: Name4;
+  preview?: Preview4;
+  recorded?: Recorded4;
+  route?: TraceRoute | null;
+  start: Start4;
+  status: Status4;
+  tokens?: TraceTokens | null;
+}
+/**
+ * A model call, with the tool calls it asked for, in request order.
+ *
+ * The tool calls are the run's own, so a ``delegate`` call has its helper's model calls
+ * under it.
+ *
+ * This interface was referenced by `TraceRunSpan`'s JSON-Schema
+ * via the `definition` "TraceModelSpan".
+ */
+export interface TraceModelSpan {
+  approval_wait_ms?: ApprovalWaitMs1;
+  children?: Children1;
+  context_window?: ContextWindow1;
+  context_window_estimated?: ContextWindowEstimated1;
+  cost_usd?: CostUsd1;
+  dropped_message_ids?: DroppedMessageIds1;
+  dropped_tokens?: DroppedTokens1;
+  duration_ms?: DurationMs3;
+  end?: End3;
+  first_token_ms?: FirstTokenMs3;
+  id: Id3;
+  kind: Kind3;
+  load_ms?: LoadMs1;
+  model?: Model3;
+  name: Name3;
+  num_ctx?: NumCtx1;
+  preview?: Preview3;
+  prompt_cut?: PromptCut1;
+  prompt_cut_kind?: PromptCutKind1;
+  prompt_ms?: PromptMs1;
+  recorded?: Recorded3;
+  reply_ms?: ReplyMs1;
+  start: Start3;
+  status: Status3;
+  tokens?: TraceTokens | null;
+  window_planned?: WindowPlanned1;
+}
+/**
+ * A tool call.
+ *
+ * A ``delegate`` call has the model calls of its helper in ``children``, in order, each with
+ * the helper's own tool calls. Any other tool call has none. A helper's calls have a context
+ * of their own, so they are not part of the run's context series.
+ *
+ * This interface was referenced by `TraceRunSpan`'s JSON-Schema
+ * via the `definition` "TraceToolSpan".
+ */
+export interface TraceToolSpan {
+  approval_wait_ms?: ApprovalWaitMs2;
+  children?: Children2;
   duration_ms?: DurationMs2;
   end?: End2;
   first_token_ms?: FirstTokenMs2;
@@ -80,33 +182,19 @@ export interface TraceRunSpan {
   name: Name2;
   preview?: Preview2;
   recorded?: Recorded2;
-  route?: TraceRoute | null;
   start: Start2;
   status: Status2;
   tokens?: TraceTokens | null;
 }
 /**
- * A model call, with the tool calls it asked for, in request order.
- *
- * ``prompt_cut`` says whether Ollama cut the prompt that did not fit: "no"
- * and "yes" are proven from exact numbers, "likely" is an estimate, and null
- * means golem cannot tell. ``prompt_cut_kind`` is set with "yes" and
- * "likely". ``dropped_message_ids`` are the messages the model probably did
- * not see (older messages only), and ``dropped_tokens`` is an estimate of
- * their size.
- *
- * ``cost_usd`` is what the call cost, as its ``model.call.completed`` recorded
- * it. Null when the price was not known or the call has no token counts.
- *
- * ``load_ms``, ``prompt_ms`` and ``reply_ms`` are from the model server's own clock.
- * Ollama only.
+ * A model call of a helper, with the helper's tool calls it asked for, in request order.
  *
  * This interface was referenced by `TraceRunSpan`'s JSON-Schema
- * via the `definition` "TraceModelSpan".
+ * via the `definition` "TraceHelperModelSpan".
  */
-export interface TraceModelSpan {
-  approval_wait_ms?: ApprovalWaitMs1;
-  children?: Children1;
+export interface TraceHelperModelSpan {
+  approval_wait_ms?: ApprovalWaitMs3;
+  children?: Children3;
   context_window?: ContextWindow;
   context_window_estimated?: ContextWindowEstimated;
   cost_usd?: CostUsd;
@@ -133,13 +221,13 @@ export interface TraceModelSpan {
   window_planned?: WindowPlanned;
 }
 /**
- * A tool call. It has no children.
+ * A tool call of a helper. It has no children.
  *
  * This interface was referenced by `TraceRunSpan`'s JSON-Schema
- * via the `definition` "TraceToolSpan".
+ * via the `definition` "TraceHelperToolSpan".
  */
-export interface TraceToolSpan {
-  approval_wait_ms?: ApprovalWaitMs2;
+export interface TraceHelperToolSpan {
+  approval_wait_ms?: ApprovalWaitMs4;
   duration_ms?: DurationMs;
   end?: End;
   first_token_ms?: FirstTokenMs;
@@ -177,7 +265,7 @@ export interface TraceTokens {
  */
 export interface TraceRoute {
   detail: Detail;
-  model?: Model3;
+  model?: Model5;
   reason: Reason;
   rejected?: Rejected;
   tier?: Tier1;

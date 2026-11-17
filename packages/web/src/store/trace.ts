@@ -1,9 +1,9 @@
-import type { ArtifactReadResult, TraceContextEvent, TraceGetResult, TraceMessage, TraceModelSpan, TraceRunSpan, TraceSpan, TraceSpanResult, TraceTokens, TraceToolSpan, TraceRoute } from "@golem/client";
+import type { ArtifactReadResult, TraceContextEvent, TraceGetResult, TraceHelperModelSpan, TraceHelperToolSpan, TraceMessage, TraceModelSpan, TraceRunSpan, TraceSpan, TraceSpanResult, TraceTokens, TraceToolSpan, TraceRoute } from "@golem/client";
 
-export type { ArtifactReadResult, TraceContextEvent, TraceGetResult, TraceMessage, TraceModelSpan, TraceRunSpan, TraceSpan, TraceSpanResult, TraceTokens, TraceToolSpan, TraceRoute };
+export type { ArtifactReadResult, TraceContextEvent, TraceGetResult, TraceHelperModelSpan, TraceHelperToolSpan, TraceMessage, TraceModelSpan, TraceRunSpan, TraceSpan, TraceSpanResult, TraceTokens, TraceToolSpan, TraceRoute };
 
 /** Any span of the tree. */
-export type TraceNode = TraceRunSpan | TraceModelSpan | TraceToolSpan;
+export type TraceNode = TraceRunSpan | TraceModelSpan | TraceToolSpan | TraceHelperModelSpan | TraceHelperToolSpan;
 
 /**
  * The query key of `trace.get`. Nothing pushed marks it stale: the trace page shows finished data
@@ -24,8 +24,21 @@ export function modelsOf(run: TraceRunSpan): readonly TraceModelSpan[] {
 }
 
 /** The tool calls a model call asked for. */
-export function toolsOf(model: TraceModelSpan): readonly TraceToolSpan[] {
+export function toolsOf(model: TraceModelSpan | TraceHelperModelSpan): readonly (TraceToolSpan | TraceHelperToolSpan)[] {
   return model.children ?? [];
+}
+
+/**
+ * The model calls of the helper a `delegate` call started, in order. They have a context of their
+ * own, so the run's context numbers leave them out, but its totals count them.
+ */
+export function helperModelsOf(tool: TraceToolSpan | TraceHelperToolSpan): readonly TraceHelperModelSpan[] {
+  return "children" in tool ? (tool.children ?? []) : [];
+}
+
+/** The model calls of a run, then those of its helpers. */
+export function withHelperModels(run: TraceRunSpan): readonly (TraceModelSpan | TraceHelperModelSpan)[] {
+  return modelsOf(run).flatMap((model) => [model, ...toolsOf(model).flatMap(helperModelsOf)]);
 }
 
 /** The query key of `trace.span`. The page's Refresh reads it again with the tree. */

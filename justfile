@@ -81,7 +81,7 @@ swift-check:
         swift test
     fi
 
-# Record the event logs the view package tests fold: a real daemon, a fake model, five chats.
+# Record the event logs the view package tests fold: a real daemon, a fake model, six chats.
 golden:
     uv run python packages/daemon/tests/golden.py
 

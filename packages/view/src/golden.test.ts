@@ -41,10 +41,10 @@ const names = readdirSync(FOLDER)
   .filter((name) => name.endsWith(".json"))
   .sort();
 
-test("the fixtures cover the five scenarios", () => {
+test("the fixtures cover the six scenarios", () => {
   assert.deepEqual(
     names.map((name) => name.replace(/\.json$/, "")),
-    ["approval", "cancel", "failure", "plain", "tool"],
+    ["approval", "cancel", "delegate", "failure", "plain", "tool"],
   );
 });
 

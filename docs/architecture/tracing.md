@@ -173,6 +173,8 @@ For contributors: the reference for the spans, the events and what they hold, th
 | `model` | one assistant reply | the reply's `message_id` | the run |
 | `tool` | one tool the model asked for | `call_id` | the model call whose reply asked for it |
 
+The `tool` span of a `delegate` call has `children`: the model spans of its helper, each with the helper's tool spans. They are spans like any other. They have a context of their own, so they are not part of the run's context series.
+
 A model call has no id of its own. Each call makes exactly one assistant message, and that message's id already joins the event log and the checkpoint. A span's status is `ok`, `failed`, `cancelled`, `denied` (a tool that was refused and never ran), or `running`.
 
 ### The events
@@ -232,7 +234,8 @@ The page shows every duration as minutes and seconds, from `formatDuration` in `
 1. **The run.** Its name is the first 80 characters of the user's message. It starts at `run.started` and ends at `run.completed`, `run.failed`, or `run.cancelled`. With no end event it is `running`.
 2. **The model calls.** One for each `model.call.started`, numbered from 1, joined to its `model.call.completed` by `message_id`. A call with no end is `running`, or `cancelled` if the run was cancelled. `preview` is the start of the reply.
 3. **The tool calls.** One for each `tool.requested`, put under the model call named by its `message_id`. If that id is unknown, it goes under the newest model call that had started by then. The end, status, and preview come from `tool.completed` or `tool.failed`.
-4. **Names and previews are short.** A preview is cut at 200 characters.
+4. **A helper's calls.** The events of a child run carry `parent_call_id`, the id of the `delegate` call ([ADR-058](../adr/058-child-runs.md)). They are left out of the run's own spans and built the same way, from the model calls down, then put under the `tool` span with that id: tool span, the helper's model spans, their tool spans. Their prompt cut is not judged against the run's calls. `with_windows` fills their windows too.
+5. **Names and previews are short.** A preview is cut at 200 characters.
 
 `trace.get` returns the runs, oldest first, each with its model calls and their tools, and `context_events`, the session's `context.changed` events with the call after each. A model span carries its `context_window`, and one the event did not record gets today's window with `context_window_estimated` set.
 
@@ -244,7 +247,7 @@ The page shows every duration as minutes and seconds, from `formatDuration` in `
 - **For a tool call:** `args`, the whole `result` text, `artifact_id` when the output was too big for the model (open it with `artifact.read`), and `approval` when one was asked.
 - **For a run:** the span alone.
 
-An unknown `span_id` is an error. Neither method calls the model or starts a run, and both answer only a client that may already attach the session.
+For a span of a helper, the context and the result come from the helper's own checkpoint thread, `<session_id>/c/<call_id>`, found by the `delegate` call that holds the span. An unknown `span_id` is an error. Neither method calls the model or starts a run, and both answer only a client that may already attach the session.
 
 ### What filled the context
 

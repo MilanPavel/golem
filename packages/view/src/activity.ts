@@ -47,6 +47,8 @@ function groupOf(name: string): { key: string; label: Group["label"] } {
     case "write_file":
     case "edit_file":
       return { key: "edit", label: (count) => `edited ${plural(count, "file", "files")}` };
+    case "delegate":
+      return { key: "delegate", label: (count) => plural(count, "helper", "helpers") };
     case "shell":
       return { key: "shell", label: (count) => `ran ${plural(count, "command", "commands")}` };
     default:
