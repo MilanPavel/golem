@@ -120,6 +120,7 @@ const sidebar: DefaultTheme.Sidebar = [
       { text: "Tools and permissions", link: "/guide/permissions" },
       { text: "MCP servers", link: "/guide/mcp" },
       { text: "Skills", link: "/guide/skills" },
+      { text: "Routines", link: "/guide/routines" },
       { text: "The web UI", link: "/guide/web" },
       { text: "Settings", link: "/guide/settings" },
     ],

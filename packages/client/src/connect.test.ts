@@ -1341,6 +1341,43 @@ test("skill.read, write, create and set_disabled send their params, and local cl
   }
 });
 
+test("routine.list, get, run and update send their params", async () => {
+  const sent: Record<string, unknown>[] = [];
+  const info = { config: { name: "brief", prompt: "p" }, path: "/h/config.toml", source: "user" };
+  const server = await listen((socket) => {
+    attach(socket, {
+      answerPing: true,
+      results: {
+        "routine.list": { routines: [info] },
+        "routine.get": { routine: info, runs: [] },
+        "routine.run": { routine_run_id: "r1", session_id: "s1" },
+        "routine.update": { routine: info },
+      },
+      onRequest: (_socket, method, params) => {
+        if (method.startsWith("routine.")) {
+          sent.push({ method, ...params });
+        }
+      },
+    });
+  });
+  const client = connectGolem({ socketPath: server.socketPath, clientName: "tui", reconnect: false, heartbeatMs: 60_000 });
+  try {
+    assert.equal((await client.listRoutines(["/repo"])).routines.length, 1);
+    assert.equal((await client.getRoutine("brief")).routine.config.name, "brief");
+    assert.deepEqual(await client.runRoutine("brief", "/repo"), { routine_run_id: "r1", session_id: "s1" });
+    await client.updateRoutine("brief", { enabled: false });
+    assert.deepEqual(sent, [
+      { method: "routine.list", folders: ["/repo"] },
+      { method: "routine.get", name: "brief" },
+      { method: "routine.run", name: "brief", folder: "/repo" },
+      { method: "routine.update", name: "brief", fields: { enabled: false } },
+    ]);
+  } finally {
+    client.close();
+    await server.close();
+  }
+});
+
 test("skill.list reads the skills, and skill.registry.changed reaches onSkillsChanged", async () => {
   const ship = { name: "ship", description: "Ship it.", source: "project", path: "/repo/.agents/skills/ship", usable: true };
   const sent: Record<string, unknown>[] = [];

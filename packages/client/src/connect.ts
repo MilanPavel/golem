@@ -60,6 +60,10 @@ import type { SkillCall } from "../../protocol/gen/skill-call.ts";
 import type { SkillCreateResult } from "../../protocol/gen/skill-create-result.ts";
 import type { SkillListResult } from "../../protocol/gen/skill-list-result.ts";
 import type { SkillReadResult } from "../../protocol/gen/skill-read-result.ts";
+import type { RoutineGetResult } from "../../protocol/gen/routine-get-result.ts";
+import type { RoutineListResult } from "../../protocol/gen/routine-list-result.ts";
+import type { RoutineRunResult } from "../../protocol/gen/routine-run-result.ts";
+import type { RoutineUpdateResult } from "../../protocol/gen/routine-update-result.ts";
 import type { SkillSetDisabledResult } from "../../protocol/gen/skill-set-disabled-result.ts";
 import type { SkillWriteResult } from "../../protocol/gen/skill-write-result.ts";
 import type { McpToggleResult } from "../../protocol/gen/mcp-toggle-result.ts";
@@ -184,6 +188,10 @@ import {
   isSkillCreateResult,
   isSkillListResult,
   isSkillReadResult,
+  isRoutineGetResult,
+  isRoutineListResult,
+  isRoutineRunResult,
+  isRoutineUpdateResult,
   isSkillSetDisabledResult,
   isSkillWriteResult,
   isSessionSetModelResult,
@@ -543,6 +551,14 @@ export interface GolemClient {
     params: { path: string; text: string; baseMtimeNs: number; cwd?: string; dryRun?: boolean },
     options?: { local?: boolean },
   ): Promise<SkillWriteResult>;
+  /** `routine.list`: the user's routines, and those of the trusted project `folders`, with the next and last run of each. Also the lines of the files that did not parse. */
+  listRoutines(folders?: string[]): Promise<RoutineListResult>;
+  /** `routine.get`: one routine with its recent runs. `folder` is the project it is in, or none for the user's. */
+  getRoutine(name: string, folder?: string): Promise<RoutineGetResult>;
+  /** `routine.run`: fire a routine now. It returns the run and the session it started. */
+  runRoutine(name: string, folder?: string): Promise<RoutineRunResult>;
+  /** `routine.update`: merge `fields` into the user's routine `name` in `config.toml`; a field set to null is removed. */
+  updateRoutine(name: string, fields: Record<string, unknown>): Promise<RoutineUpdateResult>;
   /** `skill.set_disabled`: turn a skill off, or on again, in `config.toml`. */
   setSkillDisabled(name: string, disabled: boolean): Promise<SkillSetDisabledResult>;
   /**
@@ -2040,6 +2056,38 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       const result = await call(options?.local === true ? "skill.create_protected" : "skill.create", body);
       if (!isSkillCreateResult(result)) {
         throw new Error("invalid skill.create result");
+      }
+      return result;
+    },
+    async listRoutines(folders?: string[]): Promise<RoutineListResult> {
+      await ready;
+      const result = await call("routine.list", folders === undefined ? {} : { folders });
+      if (!isRoutineListResult(result)) {
+        throw new Error("invalid routine.list result");
+      }
+      return result;
+    },
+    async getRoutine(name: string, folder?: string): Promise<RoutineGetResult> {
+      await ready;
+      const result = await call("routine.get", folder === undefined ? { name } : { name, folder });
+      if (!isRoutineGetResult(result)) {
+        throw new Error("invalid routine.get result");
+      }
+      return result;
+    },
+    async runRoutine(name: string, folder?: string): Promise<RoutineRunResult> {
+      await ready;
+      const result = await call("routine.run", folder === undefined ? { name } : { name, folder });
+      if (!isRoutineRunResult(result)) {
+        throw new Error("invalid routine.run result");
+      }
+      return result;
+    },
+    async updateRoutine(name: string, fields: Record<string, unknown>): Promise<RoutineUpdateResult> {
+      await ready;
+      const result = await call("routine.update", { name, fields });
+      if (!isRoutineUpdateResult(result)) {
+        throw new Error("invalid routine.update result");
       }
       return result;
     },

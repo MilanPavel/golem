@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync, writeFileSync } from "node:fs";
 import { test } from "node:test";
 
-import { editFile, editInEditor, editorCommand } from "./external-editor.ts";
+import { editFile, editInEditor, editorCommand, editorCommandAt } from "./external-editor.ts";
 
 test("the editor is $EDITOR split on spaces, or vi", () => {
   assert.deepEqual(editorCommand({ EDITOR: "code -w" }), ["code", "-w"]);
@@ -55,4 +55,14 @@ test("editFile runs the editor on the file itself", async () => {
     ),
     false,
   );
+});
+
+test("a line goes to the editors that take +N, and to no other", async () => {
+  assert.deepEqual(editorCommandAt(12, { EDITOR: "/usr/bin/vim" }), ["/usr/bin/vim", "+12"]);
+  assert.deepEqual(editorCommandAt(12, {}), ["vi", "+12"]);
+  assert.deepEqual(editorCommandAt(12, { EDITOR: "code -w" }), ["code", "-w"]);
+  assert.deepEqual(editorCommandAt(undefined, { EDITOR: "nano" }), ["nano"]);
+  let seen: readonly string[] = [];
+  await editFile("/x/config.toml", async (command, file) => ((seen = [...command, file]), 0), { EDITOR: "nano" }, 3);
+  assert.deepEqual(seen, ["nano", "+3", "/x/config.toml"]);
 });

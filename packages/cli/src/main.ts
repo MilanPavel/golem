@@ -44,6 +44,15 @@ import {
 } from "./mcp-format.ts";
 import { LOGIN_TIMEOUT_MS, projectSession, runConfigEdit, runMcpEdit, runMcpImport, runMcpLogin, testAfterAdd } from "./mcp-run.ts";
 import { editFile } from "./external-editor.ts";
+import {
+  parseRoutinesArgs,
+  ROUTINES_USAGE,
+  runRoutinesEdit,
+  runRoutinesList,
+  runRoutinesPause,
+  runRoutinesRun,
+  type RoutinesDeps,
+} from "./routines-run.ts";
 import { parseSkillsNew, runSkillsEdit, runSkillsNew } from "./skills-run.ts";
 import { readChoice } from "./read-choice.ts";
 import { readSecret } from "./read-secret.ts";
@@ -86,6 +95,7 @@ const USAGE =
   "       golem ask \"<prompt>\" [--folder <dir>] [--model <profile>] [--skill <name>] [--detach] | golem open <id> [--web]\n" +
   "       golem config show [--resolved] | golem config edit [--project] | golem skills [list] | golem skills check <path>\n" +
   "       golem skills new <name> [--project] [--description \"…\"] | golem skills edit <name>\n" +
+  "       golem routines [list] | golem routines run <name> [--folder <dir>] [--wait] | golem routines pause <name> | golem routines resume <name> | golem routines edit\n" +
   "       golem coding bench <profile-or-model> [--task <name>]\n" +
   "       golem web [--port N] [--no-open] [--json] (the same as golem) | golem web serve [--port N]\n" +
   "       golem web install [--port N] | golem web uninstall | golem web logout";
@@ -188,6 +198,9 @@ async function run(args: string[]): Promise<number> {
     process.stderr.write(`${USAGE}\n`);
     return 1;
   }
+  if (command === "routines") {
+    return runRoutines(rest);
+  }
   if (command === "ask") {
     return runAskCommand(rest);
   }
@@ -227,6 +240,54 @@ const SKILLS_DEPS = {
     process.stderr.write(`${line}\n`);
   },
 };
+
+function routinesDeps(): RoutinesDeps {
+  const fromEnv = process.env["GOLEM_HOME"]?.trim() ?? "";
+  return {
+    cwd: process.cwd(),
+    now: () => new Date(),
+    configPath: join(fromEnv.length > 0 ? fromEnv : join(homedir(), ".golem"), "config.toml"),
+    ...(process.stdout.columns === undefined ? {} : { columns: process.stdout.columns }),
+    editFile: (path: string, line?: number) => editFile(path, undefined, process.env, line),
+    readFile: (path: string) => {
+      try {
+        return readFileSync(path, "utf8");
+      } catch {
+        return null;
+      }
+    },
+    sleep: (ms: number) => new Promise<void>((done) => setTimeout(done, ms)),
+    write: (line: string): void => {
+      process.stdout.write(`${line}\n`);
+    },
+    error: (line: string): void => {
+      process.stderr.write(`${line}\n`);
+    },
+  };
+}
+
+/** `golem routines [list]|run|pause|resume|edit`: the routines in `config.toml`, from a shell. */
+async function runRoutines(given: string[]): Promise<number> {
+  const parsed = parseRoutinesArgs(given, process.cwd());
+  if (parsed.kind === "error") {
+    process.stderr.write(`${parsed.message === ROUTINES_USAGE ? USAGE : parsed.message}\n`);
+    return 1;
+  }
+  const deps = routinesDeps();
+  return runWithClient((client) => {
+    switch (parsed.kind) {
+      case "list":
+        return runRoutinesList(client, deps);
+      case "run":
+        return runRoutinesRun(client, parsed, deps);
+      case "pause":
+      case "resume":
+        return runRoutinesPause(client, parsed.name, parsed.kind === "pause", deps);
+      case "edit":
+        return runRoutinesEdit(client, deps);
+    }
+  });
+}
 
 /** `golem ask`: a session with origin `cli`. It waits for the answer, or with `--detach` prints the id. */
 async function runAskCommand(given: string[]): Promise<number> {
