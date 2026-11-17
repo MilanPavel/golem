@@ -53,6 +53,8 @@ import { KEYS_CASES } from "../features/settings/keys-sample.ts";
 import { SkillList } from "../features/settings/skills-section.tsx";
 import { SkillOverview } from "../features/settings/skills/skill-detail.tsx";
 import { SAMPLE_BROKEN_SKILL_MD, SAMPLE_SKILLS } from "../features/settings/skills/sample.ts";
+import { ContextView } from "../features/settings/context-section.tsx";
+import { CONTEXT_CASES } from "../features/settings/context-sample.ts";
 import { RoutingView } from "../features/settings/routing-section.tsx";
 import { ROUTING_CASES, ROUTING_LISTING } from "../features/settings/routing-sample.ts";
 import { UsageView } from "../features/settings/usage-section.tsx";
@@ -1210,13 +1212,27 @@ function RoutingDemo() {
               listing={ROUTING_LISTING}
               pulls={{ active: new Map(), failed: new Map() }}
               errors={item.errors}
-              windowNote={item.note}
               planned={item.note === null ? null : 32768}
               spentToday={0.42}
               onChange={none}
+              onOpenContext={none}
               folderBrowser={() => <p className="p-3 text-sm text-muted">The folder browser opens here.</p>}
             />
           </div>
+        </section>
+      ))}
+    </div>
+  );
+}
+
+/** Settings → Context: Auto with a hosted model, a fixed window, Ollama's, no window known, and a save error. */
+function ContextDemo() {
+  return (
+    <div className="flex flex-col gap-4">
+      {CONTEXT_CASES.map((item) => (
+        <section key={item.label} aria-label={`Context, ${item.label}`} className="flex flex-col gap-3 rounded-lg border border-line bg-bg p-4">
+          <span className="font-mono text-xs text-faint">{`Context, ${item.label}`}</span>
+          <ContextView values={item.values} listing={ROUTING_LISTING} errors={item.errors} windowNote={item.note} planned={item.planned} onChange={() => {}} />
         </section>
       ))}
     </div>
@@ -1595,6 +1611,11 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
       <section className="mt-6" id={anchor("Routing")}>
         <h3 className="mb-2 font-mono text-xs text-faint">Routing</h3>
         <RoutingDemo />
+      </section>
+
+      <section className="mt-6" id={anchor("Settings Context")}>
+        <h3 className="mb-2 font-mono text-xs text-faint">Settings › Context</h3>
+        <ContextDemo />
       </section>
 
       <section className="mt-6" id={anchor("Usage")}>

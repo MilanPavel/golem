@@ -9,6 +9,7 @@ import { CloseIcon } from "../../ui/icons.tsx";
 import { Link } from "../../ui/link.tsx";
 import { TAB_LOOK } from "../../ui/tabs.tsx";
 import { ConfigSection } from "./config-section.tsx";
+import { ContextSection } from "./context-section.tsx";
 import { useSettingsContext } from "./context.ts";
 import { KeysSection } from "./keys-section.tsx";
 import { McpSection } from "./mcp-section.tsx";
@@ -48,6 +49,8 @@ function Body({ section }: { section: string }) {
       return <KeysSection />;
     case "routing":
       return <RoutingSection />;
+    case "context":
+      return <ContextSection />;
     case "usage":
       return <UsageSection />;
     case "rules":

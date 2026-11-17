@@ -1,23 +1,24 @@
-import { ROUTING_WORDS, parseAmount, turnOutcome, windowCaption, type Situation } from "@golem/view";
-import { useQuery } from "@tanstack/react-query";
+import { CONTEXT_WORDS, ROUTING_WORDS, handoffChips, parseAmount, turnOutcome, type Situation } from "@golem/view";
 import { useId, useMemo, useState } from "react";
 import { actionErrorText } from "../../store/errors.ts";
 import type { ModelListResult } from "../../store/models.ts";
-import { useCost, useModelList, useNavigate, usePageActions, usePulls, useRouting } from "../../store/page-context.tsx";
+import { useCost, useModelList, useNavigate, usePulls, useRouting } from "../../store/page-context.tsx";
 import type { PullsSnapshot } from "../../store/pulls.ts";
 import type { RoutingGetResult, RoutingSetParams } from "../../store/routing.ts";
 import { settingsPath } from "../../store/router.ts";
 import { Button } from "../../ui/button.tsx";
 import { FolderBrowser } from "../shell/folder-browser.tsx";
-import { routingState } from "./routing-derive.ts";
+import { routingState, windowKind, windowTokens } from "./routing-derive.ts";
 import { RoutingExceptions, type FolderBrowserSlot } from "./routing-exceptions.tsx";
 import { RoutingGate } from "./routing-gate.tsx";
-import { RoutingLong } from "./routing-long.tsx";
 import { RoutingModes } from "./routing-modes.tsx";
-import { Box, More, type RoutingErrors } from "./routing-parts.tsx";
+import { Box, CARD, More, type RoutingErrors } from "./routing-parts.tsx";
 import { RoutingPath } from "./routing-path.tsx";
 import { RoutingRightNow } from "./routing-summary.tsx";
 import { RoutingTry, usePlayback } from "./routing-try.tsx";
+import { usePlannedWindow } from "./use-planned-window.ts";
+import { useRoutingSave } from "./use-routing-save.ts";
+import { cn } from "../../ui/cn.ts";
 
 export type { FolderBrowserSlot, RoutingErrors };
 
@@ -26,8 +27,6 @@ export type RoutingViewProps = {
   listing: ModelListResult | null;
   pulls: PullsSnapshot;
   errors: RoutingErrors;
-  /** What Auto gives for the local model on this Mac, or null when golem has no plan to name. */
-  windowNote: string | null;
   /** The planned window of the local model in tokens, or null when golem has no plan to name. */
   planned?: number | null;
   /** Today's spend from `cost.get`, or null while it is not known. */
@@ -36,21 +35,46 @@ export type RoutingViewProps = {
   onChange: (patch: RoutingSetParams) => void;
   /** Opens Settings › API keys. */
   onOpenKeys?: () => void;
+  /** Opens Settings › Context. */
+  onOpenContext?: () => void;
   /** The folder browser for Add. The page passes the live one, the gallery a still one. */
   folderBrowser: FolderBrowserSlot;
 };
 
-/** Settings › Routing: every routing and context setting, each saving on its own. */
+/** The last card of Routing: the three numbers of Settings › Context, and the way there. */
+function ContextHandoff({ values, planned, onOpen }: { values: RoutingGetResult; planned: number | null; onOpen: () => void }) {
+  const words = CONTEXT_WORDS.handoff;
+  return (
+    <section aria-label={words.title} className={cn(CARD, "flex flex-wrap items-center gap-x-5 gap-y-3 border-dashed px-5 py-4 shadow-none")}>
+      <div className="flex min-w-60 flex-1 flex-col gap-1.5">
+        <h3 className="font-semibold">{words.title}</h3>
+        <p className="text-note text-muted">{words.line}</p>
+        <ul className="flex flex-wrap gap-1.5">
+          {handoffChips(values.context, windowTokens(values, planned), windowKind(values.context)).map((chip) => (
+            <li key={chip} className="rounded-md border border-line-strong bg-slip px-1.5 py-0.5 font-mono text-xs font-medium whitespace-nowrap text-ink">
+              {chip}
+            </li>
+          ))}
+        </ul>
+      </div>
+      <Button size="sm" onClick={onOpen}>
+        {`${words.open} →`}
+      </Button>
+    </section>
+  );
+}
+
+/** Settings › Routing: the routing settings, each saving on its own. It ends with a card to Settings › Context. */
 export function RoutingView({
   values,
   listing,
   pulls,
   errors: saved,
-  windowNote,
   planned = null,
   spentToday = null,
   onChange,
   onOpenKeys = () => {},
+  onOpenContext = () => {},
   folderBrowser,
 }: RoutingViewProps) {
   const gateId = `${useId()}-paid-gate`;
@@ -106,7 +130,7 @@ export function RoutingView({
       </RoutingPath>
       <RoutingGate id={gateId} values={values} state={state} errors={errors} spentToday={spentToday} commit={commit} onChange={onChange} />
       <RoutingExceptions values={values} listing={listing} pulls={pulls} errors={errors} onChange={onChange} folderBrowser={folderBrowser} />
-      <RoutingLong context={values.context} windowNote={windowNote} planned={planned} errors={errors} commit={commit} onChange={onChange} />
+      <ContextHandoff values={values} planned={planned} onOpen={onOpenContext} />
     </div>
   );
 }
@@ -116,38 +140,10 @@ export function RoutingSection() {
   const routing = useRouting();
   const listing = useModelList().data ?? null;
   const pulls = usePulls();
-  const actions = usePageActions();
   const navigate = useNavigate();
   const cost = useCost();
-  const [errors, setErrors] = useState<RoutingErrors>({});
-  const [failure, setFailure] = useState<string | null>(null);
-  const local = routing.data?.picked.local ?? null;
-  const options = useQuery({
-    queryKey: ["model.options", local],
-    queryFn: () => actions.modelOptions(local ?? "", null),
-    enabled: local !== null,
-    retry: false,
-    staleTime: 60_000,
-  });
-  const planned = options.data?.default_from?.["num_ctx"] === "golem" ? Number(options.data.defaults["num_ctx"] ?? Number.NaN) || null : null;
-  const note = planned === null ? null : windowCaption(local, planned, options.data?.memory?.ram_gb ?? null);
-
-  async function save(patch: RoutingSetParams): Promise<void> {
-    setFailure(null);
-    try {
-      const result = await actions.setRouting(patch);
-      if (result.ok) {
-        setErrors({});
-        return;
-      }
-      setErrors(Object.fromEntries((result.errors ?? []).map((error) => [error.path ?? "", error.message])));
-      // An error with no setting to sit on goes where a failed save goes.
-      const loose = (result.errors ?? []).find((error) => error.path == null);
-      if (loose !== undefined) setFailure(loose.message);
-    } catch (error) {
-      setFailure(actionErrorText(error, "Could not save the setting."));
-    }
-  }
+  const { errors, failure, save } = useRoutingSave();
+  const { planned } = usePlannedWindow(routing.data?.picked.local ?? null);
 
   if (routing.isError) {
     return (
@@ -174,11 +170,11 @@ export function RoutingSection() {
         listing={listing}
         pulls={pulls}
         errors={errors}
-        windowNote={note}
         planned={planned}
         spentToday={cost.data?.today.cost_usd ?? null}
         onChange={(patch) => void save(patch)}
         onOpenKeys={() => navigate(settingsPath("keys"))}
+        onOpenContext={() => navigate(settingsPath("context"))}
         folderBrowser={({ onPick, onCancel }) => <FolderBrowser initialPath={null} autoFocus onPick={onPick} onCancel={onCancel} />}
       />
     </div>

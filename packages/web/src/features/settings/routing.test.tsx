@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import axe from "axe-core";
 import { afterEach, expect, test } from "vitest";
@@ -56,14 +56,7 @@ test("every part shows the values the daemon sends", async () => {
   expect(screen.getByRole("button", { name: "Summaries: Automatic" })).toBeTruthy();
   const folders = within(screen.getByRole("list", { name: "Folders that never leave this Mac" })).getAllByRole("listitem");
   expect(folders.map((item) => item.textContent)).toEqual(["/Users/me/private×", "/Users/me/taxes×"]);
-  expect(radio("fixed").checked).toBe(true);
-  expect(box("Window size").value).toBe("16384");
   expect(box("Budget tier price limit").value).toBe("2");
-  expect(box("Reply reserve").value).toBe("2048");
-  expect(box("Clear at").value).toBe("60");
-  expect(box("Clear to").value).toBe("35");
-  expect(box("Summarise at").value).toBe("80");
-  expect(screen.getByRole("group", { name: "Newest turns kept word for word" }).textContent).toContain("6");
   expect(summary()).toContain("It stops paying at $2.00 a day or $0.50 a chat; then it asks you.");
 });
 
@@ -79,7 +72,6 @@ test("with nothing set an empty step says what golem picks, and the limits are e
   expect(box("Per chat").value).toBe("");
   expect(screen.getByRole("button", { name: "Explorer: Automatic" })).toBeTruthy();
   expect(screen.getByText("No folders yet.")).toBeTruthy();
-  expect(radio("auto").checked).toBe(true);
   expect(screen.getByText(/the steps are not used/)).toBeTruthy();
 });
 
@@ -182,19 +174,6 @@ test("a field error from the daemon shows at its setting", async () => {
   expect(fake.raw.setRouting).toHaveBeenCalledWith({ budget: { daily_usd: -1 } });
 });
 
-test("an error on a setting in More opens More", async () => {
-  const { fake, user } = mount();
-  await screen.findByRole("heading", { name: READY });
-  fake.raw.setRouting.mockResolvedValue({ ok: false, errors: [{ path: "context.clear_to", message: "[context] needs 0 < clear_to < clear_at < compact_at < 1" }] });
-  await user.click(screen.getAllByText("More")[1] as HTMLElement);
-  await user.clear(box("Clear to"));
-  await user.type(box("Clear to"), "90");
-  await user.tab();
-  const alert = await screen.findByRole("alert");
-  expect(box("Clear to").getAttribute("aria-describedby")).toContain(alert.id);
-  expect(box("Clear to").closest("details")?.open).toBe(true);
-});
-
 test("a rejected save is shown, and the next good save clears the errors", async () => {
   const { fake, user } = mount();
   await screen.findByRole("heading", { name: READY });
@@ -218,67 +197,14 @@ test("local-only folders can be removed, and added with the folder browser", asy
   );
 });
 
-test("the window caption says what Auto gives for the default local model", async () => {
-  const { fake } = mount();
-  fake.raw.getModelOptions.mockResolvedValue({
-    model: "qwen3:8b",
-    options: [],
-    defaults: { num_ctx: 32768 },
-    default_from: { num_ctx: "golem" },
-    saved: {},
-    session: {},
-    memory: { ram_gb: 36, size_gb: 5, kv_gb_per_1k_tokens: 0.1, overhead_gb: 1, fits_share: 0.7, tight_share: 0.85 },
-  });
-  expect(await screen.findByText("Auto picks 32K for qwen3:8b on this Mac (36 GB).")).toBeTruthy();
-  expect(await screen.findByRole("button", { name: "A prompt too big for 32K" })).toBeTruthy();
-});
-
-test("the window can be Ollama's default or a number", async () => {
+test("the budget tier price limit saves as a number", async () => {
   const { fake, user } = mount();
   await screen.findByRole("heading", { name: READY });
-  await user.click(screen.getByRole("checkbox", { name: /Ollama's default window/ }));
-  await waitFor(() => expect(fake.raw.setRouting).toHaveBeenCalledWith({ context: { window: "ollama" } }));
-  await user.click(radio("fixed"));
-  await user.type(box("Window size"), "8192");
-  await user.tab();
-  await waitFor(() => expect(fake.raw.setRouting).toHaveBeenCalledWith({ context: { window: 8192 } }));
-});
-
-test("the context settings save as shares and counts", async () => {
-  const { fake, user } = mount();
-  await screen.findByRole("heading", { name: READY });
-  await user.click(screen.getAllByText("More")[0] as HTMLElement);
-  await user.click(screen.getAllByText("More")[1] as HTMLElement);
-  await user.clear(box("Clear at"));
-  await user.type(box("Clear at"), "65");
-  await user.tab();
-  await waitFor(() => expect(fake.raw.setRouting).toHaveBeenCalledWith({ context: { clear_at: 0.65 } }));
-  await user.clear(box("Reply reserve"));
-  await user.type(box("Reply reserve"), "2048");
-  await user.tab();
-  await waitFor(() => expect(fake.raw.setRouting).toHaveBeenCalledWith({ context: { reply_reserve: 2048 } }));
+  await user.click(screen.getByText("More"));
   await user.clear(box("Budget tier price limit"));
   await user.type(box("Budget tier price limit"), "3");
   await user.tab();
   await waitFor(() => expect(fake.raw.setRouting).toHaveBeenCalledWith({ routing: { budget_max_price: 3 } }));
-  await user.clear(box("Keep loaded for"));
-  await user.tab();
-  await waitFor(() => expect(fake.raw.setRouting).toHaveBeenCalledWith({ context: { keep_alive: null } }));
-});
-
-test("the steppers and the slider save the same keys", async () => {
-  const { fake, user } = mount();
-  await screen.findByRole("heading", { name: READY });
-  await user.click(screen.getByRole("button", { name: "Newest results left whole: more" }));
-  await waitFor(() => expect(fake.raw.setRouting).toHaveBeenCalledWith({ context: { keep_results: 5 } }));
-  await user.click(screen.getByRole("button", { name: "Newest turns kept word for word: less" }));
-  await waitFor(() => expect(fake.raw.setRouting).toHaveBeenCalledWith({ context: { keep_turns: 3 } }));
-  await user.click(screen.getByRole("button", { name: "Room kept for the reply: more" }));
-  await waitFor(() => expect(fake.raw.setRouting).toHaveBeenCalledWith({ context: { reply_reserve: 5120 } }));
-  const slider = screen.getByRole("slider", { name: "Start clearing at" });
-  fireEvent.change(slider, { target: { value: "75" } });
-  fireEvent.keyUp(slider);
-  await waitFor(() => expect(fake.raw.setRouting).toHaveBeenCalledWith({ context: { clear_at: 0.75 } }));
 });
 
 test("a pressed situation shows its sentence, and a settings change replays it", async () => {
@@ -313,6 +239,17 @@ test("the Frontier step offers its ready models when none is chosen, not an API 
   await waitFor(() => expect(screen.getByRole("button", { name: "Frontier: Choose a model" })).toBeTruthy());
   expect(screen.getByText("No model is chosen for this step, so the path ends at Budget.")).toBeTruthy();
   expect(screen.queryByRole("button", { name: "Add an API key" })).toBeNull();
+});
+
+test("Routing ends with a card that opens Settings › Context", async () => {
+  const { user } = mount();
+  await screen.findByRole("heading", { name: READY });
+  const card = screen.getByRole("region", { name: "Context window and long chats" });
+  expect(within(card).getByText("clear at 70%")).toBeTruthy();
+  expect(within(card).getByText("summarise at 85%")).toBeTruthy();
+  expect(screen.queryByRole("heading", { name: "Long chats on a local model" })).toBeNull();
+  await user.click(within(card).getByRole("button", { name: "Settings › Context →" }));
+  expect(location.pathname).toBe("/settings/context");
 });
 
 test("the gate on the path says what it does", async () => {

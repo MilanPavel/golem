@@ -66,23 +66,6 @@ export const ROUTING_WORDS = {
     automaticNote:
       "Automatic means: on a local chat, the chat's own model, so no second model has to load. On a hosted chat, the cheapest ready Budget model.",
   },
-  long: {
-    title: "Long chats on a local model",
-    line: "How golem keeps a chat inside the model's window, before it thinks of stepping up.",
-    nothingDeleted: "Nothing is deleted.",
-    nothingDeletedMore: " The whole chat stays in the transcript. Only what the model is sent gets shorter.",
-    noWindow: "The chart shows once the window size is known.",
-    reply: "Room kept for the reply",
-    clear: "Clear old tool results",
-    clearLine:
-      "A tool result is what a tool gave back: a file golem read, the output of a command. Old ones shrink to one line, like read_file src/app.py · 412 lines · cleared. The model can read the file again.",
-    keepResults: "Newest results left whole",
-    summarise: "Summarise earlier turns",
-    summariseLine:
-      "Only when clearing was not enough. A turn is one message of yours and everything golem did to answer it. Older turns are replaced by one short summary.",
-    keepTurns: "Newest turns kept word for word",
-    window: "Window size",
-  },
   more: "More",
 } as const;
 
