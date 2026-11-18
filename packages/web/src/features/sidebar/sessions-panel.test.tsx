@@ -84,31 +84,58 @@ test("no match and no sessions say so", async () => {
   expect(screen.getByText("No sessions yet.")).toBeTruthy();
 });
 
-test("the time and the menu button share one slot, so the title cannot move", async () => {
+test("the time is on the folder line and stays visible on hover and focus; the button is not beside it", async () => {
   const user = userEvent.setup();
   setup();
   const row = screen.getByRole("link", { name: /Fix the socket/ }).closest("li")!;
   const time = row.querySelector("time")!;
   const button = within(row).getByRole("button", { name: "Actions for Fix the socket" });
   expect(time.textContent).toBe("1h");
-  expect(time.parentElement).toBe(button.parentElement);
-  expect(time.parentElement?.getAttribute("data-slot")).toBe("row-end");
-  // The title is in the link, outside the slot, and the link reserves the slot's room.
-  expect(row.querySelector("a")?.contains(time)).toBe(false);
-  expect(time.className).toContain("group-hover:opacity-0");
-  expect(time.className).toContain("group-focus-within:opacity-0");
+  // The folder name and the time are on one line, inside the link.
+  expect(time.parentElement).toBe(screen.getByText("golem").parentElement!.parentElement);
+  expect(row.querySelector("a")?.contains(time)).toBe(true);
+  expect(time.className).toContain("ml-auto");
+  expect(time.className).not.toContain("opacity-0");
+  expect(time.parentElement?.contains(button)).toBe(false);
+  expect(row.querySelector("[data-slot=row-end]")).toBeNull();
+  // The title keeps room for the button only; the button shows on hover and focus.
+  expect(screen.getByText("Fix the socket").parentElement?.className).toContain("pr-6");
   expect(button.className).toContain("group-hover:opacity-100");
-  // It stays in the tab order, and holds the same slot when focused.
+  await user.hover(row);
   await user.tab();
   await user.tab();
   await user.tab();
   expect(document.activeElement).toBe(button);
-  expect(time.parentElement).toBe(button.parentElement);
+  expect(time.className).not.toContain("opacity-0");
+});
+
+test("a row with no folder still shows the time", () => {
+  setup();
+  const row = screen.getByRole("link", { name: /Ancient work/ }).closest("li")!;
+  expect(row.querySelector("time")?.textContent).toBe("Oct 18");
+  expect(row.querySelector("a svg")).toBeNull();
+});
+
+test("the folder icon is hidden from screen readers", () => {
+  setup();
+  const row = screen.getByRole("link", { name: /Fix the socket/ }).closest("li")!;
+  const icon = screen.getByText("golem").previousElementSibling!;
+  expect(icon.tagName.toLowerCase()).toBe("svg");
+  expect(icon.getAttribute("aria-hidden")).toBe("true");
+  expect(row.querySelector("a")?.contains(icon)).toBe(true);
+});
+
+test("the menu button's tooltip is short, and its name still names the session", async () => {
+  const user = userEvent.setup();
+  setup();
+  const button = screen.getByRole("button", { name: "Actions for Fix the socket" });
+  await user.hover(button);
+  expect((await screen.findByRole("tooltip")).textContent).toBe("More actions");
 });
 
 test("the folder shows as its basename, with the full path in the title; no folder shows none", () => {
   setup();
-  const label = screen.getByText("golem");
+  const label = screen.getByText("golem").parentElement!;
   expect(label.getAttribute("title")).toBe("/Users/you/repos/golem");
   expect(label.className).toContain("font-mono");
   expect(label.className).toContain("text-xs");

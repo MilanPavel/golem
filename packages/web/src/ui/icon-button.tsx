@@ -5,10 +5,12 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "./tooltip.tsx";
 export type IconButtonProps = Omit<ComponentProps<"button">, "aria-label" | "children"> & {
   /** The accessible name, and the tooltip text. */
   label: string;
+  /** The tooltip text, when it should be shorter than the label. Defaults to `label`. */
+  tooltip?: string;
   children: ReactNode;
 };
 
-export function IconButton({ label, children, className, type = "button", ...props }: IconButtonProps) {
+export function IconButton({ label, tooltip, children, className, type = "button", ...props }: IconButtonProps) {
   return (
     <Tooltip>
       <TooltipTrigger asChild>
@@ -24,7 +26,7 @@ export function IconButton({ label, children, className, type = "button", ...pro
           {children}
         </button>
       </TooltipTrigger>
-      <TooltipContent>{label}</TooltipContent>
+      <TooltipContent>{tooltip ?? label}</TooltipContent>
     </Tooltip>
   );
 }
