@@ -4,6 +4,7 @@ import { test } from "node:test";
 import {
   approvalsWords,
   needsYouCount,
+  needsYouElsewhere,
   runBannerText,
   runDuration,
   runGroupHeading,
@@ -152,4 +153,20 @@ test("the words do not depend on the time zone: fixed instants give the clock th
   assert.equal(runStartedText(instant, now), runWhenText(instant.started_at, now).replace("Today ", ""));
   assert.match(runStartedText(instant, now), /^(\d\d:\d\d|Yesterday \d\d:\d\d|\w{3} \d+ \w{3})$/);
   assert.ok(runStartedText(instant, now).includes(clock));
+});
+
+test("waiting elsewhere is empty when nothing waits", () => {
+  assert.deepEqual(needsYouElsewhere([RUNNING, TODAY], null), []);
+  assert.deepEqual(needsYouElsewhere([], "s_x"), []);
+});
+
+test("waiting elsewhere finds a waiting run, and leaves out the session you are in", () => {
+  assert.deepEqual(needsYouElsewhere([RUNNING, WAITING], "s_other"), [WAITING]);
+  assert.deepEqual(needsYouElsewhere([RUNNING, WAITING], WAITING.session_id), []);
+});
+
+test("waiting elsewhere puts the newest start first", () => {
+  const older = run("s_old_wait", { status: "waiting", started_at: at(10, 8, 0) });
+  const newer = run("s_new_wait", { status: "waiting", started_at: at(10, 9, 0) });
+  assert.deepEqual(needsYouElsewhere([older, newer], null).map((r) => r.session_id), ["s_new_wait", "s_old_wait"]);
 });

@@ -69,6 +69,13 @@ test("the tab state follows the same order as the mark", () => {
   assert.equal(tabState({ ...idle, phase: "waiting", connection: "reconnecting" }), "offline");
 });
 
+test("a run waiting in another session shows the tab as waiting, but not without the daemon", () => {
+  assert.equal(tabState({ ...idle, waitingElsewhere: true }), "waiting");
+  assert.equal(tabState({ ...idle, phase: "writing", waitingElsewhere: true }), "waiting");
+  assert.equal(tabState({ ...idle, waitingElsewhere: true, connection: "reconnecting" }), "offline");
+  assert.equal(titleMark({ ...idle, waitingElsewhere: true, frame: 0 }), "!");
+});
+
 test("only iTerm2 outside tmux gets the tab status", () => {
   assert.equal(hasTabStatus({ TERM_PROGRAM: "iTerm.app" }), true);
   assert.equal(hasTabStatus({ LC_TERMINAL: "iTerm2", TERM_PROGRAM: "tmux" }), false);

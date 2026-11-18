@@ -97,6 +97,20 @@ export function needsYouCount(runs: readonly RunLike[]): number {
   return runs.filter(runNeedsYou).length;
 }
 
+/**
+ * The runs that need the person, other than the session they are in, newest start first. The count
+ * on the terminal's status line and its banner read this, so "waiting elsewhere" has one rule.
+ */
+export function needsYouElsewhere<T extends RunLike>(runs: readonly T[], currentSessionId: string | null): T[] {
+  return runs
+    .filter((run) => runNeedsYou(run) && run.session_id !== currentSessionId)
+    .sort((a, b) => {
+      const x = startOf(a);
+      const y = startOf(b);
+      return x === y ? 0 : y > x ? 1 : -1;
+    });
+}
+
 /** A group's heading with its count: `Needs you (2)`. */
 export function runGroupHeading(group: Pick<RunGroup<unknown>, "label" | "items">): string {
   return `${group.label} (${group.items.length})`;

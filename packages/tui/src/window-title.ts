@@ -22,6 +22,8 @@ export type TitleState = {
   connection: ConnectionState["status"];
   /** Seconds the run has worked, for the spinner. */
   frame: number;
+  /** A run in another session waits for the person. */
+  waitingElsewhere?: boolean;
 };
 
 /** xterm saves the icon and window title. Restoring pops that stack. */
@@ -31,8 +33,14 @@ export const RESTORE_WINDOW_TITLE = `${ESC}[23;0t`;
 /** What golem is doing, in the order the tab shows it: no daemon, an approval, working, an error, or idle. */
 export type TabState = "offline" | "waiting" | "working" | "error" | "idle";
 
-export function tabState(state: Pick<TitleState, "phase" | "error" | "connection">): TabState {
+export function tabState(
+  state: Pick<TitleState, "phase" | "error" | "connection"> & { waitingElsewhere?: boolean },
+): TabState {
   const shown = golemState(state);
+  // A run in another session that waits for you shows as waiting, unless there is no daemon.
+  if (state.waitingElsewhere === true && shown !== "offline") {
+    return "waiting";
+  }
   return shown === "thinking" ? "working" : shown === "failed" ? "error" : shown;
 }
 

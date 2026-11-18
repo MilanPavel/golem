@@ -320,8 +320,8 @@ test("context sits after the model and leaves the line after the skills and befo
     context: { spanId: "m", used: 85, window: 100, windowEstimated: false, windowPlanned: false, numCtx: null },
   });
   assert.deepEqual(
-    segments.map((segment) => segment.id).slice(0, 7),
-    ["connection", "alert", "title", "model", "route", "mode", "context"],
+    segments.map((segment) => segment.id).slice(0, 8),
+    ["connection", "alert", "runs", "title", "model", "route", "mode", "context"],
   );
   const context = segments.find((segment) => segment.id === "context");
   assert.equal(context?.text, "███████░ 85% 85/100");
