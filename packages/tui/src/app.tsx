@@ -266,6 +266,7 @@ import {
 import { frameBudget, frameColumns, layoutComposer, moveRow } from "./chrome.ts";
 import { peekTip, takeTip, tipCounterPath } from "./tip-counter.ts";
 import { planOffered as planOfferedAt } from "./plan-offer.ts";
+import { pruneDismissed, runsSignal, runsWaitingLabel } from "./runs-signal.ts";
 import { bannerRow, EXPORT_HINT_MS, hintFor, liveHint, type BannerRow, type Hint } from "./hint.ts";
 import { holdDebugOffset, layoutDebug, type CheckpointMessage, type DebugTone } from "./debug-view.ts";
 import { Header } from "./header.tsx";
@@ -662,6 +663,8 @@ export function App({
   const [runList, setRunList] = useState<RunList>({ runs: null, error: null });
   const runListRef = useRef(runList);
   runListRef.current = runList;
+  /** Sessions whose "needs you" banner Esc put away, until they stop waiting. */
+  const [dismissedRuns, setDismissedRuns] = useState<ReadonlySet<string>>(new Set());
   const [changesManager, setChangesManager] = useState<ChangesManagerState>(closedChangesManager);
   const changesManagerRef = useRef(changesManager);
   changesManagerRef.current = changesManager;
@@ -832,10 +835,15 @@ export function App({
   }
   const unreadNotice = chat.unreadCall ? unreadCallNotice("tui") : null;
   const planNotice = planOffered() && panel === null ? PLAN_KEYS : null;
+  const runsSignalNow = runsSignal(runList.runs, shownSession.current, dismissedRuns);
   const banner = asking
     ? RETRY_QUESTION
-    : (keychainNotice(keychainWaiting) ?? chat.error ?? serviceText ?? warming ?? chat.notice ?? unreadNotice ?? planNotice ?? setupLine ?? welcomeLine);
-  const hintText = liveHint(hint, Date.now())?.text ?? null;
+    : (keychainNotice(keychainWaiting) ?? chat.error ?? serviceText ?? warming ?? chat.notice ?? unreadNotice ?? planNotice ?? setupLine ?? runsSignalNow.banner?.text ?? welcomeLine);
+  const runsBannerShown = runsSignalNow.banner !== null && banner === runsSignalNow.banner.text;
+  /** The session whose banner Esc dismisses, while that banner is what shows. */
+  const runsBannerRef = useRef<string | null>(null);
+  runsBannerRef.current = runsBannerShown ? (runsSignalNow.banner?.sessionId ?? null) : null;
+  const hintText = liveHint(hint, Date.now())?.text ?? (runsBannerShown ? "Esc to dismiss" : null);
   const suggestMatches =
     chat.busy ||
     switcher.open ||
@@ -1109,6 +1117,7 @@ export function App({
     error: chat.error !== null,
     connection: connection.status,
     frame: Math.floor(tick / 10),
+    waitingElsewhere: runsSignalNow.count > 0,
   };
   // In iTerm2 the tab status shows the state, so the title has no mark, as for Claude Code.
   const tabTitle = windowTitle(titleState, !TAB_STATUS_ON);
@@ -1131,6 +1140,7 @@ export function App({
       uptimeSeconds,
       freshLines: followed.fresh,
       alert: alertLabel(chat.down, mcpAlert(mcp.servers)),
+      runs: runsWaitingLabel(runsSignalNow.count),
       skills: sessionId === null ? [] : chat.activeSkills,
       skippedSkills: chat.skippedSkills,
       context: sessionId === null ? null : chat.context.last,
@@ -1427,16 +1437,26 @@ export function App({
       if (routinesManagerRef.current.open) {
         loadRoutines();
       }
-      if (runsManagerRef.current.open) {
-        loadRuns();
-      }
+      // The banner and the status line count waiting runs, so the list is kept current.
+      loadRuns();
     });
   }, [client]);
 
   useEffect(() => {
+    if (connection.status === "connected") {
+      loadRuns();
+    }
+  }, [client, connection.status]);
+
+  // A session that stopped waiting is forgotten, so it can show again when it waits again.
+  useEffect(() => {
+    setDismissedRuns((current) => pruneDismissed(current, runList.runs));
+  }, [runList]);
+
+  useEffect(() => {
     // A headless session starting, waiting, or ending changes a run.
     return client.onSessionSummary((summary) => {
-      if (runsManagerRef.current.open && summary.origin !== undefined && summary.origin !== "user") {
+      if (summary.origin !== undefined && summary.origin !== "user") {
         loadRuns();
       }
     });
@@ -5119,6 +5139,17 @@ export function App({
         startInstall(retry.ref, false, retry.text);
       }
       return;
+    }
+    const runsBanner = runsBannerRef.current;
+    if (press.name === "escape" && runsBanner !== null) {
+      const place = currentPlace();
+      const owned =
+        place.overlay || place.help || place.switcher || place.debug || place.suggestions || place.history ||
+        place.approval || place.consent || place.question;
+      if (!owned) {
+        setDismissedRuns((current) => new Set(current).add(runsBanner));
+        return;
+      }
     }
     if (press.name === "return" && !keysOpenRef.current && planOffered()) {
       buildPlan();

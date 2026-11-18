@@ -74,6 +74,7 @@ export type StatusSegment = {
 export const STATUS_PRIORITY = {
   connection: 100,
   alert: 90,
+  runs: 89,
   title: 80,
   model: 60,
   local: 59,
@@ -269,12 +270,15 @@ export function statusSegments(input: {
   changedFiles?: number;
   /** The review notes waiting for the next message, as `notesChip` says them. Hidden when empty. */
   notes?: string;
+  /** `runs: 2 waiting`, from `runsWaitingLabel`. Red, and hidden when empty. */
+  runs?: string;
   /** `local only` while the session's folder stays on this Mac. */
   localOnly?: string;
 }): StatusSegment[] {
   return [
     segment("connection", input.connection, STATUS_PRIORITY.connection, "connection", true),
     segment("alert", input.alert ?? "", STATUS_PRIORITY.alert, "alert"),
+    segment("runs", input.runs ?? "", STATUS_PRIORITY.runs, "alert"),
     segment("title", input.title, STATUS_PRIORITY.title, "title"),
     segment("model", input.model, STATUS_PRIORITY.model, "model"),
     segment("route", input.route ?? "", STATUS_PRIORITY.route, "dim"),
