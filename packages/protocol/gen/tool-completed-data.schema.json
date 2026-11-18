@@ -1,6 +1,43 @@
 {
+  "$defs": {
+    "ToolSource": {
+      "additionalProperties": false,
+      "description": "A web page a tool call found or read.\n\n``kind`` is ``search`` for a hit in search results and ``read`` for a page that was fetched.\n``title`` and ``snippet`` are text from the page, so a client shows them as text only.",
+      "properties": {
+        "kind": {
+          "enum": [
+            "search",
+            "read"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "snippet": {
+          "title": "Snippet",
+          "type": "string"
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        },
+        "url": {
+          "minLength": 1,
+          "title": "Url",
+          "type": "string"
+        }
+      },
+      "required": [
+        "url",
+        "title",
+        "snippet",
+        "kind"
+      ],
+      "title": "ToolSource",
+      "type": "object"
+    }
+  },
   "additionalProperties": false,
-  "description": "A tool call finished.\n\n``summary`` is one short line, such as ``42 lines``. ``preview`` is the\nstart of the output, cut at a few kilobytes, and ``truncated`` says\nwhether it was cut. Output too long for the model is stored whole in the\nartifact ``artifact_id``, which ``artifact.read`` reads.\n\n``failed`` is true when the call ran but what it ran did not succeed,\nsuch as a shell command that exited non-zero or timed out. The model\nstill gets the output.\n\n``duration_ms`` is how long the tool ran, from ``tool.started`` to its\nresult, without the wait for an approval. None means it was not measured.\n\n``diff`` is the change a file tool made, as a unified diff.\n\n``parent_call_id`` is set on an event of a child run: the id of the ``delegate`` call\nthat started it. The event is in the parent's run, and a client that does not know\nchild runs ignores it. None for the run's own events.",
+  "description": "A tool call finished.\n\n``summary`` is one short line, such as ``42 lines``. ``preview`` is the\nstart of the output, cut at a few kilobytes, and ``truncated`` says\nwhether it was cut. Output too long for the model is stored whole in the\nartifact ``artifact_id``, which ``artifact.read`` reads.\n\n``failed`` is true when the call ran but what it ran did not succeed,\nsuch as a shell command that exited non-zero or timed out. The model\nstill gets the output.\n\n``duration_ms`` is how long the tool ran, from ``tool.started`` to its\nresult, without the wait for an approval. None means it was not measured.\n\n``diff`` is the change a file tool made, as a unified diff.\n\n``sources`` are the web pages a ``web_search`` or ``web_fetch`` call found or read, for\nthe screen's source chips. None for any other call. The model does not get them.\n\n``parent_call_id`` is set on an event of a child run: the id of the ``delegate`` call\nthat started it. The event is in the parent's run, and a client that does not know\nchild runs ignores it. None for the run's own events.",
   "properties": {
     "artifact_id": {
       "anyOf": [
@@ -66,6 +103,21 @@
     "preview": {
       "title": "Preview",
       "type": "string"
+    },
+    "sources": {
+      "anyOf": [
+        {
+          "items": {
+            "$ref": "#/$defs/ToolSource"
+          },
+          "type": "array"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Sources"
     },
     "summary": {
       "title": "Summary",

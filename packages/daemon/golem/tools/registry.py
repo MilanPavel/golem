@@ -119,6 +119,20 @@ class FileEdit:
 
 
 @dataclass(frozen=True, slots=True)
+class Source:
+    """A web page a call found or read, for the screen's source chips.
+
+    ``kind`` is ``search`` for a hit in search results and ``read`` for a page that
+    was fetched. ``title`` and ``snippet`` are text from the page: data, never sent to the model.
+    """
+
+    url: str
+    title: str
+    snippet: str
+    kind: Literal["search", "read"]
+
+
+@dataclass(frozen=True, slots=True)
 class ToolResult:
     """``output`` goes to the model. ``summary`` is one short line for the screen.
 
@@ -130,6 +144,8 @@ class ToolResult:
     ``diff`` is what the call changed, as a unified diff, for the screen. Not
     sent to the model. ``edits`` are the files the call wrote, whole texts, for the
     tools node to report. They never reach the wire.
+
+    ``sources`` are the web pages the call found or read, for the screen. Not sent to the model.
     """
 
     output: str
@@ -138,6 +154,7 @@ class ToolResult:
     failed: bool = False
     diff: str | None = None
     edits: tuple[FileEdit, ...] = ()
+    sources: tuple[Source, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)

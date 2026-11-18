@@ -43,6 +43,19 @@ export {
   type RunGroupLabel,
   type RunLike,
 } from "./runs.ts";
+export {
+  citeCounts,
+  citedTimes,
+  displayUrl,
+  hostHue,
+  hostLetter,
+  hostOf,
+  normalizeUrl,
+  sourceFor,
+  turnSources,
+  type ToolSource,
+  type TurnSource,
+} from "./sources.ts";
 export { groupByTime, type TimeGroup, type TimeGroupLabel } from "./time-groups.ts";
 export { CONSENT_LABELS, CONSENT_TITLE, consentAnswers, consentCapsLine, consentLine, consentReason } from "./consent.ts";
 export { approvalQuestion, DETAILS, displayToolName, isDetail, stepCount, stepFailed, stepMark, summarizeSteps, writingLabel, type Detail, type StepMark } from "./activity.ts";

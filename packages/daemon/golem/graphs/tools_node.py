@@ -352,6 +352,10 @@ def tools_node(
                     "failed": result.failed,
                     "duration_ms": duration_ms,
                     "diff": result.diff,
+                    "sources": [
+                        {"url": s.url, "title": s.title, "snippet": s.snippet, "kind": s.kind}
+                        for s in result.sources
+                    ],
                 }
             )
             if verdict.args is not None:

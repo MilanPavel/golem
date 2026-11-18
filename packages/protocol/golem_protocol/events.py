@@ -746,6 +746,21 @@ class ModelCallCompletedData(BaseModel):
     parent_call_id: str | None = Field(default=None, min_length=1)
 
 
+class ToolSource(BaseModel):
+    """A web page a tool call found or read.
+
+    ``kind`` is ``search`` for a hit in search results and ``read`` for a page that was fetched.
+    ``title`` and ``snippet`` are text from the page, so a client shows them as text only.
+    """
+
+    model_config = _CONFIG
+
+    url: str = Field(min_length=1)
+    title: str
+    snippet: str
+    kind: Literal["search", "read"]
+
+
 class ToolCompletedData(BaseModel):
     """A tool call finished.
 
@@ -763,6 +778,9 @@ class ToolCompletedData(BaseModel):
 
     ``diff`` is the change a file tool made, as a unified diff.
 
+    ``sources`` are the web pages a ``web_search`` or ``web_fetch`` call found or read, for
+    the screen's source chips. None for any other call. The model does not get them.
+
     ``parent_call_id`` is set on an event of a child run: the id of the ``delegate`` call
     that started it. The event is in the parent's run, and a client that does not know
     child runs ignores it. None for the run's own events.
@@ -778,6 +796,7 @@ class ToolCompletedData(BaseModel):
     failed: bool = False
     duration_ms: int | None = Field(default=None, ge=0)
     diff: str | None = None
+    sources: list[ToolSource] | None = None
     parent_call_id: str | None = Field(default=None, min_length=1)
 
 
@@ -1648,6 +1667,7 @@ __all__ = [
     "ToolOutputEvent",
     "ToolRequestedData",
     "ToolRequestedEvent",
+    "ToolSource",
     "ToolStartedData",
     "ToolStartedEvent",
     "ToolWritingData",

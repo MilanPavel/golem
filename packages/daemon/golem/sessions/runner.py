@@ -108,6 +108,7 @@ from golem_protocol.events import (
     ToolFailedData,
     ToolOutputData,
     ToolRequestedData,
+    ToolSource,
     ToolStartedData,
     ToolWritingData,
 )
@@ -750,6 +751,7 @@ async def _apply(
                 failed=fact.failed,
                 duration_ms=fact.duration_ms,
                 diff=fact.diff,
+                sources=[ToolSource.model_validate(row) for row in fact.sources] or None,
             ),
         )
     elif isinstance(fact, ToolErrored):

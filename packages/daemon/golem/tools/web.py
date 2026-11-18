@@ -22,10 +22,11 @@ from pydantic import BaseModel, ConfigDict, Field
 from golem import __version__
 from golem.net_tls import tls_context
 from golem.tools.html_text import html_to_text
-from golem.tools.registry import Tool, ToolContext, ToolError, ToolResult
+from golem.tools.registry import Source, Tool, ToolContext, ToolError, ToolResult
 from golem.tools.untrusted import UNTRUSTED_NOTE, wrap
 
 MAX_REDIRECTS = 5
+SNIPPET_CHARS = 200
 HTML_CHARS = 1_000_000
 """The most HTML handed to the parser, which slows down on hostile markup."""
 TEXT_TYPES = ("text/", "application/json", "application/xml", "application/xhtml+xml")
@@ -135,7 +136,8 @@ async def _page(url: str, response: httpx.Response, max_bytes: int) -> ToolResul
     tail = f"\n[the page was cut at {max_bytes} bytes]" if cut else ""
     output = wrap(f"{text}{tail}", url=url, title=title)
     summary = f"{response.status_code} {kind or 'text'}, {len(text)} chars"
-    return ToolResult(output=output, summary=summary)
+    source = Source(url, title or "", " ".join(text.split())[:SNIPPET_CHARS], "read")
+    return ToolResult(output=output, summary=summary, sources=(source,))
 
 
 def _kind(response: httpx.Response) -> str:

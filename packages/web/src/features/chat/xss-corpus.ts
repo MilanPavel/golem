@@ -99,6 +99,12 @@ export const XSS_CORPUS: readonly XssCase[] = [
     present: ["click me"],
   },
   {
+    name: "source link with markup in its text",
+    markdown: '[<img src=x onerror="alert(1)"> arXiv](https://arxiv.org/abs/1 "<script>alert(2)</script>")',
+    absent: ["<img", "onerror", "<script", "alert(1)"],
+    present: ["arxiv"],
+  },
+  {
     name: "file link",
     markdown: "[click me](file:///etc/passwd)",
     absent: ["file:", "/etc/passwd"],

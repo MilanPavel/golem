@@ -13,6 +13,7 @@ from langchain_core.language_models import BaseChatModel
 from test_server import HELLO, RpcClient, error_code, rpc_result, start_daemon, stop_daemon
 
 from golem.config import GolemSettings
+from golem.graphs.cite_prompt import CITE_TEXT
 from golem.models.router import ModelRouter
 from golem.server.dispatcher import (
     APPROVAL_NOT_FOUND,
@@ -103,6 +104,16 @@ async def test_send_streams_deltas_then_completes(short_home: Path) -> None:
         await stop_daemon(app, task)
 
 
+def _without_cite(texts: list[str]) -> list[str]:
+    """The prompt texts without the web citation rule, which every session with web tools has."""
+    return [text for text in texts if text != CITE_TEXT]
+
+
+def _unprompted(messages: object) -> list[dict[str, str]]:
+    """Inspected messages without the web citation rule."""
+    return [m for m in cast(list[dict[str, str]], messages) if m["text"] != CITE_TEXT]
+
+
 async def test_inspect_reads_checkpoint_messages(short_home: Path) -> None:
     model = ScriptedChatModel(replies=["Hi"])
     app, task = await start_daemon(short_home, router=ModelRouter(model=model))
@@ -114,7 +125,7 @@ async def test_inspect_reads_checkpoint_messages(short_home: Path) -> None:
         session_id = await _open(client)
         empty = rpc_result(await client.call("session.inspect", {"session_id": session_id}))
         assert empty["message_count"] == 0
-        assert empty["messages"] == []
+        assert _unprompted(empty["messages"]) == []
         assert empty["model_profile"] == "remote"
         assert empty["model_provider"] is None
         assert empty["model_name"] is None
@@ -122,7 +133,7 @@ async def test_inspect_reads_checkpoint_messages(short_home: Path) -> None:
         await client.wait_for_event("run.completed")
         inspected = rpc_result(await client.call("session.inspect", {"session_id": session_id}))
         assert inspected["message_count"] == 2
-        assert inspected["messages"] == [
+        assert _unprompted(inspected["messages"]) == [
             {"role": "user", "text": "hello"},
             {"role": "assistant", "text": "Hi"},
         ]
@@ -290,7 +301,7 @@ async def test_restart_continues_the_same_thread(short_home: Path) -> None:
         await _attach(client, session_id, after_seq=last_seq)
         await client.call("message.send", {"session_id": session_id, "text": "two"})
         await client.wait_for_event("run.completed")
-        assert model.seen[1] == ["one", "alpha", "two"]
+        assert _without_cite(model.seen[1]) == ["one", "alpha", "two"]
         assert min(_seqs(client.events)) == last_seq + 1
     finally:
         await client.close()
@@ -319,7 +330,7 @@ async def test_a_session_never_sent_survives_a_restart(short_home: Path) -> None
         sent = await client.call("message.send", {"session_id": session_id, "text": "one"})
         assert "result" in sent
         await client.wait_for_event("run.completed")
-        assert model.seen[0] == ["one"]
+        assert _without_cite(model.seen[0]) == ["one"]
     finally:
         await client.close()
         await stop_daemon(app, task)

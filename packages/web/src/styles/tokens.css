@@ -188,3 +188,7 @@
 @utility cols-route-long {
   grid-template-columns: 1fr 1.1fr;
 }
+/* One row of a turn's Sources list: the site mark, the title and address, then the read and cited notes. */
+@utility cols-source-row {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+}
