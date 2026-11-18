@@ -225,6 +225,7 @@ class ToolFinished:
     failed: bool = False
     duration_ms: int | None = None
     diff: str | None = None
+    sources: tuple[dict[str, str], ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -847,6 +848,21 @@ def _approval(paused: object) -> ApprovalAsked | None:
     return None
 
 
+def _sources(raw: object) -> tuple[dict[str, str], ...]:
+    """The web pages a ``tool.completed`` item names, without any row that is not all text."""
+    if not isinstance(raw, list):
+        return ()
+    rows: list[dict[str, str]] = []
+    for row in cast(list[object], raw):
+        if not isinstance(row, dict):
+            continue
+        found = cast(dict[str, object], row)
+        values = {key: found.get(key) for key in ("url", "title", "snippet", "kind")}
+        if all(isinstance(value, str) for value in values.values()):
+            rows.append(cast(dict[str, str], values))
+    return tuple(rows)
+
+
 def _routed_fact(item: dict[str, object]) -> ModelRouted | None:
     profile, tier, reason = item.get("profile"), item.get("tier"), item.get("reason")
     detail = item.get("detail")
@@ -959,6 +975,7 @@ def _custom(data: object) -> Fact | None:
             item.get("failed") is True,
             _duration(item),
             diff if isinstance(diff, str) and diff else None,
+            _sources(item.get("sources")),
         )
     if kind == "todos.updated":
         todos = item.get("todos")

@@ -14,6 +14,7 @@ from test_server import HELLO, RpcClient, error_code, rpc_result, start_daemon, 
 
 from golem.config import GolemSettings, ModelSettings, RoutingSettings, load_settings
 from golem.config_edit import set_default_model
+from golem.graphs.cite_prompt import CITE_TEXT
 from golem.models.router import ModelConfigError, ModelRouter
 from golem.server.dispatcher import MODEL_NOT_CONFIGURED, SESSION_NOT_FOUND
 
@@ -100,7 +101,9 @@ async def test_switching_models_mid_session_keeps_one_conversation(short_home: P
             "reason": "user",
         }
         await _say(client, session_id, "second")
-        assert remote.seen == [["first", "from local", "second"]]
+        assert [[t for t in turn if t != CITE_TEXT] for turn in remote.seen] == [
+            ["first", "from local", "second"]
+        ]
         assert len(local.seen) == 1
     finally:
         await client.close()

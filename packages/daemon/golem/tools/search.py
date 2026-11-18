@@ -13,7 +13,7 @@ from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from golem.tools.registry import Tool, ToolContext, ToolError, ToolResult
+from golem.tools.registry import Source, Tool, ToolContext, ToolError, ToolResult
 from golem.tools.search_duckduckgo import HOST as DUCKDUCKGO_HOST
 from golem.tools.search_duckduckgo import DuckDuckGo
 from golem.tools.search_provider import Result, SearchProvider
@@ -54,7 +54,10 @@ async def _web_search(args: WebSearchArgs, ctx: ToolContext) -> ToolResult:
         raise ToolError(f"the search took longer than {settings.timeout_seconds} s") from exc
     if not results:
         return ToolResult(output=f"no results for {query!r}", summary="no results")
-    return ToolResult(output=_numbered(query, results), summary=f"{len(results)} results")
+    sources = tuple(Source(hit.url, hit.title, hit.snippet, "search") for hit in results)
+    return ToolResult(
+        output=_numbered(query, results), summary=f"{len(results)} results", sources=sources
+    )
 
 
 def _numbered(query: str, results: list[Result]) -> str:

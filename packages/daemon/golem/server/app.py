@@ -17,6 +17,7 @@ from pydantic import BaseModel
 from golem.coding.changes import ChangeStore
 from golem.config import ModelPrice, load_settings
 from golem.graphs.chat import ChatRuntime, open_chat
+from golem.graphs.cite_prompt import CITE_PROMPT
 from golem.graphs.delegate_prompt import DELEGATE_PROMPT
 from golem.graphs.estimate import TokenRatios
 from golem.graphs.prompt import PLAN, SystemPrompt
@@ -296,6 +297,7 @@ class DaemonApp:
                             index_section(self.state.skills),
                             mcp_section(mcp),
                             DELEGATE_PROMPT,
+                            CITE_PROMPT,
                             PLAN,
                         )
                     ),

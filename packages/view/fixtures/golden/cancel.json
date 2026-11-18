@@ -55,7 +55,7 @@
       "data": {
         "cleared_ids": [],
         "context_window": null,
-        "estimated_tokens": 2962,
+        "estimated_tokens": 3042,
         "index": 1,
         "message_bytes": [
           5
@@ -73,10 +73,15 @@
         "profile": "remote",
         "provider": null,
         "summary_chars": null,
-        "system_bytes": 0,
-        "system_chars": 0,
-        "system_prompt_sha": null,
-        "system_sections": null,
+        "system_bytes": 266,
+        "system_chars": 266,
+        "system_prompt_sha": "5c6cc2ee3df8bed2c0fb3c5e47f1a18ffabe9c196916e69fbc540b20f1063538",
+        "system_sections": [
+          {
+            "chars": 266,
+            "name": "cite_sources"
+          }
+        ],
         "tier": null,
         "tools_bytes": 9858,
         "tools_chars": 9858,
@@ -229,7 +234,7 @@
       "data": {
         "cleared_ids": [],
         "context_window": null,
-        "estimated_tokens": 2962,
+        "estimated_tokens": 3042,
         "index": 1,
         "message_bytes": [
           5
@@ -247,10 +252,15 @@
         "profile": "remote",
         "provider": null,
         "summary_chars": null,
-        "system_bytes": 0,
-        "system_chars": 0,
-        "system_prompt_sha": null,
-        "system_sections": null,
+        "system_bytes": 266,
+        "system_chars": 266,
+        "system_prompt_sha": "5c6cc2ee3df8bed2c0fb3c5e47f1a18ffabe9c196916e69fbc540b20f1063538",
+        "system_sections": [
+          {
+            "chars": 266,
+            "name": "cite_sources"
+          }
+        ],
         "tier": null,
         "tools_bytes": 9858,
         "tools_chars": 9858,

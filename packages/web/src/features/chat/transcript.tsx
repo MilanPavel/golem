@@ -1,4 +1,4 @@
-import { BUILD_TEXT, canTryStronger, lastQuestion, NO_STRONGER_NOTICE, STRONGER_ACTION, strongerLabel, helperLine, isDelegate, openPlan, displayToolName, formatTurnTime, groupTurns, turnFooterParts, stepCount, stepMark, summarizeSteps, turnFooter, LIVE_OUTPUT_CHARS, thinkingLine, unreadCallNotice, writingLabel, REPLY_CUT_NOTE, type ChatMessage, type ChatState, type Detail, type StepMark, type ToolBlock, type WritingBlock, noticesAfter, type ChatNotice, checksOf, checksSummary, turnRoutedNote, sessionModelOf, type SessionModelRef, rewoundLine, UNDO_WAIT } from "@golem/view";
+import { BUILD_TEXT, canTryStronger, lastQuestion, NO_STRONGER_NOTICE, STRONGER_ACTION, strongerLabel, helperLine, isDelegate, openPlan, displayToolName, formatTurnTime, groupTurns, turnFooterParts, stepCount, stepMark, summarizeSteps, turnFooter, LIVE_OUTPUT_CHARS, thinkingLine, unreadCallNotice, writingLabel, REPLY_CUT_NOTE, type ChatMessage, type ChatState, type Detail, type StepMark, type ToolBlock, type WritingBlock, noticesAfter, type ChatNotice, turnSources, type TurnSource, checksOf, checksSummary, turnRoutedNote, sessionModelOf, type SessionModelRef, rewoundLine, UNDO_WAIT } from "@golem/view";
 import { Fragment, memo, useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { useConfig, usePageActions, usePulls, useSession, useModelList, useTurnCards } from "../../store/page-context.tsx";
 import type { PullsSnapshot } from "../../store/pulls.ts";
@@ -22,6 +22,7 @@ import { ChecksStrip } from "./checks-strip.tsx";
 import { EditCards, isEditCard } from "./edit-card.tsx";
 import { isPlanCard, PlanCard, type PlanActions } from "./plan-card.tsx";
 import { Markdown } from "./markdown-view.tsx";
+import { TurnSources } from "./sources-list.tsx";
 import { redoTargets, useUndo } from "../workbench/undo.tsx";
 
 function ToolResult({ tool }: { tool: ToolBlock }) {
@@ -255,18 +256,21 @@ export const UserMessage = memo(function UserMessage({ message }: { message: Cha
   );
 });
 
+/** The tools whose results are web pages. */
+const WEB_TOOLS: ReadonlySet<string> = new Set(["web_search", "web_fetch"]);
+
 type Answering = {
   /** Overrides the `/thinking` choice, for the gallery. */
   thinkingShown?: boolean;
 };
 
-const GolemStep = memo(function GolemStep({ message, thinkingShown }: { message: ChatMessage } & Answering) {
+const GolemStep = memo(function GolemStep({ message, thinkingShown, sources }: { message: ChatMessage; sources?: readonly TurnSource[] } & Answering) {
   return (
     <div className="flex min-w-0 flex-col gap-2.5">
       <ThinkingLine message={message} shown={thinkingShown} />
       {message.text ? (
         <div className="prose">
-          <Markdown text={message.text} streaming={message.streaming} />
+          <Markdown text={message.text} streaming={message.streaming} sources={sources} />
         </div>
       ) : null}
       {message.streaming ? <span aria-hidden="true" data-cursor className="transcript-cursor" /> : null}
@@ -420,6 +424,10 @@ export function GolemTurn({
   const reverted = turnUndo?.reverted === true;
   const planCards = allTools.filter(isPlanCard);
   const tools = allTools.filter((tool) => !isPlanCard(tool));
+  // Links become source chips only in a turn that searched or fetched: elsewhere a link is a plain link.
+  const sources: TurnSource[] | undefined = tools.some((tool) => WEB_TOOLS.has(tool.name)) ? turnSources(tools) : undefined;
+  const sourcesBar =
+    footer !== null && sources !== undefined && sources.length > 0 ? <TurnSources sources={sources} answer={steps.map((step) => step.text).join("\n\n")} /> : null;
   const foot = footer
     ? [footer.durationMs === undefined ? "" : formatTurnTime(footer.durationMs), footer.tools > 0 ? stepCount(footer.tools) : "", ...turnFooterParts(footer, "", routedNote)].filter(Boolean)
     : [];
@@ -428,7 +436,7 @@ export function GolemTurn({
       <PixelGolem state={golemState(steps)} size="sm" />
       {steps.map((message) => (
         <Fragment key={message.id}>
-          <GolemStep message={message} thinkingShown={thinkingShown} />
+          <GolemStep message={message} thinkingShown={thinkingShown} sources={sources} />
           {noticesAfter(notices, message.id, detail === "quiet").map((notice) => (
             <NoticeLine key={notice.id} notice={notice} />
           ))}
@@ -445,16 +453,24 @@ export function GolemTurn({
         <EditCards tools={tools.filter(isEditCard)} />
       )}
       {undo !== undefined && runId !== undefined && turnUndo !== undefined && !reverted && undo.latest === runId ? (
-        <div className="flex flex-wrap items-start justify-between gap-x-3">
+        <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-2">
           <div className="min-w-0 flex-1">
             <ActivityLine tools={tools} detail={detail} streaming={steps.some((step) => step.streaming)} pendingId={pendingId} />
           </div>
+          {sourcesBar}
           <TurnUndoLink disabled={undo.disabled} onClick={() => undo.onUndo(runId)}>
             Undo this turn
           </TurnUndoLink>
         </div>
-      ) : (
+      ) : sourcesBar === null ? (
         <ActivityLine tools={tools} detail={detail} streaming={steps.some((step) => step.streaming)} pendingId={pendingId} />
+      ) : (
+        <div className="flex flex-wrap items-start gap-x-3 gap-y-2">
+          <div className="min-w-0 flex-1">
+            <ActivityLine tools={tools} detail={detail} streaming={steps.some((step) => step.streaming)} pendingId={pendingId} />
+          </div>
+          {sourcesBar}
+        </div>
       )}
       {undo !== undefined && runId !== undefined && turnUndo !== undefined && reverted ? (
         <p data-rewound className="flex flex-wrap items-center gap-x-1 font-mono text-xs text-muted">

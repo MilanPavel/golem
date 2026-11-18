@@ -271,3 +271,92 @@
 .prose.prose-trace h3 {
   font-size: 0.9375rem;
 }
+
+/* Source chips: a web link of an answer as a small pill (features/chat/chips.ts). */
+.prose .src-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: 3px;
+  padding: 1px 8px 1px 3px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: var(--color-sunken);
+  color: var(--color-muted);
+  font: 500 0.75rem/1.125rem var(--font-ui);
+  text-decoration: none;
+  white-space: nowrap;
+  vertical-align: 1px;
+  transition:
+    background-color 120ms,
+    color 120ms,
+    border-color 120ms;
+}
+
+.prose .src-chip:hover,
+.prose .src-chip:focus-visible {
+  border-color: color-mix(in srgb, var(--color-clay) 35%, transparent);
+  background: var(--color-clay-soft);
+  color: var(--color-clay-ink);
+  text-decoration: none;
+}
+
+.prose .src-chip:focus-visible {
+  outline: 2px solid var(--color-clay);
+  outline-offset: 1px;
+}
+
+.prose .src-chip-unread {
+  padding-left: 7px;
+  border: 1px dashed var(--color-line-strong);
+  background: none;
+}
+
+.prose .src-chip-unread::before {
+  content: "?";
+  font: 600 0.6875rem var(--font-mono);
+  color: var(--color-wait);
+}
+
+.prose .src-chip-unread .src-mark {
+  display: none;
+}
+
+.prose .src-chip-pending {
+  opacity: 0.45;
+}
+
+.prose .src-more {
+  font: 500 0.6875rem var(--font-mono);
+  opacity: 0.75;
+}
+
+/* The letter mark of a host. Its hue comes from the host (--mark-hue); the lightness suits each theme. */
+.src-mark {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
+  background: light-dark(hsl(var(--mark-hue, 30) 48% 38%), hsl(var(--mark-hue, 30) 42% 62%));
+  color: light-dark(var(--color-bg), var(--color-on-clay));
+  font: 600 9px/1 var(--font-mono);
+}
+
+.src-mark-blank {
+  background: var(--color-line-strong);
+}
+
+.src-mark-md {
+  width: 16px;
+  height: 16px;
+  font-size: 10px;
+}
+
+.src-mark-lg {
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  font-size: 10px;
+}

@@ -5,6 +5,7 @@ import { emptyPlan, reducePlan, type PlanState } from "./plan.ts";
 import { contextChangedNote, emptyLiveContext, foldLiveContext, type ContextChangeData, type LiveContextState } from "./context.ts";
 import { emptyRoute, foldRoute, type RouteState } from "./route.ts";
 import { replyWasCut } from "./stop.ts";
+import type { ToolSource } from "./sources.ts";
 import type { TodoItem } from "./todos.ts";
 
 export type ToolStatus = "requested" | "waiting" | "running" | "done" | "failed";
@@ -70,6 +71,10 @@ export type ToolBlock = {
   error?: string;
   /** The newest output of a running call, from `tool.output`. */
   output?: string;
+  /** The web pages a `web_search` or `web_fetch` call found or read, from `tool.completed`. */
+  sources?: ToolSource[];
+  /** When `sources` arrived: the time of `tool.completed`. */
+  sourcesAt?: string;
   /** The change a file tool would make, as a unified diff, from `approval.needed`. */
   diff?: string;
   /** The question the run asked about this call, from `approval.needed` and `approval.resolved`. */
@@ -383,6 +388,7 @@ function foldTool(tool: ToolBlock, event: ChatEvent): ToolBlock {
         ...(event.data.artifact_id == null ? {} : { artifactId: event.data.artifact_id }),
         ...(event.data.failed === true ? { unsuccessful: true } : {}),
         ...(event.data.diff ? { diff: event.data.diff } : {}),
+        ...(event.data.sources?.length ? { sources: event.data.sources, sourcesAt: event.ts } : {}),
       };
     case "tool.failed":
       return { ...withoutOutput(tool), status: "failed", error: event.data.message };

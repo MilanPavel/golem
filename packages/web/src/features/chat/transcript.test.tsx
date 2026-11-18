@@ -632,3 +632,32 @@ test("the turn's footer counts the helper's tokens and says how many helpers", (
   expect(footer).toContain("5.1K tok");
   expect(footer).toContain("1 helper");
 });
+
+const webTurn = (streaming: boolean) =>
+  chat([
+    answer({
+      id: "w1",
+      text: "",
+      tools: [
+        { callId: "1", name: "web_fetch", args: {}, status: "done", sources: [{ url: "https://arxiv.org/abs/1", title: "Paper", snippet: "s", kind: "read" }] },
+      ],
+    }),
+    answer({ id: "w2", text: "It says so [arXiv](https://arxiv.org/abs/1).", streaming }),
+  ]);
+
+test("a finished web turn has chips in the answer and a Sources button", () => {
+  const { container } = render(<TranscriptMessages chat={webTurn(false)} />);
+  expect(container.querySelectorAll(".src-chip")).toHaveLength(1);
+  expect(screen.getByRole("button", { name: /1 source/ })).not.toBeNull();
+});
+
+test("a turn still streaming has no Sources button yet", () => {
+  render(<TranscriptMessages chat={webTurn(true)} />);
+  expect(screen.queryByRole("button", { name: /1 source/ })).toBeNull();
+});
+
+test("a turn without a web tool keeps its links plain", () => {
+  const { container } = render(<TranscriptMessages chat={chat([answer({ text: "See [docs](https://example.com/docs)." })])} />);
+  expect(container.querySelectorAll(".src-chip")).toHaveLength(0);
+  expect(container.querySelector("a")?.textContent).toBe("docs");
+});

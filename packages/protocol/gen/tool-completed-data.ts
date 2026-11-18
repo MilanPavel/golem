@@ -7,6 +7,11 @@ export type DurationMs = number | null;
 export type Failed = boolean;
 export type ParentCallId = string | null;
 export type Preview = string;
+export type Sources = ToolSource[] | null;
+export type Kind = 'search' | 'read';
+export type Snippet = string;
+export type Title = string;
+export type Url = string;
 export type Summary = string;
 export type Truncated = boolean;
 
@@ -27,6 +32,9 @@ export type Truncated = boolean;
  *
  * ``diff`` is the change a file tool made, as a unified diff.
  *
+ * ``sources`` are the web pages a ``web_search`` or ``web_fetch`` call found or read, for
+ * the screen's source chips. None for any other call. The model does not get them.
+ *
  * ``parent_call_id`` is set on an event of a child run: the id of the ``delegate`` call
  * that started it. The event is in the parent's run, and a client that does not know
  * child runs ignores it. None for the run's own events.
@@ -39,6 +47,22 @@ export interface ToolCompletedData {
   failed?: Failed;
   parent_call_id?: ParentCallId;
   preview: Preview;
+  sources?: Sources;
   summary: Summary;
   truncated?: Truncated;
+}
+/**
+ * A web page a tool call found or read.
+ *
+ * ``kind`` is ``search`` for a hit in search results and ``read`` for a page that was fetched.
+ * ``title`` and ``snippet`` are text from the page, so a client shows them as text only.
+ *
+ * This interface was referenced by `ToolCompletedData`'s JSON-Schema
+ * via the `definition` "ToolSource".
+ */
+export interface ToolSource {
+  kind: Kind;
+  snippet: Snippet;
+  title: Title;
+  url: Url;
 }

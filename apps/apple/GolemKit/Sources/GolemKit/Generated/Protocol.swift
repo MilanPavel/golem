@@ -12525,6 +12525,9 @@ public struct Params: Codable {
 ///
 /// ``diff`` is the change a file tool made, as a unified diff.
 ///
+/// ``sources`` are the web pages a ``web_search`` or ``web_fetch`` call found or read, for
+/// the screen's source chips. None for any other call. The model does not get them.
+///
 /// ``parent_call_id`` is set on an event of a child run: the id of the ``delegate`` call
 /// that started it. The event is in the parent's run, and a client that does not know
 /// child runs ignores it. None for the run's own events.
@@ -12700,6 +12703,7 @@ public struct ParamsData: Codable {
     public let diff: String?
     public let durationMS: Int?
     public let preview: String?
+    public let sources: [PurpleToolSource]?
     public let truncated: Bool?
     public let source: String?
     public let subject: String?
@@ -12813,6 +12817,7 @@ public struct ParamsData: Codable {
         case diff = "diff"
         case durationMS = "duration_ms"
         case preview = "preview"
+        case sources = "sources"
         case truncated = "truncated"
         case source = "source"
         case subject = "subject"
@@ -12841,7 +12846,7 @@ public struct ParamsData: Codable {
         case output = "output"
     }
 
-    public init(cwd: String?, forkedFrom: PurpleForkedFrom?, modelName: String?, modelProfile: String?, modelProvider: String?, origin: String?, route: RouteEnum?, allowedTools: [PurpleSessionAllowance]?, mcpServers: [String]?, paidOk: Bool?, title: String?, runID: String?, status: PurpleStatus?, summary: String?, reason: PurpleReason?, detail: String?, model: String?, provider: String?, rejected: [FluffyModelRejection]?, replacesModel: String?, tier: Tier?, options: [String: Option]?, mode: DefaultPermissionModeEnum?, on: Bool?, messageID: String?, role: MessageCompletedDataRole?, text: String?, interrupted: Bool?, skill: FluffySkillCall?, thinking: String?, thinkingMS: Int?, clearedIDS: [String]?, contextWindow: Int?, estimatedTokens: Int?, index: Int?, messageBytes: [Int]?, messageChars: [Int]?, messageIDS: [String]?, numCtx: Int?, parentCallID: String?, profile: String?, summaryChars: Int?, systemBytes: Int?, systemChars: Int?, systemPromptSHA: String?, systemSections: [TentacledPromptSectionInfo]?, toolsBytes: Int?, toolsChars: Int?, toolsSHA: String?, windowEstimated: Bool?, windowPlanned: Bool?, costUsd: Double?, failed: Bool?, firstTokenMS: Int?, latencyMS: Int?, loadMS: Int?, price: FluffyCallPrice?, promptMS: Int?, replyMS: Int?, stopReason: String?, textToolCalls: TextToolCalls?, usage: FluffyTokenUsage?, action: ContextChangedDataAction?, afterTokens: Int?, beforeTokens: Int?, count: Int?, reloadMS: Int?, room: Int?, windowFrom: Int?, windowTo: Int?, code: Code?, hint: String?, message: String?, args: [String: JSONAny]?, callID: String?, name: String?, chars: Int?, lines: Int?, path: String?, waiting: Bool?, window: Int?, artifactID: String?, diff: String?, durationMS: Int?, preview: String?, truncated: Bool?, source: String?, subject: String?, decision: Decision?, rule: String?, alternatives: [Answer]?, caps: FluffyConsentCaps?, estimatedUsd: Double?, signal: String?, why: String?, answer: Answer?, todos: [PurpleTodo]?, planID: String?, steps: [FluffyPlanStep]?, added: Int?, changeID: String?, removed: Int?, reverts: String?, hash: String?, how: How?, checks: [FluffyCheckInfo]?, checkID: String?, command: String?, round: Int?, exitCode: Int?, output: String?) {
+    public init(cwd: String?, forkedFrom: PurpleForkedFrom?, modelName: String?, modelProfile: String?, modelProvider: String?, origin: String?, route: RouteEnum?, allowedTools: [PurpleSessionAllowance]?, mcpServers: [String]?, paidOk: Bool?, title: String?, runID: String?, status: PurpleStatus?, summary: String?, reason: PurpleReason?, detail: String?, model: String?, provider: String?, rejected: [FluffyModelRejection]?, replacesModel: String?, tier: Tier?, options: [String: Option]?, mode: DefaultPermissionModeEnum?, on: Bool?, messageID: String?, role: MessageCompletedDataRole?, text: String?, interrupted: Bool?, skill: FluffySkillCall?, thinking: String?, thinkingMS: Int?, clearedIDS: [String]?, contextWindow: Int?, estimatedTokens: Int?, index: Int?, messageBytes: [Int]?, messageChars: [Int]?, messageIDS: [String]?, numCtx: Int?, parentCallID: String?, profile: String?, summaryChars: Int?, systemBytes: Int?, systemChars: Int?, systemPromptSHA: String?, systemSections: [TentacledPromptSectionInfo]?, toolsBytes: Int?, toolsChars: Int?, toolsSHA: String?, windowEstimated: Bool?, windowPlanned: Bool?, costUsd: Double?, failed: Bool?, firstTokenMS: Int?, latencyMS: Int?, loadMS: Int?, price: FluffyCallPrice?, promptMS: Int?, replyMS: Int?, stopReason: String?, textToolCalls: TextToolCalls?, usage: FluffyTokenUsage?, action: ContextChangedDataAction?, afterTokens: Int?, beforeTokens: Int?, count: Int?, reloadMS: Int?, room: Int?, windowFrom: Int?, windowTo: Int?, code: Code?, hint: String?, message: String?, args: [String: JSONAny]?, callID: String?, name: String?, chars: Int?, lines: Int?, path: String?, waiting: Bool?, window: Int?, artifactID: String?, diff: String?, durationMS: Int?, preview: String?, sources: [PurpleToolSource]?, truncated: Bool?, source: String?, subject: String?, decision: Decision?, rule: String?, alternatives: [Answer]?, caps: FluffyConsentCaps?, estimatedUsd: Double?, signal: String?, why: String?, answer: Answer?, todos: [PurpleTodo]?, planID: String?, steps: [FluffyPlanStep]?, added: Int?, changeID: String?, removed: Int?, reverts: String?, hash: String?, how: How?, checks: [FluffyCheckInfo]?, checkID: String?, command: String?, round: Int?, exitCode: Int?, output: String?) {
         self.cwd = cwd
         self.forkedFrom = forkedFrom
         self.modelName = modelName
@@ -12927,6 +12932,7 @@ public struct ParamsData: Codable {
         self.diff = diff
         self.durationMS = durationMS
         self.preview = preview
+        self.sources = sources
         self.truncated = truncated
         self.source = source
         self.subject = subject
@@ -13118,6 +13124,38 @@ public struct FluffySkillCall: Codable {
         self.args = args
         self.name = name
     }
+}
+
+/// A web page a tool call found or read.
+///
+/// ``kind`` is ``search`` for a hit in search results and ``read`` for a page that was
+/// fetched.
+/// ``title`` and ``snippet`` are text from the page, so a client shows them as text only.
+// MARK: - PurpleToolSource
+public struct PurpleToolSource: Codable {
+    public let kind: SourceKind
+    public let snippet: String
+    public let title: String
+    public let url: String
+
+    public enum CodingKeys: String, CodingKey {
+        case kind = "kind"
+        case snippet = "snippet"
+        case title = "title"
+        case url = "url"
+    }
+
+    public init(kind: SourceKind, snippet: String, title: String, url: String) {
+        self.kind = kind
+        self.snippet = snippet
+        self.title = title
+        self.url = url
+    }
+}
+
+public enum SourceKind: String, Codable {
+    case read = "read"
+    case search = "search"
 }
 
 public enum PurpleStatus: String, Codable {
@@ -16829,6 +16867,9 @@ public struct TokenUsage: Codable {
 ///
 /// ``diff`` is the change a file tool made, as a unified diff.
 ///
+/// ``sources`` are the web pages a ``web_search`` or ``web_fetch`` call found or read, for
+/// the screen's source chips. None for any other call. The model does not get them.
+///
 /// ``parent_call_id`` is set on an event of a child run: the id of the ``delegate`` call
 /// that started it. The event is in the parent's run, and a client that does not know
 /// child runs ignores it. None for the run's own events.
@@ -16841,6 +16882,7 @@ public struct ToolCompletedData: Codable {
     public let failed: Bool?
     public let parentCallID: String?
     public let preview: String
+    public let sources: [FluffyToolSource]?
     public let summary: String
     public let truncated: Bool?
 
@@ -16852,11 +16894,12 @@ public struct ToolCompletedData: Codable {
         case failed = "failed"
         case parentCallID = "parent_call_id"
         case preview = "preview"
+        case sources = "sources"
         case summary = "summary"
         case truncated = "truncated"
     }
 
-    public init(artifactID: String?, callID: String, diff: String?, durationMS: Int?, failed: Bool?, parentCallID: String?, preview: String, summary: String, truncated: Bool?) {
+    public init(artifactID: String?, callID: String, diff: String?, durationMS: Int?, failed: Bool?, parentCallID: String?, preview: String, sources: [FluffyToolSource]?, summary: String, truncated: Bool?) {
         self.artifactID = artifactID
         self.callID = callID
         self.diff = diff
@@ -16864,8 +16907,36 @@ public struct ToolCompletedData: Codable {
         self.failed = failed
         self.parentCallID = parentCallID
         self.preview = preview
+        self.sources = sources
         self.summary = summary
         self.truncated = truncated
+    }
+}
+
+/// A web page a tool call found or read.
+///
+/// ``kind`` is ``search`` for a hit in search results and ``read`` for a page that was
+/// fetched.
+/// ``title`` and ``snippet`` are text from the page, so a client shows them as text only.
+// MARK: - FluffyToolSource
+public struct FluffyToolSource: Codable {
+    public let kind: SourceKind
+    public let snippet: String
+    public let title: String
+    public let url: String
+
+    public enum CodingKeys: String, CodingKey {
+        case kind = "kind"
+        case snippet = "snippet"
+        case title = "title"
+        case url = "url"
+    }
+
+    public init(kind: SourceKind, snippet: String, title: String, url: String) {
+        self.kind = kind
+        self.snippet = snippet
+        self.title = title
+        self.url = url
     }
 }
 
@@ -16914,6 +16985,9 @@ public struct ToolCompletedEvent: Codable {
 ///
 /// ``diff`` is the change a file tool made, as a unified diff.
 ///
+/// ``sources`` are the web pages a ``web_search`` or ``web_fetch`` call found or read, for
+/// the screen's source chips. None for any other call. The model does not get them.
+///
 /// ``parent_call_id`` is set on an event of a child run: the id of the ``delegate`` call
 /// that started it. The event is in the parent's run, and a client that does not know
 /// child runs ignores it. None for the run's own events.
@@ -16926,6 +17000,7 @@ public struct ToolCompletedEventData: Codable {
     public let failed: Bool?
     public let parentCallID: String?
     public let preview: String
+    public let sources: [TentacledToolSource]?
     public let summary: String
     public let truncated: Bool?
 
@@ -16937,11 +17012,12 @@ public struct ToolCompletedEventData: Codable {
         case failed = "failed"
         case parentCallID = "parent_call_id"
         case preview = "preview"
+        case sources = "sources"
         case summary = "summary"
         case truncated = "truncated"
     }
 
-    public init(artifactID: String?, callID: String, diff: String?, durationMS: Int?, failed: Bool?, parentCallID: String?, preview: String, summary: String, truncated: Bool?) {
+    public init(artifactID: String?, callID: String, diff: String?, durationMS: Int?, failed: Bool?, parentCallID: String?, preview: String, sources: [TentacledToolSource]?, summary: String, truncated: Bool?) {
         self.artifactID = artifactID
         self.callID = callID
         self.diff = diff
@@ -16949,8 +17025,36 @@ public struct ToolCompletedEventData: Codable {
         self.failed = failed
         self.parentCallID = parentCallID
         self.preview = preview
+        self.sources = sources
         self.summary = summary
         self.truncated = truncated
+    }
+}
+
+/// A web page a tool call found or read.
+///
+/// ``kind`` is ``search`` for a hit in search results and ``read`` for a page that was
+/// fetched.
+/// ``title`` and ``snippet`` are text from the page, so a client shows them as text only.
+// MARK: - TentacledToolSource
+public struct TentacledToolSource: Codable {
+    public let kind: SourceKind
+    public let snippet: String
+    public let title: String
+    public let url: String
+
+    public enum CodingKeys: String, CodingKey {
+        case kind = "kind"
+        case snippet = "snippet"
+        case title = "title"
+        case url = "url"
+    }
+
+    public init(kind: SourceKind, snippet: String, title: String, url: String) {
+        self.kind = kind
+        self.snippet = snippet
+        self.title = title
+        self.url = url
     }
 }
 

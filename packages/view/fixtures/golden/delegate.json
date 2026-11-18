@@ -55,7 +55,7 @@
       "data": {
         "cleared_ids": [],
         "context_window": null,
-        "estimated_tokens": 2963,
+        "estimated_tokens": 3043,
         "index": 1,
         "message_bytes": [
           10
@@ -73,10 +73,15 @@
         "profile": "remote",
         "provider": null,
         "summary_chars": null,
-        "system_bytes": 0,
-        "system_chars": 0,
-        "system_prompt_sha": null,
-        "system_sections": null,
+        "system_bytes": 266,
+        "system_chars": 266,
+        "system_prompt_sha": "5c6cc2ee3df8bed2c0fb3c5e47f1a18ffabe9c196916e69fbc540b20f1063538",
+        "system_sections": [
+          {
+            "chars": 266,
+            "name": "cite_sources"
+          }
+        ],
         "tier": null,
         "tools_bytes": 9858,
         "tools_chars": 9858,
@@ -280,6 +285,7 @@
         "failed": false,
         "parent_call_id": "call_1",
         "preview": "     1|the answer is 42",
+        "sources": null,
         "summary": "1 line",
         "truncated": false
       },
@@ -376,6 +382,7 @@
         "failed": false,
         "parent_call_id": null,
         "preview": "notes.txt says the answer is 42.",
+        "sources": null,
         "summary": "explorer finished",
         "truncated": false
       },
@@ -400,7 +407,7 @@
       "data": {
         "cleared_ids": [],
         "context_window": null,
-        "estimated_tokens": 1511,
+        "estimated_tokens": 1550,
         "index": 2,
         "message_bytes": [
           10,
@@ -424,10 +431,15 @@
         "profile": "remote",
         "provider": null,
         "summary_chars": null,
-        "system_bytes": 0,
-        "system_chars": 0,
-        "system_prompt_sha": null,
-        "system_sections": null,
+        "system_bytes": 266,
+        "system_chars": 266,
+        "system_prompt_sha": "5c6cc2ee3df8bed2c0fb3c5e47f1a18ffabe9c196916e69fbc540b20f1063538",
+        "system_sections": [
+          {
+            "chars": 266,
+            "name": "cite_sources"
+          }
+        ],
         "tier": null,
         "tools_bytes": 9858,
         "tools_chars": 9858,
@@ -550,7 +562,7 @@
       "data": {
         "cleared_ids": [],
         "context_window": null,
-        "estimated_tokens": 2963,
+        "estimated_tokens": 3043,
         "index": 1,
         "message_bytes": [
           10
@@ -568,10 +580,15 @@
         "profile": "remote",
         "provider": null,
         "summary_chars": null,
-        "system_bytes": 0,
-        "system_chars": 0,
-        "system_prompt_sha": null,
-        "system_sections": null,
+        "system_bytes": 266,
+        "system_chars": 266,
+        "system_prompt_sha": "5c6cc2ee3df8bed2c0fb3c5e47f1a18ffabe9c196916e69fbc540b20f1063538",
+        "system_sections": [
+          {
+            "chars": 266,
+            "name": "cite_sources"
+          }
+        ],
         "tier": null,
         "tools_bytes": 9858,
         "tools_chars": 9858,
@@ -764,6 +781,7 @@
         "failed": false,
         "parent_call_id": "call_1",
         "preview": "     1|the answer is 42",
+        "sources": null,
         "summary": "1 line",
         "truncated": false
       },
@@ -860,6 +878,7 @@
         "failed": false,
         "parent_call_id": null,
         "preview": "notes.txt says the answer is 42.",
+        "sources": null,
         "summary": "explorer finished",
         "truncated": false
       },
@@ -884,7 +903,7 @@
       "data": {
         "cleared_ids": [],
         "context_window": null,
-        "estimated_tokens": 1511,
+        "estimated_tokens": 1550,
         "index": 2,
         "message_bytes": [
           10,
@@ -908,10 +927,15 @@
         "profile": "remote",
         "provider": null,
         "summary_chars": null,
-        "system_bytes": 0,
-        "system_chars": 0,
-        "system_prompt_sha": null,
-        "system_sections": null,
+        "system_bytes": 266,
+        "system_chars": 266,
+        "system_prompt_sha": "5c6cc2ee3df8bed2c0fb3c5e47f1a18ffabe9c196916e69fbc540b20f1063538",
+        "system_sections": [
+          {
+            "chars": 266,
+            "name": "cite_sources"
+          }
+        ],
         "tier": null,
         "tools_bytes": 9858,
         "tools_chars": 9858,
