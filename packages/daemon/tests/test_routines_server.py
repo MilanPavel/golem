@@ -143,6 +143,40 @@ async def test_update_and_remove_edit_the_users_file_and_tell_watchers(short_hom
         await stop_daemon(app, task)
 
 
+async def test_update_switches_between_a_schedule_and_a_watch(short_home: Path) -> None:
+    path = short_home / "config.toml"
+    path.write_text(BRIEF, encoding="utf-8")
+    app, task = await start_daemon(short_home)
+    client = await RpcClient.connect(app.paths.socket_path)
+    try:
+        await client.call("hello", HELLO)
+        watch = {"watch": "/tmp/in", "glob": "*.pdf"}
+        reply = await client.call(
+            "routine.update",
+            {"name": "morning-brief", "fields": {"on": watch, "schedule": None}},
+        )
+        routine = cast(dict[str, object], rpc_result(reply)["routine"])
+        config = cast(dict[str, object], routine["config"])
+        assert config["on"] == watch
+        assert config.get("schedule") is None
+        text = path.read_text(encoding="utf-8")
+        assert "schedule" not in text
+        assert "*.pdf" in text
+
+        reply = await client.call(
+            "routine.update",
+            {"name": "morning-brief", "fields": {"schedule": "daily 07:00", "on": None}},
+        )
+        routine = cast(dict[str, object], rpc_result(reply)["routine"])
+        config = cast(dict[str, object], routine["config"])
+        assert config["schedule"] == "daily 07:00"
+        assert config.get("on") is None
+        assert "watch" not in path.read_text(encoding="utf-8")
+    finally:
+        await client.close()
+        await stop_daemon(app, task)
+
+
 async def test_update_refuses_what_is_wrong_and_a_project_routine(short_home: Path) -> None:
     (short_home / "config.toml").write_text(BRIEF, encoding="utf-8")
     app, task = await start_daemon(short_home)

@@ -26,6 +26,8 @@ export type RoutineRunLike = {
   summary?: string | null;
   started_at?: string | null;
   ended_at?: string | null;
+  /** The file a watch firing is for, as an absolute path. */
+  watch_path?: string | null;
 };
 
 /** The parts of a listed routine these words read. */
@@ -108,6 +110,31 @@ export function triggerWords(config: Pick<RoutineConfigLike, "schedule" | "on">)
     return glob === "*" ? `New files in ${config.on.watch}` : `New ${glob} in ${config.on.watch}`;
   }
   return config.schedule ? scheduleWords(config.schedule) : "No schedule";
+}
+
+/** The name of a file, from its path. */
+export function fileName(path: string): string {
+  const parts = path.split("/").filter((part) => part !== "");
+  return parts.at(-1) ?? path;
+}
+
+/** What the glob of a watch routine matches, in words: `*.pdf` is "PDF", no glob or `*` is "file", anything else "file matching <glob>". */
+function globKind(glob: string | undefined): string {
+  const text = (glob ?? "").trim();
+  if (text === "" || text === "*") return "file";
+  const ext = /^\*\.([A-Za-z0-9]+)$/.exec(text)?.[1];
+  return ext === undefined ? `file matching ${text}` : ext.toUpperCase();
+}
+
+/**
+ * The preview line of a watch routine in the editor: `Runs /receipt-to-csv for each new PDF in ~/Downloads`.
+ * A prompt that is not a /skill is "Runs the prompt". Empty until a folder is picked.
+ */
+export function watchPreviewText(watch: string, glob: string | undefined, prompt: string): string {
+  const folder = watch.trim();
+  if (folder === "") return "";
+  const skill = /^\/\S+/.exec(prompt.trim())?.[0];
+  return `Runs ${skill ?? "the prompt"} for each new ${globKind(glob)} in ${folder}`;
 }
 
 const MINUTE = 60_000;
@@ -241,8 +268,8 @@ export function routineToml(config: RoutineConfigLike): string {
   return lines.join("\n");
 }
 
-/** The five ways the schedule builder offers (a sixth, a new file, is built with file watching). */
-export type WhenKind = "daily" | "weekdays" | "weekly" | "hours" | "cron";
+/** The ways the builder offers: five schedules, and a new file in a folder (which has no schedule). */
+export type WhenKind = "daily" | "weekdays" | "weekly" | "hours" | "cron" | "watch";
 
 /** What the builder holds: the kind, and the field of each kind. `hours` is text so it can be typed. `day` is 0 for Sunday. */
 export type RoutineWhen = { kind: WhenKind; time: string; day: number; hours: string; cron: string };
@@ -253,6 +280,7 @@ export const WHEN_KINDS: readonly { kind: WhenKind; label: string }[] = [
   { kind: "weekly", label: "Weekly" },
   { kind: "hours", label: "Every N hours" },
   { kind: "cron", label: "Cron" },
+  { kind: "watch", label: "On new file" },
 ];
 
 /** The days of the Weekly picker, Monday first, with the cron number of each. */
@@ -279,10 +307,11 @@ function timeParts(time: string): [number, number] | null {
 
 /**
  * The `schedule` the builder writes: a cron line for a time of day (`30 8 * * 1-5` for weekdays at 08:30),
- * `every 2h` for every N hours, and the cron text as typed. Null when a field is not filled in. The daemon
+ * `every 2h` for every N hours, and the cron text as typed. Null for a new file, which has no schedule, and when a field is not filled in. The daemon
  * checks the rest, and says what is wrong.
  */
 export function whenToSchedule(when: RoutineWhen): string | null {
+  if (when.kind === "watch") return null;
   if (when.kind === "cron") return when.cron.trim() === "" ? null : when.cron.trim().replace(/\s+/g, " ");
   if (when.kind === "hours") return /^\d+$/.test(when.hours.trim()) && Number(when.hours) >= 1 ? `every ${Number(when.hours)}h` : null;
   const parts = timeParts(when.time);
@@ -320,6 +349,14 @@ export function scheduleToWhen(schedule: string | null | undefined): RoutineWhen
   if (/^(1-5|mon-fri)$/i.test(dow)) return { ...DEFAULT_WHEN, kind: "weekdays", time };
   const day = dayIndex(dow);
   return day === null ? cron : { ...DEFAULT_WHEN, kind: "weekly", time, day };
+}
+
+/** The `on` a watch routine saves: the folder, and the glob when there is one (left out, it is `*`). Null while no folder is named. */
+export function watchToOn(folder: string, glob: string): { watch: string; glob?: string } | null {
+  const watch = folder.trim();
+  if (watch === "") return null;
+  const pattern = glob.trim();
+  return pattern === "" ? { watch } : { watch, glob: pattern };
 }
 
 /**

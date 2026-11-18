@@ -128,10 +128,9 @@ test("/routines with nothing set up shows the empty state; the morning brief sta
   expect(await screen.findByRole("heading", { name: "Nothing runs by itself yet" })).toBeTruthy();
   expect(screen.getByRole("heading", { name: "Morning brief" })).toBeTruthy();
   expect(screen.getByRole("heading", { name: "Watch a folder" })).toBeTruthy();
-  // The starter that needs file watching waits for it.
   const [brief, watch] = screen.getAllByRole("button", { name: "Use this starter" }) as HTMLButtonElement[];
   expect(brief?.disabled).toBe(false);
-  expect(watch?.disabled).toBe(true);
+  expect(watch?.disabled).toBe(false);
   await user.click(brief as HTMLButtonElement);
   expect(location.pathname + location.search).toBe("/routines?new=morning-brief");
   expect(await screen.findByRole("heading", { name: "New routine" })).toBeTruthy();
@@ -148,6 +147,43 @@ test("/routines with nothing set up shows the empty state; the morning brief sta
     ),
   );
   await waitFor(() => expect(location.pathname).toBe("/routines/morning-brief"));
+});
+
+test("the Watch a folder starter opens the editor on a new file, and Save writes on and no schedule", async () => {
+  const user = userEvent.setup();
+  const fake = mount("/routines", ({ raw }) => {
+    raw.previewRoutine.mockResolvedValue({ next: TIMES });
+  });
+  const [, watch] = (await screen.findAllByRole("button", { name: "Use this starter" })) as HTMLButtonElement[];
+  await user.click(watch as HTMLButtonElement);
+  expect(location.pathname + location.search).toBe("/routines?new=watch-folder");
+  expect(await screen.findByRole("radio", { name: "On new file", checked: true })).toBeTruthy();
+  expect((screen.getByRole("textbox", { name: "Watch folder" }) as HTMLInputElement).value).toBe("~/Downloads");
+  expect(screen.getByText("Runs the prompt for each new PDF in ~/Downloads")).toBeTruthy();
+  await user.click(screen.getByRole("button", { name: "Save" }));
+  await waitFor(() =>
+    expect(fake.raw.updateRoutine).toHaveBeenCalledWith(
+      "watch-downloads",
+      { on: { watch: "~/Downloads", glob: "*.pdf" }, prompt: "Read the new PDF at {path} and file it where it belongs.", missed: "skip" },
+      { create: true },
+    ),
+  );
+  expect(fake.raw.previewRoutine).not.toHaveBeenCalled();
+});
+
+test("a watch routine's History shows the file of each run, with its full path as the title", async () => {
+  const receipts = SAMPLE_ROUTINES.find((routine) => routine.config.name === "receipts");
+  mount("/routines/receipts", ({ raw }) => {
+    raw.listRoutines.mockResolvedValue(SAMPLE_LIST);
+    if (receipts !== undefined)
+      raw.getRoutine.mockResolvedValue({
+        routine: receipts,
+        runs: [{ routine_run_id: "rr_8", routine: "receipts", scope: "user", trigger: "watch", status: "succeeded", started_at: "2026-11-17T09:00:00+01:00", ended_at: "2026-11-17T09:00:30+01:00", summary: "filed 1 receipt", watch_path: "/Users/you/Downloads/invoice 2026-11.pdf" }],
+      });
+  });
+  const file = await screen.findByText("invoice 2026-11.pdf");
+  expect(file.getAttribute("title")).toBe("/Users/you/Downloads/invoice 2026-11.pdf");
+  expect(screen.getAllByText("New *.pdf in ~/Downloads").length).toBeGreaterThan(0);
 });
 
 test("a refused save shows the daemon's reason next to the field and stays in the form", async () => {

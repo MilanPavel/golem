@@ -1866,7 +1866,7 @@ class RoutineRunSummary(BaseModel):
     ``skipped``: ``missed``, ``paused``, ``untrusted``, ``still running`` or ``quiet``.
     ``scope`` is ``user`` or the project folder. ``summary`` is the last reply of a
     finished firing, cut short. ``status`` ``waiting`` is read from the session, it is
-    never stored.
+    never stored. ``watch_path`` is the file a ``watch`` firing is for.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -1882,6 +1882,7 @@ class RoutineRunSummary(BaseModel):
     status: RoutineRunStatus
     reason: str | None = None
     summary: str | None = None
+    watch_path: str | None = None
 
 
 class RoutineInfo(BaseModel):

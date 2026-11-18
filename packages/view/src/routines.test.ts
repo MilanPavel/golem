@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import {
+  DEFAULT_WHEN,
+  fileName,
   lastResultText,
   nextRunText,
   nextTimesText,
@@ -13,6 +15,8 @@ import {
   scheduleToWhen,
   scheduleWords,
   triggerWords,
+  watchPreviewText,
+  watchToOn,
   whenToSchedule,
   type RoutineLike,
 } from "./routines.ts";
@@ -51,6 +55,26 @@ test("a watch trigger and a missing trigger", () => {
   assert.equal(triggerWords({ on: { watch: "~/Downloads" } }), "New files in ~/Downloads");
   assert.equal(triggerWords({ schedule: "daily 08:30" }), "Daily at 08:30");
   assert.equal(triggerWords({}), "No schedule");
+});
+
+test("the preview line of a watch routine", () => {
+  assert.equal(watchPreviewText("~/Downloads", "*.pdf", "/receipt-to-csv {path}"), "Runs /receipt-to-csv for each new PDF in ~/Downloads");
+  assert.equal(watchPreviewText("~/Desktop/inbox", "*", "Name this file."), "Runs the prompt for each new file in ~/Desktop/inbox");
+  assert.equal(watchPreviewText("~/logs", undefined, "/summarise"), "Runs /summarise for each new file in ~/logs");
+  assert.equal(watchPreviewText("~/logs", "report-*.csv", "/x"), "Runs /x for each new file matching report-*.csv in ~/logs");
+  assert.equal(watchPreviewText("  ", "*.pdf", "/x"), "");
+});
+
+test("a watch routine saves a folder and a glob, and no schedule", () => {
+  assert.equal(whenToSchedule({ ...DEFAULT_WHEN, kind: "watch" }), null);
+  assert.deepEqual(watchToOn(" ~/Downloads ", " *.pdf "), { watch: "~/Downloads", glob: "*.pdf" });
+  assert.deepEqual(watchToOn("~/Downloads", ""), { watch: "~/Downloads" });
+  assert.equal(watchToOn("  ", "*.pdf"), null);
+});
+
+test("the name of a file from its path", () => {
+  assert.equal(fileName("/Users/me/Downloads/invoice 2026.pdf"), "invoice 2026.pdf");
+  assert.equal(fileName("receipt.pdf"), "receipt.pdf");
 });
 
 test("next-run text counts in minutes, hours and days", () => {

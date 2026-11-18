@@ -214,6 +214,15 @@ test("the detail shows the facts, the last runs, and the numbered actions", () =
   assert.equal(shown({ open: true, view: { kind: "detail", key: routineKey(full), selected: 0 } }, { routines: [full], issues: [], error: null }, [])[11], "  no runs yet");
 });
 
+test("a watch routine's detail says what it watches and which file each run was for", () => {
+  const watched = routine("receipts", {}, { schedule: null, on: { watch: "~/Downloads", glob: "*.pdf" } });
+  const runs = [run("succeeded", { trigger: "watch", started_at: "2026-11-18T08:30:00", ended_at: "2026-11-18T08:30:20", summary: "filed", watch_path: "/Users/me/Downloads/invoice 2026-11.pdf" })];
+  const lines = shown({ open: true, view: { kind: "detail", key: routineKey(watched), selected: 0 } }, { routines: [watched], issues: [], error: null }, runs);
+  assert.equal(lines[2], "Status:   ○ watching");
+  assert.equal(lines[3], "Trigger:  New *.pdf in ~/Downloads");
+  assert.ok(lines.includes(`  ✔ ${runWhenText(runs[0]?.started_at, NOW)}  invoice 2026-11.pdf  ${formatDuration(20_000)}  filed`));
+});
+
 test("the detail's actions: Run now, Pause or Resume, Edit in $EDITOR, Open the last run", () => {
   assert.deepEqual(
     routineChoices(brief).map((choice) => choice.label),

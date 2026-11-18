@@ -17,7 +17,7 @@ __all__ = ["HeadlessRun", "RoutineRunRecord", "RoutineRuns", "WatchedFile"]
 
 _COLUMNS = (
     "r.routine_run_id, r.routine, r.scope, r.session_id, r.trigger, r.due_at, r.started_at,"
-    " r.ended_at, r.reason, r.summary,"
+    " r.ended_at, r.reason, r.summary, r.watch_path,"
     " CASE WHEN r.status = 'running' AND EXISTS ("
     "SELECT 1 FROM runs WHERE runs.session_id = r.session_id AND runs.status = 'waiting')"
     " THEN 'waiting' ELSE r.status END AS status"
@@ -46,6 +46,7 @@ class RoutineRunRecord:
     status: str
     reason: str | None
     summary: str | None
+    watch_path: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -144,6 +145,7 @@ def _record(row: sqlite3.Row) -> RoutineRunRecord:
         status=row["status"],
         reason=row["reason"],
         summary=row["summary"],
+        watch_path=row["watch_path"],
     )
 
 
