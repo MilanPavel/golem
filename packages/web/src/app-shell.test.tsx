@@ -60,7 +60,7 @@ test("the sidebar groups sessions by time, hides closed ones, and shows the fold
   expect(lists.map((list) => document.getElementById(list.getAttribute("aria-labelledby")!)?.textContent)).toEqual(["Earlier"]);
   expect(screen.queryByText("Hidden")).toBeNull();
   expect(within(lists[0]!).getAllByRole("link")).toHaveLength(3);
-  expect(screen.getByText("notes").getAttribute("title")).toBe("/Users/you/notes");
+  expect(screen.getByText("notes").parentElement?.getAttribute("title")).toBe("/Users/you/notes");
   expect(screen.getByText("Untitled")).toBeTruthy();
   expect(screen.getByText("waiting", { selector: ".sr-only" })).toBeTruthy();
 });

@@ -2,7 +2,7 @@ import { useId, useMemo, useRef, useState } from "react";
 import { groupByTime, isRoutineSession } from "@golem/view";
 import { cn } from "../../ui/cn.ts";
 import { IconButton } from "../../ui/icon-button.tsx";
-import { ClockIcon, MoreIcon } from "../../ui/icons.tsx";
+import { ClockIcon, FolderIcon, MoreIcon } from "../../ui/icons.tsx";
 import { Link } from "../../ui/link.tsx";
 import { Input } from "../../ui/input.tsx";
 import { Menu, MenuContent, MenuItem, MenuTrigger } from "../../ui/menu.tsx";
@@ -113,14 +113,14 @@ function SessionRow({
           onNavigate={onNavigate}
           aria-current={selected ? "page" : undefined}
           className={cn(
-            "flex items-center gap-2 rounded-md py-1.5 pr-11 pl-2.5 text-muted outline-offset-2 outline-clay hover:bg-line hover:text-ink focus-visible:outline-2",
+            "flex items-center gap-2 rounded-md py-1.5 pr-2 pl-2.5 text-muted outline-offset-2 outline-clay hover:bg-line hover:text-ink focus-visible:outline-2",
             selected && "bg-surface text-ink ring-1 ring-line ring-inset",
           )}
         >
           <SessionDot status={session.status} />
           {row.forked ? <ForkMark row={row} /> : null}
           <span className="flex min-w-0 flex-1 flex-col">
-            <span className="flex min-w-0 items-center gap-1.5">
+            <span className={cn("flex min-w-0 items-center gap-1.5", hasMenu && "pr-6")}>
               <span className={cn("min-w-0 truncate", !session.title && "text-faint")}>{name}</span>
               {routine ? (
                 <>
@@ -129,67 +129,62 @@ function SessionRow({
                 </>
               ) : null}
             </span>
-            {session.cwd ? (
-              <span title={session.cwd} className="truncate font-mono text-xs text-faint">
-                {folderName(session.cwd)}
-              </span>
-            ) : null}
+            <span className="flex items-center gap-2">
+              {session.cwd ? (
+                <span title={session.cwd} className="flex min-w-0 items-center gap-1 font-mono text-xs text-faint">
+                  <FolderIcon className="size-3 shrink-0 text-faint" aria-hidden="true" />
+                  <span className="truncate">{folderName(session.cwd)}</span>
+                </span>
+              ) : null}
+              <time dateTime={session.updated_at} className="ml-auto shrink-0 font-mono text-xs text-faint">
+                {timeAgo(session.updated_at, now)}
+              </time>
+            </span>
           </span>
         </Link>
       )}
-      {renaming ? null : (
-        // One fixed-width slot at the right: the time, and over it the menu button when the row is
-        // hovered or holds focus. Both sit in the same grid cell, so the title never moves.
-        <span data-slot="row-end" className="pointer-events-none absolute top-0 right-1.5 bottom-0 grid w-9 place-items-center">
-          <time
-            dateTime={session.updated_at}
-            className={cn(
-              "col-start-1 row-start-1 font-mono text-xs text-faint",
-              hasMenu && "group-focus-within:opacity-0 group-hover:opacity-0",
-              hasMenu && menuOpen && "opacity-0",
-            )}
-          >
-            {timeAgo(session.updated_at, now)}
-          </time>
-          {hasMenu ? (
-            <Menu open={menuOpen} onOpenChange={setMenuOpen}>
-              <MenuTrigger asChild>
-                <IconButton
-                  ref={trigger}
-                  label={`Actions for ${name}`}
-                  className="pointer-events-auto col-start-1 row-start-1 size-6 opacity-0 group-focus-within:opacity-100 group-hover:opacity-100 data-[state=open]:opacity-100"
-                >
-                  <MoreIcon />
-                </IconButton>
-              </MenuTrigger>
-              <MenuContent
-                onCloseAutoFocus={(event) => {
-                  // The next thing takes focus: the rename field, or the confirm dialog.
-                  if (chose.current) {
-                    chose.current = false;
-                    event.preventDefault();
-                  }
+      {renaming || !hasMenu ? null : (
+        // The menu button sits at the right end of the title line, outside the link. The title
+        // keeps its width free (pr-6), so nothing moves when the button shows.
+        <span className="absolute top-1 right-1.5">
+          <Menu open={menuOpen} onOpenChange={setMenuOpen}>
+            <MenuTrigger asChild>
+              <IconButton
+                ref={trigger}
+                label={`Actions for ${name}`}
+                tooltip="More actions"
+                className="size-6 opacity-0 hover:bg-line-strong group-focus-within:opacity-100 group-hover:opacity-100 data-[state=open]:opacity-100"
+              >
+                <MoreIcon />
+              </IconButton>
+            </MenuTrigger>
+            <MenuContent
+              onCloseAutoFocus={(event) => {
+                // The next thing takes focus: the rename field, or the confirm dialog.
+                if (chose.current) {
+                  chose.current = false;
+                  event.preventDefault();
+                }
+              }}
+            >
+              <MenuItem
+                onSelect={() => {
+                  chose.current = true;
+                  setRenaming(true);
                 }}
               >
-                <MenuItem
-                  onSelect={() => {
-                    chose.current = true;
-                    setRenaming(true);
-                  }}
-                >
-                  Rename
-                </MenuItem>
-                <MenuItem
-                  onSelect={() => {
-                    chose.current = true;
-                    onAskClose(session, trigger.current);
-                  }}
-                >
-                  Close
-                </MenuItem>
-              </MenuContent>
-            </Menu>
-          ) : null}
+                Rename
+              </MenuItem>
+              <MenuItem
+                onSelect={() => {
+                  chose.current = true;
+                  onAskClose(session, trigger.current);
+                }}
+              >
+                Close
+              </MenuItem>
+            </MenuContent>
+          </Menu>
         </span>
       )}
     </li>

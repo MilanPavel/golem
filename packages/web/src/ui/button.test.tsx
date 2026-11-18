@@ -51,6 +51,19 @@ test("an icon button requires a label", () => {
   expect(bad).toBeTruthy();
 });
 
+test("an icon button's tooltip can differ from its name, which stays the label", async () => {
+  const user = userEvent.setup();
+  render(
+    <IconButton label="Actions for a very long session title" tooltip="More actions">
+      <PlusIcon />
+    </IconButton>,
+  );
+  const button = screen.getByRole("button", { name: "Actions for a very long session title" });
+  expect(button.getAttribute("aria-label")).toBe("Actions for a very long session title");
+  await user.tab();
+  expect((await screen.findByRole("tooltip")).textContent).toBe("More actions");
+});
+
 test("the ink kind is the dark button", () => {
   render(<Button kind="ink">Allow once</Button>);
   expect(screen.getByRole("button").className).toContain("bg-ink");
