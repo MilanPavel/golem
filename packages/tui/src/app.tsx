@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -18,6 +19,7 @@ import {
   type ListedModel,
   type McpAddParams,
   type ModelListResult,
+  type RoutineRunSummary,
   type SetupRow,
   type SkillCall,
   type WireLine,
@@ -387,6 +389,26 @@ import {
   skillsManagerTyping,
   type SkillsManagerState,
 } from "./skills-manager.ts";
+import {
+  closedRoutinesManager,
+  layoutRoutinesManager,
+  openRoutinesManager,
+  pressRoutinesManager,
+  routineLineOf,
+  routinesManagerKeyOf,
+  type RoutineList,
+  type RoutinesManagerAction,
+  type RoutinesManagerState,
+} from "./routines-manager.ts";
+import {
+  closedRunsManager,
+  layoutRunsManager,
+  openRunsManager,
+  pressRunsManager,
+  runsManagerKeyOf,
+  type RunList,
+  type RunsManagerState,
+} from "./runs-manager.ts";
 import { assistantChars, elapsedSeconds, meterLine, meterPhase, writingNow } from "./progress.ts";
 import {
   alertLabel,
@@ -626,6 +648,20 @@ export function App({
   const [skillList, setSkillList] = useState<SkillList>({ skills: null, error: null });
   const skillListRef = useRef(skillList);
   skillListRef.current = skillList;
+  const [routinesManager, setRoutinesManager] = useState<RoutinesManagerState>(closedRoutinesManager);
+  const routinesManagerRef = useRef(routinesManager);
+  routinesManagerRef.current = routinesManager;
+  const [routineList, setRoutineList] = useState<RoutineList>({ routines: null, issues: [], error: null });
+  const routineListRef = useRef(routineList);
+  routineListRef.current = routineList;
+  /** The last runs of the routine whose detail is open, and which routine they are for. */
+  const [routineRuns, setRoutineRuns] = useState<{ name: string; folder: string | null; runs: RoutineRunSummary[] } | null>(null);
+  const [runsManager, setRunsManager] = useState<RunsManagerState>(closedRunsManager);
+  const runsManagerRef = useRef(runsManager);
+  runsManagerRef.current = runsManager;
+  const [runList, setRunList] = useState<RunList>({ runs: null, error: null });
+  const runListRef = useRef(runList);
+  runListRef.current = runList;
   const [changesManager, setChangesManager] = useState<ChangesManagerState>(closedChangesManager);
   const changesManagerRef = useRef(changesManager);
   changesManagerRef.current = changesManager;
@@ -806,6 +842,8 @@ export function App({
     perms.open ||
     mcpManager.open ||
     skillsManager.open ||
+    routinesManager.open ||
+    runsManager.open ||
     changesManager.open ||
     undoBand !== null ||
     picker.open ||
@@ -1385,6 +1423,26 @@ export function App({
   }, [client, connection.status, sessionCwd]);
 
   useEffect(() => {
+    return client.onRoutinesChanged(() => {
+      if (routinesManagerRef.current.open) {
+        loadRoutines();
+      }
+      if (runsManagerRef.current.open) {
+        loadRuns();
+      }
+    });
+  }, [client]);
+
+  useEffect(() => {
+    // A headless session starting, waiting, or ending changes a run.
+    return client.onSessionSummary((summary) => {
+      if (runsManagerRef.current.open && summary.origin !== undefined && summary.origin !== "user") {
+        loadRuns();
+      }
+    });
+  }, [client]);
+
+  useEffect(() => {
     return client.onSkillsChanged((root) => {
       if (root === null || root === skillsFolder()) {
         loadSkills();
@@ -1909,6 +1967,30 @@ export function App({
     return sessionCwdRef.current ?? process.cwd();
   }
 
+  /** Ask for the routines again, those of this folder's project too. `/routines` reads them. */
+  function loadRoutines(): void {
+    client.listRoutines([skillsFolder()]).then(
+      (listed) => setRoutineList({ routines: listed.routines, issues: listed.issues ?? [], error: null }),
+      (error: unknown) => setRoutineList({ routines: null, issues: [], error: messageOf(error) }),
+    );
+  }
+
+  /** Ask for the runs again. `/runs` reads them. */
+  function loadRuns(): void {
+    client.listRuns().then(
+      (listed) => setRunList({ runs: listed.runs, error: null }),
+      (error: unknown) => setRunList({ runs: null, error: messageOf(error) }),
+    );
+  }
+
+  /** Read one routine's runs, for its detail. */
+  function loadRoutineRuns(name: string, folder: string | null): void {
+    client.getRoutine(name, folder ?? undefined).then(
+      (got) => setRoutineRuns({ name, folder, runs: got.runs ?? [] }),
+      () => setRoutineRuns({ name, folder, runs: [] }),
+    );
+  }
+
   /** Ask for this folder's skills again. `/skills` reads them. */
   function loadSkills(): void {
     client.listSkills(skillsFolder()).then(
@@ -2079,6 +2161,22 @@ export function App({
       skillsManagerRef.current = opened;
       setSkillsManager(opened);
       loadSkills();
+      return;
+    }
+    if (outcome.kind === "routines") {
+      setDraft(draftAt(""));
+      setKeysOpen(false);
+      setSwitcher(closedSwitcher);
+      showRoutinesManager(openRoutinesManager());
+      loadRoutines();
+      return;
+    }
+    if (outcome.kind === "runs") {
+      setDraft(draftAt(""));
+      setKeysOpen(false);
+      setSwitcher(closedSwitcher);
+      showRunsManager(openRunsManager());
+      loadRuns();
       return;
     }
     if (outcome.kind === "skill-new") {
@@ -4183,6 +4281,102 @@ export function App({
     runChangesAction(pressed.action);
   }
 
+  function onRunsManagerPress(press: Press): void {
+    const key = runsManagerKeyOf(press);
+    if (key === null) {
+      return;
+    }
+    const pressed = pressRunsManager(runsManagerRef.current, runListRef.current.runs ?? [], key, Date.now());
+    showRunsManager(pressed.state);
+    if (pressed.action.kind === "open") {
+      // The chat replays the run's events, so a run that waits shows its approval band.
+      showRunsManager(closedRunsManager);
+      session.switchTo(pressed.action.sessionId);
+    }
+  }
+
+  function showRunsManager(next: RunsManagerState): void {
+    runsManagerRef.current = next;
+    setRunsManager(next);
+  }
+
+  function onRoutinesManagerPress(press: Press): void {
+    const key = routinesManagerKeyOf(press);
+    if (key === null) {
+      return;
+    }
+    const pressed = pressRoutinesManager(routinesManagerRef.current, routineListRef.current.routines ?? [], key);
+    showRoutinesManager(pressed.state);
+    runRoutinesAction(pressed.action);
+  }
+
+  function showRoutinesManager(next: RoutinesManagerState): void {
+    routinesManagerRef.current = next;
+    setRoutinesManager(next);
+  }
+
+  function runRoutinesAction(action: RoutinesManagerAction): void {
+    const notify = (notice: string) => setChat((state) => ({ ...state, notice }));
+    const failed = (error: unknown) => notify(messageOf(error));
+    if (action.kind === "close") {
+      setRoutineRuns(null);
+    } else if (action.kind === "notice") {
+      notify(action.text);
+    } else if (action.kind === "load-runs") {
+      setRoutineRuns(null);
+      loadRoutineRuns(action.name, action.folder);
+    } else if (action.kind === "run") {
+      client.runRoutine(action.name, action.folder ?? undefined).then(() => {
+        notify(`${action.name} is running`);
+        loadRoutines();
+        loadRoutineRuns(action.name, action.folder);
+      }, failed);
+    } else if (action.kind === "set-paused") {
+      client.updateRoutine(action.name, { enabled: !action.paused }).then(() => {
+        notify(action.paused ? `${action.name} is paused` : `${action.name} is resumed`);
+        loadRoutines();
+      }, failed);
+    } else if (action.kind === "open-run") {
+      showRoutinesManager(closedRoutinesManager);
+      setRoutineRuns(null);
+      session.switchTo(action.sessionId);
+    } else if (action.kind === "edit") {
+      void editRoutineFile(action.path, action.name);
+    }
+  }
+
+  /** Open `config.toml` at the routine's `[[routine]]` in `$EDITOR`, then read the routines again. */
+  async function editRoutineFile(path: string, name: string): Promise<void> {
+    if (editing.current) {
+      return;
+    }
+    editing.current = true;
+    let notice = "";
+    try {
+      const text = await readFile(path, "utf8").catch(() => "");
+      const saved = await editFile(path, suspendTerminal, undefined, process.env, routineLineOf(text, name) ?? undefined);
+      notice = saved ? "" : "the editor did not exit cleanly";
+    } catch (error) {
+      notice = messageOf(error);
+    } finally {
+      editing.current = false;
+    }
+    try {
+      const listed = await client.listRoutines([skillsFolder()]);
+      setRoutineList({ routines: listed.routines, issues: listed.issues ?? [], error: null });
+      const first = listed.issues?.[0];
+      if (notice === "") {
+        notice =
+          first === undefined
+            ? `${path} saved · reloaded · ✔ ${listed.routines.length} ${listed.routines.length === 1 ? "routine" : "routines"}`
+            : `✘ ${first.file}${first.line === null || first.line === undefined ? "" : `:${first.line}`}: ${first.message}`;
+      }
+    } catch (error) {
+      notice = notice === "" ? messageOf(error) : notice;
+    }
+    setChat((state) => ({ ...state, notice }));
+  }
+
   function onSkillsManagerPress(press: Press): void {
     const key = skillsManagerKeyOf(press, skillsManagerTyping(skillsManagerRef.current));
     if (key === null) {
@@ -4886,6 +5080,14 @@ export function App({
       onSkillsManagerPress(press);
       return;
     }
+    if (routinesManagerRef.current.open && !keysOpenRef.current && press.name !== "f1" && press.name !== "ctrl-c") {
+      onRoutinesManagerPress(press);
+      return;
+    }
+    if (runsManagerRef.current.open && !keysOpenRef.current && press.name !== "f1" && press.name !== "ctrl-c") {
+      onRunsManagerPress(press);
+      return;
+    }
     if (undoRef.current !== null && !keysOpenRef.current && press.name !== "f1" && press.name !== "ctrl-c") {
       onUndoPress(press);
       return;
@@ -5078,6 +5280,8 @@ export function App({
       permsRef.current.open ||
       mcpManagerRef.current.open ||
       skillsManagerRef.current.open ||
+      routinesManagerRef.current.open ||
+      runsManagerRef.current.open ||
       changesManagerRef.current.open ||
       tuneRef.current !== null ||
       keysOpenRef.current
@@ -5123,7 +5327,7 @@ export function App({
     },
     all: transcript.all,
     pinned: transcript.pinned === null ? null : { row: budget.header, offset: transcript.pinned.offset },
-    shown: !keysOpen && !picker.open && !mcpManager.open && !skillsManager.open && !changesManager.open && !perms.open && !switcher.open,
+    shown: !keysOpen && !picker.open && !mcpManager.open && !skillsManager.open && !routinesManager.open && !runsManager.open && !changesManager.open && !perms.open && !switcher.open,
   };
   const composer =
     argsEdit !== null
@@ -5231,6 +5435,28 @@ export function App({
           }).map((line, index) => (
             <McpManagerRow key={index} line={line} />
           ))}
+        </Box>
+      ) : routinesManager.open ? (
+        <Box flexDirection="column" width={columns} height={budget.body} flexShrink={0} overflow="hidden">
+          {layoutRoutinesManager({
+            state: routinesManager,
+            list: routineList,
+            runs: routinesManager.view.kind === "detail" ? (routineRuns?.runs ?? null) : null,
+            now: Date.now(),
+            home: homedir(),
+            columns,
+            rows: budget.body,
+          }).map((line, index) => (
+            <McpManagerRow key={index} line={line} />
+          ))}
+        </Box>
+      ) : runsManager.open ? (
+        <Box flexDirection="column" width={columns} height={budget.body} flexShrink={0} overflow="hidden">
+          {layoutRunsManager({ state: runsManager, list: runList, now: Date.now(), columns, rows: budget.body }).map(
+            (line, index) => (
+              <McpManagerRow key={index} line={line} />
+            ),
+          )}
         </Box>
       ) : changesManager.open ? (
         <Box flexDirection="column" width={columns} height={budget.body} flexShrink={0} overflow="hidden">

@@ -93,6 +93,16 @@ export function editorCommand(env: NodeJS.ProcessEnv = process.env): string[] {
   return parts.length > 0 ? parts : ["vi"];
 }
 
+/** Editors that open a file at a line with `+N` before the file name. */
+const PLUS_LINE_EDITORS = ["vi", "vim", "nvim", "nano", "emacs", "pico"];
+
+/** The editor command, with `+line` added when the editor is one that takes it. */
+export function editorCommandAt(line: number | undefined, env: NodeJS.ProcessEnv = process.env): string[] {
+  const command = editorCommand(env);
+  const name = (command[0] ?? "").split("/").at(-1) ?? "";
+  return line !== undefined && PLUS_LINE_EDITORS.includes(name) ? [...command, `+${line}`] : command;
+}
+
 /**
  * Writes the draft to a temp file, runs the editor while the terminal is suspended,
  * and returns the saved text. A failed editor leaves the draft alone.
@@ -128,16 +138,18 @@ export async function editDraft(
 /**
  * Runs the editor on the real file at `path` while the terminal is suspended.
  * Nothing is copied: the editor saves in place. Resolves with whether it exited cleanly.
+ * With a `line`, an editor that takes `+N` opens there.
  */
 export async function editFile(
   path: string,
   suspend: (run: () => Promise<void>) => Promise<void>,
   run: (command: readonly string[], file: string) => Promise<number> = runEditor,
   env: NodeJS.ProcessEnv = process.env,
+  line?: number,
 ): Promise<boolean> {
   let code = 1;
   await suspend(async () => {
-    code = await run(editorCommand(env), path);
+    code = await run(editorCommandAt(line, env), path);
   });
   return code === 0;
 }

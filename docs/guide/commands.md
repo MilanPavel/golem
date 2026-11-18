@@ -133,6 +133,8 @@ The line under an answer ends with the model, `local` for a model on your machin
 | `/permissions` | Show the tool rules for this folder, and what this chat allows |
 | `/artifact [id]` | Open the full output of a long tool call in your pager. With no id, the newest one |
 | `/skills` | See the skills this folder has, and why one is or is not used |
+| `/routines` | Your routines: run one now, pause or resume it, edit it in `$EDITOR`, open its last run |
+| `/runs` | What your routines did, grouped by what needs you |
 | `/<skill> [args]` | Run a skill once |
 | `/skill run <name> [args]` | Run a skill once, also one named like a command, such as `help` |
 | `/skill pin <name>`, `/skill unpin <name>` | Keep a skill on for the whole chat, or turn it off |
