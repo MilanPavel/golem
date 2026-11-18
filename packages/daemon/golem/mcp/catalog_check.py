@@ -17,6 +17,7 @@ from urllib.parse import quote
 import httpx
 
 from golem.mcp.catalog import CatalogEntry, CatalogError, build, load_catalog
+from golem.net_tls import tls_context
 
 SAMPLE_FOLDER = "/tmp/project"
 NPM = "https://registry.npmjs.org/{package}/latest"
@@ -59,7 +60,7 @@ def package_of(entry: CatalogEntry) -> str | None:
 
 async def check_online(entries: list[CatalogEntry]) -> list[str]:
     problems: list[str] = []
-    async with httpx.AsyncClient(timeout=15, follow_redirects=True) as client:
+    async with httpx.AsyncClient(timeout=15, follow_redirects=True, verify=tls_context()) as client:
         for entry in entries:
             if entry.runtime == "url":
                 url = str(entry.template["url"])

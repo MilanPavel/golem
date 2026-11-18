@@ -19,6 +19,7 @@ import httpx
 import tomlkit
 
 from golem.models import registry
+from golem.net_tls import tls_context
 
 CATALOG = Path(__file__).resolve().parent / "data" / "catalog.toml"
 _FAMILY = re.compile(r"^(?P<prefix>[a-z]+?)(?P<major>\d+)(?:\.(?P<minor>\d+))?(?P<suffix>.*)$")
@@ -43,7 +44,7 @@ async def check(path: Path = CATALOG) -> int:
     changed = 0
     missing: list[str] = []
     families: dict[str, set[str]] = {}
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(verify=tls_context()) as client:
         for entry in entries:
             ref = str(entry["ref"])
             parsed = registry.parse_name(ref)

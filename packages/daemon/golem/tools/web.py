@@ -20,6 +20,7 @@ import httpx
 from pydantic import BaseModel, ConfigDict, Field
 
 from golem import __version__
+from golem.net_tls import tls_context
 from golem.tools.html_text import html_to_text
 from golem.tools.registry import Tool, ToolContext, ToolError, ToolResult
 from golem.tools.untrusted import UNTRUSTED_NOTE, wrap
@@ -80,6 +81,7 @@ async def _follow(url: str, ctx: ToolContext) -> ToolResult:
         timeout=settings.timeout_seconds,
         headers=headers,
         trust_env=False,
+        verify=tls_context(),
     ) as client:
         for _ in range(MAX_REDIRECTS + 1):
             await _guard(url, allow_private=settings.allow_private, ctx=ctx)

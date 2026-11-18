@@ -42,6 +42,7 @@ from urllib.parse import parse_qsl, urlencode, urljoin, urlsplit, urlunsplit
 
 import httpx
 
+from golem.net_tls import tls_context
 from golem.secrets import SecretStore
 
 CLIENT_NAME = "golem"
@@ -149,7 +150,9 @@ def new_client(
     transport: httpx.AsyncBaseTransport | None = None, timeout: float = HTTP_SECONDS
 ) -> httpx.AsyncClient:
     """The HTTP client for discovery, registration, and tokens. It never follows a redirect."""
-    return httpx.AsyncClient(transport=transport, timeout=timeout, follow_redirects=False)
+    return httpx.AsyncClient(
+        transport=transport, timeout=timeout, follow_redirects=False, verify=tls_context()
+    )
 
 
 # --- discovery -------------------------------------------------------------------------------

@@ -6,9 +6,11 @@ from collections.abc import Callable
 
 import httpx
 import pytest
+import truststore
 
 from golem import __version__
 from golem.config import WebSettings
+from golem.net_tls import tls_context
 from golem.permissions.policy import describe, rule_for
 from golem.tools import default_registry
 from golem.tools.html_text import html_to_text
@@ -245,3 +247,24 @@ async def test_a_page_cannot_close_the_wrapper_early() -> None:
     assert result.output.count("</web_content>") == 1
     assert result.output.endswith("</web_content>")
     assert "&lt;/web_content>" in result.output
+
+
+def test_the_tls_context_asks_the_operating_system_and_is_built_once() -> None:
+    context = tls_context()
+    assert isinstance(context, truststore.SSLContext)
+    assert tls_context() is context
+
+
+async def test_the_fetch_client_verifies_against_the_operating_system_trust_store(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    seen: list[object] = []
+    real = httpx.AsyncClient
+
+    def spy(*args: object, **kwargs: object) -> httpx.AsyncClient:
+        seen.append(kwargs.get("verify"))
+        return real(*args, **kwargs)  # pyright: ignore[reportArgumentType]
+
+    monkeypatch.setattr("golem.tools.web.httpx.AsyncClient", spy)
+    await _fetch(_ctx(lambda request: httpx.Response(200, html=PAGE)), "https://docs.example.com/")
+    assert seen == [tls_context()]
