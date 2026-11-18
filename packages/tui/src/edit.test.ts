@@ -3,7 +3,7 @@ import { readFile, writeFile } from "node:fs/promises";
 import { test } from "node:test";
 
 import { applyComposer, closedDebug } from "./commands.ts";
-import { draftAt, edit, editDraft, editFile, editorCommand, insertText } from "./edit.ts";
+import { draftAt, edit, editDraft, editFile, editorCommand, editorCommandAt, insertText } from "./edit.ts";
 
 test("the cursor edits the middle of the draft", () => {
   let draft = insertText(draftAt(""), "hello");
@@ -109,4 +109,24 @@ test("editFile runs the editor on the real file, with the terminal suspended", a
   assert.equal(ok, true);
   assert.deepEqual(seen, ["nvim", "-u", "NONE", "/tmp/skill/SKILL.md"]);
   assert.equal(await editFile("/x", async (run) => run(), async () => 2), false);
+});
+
+test("an editor that takes +N opens the file at that line", async () => {
+  assert.deepEqual(editorCommandAt(12, { EDITOR: "vim" }), ["vim", "+12"]);
+  assert.deepEqual(editorCommandAt(12, { EDITOR: "/usr/bin/nano -w" }), ["/usr/bin/nano", "-w", "+12"]);
+  assert.deepEqual(editorCommandAt(12, { EDITOR: "code --wait" }), ["code", "--wait"]);
+  assert.deepEqual(editorCommandAt(undefined, { EDITOR: "vim" }), ["vim"]);
+  const seen: string[][] = [];
+  const saved = await editFile(
+    "/tmp/g/config.toml",
+    (run) => run(),
+    (command, file) => {
+      seen.push([...command, file]);
+      return Promise.resolve(0);
+    },
+    { EDITOR: "vi" },
+    7,
+  );
+  assert.equal(saved, true);
+  assert.deepEqual(seen, [["vi", "+7", "/tmp/g/config.toml"]]);
 });

@@ -132,6 +132,22 @@ test("/sessions and /new are commands without arguments", () => {
   assert.equal(applyComposer(closedDebug, "/session").kind, "unknown");
 });
 
+test("/routines and /runs open their lists and take no arguments", () => {
+  assert.deepEqual(applyComposer(closedDebug, "/routines"), { kind: "routines" });
+  assert.deepEqual(applyComposer(closedDebug, " /runs "), { kind: "runs" });
+  assert.equal(applyComposer(closedDebug, "/routines now").kind, "unknown");
+  assert.equal(applyComposer(closedDebug, "/runs 7f3a").kind, "unknown");
+});
+
+test("/ suggests /routines and /runs", async () => {
+  const { suggest } = await import("./suggest.ts");
+  const labels = (text: string) => suggest(text, COMMANDS).map((item) => item.label);
+  assert.ok(labels("/rou").includes("/routines"));
+  assert.ok(labels("/ru").includes("/runs"));
+  assert.ok(labels("/").includes("/routines") && labels("/").includes("/runs"));
+  assert.equal(suggest("/routines", COMMANDS)[0]?.completion, "/routines ");
+});
+
 test("/model opens the picker or names one model", () => {
   assert.deepEqual(applyComposer(closedDebug, "/model"), { kind: "model", name: null });
   assert.deepEqual(applyComposer(closedDebug, "/model  sonnet "), { kind: "model", name: "sonnet" });

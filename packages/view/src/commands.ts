@@ -46,6 +46,10 @@ export type ComposerOutcome =
   | { kind: "sessions" }
   | { kind: "setup" }
   | { kind: "skills" }
+  /** `/routines`: the routine manager. */
+  | { kind: "routines" }
+  /** `/runs`: everything automation did. */
+  | { kind: "runs" }
   /** `/skill new`: start the new-skill form. */
   | { kind: "skill-new" }
   | { kind: "permissions" }
@@ -419,6 +423,20 @@ export const COMMANDS: readonly Command[] = [
     args: "",
     description: "Lists the skills this folder sees, with broken and hidden ones and why.",
     run: withoutArgs({ kind: "skills" }),
+  },
+  {
+    name: "/routines",
+    group: "tools",
+    args: "",
+    description: "Lists your routines: run one now, pause or resume it, or edit it in $EDITOR.",
+    run: withoutArgs({ kind: "routines" }),
+  },
+  {
+    name: "/runs",
+    group: "tools",
+    args: "",
+    description: "Lists what routines did: what needs you, what is running, and what finished.",
+    run: withoutArgs({ kind: "runs" }),
   },
   {
     name: "/time",
