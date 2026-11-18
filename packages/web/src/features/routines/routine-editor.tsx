@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { nextTimesText, scheduleToWhen, WEEK_DAYS, WHEN_KINDS, whenToSchedule, watchPreviewText, watchToOn, type RoutineWhen, type WhenKind } from "@golem/view";
 import { actionErrorText } from "../../store/errors.ts";
 import type { RoutineConfig } from "../../store/routines.ts";
@@ -116,6 +116,8 @@ export type RoutineEditorProps = {
 export function RoutineEditor({ create, draft, now, skills, servers, folderBrowser, modelPick, onPreview, onSave, onCancel }: RoutineEditorProps) {
   const ids = useId();
   const promptRef = useRef<HTMLTextAreaElement>(null);
+  /** Where the caret goes once the prompt with a new chip is on the page. */
+  const chipCaret = useRef<number | null>(null);
   const wasWatched = draft.on !== undefined && draft.on !== null;
   const [name, setName] = useState(draft.name ?? "");
   const [when, setWhen] = useState<RoutineWhen>(() => (wasWatched ? { ...scheduleToWhen(null), kind: "watch" } : scheduleToWhen(draft.schedule)));
@@ -171,14 +173,19 @@ export function RoutineEditor({ create, draft, now, skills, servers, folderBrows
     const start = box?.selectionStart ?? prompt.length;
     const end = box?.selectionEnd ?? prompt.length;
     setPrompt(prompt.slice(0, start) + chip + prompt.slice(end));
-    if (box === null) return;
-    const caret = start + chip.length;
-    // The prompt is set on the next render; the caret goes after the chip once it is there.
-    requestAnimationFrame(() => {
-      box.focus();
-      box.setSelectionRange(caret, caret);
-    });
+    chipCaret.current = start + chip.length;
   }
+
+  // The caret goes after the chip in the same commit that shows it. A later frame could
+  // land after the next click and move a caret the person had already moved.
+  useLayoutEffect(() => {
+    const box = promptRef.current;
+    const caret = chipCaret.current;
+    if (box === null || caret === null) return;
+    chipCaret.current = null;
+    box.focus();
+    box.setSelectionRange(caret, caret);
+  }, [prompt]);
 
   function pickSkill(skill: string): void {
     setPrompt(withSkill(prompt, skill));
