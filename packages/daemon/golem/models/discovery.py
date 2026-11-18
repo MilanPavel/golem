@@ -59,6 +59,7 @@ from golem.models.router import (
 from golem.models.scores import Score, Scores
 from golem.models.speed import Speed, SpeedBook
 from golem.models.tiers import Tier, blended, tier_of
+from golem.net_tls import tls_context
 
 log = logging.getLogger(__name__)
 
@@ -800,7 +801,9 @@ class ModelDiscovery:
 
     def _http(self) -> httpx.AsyncClient:
         if self._client is None:
-            self._client = httpx.AsyncClient(transport=self._transport, follow_redirects=True)
+            self._client = httpx.AsyncClient(
+                transport=self._transport, follow_redirects=True, verify=tls_context()
+            )
         return self._client
 
     async def _ollama(self, name: str, provider: Provider) -> _ProviderResult:

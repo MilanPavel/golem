@@ -47,6 +47,7 @@ from golem.models.keys import KeyStore, KeyStoreError
 from golem.models.ollama_chat import OllamaChat
 from golem.models.tiers import BUDGET_MAX_PRICE
 from golem.models.window_plans import WindowPlans
+from golem.net_tls import tls_context
 from golem.paths import resolve_paths
 
 log = logging.getLogger(__name__)
@@ -665,7 +666,7 @@ def _merge(preset: Provider | None, configured: ProviderSettings) -> Provider:
 async def _lists(url: str, model: str) -> bool:
     """True when the Ollama at ``url`` lists ``model`` in ``/api/tags``."""
     try:
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(verify=tls_context()) as client:
             response = await client.get(f"{url}/api/tags", timeout=2.0)
             response.raise_for_status()
             body: object = response.json()

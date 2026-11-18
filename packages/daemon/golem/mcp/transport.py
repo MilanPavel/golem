@@ -23,6 +23,7 @@ from typing import Any, Protocol, cast
 import httpx
 
 from golem.mcp.oauth import NeedsAuth, TokenSource
+from golem.net_tls import tls_context
 from golem.secrets import SecretStoreError
 
 log = logging.getLogger(__name__)
@@ -250,7 +251,9 @@ class HttpTransport:
     async def open(self, deliver: Deliver) -> None:
         self._deliver = deliver
         timeout = httpx.Timeout(connect=10.0, read=None, write=30.0, pool=10.0)
-        self._client = httpx.AsyncClient(transport=self._transport, timeout=timeout)
+        self._client = httpx.AsyncClient(
+            transport=self._transport, timeout=timeout, verify=tls_context()
+        )
 
     async def send(self, message: Mapping[str, object]) -> None:
         self._state.check()

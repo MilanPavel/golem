@@ -18,6 +18,7 @@ from urllib.parse import parse_qs, urljoin, urlsplit
 
 import httpx
 
+from golem.net_tls import tls_context
 from golem.tools.registry import ToolError
 from golem.tools.search_provider import Result
 from golem.tools.web import USER_AGENT
@@ -79,6 +80,7 @@ class DuckDuckGo:
                     timeout=self._timeout,
                     headers=headers,
                     trust_env=False,
+                    verify=tls_context(),
                 ) as client,
                 client.stream("POST", URL, data={"q": query}) as response,
             ):

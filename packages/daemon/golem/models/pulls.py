@@ -29,6 +29,7 @@ from pydantic import BaseModel
 from golem.models import hardware, ollama, registry
 from golem.models.errors import ModelUnreachable
 from golem.models.router import OLLAMA_BASE_URL, ModelRouter, Provider
+from golem.net_tls import tls_context
 from golem_protocol.commands import ModelPullDone, ModelPullProgress
 from golem_protocol.rpc import ModelPullDoneNotification, ModelPullProgressNotification
 
@@ -353,7 +354,7 @@ class PullManager:
 
     def _http(self) -> httpx.AsyncClient:
         if self._client is None:
-            self._client = httpx.AsyncClient(transport=self._transport)
+            self._client = httpx.AsyncClient(transport=self._transport, verify=tls_context())
         return self._client
 
     def _disk_free_gb(self, target: _Target) -> float | None:

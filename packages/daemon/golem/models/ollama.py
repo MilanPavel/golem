@@ -32,6 +32,7 @@ import httpx
 
 from golem.config import OllamaSettings
 from golem.models.errors import ModelUnreachable
+from golem.net_tls import tls_context
 
 log = logging.getLogger(__name__)
 
@@ -346,7 +347,7 @@ class LocalServer:
 
     def _http(self) -> httpx.AsyncClient:
         if self._client is None:
-            self._client = httpx.AsyncClient(transport=self._transport)
+            self._client = httpx.AsyncClient(transport=self._transport, verify=tls_context())
         return self._client
 
     def _host(self) -> str:

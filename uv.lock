@@ -383,6 +383,7 @@ dependencies = [
     { name = "pydantic-settings" },
     { name = "pyyaml" },
     { name = "tomlkit" },
+    { name = "truststore" },
 ]
 
 [package.metadata]
@@ -401,6 +402,7 @@ requires-dist = [
     { name = "pydantic-settings", specifier = ">=2.10" },
     { name = "pyyaml", specifier = ">=6.0" },
     { name = "tomlkit", specifier = ">=0.13" },
+    { name = "truststore", specifier = ">=0.10" },
 ]
 
 [[package]]
