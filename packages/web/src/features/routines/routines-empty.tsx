@@ -2,14 +2,10 @@ import { routineNewPath } from "../../store/router.ts";
 import { Button } from "../../ui/button.tsx";
 import { Card } from "../../ui/card.tsx";
 import type { RoutineDraft } from "./routine-editor.tsx";
-import { PendingButton } from "./routine-detail.tsx";
-
-/** What the watch starter waits for: a routine that starts on a new file is built with file watching. */
-export const WATCH_PENDING = "Comes with file watching";
 
 type Starter = { id: string; title: string; line: string; draft: RoutineDraft | null };
 
-/** The starters of the empty state. One with no draft is shown and waits for what it needs. */
+/** The starters of the empty state. */
 export const STARTERS: readonly Starter[] = [
   {
     id: "morning-brief",
@@ -17,7 +13,7 @@ export const STARTERS: readonly Starter[] = [
     line: "Every weekday at 08:30, read your open pull requests and failing checks and leave a summary in the Inbox.",
     draft: { name: "morning-brief", schedule: "30 8 * * 1-5", prompt: "Read my open pull requests and failing checks and leave a summary in the Inbox." },
   },
-  { id: "watch-folder", title: "Watch a folder", line: "When a new PDF lands in Downloads, read it and file it where it belongs.", draft: null },
+  { id: "watch-folder", title: "Watch a folder", line: "When a new PDF lands in Downloads, read it and file it where it belongs.", draft: { name: "watch-downloads", on: { watch: "~/Downloads", glob: "*.pdf" }, prompt: "Read the new PDF at {path} and file it where it belongs." } },
 ];
 
 /** The draft of a starter named in `/routines?new=<id>`, or null for none (an empty form). */
@@ -42,13 +38,9 @@ export function RoutinesEmpty({ onNavigate }: { onNavigate: (path: string) => vo
               <h2 className="text-sm font-semibold">{starter.title}</h2>
               <p className="flex-1 text-sm text-muted">{starter.line}</p>
               <div>
-                {starter.draft === null ? (
-                  <PendingButton reason={WATCH_PENDING}>Use this starter</PendingButton>
-                ) : (
-                  <Button size="sm" onClick={() => onNavigate(routineNewPath(starter.id))}>
-                    Use this starter
-                  </Button>
-                )}
+                <Button size="sm" onClick={() => onNavigate(routineNewPath(starter.id))}>
+                  Use this starter
+                </Button>
               </div>
             </Card>
           </li>

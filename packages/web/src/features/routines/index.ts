@@ -2,5 +2,5 @@ export { LiveRoutinesPanel, RoutinesPanel, type RoutinesPanelProps, type Selecte
 export { RoutineDetail, type RoutineDetailProps } from "./routine-detail.tsx";
 export { RoutineEditor, type RoutineDraft, type RoutineEditorProps } from "./routine-editor.tsx";
 export { RoutineNewScreen, RoutineScreen, RoutinesScreen } from "./routine-screen.tsx";
-export { RoutinesEmpty, STARTERS, WATCH_PENDING } from "./routines-empty.tsx";
+export { RoutinesEmpty, STARTERS } from "./routines-empty.tsx";
 export { RoutineDot, RunDot } from "./routine-dot.tsx";

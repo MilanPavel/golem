@@ -272,6 +272,7 @@ def _summary(row: RoutineRunRecord) -> RoutineRunSummary:
             "status": row.status,
             "reason": row.reason,
             "summary": row.summary,
+            "watch_path": row.watch_path,
         }
     )
 

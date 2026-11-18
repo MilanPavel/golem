@@ -2,6 +2,7 @@ export type { ApprovalChoice, ConsentChoice } from "@golem/client";
 export { formatDuration, formatElapsed, formatTurnTime } from "./duration.ts";
 export {
   DEFAULT_WHEN,
+  fileName,
   lastResultText,
   nextRunText,
   nextTimesText,
@@ -14,6 +15,8 @@ export {
   scheduleToWhen,
   scheduleWords,
   triggerWords,
+  watchPreviewText,
+  watchToOn,
   WEEK_DAYS,
   WHEN_KINDS,
   whenToSchedule,

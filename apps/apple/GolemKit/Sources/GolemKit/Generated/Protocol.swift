@@ -10358,7 +10358,7 @@ public struct PurpleRoutineWatchConfig: Codable {
 /// ``skipped``: ``missed``, ``paused``, ``untrusted``, ``still running`` or ``quiet``.
 /// ``scope`` is ``user`` or the project folder. ``summary`` is the last reply of a
 /// finished firing, cut short. ``status`` ``waiting`` is read from the session, it is
-/// never stored.
+/// never stored. ``watch_path`` is the file a ``watch`` firing is for.
 // MARK: - RoutineRunSummaryElement
 public struct RoutineRunSummaryElement: Codable {
     public let dueAt: String?
@@ -10372,6 +10372,7 @@ public struct RoutineRunSummaryElement: Codable {
     public let status: RoutineFinishedStatus
     public let summary: String?
     public let trigger: Trigger
+    public let watchPath: String?
 
     public enum CodingKeys: String, CodingKey {
         case dueAt = "due_at"
@@ -10385,9 +10386,10 @@ public struct RoutineRunSummaryElement: Codable {
         case status = "status"
         case summary = "summary"
         case trigger = "trigger"
+        case watchPath = "watch_path"
     }
 
-    public init(dueAt: String?, endedAt: String?, reason: String?, routine: String, routineRunID: String, scope: String, sessionID: String?, startedAt: String?, status: RoutineFinishedStatus, summary: String?, trigger: Trigger) {
+    public init(dueAt: String?, endedAt: String?, reason: String?, routine: String, routineRunID: String, scope: String, sessionID: String?, startedAt: String?, status: RoutineFinishedStatus, summary: String?, trigger: Trigger, watchPath: String?) {
         self.dueAt = dueAt
         self.endedAt = endedAt
         self.reason = reason
@@ -10399,6 +10401,7 @@ public struct RoutineRunSummaryElement: Codable {
         self.status = status
         self.summary = summary
         self.trigger = trigger
+        self.watchPath = watchPath
     }
 }
 
@@ -10519,7 +10522,7 @@ public struct FluffyRoutineWatchConfig: Codable {
 /// ``skipped``: ``missed``, ``paused``, ``untrusted``, ``still running`` or ``quiet``.
 /// ``scope`` is ``user`` or the project folder. ``summary`` is the last reply of a
 /// finished firing, cut short. ``status`` ``waiting`` is read from the session, it is
-/// never stored.
+/// never stored. ``watch_path`` is the file a ``watch`` firing is for.
 // MARK: - RoutineInfoRoutineRunSummary
 public struct RoutineInfoRoutineRunSummary: Codable {
     public let dueAt: String?
@@ -10533,6 +10536,7 @@ public struct RoutineInfoRoutineRunSummary: Codable {
     public let status: RoutineFinishedStatus
     public let summary: String?
     public let trigger: Trigger
+    public let watchPath: String?
 
     public enum CodingKeys: String, CodingKey {
         case dueAt = "due_at"
@@ -10546,9 +10550,10 @@ public struct RoutineInfoRoutineRunSummary: Codable {
         case status = "status"
         case summary = "summary"
         case trigger = "trigger"
+        case watchPath = "watch_path"
     }
 
-    public init(dueAt: String?, endedAt: String?, reason: String?, routine: String, routineRunID: String, scope: String, sessionID: String?, startedAt: String?, status: RoutineFinishedStatus, summary: String?, trigger: Trigger) {
+    public init(dueAt: String?, endedAt: String?, reason: String?, routine: String, routineRunID: String, scope: String, sessionID: String?, startedAt: String?, status: RoutineFinishedStatus, summary: String?, trigger: Trigger, watchPath: String?) {
         self.dueAt = dueAt
         self.endedAt = endedAt
         self.reason = reason
@@ -10560,6 +10565,7 @@ public struct RoutineInfoRoutineRunSummary: Codable {
         self.status = status
         self.summary = summary
         self.trigger = trigger
+        self.watchPath = watchPath
     }
 }
 
@@ -10755,7 +10761,7 @@ public struct TentacledRoutineWatchConfig: Codable {
 /// ``skipped``: ``missed``, ``paused``, ``untrusted``, ``still running`` or ``quiet``.
 /// ``scope`` is ``user`` or the project folder. ``summary`` is the last reply of a
 /// finished firing, cut short. ``status`` ``waiting`` is read from the session, it is
-/// never stored.
+/// never stored. ``watch_path`` is the file a ``watch`` firing is for.
 // MARK: - PurpleRoutineRunSummary
 public struct PurpleRoutineRunSummary: Codable {
     public let dueAt: String?
@@ -10769,6 +10775,7 @@ public struct PurpleRoutineRunSummary: Codable {
     public let status: RoutineFinishedStatus
     public let summary: String?
     public let trigger: Trigger
+    public let watchPath: String?
 
     public enum CodingKeys: String, CodingKey {
         case dueAt = "due_at"
@@ -10782,9 +10789,10 @@ public struct PurpleRoutineRunSummary: Codable {
         case status = "status"
         case summary = "summary"
         case trigger = "trigger"
+        case watchPath = "watch_path"
     }
 
-    public init(dueAt: String?, endedAt: String?, reason: String?, routine: String, routineRunID: String, scope: String, sessionID: String?, startedAt: String?, status: RoutineFinishedStatus, summary: String?, trigger: Trigger) {
+    public init(dueAt: String?, endedAt: String?, reason: String?, routine: String, routineRunID: String, scope: String, sessionID: String?, startedAt: String?, status: RoutineFinishedStatus, summary: String?, trigger: Trigger, watchPath: String?) {
         self.dueAt = dueAt
         self.endedAt = endedAt
         self.reason = reason
@@ -10796,6 +10804,7 @@ public struct PurpleRoutineRunSummary: Codable {
         self.status = status
         self.summary = summary
         self.trigger = trigger
+        self.watchPath = watchPath
     }
 }
 
@@ -10905,7 +10914,7 @@ public struct RoutineRunResult: Codable {
 /// ``skipped``: ``missed``, ``paused``, ``untrusted``, ``still running`` or ``quiet``.
 /// ``scope`` is ``user`` or the project folder. ``summary`` is the last reply of a
 /// finished firing, cut short. ``status`` ``waiting`` is read from the session, it is
-/// never stored.
+/// never stored. ``watch_path`` is the file a ``watch`` firing is for.
 // MARK: - RoutineRunSummary
 public struct RoutineRunSummary: Codable {
     public let dueAt: String?
@@ -10919,6 +10928,7 @@ public struct RoutineRunSummary: Codable {
     public let status: RoutineFinishedStatus
     public let summary: String?
     public let trigger: Trigger
+    public let watchPath: String?
 
     public enum CodingKeys: String, CodingKey {
         case dueAt = "due_at"
@@ -10932,9 +10942,10 @@ public struct RoutineRunSummary: Codable {
         case status = "status"
         case summary = "summary"
         case trigger = "trigger"
+        case watchPath = "watch_path"
     }
 
-    public init(dueAt: String?, endedAt: String?, reason: String?, routine: String, routineRunID: String, scope: String, sessionID: String?, startedAt: String?, status: RoutineFinishedStatus, summary: String?, trigger: Trigger) {
+    public init(dueAt: String?, endedAt: String?, reason: String?, routine: String, routineRunID: String, scope: String, sessionID: String?, startedAt: String?, status: RoutineFinishedStatus, summary: String?, trigger: Trigger, watchPath: String?) {
         self.dueAt = dueAt
         self.endedAt = endedAt
         self.reason = reason
@@ -10946,6 +10957,7 @@ public struct RoutineRunSummary: Codable {
         self.status = status
         self.summary = summary
         self.trigger = trigger
+        self.watchPath = watchPath
     }
 }
 
@@ -11108,7 +11120,7 @@ public struct StickyRoutineWatchConfig: Codable {
 /// ``skipped``: ``missed``, ``paused``, ``untrusted``, ``still running`` or ``quiet``.
 /// ``scope`` is ``user`` or the project folder. ``summary`` is the last reply of a
 /// finished firing, cut short. ``status`` ``waiting`` is read from the session, it is
-/// never stored.
+/// never stored. ``watch_path`` is the file a ``watch`` firing is for.
 // MARK: - FluffyRoutineRunSummary
 public struct FluffyRoutineRunSummary: Codable {
     public let dueAt: String?
@@ -11122,6 +11134,7 @@ public struct FluffyRoutineRunSummary: Codable {
     public let status: RoutineFinishedStatus
     public let summary: String?
     public let trigger: Trigger
+    public let watchPath: String?
 
     public enum CodingKeys: String, CodingKey {
         case dueAt = "due_at"
@@ -11135,9 +11148,10 @@ public struct FluffyRoutineRunSummary: Codable {
         case status = "status"
         case summary = "summary"
         case trigger = "trigger"
+        case watchPath = "watch_path"
     }
 
-    public init(dueAt: String?, endedAt: String?, reason: String?, routine: String, routineRunID: String, scope: String, sessionID: String?, startedAt: String?, status: RoutineFinishedStatus, summary: String?, trigger: Trigger) {
+    public init(dueAt: String?, endedAt: String?, reason: String?, routine: String, routineRunID: String, scope: String, sessionID: String?, startedAt: String?, status: RoutineFinishedStatus, summary: String?, trigger: Trigger, watchPath: String?) {
         self.dueAt = dueAt
         self.endedAt = endedAt
         self.reason = reason
@@ -11149,6 +11163,7 @@ public struct FluffyRoutineRunSummary: Codable {
         self.status = status
         self.summary = summary
         self.trigger = trigger
+        self.watchPath = watchPath
     }
 }
 

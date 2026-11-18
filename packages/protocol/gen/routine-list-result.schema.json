@@ -222,7 +222,7 @@
     },
     "RoutineRunSummary": {
       "additionalProperties": false,
-      "description": "One firing of a routine: a ``routine_run`` (ADR-050).\n\nThe times are ISO 8601 with an offset. ``reason`` says why a firing was\n``skipped``: ``missed``, ``paused``, ``untrusted``, ``still running`` or ``quiet``.\n``scope`` is ``user`` or the project folder. ``summary`` is the last reply of a\nfinished firing, cut short. ``status`` ``waiting`` is read from the session, it is\nnever stored.",
+      "description": "One firing of a routine: a ``routine_run`` (ADR-050).\n\nThe times are ISO 8601 with an offset. ``reason`` says why a firing was\n``skipped``: ``missed``, ``paused``, ``untrusted``, ``still running`` or ``quiet``.\n``scope`` is ``user`` or the project folder. ``summary`` is the last reply of a\nfinished firing, cut short. ``status`` ``waiting`` is read from the session, it is\nnever stored. ``watch_path`` is the file a ``watch`` firing is for.",
       "properties": {
         "due_at": {
           "anyOf": [
@@ -333,6 +333,18 @@
           ],
           "title": "Trigger",
           "type": "string"
+        },
+        "watch_path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Watch Path"
         }
       },
       "required": [

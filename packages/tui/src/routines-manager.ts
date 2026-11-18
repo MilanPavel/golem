@@ -1,5 +1,6 @@
 import type { RoutineInfo, RoutineIssue, RoutineRunSummary } from "@golem/client";
 import {
+  fileName,
   formatDuration,
   lastResultText,
   nextRunText,
@@ -319,7 +320,8 @@ function detailLines(
 ): RoutinesManagerLine[] {
   const label = (key: string) => `${key}:`.padEnd(10);
   const config = routine.config;
-  const status = routine.blocked === true ? "untrusted folder: it never runs" : STATUS_WORDS[routineState(routine)];
+  const state = routineState(routine);
+  const status = routine.blocked === true ? "untrusted folder: it never runs" : state === "idle" && config.on ? "watching" : STATUS_WORDS[state];
   const lines: RoutinesManagerLine[] = [
     { text: `${config.name} routine`, bold: true },
     { text: "" },
@@ -357,13 +359,14 @@ function runMark(run: RoutineRunSummary): { text: string; tone: McpTone } {
   return { text: "○", tone: "off" };
 }
 
-/** `Today 08:30  2m 14.9s  5 PRs, 3 Linear issues`: when, how long, and how it went. */
+/** `Today 08:30  2m 14.9s  5 PRs, 3 Linear issues`: when, how long, and how it went. A run for a file says which one, after the time. */
 function runLine(run: RoutineRunSummary, now: number): string {
   const started = run.started_at ?? run.due_at ?? null;
   const began = started === null ? Number.NaN : Date.parse(started);
   const ended = run.ended_at === null || run.ended_at === undefined ? Number.NaN : Date.parse(run.ended_at);
   const took = Number.isNaN(began) || Number.isNaN(ended) ? "" : formatDuration(ended - began);
-  return [runWhenText(started, now), took, lastResultText(run)].filter((part) => part !== "").join("  ");
+  const file = run.watch_path === null || run.watch_path === undefined ? "" : fileName(run.watch_path);
+  return [runWhenText(started, now), file, took, lastResultText(run)].filter((part) => part !== "").join("  ");
 }
 
 /** Keep the selected line on screen, with the title lines above it when they fit. */

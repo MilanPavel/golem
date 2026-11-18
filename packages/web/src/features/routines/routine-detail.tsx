@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react";
-import { formatElapsed, lastResultText, routineHeadline, routineState, routineToml, runStatusWords, runWhenText } from "@golem/view";
+import { fileName, formatElapsed, lastResultText, routineHeadline, routineState, routineToml, runStatusWords, runWhenText } from "@golem/view";
 import { actionErrorText } from "../../store/errors.ts";
 import { sessionPath } from "../../store/router.ts";
 import type { RoutineInfo, RoutineRunResult, RoutineRunSummary } from "../../store/routines.ts";
@@ -48,6 +48,11 @@ function HistoryRow({ run, now, onNavigate }: { run: RoutineRunSummary; now: num
       <RunDot status={run.status} word={word} />
       <span className="w-28 shrink-0 text-sm font-medium">{runWhenText(run.started_at ?? run.due_at, now)}</span>
       <span className="w-16 shrink-0 font-mono text-xs text-muted">{duration(run)}</span>
+      {run.watch_path === null || run.watch_path === undefined ? null : (
+        <span title={run.watch_path} className="max-w-48 shrink-0 truncate font-mono text-xs text-muted">
+          {fileName(run.watch_path)}
+        </span>
+      )}
       <span className={cn("min-w-0 flex-1 truncate text-sm", TONE[run.status] ?? "text-ink")}>{lastResultText(run)}</span>
       {run.session_id === null || run.session_id === undefined ? null : (
         <Link href={sessionPath(run.session_id)} onNavigate={onNavigate} className={cn("shrink-0 whitespace-nowrap text-sm", LINK)}>

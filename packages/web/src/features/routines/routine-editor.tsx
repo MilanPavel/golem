@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
-import { nextTimesText, scheduleToWhen, WEEK_DAYS, WHEN_KINDS, whenToSchedule, triggerWords, type RoutineWhen, type WhenKind } from "@golem/view";
+import { nextTimesText, scheduleToWhen, WEEK_DAYS, WHEN_KINDS, whenToSchedule, watchPreviewText, watchToOn, type RoutineWhen, type WhenKind } from "@golem/view";
 import { actionErrorText } from "../../store/errors.ts";
 import type { RoutineConfig } from "../../store/routines.ts";
 import type { ListedSkill } from "../../store/skills.ts";
@@ -16,11 +16,18 @@ const SEG_CLASS = "inline-flex w-fit max-w-full flex-wrap gap-0.5 rounded-md bor
 const SEG_BUTTON_CLASS =
   "rounded-sm border border-transparent px-3 py-1 text-xs text-muted outline-offset-2 outline-clay hover:text-ink focus-visible:outline-2 aria-checked:border-line-strong aria-checked:bg-surface aria-checked:text-ink disabled:pointer-events-none disabled:opacity-50";
 
+/** What a watch routine's prompt can hold: each is filled in with the file that arrived. */
+const PLACEHOLDERS = [
+  { token: "{path}", meaning: "The full path of the new file" },
+  { token: "{name}", meaning: "The file name" },
+  { token: "{dir}", meaning: "The folder it is in" },
+] as const;
+
 /** How long the schedule is left alone before the daemon is asked for its next times. */
 export const PREVIEW_DELAY_MS = 250;
 
 /** The keys of a routine the editor writes, as the daemon names them in an error. */
-const FIELDS = ["name", "schedule", "prompt", "folder", "model", "mcp", "missed"] as const;
+const FIELDS = ["name", "schedule", "on", "prompt", "folder", "model", "mcp", "missed"] as const;
 type Field = (typeof FIELDS)[number];
 
 /** The field a daemon refusal is about: `schedule: …` names it, and a taken name is the name's. Null when it is about the routine. */
@@ -109,9 +116,12 @@ export type RoutineEditorProps = {
 export function RoutineEditor({ create, draft, now, skills, servers, folderBrowser, modelPick, onPreview, onSave, onCancel }: RoutineEditorProps) {
   const ids = useId();
   const promptRef = useRef<HTMLTextAreaElement>(null);
-  const watched = draft.on !== undefined && draft.on !== null;
+  const wasWatched = draft.on !== undefined && draft.on !== null;
   const [name, setName] = useState(draft.name ?? "");
-  const [when, setWhen] = useState<RoutineWhen>(() => scheduleToWhen(draft.schedule));
+  const [when, setWhen] = useState<RoutineWhen>(() => (wasWatched ? { ...scheduleToWhen(null), kind: "watch" } : scheduleToWhen(draft.schedule)));
+  const [watchFolder, setWatchFolder] = useState(draft.on?.watch ?? "");
+  const [glob, setGlob] = useState(draft.on?.glob ?? "");
+  const [watchBrowsing, setWatchBrowsing] = useState(false);
   // The schedule as written stays as written until a When control is used, so `weekdays 08:30` is not rewritten as cron.
   const [touched, setTouched] = useState(create);
   const [prompt, setPrompt] = useState(draft.prompt ?? "");
@@ -125,6 +135,7 @@ export function RoutineEditor({ create, draft, now, skills, servers, folderBrows
   const [busy, setBusy] = useState(false);
   const [errors, setErrors] = useState<Partial<Record<Field | "form", string>>>({});
 
+  const watched = when.kind === "watch";
   const schedule = watched ? null : touched ? whenToSchedule(when) : (draft.schedule ?? null);
 
   useEffect(() => {
@@ -155,6 +166,20 @@ export function RoutineEditor({ create, draft, now, skills, servers, folderBrows
     setWhen({ ...when, ...next });
   }
 
+  function insertChip(chip: string): void {
+    const box = promptRef.current;
+    const start = box?.selectionStart ?? prompt.length;
+    const end = box?.selectionEnd ?? prompt.length;
+    setPrompt(prompt.slice(0, start) + chip + prompt.slice(end));
+    if (box === null) return;
+    const caret = start + chip.length;
+    // The prompt is set on the next render; the caret goes after the chip once it is there.
+    requestAnimationFrame(() => {
+      box.focus();
+      box.setSelectionRange(caret, caret);
+    });
+  }
+
   function pickSkill(skill: string): void {
     setPrompt(withSkill(prompt, skill));
     promptRef.current?.focus();
@@ -162,6 +187,8 @@ export function RoutineEditor({ create, draft, now, skills, servers, folderBrows
 
   function save(): void {
     const found: Partial<Record<Field | "form", string>> = {};
+    const on = watched ? watchToOn(watchFolder, glob) : null;
+    if (watched && on === null) found.on = "Pick the folder to watch.";
     if (!watched && schedule === null) found.schedule = when.kind === "cron" ? "Write a cron line." : "Fill in the schedule.";
     if (Object.keys(found).length > 0) {
       setErrors(found);
@@ -177,6 +204,10 @@ export function RoutineEditor({ create, draft, now, skills, servers, folderBrows
       missed,
     };
     if (schedule !== null) fields["schedule"] = schedule;
+    // One trigger at a time: a routine that changes from one to the other loses the key of the one it leaves.
+    if (on !== null) fields["on"] = on;
+    if (watched && draft.schedule) fields["schedule"] = null;
+    if (!watched && wasWatched) fields["on"] = null;
     for (const key of Object.keys(fields)) {
       if (fields[key] === undefined) delete fields[key];
     }
@@ -220,15 +251,60 @@ export function RoutineEditor({ create, draft, now, skills, servers, folderBrows
           When
         </h3>
         <ul className="flex flex-col">
+          <Row label="Repeat" labelId={`${ids}-repeat`}>
+            <Segmented<WhenKind> label="Repeat" choices={WHEN_KINDS.map((each) => ({ value: each.kind, label: each.label }))} checked={when.kind} onPick={(kind) => change({ kind })} />
+          </Row>
           {watched ? (
-            <Row label="Starts on" labelId={`${ids}-starts`} hint="A routine that starts on a new file is changed in config.toml for now.">
-              <p className="font-mono text-xs">{triggerWords({ on: draft.on })}</p>
-            </Row>
+            <>
+              <Row label="Watch folder" labelId={`${ids}-watch`} error={errors.on} hint="A file that lands here starts one run. Files already there are left alone.">
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="text"
+                    aria-label="Watch folder"
+                    placeholder="~/Downloads"
+                    autoComplete="off"
+                    spellCheck={false}
+                    value={watchFolder}
+                    aria-invalid={errors.on === undefined ? undefined : true}
+                    onChange={(event) => setWatchFolder(event.target.value)}
+                    className="min-w-0 flex-1 font-mono"
+                  />
+                  <Button size="sm" onClick={() => setWatchBrowsing(true)}>
+                    Browse…
+                  </Button>
+                </div>
+                {watchBrowsing ? (
+                  <div className="rounded-lg border border-line">
+                    {folderBrowser({
+                      onPick: (path) => {
+                        setWatchFolder(path);
+                        setWatchBrowsing(false);
+                      },
+                      onCancel: () => setWatchBrowsing(false),
+                    })}
+                  </div>
+                ) : null}
+              </Row>
+              <Row label="Pattern" labelId={`${ids}-glob`} hint="Matched on the file name, ignoring case. Left empty, every new file counts.">
+                <Input
+                  type="text"
+                  aria-label="Pattern"
+                  placeholder="*.pdf"
+                  autoComplete="off"
+                  spellCheck={false}
+                  value={glob}
+                  onChange={(event) => setGlob(event.target.value)}
+                  className="font-mono"
+                />
+              </Row>
+              <li className={cn(ROW, "min-h-9")}>
+                <p aria-live="polite" className="font-mono text-xs text-muted">
+                  {watchPreviewText(watchFolder, glob.trim() === "" ? undefined : glob, prompt)}
+                </p>
+              </li>
+            </>
           ) : (
             <>
-              <Row label="Repeat" labelId={`${ids}-repeat`}>
-                <Segmented<WhenKind> label="Repeat" choices={WHEN_KINDS.map((each) => ({ value: each.kind, label: each.label }))} checked={when.kind} onPick={(kind) => change({ kind })} />
-              </Row>
               {when.kind === "weekly" ? (
                 <Row label="On" labelId={`${ids}-day`}>
                   <Segmented<number> label="On" choices={WEEK_DAYS.map((each) => ({ value: each.day, label: each.label }))} checked={when.day} onPick={(day) => change({ day })} />
@@ -273,9 +349,11 @@ export function RoutineEditor({ create, draft, now, skills, servers, folderBrows
               </li>
             </>
           )}
+          {watched ? null : (
           <Row label="When missed" labelId={`${ids}-missed`} hint={missed === "run_once" ? "A run that came due while the Mac was asleep starts once, late." : "A run that came due while the Mac was asleep is dropped."} error={errors.missed}>
             <Segmented<"skip" | "run_once"> label="When missed" choices={[{ value: "skip", label: "Skip" }, { value: "run_once", label: "Run once" }]} checked={missed} onPick={setMissed} />
           </Row>
+          )}
         </ul>
       </section>
 
@@ -331,6 +409,21 @@ export function RoutineEditor({ create, draft, now, skills, servers, folderBrows
             }
             hint={hint?.argument_hint ? `/${hint.name} ${hint.argument_hint}` : "Text, or a /skill with its arguments. It is the first message of the session."}
           >
+            {watched ? (
+              <div role="group" aria-label="Insert a placeholder" className="flex flex-wrap items-center gap-1.5">
+                {PLACEHOLDERS.map((chip) => (
+                  <button
+                    key={chip.token}
+                    type="button"
+                    title={chip.meaning}
+                    onClick={() => insertChip(chip.token)}
+                    className="rounded-md border border-line px-2 py-0.5 font-mono text-xs text-ink outline-offset-2 outline-clay hover:bg-line focus-visible:outline-2"
+                  >
+                    {chip.token}
+                  </button>
+                ))}
+              </div>
+            ) : null}
             <Textarea
               ref={promptRef}
               aria-labelledby={`${ids}-prompt`}

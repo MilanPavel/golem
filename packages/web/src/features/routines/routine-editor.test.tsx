@@ -70,8 +70,6 @@ test("each schedule option writes the right schedule", async () => {
   fireEvent.change(screen.getByLabelText("At"), { target: { value: "06:05" } });
   await user.click(screen.getByRole("button", { name: "Save" }));
   await waitFor(() => expect(onSave).toHaveBeenLastCalledWith("r", expect.objectContaining({ schedule: "5 6 * * 1-5" })));
-  // "On new file" waits for file watching.
-  expect(repeat().queryByRole("radio", { name: /new file/i })).toBeNull();
 });
 
 test("the preview asks the daemon, follows the schedule, and shows the next three times", async () => {
@@ -207,15 +205,89 @@ test("changing a routine keeps its schedule as written until a When control is u
   await waitFor(() => expect(onSave).toHaveBeenLastCalledWith("morning-brief", expect.objectContaining({ schedule: "0 9 * * 1-5" })));
 });
 
-test("a routine that starts on a new file shows its trigger and leaves the schedule alone", async () => {
+const WATCH_DRAFT: RoutineDraft = { name: "receipts", prompt: "/receipt-to-csv {path}", on: { watch: "~/Downloads", glob: "*.pdf" } };
+
+test("On new file shows a folder, a pattern and the preview line, and writes on without a schedule", async () => {
   const user = userEvent.setup();
-  const { onSave, onPreview } = setup({ create: false }, { name: "receipts", prompt: "File {path}", on: { watch: "~/Downloads", glob: "*.pdf" } });
-  expect(screen.getByText("New *.pdf in ~/Downloads")).toBeTruthy();
-  expect(screen.queryByRole("radiogroup", { name: "Repeat" })).toBeNull();
+  const { onSave, onPreview } = setup();
+  await user.type(screen.getByRole("textbox", { name: "Name" }), "receipts");
+  await user.type(screen.getByRole("textbox", { name: "Prompt" }), "/receipt-to-csv {{path}");
+  await user.click(repeat().getByRole("radio", { name: "On new file" }));
+  expect(screen.queryByLabelText("At")).toBeNull();
+  expect(screen.queryByRole("radiogroup", { name: "When missed" })).toBeNull();
+  expect((screen.getByRole("textbox", { name: "Pattern" }) as HTMLInputElement).placeholder).toBe("*.pdf");
+  await user.click(screen.getByRole("button", { name: "Save" }));
+  expect((await screen.findAllByRole("alert"))[0]?.textContent).toBe("Pick the folder to watch.");
+  expect(onSave).not.toHaveBeenCalled();
+  await user.type(screen.getByRole("textbox", { name: "Watch folder" }), "~/Downloads");
+  await user.type(screen.getByRole("textbox", { name: "Pattern" }), "*.pdf");
+  expect(screen.getByText("Runs /receipt-to-csv for each new PDF in ~/Downloads")).toBeTruthy();
   await user.click(screen.getByRole("button", { name: "Save" }));
   await waitFor(() => expect(onSave).toHaveBeenCalledOnce());
-  expect(onSave.mock.calls[0]?.[1]).not.toHaveProperty("schedule");
+  const fields = onSave.mock.calls[0]?.[1] ?? {};
+  expect(fields).toEqual({ on: { watch: "~/Downloads", glob: "*.pdf" }, prompt: "/receipt-to-csv {path}", missed: "skip" });
+  expect(fields).not.toHaveProperty("schedule");
   expect(onPreview).not.toHaveBeenCalled();
+  expect(routineToml({ name: "receipts", ...(fields as { prompt: string }) })).toContain('on = { watch = "~/Downloads", glob = "*.pdf" }');
+});
+
+test("the folder browser fills the watch folder", async () => {
+  const user = userEvent.setup();
+  setup({}, WATCH_DRAFT);
+  await user.click(screen.getByRole("button", { name: "Browse…" }));
+  await user.click(screen.getByRole("button", { name: "Pick this folder" }));
+  expect((screen.getByRole("textbox", { name: "Watch folder" }) as HTMLInputElement).value).toBe("/Users/me/src/app");
+  expect(screen.getByText("Runs /receipt-to-csv for each new PDF in /Users/me/src/app")).toBeTruthy();
+});
+
+test("the {path}, {name} and {dir} chips go into the prompt at the caret", async () => {
+  const user = userEvent.setup();
+  setup({}, WATCH_DRAFT);
+  const prompt = screen.getByRole("textbox", { name: "Prompt" }) as HTMLTextAreaElement;
+  const chips = within(screen.getByRole("group", { name: "Insert a placeholder" }));
+  expect(chips.getAllByRole("button").map((button) => button.textContent)).toEqual(["{path}", "{name}", "{dir}"]);
+  prompt.setSelectionRange(0, 0);
+  await user.click(chips.getByRole("button", { name: "{dir}" }));
+  expect(prompt.value).toBe("{dir}/receipt-to-csv {path}");
+  prompt.setSelectionRange(prompt.value.length, prompt.value.length);
+  await user.click(chips.getByRole("button", { name: "{name}" }));
+  expect(prompt.value).toBe("{dir}/receipt-to-csv {path}{name}");
+});
+
+test("the chips are for a routine that starts on a new file only", () => {
+  setup();
+  expect(screen.queryByRole("group", { name: "Insert a placeholder" })).toBeNull();
+});
+
+test("a routine that starts on a new file opens in the form, and saving it leaves the schedule out", async () => {
+  const user = userEvent.setup();
+  const { onSave, onPreview } = setup({ create: false }, WATCH_DRAFT);
+  expect(repeat().getByRole("radio", { name: "On new file", checked: true })).toBeTruthy();
+  expect((screen.getByRole("textbox", { name: "Watch folder" }) as HTMLInputElement).value).toBe("~/Downloads");
+  expect((screen.getByRole("textbox", { name: "Pattern" }) as HTMLInputElement).value).toBe("*.pdf");
+  await user.clear(screen.getByRole("textbox", { name: "Pattern" }));
+  await user.type(screen.getByRole("textbox", { name: "Pattern" }), "*.png");
+  await user.click(screen.getByRole("button", { name: "Save" }));
+  await waitFor(() => expect(onSave).toHaveBeenCalledOnce());
+  expect(onSave).toHaveBeenLastCalledWith("receipts", { on: { watch: "~/Downloads", glob: "*.png" }, prompt: "/receipt-to-csv {path}", folder: null, model: null, mcp: null, missed: "skip" });
+  expect(onPreview).not.toHaveBeenCalled();
+});
+
+test("a schedule routine changed to a new file removes its schedule, and a watch routine changed to a schedule removes its on", async () => {
+  const user = userEvent.setup();
+  const first = setup({ create: false }, { ...SAMPLE_MORNING_BRIEF.config });
+  await user.click(repeat().getByRole("radio", { name: "On new file" }));
+  await user.type(screen.getByRole("textbox", { name: "Watch folder" }), "~/Downloads");
+  await user.click(screen.getByRole("button", { name: "Save" }));
+  await waitFor(() => expect(first.onSave).toHaveBeenCalledOnce());
+  expect(first.onSave.mock.calls[0]?.[1]).toMatchObject({ on: { watch: "~/Downloads" }, schedule: null });
+  first.unmount();
+
+  const second = setup({ create: false }, WATCH_DRAFT);
+  await user.click(repeat().getByRole("radio", { name: "Weekdays" }));
+  await user.click(screen.getByRole("button", { name: "Save" }));
+  await waitFor(() => expect(second.onSave).toHaveBeenCalledOnce());
+  expect(second.onSave.mock.calls[0]?.[1]).toMatchObject({ schedule: "30 8 * * 1-5", on: null });
 });
 
 test("Cancel closes without saving, and the form has no axe violations", async () => {

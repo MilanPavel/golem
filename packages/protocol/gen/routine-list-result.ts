@@ -29,6 +29,7 @@ export type StartedAt = string | null;
 export type Status = 'queued' | 'running' | 'waiting' | 'succeeded' | 'failed' | 'skipped' | 'cancelled';
 export type Summary = string | null;
 export type Trigger = 'schedule' | 'watch' | 'manual' | 'hook';
+export type WatchPath = string | null;
 export type NextAt = string | null;
 export type Path = string;
 export type Paused = boolean;
@@ -120,7 +121,7 @@ export interface RoutineWatchConfig {
  * ``skipped``: ``missed``, ``paused``, ``untrusted``, ``still running`` or ``quiet``.
  * ``scope`` is ``user`` or the project folder. ``summary`` is the last reply of a
  * finished firing, cut short. ``status`` ``waiting`` is read from the session, it is
- * never stored.
+ * never stored. ``watch_path`` is the file a ``watch`` firing is for.
  *
  * This interface was referenced by `RoutineListResult`'s JSON-Schema
  * via the `definition` "RoutineRunSummary".
@@ -137,4 +138,5 @@ export interface RoutineRunSummary {
   status: Status;
   summary?: Summary;
   trigger: Trigger;
+  watch_path?: WatchPath;
 }
