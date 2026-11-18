@@ -65,6 +65,8 @@ export type { RoutineListResult } from "../../protocol/gen/routine-list-result.t
 export type { RoutinePreviewResult } from "../../protocol/gen/routine-preview-result.ts";
 export type { RoutineRunResult } from "../../protocol/gen/routine-run-result.ts";
 export type { RoutineRunSummary } from "../../protocol/gen/routine-run-summary.ts";
+export type { RunInfo } from "../../protocol/gen/run-info.ts";
+export type { RunListResult } from "../../protocol/gen/run-list-result.ts";
 export type { RoutineUpdateResult } from "../../protocol/gen/routine-update-result.ts";
 export type { RuntimeName } from "./runtime.ts";
 export type { RuntimeInstallDone } from "../../protocol/gen/runtime-install-done.ts";

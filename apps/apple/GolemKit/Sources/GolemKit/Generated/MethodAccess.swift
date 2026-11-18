@@ -68,6 +68,7 @@ public enum MethodAccess {
         "routing.get",
         "routing.set",
         "run.cancel",
+        "run.list",
         "runtime.install",
         "runtime.install_cancel",
         "session.attach",

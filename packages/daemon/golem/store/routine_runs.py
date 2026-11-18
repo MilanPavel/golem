@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from golem.sessions.ids import new_id
 from golem.store.database import Database, Params
 
-__all__ = ["RoutineRunRecord", "RoutineRuns", "WatchedFile"]
+__all__ = ["HeadlessRun", "RoutineRunRecord", "RoutineRuns", "WatchedFile"]
 
 _COLUMNS = (
     "r.routine_run_id, r.routine, r.scope, r.session_id, r.trigger, r.due_at, r.started_at,"
@@ -46,6 +46,89 @@ class RoutineRunRecord:
     status: str
     reason: str | None
     summary: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class HeadlessRun:
+    """A session whose origin is not ``user``, joined with its firing when it has one."""
+
+    session_id: str
+    origin: str
+    routine_run_id: str | None
+    routine: str | None
+    scope: str | None
+    trigger: str | None
+    status: str
+    started_at: str | None
+    ended_at: str | None
+    reason: str | None
+    summary: str | None
+    watch_path: str | None
+
+
+_LAST_RUN = (
+    "(SELECT {col} FROM runs WHERE runs.session_id = s.session_id"
+    " ORDER BY runs.started_at DESC, runs.rowid DESC LIMIT 1)"
+)
+_HEADLESS = (
+    "SELECT s.session_id, s.origin, s.created_at, r.routine_run_id, r.routine, r.scope, r.trigger,"
+    " r.status AS fired_status, r.started_at AS fired_at, r.ended_at AS fired_end, r.reason AS"
+    " fired_reason, r.summary AS fired_summary, r.watch_path,"
+    " EXISTS (SELECT 1 FROM runs WHERE runs.session_id = s.session_id"
+    " AND runs.status = 'waiting') AS waiting,"
+    " " + _LAST_RUN.format(col="status") + " AS last_status,"
+    " " + _LAST_RUN.format(col="ended_at") + " AS last_end,"
+    " " + _LAST_RUN.format(col="error") + " AS last_error,"
+    " (SELECT json_extract(e.data, '$.summary') FROM events e"
+    "  WHERE e.session_id = s.session_id AND e.type = 'session.completed'"
+    "  ORDER BY e.seq DESC LIMIT 1) AS last_summary"
+    " FROM sessions s LEFT JOIN routine_runs r ON r.session_id = s.session_id"
+    " WHERE COALESCE(s.origin, 'user') != 'user'"
+)
+_ASK_STATUS = {"completed": "succeeded", "failed": "failed", "cancelled": "cancelled"}
+
+
+def _headless(row: sqlite3.Row) -> HeadlessRun:
+    if row["routine_run_id"] is not None:
+        waiting = row["fired_status"] == "running" and bool(row["waiting"])
+        return HeadlessRun(
+            session_id=row["session_id"],
+            origin=row["origin"],
+            routine_run_id=row["routine_run_id"],
+            routine=row["routine"],
+            scope=row["scope"],
+            trigger=row["trigger"],
+            status="waiting" if waiting else row["fired_status"],
+            started_at=row["fired_at"],
+            ended_at=row["fired_end"],
+            reason=row["fired_reason"],
+            summary=row["fired_summary"],
+            watch_path=row["watch_path"],
+        )
+    last = row["last_status"]
+    status = (
+        "waiting"
+        if row["waiting"]
+        else "running"
+        if last == "running"
+        else "queued"
+        if last is None
+        else _ASK_STATUS.get(last, "failed")
+    )
+    return HeadlessRun(
+        session_id=row["session_id"],
+        origin=row["origin"],
+        routine_run_id=None,
+        routine=None,
+        scope=None,
+        trigger=None,
+        status=status,
+        started_at=row["created_at"],
+        ended_at=row["last_end"] if status in ("succeeded", "failed", "cancelled") else None,
+        reason=row["last_error"] if status == "failed" else None,
+        summary=row["last_summary"],
+        watch_path=None,
+    )
 
 
 def _record(row: sqlite3.Row) -> RoutineRunRecord:
@@ -189,3 +272,17 @@ class RoutineRuns:
             (routine, scope, limit),
         )
         return [_record(row) for row in rows]
+
+    async def headless(self, limit: int, session_id: str | None = None) -> list[HeadlessRun]:
+        """The headless sessions, newest start first, each with its firing if it has one.
+
+        A routine firing that never got a session (a skipped one) is not a row.
+        """
+        where = " AND s.session_id = ?" if session_id is not None else ""
+        params: tuple[object, ...] = (session_id, limit) if session_id is not None else (limit,)
+        rows = await self._database.fetch_all(
+            f"{_HEADLESS}{where} ORDER BY COALESCE(r.started_at, s.created_at) DESC,"
+            " s.session_id DESC LIMIT ?",
+            params,
+        )
+        return [_headless(row) for row in rows]

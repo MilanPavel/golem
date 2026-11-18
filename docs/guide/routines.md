@@ -51,6 +51,23 @@ Drop a PDF in `~/Downloads` and one session starts for it.
 
 Open **Routines** in the sidebar. **+ New routine** opens a form, and **Edit** on a routine opens the same form. Under **When**, pick Every day, Weekdays, Weekly, Every N hours or Cron, and the page shows the next three times, which the daemon works out, so a wrong cron line is clear before you save. **What** is the prompt, with a **/ Skill** picker. **Where and with what** is the folder, the model and the MCP servers. Save writes the `[[routine]]` table into your `config.toml`. A project's routine is shown but not edited here; use **Open config**.
 
+## Runs
+
+Open **Runs** in the sidebar rail for one list of what golem did by itself: every routine firing and every `golem ask --detach`, newest first. The panel shows the groups in one line a run, and **Open Runs** (`/runs`) shows them as rows.
+
+| Group | What is in it |
+|---|---|
+| **Needs you** | Runs that wait for an answer, such as a tool that asks for approval. The row says what it asks |
+| **Running** | Runs that are queued or running |
+| **Today** | Everything else that started today, in your local time |
+| **Earlier** | The rest |
+
+A row has a status dot, the routine's name (`golem ask` for a detached ask), what started it (`by schedule`, `by you`, `by new file receipt-0412.pdf`, or `from the CLI`), when it started, how long it took, and one line: the reply, the reason it failed, or the question. Click a row to open its session. A firing that was skipped never got a session, so it is in the routine's History and not in Runs.
+
+A routine's session has a **banner** under its top bar: `Routine morning-brief · started 08:30 by schedule · 1 approval waiting`, with **Routine settings** and **All runs**. The approval itself is in the dock at the foot of the session, where you answer it.
+
+The page reads the list with `run.list`, and refreshes it when a routine fires or ends and when a routine's session starts or stops waiting.
+
 ## From a shell
 
 | Command | What it does |

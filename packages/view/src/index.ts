@@ -24,6 +24,25 @@ export {
   type RoutineWhen,
   type WhenKind,
 } from "./routines.ts";
+export {
+  approvalsWords,
+  ASK_NAME,
+  needsYouCount,
+  runBannerText,
+  runDuration,
+  runGroupHeading,
+  runGroups,
+  runName,
+  runNeedsYou,
+  runResultLine,
+  runRowLine,
+  runStartedText,
+  runStepsWords,
+  runTriggerWords,
+  type RunGroup,
+  type RunGroupLabel,
+  type RunLike,
+} from "./runs.ts";
 export { groupByTime, type TimeGroup, type TimeGroupLabel } from "./time-groups.ts";
 export { CONSENT_LABELS, CONSENT_TITLE, consentAnswers, consentCapsLine, consentLine, consentReason } from "./consent.ts";
 export { approvalQuestion, DETAILS, displayToolName, isDetail, stepCount, stepFailed, stepMark, summarizeSteps, writingLabel, type Detail, type StepMark } from "./activity.ts";

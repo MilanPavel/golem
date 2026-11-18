@@ -2008,6 +2008,67 @@ class RoutineFinished(BaseModel):
     summary: str | None = None
 
 
+RunKind = Literal["routine", "ask"]
+"""What a Runs row is. ``workflow`` joins with 3.9. A client never infers it from an id."""
+
+
+class RunInfo(BaseModel):
+    """One row of the Runs list: a headless session and how its run is going (ADR-050).
+
+    One row for each session whose origin is not ``user``. ``kind`` is ``routine`` for a
+    routine's firing and ``ask`` for ``golem ask --detach``. ``routine`` is the routine's
+    name, null for ``ask``. ``folder`` is the project folder of a project routine, null for a
+    user routine, so ``routine.get(routine, folder)`` finds it. ``routine_run_id`` and
+    ``trigger`` are null for ``ask``. ``status`` is read as ``RoutineRunSummary.status`` is:
+    ``waiting`` is a session that waits for an answer, and an ``ask`` that is not open reads
+    ``succeeded``, ``failed`` or ``cancelled`` from its last agent run. ``summary`` is one line:
+    the question while ``waiting`` (``Allow <tool>``, with the subject), the last reply once
+    finished. ``reason`` says why a firing failed or was skipped. ``approvals`` counts the
+    approvals the session waits for. ``watch_path`` is the file a ``watch`` firing is for.
+    ``steps`` is the number of steps of a workflow run, null for the other kinds. The times
+    are ISO 8601 with an offset.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    session_id: str = Field(min_length=1)
+    kind: RunKind
+    origin: str = Field(min_length=1)
+    routine: str | None = Field(default=None, min_length=1)
+    folder: str | None = Field(default=None, min_length=1)
+    routine_run_id: str | None = Field(default=None, min_length=1)
+    trigger: RoutineTrigger | None = None
+    status: RoutineRunStatus
+    started_at: str | None = None
+    ended_at: str | None = None
+    summary: str | None = None
+    reason: str | None = None
+    approvals: int = Field(default=0, ge=0)
+    watch_path: str | None = None
+    steps: int | None = Field(default=None, ge=0)
+
+
+class RunListParams(BaseModel):
+    """``run.list``. The newest runs, one for each headless session.
+
+    ``limit`` is at most 500. ``session_id`` asks for that one session's row only (the banner
+    of a routine's session), and it returns no row for a session that is not headless.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    limit: int = Field(default=100, ge=1, le=500)
+    session_id: str | None = Field(default=None, min_length=1)
+
+
+class RunListResult(BaseModel):
+    """The runs, newest first by start. A firing that was skipped has no session and no row."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    runs: list[RunInfo]
+
+
 class RoutineUpdateParams(BaseModel):
     """``routine.update``. Change keys of a user routine, or create it with ``create``.
 

@@ -1,5 +1,5 @@
 import { afterEach, expect, test, vi } from "vitest";
-import { createRouter, inspectPath, parseRoute, routineNewPath, routinePath, sessionPath, settingsPath, tracePath, welcomePath } from "./router.ts";
+import { createRouter, inspectPath, parseRoute, routineNewPath, routinePath, runsPath, sessionPath, settingsPath, tracePath, welcomePath } from "./router.ts";
 
 afterEach(() => {
   history.replaceState(null, "", "/");
@@ -51,9 +51,14 @@ test("parseRoute reads the routines page and one routine", () => {
   expect(parseRoute("/routines")).toEqual({ name: "routines" });
   expect(parseRoute("/routines/morning-brief")).toEqual({ name: "routine", routine: "morning-brief", folder: null });
   expect(parseRoute("/routines/morning-brief", "?folder=%2FUsers%2Fme%2Fgolem")).toEqual({ name: "routine", routine: "morning-brief", folder: "/Users/me/golem" });
-  for (const bad of ["/routines/", "/routines/a/b", "/routines/a%2Fb", "/routinesx", "/runs"]) {
+  for (const bad of ["/routines/", "/routines/a/b", "/routines/a%2Fb", "/routinesx", "/runs/", "/runs/a", "/runsx"]) {
     expect(parseRoute(bad)).toEqual({ name: "not-found" });
   }
+});
+
+test("parseRoute reads the Runs page", () => {
+  expect(parseRoute("/runs")).toEqual({ name: "runs" });
+  expect(parseRoute(runsPath())).toEqual({ name: "runs" });
 });
 
 test("routinePath round-trips through parseRoute", () => {

@@ -8,6 +8,7 @@ export type Route =
   | { name: "routines" }
   | { name: "routine-new"; starter: string | null }
   | { name: "routine"; routine: string; folder: string | null }
+  | { name: "runs" }
   | { name: "welcome"; step: WelcomeStep; from: "send" | null }
   | { name: "not-found" };
 
@@ -35,6 +36,7 @@ export type Router = StoreSource<Route> & {
  * `/routines` is the routines page with none picked, `/routines/:routine` one routine (name decoded, no further `/`),
  * and `?folder=` in `search` names the project of a project routine. `/routines?new` is the form for a new routine,
  * and `?new=<starter>` fills it from a starter.
+ * `/runs` is the Runs page: what needs you, what is running, and what ran.
  * `/welcome` is first run: `?step=engine|model|tools|ready` (engine when missing or unknown) and `?from=send`.
  * On `/s/:id`, `?inspect` opens the inspector panel and `?inspect=<span>` opens it at that span.
  */
@@ -54,6 +56,9 @@ export function parseRoute(pathname: string, search = ""): Route {
   if (pathname === "/routines") {
     const make = new URLSearchParams(search).get("new");
     return make === null ? { name: "routines" } : { name: "routine-new", starter: make === "" ? null : make };
+  }
+  if (pathname === "/runs") {
+    return { name: "runs" };
   }
   const routine = /^\/routines\/([^/]+)$/.exec(pathname)?.[1];
   if (routine !== undefined) {
@@ -118,6 +123,11 @@ export function routinePath(name?: string, folder?: string | null): string {
   if (name === undefined) return "/routines";
   const base = `/routines/${encodeURIComponent(name)}`;
   return folder === undefined || folder === null ? base : `${base}?folder=${encodeURIComponent(folder)}`;
+}
+
+/** The path of the Runs page. */
+export function runsPath(): string {
+  return "/runs";
 }
 
 /** The path of the form for a new routine, filled from `starter` when given. */

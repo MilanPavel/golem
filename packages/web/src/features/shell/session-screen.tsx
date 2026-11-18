@@ -19,6 +19,7 @@ import { closeModelDialog, ModelDialog, useModelDialogOpen } from "../models/ind
 import { folderName, useSessionActions } from "../sessions/index.ts";
 import { useRememberSettingsContext } from "../settings/index.ts";
 import { MenuBar, MenuButton } from "../sidebar/index.ts";
+import { LiveRunBanner } from "../runs/index.ts";
 import { ModelChip } from "./model-chip.tsx";
 import { SessionTitle } from "./session-title.tsx";
 
@@ -286,6 +287,7 @@ export function SessionFrame({ id, children }: { id: string; children: ReactNode
           ) : null}
           <DrawerToggle ref={toggle} open={drawerOpen} todos={todos} onToggle={() => setDrawerOpen(!drawerOpen)} />
         </TopBar>
+        <LiveRunBanner sessionId={id} />
         {children}
       </div>
       {inspect === null ? null : (

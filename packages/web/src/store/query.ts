@@ -47,6 +47,8 @@ export function keepQueriesHonest(client: QueryWiringClient, queryClient: QueryC
     client.onRoutinesChanged(() => {
       stale("routine.list");
       stale("routine.get");
+      // A firing starts or ends a run.
+      stale("run.list");
     }),
     client.onMcpStatus(() => {
       stale("mcp.list");
@@ -75,6 +77,8 @@ export function keepQueriesHonest(client: QueryWiringClient, queryClient: QueryC
     }),
     client.onSessionSummary((summary) => {
       stale("session.inspect", summary.session_id);
+      // A headless session that starts waiting or finishes changes its row. A chat of yours is not a run.
+      if (summary.origin !== undefined && summary.origin !== "user") stale("run.list");
     }),
     client.onState((state) => {
       if (state.status !== "connected") {

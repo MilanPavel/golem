@@ -71,6 +71,8 @@ import { NO_OLLAMA_LISTING, OLLAMA_DOWN_LISTING, SAMPLE_LISTING, SAMPLE_PULLS, T
 import { CloseSessionDialog, RenameField } from "../features/sessions/index.ts";
 import { RoutineDetail, RoutinesEmpty, RoutinesPanel } from "../features/routines/index.ts";
 import { SAMPLE_LIST, SAMPLE_MORNING_BRIEF, ROUTINES_NOW, SAMPLE_RUNS } from "../features/routines/sample.ts";
+import { RunBanner, RunsList, RunsPanel } from "../features/runs/index.ts";
+import { RUNS_NOW, SAMPLE_RUN_LIST, SAMPLE_WAITING_RUN } from "../features/runs/sample.ts";
 import { Rail, SessionsPanel, SidebarPanel, WaitingChip } from "../features/sidebar/index.ts";
 import { ConnectionStrip } from "../features/connection/index.ts";
 import { InboxPanel } from "../features/inbox/index.ts";
@@ -1526,6 +1528,35 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
         </div>
         <div className="mt-4 rounded-lg border border-line bg-bg p-5" role="region" aria-label={`Routines, nothing set up, ${theme}`}>
           <RoutinesEmpty onNavigate={() => {}} />
+        </div>
+      </section>
+
+      <section className="mt-6" id={anchor("Runs")}>
+        <h3 className="mb-2 font-mono text-xs text-faint">Runs</h3>
+        <div className="flex flex-wrap gap-4">
+          <div className="h-96 w-67 overflow-hidden rounded-lg border border-line">
+            <SidebarPanel title="Runs" label={`Runs, ${theme}`} onHide={() => {}}>
+              <RunsPanel runs={SAMPLE_RUN_LIST} selected="s_wait" now={RUNS_NOW} onNavigate={() => {}} />
+            </SidebarPanel>
+          </div>
+          <div className="h-96 w-67 overflow-hidden rounded-lg border border-line">
+            <SidebarPanel title="Runs" label={`Runs, empty, ${theme}`} onHide={() => {}}>
+              <RunsPanel runs={[]} selected={null} now={RUNS_NOW} onNavigate={() => {}} />
+            </SidebarPanel>
+          </div>
+        </div>
+        <div className="mt-4 rounded-lg border border-line bg-bg p-5" role="region" aria-label={`Runs list, ${theme}`}>
+          <RunsList runs={SAMPLE_RUN_LIST} now={RUNS_NOW} onNavigate={() => {}} />
+        </div>
+        <div className="mt-4 flex flex-col gap-3 overflow-hidden rounded-lg border border-line bg-bg" role="region" aria-label={`Routine banners, ${theme}`}>
+          <RunBanner run={SAMPLE_WAITING_RUN} label="Routine run, schedule" now={RUNS_NOW} onNavigate={() => {}} />
+          <RunBanner run={{ ...SAMPLE_WAITING_RUN, status: "running", approvals: 0, trigger: "manual" }} label="Routine run, manual" now={RUNS_NOW} onNavigate={() => {}} />
+          <RunBanner
+            run={{ ...SAMPLE_WAITING_RUN, routine: "receipts", status: "succeeded", approvals: 0, trigger: "watch", watch_path: "/Users/you/Downloads/receipt-0412.pdf" }}
+            label="Routine run, file"
+            now={RUNS_NOW}
+            onNavigate={() => {}}
+          />
         </div>
       </section>
 

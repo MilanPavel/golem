@@ -14,6 +14,7 @@ import { ROUTING_KEY } from "./routing.ts";
 import { MODEL_LIST_ALL_KEY, MODEL_LIST_KEY, SETUP_STATUS_KEY, type ModelListResult } from "./models.ts";
 import { SKILL_LIST_KEY } from "./skills.ts";
 import { ROUTINE_GET_KEY, ROUTINE_LIST_KEY, type RoutineGetResult, type RoutineInfo, type RoutineListResult, type RoutineRunResult } from "./routines.ts";
+import { type RunListResult } from "./runs.ts";
 import { createPulls, type Pulls } from "./pulls.ts";
 import { createQueryClient, keepQueriesHonest } from "./query.ts";
 import { createRouter, type Router } from "./router.ts";
@@ -33,6 +34,7 @@ export type PageClient = Pick<
   | "onSkillsChanged"
   | "onRoutinesChanged"
   | "listRoutines"
+  | "listRuns"
   | "getRoutine"
   | "runRoutine"
   | "removeRoutine"
@@ -328,6 +330,8 @@ export type PageQueries = {
   skillList(cwd: string | null): Promise<SkillListResult>;
   /** The routines, with each one's next and last run. */
   routineList(): Promise<RoutineListResult>;
+  /** The runs, one per headless session, newest first. With `sessionId`, that session's row alone. */
+  runList(sessionId: string | null): Promise<RunListResult>;
   /** One routine and its recent runs, newest first. `folder` is a project routine's project, null a user routine. */
   routineGet(name: string, folder: string | null): Promise<RoutineGetResult>;
   /** The tool rules in check order, and what the session allows. `null` is no folder or no session. */
@@ -445,6 +449,7 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
       }),
       skillList: (cwd) => (cwd === null ? client.listSkills() : client.listSkills(cwd)),
       routineList: () => client.listRoutines(),
+      runList: (sessionId) => (sessionId === null ? client.listRuns() : client.listRuns({ sessionId })),
       routineGet: (name, folder) => (folder === null ? client.getRoutine(name) : client.getRoutine(name, folder)),
       config: (cwd, sessionId) => client.getConfig(cwd ?? undefined, sessionId ?? undefined),
       mcpList: (sessionId) => client.listMcp(sessionId ?? undefined),

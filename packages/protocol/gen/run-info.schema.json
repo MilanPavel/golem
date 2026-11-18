@@ -1,0 +1,181 @@
+{
+  "additionalProperties": false,
+  "description": "One row of the Runs list: a headless session and how its run is going (ADR-050).\n\nOne row for each session whose origin is not ``user``. ``kind`` is ``routine`` for a\nroutine's firing and ``ask`` for ``golem ask --detach``. ``routine`` is the routine's\nname, null for ``ask``. ``folder`` is the project folder of a project routine, null for a\nuser routine, so ``routine.get(routine, folder)`` finds it. ``routine_run_id`` and\n``trigger`` are null for ``ask``. ``status`` is read as ``RoutineRunSummary.status`` is:\n``waiting`` is a session that waits for an answer, and an ``ask`` that is not open reads\n``succeeded``, ``failed`` or ``cancelled`` from its last agent run. ``summary`` is one line:\nthe question while ``waiting`` (``Allow <tool>``, with the subject), the last reply once\nfinished. ``reason`` says why a firing failed or was skipped. ``approvals`` counts the\napprovals the session waits for. ``watch_path`` is the file a ``watch`` firing is for.\n``steps`` is the number of steps of a workflow run, null for the other kinds. The times\nare ISO 8601 with an offset.",
+  "properties": {
+    "approvals": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Approvals",
+      "type": "integer"
+    },
+    "ended_at": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Ended At"
+    },
+    "folder": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Folder"
+    },
+    "kind": {
+      "enum": [
+        "routine",
+        "ask"
+      ],
+      "title": "Kind",
+      "type": "string"
+    },
+    "origin": {
+      "minLength": 1,
+      "title": "Origin",
+      "type": "string"
+    },
+    "reason": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Reason"
+    },
+    "routine": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Routine"
+    },
+    "routine_run_id": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Routine Run Id"
+    },
+    "session_id": {
+      "minLength": 1,
+      "title": "Session Id",
+      "type": "string"
+    },
+    "started_at": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Started At"
+    },
+    "status": {
+      "enum": [
+        "queued",
+        "running",
+        "waiting",
+        "succeeded",
+        "failed",
+        "skipped",
+        "cancelled"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "steps": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Steps"
+    },
+    "summary": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Summary"
+    },
+    "trigger": {
+      "anyOf": [
+        {
+          "enum": [
+            "schedule",
+            "watch",
+            "manual",
+            "hook"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Trigger"
+    },
+    "watch_path": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Watch Path"
+    }
+  },
+  "required": [
+    "session_id",
+    "kind",
+    "origin",
+    "status"
+  ],
+  "title": "RunInfo",
+  "type": "object"
+}

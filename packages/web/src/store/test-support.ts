@@ -99,6 +99,7 @@ export function fakeClient() {
     onSkillsChanged: skills.on,
     onRoutinesChanged: routines.on,
     listRoutines: vi.fn<PageClient["listRoutines"]>(async () => ({ routines: [] })),
+    listRuns: vi.fn<PageClient["listRuns"]>(async () => ({ runs: [] })),
     getRoutine: vi.fn<PageClient["getRoutine"]>(async (name) => ({ routine: { config: { name, prompt: "" }, path: "/Users/me/.golem/config.toml", source: "user" }, runs: [] })),
     runRoutine: vi.fn<PageClient["runRoutine"]>(async () => ({ routine_run_id: "rr_1", session_id: "s_run" })),
     removeRoutine: vi.fn<PageClient["removeRoutine"]>(async (name) => ({ name })),

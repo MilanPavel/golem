@@ -37,8 +37,9 @@ from golem.routine_files import (
 from golem.routine_scheduler import RoutineBlockedError, RoutineBusyError, RoutineNotFoundError
 from golem.routines import ScheduleError, next_after, parse_schedule
 from golem.server.dispatcher import INTERNAL_ERROR, INVALID_PARAMS, RequestContext, RpcCallError
-from golem.store.routine_runs import RoutineRunRecord
+from golem.store.routine_runs import HeadlessRun, RoutineRunRecord
 from golem_protocol.commands import (
+    PendingItem,
     RoutineChanged,
     RoutineConfig,
     RoutineGetParams,
@@ -57,6 +58,9 @@ from golem_protocol.commands import (
     RoutineSource,
     RoutineUpdateParams,
     RoutineUpdateResult,
+    RunInfo,
+    RunListParams,
+    RunListResult,
 )
 from golem_protocol.rpc import RoutineChangedNotification
 
@@ -194,6 +198,56 @@ async def routine_remove(ctx: RequestContext, params: RoutineRemoveParams) -> Ro
     if ctx.state.watcher is not None:
         ctx.state.watcher.reload()
     return RoutineRemoveResult(name=params.name)
+
+
+async def run_list(ctx: RequestContext, params: RunListParams) -> RunListResult:
+    """The headless sessions as Runs rows: a routine's firing joins its session's state."""
+    runs = ctx.state.routine_runs
+    sessions = ctx.state.sessions
+    if runs is None or sessions is None:
+        return RunListResult(runs=[])
+    shown: list[RunInfo] = []
+    for row in await runs.headless(params.limit, params.session_id):
+        pending = await sessions.pending_of(row.session_id) if row.status == "waiting" else None
+        shown.append(run_info(row, pending))
+    return RunListResult(runs=shown)
+
+
+def _question(pending: PendingItem) -> str:
+    """One line for what a waiting session asks: ``Allow <tool>``, with the subject."""
+    if pending.kind == "consent":
+        return "Asks to use a paid model"
+    name = pending.name or "a tool"
+    subject = " ".join((pending.subject or "").split())
+    return f"Allow {name}: {subject}" if subject else f"Allow {name}"
+
+
+def run_info(row: HeadlessRun, pending: PendingItem | None) -> RunInfo:
+    waiting = row.status == "waiting"
+    summary = row.summary
+    if waiting and pending is not None:
+        summary = _question(pending)
+    elif waiting:
+        summary = None
+    folder = None if row.scope in (None, "user") else row.scope
+    return RunInfo.model_validate(
+        {
+            "session_id": row.session_id,
+            "kind": "routine" if row.routine_run_id is not None else "ask",
+            "origin": row.origin,
+            "routine": row.routine,
+            "folder": folder,
+            "routine_run_id": row.routine_run_id,
+            "trigger": row.trigger,
+            "status": row.status,
+            "started_at": row.started_at,
+            "ended_at": row.ended_at,
+            "summary": summary,
+            "reason": row.reason,
+            "approvals": 1 if waiting and pending is not None else 0,
+            "watch_path": row.watch_path,
+        }
+    )
 
 
 async def _rows(ctx: RequestContext, info: RoutineInfo, limit: int) -> list[RoutineRunRecord]:

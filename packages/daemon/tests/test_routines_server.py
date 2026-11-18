@@ -244,3 +244,58 @@ async def test_run_fires_a_headless_session_and_get_lists_the_firing(short_home:
     finally:
         await client.close()
         await stop_daemon(app, task)
+
+
+async def _wait_for_status(client: RpcClient, session_id: object, status: str) -> Rows:
+    async with asyncio.timeout(5):
+        while True:
+            got = rpc_result(await client.call("run.list", {"session_id": session_id}))
+            runs = cast(Rows, got["runs"])
+            if runs and runs[0]["status"] == status:
+                return runs
+            await asyncio.sleep(0.02)
+
+
+async def test_run_list_has_a_row_for_a_routine_and_one_for_a_detached_ask(
+    short_home: Path,
+) -> None:
+    (short_home / "config.toml").write_text(
+        BRIEF.replace('folder = "~/work"\n', "").replace("/brief", "Brief me."), "utf-8"
+    )
+    router = ModelRouter(model=ToolCallingChatModel(replies=["Three PRs need you.", "Done."]))
+    app, task = await start_daemon(short_home, router=router)
+    client = await RpcClient.connect(app.paths.socket_path)
+    try:
+        await client.call("hello", HELLO)
+        assert rpc_result(await client.call("run.list", {})) == {"runs": []}
+        # A chat the user started is not a run.
+        rpc_result(await client.call("session.create", {}))
+        assert rpc_result(await client.call("run.list", {})) == {"runs": []}
+
+        fired = rpc_result(await client.call("routine.run", {"name": "morning-brief"}))
+        (brief,) = await _wait_for_status(client, fired["session_id"], "succeeded")
+        assert (brief["kind"], brief["routine"], brief["folder"]) == (
+            "routine",
+            "morning-brief",
+            None,
+        )
+        assert (brief["trigger"], brief["routine_run_id"]) == ("manual", fired["routine_run_id"])
+        assert (brief["origin"], brief["approvals"]) == ("routine:morning-brief", 0)
+        assert brief["summary"] == "Three PRs need you."
+        assert brief["started_at"] is not None and brief["ended_at"] is not None
+
+        ask = rpc_result(await client.call("session.create", {"origin": "cli"}))
+        await client.call("message.send", {"session_id": ask["session_id"], "text": "hi"})
+        (detached,) = await _wait_for_status(client, ask["session_id"], "succeeded")
+        assert (detached["kind"], detached["routine"], detached["trigger"]) == ("ask", None, None)
+        assert (detached["origin"], detached["summary"]) == ("cli", "Done.")
+
+        both = cast(Rows, rpc_result(await client.call("run.list", {}))["runs"])
+        assert [r["session_id"] for r in both] == [ask["session_id"], fired["session_id"]]
+        one = cast(Rows, rpc_result(await client.call("run.list", {"limit": 1}))["runs"])
+        assert len(one) == 1
+        for bad in ({"limit": 0}, {"limit": 501}, {"session_id": ""}):
+            assert error_code(await client.call("run.list", bad)) == INVALID_PARAMS
+    finally:
+        await client.close()
+        await stop_daemon(app, task)

@@ -18,6 +18,7 @@ import type { Route } from "./router.ts";
 import type { AuthListResult, FileListResult, CostGetResult, NotificationsValues, RoutingGetResult, McpListResult, SessionSummary, SetupStatusResult, SkillListResult } from "@golem/client";
 import { ARTIFACT_PAGE, artifactKey, traceKey, traceSpanKey, type ArtifactReadResult, type TraceGetResult, type TraceSpanResult } from "./trace.ts";
 import { ROUTINE_LIST_KEY, routineGetKey, type RoutineGetResult, type RoutineListResult } from "./routines.ts";
+import { RUN_LIST_KEY, sessionRunKey, type RunInfo, type RunListResult } from "./runs.ts";
 import { mcpCatalogKey, mcpListKey, mcpToolsKey, type McpCatalogResult, type McpToolsResult } from "./mcp.ts";
 import { turnCards, type NotesState, type Pastes, type ReviewNote, type ShellTracking, type TurnCard } from "@golem/view";
 import { distinctFolders, resolveFolder } from "./new-session.ts";
@@ -448,4 +449,18 @@ export function useRoutineList(): UseQueryResult<RoutineListResult> {
 export function useRoutine(name: string, folder: string | null): UseQueryResult<RoutineGetResult> {
   const { queries } = usePage();
   return useQuery({ queryKey: routineGetKey(name, folder), queryFn: () => queries.routineGet(name, folder), retry: false });
+}
+
+/** The runs, one per headless session, newest first. Marked stale when a routine fires or ends and when a headless session changes. */
+export function useRunList(): UseQueryResult<RunListResult> {
+  const { queries } = usePage();
+  return useQuery({ queryKey: [...RUN_LIST_KEY], queryFn: () => queries.runList(null), retry: false });
+}
+
+/** The run row of one session: null when the session is not headless (or the daemon cannot say), undefined while it loads. */
+export function useSessionRun(sessionId: string): RunInfo | null | undefined {
+  const { queries } = usePage();
+  const query = useQuery({ queryKey: sessionRunKey(sessionId), queryFn: () => queries.runList(sessionId), retry: false });
+  if (query.data === undefined) return query.isError ? null : undefined;
+  return query.data.runs[0] ?? null;
 }

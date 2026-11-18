@@ -22,7 +22,3 @@ function InProgress({ title, line }: { title: string; line: string }) {
 export const WorkflowsInProgress = () => (
   <InProgress title="Workflows" line="A workflow will chain steps that run one after another, each with its own model and tools." />
 );
-
-export const RunsInProgress = () => (
-  <InProgress title="Runs" line="Runs will list what routines and workflows did, with the outcome of each." />
-);

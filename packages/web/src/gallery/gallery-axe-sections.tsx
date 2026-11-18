@@ -15,6 +15,7 @@ export const GALLERY_SECTIONS = [
   "connection-screens",
   "sessions-panel",
   "routines",
+  "runs",
   "rail",
   "sessions-flyout",
   "inbox-panel",
