@@ -25,6 +25,7 @@ from golem.routine_scheduler import (
     RoutineScheduler,
 )
 from golem.server.routine_launch import SessionLauncher, folder_of, skill_of
+from golem.server.routines import run_info
 from golem.sessions.bus import EventBus
 from golem.sessions.log import SessionLog
 from golem.sessions.manager import SessionManager
@@ -569,4 +570,29 @@ async def test_a_watch_firing_sends_the_path_and_may_read_the_watched_folder(
     assert f"Summarize {receipt}" in str(first.content)
     state = await live.runtime.values(row.session_id)
     assert state.get("skill_folders") == [str(inbox)]
+    await live.scheduler.aclose()
+
+
+async def test_a_waiting_firing_is_a_run_that_asks_its_question(
+    database: Database, tmp_path: Path
+) -> None:
+    live = Live(database, tmp_path, [[("ask_tool", {})], "all done"])
+    _write(tmp_path, _routine("brief", "daily 09:30"))
+    await live.scheduler.tick()
+    live.clock.to(9, 30)
+    await live.scheduler.tick()
+    (row,) = await live.runs.recent("brief", "user")
+
+    async def waiting() -> bool:
+        got = await live.runs.get(row.routine_run_id)
+        return got is not None and got.status == "waiting"
+
+    await live.until(waiting)
+    (headless,) = await live.runs.headless(10)
+    assert (headless.status, headless.routine, headless.trigger) == ("waiting", "brief", "schedule")
+    assert headless.session_id == row.session_id
+    info = run_info(headless, await live.manager.pending_of(headless.session_id))
+    assert (info.status, info.approvals, info.ended_at) == ("waiting", 1, None)
+    assert info.summary == "Allow ask_tool"
+    assert await live.manager.pending_of("s_missing") is None
     await live.scheduler.aclose()

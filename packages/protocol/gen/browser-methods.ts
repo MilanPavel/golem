@@ -67,6 +67,7 @@ export const BROWSER_METHODS: ReadonlySet<string> = new Set([
   "routing.get",
   "routing.set",
   "run.cancel",
+  "run.list",
   "runtime.install",
   "runtime.install_cancel",
   "session.attach",

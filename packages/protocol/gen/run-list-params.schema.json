@@ -1,0 +1,28 @@
+{
+  "additionalProperties": false,
+  "description": "``run.list``. The newest runs, one for each headless session.\n\n``limit`` is at most 500. ``session_id`` asks for that one session's row only (the banner\nof a routine's session), and it returns no row for a session that is not headless.",
+  "properties": {
+    "limit": {
+      "default": 100,
+      "maximum": 500,
+      "minimum": 1,
+      "title": "Limit",
+      "type": "integer"
+    },
+    "session_id": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Session Id"
+    }
+  },
+  "title": "RunListParams",
+  "type": "object"
+}

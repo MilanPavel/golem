@@ -41,6 +41,7 @@ import type { RoutineInfo, RoutineListResult } from "../../protocol/gen/routine-
 import type { RoutinePreviewResult } from "../../protocol/gen/routine-preview-result.ts";
 import type { RoutineRemoveResult } from "../../protocol/gen/routine-remove-result.ts";
 import type { RoutineRunResult } from "../../protocol/gen/routine-run-result.ts";
+import type { RunListResult } from "../../protocol/gen/run-list-result.ts";
 import type { SkillCreateResult } from "../../protocol/gen/skill-create-result.ts";
 import type { SkillReadResult } from "../../protocol/gen/skill-read-result.ts";
 import type { RoutineUpdateResult } from "../../protocol/gen/routine-update-result.ts";
@@ -238,6 +239,26 @@ function isRoutineRun(value: unknown): boolean {
 
 export function isRoutineListResult(value: unknown): value is RoutineListResult {
   return isRecord(value) && Array.isArray(value["routines"]) && value["routines"].every(isRoutineInfo);
+}
+
+const RUN_KINDS = ["routine", "ask"];
+const RUN_STATUSES = ["queued", "running", "waiting", "succeeded", "failed", "skipped", "cancelled"];
+
+function isRunInfo(value: unknown): boolean {
+  return (
+    isRecord(value) &&
+    typeof value["session_id"] === "string" &&
+    typeof value["origin"] === "string" &&
+    typeof value["kind"] === "string" &&
+    RUN_KINDS.includes(value["kind"]) &&
+    typeof value["status"] === "string" &&
+    RUN_STATUSES.includes(value["status"]) &&
+    (value["approvals"] === undefined || typeof value["approvals"] === "number")
+  );
+}
+
+export function isRunListResult(value: unknown): value is RunListResult {
+  return isRecord(value) && Array.isArray(value["runs"]) && value["runs"].every(isRunInfo);
 }
 
 export function isRoutineGetResult(value: unknown): value is RoutineGetResult {

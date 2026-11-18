@@ -1383,6 +1383,32 @@ test("routine.list, get, run and update send their params", async () => {
   }
 });
 
+test("run.list sends its params and refuses a result that is not runs", async () => {
+  const sent: Record<string, unknown>[] = [];
+  const row = { session_id: "s1", kind: "routine", origin: "routine:brief", status: "waiting", approvals: 1 };
+  const results: Record<string, unknown> = { "run.list": { runs: [row] } };
+  const server = await listen((socket) => {
+    attach(socket, {
+      answerPing: true,
+      results,
+      onRequest: (_socket, method, params) => {
+        if (method === "run.list") sent.push({ ...params });
+      },
+    });
+  });
+  const client = connectGolem({ socketPath: server.socketPath, clientName: "tui", reconnect: false, heartbeatMs: 60_000 });
+  try {
+    assert.deepEqual((await client.listRuns()).runs, [row]);
+    await client.listRuns({ limit: 20, sessionId: "s1" });
+    assert.deepEqual(sent, [{}, { limit: 20, session_id: "s1" }]);
+    results["run.list"] = { runs: [{ ...row, status: "paused" }] };
+    await assert.rejects(client.listRuns(), /invalid run.list result/);
+  } finally {
+    client.close();
+    await server.close();
+  }
+});
+
 test("skill.list reads the skills, and skill.registry.changed reaches onSkillsChanged", async () => {
   const ship = { name: "ship", description: "Ship it.", source: "project", path: "/repo/.agents/skills/ship", usable: true };
   const sent: Record<string, unknown>[] = [];

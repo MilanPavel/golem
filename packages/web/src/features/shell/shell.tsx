@@ -3,6 +3,7 @@ import { useNavigate, useRoute } from "../../store/page-context.tsx";
 import { PaletteHost } from "../palette/index.ts";
 import { MenuBar, SidebarShell } from "../sidebar/index.ts";
 import { RoutineNewScreen, RoutineScreen, RoutinesScreen } from "../routines/index.ts";
+import { RunsScreen } from "../runs/index.ts";
 import { SettingsScreen } from "../settings/index.ts";
 import { TraceScreen } from "../trace/index.ts";
 import { SetupAtStart, WelcomeScreen } from "../welcome/index.ts";
@@ -47,6 +48,8 @@ function Content() {
       return <RoutineNewScreen starter={route.starter} />;
     case "routine":
       return <RoutineScreen name={route.routine} folder={route.folder} />;
+    case "runs":
+      return <RunsScreen />;
     case "welcome":
       return <WelcomeScreen step={route.step} from={route.from} />;
     case "not-found":

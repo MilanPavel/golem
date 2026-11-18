@@ -96,6 +96,7 @@ from golem.server.routines import (
     routine_remove,
     routine_run,
     routine_update,
+    run_list,
 )
 from golem.server.routing_edit import routing_get, routing_set
 from golem.server.skills_edit import (
@@ -263,6 +264,7 @@ from golem_protocol.commands import (
     RoutingSetParams,
     RunCancelParams,
     RunCancelResult,
+    RunListParams,
     RuntimeInstallCancelParams,
     RuntimeInstallParams,
     SessionAttachParams,
@@ -1914,6 +1916,7 @@ def standard_methods() -> dict[str, Method]:
         "routine.remove": Method("routine.remove", RoutineRemoveParams, True, routine_remove),
         "routine.run": Method("routine.run", RoutineRunParams, True, routine_run),
         "routine.preview": Method("routine.preview", RoutinePreviewParams, True, routine_preview),
+        "run.list": Method("run.list", RunListParams, True, run_list),
         "session.set_skills": Method(
             "session.set_skills", SessionSetSkillsParams, True, _session_set_skills
         ),

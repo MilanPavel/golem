@@ -61,6 +61,7 @@ import type { RoutineListResult } from "../../protocol/gen/routine-list-result.t
 import type { RoutinePreviewResult } from "../../protocol/gen/routine-preview-result.ts";
 import type { RoutineRemoveResult } from "../../protocol/gen/routine-remove-result.ts";
 import type { RoutineRunResult } from "../../protocol/gen/routine-run-result.ts";
+import type { RunListResult } from "../../protocol/gen/run-list-result.ts";
 import type { SkillCall } from "../../protocol/gen/skill-call.ts";
 import type { SkillCreateResult } from "../../protocol/gen/skill-create-result.ts";
 import type { SkillListResult } from "../../protocol/gen/skill-list-result.ts";
@@ -196,6 +197,7 @@ import {
   isRoutinePreviewResult,
   isRoutineRemoveResult,
   isRoutineRunResult,
+  isRunListResult,
   isSkillCreateResult,
   isSkillListResult,
   isSkillReadResult,
@@ -567,6 +569,8 @@ export interface GolemClient {
   ): Promise<SkillWriteResult>;
   /** `routine.list`: the user's routines, and those of the trusted project `folders`, with the next and last run of each. Also the lines of the files that did not parse. */
   listRoutines(folders?: string[]): Promise<RoutineListResult>;
+  /** `run.list`: the newest runs, one per headless session (a routine's firing or a detached ask), newest first. `sessionId` asks for that session's row alone. */
+  listRuns(options?: { limit?: number; sessionId?: string }): Promise<RunListResult>;
   /** `routine.get`: one routine with its recent runs. `folder` is the project it is in, or none for the user's. */
   getRoutine(name: string, folder?: string): Promise<RoutineGetResult>;
   /** `routine.run`: fire a routine now. It returns the run and the session it started. */
@@ -2127,6 +2131,17 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       const result = await call("routine.list", folders === undefined ? {} : { folders });
       if (!isRoutineListResult(result)) {
         throw new Error("invalid routine.list result");
+      }
+      return result;
+    },
+    async listRuns(options?: { limit?: number; sessionId?: string }): Promise<RunListResult> {
+      await ready;
+      const params: Record<string, unknown> = {};
+      if (options?.limit !== undefined) params["limit"] = options.limit;
+      if (options?.sessionId !== undefined) params["session_id"] = options.sessionId;
+      const result = await call("run.list", params);
+      if (!isRunListResult(result)) {
+        throw new Error("invalid run.list result");
       }
       return result;
     },

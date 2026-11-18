@@ -13558,6 +13558,185 @@ public enum RunFailedEventType: String, Codable {
     case runFailed = "run.failed"
 }
 
+/// One row of the Runs list: a headless session and how its run is going (ADR-050).
+///
+/// One row for each session whose origin is not ``user``. ``kind`` is ``routine`` for a
+/// routine's firing and ``ask`` for ``golem ask --detach``. ``routine`` is the routine's
+/// name, null for ``ask``. ``folder`` is the project folder of a project routine, null for a
+/// user routine, so ``routine.get(routine, folder)`` finds it. ``routine_run_id`` and
+/// ``trigger`` are null for ``ask``. ``status`` is read as ``RoutineRunSummary.status`` is:
+/// ``waiting`` is a session that waits for an answer, and an ``ask`` that is not open reads
+/// ``succeeded``, ``failed`` or ``cancelled`` from its last agent run. ``summary`` is one
+/// line:
+/// the question while ``waiting`` (``Allow <tool>``, with the subject), the last reply once
+/// finished. ``reason`` says why a firing failed or was skipped. ``approvals`` counts the
+/// approvals the session waits for. ``watch_path`` is the file a ``watch`` firing is for.
+/// ``steps`` is the number of steps of a workflow run, null for the other kinds. The times
+/// are ISO 8601 with an offset.
+// MARK: - RunInfo
+public struct RunInfo: Codable {
+    public let approvals: Int?
+    public let endedAt: String?
+    public let folder: String?
+    public let kind: RunInfoKind
+    public let origin: String
+    public let reason: String?
+    public let routine: String?
+    public let routineRunID: String?
+    public let sessionID: String
+    public let startedAt: String?
+    public let status: RoutineFinishedStatus
+    public let steps: Int?
+    public let summary: String?
+    public let trigger: Trigger?
+    public let watchPath: String?
+
+    public enum CodingKeys: String, CodingKey {
+        case approvals = "approvals"
+        case endedAt = "ended_at"
+        case folder = "folder"
+        case kind = "kind"
+        case origin = "origin"
+        case reason = "reason"
+        case routine = "routine"
+        case routineRunID = "routine_run_id"
+        case sessionID = "session_id"
+        case startedAt = "started_at"
+        case status = "status"
+        case steps = "steps"
+        case summary = "summary"
+        case trigger = "trigger"
+        case watchPath = "watch_path"
+    }
+
+    public init(approvals: Int?, endedAt: String?, folder: String?, kind: RunInfoKind, origin: String, reason: String?, routine: String?, routineRunID: String?, sessionID: String, startedAt: String?, status: RoutineFinishedStatus, steps: Int?, summary: String?, trigger: Trigger?, watchPath: String?) {
+        self.approvals = approvals
+        self.endedAt = endedAt
+        self.folder = folder
+        self.kind = kind
+        self.origin = origin
+        self.reason = reason
+        self.routine = routine
+        self.routineRunID = routineRunID
+        self.sessionID = sessionID
+        self.startedAt = startedAt
+        self.status = status
+        self.steps = steps
+        self.summary = summary
+        self.trigger = trigger
+        self.watchPath = watchPath
+    }
+}
+
+public enum RunInfoKind: String, Codable {
+    case ask = "ask"
+    case routine = "routine"
+}
+
+/// ``run.list``. The newest runs, one for each headless session.
+///
+/// ``limit`` is at most 500. ``session_id`` asks for that one session's row only (the banner
+/// of a routine's session), and it returns no row for a session that is not headless.
+// MARK: - RunListParams
+public struct RunListParams: Codable {
+    public let limit: Int?
+    public let sessionID: String?
+
+    public enum CodingKeys: String, CodingKey {
+        case limit = "limit"
+        case sessionID = "session_id"
+    }
+
+    public init(limit: Int?, sessionID: String?) {
+        self.limit = limit
+        self.sessionID = sessionID
+    }
+}
+
+/// The runs, newest first by start. A firing that was skipped has no session and no row.
+// MARK: - RunListResult
+public struct RunListResult: Codable {
+    public let runs: [RunElement]
+
+    public enum CodingKeys: String, CodingKey {
+        case runs = "runs"
+    }
+
+    public init(runs: [RunElement]) {
+        self.runs = runs
+    }
+}
+
+/// One row of the Runs list: a headless session and how its run is going (ADR-050).
+///
+/// One row for each session whose origin is not ``user``. ``kind`` is ``routine`` for a
+/// routine's firing and ``ask`` for ``golem ask --detach``. ``routine`` is the routine's
+/// name, null for ``ask``. ``folder`` is the project folder of a project routine, null for a
+/// user routine, so ``routine.get(routine, folder)`` finds it. ``routine_run_id`` and
+/// ``trigger`` are null for ``ask``. ``status`` is read as ``RoutineRunSummary.status`` is:
+/// ``waiting`` is a session that waits for an answer, and an ``ask`` that is not open reads
+/// ``succeeded``, ``failed`` or ``cancelled`` from its last agent run. ``summary`` is one
+/// line:
+/// the question while ``waiting`` (``Allow <tool>``, with the subject), the last reply once
+/// finished. ``reason`` says why a firing failed or was skipped. ``approvals`` counts the
+/// approvals the session waits for. ``watch_path`` is the file a ``watch`` firing is for.
+/// ``steps`` is the number of steps of a workflow run, null for the other kinds. The times
+/// are ISO 8601 with an offset.
+// MARK: - RunElement
+public struct RunElement: Codable {
+    public let approvals: Int?
+    public let endedAt: String?
+    public let folder: String?
+    public let kind: RunInfoKind
+    public let origin: String
+    public let reason: String?
+    public let routine: String?
+    public let routineRunID: String?
+    public let sessionID: String
+    public let startedAt: String?
+    public let status: RoutineFinishedStatus
+    public let steps: Int?
+    public let summary: String?
+    public let trigger: Trigger?
+    public let watchPath: String?
+
+    public enum CodingKeys: String, CodingKey {
+        case approvals = "approvals"
+        case endedAt = "ended_at"
+        case folder = "folder"
+        case kind = "kind"
+        case origin = "origin"
+        case reason = "reason"
+        case routine = "routine"
+        case routineRunID = "routine_run_id"
+        case sessionID = "session_id"
+        case startedAt = "started_at"
+        case status = "status"
+        case steps = "steps"
+        case summary = "summary"
+        case trigger = "trigger"
+        case watchPath = "watch_path"
+    }
+
+    public init(approvals: Int?, endedAt: String?, folder: String?, kind: RunInfoKind, origin: String, reason: String?, routine: String?, routineRunID: String?, sessionID: String, startedAt: String?, status: RoutineFinishedStatus, steps: Int?, summary: String?, trigger: Trigger?, watchPath: String?) {
+        self.approvals = approvals
+        self.endedAt = endedAt
+        self.folder = folder
+        self.kind = kind
+        self.origin = origin
+        self.reason = reason
+        self.routine = routine
+        self.routineRunID = routineRunID
+        self.sessionID = sessionID
+        self.startedAt = startedAt
+        self.status = status
+        self.steps = steps
+        self.summary = summary
+        self.trigger = trigger
+        self.watchPath = watchPath
+    }
+}
+
 /// A graph run is in progress for this session.
 // MARK: - RunStartedEvent
 public struct RunStartedEvent: Codable {
@@ -17484,7 +17663,7 @@ public struct TraceGetParams: Codable {
 // MARK: - TraceGetResult
 public struct TraceGetResult: Codable {
     public let contextEvents: [ContextEventElement]?
-    public let runs: [RunElement]
+    public let runs: [RunClass]
     public let sessionID: String
     public let title: String?
 
@@ -17495,7 +17674,7 @@ public struct TraceGetResult: Codable {
         case title = "title"
     }
 
-    public init(contextEvents: [ContextEventElement]?, runs: [RunElement], sessionID: String, title: String?) {
+    public init(contextEvents: [ContextEventElement]?, runs: [RunClass], sessionID: String, title: String?) {
         self.contextEvents = contextEvents
         self.runs = runs
         self.sessionID = sessionID
@@ -17553,8 +17732,8 @@ public struct ContextEventElement: Codable {
 /// A run, with its model calls in order.
 ///
 /// ``route`` is the pick for the run, null for a run of a ``pinned`` session.
-// MARK: - RunElement
-public struct RunElement: Codable {
+// MARK: - RunClass
+public struct RunClass: Codable {
     public let approvalWaitMS: Int?
     public let children: [RunChild]?
     public let durationMS: Int?

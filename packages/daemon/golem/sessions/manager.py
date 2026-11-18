@@ -492,6 +492,11 @@ class SessionManager:
         """What a waiting session waits for, read from its stored events."""
         return await self._events.pending(activity)
 
+    async def pending_of(self, session_id: str) -> PendingItem | None:
+        """What the session waits for, None when it waits for nothing or does not exist."""
+        activity = await self._records.activity(session_id)
+        return None if activity is None else await self._events.pending(activity)
+
     def _offered(self, session: _LiveSession) -> list[str]:
         """The names of the tools the session's next model call would offer."""
         found = self._runtime.tools.scoped(_scope(session)).schemas()

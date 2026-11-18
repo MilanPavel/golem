@@ -25,12 +25,13 @@ The UI uses these four words and never says "flow".
 | **Skill** | Instructions (`SKILL.md`) the model follows | files | `skill.*` |
 | **Workflow** | Python code, durable, resumable ([workflows.md](../vision/workflows.md)) | `workflow_runs` | `workflow.*` (designed in 3.0) |
 | **Routine** | A trigger plus a target | `[[routine]]` in `config.toml` | `routine.list`, `routine.get`, `routine.run`, `routine.update`, `routine.preview` |
-| **Run** | One execution of a routine or a workflow | `routine_runs`, `workflow_runs` | `routine.fired`, `routine.finished` |
+| **Run** | One execution of a routine or a workflow | `routine_runs`, `workflow_runs` | `run.list`, `routine.fired`, `routine.finished` |
 
 - `runs` and `run.*` **stay agent turns.** Nothing is renamed. A routine firing is a `routine_run`, and it has one session, which has one or more `runs`.
 - `routine.fired` and `routine.finished` are daemon-wide notifications to every connection, like `mcp.server.status`, not session events. `routine.fired {routine, routine_run_id, session_id, trigger}` names the trigger: `schedule`, `watch`, `manual`, or later `hook`. `routine.finished {routine_run_id, status, summary}` carries the outcome. A skipped firing sends `routine.finished` with `skipped` and no `routine.fired`.
 - `routine.run` fires a routine now. It works while paused (you asked), still obeys trust, and is refused with a clear error while the routine's previous run is still running or waiting. `routine.update` creates, replaces, removes or toggles one `[[routine]]` through `config_edit.py`.
 - The Runs list in the web and the terminal takes rows of a kind: a routine run now, a workflow run later (3.9). A client never infers the kind from the id.
+- `run.list {limit?, session_id?}` returns `{runs: RunInfo[]}`, newest first, one row for each session whose origin is not `user`: `session_id`, `kind` (`routine` or `ask`, later `workflow`), `origin`, `routine`, `folder`, `routine_run_id`, `trigger`, `status` (as in `routine_runs`, with `waiting` read from the session), `started_at`, `ended_at`, `summary` (the question while waiting, the last reply after), `reason`, `approvals`, `watch_path`, and `steps` (null until workflow runs). It is one query, so the Runs list does not make one `routine.get` for each routine and join it with `session.list` in the client. It sends no notification of its own: `routine.fired`, `routine.finished` and the session summaries already change exactly when a row does. A skipped firing has no session and no row.
 
 ### A headless session
 
