@@ -9,7 +9,7 @@
   "scripts": {
     "lint": "eslint src",
     "typecheck": "tsc --noEmit",
-    "test": "node --experimental-strip-types --test src/*.test.ts",
+    "test": "node --import tsx --experimental-strip-types --test src/*.test.ts",
     "start": "tsx src/dev.tsx"
   },
   "dependencies": {

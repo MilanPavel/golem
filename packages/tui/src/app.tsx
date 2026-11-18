@@ -830,6 +830,53 @@ export function App({
   if (chat.busy && answering && model.provider === "ollama") {
     warmModels.current.add(chip);
   }
+  // Before the banner: planOffered() reads sessionRef through currentPlace().
+  const batcher = useRef<DeltaBatcher | null>(null);
+  if (batcher.current === null) {
+    batcher.current = createDeltaBatcher((key, text) => {
+      setChat((current) =>
+        reduceChat(
+          current,
+          key.startsWith(THINKING_KEY)
+            ? deltaEvent(key.slice(THINKING_KEY.length), text, "message.thinking.delta")
+            : deltaEvent(key, text),
+        ),
+      );
+    });
+  }
+
+  const session = useSession(client, connection.status === "connected", process.cwd(), {
+    onSwitch: (next) => {
+      batcher.current?.flush();
+      setLiveTitle(null);
+      setPanel(null);
+      contextGen.current += 1;
+      costGen.current += 1;
+      showTune(null);
+      setKeysOpen(false);
+      historyCursorRef.current = null;
+      setHistoryCursor(null);
+      changesFold.current = noChanges;
+      promptsFold.current = noPrompts;
+      setUndoBand(null);
+      setChat((current) => ({ ...emptyChat, notice: current.notice }));
+      setChangesState(noChanges);
+      setSessionModel(null);
+      setSessionCwd(null);
+      setModelMessages([]);
+      setModelCount(null);
+      setOffset(0);
+      if (panelOpen.current) {
+        loadCheckpointRef.current(next);
+      }
+    },
+    onError: (error) => {
+      setChat((current) => ({ ...current, error: messageOf(error) }));
+    },
+  }, firstSession);
+  const sessionRef = session.ref;
+  const sessionId = session.id;
+
   const unreadNotice = chat.unreadCall ? unreadCallNotice("tui") : null;
   const planNotice = planOffered() && panel === null ? PLAN_KEYS : null;
   const banner = asking
@@ -983,52 +1030,6 @@ export function App({
   );
   const page = Math.max(1, (keysOpen ? budget.body : Math.max(1, chatHeight)) - 1);
   const debugPage = Math.max(1, budget.debug - 2);
-
-  const batcher = useRef<DeltaBatcher | null>(null);
-  if (batcher.current === null) {
-    batcher.current = createDeltaBatcher((key, text) => {
-      setChat((current) =>
-        reduceChat(
-          current,
-          key.startsWith(THINKING_KEY)
-            ? deltaEvent(key.slice(THINKING_KEY.length), text, "message.thinking.delta")
-            : deltaEvent(key, text),
-        ),
-      );
-    });
-  }
-
-  const session = useSession(client, connection.status === "connected", process.cwd(), {
-    onSwitch: (next) => {
-      batcher.current?.flush();
-      setLiveTitle(null);
-      setPanel(null);
-      contextGen.current += 1;
-      costGen.current += 1;
-      showTune(null);
-      setKeysOpen(false);
-      historyCursorRef.current = null;
-      setHistoryCursor(null);
-      changesFold.current = noChanges;
-      promptsFold.current = noPrompts;
-      setUndoBand(null);
-      setChat((current) => ({ ...emptyChat, notice: current.notice }));
-      setChangesState(noChanges);
-      setSessionModel(null);
-      setSessionCwd(null);
-      setModelMessages([]);
-      setModelCount(null);
-      setOffset(0);
-      if (panelOpen.current) {
-        loadCheckpointRef.current(next);
-      }
-    },
-    onError: (error) => {
-      setChat((current) => ({ ...current, error: messageOf(error) }));
-    },
-  }, firstSession);
-  const sessionRef = session.ref;
-  const sessionId = session.id;
 
   // One `model.options.get` when the session opens or the model changes, for the tune chip.
   const chipModel = model.provider === "ollama" ? model.name : null;
