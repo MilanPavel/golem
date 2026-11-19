@@ -1,11 +1,12 @@
-"""One aiosqlite connection to ``golem.db``.
+"""One aiosqlite connection to a golem SQLite file: ``golem.db``, or ``memory.db``.
 
 The daemon is the only writer. Every statement goes through one lock, so a
 transaction never interleaves with another coroutine's reads or writes.
 
-Opening upgrades the file: it copies it to ``golem.db.bak-<schema>`` first,
+Opening upgrades the file: it copies it to ``<file>.bak-<schema>`` first,
 then runs each pending migration in its own transaction and records it in
-``schema_version``. A file from a newer daemon is refused, never changed.
+``schema_version``, when the file has that table. A file from a newer daemon is
+refused, never changed. The migrations are an argument, ``golem.db``'s by default.
 """
 
 from __future__ import annotations
@@ -27,12 +28,13 @@ from golem.store.migrations import MIGRATIONS
 log = logging.getLogger("golem.store")
 
 Params = tuple[object, ...]
+Migrations = tuple[tuple[str, ...], ...]
 
 _HAS_HISTORY = "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'schema_version'"
 
 
 class DatabaseTooNewError(Exception):
-    """``golem.db`` was written by a newer daemon.
+    """A database file was written by a newer daemon.
 
     ``needs`` is the golem version that upgraded it to ``found``, when the file
     recorded one. ``backup`` is the copy from before that upgrade, which this
@@ -46,8 +48,9 @@ class DatabaseTooNewError(Exception):
         *,
         needs: str | None = None,
         backup: Path | None = None,
+        name: str = "golem.db",
     ) -> None:
-        message = f"golem.db is at schema {found}, and this daemon reads up to schema {supported}."
+        message = f"{name} is at schema {found}, and this daemon reads up to schema {supported}."
         if needs is not None:
             message += f" It needs golem {needs} or newer."
         if backup is not None:
@@ -57,6 +60,7 @@ class DatabaseTooNewError(Exception):
         self.supported = supported
         self.needs = needs
         self.backup = backup
+        self.name = name
 
 
 class Transaction:
@@ -87,10 +91,15 @@ class Database:
     @classmethod
     @asynccontextmanager
     async def open(
-        cls, path: Path, *, golem_version: str = __version__
+        cls,
+        path: Path,
+        migrations: Migrations = MIGRATIONS,
+        *,
+        golem_version: str = __version__,
     ) -> AsyncGenerator[Database]:
         """Connect, apply pragmas and pending migrations, and close on exit.
 
+        ``migrations`` is one tuple of statements per ``user_version``.
         ``golem_version`` is recorded with each migration this call applies.
         """
         connection = await aiosqlite.connect(path, isolation_level=None)
@@ -104,7 +113,7 @@ class Database:
             ):
                 await connection.execute(pragma)
             database = cls(connection)
-            await database._migrate(path, golem_version)
+            await database._migrate(path, migrations, golem_version)
             yield database
         finally:
             await connection.close()
@@ -133,9 +142,9 @@ class Database:
         row = await self.fetch_one("PRAGMA user_version")
         return 0 if row is None else int(row[0])
 
-    async def _migrate(self, path: Path, golem_version: str) -> None:
+    async def _migrate(self, path: Path, migrations: Migrations, golem_version: str) -> None:
         current = await self.user_version()
-        latest = len(MIGRATIONS)
+        latest = len(migrations)
         if current > latest:
             backup = backup_path(path, str(latest))
             raise DatabaseTooNewError(
@@ -143,6 +152,7 @@ class Database:
                 latest,
                 needs=await self._written_by(current),
                 backup=backup if backup.is_file() else None,
+                name=path.name,
             )
         if current == latest:
             return
@@ -153,7 +163,7 @@ class Database:
                 "copied %s to %s before upgrading it to schema %d", path.name, backup.name, latest
             )
         applied_at = datetime.now(UTC).isoformat()
-        for version, statements in enumerate(MIGRATIONS[current:], start=current + 1):
+        for version, statements in enumerate(migrations[current:], start=current + 1):
             async with self.transaction() as tx:
                 for statement in statements:
                     await tx.execute(statement)
@@ -176,4 +186,4 @@ class Database:
         return None if row is None else str(row[0])
 
 
-__all__ = ["Database", "DatabaseTooNewError", "Params", "Transaction"]
+__all__ = ["Database", "DatabaseTooNewError", "Migrations", "Params", "Transaction"]
