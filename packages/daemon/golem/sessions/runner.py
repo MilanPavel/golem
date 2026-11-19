@@ -60,7 +60,7 @@ from golem.graphs.adapter import (
 )
 from golem.graphs.chat import ChatRuntime, Growth
 from golem.graphs.step_up import Consent
-from golem.graphs.tools_node import Answer
+from golem.graphs.tools_node import Answer, ChildScope
 from golem.models.cost import cost_usd
 from golem.models.errors import ContextFull, ModelUnreachable
 from golem.models.pick import Choice
@@ -161,6 +161,8 @@ class Turn:
     """The model whose answer the user asked to try again on a stronger one."""
     read_folders: tuple[str, ...] = ()
     """Folders the read tools may read from this turn on (a watch firing's folder)."""
+    child: ChildScope | None = field(default=None, compare=False)
+    """The scope of a helper session, from its record. None for any other session."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -199,6 +201,8 @@ class Resume:
     plan_first: bool = False
     local_only: bool = False
     pins: PinMemory = field(default_factory=PinMemory, compare=False)
+    child: ChildScope | None = field(default=None, compare=False)
+    """The scope of a helper session, from its record. None for any other session."""
 
 
 @dataclass
@@ -327,6 +331,7 @@ async def run_turn(
             step_up=turn.step_up,
             skill_folder=None if skill is None else str(skill.path),
             read_folders=turn.read_folders,
+            child=turn.child,
         )
         return await _finish(stream, progress, emit)
     except asyncio.CancelledError:
@@ -495,6 +500,7 @@ async def resume_turn(
             checks=resume.checks,
             plan_first=resume.plan_first,
             local_only=resume.local_only,
+            child=resume.child,
         )
         return await _finish(stream, progress, emit)
     except asyncio.CancelledError:

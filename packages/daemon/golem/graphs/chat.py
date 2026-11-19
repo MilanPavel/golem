@@ -332,6 +332,7 @@ class ChatRuntime:
         local_only: bool = False,
         growth: Growth | None = None,
         step_up: bool = False,
+        child: ChildScope | None = None,
     ) -> AsyncGenerator[object]:
         """Stream one user turn. The first turn writes the state fields.
 
@@ -364,6 +365,7 @@ class ChatRuntime:
                 PLAN_KEY: plan_first,
                 LOCAL_ONLY_KEY: local_only,
                 GROWTH_KEY: growth,
+                **({} if child is None else {CHILD_KEY: child}),
             },
             "recursion_limit": _RECURSION_LIMIT,
         }
@@ -403,6 +405,7 @@ class ChatRuntime:
         checks: bool | None = None,
         plan_first: bool = False,
         local_only: bool = False,
+        child: ChildScope | None = None,
     ) -> AsyncGenerator[object]:
         """Go on with a run paused on a tool approval, with the user's ``answer``.
 
@@ -427,6 +430,7 @@ class ChatRuntime:
                 CHECKS_KEY: checks,
                 PLAN_KEY: plan_first,
                 LOCAL_ONLY_KEY: local_only,
+                **({} if child is None else {CHILD_KEY: child}),
             },
             "recursion_limit": _RECURSION_LIMIT,
         }
