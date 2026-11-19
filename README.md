@@ -23,19 +23,8 @@
 </p>
 
 <p align="center">
-  <b>Ask, and read the sources</b><br>
-  <img src="docs/images/demo-search.gif" alt="In the browser, golem is asked about infinity and good sources to study. It searches the web once and reads three pages, then answers with a small source chip after each claim. Hovering a chip shows the page's title and an excerpt, and the Sources list shows the three pages it cited out of the four it found" width="900">
-</p>
-
-<p align="center">
-  <b>Code with you, and see every change</b><br>
-  <img src="docs/images/demo-code.gif" alt="In the browser, golem is asked to make a hello world app in Rust with a test and run it. An approval card shows each file as a diff and you allow it, then the command cargo test and cargo run, while the Changes panel on the right fills with the two new files" width="900">
-</p>
-
-<p align="center">
-  <b>Works while you're away</b><br>
-  <img src="docs/images/demo-inbox.gif" alt="In the browser, in another chat, a PDF lands in a watched folder. A routine starts by itself and stops to ask to write receipts.csv, and the Inbox in the sidebar shows 1. The Inbox asks the question in plain words and you allow it there, then Runs shows the routine finished next to a scheduled one" width="900"><br>
-  <sub>It also arrives as a Mac notification.</sub>
+  <b>In the browser</b><br>
+  <img src="docs/images/demo-web.gif" alt="In the browser, golem is asked about infinity and good sources to study. It searches the web and reads three pages, then answers with a small source chip after each claim, and a chip's card shows the page it read. Then, in a new chat, it is asked to make a hello world app in Rust with a test and run it: an approval card shows each file as a diff and you allow it, then cargo test and cargo run, while the Changes panel fills with the two new files" width="900">
 </p>
 
 <p align="center">
