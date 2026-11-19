@@ -150,6 +150,8 @@ export type { SkillCall } from "../../protocol/gen/skill-call.ts";
 export type { SkillCreateResult } from "../../protocol/gen/skill-create-result.ts";
 export type { SkillReadResult } from "../../protocol/gen/skill-read-result.ts";
 export type { ListedSkill, SkillListResult } from "../../protocol/gen/skill-list-result.ts";
+export type { AgentInfo, AgentLimits } from "../../protocol/gen/agent-info.ts";
+export type { AgentsListResult } from "../../protocol/gen/agents-list-result.ts";
 export type { SkillSetDisabledResult } from "../../protocol/gen/skill-set-disabled-result.ts";
 export type { SkillIssue, SkillWriteResult } from "../../protocol/gen/skill-write-result.ts";
 export type { AuthKeyStatus, AuthListResult } from "../../protocol/gen/auth-list-result.ts";

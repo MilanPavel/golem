@@ -807,6 +807,18 @@ export {
 export { keyWhere } from "./key-where.ts";
 export { keyGroups, mcpRefParts, savedCount, type KeyGroups, type KeyRow, type KeyServer } from "./key-groups.ts";
 export {
+  AGENT_GROUPS,
+  AGENT_SOURCES,
+  agentFinished,
+  agentRow,
+  agentRows,
+  agentUsed,
+  agentWarnings,
+  agentWish,
+  type AgentOrigin,
+  type AgentRow,
+} from "./agents-view.ts";
+export {
   GROUPS,
   skillFacts,
   skillIssues,
