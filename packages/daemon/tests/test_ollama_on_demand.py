@@ -18,7 +18,7 @@ from pydantic import Field
 from serve_fakes import FakeServe
 from test_server import HELLO, RpcClient, rpc_result, start_daemon, stop_daemon
 
-from golem.config import GolemSettings
+from golem.config import GolemSettings, OllamaSettings
 from golem.graphs.chat import open_chat
 from golem.models import ollama
 from golem.models.discovery import ModelDiscovery
@@ -109,6 +109,48 @@ async def test_a_hosted_model_call_leaves_ollama_alone(database: Database, tmp_p
     chat = _Chat(database, router, local)
     events = await chat.turn(await chat.manager.create(None), "hi")
     assert events[-1].type == "run.completed"
+    assert serve.spawned == []
+
+
+class _Spied(ollama.LocalServer):
+    calls = 0
+
+    async def ensure_running(self) -> bool:
+        type(self).calls += 1
+        return await super().ensure_running()
+
+
+async def test_a_config_with_no_local_model_never_calls_ensure_running(
+    database: Database, tmp_path: Path
+) -> None:
+    serve = FakeServe()
+    _Spied.calls = 0
+
+    def make(base_url: str, **options: Any) -> ollama.LocalServer:
+        return _Spied(
+            base_url,
+            transport=serve.transport(),
+            spawn=serve.spawn,
+            find_binary=lambda: "/opt/homebrew/bin/ollama",
+            **options,
+        )
+
+    local = LocalServers(
+        OllamaSettings(parallel=4),
+        log_file=tmp_path / "logs" / "ollama.log",
+        run_dir=tmp_path / "run",
+        make=make,
+    )
+    model = ToolCallingChatModel(replies=["hello", "again", "third"])
+    router = ModelRouter(GolemSettings(default_model="openai/gpt-5"), model=model)
+    chat = _Chat(database, router, local)
+    session_id = await chat.manager.create(None)
+    await chat.turn(session_id, "hi")
+    await chat.turn(session_id, "more")
+    local.settings = OllamaSettings(parallel=2)
+    await chat.turn(session_id, "after a change")
+    await local.aclose()
+    assert _Spied.calls == 0
     assert serve.spawned == []
 
 

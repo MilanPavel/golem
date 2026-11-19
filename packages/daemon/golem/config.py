@@ -262,8 +262,11 @@ class OllamaSettings(BaseModel):
     nothing answers. ``idle_stop_minutes`` stops a server golem started after
     that long unused, and 0 keeps it running. A server golem did not start is
     never stopped. ``parallel`` is how many generations golem sends to a local server at
-    once. Raise it only if you also set ``OLLAMA_NUM_PARALLEL``. ``models`` holds the
-    options saved for each model, by its Ollama name, such as ``qwen3:8b``.
+    once, 1 to 8. golem passes it to the ``ollama serve`` it starts as ``OLLAMA_NUM_PARALLEL``
+    and restarts that server between calls when it changes. A server golem did not start
+    keeps whatever it was started with, so set ``OLLAMA_NUM_PARALLEL`` there yourself.
+    ``models`` holds the options saved for each model, by its Ollama name, such as
+    ``qwen3:8b``.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
