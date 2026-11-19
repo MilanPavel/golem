@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import sqlite3
 from pathlib import Path
+from typing import Literal
 
 import pytest
 
@@ -11,9 +12,13 @@ from golem.store.database import Database, DatabaseTooNewError
 from golem.store.events import EventLog
 from golem.store.migrations import MIGRATIONS
 from golem.store.records import RunRecords, SessionRecords
+from golem.store.routine_runs import RoutineRuns
 from golem_protocol.events import (
+    AgentSnapshot,
     ChatEvent,
     EmptyEventData,
+    HelperWaitData,
+    HelperWaitEvent,
     MessageCompletedData,
     MessageCompletedEvent,
     MessageDeltaData,
@@ -27,6 +32,7 @@ from golem_protocol.events import (
     SessionClosedEvent,
     SessionCreatedData,
     SessionCreatedEvent,
+    SessionParent,
 )
 
 _S = "s_a"
@@ -204,3 +210,97 @@ async def test_a_failed_run_keeps_its_reason(database: Database) -> None:
     run = await RunRecords(database).get(_R)
     assert run is not None
     assert (run.status, run.error) == ("failed", "boom")
+
+
+def _helper_created(seq: int, session_id: str = "s_helper") -> SessionCreatedEvent:
+    return SessionCreatedEvent(
+        seq=seq,
+        session_id=session_id,
+        run_id=None,
+        ts=_ts(seq),
+        type="session.created",
+        data=SessionCreatedData(
+            model_profile="remote",
+            origin="agent:explorer",
+            parent=SessionParent(session_id=_S, call_id="c_1", index=2),
+            agent=AgentSnapshot(name="explorer", source="bundled", wish="cheapest"),
+        ),
+    )
+
+
+def _wait(seq: int, state: Literal["parked", "resumed"]) -> HelperWaitEvent:
+    return HelperWaitEvent(
+        seq=seq,
+        session_id=_S,
+        run_id=_R,
+        ts=_ts(seq),
+        type="helper.wait",
+        data=HelperWaitData(call_id="c_1", state=state, helper_ids=["s_helper"]),
+    )
+
+
+async def _columns(database: Database, session_id: str) -> tuple[object, ...]:
+    row = await database.fetch_one(
+        "SELECT parent_session_id, root_session_id, parent_call_id, helper_index, agent"
+        " FROM sessions WHERE session_id = ?",
+        (session_id,),
+    )
+    assert row is not None
+    return tuple(row)
+
+
+async def test_a_database_from_the_previous_schema_gains_the_helper_columns(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "golem.db"
+    previous = len(MIGRATIONS) - 1
+    with sqlite3.connect(path) as raw:
+        for statements in MIGRATIONS[:previous]:
+            for statement in statements:
+                raw.execute(statement)
+        raw.execute(
+            "INSERT INTO sessions (session_id, model_profile, created_at, updated_at)"
+            " VALUES ('s_old', 'remote', 't', 't')"
+        )
+        raw.execute(f"PRAGMA user_version = {previous}")
+    async with Database.open(path) as database:
+        assert await database.user_version() == len(MIGRATIONS)
+        assert await _columns(database, "s_old") == (None, None, None, None, None)
+        run_columns = await database.fetch_all("PRAGMA table_info(runs)")
+        assert "wait_reason" in [row["name"] for row in run_columns]
+        sessions = SessionRecords(database)
+        assert [a.session.session_id for a in await sessions.recent(10)] == ["s_old"]
+
+
+async def test_a_helper_session_fills_the_columns_and_stays_out_of_the_lists(
+    database: Database,
+) -> None:
+    log = EventLog(database)
+    await _append(log, [_created(), _started(2), _helper_created(3)])
+    assert await _columns(database, "s_helper") == (_S, _S, "c_1", 2, "explorer")
+    assert await _columns(database, _S) == (None, None, None, None, None)
+    sessions = SessionRecords(database)
+    assert [a.session.session_id for a in await sessions.recent(10)] == [_S]
+    assert [run.session_id for run in await RoutineRuns(database).headless(10)] == []
+
+
+async def test_a_second_helper_for_the_same_call_and_index_is_refused(database: Database) -> None:
+    log = EventLog(database)
+    await _append(log, [_created(), _helper_created(2)])
+    with pytest.raises(sqlite3.IntegrityError):
+        await log.append(_helper_created(3, "s_other"))
+
+
+async def test_the_lead_parks_for_its_team_and_goes_on(database: Database) -> None:
+    log = EventLog(database)
+    runs = RunRecords(database)
+    await _append(log, [_created(), _started(2), _wait(3, "parked")])
+    run = await runs.get(_R)
+    assert run is not None and run.status == "waiting"
+    reason = await database.fetch_one("SELECT wait_reason FROM runs WHERE run_id = ?", (_R,))
+    assert reason is not None and reason[0] == "team"
+    await log.append(_wait(4, "resumed"))
+    run = await runs.get(_R)
+    assert run is not None and run.status == "running"
+    reason = await database.fetch_one("SELECT wait_reason FROM runs WHERE run_id = ?", (_R,))
+    assert reason is not None and reason[0] is None

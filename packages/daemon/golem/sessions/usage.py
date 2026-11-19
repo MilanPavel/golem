@@ -31,6 +31,14 @@ from golem_protocol.events import (
 EVER = "0000-00-00"
 """A ``since_day`` that reaches every row."""
 
+# A helper's calls count under its lead: the root of a session with no parent is itself.
+_BY_ROOT = (
+    "COALESCE((SELECT s.root_session_id FROM sessions s"
+    " WHERE s.session_id = model_calls.session_id), session_id) = ?"
+)
+# Calls written before helpers were sessions have the role ``explore``.
+_ROLE = "CASE role WHEN 'explore' THEN 'helper' ELSE role END"
+
 
 @dataclass(frozen=True, slots=True)
 class Reference:
@@ -166,7 +174,7 @@ class Usage:
             where.append("day = ?")
             params.append(day)
         if session_id is not None:
-            where.append("session_id = ?")
+            where.append(_BY_ROOT)
             params.append(session_id)
         row = await self._database.fetch_one(
             f"SELECT COALESCE(SUM(cost_usd), 0) FROM model_calls WHERE {' AND '.join(where)}",
@@ -187,7 +195,7 @@ class Usage:
         """
         where, params = "day >= ?", [since_day]
         if session_id is not None:
-            where += " AND session_id = ?"
+            where += f" AND {_BY_ROOT}"
             params.append(session_id)
         args = tuple(params)
         total = await self._database.fetch_one(
@@ -233,9 +241,9 @@ class Usage:
             args,
         )
         roles = await self._database.fetch_all(
-            "SELECT role, COUNT(*), COALESCE(SUM(input), 0), COALESCE(SUM(output), 0),"
-            " COALESCE(SUM(cost_usd), 0) AS spent"
-            f" FROM model_calls WHERE {where} GROUP BY role"
+            f"SELECT {_ROLE} AS role, COUNT(*), COALESCE(SUM(input), 0),"
+            " COALESCE(SUM(output), 0), COALESCE(SUM(cost_usd), 0) AS spent"
+            f" FROM model_calls WHERE {where} GROUP BY {_ROLE}"
             " ORDER BY spent DESC, COUNT(*) DESC, role",
             args,
         )

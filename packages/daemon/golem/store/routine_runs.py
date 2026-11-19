@@ -84,7 +84,7 @@ _HEADLESS = (
     "  WHERE e.session_id = s.session_id AND e.type = 'session.completed'"
     "  ORDER BY e.seq DESC LIMIT 1) AS last_summary"
     " FROM sessions s LEFT JOIN routine_runs r ON r.session_id = s.session_id"
-    " WHERE COALESCE(s.origin, 'user') != 'user'"
+    " WHERE COALESCE(s.origin, 'user') != 'user' AND s.parent_session_id IS NULL"
 )
 _ASK_STATUS = {"completed": "succeeded", "failed": "failed", "cancelled": "cancelled"}
 

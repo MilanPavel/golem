@@ -17,6 +17,7 @@ from golem_protocol.events import (
     ApprovalNeededEvent,
     ApprovalResolvedEvent,
     ChatEvent,
+    HelperWaitEvent,
     MessageDeltaEvent,
     MessageThinkingDeltaEvent,
     ModelCallCompletedEvent,
@@ -50,8 +51,9 @@ async def project(tx: Transaction, event: ChatEvent) -> None:
         parent = event.data.forked_from
         await tx.execute(
             "INSERT INTO sessions (session_id, model_profile, created_at, updated_at,"
-            " forked_from_session_id, forked_from_message_id, cwd, origin, route)"
-            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            " forked_from_session_id, forked_from_message_id, cwd, origin, route,"
+            " parent_session_id, root_session_id, parent_call_id, helper_index, agent)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 event.session_id,
                 event.data.model_profile,
@@ -62,6 +64,7 @@ async def project(tx: Transaction, event: ChatEvent) -> None:
                 event.data.cwd,
                 None if event.data.origin in (None, "user") else event.data.origin,
                 event.data.route or "pinned",
+                *_helper_columns(event),
             ),
         )
         return
@@ -154,6 +157,19 @@ async def project(tx: Transaction, event: ChatEvent) -> None:
         )
         if isinstance(event, ApprovalResolvedEvent) and event.data.decision == "allow_session":
             await _allow_tool(tx, event.session_id, event.data.name, event.data.subject)
+    elif isinstance(event, HelperWaitEvent):
+        if event.run_id is not None and event.data.state == "parked":
+            await tx.execute(
+                "UPDATE runs SET status = 'waiting', wait_reason = 'team'"
+                " WHERE run_id = ? AND status = 'running'",
+                (event.run_id,),
+            )
+        elif event.run_id is not None:
+            await tx.execute(
+                "UPDATE runs SET status = 'running', wait_reason = NULL"
+                " WHERE run_id = ? AND status = 'waiting' AND wait_reason = 'team'",
+                (event.run_id,),
+            )
     elif isinstance(event, RunCompletedEvent):
         await _finish_run(tx, event.run_id, "completed", event.ts, None)
     elif isinstance(event, RunFailedEvent):
@@ -165,6 +181,19 @@ async def project(tx: Transaction, event: ChatEvent) -> None:
             "UPDATE sessions SET updated_at = ? WHERE session_id = ?",
             (event.ts, event.session_id),
         )
+
+
+def _helper_columns(
+    event: SessionCreatedEvent,
+) -> tuple[str | None, str | None, str | None, int | None, str | None]:
+    """``parent_session_id``, ``root_session_id``, ``parent_call_id``, ``helper_index`` and
+    ``agent`` of a new session. All None unless it is a helper. The root is the lead, since a
+    helper has no helpers."""
+    parent = event.data.parent
+    agent = None if event.data.agent is None else event.data.agent.name
+    if parent is None:
+        return None, None, None, None, agent
+    return parent.session_id, parent.session_id, parent.call_id, parent.index, agent
 
 
 def local_day(ts: str, zone: tzinfo | None = None) -> str:
@@ -187,6 +216,13 @@ async def project_model_call(
     if isinstance(event, ModelCallStartedEvent):
         data = event.data
         tier = data.tier or ("local" if data.provider == "ollama" else None)
+        role = "explore"
+        if data.parent_call_id is None:
+            rows = await tx.fetch_all(
+                "SELECT 1 FROM sessions WHERE session_id = ? AND parent_session_id IS NOT NULL",
+                (event.session_id,),
+            )
+            role = "helper" if rows else "chat"
         await tx.execute(
             "INSERT OR REPLACE INTO model_calls (call_id, session_id, run_id, role, provider,"
             " model, tier, started_at, day) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
@@ -194,7 +230,7 @@ async def project_model_call(
                 data.message_id,
                 event.session_id,
                 event.run_id,
-                "chat" if data.parent_call_id is None else "explore",
+                role,
                 data.provider,
                 data.model,
                 tier,

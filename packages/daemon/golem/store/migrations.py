@@ -202,4 +202,15 @@ MIGRATIONS: tuple[tuple[str, ...], ...] = (
         "ALTER TABLE routine_runs ADD COLUMN watch_mtime_ns INTEGER",
         "CREATE INDEX routine_runs_watch ON routine_runs (scope, routine, watch_path)",
     ),
+    (
+        "ALTER TABLE sessions ADD COLUMN parent_session_id TEXT",
+        "ALTER TABLE sessions ADD COLUMN root_session_id TEXT",
+        "ALTER TABLE sessions ADD COLUMN parent_call_id TEXT",
+        "ALTER TABLE sessions ADD COLUMN helper_index INTEGER",
+        "ALTER TABLE sessions ADD COLUMN agent TEXT",
+        "ALTER TABLE runs ADD COLUMN wait_reason TEXT",
+        "CREATE UNIQUE INDEX sessions_helper ON sessions"
+        " (parent_session_id, parent_call_id, helper_index)",
+        "CREATE INDEX sessions_root ON sessions (root_session_id)",
+    ),
 )

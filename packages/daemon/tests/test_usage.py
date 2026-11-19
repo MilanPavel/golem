@@ -22,12 +22,14 @@ from golem.store.events import EventLog
 from golem.store.projection import local_day, project_model_call
 from golem.store.records import RunRecords, SessionRecords
 from golem_protocol.events import (
+    AgentSnapshot,
     EmptyEventData,
     ModelCallCompletedData,
     ModelCallCompletedEvent,
     ModelCallStartedData,
     ModelCallStartedEvent,
     SessionCreatedData,
+    SessionParent,
     TokenUsage,
 )
 
@@ -334,3 +336,59 @@ async def test_a_real_run_fills_the_table_and_cost_get_sums_it(
     summary = await usage.summary(since_day=EVER, session_id=session_id)
     assert summary.totals.cost_usd == pytest.approx(paid)
     assert summary.totals.calls == 2
+
+
+async def _helper(log: SessionLog, session_id: str, lead: str) -> None:
+    await log.emit(
+        session_id,
+        None,
+        "session.created",
+        SessionCreatedData(
+            model_profile="x",
+            origin="agent:explorer",
+            parent=SessionParent(session_id=lead, call_id="c_1", index=0),
+            agent=AgentSnapshot(name="explorer", source="bundled", wish="cheapest"),
+        ),
+    )
+    await log.emit(session_id, f"r_{session_id}", "run.started", EmptyEventData())
+
+
+async def test_a_lead_counts_the_calls_of_its_helpers(database: Database) -> None:
+    log = _log(database)
+    usage = Usage(database)
+    await _session(log, "s_lead")
+    await _helper(log, "s_help", "s_lead")
+    await _session(log, "s_other")
+    await _call(log, "m_1", session_id="s_lead", usage=TokenUsage(input=10, output=1), cost=0.5)
+    await _call(log, "m_2", session_id="s_help", usage=TokenUsage(input=20, output=2), cost=0.25)
+    await _call(log, "m_3", session_id="s_other", usage=TokenUsage(input=30, output=3), cost=1.0)
+    roles = {r[0]: r[2] for r in await _rows(database)}
+    assert roles == {"m_1": "chat", "m_2": "helper", "m_3": "chat"}
+    assert await usage.spent(session_id="s_lead") == 0.75
+    assert await usage.spent(session_id="s_help") == 0.0
+    summary = await usage.summary(since_day=EVER, session_id="s_lead")
+    assert (summary.totals.calls, summary.totals.cost_usd) == (2, 0.75)
+    assert {r.role: r.calls for r in summary.by_role} == {"chat": 1, "helper": 1}
+
+
+async def test_old_explore_rows_read_as_helper(database: Database) -> None:
+    log = _log(database)
+    await _session(log)
+    await _call(log, "m_1")
+    await database.fetch_all("UPDATE model_calls SET role = 'explore'")
+    summary = await Usage(database).summary(since_day=EVER)
+    assert [(r.role, r.calls) for r in summary.by_role] == [("helper", 1)]
+
+
+async def test_replaying_helper_events_leaves_the_same_rows(database: Database) -> None:
+    log = _log(database)
+    await _session(log, "s_lead")
+    await _helper(log, "s_help", "s_lead")
+    await _call(log, "m_2", session_id="s_help", usage=TokenUsage(input=20, output=2), cost=0.25)
+    first = await _rows(database)
+    events = await EventLog(database).after("s_help", 0)
+    async with database.transaction() as tx:
+        for event in events:
+            if isinstance(event, ModelCallStartedEvent | ModelCallCompletedEvent):
+                await project_model_call(tx, event)
+    assert await _rows(database) == first

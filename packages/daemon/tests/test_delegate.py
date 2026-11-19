@@ -574,7 +574,7 @@ async def test_two_delegates_in_one_reply_run_in_order(database: Database, proje
     assert _result_of(events, "call_2") == "two"
 
 
-async def test_usage_rows_of_a_helper_are_explore_and_cost_get_groups_them(
+async def test_usage_rows_of_a_helper_are_grouped_as_helper_by_cost_get(
     database: Database, project: Path
 ) -> None:
     from golem.sessions.usage import EVER, Usage
@@ -585,7 +585,8 @@ async def test_usage_rows_of_a_helper_are_explore_and_cost_get_groups_them(
 
     summary = await Usage(database).summary(since_day=EVER)
     by_role = {row.role: row.calls for row in summary.by_role}
-    assert by_role == {"chat": 2, "explore": 1}
+    # The stored role of a child run is still ``explore``; usage reads it as ``helper``.
+    assert by_role == {"chat": 2, "helper": 1}
 
 
 def _paid(profile: str) -> Tier:
