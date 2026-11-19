@@ -1,20 +1,9 @@
 from golem.server.handlers import standard_methods
 from golem_protocol.methods import BROWSER_METHODS, METHOD_ACCESS
 
-# On the wire, with no handler in the daemon yet. Remove each name when its handler is added.
-NOT_YET_IN_THE_DAEMON = {
-    "memory.list",
-    "memory.get",
-    "memory.write",
-    "memory.update",
-    "memory.delete",
-    "memory.export",
-    "memory.settings",
-}
-
 
 def test_every_daemon_method_says_whether_a_browser_may_call_it() -> None:
-    declared = set(METHOD_ACCESS) - NOT_YET_IN_THE_DAEMON
+    declared = set(METHOD_ACCESS)
     registered = set(standard_methods())
     assert registered == declared, (
         f"in the daemon but not flagged: {sorted(registered - declared)}; "
