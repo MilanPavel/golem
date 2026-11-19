@@ -6,6 +6,8 @@ tools node gives the tool its way to run one, so this file knows nothing of the 
 
 from __future__ import annotations
 
+from collections.abc import Sequence
+from dataclasses import dataclass
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -32,6 +34,61 @@ def result_text(text: str, stopped: str) -> str:
     return f"{AGENT} finished: {stopped}\n\n{answer}"
 
 
+@dataclass(frozen=True, slots=True)
+class HelperSpec:
+    """One helper to start for a ``delegate`` call."""
+
+    agent: str
+    brief: str
+    label: str = ""
+
+
+@dataclass(frozen=True, slots=True)
+class HelperOutcome:
+    """How one helper ended. ``text`` is its answer, or its head when ``artifact_id`` is set."""
+
+    agent: str
+    stopped: str
+    text: str
+    artifact_id: str | None = None
+    label: str = ""
+
+
+def _section(done: HelperOutcome) -> str:
+    answer = done.text.strip()
+    if done.artifact_id is not None:
+        note = (
+            f"[the answer is long: it is in artifact {done.artifact_id}. "
+            "Read it with read_artifact(artifact_id, offset, limit).]"
+        )
+        answer = f"{answer}\n{note}" if answer else note
+    answer = answer or "(the helper gave no answer)"
+    if done.stopped == "done":
+        return answer
+    return f"{done.agent} finished: {done.stopped}\n\n{answer}"
+
+
+def results_text(ended: Sequence[HelperOutcome]) -> str:
+    """The tool result of a ``delegate`` call: one section per helper, in the order of the call."""
+    if len(ended) == 1:
+        return _section(ended[0])
+    parts = [
+        f"### {n}. {done.label or done.agent}\n{_section(done)}" for n, done in enumerate(ended, 1)
+    ]
+    return "\n\n".join(parts)
+
+
+def results_summary(ended: Sequence[HelperOutcome]) -> str:
+    """One short line for the screen."""
+    if len(ended) == 1:
+        done = ended[0]
+        return (
+            f"{done.agent} finished" if done.stopped == "done" else f"{done.agent}: {done.stopped}"
+        )
+    stopped = sum(done.stopped != "done" for done in ended)
+    return f"{len(ended)} helpers finished" + (f", {stopped} stopped early" if stopped else "")
+
+
 async def _delegate(args: DelegateArgs, ctx: ToolContext) -> ToolResult:
     if ctx.delegate is None:
         raise ToolError("a helper cannot be started here")
@@ -54,4 +111,13 @@ DELEGATE = Tool(
     read_only=True,
 )
 
-__all__ = ["AGENT", "DELEGATE", "DelegateArgs", "result_text"]
+__all__ = [
+    "AGENT",
+    "DELEGATE",
+    "DelegateArgs",
+    "HelperOutcome",
+    "HelperSpec",
+    "result_text",
+    "results_summary",
+    "results_text",
+]

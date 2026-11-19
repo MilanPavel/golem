@@ -40,6 +40,9 @@ APPROVAL_KIND = "approval"
 CONSENT_KIND = "consent"
 """``STREAM_KEY`` value of an interrupt that waits for the paid question's answer."""
 
+HELPERS_KIND = "helpers"
+"""``STREAM_KEY`` value of an interrupt that parks the lead while its helpers run."""
+
 CHILD_FACT_KIND = "child.fact"
 """``STREAM_KEY`` value of a fact of a child run, carried on its parent's stream."""
 
@@ -281,6 +284,13 @@ class ConsentAsked:
 
 
 @dataclass(frozen=True, slots=True)
+class HelpersParked:
+    """The run parked on the ``delegate`` calls ``call_ids``, until their helpers have ended."""
+
+    call_ids: tuple[str, ...]
+
+
+@dataclass(frozen=True, slots=True)
 class PlanProposed:
     """``propose_plan`` ended a plan first run with this plan."""
 
@@ -373,6 +383,7 @@ Fact = (
     | ToolErrored
     | ApprovalAsked
     | ConsentAsked
+    | HelpersParked
     | TodosChanged
     | PlanProposed
     | FileChanged
@@ -724,12 +735,14 @@ def _writing_fact(index: int, call: _Writing) -> ToolWriting:
     )
 
 
-def _completed(data: object) -> TextCompleted | ApprovalAsked | ConsentAsked | None:
+def _completed(
+    data: object,
+) -> TextCompleted | ApprovalAsked | ConsentAsked | HelpersParked | None:
     if not isinstance(data, dict):
         return None
     paused = cast(dict[object, object], data).get("__interrupt__")
     if paused is not None:
-        return _consent(paused) or _approval(paused)
+        return _consent(paused) or _approval(paused) or _parked(paused)
     update = cast(dict[object, object], data).get("call_model")
     if not isinstance(update, dict):
         return None
@@ -817,6 +830,19 @@ def _consent(paused: object) -> ConsentAsked | None:
             caps=asked.caps,
             signal=asked.signal,
         )
+    return None
+
+
+def _parked(paused: object) -> HelpersParked | None:
+    items = cast(tuple[object, ...], paused) if isinstance(paused, tuple | list) else ()
+    for item in items:
+        value = getattr(item, "value", None)
+        if not isinstance(value, dict):
+            continue
+        raw = cast(dict[str, object], value)
+        ids = raw.get("call_ids")
+        if raw.get(STREAM_KEY) == HELPERS_KIND and isinstance(ids, list):
+            return HelpersParked(tuple(i for i in cast(list[object], ids) if isinstance(i, str)))
     return None
 
 
@@ -1150,6 +1176,7 @@ __all__ = [
     "APPROVAL_KIND",
     "CHILD_FACT_KIND",
     "FILE_CHANGED_KIND",
+    "HELPERS_KIND",
     "PIN_READ_KIND",
     "PIN_SKIPPED_KIND",
     "PLAN_PROPOSED_KIND",
@@ -1161,6 +1188,7 @@ __all__ = [
     "ContextChanged",
     "Fact",
     "FileChanged",
+    "HelpersParked",
     "ModelRequested",
     "ModelResponded",
     "ModelRouted",
