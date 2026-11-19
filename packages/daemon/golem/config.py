@@ -111,6 +111,7 @@ class ProviderSettings(BaseModel):
     kind: ProviderKind | None = None
     base_url: Annotated[str | None, BeforeValidator(_blank_to_none)] = None
     api_key_env: str | None = Field(default=None, min_length=1)
+    at_once: int = Field(default=4, ge=1)  # calls to this provider at once, for any model
 
 
 class ModelPrice(BaseModel):

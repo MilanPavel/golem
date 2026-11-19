@@ -28,7 +28,7 @@ from test_step_up_consent import _waits
 
 from golem.config import GolemSettings, ModelPrice
 from golem.graphs.chat import open_chat
-from golem.models import ollama
+from golem.models import dispatcher, ollama
 from golem.models.facts import ModelFacts
 from golem.models.roles import for_role
 from golem.models.router import ModelRouter
@@ -52,6 +52,13 @@ ERRORS = {
 def installed(monkeypatch: pytest.MonkeyPatch) -> None:
     """Ollama counts as installed on any machine."""
     monkeypatch.setattr(ollama, "installed", lambda: True)
+
+
+@pytest.fixture(autouse=True)
+def quick_backoff(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A provider line backs off for a few ms, not 2 s and more."""
+    monkeypatch.setattr(dispatcher, "BACKOFF_BASE", 0.01)
+    monkeypatch.setattr(dispatcher, "BACKOFF_MAX", 0.05)
 
 
 def _facts(fixture: dict[str, Any]) -> ModelFacts:
@@ -101,7 +108,7 @@ def _models_of(case: Case) -> dict[str, FlakyModel]:
     elif case.action == "provider_down":
         models[own] = FlakyModel(replies=["done"], errors=[httpx.ConnectError("down")])
     elif case.action == "rate_limited":
-        models[own] = FlakyModel(replies=["done"], errors=[_Http(429), _Http(429)])
+        models[own] = FlakyModel(replies=["done"], errors=[_Http(429)] * 4)
     return models
 
 

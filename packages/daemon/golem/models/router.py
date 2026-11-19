@@ -168,6 +168,7 @@ class _Catalog:
     context: ContextSettings = field(default_factory=ContextSettings)
     budget: BudgetSettings = field(default_factory=BudgetSettings)
     agents: AgentSettings = field(default_factory=AgentSettings)
+    at_once: dict[str, int] = field(default_factory=lambda: dict[str, int]())
 
 
 class ModelRouter:
@@ -442,6 +443,18 @@ class ModelRouter:
             return None
         return LineKey.local(OLLAMA.id, server[1], self.resolve(profile).model_id)
 
+    def provider_line(self, profile: str) -> tuple[LineKey, int] | None:
+        """The provider line a hosted ``profile`` runs on, and its cap, or None if local."""
+        try:
+            resolved = self.resolve(profile)
+        except ModelConfigError:
+            return None
+        if resolved.provider.kind == "ollama":
+            return None
+        catalog = self._current()
+        cap = 4 if catalog is None else catalog.at_once.get(resolved.provider_name, 4)
+        return LineKey.provider(resolved.provider_name), cap
+
     def unreachable(self, profile: str, exc: BaseException) -> ModelUnreachable | None:
         """``exc`` from a call to ``profile`` as :class:`ModelUnreachable`, or None.
 
@@ -655,6 +668,7 @@ def _catalog(settings: GolemSettings) -> _Catalog:
         context=settings.context,
         budget=settings.budget,
         agents=settings.agents,
+        at_once={name: configured.at_once for name, configured in settings.providers.items()},
     )
 
 
