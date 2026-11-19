@@ -2,6 +2,13 @@ import pytest
 from pydantic import ValidationError
 
 from golem_protocol.commands import (
+    AgentInfo,
+    AgentLimits,
+    AgentRegistryChanged,
+    AgentsGetParams,
+    AgentsGetResult,
+    AgentsListParams,
+    AgentsListResult,
     DaemonStatus,
     HelloParams,
     HelloResult,
@@ -19,6 +26,7 @@ from golem_protocol.commands import (
 )
 from golem_protocol.events import Ping
 from golem_protocol.rpc import (
+    AgentRegistryChangedNotification,
     ModelOptionsSavedNotification,
     ModelServerStatusNotification,
     RpcErrorBody,
@@ -214,3 +222,53 @@ def test_pending_item_refuses_unknown_fields_and_negative_counts() -> None:
     for field in ("added", "removed", "alternatives"):
         with pytest.raises(ValidationError):
             PendingItem.model_validate({"kind": "approval", "since": "t", field: -1})
+
+
+def test_agents_list_and_get_round_trip() -> None:
+    info = AgentInfo(
+        name="explorer",
+        description="Reads and searches, returns paths and lines.",
+        origin="bundled",
+        wish="cheapest",
+        tools=["read_file", "grep"],
+        limits=AgentLimits(max_calls=15, max_seconds=300),
+        shadowed=["user"],
+        used=4,
+        finished=3,
+    )
+    listed = AgentsListResult(agents=[info])
+    assert AgentsListResult.model_validate_json(listed.model_dump_json()) == listed
+    got = AgentsGetResult(**info.model_dump(), prompt="Find it.")
+    assert AgentsGetResult.model_validate_json(got.model_dump_json()) == got
+    list_params = AgentsListParams(cwd="/work")
+    assert AgentsListParams.model_validate_json(list_params.model_dump_json()) == list_params
+    get_params = AgentsGetParams(name="explorer")
+    assert AgentsGetParams.model_validate_json(get_params.model_dump_json()) == get_params
+
+
+def test_agent_info_defaults_and_nullable_finished() -> None:
+    info = AgentInfo.model_validate(
+        {"name": "worker", "description": "", "origin": "project", "wish": "same"}
+    )
+    assert info.tools == [] and info.errors == [] and info.shadowed == []
+    assert info.limits == AgentLimits()
+    assert info.trusted is True and info.used == 0 and info.finished is None
+
+
+def test_agents_reject_bad_input() -> None:
+    base = {"name": "x", "description": "", "wish": "same"}
+    with pytest.raises(ValidationError):
+        AgentInfo.model_validate({**base, "origin": "plugin"})
+    with pytest.raises(ValidationError):
+        AgentInfo.model_validate({**base, "origin": "user", "used": -1})
+    with pytest.raises(ValidationError):
+        AgentsGetParams.model_validate({"name": ""})
+    with pytest.raises(ValidationError):
+        AgentsListParams.model_validate({"cwd": "/w", "extra": 1})
+
+
+def test_agent_registry_changed_notification() -> None:
+    note = AgentRegistryChangedNotification(params=AgentRegistryChanged(root="/work"))
+    assert note.method == "agent.registry.changed"
+    assert AgentRegistryChangedNotification.model_validate_json(note.model_dump_json()) == note
+    assert AgentRegistryChanged().root is None

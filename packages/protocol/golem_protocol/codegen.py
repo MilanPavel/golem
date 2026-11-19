@@ -8,6 +8,13 @@ from pathlib import Path
 from pydantic import BaseModel
 
 from golem_protocol.commands import (
+    AgentInfo,
+    AgentLimits,
+    AgentRegistryChanged,
+    AgentsGetParams,
+    AgentsGetResult,
+    AgentsListParams,
+    AgentsListResult,
     ApprovalRespondParams,
     ApprovalRespondResult,
     ArtifactReadParams,
@@ -383,6 +390,7 @@ from golem_protocol.events import (
 )
 from golem_protocol.methods import METHOD_ACCESS
 from golem_protocol.rpc import (
+    AgentRegistryChangedNotification,
     KeychainWaitNotification,
     McpLoginDoneNotification,
     McpServerLogNotification,
@@ -732,6 +740,14 @@ MODELS: tuple[type[BaseModel], ...] = (
     McpUpdateParams,
     McpRemoveParams,
     McpRemoveResult,
+    AgentInfo,
+    AgentLimits,
+    AgentRegistryChanged,
+    AgentRegistryChangedNotification,
+    AgentsGetParams,
+    AgentsGetResult,
+    AgentsListParams,
+    AgentsListResult,
     SkillRegistryChanged,
     SkillRegistryChangedNotification,
     RevertConflict,

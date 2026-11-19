@@ -1,0 +1,29 @@
+{
+  "additionalProperties": false,
+  "description": "``agents.get``. The agent type called ``name`` that a session in ``cwd`` sees.",
+  "properties": {
+    "cwd": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Cwd"
+    },
+    "name": {
+      "minLength": 1,
+      "title": "Name",
+      "type": "string"
+    }
+  },
+  "required": [
+    "name"
+  ],
+  "title": "AgentsGetParams",
+  "type": "object"
+}

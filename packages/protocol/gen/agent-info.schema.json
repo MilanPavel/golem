@@ -1,0 +1,170 @@
+{
+  "$defs": {
+    "AgentLimits": {
+      "additionalProperties": false,
+      "description": "What bounds one helper of this type. ``None`` means the file sets no limit of that kind.\n\n``max_seconds`` is working time: it does not count the time spent waiting for\nyou, for a slot or for a provider. ``answer_chars`` cuts the helper's final answer.",
+      "properties": {
+        "answer_chars": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Answer Chars"
+        },
+        "max_calls": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Max Calls"
+        },
+        "max_cost_usd": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Max Cost Usd"
+        },
+        "max_seconds": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Max Seconds"
+        },
+        "max_tokens": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Max Tokens"
+        }
+      },
+      "title": "AgentLimits",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "One agent type: an ``agents/<name>.md`` file, valid or not.\n\n``wish`` is the model wish as written: ``cheapest``, ``same``, ``stronger``, a tier\nor a model. ``tools`` are the tool names the helper may use, empty for none. ``asks``\nis true when the helper may ask you a question. ``errors`` are what is wrong with\nthe file: a type with errors is never the one a name resolves to. ``shadowed`` lists\nthe origins of lower files of the same name that this one hides. ``trusted`` is\nfalse for a project agent in a folder that is not trusted, which is listed and\nnever started. ``used`` and ``finished`` count helpers of this type started and\nended in the last 30 days (``helper.ended``). ``finished`` is ``None`` when the\ndaemon cannot count them.",
+  "properties": {
+    "asks": {
+      "default": false,
+      "title": "Asks",
+      "type": "boolean"
+    },
+    "description": {
+      "title": "Description",
+      "type": "string"
+    },
+    "errors": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Errors",
+      "type": "array"
+    },
+    "finished": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Finished"
+    },
+    "limits": {
+      "$ref": "#/$defs/AgentLimits"
+    },
+    "name": {
+      "minLength": 1,
+      "title": "Name",
+      "type": "string"
+    },
+    "origin": {
+      "enum": [
+        "bundled",
+        "user",
+        "project"
+      ],
+      "title": "Origin",
+      "type": "string"
+    },
+    "shadowed": {
+      "items": {
+        "enum": [
+          "bundled",
+          "user",
+          "project"
+        ],
+        "type": "string"
+      },
+      "title": "Shadowed",
+      "type": "array"
+    },
+    "tools": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Tools",
+      "type": "array"
+    },
+    "trusted": {
+      "default": true,
+      "title": "Trusted",
+      "type": "boolean"
+    },
+    "used": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Used",
+      "type": "integer"
+    },
+    "wish": {
+      "minLength": 1,
+      "title": "Wish",
+      "type": "string"
+    }
+  },
+  "required": [
+    "name",
+    "description",
+    "origin",
+    "wish"
+  ],
+  "title": "AgentInfo",
+  "type": "object"
+}
