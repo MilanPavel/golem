@@ -17,6 +17,12 @@ order, so a call that was already asked about (``ASKED_KEY``, from the run's
 events) asks again and gets its stored answer, whatever the rules say now.
 A call before the last asked one that would ask only because the rules
 changed is refused, rather than asked out of turn.
+
+A permitted ``delegate`` starts its helpers in the first pass (the host finds them again when this
+node starts over, so nothing starts twice). After the last approval the node parks the run with
+one more ``interrupt()`` while any helper has not ended. The wake is a plain answer: pass 1 then
+finds every helper ended and does not interrupt, and pass 2 builds the result from their logs.
+Parks come last, so they never change which answer belongs to which approval.
 """
 
 from __future__ import annotations
@@ -34,12 +40,14 @@ from langchain_core.messages.tool import ToolCall
 from langchain_core.runnables import RunnableConfig
 from langgraph.config import get_stream_writer
 from langgraph.types import interrupt
+from pydantic import ValidationError
 
 from golem.config import PERMISSION_MODES, PermissionMode
 from golem.graphs.adapter import (
     APPROVAL_KIND,
     CHILD_FACT_KIND,
     FILE_CHANGED_KIND,
+    HELPERS_KIND,
     PLAN_PROPOSED_KIND,
     SKILL_LOADED_KIND,
     STREAM_KEY,
@@ -51,6 +59,13 @@ from golem.graphs.state import AgentState
 from golem.permissions.engine import Allowance, session_allows
 from golem.permissions.policy import Policy, describe, explain
 from golem.skills.registry import SkillRegistry
+from golem.tools.delegate import (
+    DelegateArgs,
+    HelperOutcome,
+    HelperSpec,
+    results_summary,
+    results_text,
+)
 from golem.tools.registry import (
     Artifacts,
     Delegated,
@@ -59,6 +74,7 @@ from golem.tools.registry import (
     ToolContext,
     ToolError,
     ToolRegistry,
+    ToolResult,
     ToolScope,
 )
 
@@ -93,6 +109,9 @@ CHILD_KEY = "golem_child"
 LOCAL_ONLY_KEY = "golem_local_only"
 """``configurable`` key for whether the session stays on this Mac, for the helper's model."""
 
+HELPERS_DONE = "helpers_done"
+"""The ``decision`` of the answer that wakes a lead parked for its helpers."""
+
 NO_ASK_REFUSAL = "a helper cannot ask for approval: this call needs it"
 
 
@@ -104,11 +123,43 @@ class ChildScope:
     max_calls: int
 
 
-class ChildHost(Protocol):
+class HelperHost(Protocol):
+    """What starts helper sessions and reads how they ended. The session manager has it."""
+
+    async def start_helpers(
+        self,
+        *,
+        state: AgentState,
+        config: RunnableConfig,
+        call_id: str,
+        helpers: Sequence[HelperSpec],
+    ) -> None:
+        """Start the helpers of the ``delegate`` call ``call_id``, or find them again.
+
+        Idempotent for one call. Refuses what the manager refuses, such as a helper of a helper,
+        by raising :class:`ToolError` with a message the model can read.
+        """
+        ...
+
+    async def helpers_ended(self, session_id: str, call_id: str) -> bool:
+        """Whether every helper of the call has ended."""
+        ...
+
+    async def helper_results(self, session_id: str, call_id: str) -> list[HelperOutcome]:
+        """How each helper of the call ended, in the order of the call."""
+        ...
+
+
+class ChildHost(HelperHost, Protocol):
     """What the tools node needs to start a helper. The chat runtime has it."""
 
     @property
     def child_limits(self) -> ChildLimits: ...
+
+    @property
+    def parks_lead(self) -> bool:
+        """Whether helpers are sessions the lead parks for. False: ``delegate`` below runs them."""
+        ...
 
     async def delegate(
         self,
@@ -178,6 +229,11 @@ class Answer:
         return {"decision": self.decision, "diff": self.diff, "args": self.args}
 
     @staticmethod
+    def helpers_done() -> Answer:
+        """The wake of a lead parked for its helpers. The node ignores what it says."""
+        return Answer(decision=HELPERS_DONE)
+
+    @staticmethod
     def parse(raw: object) -> Answer:
         if not isinstance(raw, dict):
             return Answer(decision="deny")
@@ -234,6 +290,9 @@ def tools_node(
         plan_first = _plan_first(config)
         helper = child_of(config) is not None
         host = children()
+        parking = host is not None and host.parks_lead and bool(session_id)
+        parked: list[str] = []
+        delegated = _delegated_this_turn(state["messages"])
         asked = _asked(config)
         ids = [call_id_of(call) for call in last.tool_calls]
         last_asked = max(
@@ -275,15 +334,42 @@ def tools_node(
                 )
             if verdict.run and isinstance(preview, Preview):
                 planned[preview.path] = preview.after
+            if verdict.run and parking and call["name"] == "delegate":
+                # Only a call the policy lets through starts helpers.
+                assert host is not None
+                try:
+                    specs = _specs(call if verdict.args is None else {**call, "args": verdict.args})
+                    if delegated >= host.child_limits.max_per_turn:
+                        raise ToolError(NO_MORE_HELPERS)
+                    await host.start_helpers(
+                        state=state, config=config, call_id=ids[index], helpers=specs
+                    )
+                except InvalidArguments as exc:
+                    verdict = _Verdict(run=False, message=str(exc), kind="invalid_args")
+                except ToolError as exc:
+                    message = str(exc) or type(exc).__name__
+                    verdict = _Verdict(run=False, message=message, kind="denied")
+                else:
+                    delegated += 1
+                    parked.append(ids[index])
             verdicts.append(verdict)
+        if parked:
+            assert host is not None and session_id is not None
+            while not all([await host.helpers_ended(session_id, c) for c in parked]):
+                interrupt({STREAM_KEY: HELPERS_KIND, "call_ids": list(parked)})
         write = get_stream_writer()
         results: list[BaseMessage] = []
         updates: dict[str, object] = {}
-        # Helpers run one after the other: this loop awaits each call before the next.
-        delegated = _delegated_this_turn(state["messages"])
+        # A child run's helpers run one after the other: this loop awaits each call before the next.
         for call, verdict in zip(last.tool_calls, verdicts, strict=True):
             call_id = call_id_of(call)
-            if verdict.run and call["name"] == "delegate" and host is not None and not helper:
+            if (
+                verdict.run
+                and call_id not in parked
+                and call["name"] == "delegate"
+                and host is not None
+                and not helper
+            ):
                 if delegated >= host.child_limits.max_per_turn:
                     verdict = _Verdict(run=False, message=NO_MORE_HELPERS, kind="denied")
                 else:
@@ -294,35 +380,45 @@ def tools_node(
                     _result(call_id, call["name"], f"error: {verdict.message}", error=verdict.kind)
                 )
                 continue
-            write({STREAM_KEY: "tool.started", "call_id": call_id})
             started = time.monotonic()
-            output = _streamer(write, call_id)
-            ctx = replace(base, output=output, approved_diff=verdict.approved_diff)
-            if host is not None and not helper and call["name"] == "delegate" and session_id:
-                ctx = replace(
-                    ctx, delegate=_delegation(host, state, config, call_id, write, output)
-                )
-            args = call["args"] if verdict.args is None else verdict.args
-            try:
-                result = await session_tools.call(call["name"], args, ctx)
-            except ToolError as exc:
-                message = str(exc) or type(exc).__name__
-                write(_failure(call_id, message, started))
-                failure: ErrorKind = (
-                    "invalid_args"
-                    if isinstance(exc, InvalidArguments)
-                    else ("unknown_tool" if message.startswith("unknown tool") else "tool_error")
-                )
-                results.append(_result(call_id, call["name"], f"error: {message}", error=failure))
-                continue
-            except Exception as exc:
-                log.exception("tool %s failed", call["name"])
-                message = f"{type(exc).__name__}: {exc}"
-                write(_failure(call_id, message, started))
-                results.append(
-                    _result(call_id, call["name"], f"error: {message}", error="tool_error")
-                )
-                continue
+            if call_id in parked:
+                # The manager stored tool.started when it started the helpers.
+                assert host is not None and session_id is not None
+                ended = await host.helper_results(session_id, call_id)
+                result = ToolResult(output=results_text(ended), summary=results_summary(ended))
+            else:
+                write({STREAM_KEY: "tool.started", "call_id": call_id})
+                output = _streamer(write, call_id)
+                ctx = replace(base, output=output, approved_diff=verdict.approved_diff)
+                if host is not None and not helper and call["name"] == "delegate" and session_id:
+                    ctx = replace(
+                        ctx, delegate=_delegation(host, state, config, call_id, write, output)
+                    )
+                args = call["args"] if verdict.args is None else verdict.args
+                try:
+                    result = await session_tools.call(call["name"], args, ctx)
+                except ToolError as exc:
+                    message = str(exc) or type(exc).__name__
+                    write(_failure(call_id, message, started))
+                    failure: ErrorKind = (
+                        "invalid_args"
+                        if isinstance(exc, InvalidArguments)
+                        else (
+                            "unknown_tool" if message.startswith("unknown tool") else "tool_error"
+                        )
+                    )
+                    results.append(
+                        _result(call_id, call["name"], f"error: {message}", error=failure)
+                    )
+                    continue
+                except Exception as exc:
+                    log.exception("tool %s failed", call["name"])
+                    message = f"{type(exc).__name__}: {exc}"
+                    write(_failure(call_id, message, started))
+                    results.append(
+                        _result(call_id, call["name"], f"error: {message}", error="tool_error")
+                    )
+                    continue
             duration_ms = _ms(started)
             tool = session_tools.get(call["name"])
             kind = "untrusted" if tool is not None and tool.untrusted else "tool_output"
@@ -555,6 +651,16 @@ def _delegated_this_turn(messages: Sequence[BaseMessage]) -> int:
     return found
 
 
+def _specs(call: ToolCall) -> list[HelperSpec]:
+    """The helpers a ``delegate`` call asks for. Bad arguments raise :class:`InvalidArguments`."""
+    try:
+        args = DelegateArgs.model_validate(dict(call["args"]))
+    except ValidationError as exc:
+        message = f"invalid arguments for delegate: {exc.error_count()} problem(s)"
+        raise InvalidArguments(message) from exc
+    return [HelperSpec(agent=args.agent, brief=args.brief)]
+
+
 def _delegation(
     host: ChildHost,
     state: AgentState,
@@ -687,6 +793,7 @@ __all__ = [
     "CWD_KEY",
     "DENIED_RESULT",
     "ERROR_KEY",
+    "HELPERS_DONE",
     "LOCAL_ONLY_KEY",
     "MCP_KEY",
     "MCP_NOW_KEY",
@@ -703,6 +810,7 @@ __all__ = [
     "ChildScope",
     "EnableMcp",
     "ErrorKind",
+    "HelperHost",
     "call_id_of",
     "cancelled_results",
     "child_of",

@@ -87,6 +87,7 @@ from golem.graphs.tools_node import (
     BudgetOf,
     ChildScope,
     EnableMcp,
+    HelperHost,
     cancelled_results,
     child_of,
     scope_of,
@@ -118,6 +119,7 @@ from golem.permissions.policy import Policy
 from golem.sessions.ids import new_id
 from golem.skills.registry import SkillRegistry
 from golem.tools import default_registry
+from golem.tools.delegate import HelperOutcome, HelperSpec
 from golem.tools.registry import Artifacts, ToolRegistry
 
 log = logging.getLogger("golem.graphs")
@@ -170,7 +172,7 @@ _MAX_UNDONE = 20
 class _RunningGraph(Protocol):
     def astream(
         self,
-        graph_input: AgentState | Command[object],
+        graph_input: AgentState | Command[object] | None,
         config: RunnableConfig,
         *,
         stream_mode: list[str],
@@ -246,6 +248,8 @@ class ChatRuntime:
         self.budget_refs: Callable[[], list[str]] | None = None
         """Ready budget models that take tools, cheapest first, for the ``explore`` role."""
         self._child_limits: ChildLimits | None = None
+        self.helpers: HelperHost | None = None
+        """Starts and reads helper sessions, for ``delegate``. None: a helper is a child run."""
         self.next_model: NextModel | None = None
         """Names the model a run steps up to. None: a run never steps up."""
 
@@ -401,6 +405,8 @@ class ChatRuntime:
     ) -> AsyncGenerator[object]:
         """Go on with a run paused on a tool approval, with the user's ``answer``.
 
+        A lead parked for its helpers is woken with ``Answer.helpers_done()``.
+
         ``asked`` are the call ids the run already asked about, this one included.
 
         Close the generator when you stop early, as with :meth:`stream`.
@@ -425,6 +431,47 @@ class ChatRuntime:
         }
         command: Command[object] = Command(resume=answer.to_resume())
         async with aclosing(self._parts(command, config)) as parts:
+            async for part in parts:
+                yield part
+
+    async def continue_thread(
+        self,
+        *,
+        session_id: str,
+        cwd: str | None = None,
+        allowed_tools: Sequence[Allowance] = (),
+        mcp_servers: Sequence[str] = (),
+        pinned: Sequence[str] = (),
+        pinned_folders: Sequence[str] = (),
+        options: Mapping[str, float | str] | None = None,
+        permission_mode: PermissionMode | None = None,
+        checks: bool | None = None,
+        plan_first: bool = False,
+        local_only: bool = False,
+    ) -> AsyncGenerator[object]:
+        """Run the thread from its last checkpoint with no new input.
+
+        For a run that stopped between two steps, such as a helper after a restart. Close the
+        generator when you stop early, as with :meth:`stream`.
+        """
+        config: RunnableConfig = {
+            "configurable": {
+                "thread_id": session_id,
+                CWD_KEY: cwd or "",
+                ALLOWED_KEY: [list(pair) for pair in allowed_tools],
+                MCP_KEY: list(mcp_servers),
+                MCP_NOW_KEY: set[str](),
+                PINNED_KEY: list(pinned),
+                PINNED_FOLDERS_KEY: list(pinned_folders),
+                OPTIONS_KEY: dict(options or {}),
+                MODE_KEY: permission_mode,
+                CHECKS_KEY: checks,
+                PLAN_KEY: plan_first,
+                LOCAL_ONLY_KEY: local_only,
+            },
+            "recursion_limit": _RECURSION_LIMIT,
+        }
+        async with aclosing(self._parts(None, config)) as parts:
             async for part in parts:
                 yield part
 
@@ -512,13 +559,41 @@ class ChatRuntime:
             options=_options(config) if role.same_as_session else {},
         )
 
+    @property
+    def parks_lead(self) -> bool:
+        """Whether ``delegate`` starts helper sessions and parks the run for them."""
+        return self.helpers is not None
+
+    async def start_helpers(
+        self,
+        *,
+        state: AgentState,
+        config: RunnableConfig,
+        call_id: str,
+        helpers: Sequence[HelperSpec],
+    ) -> None:
+        await self._helper_host().start_helpers(
+            state=state, config=config, call_id=call_id, helpers=helpers
+        )
+
+    async def helpers_ended(self, session_id: str, call_id: str) -> bool:
+        return await self._helper_host().helpers_ended(session_id, call_id)
+
+    async def helper_results(self, session_id: str, call_id: str) -> list[HelperOutcome]:
+        return await self._helper_host().helper_results(session_id, call_id)
+
+    def _helper_host(self) -> HelperHost:
+        if self.helpers is None:
+            raise RuntimeError("no helper host is set")
+        return self.helpers
+
     async def waiting(self, session_id: str) -> bool:
         """Whether the thread is paused on an interrupt."""
         snapshot = await self._graph.aget_state(self._config(session_id))
         return bool(getattr(snapshot, "interrupts", ()))
 
     async def _parts(
-        self, graph_input: AgentState | Command[object], config: RunnableConfig
+        self, graph_input: AgentState | Command[object] | None, config: RunnableConfig
     ) -> AsyncGenerator[object]:
         parts = self._graph.astream(
             graph_input,
