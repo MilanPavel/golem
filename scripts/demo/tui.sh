@@ -27,4 +27,5 @@ done
 
 mkdir -p scripts/demo/out
 DEMO_ENV="$env_file" vhs scripts/demo/tui.tape
-sh scripts/demo/encode.sh scripts/demo/out/tui.mp4 demo-tui
+# The terminal clip scrolls a lot, so its GIF takes fewer frames and colours to stay small.
+GIF_FPS=8 GIF_COLORS=40 GIF_DITHER=none GIF_STATS=full sh scripts/demo/encode.sh scripts/demo/out/tui.mp4 demo-tui
