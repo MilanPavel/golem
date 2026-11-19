@@ -31,8 +31,8 @@ from golem.models.check_cases import (
     Reply,
 )
 from golem.models.cost import cost_usd
+from golem.models.dispatcher import Dispatcher, job_slot
 from golem.models.errors import ModelUnreachable, failure_of, provider_error
-from golem.models.gate import ServerGate
 from golem.models.ollama import LocalServers
 from golem.models.router import ModelConfigError, ModelRouter
 from golem.models.scores import Scores
@@ -201,7 +201,7 @@ class CheckManager:
         *,
         tools: ToolRegistry | None = None,
         broadcast: Broadcast | None = None,
-        gate: ServerGate | None = None,
+        dispatcher: Dispatcher | None = None,
         local: LocalServers | None = None,
         learn_window: Callable[[str], Awaitable[None]] | None = None,
         price_of: Callable[[str], ModelPrice | None] | None = None,
@@ -212,7 +212,7 @@ class CheckManager:
         self._scores = scores
         self._tools = tools or default_registry()
         self.broadcast: Broadcast = broadcast or (lambda _model: None)
-        self._gate = gate
+        self._dispatcher = dispatcher
         self.local = local
         self._learn_window = learn_window
         self._price_of = price_of
@@ -298,10 +298,9 @@ class CheckManager:
             note = ModelCheckProgress(ref=ref, index=index, total=total, result=_case_wire(result))
             self._send(ModelCheckProgressNotification(params=note))
 
-        gate = None if self._gate is None or target is None else self._gate.hold(target[1], "chat")
+        line = self._router.local_line(profile)
         async with contextlib.AsyncExitStack() as stack:
-            if gate is not None:
-                await stack.enter_async_context(gate)
+            await stack.enter_async_context(job_slot(self._dispatcher, line, None, "a model check"))
             if server is not None:
                 await stack.enter_async_context(server.hold())
             return await run_cases(

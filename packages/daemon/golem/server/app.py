@@ -29,8 +29,9 @@ from golem.mcp.prompt import mcp_section
 from golem.models.budget import Budget
 from golem.models.check import CheckManager
 from golem.models.discovery import Loaded, ModelDiscovery
+from golem.models.dispatcher import Call
+from golem.models.dispatcher import Dispatcher as ModelDispatcher
 from golem.models.facts import FactsSource, ListedFacts
-from golem.models.gate import ServerGate
 from golem.models.install import RUNTIMES, OllamaInstaller, runtime_installer
 from golem.models.keys import ProviderKeys
 from golem.models.ollama import LocalServer, LocalServers, ServerState
@@ -131,7 +132,6 @@ class DaemonApp:
         user_home: Path | None = None,
         bundled_skills: Path | None = None,
         local_servers: LocalServers | None = None,
-        gate: ServerGate | None = None,
         socket_check_seconds: float = SOCKET_CHECK_SECONDS,
         poster: Poster | None = None,
     ) -> None:
@@ -142,7 +142,6 @@ class DaemonApp:
         self._bundled_skills = bundled_skills
         self._router = router
         self._titles = titles
-        self._gate = gate
         self._discovery = discovery
         self._facts = facts
         self._pulls = pulls
@@ -283,7 +282,15 @@ class DaemonApp:
                         lambda profile: _price_of(router, models, profile),
                         lambda profile: _tier_of(router, models, profile),
                     )
-                gate = self._gate or ServerGate(settings.ollama.parallel)
+                bus = EventBus()
+                state = self.state
+
+                def rank_of(call: Call) -> int:
+                    return class_of(call, bus, state.sessions)
+
+                dispatch = ModelDispatcher(rank_of, local_slots=settings.ollama.parallel)
+                if isinstance(self._titles, ModelTitles):
+                    self._titles.use(dispatch)
                 chat = open_chat(
                     router,
                     saver,
@@ -309,14 +316,14 @@ class DaemonApp:
                     learn_window=learn_window,
                     context=router.context_settings(),
                     price_of=lambda profile: _price_of(router, models, profile),
-                    gate=gate,
+                    dispatcher=dispatch,
                     tier_of=lambda profile: _tier_of(router, models, profile),
                     ratios=TokenRatios(),
                     paid_ok=budget.paid_ok,
                     budget_refs=models.budget_refs,
                     summariser=Summariser(
                         router,
-                        gate=gate,
+                        dispatcher=dispatch,
                         usage=usage,
                         paid_ok=budget.paid_ok,
                         price_of=lambda profile: _price_of(router, models, profile),
@@ -327,7 +334,6 @@ class DaemonApp:
                         ),
                     ),
                 )
-                bus = EventBus()
                 self.state.sessions = await _open_sessions(
                     database,
                     bus,
@@ -391,7 +397,7 @@ class DaemonApp:
                     scores,
                     tools=default_registry(None, policy.web()),
                     broadcast=self._broadcast,
-                    gate=gate,
+                    dispatcher=dispatch,
                     local=local,
                     learn_window=learn_window,
                     price_of=lambda profile: _price_of(router, models, profile),
@@ -415,7 +421,7 @@ class DaemonApp:
                     routines.start()
                     watcher.start()
                     idle = asyncio.create_task(
-                        _stop_idle(local, self.paths.home), name="golem-ollama-idle"
+                        _stop_idle(local, self.paths.home, dispatch), name="golem-ollama-idle"
                     )
                     watch = asyncio.create_task(self._watch_socket(), name="golem-socket-watch")
                     await self._stop.wait()
@@ -730,13 +736,11 @@ async def serve_forever() -> int:
     paths.ensure_layout()
     secrets = KeychainSecrets()
     router = ModelRouter(settings, home=paths.home, keys=ProviderKeys(secrets))
-    gate = ServerGate(settings.ollama.parallel)
-    titles = ModelTitles(router, gate) if settings.session_titles else None
+    titles = ModelTitles(router) if settings.session_titles else None
     app = DaemonApp(
         paths,
         router=router,
         titles=titles,
-        gate=gate,
         secrets=secrets,
         bundled_skills=bundled_skills_dir(),
     )
@@ -760,24 +764,50 @@ def _refuse_start(paths: GolemPaths, exc: Exception, why: tuple[str, str]) -> in
     return 1
 
 
-def _apply_ollama_settings(local: LocalServers, home: Path) -> None:
+def class_of(call: Call, bus: EventBus, sessions: SessionManager | None) -> int:
+    """The class of a call (ADR-060, section 5). A lower class goes first.
+
+    0 a chat you look at, 1 its helper, 2 any other chat and its helper, 3 an unattended
+    run (origin ``routine:*``) and its helper, 4 a job.
+    """
+    if call.role == "job":
+        return 4
+    session_id = call.session_id
+    origin = None if session_id is None or sessions is None else sessions.origin_of(session_id)
+    if session_id is not None and bus.attached(session_id):
+        base = 0
+    elif origin is not None and origin.startswith("routine:"):
+        base = 3
+    else:
+        base = 2
+    return 1 if call.role == "helper" and base == 0 else base
+
+
+def _apply_ollama_settings(
+    local: LocalServers, home: Path, dispatch: ModelDispatcher | None = None
+) -> None:
     """Hand a changed ``[ollama]`` table to the local servers. A server golem started
-    restarts for a new ``parallel`` the next time a call finds it unused."""
+    restarts for a new ``parallel`` the next time a call finds it unused. The lines of the
+    dispatcher get the new slot count at once."""
     try:
         settings = load_settings(home=home, project_dir=home).ollama
     except (OSError, ValueError):
         log.debug("config.toml does not load; the local servers keep their settings")
         return
     if settings != local.settings:
+        if dispatch is not None and settings.parallel != local.settings.parallel:
+            dispatch.set_local_slots(settings.parallel)
         local.settings = settings
 
 
-async def _stop_idle(local: LocalServers, home: Path) -> None:
+async def _stop_idle(
+    local: LocalServers, home: Path, dispatch: ModelDispatcher | None = None
+) -> None:
     """Stop each Ollama golem started once it has been unused for ``idle_stop_minutes``,
     and pick up a changed ``[ollama]`` setting."""
     while True:
         await asyncio.sleep(_IDLE_CHECK_SECONDS)
-        _apply_ollama_settings(local, home)
+        _apply_ollama_settings(local, home, dispatch)
         try:
             await local.stop_idle()
         except Exception:

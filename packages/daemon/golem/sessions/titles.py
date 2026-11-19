@@ -18,8 +18,8 @@ from langchain_core.messages import HumanMessage, SystemMessage
 
 from golem.config import ModelPrice
 from golem.models.cost import cost_usd
+from golem.models.dispatcher import Dispatcher, job_slot
 from golem.models.errors import BUDGET_HINT, BudgetSpent
-from golem.models.gate import ServerGate
 from golem.models.roles import for_role
 from golem.models.router import ModelConfigError, ModelRouter
 from golem.models.tiers import Tier
@@ -65,15 +65,19 @@ class ModelTitles:
     ``titles`` call of the session, under the model that wrote it.
     """
 
-    def __init__(self, router: ModelRouter, gate: ServerGate | None = None) -> None:
+    def __init__(self, router: ModelRouter, dispatcher: Dispatcher | None = None) -> None:
         self._router = router
-        self._gate = gate
+        self._dispatcher = dispatcher
         self._tier_of_ref: Callable[[str], Tier | None] = lambda ref: None
         self._budget_refs: Callable[[], list[str]] = list
         self._usage: Usage | None = None
         self._price_of: Callable[[str], ModelPrice | None] | None = None
         self._tier_of: Callable[[str], Tier | None] | None = None
         self._paid_ok: Callable[[str | None], Awaitable[bool]] | None = None
+
+    def use(self, dispatcher: Dispatcher) -> None:
+        """Take a slot of ``dispatcher`` before each local title call."""
+        self._dispatcher = dispatcher
 
     def limit(self, paid_ok: Callable[[str | None], Awaitable[bool]]) -> None:
         """Skip a paid title when ``paid_ok`` says a cap in ``[budget]`` is spent."""
@@ -133,12 +137,10 @@ class ModelTitles:
             if "off" in (self._router.think_values(model_id) or ()):
                 overrides["think"] = "off"
         model = self._router.chat_model(role.profile, overrides, local_only=local_only)
-        gate = self._gate or ServerGate()
-        # A title waits behind the chat on the local server of the model it runs on.
+        # A title waits behind the chat on the local line of the model it runs on.
+        line = self._router.local_line(role.profile)
         try:
-            async with gate.hold(
-                None if self._gate is None or server is None else server[1], "job"
-            ):
+            async with job_slot(self._dispatcher, line, session_id, "a title job"):
                 answer = await model.ainvoke(
                     [
                         SystemMessage(content=_INSTRUCTION),

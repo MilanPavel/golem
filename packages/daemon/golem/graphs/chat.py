@@ -16,7 +16,7 @@ from __future__ import annotations
 import json
 import logging
 from collections.abc import AsyncGenerator, AsyncIterator, Awaitable, Callable, Mapping, Sequence
-from contextlib import AbstractAsyncContextManager, aclosing, nullcontext
+from contextlib import AbstractAsyncContextManager, aclosing, asynccontextmanager, nullcontext
 from dataclasses import dataclass, replace
 from typing import Any, Literal, Protocol, cast
 
@@ -94,6 +94,7 @@ from golem.graphs.tools_node import (
     unanswered_calls,
 )
 from golem.models.discovery import Loaded
+from golem.models.dispatcher import Call, Dispatcher, Grant, Wait
 from golem.models.errors import (
     BUDGET_HINT,
     BudgetSpent,
@@ -105,7 +106,6 @@ from golem.models.errors import (
     provider_error,
     retry_delay,
 )
-from golem.models.gate import ServerGate
 from golem.models.ollama import LocalServers
 from golem.models.pick import size_text
 from golem.models.roles import RoleModel, for_role
@@ -689,7 +689,7 @@ def open_chat(
     window_of: WindowOf | None = None,
     note_loaded: Callable[[str, int | None], Awaitable[Loaded]] | None = None,
     price_of: Callable[[str], ModelPrice | None] | None = None,
-    gate: ServerGate | None = None,
+    dispatcher: Dispatcher | None = None,
     tier_of: Callable[[str], Tier | None] | None = None,
     learn_window: Callable[[str], Awaitable[None]] | None = None,
     context: ContextSettings | None = None,
@@ -716,8 +716,9 @@ def open_chat(
     ``learn_window`` is awaited before the window is worked out, so a local model's size
     and maximum are known on the first call. The window the call ran with goes out as
     ``model.response``, with ``text_tool_calls`` (``recovered`` or ``unread``) when the reply
-    held a tool call written as text. A failure there never fails the call. With ``gate``,
-    a call to a local server waits for its turn first, so one generation runs at a time on it.
+    held a tool call written as text. A failure there never fails the call. With
+    ``dispatcher``, a call to a local model waits for a slot of its line first. The slot is held
+    for one call: a retry gives it back and takes one again.
     ``context`` holds the ``[context]`` settings. When the history fills the window past
     ``clear_at``, old tool results are sent as one line each. Without it, nothing is cleared.
     With ``summariser``, a history still past ``compact_at`` after that has its old turns
@@ -897,9 +898,24 @@ def open_chat(
             chat = router.chat_model(profile, overrides, local_only=local_only)
             before = chat.callbacks
             chat.callbacks = [streamed]
-            try:
-                async with _gated(router, gate, profile, message_id):
-                    if growth is not None:
+            arrived: float | None = None
+            grew_told = False
+
+            async def attempt() -> AIMessage:
+                nonlocal arrived, grew_told
+                async with _gated(
+                    router,
+                    dispatcher,
+                    profile,
+                    message_id,
+                    state.get("session_id"),
+                    "chat" if child is None else "helper",
+                    arrived,
+                ) as grant:
+                    if grant is not None:
+                        arrived = grant.arrived
+                    if growth is not None and not grew_told:
+                        grew_told = True
                         get_stream_writer()(
                             {
                                 STREAM_KEY: "model.waiting",
@@ -909,9 +925,10 @@ def open_chat(
                                 "window": growth.window_to,
                             }
                         )
-                    response = await _retrying(
-                        lambda: binder.invoke(profile, chat, sent, schemas), streamed, router.sleep
-                    )
+                    return await binder.invoke(profile, chat, sent, schemas)
+
+            try:
+                response = await _retrying(attempt, streamed, router.sleep)
             except Exception as exc:
                 down = router.unreachable(profile, exc) or await router.refused(profile, exc)
                 failure = "unreachable" if down is not None else failure_of(exc)
@@ -1657,19 +1674,41 @@ def _held(
     return nullcontext() if server is None else server.hold()
 
 
-def _gated(
-    router: ModelRouter, gate: ServerGate | None, profile: str, message_id: str
-) -> AbstractAsyncContextManager[None]:
-    """Wait for a turn on the local server ``profile`` runs on, or not for any other model."""
-    target = None if gate is None else router.ollama_server(profile)
-    if gate is None or target is None:
-        return nullcontext()
+@asynccontextmanager
+async def _gated(
+    router: ModelRouter,
+    dispatcher: Dispatcher | None,
+    profile: str,
+    message_id: str,
+    session_id: object,
+    role: Literal["chat", "helper"],
+    arrived: float | None,
+) -> AsyncGenerator[Grant | None]:
+    """Hold a slot of the local line ``profile`` runs on, or nothing for any other model.
+
+    A wait of over a second writes ``model.waiting``, and it ends when the call has its turn.
+    ``arrived`` is the first arrival of a call that is tried again, so it keeps its place.
+    """
+    line = None if dispatcher is None else router.local_line(profile)
+    if dispatcher is None or line is None:
+        yield None
+        return
     write = get_stream_writer()
+    told = False
 
-    def notice(waiting: bool) -> None:
-        write({STREAM_KEY: "model.waiting", "message_id": message_id, "waiting": waiting})
+    def notice(wait: Wait | None) -> None:
+        nonlocal told
+        if wait is not None and not told:
+            told = True
+            write({STREAM_KEY: "model.waiting", "message_id": message_id, "waiting": True})
+        elif wait is None and told:
+            told = False
+            write({STREAM_KEY: "model.waiting", "message_id": message_id, "waiting": False})
 
-    return gate.hold(target[1], "chat", notice)
+    label = "a chat" if role == "chat" else "a helper"
+    sid = session_id if isinstance(session_id, str) else None
+    async with dispatcher.hold(Call(line, sid, role, label, arrived), notice) as grant:
+        yield grant
 
 
 def _ai(message: BaseMessage) -> AIMessage:
