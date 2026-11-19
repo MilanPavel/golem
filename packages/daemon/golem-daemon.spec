@@ -29,7 +29,11 @@ if sys.platform == "darwin":
 for package in packages:
     hidden += collect_submodules(package)
 
-datas = collect_data_files("golem.models") + collect_data_files("golem.mcp")
+datas = (
+    collect_data_files("golem.models")
+    + collect_data_files("golem.mcp")
+    + collect_data_files("golem.agents")
+)
 for distribution in (
     "golem",
     "golem-protocol",
