@@ -43,7 +43,12 @@ export type Params =
   | SkillSkippedEvent
   | CheckOfferedEvent
   | CheckStartedEvent
-  | CheckCompletedEvent;
+  | CheckCompletedEvent
+  | HelperStartedEvent
+  | HelperStepEvent
+  | HelperStateEvent
+  | HelperWaitEvent
+  | HelperEndedEvent;
 export type Asks = boolean;
 export type AnswerChars = number | null;
 export type MaxCalls = number | null;
@@ -802,6 +807,61 @@ export type Seq40 = number;
 export type SessionId42 = string;
 export type Ts40 = string;
 export type Type40 = 'check.completed';
+export type Agent = string;
+export type CallId11 = string;
+export type HelperId = string;
+export type Index3 = number;
+export type Label = string;
+export type Model4 = string;
+export type PickReason = string;
+export type Wish1 = string;
+export type RunId42 = string | null;
+export type Seq41 = number;
+export type SessionId43 = string;
+export type Ts41 = string;
+export type Type41 = 'helper.started';
+export type CallId12 = string;
+export type Calls = number;
+export type Index4 = number;
+export type Name13 = string;
+export type Status4 = 'running' | 'done' | 'failed';
+export type StepId = string;
+export type RunId43 = string | null;
+export type Seq42 = number;
+export type SessionId44 = string;
+export type Ts42 = string;
+export type Type42 = 'helper.step';
+export type CallId13 = string;
+export type Index5 = number;
+export type Reason5 = string | null;
+export type State = 'queued' | 'running' | 'waiting';
+export type RunId44 = string | null;
+export type Seq43 = number;
+export type SessionId45 = string;
+export type Ts43 = string;
+export type Type43 = 'helper.state';
+export type CallId14 = string;
+export type HelperIds = string[];
+export type State1 = 'parked' | 'resumed';
+export type RunId45 = string | null;
+export type Seq44 = number;
+export type SessionId46 = string;
+export type Ts44 = string;
+export type Type44 = 'helper.wait';
+export type AnswerTokens = number;
+export type CallId15 = string;
+export type CostUsd1 = number;
+export type DurationMs3 = number;
+export type Index6 = number;
+export type ModelCalls = number;
+export type Stopped = 'done' | 'calls' | 'time' | 'budget' | 'tokens' | 'cancelled' | 'failed';
+export type Tokens = number;
+export type WorkingMs = number;
+export type RunId46 = string | null;
+export type Seq45 = number;
+export type SessionId47 = string;
+export type Ts45 = string;
+export type Type45 = 'helper.ended';
 
 /**
  * Server → client event. No ``id``; this is not a response to a request.
@@ -1364,9 +1424,11 @@ export interface ModelCallStartedEvent {
  * and ``message_bytes`` have one number per message sent. Each is None on an
  * event recorded before they existed.
  *
- * ``parent_call_id`` is set on an event of a child run: the id of the ``delegate`` call
- * that started it. The event is in the parent's run, and a client that does not know
- * child runs ignores it. None for the run's own events.
+ * ``parent_call_id`` is legacy. Old logs set it on an event of a child run: the id of
+ * the ``delegate`` call that started it. The event is in the parent's run, and a client
+ * that does not know child runs ignores it. None for the run's own events. A new helper
+ * writes none, because it has its own session and ``helper.*`` events. The field stays,
+ * since removing it would break old logs.
  *
  * This interface was referenced by `RpcNotification`'s JSON-Schema
  * via the `definition` "ModelCallStartedData".
@@ -1448,9 +1510,11 @@ export interface ModelCallCompletedEvent {
  * the model, reading the prompt and writing the reply. From the model server's own clock.
  * Ollama only.
  *
- * ``parent_call_id`` is set on an event of a child run: the id of the ``delegate`` call
- * that started it. The event is in the parent's run, and a client that does not know
- * child runs ignores it. None for the run's own events.
+ * ``parent_call_id`` is legacy. Old logs set it on an event of a child run: the id of
+ * the ``delegate`` call that started it. The event is in the parent's run, and a client
+ * that does not know child runs ignores it. None for the run's own events. A new helper
+ * writes none, because it has its own session and ``helper.*`` events. The field stays,
+ * since removing it would break old logs.
  *
  * This interface was referenced by `RpcNotification`'s JSON-Schema
  * via the `definition` "ModelCallCompletedData".
@@ -1643,9 +1707,11 @@ export interface ToolRequestedEvent {
  * ``message_id`` is the assistant message that asked. ``args`` are the
  * arguments as the model wrote them.
  *
- * ``parent_call_id`` is set on an event of a child run: the id of the ``delegate`` call
- * that started it. The event is in the parent's run, and a client that does not know
- * child runs ignores it. None for the run's own events.
+ * ``parent_call_id`` is legacy. Old logs set it on an event of a child run: the id of
+ * the ``delegate`` call that started it. The event is in the parent's run, and a client
+ * that does not know child runs ignores it. None for the run's own events. A new helper
+ * writes none, because it has its own session and ``helper.*`` events. The field stays,
+ * since removing it would break old logs.
  *
  * This interface was referenced by `RpcNotification`'s JSON-Schema
  * via the `definition` "ToolRequestedData".
@@ -1739,9 +1805,11 @@ export interface ToolStartedEvent {
 /**
  * A requested tool call is running.
  *
- * ``parent_call_id`` is set on an event of a child run: the id of the ``delegate`` call
- * that started it. The event is in the parent's run, and a client that does not know
- * child runs ignores it. None for the run's own events.
+ * ``parent_call_id`` is legacy. Old logs set it on an event of a child run: the id of
+ * the ``delegate`` call that started it. The event is in the parent's run, and a client
+ * that does not know child runs ignores it. None for the run's own events. A new helper
+ * writes none, because it has its own session and ``helper.*`` events. The field stays,
+ * since removing it would break old logs.
  *
  * This interface was referenced by `RpcNotification`'s JSON-Schema
  * via the `definition` "ToolStartedData".
@@ -1808,9 +1876,11 @@ export interface ToolCompletedEvent {
  * ``sources`` are the web pages a ``web_search`` or ``web_fetch`` call found or read, for
  * the screen's source chips. None for any other call. The model does not get them.
  *
- * ``parent_call_id`` is set on an event of a child run: the id of the ``delegate`` call
- * that started it. The event is in the parent's run, and a client that does not know
- * child runs ignores it. None for the run's own events.
+ * ``parent_call_id`` is legacy. Old logs set it on an event of a child run: the id of
+ * the ``delegate`` call that started it. The event is in the parent's run, and a client
+ * that does not know child runs ignores it. None for the run's own events. A new helper
+ * writes none, because it has its own session and ``helper.*`` events. The field stays,
+ * since removing it would break old logs.
  *
  * This interface was referenced by `RpcNotification`'s JSON-Schema
  * via the `definition` "ToolCompletedData".
@@ -1862,9 +1932,11 @@ export interface ToolFailedEvent {
  * ``duration_ms`` is how long the tool ran before it raised. None means a
  * call that was denied or cut off, which never ran or was not timed.
  *
- * ``parent_call_id`` is set on an event of a child run: the id of the ``delegate`` call
- * that started it. The event is in the parent's run, and a client that does not know
- * child runs ignores it. None for the run's own events.
+ * ``parent_call_id`` is legacy. Old logs set it on an event of a child run: the id of
+ * the ``delegate`` call that started it. The event is in the parent's run, and a client
+ * that does not know child runs ignores it. None for the run's own events. A new helper
+ * writes none, because it has its own session and ``helper.*`` events. The field stays,
+ * since removing it would break old logs.
  *
  * This interface was referenced by `RpcNotification`'s JSON-Schema
  * via the `definition` "ToolFailedData".
@@ -2323,4 +2395,171 @@ export interface CheckCompletedData {
   output: Output2;
   round?: Round1;
   status: Status3;
+}
+/**
+ * A helper session was made. A summary on the lead's log; the helper's own log has the rest.
+ *
+ * This interface was referenced by `RpcNotification`'s JSON-Schema
+ * via the `definition` "HelperStartedEvent".
+ */
+export interface HelperStartedEvent {
+  data: HelperStartedData;
+  run_id?: RunId42;
+  seq: Seq41;
+  session_id: SessionId43;
+  ts: Ts41;
+  type: Type41;
+}
+/**
+ * A helper session was made for one ``delegate`` call.
+ *
+ * This is on the lead's log, with the ``delegate`` call's id as ``call_id``. ``index``
+ * is the helper's place in that call, and ``helper_id`` is its own session id.
+ * ``agent`` is the agent type and ``label`` the short name the card shows. ``model`` is
+ * the model it was given. ``wish`` is what the agent file asked for (``cheapest``,
+ * ``same``, ``stronger``, a tier or a model) and ``pick_reason`` says in plain words
+ * why that model came out of it.
+ *
+ * This interface was referenced by `RpcNotification`'s JSON-Schema
+ * via the `definition` "HelperStartedData".
+ */
+export interface HelperStartedData {
+  agent: Agent;
+  call_id: CallId11;
+  helper_id: HelperId;
+  index: Index3;
+  label: Label;
+  model: Model4;
+  pick_reason: PickReason;
+  wish: Wish1;
+}
+/**
+ * A tool call of a helper started or ended.
+ *
+ * This interface was referenced by `RpcNotification`'s JSON-Schema
+ * via the `definition` "HelperStepEvent".
+ */
+export interface HelperStepEvent {
+  data: HelperStepData;
+  run_id?: RunId43;
+  seq: Seq42;
+  session_id: SessionId44;
+  ts: Ts42;
+  type: Type42;
+}
+/**
+ * A tool call of a helper started or ended.
+ *
+ * Thin on purpose: the card shows what ran, and the helper's own log has the detail.
+ * ``args`` holds only the path, pattern, query or ref of the call. ``step_id`` is the
+ * helper's own tool call id. ``calls`` is how many tool calls the helper has made so far.
+ *
+ * This interface was referenced by `RpcNotification`'s JSON-Schema
+ * via the `definition` "HelperStepData".
+ */
+export interface HelperStepData {
+  args?: Args4;
+  call_id: CallId12;
+  calls: Calls;
+  index: Index4;
+  name: Name13;
+  status: Status4;
+  step_id: StepId;
+}
+export interface Args4 {
+  [k: string]: unknown;
+}
+/**
+ * A helper queued, started running, started waiting, or went on.
+ *
+ * This interface was referenced by `RpcNotification`'s JSON-Schema
+ * via the `definition` "HelperStateEvent".
+ */
+export interface HelperStateEvent {
+  data: HelperStateData;
+  run_id?: RunId44;
+  seq: Seq43;
+  session_id: SessionId45;
+  ts: Ts43;
+  type: Type43;
+}
+/**
+ * A helper queued, started running, started waiting, or went on.
+ *
+ * ``reason`` says why it waits or queues. It is a plain string, not a fixed list: the
+ * words today are ``you`` and ``team``, and later phases add more, so a new word is not
+ * a protocol change. It is None when the helper runs with nothing to explain.
+ *
+ * This interface was referenced by `RpcNotification`'s JSON-Schema
+ * via the `definition` "HelperStateData".
+ */
+export interface HelperStateData {
+  call_id: CallId13;
+  index: Index5;
+  reason?: Reason5;
+  state: State;
+}
+/**
+ * The lead parked to wait for its helpers, or went on.
+ *
+ * This interface was referenced by `RpcNotification`'s JSON-Schema
+ * via the `definition` "HelperWaitEvent".
+ */
+export interface HelperWaitEvent {
+  data: HelperWaitData;
+  run_id?: RunId45;
+  seq: Seq44;
+  session_id: SessionId46;
+  ts: Ts44;
+  type: Type44;
+}
+/**
+ * The lead parked to wait for its helpers, or went on.
+ *
+ * ``helper_ids`` are the helpers of this ``delegate`` call that it waits for.
+ *
+ * This interface was referenced by `RpcNotification`'s JSON-Schema
+ * via the `definition` "HelperWaitData".
+ */
+export interface HelperWaitData {
+  call_id: CallId14;
+  helper_ids?: HelperIds;
+  state: State1;
+}
+/**
+ * A helper's run ended.
+ *
+ * This interface was referenced by `RpcNotification`'s JSON-Schema
+ * via the `definition` "HelperEndedEvent".
+ */
+export interface HelperEndedEvent {
+  data: HelperEndedData;
+  run_id?: RunId46;
+  seq: Seq45;
+  session_id: SessionId47;
+  ts: Ts45;
+  type: Type45;
+}
+/**
+ * A helper's run ended.
+ *
+ * ``stopped`` says why. ``model_calls`` and ``tokens`` count what the helper used, and
+ * ``answer_tokens`` is the size of its answer. ``cost_usd`` is what it cost (0 on a local
+ * model), because the lead's footer sums its own log. ``duration_ms`` is the whole time
+ * since it started and ``working_ms`` is the part that was not spent waiting for you, a
+ * slot or a provider.
+ *
+ * This interface was referenced by `RpcNotification`'s JSON-Schema
+ * via the `definition` "HelperEndedData".
+ */
+export interface HelperEndedData {
+  answer_tokens: AnswerTokens;
+  call_id: CallId15;
+  cost_usd: CostUsd1;
+  duration_ms: DurationMs3;
+  index: Index6;
+  model_calls: ModelCalls;
+  stopped: Stopped;
+  tokens: Tokens;
+  working_ms: WorkingMs;
 }

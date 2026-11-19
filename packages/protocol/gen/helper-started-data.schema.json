@@ -1,0 +1,56 @@
+{
+  "additionalProperties": false,
+  "description": "A helper session was made for one ``delegate`` call.\n\nThis is on the lead's log, with the ``delegate`` call's id as ``call_id``. ``index``\nis the helper's place in that call, and ``helper_id`` is its own session id.\n``agent`` is the agent type and ``label`` the short name the card shows. ``model`` is\nthe model it was given. ``wish`` is what the agent file asked for (``cheapest``,\n``same``, ``stronger``, a tier or a model) and ``pick_reason`` says in plain words\nwhy that model came out of it.",
+  "properties": {
+    "agent": {
+      "minLength": 1,
+      "title": "Agent",
+      "type": "string"
+    },
+    "call_id": {
+      "minLength": 1,
+      "title": "Call Id",
+      "type": "string"
+    },
+    "helper_id": {
+      "minLength": 1,
+      "title": "Helper Id",
+      "type": "string"
+    },
+    "index": {
+      "minimum": 0,
+      "title": "Index",
+      "type": "integer"
+    },
+    "label": {
+      "title": "Label",
+      "type": "string"
+    },
+    "model": {
+      "minLength": 1,
+      "title": "Model",
+      "type": "string"
+    },
+    "pick_reason": {
+      "title": "Pick Reason",
+      "type": "string"
+    },
+    "wish": {
+      "minLength": 1,
+      "title": "Wish",
+      "type": "string"
+    }
+  },
+  "required": [
+    "call_id",
+    "index",
+    "helper_id",
+    "agent",
+    "label",
+    "model",
+    "wish",
+    "pick_reason"
+  ],
+  "title": "HelperStartedData",
+  "type": "object"
+}

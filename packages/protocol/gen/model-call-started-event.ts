@@ -70,9 +70,11 @@ export interface ModelCallStartedEvent {
  * and ``message_bytes`` have one number per message sent. Each is None on an
  * event recorded before they existed.
  *
- * ``parent_call_id`` is set on an event of a child run: the id of the ``delegate`` call
- * that started it. The event is in the parent's run, and a client that does not know
- * child runs ignores it. None for the run's own events.
+ * ``parent_call_id`` is legacy. Old logs set it on an event of a child run: the id of
+ * the ``delegate`` call that started it. The event is in the parent's run, and a client
+ * that does not know child runs ignores it. None for the run's own events. A new helper
+ * writes none, because it has its own session and ``helper.*`` events. The field stays,
+ * since removing it would break old logs.
  *
  * This interface was referenced by `ModelCallStartedEvent`'s JSON-Schema
  * via the `definition` "ModelCallStartedData".

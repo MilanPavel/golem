@@ -1,0 +1,32 @@
+{
+  "additionalProperties": false,
+  "description": "The lead parked to wait for its helpers, or went on.\n\n``helper_ids`` are the helpers of this ``delegate`` call that it waits for.",
+  "properties": {
+    "call_id": {
+      "minLength": 1,
+      "title": "Call Id",
+      "type": "string"
+    },
+    "helper_ids": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Helper Ids",
+      "type": "array"
+    },
+    "state": {
+      "enum": [
+        "parked",
+        "resumed"
+      ],
+      "title": "State",
+      "type": "string"
+    }
+  },
+  "required": [
+    "call_id",
+    "state"
+  ],
+  "title": "HelperWaitData",
+  "type": "object"
+}

@@ -464,9 +464,11 @@ class ToolRequestedData(BaseModel):
     ``message_id`` is the assistant message that asked. ``args`` are the
     arguments as the model wrote them.
 
-    ``parent_call_id`` is set on an event of a child run: the id of the ``delegate`` call
-    that started it. The event is in the parent's run, and a client that does not know
-    child runs ignores it. None for the run's own events.
+    ``parent_call_id`` is legacy. Old logs set it on an event of a child run: the id of
+    the ``delegate`` call that started it. The event is in the parent's run, and a client
+    that does not know child runs ignores it. None for the run's own events. A new helper
+    writes none, because it has its own session and ``helper.*`` events. The field stays,
+    since removing it would break old logs.
     """
 
     model_config = _CONFIG
@@ -578,9 +580,11 @@ class CheckCompletedData(BaseModel):
 class ToolStartedData(BaseModel):
     """A requested tool call is running.
 
-    ``parent_call_id`` is set on an event of a child run: the id of the ``delegate`` call
-    that started it. The event is in the parent's run, and a client that does not know
-    child runs ignores it. None for the run's own events.
+    ``parent_call_id`` is legacy. Old logs set it on an event of a child run: the id of
+    the ``delegate`` call that started it. The event is in the parent's run, and a client
+    that does not know child runs ignores it. None for the run's own events. A new helper
+    writes none, because it has its own session and ``helper.*`` events. The field stays,
+    since removing it would break old logs.
     """
 
     model_config = _CONFIG
@@ -674,9 +678,11 @@ class ModelCallStartedData(BaseModel):
     and ``message_bytes`` have one number per message sent. Each is None on an
     event recorded before they existed.
 
-    ``parent_call_id`` is set on an event of a child run: the id of the ``delegate`` call
-    that started it. The event is in the parent's run, and a client that does not know
-    child runs ignores it. None for the run's own events.
+    ``parent_call_id`` is legacy. Old logs set it on an event of a child run: the id of
+    the ``delegate`` call that started it. The event is in the parent's run, and a client
+    that does not know child runs ignores it. None for the run's own events. A new helper
+    writes none, because it has its own session and ``helper.*`` events. The field stays,
+    since removing it would break old logs.
     """
 
     model_config = _CONFIG
@@ -780,9 +786,11 @@ class ModelCallCompletedData(BaseModel):
     the model, reading the prompt and writing the reply. From the model server's own clock.
     Ollama only.
 
-    ``parent_call_id`` is set on an event of a child run: the id of the ``delegate`` call
-    that started it. The event is in the parent's run, and a client that does not know
-    child runs ignores it. None for the run's own events.
+    ``parent_call_id`` is legacy. Old logs set it on an event of a child run: the id of
+    the ``delegate`` call that started it. The event is in the parent's run, and a client
+    that does not know child runs ignores it. None for the run's own events. A new helper
+    writes none, because it has its own session and ``helper.*`` events. The field stays,
+    since removing it would break old logs.
     """
 
     model_config = _CONFIG
@@ -838,9 +846,11 @@ class ToolCompletedData(BaseModel):
     ``sources`` are the web pages a ``web_search`` or ``web_fetch`` call found or read, for
     the screen's source chips. None for any other call. The model does not get them.
 
-    ``parent_call_id`` is set on an event of a child run: the id of the ``delegate`` call
-    that started it. The event is in the parent's run, and a client that does not know
-    child runs ignores it. None for the run's own events.
+    ``parent_call_id`` is legacy. Old logs set it on an event of a child run: the id of
+    the ``delegate`` call that started it. The event is in the parent's run, and a client
+    that does not know child runs ignores it. None for the run's own events. A new helper
+    writes none, because it has its own session and ``helper.*`` events. The field stays,
+    since removing it would break old logs.
     """
 
     model_config = _CONFIG
@@ -863,9 +873,11 @@ class ToolFailedData(BaseModel):
     ``duration_ms`` is how long the tool ran before it raised. None means a
     call that was denied or cut off, which never ran or was not timed.
 
-    ``parent_call_id`` is set on an event of a child run: the id of the ``delegate`` call
-    that started it. The event is in the parent's run, and a client that does not know
-    child runs ignores it. None for the run's own events.
+    ``parent_call_id`` is legacy. Old logs set it on an event of a child run: the id of
+    the ``delegate`` call that started it. The event is in the parent's run, and a client
+    that does not know child runs ignores it. None for the run's own events. A new helper
+    writes none, because it has its own session and ``helper.*`` events. The field stays,
+    since removing it would break old logs.
     """
 
     model_config = _CONFIG
@@ -1165,6 +1177,178 @@ class CheckCompletedEvent(BaseModel):
     ts: str = Field(min_length=1)
     type: Literal["check.completed"]
     data: CheckCompletedData
+
+
+HelperState = Literal["queued", "running", "waiting"]
+"""Where a helper is: in line for a slot, working, or waiting for something."""
+
+HelperStep = Literal["running", "done", "failed"]
+"""How one tool call of a helper stands: it started, it ended well, it ended in an error."""
+
+HelperStopped = Literal["done", "calls", "time", "budget", "tokens", "cancelled", "failed"]
+"""Why a helper run ended: it answered, hit a limit, was cancelled, or a model call failed."""
+
+HelperWaitState = Literal["parked", "resumed"]
+"""A lead that waits for its helpers is ``parked``. When they have answered it is ``resumed``."""
+
+
+class HelperStartedData(BaseModel):
+    """A helper session was made for one ``delegate`` call.
+
+    This is on the lead's log, with the ``delegate`` call's id as ``call_id``. ``index``
+    is the helper's place in that call, and ``helper_id`` is its own session id.
+    ``agent`` is the agent type and ``label`` the short name the card shows. ``model`` is
+    the model it was given. ``wish`` is what the agent file asked for (``cheapest``,
+    ``same``, ``stronger``, a tier or a model) and ``pick_reason`` says in plain words
+    why that model came out of it.
+    """
+
+    model_config = _CONFIG
+
+    call_id: str = Field(min_length=1)
+    index: int = Field(ge=0)
+    helper_id: str = Field(min_length=1)
+    agent: str = Field(min_length=1)
+    label: str
+    model: str = Field(min_length=1)
+    wish: str = Field(min_length=1)
+    pick_reason: str
+
+
+class HelperStepData(BaseModel):
+    """A tool call of a helper started or ended.
+
+    Thin on purpose: the card shows what ran, and the helper's own log has the detail.
+    ``args`` holds only the path, pattern, query or ref of the call. ``step_id`` is the
+    helper's own tool call id. ``calls`` is how many tool calls the helper has made so far.
+    """
+
+    model_config = _CONFIG
+
+    call_id: str = Field(min_length=1)
+    index: int = Field(ge=0)
+    step_id: str = Field(min_length=1)
+    name: str = Field(min_length=1)
+    args: dict[str, Any] = Field(default_factory=dict[str, Any])
+    status: HelperStep
+    calls: int = Field(ge=0)
+
+
+class HelperStateData(BaseModel):
+    """A helper queued, started running, started waiting, or went on.
+
+    ``reason`` says why it waits or queues. It is a plain string, not a fixed list: the
+    words today are ``you`` and ``team``, and later phases add more, so a new word is not
+    a protocol change. It is None when the helper runs with nothing to explain.
+    """
+
+    model_config = _CONFIG
+
+    call_id: str = Field(min_length=1)
+    index: int = Field(ge=0)
+    state: HelperState
+    reason: str | None = Field(default=None, min_length=1)
+
+
+class HelperWaitData(BaseModel):
+    """The lead parked to wait for its helpers, or went on.
+
+    ``helper_ids`` are the helpers of this ``delegate`` call that it waits for.
+    """
+
+    model_config = _CONFIG
+
+    call_id: str = Field(min_length=1)
+    state: HelperWaitState
+    helper_ids: list[str] = Field(default_factory=list[str])
+
+
+class HelperEndedData(BaseModel):
+    """A helper's run ended.
+
+    ``stopped`` says why. ``model_calls`` and ``tokens`` count what the helper used, and
+    ``answer_tokens`` is the size of its answer. ``cost_usd`` is what it cost (0 on a local
+    model), because the lead's footer sums its own log. ``duration_ms`` is the whole time
+    since it started and ``working_ms`` is the part that was not spent waiting for you, a
+    slot or a provider.
+    """
+
+    model_config = _CONFIG
+
+    call_id: str = Field(min_length=1)
+    index: int = Field(ge=0)
+    stopped: HelperStopped
+    model_calls: int = Field(ge=0)
+    tokens: int = Field(ge=0)
+    answer_tokens: int = Field(ge=0)
+    cost_usd: float = Field(ge=0)
+    duration_ms: int = Field(ge=0)
+    working_ms: int = Field(ge=0)
+
+
+class HelperStartedEvent(BaseModel):
+    """A helper session was made. A summary on the lead's log; the helper's own log has the rest."""
+
+    model_config = _CONFIG
+
+    seq: int = Field(ge=1)
+    session_id: str = Field(min_length=1)
+    run_id: str | None = Field(default=None, min_length=1)
+    ts: str = Field(min_length=1)
+    type: Literal["helper.started"]
+    data: HelperStartedData
+
+
+class HelperStepEvent(BaseModel):
+    """A tool call of a helper started or ended."""
+
+    model_config = _CONFIG
+
+    seq: int = Field(ge=1)
+    session_id: str = Field(min_length=1)
+    run_id: str | None = Field(default=None, min_length=1)
+    ts: str = Field(min_length=1)
+    type: Literal["helper.step"]
+    data: HelperStepData
+
+
+class HelperStateEvent(BaseModel):
+    """A helper queued, started running, started waiting, or went on."""
+
+    model_config = _CONFIG
+
+    seq: int = Field(ge=1)
+    session_id: str = Field(min_length=1)
+    run_id: str | None = Field(default=None, min_length=1)
+    ts: str = Field(min_length=1)
+    type: Literal["helper.state"]
+    data: HelperStateData
+
+
+class HelperWaitEvent(BaseModel):
+    """The lead parked to wait for its helpers, or went on."""
+
+    model_config = _CONFIG
+
+    seq: int = Field(ge=1)
+    session_id: str = Field(min_length=1)
+    run_id: str | None = Field(default=None, min_length=1)
+    ts: str = Field(min_length=1)
+    type: Literal["helper.wait"]
+    data: HelperWaitData
+
+
+class HelperEndedEvent(BaseModel):
+    """A helper's run ended."""
+
+    model_config = _CONFIG
+
+    seq: int = Field(ge=1)
+    session_id: str = Field(min_length=1)
+    run_id: str | None = Field(default=None, min_length=1)
+    ts: str = Field(min_length=1)
+    type: Literal["helper.ended"]
+    data: HelperEndedData
 
 
 class MessageStartedEvent(BaseModel):
@@ -1573,6 +1757,11 @@ EventType = Literal[
     "check.offered",
     "check.started",
     "check.completed",
+    "helper.started",
+    "helper.step",
+    "helper.state",
+    "helper.wait",
+    "helper.ended",
 ]
 """The ``type`` of each :data:`ChatEvent` member."""
 
@@ -1618,7 +1807,12 @@ ChatEvent = Annotated[
     | SkillSkippedEvent
     | CheckOfferedEvent
     | CheckStartedEvent
-    | CheckCompletedEvent,
+    | CheckCompletedEvent
+    | HelperStartedEvent
+    | HelperStepEvent
+    | HelperStateEvent
+    | HelperWaitEvent
+    | HelperEndedEvent,
     Field(discriminator="type"),
 ]
 
@@ -1654,6 +1848,20 @@ __all__ = [
     "FileChangedData",
     "FileChangedEvent",
     "ForkedFrom",
+    "HelperEndedData",
+    "HelperEndedEvent",
+    "HelperStartedData",
+    "HelperStartedEvent",
+    "HelperState",
+    "HelperStateData",
+    "HelperStateEvent",
+    "HelperStep",
+    "HelperStepData",
+    "HelperStepEvent",
+    "HelperStopped",
+    "HelperWaitData",
+    "HelperWaitEvent",
+    "HelperWaitState",
     "MessageCompletedData",
     "MessageCompletedEvent",
     "MessageDeltaData",

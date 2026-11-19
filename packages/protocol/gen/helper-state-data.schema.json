@@ -1,0 +1,45 @@
+{
+  "additionalProperties": false,
+  "description": "A helper queued, started running, started waiting, or went on.\n\n``reason`` says why it waits or queues. It is a plain string, not a fixed list: the\nwords today are ``you`` and ``team``, and later phases add more, so a new word is not\na protocol change. It is None when the helper runs with nothing to explain.",
+  "properties": {
+    "call_id": {
+      "minLength": 1,
+      "title": "Call Id",
+      "type": "string"
+    },
+    "index": {
+      "minimum": 0,
+      "title": "Index",
+      "type": "integer"
+    },
+    "reason": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Reason"
+    },
+    "state": {
+      "enum": [
+        "queued",
+        "running",
+        "waiting"
+      ],
+      "title": "State",
+      "type": "string"
+    }
+  },
+  "required": [
+    "call_id",
+    "index",
+    "state"
+  ],
+  "title": "HelperStateData",
+  "type": "object"
+}

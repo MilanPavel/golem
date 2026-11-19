@@ -16,6 +16,16 @@ from golem_protocol.events import (
     ChatEvent,
     EmptyEventData,
     EventType,
+    HelperEndedData,
+    HelperEndedEvent,
+    HelperStartedData,
+    HelperStartedEvent,
+    HelperStateData,
+    HelperStateEvent,
+    HelperStepData,
+    HelperStepEvent,
+    HelperWaitData,
+    HelperWaitEvent,
     MessageCompletedData,
     MessageCompletedEvent,
     MessageDeltaData,
@@ -311,3 +321,107 @@ def test_a_session_created_event_written_before_parent_and_agent_still_validates
     event = CHAT_EVENT.validate_python(old)
     assert isinstance(event, SessionCreatedEvent)
     assert event.data.parent is None and event.data.agent is None
+
+
+def _helper_event(cls: type, type_: str, data: object) -> object:
+    return cls(
+        seq=7,
+        session_id="s_lead",
+        run_id="r_1",
+        ts="2026-11-19T10:00:00+00:00",
+        type=type_,
+        data=data,
+    )
+
+
+def test_the_five_helper_events_round_trip() -> None:
+    events = [
+        _helper_event(
+            HelperStartedEvent,
+            "helper.started",
+            HelperStartedData(
+                call_id="call_1",
+                index=0,
+                helper_id="s_helper",
+                agent="explorer",
+                label="find the parser",
+                model="qwen3:14b",
+                wish="cheapest",
+                pick_reason="the loaded local model",
+            ),
+        ),
+        _helper_event(
+            HelperStepEvent,
+            "helper.step",
+            HelperStepData(
+                call_id="call_1",
+                index=0,
+                step_id="t_1",
+                name="grep",
+                args={"pattern": "parse"},
+                status="running",
+                calls=1,
+            ),
+        ),
+        _helper_event(
+            HelperStateEvent,
+            "helper.state",
+            HelperStateData(call_id="call_1", index=0, state="waiting", reason="you"),
+        ),
+        _helper_event(
+            HelperWaitEvent,
+            "helper.wait",
+            HelperWaitData(call_id="call_1", state="parked", helper_ids=["s_helper"]),
+        ),
+        _helper_event(
+            HelperEndedEvent,
+            "helper.ended",
+            HelperEndedData(
+                call_id="call_1",
+                index=0,
+                stopped="done",
+                model_calls=3,
+                tokens=1200,
+                answer_tokens=80,
+                cost_usd=0.0,
+                duration_ms=9000,
+                working_ms=7000,
+            ),
+        ),
+    ]
+    for event in events:
+        assert _ADAPTER.validate_python(event.model_dump()) == event  # type: ignore[attr-defined]
+        assert _ADAPTER.validate_json(event.model_dump_json()) == event  # type: ignore[attr-defined]
+    assert {e.type for e in events} <= set(get_args(EventType))  # type: ignore[attr-defined]
+
+
+def test_a_helper_state_reason_is_any_word_and_optional() -> None:
+    assert HelperStateData(call_id="c", index=0, state="running").reason is None
+    assert HelperStateData(call_id="c", index=0, state="queued", reason="slot").reason == "slot"
+    assert HelperStateData(call_id="c", index=0, state="waiting", reason="a later word").reason
+
+
+def test_helper_events_refuse_values_outside_their_lists() -> None:
+    with pytest.raises(ValidationError):
+        HelperStateData(call_id="c", index=0, state="sleeping")  # type: ignore[arg-type]
+    with pytest.raises(ValidationError):
+        HelperWaitData(call_id="c", state="paused", helper_ids=[])  # type: ignore[arg-type]
+    with pytest.raises(ValidationError):
+        HelperStepData(call_id="c", index=0, step_id="t", name="grep", status="queued", calls=0)  # type: ignore[arg-type]
+    ended = {
+        "call_id": "c",
+        "index": 0,
+        "stopped": "done",
+        "model_calls": 1,
+        "tokens": 1,
+        "answer_tokens": 1,
+        "cost_usd": 0,
+        "duration_ms": 1,
+        "working_ms": 1,
+    }
+    for stopped in ("done", "calls", "time", "budget", "tokens", "cancelled", "failed"):
+        assert HelperEndedData.model_validate({**ended, "stopped": stopped}).stopped == stopped
+    with pytest.raises(ValidationError):
+        HelperEndedData.model_validate({**ended, "stopped": "tired"})
+    with pytest.raises(ValidationError):
+        HelperEndedData.model_validate({**ended, "working_ms": -1})
