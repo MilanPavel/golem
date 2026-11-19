@@ -26,7 +26,7 @@ from golem.lock import DaemonAlreadyRunning, DaemonLock
 from golem.logging import configure_logging
 from golem.mcp import McpSupervisor
 from golem.mcp.prompt import mcp_section
-from golem.memory.service import MemoryService
+from golem.memory.service import MemoryChange, MemoryService
 from golem.memory.store import MemoryStore
 from golem.models.budget import Budget
 from golem.models.check import CheckManager
@@ -88,8 +88,12 @@ from golem.store.records import RunRecords, SessionRecords
 from golem.store.routine_runs import RoutineRuns
 from golem.tools import default_registry
 from golem.tools.registry import ToolScope
-from golem_protocol.commands import KeychainWait, ModelServerStatus
-from golem_protocol.rpc import KeychainWaitNotification, ModelServerStatusNotification
+from golem_protocol.commands import KeychainWait, MemoryChanged, ModelServerStatus
+from golem_protocol.rpc import (
+    KeychainWaitNotification,
+    MemoryChangedNotification,
+    ModelServerStatusNotification,
+)
 
 log = logging.getLogger("golem.server")
 
@@ -263,7 +267,7 @@ class DaemonApp:
             async with (
                 Database.open(self.paths.database_file) as database,
                 open_checkpoints(database, self.paths.checkpoints_file) as saver,
-                _open_memory(self.paths.memory_file, settings.memory) as memory,
+                _open_memory(self.paths.memory_file, settings.memory, self._broadcast) as memory,
             ):
                 self.state.memory = memory
                 self.state.policy = policy
@@ -686,17 +690,31 @@ def _open_notifier(records: SessionRecords, bus: EventBus, poster: Poster, home:
 
 @contextlib.asynccontextmanager
 async def _open_memory(
-    path: Path, settings: MemorySettings
+    path: Path, settings: MemorySettings, broadcast: Callable[[BaseModel], None]
 ) -> AsyncGenerator[MemoryService | None]:
     """The memory service over ``memory.db``, or None when ``[memory] enabled = false``.
 
     Off means the file is not opened, so a daemon that never uses memory never makes one.
+    A change goes to every connection as ``memory.changed``.
     """
     if not settings.enabled:
         yield None
         return
     async with MemoryStore.open(path) as store:
-        yield MemoryService(store, lambda: settings)
+
+        def changed(change: MemoryChange) -> None:
+            broadcast(
+                MemoryChangedNotification(
+                    params=MemoryChanged(
+                        id=change.id,
+                        change=change.change,
+                        scope=change.scope,
+                        folder=change.folder,
+                    )
+                )
+            )
+
+        yield MemoryService(store, lambda: settings, changed)
 
 
 async def _open_sessions(

@@ -88,6 +88,15 @@ from golem.server.mcp_import import mcp_import_apply, mcp_import_scan
 from golem.server.mcp_login import mcp_login, mcp_logout
 from golem.server.mcp_model import turn_on
 from golem.server.mcp_try import mcp_call, mcp_logs, mcp_test
+from golem.server.memory_rpc import (
+    memory_delete,
+    memory_export,
+    memory_get,
+    memory_list,
+    memory_settings,
+    memory_update,
+    memory_write,
+)
 from golem.server.notifications_edit import notifications_get, notifications_set
 from golem.server.routines import (
     routine_get,
@@ -204,6 +213,13 @@ from golem_protocol.commands import (
     McpToolInfo,
     McpToolsResult,
     McpUpdateParams,
+    MemoryDeleteParams,
+    MemoryExportParams,
+    MemoryGetParams,
+    MemoryListParams,
+    MemorySettingsParams,
+    MemoryUpdateParams,
+    MemoryWriteParams,
     MessageSendParams,
     MessageSendResult,
     ModelCategory,
@@ -1969,4 +1985,11 @@ def standard_methods() -> dict[str, Method]:
         "session.set_model": Method(
             "session.set_model", SessionSetModelParams, True, _session_set_model
         ),
+        "memory.list": Method("memory.list", MemoryListParams, True, memory_list),
+        "memory.get": Method("memory.get", MemoryGetParams, True, memory_get),
+        "memory.write": Method("memory.write", MemoryWriteParams, True, memory_write),
+        "memory.update": Method("memory.update", MemoryUpdateParams, True, memory_update),
+        "memory.delete": Method("memory.delete", MemoryDeleteParams, True, memory_delete),
+        "memory.export": Method("memory.export", MemoryExportParams, True, memory_export),
+        "memory.settings": Method("memory.settings", MemorySettingsParams, True, memory_settings),
     }

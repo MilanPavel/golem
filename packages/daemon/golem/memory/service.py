@@ -7,16 +7,16 @@ enabled = false`` turns every method off: writes return None, reads return nothi
 
 from __future__ import annotations
 
-import json
 from collections.abc import Callable, Iterable
-from dataclasses import asdict, dataclass, replace
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from typing import Literal
 
 from golem.config import MemoryPrivacyLevel, MemorySettings
+from golem.memory.export import ExportFormat, render
 from golem.memory.privacy import ChatPrivacy, MemoryPrivacy, Target, may_use
 from golem.memory.quote import quote_matches
-from golem.memory.records import MemoryRecord, Privacy, Scope, new_memory_id
+from golem.memory.records import MemoryRecord, Privacy, Scope, SourceRow, new_memory_id
 from golem.memory.store import MemoryStore
 
 MAX_TEXT_CHARS = 2000
@@ -28,7 +28,6 @@ _FETCH = 50
 """How many rows a search reads per scope before the privacy check drops some."""
 
 Change = Literal["created", "updated", "deleted", "stale", "resolved"]
-ExportFormat = Literal["json", "markdown"]
 
 
 class MemoryTextError(ValueError):
@@ -86,6 +85,15 @@ class MemoryService:
     def enabled(self) -> bool:
         return self._settings().enabled
 
+    @property
+    def store(self) -> MemoryStore:
+        """The rows, for the browser's list, count and export. Writes go through the service."""
+        return self._store
+
+    def use_settings(self, settings: MemorySettings) -> None:
+        """Take ``settings`` from now on, after the user's file changed."""
+        self._settings = lambda: settings
+
     async def write_by_you(
         self,
         text: str,
@@ -95,15 +103,20 @@ class MemoryService:
         title: str | None = None,
         privacy: Privacy = "chat",
         session_id: str | None = None,
+        always: bool | None = None,
+        sources: tuple[SourceRow, ...] = (),
     ) -> MemoryRecord | None:
         """A note you wrote: ``kept``, author ``you``. None when memory is off.
 
         A note about you is ``always`` (in the fixed block of every chat) while fewer than 5
-        such lines exist. Raises :class:`MemoryTextError` for an empty or too long text.
+        such lines exist, unless ``always`` says otherwise. Raises :class:`MemoryTextError`
+        for an empty or too long text.
         """
         if not self.enabled:
             return None
-        return await self._add_kept(text, scope, folder, title, privacy, session_id)
+        return await self._add_kept(
+            text, scope, folder, title, privacy, session_id, always, sources
+        )
 
     async def remember(
         self,
@@ -152,10 +165,16 @@ class MemoryService:
         title: str | None = None,
         privacy: Privacy | None = None,
         keep: bool = False,
+        always: bool | None = None,
+        folder: str | None = None,
+        sources: tuple[SourceRow, ...] | None = None,
     ) -> MemoryRecord | None:
         """Edit a memory. ``keep`` decides a proposal: ``kept`` by you.
 
-        None when memory is off or there is no such memory.
+        ``sources`` are the files hashed again: they replace the old ones and a ``stale`` memory
+        is ``kept`` again. ``always`` is yours: a memory a model wrote and you have not kept
+        cannot have it. ``folder`` is only for a project memory. Raises ``ValueError`` for
+        a change a memory cannot take. None when memory is off or there is no such memory.
         """
         if not self.enabled:
             return None
@@ -169,9 +188,21 @@ class MemoryService:
             record = replace(record, title=title_of(record.text, title))
         if privacy is not None:
             record = replace(record, privacy=privacy)
+        if folder is not None:
+            if record.scope != "project":
+                raise ValueError("only a project memory has a folder")
+            record = replace(record, folder=folder)
         resolved = keep and record.state == "proposed"
         if keep:
             record = replace(record, state="kept", kept_by="you")
+        if sources is not None:
+            record = replace(record, sources=sources)
+            if record.state == "stale":
+                record = replace(record, state="kept")
+        if always is not None:
+            if always and "you" not in (record.author, record.kept_by):
+                raise ValueError("only a memory you wrote or kept can be always")
+            record = replace(record, always=always)
         if not await self._store.update(record):
             return None
         self._send(record, "resolved" if resolved else "updated")
@@ -245,15 +276,13 @@ class MemoryService:
     async def export(self, fmt: ExportFormat = "json") -> str:
         """Every memory, newest first: JSON with every field, or Markdown for reading."""
         if not self.enabled:
-            return "[]" if fmt == "json" else ""
+            return render([], fmt)
         records: list[MemoryRecord] = []
         after: str | None = None
         while page := await self._store.list(limit=200, after=after):
             records.extend(page)
             after = page[-1].id
-        if fmt == "json":
-            return json.dumps([asdict(r) for r in records], indent=2, ensure_ascii=False)
-        return "\n\n".join(_markdown(r) for r in records)
+        return render(records, fmt)
 
     async def touch_used(self, ids: Iterable[str]) -> None:
         """Count a recall that returned these memories. It is not a change."""
@@ -273,6 +302,8 @@ class MemoryService:
         title: str | None,
         privacy: Privacy,
         session_id: str | None,
+        always: bool | None = None,
+        sources: tuple[SourceRow, ...] = (),
     ) -> MemoryRecord:
         text = _checked(text)
         now = self._clock()
@@ -289,7 +320,8 @@ class MemoryService:
             session_id=session_id,
             kept_by="you",
             privacy=privacy,
-            always=scope == "you" and await self._always_room(),
+            always=(scope == "you" and await self._always_room()) if always is None else always,
+            sources=sources,
         )
         await self._store.add(record)
         self._send(record, "created")
@@ -376,18 +408,6 @@ def _setting(settings: MemorySettings, scope: Scope) -> MemoryPrivacyLevel:
     if scope == "you":
         return settings.you
     return settings.projects if scope == "project" else settings.history
-
-
-def _markdown(record: MemoryRecord) -> str:
-    facts = (
-        f"- id: {record.id}\n- scope: {record.scope}\n- author: {record.author}\n"
-        f"- state: {record.state}\n- privacy: {record.privacy}\n"
-    )
-    if record.folder:
-        facts += f"- folder: {record.folder}\n"
-    if record.sources:
-        facts += "- sources: " + ", ".join(s.path for s in record.sources) + "\n"
-    return f"## {record.title}\n\n{facts}\n{record.text}"
 
 
 __all__ = [
