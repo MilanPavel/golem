@@ -113,6 +113,7 @@ from golem.sessions.manager import (
     BudgetSpentError,
     ConsentAnswerError,
     GrowRefusedError,
+    HelperSessionError,
     InvalidToolArgsError,
     MessageNotFoundError,
     RuleWriteError,
@@ -498,6 +499,8 @@ async def _message_send(ctx: RequestContext, params: MessageSendParams) -> Messa
         raise RpcCallError(SESSION_NOT_FOUND, "session not found") from exc
     except SessionBusyError as exc:
         raise RpcCallError(SESSION_BUSY, "session is busy") from exc
+    except HelperSessionError as exc:
+        raise RpcCallError(INVALID_PARAMS, str(exc)) from exc
     except SchemaMismatchError as exc:
         raise RpcCallError(SESSION_NOT_FOUND, str(exc)) from exc
     except ModelConfigError as exc:

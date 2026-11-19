@@ -20,6 +20,7 @@ _ACTIVITY = (
     " s.route,"
     " s.plan_first, s.paid_ok,"
     " s.forked_from_session_id, s.origin,"
+    " s.parent_session_id, s.parent_call_id, s.helper_index, s.agent,"
     " EXISTS (SELECT 1 FROM runs r"
     "  WHERE r.session_id = s.session_id AND r.status = 'running') AS running,"
     " EXISTS (SELECT 1 FROM runs r"
@@ -59,6 +60,14 @@ class SessionRecord:
     """The user agreed to paid models for this session, from ``session.updated``."""
     origin: str = "user"
     """Who started the session: ``user``, ``cli``, ``routine:<name>``. Never changes."""
+    parent_session_id: str | None = None
+    """The lead of a helper session, None for any other."""
+    parent_call_id: str | None = None
+    """The ``delegate`` call that started a helper session."""
+    helper_index: int | None = None
+    """A helper's place in that call."""
+    agent: str | None = None
+    """The agent type of a helper session."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -99,10 +108,37 @@ class SessionRecords:
             "SELECT session_id, model_profile, title, created_at, updated_at, closed_at, cwd,"
             " allowed_tools, mcp_servers, skills, options, permission_mode, checks, route,"
             " plan_first, paid_ok,"
-            " forked_from_session_id, origin FROM sessions WHERE session_id = ?",
+            " forked_from_session_id, origin,"
+            " parent_session_id, parent_call_id, helper_index, agent"
+            " FROM sessions WHERE session_id = ?",
             (session_id,),
         )
         return None if row is None else _session(row)
+
+    async def helper(
+        self, parent_session_id: str, call_id: str, index: int
+    ) -> SessionRecord | None:
+        """The helper session made for ``call_id`` of ``parent_session_id`` at ``index``, if any."""
+        row = await self._database.fetch_one(
+            "SELECT session_id, model_profile, title, created_at, updated_at, closed_at, cwd,"
+            " allowed_tools, mcp_servers, skills, options, permission_mode, checks, route,"
+            " plan_first, paid_ok,"
+            " forked_from_session_id, origin,"
+            " parent_session_id, parent_call_id, helper_index, agent"
+            " FROM sessions WHERE parent_session_id = ? AND parent_call_id = ?"
+            " AND helper_index = ?",
+            (parent_session_id, call_id, index),
+        )
+        return None if row is None else _session(row)
+
+    async def open_helpers(self, parent_session_id: str) -> list[str]:
+        """The ids of the helper sessions of ``parent_session_id`` that are not closed."""
+        rows = await self._database.fetch_all(
+            "SELECT session_id FROM sessions WHERE parent_session_id = ? AND closed_at IS NULL"
+            " ORDER BY created_at, session_id",
+            (parent_session_id,),
+        )
+        return [str(row["session_id"]) for row in rows]
 
     async def activity(self, session_id: str) -> SessionActivity | None:
         """One session's row, whether a run is open, and its newest ``seq``."""
@@ -261,6 +297,10 @@ def _session(row: sqlite3.Row) -> SessionRecord:
         plan_first=bool(row["plan_first"]),
         paid_ok=bool(row["paid_ok"]),
         origin=row["origin"] or "user",
+        parent_session_id=row["parent_session_id"],
+        parent_call_id=row["parent_call_id"],
+        helper_index=row["helper_index"],
+        agent=row["agent"],
     )
 
 

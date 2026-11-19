@@ -121,6 +121,8 @@ class ChildScope:
 
     tools: frozenset[str]
     max_calls: int
+    asks: bool = False
+    """Whether the helper may ask you, as a helper session of an agent that has ``asks``."""
 
 
 class HelperHost(Protocol):
@@ -288,7 +290,9 @@ def tools_node(
         allowed = _allowed(config)
         mode = _mode(config)
         plan_first = _plan_first(config)
-        helper = child_of(config) is not None
+        child = child_of(config)
+        helper = child is not None
+        never_ask = child is not None and not child.asks
         host = children()
         parking = host is not None and host.parks_lead and bool(session_id)
         parked: list[str] = []
@@ -325,7 +329,7 @@ def tools_node(
                 mode,
                 asked=ids[index] in asked,
                 before_last_asked=index < last_asked,
-                never_ask=helper,
+                never_ask=never_ask,
             )
             if verdict.run and verdict.args is not None:
                 edited = cast(ToolCall, {**call, "args": verdict.args})

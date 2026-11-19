@@ -31,6 +31,7 @@ from golem.graphs.child import child_thread
 from golem.graphs.context_view import ContextView, view
 from golem.graphs.state import SCHEMA_VERSION
 from golem.graphs.step_up import Consent, StepAsk, StepRequest, StepUp
+from golem.graphs.tools_node import ChildScope
 from golem.memory.privacy import ChatPrivacy
 from golem.memory.project import project_key
 from golem.memory.project_privacy import project_memory_private
@@ -51,6 +52,16 @@ from golem.permissions.policy import explain
 from golem.sessions.approvals import pending_approval, pending_consent
 from golem.sessions.bus import EventTarget, SummaryTarget
 from golem.sessions.context import context_breakdown
+from golem.sessions.helpers import (
+    NO_NESTED,
+    NO_SEND,
+    HelperRef,
+    check_agent,
+    cut_allowances,
+    helper_mode,
+    origin_of,
+    scope_of_agent,
+)
 from golem.sessions.ids import new_id
 from golem.sessions.log import SessionLog
 from golem.sessions.runner import (
@@ -88,6 +99,7 @@ from golem_protocol.commands import (
     TraceSpanResult,
 )
 from golem_protocol.events import (
+    AgentSnapshot,
     ApprovalDecision,
     ChatEvent,
     ConsentAnswer,
@@ -96,6 +108,7 @@ from golem_protocol.events import (
     EmptyEventData,
     FileChangedData,
     ForkedFrom,
+    HelperStartedData,
     MessageCompletedEvent,
     ModelOptionsChangedData,
     ModelRoutedEvent,
@@ -108,6 +121,7 @@ from golem_protocol.events import (
     SessionCompletedData,
     SessionCreatedData,
     SessionModeChangedData,
+    SessionParent,
     SessionPlanChangedData,
     SessionUpdatedData,
     SkillActivatedData,
@@ -116,6 +130,7 @@ from golem_protocol.events import (
     SkillDeactivatedData,
     SkillSkippedEvent,
     TodosUpdatedData,
+    ToolStartedData,
 )
 
 NOT_APPROVED = "cancelled before it was approved"
@@ -185,6 +200,13 @@ class SessionView:
         return sum(1 for message in self.messages if message.role != "system")
 
 
+class HelperSessionError(Exception):
+    """A helper session answers its lead, so nobody sends it a message."""
+
+    def __init__(self) -> None:
+        super().__init__(NO_SEND)
+
+
 class BudgetSpentError(Exception):
     """A turn on a paid model was refused because a cap in ``[budget]`` is spent."""
 
@@ -219,6 +241,10 @@ class _LiveSession:
     cwd: str | None = None
     origin: str = "user"
     """Who started the session. It never changes."""
+    parent: SessionParent | None = None
+    """The lead and the ``delegate`` call of a helper session, from its ``session.created``."""
+    agent: AgentSnapshot | None = None
+    """The agent type a helper session started with, from its ``session.created``."""
     allowed_tools: set[Allowance] = field(default_factory=set[Allowance])
     mcp_servers: set[str] = field(default_factory=set[str])
     skills: list[str] = field(default_factory=list[str])
@@ -717,8 +743,12 @@ class SessionManager:
         A run still in progress is cancelled first. Closing a session that is
         already hidden returns its id.
 
+        The helpers of a lead are cancelled and closed first.
+
         Raises :class:`SessionNotFoundError`.
         """
+        for helper in await self._records.open_helpers(session_id):
+            await self.close(helper)
         while True:
             async with self._lock:
                 record = await self._records.get(session_id)
@@ -1011,72 +1041,198 @@ class SessionManager:
 
         Raises :class:`SessionNotFoundError`, :class:`SessionBusyError`,
         :class:`SchemaMismatchError`, :class:`~golem.skills.invoke.SkillInvokeError`,
-        or :class:`~golem.models.router.ModelConfigError`.
+        :class:`~golem.models.router.ModelConfigError`, or :class:`HelperSessionError`
+        for a helper session, which only its lead's ``delegate`` talks to.
         """
         async with self._lock:
             session = await self._resolve(session_id)
-            if session.task is not None and not session.task.done():
-                raise SessionBusyError(session_id)
-            if session.compacting:
-                raise SessionBusyError(session_id)
-            if await self._run_records.waiting(session_id) is not None:
-                raise SessionBusyError(session_id)
-            room = None if self.budget is None else await self.budget.room(session_id)
-            # The folder may come with this message, so it is known before the model is chosen.
-            folder = session.cwd if session.cwd is not None else cwd
-            local_only = self.local_only(folder)
-            routed = _Routed(session.model_profile, None)
-            replaces = None
-            if stronger:
-                if local_only:
-                    raise ModelConfigError(LOCAL_ONLY_REFUSAL, code="local_only")
-                if session.route != "auto":
-                    raise ModelConfigError(NO_STRONGER)
-                replaces = await self._last_model(session_id)
-                if replaces is None:
-                    raise ModelConfigError(NO_STRONGER)
-            if session.route != "pinned":
-                routed = await self._route(
-                    session, text, room, local_only=local_only, replaces=replaces
-                )
-            elif local_only:
-                self._refuse_hosted(routed.profile)
-            if routed.ask is None:
-                self._check_budget(routed.profile, room)
-            self._runtime.router.chat_model(routed.profile, local_only=local_only)
-            growth = None
-            if routed.ask is None:
-                growth = await self._growth_for(session, routed.profile)
-            invocation = None if skill is None else self._invoke(session_id, folder, skill)
-            if session.cwd is None and cwd is not None:
-                await self._events.emit(
-                    session_id, None, "session.updated", SessionUpdatedData(cwd=cwd)
-                )
-                session.cwd = cwd
-            turn = self._turn_of(
-                session,
-                routed,
-                run_id=new_id("r"),
-                user_message_id=new_id("m"),
-                text=text if invocation is None else invocation.text,
-                skill=invocation,
-                typed=None if invocation is None else text,
-                growth=growth,
-                local_only=local_only,
-                read_folders=read_folders,
+            if session.parent is not None:
+                raise HelperSessionError
+            return await self._send(
+                session, text, cwd=cwd, skill=skill, stronger=stronger, read_folders=read_folders
             )
-            if routed.ask is not None:
-                await ask_consent(self._runtime, self._events, turn, routed.ask)
-                return turn.run_id
-            control = RunControl()
-            await self._start(
-                session,
-                turn.run_id,
-                control,
-                self._turn(session, turn, control),
-                self._memory_access(session, routed.profile, text),
+
+    async def _send(
+        self,
+        session: _LiveSession,
+        text: str,
+        *,
+        cwd: str | None = None,
+        skill: SkillCall | None = None,
+        stronger: bool = False,
+        read_folders: tuple[str, ...] = (),
+    ) -> str:
+        """Start one run of ``session`` on ``text``, with the manager's lock held."""
+        session_id = session.session_id
+        if session.task is not None and not session.task.done():
+            raise SessionBusyError(session_id)
+        if session.compacting:
+            raise SessionBusyError(session_id)
+        if await self._run_records.waiting(session_id) is not None:
+            raise SessionBusyError(session_id)
+        room = None if self.budget is None else await self.budget.room(session_id)
+        # The folder may come with this message, so it is known before the model is chosen.
+        folder = session.cwd if session.cwd is not None else cwd
+        local_only = self.local_only(folder)
+        routed = _Routed(session.model_profile, None)
+        replaces = None
+        if stronger:
+            if local_only:
+                raise ModelConfigError(LOCAL_ONLY_REFUSAL, code="local_only")
+            if session.route != "auto":
+                raise ModelConfigError(NO_STRONGER)
+            replaces = await self._last_model(session_id)
+            if replaces is None:
+                raise ModelConfigError(NO_STRONGER)
+        if session.route != "pinned":
+            routed = await self._route(
+                session, text, room, local_only=local_only, replaces=replaces
             )
+        elif local_only:
+            self._refuse_hosted(routed.profile)
+        if routed.ask is None:
+            self._check_budget(routed.profile, room)
+        self._runtime.router.chat_model(routed.profile, local_only=local_only)
+        growth = None
+        if routed.ask is None:
+            growth = await self._growth_for(session, routed.profile)
+        invocation = None if skill is None else self._invoke(session_id, folder, skill)
+        if session.cwd is None and cwd is not None:
+            await self._events.emit(
+                session_id, None, "session.updated", SessionUpdatedData(cwd=cwd)
+            )
+            session.cwd = cwd
+        turn = self._turn_of(
+            session,
+            routed,
+            run_id=new_id("r"),
+            user_message_id=new_id("m"),
+            text=text if invocation is None else invocation.text,
+            skill=invocation,
+            typed=None if invocation is None else text,
+            growth=growth,
+            local_only=local_only,
+            read_folders=read_folders,
+        )
+        if routed.ask is not None:
+            await ask_consent(self._runtime, self._events, turn, routed.ask)
             return turn.run_id
+        control = RunControl()
+        await self._start(
+            session,
+            turn.run_id,
+            control,
+            self._turn(session, turn, control),
+            self._memory_access(session, routed.profile, text),
+        )
+        return turn.run_id
+
+    async def start_helper(
+        self,
+        parent: str,
+        call_id: str,
+        index: int,
+        agent: AgentSnapshot,
+        brief: str,
+        model_profile: str,
+        cwd: str | None,
+        *,
+        label: str = "",
+    ) -> HelperRef:
+        """Start the helper of the ``delegate`` call ``call_id`` of ``parent`` at ``index``, once.
+
+        A helper that exists for this key is returned and nothing else happens. Otherwise this
+        stores a session with origin ``agent:<type>``, route ``pinned``, the folder ``cwd``, the
+        ``agent`` snapshot, the lead's allowances cut to the agent's tools and a mode that is
+        careful for an agent that never asks, else the lead's. It then stores ``helper.started``
+        and, for the first helper of the call, ``tool.started`` on the lead's log when the lead
+        has a run, and sends
+        ``brief`` as the helper's first message through the normal run path.
+
+        ``model_profile`` is the model the lead's run uses. The helper's model is the ``explore``
+        role of it: the lead's local model, a local one only in a local-only folder or on route
+        ``local``, else the cheapest ready budget model of a hosted lead.
+
+        Raises :class:`~golem.tools.registry.ToolError` for a helper of a helper, an agent with
+        ``delegate`` in its tools, and a model that may not run here. Raises
+        :class:`SessionNotFoundError` for an unknown lead.
+        """
+        check_agent(agent)
+        async with self._lock:
+            lead = await self._resolve(parent)
+            if lead.parent is not None:
+                raise ToolError(NO_NESTED)
+            found = await self._records.helper(parent, call_id, index)
+            if found is not None:
+                return HelperRef(found.session_id, found.model_profile, False)
+            local_only = self.local_only(cwd) or lead.route == "local"
+            role = self._runtime.explore_role(model_profile, local_only=local_only)
+            try:
+                self._runtime.router.chat_model(role.profile, local_only=local_only)
+            except ModelConfigError as exc:
+                raise ToolError(str(exc)) from exc
+            allowed = cut_allowances(lead.allowed_tools, agent)
+            helper = _LiveSession(
+                session_id=new_id("s"),
+                model_profile=role.profile,
+                schema_version=SCHEMA_VERSION,
+                cwd=cwd,
+                origin=origin_of(agent),
+                parent=SessionParent(session_id=parent, call_id=call_id, index=index),
+                agent=agent,
+                allowed_tools=set(allowed),
+                options=dict(lead.options) if role.same_as_session else {},
+                permission_mode=helper_mode(agent, self._effective_mode(lead)),
+            )
+            await self._announce(helper)
+            sid = helper.session_id
+            if allowed:
+                items = [SessionAllowance(tool=name, subject=item) for name, item in allowed]
+                await self._events.emit(
+                    sid, None, "session.updated", SessionUpdatedData(allowed_tools=items)
+                )
+            await self._events.emit(
+                sid,
+                None,
+                "session.mode.changed",
+                SessionModeChangedData(mode=helper.permission_mode),
+            )
+            if helper.options:
+                await self._events.emit(
+                    sid,
+                    None,
+                    "model.options.changed",
+                    ModelOptionsChangedData(options=dict(helper.options)),
+                )
+            self._sessions[sid] = helper
+            run_id = next((r for r, live in self._runs.items() if live.task is lead.task), None)
+            await self._events.emit(
+                parent,
+                run_id,
+                "helper.started",
+                HelperStartedData(
+                    call_id=call_id,
+                    index=index,
+                    helper_id=sid,
+                    agent=agent.name,
+                    label=label,
+                    model=role.profile,
+                    wish=agent.wish,
+                    pick_reason=role.reason,
+                ),
+            )
+            if index == 0 and run_id is not None:
+                await self._events.emit(
+                    parent, run_id, "tool.started", ToolStartedData(call_id=call_id)
+                )
+            try:
+                await self._send(helper, brief)
+            except BaseException:
+                helper.closed = True
+                await self._events.emit(sid, None, "session.closed", EmptyEventData())
+                self._sessions.pop(sid, None)
+                raise
+            return HelperRef(sid, role.profile, True)
 
     def _turn_of(
         self,
@@ -1120,6 +1276,7 @@ class SessionManager:
             step_up=session.route == "auto",
             replaces=routed.replaces,
             read_folders=read_folders,
+            child=self._child_of(session),
         )
 
     async def answer_consent(self, session_id: str, run_id: str, answer: ConsentAnswer) -> str:
@@ -1175,6 +1332,7 @@ class SessionManager:
                     plan_first=session.plan_first,
                     local_only=self.local_only(session.cwd) or session.route == "local",
                     pins=session.pins,
+                    child=self._child_of(session),
                 )
                 control = RunControl()
                 work = self._resumed(session, resume, control, None)
@@ -1763,6 +1921,7 @@ class SessionManager:
                 plan_first=session.plan_first,
                 local_only=self.local_only(session.cwd) or session.route == "local",
                 pins=session.pins,
+                child=self._child_of(session),
             )
             control = RunControl()
             work = self._resumed(session, resume, control, pending.prompt)
@@ -2078,6 +2237,8 @@ class SessionManager:
     ) -> None:
         if reply is None or self._titles is None or session.title is not None or session.titling:
             return
+        if session.parent is not None:
+            return  # a helper is not in the list, so it has no title to show
         session.titling = True
         task = asyncio.create_task(
             self._name(session, self._titles, prompt, reply, local_only, profile),
@@ -2161,12 +2322,26 @@ class SessionManager:
             paid_ok=False if record is None else record.paid_ok,
             plan_first=False if record is None else record.plan_first,
         )
+        if record is not None and record.parent_session_id is not None:
+            await self._load_helper(session)
         if session.skills:
             session.pins = PinMemory.from_events(await self._events.stored(session_id))
         if record is None:
             await self._announce(session)
         self._sessions[session_id] = session
         return session
+
+    async def _load_helper(self, session: _LiveSession) -> None:
+        """Read the lead and the agent of a helper session from its ``session.created``."""
+        for event in await self._events.stored(session.session_id):
+            if event.type == "session.created":
+                session.parent = event.data.parent
+                session.agent = event.data.agent
+                return
+
+    def _child_of(self, session: _LiveSession) -> ChildScope | None:
+        """The scope of a helper session, from its record. None for any other session."""
+        return None if session.agent is None else scope_of_agent(session.agent)
 
     async def _announce(self, session: _LiveSession, forked_from: ForkedFrom | None = None) -> None:
         chosen = self._runtime.router.identity(session.model_profile)
@@ -2182,6 +2357,8 @@ class SessionManager:
                 cwd=session.cwd,
                 origin=None if session.origin == "user" else session.origin,
                 route=session.route,
+                parent=session.parent,
+                agent=session.agent,
             ),
         )
 
