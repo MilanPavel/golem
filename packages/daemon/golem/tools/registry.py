@@ -17,6 +17,8 @@ import httpx
 from pydantic import BaseModel, ValidationError
 
 from golem.config import PERMISSION_MODES, PermissionMode, ShellSettings, WebSettings
+from golem.memory.privacy import Target
+from golem.memory.service import MemoryAccess
 from golem.skills.registry import SkillView
 
 MAX_OUTPUT_CHARS = 5_000_000
@@ -106,6 +108,10 @@ class ToolContext:
     """The most characters of a result page for the model's window, for ``read_artifact``."""
     delegate: Callable[[str], Awaitable[Delegated]] | None = None
     """Runs a helper on a brief and waits for its answer, for ``delegate``. None in a helper."""
+    memory: MemoryAccess | None = None
+    """What the run may use of memory, for ``recall`` and ``remember``. None: memory is off."""
+    memory_target: Target | None = None
+    """The model of this call, for the privacy check of ``recall``."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -207,6 +213,8 @@ class Tool[A: BaseModel]:
     offline_only: bool = False
     plan_only: bool = False
     """Offered only while the session is in plan first, such as ``propose_plan``."""
+    needs_memory: bool = False
+    """Offered only to a run that carries memory, such as ``recall``."""
 
     def schema(self) -> dict[str, object]:
         """The OpenAI function format, which every chat model's ``bind_tools`` accepts."""
@@ -248,11 +256,13 @@ class ToolScope:
     ``root`` is its folder, which may bring a trusted project's MCP servers,
     and ``enabled`` the on-demand servers it turned on with ``/mcp enable``. With ``only``
     the scope has exactly those of golem's own tools and no outside ones, as a helper's does.
+    ``memory`` says the run carries memory, so it sees the tools that need it.
     """
 
     root: Path | None = None
     enabled: frozenset[str] = frozenset()
     only: frozenset[str] | None = None
+    memory: bool = False
 
 
 class ToolSource(Protocol):
@@ -280,7 +290,14 @@ class ToolRegistry:
     def __init__(self, tools: Iterable[Tool[Any]], source: ToolSource | None = None) -> None:
         self._tools = {tool.name: tool for tool in tools}
         self._source = source
-        self._schemas = [tool.schema() for tool in self._tools.values() if not tool.plan_only]
+        self._all_schemas = [tool.schema() for tool in self._tools.values() if not tool.plan_only]
+        self._plain_schemas = [
+            tool.schema()
+            for tool in self._tools.values()
+            if not tool.plan_only and not tool.needs_memory
+        ]
+        # Offered without a scope: no run, so no memory, so no memory tools.
+        self._schemas = self._plain_schemas
         self._extra: dict[str, Tool[Any]] = {}
 
     def scoped(self, scope: ToolScope) -> ToolRegistry:
@@ -290,9 +307,16 @@ class ToolRegistry:
             view._tools = {n: t for n, t in self._tools.items() if n in scope.only}
             view._source = None
             view._schemas = [t.schema() for t in view._tools.values() if not t.plan_only]
+            view._plain_schemas = view._all_schemas = view._schemas
             view._extra = {}
             return view
-        view._tools, view._source, view._schemas = self._tools, self._source, self._schemas
+        view._source, view._plain_schemas = self._source, self._plain_schemas
+        view._all_schemas = self._all_schemas
+        if scope.memory:
+            view._tools, view._schemas = self._tools, self._all_schemas
+        else:
+            view._tools = {n: t for n, t in self._tools.items() if not t.needs_memory}
+            view._schemas = self._plain_schemas
         found: Iterable[Tool[Any]] = () if self._source is None else self._source.tools(scope)
         view._extra = {tool.name: tool for tool in found if tool.name not in self._tools}
         return view

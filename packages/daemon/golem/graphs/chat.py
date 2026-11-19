@@ -1277,6 +1277,7 @@ def open_chat(
             lambda: runtime[0].skills if runtime else None,
             _budget_by_window(window_of),
             lambda: runtime[0] if runtime else None,
+            tier_of,
         ),
     )
     builder.add_edge(START, "call_model")

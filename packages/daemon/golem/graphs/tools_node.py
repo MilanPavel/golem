@@ -56,6 +56,9 @@ from golem.graphs.child import ChildLimits, ChildProgress, ChildResult
 from golem.graphs.notes import is_note
 from golem.graphs.result_budget import DEFAULT_BUDGET, ResultBudget
 from golem.graphs.state import AgentState
+from golem.memory.privacy import Target
+from golem.memory.service import MemoryAccess
+from golem.models.tiers import Tier
 from golem.permissions.engine import Allowance, session_allows
 from golem.permissions.policy import Policy, describe, explain
 from golem.skills.registry import SkillRegistry
@@ -108,6 +111,10 @@ CHILD_KEY = "golem_child"
 
 LOCAL_ONLY_KEY = "golem_local_only"
 """``configurable`` key for whether the session stays on this Mac, for the helper's model."""
+
+MEMORY_KEY = "golem_memory"
+"""``configurable`` key for the run's :class:`MemoryAccess`. Absent when memory is off, and in
+a run that resumed after a tool approval or a step-up."""
 
 HELPERS_DONE = "helpers_done"
 """The ``decision`` of the answer that wakes a lead parked for its helpers."""
@@ -254,6 +261,7 @@ def tools_node(
     skills: Callable[[], SkillRegistry | None] = lambda: None,
     budget_of: BudgetOf | None = None,
     children: Callable[[], ChildHost | None] = lambda: None,
+    tier_of: Callable[[str], Tier | None] | None = None,
 ) -> Callable[[AgentState, RunnableConfig], Awaitable[dict[str, object]]]:
     async def tools(state: AgentState, config: RunnableConfig) -> dict[str, object]:
         last = state["messages"][-1]
@@ -284,6 +292,8 @@ def tools_node(
             enable_mcp=enable_here if enabler is not None and session_id else None,
             skills=None if skill_registry is None else skill_registry.view(root),
             page_chars=budget.page_chars,
+            memory=None if child_of(config) is not None else _memory(config),
+            memory_target=_target(state, tier_of),
         )
         allowed = _allowed(config)
         mode = _mode(config)
@@ -732,6 +742,8 @@ def _asked(config: RunnableConfig) -> set[str]:
 
 def unavailable(name: str) -> str:
     """Why a call to a tool the session does not have did not run."""
+    if name in ("recall", "remember"):
+        return f"{name} is not available in this run: memory is off"
     if name.startswith("mcp__"):
         server = name.removeprefix("mcp__").split("__", 1)[0]
         return (
@@ -745,6 +757,18 @@ def child_of(config: RunnableConfig) -> ChildScope | None:
     """The scope of a child run, or None for a session's own run."""
     raw = cast(Mapping[str, object], config.get("configurable", {})).get(CHILD_KEY)
     return raw if isinstance(raw, ChildScope) else None
+
+
+def _memory(config: RunnableConfig) -> MemoryAccess | None:
+    raw = cast(Mapping[str, object], config.get("configurable", {})).get(MEMORY_KEY)
+    return raw if isinstance(raw, MemoryAccess) else None
+
+
+def _target(state: AgentState, tier_of: Callable[[str], Tier | None] | None) -> Target:
+    """The model of this call. One whose tier is unknown counts as hosted."""
+    profile = state.get("model_profile")
+    tier = None if tier_of is None or not profile else tier_of(profile)
+    return Target(local=tier == "local")
 
 
 def scope_of(config: RunnableConfig) -> ToolScope:
@@ -762,7 +786,9 @@ def scope_of(config: RunnableConfig) -> ToolScope:
     if isinstance(now, set):
         names.extend(cast(set[object], now))
     return ToolScope(
-        root=_root(config), enabled=frozenset(name for name in names if isinstance(name, str))
+        root=_root(config),
+        enabled=frozenset(name for name in names if isinstance(name, str)),
+        memory=_memory(config) is not None,
     )
 
 
@@ -797,6 +823,7 @@ __all__ = [
     "LOCAL_ONLY_KEY",
     "MCP_KEY",
     "MCP_NOW_KEY",
+    "MEMORY_KEY",
     "MODE_KEY",
     "NO_ASK_REFUSAL",
     "PINNED_FOLDERS_KEY",
