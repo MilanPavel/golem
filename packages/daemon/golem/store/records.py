@@ -115,7 +115,8 @@ class SessionRecords:
         With ``cwd``, only the sessions in that folder.
         """
         rows = await self._database.fetch_all(
-            f"{_ACTIVITY} WHERE s.closed_at IS NULL AND (? IS NULL OR s.cwd = ?)"
+            f"{_ACTIVITY} WHERE s.closed_at IS NULL AND s.parent_session_id IS NULL"
+            " AND (? IS NULL OR s.cwd = ?)"
             " ORDER BY s.updated_at DESC, s.session_id DESC LIMIT ?",
             (cwd, cwd, limit),
         )
