@@ -2222,6 +2222,272 @@ class RoutineChanged(BaseModel):
     change: Literal["added", "updated", "removed", "reloaded"]
 
 
+MemoryScope = Literal["you", "project", "history"]
+MemoryAuthor = Literal["you", "lead", "helper"]
+MemoryState = Literal["proposed", "kept", "stale"]
+MemoryKeptBy = Literal["you", "auto"]
+MemoryPrivacy = Literal["chat", "local"]
+
+
+class MemorySource(BaseModel):
+    """A file a note is about, as it was when the note was made or last accepted."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    path: str = Field(min_length=1)
+    """Relative to the folder when inside it, else absolute."""
+    sha256: str
+    size: int = Field(ge=0)
+    mtime_ns: int
+    checked_at: str
+
+
+class MemoryItem(BaseModel):
+    """One memory, with its sources (ADR-061, decision 7).
+
+    ``usable`` is false for a ``local`` memory when no local model is set up, so no
+    chat can use it. It is null for a ``chat`` memory.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    id: str = Field(min_length=1)
+    scope: MemoryScope
+    title: str
+    text: str
+    author: MemoryAuthor
+    state: MemoryState
+    created_at: str
+    updated_at: str
+    folder: str | None = None
+    """The project folder for ``project``, else null."""
+    session_id: str | None = None
+    agent: str | None = None
+    call_id: str | None = None
+    kept_by: MemoryKeptBy | None = None
+    """Null while ``proposed``."""
+    privacy: MemoryPrivacy = "chat"
+    always: bool = False
+    uses: int = Field(default=0, ge=0)
+    last_used_at: str | None = None
+    sources: list[MemorySource] = Field(default_factory=list[MemorySource])
+    usable: bool | None = None
+
+
+class MemoryCounts(BaseModel):
+    """How many memories there are, by scope and by state, over every folder."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    you: int = Field(default=0, ge=0)
+    project: int = Field(default=0, ge=0)
+    history: int = Field(default=0, ge=0)
+    proposed: int = Field(default=0, ge=0)
+    kept: int = Field(default=0, ge=0)
+    stale: int = Field(default=0, ge=0)
+
+
+class MemorySettings(BaseModel):
+    """``[memory]`` of ``config.toml``.
+
+    ``you``, ``projects`` and ``history`` are the privacy of each scope. ``auto_keep`` is
+    the folders where a note with sources is kept without asking. It is read only here,
+    because it widens trust.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    you: MemoryPrivacy = "chat"
+    projects: MemoryPrivacy = "chat"
+    history: MemoryPrivacy = "chat"
+    auto_keep: list[str] = Field(default_factory=list[str])
+    share: float = Field(default=0.02, gt=0, le=1)
+    min_tokens: int = Field(default=200, ge=0)
+    max_tokens: int = Field(default=1500, ge=0)
+
+
+class MemoryListParams(BaseModel):
+    """``memory.list``. Rows newest first, filtered, a page at a time.
+
+    ``query`` is a word search over ``title`` and ``text``. ``proposed`` and ``stale``
+    rows are listed too. ``limit`` is at most 200.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    scope: MemoryScope | None = None
+    folder: str | None = Field(default=None, min_length=1)
+    state: MemoryState | None = None
+    query: str | None = Field(default=None, min_length=1)
+    limit: int = Field(default=50, ge=1, le=200)
+    after: str | None = Field(default=None, min_length=1)
+    """The id of the last row of the page before. Null for the first page."""
+
+
+class MemoryListResult(BaseModel):
+    """One page. ``total`` is the rows the filters match, ``counts`` all rows."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    items: list[MemoryItem]
+    total: int = Field(ge=0)
+    counts: MemoryCounts
+    settings: MemorySettings
+
+
+class MemoryGetParams(BaseModel):
+    """``memory.get``. One memory with its sources."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    id: str = Field(min_length=1)
+
+
+class MemoryGetResult(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    item: MemoryItem
+
+
+class MemoryWriteParams(BaseModel):
+    """``memory.write``. You write a memory: it is ``kept``, author ``you``.
+
+    ``scope`` is ``you`` or ``project``; a ``project`` note needs ``folder``. ``text`` is
+    at most 2000 characters. ``title`` defaults to the first line of ``text``, cut to 120
+    characters. ``sources`` are paths, at most 20, hashed when the note is written.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    scope: Literal["you", "project"]
+    text: str = Field(min_length=1, max_length=2000)
+    title: str | None = Field(default=None, min_length=1, max_length=120)
+    folder: str | None = Field(default=None, min_length=1)
+    privacy: MemoryPrivacy = "chat"
+    always: bool = False
+    sources: list[str] = Field(default_factory=list[str], max_length=20)
+
+    @model_validator(mode="after")
+    def _folder_goes_with_project(self) -> Self:
+        if self.scope == "project" and self.folder is None:
+            raise ValueError("a project memory needs a folder")
+        if self.scope != "project" and self.folder is not None:
+            raise ValueError("only a project memory has a folder")
+        return self
+
+
+class MemoryWriteResult(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    item: MemoryItem
+
+
+class MemoryUpdateParams(BaseModel):
+    """``memory.update``. Edit ``text``, ``title``, ``privacy``, ``always`` or ``folder``.
+
+    ``accept_sources`` hashes the sources again and makes a ``stale`` note ``kept``.
+    At least one change is needed.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    id: str = Field(min_length=1)
+    text: str | None = Field(default=None, min_length=1, max_length=2000)
+    title: str | None = Field(default=None, min_length=1, max_length=120)
+    privacy: MemoryPrivacy | None = None
+    always: bool | None = None
+    folder: str | None = Field(default=None, min_length=1)
+    accept_sources: bool = False
+
+    @model_validator(mode="after")
+    def _something_changes(self) -> Self:
+        changes = (self.text, self.title, self.privacy, self.always, self.folder)
+        if all(change is None for change in changes) and not self.accept_sources:
+            raise ValueError("nothing to change")
+        return self
+
+
+class MemoryUpdateResult(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    item: MemoryItem
+
+
+class MemoryDeleteParams(BaseModel):
+    """``memory.delete``. Delete rows with their sources and search entries. No trash."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    ids: list[str] = Field(min_length=1, max_length=200)
+
+
+class MemoryDeleteResult(BaseModel):
+    """``deleted`` are the ids that were there. ``missing`` are the ones that were not."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    deleted: list[str]
+    missing: list[str] = Field(default_factory=list[str])
+
+
+class MemoryExportParams(BaseModel):
+    """``memory.export``. The memories of a scope or a folder, as ``markdown`` or ``json``."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    format: Literal["markdown", "json"]
+    scope: MemoryScope | None = None
+    folder: str | None = Field(default=None, min_length=1)
+
+
+class MemoryExportResult(BaseModel):
+    """``text`` is the document: a section for each memory, or a JSON array of every field."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    format: Literal["markdown", "json"]
+    text: str
+    count: int = Field(ge=0)
+
+
+class MemorySettingsParams(BaseModel):
+    """``memory.settings``. Read ``[memory]``, or set the privacy of a scope.
+
+    ``scope`` and ``privacy`` come together, or neither. ``auto_keep`` cannot be set here.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    scope: MemoryScope | None = None
+    privacy: MemoryPrivacy | None = None
+
+    @model_validator(mode="after")
+    def _scope_and_privacy_together(self) -> Self:
+        if (self.scope is None) != (self.privacy is None):
+            raise ValueError("scope and privacy go together")
+        return self
+
+
+class MemorySettingsResult(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    settings: MemorySettings
+
+
+class MemoryChanged(BaseModel):
+    """A memory was made, edited, deleted, went stale or was resolved. List again.
+
+    ``folder`` is the project folder of a ``project`` memory, else null.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    id: str = Field(min_length=1)
+    change: Literal["created", "updated", "deleted", "stale", "resolved"]
+    scope: MemoryScope
+    folder: str | None = None
+
+
 class McpListParams(BaseModel):
     """``mcp.list``. The user's MCP servers and their state.
 
@@ -3996,6 +4262,30 @@ __all__ = [
     "McpToolInfo",
     "McpToolsResult",
     "McpUpdateParams",
+    "MemoryAuthor",
+    "MemoryChanged",
+    "MemoryCounts",
+    "MemoryDeleteParams",
+    "MemoryDeleteResult",
+    "MemoryExportParams",
+    "MemoryExportResult",
+    "MemoryGetParams",
+    "MemoryGetResult",
+    "MemoryItem",
+    "MemoryKeptBy",
+    "MemoryListParams",
+    "MemoryListResult",
+    "MemoryPrivacy",
+    "MemoryScope",
+    "MemorySettings",
+    "MemorySettingsParams",
+    "MemorySettingsResult",
+    "MemorySource",
+    "MemoryState",
+    "MemoryUpdateParams",
+    "MemoryUpdateResult",
+    "MemoryWriteParams",
+    "MemoryWriteResult",
     "MessageSendParams",
     "MessageSendResult",
     "ModelCheckCase",

@@ -52,3 +52,8 @@ test("a helper event type this build does not list is dropped, and the five it l
     assert.notEqual(asChatEvent({ ...base, type }), undefined);
   }
 });
+
+test("a memory.changed payload is not a chat event", () => {
+  assert.equal(asChatEvent({ id: "mem_1", change: "created", scope: "you", folder: null }), undefined);
+  assert.equal(asChatEvent({ type: "memory.changed", seq: 1, session_id: "s_test", run_id: null, ts: "t", data: {} }), undefined);
+});

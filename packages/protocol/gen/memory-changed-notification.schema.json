@@ -1,0 +1,78 @@
+{
+  "$defs": {
+    "MemoryChanged": {
+      "additionalProperties": false,
+      "description": "A memory was made, edited, deleted, went stale or was resolved. List again.\n\n``folder`` is the project folder of a ``project`` memory, else null.",
+      "properties": {
+        "change": {
+          "enum": [
+            "created",
+            "updated",
+            "deleted",
+            "stale",
+            "resolved"
+          ],
+          "title": "Change",
+          "type": "string"
+        },
+        "folder": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Folder"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "scope": {
+          "enum": [
+            "you",
+            "project",
+            "history"
+          ],
+          "title": "Scope",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "change",
+        "scope"
+      ],
+      "title": "MemoryChanged",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Server → every connection: a memory changed. Not stored.",
+  "properties": {
+    "jsonrpc": {
+      "const": "2.0",
+      "default": "2.0",
+      "title": "Jsonrpc",
+      "type": "string"
+    },
+    "method": {
+      "const": "memory.changed",
+      "default": "memory.changed",
+      "title": "Method",
+      "type": "string"
+    },
+    "params": {
+      "$ref": "#/$defs/MemoryChanged"
+    }
+  },
+  "required": [
+    "params"
+  ],
+  "title": "MemoryChangedNotification",
+  "type": "object"
+}

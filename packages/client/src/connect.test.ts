@@ -1447,6 +1447,49 @@ test("skill.list reads the skills, and skill.registry.changed reaches onSkillsCh
   }
 });
 
+test("memory.list reads a page, and memory.changed reaches onMemoryChanged unless it is malformed", async () => {
+  const note = { id: "mem_1", scope: "you", title: "pnpm", text: "Use pnpm.", author: "you", state: "kept", sources: [] };
+  const page = {
+    items: [note],
+    total: 1,
+    counts: { you: 1, project: 0, history: 0, proposed: 0, kept: 1, stale: 0 },
+    settings: { you: "chat", projects: "chat", history: "local", auto_keep: [] },
+  };
+  const sent: Record<string, unknown>[] = [];
+  const server = await listen((socket) => {
+    attach(socket, {
+      answerPing: true,
+      results: { "memory.list": page },
+      onRequest: (_socket, method, params) => {
+        if (method.startsWith("memory.")) {
+          sent.push({ method, ...params });
+        }
+      },
+      onHello: (current) => {
+        write(current, { jsonrpc: "2.0", method: "memory.changed", params: { change: "created" } });
+        write(current, { jsonrpc: "2.0", method: "memory.changed", params: { id: "mem_1", change: "created", scope: "you", folder: null } });
+      },
+    });
+  });
+  const client = connectGolem({ socketPath: server.socketPath, clientName: "tui", reconnect: false, heartbeatMs: 60_000 });
+  const seen: string[] = [];
+  const stop = client.onMemoryChanged((change) => {
+    seen.push(`${change.change} ${change.id}`);
+  });
+  try {
+    assert.deepEqual(await client.listMemories({ scope: "you", limit: 20 }), page);
+    assert.deepEqual(sent, [{ method: "memory.list", scope: "you", limit: 20 }]);
+    for (let tries = 0; tries < 50 && seen.length < 1; tries += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+    assert.deepEqual(seen, ["created mem_1"]);
+  } finally {
+    stop();
+    client.close();
+    await server.close();
+  }
+});
+
 test("forkSession sends the message id and reads the new session", async () => {
   const sent: Record<string, unknown>[] = [];
   const server = await listen((socket) => {

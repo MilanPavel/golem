@@ -1,0 +1,37 @@
+{
+  "additionalProperties": false,
+  "description": "A file a note is about, as it was when the note was made or last accepted.",
+  "properties": {
+    "checked_at": {
+      "title": "Checked At",
+      "type": "string"
+    },
+    "mtime_ns": {
+      "title": "Mtime Ns",
+      "type": "integer"
+    },
+    "path": {
+      "minLength": 1,
+      "title": "Path",
+      "type": "string"
+    },
+    "sha256": {
+      "title": "Sha256",
+      "type": "string"
+    },
+    "size": {
+      "minimum": 0,
+      "title": "Size",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "path",
+    "sha256",
+    "size",
+    "mtime_ns",
+    "checked_at"
+  ],
+  "title": "MemorySource",
+  "type": "object"
+}

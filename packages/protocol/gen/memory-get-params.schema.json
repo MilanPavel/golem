@@ -1,0 +1,16 @@
+{
+  "additionalProperties": false,
+  "description": "``memory.get``. One memory with its sources.",
+  "properties": {
+    "id": {
+      "minLength": 1,
+      "title": "Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id"
+  ],
+  "title": "MemoryGetParams",
+  "type": "object"
+}

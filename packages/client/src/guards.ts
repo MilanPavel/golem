@@ -36,6 +36,14 @@ import type { SessionSetPlanResult } from "../../protocol/gen/session-set-plan-r
 import type { SessionSetModeResult } from "../../protocol/gen/session-set-mode-result.ts";
 import type { SessionSetOptionsResult } from "../../protocol/gen/session-set-options-result.ts";
 import type { ListedSkill, SkillListResult } from "../../protocol/gen/skill-list-result.ts";
+import type { MemoryDeleteResult } from "../../protocol/gen/memory-delete-result.ts";
+import type { MemoryExportResult } from "../../protocol/gen/memory-export-result.ts";
+import type { MemoryGetResult } from "../../protocol/gen/memory-get-result.ts";
+import type { MemoryListResult } from "../../protocol/gen/memory-list-result.ts";
+import type { MemorySettingsResult } from "../../protocol/gen/memory-settings-result.ts";
+import type { MemoryUpdateResult } from "../../protocol/gen/memory-update-result.ts";
+import type { MemoryWriteResult } from "../../protocol/gen/memory-write-result.ts";
+import type { MemoryChanged } from "../../protocol/gen/memory-changed.ts";
 import type { RoutineGetResult } from "../../protocol/gen/routine-get-result.ts";
 import type { RoutineInfo, RoutineListResult } from "../../protocol/gen/routine-list-result.ts";
 import type { RoutinePreviewResult } from "../../protocol/gen/routine-preview-result.ts";
@@ -321,6 +329,71 @@ export function isSkillCreateResult(value: unknown): value is SkillCreateResult 
 
 export function isSkillSetDisabledResult(value: unknown): value is SkillSetDisabledResult {
   return isRecord(value) && typeof value["name"] === "string" && typeof value["disabled"] === "boolean";
+}
+
+const MEMORY_SCOPES = ["you", "project", "history"];
+
+export function isMemoryItem(value: unknown): boolean {
+  return (
+    isRecord(value) &&
+    typeof value["id"] === "string" &&
+    typeof value["title"] === "string" &&
+    typeof value["text"] === "string" &&
+    typeof value["scope"] === "string" &&
+    MEMORY_SCOPES.includes(value["scope"]) &&
+    typeof value["state"] === "string" &&
+    Array.isArray(value["sources"])
+  );
+}
+
+function isMemorySettings(value: unknown): boolean {
+  return isRecord(value) && typeof value["you"] === "string" && typeof value["projects"] === "string" && typeof value["history"] === "string";
+}
+
+export function isMemoryListResult(value: unknown): value is MemoryListResult {
+  return (
+    isRecord(value) &&
+    Array.isArray(value["items"]) &&
+    value["items"].every(isMemoryItem) &&
+    typeof value["total"] === "number" &&
+    isRecord(value["counts"]) &&
+    isMemorySettings(value["settings"])
+  );
+}
+
+export function isMemoryGetResult(value: unknown): value is MemoryGetResult {
+  return isRecord(value) && isMemoryItem(value["item"]);
+}
+
+export function isMemoryWriteResult(value: unknown): value is MemoryWriteResult {
+  return isRecord(value) && isMemoryItem(value["item"]);
+}
+
+export function isMemoryUpdateResult(value: unknown): value is MemoryUpdateResult {
+  return isRecord(value) && isMemoryItem(value["item"]);
+}
+
+export function isMemoryDeleteResult(value: unknown): value is MemoryDeleteResult {
+  return isRecord(value) && Array.isArray(value["deleted"]) && value["deleted"].every((id) => typeof id === "string");
+}
+
+export function isMemoryExportResult(value: unknown): value is MemoryExportResult {
+  return isRecord(value) && typeof value["text"] === "string" && typeof value["count"] === "number";
+}
+
+export function isMemorySettingsResult(value: unknown): value is MemorySettingsResult {
+  return isRecord(value) && isMemorySettings(value["settings"]);
+}
+
+export function isMemoryChanged(value: unknown): value is MemoryChanged {
+  return (
+    isRecord(value) &&
+    typeof value["id"] === "string" &&
+    typeof value["change"] === "string" &&
+    ["created", "updated", "deleted", "stale", "resolved"].includes(value["change"]) &&
+    typeof value["scope"] === "string" &&
+    MEMORY_SCOPES.includes(value["scope"])
+  );
 }
 
 export function isSessionSetSkillsResult(value: unknown): value is SessionSetSkillsResult {

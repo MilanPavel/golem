@@ -1,0 +1,20 @@
+{
+  "additionalProperties": false,
+  "description": "``memory.delete``. Delete rows with their sources and search entries. No trash.",
+  "properties": {
+    "ids": {
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 200,
+      "minItems": 1,
+      "title": "Ids",
+      "type": "array"
+    }
+  },
+  "required": [
+    "ids"
+  ],
+  "title": "MemoryDeleteParams",
+  "type": "object"
+}

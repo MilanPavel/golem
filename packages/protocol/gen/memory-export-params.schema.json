@@ -1,0 +1,49 @@
+{
+  "additionalProperties": false,
+  "description": "``memory.export``. The memories of a scope or a folder, as ``markdown`` or ``json``.",
+  "properties": {
+    "folder": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Folder"
+    },
+    "format": {
+      "enum": [
+        "markdown",
+        "json"
+      ],
+      "title": "Format",
+      "type": "string"
+    },
+    "scope": {
+      "anyOf": [
+        {
+          "enum": [
+            "you",
+            "project",
+            "history"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Scope"
+    }
+  },
+  "required": [
+    "format"
+  ],
+  "title": "MemoryExportParams",
+  "type": "object"
+}

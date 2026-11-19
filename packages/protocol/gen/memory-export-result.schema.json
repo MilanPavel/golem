@@ -1,0 +1,30 @@
+{
+  "additionalProperties": false,
+  "description": "``text`` is the document: a section for each memory, or a JSON array of every field.",
+  "properties": {
+    "count": {
+      "minimum": 0,
+      "title": "Count",
+      "type": "integer"
+    },
+    "format": {
+      "enum": [
+        "markdown",
+        "json"
+      ],
+      "title": "Format",
+      "type": "string"
+    },
+    "text": {
+      "title": "Text",
+      "type": "string"
+    }
+  },
+  "required": [
+    "format",
+    "text",
+    "count"
+  ],
+  "title": "MemoryExportResult",
+  "type": "object"
+}

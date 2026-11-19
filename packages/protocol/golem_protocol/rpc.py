@@ -11,6 +11,7 @@ from golem_protocol.commands import (
     McpServer,
     McpServerLog,
     McpTestProgress,
+    MemoryChanged,
     ModelCheckDone,
     ModelCheckProgress,
     ModelOptionsSaved,
@@ -274,6 +275,16 @@ class RoutineFinishedNotification(BaseModel):
     params: RoutineFinished
 
 
+class MemoryChangedNotification(BaseModel):
+    """Server → every connection: a memory changed. Not stored."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    jsonrpc: Literal["2.0"] = "2.0"
+    method: Literal["memory.changed"] = "memory.changed"
+    params: MemoryChanged
+
+
 __all__ = [
     "AgentRegistryChangedNotification",
     "KeychainWaitNotification",
@@ -281,6 +292,7 @@ __all__ = [
     "McpServerLogNotification",
     "McpServerStatusNotification",
     "McpTestProgressNotification",
+    "MemoryChangedNotification",
     "ModelCheckDoneNotification",
     "ModelCheckProgressNotification",
     "ModelOptionsSavedNotification",
