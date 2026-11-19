@@ -120,6 +120,13 @@ METHOD_ACCESS: Final[Mapping[str, Access]] = {
     "ollama.start": "browser",
     "fs.list_dirs": "browser",
     "notify.test": "browser",
+    "memory.list": "browser",
+    "memory.get": "browser",
+    "memory.write": "browser",
+    "memory.update": "browser",
+    "memory.delete": "browser",
+    "memory.export": "browser",
+    "memory.settings": "browser",
 }
 
 BROWSER_METHODS: Final[frozenset[str]] = frozenset(

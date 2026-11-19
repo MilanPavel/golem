@@ -1,0 +1,41 @@
+{
+  "additionalProperties": false,
+  "description": "``memory.settings``. Read ``[memory]``, or set the privacy of a scope.\n\n``scope`` and ``privacy`` come together, or neither. ``auto_keep`` cannot be set here.",
+  "properties": {
+    "privacy": {
+      "anyOf": [
+        {
+          "enum": [
+            "chat",
+            "local"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Privacy"
+    },
+    "scope": {
+      "anyOf": [
+        {
+          "enum": [
+            "you",
+            "project",
+            "history"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Scope"
+    }
+  },
+  "title": "MemorySettingsParams",
+  "type": "object"
+}

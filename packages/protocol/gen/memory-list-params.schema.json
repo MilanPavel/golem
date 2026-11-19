@@ -1,0 +1,88 @@
+{
+  "additionalProperties": false,
+  "description": "``memory.list``. Rows newest first, filtered, a page at a time.\n\n``query`` is a word search over ``title`` and ``text``. ``proposed`` and ``stale``\nrows are listed too. ``limit`` is at most 200.",
+  "properties": {
+    "after": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "After"
+    },
+    "folder": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Folder"
+    },
+    "limit": {
+      "default": 50,
+      "maximum": 200,
+      "minimum": 1,
+      "title": "Limit",
+      "type": "integer"
+    },
+    "query": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Query"
+    },
+    "scope": {
+      "anyOf": [
+        {
+          "enum": [
+            "you",
+            "project",
+            "history"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Scope"
+    },
+    "state": {
+      "anyOf": [
+        {
+          "enum": [
+            "proposed",
+            "kept",
+            "stale"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "State"
+    }
+  },
+  "title": "MemoryListParams",
+  "type": "object"
+}

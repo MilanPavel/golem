@@ -1,0 +1,75 @@
+{
+  "additionalProperties": false,
+  "description": "``memory.write``. You write a memory: it is ``kept``, author ``you``.\n\n``scope`` is ``you`` or ``project``; a ``project`` note needs ``folder``. ``text`` is\nat most 2000 characters. ``title`` defaults to the first line of ``text``, cut to 120\ncharacters. ``sources`` are paths, at most 20, hashed when the note is written.",
+  "properties": {
+    "always": {
+      "default": false,
+      "title": "Always",
+      "type": "boolean"
+    },
+    "folder": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Folder"
+    },
+    "privacy": {
+      "default": "chat",
+      "enum": [
+        "chat",
+        "local"
+      ],
+      "title": "Privacy",
+      "type": "string"
+    },
+    "scope": {
+      "enum": [
+        "you",
+        "project"
+      ],
+      "title": "Scope",
+      "type": "string"
+    },
+    "sources": {
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 20,
+      "title": "Sources",
+      "type": "array"
+    },
+    "text": {
+      "maxLength": 2000,
+      "minLength": 1,
+      "title": "Text",
+      "type": "string"
+    },
+    "title": {
+      "anyOf": [
+        {
+          "maxLength": 120,
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Title"
+    }
+  },
+  "required": [
+    "scope",
+    "text"
+  ],
+  "title": "MemoryWriteParams",
+  "type": "object"
+}

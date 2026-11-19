@@ -1,0 +1,220 @@
+{
+  "$defs": {
+    "MemorySource": {
+      "additionalProperties": false,
+      "description": "A file a note is about, as it was when the note was made or last accepted.",
+      "properties": {
+        "checked_at": {
+          "title": "Checked At",
+          "type": "string"
+        },
+        "mtime_ns": {
+          "title": "Mtime Ns",
+          "type": "integer"
+        },
+        "path": {
+          "minLength": 1,
+          "title": "Path",
+          "type": "string"
+        },
+        "sha256": {
+          "title": "Sha256",
+          "type": "string"
+        },
+        "size": {
+          "minimum": 0,
+          "title": "Size",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "path",
+        "sha256",
+        "size",
+        "mtime_ns",
+        "checked_at"
+      ],
+      "title": "MemorySource",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "One memory, with its sources (ADR-061, decision 7).\n\n``usable`` is false for a ``local`` memory when no local model is set up, so no\nchat can use it. It is null for a ``chat`` memory.",
+  "properties": {
+    "agent": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Agent"
+    },
+    "always": {
+      "default": false,
+      "title": "Always",
+      "type": "boolean"
+    },
+    "author": {
+      "enum": [
+        "you",
+        "lead",
+        "helper"
+      ],
+      "title": "Author",
+      "type": "string"
+    },
+    "call_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Call Id"
+    },
+    "created_at": {
+      "title": "Created At",
+      "type": "string"
+    },
+    "folder": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Folder"
+    },
+    "id": {
+      "minLength": 1,
+      "title": "Id",
+      "type": "string"
+    },
+    "kept_by": {
+      "anyOf": [
+        {
+          "enum": [
+            "you",
+            "auto"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Kept By"
+    },
+    "last_used_at": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Last Used At"
+    },
+    "privacy": {
+      "default": "chat",
+      "enum": [
+        "chat",
+        "local"
+      ],
+      "title": "Privacy",
+      "type": "string"
+    },
+    "scope": {
+      "enum": [
+        "you",
+        "project",
+        "history"
+      ],
+      "title": "Scope",
+      "type": "string"
+    },
+    "session_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Session Id"
+    },
+    "sources": {
+      "items": {
+        "$ref": "#/$defs/MemorySource"
+      },
+      "title": "Sources",
+      "type": "array"
+    },
+    "state": {
+      "enum": [
+        "proposed",
+        "kept",
+        "stale"
+      ],
+      "title": "State",
+      "type": "string"
+    },
+    "text": {
+      "title": "Text",
+      "type": "string"
+    },
+    "title": {
+      "title": "Title",
+      "type": "string"
+    },
+    "updated_at": {
+      "title": "Updated At",
+      "type": "string"
+    },
+    "usable": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Usable"
+    },
+    "uses": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Uses",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "id",
+    "scope",
+    "title",
+    "text",
+    "author",
+    "state",
+    "created_at",
+    "updated_at"
+  ],
+  "title": "MemoryItem",
+  "type": "object"
+}

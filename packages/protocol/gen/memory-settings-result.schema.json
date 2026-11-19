@@ -1,0 +1,76 @@
+{
+  "$defs": {
+    "MemorySettings": {
+      "additionalProperties": false,
+      "description": "``[memory]`` of ``config.toml``.\n\n``you``, ``projects`` and ``history`` are the privacy of each scope. ``auto_keep`` is\nthe folders where a note with sources is kept without asking. It is read only here,\nbecause it widens trust.",
+      "properties": {
+        "auto_keep": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Auto Keep",
+          "type": "array"
+        },
+        "history": {
+          "default": "chat",
+          "enum": [
+            "chat",
+            "local"
+          ],
+          "title": "History",
+          "type": "string"
+        },
+        "max_tokens": {
+          "default": 1500,
+          "minimum": 0,
+          "title": "Max Tokens",
+          "type": "integer"
+        },
+        "min_tokens": {
+          "default": 200,
+          "minimum": 0,
+          "title": "Min Tokens",
+          "type": "integer"
+        },
+        "projects": {
+          "default": "chat",
+          "enum": [
+            "chat",
+            "local"
+          ],
+          "title": "Projects",
+          "type": "string"
+        },
+        "share": {
+          "default": 0.02,
+          "exclusiveMinimum": 0,
+          "maximum": 1,
+          "title": "Share",
+          "type": "number"
+        },
+        "you": {
+          "default": "chat",
+          "enum": [
+            "chat",
+            "local"
+          ],
+          "title": "You",
+          "type": "string"
+        }
+      },
+      "title": "MemorySettings",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "settings": {
+      "$ref": "#/$defs/MemorySettings"
+    }
+  },
+  "required": [
+    "settings"
+  ],
+  "title": "MemorySettingsResult",
+  "type": "object"
+}

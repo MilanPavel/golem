@@ -1,0 +1,44 @@
+{
+  "additionalProperties": false,
+  "description": "How many memories there are, by scope and by state, over every folder.",
+  "properties": {
+    "history": {
+      "default": 0,
+      "minimum": 0,
+      "title": "History",
+      "type": "integer"
+    },
+    "kept": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Kept",
+      "type": "integer"
+    },
+    "project": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Project",
+      "type": "integer"
+    },
+    "proposed": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Proposed",
+      "type": "integer"
+    },
+    "stale": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Stale",
+      "type": "integer"
+    },
+    "you": {
+      "default": 0,
+      "minimum": 0,
+      "title": "You",
+      "type": "integer"
+    }
+  },
+  "title": "MemoryCounts",
+  "type": "object"
+}

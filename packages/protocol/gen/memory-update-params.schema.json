@@ -1,0 +1,90 @@
+{
+  "additionalProperties": false,
+  "description": "``memory.update``. Edit ``text``, ``title``, ``privacy``, ``always`` or ``folder``.\n\n``accept_sources`` hashes the sources again and makes a ``stale`` note ``kept``.\nAt least one change is needed.",
+  "properties": {
+    "accept_sources": {
+      "default": false,
+      "title": "Accept Sources",
+      "type": "boolean"
+    },
+    "always": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Always"
+    },
+    "folder": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Folder"
+    },
+    "id": {
+      "minLength": 1,
+      "title": "Id",
+      "type": "string"
+    },
+    "privacy": {
+      "anyOf": [
+        {
+          "enum": [
+            "chat",
+            "local"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Privacy"
+    },
+    "text": {
+      "anyOf": [
+        {
+          "maxLength": 2000,
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Text"
+    },
+    "title": {
+      "anyOf": [
+        {
+          "maxLength": 120,
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Title"
+    }
+  },
+  "required": [
+    "id"
+  ],
+  "title": "MemoryUpdateParams",
+  "type": "object"
+}

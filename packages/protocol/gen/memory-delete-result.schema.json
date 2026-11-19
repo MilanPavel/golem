@@ -1,0 +1,25 @@
+{
+  "additionalProperties": false,
+  "description": "``deleted`` are the ids that were there. ``missing`` are the ones that were not.",
+  "properties": {
+    "deleted": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Deleted",
+      "type": "array"
+    },
+    "missing": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Missing",
+      "type": "array"
+    }
+  },
+  "required": [
+    "deleted"
+  ],
+  "title": "MemoryDeleteResult",
+  "type": "object"
+}

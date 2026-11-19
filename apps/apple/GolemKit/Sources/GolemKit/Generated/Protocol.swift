@@ -6871,6 +6871,1085 @@ public struct AmbitiousMCPToolFilterConfig: Codable {
     }
 }
 
+/// Server → every connection: a memory changed. Not stored.
+// MARK: - MemoryChangedNotification
+public struct MemoryChangedNotification: Codable {
+    public let jsonrpc: Jsonrpc?
+    public let method: MemoryChangedNotificationMethod?
+    public let params: MemoryChangedNotificationParams
+
+    public enum CodingKeys: String, CodingKey {
+        case jsonrpc = "jsonrpc"
+        case method = "method"
+        case params = "params"
+    }
+
+    public init(jsonrpc: Jsonrpc?, method: MemoryChangedNotificationMethod?, params: MemoryChangedNotificationParams) {
+        self.jsonrpc = jsonrpc
+        self.method = method
+        self.params = params
+    }
+}
+
+public enum MemoryChangedNotificationMethod: String, Codable {
+    case memoryChanged = "memory.changed"
+}
+
+/// A memory was made, edited, deleted, went stale or was resolved. List again.
+///
+/// ``folder`` is the project folder of a ``project`` memory, else null.
+// MARK: - MemoryChangedNotificationParams
+public struct MemoryChangedNotificationParams: Codable {
+    public let change: MemoryChangedChange
+    public let folder: String?
+    public let id: String
+    public let scope: ParamsScope
+
+    public enum CodingKeys: String, CodingKey {
+        case change = "change"
+        case folder = "folder"
+        case id = "id"
+        case scope = "scope"
+    }
+
+    public init(change: MemoryChangedChange, folder: String?, id: String, scope: ParamsScope) {
+        self.change = change
+        self.folder = folder
+        self.id = id
+        self.scope = scope
+    }
+}
+
+public enum MemoryChangedChange: String, Codable {
+    case created = "created"
+    case deleted = "deleted"
+    case resolved = "resolved"
+    case stale = "stale"
+    case updated = "updated"
+}
+
+public enum ParamsScope: String, Codable {
+    case history = "history"
+    case project = "project"
+    case you = "you"
+}
+
+/// A memory was made, edited, deleted, went stale or was resolved. List again.
+///
+/// ``folder`` is the project folder of a ``project`` memory, else null.
+// MARK: - MemoryChanged
+public struct MemoryChanged: Codable {
+    public let change: MemoryChangedChange
+    public let folder: String?
+    public let id: String
+    public let scope: ParamsScope
+
+    public enum CodingKeys: String, CodingKey {
+        case change = "change"
+        case folder = "folder"
+        case id = "id"
+        case scope = "scope"
+    }
+
+    public init(change: MemoryChangedChange, folder: String?, id: String, scope: ParamsScope) {
+        self.change = change
+        self.folder = folder
+        self.id = id
+        self.scope = scope
+    }
+}
+
+/// How many memories there are, by scope and by state, over every folder.
+// MARK: - MemoryCounts
+public struct MemoryCounts: Codable {
+    public let history: Int?
+    public let kept: Int?
+    public let project: Int?
+    public let proposed: Int?
+    public let stale: Int?
+    public let you: Int?
+
+    public enum CodingKeys: String, CodingKey {
+        case history = "history"
+        case kept = "kept"
+        case project = "project"
+        case proposed = "proposed"
+        case stale = "stale"
+        case you = "you"
+    }
+
+    public init(history: Int?, kept: Int?, project: Int?, proposed: Int?, stale: Int?, you: Int?) {
+        self.history = history
+        self.kept = kept
+        self.project = project
+        self.proposed = proposed
+        self.stale = stale
+        self.you = you
+    }
+}
+
+/// ``memory.delete``. Delete rows with their sources and search entries. No trash.
+// MARK: - MemoryDeleteParams
+public struct MemoryDeleteParams: Codable {
+    public let ids: [String]
+
+    public enum CodingKeys: String, CodingKey {
+        case ids = "ids"
+    }
+
+    public init(ids: [String]) {
+        self.ids = ids
+    }
+}
+
+/// ``deleted`` are the ids that were there. ``missing`` are the ones that were not.
+// MARK: - MemoryDeleteResult
+public struct MemoryDeleteResult: Codable {
+    public let deleted: [String]
+    public let missing: [String]?
+
+    public enum CodingKeys: String, CodingKey {
+        case deleted = "deleted"
+        case missing = "missing"
+    }
+
+    public init(deleted: [String], missing: [String]?) {
+        self.deleted = deleted
+        self.missing = missing
+    }
+}
+
+/// ``memory.export``. The memories of a scope or a folder, as ``markdown`` or ``json``.
+// MARK: - MemoryExportParams
+public struct MemoryExportParams: Codable {
+    public let folder: String?
+    public let format: Format
+    public let scope: ParamsScope?
+
+    public enum CodingKeys: String, CodingKey {
+        case folder = "folder"
+        case format = "format"
+        case scope = "scope"
+    }
+
+    public init(folder: String?, format: Format, scope: ParamsScope?) {
+        self.folder = folder
+        self.format = format
+        self.scope = scope
+    }
+}
+
+public enum Format: String, Codable {
+    case json = "json"
+    case markdown = "markdown"
+}
+
+/// ``text`` is the document: a section for each memory, or a JSON array of every field.
+// MARK: - MemoryExportResult
+public struct MemoryExportResult: Codable {
+    public let count: Int
+    public let format: Format
+    public let text: String
+
+    public enum CodingKeys: String, CodingKey {
+        case count = "count"
+        case format = "format"
+        case text = "text"
+    }
+
+    public init(count: Int, format: Format, text: String) {
+        self.count = count
+        self.format = format
+        self.text = text
+    }
+}
+
+/// ``memory.get``. One memory with its sources.
+// MARK: - MemoryGetParams
+public struct MemoryGetParams: Codable {
+    public let id: String
+
+    public enum CodingKeys: String, CodingKey {
+        case id = "id"
+    }
+
+    public init(id: String) {
+        self.id = id
+    }
+}
+
+// MARK: - MemoryGetResult
+public struct MemoryGetResult: Codable {
+    public let item: MemoryGetResultItem
+
+    public enum CodingKeys: String, CodingKey {
+        case item = "item"
+    }
+
+    public init(item: MemoryGetResultItem) {
+        self.item = item
+    }
+}
+
+/// One memory, with its sources (ADR-061, decision 7).
+///
+/// ``usable`` is false for a ``local`` memory when no local model is set up, so no
+/// chat can use it. It is null for a ``chat`` memory.
+// MARK: - MemoryGetResultItem
+public struct MemoryGetResultItem: Codable {
+    public let agent: String?
+    public let always: Bool?
+    public let author: Author
+    public let callID: String?
+    public let createdAt: String
+    public let folder: String?
+    public let id: String
+    public let keptBy: KeptBy?
+    public let lastUsedAt: String?
+    public let privacy: Privacy?
+    public let scope: ParamsScope
+    public let sessionID: String?
+    public let sources: [PurpleMemorySource]?
+    public let state: StateEnum
+    public let text: String
+    public let title: String
+    public let updatedAt: String
+    public let usable: Bool?
+    public let uses: Int?
+
+    public enum CodingKeys: String, CodingKey {
+        case agent = "agent"
+        case always = "always"
+        case author = "author"
+        case callID = "call_id"
+        case createdAt = "created_at"
+        case folder = "folder"
+        case id = "id"
+        case keptBy = "kept_by"
+        case lastUsedAt = "last_used_at"
+        case privacy = "privacy"
+        case scope = "scope"
+        case sessionID = "session_id"
+        case sources = "sources"
+        case state = "state"
+        case text = "text"
+        case title = "title"
+        case updatedAt = "updated_at"
+        case usable = "usable"
+        case uses = "uses"
+    }
+
+    public init(agent: String?, always: Bool?, author: Author, callID: String?, createdAt: String, folder: String?, id: String, keptBy: KeptBy?, lastUsedAt: String?, privacy: Privacy?, scope: ParamsScope, sessionID: String?, sources: [PurpleMemorySource]?, state: StateEnum, text: String, title: String, updatedAt: String, usable: Bool?, uses: Int?) {
+        self.agent = agent
+        self.always = always
+        self.author = author
+        self.callID = callID
+        self.createdAt = createdAt
+        self.folder = folder
+        self.id = id
+        self.keptBy = keptBy
+        self.lastUsedAt = lastUsedAt
+        self.privacy = privacy
+        self.scope = scope
+        self.sessionID = sessionID
+        self.sources = sources
+        self.state = state
+        self.text = text
+        self.title = title
+        self.updatedAt = updatedAt
+        self.usable = usable
+        self.uses = uses
+    }
+}
+
+public enum Author: String, Codable {
+    case helper = "helper"
+    case lead = "lead"
+    case you = "you"
+}
+
+public enum KeptBy: String, Codable {
+    case auto = "auto"
+    case you = "you"
+}
+
+public enum Privacy: String, Codable {
+    case chat = "chat"
+    case local = "local"
+}
+
+/// A file a note is about, as it was when the note was made or last accepted.
+// MARK: - PurpleMemorySource
+public struct PurpleMemorySource: Codable {
+    public let checkedAt: String
+    public let mtimeNS: Int
+    public let path: String
+    public let sha256: String
+    public let size: Int
+
+    public enum CodingKeys: String, CodingKey {
+        case checkedAt = "checked_at"
+        case mtimeNS = "mtime_ns"
+        case path = "path"
+        case sha256 = "sha256"
+        case size = "size"
+    }
+
+    public init(checkedAt: String, mtimeNS: Int, path: String, sha256: String, size: Int) {
+        self.checkedAt = checkedAt
+        self.mtimeNS = mtimeNS
+        self.path = path
+        self.sha256 = sha256
+        self.size = size
+    }
+}
+
+public enum StateEnum: String, Codable {
+    case kept = "kept"
+    case proposed = "proposed"
+    case stale = "stale"
+}
+
+/// One memory, with its sources (ADR-061, decision 7).
+///
+/// ``usable`` is false for a ``local`` memory when no local model is set up, so no
+/// chat can use it. It is null for a ``chat`` memory.
+// MARK: - MemoryItem
+public struct MemoryItem: Codable {
+    public let agent: String?
+    public let always: Bool?
+    public let author: Author
+    public let callID: String?
+    public let createdAt: String
+    public let folder: String?
+    public let id: String
+    public let keptBy: KeptBy?
+    public let lastUsedAt: String?
+    public let privacy: Privacy?
+    public let scope: ParamsScope
+    public let sessionID: String?
+    public let sources: [MemoryItemSource]?
+    public let state: StateEnum
+    public let text: String
+    public let title: String
+    public let updatedAt: String
+    public let usable: Bool?
+    public let uses: Int?
+
+    public enum CodingKeys: String, CodingKey {
+        case agent = "agent"
+        case always = "always"
+        case author = "author"
+        case callID = "call_id"
+        case createdAt = "created_at"
+        case folder = "folder"
+        case id = "id"
+        case keptBy = "kept_by"
+        case lastUsedAt = "last_used_at"
+        case privacy = "privacy"
+        case scope = "scope"
+        case sessionID = "session_id"
+        case sources = "sources"
+        case state = "state"
+        case text = "text"
+        case title = "title"
+        case updatedAt = "updated_at"
+        case usable = "usable"
+        case uses = "uses"
+    }
+
+    public init(agent: String?, always: Bool?, author: Author, callID: String?, createdAt: String, folder: String?, id: String, keptBy: KeptBy?, lastUsedAt: String?, privacy: Privacy?, scope: ParamsScope, sessionID: String?, sources: [MemoryItemSource]?, state: StateEnum, text: String, title: String, updatedAt: String, usable: Bool?, uses: Int?) {
+        self.agent = agent
+        self.always = always
+        self.author = author
+        self.callID = callID
+        self.createdAt = createdAt
+        self.folder = folder
+        self.id = id
+        self.keptBy = keptBy
+        self.lastUsedAt = lastUsedAt
+        self.privacy = privacy
+        self.scope = scope
+        self.sessionID = sessionID
+        self.sources = sources
+        self.state = state
+        self.text = text
+        self.title = title
+        self.updatedAt = updatedAt
+        self.usable = usable
+        self.uses = uses
+    }
+}
+
+/// A file a note is about, as it was when the note was made or last accepted.
+// MARK: - MemoryItemSource
+public struct MemoryItemSource: Codable {
+    public let checkedAt: String
+    public let mtimeNS: Int
+    public let path: String
+    public let sha256: String
+    public let size: Int
+
+    public enum CodingKeys: String, CodingKey {
+        case checkedAt = "checked_at"
+        case mtimeNS = "mtime_ns"
+        case path = "path"
+        case sha256 = "sha256"
+        case size = "size"
+    }
+
+    public init(checkedAt: String, mtimeNS: Int, path: String, sha256: String, size: Int) {
+        self.checkedAt = checkedAt
+        self.mtimeNS = mtimeNS
+        self.path = path
+        self.sha256 = sha256
+        self.size = size
+    }
+}
+
+/// ``memory.list``. Rows newest first, filtered, a page at a time.
+///
+/// ``query`` is a word search over ``title`` and ``text``. ``proposed`` and ``stale``
+/// rows are listed too. ``limit`` is at most 200.
+// MARK: - MemoryListParams
+public struct MemoryListParams: Codable {
+    public let after: String?
+    public let folder: String?
+    public let limit: Int?
+    public let query: String?
+    public let scope: ParamsScope?
+    public let state: StateEnum?
+
+    public enum CodingKeys: String, CodingKey {
+        case after = "after"
+        case folder = "folder"
+        case limit = "limit"
+        case query = "query"
+        case scope = "scope"
+        case state = "state"
+    }
+
+    public init(after: String?, folder: String?, limit: Int?, query: String?, scope: ParamsScope?, state: StateEnum?) {
+        self.after = after
+        self.folder = folder
+        self.limit = limit
+        self.query = query
+        self.scope = scope
+        self.state = state
+    }
+}
+
+/// One page. ``total`` is the rows the filters match, ``counts`` all rows.
+// MARK: - MemoryListResult
+public struct MemoryListResult: Codable {
+    public let counts: CountsClass
+    public let items: [ItemElement]
+    public let settings: MemoryListResultSettings
+    public let total: Int
+
+    public enum CodingKeys: String, CodingKey {
+        case counts = "counts"
+        case items = "items"
+        case settings = "settings"
+        case total = "total"
+    }
+
+    public init(counts: CountsClass, items: [ItemElement], settings: MemoryListResultSettings, total: Int) {
+        self.counts = counts
+        self.items = items
+        self.settings = settings
+        self.total = total
+    }
+}
+
+/// How many memories there are, by scope and by state, over every folder.
+// MARK: - CountsClass
+public struct CountsClass: Codable {
+    public let history: Int?
+    public let kept: Int?
+    public let project: Int?
+    public let proposed: Int?
+    public let stale: Int?
+    public let you: Int?
+
+    public enum CodingKeys: String, CodingKey {
+        case history = "history"
+        case kept = "kept"
+        case project = "project"
+        case proposed = "proposed"
+        case stale = "stale"
+        case you = "you"
+    }
+
+    public init(history: Int?, kept: Int?, project: Int?, proposed: Int?, stale: Int?, you: Int?) {
+        self.history = history
+        self.kept = kept
+        self.project = project
+        self.proposed = proposed
+        self.stale = stale
+        self.you = you
+    }
+}
+
+/// One memory, with its sources (ADR-061, decision 7).
+///
+/// ``usable`` is false for a ``local`` memory when no local model is set up, so no
+/// chat can use it. It is null for a ``chat`` memory.
+// MARK: - ItemElement
+public struct ItemElement: Codable {
+    public let agent: String?
+    public let always: Bool?
+    public let author: Author
+    public let callID: String?
+    public let createdAt: String
+    public let folder: String?
+    public let id: String
+    public let keptBy: KeptBy?
+    public let lastUsedAt: String?
+    public let privacy: Privacy?
+    public let scope: ParamsScope
+    public let sessionID: String?
+    public let sources: [FluffyMemorySource]?
+    public let state: StateEnum
+    public let text: String
+    public let title: String
+    public let updatedAt: String
+    public let usable: Bool?
+    public let uses: Int?
+
+    public enum CodingKeys: String, CodingKey {
+        case agent = "agent"
+        case always = "always"
+        case author = "author"
+        case callID = "call_id"
+        case createdAt = "created_at"
+        case folder = "folder"
+        case id = "id"
+        case keptBy = "kept_by"
+        case lastUsedAt = "last_used_at"
+        case privacy = "privacy"
+        case scope = "scope"
+        case sessionID = "session_id"
+        case sources = "sources"
+        case state = "state"
+        case text = "text"
+        case title = "title"
+        case updatedAt = "updated_at"
+        case usable = "usable"
+        case uses = "uses"
+    }
+
+    public init(agent: String?, always: Bool?, author: Author, callID: String?, createdAt: String, folder: String?, id: String, keptBy: KeptBy?, lastUsedAt: String?, privacy: Privacy?, scope: ParamsScope, sessionID: String?, sources: [FluffyMemorySource]?, state: StateEnum, text: String, title: String, updatedAt: String, usable: Bool?, uses: Int?) {
+        self.agent = agent
+        self.always = always
+        self.author = author
+        self.callID = callID
+        self.createdAt = createdAt
+        self.folder = folder
+        self.id = id
+        self.keptBy = keptBy
+        self.lastUsedAt = lastUsedAt
+        self.privacy = privacy
+        self.scope = scope
+        self.sessionID = sessionID
+        self.sources = sources
+        self.state = state
+        self.text = text
+        self.title = title
+        self.updatedAt = updatedAt
+        self.usable = usable
+        self.uses = uses
+    }
+}
+
+/// A file a note is about, as it was when the note was made or last accepted.
+// MARK: - FluffyMemorySource
+public struct FluffyMemorySource: Codable {
+    public let checkedAt: String
+    public let mtimeNS: Int
+    public let path: String
+    public let sha256: String
+    public let size: Int
+
+    public enum CodingKeys: String, CodingKey {
+        case checkedAt = "checked_at"
+        case mtimeNS = "mtime_ns"
+        case path = "path"
+        case sha256 = "sha256"
+        case size = "size"
+    }
+
+    public init(checkedAt: String, mtimeNS: Int, path: String, sha256: String, size: Int) {
+        self.checkedAt = checkedAt
+        self.mtimeNS = mtimeNS
+        self.path = path
+        self.sha256 = sha256
+        self.size = size
+    }
+}
+
+/// ``[memory]`` of ``config.toml``.
+///
+/// ``you``, ``projects`` and ``history`` are the privacy of each scope. ``auto_keep`` is
+/// the folders where a note with sources is kept without asking. It is read only here,
+/// because it widens trust.
+// MARK: - MemoryListResultSettings
+public struct MemoryListResultSettings: Codable {
+    public let autoKeep: [String]?
+    public let history: Privacy?
+    public let maxTokens: Int?
+    public let minTokens: Int?
+    public let projects: Privacy?
+    public let share: Double?
+    public let you: Privacy?
+
+    public enum CodingKeys: String, CodingKey {
+        case autoKeep = "auto_keep"
+        case history = "history"
+        case maxTokens = "max_tokens"
+        case minTokens = "min_tokens"
+        case projects = "projects"
+        case share = "share"
+        case you = "you"
+    }
+
+    public init(autoKeep: [String]?, history: Privacy?, maxTokens: Int?, minTokens: Int?, projects: Privacy?, share: Double?, you: Privacy?) {
+        self.autoKeep = autoKeep
+        self.history = history
+        self.maxTokens = maxTokens
+        self.minTokens = minTokens
+        self.projects = projects
+        self.share = share
+        self.you = you
+    }
+}
+
+/// ``memory.settings``. Read ``[memory]``, or set the privacy of a scope.
+///
+/// ``scope`` and ``privacy`` come together, or neither. ``auto_keep`` cannot be set here.
+// MARK: - MemorySettingsParams
+public struct MemorySettingsParams: Codable {
+    public let privacy: Privacy?
+    public let scope: ParamsScope?
+
+    public enum CodingKeys: String, CodingKey {
+        case privacy = "privacy"
+        case scope = "scope"
+    }
+
+    public init(privacy: Privacy?, scope: ParamsScope?) {
+        self.privacy = privacy
+        self.scope = scope
+    }
+}
+
+// MARK: - MemorySettingsResult
+public struct MemorySettingsResult: Codable {
+    public let settings: MemorySettingsResultSettings
+
+    public enum CodingKeys: String, CodingKey {
+        case settings = "settings"
+    }
+
+    public init(settings: MemorySettingsResultSettings) {
+        self.settings = settings
+    }
+}
+
+/// ``[memory]`` of ``config.toml``.
+///
+/// ``you``, ``projects`` and ``history`` are the privacy of each scope. ``auto_keep`` is
+/// the folders where a note with sources is kept without asking. It is read only here,
+/// because it widens trust.
+// MARK: - MemorySettingsResultSettings
+public struct MemorySettingsResultSettings: Codable {
+    public let autoKeep: [String]?
+    public let history: Privacy?
+    public let maxTokens: Int?
+    public let minTokens: Int?
+    public let projects: Privacy?
+    public let share: Double?
+    public let you: Privacy?
+
+    public enum CodingKeys: String, CodingKey {
+        case autoKeep = "auto_keep"
+        case history = "history"
+        case maxTokens = "max_tokens"
+        case minTokens = "min_tokens"
+        case projects = "projects"
+        case share = "share"
+        case you = "you"
+    }
+
+    public init(autoKeep: [String]?, history: Privacy?, maxTokens: Int?, minTokens: Int?, projects: Privacy?, share: Double?, you: Privacy?) {
+        self.autoKeep = autoKeep
+        self.history = history
+        self.maxTokens = maxTokens
+        self.minTokens = minTokens
+        self.projects = projects
+        self.share = share
+        self.you = you
+    }
+}
+
+/// ``[memory]`` of ``config.toml``.
+///
+/// ``you``, ``projects`` and ``history`` are the privacy of each scope. ``auto_keep`` is
+/// the folders where a note with sources is kept without asking. It is read only here,
+/// because it widens trust.
+// MARK: - MemorySettings
+public struct MemorySettings: Codable {
+    public let autoKeep: [String]?
+    public let history: Privacy?
+    public let maxTokens: Int?
+    public let minTokens: Int?
+    public let projects: Privacy?
+    public let share: Double?
+    public let you: Privacy?
+
+    public enum CodingKeys: String, CodingKey {
+        case autoKeep = "auto_keep"
+        case history = "history"
+        case maxTokens = "max_tokens"
+        case minTokens = "min_tokens"
+        case projects = "projects"
+        case share = "share"
+        case you = "you"
+    }
+
+    public init(autoKeep: [String]?, history: Privacy?, maxTokens: Int?, minTokens: Int?, projects: Privacy?, share: Double?, you: Privacy?) {
+        self.autoKeep = autoKeep
+        self.history = history
+        self.maxTokens = maxTokens
+        self.minTokens = minTokens
+        self.projects = projects
+        self.share = share
+        self.you = you
+    }
+}
+
+/// A file a note is about, as it was when the note was made or last accepted.
+// MARK: - MemorySource
+public struct MemorySource: Codable {
+    public let checkedAt: String
+    public let mtimeNS: Int
+    public let path: String
+    public let sha256: String
+    public let size: Int
+
+    public enum CodingKeys: String, CodingKey {
+        case checkedAt = "checked_at"
+        case mtimeNS = "mtime_ns"
+        case path = "path"
+        case sha256 = "sha256"
+        case size = "size"
+    }
+
+    public init(checkedAt: String, mtimeNS: Int, path: String, sha256: String, size: Int) {
+        self.checkedAt = checkedAt
+        self.mtimeNS = mtimeNS
+        self.path = path
+        self.sha256 = sha256
+        self.size = size
+    }
+}
+
+/// ``memory.update``. Edit ``text``, ``title``, ``privacy``, ``always`` or ``folder``.
+///
+/// ``accept_sources`` hashes the sources again and makes a ``stale`` note ``kept``.
+/// At least one change is needed.
+// MARK: - MemoryUpdateParams
+public struct MemoryUpdateParams: Codable {
+    public let acceptSources: Bool?
+    public let always: Bool?
+    public let folder: String?
+    public let id: String
+    public let privacy: Privacy?
+    public let text: String?
+    public let title: String?
+
+    public enum CodingKeys: String, CodingKey {
+        case acceptSources = "accept_sources"
+        case always = "always"
+        case folder = "folder"
+        case id = "id"
+        case privacy = "privacy"
+        case text = "text"
+        case title = "title"
+    }
+
+    public init(acceptSources: Bool?, always: Bool?, folder: String?, id: String, privacy: Privacy?, text: String?, title: String?) {
+        self.acceptSources = acceptSources
+        self.always = always
+        self.folder = folder
+        self.id = id
+        self.privacy = privacy
+        self.text = text
+        self.title = title
+    }
+}
+
+// MARK: - MemoryUpdateResult
+public struct MemoryUpdateResult: Codable {
+    public let item: MemoryUpdateResultItem
+
+    public enum CodingKeys: String, CodingKey {
+        case item = "item"
+    }
+
+    public init(item: MemoryUpdateResultItem) {
+        self.item = item
+    }
+}
+
+/// One memory, with its sources (ADR-061, decision 7).
+///
+/// ``usable`` is false for a ``local`` memory when no local model is set up, so no
+/// chat can use it. It is null for a ``chat`` memory.
+// MARK: - MemoryUpdateResultItem
+public struct MemoryUpdateResultItem: Codable {
+    public let agent: String?
+    public let always: Bool?
+    public let author: Author
+    public let callID: String?
+    public let createdAt: String
+    public let folder: String?
+    public let id: String
+    public let keptBy: KeptBy?
+    public let lastUsedAt: String?
+    public let privacy: Privacy?
+    public let scope: ParamsScope
+    public let sessionID: String?
+    public let sources: [TentacledMemorySource]?
+    public let state: StateEnum
+    public let text: String
+    public let title: String
+    public let updatedAt: String
+    public let usable: Bool?
+    public let uses: Int?
+
+    public enum CodingKeys: String, CodingKey {
+        case agent = "agent"
+        case always = "always"
+        case author = "author"
+        case callID = "call_id"
+        case createdAt = "created_at"
+        case folder = "folder"
+        case id = "id"
+        case keptBy = "kept_by"
+        case lastUsedAt = "last_used_at"
+        case privacy = "privacy"
+        case scope = "scope"
+        case sessionID = "session_id"
+        case sources = "sources"
+        case state = "state"
+        case text = "text"
+        case title = "title"
+        case updatedAt = "updated_at"
+        case usable = "usable"
+        case uses = "uses"
+    }
+
+    public init(agent: String?, always: Bool?, author: Author, callID: String?, createdAt: String, folder: String?, id: String, keptBy: KeptBy?, lastUsedAt: String?, privacy: Privacy?, scope: ParamsScope, sessionID: String?, sources: [TentacledMemorySource]?, state: StateEnum, text: String, title: String, updatedAt: String, usable: Bool?, uses: Int?) {
+        self.agent = agent
+        self.always = always
+        self.author = author
+        self.callID = callID
+        self.createdAt = createdAt
+        self.folder = folder
+        self.id = id
+        self.keptBy = keptBy
+        self.lastUsedAt = lastUsedAt
+        self.privacy = privacy
+        self.scope = scope
+        self.sessionID = sessionID
+        self.sources = sources
+        self.state = state
+        self.text = text
+        self.title = title
+        self.updatedAt = updatedAt
+        self.usable = usable
+        self.uses = uses
+    }
+}
+
+/// A file a note is about, as it was when the note was made or last accepted.
+// MARK: - TentacledMemorySource
+public struct TentacledMemorySource: Codable {
+    public let checkedAt: String
+    public let mtimeNS: Int
+    public let path: String
+    public let sha256: String
+    public let size: Int
+
+    public enum CodingKeys: String, CodingKey {
+        case checkedAt = "checked_at"
+        case mtimeNS = "mtime_ns"
+        case path = "path"
+        case sha256 = "sha256"
+        case size = "size"
+    }
+
+    public init(checkedAt: String, mtimeNS: Int, path: String, sha256: String, size: Int) {
+        self.checkedAt = checkedAt
+        self.mtimeNS = mtimeNS
+        self.path = path
+        self.sha256 = sha256
+        self.size = size
+    }
+}
+
+/// ``memory.write``. You write a memory: it is ``kept``, author ``you``.
+///
+/// ``scope`` is ``you`` or ``project``; a ``project`` note needs ``folder``. ``text`` is
+/// at most 2000 characters. ``title`` defaults to the first line of ``text``, cut to 120
+/// characters. ``sources`` are paths, at most 20, hashed when the note is written.
+// MARK: - MemoryWriteParams
+public struct MemoryWriteParams: Codable {
+    public let always: Bool?
+    public let folder: String?
+    public let privacy: Privacy?
+    public let scope: MemoryWriteParamsScope
+    public let sources: [String]?
+    public let text: String
+    public let title: String?
+
+    public enum CodingKeys: String, CodingKey {
+        case always = "always"
+        case folder = "folder"
+        case privacy = "privacy"
+        case scope = "scope"
+        case sources = "sources"
+        case text = "text"
+        case title = "title"
+    }
+
+    public init(always: Bool?, folder: String?, privacy: Privacy?, scope: MemoryWriteParamsScope, sources: [String]?, text: String, title: String?) {
+        self.always = always
+        self.folder = folder
+        self.privacy = privacy
+        self.scope = scope
+        self.sources = sources
+        self.text = text
+        self.title = title
+    }
+}
+
+public enum MemoryWriteParamsScope: String, Codable {
+    case project = "project"
+    case you = "you"
+}
+
+// MARK: - MemoryWriteResult
+public struct MemoryWriteResult: Codable {
+    public let item: MemoryWriteResultItem
+
+    public enum CodingKeys: String, CodingKey {
+        case item = "item"
+    }
+
+    public init(item: MemoryWriteResultItem) {
+        self.item = item
+    }
+}
+
+/// One memory, with its sources (ADR-061, decision 7).
+///
+/// ``usable`` is false for a ``local`` memory when no local model is set up, so no
+/// chat can use it. It is null for a ``chat`` memory.
+// MARK: - MemoryWriteResultItem
+public struct MemoryWriteResultItem: Codable {
+    public let agent: String?
+    public let always: Bool?
+    public let author: Author
+    public let callID: String?
+    public let createdAt: String
+    public let folder: String?
+    public let id: String
+    public let keptBy: KeptBy?
+    public let lastUsedAt: String?
+    public let privacy: Privacy?
+    public let scope: ParamsScope
+    public let sessionID: String?
+    public let sources: [StickyMemorySource]?
+    public let state: StateEnum
+    public let text: String
+    public let title: String
+    public let updatedAt: String
+    public let usable: Bool?
+    public let uses: Int?
+
+    public enum CodingKeys: String, CodingKey {
+        case agent = "agent"
+        case always = "always"
+        case author = "author"
+        case callID = "call_id"
+        case createdAt = "created_at"
+        case folder = "folder"
+        case id = "id"
+        case keptBy = "kept_by"
+        case lastUsedAt = "last_used_at"
+        case privacy = "privacy"
+        case scope = "scope"
+        case sessionID = "session_id"
+        case sources = "sources"
+        case state = "state"
+        case text = "text"
+        case title = "title"
+        case updatedAt = "updated_at"
+        case usable = "usable"
+        case uses = "uses"
+    }
+
+    public init(agent: String?, always: Bool?, author: Author, callID: String?, createdAt: String, folder: String?, id: String, keptBy: KeptBy?, lastUsedAt: String?, privacy: Privacy?, scope: ParamsScope, sessionID: String?, sources: [StickyMemorySource]?, state: StateEnum, text: String, title: String, updatedAt: String, usable: Bool?, uses: Int?) {
+        self.agent = agent
+        self.always = always
+        self.author = author
+        self.callID = callID
+        self.createdAt = createdAt
+        self.folder = folder
+        self.id = id
+        self.keptBy = keptBy
+        self.lastUsedAt = lastUsedAt
+        self.privacy = privacy
+        self.scope = scope
+        self.sessionID = sessionID
+        self.sources = sources
+        self.state = state
+        self.text = text
+        self.title = title
+        self.updatedAt = updatedAt
+        self.usable = usable
+        self.uses = uses
+    }
+}
+
+/// A file a note is about, as it was when the note was made or last accepted.
+// MARK: - StickyMemorySource
+public struct StickyMemorySource: Codable {
+    public let checkedAt: String
+    public let mtimeNS: Int
+    public let path: String
+    public let sha256: String
+    public let size: Int
+
+    public enum CodingKeys: String, CodingKey {
+        case checkedAt = "checked_at"
+        case mtimeNS = "mtime_ns"
+        case path = "path"
+        case sha256 = "sha256"
+        case size = "size"
+    }
+
+    public init(checkedAt: String, mtimeNS: Int, path: String, sha256: String, size: Int) {
+        self.checkedAt = checkedAt
+        self.mtimeNS = mtimeNS
+        self.path = path
+        self.sha256 = sha256
+        self.size = size
+    }
+}
+
 /// Full text of a user or assistant message.
 ///
 /// ``interrupted`` is true when the run stopped before the model finished.
@@ -10909,7 +11988,7 @@ public enum RoutineChangedNotificationMethod: String, Codable {
 /// ``name`` is null when the file changed in a way that is not one routine.
 // MARK: - RoutineChangedNotificationParams
 public struct RoutineChangedNotificationParams: Codable {
-    public let change: Change
+    public let change: RoutineChangedChange
     public let name: String?
 
     public enum CodingKeys: String, CodingKey {
@@ -10917,13 +11996,13 @@ public struct RoutineChangedNotificationParams: Codable {
         case name = "name"
     }
 
-    public init(change: Change, name: String?) {
+    public init(change: RoutineChangedChange, name: String?) {
         self.change = change
         self.name = name
     }
 }
 
-public enum Change: String, Codable {
+public enum RoutineChangedChange: String, Codable {
     case added = "added"
     case reloaded = "reloaded"
     case removed = "removed"
@@ -10935,7 +12014,7 @@ public enum Change: String, Codable {
 /// ``name`` is null when the file changed in a way that is not one routine.
 // MARK: - RoutineChanged
 public struct RoutineChanged: Codable {
-    public let change: Change
+    public let change: RoutineChangedChange
     public let name: String?
 
     public enum CodingKeys: String, CodingKey {
@@ -10943,7 +12022,7 @@ public struct RoutineChanged: Codable {
         case name = "name"
     }
 
-    public init(change: Change, name: String?) {
+    public init(change: RoutineChangedChange, name: String?) {
         self.change = change
         self.name = name
     }

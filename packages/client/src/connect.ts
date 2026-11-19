@@ -56,6 +56,18 @@ import type { DaemonStatus } from "../../protocol/gen/daemon-status.ts";
 import type { McpListResult } from "../../protocol/gen/mcp-list-result.ts";
 import type { McpServer } from "../../protocol/gen/mcp-server.ts";
 import type { ModelServerStatus } from "../../protocol/gen/model-server-status.ts";
+import type { MemoryChanged } from "../../protocol/gen/memory-changed.ts";
+import type { MemoryDeleteResult } from "../../protocol/gen/memory-delete-result.ts";
+import type { MemoryExportParams } from "../../protocol/gen/memory-export-params.ts";
+import type { MemoryExportResult } from "../../protocol/gen/memory-export-result.ts";
+import type { MemoryGetResult } from "../../protocol/gen/memory-get-result.ts";
+import type { MemoryListParams } from "../../protocol/gen/memory-list-params.ts";
+import type { MemoryListResult } from "../../protocol/gen/memory-list-result.ts";
+import type { MemorySettingsResult } from "../../protocol/gen/memory-settings-result.ts";
+import type { MemoryUpdateParams } from "../../protocol/gen/memory-update-params.ts";
+import type { MemoryUpdateResult } from "../../protocol/gen/memory-update-result.ts";
+import type { MemoryWriteParams } from "../../protocol/gen/memory-write-params.ts";
+import type { MemoryWriteResult } from "../../protocol/gen/memory-write-result.ts";
 import type { RoutineGetResult } from "../../protocol/gen/routine-get-result.ts";
 import type { RoutineListResult } from "../../protocol/gen/routine-list-result.ts";
 import type { RoutinePreviewResult } from "../../protocol/gen/routine-preview-result.ts";
@@ -192,6 +204,14 @@ import {
   isPullDone,
   isPullProgress,
   isRefResult,
+  isMemoryChanged,
+  isMemoryDeleteResult,
+  isMemoryExportResult,
+  isMemoryGetResult,
+  isMemoryListResult,
+  isMemorySettingsResult,
+  isMemoryUpdateResult,
+  isMemoryWriteResult,
   isRoutineGetResult,
   isRoutineListResult,
   isRoutinePreviewResult,
@@ -593,6 +613,22 @@ export interface GolemClient {
    * a list or a history read before is stale. The listener is told which one arrived.
    */
   onRoutinesChanged(listener: (kind: "changed" | "fired" | "finished") => void): () => void;
+  /** `memory.list`: memories, filtered and paged, with counts and the `[memory]` settings. */
+  listMemories(params?: MemoryListParams): Promise<MemoryListResult>;
+  /** `memory.get`: one memory with its sources. */
+  getMemory(id: string): Promise<MemoryGetResult>;
+  /** `memory.write`: write a memory of yours. It is kept at once. */
+  writeMemory(params: MemoryWriteParams): Promise<MemoryWriteResult>;
+  /** `memory.update`: edit a memory, or accept its changed sources. */
+  updateMemory(params: MemoryUpdateParams): Promise<MemoryUpdateResult>;
+  /** `memory.delete`: delete memories by id. There is no trash. */
+  deleteMemories(ids: string[]): Promise<MemoryDeleteResult>;
+  /** `memory.export`: the memories of a scope or a folder, as Markdown or JSON text. */
+  exportMemories(params: MemoryExportParams): Promise<MemoryExportResult>;
+  /** `memory.settings`: read `[memory]`, or set the privacy of one scope. `auto_keep` is read only. */
+  memorySettings(change?: { scope: "you" | "project" | "history"; privacy: "chat" | "local" }): Promise<MemorySettingsResult>;
+  /** `memory.changed`: a memory was made, edited, deleted, went stale or was resolved, so a list read before is stale. */
+  onMemoryChanged(listener: (change: MemoryChanged) => void): () => void;
   /** Ping the daemon now, with the heartbeat's timeout. A dead link then closes and reconnects. Does nothing unless the link is open. */
   checkNow(): void;
   close(): void;
@@ -651,6 +687,7 @@ export function connectGolem(options: ConnectOptions): GolemClient {
   const logListeners = new Set<(log: McpServerLog) => void>();
   const skillListeners = new Set<(root: string | null) => void>();
   const routineListeners = new Set<(kind: "changed" | "fired" | "finished") => void>();
+  const memoryListeners = new Set<(change: MemoryChanged) => void>();
   const serverListeners = new Set<(status: ModelServerStatus) => void>();
   const optionsSavedListeners = new Set<(saved: ModelOptionsSaved) => void>();
   const installListeners = new Set<(update: OllamaInstallUpdate) => void>();
@@ -1011,6 +1048,20 @@ export function connectGolem(options: ConnectOptions): GolemClient {
           listener(kind);
         } catch {
           // A listener must not tear the socket down.
+        }
+      }
+      return;
+    }
+    if (isRecord(message) && message["method"] === "memory.changed") {
+      const params = message["params"];
+      record({ direction: "in", kind: "memory.changed", detail: isMemoryChanged(params) ? `${params.change} ${params.id}` : "", json: line });
+      if (isMemoryChanged(params)) {
+        for (const listener of memoryListeners) {
+          try {
+            listener(params);
+          } catch {
+            // A listener must not tear the socket down.
+          }
         }
       }
       return;
@@ -2203,6 +2254,68 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       routineListeners.add(listener);
       return () => {
         routineListeners.delete(listener);
+      };
+    },
+    async listMemories(params?: MemoryListParams): Promise<MemoryListResult> {
+      await ready;
+      const result = await call("memory.list", { ...params });
+      if (!isMemoryListResult(result)) {
+        throw new Error("invalid memory.list result");
+      }
+      return result;
+    },
+    async getMemory(id: string): Promise<MemoryGetResult> {
+      await ready;
+      const result = await call("memory.get", { id });
+      if (!isMemoryGetResult(result)) {
+        throw new Error("invalid memory.get result");
+      }
+      return result;
+    },
+    async writeMemory(params: MemoryWriteParams): Promise<MemoryWriteResult> {
+      await ready;
+      const result = await call("memory.write", { ...params });
+      if (!isMemoryWriteResult(result)) {
+        throw new Error("invalid memory.write result");
+      }
+      return result;
+    },
+    async updateMemory(params: MemoryUpdateParams): Promise<MemoryUpdateResult> {
+      await ready;
+      const result = await call("memory.update", { ...params });
+      if (!isMemoryUpdateResult(result)) {
+        throw new Error("invalid memory.update result");
+      }
+      return result;
+    },
+    async deleteMemories(ids: string[]): Promise<MemoryDeleteResult> {
+      await ready;
+      const result = await call("memory.delete", { ids });
+      if (!isMemoryDeleteResult(result)) {
+        throw new Error("invalid memory.delete result");
+      }
+      return result;
+    },
+    async exportMemories(params: MemoryExportParams): Promise<MemoryExportResult> {
+      await ready;
+      const result = await call("memory.export", { ...params });
+      if (!isMemoryExportResult(result)) {
+        throw new Error("invalid memory.export result");
+      }
+      return result;
+    },
+    async memorySettings(change?: { scope: "you" | "project" | "history"; privacy: "chat" | "local" }): Promise<MemorySettingsResult> {
+      await ready;
+      const result = await call("memory.settings", change ?? {});
+      if (!isMemorySettingsResult(result)) {
+        throw new Error("invalid memory.settings result");
+      }
+      return result;
+    },
+    onMemoryChanged(listener: (change: MemoryChanged) => void): () => void {
+      memoryListeners.add(listener);
+      return () => {
+        memoryListeners.delete(listener);
       };
     },
     close(): void {

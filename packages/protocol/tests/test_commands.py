@@ -1,5 +1,7 @@
+from typing import Any
+
 import pytest
-from pydantic import ValidationError
+from pydantic import BaseModel, ValidationError
 
 from golem_protocol.commands import (
     AgentInfo,
@@ -15,6 +17,25 @@ from golem_protocol.commands import (
     InspectMessage,
     ListedProvider,
     LocalServer,
+    MemoryChanged,
+    MemoryCounts,
+    MemoryDeleteParams,
+    MemoryDeleteResult,
+    MemoryExportParams,
+    MemoryExportResult,
+    MemoryGetParams,
+    MemoryGetResult,
+    MemoryItem,
+    MemoryListParams,
+    MemoryListResult,
+    MemorySettings,
+    MemorySettingsParams,
+    MemorySettingsResult,
+    MemorySource,
+    MemoryUpdateParams,
+    MemoryUpdateResult,
+    MemoryWriteParams,
+    MemoryWriteResult,
     ModelOptionsSaved,
     ModelServerStatus,
     PendingItem,
@@ -27,6 +48,7 @@ from golem_protocol.commands import (
 from golem_protocol.events import Ping
 from golem_protocol.rpc import (
     AgentRegistryChangedNotification,
+    MemoryChangedNotification,
     ModelOptionsSavedNotification,
     ModelServerStatusNotification,
     RpcErrorBody,
@@ -301,3 +323,110 @@ def test_summary_written_before_parent_and_agent_still_validates() -> None:
     assert summary.parent_session_id is None and summary.agent is None
     with pytest.raises(ValidationError):
         SessionSummary.model_validate({**old, "agent": ""})
+
+
+def _memory_item(**changes: Any) -> MemoryItem:
+    fields: dict[str, Any] = {
+        "id": "m_1",
+        "scope": "project",
+        "title": "We use pnpm",
+        "text": "We use pnpm here.",
+        "author": "you",
+        "state": "kept",
+        "created_at": "2026-11-19T10:00:00+00:00",
+        "updated_at": "2026-11-19T10:00:00+00:00",
+        "folder": "/repo",
+        "kept_by": "you",
+        "sources": [
+            MemorySource(
+                path="package.json",
+                sha256="ab" * 32,
+                size=120,
+                mtime_ns=1,
+                checked_at="2026-11-19T10:00:00+00:00",
+            )
+        ],
+    }
+    return MemoryItem(**{**fields, **changes})
+
+
+def _fits_schema(model: BaseModel) -> None:
+    """The dump only names properties the model's JSON schema has, and has the required ones."""
+    schema = type(model).model_json_schema()
+    dumped = model.model_dump(mode="json")
+    assert set(dumped) <= set(schema["properties"])
+    assert set(schema.get("required", [])) <= set(dumped)
+    assert type(model).model_validate_json(model.model_dump_json()) == model
+
+
+def test_every_memory_params_and_result_round_trips_and_fits_its_schema() -> None:
+    item = _memory_item()
+    models: list[BaseModel] = [
+        MemoryListParams(
+            scope="project", folder="/repo", state="kept", query="pnpm", limit=20, after="mem_1"
+        ),
+        MemoryListResult(
+            items=[item],
+            total=1,
+            counts=MemoryCounts(project=1, kept=1),
+            settings=MemorySettings(history="local", auto_keep=["/repo"]),
+        ),
+        MemoryGetParams(id="m_1"),
+        MemoryGetResult(item=item),
+        MemoryWriteParams(
+            scope="project", text="We use pnpm.", folder="/repo", sources=["package.json"]
+        ),
+        MemoryWriteResult(item=item),
+        MemoryUpdateParams(id="m_1", always=True),
+        MemoryUpdateParams(id="m_1", accept_sources=True),
+        MemoryUpdateResult(item=item),
+        MemoryDeleteParams(ids=["m_1", "m_2"]),
+        MemoryDeleteResult(deleted=["m_1"], missing=["m_2"]),
+        MemoryExportParams(format="markdown", scope="you"),
+        MemoryExportResult(format="json", text="[]", count=0),
+        MemorySettingsParams(),
+        MemorySettingsParams(scope="you", privacy="local"),
+        MemorySettingsResult(settings=MemorySettings()),
+        MemoryChanged(id="m_1", change="stale", scope="project", folder="/repo"),
+    ]
+    for model in models:
+        _fits_schema(model)
+
+
+def test_a_local_memory_says_whether_a_local_model_can_use_it() -> None:
+    assert _memory_item().usable is None
+    assert _memory_item(privacy="local", usable=False).usable is False
+
+
+def test_memory_write_needs_a_folder_for_a_project_note_and_only_then() -> None:
+    with pytest.raises(ValidationError):
+        MemoryWriteParams(scope="project", text="x")
+    with pytest.raises(ValidationError):
+        MemoryWriteParams(scope="you", text="x", folder="/repo")
+    with pytest.raises(ValidationError):
+        MemoryWriteParams(scope="history", text="x")  # type: ignore[arg-type]
+    with pytest.raises(ValidationError):
+        MemoryWriteParams(scope="you", text="x" * 2001)
+    with pytest.raises(ValidationError):
+        MemoryWriteParams(scope="you", text="x", sources=["a"] * 21)
+
+
+def test_memory_update_and_settings_refuse_empty_or_half_requests() -> None:
+    with pytest.raises(ValidationError):
+        MemoryUpdateParams(id="m_1")
+    with pytest.raises(ValidationError):
+        MemorySettingsParams(scope="you")
+    with pytest.raises(ValidationError):
+        MemorySettingsParams(privacy="local")
+    with pytest.raises(ValidationError):
+        MemorySettingsParams.model_validate({"scope": "you", "privacy": "local", "auto_keep": []})
+
+
+def test_memory_changed_is_a_notification_with_the_five_changes() -> None:
+    for change in ("created", "updated", "deleted", "stale", "resolved"):
+        note = MemoryChangedNotification(params=MemoryChanged(id="m_1", change=change, scope="you"))  # type: ignore[arg-type]
+        assert note.method == "memory.changed"
+        assert MemoryChangedNotification.model_validate_json(note.model_dump_json()) == note
+        assert note.params.folder is None
+    with pytest.raises(ValidationError):
+        MemoryChanged(id="m_1", change="moved", scope="you")  # type: ignore[arg-type]
