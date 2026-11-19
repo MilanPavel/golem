@@ -26,19 +26,25 @@ def plan_window(
     size_gb: float | None,
     ram_gb: float | None,
     lowered_to: int | None = None,
+    slots: int = 1,
 ) -> int | None:
-    """The window to ask for, or None when golem should send nothing."""
+    """The window to ask for, or None when golem should send nothing.
+
+    The KV cache is the window times ``slots``.
+    """
     if size_gb is None or ram_gb is None:
         return None
     limit = min(model_max or CEILING, CEILING)
     if lowered_to is not None:
         limit = min(limit, lowered_to)
     candidates = [s for s in STEPS if s <= limit]
-    fits = [s for s in candidates if fit(size_gb, ram_gb, s) == "fits"]
+    fits = [s for s in candidates if fit(size_gb, ram_gb, s, slots) == "fits"]
     a = fits[-1] if fits else None
     if a is not None and a >= TIGHT_CEILING:
         return a
-    roomy = [s for s in candidates if s <= TIGHT_CEILING and fit(size_gb, ram_gb, s) != "too_big"]
+    roomy = [
+        s for s in candidates if s <= TIGHT_CEILING and fit(size_gb, ram_gb, s, slots) != "too_big"
+    ]
     if roomy:
         return roomy[-1]
     return a

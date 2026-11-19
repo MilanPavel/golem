@@ -38,15 +38,18 @@ def total_ram_gb() -> float | None:
         return None
 
 
-def kv_gb(ctx: int) -> float:
-    """The KV-cache memory in GB for ``ctx`` tokens, at one rate for every model."""
-    return ctx / 1024 * KV_GB_PER_1K_TOKENS
+def kv_gb(ctx: int, slots: int = 1) -> float:
+    """The KV-cache memory in GB for ``ctx`` tokens in each of ``slots``, at one rate."""
+    return ctx * max(slots, 1) / 1024 * KV_GB_PER_1K_TOKENS
 
 
-def fit(size_gb: float, ram_gb: float, ctx: int | None = None) -> Fit:
-    """``fits`` within half of RAM, ``tight`` within three quarters, else ``too_big``."""
+def fit(size_gb: float, ram_gb: float, ctx: int | None = None, slots: int = 1) -> Fit:
+    """``fits`` within half of RAM, ``tight`` within three quarters, else ``too_big``.
+
+    The KV cache is ``ctx`` tokens for each of ``slots``.
+    """
     tokens = ctx if ctx is not None and ctx > 0 else DEFAULT_CTX
-    need = size_gb + kv_gb(tokens) + OVERHEAD_GB
+    need = size_gb + kv_gb(tokens, slots) + OVERHEAD_GB
     if need <= ram_gb * FITS_SHARE:
         return "fits"
     if need <= ram_gb * TIGHT_SHARE:
