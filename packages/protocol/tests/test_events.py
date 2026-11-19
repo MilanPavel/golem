@@ -10,6 +10,9 @@ from golem_protocol.commands import (
     SessionCreateResult,
 )
 from golem_protocol.events import (
+    CHAT_EVENT,
+    AgentLimits,
+    AgentSnapshot,
     ChatEvent,
     EmptyEventData,
     EventType,
@@ -27,6 +30,7 @@ from golem_protocol.events import (
     RunFailedEvent,
     SessionCreatedData,
     SessionCreatedEvent,
+    SessionParent,
     SessionUpdatedData,
     ToolCompletedData,
     ToolCompletedEvent,
@@ -249,3 +253,61 @@ def test_a_model_waiting_event_round_trips() -> None:
     assert _ADAPTER.validate_python(event.model_dump()) == event
     with pytest.raises(ValidationError):
         ModelWaitingData(message_id="", waiting=True)
+
+
+def test_session_created_names_its_parent_and_agent() -> None:
+    data = SessionCreatedData(
+        model_profile="remote",
+        parent=SessionParent(session_id="s_lead", call_id="call_1", index=2),
+        agent=AgentSnapshot(
+            name="explorer",
+            source="bundled",
+            tools=["read_file", "grep"],
+            limits=AgentLimits(max_calls=15, max_seconds=300),
+            wish="cheapest",
+        ),
+    )
+    restored = SessionCreatedData.model_validate_json(data.model_dump_json())
+    assert restored == data
+    assert restored.agent is not None and restored.agent.asks is False
+
+
+def test_session_created_without_parent_or_agent_leaves_them_none() -> None:
+    data = SessionCreatedData(model_profile="remote")
+    assert data.parent is None and data.agent is None
+
+
+def test_session_created_refuses_a_bad_parent_or_agent() -> None:
+    base = {"model_profile": "remote"}
+    with pytest.raises(ValidationError):
+        SessionCreatedData.model_validate(
+            {**base, "parent": {"session_id": "s", "call_id": "c", "index": -1}}
+        )
+    with pytest.raises(ValidationError):
+        SessionCreatedData.model_validate({**base, "parent": {"session_id": "s", "call_id": "c"}})
+    with pytest.raises(ValidationError):
+        SessionCreatedData.model_validate(
+            {**base, "agent": {"name": "x", "source": "plugin", "wish": "same"}}
+        )
+
+
+def test_a_session_created_event_written_before_parent_and_agent_still_validates() -> None:
+    old = {
+        "seq": 1,
+        "session_id": "s_old",
+        "run_id": None,
+        "ts": "2026-01-01T00:00:00Z",
+        "type": "session.created",
+        "data": {
+            "cwd": "/tmp/golem-golden",
+            "forked_from": None,
+            "model_name": None,
+            "model_profile": "remote",
+            "model_provider": None,
+            "origin": None,
+            "route": "pinned",
+        },
+    }
+    event = CHAT_EVENT.validate_python(old)
+    assert isinstance(event, SessionCreatedEvent)
+    assert event.data.parent is None and event.data.agent is None

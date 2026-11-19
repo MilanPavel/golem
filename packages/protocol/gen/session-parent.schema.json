@@ -1,0 +1,28 @@
+{
+  "additionalProperties": false,
+  "description": "The session that started this one, and the ``delegate`` call that did it.\n\n``index`` is the helper's place in that call: 0 for a single helper.",
+  "properties": {
+    "call_id": {
+      "minLength": 1,
+      "title": "Call Id",
+      "type": "string"
+    },
+    "index": {
+      "minimum": 0,
+      "title": "Index",
+      "type": "integer"
+    },
+    "session_id": {
+      "minLength": 1,
+      "title": "Session Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "session_id",
+    "call_id",
+    "index"
+  ],
+  "title": "SessionParent",
+  "type": "object"
+}

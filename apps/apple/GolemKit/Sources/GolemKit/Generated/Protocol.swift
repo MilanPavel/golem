@@ -187,6 +187,69 @@ public struct AgentRegistryChanged: Codable {
     }
 }
 
+/// The agent type a helper session started with, as its file read at that moment.
+///
+/// Editing the file later does not change it. ``source`` is where the file was
+/// found. ``wish`` is the model wish as written. ``tools`` are the tool names the
+/// helper may use, empty for none. ``asks`` is true when the helper may ask you a
+/// question.
+// MARK: - AgentSnapshot
+public struct AgentSnapshot: Codable {
+    public let asks: Bool?
+    public let limits: PurpleAgentLimits?
+    public let name: String
+    public let source: Origin
+    public let tools: [String]?
+    public let wish: String
+
+    public enum CodingKeys: String, CodingKey {
+        case asks = "asks"
+        case limits = "limits"
+        case name = "name"
+        case source = "source"
+        case tools = "tools"
+        case wish = "wish"
+    }
+
+    public init(asks: Bool?, limits: PurpleAgentLimits?, name: String, source: Origin, tools: [String]?, wish: String) {
+        self.asks = asks
+        self.limits = limits
+        self.name = name
+        self.source = source
+        self.tools = tools
+        self.wish = wish
+    }
+}
+
+/// What bounds one helper of this type. ``None`` means the file sets no limit of that kind.
+///
+/// ``max_seconds`` is working time: it does not count the time spent waiting for
+/// you, for a slot or for a provider. ``answer_chars`` cuts the helper's final answer.
+// MARK: - PurpleAgentLimits
+public struct PurpleAgentLimits: Codable {
+    public let answerChars: Int?
+    public let maxCalls: Int?
+    public let maxCostUsd: Double?
+    public let maxSeconds: Int?
+    public let maxTokens: Int?
+
+    public enum CodingKeys: String, CodingKey {
+        case answerChars = "answer_chars"
+        case maxCalls = "max_calls"
+        case maxCostUsd = "max_cost_usd"
+        case maxSeconds = "max_seconds"
+        case maxTokens = "max_tokens"
+    }
+
+    public init(answerChars: Int?, maxCalls: Int?, maxCostUsd: Double?, maxSeconds: Int?, maxTokens: Int?) {
+        self.answerChars = answerChars
+        self.maxCalls = maxCalls
+        self.maxCostUsd = maxCostUsd
+        self.maxSeconds = maxSeconds
+        self.maxTokens = maxTokens
+    }
+}
+
 /// ``agents.get``. The agent type called ``name`` that a session in ``cwd`` sees.
 // MARK: - AgentsGetParams
 public struct AgentsGetParams: Codable {
@@ -12706,6 +12769,9 @@ public struct Params: Codable {
 /// ``cli``, ``routine:<name>``, and so on. Null means ``user``, and an older
 /// daemon leaves it out. ``route`` is the session's route mode when it was
 /// made. Null means ``pinned``, and an older daemon leaves it out.
+/// ``parent`` and ``agent`` are set on a helper session: the session and call
+/// that started it, and the agent type it started with. Both are null for any
+/// other session, and an older daemon leaves them out.
 ///
 /// A session attribute changed: its title, folder, allowed tools, MCP servers, or route.
 ///
@@ -13003,12 +13069,14 @@ public struct Params: Codable {
 /// output is in the artifact ``artifact_id``.
 // MARK: - ParamsData
 public struct ParamsData: Codable {
+    public let agent: PurpleAgentSnapshot?
     public let cwd: String?
     public let forkedFrom: PurpleForkedFrom?
     public let modelName: String?
     public let modelProfile: String?
     public let modelProvider: String?
     public let origin: String?
+    public let parent: PurpleSessionParent?
     public let route: RouteEnum?
     public let allowedTools: [PurpleSessionAllowance]?
     public let mcpServers: [String]?
@@ -13117,12 +13185,14 @@ public struct ParamsData: Codable {
     public let output: String?
 
     public enum CodingKeys: String, CodingKey {
+        case agent = "agent"
         case cwd = "cwd"
         case forkedFrom = "forked_from"
         case modelName = "model_name"
         case modelProfile = "model_profile"
         case modelProvider = "model_provider"
         case origin = "origin"
+        case parent = "parent"
         case route = "route"
         case allowedTools = "allowed_tools"
         case mcpServers = "mcp_servers"
@@ -13231,13 +13301,15 @@ public struct ParamsData: Codable {
         case output = "output"
     }
 
-    public init(cwd: String?, forkedFrom: PurpleForkedFrom?, modelName: String?, modelProfile: String?, modelProvider: String?, origin: String?, route: RouteEnum?, allowedTools: [PurpleSessionAllowance]?, mcpServers: [String]?, paidOk: Bool?, title: String?, runID: String?, status: PurpleStatus?, summary: String?, reason: PurpleReason?, detail: String?, model: String?, provider: String?, rejected: [FluffyModelRejection]?, replacesModel: String?, tier: Tier?, options: [String: Option]?, mode: DefaultPermissionModeEnum?, on: Bool?, messageID: String?, role: MessageCompletedDataRole?, text: String?, interrupted: Bool?, skill: FluffySkillCall?, thinking: String?, thinkingMS: Int?, clearedIDS: [String]?, contextWindow: Int?, estimatedTokens: Int?, index: Int?, messageBytes: [Int]?, messageChars: [Int]?, messageIDS: [String]?, numCtx: Int?, parentCallID: String?, profile: String?, summaryChars: Int?, systemBytes: Int?, systemChars: Int?, systemPromptSHA: String?, systemSections: [TentacledPromptSectionInfo]?, toolsBytes: Int?, toolsChars: Int?, toolsSHA: String?, windowEstimated: Bool?, windowPlanned: Bool?, costUsd: Double?, failed: Bool?, firstTokenMS: Int?, latencyMS: Int?, loadMS: Int?, price: FluffyCallPrice?, promptMS: Int?, replyMS: Int?, stopReason: String?, textToolCalls: TextToolCalls?, usage: FluffyTokenUsage?, action: ContextChangedDataAction?, afterTokens: Int?, beforeTokens: Int?, count: Int?, reloadMS: Int?, room: Int?, windowFrom: Int?, windowTo: Int?, code: Code?, hint: String?, message: String?, args: [String: JSONAny]?, callID: String?, name: String?, chars: Int?, lines: Int?, path: String?, waiting: Bool?, window: Int?, artifactID: String?, diff: String?, durationMS: Int?, preview: String?, sources: [PurpleToolSource]?, truncated: Bool?, source: String?, subject: String?, decision: Decision?, rule: String?, alternatives: [Answer]?, caps: FluffyConsentCaps?, estimatedUsd: Double?, signal: String?, why: String?, answer: Answer?, todos: [PurpleTodo]?, planID: String?, steps: [FluffyPlanStep]?, added: Int?, changeID: String?, removed: Int?, reverts: String?, hash: String?, how: How?, checks: [FluffyCheckInfo]?, checkID: String?, command: String?, round: Int?, exitCode: Int?, output: String?) {
+    public init(agent: PurpleAgentSnapshot?, cwd: String?, forkedFrom: PurpleForkedFrom?, modelName: String?, modelProfile: String?, modelProvider: String?, origin: String?, parent: PurpleSessionParent?, route: RouteEnum?, allowedTools: [PurpleSessionAllowance]?, mcpServers: [String]?, paidOk: Bool?, title: String?, runID: String?, status: PurpleStatus?, summary: String?, reason: PurpleReason?, detail: String?, model: String?, provider: String?, rejected: [FluffyModelRejection]?, replacesModel: String?, tier: Tier?, options: [String: Option]?, mode: DefaultPermissionModeEnum?, on: Bool?, messageID: String?, role: MessageCompletedDataRole?, text: String?, interrupted: Bool?, skill: FluffySkillCall?, thinking: String?, thinkingMS: Int?, clearedIDS: [String]?, contextWindow: Int?, estimatedTokens: Int?, index: Int?, messageBytes: [Int]?, messageChars: [Int]?, messageIDS: [String]?, numCtx: Int?, parentCallID: String?, profile: String?, summaryChars: Int?, systemBytes: Int?, systemChars: Int?, systemPromptSHA: String?, systemSections: [TentacledPromptSectionInfo]?, toolsBytes: Int?, toolsChars: Int?, toolsSHA: String?, windowEstimated: Bool?, windowPlanned: Bool?, costUsd: Double?, failed: Bool?, firstTokenMS: Int?, latencyMS: Int?, loadMS: Int?, price: FluffyCallPrice?, promptMS: Int?, replyMS: Int?, stopReason: String?, textToolCalls: TextToolCalls?, usage: FluffyTokenUsage?, action: ContextChangedDataAction?, afterTokens: Int?, beforeTokens: Int?, count: Int?, reloadMS: Int?, room: Int?, windowFrom: Int?, windowTo: Int?, code: Code?, hint: String?, message: String?, args: [String: JSONAny]?, callID: String?, name: String?, chars: Int?, lines: Int?, path: String?, waiting: Bool?, window: Int?, artifactID: String?, diff: String?, durationMS: Int?, preview: String?, sources: [PurpleToolSource]?, truncated: Bool?, source: String?, subject: String?, decision: Decision?, rule: String?, alternatives: [Answer]?, caps: FluffyConsentCaps?, estimatedUsd: Double?, signal: String?, why: String?, answer: Answer?, todos: [PurpleTodo]?, planID: String?, steps: [FluffyPlanStep]?, added: Int?, changeID: String?, removed: Int?, reverts: String?, hash: String?, how: How?, checks: [FluffyCheckInfo]?, checkID: String?, command: String?, round: Int?, exitCode: Int?, output: String?) {
+        self.agent = agent
         self.cwd = cwd
         self.forkedFrom = forkedFrom
         self.modelName = modelName
         self.modelProfile = modelProfile
         self.modelProvider = modelProvider
         self.origin = origin
+        self.parent = parent
         self.route = route
         self.allowedTools = allowedTools
         self.mcpServers = mcpServers
@@ -13347,6 +13419,69 @@ public struct ParamsData: Codable {
     }
 }
 
+/// The agent type a helper session started with, as its file read at that moment.
+///
+/// Editing the file later does not change it. ``source`` is where the file was
+/// found. ``wish`` is the model wish as written. ``tools`` are the tool names the
+/// helper may use, empty for none. ``asks`` is true when the helper may ask you a
+/// question.
+// MARK: - PurpleAgentSnapshot
+public struct PurpleAgentSnapshot: Codable {
+    public let asks: Bool?
+    public let limits: FluffyAgentLimits?
+    public let name: String
+    public let source: Origin
+    public let tools: [String]?
+    public let wish: String
+
+    public enum CodingKeys: String, CodingKey {
+        case asks = "asks"
+        case limits = "limits"
+        case name = "name"
+        case source = "source"
+        case tools = "tools"
+        case wish = "wish"
+    }
+
+    public init(asks: Bool?, limits: FluffyAgentLimits?, name: String, source: Origin, tools: [String]?, wish: String) {
+        self.asks = asks
+        self.limits = limits
+        self.name = name
+        self.source = source
+        self.tools = tools
+        self.wish = wish
+    }
+}
+
+/// What bounds one helper of this type. ``None`` means the file sets no limit of that kind.
+///
+/// ``max_seconds`` is working time: it does not count the time spent waiting for
+/// you, for a slot or for a provider. ``answer_chars`` cuts the helper's final answer.
+// MARK: - FluffyAgentLimits
+public struct FluffyAgentLimits: Codable {
+    public let answerChars: Int?
+    public let maxCalls: Int?
+    public let maxCostUsd: Double?
+    public let maxSeconds: Int?
+    public let maxTokens: Int?
+
+    public enum CodingKeys: String, CodingKey {
+        case answerChars = "answer_chars"
+        case maxCalls = "max_calls"
+        case maxCostUsd = "max_cost_usd"
+        case maxSeconds = "max_seconds"
+        case maxTokens = "max_tokens"
+    }
+
+    public init(answerChars: Int?, maxCalls: Int?, maxCostUsd: Double?, maxSeconds: Int?, maxTokens: Int?) {
+        self.answerChars = answerChars
+        self.maxCalls = maxCalls
+        self.maxCostUsd = maxCostUsd
+        self.maxSeconds = maxSeconds
+        self.maxTokens = maxTokens
+    }
+}
+
 /// A tool allowed for the rest of a session. ``subject`` null allows every call of it.
 // MARK: - PurpleSessionAllowance
 public struct PurpleSessionAllowance: Codable {
@@ -13436,6 +13571,28 @@ public enum How: String, Codable {
     case invoked = "invoked"
     case model = "model"
     case pinned = "pinned"
+}
+
+/// The session that started this one, and the ``delegate`` call that did it.
+///
+/// ``index`` is the helper's place in that call: 0 for a single helper.
+// MARK: - PurpleSessionParent
+public struct PurpleSessionParent: Codable {
+    public let callID: String
+    public let index: Int
+    public let sessionID: String
+
+    public enum CodingKeys: String, CodingKey {
+        case callID = "call_id"
+        case index = "index"
+        case sessionID = "session_id"
+    }
+
+    public init(callID: String, index: Int, sessionID: String) {
+        self.callID = callID
+        self.index = index
+        self.sessionID = sessionID
+    }
 }
 
 /// USD per million tokens, as golem knew it when the call ended.
@@ -14827,34 +14984,106 @@ public struct SessionCreateResult: Codable {
 /// ``cli``, ``routine:<name>``, and so on. Null means ``user``, and an older
 /// daemon leaves it out. ``route`` is the session's route mode when it was
 /// made. Null means ``pinned``, and an older daemon leaves it out.
+/// ``parent`` and ``agent`` are set on a helper session: the session and call
+/// that started it, and the agent type it started with. Both are null for any
+/// other session, and an older daemon leaves them out.
 // MARK: - SessionCreatedData
 public struct SessionCreatedData: Codable {
+    public let agent: SessionCreatedDataAgentSnapshot?
     public let cwd: String?
     public let forkedFrom: SessionCreatedDataForkedFrom?
     public let modelName: String?
     public let modelProfile: String
     public let modelProvider: String?
     public let origin: String?
+    public let parent: SessionCreatedDataSessionParent?
     public let route: RouteEnum?
 
     public enum CodingKeys: String, CodingKey {
+        case agent = "agent"
         case cwd = "cwd"
         case forkedFrom = "forked_from"
         case modelName = "model_name"
         case modelProfile = "model_profile"
         case modelProvider = "model_provider"
         case origin = "origin"
+        case parent = "parent"
         case route = "route"
     }
 
-    public init(cwd: String?, forkedFrom: SessionCreatedDataForkedFrom?, modelName: String?, modelProfile: String, modelProvider: String?, origin: String?, route: RouteEnum?) {
+    public init(agent: SessionCreatedDataAgentSnapshot?, cwd: String?, forkedFrom: SessionCreatedDataForkedFrom?, modelName: String?, modelProfile: String, modelProvider: String?, origin: String?, parent: SessionCreatedDataSessionParent?, route: RouteEnum?) {
+        self.agent = agent
         self.cwd = cwd
         self.forkedFrom = forkedFrom
         self.modelName = modelName
         self.modelProfile = modelProfile
         self.modelProvider = modelProvider
         self.origin = origin
+        self.parent = parent
         self.route = route
+    }
+}
+
+/// The agent type a helper session started with, as its file read at that moment.
+///
+/// Editing the file later does not change it. ``source`` is where the file was
+/// found. ``wish`` is the model wish as written. ``tools`` are the tool names the
+/// helper may use, empty for none. ``asks`` is true when the helper may ask you a
+/// question.
+// MARK: - SessionCreatedDataAgentSnapshot
+public struct SessionCreatedDataAgentSnapshot: Codable {
+    public let asks: Bool?
+    public let limits: TentacledAgentLimits?
+    public let name: String
+    public let source: Origin
+    public let tools: [String]?
+    public let wish: String
+
+    public enum CodingKeys: String, CodingKey {
+        case asks = "asks"
+        case limits = "limits"
+        case name = "name"
+        case source = "source"
+        case tools = "tools"
+        case wish = "wish"
+    }
+
+    public init(asks: Bool?, limits: TentacledAgentLimits?, name: String, source: Origin, tools: [String]?, wish: String) {
+        self.asks = asks
+        self.limits = limits
+        self.name = name
+        self.source = source
+        self.tools = tools
+        self.wish = wish
+    }
+}
+
+/// What bounds one helper of this type. ``None`` means the file sets no limit of that kind.
+///
+/// ``max_seconds`` is working time: it does not count the time spent waiting for
+/// you, for a slot or for a provider. ``answer_chars`` cuts the helper's final answer.
+// MARK: - TentacledAgentLimits
+public struct TentacledAgentLimits: Codable {
+    public let answerChars: Int?
+    public let maxCalls: Int?
+    public let maxCostUsd: Double?
+    public let maxSeconds: Int?
+    public let maxTokens: Int?
+
+    public enum CodingKeys: String, CodingKey {
+        case answerChars = "answer_chars"
+        case maxCalls = "max_calls"
+        case maxCostUsd = "max_cost_usd"
+        case maxSeconds = "max_seconds"
+        case maxTokens = "max_tokens"
+    }
+
+    public init(answerChars: Int?, maxCalls: Int?, maxCostUsd: Double?, maxSeconds: Int?, maxTokens: Int?) {
+        self.answerChars = answerChars
+        self.maxCalls = maxCalls
+        self.maxCostUsd = maxCostUsd
+        self.maxSeconds = maxSeconds
+        self.maxTokens = maxTokens
     }
 }
 
@@ -14871,6 +15100,28 @@ public struct SessionCreatedDataForkedFrom: Codable {
 
     public init(messageID: String, sessionID: String) {
         self.messageID = messageID
+        self.sessionID = sessionID
+    }
+}
+
+/// The session that started this one, and the ``delegate`` call that did it.
+///
+/// ``index`` is the helper's place in that call: 0 for a single helper.
+// MARK: - SessionCreatedDataSessionParent
+public struct SessionCreatedDataSessionParent: Codable {
+    public let callID: String
+    public let index: Int
+    public let sessionID: String
+
+    public enum CodingKeys: String, CodingKey {
+        case callID = "call_id"
+        case index = "index"
+        case sessionID = "session_id"
+    }
+
+    public init(callID: String, index: Int, sessionID: String) {
+        self.callID = callID
+        self.index = index
         self.sessionID = sessionID
     }
 }
@@ -14914,34 +15165,106 @@ public struct SessionCreatedEvent: Codable {
 /// ``cli``, ``routine:<name>``, and so on. Null means ``user``, and an older
 /// daemon leaves it out. ``route`` is the session's route mode when it was
 /// made. Null means ``pinned``, and an older daemon leaves it out.
+/// ``parent`` and ``agent`` are set on a helper session: the session and call
+/// that started it, and the agent type it started with. Both are null for any
+/// other session, and an older daemon leaves them out.
 // MARK: - SessionCreatedEventData
 public struct SessionCreatedEventData: Codable {
+    public let agent: FluffyAgentSnapshot?
     public let cwd: String?
     public let forkedFrom: FluffyForkedFrom?
     public let modelName: String?
     public let modelProfile: String
     public let modelProvider: String?
     public let origin: String?
+    public let parent: FluffySessionParent?
     public let route: RouteEnum?
 
     public enum CodingKeys: String, CodingKey {
+        case agent = "agent"
         case cwd = "cwd"
         case forkedFrom = "forked_from"
         case modelName = "model_name"
         case modelProfile = "model_profile"
         case modelProvider = "model_provider"
         case origin = "origin"
+        case parent = "parent"
         case route = "route"
     }
 
-    public init(cwd: String?, forkedFrom: FluffyForkedFrom?, modelName: String?, modelProfile: String, modelProvider: String?, origin: String?, route: RouteEnum?) {
+    public init(agent: FluffyAgentSnapshot?, cwd: String?, forkedFrom: FluffyForkedFrom?, modelName: String?, modelProfile: String, modelProvider: String?, origin: String?, parent: FluffySessionParent?, route: RouteEnum?) {
+        self.agent = agent
         self.cwd = cwd
         self.forkedFrom = forkedFrom
         self.modelName = modelName
         self.modelProfile = modelProfile
         self.modelProvider = modelProvider
         self.origin = origin
+        self.parent = parent
         self.route = route
+    }
+}
+
+/// The agent type a helper session started with, as its file read at that moment.
+///
+/// Editing the file later does not change it. ``source`` is where the file was
+/// found. ``wish`` is the model wish as written. ``tools`` are the tool names the
+/// helper may use, empty for none. ``asks`` is true when the helper may ask you a
+/// question.
+// MARK: - FluffyAgentSnapshot
+public struct FluffyAgentSnapshot: Codable {
+    public let asks: Bool?
+    public let limits: StickyAgentLimits?
+    public let name: String
+    public let source: Origin
+    public let tools: [String]?
+    public let wish: String
+
+    public enum CodingKeys: String, CodingKey {
+        case asks = "asks"
+        case limits = "limits"
+        case name = "name"
+        case source = "source"
+        case tools = "tools"
+        case wish = "wish"
+    }
+
+    public init(asks: Bool?, limits: StickyAgentLimits?, name: String, source: Origin, tools: [String]?, wish: String) {
+        self.asks = asks
+        self.limits = limits
+        self.name = name
+        self.source = source
+        self.tools = tools
+        self.wish = wish
+    }
+}
+
+/// What bounds one helper of this type. ``None`` means the file sets no limit of that kind.
+///
+/// ``max_seconds`` is working time: it does not count the time spent waiting for
+/// you, for a slot or for a provider. ``answer_chars`` cuts the helper's final answer.
+// MARK: - StickyAgentLimits
+public struct StickyAgentLimits: Codable {
+    public let answerChars: Int?
+    public let maxCalls: Int?
+    public let maxCostUsd: Double?
+    public let maxSeconds: Int?
+    public let maxTokens: Int?
+
+    public enum CodingKeys: String, CodingKey {
+        case answerChars = "answer_chars"
+        case maxCalls = "max_calls"
+        case maxCostUsd = "max_cost_usd"
+        case maxSeconds = "max_seconds"
+        case maxTokens = "max_tokens"
+    }
+
+    public init(answerChars: Int?, maxCalls: Int?, maxCostUsd: Double?, maxSeconds: Int?, maxTokens: Int?) {
+        self.answerChars = answerChars
+        self.maxCalls = maxCalls
+        self.maxCostUsd = maxCostUsd
+        self.maxSeconds = maxSeconds
+        self.maxTokens = maxTokens
     }
 }
 
@@ -14958,6 +15281,28 @@ public struct FluffyForkedFrom: Codable {
 
     public init(messageID: String, sessionID: String) {
         self.messageID = messageID
+        self.sessionID = sessionID
+    }
+}
+
+/// The session that started this one, and the ``delegate`` call that did it.
+///
+/// ``index`` is the helper's place in that call: 0 for a single helper.
+// MARK: - FluffySessionParent
+public struct FluffySessionParent: Codable {
+    public let callID: String
+    public let index: Int
+    public let sessionID: String
+
+    public enum CodingKeys: String, CodingKey {
+        case callID = "call_id"
+        case index = "index"
+        case sessionID = "session_id"
+    }
+
+    public init(callID: String, index: Int, sessionID: String) {
+        self.callID = callID
+        self.index = index
         self.sessionID = sessionID
     }
 }
@@ -15146,8 +15491,12 @@ public struct SessionListResult: Codable {
 /// An older daemon leaves it out.
 /// ``pending`` says what a ``waiting`` session waits for, null otherwise. An older daemon
 /// leaves it out.
+/// ``parent_session_id`` and ``agent`` are set on a helper session: the id of the
+/// session that started it, and the name of its agent type. Null for any other
+/// session. An older daemon leaves them out.
 // MARK: - SessionElement
 public struct SessionElement: Codable {
+    public let agent: String?
     public let createdAt: String
     public let cwd: String?
     public let forkedFrom: String?
@@ -15155,6 +15504,7 @@ public struct SessionElement: Codable {
     public let localOnly: Bool?
     public let modelProfile: String
     public let origin: String?
+    public let parentSessionID: String?
     public let pending: SessionPendingItem?
     public let planFirst: Bool?
     public let route: RouteEnum?
@@ -15164,6 +15514,7 @@ public struct SessionElement: Codable {
     public let updatedAt: String
 
     public enum CodingKeys: String, CodingKey {
+        case agent = "agent"
         case createdAt = "created_at"
         case cwd = "cwd"
         case forkedFrom = "forked_from"
@@ -15171,6 +15522,7 @@ public struct SessionElement: Codable {
         case localOnly = "local_only"
         case modelProfile = "model_profile"
         case origin = "origin"
+        case parentSessionID = "parent_session_id"
         case pending = "pending"
         case planFirst = "plan_first"
         case route = "route"
@@ -15180,7 +15532,8 @@ public struct SessionElement: Codable {
         case updatedAt = "updated_at"
     }
 
-    public init(createdAt: String, cwd: String?, forkedFrom: String?, lastSeq: Int, localOnly: Bool?, modelProfile: String, origin: String?, pending: SessionPendingItem?, planFirst: Bool?, route: RouteEnum?, sessionID: String, status: SessionStatus, title: String?, updatedAt: String) {
+    public init(agent: String?, createdAt: String, cwd: String?, forkedFrom: String?, lastSeq: Int, localOnly: Bool?, modelProfile: String, origin: String?, parentSessionID: String?, pending: SessionPendingItem?, planFirst: Bool?, route: RouteEnum?, sessionID: String, status: SessionStatus, title: String?, updatedAt: String) {
+        self.agent = agent
         self.createdAt = createdAt
         self.cwd = cwd
         self.forkedFrom = forkedFrom
@@ -15188,6 +15541,7 @@ public struct SessionElement: Codable {
         self.localOnly = localOnly
         self.modelProfile = modelProfile
         self.origin = origin
+        self.parentSessionID = parentSessionID
         self.pending = pending
         self.planFirst = planFirst
         self.route = route
@@ -15325,6 +15679,28 @@ public struct SessionModeChangedEventData: Codable {
 
 public enum SessionModeChangedEventType: String, Codable {
     case sessionModeChanged = "session.mode.changed"
+}
+
+/// The session that started this one, and the ``delegate`` call that did it.
+///
+/// ``index`` is the helper's place in that call: 0 for a single helper.
+// MARK: - SessionParent
+public struct SessionParent: Codable {
+    public let callID: String
+    public let index: Int
+    public let sessionID: String
+
+    public enum CodingKeys: String, CodingKey {
+        case callID = "call_id"
+        case index = "index"
+        case sessionID = "session_id"
+    }
+
+    public init(callID: String, index: Int, sessionID: String) {
+        self.callID = callID
+        self.index = index
+        self.sessionID = sessionID
+    }
 }
 
 /// Whether the session is in plan first, after a change.
@@ -15788,8 +16164,12 @@ public enum SessionSummaryNotificationMethod: String, Codable {
 /// An older daemon leaves it out.
 /// ``pending`` says what a ``waiting`` session waits for, null otherwise. An older daemon
 /// leaves it out.
+/// ``parent_session_id`` and ``agent`` are set on a helper session: the id of the
+/// session that started it, and the name of its agent type. Null for any other
+/// session. An older daemon leaves them out.
 // MARK: - SessionSummaryNotificationParams
 public struct SessionSummaryNotificationParams: Codable {
+    public let agent: String?
     public let createdAt: String
     public let cwd: String?
     public let forkedFrom: String?
@@ -15797,6 +16177,7 @@ public struct SessionSummaryNotificationParams: Codable {
     public let localOnly: Bool?
     public let modelProfile: String
     public let origin: String?
+    public let parentSessionID: String?
     public let pending: ParamsPendingItem?
     public let planFirst: Bool?
     public let route: RouteEnum?
@@ -15806,6 +16187,7 @@ public struct SessionSummaryNotificationParams: Codable {
     public let updatedAt: String
 
     public enum CodingKeys: String, CodingKey {
+        case agent = "agent"
         case createdAt = "created_at"
         case cwd = "cwd"
         case forkedFrom = "forked_from"
@@ -15813,6 +16195,7 @@ public struct SessionSummaryNotificationParams: Codable {
         case localOnly = "local_only"
         case modelProfile = "model_profile"
         case origin = "origin"
+        case parentSessionID = "parent_session_id"
         case pending = "pending"
         case planFirst = "plan_first"
         case route = "route"
@@ -15822,7 +16205,8 @@ public struct SessionSummaryNotificationParams: Codable {
         case updatedAt = "updated_at"
     }
 
-    public init(createdAt: String, cwd: String?, forkedFrom: String?, lastSeq: Int, localOnly: Bool?, modelProfile: String, origin: String?, pending: ParamsPendingItem?, planFirst: Bool?, route: RouteEnum?, sessionID: String, status: SessionStatus, title: String?, updatedAt: String) {
+    public init(agent: String?, createdAt: String, cwd: String?, forkedFrom: String?, lastSeq: Int, localOnly: Bool?, modelProfile: String, origin: String?, parentSessionID: String?, pending: ParamsPendingItem?, planFirst: Bool?, route: RouteEnum?, sessionID: String, status: SessionStatus, title: String?, updatedAt: String) {
+        self.agent = agent
         self.createdAt = createdAt
         self.cwd = cwd
         self.forkedFrom = forkedFrom
@@ -15830,6 +16214,7 @@ public struct SessionSummaryNotificationParams: Codable {
         self.localOnly = localOnly
         self.modelProfile = modelProfile
         self.origin = origin
+        self.parentSessionID = parentSessionID
         self.pending = pending
         self.planFirst = planFirst
         self.route = route
@@ -15906,8 +16291,12 @@ public struct ParamsPendingItem: Codable {
 /// An older daemon leaves it out.
 /// ``pending`` says what a ``waiting`` session waits for, null otherwise. An older daemon
 /// leaves it out.
+/// ``parent_session_id`` and ``agent`` are set on a helper session: the id of the
+/// session that started it, and the name of its agent type. Null for any other
+/// session. An older daemon leaves them out.
 // MARK: - SessionSummary
 public struct SessionSummary: Codable {
+    public let agent: String?
     public let createdAt: String
     public let cwd: String?
     public let forkedFrom: String?
@@ -15915,6 +16304,7 @@ public struct SessionSummary: Codable {
     public let localOnly: Bool?
     public let modelProfile: String
     public let origin: String?
+    public let parentSessionID: String?
     public let pending: SessionSummaryPendingItem?
     public let planFirst: Bool?
     public let route: RouteEnum?
@@ -15924,6 +16314,7 @@ public struct SessionSummary: Codable {
     public let updatedAt: String
 
     public enum CodingKeys: String, CodingKey {
+        case agent = "agent"
         case createdAt = "created_at"
         case cwd = "cwd"
         case forkedFrom = "forked_from"
@@ -15931,6 +16322,7 @@ public struct SessionSummary: Codable {
         case localOnly = "local_only"
         case modelProfile = "model_profile"
         case origin = "origin"
+        case parentSessionID = "parent_session_id"
         case pending = "pending"
         case planFirst = "plan_first"
         case route = "route"
@@ -15940,7 +16332,8 @@ public struct SessionSummary: Codable {
         case updatedAt = "updated_at"
     }
 
-    public init(createdAt: String, cwd: String?, forkedFrom: String?, lastSeq: Int, localOnly: Bool?, modelProfile: String, origin: String?, pending: SessionSummaryPendingItem?, planFirst: Bool?, route: RouteEnum?, sessionID: String, status: SessionStatus, title: String?, updatedAt: String) {
+    public init(agent: String?, createdAt: String, cwd: String?, forkedFrom: String?, lastSeq: Int, localOnly: Bool?, modelProfile: String, origin: String?, parentSessionID: String?, pending: SessionSummaryPendingItem?, planFirst: Bool?, route: RouteEnum?, sessionID: String, status: SessionStatus, title: String?, updatedAt: String) {
+        self.agent = agent
         self.createdAt = createdAt
         self.cwd = cwd
         self.forkedFrom = forkedFrom
@@ -15948,6 +16341,7 @@ public struct SessionSummary: Codable {
         self.localOnly = localOnly
         self.modelProfile = modelProfile
         self.origin = origin
+        self.parentSessionID = parentSessionID
         self.pending = pending
         self.planFirst = planFirst
         self.route = route

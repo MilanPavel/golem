@@ -8,6 +8,8 @@ from typing import Any, Literal, Self
 from pydantic import BaseModel, ConfigDict, Field, SecretStr, model_validator
 
 from golem_protocol.events import (
+    AgentLimits,
+    AgentOrigin,
     ConsentAnswer,
     ModelRejection,
     PermissionMode,
@@ -235,6 +237,9 @@ class SessionSummary(BaseModel):
     An older daemon leaves it out.
     ``pending`` says what a ``waiting`` session waits for, null otherwise. An older daemon
     leaves it out.
+    ``parent_session_id`` and ``agent`` are set on a helper session: the id of the
+    session that started it, and the name of its agent type. Null for any other
+    session. An older daemon leaves them out.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -253,6 +258,8 @@ class SessionSummary(BaseModel):
     plan_first: bool = False
     local_only: bool = False
     pending: PendingItem | None = None
+    parent_session_id: str | None = Field(default=None, min_length=1)
+    agent: str | None = Field(default=None, min_length=1)
 
 
 class SessionListResult(BaseModel):
@@ -1813,10 +1820,6 @@ class SkillSetDisabledResult(BaseModel):
     disabled: bool
 
 
-AgentOrigin = Literal["bundled", "user", "project"]
-"""Where an agent type file was found: golem itself, the user's folders, or the project."""
-
-
 class AgentRegistryChanged(BaseModel):
     """Agent type files changed on disk. List them again for the folders it covers.
 
@@ -1828,22 +1831,6 @@ class AgentRegistryChanged(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     root: str | None = None
-
-
-class AgentLimits(BaseModel):
-    """What bounds one helper of this type. ``None`` means the file sets no limit of that kind.
-
-    ``max_seconds`` is working time: it does not count the time spent waiting for
-    you, for a slot or for a provider. ``answer_chars`` cuts the helper's final answer.
-    """
-
-    model_config = ConfigDict(extra="forbid", frozen=True)
-
-    max_calls: int | None = Field(default=None, ge=1)
-    max_seconds: int | None = Field(default=None, ge=1)
-    max_cost_usd: float | None = Field(default=None, ge=0)
-    max_tokens: int | None = Field(default=None, ge=1)
-    answer_chars: int | None = Field(default=None, ge=1)
 
 
 class AgentInfo(BaseModel):

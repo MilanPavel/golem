@@ -36,6 +36,58 @@ class ForkedFrom(BaseModel):
     message_id: str = Field(min_length=1)
 
 
+AgentOrigin = Literal["bundled", "user", "project"]
+"""Where an agent type file was found: golem itself, the user's folders, or the project."""
+
+
+class AgentLimits(BaseModel):
+    """What bounds one helper of this type. ``None`` means the file sets no limit of that kind.
+
+    ``max_seconds`` is working time: it does not count the time spent waiting for
+    you, for a slot or for a provider. ``answer_chars`` cuts the helper's final answer.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    max_calls: int | None = Field(default=None, ge=1)
+    max_seconds: int | None = Field(default=None, ge=1)
+    max_cost_usd: float | None = Field(default=None, ge=0)
+    max_tokens: int | None = Field(default=None, ge=1)
+    answer_chars: int | None = Field(default=None, ge=1)
+
+
+class AgentSnapshot(BaseModel):
+    """The agent type a helper session started with, as its file read at that moment.
+
+    Editing the file later does not change it. ``source`` is where the file was
+    found. ``wish`` is the model wish as written. ``tools`` are the tool names the
+    helper may use, empty for none. ``asks`` is true when the helper may ask you a
+    question.
+    """
+
+    model_config = _CONFIG
+
+    name: str = Field(min_length=1)
+    source: AgentOrigin
+    tools: list[str] = Field(default_factory=list[str])
+    limits: AgentLimits = Field(default_factory=AgentLimits)
+    wish: str = Field(min_length=1)
+    asks: bool = False
+
+
+class SessionParent(BaseModel):
+    """The session that started this one, and the ``delegate`` call that did it.
+
+    ``index`` is the helper's place in that call: 0 for a single helper.
+    """
+
+    model_config = _CONFIG
+
+    session_id: str = Field(min_length=1)
+    call_id: str = Field(min_length=1)
+    index: int = Field(ge=0)
+
+
 class SessionCreatedData(BaseModel):
     """Profile stored for a new session.
 
@@ -47,6 +99,9 @@ class SessionCreatedData(BaseModel):
     ``cli``, ``routine:<name>``, and so on. Null means ``user``, and an older
     daemon leaves it out. ``route`` is the session's route mode when it was
     made. Null means ``pinned``, and an older daemon leaves it out.
+    ``parent`` and ``agent`` are set on a helper session: the session and call
+    that started it, and the agent type it started with. Both are null for any
+    other session, and an older daemon leaves them out.
     """
 
     model_config = _CONFIG
@@ -58,6 +113,8 @@ class SessionCreatedData(BaseModel):
     cwd: str | None = Field(default=None, min_length=1)
     origin: str | None = Field(default=None, min_length=1)
     route: RouteMode | None = None
+    parent: SessionParent | None = None
+    agent: AgentSnapshot | None = None
 
 
 class MessageStartedData(BaseModel):
@@ -1571,6 +1628,9 @@ CHAT_EVENT: TypeAdapter[ChatEvent] = TypeAdapter(ChatEvent)
 
 __all__ = [
     "CHAT_EVENT",
+    "AgentLimits",
+    "AgentOrigin",
+    "AgentSnapshot",
     "ApprovalDecision",
     "ApprovalNeededData",
     "ApprovalNeededEvent",
@@ -1642,6 +1702,7 @@ __all__ = [
     "SessionCreatedEvent",
     "SessionModeChangedData",
     "SessionModeChangedEvent",
+    "SessionParent",
     "SessionPlanChangedData",
     "SessionPlanChangedEvent",
     "SessionUpdatedData",
