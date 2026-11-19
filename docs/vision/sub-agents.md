@@ -4,51 +4,74 @@
 
 ### The idea
 
-A workflow is code deciding what happens next. A sub-agent is the *model* deciding: in the middle of a task, golem hands a part of it to a smaller agent with a short brief, waits for the answer, and goes on.
+A workflow is code deciding what happens next. A helper is the *model* deciding: in the middle of a task, golem hands a part of it to another agent with a short brief, waits for the answer, and goes on.
 
-This matters more for golem than for most agents. **A small local model is good at a narrow job with a short context, and bad at a long chat.** A sub-agent turns one long, wide task into several short, narrow ones. "Upgrade every dependency and fix what breaks" is hard for an 8B model. "Read this changelog and list what changed in the API" is not.
+This matters more for golem than for most agents. **A small local model is good at a narrow job with a short context, and bad at a long chat.** A helper turns one wide task into short, narrow ones. "Read these call sites and list what changed" is a job an 8B model does well. "Upgrade every dependency and fix what breaks" is not.
 
-The two fit together: a workflow step can be an agent, and an agent can start a workflow.
+The two fit together: a workflow step can be a helper (`run.agent`), and a chat that went well can become a workflow.
+
+### Fold by default
+
+golem does the work in the chat. It starts a helper only for one of three reasons, and the card says which:
+
+1. **The window.** The reading does not fit, or would crowd out the task.
+2. **Independent jobs that can truly run at once.** One per package, one per folder.
+3. **A different model fits better.** One hard question to a stronger model, or a large read on a cheaper one.
+
+There are no chains of helpers (find, fix, check). After the explorers answer, the lead makes the fix itself, because it understands the task. A reviewer with a fresh window may check the result. Settings has "Use helpers: When needed, Ask me first, Never", and with "Never" everything still works, in one window.
 
 ### How it works
 
-- **A tool, like any other.** The model calls `delegate` with a brief, an agent type, and optionally a model. It goes through the same permission layer as every tool call.
-- **Its own session.** A child is a session of its own, linked to its parent, on its own thread. It starts from the brief and the files it needs, not from the whole chat. Its events go to the same log, so a crash or a restart resumes it like any session.
-- **A summary back, not a transcript.** The parent gets the child's answer and its artifacts (a diff, a file, a list), never its whole chat. The parent's context stays small.
-- **Agent types are files.** An agent is a markdown file with a header: name, model or profile, tools, skills, and rules, with its prompt as the body (`agents/*.md`, the same shape as `SKILL.md`). Golem comes with a few: an **explorer** that only reads, on a cheap local model; a **worker** that edits inside its own git worktree; a **reviewer** that checks a diff. The same files are what [serve mode](./serve-mode.md#serve-mode-the-agent-behind-your-app) deploys.
-- **In parallel.** A parent can start several children at once, up to a limit, and wait for any or all.
+- **A tool.** The model calls `delegate` with one brief, or a batch of independent ones. A batch has no order. Order belongs to the lead or to a workflow.
+- **A session with a parent.** A helper is a headless session, linked to its lead and hidden from the session list. It starts from the brief, parks when it asks you, resumes after a restart, and can be opened read-only. It is the same session a workflow step starts.
+- **Agent types are files.** An agent is a markdown file (`agents/*.md`) with the shape and sources of a skill: name, model wish, tools, limits, and the prompt as body. golem ships four: **explorer** (reads), **worker** (one change in a copy of your folder), **reviewer** (reads a diff it did not write) and **advisor** (one hard question, no tools). The same files are what [serve mode](./serve-mode.md#serve-mode-the-agent-behind-your-app) deploys.
+- **References back, not a transcript.** A helper's answer names files and lines, and stores large output as an artifact. The lead reads the real thing.
+- **A model by wish.** An agent file says `cheapest`, `same`, `stronger`, a tier or a model, and golem turns it into a model on your Mac or your accounts. An empty tier never breaks it: it falls back to the nearest tier, then to the lead's model.
 
 ### The rules
 
-- **A child never has more than its parent.** Its tools and rules are the parent's, or fewer. It cannot grant itself anything.
-- **Approvals bubble up.** When a child asks "may I run `uv lock`?", the question appears on whichever screen watches the parent: the terminal, the Mac, the phone. You answer once.
-- **Every child has limits:** a budget, a time, a depth (a child may start children only so deep), and a number running at once.
-- **A child's answer is data.** What a child returns is never an instruction about permissions, like anything a tool returns.
+Seven things never bend ([ADR-059](../adr/059-helpers-are-child-sessions.md)):
 
-### Routing, per child
+1. A run holds no model slot while it waits.
+2. Every wait has a named reason and an event.
+3. A helper never has more tools, folders or allowances than its lead.
+4. Only golem shortens a context, never the engine.
+5. Privacy is never overridden: no wish, step-up or memory brings a hosted model or personal memory into a local-only chat.
+6. A helper never writes memory. It proposes.
+7. Nothing requires a local model and nothing requires a hosted one.
 
-Each child picks its own model. Fan out to a free local model for search and summaries, and step up to a hosted model for the plan or the final review. Each child's cost is counted, and rolls up into the parent's, so one answer shows what the whole tree cost.
+A helper's answer is data, never an instruction about permissions. Every helper has limits (calls, working time, cost), and stopping at one says why and how far it got. Working time does not count waiting for you, for a slot or for a provider.
 
-### Somewhere else
+### Local, mixed, cloud
 
-A child does not have to run on your Mac. The same child can start in a container, on a machine you own over `ssh`, or on a rented GPU with a bigger open model than your Mac can hold. Your golem attaches to it over the gateway like any client, watches it, and takes the result back **as a diff you review**, never as a write to your files. Your Keychain and your other chats never cross; tokens are for one task, and expire with it. A forgotten GPU is the main risk to money, so every remote child has a time limit and destroys itself when idle.
+golem allows local models and does not require them. Each setup has a stated behaviour, and each ticket has a test for local only and for cloud only.
 
-The same split works for tools: golem's own tools can run on another machine than the daemon, inside that machine's own sandbox and folders, so a daemon on a server can still work on your laptop's files.
+| | Local only | Mixed | Cloud only |
+|---|---|---|---|
+| Usual reason | the window | the window; one call to a stronger model | at once; a cheaper reader |
+| `cheapest` | the loaded model | a local model | the cheapest hosted model |
+| `stronger` | the same model, fresh window | one paid call | the next tier up |
+| The paid question | never | before the first paid call | none: caps and an estimate |
+| The card shows | window saved | both | cost first |
+
+### Asking you
+
+A helper's question is an ordinary pending item. It shows above the lead's composer, in the Inbox grouped under the lead, and in the terminal. The same question from several helpers is asked once, with a count. You answer once, for this time, for this helper, or for every helper of the batch. When the question is the paid one, it shows exactly what is sent: the brief, not the chat.
 
 ### Seeing it work
 
-Many agents at once are easy to lose. Each screen shows them in its own way:
+You see as much as you want, and nothing new sits in the top bar.
 
-- **The terminal:** a tree under the turn that started it, one line per child with its status, model, cost, and time. Expand a line to see its tool calls; press enter to open its chat.
+- **Quiet:** one grey line, "used 2 helpers".
+- **Normal:** one card for the batch, a row for each helper with what it read and what it saved. The right column is always a state or a wait reason.
+- **Verbose:** the model each helper got and why.
+- **A helper's chat** opens read-only from its name. **How it ran** is the Steps tab of the Inspector, and **Runs** in the rail lists the same steps full width. In the terminal a tree sits under the turn.
+- A worker's diff comes back in the Changes tab, one block for each worker, to view, apply or try again on a stronger model. Nothing in your folder changes until you apply.
 
-  ```
-  ▾ delegate · 3 helpers · $0.03 · 4m
-    ✓ explorer   qwen3:8b       find what the upgrade breaks      $0.00  1m12s
-    ◐ worker     qwen3-coder    upgrade httpx in a worktree       $0.00  2m40s  ⏸ may I run uv lock?
-    ○ reviewer   claude         check the diff                    waiting
-  ```
+### Somewhere else
 
-- **The Mac and the web UI:** a swimlane timeline, one lane per child (as in the figure above), with approvals as markers on the lane. Click a lane to open that child's chat; drag across the lanes to see what ran at the same time.
-- **The phone:** one Live Activity for the whole tree: "3 helpers · 2 done · 1 asks you".
+A helper does not have to run on your Mac. The same helper can start in a container, on a machine you own over `ssh`, or on a rented GPU with a bigger open model, and come back **as a diff you review**, never as a write to your files. Your Keychain and your other chats never cross. A forgotten GPU is the main risk to money, so every remote helper has a time limit and stops when idle. This is later work.
 
----
+### Where it is built
+
+Phase 15 (#733) builds helpers. Phase 18 (#1198, ADR-060) builds the dispatcher that decides how many run at once and why anything waits. Phase 5 (#90, ADR-061) builds the memory a helper may be given and may propose to. The design record is [ADR-059](../adr/059-helpers-are-child-sessions.md).

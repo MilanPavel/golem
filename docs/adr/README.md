@@ -61,8 +61,11 @@ An Architecture Decision Record (ADR) is a short note of one choice: what was de
 | [055](055-model-routing.md) | golem picks a model by fixed rules: three tiers, a route mode per session, and caps on spending | accepted | 2026-11-14 |
 | [056](056-planned-window-and-context-view.md) | golem plans the window of a local model, and sends a view of the history, never a shorter history | accepted | 2026-11-14 |
 | [057](057-change-set.md) | golem keeps a snapshot of every file it changes, and undo is a new change | accepted | 2026-11-15 |
-| [058](058-child-runs.md) | A helper is a child run on its own thread, with its steps in the parent's log | accepted | 2026-11-15 |
+| [058](058-child-runs.md) | A helper is a child run on its own thread, with its steps in the parent's log | accepted, superseded in part by 059 once 15.2 is built | 2026-11-15 |
+| [059](059-helpers-are-child-sessions.md) | A helper is a headless session with a parent, started for a reason, never by habit | proposed | 2026-11-19 |
+| [060](060-dispatcher-and-engine-profile.md) | One dispatcher decides how many model calls run at once, and every wait has a named reason | proposed | 2026-11-19 |
+| [061](061-memory.md) | golem keeps long-term memory in `memory.db`, recalls it inside a small budget, and never sends it somewhere less private than the chat | proposed | 2026-11-19 |
 
 How the running code fits together is in [../architecture.md](../architecture.md).
 
-New records use [template.md](template.md). Number the next file `059-….md` and add a row here.
+New records use [template.md](template.md). Number the next file `062-….md` and add a row here.
