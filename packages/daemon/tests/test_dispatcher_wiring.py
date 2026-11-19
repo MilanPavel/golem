@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import time
 from collections.abc import AsyncIterator, Awaitable, Callable
 from types import SimpleNamespace
 from typing import Any
@@ -12,7 +13,7 @@ from langchain_core.messages import BaseMessage
 from langchain_core.outputs import ChatGenerationChunk
 from langgraph.checkpoint.memory import InMemorySaver
 
-from golem.config import GolemSettings
+from golem.config import GolemSettings, ProviderSettings
 from golem.graphs.chat import open_chat
 from golem.models.dispatcher import Call, Dispatcher, LineKey
 from golem.models.router import ModelRouter
@@ -263,11 +264,91 @@ async def test_a_cloud_only_chat_takes_no_local_line(database: Database) -> None
         return len(model.seen) == 2
 
     await _until(both_run)
-    assert dispatcher.snapshot() == []
+    assert [line.kind for line in dispatcher.snapshot()] == ["provider"]
     model.release.set()
     for run in runs:
         await chat.finished(run)
     assert [await chat.status(run) for run in runs] == ["completed", "completed"]
+
+
+async def test_five_hosted_calls_with_a_cap_of_four_run_four_and_wait_one(
+    database: Database,
+) -> None:
+    dispatcher = _dispatcher()
+    model = GatedChatModel(reply="ok")
+    chat = _Chat(database, dispatcher, model, default=CLOUD)
+    runs = [await chat.send(str(n)) for n in range(5)]
+
+    async def four_run() -> bool:
+        return len(model.seen) == 4
+
+    await _until(four_run)
+    await asyncio.sleep(0.1)
+    assert len(model.seen) == 4
+    [line] = dispatcher.snapshot()
+    assert (line.line, line.slots, len(line.holders), len(line.waiting)) == (
+        "provider:anthropic",
+        4,
+        4,
+        1,
+    )
+    model.release.set()
+    for run in runs:
+        await chat.finished(run)
+    assert len(model.seen) == 5
+    assert [await chat.status(run) for run in runs] == ["completed"] * 5
+
+
+async def test_a_rate_limited_hosted_call_backs_off_and_succeeds_on_retry(
+    database: Database,
+) -> None:
+    model = _Flaky(reply="ok")
+    chat = _Chat(database, _dispatcher(), model, default=CLOUD)
+    run = await chat.send("hi")
+    await chat.finished(run)
+
+    assert await chat.status(run) == "completed"
+    assert model.calls == 2
+
+
+class _Limited(GatedChatModel):
+    """Refuses every call with a rate limit."""
+
+    calls: int = 0
+
+    async def _astream(
+        self, messages: list[BaseMessage], *args: Any, **kwargs: Any
+    ) -> AsyncIterator[ChatGenerationChunk]:
+        self.calls += 1
+        raise _Http()
+        yield  # pragma: no cover
+
+
+async def test_a_hosted_call_retries_three_times_through_the_line_then_fails(
+    database: Database,
+) -> None:
+    model = _Limited(reply="ok")
+    start = time.monotonic()
+    # Time runs 50 times faster, like the sleep, so the 2, 4 and 8 second backoffs are short.
+    dispatcher = Dispatcher(_rank, sleep=_fast, clock=lambda: (time.monotonic() - start) * 50)
+    chat = _Chat(database, dispatcher, model, default=CLOUD)
+    run = await chat.send("hi")
+    await chat.finished(run)
+
+    assert model.calls == 4
+    assert await chat.status(run) == "failed"
+
+
+def test_a_hosted_profile_takes_a_provider_line_with_its_cap_and_a_local_one_never_does() -> None:
+    model = ScriptedChatModel(replies=[])
+    router = ModelRouter(GolemSettings(default_model=CLOUD), model=model)
+    assert router.provider_line(CLOUD) == (LineKey.provider("anthropic"), 4)
+    assert router.provider_line(LOCAL) is None
+    capped = ModelRouter(
+        GolemSettings(default_model=CLOUD, providers={"anthropic": ProviderSettings(at_once=2)}),
+        model=model,
+    )
+    assert capped.provider_line(CLOUD) == (LineKey.provider("anthropic"), 2)
 
 
 async def test_a_cloud_title_takes_no_local_line() -> None:

@@ -143,15 +143,21 @@ def failure_of(exc: BaseException) -> Failure:
     return "other"
 
 
-def retry_delay(exc: BaseException) -> float:
-    """Seconds to wait before the retry: ``retry-after`` up to :data:`RETRY_MAX`, else 2."""
+def retry_after(exc: BaseException) -> float | None:
+    """What the ``retry-after`` header asks for, up to :data:`RETRY_MAX`, or None without one."""
     headers = getattr(getattr(exc, "response", None), "headers", None)
     try:
         asked = None if headers is None else headers.get("retry-after")
-        wait = float(asked) if asked is not None else RETRY_WAIT
+        wait = None if asked is None else float(asked)
     except (TypeError, ValueError, AttributeError):
-        return RETRY_WAIT
-    return min(max(wait, 0.0), RETRY_MAX)
+        return None
+    return None if wait is None else min(max(wait, 0.0), RETRY_MAX)
+
+
+def retry_delay(exc: BaseException) -> float:
+    """Seconds to wait before the retry: ``retry-after`` up to :data:`RETRY_MAX`, else 2."""
+    asked = retry_after(exc)
+    return RETRY_WAIT if asked is None else asked
 
 
 def provider_error(provider: str, failure: Failure) -> ModelUnreachable:

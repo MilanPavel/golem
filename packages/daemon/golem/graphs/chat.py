@@ -94,7 +94,7 @@ from golem.graphs.tools_node import (
     unanswered_calls,
 )
 from golem.models.discovery import Loaded
-from golem.models.dispatcher import Call, Dispatcher, Grant, Wait
+from golem.models.dispatcher import Call, Dispatcher, Grant, LineKey, Wait
 from golem.models.errors import (
     BUDGET_HINT,
     BudgetSpent,
@@ -104,6 +104,7 @@ from golem.models.errors import (
     failure_note,
     failure_of,
     provider_error,
+    retry_after,
     retry_delay,
 )
 from golem.models.ollama import LocalServers
@@ -928,7 +929,14 @@ def open_chat(
                     return await binder.invoke(profile, chat, sent, schemas)
 
             try:
-                response = await _retrying(attempt, streamed, router.sleep)
+                provided = router.provider_line(profile)
+                response = await _retrying(
+                    attempt,
+                    streamed,
+                    router.sleep,
+                    dispatcher,
+                    None if provided is None else provided[0],
+                )
             except Exception as exc:
                 down = router.unreachable(profile, exc) or await router.refused(profile, exc)
                 failure = "unreachable" if down is not None else failure_of(exc)
@@ -1285,19 +1293,40 @@ async def _retrying(
     call: Callable[[], Awaitable[AIMessage]],
     streamed: _Streamed,
     sleep: Callable[[float], Awaitable[None]],
+    dispatcher: Dispatcher | None = None,
+    line: LineKey | None = None,
 ) -> AIMessage:
     """Run ``call``; when it is rate-limited or fails on the server's side, once more.
 
     The retry waits 2 seconds, or what ``retry-after`` asks for up to 10. A call that already
     streamed text is not retried: the user saw it.
+
+    On a provider ``line`` a refusal (429) calls ``refused`` and the call tries again through
+    the line, which holds it back, up to three times. A server error still gets the one retry.
     """
-    try:
-        return await call()
-    except Exception as exc:
-        if failure_of(exc) not in ("rate_limited", "server_error") or streamed.seen:
-            raise
-        await sleep(retry_delay(exc))
-    return await call()
+    refusals = 0
+    served = False
+    while True:
+        try:
+            reply = await call()
+        except Exception as exc:
+            failure = failure_of(exc)
+            if streamed.seen:
+                raise
+            if dispatcher is not None and line is not None and failure == "rate_limited":
+                if refusals == 3:
+                    raise
+                refusals += 1
+                dispatcher.refused(line, retry_after(exc))
+                continue
+            if failure not in ("rate_limited", "server_error") or served:
+                raise
+            served = True
+            await sleep(retry_delay(exc))
+            continue
+        if dispatcher is not None and line is not None:
+            dispatcher.succeeded(line)
+        return reply
 
 
 def _count(value: object) -> int | None:
@@ -1684,12 +1713,17 @@ async def _gated(
     role: Literal["chat", "helper"],
     arrived: float | None,
 ) -> AsyncGenerator[Grant | None]:
-    """Hold a slot of the local line ``profile`` runs on, or nothing for any other model.
+    """Hold a slot of the line ``profile`` runs on: a local model's, or a hosted provider's.
 
     A wait of over a second writes ``model.waiting``, and it ends when the call has its turn.
     ``arrived`` is the first arrival of a call that is tried again, so it keeps its place.
     """
     line = None if dispatcher is None else router.local_line(profile)
+    if dispatcher is not None and line is None:
+        provided = router.provider_line(profile)
+        if provided is not None:
+            line = provided[0]
+            dispatcher.set_slots(line, provided[1])  # follows a change of config.toml
     if dispatcher is None or line is None:
         yield None
         return

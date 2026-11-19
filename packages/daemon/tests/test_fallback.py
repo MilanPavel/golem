@@ -23,8 +23,8 @@ from test_server import HELLO, RpcClient, rpc_result, start_daemon, stop_daemon
 
 from golem.config import GolemSettings, RoutingSettings
 from golem.graphs.step_up import StepRequest
-from golem.models import ollama
-from golem.models.errors import RETRY_MAX, failure_of, provider_error, retry_delay
+from golem.models import dispatcher, ollama
+from golem.models.errors import RETRY_MAX, failure_of, provider_error, retry_after, retry_delay
 from golem.models.facts import ListedFacts, ModelFacts
 from golem.models.health import Health
 from golem.models.router import ModelRouter
@@ -90,6 +90,9 @@ def test_a_connect_error_under_another_error_is_unreachable() -> None:
 
 
 def test_retry_after_is_honoured_up_to_ten_seconds() -> None:
+    assert retry_after(_Http(429)) is None
+    assert retry_after(_Http(429, retry_after="5")) == 5.0
+    assert retry_after(_Http(429, retry_after="soon")) is None
     assert retry_delay(_Http(429)) == 2.0
     assert retry_delay(_Http(429, retry_after="5")) == 5.0
     assert retry_delay(_Http(429, retry_after="120")) == RETRY_MAX
@@ -204,6 +207,13 @@ def installed(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(ollama, "installed", lambda: True)
 
 
+@pytest.fixture(autouse=True)
+def quick_backoff(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A provider line backs off for a few ms, not 2 s and more."""
+    monkeypatch.setattr(dispatcher, "BACKOFF_BASE", 0.01)
+    monkeypatch.setattr(dispatcher, "BACKOFF_MAX", 0.05)
+
+
 class _Router(ModelRouter):
     def __init__(self, settings: GolemSettings, models: dict[str, FlakyModel]) -> None:
         super().__init__(settings)
@@ -316,14 +326,14 @@ async def _with(
     return app, task, await RpcClient.connect(app.paths.socket_path)
 
 
-async def test_a_rate_limit_once_is_retried_after_two_seconds(short_home: Path) -> None:
+async def test_a_rate_limit_once_is_retried_through_the_line(short_home: Path) -> None:
     cheap = _flaky(_Http(429))
     router = _all(deepseek__cheap=cheap, moonshot__other=_flaky(), anthropic__big=_flaky())
     app, task, client = await _with(short_home, router)
     try:
         await _run(app, client, CHEAP)
         assert "run.completed" in _types(client)
-        assert router.slept == [2.0]
+        assert router.slept == []
         assert cheap.attempts == 2
         assert _fallbacks(client) == []
     finally:
@@ -331,21 +341,9 @@ async def test_a_rate_limit_once_is_retried_after_two_seconds(short_home: Path) 
         await stop_daemon(app, task)
 
 
-async def test_a_retry_after_header_sets_the_wait(short_home: Path) -> None:
-    router = _all(deepseek__cheap=_flaky(_Http(429, retry_after="7")))
-    app, task, client = await _with(short_home, router)
-    try:
-        await _run(app, client, CHEAP)
-        assert "run.completed" in _types(client)
-        assert router.slept == [7.0]
-    finally:
-        await client.close()
-        await stop_daemon(app, task)
-
-
 async def test_two_rate_limits_fall_back_to_another_model_of_the_tier(short_home: Path) -> None:
     router = _all(
-        deepseek__cheap=_flaky(_Http(429), _Http(429)),
+        deepseek__cheap=_flaky(*[_Http(429)] * 4),
         moonshot__other=_flaky(),
         anthropic__big=_flaky(),
     )
@@ -358,7 +356,7 @@ async def test_two_rate_limits_fall_back_to_another_model_of_the_tier(short_home
         assert note["tier"] == "budget"
         assert note["detail"] == "deepseek is rate-limited"
         assert _models(client) == ["cheap", "other"]
-        assert router.slept == [2.0]
+        assert router.slept == []
         assert router.health.why("deepseek") == "rate-limited"
     finally:
         await client.close()
@@ -384,7 +382,7 @@ async def test_a_hosted_provider_that_is_down_falls_back_to_local_at_once(
 
 
 async def test_a_pinned_session_fails_with_the_code_and_the_hint(short_home: Path) -> None:
-    router = _all(deepseek__cheap=_flaky(_Http(429), _Http(429)), moonshot__other=_flaky())
+    router = _all(deepseek__cheap=_flaky(*[_Http(429)] * 4), moonshot__other=_flaky())
     app, task, client = await _with(short_home, router)
     try:
         await _run(app, client, CHEAP, mode=None)
@@ -424,9 +422,9 @@ async def test_a_run_falls_back_twice_and_then_fails_with_the_last_error(
     short_home: Path,
 ) -> None:
     router = _all(
-        deepseek__cheap=_flaky(_Http(429), _Http(429)),
-        moonshot__other=_flaky(_Http(429), _Http(429)),
-        anthropic__big=_flaky(_Http(429), _Http(429)),
+        deepseek__cheap=_flaky(*[_Http(429)] * 4),
+        moonshot__other=_flaky(*[_Http(429)] * 4),
+        anthropic__big=_flaky(*[_Http(429)] * 4),
         ollama__small=_flaky(),
     )
     app, task, client = await _with(short_home, router)
