@@ -58,6 +58,12 @@ def test_a_new_provider_and_the_skill_folders_are_protected() -> None:
     assert check_text("[skills]\ndisabled = ['a']\n", "").issues == []
 
 
+def test_memory_auto_keep_is_protected_and_the_rest_of_memory_is_not() -> None:
+    [issue] = check_text('[memory]\nauto_keep = ["/x"]\n', "").issues
+    assert issue.path == "memory.auto_keep"
+    assert check_text("[memory]\nshare = 0.05\n", "").issues == []
+
+
 def test_a_server_may_name_only_its_own_secrets() -> None:
     text = SERVER + 'headers = { Authorization = "Bearer keychain:mcp/other" }\n'
     [issue] = check_text(text, "").issues
