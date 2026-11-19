@@ -371,6 +371,39 @@ class BudgetSettings(BaseModel):
     over: Literal["local", "ask"] = "local"
 
 
+MemoryScope = Literal["you", "project", "history"]
+MemoryPrivacyLevel = Literal["chat", "local"]
+
+
+class MemorySettings(BaseModel):
+    """``[memory]``. Long-term memory (ADR-061).
+
+    ``enabled`` turns it on. ``share`` is the part of the model's window the memory block may
+    use, between ``min_tokens`` and ``max_tokens``; a helper gets ``helper_share``. ``you``,
+    ``projects`` and ``history`` set the privacy of each scope: ``chat`` goes where the chat
+    goes, ``local`` goes to local models only. ``auto_keep`` lists folders where a note with
+    sources is kept without asking. It is read from the user's file only.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    enabled: bool = True
+    share: float = Field(default=0.02, gt=0, le=1)
+    min_tokens: int = Field(default=200, ge=1)
+    max_tokens: int = Field(default=1500, ge=1)
+    helper_share: float = Field(default=0.01, gt=0, le=1)
+    you: MemoryPrivacyLevel = "chat"
+    projects: MemoryPrivacyLevel = "chat"
+    history: MemoryPrivacyLevel = "chat"
+    auto_keep: list[str] = Field(default_factory=list[str])
+
+    @model_validator(mode="after")
+    def _ordered(self) -> MemorySettings:
+        if self.min_tokens > self.max_tokens:
+            raise ValueError("[memory] needs min_tokens <= max_tokens")
+        return self
+
+
 TerminalApp = Literal["Terminal", "iTerm", "Ghostty"]
 TERMINAL_APPS: tuple[TerminalApp, ...] = ("Terminal", "iTerm", "Ghostty")
 """The terminal apps a click can open a session in."""
@@ -675,6 +708,9 @@ see ``PROTECTED_SKILL_SETTINGS``.
 
 PROTECTED_SKILL_SETTINGS = frozenset({"extra_dirs", "claude_dirs"})
 
+PROTECTED_MEMORY_SETTINGS = frozenset({"auto_keep"})
+"""``[memory]`` keys the browser may not change: they widen what golem trusts (ADR-061)."""
+
 BROWSER_SETTINGS = frozenset(
     {
         "log_level",
@@ -690,6 +726,7 @@ BROWSER_SETTINGS = frozenset(
         "notifications",
         "context",
         "budget",
+        "memory",
         "agents",
     }
 )
@@ -704,12 +741,15 @@ class _ProjectToml(TomlConfigSettingsSource):
     through ``golem.routine_files``, which checks trust (ADR-050).
 
     ``[routing] local_only`` is a flag there (``true``), not the user's list of folders. The
-    flag is read by ``golem.models.project_privacy``, so it is dropped here.
+    flag is read by ``golem.models.project_privacy``, so it is dropped here. The whole
+    ``[memory]`` table is dropped too: a project may only set ``private = true``, which
+    ``golem.memory.project_privacy`` reads, and never ``auto_keep`` or the budget.
     """
 
     def __call__(self) -> dict[str, Any]:
         data = dict(super().__call__())
         data.pop("routine", None)
+        data.pop("memory", None)
         routing = data.get("routing")
         if isinstance(routing, dict) and "local_only" in routing:
             data["routing"] = {k: v for k, v in routing.items() if k != "local_only"}  # pyright: ignore[reportUnknownVariableType]
@@ -761,6 +801,7 @@ class GolemSettings(BaseSettings):
     routing: RoutingSettings = Field(default_factory=RoutingSettings)
     context: ContextSettings = Field(default_factory=ContextSettings)
     budget: BudgetSettings = Field(default_factory=BudgetSettings)
+    memory: MemorySettings = Field(default_factory=MemorySettings)
     agents: AgentSettings = Field(default_factory=AgentSettings)
     notifications: NotificationSettings = Field(default_factory=NotificationSettings)
     routine: list[RoutineSettings] = Field(default_factory=list[RoutineSettings])

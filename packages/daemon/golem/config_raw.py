@@ -18,6 +18,7 @@ from typing import Any, cast
 from pydantic import TypeAdapter, ValidationError
 
 from golem.config import (
+    PROTECTED_MEMORY_SETTINGS,
     PROTECTED_SETTINGS,
     PROTECTED_SKILL_SETTINGS,
     GolemSettings,
@@ -315,6 +316,12 @@ def _protected_issues(text: str, data: dict[str, Any], old: dict[str, Any]) -> l
     for key in sorted(PROTECTED_SKILL_SETTINGS):
         if new_skills.get(key) != old_skills.get(key):
             issues.append(_refused(text, f"skills.{key}"))
+    memory, was_memory = data.get("memory"), old.get("memory")
+    new_memory = cast(dict[str, Any], memory) if isinstance(memory, dict) else {}
+    old_memory = cast(dict[str, Any], was_memory) if isinstance(was_memory, dict) else {}
+    for key in sorted(PROTECTED_MEMORY_SETTINGS):
+        if new_memory.get(key) != old_memory.get(key):
+            issues.append(_refused(text, f"memory.{key}"))
     return issues
 
 
