@@ -1,5 +1,125 @@
 {
   "$defs": {
+    "AgentLimits": {
+      "additionalProperties": false,
+      "description": "What bounds one helper of this type. ``None`` means the file sets no limit of that kind.\n\n``max_seconds`` is working time: it does not count the time spent waiting for\nyou, for a slot or for a provider. ``answer_chars`` cuts the helper's final answer.",
+      "properties": {
+        "answer_chars": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Answer Chars"
+        },
+        "max_calls": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Max Calls"
+        },
+        "max_cost_usd": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Max Cost Usd"
+        },
+        "max_seconds": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Max Seconds"
+        },
+        "max_tokens": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Max Tokens"
+        }
+      },
+      "title": "AgentLimits",
+      "type": "object"
+    },
+    "AgentSnapshot": {
+      "additionalProperties": false,
+      "description": "The agent type a helper session started with, as its file read at that moment.\n\nEditing the file later does not change it. ``source`` is where the file was\nfound. ``wish`` is the model wish as written. ``tools`` are the tool names the\nhelper may use, empty for none. ``asks`` is true when the helper may ask you a\nquestion.",
+      "properties": {
+        "asks": {
+          "default": false,
+          "title": "Asks",
+          "type": "boolean"
+        },
+        "limits": {
+          "$ref": "#/$defs/AgentLimits"
+        },
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "source": {
+          "enum": [
+            "bundled",
+            "user",
+            "project"
+          ],
+          "title": "Source",
+          "type": "string"
+        },
+        "tools": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Tools",
+          "type": "array"
+        },
+        "wish": {
+          "minLength": 1,
+          "title": "Wish",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "source",
+        "wish"
+      ],
+      "title": "AgentSnapshot",
+      "type": "object"
+    },
     "ForkedFrom": {
       "additionalProperties": false,
       "description": "The session and message a fork was copied from.",
@@ -24,8 +144,19 @@
     },
     "SessionCreatedData": {
       "additionalProperties": false,
-      "description": "Profile stored for a new session.\n\n``model_profile`` is a profile name or a ``provider/model`` ref.\n``model_provider`` and ``model_name`` are set when the daemon can resolve\nit, and null otherwise. ``forked_from`` is set on a session made by\n``session.fork``. ``cwd`` is the project folder the file tools work in,\nor null for a session without one. ``origin`` is who started the session:\n``cli``, ``routine:<name>``, and so on. Null means ``user``, and an older\ndaemon leaves it out. ``route`` is the session's route mode when it was\nmade. Null means ``pinned``, and an older daemon leaves it out.",
+      "description": "Profile stored for a new session.\n\n``model_profile`` is a profile name or a ``provider/model`` ref.\n``model_provider`` and ``model_name`` are set when the daemon can resolve\nit, and null otherwise. ``forked_from`` is set on a session made by\n``session.fork``. ``cwd`` is the project folder the file tools work in,\nor null for a session without one. ``origin`` is who started the session:\n``cli``, ``routine:<name>``, and so on. Null means ``user``, and an older\ndaemon leaves it out. ``route`` is the session's route mode when it was\nmade. Null means ``pinned``, and an older daemon leaves it out.\n``parent`` and ``agent`` are set on a helper session: the session and call\nthat started it, and the agent type it started with. Both are null for any\nother session, and an older daemon leaves them out.",
       "properties": {
+        "agent": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AgentSnapshot"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
         "cwd": {
           "anyOf": [
             {
@@ -94,6 +225,17 @@
           "default": null,
           "title": "Origin"
         },
+        "parent": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SessionParent"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
         "route": {
           "anyOf": [
             {
@@ -116,6 +258,34 @@
         "model_profile"
       ],
       "title": "SessionCreatedData",
+      "type": "object"
+    },
+    "SessionParent": {
+      "additionalProperties": false,
+      "description": "The session that started this one, and the ``delegate`` call that did it.\n\n``index`` is the helper's place in that call: 0 for a single helper.",
+      "properties": {
+        "call_id": {
+          "minLength": 1,
+          "title": "Call Id",
+          "type": "string"
+        },
+        "index": {
+          "minimum": 0,
+          "title": "Index",
+          "type": "integer"
+        },
+        "session_id": {
+          "minLength": 1,
+          "title": "Session Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "session_id",
+        "call_id",
+        "index"
+      ],
+      "title": "SessionParent",
       "type": "object"
     }
   },

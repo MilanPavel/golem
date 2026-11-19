@@ -9,7 +9,6 @@ from pydantic import BaseModel
 
 from golem_protocol.commands import (
     AgentInfo,
-    AgentLimits,
     AgentRegistryChanged,
     AgentsGetParams,
     AgentsGetResult,
@@ -295,6 +294,8 @@ from golem_protocol.commands import (
     TraceToolSpan,
 )
 from golem_protocol.events import (
+    AgentLimits,
+    AgentSnapshot,
     ApprovalNeededData,
     ApprovalNeededEvent,
     ApprovalResolvedData,
@@ -360,6 +361,7 @@ from golem_protocol.events import (
     SessionCreatedEvent,
     SessionModeChangedData,
     SessionModeChangedEvent,
+    SessionParent,
     SessionPlanChangedData,
     SessionPlanChangedEvent,
     SessionUpdatedData,
@@ -554,6 +556,7 @@ MODELS: tuple[type[BaseModel], ...] = (
     SessionCompletedEvent,
     SessionCreatedData,
     SessionCreatedEvent,
+    SessionParent,
     SessionUpdatedData,
     SessionUpdatedEvent,
     MessageStartedData,
@@ -742,6 +745,7 @@ MODELS: tuple[type[BaseModel], ...] = (
     McpRemoveResult,
     AgentInfo,
     AgentLimits,
+    AgentSnapshot,
     AgentRegistryChanged,
     AgentRegistryChangedNotification,
     AgentsGetParams,

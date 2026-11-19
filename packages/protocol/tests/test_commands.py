@@ -272,3 +272,32 @@ def test_agent_registry_changed_notification() -> None:
     assert note.method == "agent.registry.changed"
     assert AgentRegistryChangedNotification.model_validate_json(note.model_dump_json()) == note
     assert AgentRegistryChanged().root is None
+
+
+def test_summary_names_its_parent_and_agent() -> None:
+    summary = SessionSummary(
+        session_id="s_helper",
+        model_profile="remote",
+        status="idle",
+        created_at="t",
+        updated_at="t",
+        last_seq=3,
+        parent_session_id="s_lead",
+        agent="explorer",
+    )
+    assert SessionSummary.model_validate_json(summary.model_dump_json()) == summary
+
+
+def test_summary_written_before_parent_and_agent_still_validates() -> None:
+    old = {
+        "session_id": "s_old",
+        "model_profile": "remote",
+        "status": "idle",
+        "created_at": "t",
+        "updated_at": "t",
+        "last_seq": 1,
+    }
+    summary = SessionSummary.model_validate(old)
+    assert summary.parent_session_id is None and summary.agent is None
+    with pytest.raises(ValidationError):
+        SessionSummary.model_validate({**old, "agent": ""})

@@ -2,12 +2,14 @@
   "live": [
     {
       "data": {
+        "agent": null,
         "cwd": "/tmp/golem-golden",
         "forked_from": null,
         "model_name": null,
         "model_profile": "remote",
         "model_provider": null,
         "origin": null,
+        "parent": null,
         "route": "pinned"
       },
       "run_id": null,
@@ -292,12 +294,14 @@
   "replay": [
     {
       "data": {
+        "agent": null,
         "cwd": "/tmp/golem-golden",
         "forked_from": null,
         "model_name": null,
         "model_profile": "remote",
         "model_provider": null,
         "origin": null,
+        "parent": null,
         "route": "pinned"
       },
       "run_id": null,

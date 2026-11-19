@@ -2,6 +2,7 @@
 
 export type Jsonrpc = '2.0';
 export type Method = 'session.summary';
+export type Agent = string | null;
 export type CreatedAt = string;
 export type Cwd = string | null;
 export type ForkedFrom = string | null;
@@ -9,6 +10,7 @@ export type LastSeq = number;
 export type LocalOnly = boolean;
 export type ModelProfile = string;
 export type Origin = string;
+export type ParentSessionId = string | null;
 export type Added = number | null;
 export type Alternatives = number | null;
 export type CallId = string | null;
@@ -54,11 +56,15 @@ export interface SessionSummaryNotification {
  * An older daemon leaves it out.
  * ``pending`` says what a ``waiting`` session waits for, null otherwise. An older daemon
  * leaves it out.
+ * ``parent_session_id`` and ``agent`` are set on a helper session: the id of the
+ * session that started it, and the name of its agent type. Null for any other
+ * session. An older daemon leaves them out.
  *
  * This interface was referenced by `SessionSummaryNotification`'s JSON-Schema
  * via the `definition` "SessionSummary".
  */
 export interface SessionSummary {
+  agent?: Agent;
   created_at: CreatedAt;
   cwd?: Cwd;
   forked_from?: ForkedFrom;
@@ -66,6 +72,7 @@ export interface SessionSummary {
   local_only?: LocalOnly;
   model_profile: ModelProfile;
   origin?: Origin;
+  parent_session_id?: ParentSessionId;
   pending?: PendingItem | null;
   plan_first?: PlanFirst;
   route?: Route;

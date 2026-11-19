@@ -1,0 +1,122 @@
+{
+  "$defs": {
+    "AgentLimits": {
+      "additionalProperties": false,
+      "description": "What bounds one helper of this type. ``None`` means the file sets no limit of that kind.\n\n``max_seconds`` is working time: it does not count the time spent waiting for\nyou, for a slot or for a provider. ``answer_chars`` cuts the helper's final answer.",
+      "properties": {
+        "answer_chars": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Answer Chars"
+        },
+        "max_calls": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Max Calls"
+        },
+        "max_cost_usd": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Max Cost Usd"
+        },
+        "max_seconds": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Max Seconds"
+        },
+        "max_tokens": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Max Tokens"
+        }
+      },
+      "title": "AgentLimits",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "The agent type a helper session started with, as its file read at that moment.\n\nEditing the file later does not change it. ``source`` is where the file was\nfound. ``wish`` is the model wish as written. ``tools`` are the tool names the\nhelper may use, empty for none. ``asks`` is true when the helper may ask you a\nquestion.",
+  "properties": {
+    "asks": {
+      "default": false,
+      "title": "Asks",
+      "type": "boolean"
+    },
+    "limits": {
+      "$ref": "#/$defs/AgentLimits"
+    },
+    "name": {
+      "minLength": 1,
+      "title": "Name",
+      "type": "string"
+    },
+    "source": {
+      "enum": [
+        "bundled",
+        "user",
+        "project"
+      ],
+      "title": "Source",
+      "type": "string"
+    },
+    "tools": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Tools",
+      "type": "array"
+    },
+    "wish": {
+      "minLength": 1,
+      "title": "Wish",
+      "type": "string"
+    }
+  },
+  "required": [
+    "name",
+    "source",
+    "wish"
+  ],
+  "title": "AgentSnapshot",
+  "type": "object"
+}
