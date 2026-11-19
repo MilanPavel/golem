@@ -13,6 +13,7 @@ from pydantic import BaseModel
 from golem.coding.changes import ChangeStore
 from golem.mcp import McpSupervisor
 from golem.mcp.importer import ScanStore
+from golem.memory.service import MemoryService
 from golem.models.check import CheckManager
 from golem.models.discovery import ModelDiscovery
 from golem.models.facts import FactsSource
@@ -62,6 +63,8 @@ class DaemonState:
     mcp: McpSupervisor | None = None
     secrets: SecretStore | None = None
     skills: SkillRegistry | None = None
+    memory: MemoryService | None = None
+    """The memory service. None when ``[memory] enabled = false``."""
     local_servers: LocalServers | None = None
     installer: OllamaInstaller | None = None
     runtimes: dict[str, BrewInstaller] = field(default_factory=dict[str, BrewInstaller])

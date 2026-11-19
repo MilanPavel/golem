@@ -9,13 +9,13 @@ import os
 import signal
 import sys
 import time
-from collections.abc import Callable, Mapping
+from collections.abc import AsyncGenerator, Callable, Mapping
 from pathlib import Path
 
 from pydantic import BaseModel
 
 from golem.coding.changes import ChangeStore
-from golem.config import ModelPrice, load_settings
+from golem.config import MemorySettings, ModelPrice, load_settings
 from golem.graphs.chat import ChatRuntime, open_chat
 from golem.graphs.cite_prompt import CITE_PROMPT
 from golem.graphs.delegate_prompt import DELEGATE_PROMPT
@@ -26,6 +26,8 @@ from golem.lock import DaemonAlreadyRunning, DaemonLock
 from golem.logging import configure_logging
 from golem.mcp import McpSupervisor
 from golem.mcp.prompt import mcp_section
+from golem.memory.service import MemoryService
+from golem.memory.store import MemoryStore
 from golem.models.budget import Budget
 from golem.models.check import CheckManager
 from golem.models.discovery import Loaded, ModelDiscovery
@@ -262,7 +264,9 @@ class DaemonApp:
             async with (
                 Database.open(self.paths.database_file) as database,
                 open_checkpoints(database, self.paths.checkpoints_file) as saver,
+                _open_memory(self.paths.memory_file, settings.memory) as memory,
             ):
+                self.state.memory = memory
                 self.state.policy = policy
                 self.state.tools = default_registry(mcp, policy.web())
                 self.state.artifacts = ArtifactStore(database)
@@ -337,6 +341,8 @@ class DaemonApp:
                     BlobStore(database),
                 )
                 sessions = self.state.sessions
+                sessions.memory = memory
+                sessions.golem_home = self.paths.home
                 sessions.budget = budget
                 self.state.notifier = _open_notifier(
                     SessionRecords(database),
@@ -462,6 +468,7 @@ class DaemonApp:
             self.state.watcher = None
             self.state.routine_runs = None
             self.state.sessions = None
+            self.state.memory = None
             self._lock.release()
 
     def _secret(self, name: str) -> str | None:
@@ -669,6 +676,21 @@ def _open_notifier(records: SessionRecords, bus: EventBus, poster: Poster, home:
     notifier = Notifier(poster, lookup, bus.attached, _notifier_kinds(home))
     bus.observe(notifier.on_event)
     return notifier
+
+
+@contextlib.asynccontextmanager
+async def _open_memory(
+    path: Path, settings: MemorySettings
+) -> AsyncGenerator[MemoryService | None]:
+    """The memory service over ``memory.db``, or None when ``[memory] enabled = false``.
+
+    Off means the file is not opened, so a daemon that never uses memory never makes one.
+    """
+    if not settings.enabled:
+        yield None
+        return
+    async with MemoryStore.open(path) as store:
+        yield MemoryService(store, lambda: settings)
 
 
 async def _open_sessions(
