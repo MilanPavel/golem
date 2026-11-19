@@ -5,9 +5,22 @@
 import { chmodSync, mkdirSync, realpathSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
-import { DEMO_VERSION, demoConfig, queueDemo, startDemoDaemon, writeDemoProject } from "./demo-scenario.ts";
+import {
+  DEMO_VERSION,
+  RECEIPTS_ROUTINE,
+  cargoEnv,
+  demoConfig,
+  dropReceipt,
+  queueReceipts,
+  queueRust,
+  routineConfig,
+  runMorningBrief,
+  startDemoDaemon,
+  titleRun,
+  writeRustProject,
+} from "./demo-scenario.ts";
 import { startFakeModel } from "./fake-model.ts";
-import { REPO, Rig, writeConfig } from "./harness.ts";
+import { REPO, Rig, startSecondClient, writeConfig } from "./harness.ts";
 
 const envFile = process.argv[2];
 if (envFile === undefined) {
@@ -18,13 +31,33 @@ if (envFile === undefined) {
 const rig = new Rig();
 const model = rig.own(await startFakeModel());
 const home = rig.home();
-writeConfig(home, demoConfig(model));
-
-rig.own(await startDemoDaemon(home));
-// The recording's shell gets this as HOME, so the TUI shows the folder as ~/my-project.
+// The recording's shell gets this as HOME, so the TUI shows the folder as ~/rust-hello.
 const fakeHome = realpathSync(rig.home());
-const project = writeDemoProject(path.join(fakeHome, "my-project"));
-queueDemo(model, 35);
+const watched = path.join(fakeHome, "Receipts");
+const work = path.join(fakeHome, "work");
+mkdirSync(watched, { recursive: true });
+mkdirSync(work, { recursive: true });
+writeConfig(home, demoConfig(model, "qwen3-coder:30b", routineConfig(watched, work)));
+
+rig.own(await startDemoDaemon(home, { env: cargoEnv() }));
+const second = rig.own(await startSecondClient(home));
+const project = writeRustProject(path.join(fakeHome, "rust-hello"));
+
+// A past run for /runs, then the story: the Rust project in the terminal. When its answer has
+// begun, a receipt lands in the watched folder, and its routine waits for you in another session.
+await runMorningBrief(model, second);
+const asked = model.requests.length;
+queueRust(model, 35);
+queueReceipts(model);
+const STORY_REQUESTS = 4;
+const poll = setInterval(() => {
+  if (model.requests.length < asked + STORY_REQUESTS) return;
+  clearInterval(poll);
+  setTimeout(() => {
+    dropReceipt(watched);
+    void titleRun(second, RECEIPTS_ROUTINE, "Receipts to CSV");
+  }, 800);
+}, 200);
 
 // `golem` in the recording is this checkout's CLI, on the temp home, with the demo's version.
 const bin = path.join(home, "bin");

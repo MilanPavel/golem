@@ -1,28 +1,40 @@
 <script setup lang="ts">
-// "See it work": the same task in the terminal and in the browser, recorded from the real golem
-// with a scripted model (`just demo-tui`, `just demo-web`). The three dots take golem's deny,
+// "See it work": three stories in the browser and one in the terminal, recorded from the real
+// golem with a scripted model (`just demo-web`, `just demo-tui`). The three dots take golem's deny,
 // wait, and allow. Under prefers-reduced-motion the video does not play; its poster is the end.
 import { computed, onMounted, ref, watch } from "vue";
 import { withBase } from "vitepress";
 
 const demos = [
   {
-    id: "tui",
-    label: "Terminal",
-    title: "golem tui · ~/my-project",
-    alt: "In the terminal, golem is asked to fix a test that fails on an empty list. It reads stats.py, shows the edit as a diff and you allow it, asks to run the tests and you allow it, and says all three tests pass.",
+    id: "search",
+    label: "Sources",
+    title: "127.0.0.1 · golem",
+    alt: "In the browser, golem is asked about infinity and good sources to study. It searches the web and reads three pages, then answers with a source chip after each claim. A chip's hover card shows the page, and the Sources list shows the three pages it cited out of the four it found.",
   },
   {
-    id: "web",
-    label: "Browser",
+    id: "code",
+    label: "Coding",
+    title: "127.0.0.1 · golem · ~/rust-hello",
+    alt: "In the browser, golem is asked to make a hello world app in Rust with a test and run it. An approval card shows each file as a diff and you allow it, then the command that tests and runs it, while the Changes panel fills with the two new files.",
+  },
+  {
+    id: "inbox",
+    label: "Away",
     title: "127.0.0.1 · golem",
-    alt: "In the browser, the same task: golem reads stats.py, an approval card shows the diff and you allow it, a second card asks to run the tests, and the answer says all three tests pass.",
+    alt: "In the browser, a PDF lands in a watched folder and a routine starts by itself. It stops to ask to write a file, the Inbox in the sidebar shows 1, you allow it there, and Runs shows it finished next to a scheduled routine.",
+  },
+  {
+    id: "tui",
+    label: "Terminal",
+    title: "golem tui · ~/rust-hello",
+    alt: "In the terminal, golem writes a Rust hello world app with a test. You allow each file as a diff and then the test run. A routine then asks for approval in another session, the banner and the status line say so, and /runs lists what needs you and what finished.",
   },
 ] as const;
 
 type DemoId = (typeof demos)[number]["id"];
 
-const current = ref<DemoId>("tui");
+const current = ref<DemoId>("search");
 const video = ref<HTMLVideoElement | null>(null);
 const still = ref(true);
 const demo = computed(() => demos.find((d) => d.id === current.value) ?? demos[0]);
@@ -42,7 +54,7 @@ watch(current, () => {
 
 <template>
   <div class="golem-demo">
-    <div class="golem-demo-tabs" role="tablist" aria-label="Where you chat with golem">
+    <div class="golem-demo-tabs" role="tablist" aria-label="What golem does">
       <button
         v-for="d in demos"
         :key="d.id"

@@ -103,10 +103,12 @@ export interface Daemon {
 export interface DaemonOptions {
   /** Merged over the environment the daemon gets. */
   env?: Record<string, string>;
+  /** What `uv run --project <repo>` runs, in place of `golem-daemon serve`. The demo's launcher uses it. */
+  command?: string[];
 }
 
 export async function startDaemon(home: string, options: DaemonOptions = {}): Promise<Daemon> {
-  const child = spawn("uv", ["run", "--project", REPO, "golem-daemon", "serve"], {
+  const child = spawn("uv", ["run", "--project", REPO, ...(options.command ?? ["golem-daemon", "serve"])], {
     env: { ...envFor(home), ...options.env },
     stdio: "ignore",
     cwd: REPO,

@@ -23,13 +23,24 @@
 </p>
 
 <p align="center">
-  <b>In the terminal</b><br>
-  <img src="docs/images/demo-tui.gif" alt="In the terminal, golem is asked to fix a test that fails on an empty list. It reads stats.py, shows the edit as a diff and you allow it, runs the tests after you allow that too, and says all three tests pass" width="900">
+  <b>Ask, and read the sources</b><br>
+  <img src="docs/images/demo-search.gif" alt="In the browser, golem is asked about infinity and good sources to study. It searches the web once and reads three pages, then answers with a small source chip after each claim. Hovering a chip shows the page's title and an excerpt, and the Sources list shows the three pages it cited out of the four it found" width="900">
 </p>
 
 <p align="center">
-  <b>In the browser</b><br>
-  <img src="docs/images/demo-web.gif" alt="In the browser, the same task: golem reads stats.py, an approval card shows the diff and you allow it, a second card asks to run the tests, and the answer says all three tests pass" width="900">
+  <b>Code with you, and see every change</b><br>
+  <img src="docs/images/demo-code.gif" alt="In the browser, golem is asked to make a hello world app in Rust with a test and run it. An approval card shows each file as a diff and you allow it, then the command cargo test and cargo run, while the Changes panel on the right fills with the two new files" width="900">
+</p>
+
+<p align="center">
+  <b>Works while you're away</b><br>
+  <img src="docs/images/demo-inbox.gif" alt="In the browser, in another chat, a PDF lands in a watched folder. A routine starts by itself and stops to ask to write receipts.csv, and the Inbox in the sidebar shows 1. The Inbox asks the question in plain words and you allow it there, then Runs shows the routine finished next to a scheduled one" width="900"><br>
+  <sub>It also arrives as a Mac notification.</sub>
+</p>
+
+<p align="center">
+  <b>In the terminal</b><br>
+  <img src="docs/images/demo-tui.gif" alt="In the terminal, golem writes the same Rust hello world app: you allow each file as a diff and then the test run. A routine then asks for approval in another session, the banner and the status line say so, and /runs lists what needs you and what finished" width="900">
 </p>
 
 ## Get started

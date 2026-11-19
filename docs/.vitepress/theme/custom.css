@@ -379,7 +379,7 @@ html.dark .golem-why-card img {
   height: auto;
 }
 
-/* The demo's Terminal | Browser switch. */
+/* The demo's clip switch. */
 .golem-demo-tabs {
   display: inline-flex;
   gap: 2px;

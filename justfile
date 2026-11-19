@@ -148,13 +148,13 @@ gallery-build:
 docs-build:
     pnpm --filter @golem/docs build
 
-# Record the terminal demo into docs/images/demo-tui.*: the real TUI and daemon, a scripted model. Needs vhs.
+# Record the terminal demo into docs/images/demo-tui.*: the real TUI and daemon, a scripted model. Needs vhs and cargo.
 demo-tui:
     sh scripts/demo/tui.sh
 
-# Record the web UI demo into docs/images/demo-web.*: the real web UI and daemon, a scripted model.
-demo-web:
-    sh scripts/demo/web.sh
+# Record the three web UI demos into docs/images/demo-{search,code,inbox}.*: the real web UI and daemon, a scripted model. Needs cargo. Name clips to record only those.
+demo-web *clips:
+    sh scripts/demo/web.sh {{clips}}
 
 # Run the golem CLI (--version, status, daemon install|start|stop|logs). Quoted arguments stay one argument.
 [positional-arguments]
