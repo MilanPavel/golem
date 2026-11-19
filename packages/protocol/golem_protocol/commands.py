@@ -1813,6 +1813,100 @@ class SkillSetDisabledResult(BaseModel):
     disabled: bool
 
 
+AgentOrigin = Literal["bundled", "user", "project"]
+"""Where an agent type file was found: golem itself, the user's folders, or the project."""
+
+
+class AgentRegistryChanged(BaseModel):
+    """Agent type files changed on disk. List them again for the folders it covers.
+
+    ``root`` is the session folder whose project agents changed. ``None`` means the
+    user's or golem's agents, or ``[agents]`` in ``config.toml``, changed, which every
+    folder sees.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    root: str | None = None
+
+
+class AgentLimits(BaseModel):
+    """What bounds one helper of this type. ``None`` means the file sets no limit of that kind.
+
+    ``max_seconds`` is working time: it does not count the time spent waiting for
+    you, for a slot or for a provider. ``answer_chars`` cuts the helper's final answer.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    max_calls: int | None = Field(default=None, ge=1)
+    max_seconds: int | None = Field(default=None, ge=1)
+    max_cost_usd: float | None = Field(default=None, ge=0)
+    max_tokens: int | None = Field(default=None, ge=1)
+    answer_chars: int | None = Field(default=None, ge=1)
+
+
+class AgentInfo(BaseModel):
+    """One agent type: an ``agents/<name>.md`` file, valid or not.
+
+    ``wish`` is the model wish as written: ``cheapest``, ``same``, ``stronger``, a tier
+    or a model. ``tools`` are the tool names the helper may use, empty for none. ``asks``
+    is true when the helper may ask you a question. ``errors`` are what is wrong with
+    the file: a type with errors is never the one a name resolves to. ``shadowed`` lists
+    the origins of lower files of the same name that this one hides. ``trusted`` is
+    false for a project agent in a folder that is not trusted, which is listed and
+    never started. ``used`` and ``finished`` count helpers of this type started and
+    ended in the last 30 days (``helper.ended``). ``finished`` is ``None`` when the
+    daemon cannot count them.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    name: str = Field(min_length=1)
+    description: str
+    origin: AgentOrigin
+    wish: str = Field(min_length=1)
+    tools: list[str] = Field(default_factory=list[str])
+    limits: AgentLimits = Field(default_factory=AgentLimits)
+    asks: bool = False
+    errors: list[str] = Field(default_factory=list[str])
+    shadowed: list[AgentOrigin] = Field(default_factory=list[AgentOrigin])
+    trusted: bool = True
+    used: int = Field(default=0, ge=0)
+    finished: int | None = Field(default=None, ge=0)
+
+
+class AgentsListParams(BaseModel):
+    """``agents.list``. The agent types a session in ``cwd`` sees, or the user's without it."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    cwd: str | None = Field(default=None, min_length=1)
+
+
+class AgentsListResult(BaseModel):
+    """Every agent type found, highest origin first."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    agents: list[AgentInfo]
+
+
+class AgentsGetParams(BaseModel):
+    """``agents.get``. The agent type called ``name`` that a session in ``cwd`` sees."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    name: str = Field(min_length=1)
+    cwd: str | None = Field(default=None, min_length=1)
+
+
+class AgentsGetResult(AgentInfo):
+    """The agent type and its prompt, the body of its file."""
+
+    prompt: str
+
+
 RoutineSource = Literal["user", "project"]
 """Where a routine is written: the user's ``config.toml``, or a project's."""
 
@@ -3801,6 +3895,14 @@ class FsListDirsResult(BaseModel):
 
 
 __all__ = [
+    "AgentInfo",
+    "AgentLimits",
+    "AgentOrigin",
+    "AgentRegistryChanged",
+    "AgentsGetParams",
+    "AgentsGetResult",
+    "AgentsListParams",
+    "AgentsListResult",
     "ApprovalRespondParams",
     "ApprovalRespondResult",
     "ArtifactReadParams",

@@ -5,6 +5,7 @@ from typing import Annotated, Any, Literal
 from pydantic import BaseModel, BeforeValidator, ConfigDict, Field
 
 from golem_protocol.commands import (
+    AgentRegistryChanged,
     KeychainWait,
     McpLoginDone,
     McpServer,
@@ -233,6 +234,16 @@ class SkillRegistryChangedNotification(BaseModel):
     params: SkillRegistryChanged
 
 
+class AgentRegistryChangedNotification(BaseModel):
+    """Server → every connection: an agent type file changed on disk. Not stored."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    jsonrpc: Literal["2.0"] = "2.0"
+    method: Literal["agent.registry.changed"] = "agent.registry.changed"
+    params: AgentRegistryChanged
+
+
 class RoutineChangedNotification(BaseModel):
     """Server → every connection: a routine was added, changed or removed. Not stored."""
 
@@ -264,6 +275,7 @@ class RoutineFinishedNotification(BaseModel):
 
 
 __all__ = [
+    "AgentRegistryChangedNotification",
     "KeychainWaitNotification",
     "McpLoginDoneNotification",
     "McpServerLogNotification",

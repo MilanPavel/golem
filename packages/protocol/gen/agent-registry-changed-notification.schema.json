@@ -1,0 +1,48 @@
+{
+  "$defs": {
+    "AgentRegistryChanged": {
+      "additionalProperties": false,
+      "description": "Agent type files changed on disk. List them again for the folders it covers.\n\n``root`` is the session folder whose project agents changed. ``None`` means the\nuser's or golem's agents, or ``[agents]`` in ``config.toml``, changed, which every\nfolder sees.",
+      "properties": {
+        "root": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Root"
+        }
+      },
+      "title": "AgentRegistryChanged",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Server → every connection: an agent type file changed on disk. Not stored.",
+  "properties": {
+    "jsonrpc": {
+      "const": "2.0",
+      "default": "2.0",
+      "title": "Jsonrpc",
+      "type": "string"
+    },
+    "method": {
+      "const": "agent.registry.changed",
+      "default": "agent.registry.changed",
+      "title": "Method",
+      "type": "string"
+    },
+    "params": {
+      "$ref": "#/$defs/AgentRegistryChanged"
+    }
+  },
+  "required": [
+    "params"
+  ],
+  "title": "AgentRegistryChangedNotification",
+  "type": "object"
+}

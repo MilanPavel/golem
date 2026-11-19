@@ -2,6 +2,401 @@
 
 import Foundation
 
+/// One agent type: an ``agents/<name>.md`` file, valid or not.
+///
+/// ``wish`` is the model wish as written: ``cheapest``, ``same``, ``stronger``, a tier
+/// or a model. ``tools`` are the tool names the helper may use, empty for none. ``asks``
+/// is true when the helper may ask you a question. ``errors`` are what is wrong with
+/// the file: a type with errors is never the one a name resolves to. ``shadowed`` lists
+/// the origins of lower files of the same name that this one hides. ``trusted`` is
+/// false for a project agent in a folder that is not trusted, which is listed and
+/// never started. ``used`` and ``finished`` count helpers of this type started and
+/// ended in the last 30 days (``helper.ended``). ``finished`` is ``None`` when the
+/// daemon cannot count them.
+// MARK: - AgentInfo
+public struct AgentInfo: Codable {
+    public let asks: Bool?
+    public let description: String
+    public let errors: [String]?
+    public let finished: Int?
+    public let limits: AgentInfoLimits?
+    public let name: String
+    public let origin: Origin
+    public let shadowed: [Origin]?
+    public let tools: [String]?
+    public let trusted: Bool?
+    public let used: Int?
+    public let wish: String
+
+    public enum CodingKeys: String, CodingKey {
+        case asks = "asks"
+        case description = "description"
+        case errors = "errors"
+        case finished = "finished"
+        case limits = "limits"
+        case name = "name"
+        case origin = "origin"
+        case shadowed = "shadowed"
+        case tools = "tools"
+        case trusted = "trusted"
+        case used = "used"
+        case wish = "wish"
+    }
+
+    public init(asks: Bool?, description: String, errors: [String]?, finished: Int?, limits: AgentInfoLimits?, name: String, origin: Origin, shadowed: [Origin]?, tools: [String]?, trusted: Bool?, used: Int?, wish: String) {
+        self.asks = asks
+        self.description = description
+        self.errors = errors
+        self.finished = finished
+        self.limits = limits
+        self.name = name
+        self.origin = origin
+        self.shadowed = shadowed
+        self.tools = tools
+        self.trusted = trusted
+        self.used = used
+        self.wish = wish
+    }
+}
+
+/// What bounds one helper of this type. ``None`` means the file sets no limit of that kind.
+///
+/// ``max_seconds`` is working time: it does not count the time spent waiting for
+/// you, for a slot or for a provider. ``answer_chars`` cuts the helper's final answer.
+// MARK: - AgentInfoLimits
+public struct AgentInfoLimits: Codable {
+    public let answerChars: Int?
+    public let maxCalls: Int?
+    public let maxCostUsd: Double?
+    public let maxSeconds: Int?
+    public let maxTokens: Int?
+
+    public enum CodingKeys: String, CodingKey {
+        case answerChars = "answer_chars"
+        case maxCalls = "max_calls"
+        case maxCostUsd = "max_cost_usd"
+        case maxSeconds = "max_seconds"
+        case maxTokens = "max_tokens"
+    }
+
+    public init(answerChars: Int?, maxCalls: Int?, maxCostUsd: Double?, maxSeconds: Int?, maxTokens: Int?) {
+        self.answerChars = answerChars
+        self.maxCalls = maxCalls
+        self.maxCostUsd = maxCostUsd
+        self.maxSeconds = maxSeconds
+        self.maxTokens = maxTokens
+    }
+}
+
+public enum Origin: String, Codable {
+    case bundled = "bundled"
+    case project = "project"
+    case user = "user"
+}
+
+/// What bounds one helper of this type. ``None`` means the file sets no limit of that kind.
+///
+/// ``max_seconds`` is working time: it does not count the time spent waiting for
+/// you, for a slot or for a provider. ``answer_chars`` cuts the helper's final answer.
+// MARK: - AgentLimits
+public struct AgentLimits: Codable {
+    public let answerChars: Int?
+    public let maxCalls: Int?
+    public let maxCostUsd: Double?
+    public let maxSeconds: Int?
+    public let maxTokens: Int?
+
+    public enum CodingKeys: String, CodingKey {
+        case answerChars = "answer_chars"
+        case maxCalls = "max_calls"
+        case maxCostUsd = "max_cost_usd"
+        case maxSeconds = "max_seconds"
+        case maxTokens = "max_tokens"
+    }
+
+    public init(answerChars: Int?, maxCalls: Int?, maxCostUsd: Double?, maxSeconds: Int?, maxTokens: Int?) {
+        self.answerChars = answerChars
+        self.maxCalls = maxCalls
+        self.maxCostUsd = maxCostUsd
+        self.maxSeconds = maxSeconds
+        self.maxTokens = maxTokens
+    }
+}
+
+/// Server → every connection: an agent type file changed on disk. Not stored.
+// MARK: - AgentRegistryChangedNotification
+public struct AgentRegistryChangedNotification: Codable {
+    public let jsonrpc: Jsonrpc?
+    public let method: AgentRegistryChangedNotificationMethod?
+    public let params: ParamsClass
+
+    public enum CodingKeys: String, CodingKey {
+        case jsonrpc = "jsonrpc"
+        case method = "method"
+        case params = "params"
+    }
+
+    public init(jsonrpc: Jsonrpc?, method: AgentRegistryChangedNotificationMethod?, params: ParamsClass) {
+        self.jsonrpc = jsonrpc
+        self.method = method
+        self.params = params
+    }
+}
+
+public enum Jsonrpc: String, Codable {
+    case the20 = "2.0"
+}
+
+public enum AgentRegistryChangedNotificationMethod: String, Codable {
+    case agentRegistryChanged = "agent.registry.changed"
+}
+
+/// Agent type files changed on disk. List them again for the folders it covers.
+///
+/// ``root`` is the session folder whose project agents changed. ``None`` means the
+/// user's or golem's agents, or ``[agents]`` in ``config.toml``, changed, which every
+/// folder sees.
+// MARK: - ParamsClass
+public struct ParamsClass: Codable {
+    public let root: String?
+
+    public enum CodingKeys: String, CodingKey {
+        case root = "root"
+    }
+
+    public init(root: String?) {
+        self.root = root
+    }
+}
+
+/// Agent type files changed on disk. List them again for the folders it covers.
+///
+/// ``root`` is the session folder whose project agents changed. ``None`` means the
+/// user's or golem's agents, or ``[agents]`` in ``config.toml``, changed, which every
+/// folder sees.
+// MARK: - AgentRegistryChanged
+public struct AgentRegistryChanged: Codable {
+    public let root: String?
+
+    public enum CodingKeys: String, CodingKey {
+        case root = "root"
+    }
+
+    public init(root: String?) {
+        self.root = root
+    }
+}
+
+/// ``agents.get``. The agent type called ``name`` that a session in ``cwd`` sees.
+// MARK: - AgentsGetParams
+public struct AgentsGetParams: Codable {
+    public let cwd: String?
+    public let name: String
+
+    public enum CodingKeys: String, CodingKey {
+        case cwd = "cwd"
+        case name = "name"
+    }
+
+    public init(cwd: String?, name: String) {
+        self.cwd = cwd
+        self.name = name
+    }
+}
+
+/// The agent type and its prompt, the body of its file.
+// MARK: - AgentsGetResult
+public struct AgentsGetResult: Codable {
+    public let asks: Bool?
+    public let description: String
+    public let errors: [String]?
+    public let finished: Int?
+    public let limits: AgentsGetResultLimits?
+    public let name: String
+    public let origin: Origin
+    public let prompt: String
+    public let shadowed: [Origin]?
+    public let tools: [String]?
+    public let trusted: Bool?
+    public let used: Int?
+    public let wish: String
+
+    public enum CodingKeys: String, CodingKey {
+        case asks = "asks"
+        case description = "description"
+        case errors = "errors"
+        case finished = "finished"
+        case limits = "limits"
+        case name = "name"
+        case origin = "origin"
+        case prompt = "prompt"
+        case shadowed = "shadowed"
+        case tools = "tools"
+        case trusted = "trusted"
+        case used = "used"
+        case wish = "wish"
+    }
+
+    public init(asks: Bool?, description: String, errors: [String]?, finished: Int?, limits: AgentsGetResultLimits?, name: String, origin: Origin, prompt: String, shadowed: [Origin]?, tools: [String]?, trusted: Bool?, used: Int?, wish: String) {
+        self.asks = asks
+        self.description = description
+        self.errors = errors
+        self.finished = finished
+        self.limits = limits
+        self.name = name
+        self.origin = origin
+        self.prompt = prompt
+        self.shadowed = shadowed
+        self.tools = tools
+        self.trusted = trusted
+        self.used = used
+        self.wish = wish
+    }
+}
+
+/// What bounds one helper of this type. ``None`` means the file sets no limit of that kind.
+///
+/// ``max_seconds`` is working time: it does not count the time spent waiting for
+/// you, for a slot or for a provider. ``answer_chars`` cuts the helper's final answer.
+// MARK: - AgentsGetResultLimits
+public struct AgentsGetResultLimits: Codable {
+    public let answerChars: Int?
+    public let maxCalls: Int?
+    public let maxCostUsd: Double?
+    public let maxSeconds: Int?
+    public let maxTokens: Int?
+
+    public enum CodingKeys: String, CodingKey {
+        case answerChars = "answer_chars"
+        case maxCalls = "max_calls"
+        case maxCostUsd = "max_cost_usd"
+        case maxSeconds = "max_seconds"
+        case maxTokens = "max_tokens"
+    }
+
+    public init(answerChars: Int?, maxCalls: Int?, maxCostUsd: Double?, maxSeconds: Int?, maxTokens: Int?) {
+        self.answerChars = answerChars
+        self.maxCalls = maxCalls
+        self.maxCostUsd = maxCostUsd
+        self.maxSeconds = maxSeconds
+        self.maxTokens = maxTokens
+    }
+}
+
+/// ``agents.list``. The agent types a session in ``cwd`` sees, or the user's without it.
+// MARK: - AgentsListParams
+public struct AgentsListParams: Codable {
+    public let cwd: String?
+
+    public enum CodingKeys: String, CodingKey {
+        case cwd = "cwd"
+    }
+
+    public init(cwd: String?) {
+        self.cwd = cwd
+    }
+}
+
+/// Every agent type found, highest origin first.
+// MARK: - AgentsListResult
+public struct AgentsListResult: Codable {
+    public let agents: [AgentElement]
+
+    public enum CodingKeys: String, CodingKey {
+        case agents = "agents"
+    }
+
+    public init(agents: [AgentElement]) {
+        self.agents = agents
+    }
+}
+
+/// One agent type: an ``agents/<name>.md`` file, valid or not.
+///
+/// ``wish`` is the model wish as written: ``cheapest``, ``same``, ``stronger``, a tier
+/// or a model. ``tools`` are the tool names the helper may use, empty for none. ``asks``
+/// is true when the helper may ask you a question. ``errors`` are what is wrong with
+/// the file: a type with errors is never the one a name resolves to. ``shadowed`` lists
+/// the origins of lower files of the same name that this one hides. ``trusted`` is
+/// false for a project agent in a folder that is not trusted, which is listed and
+/// never started. ``used`` and ``finished`` count helpers of this type started and
+/// ended in the last 30 days (``helper.ended``). ``finished`` is ``None`` when the
+/// daemon cannot count them.
+// MARK: - AgentElement
+public struct AgentElement: Codable {
+    public let asks: Bool?
+    public let description: String
+    public let errors: [String]?
+    public let finished: Int?
+    public let limits: AgentLimitsClass?
+    public let name: String
+    public let origin: Origin
+    public let shadowed: [Origin]?
+    public let tools: [String]?
+    public let trusted: Bool?
+    public let used: Int?
+    public let wish: String
+
+    public enum CodingKeys: String, CodingKey {
+        case asks = "asks"
+        case description = "description"
+        case errors = "errors"
+        case finished = "finished"
+        case limits = "limits"
+        case name = "name"
+        case origin = "origin"
+        case shadowed = "shadowed"
+        case tools = "tools"
+        case trusted = "trusted"
+        case used = "used"
+        case wish = "wish"
+    }
+
+    public init(asks: Bool?, description: String, errors: [String]?, finished: Int?, limits: AgentLimitsClass?, name: String, origin: Origin, shadowed: [Origin]?, tools: [String]?, trusted: Bool?, used: Int?, wish: String) {
+        self.asks = asks
+        self.description = description
+        self.errors = errors
+        self.finished = finished
+        self.limits = limits
+        self.name = name
+        self.origin = origin
+        self.shadowed = shadowed
+        self.tools = tools
+        self.trusted = trusted
+        self.used = used
+        self.wish = wish
+    }
+}
+
+/// What bounds one helper of this type. ``None`` means the file sets no limit of that kind.
+///
+/// ``max_seconds`` is working time: it does not count the time spent waiting for
+/// you, for a slot or for a provider. ``answer_chars`` cuts the helper's final answer.
+// MARK: - AgentLimitsClass
+public struct AgentLimitsClass: Codable {
+    public let answerChars: Int?
+    public let maxCalls: Int?
+    public let maxCostUsd: Double?
+    public let maxSeconds: Int?
+    public let maxTokens: Int?
+
+    public enum CodingKeys: String, CodingKey {
+        case answerChars = "answer_chars"
+        case maxCalls = "max_calls"
+        case maxCostUsd = "max_cost_usd"
+        case maxSeconds = "max_seconds"
+        case maxTokens = "max_tokens"
+    }
+
+    public init(answerChars: Int?, maxCalls: Int?, maxCostUsd: Double?, maxSeconds: Int?, maxTokens: Int?) {
+        self.answerChars = answerChars
+        self.maxCalls = maxCalls
+        self.maxCostUsd = maxCostUsd
+        self.maxSeconds = maxSeconds
+        self.maxTokens = maxTokens
+    }
+}
+
 /// A tool call waits for the user. The run is paused until ``approval.respond``.
 ///
 /// ``source`` is the rule that asked, such as ``built-in default``.
@@ -2686,7 +3081,7 @@ public enum InspectMessageRole: String, Codable {
 public struct KeychainWaitNotification: Codable {
     public let jsonrpc: Jsonrpc?
     public let method: KeychainWaitNotificationMethod?
-    public let params: ParamsClass
+    public let params: KeychainWaitNotificationParams
 
     public enum CodingKeys: String, CodingKey {
         case jsonrpc = "jsonrpc"
@@ -2694,15 +3089,11 @@ public struct KeychainWaitNotification: Codable {
         case params = "params"
     }
 
-    public init(jsonrpc: Jsonrpc?, method: KeychainWaitNotificationMethod?, params: ParamsClass) {
+    public init(jsonrpc: Jsonrpc?, method: KeychainWaitNotificationMethod?, params: KeychainWaitNotificationParams) {
         self.jsonrpc = jsonrpc
         self.method = method
         self.params = params
     }
-}
-
-public enum Jsonrpc: String, Codable {
-    case the20 = "2.0"
 }
 
 public enum KeychainWaitNotificationMethod: String, Codable {
@@ -2713,8 +3104,8 @@ public enum KeychainWaitNotificationMethod: String, Codable {
 ///
 /// ``waiting`` is true when the read has taken a moment, and false once it
 /// ended. ``provider`` is set for a provider's API key.
-// MARK: - ParamsClass
-public struct ParamsClass: Codable {
+// MARK: - KeychainWaitNotificationParams
+public struct KeychainWaitNotificationParams: Codable {
     public let name: String
     public let provider: String?
     public let waiting: Bool
@@ -3010,7 +3401,7 @@ public struct ListedSkill: Codable {
     public let name: String
     public let path: String
     public let shadowedBy: String?
-    public let source: ListedSkillSource
+    public let source: Origin
     public let usable: Bool
     public let userInvocable: Bool?
     public let warnings: [String]?
@@ -3033,7 +3424,7 @@ public struct ListedSkill: Codable {
         case warnings = "warnings"
     }
 
-    public init(allowedTools: [String]?, argumentHint: String?, description: String, disabled: Bool?, errors: [String]?, indexed: Bool?, model: String?, modelInvocable: Bool?, name: String, path: String, shadowedBy: String?, source: ListedSkillSource, usable: Bool, userInvocable: Bool?, warnings: [String]?) {
+    public init(allowedTools: [String]?, argumentHint: String?, description: String, disabled: Bool?, errors: [String]?, indexed: Bool?, model: String?, modelInvocable: Bool?, name: String, path: String, shadowedBy: String?, source: Origin, usable: Bool, userInvocable: Bool?, warnings: [String]?) {
         self.allowedTools = allowedTools
         self.argumentHint = argumentHint
         self.description = description
@@ -3050,12 +3441,6 @@ public struct ListedSkill: Codable {
         self.userInvocable = userInvocable
         self.warnings = warnings
     }
-}
-
-public enum ListedSkillSource: String, Codable {
-    case bundled = "bundled"
-    case project = "project"
-    case user = "user"
 }
 
 /// A model server on this machine that answers, such as Ollama.
@@ -14398,7 +14783,7 @@ public enum SessionCompletedEventType: String, Codable {
 public struct SessionCreateParams: Codable {
     public let cwd: String?
     public let modelProfile: String?
-    public let origin: Origin?
+    public let origin: OriginEnum?
 
     public enum CodingKeys: String, CodingKey {
         case cwd = "cwd"
@@ -14406,14 +14791,14 @@ public struct SessionCreateParams: Codable {
         case origin = "origin"
     }
 
-    public init(cwd: String?, modelProfile: String?, origin: Origin?) {
+    public init(cwd: String?, modelProfile: String?, origin: OriginEnum?) {
         self.cwd = cwd
         self.modelProfile = modelProfile
         self.origin = origin
     }
 }
 
-public enum Origin: String, Codable {
+public enum OriginEnum: String, Codable {
     case cli = "cli"
     case user = "user"
 }
@@ -16053,7 +16438,7 @@ public struct SkillActivatedData: Codable {
     public let how: How
     public let name: String
     public let path: String
-    public let source: ListedSkillSource
+    public let source: Origin
 
     public enum CodingKeys: String, CodingKey {
         case hash = "hash"
@@ -16063,7 +16448,7 @@ public struct SkillActivatedData: Codable {
         case source = "source"
     }
 
-    public init(hash: String, how: How, name: String, path: String, source: ListedSkillSource) {
+    public init(hash: String, how: How, name: String, path: String, source: Origin) {
         self.hash = hash
         self.how = how
         self.name = name
@@ -16121,7 +16506,7 @@ public struct SkillActivatedEventData: Codable {
     public let how: How
     public let name: String
     public let path: String
-    public let source: ListedSkillSource
+    public let source: Origin
 
     public enum CodingKeys: String, CodingKey {
         case hash = "hash"
@@ -16131,7 +16516,7 @@ public struct SkillActivatedEventData: Codable {
         case source = "source"
     }
 
-    public init(hash: String, how: How, name: String, path: String, source: ListedSkillSource) {
+    public init(hash: String, how: How, name: String, path: String, source: Origin) {
         self.hash = hash
         self.how = how
         self.name = name
@@ -16347,7 +16732,7 @@ public struct SkillElement: Codable {
     public let name: String
     public let path: String
     public let shadowedBy: String?
-    public let source: ListedSkillSource
+    public let source: Origin
     public let usable: Bool
     public let userInvocable: Bool?
     public let warnings: [String]?
@@ -16370,7 +16755,7 @@ public struct SkillElement: Codable {
         case warnings = "warnings"
     }
 
-    public init(allowedTools: [String]?, argumentHint: String?, description: String, disabled: Bool?, errors: [String]?, indexed: Bool?, model: String?, modelInvocable: Bool?, name: String, path: String, shadowedBy: String?, source: ListedSkillSource, usable: Bool, userInvocable: Bool?, warnings: [String]?) {
+    public init(allowedTools: [String]?, argumentHint: String?, description: String, disabled: Bool?, errors: [String]?, indexed: Bool?, model: String?, modelInvocable: Bool?, name: String, path: String, shadowedBy: String?, source: Origin, usable: Bool, userInvocable: Bool?, warnings: [String]?) {
         self.allowedTools = allowedTools
         self.argumentHint = argumentHint
         self.description = description
@@ -16414,7 +16799,7 @@ public struct SkillReadParams: Codable {
 public struct SkillReadResult: Codable {
     public let mtimeNS: Int
     public let path: String
-    public let source: ListedSkillSource
+    public let source: Origin
     public let text: String
 
     public enum CodingKeys: String, CodingKey {
@@ -16424,7 +16809,7 @@ public struct SkillReadResult: Codable {
         case text = "text"
     }
 
-    public init(mtimeNS: Int, path: String, source: ListedSkillSource, text: String) {
+    public init(mtimeNS: Int, path: String, source: Origin, text: String) {
         self.mtimeNS = mtimeNS
         self.path = path
         self.source = source
