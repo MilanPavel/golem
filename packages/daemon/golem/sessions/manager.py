@@ -31,6 +31,10 @@ from golem.graphs.child import child_thread
 from golem.graphs.context_view import ContextView, view
 from golem.graphs.state import SCHEMA_VERSION
 from golem.graphs.step_up import Consent, StepAsk, StepRequest, StepUp
+from golem.memory.privacy import ChatPrivacy
+from golem.memory.project import project_key
+from golem.memory.project_privacy import project_memory_private
+from golem.memory.service import MemoryAccess, MemoryService
 from golem.models import options as model_options
 from golem.models.budget import Budget, Room, spent_text
 from golem.models.cost import cost_usd
@@ -293,6 +297,8 @@ class _NoLocalFit(Exception):
 class _LiveRun:
     task: asyncio.Task[None]
     control: RunControl
+    memory: MemoryAccess | None = None
+    """What the run may use of long-term memory. None when memory is off."""
 
 
 class SessionManager:
@@ -318,6 +324,10 @@ class SessionManager:
         self._titles = titles
         events.local_only = self.local_only
         runtime.next_model = self._next_model
+        self.memory: MemoryService | None = None
+        """Long-term memory. None: a run carries no memory access."""
+        self.golem_home: Path | None = None
+        """golem's own folder, which is never a project marker for memory."""
         self.facts: FactsSource | None = None
         """Where a routed turn reads the facts of the models. None: it has none."""
         self.budget: Budget | None = None
@@ -1059,7 +1069,13 @@ class SessionManager:
                 await ask_consent(self._runtime, self._events, turn, routed.ask)
                 return turn.run_id
             control = RunControl()
-            await self._start(session, turn.run_id, control, self._turn(session, turn, control))
+            await self._start(
+                session,
+                turn.run_id,
+                control,
+                self._turn(session, turn, control),
+                self._memory_access(session, routed.profile, text),
+            )
             return turn.run_id
 
     def _turn_of(
@@ -1206,7 +1222,13 @@ class SessionManager:
             if answer == "once" and room is not None and room.spent and self.budget is not None:
                 self.budget.exempt(session_id)
             control = RunControl()
-            await self._start(session, run_id, control, self._turn(session, turn, control))
+            await self._start(
+                session,
+                run_id,
+                control,
+                self._turn(session, turn, control),
+                self._memory_access(session, routed.profile, pending.text),
+            )
             return run_id
 
     async def _fail_waiting(self, session_id: str, run_id: str, failed: RunFailedData) -> None:
@@ -1889,16 +1911,35 @@ class SessionManager:
         except (OSError, ValueError) as exc:
             raise RuleWriteError(str(exc)) from exc
 
+    def _memory_access(self, session: _LiveSession, profile: str, text: str) -> MemoryAccess | None:
+        """What a run carries of memory, built once as it starts. None when memory is off."""
+        if self.memory is None or not self.memory.enabled:
+            return None
+        tier = None if self._runtime.tier_of is None else self._runtime.tier_of(profile)
+        chat = ChatPrivacy(
+            local_only=self.local_only(session.cwd),
+            route=session.route,
+            model_local=tier == "local",
+        )
+        return MemoryAccess(
+            self.memory,
+            project_key(session.cwd, self.golem_home),
+            chat,
+            text,
+            project_private=project_memory_private(session.cwd),
+        )
+
     async def _start(
         self,
         session: _LiveSession,
         run_id: str,
         control: RunControl,
         work: Coroutine[None, None, None],
+        memory: MemoryAccess | None = None,
     ) -> None:
         task = asyncio.create_task(work, name=f"golem-run-{run_id}")
         session.task = task
-        self._runs[run_id] = _LiveRun(task=task, control=control)
+        self._runs[run_id] = _LiveRun(task=task, control=control, memory=memory)
         task.add_done_callback(lambda done: self._finished(run_id, done))
         await control.started.wait()
 

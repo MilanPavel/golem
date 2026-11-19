@@ -15,6 +15,7 @@ import queue
 import re
 import signal
 import socket
+import sqlite3
 import subprocess
 import sys
 import tempfile
@@ -23,6 +24,7 @@ import time
 import urllib.error
 import urllib.request
 from collections.abc import Callable
+from contextlib import closing
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import cast
@@ -100,6 +102,9 @@ def main() -> int:
             fastest = min(times)
             print(f"no start was under {START_LIMIT_S:g}s (fastest {fastest:.3f}s)", file=sys.stderr)
             return 1
+        if not check_memory_db(home):
+            return 1
+
         # `golem web --json` exits 1 with no daemon, so the page is checked with one running.
         def web() -> bool:
             return (
@@ -115,6 +120,27 @@ def main() -> int:
     finally:
         server.shutdown()
     return 0
+
+
+def check_memory_db(home: Path) -> bool:
+    """The daemon made ``memory.db`` with its FTS5 search table.
+
+    Without the table the packaged Python has no FTS5 and memory search falls back to LIKE,
+    which a release should not do by accident.
+    """
+    path = home / "memory.db"
+    if not path.is_file():
+        print(f"the daemon did not make {path}", file=sys.stderr)
+        return False
+    with closing(sqlite3.connect(path)) as raw:
+        found = raw.execute(
+            "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'memory_fts'"
+        ).fetchone()
+    if found is None:
+        print("memory.db has no memory_fts table: this Python has no FTS5", file=sys.stderr)
+        return False
+    print("memory.db ok: FTS5 search table present")
+    return True
 
 
 def http_get(url: str) -> tuple[int, dict[str, str], bytes]:
