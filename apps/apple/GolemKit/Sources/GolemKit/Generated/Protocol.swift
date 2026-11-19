@@ -3115,6 +3115,540 @@ public struct HelloResult: Codable {
     }
 }
 
+/// A helper's run ended.
+///
+/// ``stopped`` says why. ``model_calls`` and ``tokens`` count what the helper used, and
+/// ``answer_tokens`` is the size of its answer. ``cost_usd`` is what it cost (0 on a local
+/// model), because the lead's footer sums its own log. ``duration_ms`` is the whole time
+/// since it started and ``working_ms`` is the part that was not spent waiting for you, a
+/// slot or a provider.
+// MARK: - HelperEndedData
+public struct HelperEndedData: Codable {
+    public let answerTokens: Int
+    public let callID: String
+    public let costUsd: Double
+    public let durationMS: Int
+    public let index: Int
+    public let modelCalls: Int
+    public let stopped: Stopped
+    public let tokens: Int
+    public let workingMS: Int
+
+    public enum CodingKeys: String, CodingKey {
+        case answerTokens = "answer_tokens"
+        case callID = "call_id"
+        case costUsd = "cost_usd"
+        case durationMS = "duration_ms"
+        case index = "index"
+        case modelCalls = "model_calls"
+        case stopped = "stopped"
+        case tokens = "tokens"
+        case workingMS = "working_ms"
+    }
+
+    public init(answerTokens: Int, callID: String, costUsd: Double, durationMS: Int, index: Int, modelCalls: Int, stopped: Stopped, tokens: Int, workingMS: Int) {
+        self.answerTokens = answerTokens
+        self.callID = callID
+        self.costUsd = costUsd
+        self.durationMS = durationMS
+        self.index = index
+        self.modelCalls = modelCalls
+        self.stopped = stopped
+        self.tokens = tokens
+        self.workingMS = workingMS
+    }
+}
+
+public enum Stopped: String, Codable {
+    case budget = "budget"
+    case calls = "calls"
+    case cancelled = "cancelled"
+    case done = "done"
+    case failed = "failed"
+    case time = "time"
+    case tokens = "tokens"
+}
+
+/// A helper's run ended.
+// MARK: - HelperEndedEvent
+public struct HelperEndedEvent: Codable {
+    public let data: HelperEndedEventData
+    public let runID: String?
+    public let seq: Int
+    public let sessionID: String
+    public let ts: String
+    public let type: HelperEndedEventType
+
+    public enum CodingKeys: String, CodingKey {
+        case data = "data"
+        case runID = "run_id"
+        case seq = "seq"
+        case sessionID = "session_id"
+        case ts = "ts"
+        case type = "type"
+    }
+
+    public init(data: HelperEndedEventData, runID: String?, seq: Int, sessionID: String, ts: String, type: HelperEndedEventType) {
+        self.data = data
+        self.runID = runID
+        self.seq = seq
+        self.sessionID = sessionID
+        self.ts = ts
+        self.type = type
+    }
+}
+
+/// A helper's run ended.
+///
+/// ``stopped`` says why. ``model_calls`` and ``tokens`` count what the helper used, and
+/// ``answer_tokens`` is the size of its answer. ``cost_usd`` is what it cost (0 on a local
+/// model), because the lead's footer sums its own log. ``duration_ms`` is the whole time
+/// since it started and ``working_ms`` is the part that was not spent waiting for you, a
+/// slot or a provider.
+// MARK: - HelperEndedEventData
+public struct HelperEndedEventData: Codable {
+    public let answerTokens: Int
+    public let callID: String
+    public let costUsd: Double
+    public let durationMS: Int
+    public let index: Int
+    public let modelCalls: Int
+    public let stopped: Stopped
+    public let tokens: Int
+    public let workingMS: Int
+
+    public enum CodingKeys: String, CodingKey {
+        case answerTokens = "answer_tokens"
+        case callID = "call_id"
+        case costUsd = "cost_usd"
+        case durationMS = "duration_ms"
+        case index = "index"
+        case modelCalls = "model_calls"
+        case stopped = "stopped"
+        case tokens = "tokens"
+        case workingMS = "working_ms"
+    }
+
+    public init(answerTokens: Int, callID: String, costUsd: Double, durationMS: Int, index: Int, modelCalls: Int, stopped: Stopped, tokens: Int, workingMS: Int) {
+        self.answerTokens = answerTokens
+        self.callID = callID
+        self.costUsd = costUsd
+        self.durationMS = durationMS
+        self.index = index
+        self.modelCalls = modelCalls
+        self.stopped = stopped
+        self.tokens = tokens
+        self.workingMS = workingMS
+    }
+}
+
+public enum HelperEndedEventType: String, Codable {
+    case helperEnded = "helper.ended"
+}
+
+/// A helper session was made for one ``delegate`` call.
+///
+/// This is on the lead's log, with the ``delegate`` call's id as ``call_id``. ``index``
+/// is the helper's place in that call, and ``helper_id`` is its own session id.
+/// ``agent`` is the agent type and ``label`` the short name the card shows. ``model`` is
+/// the model it was given. ``wish`` is what the agent file asked for (``cheapest``,
+/// ``same``, ``stronger``, a tier or a model) and ``pick_reason`` says in plain words
+/// why that model came out of it.
+// MARK: - HelperStartedData
+public struct HelperStartedData: Codable {
+    public let agent: String
+    public let callID: String
+    public let helperID: String
+    public let index: Int
+    public let label: String
+    public let model: String
+    public let pickReason: String
+    public let wish: String
+
+    public enum CodingKeys: String, CodingKey {
+        case agent = "agent"
+        case callID = "call_id"
+        case helperID = "helper_id"
+        case index = "index"
+        case label = "label"
+        case model = "model"
+        case pickReason = "pick_reason"
+        case wish = "wish"
+    }
+
+    public init(agent: String, callID: String, helperID: String, index: Int, label: String, model: String, pickReason: String, wish: String) {
+        self.agent = agent
+        self.callID = callID
+        self.helperID = helperID
+        self.index = index
+        self.label = label
+        self.model = model
+        self.pickReason = pickReason
+        self.wish = wish
+    }
+}
+
+/// A helper session was made. A summary on the lead's log; the helper's own log has the rest.
+// MARK: - HelperStartedEvent
+public struct HelperStartedEvent: Codable {
+    public let data: HelperStartedEventData
+    public let runID: String?
+    public let seq: Int
+    public let sessionID: String
+    public let ts: String
+    public let type: HelperStartedEventType
+
+    public enum CodingKeys: String, CodingKey {
+        case data = "data"
+        case runID = "run_id"
+        case seq = "seq"
+        case sessionID = "session_id"
+        case ts = "ts"
+        case type = "type"
+    }
+
+    public init(data: HelperStartedEventData, runID: String?, seq: Int, sessionID: String, ts: String, type: HelperStartedEventType) {
+        self.data = data
+        self.runID = runID
+        self.seq = seq
+        self.sessionID = sessionID
+        self.ts = ts
+        self.type = type
+    }
+}
+
+/// A helper session was made for one ``delegate`` call.
+///
+/// This is on the lead's log, with the ``delegate`` call's id as ``call_id``. ``index``
+/// is the helper's place in that call, and ``helper_id`` is its own session id.
+/// ``agent`` is the agent type and ``label`` the short name the card shows. ``model`` is
+/// the model it was given. ``wish`` is what the agent file asked for (``cheapest``,
+/// ``same``, ``stronger``, a tier or a model) and ``pick_reason`` says in plain words
+/// why that model came out of it.
+// MARK: - HelperStartedEventData
+public struct HelperStartedEventData: Codable {
+    public let agent: String
+    public let callID: String
+    public let helperID: String
+    public let index: Int
+    public let label: String
+    public let model: String
+    public let pickReason: String
+    public let wish: String
+
+    public enum CodingKeys: String, CodingKey {
+        case agent = "agent"
+        case callID = "call_id"
+        case helperID = "helper_id"
+        case index = "index"
+        case label = "label"
+        case model = "model"
+        case pickReason = "pick_reason"
+        case wish = "wish"
+    }
+
+    public init(agent: String, callID: String, helperID: String, index: Int, label: String, model: String, pickReason: String, wish: String) {
+        self.agent = agent
+        self.callID = callID
+        self.helperID = helperID
+        self.index = index
+        self.label = label
+        self.model = model
+        self.pickReason = pickReason
+        self.wish = wish
+    }
+}
+
+public enum HelperStartedEventType: String, Codable {
+    case helperStarted = "helper.started"
+}
+
+/// A helper queued, started running, started waiting, or went on.
+///
+/// ``reason`` says why it waits or queues. It is a plain string, not a fixed list: the
+/// words today are ``you`` and ``team``, and later phases add more, so a new word is not
+/// a protocol change. It is None when the helper runs with nothing to explain.
+// MARK: - HelperStateData
+public struct HelperStateData: Codable {
+    public let callID: String
+    public let index: Int
+    public let reason: String?
+    public let state: HelperStateDataState
+
+    public enum CodingKeys: String, CodingKey {
+        case callID = "call_id"
+        case index = "index"
+        case reason = "reason"
+        case state = "state"
+    }
+
+    public init(callID: String, index: Int, reason: String?, state: HelperStateDataState) {
+        self.callID = callID
+        self.index = index
+        self.reason = reason
+        self.state = state
+    }
+}
+
+public enum HelperStateDataState: String, Codable {
+    case queued = "queued"
+    case running = "running"
+    case waiting = "waiting"
+}
+
+/// A helper queued, started running, started waiting, or went on.
+// MARK: - HelperStateEvent
+public struct HelperStateEvent: Codable {
+    public let data: HelperStateEventData
+    public let runID: String?
+    public let seq: Int
+    public let sessionID: String
+    public let ts: String
+    public let type: HelperStateEventType
+
+    public enum CodingKeys: String, CodingKey {
+        case data = "data"
+        case runID = "run_id"
+        case seq = "seq"
+        case sessionID = "session_id"
+        case ts = "ts"
+        case type = "type"
+    }
+
+    public init(data: HelperStateEventData, runID: String?, seq: Int, sessionID: String, ts: String, type: HelperStateEventType) {
+        self.data = data
+        self.runID = runID
+        self.seq = seq
+        self.sessionID = sessionID
+        self.ts = ts
+        self.type = type
+    }
+}
+
+/// A helper queued, started running, started waiting, or went on.
+///
+/// ``reason`` says why it waits or queues. It is a plain string, not a fixed list: the
+/// words today are ``you`` and ``team``, and later phases add more, so a new word is not
+/// a protocol change. It is None when the helper runs with nothing to explain.
+// MARK: - HelperStateEventData
+public struct HelperStateEventData: Codable {
+    public let callID: String
+    public let index: Int
+    public let reason: String?
+    public let state: HelperStateDataState
+
+    public enum CodingKeys: String, CodingKey {
+        case callID = "call_id"
+        case index = "index"
+        case reason = "reason"
+        case state = "state"
+    }
+
+    public init(callID: String, index: Int, reason: String?, state: HelperStateDataState) {
+        self.callID = callID
+        self.index = index
+        self.reason = reason
+        self.state = state
+    }
+}
+
+public enum HelperStateEventType: String, Codable {
+    case helperState = "helper.state"
+}
+
+/// A tool call of a helper started or ended.
+///
+/// Thin on purpose: the card shows what ran, and the helper's own log has the detail.
+/// ``args`` holds only the path, pattern, query or ref of the call. ``step_id`` is the
+/// helper's own tool call id. ``calls`` is how many tool calls the helper has made so far.
+// MARK: - HelperStepData
+public struct HelperStepData: Codable {
+    public let args: [String: JSONAny]?
+    public let callID: String
+    public let calls: Int
+    public let index: Int
+    public let name: String
+    public let status: HelperStepDataStatus
+    public let stepID: String
+
+    public enum CodingKeys: String, CodingKey {
+        case args = "args"
+        case callID = "call_id"
+        case calls = "calls"
+        case index = "index"
+        case name = "name"
+        case status = "status"
+        case stepID = "step_id"
+    }
+
+    public init(args: [String: JSONAny]?, callID: String, calls: Int, index: Int, name: String, status: HelperStepDataStatus, stepID: String) {
+        self.args = args
+        self.callID = callID
+        self.calls = calls
+        self.index = index
+        self.name = name
+        self.status = status
+        self.stepID = stepID
+    }
+}
+
+public enum HelperStepDataStatus: String, Codable {
+    case done = "done"
+    case failed = "failed"
+    case running = "running"
+}
+
+/// A tool call of a helper started or ended.
+// MARK: - HelperStepEvent
+public struct HelperStepEvent: Codable {
+    public let data: HelperStepEventData
+    public let runID: String?
+    public let seq: Int
+    public let sessionID: String
+    public let ts: String
+    public let type: HelperStepEventType
+
+    public enum CodingKeys: String, CodingKey {
+        case data = "data"
+        case runID = "run_id"
+        case seq = "seq"
+        case sessionID = "session_id"
+        case ts = "ts"
+        case type = "type"
+    }
+
+    public init(data: HelperStepEventData, runID: String?, seq: Int, sessionID: String, ts: String, type: HelperStepEventType) {
+        self.data = data
+        self.runID = runID
+        self.seq = seq
+        self.sessionID = sessionID
+        self.ts = ts
+        self.type = type
+    }
+}
+
+/// A tool call of a helper started or ended.
+///
+/// Thin on purpose: the card shows what ran, and the helper's own log has the detail.
+/// ``args`` holds only the path, pattern, query or ref of the call. ``step_id`` is the
+/// helper's own tool call id. ``calls`` is how many tool calls the helper has made so far.
+// MARK: - HelperStepEventData
+public struct HelperStepEventData: Codable {
+    public let args: [String: JSONAny]?
+    public let callID: String
+    public let calls: Int
+    public let index: Int
+    public let name: String
+    public let status: HelperStepDataStatus
+    public let stepID: String
+
+    public enum CodingKeys: String, CodingKey {
+        case args = "args"
+        case callID = "call_id"
+        case calls = "calls"
+        case index = "index"
+        case name = "name"
+        case status = "status"
+        case stepID = "step_id"
+    }
+
+    public init(args: [String: JSONAny]?, callID: String, calls: Int, index: Int, name: String, status: HelperStepDataStatus, stepID: String) {
+        self.args = args
+        self.callID = callID
+        self.calls = calls
+        self.index = index
+        self.name = name
+        self.status = status
+        self.stepID = stepID
+    }
+}
+
+public enum HelperStepEventType: String, Codable {
+    case helperStep = "helper.step"
+}
+
+/// The lead parked to wait for its helpers, or went on.
+///
+/// ``helper_ids`` are the helpers of this ``delegate`` call that it waits for.
+// MARK: - HelperWaitData
+public struct HelperWaitData: Codable {
+    public let callID: String
+    public let helperIDS: [String]?
+    public let state: HelperWaitDataState
+
+    public enum CodingKeys: String, CodingKey {
+        case callID = "call_id"
+        case helperIDS = "helper_ids"
+        case state = "state"
+    }
+
+    public init(callID: String, helperIDS: [String]?, state: HelperWaitDataState) {
+        self.callID = callID
+        self.helperIDS = helperIDS
+        self.state = state
+    }
+}
+
+public enum HelperWaitDataState: String, Codable {
+    case parked = "parked"
+    case resumed = "resumed"
+}
+
+/// The lead parked to wait for its helpers, or went on.
+// MARK: - HelperWaitEvent
+public struct HelperWaitEvent: Codable {
+    public let data: HelperWaitEventData
+    public let runID: String?
+    public let seq: Int
+    public let sessionID: String
+    public let ts: String
+    public let type: HelperWaitEventType
+
+    public enum CodingKeys: String, CodingKey {
+        case data = "data"
+        case runID = "run_id"
+        case seq = "seq"
+        case sessionID = "session_id"
+        case ts = "ts"
+        case type = "type"
+    }
+
+    public init(data: HelperWaitEventData, runID: String?, seq: Int, sessionID: String, ts: String, type: HelperWaitEventType) {
+        self.data = data
+        self.runID = runID
+        self.seq = seq
+        self.sessionID = sessionID
+        self.ts = ts
+        self.type = type
+    }
+}
+
+/// The lead parked to wait for its helpers, or went on.
+///
+/// ``helper_ids`` are the helpers of this ``delegate`` call that it waits for.
+// MARK: - HelperWaitEventData
+public struct HelperWaitEventData: Codable {
+    public let callID: String
+    public let helperIDS: [String]?
+    public let state: HelperWaitDataState
+
+    public enum CodingKeys: String, CodingKey {
+        case callID = "call_id"
+        case helperIDS = "helper_ids"
+        case state = "state"
+    }
+
+    public init(callID: String, helperIDS: [String]?, state: HelperWaitDataState) {
+        self.callID = callID
+        self.helperIDS = helperIDS
+        self.state = state
+    }
+}
+
+public enum HelperWaitEventType: String, Codable {
+    case helperWait = "helper.wait"
+}
+
 /// One checkpoint message as plain text.
 // MARK: - InspectMessage
 public struct InspectMessage: Codable {
@@ -6792,9 +7326,11 @@ public enum MessageThinkingDeltaEventType: String, Codable {
 /// the model, reading the prompt and writing the reply. From the model server's own clock.
 /// Ollama only.
 ///
-/// ``parent_call_id`` is set on an event of a child run: the id of the ``delegate`` call
-/// that started it. The event is in the parent's run, and a client that does not know
-/// child runs ignores it. None for the run's own events.
+/// ``parent_call_id`` is legacy. Old logs set it on an event of a child run: the id of
+/// the ``delegate`` call that started it. The event is in the parent's run, and a client
+/// that does not know child runs ignores it. None for the run's own events. A new helper
+/// writes none, because it has its own session and ``helper.*`` events. The field stays,
+/// since removing it would break old logs.
 // MARK: - ModelCallCompletedData
 public struct ModelCallCompletedData: Codable {
     public let contextWindow: Int?
@@ -6945,9 +7481,11 @@ public struct ModelCallCompletedEvent: Codable {
 /// the model, reading the prompt and writing the reply. From the model server's own clock.
 /// Ollama only.
 ///
-/// ``parent_call_id`` is set on an event of a child run: the id of the ``delegate`` call
-/// that started it. The event is in the parent's run, and a client that does not know
-/// child runs ignores it. None for the run's own events.
+/// ``parent_call_id`` is legacy. Old logs set it on an event of a child run: the id of
+/// the ``delegate`` call that started it. The event is in the parent's run, and a client
+/// that does not know child runs ignores it. None for the run's own events. A new helper
+/// writes none, because it has its own session and ``helper.*`` events. The field stays,
+/// since removing it would break old logs.
 // MARK: - ModelCallCompletedEventData
 public struct ModelCallCompletedEventData: Codable {
     public let contextWindow: Int?
@@ -7074,9 +7612,11 @@ public enum ModelCallCompletedEventType: String, Codable {
 /// and ``message_bytes`` have one number per message sent. Each is None on an
 /// event recorded before they existed.
 ///
-/// ``parent_call_id`` is set on an event of a child run: the id of the ``delegate`` call
-/// that started it. The event is in the parent's run, and a client that does not know
-/// child runs ignores it. None for the run's own events.
+/// ``parent_call_id`` is legacy. Old logs set it on an event of a child run: the id of
+/// the ``delegate`` call that started it. The event is in the parent's run, and a client
+/// that does not know child runs ignores it. None for the run's own events. A new helper
+/// writes none, because it has its own session and ``helper.*`` events. The field stays,
+/// since removing it would break old logs.
 // MARK: - ModelCallStartedData
 public struct ModelCallStartedData: Codable {
     public let clearedIDS: [String]?
@@ -7237,9 +7777,11 @@ public struct ModelCallStartedEvent: Codable {
 /// and ``message_bytes`` have one number per message sent. Each is None on an
 /// event recorded before they existed.
 ///
-/// ``parent_call_id`` is set on an event of a child run: the id of the ``delegate`` call
-/// that started it. The event is in the parent's run, and a client that does not know
-/// child runs ignores it. None for the run's own events.
+/// ``parent_call_id`` is legacy. Old logs set it on an event of a child run: the id of
+/// the ``delegate`` call that started it. The event is in the parent's run, and a client
+/// that does not know child runs ignores it. None for the run's own events. A new helper
+/// writes none, because it has its own session and ``helper.*`` events. The field stays,
+/// since removing it would break old logs.
 // MARK: - ModelCallStartedEventData
 public struct ModelCallStartedEventData: Codable {
     public let clearedIDS: [String]?
@@ -12731,6 +13273,17 @@ public enum RPCNotificationMethod: String, Codable {
 /// A check is running.
 ///
 /// A check ended.
+///
+/// A helper session was made. A summary on the lead's log; the helper's own log has the
+/// rest.
+///
+/// A tool call of a helper started or ended.
+///
+/// A helper queued, started running, started waiting, or went on.
+///
+/// The lead parked to wait for its helpers, or went on.
+///
+/// A helper's run ended.
 // MARK: - Params
 public struct Params: Codable {
     public let data: ParamsData
@@ -12876,9 +13429,11 @@ public struct Params: Codable {
 /// and ``message_bytes`` have one number per message sent. Each is None on an
 /// event recorded before they existed.
 ///
-/// ``parent_call_id`` is set on an event of a child run: the id of the ``delegate`` call
-/// that started it. The event is in the parent's run, and a client that does not know
-/// child runs ignores it. None for the run's own events.
+/// ``parent_call_id`` is legacy. Old logs set it on an event of a child run: the id of
+/// the ``delegate`` call that started it. The event is in the parent's run, and a client
+/// that does not know child runs ignores it. None for the run's own events. A new helper
+/// writes none, because it has its own session and ``helper.*`` events. The field stays,
+/// since removing it would break old logs.
 ///
 /// A model call ended.
 ///
@@ -12901,9 +13456,11 @@ public struct Params: Codable {
 /// the model, reading the prompt and writing the reply. From the model server's own clock.
 /// Ollama only.
 ///
-/// ``parent_call_id`` is set on an event of a child run: the id of the ``delegate`` call
-/// that started it. The event is in the parent's run, and a client that does not know
-/// child runs ignores it. None for the run's own events.
+/// ``parent_call_id`` is legacy. Old logs set it on an event of a child run: the id of
+/// the ``delegate`` call that started it. The event is in the parent's run, and a client
+/// that does not know child runs ignores it. None for the run's own events. A new helper
+/// writes none, because it has its own session and ``helper.*`` events. The field stays,
+/// since removing it would break old logs.
 ///
 /// What golem sends of the history changed before a model call.
 ///
@@ -12936,9 +13493,11 @@ public struct Params: Codable {
 /// ``message_id`` is the assistant message that asked. ``args`` are the
 /// arguments as the model wrote them.
 ///
-/// ``parent_call_id`` is set on an event of a child run: the id of the ``delegate`` call
-/// that started it. The event is in the parent's run, and a client that does not know
-/// child runs ignores it. None for the run's own events.
+/// ``parent_call_id`` is legacy. Old logs set it on an event of a child run: the id of
+/// the ``delegate`` call that started it. The event is in the parent's run, and a client
+/// that does not know child runs ignores it. None for the run's own events. A new helper
+/// writes none, because it has its own session and ``helper.*`` events. The field stays,
+/// since removing it would break old logs.
 ///
 /// How far the model got writing a ``write_file`` or ``edit_file`` call.
 ///
@@ -12954,9 +13513,11 @@ public struct Params: Codable {
 ///
 /// A requested tool call is running.
 ///
-/// ``parent_call_id`` is set on an event of a child run: the id of the ``delegate`` call
-/// that started it. The event is in the parent's run, and a client that does not know
-/// child runs ignores it. None for the run's own events.
+/// ``parent_call_id`` is legacy. Old logs set it on an event of a child run: the id of
+/// the ``delegate`` call that started it. The event is in the parent's run, and a client
+/// that does not know child runs ignores it. None for the run's own events. A new helper
+/// writes none, because it has its own session and ``helper.*`` events. The field stays,
+/// since removing it would break old logs.
 ///
 /// Text a running tool call printed. Stored only until the call ends.
 ///
@@ -12979,18 +13540,22 @@ public struct Params: Codable {
 /// ``sources`` are the web pages a ``web_search`` or ``web_fetch`` call found or read, for
 /// the screen's source chips. None for any other call. The model does not get them.
 ///
-/// ``parent_call_id`` is set on an event of a child run: the id of the ``delegate`` call
-/// that started it. The event is in the parent's run, and a client that does not know
-/// child runs ignores it. None for the run's own events.
+/// ``parent_call_id`` is legacy. Old logs set it on an event of a child run: the id of
+/// the ``delegate`` call that started it. The event is in the parent's run, and a client
+/// that does not know child runs ignores it. None for the run's own events. A new helper
+/// writes none, because it has its own session and ``helper.*`` events. The field stays,
+/// since removing it would break old logs.
 ///
 /// A tool call did not run, or stopped with an error. The model sees the same message.
 ///
 /// ``duration_ms`` is how long the tool ran before it raised. None means a
 /// call that was denied or cut off, which never ran or was not timed.
 ///
-/// ``parent_call_id`` is set on an event of a child run: the id of the ``delegate`` call
-/// that started it. The event is in the parent's run, and a client that does not know
-/// child runs ignores it. None for the run's own events.
+/// ``parent_call_id`` is legacy. Old logs set it on an event of a child run: the id of
+/// the ``delegate`` call that started it. The event is in the parent's run, and a client
+/// that does not know child runs ignores it. None for the run's own events. A new helper
+/// writes none, because it has its own session and ``helper.*`` events. The field stays,
+/// since removing it would break old logs.
 ///
 /// A tool call waits for the user. The run is paused until ``approval.respond``.
 ///
@@ -13067,9 +13632,42 @@ public struct Params: Codable {
 ///
 /// ``output`` is the last 4,000 characters. When there was more, the whole
 /// output is in the artifact ``artifact_id``.
+///
+/// A helper session was made for one ``delegate`` call.
+///
+/// This is on the lead's log, with the ``delegate`` call's id as ``call_id``. ``index``
+/// is the helper's place in that call, and ``helper_id`` is its own session id.
+/// ``agent`` is the agent type and ``label`` the short name the card shows. ``model`` is
+/// the model it was given. ``wish`` is what the agent file asked for (``cheapest``,
+/// ``same``, ``stronger``, a tier or a model) and ``pick_reason`` says in plain words
+/// why that model came out of it.
+///
+/// A tool call of a helper started or ended.
+///
+/// Thin on purpose: the card shows what ran, and the helper's own log has the detail.
+/// ``args`` holds only the path, pattern, query or ref of the call. ``step_id`` is the
+/// helper's own tool call id. ``calls`` is how many tool calls the helper has made so far.
+///
+/// A helper queued, started running, started waiting, or went on.
+///
+/// ``reason`` says why it waits or queues. It is a plain string, not a fixed list: the
+/// words today are ``you`` and ``team``, and later phases add more, so a new word is not
+/// a protocol change. It is None when the helper runs with nothing to explain.
+///
+/// The lead parked to wait for its helpers, or went on.
+///
+/// ``helper_ids`` are the helpers of this ``delegate`` call that it waits for.
+///
+/// A helper's run ended.
+///
+/// ``stopped`` says why. ``model_calls`` and ``tokens`` count what the helper used, and
+/// ``answer_tokens`` is the size of its answer. ``cost_usd`` is what it cost (0 on a local
+/// model), because the lead's footer sums its own log. ``duration_ms`` is the whole time
+/// since it started and ``working_ms`` is the part that was not spent waiting for you, a
+/// slot or a provider.
 // MARK: - ParamsData
 public struct ParamsData: Codable {
-    public let agent: PurpleAgentSnapshot?
+    public let agent: Agent?
     public let cwd: String?
     public let forkedFrom: PurpleForkedFrom?
     public let modelName: String?
@@ -13085,7 +13683,7 @@ public struct ParamsData: Codable {
     public let runID: String?
     public let status: PurpleStatus?
     public let summary: String?
-    public let reason: PurpleReason?
+    public let reason: String?
     public let detail: String?
     public let model: String?
     public let provider: String?
@@ -13183,6 +13781,19 @@ public struct ParamsData: Codable {
     public let round: Int?
     public let exitCode: Int?
     public let output: String?
+    public let helperID: String?
+    public let label: String?
+    public let pickReason: String?
+    public let wish: String?
+    public let calls: Int?
+    public let stepID: String?
+    public let state: PurpleState?
+    public let helperIDS: [String]?
+    public let answerTokens: Int?
+    public let modelCalls: Int?
+    public let stopped: Stopped?
+    public let tokens: Int?
+    public let workingMS: Int?
 
     public enum CodingKeys: String, CodingKey {
         case agent = "agent"
@@ -13299,9 +13910,22 @@ public struct ParamsData: Codable {
         case round = "round"
         case exitCode = "exit_code"
         case output = "output"
+        case helperID = "helper_id"
+        case label = "label"
+        case pickReason = "pick_reason"
+        case wish = "wish"
+        case calls = "calls"
+        case stepID = "step_id"
+        case state = "state"
+        case helperIDS = "helper_ids"
+        case answerTokens = "answer_tokens"
+        case modelCalls = "model_calls"
+        case stopped = "stopped"
+        case tokens = "tokens"
+        case workingMS = "working_ms"
     }
 
-    public init(agent: PurpleAgentSnapshot?, cwd: String?, forkedFrom: PurpleForkedFrom?, modelName: String?, modelProfile: String?, modelProvider: String?, origin: String?, parent: PurpleSessionParent?, route: RouteEnum?, allowedTools: [PurpleSessionAllowance]?, mcpServers: [String]?, paidOk: Bool?, title: String?, runID: String?, status: PurpleStatus?, summary: String?, reason: PurpleReason?, detail: String?, model: String?, provider: String?, rejected: [FluffyModelRejection]?, replacesModel: String?, tier: Tier?, options: [String: Option]?, mode: DefaultPermissionModeEnum?, on: Bool?, messageID: String?, role: MessageCompletedDataRole?, text: String?, interrupted: Bool?, skill: FluffySkillCall?, thinking: String?, thinkingMS: Int?, clearedIDS: [String]?, contextWindow: Int?, estimatedTokens: Int?, index: Int?, messageBytes: [Int]?, messageChars: [Int]?, messageIDS: [String]?, numCtx: Int?, parentCallID: String?, profile: String?, summaryChars: Int?, systemBytes: Int?, systemChars: Int?, systemPromptSHA: String?, systemSections: [TentacledPromptSectionInfo]?, toolsBytes: Int?, toolsChars: Int?, toolsSHA: String?, windowEstimated: Bool?, windowPlanned: Bool?, costUsd: Double?, failed: Bool?, firstTokenMS: Int?, latencyMS: Int?, loadMS: Int?, price: FluffyCallPrice?, promptMS: Int?, replyMS: Int?, stopReason: String?, textToolCalls: TextToolCalls?, usage: FluffyTokenUsage?, action: ContextChangedDataAction?, afterTokens: Int?, beforeTokens: Int?, count: Int?, reloadMS: Int?, room: Int?, windowFrom: Int?, windowTo: Int?, code: Code?, hint: String?, message: String?, args: [String: JSONAny]?, callID: String?, name: String?, chars: Int?, lines: Int?, path: String?, waiting: Bool?, window: Int?, artifactID: String?, diff: String?, durationMS: Int?, preview: String?, sources: [PurpleToolSource]?, truncated: Bool?, source: String?, subject: String?, decision: Decision?, rule: String?, alternatives: [Answer]?, caps: FluffyConsentCaps?, estimatedUsd: Double?, signal: String?, why: String?, answer: Answer?, todos: [PurpleTodo]?, planID: String?, steps: [FluffyPlanStep]?, added: Int?, changeID: String?, removed: Int?, reverts: String?, hash: String?, how: How?, checks: [FluffyCheckInfo]?, checkID: String?, command: String?, round: Int?, exitCode: Int?, output: String?) {
+    public init(agent: Agent?, cwd: String?, forkedFrom: PurpleForkedFrom?, modelName: String?, modelProfile: String?, modelProvider: String?, origin: String?, parent: PurpleSessionParent?, route: RouteEnum?, allowedTools: [PurpleSessionAllowance]?, mcpServers: [String]?, paidOk: Bool?, title: String?, runID: String?, status: PurpleStatus?, summary: String?, reason: String?, detail: String?, model: String?, provider: String?, rejected: [FluffyModelRejection]?, replacesModel: String?, tier: Tier?, options: [String: Option]?, mode: DefaultPermissionModeEnum?, on: Bool?, messageID: String?, role: MessageCompletedDataRole?, text: String?, interrupted: Bool?, skill: FluffySkillCall?, thinking: String?, thinkingMS: Int?, clearedIDS: [String]?, contextWindow: Int?, estimatedTokens: Int?, index: Int?, messageBytes: [Int]?, messageChars: [Int]?, messageIDS: [String]?, numCtx: Int?, parentCallID: String?, profile: String?, summaryChars: Int?, systemBytes: Int?, systemChars: Int?, systemPromptSHA: String?, systemSections: [TentacledPromptSectionInfo]?, toolsBytes: Int?, toolsChars: Int?, toolsSHA: String?, windowEstimated: Bool?, windowPlanned: Bool?, costUsd: Double?, failed: Bool?, firstTokenMS: Int?, latencyMS: Int?, loadMS: Int?, price: FluffyCallPrice?, promptMS: Int?, replyMS: Int?, stopReason: String?, textToolCalls: TextToolCalls?, usage: FluffyTokenUsage?, action: ContextChangedDataAction?, afterTokens: Int?, beforeTokens: Int?, count: Int?, reloadMS: Int?, room: Int?, windowFrom: Int?, windowTo: Int?, code: Code?, hint: String?, message: String?, args: [String: JSONAny]?, callID: String?, name: String?, chars: Int?, lines: Int?, path: String?, waiting: Bool?, window: Int?, artifactID: String?, diff: String?, durationMS: Int?, preview: String?, sources: [PurpleToolSource]?, truncated: Bool?, source: String?, subject: String?, decision: Decision?, rule: String?, alternatives: [Answer]?, caps: FluffyConsentCaps?, estimatedUsd: Double?, signal: String?, why: String?, answer: Answer?, todos: [PurpleTodo]?, planID: String?, steps: [FluffyPlanStep]?, added: Int?, changeID: String?, removed: Int?, reverts: String?, hash: String?, how: How?, checks: [FluffyCheckInfo]?, checkID: String?, command: String?, round: Int?, exitCode: Int?, output: String?, helperID: String?, label: String?, pickReason: String?, wish: String?, calls: Int?, stepID: String?, state: PurpleState?, helperIDS: [String]?, answerTokens: Int?, modelCalls: Int?, stopped: Stopped?, tokens: Int?, workingMS: Int?) {
         self.agent = agent
         self.cwd = cwd
         self.forkedFrom = forkedFrom
@@ -13416,6 +14040,54 @@ public struct ParamsData: Codable {
         self.round = round
         self.exitCode = exitCode
         self.output = output
+        self.helperID = helperID
+        self.label = label
+        self.pickReason = pickReason
+        self.wish = wish
+        self.calls = calls
+        self.stepID = stepID
+        self.state = state
+        self.helperIDS = helperIDS
+        self.answerTokens = answerTokens
+        self.modelCalls = modelCalls
+        self.stopped = stopped
+        self.tokens = tokens
+        self.workingMS = workingMS
+    }
+}
+
+public enum Agent: Codable {
+    case agentAgentSnapshot(AgentAgentSnapshot)
+    case string(String)
+    case null
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        if let x = try? container.decode(String.self) {
+            self = .string(x)
+            return
+        }
+        if let x = try? container.decode(AgentAgentSnapshot.self) {
+            self = .agentAgentSnapshot(x)
+            return
+        }
+        if container.decodeNil() {
+            self = .null
+            return
+        }
+        throw DecodingError.typeMismatch(Agent.self, DecodingError.Context(codingPath: decoder.codingPath, debugDescription: "Wrong type for Agent"))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        switch self {
+        case .agentAgentSnapshot(let x):
+            try container.encode(x)
+        case .string(let x):
+            try container.encode(x)
+        case .null:
+            try container.encodeNil()
+        }
     }
 }
 
@@ -13425,8 +14097,8 @@ public struct ParamsData: Codable {
 /// found. ``wish`` is the model wish as written. ``tools`` are the tool names the
 /// helper may use, empty for none. ``asks`` is true when the helper may ask you a
 /// question.
-// MARK: - PurpleAgentSnapshot
-public struct PurpleAgentSnapshot: Codable {
+// MARK: - AgentAgentSnapshot
+public struct AgentAgentSnapshot: Codable {
     public let asks: Bool?
     public let limits: FluffyAgentLimits?
     public let name: String
@@ -13615,22 +14287,6 @@ public struct FluffyCallPrice: Codable {
     }
 }
 
-public enum PurpleReason: String, Codable {
-    case broken = "broken"
-    case budget = "budget"
-    case cheapest = "cheapest"
-    case disabled = "disabled"
-    case escalated = "escalated"
-    case fallback = "fallback"
-    case fit = "fit"
-    case missing = "missing"
-    case pinned = "pinned"
-    case privacy = "privacy"
-    case shutdown = "shutdown"
-    case unpinned = "unpinned"
-    case user = "user"
-}
-
 /// A candidate the pick left out, and why in plain words.
 // MARK: - FluffyModelRejection
 public struct FluffyModelRejection: Codable {
@@ -13700,14 +14356,24 @@ public enum SourceKind: String, Codable {
     case search = "search"
 }
 
+public enum PurpleState: String, Codable {
+    case parked = "parked"
+    case queued = "queued"
+    case resumed = "resumed"
+    case running = "running"
+    case waiting = "waiting"
+}
+
 public enum PurpleStatus: String, Codable {
     case cancelled = "cancelled"
     case completed = "completed"
     case created = "created"
     case deleted = "deleted"
+    case done = "done"
     case failed = "failed"
     case modified = "modified"
     case passed = "passed"
+    case running = "running"
     case timedOut = "timed_out"
 }
 
@@ -13807,6 +14473,11 @@ public enum ParamsType: String, Codable {
     case checkStarted = "check.started"
     case contextChanged = "context.changed"
     case fileChanged = "file.changed"
+    case helperEnded = "helper.ended"
+    case helperStarted = "helper.started"
+    case helperState = "helper.state"
+    case helperStep = "helper.step"
+    case helperWait = "helper.wait"
     case messageCompleted = "message.completed"
     case messageDelta = "message.delta"
     case messageStarted = "message.started"
@@ -15170,7 +15841,7 @@ public struct SessionCreatedEvent: Codable {
 /// other session, and an older daemon leaves them out.
 // MARK: - SessionCreatedEventData
 public struct SessionCreatedEventData: Codable {
-    public let agent: FluffyAgentSnapshot?
+    public let agent: DataAgentSnapshot?
     public let cwd: String?
     public let forkedFrom: FluffyForkedFrom?
     public let modelName: String?
@@ -15192,7 +15863,7 @@ public struct SessionCreatedEventData: Codable {
         case route = "route"
     }
 
-    public init(agent: FluffyAgentSnapshot?, cwd: String?, forkedFrom: FluffyForkedFrom?, modelName: String?, modelProfile: String, modelProvider: String?, origin: String?, parent: FluffySessionParent?, route: RouteEnum?) {
+    public init(agent: DataAgentSnapshot?, cwd: String?, forkedFrom: FluffyForkedFrom?, modelName: String?, modelProfile: String, modelProvider: String?, origin: String?, parent: FluffySessionParent?, route: RouteEnum?) {
         self.agent = agent
         self.cwd = cwd
         self.forkedFrom = forkedFrom
@@ -15211,8 +15882,8 @@ public struct SessionCreatedEventData: Codable {
 /// found. ``wish`` is the model wish as written. ``tools`` are the tool names the
 /// helper may use, empty for none. ``asks`` is true when the helper may ask you a
 /// question.
-// MARK: - FluffyAgentSnapshot
-public struct FluffyAgentSnapshot: Codable {
+// MARK: - DataAgentSnapshot
+public struct DataAgentSnapshot: Codable {
     public let asks: Bool?
     public let limits: StickyAgentLimits?
     public let name: String
@@ -17649,9 +18320,11 @@ public struct TokenUsage: Codable {
 /// ``sources`` are the web pages a ``web_search`` or ``web_fetch`` call found or read, for
 /// the screen's source chips. None for any other call. The model does not get them.
 ///
-/// ``parent_call_id`` is set on an event of a child run: the id of the ``delegate`` call
-/// that started it. The event is in the parent's run, and a client that does not know
-/// child runs ignores it. None for the run's own events.
+/// ``parent_call_id`` is legacy. Old logs set it on an event of a child run: the id of
+/// the ``delegate`` call that started it. The event is in the parent's run, and a client
+/// that does not know child runs ignores it. None for the run's own events. A new helper
+/// writes none, because it has its own session and ``helper.*`` events. The field stays,
+/// since removing it would break old logs.
 // MARK: - ToolCompletedData
 public struct ToolCompletedData: Codable {
     public let artifactID: String?
@@ -17767,9 +18440,11 @@ public struct ToolCompletedEvent: Codable {
 /// ``sources`` are the web pages a ``web_search`` or ``web_fetch`` call found or read, for
 /// the screen's source chips. None for any other call. The model does not get them.
 ///
-/// ``parent_call_id`` is set on an event of a child run: the id of the ``delegate`` call
-/// that started it. The event is in the parent's run, and a client that does not know
-/// child runs ignores it. None for the run's own events.
+/// ``parent_call_id`` is legacy. Old logs set it on an event of a child run: the id of
+/// the ``delegate`` call that started it. The event is in the parent's run, and a client
+/// that does not know child runs ignores it. None for the run's own events. A new helper
+/// writes none, because it has its own session and ``helper.*`` events. The field stays,
+/// since removing it would break old logs.
 // MARK: - ToolCompletedEventData
 public struct ToolCompletedEventData: Codable {
     public let artifactID: String?
@@ -17846,9 +18521,11 @@ public enum ToolCompletedEventType: String, Codable {
 /// ``duration_ms`` is how long the tool ran before it raised. None means a
 /// call that was denied or cut off, which never ran or was not timed.
 ///
-/// ``parent_call_id`` is set on an event of a child run: the id of the ``delegate`` call
-/// that started it. The event is in the parent's run, and a client that does not know
-/// child runs ignores it. None for the run's own events.
+/// ``parent_call_id`` is legacy. Old logs set it on an event of a child run: the id of
+/// the ``delegate`` call that started it. The event is in the parent's run, and a client
+/// that does not know child runs ignores it. None for the run's own events. A new helper
+/// writes none, because it has its own session and ``helper.*`` events. The field stays,
+/// since removing it would break old logs.
 // MARK: - ToolFailedData
 public struct ToolFailedData: Codable {
     public let callID: String
@@ -17905,9 +18582,11 @@ public struct ToolFailedEvent: Codable {
 /// ``duration_ms`` is how long the tool ran before it raised. None means a
 /// call that was denied or cut off, which never ran or was not timed.
 ///
-/// ``parent_call_id`` is set on an event of a child run: the id of the ``delegate`` call
-/// that started it. The event is in the parent's run, and a client that does not know
-/// child runs ignores it. None for the run's own events.
+/// ``parent_call_id`` is legacy. Old logs set it on an event of a child run: the id of
+/// the ``delegate`` call that started it. The event is in the parent's run, and a client
+/// that does not know child runs ignores it. None for the run's own events. A new helper
+/// writes none, because it has its own session and ``helper.*`` events. The field stays,
+/// since removing it would break old logs.
 // MARK: - ToolFailedEventData
 public struct ToolFailedEventData: Codable {
     public let callID: String
@@ -18006,9 +18685,11 @@ public enum ToolOutputEventType: String, Codable {
 /// ``message_id`` is the assistant message that asked. ``args`` are the
 /// arguments as the model wrote them.
 ///
-/// ``parent_call_id`` is set on an event of a child run: the id of the ``delegate`` call
-/// that started it. The event is in the parent's run, and a client that does not know
-/// child runs ignores it. None for the run's own events.
+/// ``parent_call_id`` is legacy. Old logs set it on an event of a child run: the id of
+/// the ``delegate`` call that started it. The event is in the parent's run, and a client
+/// that does not know child runs ignores it. None for the run's own events. A new helper
+/// writes none, because it has its own session and ``helper.*`` events. The field stays,
+/// since removing it would break old logs.
 // MARK: - ToolRequestedData
 public struct ToolRequestedData: Codable {
     public let args: [String: JSONAny]
@@ -18068,9 +18749,11 @@ public struct ToolRequestedEvent: Codable {
 /// ``message_id`` is the assistant message that asked. ``args`` are the
 /// arguments as the model wrote them.
 ///
-/// ``parent_call_id`` is set on an event of a child run: the id of the ``delegate`` call
-/// that started it. The event is in the parent's run, and a client that does not know
-/// child runs ignores it. None for the run's own events.
+/// ``parent_call_id`` is legacy. Old logs set it on an event of a child run: the id of
+/// the ``delegate`` call that started it. The event is in the parent's run, and a client
+/// that does not know child runs ignores it. None for the run's own events. A new helper
+/// writes none, because it has its own session and ``helper.*`` events. The field stays,
+/// since removing it would break old logs.
 // MARK: - ToolRequestedEventData
 public struct ToolRequestedEventData: Codable {
     public let args: [String: JSONAny]
@@ -18102,9 +18785,11 @@ public enum ToolRequestedEventType: String, Codable {
 
 /// A requested tool call is running.
 ///
-/// ``parent_call_id`` is set on an event of a child run: the id of the ``delegate`` call
-/// that started it. The event is in the parent's run, and a client that does not know
-/// child runs ignores it. None for the run's own events.
+/// ``parent_call_id`` is legacy. Old logs set it on an event of a child run: the id of
+/// the ``delegate`` call that started it. The event is in the parent's run, and a client
+/// that does not know child runs ignores it. None for the run's own events. A new helper
+/// writes none, because it has its own session and ``helper.*`` events. The field stays,
+/// since removing it would break old logs.
 // MARK: - ToolStartedData
 public struct ToolStartedData: Codable {
     public let callID: String
@@ -18152,9 +18837,11 @@ public struct ToolStartedEvent: Codable {
 
 /// A requested tool call is running.
 ///
-/// ``parent_call_id`` is set on an event of a child run: the id of the ``delegate`` call
-/// that started it. The event is in the parent's run, and a client that does not know
-/// child runs ignores it. None for the run's own events.
+/// ``parent_call_id`` is legacy. Old logs set it on an event of a child run: the id of
+/// the ``delegate`` call that started it. The event is in the parent's run, and a client
+/// that does not know child runs ignores it. None for the run's own events. A new helper
+/// writes none, because it has its own session and ``helper.*`` events. The field stays,
+/// since removing it would break old logs.
 // MARK: - ToolStartedEventData
 public struct ToolStartedEventData: Codable {
     public let callID: String

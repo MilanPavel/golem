@@ -131,6 +131,11 @@ const EVENT_TYPES = new Set([
   "check.offered",
   "check.started",
   "check.completed",
+  "helper.started",
+  "helper.step",
+  "helper.state",
+  "helper.wait",
+  "helper.ended",
 ]);
 
 export function isRecord(value: unknown): value is Record<string, unknown> {

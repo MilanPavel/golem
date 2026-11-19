@@ -1,0 +1,72 @@
+{
+  "additionalProperties": false,
+  "description": "A helper's run ended.\n\n``stopped`` says why. ``model_calls`` and ``tokens`` count what the helper used, and\n``answer_tokens`` is the size of its answer. ``cost_usd`` is what it cost (0 on a local\nmodel), because the lead's footer sums its own log. ``duration_ms`` is the whole time\nsince it started and ``working_ms`` is the part that was not spent waiting for you, a\nslot or a provider.",
+  "properties": {
+    "answer_tokens": {
+      "minimum": 0,
+      "title": "Answer Tokens",
+      "type": "integer"
+    },
+    "call_id": {
+      "minLength": 1,
+      "title": "Call Id",
+      "type": "string"
+    },
+    "cost_usd": {
+      "minimum": 0,
+      "title": "Cost Usd",
+      "type": "number"
+    },
+    "duration_ms": {
+      "minimum": 0,
+      "title": "Duration Ms",
+      "type": "integer"
+    },
+    "index": {
+      "minimum": 0,
+      "title": "Index",
+      "type": "integer"
+    },
+    "model_calls": {
+      "minimum": 0,
+      "title": "Model Calls",
+      "type": "integer"
+    },
+    "stopped": {
+      "enum": [
+        "done",
+        "calls",
+        "time",
+        "budget",
+        "tokens",
+        "cancelled",
+        "failed"
+      ],
+      "title": "Stopped",
+      "type": "string"
+    },
+    "tokens": {
+      "minimum": 0,
+      "title": "Tokens",
+      "type": "integer"
+    },
+    "working_ms": {
+      "minimum": 0,
+      "title": "Working Ms",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "call_id",
+    "index",
+    "stopped",
+    "model_calls",
+    "tokens",
+    "answer_tokens",
+    "cost_usd",
+    "duration_ms",
+    "working_ms"
+  ],
+  "title": "HelperEndedData",
+  "type": "object"
+}

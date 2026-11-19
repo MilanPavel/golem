@@ -58,9 +58,11 @@ export interface ModelCallCompletedEvent {
  * the model, reading the prompt and writing the reply. From the model server's own clock.
  * Ollama only.
  *
- * ``parent_call_id`` is set on an event of a child run: the id of the ``delegate`` call
- * that started it. The event is in the parent's run, and a client that does not know
- * child runs ignores it. None for the run's own events.
+ * ``parent_call_id`` is legacy. Old logs set it on an event of a child run: the id of
+ * the ``delegate`` call that started it. The event is in the parent's run, and a client
+ * that does not know child runs ignores it. None for the run's own events. A new helper
+ * writes none, because it has its own session and ``helper.*`` events. The field stays,
+ * since removing it would break old logs.
  *
  * This interface was referenced by `ModelCallCompletedEvent`'s JSON-Schema
  * via the `definition` "ModelCallCompletedData".

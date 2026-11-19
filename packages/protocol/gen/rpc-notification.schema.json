@@ -1046,6 +1046,521 @@
       "title": "ForkedFrom",
       "type": "object"
     },
+    "HelperEndedData": {
+      "additionalProperties": false,
+      "description": "A helper's run ended.\n\n``stopped`` says why. ``model_calls`` and ``tokens`` count what the helper used, and\n``answer_tokens`` is the size of its answer. ``cost_usd`` is what it cost (0 on a local\nmodel), because the lead's footer sums its own log. ``duration_ms`` is the whole time\nsince it started and ``working_ms`` is the part that was not spent waiting for you, a\nslot or a provider.",
+      "properties": {
+        "answer_tokens": {
+          "minimum": 0,
+          "title": "Answer Tokens",
+          "type": "integer"
+        },
+        "call_id": {
+          "minLength": 1,
+          "title": "Call Id",
+          "type": "string"
+        },
+        "cost_usd": {
+          "minimum": 0,
+          "title": "Cost Usd",
+          "type": "number"
+        },
+        "duration_ms": {
+          "minimum": 0,
+          "title": "Duration Ms",
+          "type": "integer"
+        },
+        "index": {
+          "minimum": 0,
+          "title": "Index",
+          "type": "integer"
+        },
+        "model_calls": {
+          "minimum": 0,
+          "title": "Model Calls",
+          "type": "integer"
+        },
+        "stopped": {
+          "enum": [
+            "done",
+            "calls",
+            "time",
+            "budget",
+            "tokens",
+            "cancelled",
+            "failed"
+          ],
+          "title": "Stopped",
+          "type": "string"
+        },
+        "tokens": {
+          "minimum": 0,
+          "title": "Tokens",
+          "type": "integer"
+        },
+        "working_ms": {
+          "minimum": 0,
+          "title": "Working Ms",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "call_id",
+        "index",
+        "stopped",
+        "model_calls",
+        "tokens",
+        "answer_tokens",
+        "cost_usd",
+        "duration_ms",
+        "working_ms"
+      ],
+      "title": "HelperEndedData",
+      "type": "object"
+    },
+    "HelperEndedEvent": {
+      "additionalProperties": false,
+      "description": "A helper's run ended.",
+      "properties": {
+        "data": {
+          "$ref": "#/$defs/HelperEndedData"
+        },
+        "run_id": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Run Id"
+        },
+        "seq": {
+          "minimum": 1,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "session_id": {
+          "minLength": 1,
+          "title": "Session Id",
+          "type": "string"
+        },
+        "ts": {
+          "minLength": 1,
+          "title": "Ts",
+          "type": "string"
+        },
+        "type": {
+          "const": "helper.ended",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "seq",
+        "session_id",
+        "ts",
+        "type",
+        "data"
+      ],
+      "title": "HelperEndedEvent",
+      "type": "object"
+    },
+    "HelperStartedData": {
+      "additionalProperties": false,
+      "description": "A helper session was made for one ``delegate`` call.\n\nThis is on the lead's log, with the ``delegate`` call's id as ``call_id``. ``index``\nis the helper's place in that call, and ``helper_id`` is its own session id.\n``agent`` is the agent type and ``label`` the short name the card shows. ``model`` is\nthe model it was given. ``wish`` is what the agent file asked for (``cheapest``,\n``same``, ``stronger``, a tier or a model) and ``pick_reason`` says in plain words\nwhy that model came out of it.",
+      "properties": {
+        "agent": {
+          "minLength": 1,
+          "title": "Agent",
+          "type": "string"
+        },
+        "call_id": {
+          "minLength": 1,
+          "title": "Call Id",
+          "type": "string"
+        },
+        "helper_id": {
+          "minLength": 1,
+          "title": "Helper Id",
+          "type": "string"
+        },
+        "index": {
+          "minimum": 0,
+          "title": "Index",
+          "type": "integer"
+        },
+        "label": {
+          "title": "Label",
+          "type": "string"
+        },
+        "model": {
+          "minLength": 1,
+          "title": "Model",
+          "type": "string"
+        },
+        "pick_reason": {
+          "title": "Pick Reason",
+          "type": "string"
+        },
+        "wish": {
+          "minLength": 1,
+          "title": "Wish",
+          "type": "string"
+        }
+      },
+      "required": [
+        "call_id",
+        "index",
+        "helper_id",
+        "agent",
+        "label",
+        "model",
+        "wish",
+        "pick_reason"
+      ],
+      "title": "HelperStartedData",
+      "type": "object"
+    },
+    "HelperStartedEvent": {
+      "additionalProperties": false,
+      "description": "A helper session was made. A summary on the lead's log; the helper's own log has the rest.",
+      "properties": {
+        "data": {
+          "$ref": "#/$defs/HelperStartedData"
+        },
+        "run_id": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Run Id"
+        },
+        "seq": {
+          "minimum": 1,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "session_id": {
+          "minLength": 1,
+          "title": "Session Id",
+          "type": "string"
+        },
+        "ts": {
+          "minLength": 1,
+          "title": "Ts",
+          "type": "string"
+        },
+        "type": {
+          "const": "helper.started",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "seq",
+        "session_id",
+        "ts",
+        "type",
+        "data"
+      ],
+      "title": "HelperStartedEvent",
+      "type": "object"
+    },
+    "HelperStateData": {
+      "additionalProperties": false,
+      "description": "A helper queued, started running, started waiting, or went on.\n\n``reason`` says why it waits or queues. It is a plain string, not a fixed list: the\nwords today are ``you`` and ``team``, and later phases add more, so a new word is not\na protocol change. It is None when the helper runs with nothing to explain.",
+      "properties": {
+        "call_id": {
+          "minLength": 1,
+          "title": "Call Id",
+          "type": "string"
+        },
+        "index": {
+          "minimum": 0,
+          "title": "Index",
+          "type": "integer"
+        },
+        "reason": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reason"
+        },
+        "state": {
+          "enum": [
+            "queued",
+            "running",
+            "waiting"
+          ],
+          "title": "State",
+          "type": "string"
+        }
+      },
+      "required": [
+        "call_id",
+        "index",
+        "state"
+      ],
+      "title": "HelperStateData",
+      "type": "object"
+    },
+    "HelperStateEvent": {
+      "additionalProperties": false,
+      "description": "A helper queued, started running, started waiting, or went on.",
+      "properties": {
+        "data": {
+          "$ref": "#/$defs/HelperStateData"
+        },
+        "run_id": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Run Id"
+        },
+        "seq": {
+          "minimum": 1,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "session_id": {
+          "minLength": 1,
+          "title": "Session Id",
+          "type": "string"
+        },
+        "ts": {
+          "minLength": 1,
+          "title": "Ts",
+          "type": "string"
+        },
+        "type": {
+          "const": "helper.state",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "seq",
+        "session_id",
+        "ts",
+        "type",
+        "data"
+      ],
+      "title": "HelperStateEvent",
+      "type": "object"
+    },
+    "HelperStepData": {
+      "additionalProperties": false,
+      "description": "A tool call of a helper started or ended.\n\nThin on purpose: the card shows what ran, and the helper's own log has the detail.\n``args`` holds only the path, pattern, query or ref of the call. ``step_id`` is the\nhelper's own tool call id. ``calls`` is how many tool calls the helper has made so far.",
+      "properties": {
+        "args": {
+          "additionalProperties": true,
+          "title": "Args",
+          "type": "object"
+        },
+        "call_id": {
+          "minLength": 1,
+          "title": "Call Id",
+          "type": "string"
+        },
+        "calls": {
+          "minimum": 0,
+          "title": "Calls",
+          "type": "integer"
+        },
+        "index": {
+          "minimum": 0,
+          "title": "Index",
+          "type": "integer"
+        },
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "running",
+            "done",
+            "failed"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "step_id": {
+          "minLength": 1,
+          "title": "Step Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "call_id",
+        "index",
+        "step_id",
+        "name",
+        "status",
+        "calls"
+      ],
+      "title": "HelperStepData",
+      "type": "object"
+    },
+    "HelperStepEvent": {
+      "additionalProperties": false,
+      "description": "A tool call of a helper started or ended.",
+      "properties": {
+        "data": {
+          "$ref": "#/$defs/HelperStepData"
+        },
+        "run_id": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Run Id"
+        },
+        "seq": {
+          "minimum": 1,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "session_id": {
+          "minLength": 1,
+          "title": "Session Id",
+          "type": "string"
+        },
+        "ts": {
+          "minLength": 1,
+          "title": "Ts",
+          "type": "string"
+        },
+        "type": {
+          "const": "helper.step",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "seq",
+        "session_id",
+        "ts",
+        "type",
+        "data"
+      ],
+      "title": "HelperStepEvent",
+      "type": "object"
+    },
+    "HelperWaitData": {
+      "additionalProperties": false,
+      "description": "The lead parked to wait for its helpers, or went on.\n\n``helper_ids`` are the helpers of this ``delegate`` call that it waits for.",
+      "properties": {
+        "call_id": {
+          "minLength": 1,
+          "title": "Call Id",
+          "type": "string"
+        },
+        "helper_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Helper Ids",
+          "type": "array"
+        },
+        "state": {
+          "enum": [
+            "parked",
+            "resumed"
+          ],
+          "title": "State",
+          "type": "string"
+        }
+      },
+      "required": [
+        "call_id",
+        "state"
+      ],
+      "title": "HelperWaitData",
+      "type": "object"
+    },
+    "HelperWaitEvent": {
+      "additionalProperties": false,
+      "description": "The lead parked to wait for its helpers, or went on.",
+      "properties": {
+        "data": {
+          "$ref": "#/$defs/HelperWaitData"
+        },
+        "run_id": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Run Id"
+        },
+        "seq": {
+          "minimum": 1,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "session_id": {
+          "minLength": 1,
+          "title": "Session Id",
+          "type": "string"
+        },
+        "ts": {
+          "minLength": 1,
+          "title": "Ts",
+          "type": "string"
+        },
+        "type": {
+          "const": "helper.wait",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "seq",
+        "session_id",
+        "ts",
+        "type",
+        "data"
+      ],
+      "title": "HelperWaitEvent",
+      "type": "object"
+    },
     "MessageCompletedData": {
       "additionalProperties": false,
       "description": "Full text of a user or assistant message.\n\n``interrupted`` is true when the run stopped before the model finished.\n``text`` is then what had streamed so far. ``skill`` is set on a user\nmessage that invoked a skill: ``text`` is then the skill body the model\ngot, with the arguments filled in, and a client can show the skill's name\nand arguments instead.\n\n``thinking`` is the whole thinking text of an assistant message, None when\nthe model did not think. ``thinking_ms`` is the time from the first\nthinking fragment to the first answer fragment, or to the end when no\nanswer text came.",
@@ -1359,7 +1874,7 @@
     },
     "ModelCallCompletedData": {
       "additionalProperties": false,
-      "description": "A model call ended.\n\n``first_token_ms`` is the time from the request to the first text, and\nNone when no text came. ``latency_ms`` is the time to the end.\n``failed`` is true when the call raised or was stopped.\n\n``context_window`` is the window the call ran with, read from the model server\nafter the call. Exact. None when it could not be read.\n\n``text_tool_calls`` is set when the model wrote a tool call as text in its\nreply. ``recovered`` means golem turned the text into tool calls. ``unread``\nmeans the text held a call golem could not read, so the reply stayed text.\nNone when the reply had no such text.\n\n``cost_usd`` is the cost of this call at ``price``. Both are None when the\nprice is not known. A local model costs 0.\n\n``load_ms``, ``prompt_ms`` and ``reply_ms`` are the time the model server spent loading\nthe model, reading the prompt and writing the reply. From the model server's own clock.\nOllama only.\n\n``parent_call_id`` is set on an event of a child run: the id of the ``delegate`` call\nthat started it. The event is in the parent's run, and a client that does not know\nchild runs ignores it. None for the run's own events.",
+      "description": "A model call ended.\n\n``first_token_ms`` is the time from the request to the first text, and\nNone when no text came. ``latency_ms`` is the time to the end.\n``failed`` is true when the call raised or was stopped.\n\n``context_window`` is the window the call ran with, read from the model server\nafter the call. Exact. None when it could not be read.\n\n``text_tool_calls`` is set when the model wrote a tool call as text in its\nreply. ``recovered`` means golem turned the text into tool calls. ``unread``\nmeans the text held a call golem could not read, so the reply stayed text.\nNone when the reply had no such text.\n\n``cost_usd`` is the cost of this call at ``price``. Both are None when the\nprice is not known. A local model costs 0.\n\n``load_ms``, ``prompt_ms`` and ``reply_ms`` are the time the model server spent loading\nthe model, reading the prompt and writing the reply. From the model server's own clock.\nOllama only.\n\n``parent_call_id`` is legacy. Old logs set it on an event of a child run: the id of\nthe ``delegate`` call that started it. The event is in the parent's run, and a client\nthat does not know child runs ignores it. None for the run's own events. A new helper\nwrites none, because it has its own session and ``helper.*`` events. The field stays,\nsince removing it would break old logs.",
       "properties": {
         "context_window": {
           "anyOf": [
@@ -1571,7 +2086,7 @@
     },
     "ModelCallStartedData": {
       "additionalProperties": false,
-      "description": "A request went to the model.\n\n``message_id`` is the assistant reply's id, which identifies the model\ncall. ``index`` counts the calls of this run from 1. ``provider`` and\n``model`` are None when the profile does not resolve.\n\n``tier`` is the model's tier when the call was sent (``local``, ``budget`` or\n``frontier``), and None on an older event or when the profile does not resolve.\n\n``system_prompt_sha`` and ``tools_sha`` are the sha256 of the system\nprompt and of the tool schemas (compact JSON, sorted keys) sent with the\ncall, which the daemon keeps by hash. Each is None when it was not sent.\n``message_ids`` are the history messages sent, in order, not counting the\nsystem prompt.\n\n``window_estimated`` is true when golem did not send the window and read it\nfrom Ollama (the loaded context or the Modelfile). An older event has no\nfield and reads as False. ``window_planned`` is true when golem chose the ``num_ctx`` it\nsent (``[context] window``), and false for one that someone set or that golem did not send.\n\nThe size fields count what was sent, in UTF-8 bytes and in characters: the\nsystem text, the tool schemas as compact JSON, and each history message in\n``message_ids`` order (its text and its tool calls as JSON). ``message_chars``\nand ``message_bytes`` have one number per message sent. Each is None on an\nevent recorded before they existed.\n\n``parent_call_id`` is set on an event of a child run: the id of the ``delegate`` call\nthat started it. The event is in the parent's run, and a client that does not know\nchild runs ignores it. None for the run's own events.",
+      "description": "A request went to the model.\n\n``message_id`` is the assistant reply's id, which identifies the model\ncall. ``index`` counts the calls of this run from 1. ``provider`` and\n``model`` are None when the profile does not resolve.\n\n``tier`` is the model's tier when the call was sent (``local``, ``budget`` or\n``frontier``), and None on an older event or when the profile does not resolve.\n\n``system_prompt_sha`` and ``tools_sha`` are the sha256 of the system\nprompt and of the tool schemas (compact JSON, sorted keys) sent with the\ncall, which the daemon keeps by hash. Each is None when it was not sent.\n``message_ids`` are the history messages sent, in order, not counting the\nsystem prompt.\n\n``window_estimated`` is true when golem did not send the window and read it\nfrom Ollama (the loaded context or the Modelfile). An older event has no\nfield and reads as False. ``window_planned`` is true when golem chose the ``num_ctx`` it\nsent (``[context] window``), and false for one that someone set or that golem did not send.\n\nThe size fields count what was sent, in UTF-8 bytes and in characters: the\nsystem text, the tool schemas as compact JSON, and each history message in\n``message_ids`` order (its text and its tool calls as JSON). ``message_chars``\nand ``message_bytes`` have one number per message sent. Each is None on an\nevent recorded before they existed.\n\n``parent_call_id`` is legacy. Old logs set it on an event of a child run: the id of\nthe ``delegate`` call that started it. The event is in the parent's run, and a client\nthat does not know child runs ignores it. None for the run's own events. A new helper\nwrites none, because it has its own session and ``helper.*`` events. The field stays,\nsince removing it would break old logs.",
       "properties": {
         "cleared_ids": {
           "items": {
@@ -4046,7 +4561,7 @@
     },
     "ToolCompletedData": {
       "additionalProperties": false,
-      "description": "A tool call finished.\n\n``summary`` is one short line, such as ``42 lines``. ``preview`` is the\nstart of the output, cut at a few kilobytes, and ``truncated`` says\nwhether it was cut. Output too long for the model is stored whole in the\nartifact ``artifact_id``, which ``artifact.read`` reads.\n\n``failed`` is true when the call ran but what it ran did not succeed,\nsuch as a shell command that exited non-zero or timed out. The model\nstill gets the output.\n\n``duration_ms`` is how long the tool ran, from ``tool.started`` to its\nresult, without the wait for an approval. None means it was not measured.\n\n``diff`` is the change a file tool made, as a unified diff.\n\n``sources`` are the web pages a ``web_search`` or ``web_fetch`` call found or read, for\nthe screen's source chips. None for any other call. The model does not get them.\n\n``parent_call_id`` is set on an event of a child run: the id of the ``delegate`` call\nthat started it. The event is in the parent's run, and a client that does not know\nchild runs ignores it. None for the run's own events.",
+      "description": "A tool call finished.\n\n``summary`` is one short line, such as ``42 lines``. ``preview`` is the\nstart of the output, cut at a few kilobytes, and ``truncated`` says\nwhether it was cut. Output too long for the model is stored whole in the\nartifact ``artifact_id``, which ``artifact.read`` reads.\n\n``failed`` is true when the call ran but what it ran did not succeed,\nsuch as a shell command that exited non-zero or timed out. The model\nstill gets the output.\n\n``duration_ms`` is how long the tool ran, from ``tool.started`` to its\nresult, without the wait for an approval. None means it was not measured.\n\n``diff`` is the change a file tool made, as a unified diff.\n\n``sources`` are the web pages a ``web_search`` or ``web_fetch`` call found or read, for\nthe screen's source chips. None for any other call. The model does not get them.\n\n``parent_call_id`` is legacy. Old logs set it on an event of a child run: the id of\nthe ``delegate`` call that started it. The event is in the parent's run, and a client\nthat does not know child runs ignores it. None for the run's own events. A new helper\nwrites none, because it has its own session and ``helper.*`` events. The field stays,\nsince removing it would break old logs.",
       "properties": {
         "artifact_id": {
           "anyOf": [
@@ -4192,7 +4707,7 @@
     },
     "ToolFailedData": {
       "additionalProperties": false,
-      "description": "A tool call did not run, or stopped with an error. The model sees the same message.\n\n``duration_ms`` is how long the tool ran before it raised. None means a\ncall that was denied or cut off, which never ran or was not timed.\n\n``parent_call_id`` is set on an event of a child run: the id of the ``delegate`` call\nthat started it. The event is in the parent's run, and a client that does not know\nchild runs ignores it. None for the run's own events.",
+      "description": "A tool call did not run, or stopped with an error. The model sees the same message.\n\n``duration_ms`` is how long the tool ran before it raised. None means a\ncall that was denied or cut off, which never ran or was not timed.\n\n``parent_call_id`` is legacy. Old logs set it on an event of a child run: the id of\nthe ``delegate`` call that started it. The event is in the parent's run, and a client\nthat does not know child runs ignores it. None for the run's own events. A new helper\nwrites none, because it has its own session and ``helper.*`` events. The field stays,\nsince removing it would break old logs.",
       "properties": {
         "call_id": {
           "minLength": 1,
@@ -4350,7 +4865,7 @@
     },
     "ToolRequestedData": {
       "additionalProperties": false,
-      "description": "The model asked for one tool call.\n\n``message_id`` is the assistant message that asked. ``args`` are the\narguments as the model wrote them.\n\n``parent_call_id`` is set on an event of a child run: the id of the ``delegate`` call\nthat started it. The event is in the parent's run, and a client that does not know\nchild runs ignores it. None for the run's own events.",
+      "description": "The model asked for one tool call.\n\n``message_id`` is the assistant message that asked. ``args`` are the\narguments as the model wrote them.\n\n``parent_call_id`` is legacy. Old logs set it on an event of a child run: the id of\nthe ``delegate`` call that started it. The event is in the parent's run, and a client\nthat does not know child runs ignores it. None for the run's own events. A new helper\nwrites none, because it has its own session and ``helper.*`` events. The field stays,\nsince removing it would break old logs.",
       "properties": {
         "args": {
           "additionalProperties": true,
@@ -4476,7 +4991,7 @@
     },
     "ToolStartedData": {
       "additionalProperties": false,
-      "description": "A requested tool call is running.\n\n``parent_call_id`` is set on an event of a child run: the id of the ``delegate`` call\nthat started it. The event is in the parent's run, and a client that does not know\nchild runs ignores it. None for the run's own events.",
+      "description": "A requested tool call is running.\n\n``parent_call_id`` is legacy. Old logs set it on an event of a child run: the id of\nthe ``delegate`` call that started it. The event is in the parent's run, and a client\nthat does not know child runs ignores it. None for the run's own events. A new helper\nwrites none, because it has its own session and ``helper.*`` events. The field stays,\nsince removing it would break old logs.",
       "properties": {
         "call_id": {
           "minLength": 1,
@@ -4669,6 +5184,11 @@
           "check.started": "#/$defs/CheckStartedEvent",
           "context.changed": "#/$defs/ContextChangedEvent",
           "file.changed": "#/$defs/FileChangedEvent",
+          "helper.ended": "#/$defs/HelperEndedEvent",
+          "helper.started": "#/$defs/HelperStartedEvent",
+          "helper.state": "#/$defs/HelperStateEvent",
+          "helper.step": "#/$defs/HelperStepEvent",
+          "helper.wait": "#/$defs/HelperWaitEvent",
           "message.completed": "#/$defs/MessageCompletedEvent",
           "message.delta": "#/$defs/MessageDeltaEvent",
           "message.started": "#/$defs/MessageStartedEvent",
@@ -4829,6 +5349,21 @@
         },
         {
           "$ref": "#/$defs/CheckCompletedEvent"
+        },
+        {
+          "$ref": "#/$defs/HelperStartedEvent"
+        },
+        {
+          "$ref": "#/$defs/HelperStepEvent"
+        },
+        {
+          "$ref": "#/$defs/HelperStateEvent"
+        },
+        {
+          "$ref": "#/$defs/HelperWaitEvent"
+        },
+        {
+          "$ref": "#/$defs/HelperEndedEvent"
         }
       ],
       "title": "Params"

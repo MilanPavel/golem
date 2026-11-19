@@ -44,3 +44,11 @@ test("an unknown type and a malformed event are dropped", () => {
   assert.equal(asChatEvent({ type: "file.changed", session_id: "s_test", data: {} }), undefined);
   assert.equal(asChatEvent(null), undefined);
 });
+
+test("a helper event type this build does not list is dropped, and the five it lists pass", () => {
+  const base = { seq: 1, session_id: "s_test", run_id: null, ts: "t", data: {} };
+  assert.equal(asChatEvent({ ...base, type: "helper.future" }), undefined);
+  for (const type of ["helper.started", "helper.step", "helper.state", "helper.wait", "helper.ended"]) {
+    assert.notEqual(asChatEvent({ ...base, type }), undefined);
+  }
+});

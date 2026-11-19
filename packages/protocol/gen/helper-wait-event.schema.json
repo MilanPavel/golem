@@ -1,0 +1,85 @@
+{
+  "$defs": {
+    "HelperWaitData": {
+      "additionalProperties": false,
+      "description": "The lead parked to wait for its helpers, or went on.\n\n``helper_ids`` are the helpers of this ``delegate`` call that it waits for.",
+      "properties": {
+        "call_id": {
+          "minLength": 1,
+          "title": "Call Id",
+          "type": "string"
+        },
+        "helper_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Helper Ids",
+          "type": "array"
+        },
+        "state": {
+          "enum": [
+            "parked",
+            "resumed"
+          ],
+          "title": "State",
+          "type": "string"
+        }
+      },
+      "required": [
+        "call_id",
+        "state"
+      ],
+      "title": "HelperWaitData",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "The lead parked to wait for its helpers, or went on.",
+  "properties": {
+    "data": {
+      "$ref": "#/$defs/HelperWaitData"
+    },
+    "run_id": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Run Id"
+    },
+    "seq": {
+      "minimum": 1,
+      "title": "Seq",
+      "type": "integer"
+    },
+    "session_id": {
+      "minLength": 1,
+      "title": "Session Id",
+      "type": "string"
+    },
+    "ts": {
+      "minLength": 1,
+      "title": "Ts",
+      "type": "string"
+    },
+    "type": {
+      "const": "helper.wait",
+      "title": "Type",
+      "type": "string"
+    }
+  },
+  "required": [
+    "seq",
+    "session_id",
+    "ts",
+    "type",
+    "data"
+  ],
+  "title": "HelperWaitEvent",
+  "type": "object"
+}
