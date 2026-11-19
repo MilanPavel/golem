@@ -37,6 +37,7 @@ import httpx
 
 from golem.config import OllamaSettings
 from golem.models.errors import ModelUnreachable
+from golem.models.ollama_probe import OverlapResult, probe_overlap
 from golem.net_tls import tls_context
 
 log = logging.getLogger(__name__)
@@ -178,6 +179,8 @@ class LocalServer:
         # know it, as for a server an older golem started.
         self._parallel: int | None = None
         self._restarting = False
+        # What the overlap probe found for a server golem did not start. None before one.
+        self.overlap: OverlapResult | None = None
 
     @property
     def owner(self) -> Owner | None:
@@ -440,6 +443,8 @@ class LocalServers:
         self.listener: Callable[[LocalServer, ServerState, str | None], None] = (
             lambda _server, _state, _message: None
         )
+        # Hears each finished probe, so the caller can give the line its slot count.
+        self.on_probe: Callable[[LocalServer, OverlapResult], None] = lambda _server, _result: None
 
     @property
     def settings(self) -> OllamaSettings:
@@ -470,6 +475,32 @@ class LocalServers:
             self._servers[url] = made
             server = made
         return server
+
+    async def probe(
+        self, base_url: str, model: str, *, again: bool = False
+    ) -> OverlapResult | None:
+        """Whether the external server at ``base_url`` runs two calls at once.
+
+        Probes once per server and keeps the result, until ``again`` asks for a new
+        one. None for a server that is not known, that golem started (it sets the slot
+        count itself) or that is not external, and when the probe was inconclusive.
+        Starts nothing: a setup with no local model never calls this.
+        """
+        server = self._servers.get(base_url.rstrip("/"))
+        if server is None or server.owner != "external":
+            return None
+        if server.overlap is not None and not again:
+            return server.overlap
+        result = await probe_overlap(
+            server.base_url,
+            model,
+            parallel=self._settings.parallel,
+            transport=server._transport,  # pyright: ignore[reportPrivateUsage]
+        )
+        if result is not None:
+            server.overlap = result
+            self.on_probe(server, result)
+        return result
 
     def statuses(self) -> list[LocalServerStatus]:
         return [status for server in self._servers.values() if (status := server.status())]
