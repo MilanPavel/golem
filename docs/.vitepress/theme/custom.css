@@ -364,14 +364,6 @@ html.dark .golem-why-card img {
 .golem-terminal-bar .allow {
   background: var(--golem-allow);
 }
-.golem-terminal-title {
-  flex: 1;
-  margin-right: 49px;
-  text-align: center;
-  font-family: var(--golem-font-mono);
-  font-size: 12px;
-  color: var(--golem-muted);
-}
 .golem-terminal img,
 .golem-terminal video {
   display: block;

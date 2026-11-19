@@ -8,26 +8,22 @@ import { withBase } from "vitepress";
 const demos = [
   {
     id: "search",
-    label: "Sources",
-    title: "127.0.0.1 · golem",
+    label: "Chat",
     alt: "In the browser, golem is asked about infinity and good sources to study. It searches the web and reads three pages, then answers with a source chip after each claim. A chip's hover card shows the page, and the Sources list shows the three pages it cited out of the four it found.",
   },
   {
     id: "code",
     label: "Coding",
-    title: "127.0.0.1 · golem · ~/rust-hello",
     alt: "In the browser, golem is asked to make a hello world app in Rust with a test and run it. An approval card shows each file as a diff and you allow it, then the command that tests and runs it, while the Changes panel fills with the two new files.",
   },
   {
     id: "inbox",
-    label: "Away",
-    title: "127.0.0.1 · golem",
+    label: "Routines",
     alt: "In the browser, a PDF lands in a watched folder and a routine starts by itself. It stops to ask to write a file, the Inbox in the sidebar shows 1, you allow it there, and Runs shows it finished next to a scheduled routine.",
   },
   {
     id: "tui",
     label: "Terminal",
-    title: "golem tui · ~/rust-hello",
     alt: "In the terminal, golem writes a Rust hello world app with a test. You allow each file as a diff and then the test run. A routine then asks for approval in another session, the banner and the status line say so, and /runs lists what needs you and what finished.",
   },
 ] as const;
@@ -70,7 +66,6 @@ watch(current, () => {
     <figure class="golem-terminal" :class="`golem-demo-${current}`">
       <div class="golem-terminal-bar" aria-hidden="true">
         <span class="dot deny" /><span class="dot wait" /><span class="dot allow" />
-        <span class="golem-terminal-title">{{ demo.title }}</span>
       </div>
       <video
         ref="video"
