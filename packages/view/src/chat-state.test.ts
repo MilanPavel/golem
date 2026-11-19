@@ -20,6 +20,7 @@ import {
   stopWriting,
   thinkingLine,
 } from "./chat-state.ts";
+import { helperLine } from "./helper.ts";
 
 function event(partial: ChatEvent): ChatEvent {
   return partial;
@@ -662,6 +663,75 @@ test("two delegates in one turn stay apart", () => {
   ];
   const tools = events.reduce(reduceChat, emptyChat).messages[0]?.tools ?? [];
   assert.deepEqual(tools.map((tool) => tool.child?.toolSteps.map((step) => step.callId)), [["k1", "k3"], ["k2"]]);
+});
+
+function helperEvents(): ChatEvent[] {
+  const at = "2026-11-01T10:00:02.000Z";
+  const base = { ...helperBase, ts: at };
+  const step = (seq: number, id: string, path: string, status: "running" | "done"): ChatEvent => ({
+    ...base,
+    seq,
+    type: "helper.step",
+    data: { call_id: "d1", index: 0, step_id: id, name: "read_file", args: { path }, status, calls: 1 },
+  });
+  return [
+    {
+      ...base,
+      seq: 10,
+      type: "helper.started",
+      data: { call_id: "d1", index: 0, helper_id: "h1", agent: "explorer", label: "explorer", model: "qwen3:27b", wish: "same", pick_reason: "" },
+    },
+    { ...base, seq: 11, type: "helper.state", data: { call_id: "d1", index: 0, state: "running" } },
+    step(12, "k1", "a.py", "running"),
+    step(13, "k1", "a.py", "done"),
+    step(14, "k2", "b.py", "running"),
+    step(15, "k2", "b.py", "done"),
+    {
+      ...base,
+      seq: 16,
+      type: "helper.ended",
+      data: { call_id: "d1", index: 0, stopped: "done", model_calls: 2, tokens: 1040, answer_tokens: 620, cost_usd: 0.5, duration_ms: 71000, working_ms: 70000 },
+    },
+  ];
+}
+
+test("helper events fold into the same helper run as the events with a parent call id", () => {
+  const end: ChatEvent = {
+    ...helperBase,
+    ts: "2026-11-01T10:01:13.000Z",
+    seq: 40,
+    type: "tool.completed",
+    data: { call_id: "d1", summary: "explorer finished", preview: "found it", duration_ms: 71000 },
+  };
+  const old = [
+    ...delegateTurn("d1"),
+    ...childCall("d1", 10, { input: 100, output: 20 }, 0),
+    ...childRead("d1", "k1", "a.py", 12),
+    ...childRead("d1", "k2", "b.py", 15),
+    ...childCall("d1", 20, { input: 300, output: 620 }, 0.5),
+    end,
+  ].reduce(reduceChat, emptyChat);
+  const now = [...delegateTurn("d1"), ...helperEvents(), end].reduce(reduceChat, emptyChat);
+  const oldStep = old.messages[0]?.tools?.[0];
+  const newStep = now.messages[0]?.tools?.[0];
+  const plain = (step: typeof oldStep) => ({
+    ...step?.child,
+    toolSteps: step?.child?.toolSteps.map(({ callId, name, args, status }) => ({ callId, name, args, status })),
+    startedAt: null,
+  });
+  assert.deepEqual(plain(newStep), plain(oldStep));
+  assert.equal(newStep?.child?.status, "done");
+  assert.equal(helperLine(newStep!), helperLine(oldStep!));
+  assert.equal(now.messages.length, old.messages.length);
+});
+
+test("a helper that stopped with failed is failed, and a helper event with no delegate call changes nothing", () => {
+  const failed = helperEvents().map((event): ChatEvent =>
+    event.type === "helper.ended" ? { ...event, data: { ...event.data, stopped: "failed" } } : event,
+  );
+  const step = [...delegateTurn("d1"), ...failed].reduce(reduceChat, emptyChat).messages[0]?.tools?.[0];
+  assert.equal(step?.child?.status, "failed");
+  assert.deepEqual(helperEvents().reduce(reduceChat, emptyChat), emptyChat);
 });
 
 test("a child event for a delegate call that is not there changes nothing", () => {

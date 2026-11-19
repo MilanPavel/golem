@@ -50,6 +50,18 @@ test("the run's totals add three calls, one without a cost, and name the last mo
   assert.deepEqual(turnFooter(finished), { durationMs: undefined, tools: 0, model: "deepseek-chat", tier: "budget", tokens: 6600, costUsd: 0.004 });
 });
 
+test("the cost of helper.ended is added to the turn's cost, with its tokens and a helper count", () => {
+  let state = reduceChat(emptyChat, ev("model.call.started", { message_id: "m1", model: "deepseek-chat", tier: "budget" }));
+  state = reduceChat(state, ev("message.started", { message_id: "m1" }));
+  state = reduceChat(state, ev("model.call.completed", { message_id: "m1", usage: { input: 100, output: 10 }, cost_usd: 0.01 }));
+  state = reduceChat(state, ev("tool.requested", { call_id: "d1", message_id: "m1", name: "delegate", args: { brief: "look" } }));
+  state = reduceChat(
+    state,
+    ev("helper.ended", { call_id: "d1", index: 0, stopped: "done", model_calls: 2, tokens: 500, answer_tokens: 50, cost_usd: 0.25, duration_ms: 1000, working_ms: 900 }),
+  );
+  assert.deepEqual(turnTotals(state.messages), { model: "deepseek-chat", tier: "budget", tokens: 610, costUsd: 0.26, helpers: 1 });
+});
+
 test("a call still in flight adds no tokens", () => {
   let state = reduceChat(emptyChat, ev("model.call.started", { message_id: "m1", model: "qwen3:27b", tier: "local" }));
   state = reduceChat(state, ev("message.started", { message_id: "m1" }));

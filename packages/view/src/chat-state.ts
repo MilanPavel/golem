@@ -371,6 +371,15 @@ function parentCallOf(event: ChatEvent): string | null {
   return "parent_call_id" in data && typeof data.parent_call_id === "string" ? data.parent_call_id : null;
 }
 
+type HelperEvent = Extract<ChatEvent, { type: "helper.started" | "helper.step" | "helper.state" | "helper.ended" }>;
+
+/** The events a helper session sends to its lead's log, each naming the `delegate` call as `call_id`. `helper.wait` is the lead's own. */
+function isHelperEvent(event: ChatEvent): event is HelperEvent {
+  return (
+    event.type === "helper.started" || event.type === "helper.step" || event.type === "helper.state" || event.type === "helper.ended"
+  );
+}
+
 /** A tool call after one of the events of its life: started, output, completed or failed. */
 function foldTool(tool: ToolBlock, event: ChatEvent): ToolBlock {
   switch (event.type) {
@@ -435,6 +444,27 @@ function foldHelper(child: HelperRun, event: ChatEvent): HelperRun {
       };
       return { ...next, toolSteps: [...child.toolSteps.filter((tool) => tool.callId !== block.callId), block] };
     }
+    case "helper.started":
+      return { ...next, model: event.data.model };
+    case "helper.step": {
+      const { step_id: callId, name, status } = event.data;
+      const args = event.data.args ?? {};
+      const known = child.toolSteps.some((tool) => tool.callId === callId);
+      const toolSteps = known
+        ? child.toolSteps.map((tool) => (tool.callId === callId ? { ...tool, status } : tool))
+        : [...child.toolSteps, { callId, name, args, status }];
+      return { ...next, toolSteps };
+    }
+    case "helper.ended":
+      return {
+        ...next,
+        modelCalls: event.data.model_calls,
+        tokens: event.data.tokens,
+        costUsd: event.data.cost_usd,
+        answerTokens: event.data.answer_tokens,
+        status: event.data.stopped === "failed" ? "failed" : "done",
+        durationMs: event.data.duration_ms,
+      };
     case "tool.started":
     case "tool.output":
     case "tool.completed":
@@ -462,7 +492,7 @@ function endHelper(tool: ToolBlock, event: ChatEvent): ToolBlock {
     child: {
       ...child,
       status: event.type === "tool.failed" ? "failed" : "done",
-      durationMs: own ?? elapsed(child.startedAt, event.ts),
+      durationMs: own ?? child.durationMs ?? elapsed(child.startedAt, event.ts),
     },
   };
 }
@@ -470,6 +500,7 @@ function endHelper(tool: ToolBlock, event: ChatEvent): ToolBlock {
 export function reduceChat(state: ChatState, event: ChatEvent): ChatState {
   const parent = parentCallOf(event);
   if (parent !== null) return reduceChild(state, parent, event);
+  if (isHelperEvent(event)) return reduceChild(state, event.data.call_id, event);
   const base = reduceChatEvent(state, event);
   const plan = reducePlan(state.plan, event);
   const next = plan === state.plan ? base : { ...base, plan };
