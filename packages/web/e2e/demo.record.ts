@@ -15,6 +15,8 @@ import {
   RECEIPTS_ROUTINE,
   RUST_ASK_WEB,
   RUST_COMMAND,
+  RUST_TITLE,
+  SEARCH_TITLE,
   SEARCH_ASK,
   cargoEnv,
   demoConfig,
@@ -107,6 +109,7 @@ test("record the search demo", async ({ page, rig }) => {
   const folder = path.join(projectIn(rig, "notes"));
   mkdirSync(folder, { recursive: true });
   const { session_id: id } = await second.client.createSession({ cwd: folder });
+  await second.client.renameSession(id, SEARCH_TITLE);
   queueSearch(model);
   await openSession(page, gateway.url, id, { details: false });
 
@@ -146,15 +149,22 @@ test("record the inbox demo", async ({ page, rig }) => {
   mkdirSync(notes, { recursive: true });
   mkdirSync(work, { recursive: true });
   writeConfig(home, demoConfig(model, "qwen3:30b", routineConfig(watched, work)));
-  rig.own(await startDemoDaemon(home));
+  rig.own(await startDemoDaemon(home, { cannedWeb: true }));
   const gateway = rig.own(await startGateway(home));
   const second = rig.own(await startSecondClient(home));
 
   // A past run, so Runs has two rows: the scheduled routine ran once, from the real routine.run.
   await runMorningBrief(model, second);
+  // The chat you are in when the receipt arrives: a finished search, asked off camera.
   const { session_id: id } = await second.client.createSession({ cwd: notes });
-  queueReceipts(model);
+  await second.client.renameSession(id, SEARCH_TITLE);
+  queueSearch(model);
   await openSession(page, gateway.url, id, { details: false });
+  await ask(page, SEARCH_ASK);
+  await expect(page.getByRole("article", { name: "golem" }).last()).toContainText("Naive Set Theory");
+  await expect(page.getByRole("button", { name: /\d sources?$/ })).toBeVisible();
+  await page.waitForTimeout(500);
+  queueReceipts(model);
   // The folder watch has taken its first listing, so a file dropped now is new.
   await page.waitForTimeout(2500);
 
@@ -195,6 +205,7 @@ test("record the code demo", async ({ page, rig }) => {
 
   const project = writeRustProject(projectIn(rig, "rust-hello"));
   const { session_id: id } = await second.client.createSession({ cwd: project });
+  await second.client.renameSession(id, RUST_TITLE);
   queueRust(model);
   await openSession(page, gateway.url, id, { details: true });
   await page.getByRole("tab", { name: /^Changes/ }).click();

@@ -8,6 +8,7 @@ import path from "node:path";
 import {
   DEMO_VERSION,
   RECEIPTS_ROUTINE,
+  RUST_TITLE,
   cargoEnv,
   demoConfig,
   dropReceipt,
@@ -49,6 +50,15 @@ await runMorningBrief(model, second);
 const asked = model.requests.length;
 queueRust(model, 35);
 queueReceipts(model);
+// `golem tui` makes the session itself, so it is titled once it exists, as the title model would.
+const naming = setInterval(() => {
+  void second.client.listSessions(20, project).then(async ({ sessions }) => {
+    const mine = sessions.find((x) => x.title !== RUST_TITLE);
+    if (mine === undefined) return;
+    clearInterval(naming);
+    await second.client.renameSession(mine.session_id, RUST_TITLE);
+  });
+}, 100);
 const STORY_REQUESTS = 4;
 const poll = setInterval(() => {
   if (model.requests.length < asked + STORY_REQUESTS) return;

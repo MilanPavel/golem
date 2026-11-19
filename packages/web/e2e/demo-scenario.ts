@@ -57,6 +57,7 @@ export function demoConfig(model: Pick<FakeModel, "baseUrl">, name = "qwen3:30b"
 // ---------------------------------------------------------------------------------------------
 // search
 
+export const SEARCH_TITLE = "Infinity and sources";
 export const SEARCH_ASK = "Tell me something about infinity and great sources I can study.";
 const SEP = "https://plato.stanford.edu/entries/infinity/";
 const DELFT = "https://ocw.tudelft.nl/courses/infinity-and-the-foundations-of-mathematics/";
@@ -83,6 +84,7 @@ export function queueSearch(model: FakeModel, delayMs = 30): void {
 // ---------------------------------------------------------------------------------------------
 // rust
 
+export const RUST_TITLE = "Rust hello world";
 export const RUST_ASK_WEB = "Make a hello world app in Rust in rust-hello, with a test, and run it.";
 export const RUST_ASK_TUI = "Make a hello world app in Rust, with a test, and run it.";
 export const RUST_COMMAND = "cargo test && cargo run";
