@@ -31,8 +31,8 @@ from pydantic import BaseModel
 from golem.config import ModelPrice
 from golem.graphs.adapter import message_text
 from golem.models.cost import cost_usd
+from golem.models.dispatcher import Dispatcher, job_slot
 from golem.models.errors import BUDGET_HINT, BudgetSpent
-from golem.models.gate import ServerGate
 from golem.models.roles import RoleModel, for_role
 from golem.models.router import ModelRouter
 from golem.models.structured import StructuredError, structured
@@ -212,7 +212,7 @@ class Summariser:
         self,
         router: ModelRouter,
         *,
-        gate: ServerGate | None = None,
+        dispatcher: Dispatcher | None = None,
         usage: Usage | None = None,
         price_of: Callable[[str], ModelPrice | None] | None = None,
         tier_of: Callable[[str], Tier | None] | None = None,
@@ -221,7 +221,7 @@ class Summariser:
         paid_ok: Callable[[str | None], Awaitable[bool]] | None = None,
     ) -> None:
         self._router = router
-        self._gate = gate
+        self._dispatcher = dispatcher
         self._usage = usage
         self._price_of = price_of
         self._tier_of = tier_of
@@ -278,13 +278,12 @@ class Summariser:
         reserve = self._router.context_settings().reply_reserve
         room = None if window is None else max(1, window - reserve)
         model = self._router.chat_model(role.profile, overrides, local_only=local_only)
-        held = None if self._gate is None or server is None else server[1]
-        gate = self._gate or ServerGate()
+        line = self._router.local_line(role.profile)
         try:
             seen = _Tokens()
             at = _COUNTING.set(seen)
             try:
-                async with gate.hold(held, "job"):
+                async with job_slot(self._dispatcher, line, session_id, "a summary job"):
                     text = await summarise(model, messages, earlier, room=room, focus=focus)
             finally:
                 _COUNTING.reset(at)

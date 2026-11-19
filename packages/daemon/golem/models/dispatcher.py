@@ -16,7 +16,7 @@ import asyncio
 import logging
 import time
 from collections.abc import AsyncGenerator, Awaitable, Callable, Mapping
-from contextlib import asynccontextmanager, suppress
+from contextlib import AbstractAsyncContextManager, asynccontextmanager, nullcontext, suppress
 from dataclasses import dataclass, field
 from typing import Literal
 
@@ -257,6 +257,14 @@ class Dispatcher:
         """A call on the line went through: the run of refusals ends."""
         self._line(line).refusals = 0
 
+    def set_local_slots(self, n: int) -> None:
+        """A new slot count for every local line, those made so far and those made later."""
+        if n < 1:
+            raise ValueError("slots must be at least 1")
+        self._default_slots["local"] = n
+        for key in [k for k in self._lines if k.kind == "local"]:
+            self.set_slots(key, n)
+
     def snapshot(self) -> list[LineState]:
         """Every line made so far: its slots, who holds them and who waits."""
         now = self._clock()
@@ -442,6 +450,18 @@ class Dispatcher:
             await entry.changed.wait()
 
 
+def job_slot(
+    dispatcher: Dispatcher | None, line: LineKey | None, session_id: str | None, label: str
+) -> AbstractAsyncContextManager[object]:
+    """A slot for a job (a title, a summary, a check), or nothing without a dispatcher or a line.
+
+    A model with no local line, such as a hosted one, never waits.
+    """
+    if dispatcher is None or line is None:
+        return nullcontext()
+    return dispatcher.hold(Call(line, session_id, "job", label))
+
+
 def _remaining(line: _Line, now: float) -> float | None:
     return line.backoff_until - now if now < line.backoff_until else None
 
@@ -457,4 +477,5 @@ __all__ = [
     "Role",
     "Wait",
     "Waiting",
+    "job_slot",
 ]

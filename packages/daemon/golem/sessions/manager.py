@@ -1992,6 +1992,11 @@ class SessionManager:
         if prompt is not None:
             self._title_after(session, prompt, reply, local_only=resume.local_only)
 
+    def origin_of(self, session_id: str) -> str | None:
+        """The origin of a session that is loaded, else None. It reads no storage."""
+        live = self._sessions.get(session_id)
+        return None if live is None else live.origin
+
     async def _ended(self, session_id: str, run_id: str, reply: str | None) -> None:
         """Store ``session.completed`` when a run of a headless session ended.
 

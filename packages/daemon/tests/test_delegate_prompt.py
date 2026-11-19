@@ -15,7 +15,7 @@ from golem.graphs.chat import ChatRuntime, open_chat
 from golem.graphs.child import CHILD_PROMPT
 from golem.graphs.delegate_prompt import DELEGATE_PROMPT, DELEGATE_TEXT, delegate_section
 from golem.graphs.prompt import PromptContext, SystemPrompt
-from golem.models.gate import ServerGate
+from golem.models.dispatcher import Dispatcher
 from golem.models.router import ModelRouter
 from golem.models.window import ContextWindow
 from golem.sessions.bus import EventBus
@@ -62,7 +62,7 @@ class _Chat:
             prompt=SystemPrompt(sections=(DELEGATE_PROMPT,)),
             blobs=BlobStore(database),
             window_of=lambda _profile, _overrides: ContextWindow(window=window),
-            gate=ServerGate(slots=1),
+            dispatcher=Dispatcher(lambda _call: 2),
         )
         self.runs = RunRecords(database)
         self.events = EventLog(database)

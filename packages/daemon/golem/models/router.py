@@ -41,6 +41,8 @@ from golem.config import (
 )
 from golem.models import ollama
 from golem.models import options as model_options
+from golem.models.dispatcher import LineKey
+from golem.models.engine import OLLAMA
 from golem.models.errors import ModelUnreachable
 from golem.models.health import Health
 from golem.models.keys import KeyStore, KeyStoreError
@@ -432,6 +434,13 @@ class ModelRouter:
         if resolved.provider.kind != "ollama":
             return None
         return resolved.provider_name, _ollama_url(resolved.provider.base_url)
+
+    def local_line(self, profile: str) -> LineKey | None:
+        """The dispatcher line ``profile`` runs on when it is a local model, or None."""
+        server = self.ollama_server(profile)
+        if server is None:
+            return None
+        return LineKey.local(OLLAMA.id, server[1], self.resolve(profile).model_id)
 
     def unreachable(self, profile: str, exc: BaseException) -> ModelUnreachable | None:
         """``exc`` from a call to ``profile`` as :class:`ModelUnreachable`, or None.

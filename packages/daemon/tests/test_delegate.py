@@ -30,7 +30,7 @@ from golem.config import (
 from golem.graphs.adapter import plain_messages
 from golem.graphs.chat import ChatRuntime, open_chat
 from golem.graphs.child import CHILD_PROMPT, EXPLORER_TOOLS, FINAL_REQUEST, ChildLimits
-from golem.models.gate import ServerGate
+from golem.models.dispatcher import Dispatcher
 from golem.models.router import ModelRouter
 from golem.models.tiers import Tier
 from golem.models.window import ContextWindow
@@ -94,7 +94,7 @@ class _Chat:
         *,
         settings: GolemSettings = SETTINGS,
         limits: ChildLimits | None = None,
-        gate: ServerGate | None = None,
+        dispatcher: Dispatcher | None = None,
         policy: Policy | None = None,
         tier_of: Callable[[str], Tier | None] | None = None,
         paid_ok: Callable[[str | None], Awaitable[bool]] | None = None,
@@ -106,7 +106,7 @@ class _Chat:
             self.saver,
             default_registry(),
             policy,
-            gate=gate,
+            dispatcher=dispatcher,
             price_of=lambda _profile: ModelPrice(input=1.0, output=2.0),
             tier_of=tier_of,
             paid_ok=paid_ok,
@@ -193,7 +193,7 @@ async def test_the_parent_delegates_and_keeps_only_the_answer(
         ],
         usage=USAGE,
     )
-    chat = _Chat(database, model, gate=ServerGate(slots=1))
+    chat = _Chat(database, model, dispatcher=Dispatcher(lambda _call: 2))
     session_id, run_id, _ = await chat.run(project)
 
     run = await chat.runs.get(run_id)
