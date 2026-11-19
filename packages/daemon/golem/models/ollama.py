@@ -10,6 +10,11 @@ stopped. The started server's pid goes into a file, so a daemon that restarts
 takes it back. Two daemons need no lock between them, because the port is the
 lock: a second ``ollama serve`` exits, and its daemon then finds the first one
 answering.
+
+golem starts that server with ``OLLAMA_NUM_PARALLEL`` set from ``[ollama] parallel``.
+When the setting changes, a server golem started is restarted the next time something
+takes :meth:`LocalServer.hold` while nothing else holds it, never during a call. A
+server golem did not start is never restarted.
 """
 
 from __future__ import annotations
@@ -169,6 +174,10 @@ class LocalServer:
         self._pid: int | None = None
         self._users = 0
         self._used = clock()
+        # The OLLAMA_NUM_PARALLEL the owned server runs with. None when golem does not
+        # know it, as for a server an older golem started.
+        self._parallel: int | None = None
+        self._restarting = False
 
     @property
     def owner(self) -> Owner | None:
@@ -195,7 +204,7 @@ class LocalServer:
         when a start fails.
         """
         self._used = self._clock()
-        if self._process is not None and self._process.returncode is None:
+        if self._process is not None and self._process.returncode is None and not self._restarting:
             return True
         # Shielded: a caller that goes away mid-start must not leave a server nobody owns.
         return await asyncio.shield(self._ensure())
@@ -218,13 +227,59 @@ class LocalServer:
     @contextlib.asynccontextmanager
     async def hold(self) -> AsyncGenerator[None]:
         """Make sure the server runs, and keep the idle stop away while inside."""
-        await self.ensure_running()
+        # No await between the last check and the count, so a call never starts on a
+        # server that is about to restart.
+        while True:
+            await self.ensure_running()
+            if self._restarting:
+                continue
+            if not self._stale():
+                break
+            await self._restart()
         self._users += 1
         try:
             yield
         finally:
             self._users -= 1
             self._used = self._clock()
+
+    def _stale(self) -> bool:
+        """True when golem's own server runs with another slot count than ``parallel`` now says."""
+        return (
+            self._owner == "golem"
+            and self._users == 0
+            and not self._restarting
+            and self._parallel is not None
+            and self._parallel != self.settings.parallel
+        )
+
+    async def _restart(self) -> None:
+        """Stop the server golem started and start it again with the current ``parallel``."""
+        if not self._stale():
+            return
+        self._restarting = True
+        try:
+            async with self._lock:
+                if self._users > 0 or self._owner != "golem":
+                    return
+                log.info(
+                    "restarting ollama at %s: parallel changed from %s to %d",
+                    self.base_url,
+                    self._parallel,
+                    self.settings.parallel,
+                )
+                if self._process is not None:
+                    await self._stop_child(self._process)
+                elif self._pid is not None:
+                    await self._stop_pid(self._pid)
+                self._forget()
+                self.listener("stopped", None)
+                path = self._find_binary()
+                if path is None:
+                    return
+                await self._start(path)
+        finally:
+            self._restarting = False
 
     async def stop_if_idle(self) -> bool:
         """Stop a server golem started once nothing has held it for ``idle_stop_minutes``."""
@@ -258,7 +313,12 @@ class LocalServer:
     async def _start(self, path: str) -> None:
         self.listener("starting", None)
         log.info("starting %s serve for %s", path, self.base_url)
-        env = {**os.environ, "OLLAMA_HOST": self._host()}
+        parallel = self.settings.parallel
+        env = {
+            **os.environ,
+            "OLLAMA_HOST": self._host(),
+            "OLLAMA_NUM_PARALLEL": str(parallel),
+        }
         try:
             self._log_file.parent.mkdir(parents=True, exist_ok=True)
             process = await self._spawn(path, env, self._log_file)
@@ -280,9 +340,11 @@ class LocalServer:
         self._process = process
         self._owner = "golem"
         self._pid = process.pid
+        self._parallel = parallel
+        # The second line is the slot count, so a daemon that takes the server back knows it.
         with contextlib.suppress(OSError):
             self._pid_file.parent.mkdir(parents=True, exist_ok=True)
-            self._pid_file.write_text(f"{process.pid}\n", encoding="utf-8")
+            self._pid_file.write_text(f"{process.pid}\n{parallel}\n", encoding="utf-8")
         log.info("ollama serve is answering at %s, pid %d", self.base_url, process.pid)
         self.listener("ready", None)
 
@@ -297,9 +359,9 @@ class LocalServer:
 
     def _take_back(self) -> None:
         """A server answers that this daemon did not start. Did golem start it before?"""
-        pid = _read_pid(self._pid_file)
+        pid, parallel = _read_pid(self._pid_file)
         if pid is not None and self._is_ollama(pid):
-            self._owner, self._pid = "golem", pid
+            self._owner, self._pid, self._parallel = "golem", pid, parallel
             log.info("took back ollama serve at %s, pid %d", self.base_url, pid)
             return
         self._pid_file.unlink(missing_ok=True)
@@ -311,6 +373,7 @@ class LocalServer:
         self._process = None
         self._owner = None
         self._pid = None
+        self._parallel = None
 
     async def _stop_child(self, process: Process) -> None:
         if process.returncode is not None:
@@ -492,12 +555,15 @@ def _is_ollama(pid: int) -> bool:
     return Path(result.stdout.strip()).name == "ollama"
 
 
-def _read_pid(path: Path) -> int | None:
+def _read_pid(path: Path) -> tuple[int | None, int | None]:
+    """The pid and the slot count in the pid file. Either is None when it is missing."""
     try:
-        text = path.read_text(encoding="utf-8").strip()
+        lines = path.read_text(encoding="utf-8").split()
     except OSError:
-        return None
-    return int(text) if text.isdigit() else None
+        return None, None
+    numbers = [int(line) if line.isdigit() else None for line in lines[:2]]
+    numbers += [None] * (2 - len(numbers))
+    return numbers[0], numbers[1]
 
 
 def _tilde(path: Path) -> str:

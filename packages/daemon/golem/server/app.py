@@ -414,7 +414,9 @@ class DaemonApp:
                     self.state.skills.start()
                     routines.start()
                     watcher.start()
-                    idle = asyncio.create_task(_stop_idle(local), name="golem-ollama-idle")
+                    idle = asyncio.create_task(
+                        _stop_idle(local, self.paths.home), name="golem-ollama-idle"
+                    )
                     watch = asyncio.create_task(self._watch_socket(), name="golem-socket-watch")
                     await self._stop.wait()
                     log.info("shutting down")
@@ -758,10 +760,24 @@ def _refuse_start(paths: GolemPaths, exc: Exception, why: tuple[str, str]) -> in
     return 1
 
 
-async def _stop_idle(local: LocalServers) -> None:
-    """Stop each Ollama golem started once it has been unused for ``idle_stop_minutes``."""
+def _apply_ollama_settings(local: LocalServers, home: Path) -> None:
+    """Hand a changed ``[ollama]`` table to the local servers. A server golem started
+    restarts for a new ``parallel`` the next time a call finds it unused."""
+    try:
+        settings = load_settings(home=home, project_dir=home).ollama
+    except (OSError, ValueError):
+        log.debug("config.toml does not load; the local servers keep their settings")
+        return
+    if settings != local.settings:
+        local.settings = settings
+
+
+async def _stop_idle(local: LocalServers, home: Path) -> None:
+    """Stop each Ollama golem started once it has been unused for ``idle_stop_minutes``,
+    and pick up a changed ``[ollama]`` setting."""
     while True:
         await asyncio.sleep(_IDLE_CHECK_SECONDS)
+        _apply_ollama_settings(local, home)
         try:
             await local.stop_idle()
         except Exception:

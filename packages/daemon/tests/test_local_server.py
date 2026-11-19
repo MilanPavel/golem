@@ -77,7 +77,7 @@ async def test_nothing_answers_so_golem_starts_ollama_serve(
     assert (path, env["OLLAMA_HOST"]) == ("/opt/homebrew/bin/ollama", "127.0.0.1:11434")
     status = server.status()
     assert status is not None and (status.owner, status.pid) == ("golem", 4000)
-    assert (tmp_path / "run" / "ollama-11434.pid").read_text() == "4000\n"
+    assert (tmp_path / "run" / "ollama-11434.pid").read_text() == "4000\n1\n"
     assert heard == [("starting", None), ("ready", None)]
 
 
@@ -238,3 +238,121 @@ def test_only_a_url_on_this_machine_gets_a_server(tmp_path: Path) -> None:
     other = servers.get("second", "http://localhost:11500")
     assert other is not None and other is not local
     assert other._pid_file.name == "ollama-11500.pid"  # pyright: ignore[reportPrivateUsage]
+
+
+def _is_4242(pid: int) -> bool:
+    return pid == 4242
+
+
+async def test_a_started_server_gets_the_slot_count_in_its_env(
+    ollama: FakeServe, tmp_path: Path
+) -> None:
+    server, _ = _server(ollama, tmp_path, settings=OllamaSettings(parallel=4))
+    await server.ensure_running()
+    assert ollama.spawned[0][1]["OLLAMA_NUM_PARALLEL"] == "4"
+    pid_file = tmp_path / "run" / "ollama-11434.pid"
+    assert pid_file.read_text() == "4000\n4\n"
+
+
+async def test_the_default_setup_passes_one_slot(ollama: FakeServe, tmp_path: Path) -> None:
+    server, _ = _server(ollama, tmp_path)
+    await server.ensure_running()
+    assert ollama.spawned[0][1]["OLLAMA_NUM_PARALLEL"] == "1"
+
+
+async def test_a_changed_parallel_restarts_an_owned_server_between_calls(
+    ollama: FakeServe, tmp_path: Path
+) -> None:
+    server, heard = _server(ollama, tmp_path)
+    async with server.hold():
+        server.settings = OllamaSettings(parallel=3)
+        # A second caller while the first is inside does not restart it.
+        async with server.hold():
+            assert len(ollama.spawned) == 1
+    assert ollama.processes[0].signals == []
+
+    async with server.hold():
+        pass
+    assert ollama.processes[0].signals == ["term"]
+    assert [env["OLLAMA_NUM_PARALLEL"] for _, env in ollama.spawned] == ["1", "3"]
+    assert server.owner == "golem"
+    assert [state for state, _ in heard] == [
+        "starting",
+        "ready",
+        "stopped",
+        "starting",
+        "ready",
+    ]
+
+    async with server.hold():
+        pass
+    assert len(ollama.spawned) == 2
+
+
+async def test_an_unchanged_parallel_never_restarts(ollama: FakeServe, tmp_path: Path) -> None:
+    server, _ = _server(ollama, tmp_path)
+    for _ in range(3):
+        async with server.hold():
+            pass
+    server.settings = OllamaSettings(parallel=1, idle_stop_minutes=5)
+    async with server.hold():
+        pass
+    assert len(ollama.spawned) == 1
+
+
+async def test_an_external_server_is_never_restarted_for_parallel(
+    ollama: FakeServe, tmp_path: Path
+) -> None:
+    ollama.up = True
+    server, _ = _server(ollama, tmp_path)
+    async with server.hold():
+        pass
+    assert server.owner == "external"
+    server.settings = OllamaSettings(parallel=4)
+    async with server.hold():
+        pass
+    assert ollama.spawned == []
+    assert ollama.processes == []
+
+
+async def test_a_taken_back_server_restarts_when_its_recorded_count_differs(
+    ollama: FakeServe, tmp_path: Path
+) -> None:
+    ollama.up = True
+    pid_file = tmp_path / "run" / "ollama-11434.pid"
+    pid_file.parent.mkdir()
+    pid_file.write_text("4242\n2\n")
+    stopped = False
+
+    def kill(pid: int, sig: int) -> None:
+        nonlocal stopped
+        if sig == signal.SIGTERM:
+            stopped = True
+            ollama.up = False
+        if sig == 0 and stopped:
+            raise ProcessLookupError
+
+    server, _ = _server(
+        ollama,
+        tmp_path,
+        is_ollama=_is_4242,
+        kill=kill,
+        settings=OllamaSettings(parallel=4),
+    )
+    async with server.hold():
+        pass
+    assert stopped
+    assert [env["OLLAMA_NUM_PARALLEL"] for _, env in ollama.spawned] == ["4"]
+
+
+async def test_a_taken_back_server_with_no_recorded_count_is_left_running(
+    ollama: FakeServe, tmp_path: Path
+) -> None:
+    ollama.up = True
+    pid_file = tmp_path / "run" / "ollama-11434.pid"
+    pid_file.parent.mkdir()
+    pid_file.write_text("4242\n")
+    server, _ = _server(ollama, tmp_path, is_ollama=_is_4242, settings=OllamaSettings(parallel=4))
+    async with server.hold():
+        pass
+    assert ollama.spawned == []
