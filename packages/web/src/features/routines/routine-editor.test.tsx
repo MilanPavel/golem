@@ -213,6 +213,9 @@ test("On new file shows a folder, a pattern and the preview line, and writes on 
   await user.type(screen.getByRole("textbox", { name: "Name" }), "receipts");
   await user.type(screen.getByRole("textbox", { name: "Prompt" }), "/receipt-to-csv {{path}");
   await user.click(repeat().getByRole("radio", { name: "On new file" }));
+  // A new routine starts on the default schedule, and its preview may already have been asked
+  // for while the name and prompt were typed. From here on a watch routine must ask for none.
+  onPreview.mockClear();
   expect(screen.queryByLabelText("At")).toBeNull();
   expect(screen.queryByRole("radiogroup", { name: "When missed" })).toBeNull();
   expect((screen.getByRole("textbox", { name: "Pattern" }) as HTMLInputElement).placeholder).toBe("*.pdf");
