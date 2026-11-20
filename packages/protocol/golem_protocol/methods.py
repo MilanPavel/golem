@@ -130,6 +130,7 @@ METHOD_ACCESS: Final[Mapping[str, Access]] = {
     "memory.settings": "browser",
     "agents.list": "browser",
     "agents.get": "browser",
+    "agents.set_wish": "browser",
     "helper.stop": "browser",
 }
 

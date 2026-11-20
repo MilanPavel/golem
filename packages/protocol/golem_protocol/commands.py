@@ -1916,6 +1916,22 @@ class AgentRegistryChanged(BaseModel):
     root: str | None = None
 
 
+class WishResolution(BaseModel):
+    """What a type's wish becomes in this setup.
+
+    ``model`` is the model the wish picks now and ``tier`` its tier. ``reason`` is one plain
+    line on why, at most 200 characters. ``fresh_window`` is true when the helper starts
+    with an empty context window on that model. Every field may be left out.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    model: str | None = Field(default=None, min_length=1, max_length=200)
+    tier: Literal["local", "budget", "frontier"] | None = None
+    reason: str | None = Field(default=None, min_length=1, max_length=200)
+    fresh_window: bool | None = None
+
+
 class AgentInfo(BaseModel):
     """One agent type: an ``agents/<name>.md`` file, valid or not.
 
@@ -1927,7 +1943,8 @@ class AgentInfo(BaseModel):
     false for a project agent in a folder that is not trusted, which is listed and
     never started. ``used`` and ``finished`` count helpers of this type started and
     ended in the last 30 days (``helper.ended``). ``finished`` is ``None`` when the
-    daemon cannot count them.
+    daemon cannot count them. ``resolves_to`` is what ``wish`` becomes in this setup;
+    ``None`` when the daemon does not say. An older daemon leaves it out.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -1944,6 +1961,7 @@ class AgentInfo(BaseModel):
     trusted: bool = True
     used: int = Field(default=0, ge=0)
     finished: int | None = Field(default=None, ge=0)
+    resolves_to: WishResolution | None = None
 
 
 class AgentsListParams(BaseModel):
@@ -1975,6 +1993,23 @@ class AgentsGetResult(AgentInfo):
     """The agent type and its prompt, the body of its file."""
 
     prompt: str
+
+
+class AgentsSetWishParams(BaseModel):
+    """``agents.set_wish``. Set the model wish of the agent type ``name``.
+
+    ``wish`` is ``cheapest``, ``same``, ``stronger``, a tier or a model name.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    name: str = Field(min_length=1)
+    wish: str = Field(min_length=1, max_length=200)
+    cwd: str | None = Field(default=None, min_length=1)
+
+
+class AgentsSetWishResult(AgentInfo):
+    """The agent type after the change."""
 
 
 class HelperStopParams(BaseModel):
@@ -4261,6 +4296,8 @@ __all__ = [
     "AgentsGetResult",
     "AgentsListParams",
     "AgentsListResult",
+    "AgentsSetWishParams",
+    "AgentsSetWishResult",
     "ApprovalRespondParams",
     "ApprovalRespondResult",
     "ArtifactReadParams",
@@ -4554,4 +4591,5 @@ __all__ = [
     "TraceSpanResult",
     "TraceTokens",
     "TraceToolSpan",
+    "WishResolution",
 ]

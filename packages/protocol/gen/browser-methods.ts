@@ -3,6 +3,7 @@
 export const BROWSER_METHODS: ReadonlySet<string> = new Set([
   "agents.get",
   "agents.list",
+  "agents.set_wish",
   "approval.respond",
   "artifact.read",
   "auth.list",

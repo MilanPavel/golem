@@ -1,0 +1,36 @@
+{
+  "additionalProperties": false,
+  "description": "``agents.set_wish``. Set the model wish of the agent type ``name``.\n\n``wish`` is ``cheapest``, ``same``, ``stronger``, a tier or a model name.",
+  "properties": {
+    "cwd": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Cwd"
+    },
+    "name": {
+      "minLength": 1,
+      "title": "Name",
+      "type": "string"
+    },
+    "wish": {
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "Wish",
+      "type": "string"
+    }
+  },
+  "required": [
+    "name",
+    "wish"
+  ],
+  "title": "AgentsSetWishParams",
+  "type": "object"
+}

@@ -12,6 +12,10 @@ export type MaxTokens = number | null;
 export type Name = string;
 export type Origin = 'bundled' | 'user' | 'project';
 export type Prompt = string;
+export type FreshWindow = boolean | null;
+export type Model = string | null;
+export type Reason = string | null;
+export type Tier = ('local' | 'budget' | 'frontier') | null;
 export type Shadowed = ('bundled' | 'user' | 'project')[];
 export type Tools = string[];
 export type Trusted = boolean;
@@ -30,6 +34,7 @@ export interface AgentsGetResult {
   name: Name;
   origin: Origin;
   prompt: Prompt;
+  resolves_to?: WishResolution | null;
   shadowed?: Shadowed;
   tools?: Tools;
   trusted?: Trusted;
@@ -51,4 +56,20 @@ export interface AgentLimits {
   max_cost_usd?: MaxCostUsd;
   max_seconds?: MaxSeconds;
   max_tokens?: MaxTokens;
+}
+/**
+ * What a type's wish becomes in this setup.
+ *
+ * ``model`` is the model the wish picks now and ``tier`` its tier. ``reason`` is one plain
+ * line on why, at most 200 characters. ``fresh_window`` is true when the helper starts
+ * with an empty context window on that model. Every field may be left out.
+ *
+ * This interface was referenced by `AgentsGetResult`'s JSON-Schema
+ * via the `definition` "WishResolution".
+ */
+export interface WishResolution {
+  fresh_window?: FreshWindow;
+  model?: Model;
+  reason?: Reason;
+  tier?: Tier;
 }

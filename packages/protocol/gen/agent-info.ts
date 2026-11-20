@@ -11,6 +11,10 @@ export type MaxSeconds = number | null;
 export type MaxTokens = number | null;
 export type Name = string;
 export type Origin = 'bundled' | 'user' | 'project';
+export type FreshWindow = boolean | null;
+export type Model = string | null;
+export type Reason = string | null;
+export type Tier = ('local' | 'budget' | 'frontier') | null;
 export type Shadowed = ('bundled' | 'user' | 'project')[];
 export type Tools = string[];
 export type Trusted = boolean;
@@ -28,7 +32,8 @@ export type Wish = string;
  * false for a project agent in a folder that is not trusted, which is listed and
  * never started. ``used`` and ``finished`` count helpers of this type started and
  * ended in the last 30 days (``helper.ended``). ``finished`` is ``None`` when the
- * daemon cannot count them.
+ * daemon cannot count them. ``resolves_to`` is what ``wish`` becomes in this setup;
+ * ``None`` when the daemon does not say. An older daemon leaves it out.
  */
 export interface AgentInfo {
   asks?: Asks;
@@ -38,6 +43,7 @@ export interface AgentInfo {
   limits?: AgentLimits;
   name: Name;
   origin: Origin;
+  resolves_to?: WishResolution | null;
   shadowed?: Shadowed;
   tools?: Tools;
   trusted?: Trusted;
@@ -59,4 +65,20 @@ export interface AgentLimits {
   max_cost_usd?: MaxCostUsd;
   max_seconds?: MaxSeconds;
   max_tokens?: MaxTokens;
+}
+/**
+ * What a type's wish becomes in this setup.
+ *
+ * ``model`` is the model the wish picks now and ``tier`` its tier. ``reason`` is one plain
+ * line on why, at most 200 characters. ``fresh_window`` is true when the helper starts
+ * with an empty context window on that model. Every field may be left out.
+ *
+ * This interface was referenced by `AgentInfo`'s JSON-Schema
+ * via the `definition` "WishResolution".
+ */
+export interface WishResolution {
+  fresh_window?: FreshWindow;
+  model?: Model;
+  reason?: Reason;
+  tier?: Tier;
 }
