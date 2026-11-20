@@ -54,7 +54,7 @@ class HelperRef:
     created: bool
 
 
-def wish_of(agent: AgentSnapshot, roles: RoleSettings) -> str:
+def wish_of(agent: Agent | AgentSnapshot, roles: RoleSettings) -> str:
     """What the helper of ``agent`` wishes for its model (ADR-059, section 5).
 
     The agent file's wish. ``[routing.roles] explore`` is read as the wish of the explorer, when
