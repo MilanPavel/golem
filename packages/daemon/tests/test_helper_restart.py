@@ -33,21 +33,27 @@ from golem_protocol.events import ChatEvent, EmptyEventData, RunFailedData
 
 
 class _Model(ToolCallingChatModel):
-    """Answers as scripted, except a call whose history holds a ``hang`` message: that waits."""
+    """Answers as scripted, except a call whose history holds a ``hang`` message: that waits,
+    for ever or until :meth:`release`."""
 
     hangs: bool = True
     _waiting: asyncio.Event = PrivateAttr(default_factory=asyncio.Event)
+    _released: asyncio.Event = PrivateAttr(default_factory=asyncio.Event)
 
     @property
     def waiting(self) -> asyncio.Event:
         return self._waiting
+
+    def release(self) -> None:
+        """Let the waiting call answer."""
+        self._released.set()
 
     async def _agenerate(
         self, messages: list[BaseMessage], stop: Any = None, run_manager: Any = None, **kwargs: Any
     ) -> ChatResult:
         if self.hangs and any(m.text == "hang" for m in messages if isinstance(m, HumanMessage)):
             self._waiting.set()
-            await asyncio.Event().wait()
+            await self._released.wait()
         return self._generate(messages, stop, run_manager, **kwargs)
 
 
@@ -275,12 +281,17 @@ async def test_a_restart_in_the_middle_of_a_helper_resumes_it_and_the_lead_finis
 async def test_a_restart_with_the_helper_ended_wakes_the_lead(
     setup: _Setup, database: Database, project: Path, tmp_path: Path
 ) -> None:
-    before = _chat(database, [_delegate("look"), "found it"], setup, project, tmp_path)
-    # The daemon dies after the helper's run ended and before it told its lead.
+    before = _chat(database, [_delegate("hang"), "found it"], setup, project, tmp_path)
+    # The daemon dies after the helper's run ended and before it told or woke its lead.
     before.manager._helper_ended = _nothing  # type: ignore[method-assign]  # pyright: ignore
+    before.manager._spawn_wake = _no_wake  # type: ignore[method-assign]  # pyright: ignore
     lead = await before.lead(project)
     await before.manager.send(lead, "go")
+    # The helper answers only after the lead has parked, so the order does not depend on speed.
+    await asyncio.wait_for(before.model.waiting.wait(), 5)
+    await before.until(lead, "helper.wait")
     (helper,) = await _helpers(before, lead)
+    before.model.release()
     await before.until(helper, "session.completed")
     assert "helper.ended" not in _kinds(await before.stored(lead))
     assert [r.session_id for r in await before.runs.parked()] == [lead]
@@ -297,6 +308,10 @@ async def test_a_restart_with_the_helper_ended_wakes_the_lead(
 
 async def _nothing(*args: object, **kwargs: object) -> None:
     del args, kwargs
+
+
+def _no_wake(lead_id: str) -> None:
+    del lead_id
 
 
 async def _helpers(chat: _Chat, lead: str) -> list[str]:

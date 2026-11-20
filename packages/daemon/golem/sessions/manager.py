@@ -2490,7 +2490,10 @@ class SessionManager:
             if self.budget is not None:
                 self.budget.restore(session.session_id)
         await self._ended(session.session_id, turn.run_id, reply)
-        await self._after_run(session.session_id, turn.run_id)
+        if reply is None:
+            # A run that answered has completed: it neither failed nor parked, so it has no
+            # helpers to look at, and the session is free as soon as its task ends.
+            await self._after_run(session.session_id, turn.run_id)
         self._title_after(
             session,
             turn.typed or turn.text,
@@ -2511,7 +2514,8 @@ class SessionManager:
             )
             raise
         await self._ended(resume.session_id, resume.run_id, reply)
-        await self._after_run(resume.session_id, resume.run_id)
+        if reply is None:
+            await self._after_run(resume.session_id, resume.run_id)
         if prompt is not None:
             self._title_after(session, prompt, reply, local_only=resume.local_only)
 
