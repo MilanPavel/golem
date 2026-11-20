@@ -3148,8 +3148,21 @@
     },
     "RouteConsentNeededData": {
       "additionalProperties": false,
-      "description": "The run waits for the user's yes to a paid model. It is paused until\n``route.consent.answer``.\n\n``model_profile``, ``provider``, ``model`` and ``tier`` name the paid model that would\nrun. ``why`` is one plain sentence on why golem asks. ``estimated_usd`` is golem's\nestimate for this turn, null when the price is unknown. ``caps`` is set when a cap is.\n``alternatives`` are the answers the user may give: a spent cap leaves out ``session``.\n``signal`` is set when the question comes in the middle of a run, because the model\nstruggled (a struggle signal of the daemon); ``why`` then says how. It is null before a turn.\n``replaces_model`` is set when the question is for a turn the user asked to run on a\nstronger model; the turn's ``model.routed`` then carries it too.",
+      "description": "The run waits for the user's yes to a paid model. It is paused until\n``route.consent.answer``.\n\n``model_profile``, ``provider``, ``model`` and ``tier`` name the paid model that would\nrun. ``why`` is one plain sentence on why golem asks. ``estimated_usd`` is golem's\nestimate for this turn, null when the price is unknown. ``caps`` is set when a cap is.\n``alternatives`` are the answers the user may give: a spent cap leaves out ``session``.\n``signal`` is set when the question comes in the middle of a run, because the model\nstruggled (a struggle signal of the daemon); ``why`` then says how. It is null before a turn.\n``replaces_model`` is set when the question is for a turn the user asked to run on a\nstronger model; the turn's ``model.routed`` then carries it too.\n\nFor a helper's question (ADR-059) the event is on the helper's own log and three optional\nfields say who asks: ``helper_id`` is the helper's session id, ``agent`` its agent type and\n``label`` the short name the card shows. ``sent`` and ``not_sent`` are short lists that say\nwhat goes to the paid model (\"the brief\", \"the diff, 212 lines\") and what does not (\"this\nchat\"). All five are null or empty for a lead's own question. An older daemon leaves them out.",
       "properties": {
+        "agent": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Agent"
+        },
         "alternatives": {
           "items": {
             "enum": [
@@ -3186,6 +3199,32 @@
           "default": null,
           "title": "Estimated Usd"
         },
+        "helper_id": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Helper Id"
+        },
+        "label": {
+          "anyOf": [
+            {
+              "maxLength": 120,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Label"
+        },
         "model": {
           "anyOf": [
             {
@@ -3203,6 +3242,24 @@
           "minLength": 1,
           "title": "Model Profile",
           "type": "string"
+        },
+        "not_sent": {
+          "anyOf": [
+            {
+              "items": {
+                "maxLength": 120,
+                "minLength": 1,
+                "type": "string"
+              },
+              "maxItems": 10,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Not Sent"
         },
         "provider": {
           "anyOf": [
@@ -3229,6 +3286,24 @@
           ],
           "default": null,
           "title": "Replaces Model"
+        },
+        "sent": {
+          "anyOf": [
+            {
+              "items": {
+                "maxLength": 120,
+                "minLength": 1,
+                "type": "string"
+              },
+              "maxItems": 10,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Sent"
         },
         "signal": {
           "anyOf": [

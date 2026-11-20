@@ -410,6 +410,10 @@ class ConsentCaps(BaseModel):
     spent_today: float = Field(ge=0)
 
 
+ShortText = Annotated[str, Field(min_length=1, max_length=120)]
+"""One short line of the paid question: what is sent, or what is not."""
+
+
 class RouteConsentNeededData(BaseModel):
     """The run waits for the user's yes to a paid model. It is paused until
     ``route.consent.answer``.
@@ -422,6 +426,12 @@ class RouteConsentNeededData(BaseModel):
     struggled (a struggle signal of the daemon); ``why`` then says how. It is null before a turn.
     ``replaces_model`` is set when the question is for a turn the user asked to run on a
     stronger model; the turn's ``model.routed`` then carries it too.
+
+    For a helper's question (ADR-059) the event is on the helper's own log and three optional
+    fields say who asks: ``helper_id`` is the helper's session id, ``agent`` its agent type and
+    ``label`` the short name the card shows. ``sent`` and ``not_sent`` are short lists that say
+    what goes to the paid model ("the brief", "the diff, 212 lines") and what does not ("this
+    chat"). All five are null or empty for a lead's own question. An older daemon leaves them out.
     """
 
     model_config = _CONFIG
@@ -436,6 +446,11 @@ class RouteConsentNeededData(BaseModel):
     caps: ConsentCaps | None = None
     signal: str | None = Field(default=None, min_length=1)
     replaces_model: str | None = Field(default=None, min_length=1)
+    helper_id: str | None = Field(default=None, min_length=1)
+    agent: str | None = Field(default=None, min_length=1)
+    label: str | None = Field(default=None, max_length=120)
+    sent: list[ShortText] | None = Field(default=None, max_length=10)
+    not_sent: list[ShortText] | None = Field(default=None, max_length=10)
 
 
 class RouteConsentAnsweredData(BaseModel):

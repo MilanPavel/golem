@@ -390,16 +390,45 @@ export type Seq29 = number;
 export type SessionId31 = string;
 export type Ts29 = string;
 export type Type29 = 'approval.resolved';
+export type Agent = string | null;
 export type Alternatives = ('session' | 'once' | 'local')[];
 export type DailyUsd = number | null;
 export type SessionUsd = number | null;
 export type SpentSession = number;
 export type SpentToday = number;
 export type EstimatedUsd = number | null;
+export type HelperId = string | null;
+export type Label = string | null;
 export type Model3 = string | null;
 export type ModelProfile3 = string;
+export type NotSent =
+  | []
+  | [string]
+  | [string, string]
+  | [string, string, string]
+  | [string, string, string, string]
+  | [string, string, string, string, string]
+  | [string, string, string, string, string, string]
+  | [string, string, string, string, string, string, string]
+  | [string, string, string, string, string, string, string, string]
+  | [string, string, string, string, string, string, string, string, string]
+  | [string, string, string, string, string, string, string, string, string, string]
+  | null;
 export type Provider3 = string | null;
 export type ReplacesModel1 = string | null;
+export type Sent =
+  | []
+  | [string]
+  | [string, string]
+  | [string, string, string]
+  | [string, string, string, string]
+  | [string, string, string, string, string]
+  | [string, string, string, string, string, string]
+  | [string, string, string, string, string, string, string]
+  | [string, string, string, string, string, string, string, string]
+  | [string, string, string, string, string, string, string, string, string]
+  | [string, string, string, string, string, string, string, string, string, string]
+  | null;
 export type Signal = string | null;
 export type Tier3 = 'local' | 'budget' | 'frontier';
 export type Why1 = string;
@@ -815,11 +844,11 @@ export type Seq40 = number;
 export type SessionId42 = string;
 export type Ts40 = string;
 export type Type40 = 'check.completed';
-export type Agent = string;
+export type Agent1 = string;
 export type CallId11 = string;
-export type HelperId = string;
+export type HelperId1 = string;
 export type Index3 = number;
-export type Label = string;
+export type Label1 = string;
 export type Model4 = string;
 export type PickReason = string;
 export type Wish1 = string;
@@ -2068,17 +2097,28 @@ export interface RouteConsentNeededEvent {
  * ``replaces_model`` is set when the question is for a turn the user asked to run on a
  * stronger model; the turn's ``model.routed`` then carries it too.
  *
+ * For a helper's question (ADR-059) the event is on the helper's own log and three optional
+ * fields say who asks: ``helper_id`` is the helper's session id, ``agent`` its agent type and
+ * ``label`` the short name the card shows. ``sent`` and ``not_sent`` are short lists that say
+ * what goes to the paid model ("the brief", "the diff, 212 lines") and what does not ("this
+ * chat"). All five are null or empty for a lead's own question. An older daemon leaves them out.
+ *
  * This interface was referenced by `RpcNotification`'s JSON-Schema
  * via the `definition` "RouteConsentNeededData".
  */
 export interface RouteConsentNeededData {
+  agent?: Agent;
   alternatives: Alternatives;
   caps?: ConsentCaps | null;
   estimated_usd?: EstimatedUsd;
+  helper_id?: HelperId;
+  label?: Label;
   model?: Model3;
   model_profile: ModelProfile3;
+  not_sent?: NotSent;
   provider?: Provider3;
   replaces_model?: ReplacesModel1;
+  sent?: Sent;
   signal?: Signal;
   tier: Tier3;
   why: Why1;
@@ -2448,11 +2488,11 @@ export interface HelperStartedEvent {
  * via the `definition` "HelperStartedData".
  */
 export interface HelperStartedData {
-  agent: Agent;
+  agent: Agent1;
   call_id: CallId11;
-  helper_id: HelperId;
+  helper_id: HelperId1;
   index: Index3;
-  label: Label;
+  label: Label1;
   model: Model4;
   pick_reason: PickReason;
   wish: Wish1;

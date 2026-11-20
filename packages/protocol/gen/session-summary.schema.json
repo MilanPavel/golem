@@ -2,7 +2,7 @@
   "$defs": {
     "PendingItem": {
       "additionalProperties": false,
-      "description": "What a waiting session waits for, in a form a client can list without opening it.\n\n``kind`` is ``approval`` for a tool call that needs a yes, and ``consent`` for the paid\nstep-up question. ``since`` is the ``ts`` of the event that asked\n(``approval.needed`` or ``route.consent.needed``). For an approval, ``call_id``, ``name``,\n``subject`` and ``source`` are those of the ``approval.needed`` event, and ``added`` and\n``removed`` count the lines its diff adds and removes (null when the call has no diff).\nFor a consent, ``alternatives`` is the number of answers the user may give. The full diff\nstays in the session's events: a summary goes to every watcher on every event, so it\ncarries counts only. An older daemon leaves ``pending`` out of the summary.",
+      "description": "What a waiting session waits for, in a form a client can list without opening it.\n\n``kind`` is ``approval`` for a tool call that needs a yes, and ``consent`` for the paid\nstep-up question. ``since`` is the ``ts`` of the event that asked\n(``approval.needed`` or ``route.consent.needed``). For an approval, ``call_id``, ``name``,\n``subject`` and ``source`` are those of the ``approval.needed`` event, and ``added`` and\n``removed`` count the lines its diff adds and removes (null when the call has no diff).\nFor a consent, ``alternatives`` is the number of answers the user may give. A helper's\nconsent also carries ``helper_id``, ``agent``, ``label``, ``sent`` and ``not_sent`` of its\n``route.consent.needed`` event. The full diff\nstays in the session's events: a summary goes to every watcher on every event, so it\ncarries counts only. An older daemon leaves ``pending`` out of the summary.",
       "properties": {
         "added": {
           "anyOf": [
@@ -16,6 +16,19 @@
           ],
           "default": null,
           "title": "Added"
+        },
+        "agent": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Agent"
         },
         "alternatives": {
           "anyOf": [
@@ -43,6 +56,19 @@
           "default": null,
           "title": "Call Id"
         },
+        "helper_id": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Helper Id"
+        },
         "kind": {
           "enum": [
             "approval",
@@ -50,6 +76,19 @@
           ],
           "title": "Kind",
           "type": "string"
+        },
+        "label": {
+          "anyOf": [
+            {
+              "maxLength": 120,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Label"
         },
         "name": {
           "anyOf": [
@@ -64,6 +103,24 @@
           "default": null,
           "title": "Name"
         },
+        "not_sent": {
+          "anyOf": [
+            {
+              "items": {
+                "maxLength": 120,
+                "minLength": 1,
+                "type": "string"
+              },
+              "maxItems": 10,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Not Sent"
+        },
         "removed": {
           "anyOf": [
             {
@@ -76,6 +133,24 @@
           ],
           "default": null,
           "title": "Removed"
+        },
+        "sent": {
+          "anyOf": [
+            {
+              "items": {
+                "maxLength": 120,
+                "minLength": 1,
+                "type": "string"
+              },
+              "maxItems": 10,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Sent"
         },
         "since": {
           "minLength": 1,

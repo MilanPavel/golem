@@ -12,11 +12,40 @@ export type ModelProfile = string;
 export type Origin = string;
 export type ParentSessionId = string | null;
 export type Added = number | null;
+export type Agent1 = string | null;
 export type Alternatives = number | null;
 export type CallId = string | null;
+export type HelperId = string | null;
 export type Kind = 'approval' | 'consent';
+export type Label = string | null;
 export type Name = string | null;
+export type NotSent =
+  | []
+  | [string]
+  | [string, string]
+  | [string, string, string]
+  | [string, string, string, string]
+  | [string, string, string, string, string]
+  | [string, string, string, string, string, string]
+  | [string, string, string, string, string, string, string]
+  | [string, string, string, string, string, string, string, string]
+  | [string, string, string, string, string, string, string, string, string]
+  | [string, string, string, string, string, string, string, string, string, string]
+  | null;
 export type Removed = number | null;
+export type Sent =
+  | []
+  | [string]
+  | [string, string]
+  | [string, string, string]
+  | [string, string, string, string]
+  | [string, string, string, string, string]
+  | [string, string, string, string, string, string]
+  | [string, string, string, string, string, string, string]
+  | [string, string, string, string, string, string, string, string]
+  | [string, string, string, string, string, string, string, string, string]
+  | [string, string, string, string, string, string, string, string, string, string]
+  | null;
 export type Since = string;
 export type Source = string | null;
 export type Subject = string | null;
@@ -91,7 +120,9 @@ export interface SessionSummary {
  * (``approval.needed`` or ``route.consent.needed``). For an approval, ``call_id``, ``name``,
  * ``subject`` and ``source`` are those of the ``approval.needed`` event, and ``added`` and
  * ``removed`` count the lines its diff adds and removes (null when the call has no diff).
- * For a consent, ``alternatives`` is the number of answers the user may give. The full diff
+ * For a consent, ``alternatives`` is the number of answers the user may give. A helper's
+ * consent also carries ``helper_id``, ``agent``, ``label``, ``sent`` and ``not_sent`` of its
+ * ``route.consent.needed`` event. The full diff
  * stays in the session's events: a summary goes to every watcher on every event, so it
  * carries counts only. An older daemon leaves ``pending`` out of the summary.
  *
@@ -100,11 +131,16 @@ export interface SessionSummary {
  */
 export interface PendingItem {
   added?: Added;
+  agent?: Agent1;
   alternatives?: Alternatives;
   call_id?: CallId;
+  helper_id?: HelperId;
   kind: Kind;
+  label?: Label;
   name?: Name;
+  not_sent?: NotSent;
   removed?: Removed;
+  sent?: Sent;
   since: Since;
   source?: Source;
   subject?: Subject;

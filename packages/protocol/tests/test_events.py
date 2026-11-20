@@ -36,6 +36,7 @@ from golem_protocol.events import (
     ModelWaitingData,
     ModelWaitingEvent,
     PromptSectionInfo,
+    RouteConsentNeededData,
     RunFailedData,
     RunFailedEvent,
     SessionCreatedData,
@@ -468,3 +469,42 @@ def test_helper_events_refuse_values_outside_their_lists() -> None:
         HelperEndedData.model_validate({**ended, "stopped": "tired"})
     with pytest.raises(ValidationError):
         HelperEndedData.model_validate({**ended, "working_ms": -1})
+
+
+def _consent_data(**extra: object) -> dict[str, object]:
+    return {
+        "model_profile": "p",
+        "tier": "frontier",
+        "why": "w",
+        "alternatives": ["once", "local"],
+        **extra,
+    }
+
+
+def test_consent_needed_helper_fields_are_optional() -> None:
+    plain = RouteConsentNeededData.model_validate(_consent_data())
+    assert plain.helper_id is None and plain.sent is None and plain.not_sent is None
+    assert RouteConsentNeededData.model_validate_json(plain.model_dump_json()) == plain
+    helper = RouteConsentNeededData.model_validate(
+        _consent_data(
+            helper_id="h1",
+            agent="reviewer",
+            label="Review",
+            sent=["the brief", "the diff, 212 lines"],
+            not_sent=["this chat"],
+        )
+    )
+    assert RouteConsentNeededData.model_validate_json(helper.model_dump_json()) == helper
+    assert helper.not_sent == ["this chat"]
+
+
+def test_consent_needed_refuses_long_lists_and_strings() -> None:
+    for bad in (
+        {"sent": ["x"] * 11},
+        {"not_sent": ["x" * 121]},
+        {"sent": [""]},
+        {"label": "x" * 121},
+        {"helper_id": ""},
+    ):
+        with pytest.raises(ValidationError):
+            RouteConsentNeededData.model_validate(_consent_data(**bad))
