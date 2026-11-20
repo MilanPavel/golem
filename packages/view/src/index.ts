@@ -819,6 +819,15 @@ export {
   type AgentRow,
 } from "./agents-view.ts";
 export {
+  groupMemories,
+  MEMORY_GROUPS,
+  memoryKeyHints,
+  memoryLabel,
+  memoryStateText,
+  memoryUsableNote,
+  type MemoryGroup,
+} from "./memory.ts";
+export {
   GROUPS,
   skillFacts,
   skillIssues,

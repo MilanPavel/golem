@@ -19,6 +19,7 @@ export const NOT_YET = {
   tune: inTerminal("Tuning a model is", "/tune"),
   undo: inTerminal("Undoing a turn is", "/undo"),
   sessions: "The sidebar lists your sessions.",
+  memory: "The memory browser is not here yet.",
 } as const;
 
 export const NEEDS_SESSION = "Start a session first: send a message.";

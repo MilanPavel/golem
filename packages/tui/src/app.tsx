@@ -2200,6 +2200,12 @@ export function App({
       loadRuns();
       return;
     }
+    if (outcome.kind === "memory") {
+      // The browser is a later ticket. Until then the command only says so.
+      setDraft(draftAt(""));
+      setChat((state) => ({ ...state, notice: "the memory browser is not here yet" }));
+      return;
+    }
     if (outcome.kind === "skill-new") {
       setDraft(draftAt(""));
       setKeysOpen(false);
