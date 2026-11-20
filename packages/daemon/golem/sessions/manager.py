@@ -32,7 +32,9 @@ from typing import Literal, cast
 from langchain_core.messages import BaseMessage
 from langchain_core.runnables import RunnableConfig
 
-from golem.config import ModelPrice, PermissionMode, RouteMode
+from golem.agents.bundled import bundled_agents_dir
+from golem.agents.registry import AgentRegistry
+from golem.config import AgentSettings, ModelPrice, PermissionMode, RouteMode
 from golem.evals.whatif import build_report, session_model
 from golem.graphs.adapter import PlainMessage, plain_messages, trace_messages
 from golem.graphs.chat import ChatRuntime, Growth
@@ -62,21 +64,23 @@ from golem.sessions.approvals import pending_approval, pending_consent
 from golem.sessions.bus import EventTarget, SummaryTarget
 from golem.sessions.context import context_breakdown
 from golem.sessions.helpers import (
+    DEFAULT_PROMPT,
     NO_NESTED,
     NO_SEND,
     ORIGIN_PREFIX,
     HelperRef,
     check_agent,
     cut_allowances,
-    explorer_agent,
     helper_mode,
     origin_of,
     parked_calls,
     scope_of_agent,
+    snapshot_of,
     started_at,
     stop_reason,
     summarize_run,
     tokens_over,
+    writing_tools,
 )
 from golem.sessions.ids import new_id
 from golem.sessions.log import SessionLog
@@ -109,7 +113,7 @@ from golem.skills.pinned import PinMemory, SkillPinError, pinnable, pinned_folde
 from golem.skills.registry import SkillRegistry
 from golem.store.blobs import BlobStore
 from golem.store.records import RunRecord, RunRecords, SessionActivity, SessionRecords
-from golem.tools.delegate import HelperOutcome, HelperSpec
+from golem.tools.delegate import HelperOutcome, HelperSpec, describe
 from golem.tools.registry import ToolError, ToolScope
 from golem_protocol.commands import (
     EvalRoutingResult,
@@ -120,6 +124,7 @@ from golem_protocol.commands import (
     TraceSpanResult,
 )
 from golem_protocol.events import (
+    AgentOrigin,
     AgentSnapshot,
     ApprovalDecision,
     ChatEvent,
@@ -278,6 +283,9 @@ class _LiveSession:
     """The lead and the ``delegate`` call of a helper session, from its ``session.created``."""
     agent: AgentSnapshot | None = None
     """The agent type a helper session started with, from its ``session.created``."""
+    prompt: str = ""
+    """The body of the agent file when the helper started. Empty after a restart: the file is
+    read again by name."""
     allowed_tools: set[Allowance] = field(default_factory=set[Allowance])
     mcp_servers: set[str] = field(default_factory=set[str])
     skills: list[str] = field(default_factory=list[str])
@@ -373,10 +381,13 @@ class SessionManager:
         titles: TitleGenerator | None = None,
         skills: SkillRegistry | None = None,
         blobs: BlobStore | None = None,
+        agents: AgentRegistry | None = None,
     ) -> None:
         self._runtime = runtime
         self._blobs = blobs
         self._skills = skills
+        self._agents = agents if agents is not None else _bundled_agents()
+        runtime.tools.delegate_text = self._delegate_text
         self._events = events
         self._records = records
         self._run_records = runs
@@ -1217,6 +1228,7 @@ class SessionManager:
         cwd: str | None,
         *,
         label: str = "",
+        prompt: str = "",
     ) -> HelperRef:
         """Start the helper of the ``delegate`` call ``call_id`` of ``parent`` at ``index``, once.
 
@@ -1226,7 +1238,8 @@ class SessionManager:
         careful for an agent that never asks, else the lead's. It then stores ``helper.started``
         and, for the first helper of the call, ``tool.started`` on the lead's log when the lead
         has a run, and sends
-        ``brief`` as the helper's first message through the normal run path.
+        ``brief`` as the helper's first message through the normal run path. ``prompt`` is the
+        body of the agent's file, its system prompt.
 
         ``model_profile`` is the model the lead's run uses. The helper's model is the ``explore``
         role of it: the lead's local model, a local one only in a local-only folder or on route
@@ -1259,6 +1272,7 @@ class SessionManager:
                 origin=origin_of(agent),
                 parent=SessionParent(session_id=parent, call_id=call_id, index=index),
                 agent=agent,
+                prompt=prompt,
                 allowed_tools=set(allowed),
                 options=dict(lead.options) if role.same_as_session else {},
                 permission_mode=helper_mode(agent, self._effective_mode(lead)),
@@ -1323,26 +1337,67 @@ class SessionManager:
     ) -> None:
         """Start the helpers of the ``delegate`` call ``call_id``, or find them again.
 
-        The agent is the explorer as ``[agents.explorer]`` sets it, since no agent files are read
-        yet. Raises :class:`~golem.tools.registry.ToolError` as :meth:`start_helper` does.
+        Each agent is the file of that name as the folder of the call sees it: a project agent
+        only in a trusted folder. Its tools are the ones its lead may use too, and its limits are
+        the file's, except the explorer's, which ``[agents.explorer]`` sets. Only an agent whose
+        tools all read can run now. Every spec is checked before any helper starts. Raises
+        :class:`~golem.tools.registry.ToolError` for an agent that is unknown, held back or
+        not available yet, and as :meth:`start_helper` does.
         """
         configurable = cast(Mapping[str, object], config.get("configurable", {}))
         raw = configurable.get(CWD_KEY)
         cwd = raw if isinstance(raw, str) and raw != "" else None
-        agent = explorer_agent(self._runtime.child_limits)
-        for index, spec in enumerate(helpers):
-            if spec.agent != agent.name:
-                raise ToolError(f"unknown agent {spec.agent}")
+        root = None if cwd is None else Path(cwd)
+        view = self._agents.view(root)
+        lead = self._sessions.get(state["session_id"])
+        offered = set(
+            self._runtime.tools.scoped(
+                _scope(lead) if lead is not None else ToolScope(root=root)
+            ).names
+        )
+        chosen: list[tuple[AgentSnapshot, str]] = []
+        for spec in helpers:
+            agent = view.get(spec.agent)
+            if agent is None:
+                held = {a.name for a in self._agents.blocked(root) if a.valid}
+                if spec.agent in held:
+                    raise ToolError(
+                        f"agent {spec.agent} is in this project's .golem/agents, and the "
+                        "project is not in trusted_projects, so it cannot run"
+                    )
+                names = ", ".join(a.name for a in view.usable())
+                raise ToolError(f"unknown agent {spec.agent}; the agents are {names}")
+            writes = writing_tools(agent, self._is_read_only)
+            if writes:
+                raise ToolError(
+                    f"agent {agent.name} is not available yet: it has tools that change things "
+                    f"({', '.join(writes)}), and only agents that read can run now"
+                )
+            source: AgentOrigin = next(e.origin for e in view.listed if e.agent is agent)
+            tools = [name for name in agent.tools if name in offered or name == "delegate"]
+            snapshot = snapshot_of(agent, source, tools, self._runtime.child_limits)
+            chosen.append((snapshot, agent.body))
+        for index, (spec, (snapshot, prompt)) in enumerate(zip(helpers, chosen, strict=True)):
             await self.start_helper(
                 state["session_id"],
                 call_id,
                 index,
-                agent,
+                snapshot,
                 spec.brief,
                 state["model_profile"],
                 cwd,
                 label=spec.label,
+                prompt=prompt,
             )
+
+    def _is_read_only(self, name: str) -> bool:
+        tool = self._runtime.tools.get(name)
+        return tool is not None and tool.read_only
+
+    def _delegate_text(self, root: Path | None) -> str:
+        """The description of ``delegate`` for a folder: the agent types its sessions see."""
+        agents = self._agents.view(root).usable()
+        return describe([(agent.name, agent.description) for agent in agents])
 
     async def helpers_ended(self, session_id: str, call_id: str) -> bool:
         """Whether every helper of the call has ended: its last run is over, or it was closed.
@@ -2884,7 +2939,19 @@ class SessionManager:
 
     def _child_of(self, session: _LiveSession) -> ChildScope | None:
         """The scope of a helper session, from its record. None for any other session."""
-        return None if session.agent is None else scope_of_agent(session.agent)
+        if session.agent is None:
+            return None
+        return scope_of_agent(
+            session.agent, session.prompt or self._prompt_of(session.agent, session)
+        )
+
+    def _prompt_of(self, agent: AgentSnapshot, session: _LiveSession) -> str:
+        """The prompt of a helper that lost it, such as after a restart: its agent file, read
+        again by name, else a plain default."""
+        root = None if session.cwd is None else Path(session.cwd)
+        found = self._agents.view(root).get(agent.name)
+        session.prompt = DEFAULT_PROMPT if found is None else found.body
+        return session.prompt
 
     async def _announce(self, session: _LiveSession, forked_from: ForkedFrom | None = None) -> None:
         chosen = self._runtime.router.identity(session.model_profile)
@@ -2915,6 +2982,16 @@ class SessionManager:
     def _named(self, task: asyncio.Task[None]) -> None:
         self._naming.discard(task)
         _report(task, "title task failed")
+
+
+def _bundled_agents() -> AgentRegistry:
+    """The agents that ship with golem, for a manager built without a registry."""
+    return AgentRegistry(
+        AgentSettings(),
+        golem_agents=Path("/nonexistent/golem/agents"),
+        trusted=lambda _root: False,
+        bundled=bundled_agents_dir(),
+    )
 
 
 def _scope(session: _LiveSession) -> ToolScope:

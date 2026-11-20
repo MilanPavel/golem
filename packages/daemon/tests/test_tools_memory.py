@@ -13,8 +13,9 @@ from langchain_core.runnables import RunnableConfig
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.graph import END, START, StateGraph  # pyright: ignore[reportMissingTypeStubs]
 
+from golem.agents.bundled import bundled_agents_dir
+from golem.agents.parse import parse_agent
 from golem.config import MemorySettings
-from golem.graphs.child import EXPLORER_TOOLS
 from golem.graphs.state import AgentState
 from golem.graphs.tools_node import MEMORY_KEY, scope_of, tools_node
 from golem.memory.privacy import ChatPrivacy
@@ -195,21 +196,8 @@ def test_the_tools_are_absent_when_memory_is_off() -> None:
 
 
 def test_a_helper_never_has_them() -> None:
-    assert (
-        EXPLORER_TOOLS
-        == {
-            "read_file",
-            "list_dir",
-            "glob",
-            "grep",
-            "git_log",
-            "git_diff",
-            "git_status",
-            "read_artifact",
-        }
-        == EXPLORER_TOOLS
-    )
-    helper = default_registry().scoped(ToolScope(only=EXPLORER_TOOLS, memory=True))
+    explorer = frozenset(parse_agent(bundled_agents_dir() / "explorer.md").tools)
+    helper = default_registry().scoped(ToolScope(only=explorer, memory=True))
     assert not {"recall", "remember"} & set(helper.names)
 
 

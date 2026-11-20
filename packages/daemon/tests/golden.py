@@ -36,6 +36,7 @@ from langchain_core.outputs import ChatResult
 from pydantic import PrivateAttr
 from test_server import HELLO, RpcClient, rpc_result, start_daemon, stop_daemon
 
+from golem.agents.bundled import bundled_agents_dir
 from golem.models.router import ModelRouter
 
 FIXTURES = Path(__file__).resolve().parents[3] / "packages" / "view" / "fixtures" / "golden"
@@ -200,7 +201,9 @@ async def _record(name: str, scenario: Scenario, home: Path) -> dict[str, list[E
         (project / file).write_text(text, encoding="utf-8")
     if scenario.rules:
         (home / "config.toml").write_text(scenario.rules, encoding="utf-8")
-    app, task = await start_daemon(home, router=ModelRouter(model=scenario.model))
+    app, task = await start_daemon(
+        home, router=ModelRouter(model=scenario.model), bundled_agents=bundled_agents_dir()
+    )
     live = await RpcClient.connect(app.paths.socket_path)
     replay = await RpcClient.connect(app.paths.socket_path)
     try:

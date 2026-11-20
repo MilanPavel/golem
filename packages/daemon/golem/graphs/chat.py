@@ -43,7 +43,6 @@ from golem.config import ContextSettings, ModelPrice, PermissionMode
 from golem.graphs.adapter import CONSENT_KIND, STREAM_KEY, message_text, stop_reason_of
 from golem.graphs.checks_node import CHECKS_KEY, checks_node
 from golem.graphs.child import (
-    CHILD_PROMPT,
     FINAL_REQUEST,
     ChildLimits,
 )
@@ -819,7 +818,7 @@ def open_chat(
                 memory=await _memory_block(memory_of(config), tier_of, profile),
             )
             parts = (
-                [("helper", CHILD_PROMPT)] if child is not None else system_prompt.parts(context)
+                [("helper", child.prompt)] if child is not None else system_prompt.parts(context)
             )
             text = "\n\n".join(t for _, t in parts)
             system = SystemMessage(content=text) if text else None

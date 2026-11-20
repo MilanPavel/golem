@@ -8,9 +8,18 @@ from golem.agents.bundled import bundled_agents_dir
 from golem.agents.model import AgentLimits
 from golem.agents.parse import MAX_FILE_BYTES, builtin_tool_names, parse_agent
 from golem.config import ExplorerSettings
-from golem.graphs.child import CHILD_PROMPT, EXPLORER_TOOLS, ChildLimits
+from golem.graphs.child import ChildLimits
 
 TOOLS = frozenset({"read_file", "grep", "shell"})
+
+EXPLORER_TOOLS = frozenset(
+    {"read_file", "list_dir", "glob", "grep", "git_log", "git_diff", "git_status", "read_artifact"}
+)
+EXPLORER_PROMPT = (
+    "You are a helper. Answer the brief. Read only what you need. End with a short answer: "
+    "findings first, then the paths that matter. Do not ask questions."
+)
+"""What the explorer was before it came from a file: the file keeps it word for word."""
 
 
 def _write(tmp_path: Path, name: str, text: str) -> Path:
@@ -157,7 +166,7 @@ def test_the_bundled_explorer_is_todays_explorer() -> None:
     today = ExplorerSettings()
 
     assert explorer.valid
-    assert explorer.body == CHILD_PROMPT
+    assert explorer.body == EXPLORER_PROMPT
     assert set(explorer.tools) == EXPLORER_TOOLS
     assert explorer.wish == "cheapest"
     assert explorer.asks is False

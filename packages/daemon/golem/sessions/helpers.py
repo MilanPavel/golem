@@ -6,17 +6,19 @@ from its agent type, as the agent was when the helper started, and never from it
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Sequence
+from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 
+from golem.agents.model import Agent
 from golem.config import PermissionMode
-from golem.graphs.child import EXPLORER_TOOLS, ChildLimits
+from golem.graphs.child import ChildLimits
 from golem.graphs.tools_node import ChildScope
 from golem.permissions.engine import Allowance
 from golem.tools.registry import ToolError
 from golem_protocol.events import (
     AgentLimits,
+    AgentOrigin,
     AgentSnapshot,
     ApprovalNeededEvent,
     ApprovalResolvedEvent,
@@ -59,10 +61,15 @@ def check_agent(agent: AgentSnapshot) -> None:
         raise ToolError(NO_DELEGATE)
 
 
-def scope_of_agent(agent: AgentSnapshot) -> ChildScope:
-    """The tools and the limit on model calls of a helper, from its agent snapshot."""
+def scope_of_agent(agent: AgentSnapshot, prompt: str) -> ChildScope:
+    """The tools, the prompt and the limit on model calls of a helper, from its agent snapshot."""
     calls = agent.limits.max_calls or ChildLimits().max_calls
-    return ChildScope(tools=frozenset(agent.tools) - {"delegate"}, max_calls=calls, asks=agent.asks)
+    return ChildScope(
+        tools=frozenset(agent.tools) - {"delegate"},
+        max_calls=calls,
+        asks=agent.asks,
+        prompt=prompt,
+    )
 
 
 def cut_allowances(allowed: Iterable[Allowance], agent: AgentSnapshot) -> list[Allowance]:
@@ -78,19 +85,47 @@ def helper_mode(agent: AgentSnapshot, lead: PermissionMode) -> PermissionMode:
     return lead if agent.asks else "careful"
 
 
-def explorer_agent(limits: ChildLimits) -> AgentSnapshot:
-    """The explorer as the settings give it, until the agent files registry exists."""
-    return AgentSnapshot(
-        name="explorer",
-        source="bundled",
-        tools=sorted(EXPLORER_TOOLS),
-        limits=AgentLimits(
+EXPLORER = "explorer"
+"""The one agent type whose limits ``[agents.explorer]`` sets."""
+
+DEFAULT_PROMPT = "You are a helper. Answer the brief. Do not ask questions."
+"""The prompt of a helper whose agent file cannot be found again, such as after a restart."""
+
+
+def snapshot_of(
+    agent: Agent, source: AgentOrigin, tools: Iterable[str], limits: ChildLimits
+) -> AgentSnapshot:
+    """The agent as its file reads now, with the tools it keeps: what its lead may use.
+
+    ``[agents.explorer]`` overrides the limits of the explorer's file.
+    """
+    if agent.name == EXPLORER:
+        cut = AgentLimits(
             max_calls=limits.max_calls,
             max_seconds=int(limits.timeout_s),
+            max_cost_usd=agent.limits.max_cost_usd,
             answer_chars=limits.answer_chars,
-        ),
-        wish="cheapest",
+        )
+    else:
+        cut = AgentLimits(
+            max_calls=agent.limits.max_calls,
+            max_seconds=agent.limits.max_seconds,
+            max_cost_usd=agent.limits.max_cost_usd,
+            answer_chars=agent.limits.answer_chars,
+        )
+    return AgentSnapshot(
+        name=agent.name,
+        source=source,
+        tools=list(tools),
+        limits=cut,
+        wish=agent.wish,
+        asks=agent.asks,
     )
+
+
+def writing_tools(agent: Agent, is_read_only: Callable[[str], bool]) -> list[str]:
+    """The tools of ``agent`` that are not read-only, or that golem does not know."""
+    return [name for name in agent.tools if not is_read_only(name)]
 
 
 @dataclass(frozen=True, slots=True)
@@ -223,6 +258,8 @@ def parked_calls(events: Sequence[ChatEvent]) -> list[str]:
 
 
 __all__ = [
+    "DEFAULT_PROMPT",
+    "EXPLORER",
     "NO_DELEGATE",
     "NO_NESTED",
     "NO_SEND",
@@ -232,14 +269,15 @@ __all__ = [
     "RunSummary",
     "check_agent",
     "cut_allowances",
-    "explorer_agent",
     "helper_mode",
     "origin_of",
     "parked_calls",
     "scope_of_agent",
+    "snapshot_of",
     "started_at",
     "stop_reason",
     "stopped_of",
     "summarize_run",
     "tokens_over",
+    "writing_tools",
 ]

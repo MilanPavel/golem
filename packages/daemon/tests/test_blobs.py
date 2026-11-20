@@ -28,6 +28,7 @@ from golem.store.database import Database
 from golem.store.events import EventLog
 from golem.store.records import RunRecords, SessionRecords
 from golem.tools import default_registry
+from golem.tools.registry import ToolScope
 from golem_protocol.events import (
     ChatEvent,
     ModelCallCompletedEvent,
@@ -77,6 +78,11 @@ class _Chat:
         self.manager = SessionManager(
             self.runtime, SessionLog(self.events, EventBus(), records), records, self.runs
         )
+
+    def tools_text(self) -> str:
+        """The tool schemas a session with no folder is sent, as they are stored."""
+        schemas = self.runtime.tools.scoped(ToolScope(root=None)).schemas()
+        return json.dumps(schemas, sort_keys=True, separators=(",", ":"))
 
     async def send(self, session_id: str, text: str) -> list[ModelCallStartedEvent]:
         run_id = await self.manager.send(session_id, text)
@@ -128,7 +134,7 @@ async def test_two_calls_with_one_prompt_share_a_blob(database: Database) -> Non
     assert await blobs.get(first.data.system_prompt_sha or "") == ("system_prompt", "Be brief.")
     kind, text = await blobs.get(first.data.tools_sha or "") or ("", "")
     assert kind == "tools"
-    assert text == json.dumps(default_registry().schemas(), sort_keys=True, separators=(",", ":"))
+    assert text == chat.tools_text()
     assert hashlib.sha256(text.encode()).hexdigest() == first.data.tools_sha
 
 
@@ -352,7 +358,7 @@ async def test_the_sizes_sent_are_recorded_in_chars_and_bytes(database: Database
     session_id = await chat.manager.create(None)
     (first,) = await chat.send(session_id, "naïve café")
     await chat.manager.cancel_all()
-    tools = json.dumps(default_registry().schemas(), sort_keys=True, separators=(",", ":"))
+    tools = chat.tools_text()
     data = first.data
     assert (data.system_chars, data.system_bytes) == (10, 12)
     assert (data.tools_chars, data.tools_bytes) == (len(tools), len(tools.encode()))

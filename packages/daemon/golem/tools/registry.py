@@ -9,7 +9,7 @@ and calls :meth:`ToolRegistry.call`.
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable, Iterable, Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any, Literal, Protocol
 
@@ -292,6 +292,9 @@ class ToolRegistry:
         # Offered without a scope: no run, so no memory, so no memory tools.
         self._schemas = self._plain_schemas
         self._extra: dict[str, Tool[Any]] = {}
+        self.delegate_text: Callable[[Path | None], str] | None = None
+        """The description of ``delegate`` for a session folder, with the agent types it sees.
+        The session manager sets it. None: ``delegate`` keeps its own description."""
 
     def scoped(self, scope: ToolScope) -> ToolRegistry:
         """This registry with the outside tools ``scope`` sees."""
@@ -302,6 +305,7 @@ class ToolRegistry:
             view._schemas = [t.schema() for t in view._tools.values() if not t.plan_only]
             view._plain_schemas = view._all_schemas = view._schemas
             view._extra = {}
+            view.delegate_text = None
             return view
         view._source, view._plain_schemas = self._source, self._plain_schemas
         view._all_schemas = self._all_schemas
@@ -312,7 +316,21 @@ class ToolRegistry:
             view._schemas = self._plain_schemas
         found: Iterable[Tool[Any]] = () if self._source is None else self._source.tools(scope)
         view._extra = {tool.name: tool for tool in found if tool.name not in self._tools}
+        view.delegate_text = self.delegate_text
+        self._describe_delegate(view, scope.root)
         return view
+
+    def _describe_delegate(self, view: ToolRegistry, root: Path | None) -> None:
+        """Give ``delegate`` in ``view`` the agent types ``root`` sees."""
+        tool = view._tools.get("delegate")
+        if tool is None or self.delegate_text is None:
+            return
+        described = replace(tool, description=self.delegate_text(root))
+        view._tools = {**view._tools, "delegate": described}
+        view._schemas = [
+            described.schema() if _function_name(item) == "delegate" else item
+            for item in view._schemas
+        ]
 
     async def prepare(self, scope: ToolScope) -> None:
         if self._source is not None and scope.only is None:
@@ -389,6 +407,11 @@ class ToolRegistry:
         if tool is None:
             raise ToolError(f"unknown tool {name!r}; the tools are {', '.join(self.names)}")
         return tool
+
+
+def _function_name(schema: Mapping[str, object]) -> object:
+    function = schema.get("function")
+    return function.get("name") if isinstance(function, dict) else None  # type: ignore[reportUnknownMemberType]
 
 
 def _problems(exc: ValidationError) -> str:

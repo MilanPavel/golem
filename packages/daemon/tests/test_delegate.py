@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Mapping
 from pathlib import Path
 from typing import Any, cast
 
@@ -19,6 +19,9 @@ from langchain_core.outputs import ChatResult
 from langgraph.checkpoint.memory import InMemorySaver
 from pydantic import Field, PrivateAttr
 
+from golem.agents.bundled import bundled_agents_dir
+from golem.agents.parse import parse_agent
+from golem.agents.registry import AgentRegistry
 from golem.config import (
     AgentSettings,
     ExplorerSettings,
@@ -29,7 +32,7 @@ from golem.config import (
 )
 from golem.graphs.adapter import plain_messages
 from golem.graphs.chat import ChatRuntime, open_chat
-from golem.graphs.child import CHILD_PROMPT, EXPLORER_TOOLS, FINAL_REQUEST, ChildLimits
+from golem.graphs.child import FINAL_REQUEST, ChildLimits
 from golem.models.dispatcher import Dispatcher
 from golem.models.router import ModelRouter
 from golem.models.tiers import Tier
@@ -48,6 +51,12 @@ from golem_protocol.events import ChatEvent
 
 SETTINGS = GolemSettings(default_model="ollama/qwen3:8b")
 USAGE = {"input_tokens": 1_000, "output_tokens": 500, "total_tokens": 1_500}
+
+
+EXPLORER_FILE = parse_agent(bundled_agents_dir() / "explorer.md")
+CHILD_PROMPT = EXPLORER_FILE.body
+EXPLORER_TOOLS = frozenset(EXPLORER_FILE.tools)
+"""What the explorer's bundled file gives: its prompt and its tools."""
 
 
 class _Recording(ToolCallingChatModel):
@@ -87,6 +96,22 @@ class _Hanging(ToolCallingChatModel):
         return self._generate(messages, stop, run_manager, **kwargs)
 
 
+class _Router(ModelRouter):
+    """Gives its one test double for any profile, so a test can pick another model."""
+
+    def chat_model(
+        self,
+        profile: str,
+        overrides: Mapping[str, float | str] | None = None,
+        *,
+        local_only: bool = False,
+    ) -> Any:
+        del overrides
+        if local_only:
+            self.ensure_local(profile)
+        return self._model
+
+
 class _Chat:
     def __init__(
         self,
@@ -100,10 +125,12 @@ class _Chat:
         tier_of: Callable[[str], Tier | None] | None = None,
         paid_ok: Callable[[str | None], Awaitable[bool]] | None = None,
         window_of: Callable[[str, Any], ContextWindow] | None = None,
+        agents: AgentRegistry | None = None,
+        budget_refs: Callable[[], list[str]] | None = None,
     ) -> None:
         self.saver = InMemorySaver()
         self.runtime: ChatRuntime = open_chat(
-            ModelRouter(settings, model=model),
+            _Router(settings, model=model),
             self.saver,
             default_registry(),
             policy,
@@ -112,6 +139,7 @@ class _Chat:
             tier_of=tier_of,
             paid_ok=paid_ok,
             window_of=window_of,
+            budget_refs=budget_refs,
         )
         if limits is not None:
             self.runtime.child_limits = limits
@@ -119,7 +147,11 @@ class _Chat:
         self.runs = RunRecords(database)
         records = SessionRecords(database)
         self.manager = SessionManager(
-            self.runtime, SessionLog(self.events, EventBus(), records), records, self.runs
+            self.runtime,
+            SessionLog(self.events, EventBus(), records),
+            records,
+            self.runs,
+            agents=agents,
         )
 
     async def run(self, folder: Path, text: str = "go") -> tuple[str, str, list[ChatEvent]]:
@@ -803,3 +835,181 @@ async def test_the_calls_of_a_lead_go_on_counting_after_it_was_woken(
     _, _, events = await chat.run(project)
 
     assert [cast(Any, e.data).index for e in _calls(events)] == [1, 2]
+
+
+# --- agent types: any registered one, from its file ---------------------------------------------
+
+
+def _registry(home: Path, *trusted: Path) -> AgentRegistry:
+    """The bundled agents, a user folder under ``home``, and the project folders in ``trusted``."""
+    return AgentRegistry(
+        AgentSettings(),
+        golem_agents=home / "agents",
+        trusted=lambda root: root in trusted,
+        bundled=bundled_agents_dir(),
+    )
+
+
+def _scout(project: Path) -> None:
+    folder = project / ".golem" / "agents"
+    folder.mkdir(parents=True)
+    (folder / "scout.md").write_text(
+        "---\ndescription: Counts the files of a folder.\nmodel: cheapest\ntools: list_dir\n"
+        "max-calls: 4\n---\nYou are a scout. Count.\n",
+        encoding="utf-8",
+    )
+
+
+async def test_the_explorer_runs_from_its_file_with_the_limits_of_the_settings(
+    database: Database, project: Path, tmp_path: Path
+) -> None:
+    model = _Recording(replies=[[("delegate", {"brief": "look"})], "found it", "ok"])
+    settings = GolemSettings(
+        default_model="ollama/qwen3:8b",
+        agents=AgentSettings(explorer=ExplorerSettings(max_calls=9)),
+    )
+    chat = _Chat(database, model, settings=settings, agents=_registry(tmp_path))
+    _, _, events = await chat.run(project)
+
+    assert _delegate_result(events) == "found it"
+    first_helper_call = model.seen[1]
+    assert isinstance(first_helper_call[0], SystemMessage)
+    assert first_helper_call[0].content == EXPLORER_FILE.body
+    assert set(model.offered[1]) == set(EXPLORER_FILE.tools)
+    (helper_id,) = await chat.helper_ids(events)
+    created = (await chat.helper_events(helper_id))[0]
+    assert created.type == "session.created"
+    assert created.data.agent is not None
+    assert created.data.agent.source == "bundled"
+    assert created.data.agent.limits.max_calls == 9
+    assert created.data.agent.limits.max_seconds == 300
+
+
+async def test_a_project_agent_runs_in_a_trusted_project(
+    database: Database, project: Path, tmp_path: Path
+) -> None:
+    _scout(project)
+    model = _Recording(
+        replies=[[("delegate", {"brief": "count", "agent": "scout"})], "three files", "ok"]
+    )
+    chat = _Chat(database, model, agents=_registry(tmp_path, project))
+    _, _, events = await chat.run(project)
+
+    assert _delegate_result(events) == "three files"
+    helper_call = model.seen[1]
+    assert isinstance(helper_call[0], SystemMessage)
+    assert helper_call[0].content == "You are a scout. Count."
+    assert model.offered[1] == ["list_dir"]
+    (helper_id,) = await chat.helper_ids(events)
+    created = (await chat.helper_events(helper_id))[0]
+    assert created.type == "session.created"
+    assert created.data.origin == "agent:scout"
+    assert created.data.agent is not None
+    assert created.data.agent.source == "project"
+
+
+async def test_a_project_agent_of_an_untrusted_project_gives_a_readable_result(
+    database: Database, project: Path, tmp_path: Path
+) -> None:
+    _scout(project)
+    model = _Recording(replies=[[("delegate", {"brief": "count", "agent": "scout"})], "ok"])
+    chat = _Chat(database, model, agents=_registry(tmp_path))
+    _, _, events = await chat.run(project)
+
+    result = _result_of(events, "call_1")
+    assert "agent scout" in result
+    assert "not in trusted_projects" in result
+    assert await chat.helper_ids(events) == []
+
+
+async def test_an_unknown_agent_gives_a_readable_result_that_names_the_agents(
+    database: Database, project: Path, tmp_path: Path
+) -> None:
+    model = _Recording(replies=[[("delegate", {"brief": "go", "agent": "nobody"})], "ok"])
+    chat = _Chat(database, model, agents=_registry(tmp_path))
+    _, run_id, events = await chat.run(project)
+
+    result = _result_of(events, "call_1")
+    assert result.startswith("unknown agent nobody; the agents are ")
+    assert "explorer" in result
+    assert await chat.helper_ids(events) == []
+    run = await chat.runs.get(run_id)
+    assert run is not None
+    assert run.status == "completed"
+
+
+async def test_the_worker_is_listed_but_not_available_yet(
+    database: Database, project: Path, tmp_path: Path
+) -> None:
+    model = _Recording(replies=[[("delegate", {"brief": "change it", "agent": "worker"})], "ok"])
+    chat = _Chat(database, model, agents=_registry(tmp_path))
+    _, _, events = await chat.run(project)
+
+    result = _result_of(events, "call_1")
+    assert result.startswith("agent worker is not available yet")
+    assert "write_file" in result
+    assert await chat.helper_ids(events) == []
+    tool = chat.runtime.tools.scoped(ToolScope(root=project)).get("delegate")
+    assert tool is not None
+    assert "- worker: " in tool.description
+
+
+async def test_the_delegate_description_lists_the_types_a_folder_sees(
+    database: Database, project: Path, tmp_path: Path
+) -> None:
+    _scout(project)
+    chat = _Chat(database, ToolCallingChatModel(replies=[]), agents=_registry(tmp_path, project))
+    tools = chat.runtime.tools
+
+    def text(root: Path | None) -> str:
+        tool = tools.scoped(ToolScope(root=root)).get("delegate")
+        assert tool is not None
+        return tool.description
+
+    trusted = text(project)
+    for agent in ("advisor", "explorer", "reviewer", "worker"):
+        assert f"- {agent}: " in trusted
+    assert f"- explorer: {EXPLORER_FILE.description}" in trusted
+    assert "- scout: Counts the files of a folder." in trusted
+    assert "- scout: " not in text(tmp_path)
+    schemas = tools.scoped(ToolScope(root=project)).schemas()
+    shown = [s for s in schemas if s["function"]["name"] == "delegate"]  # type: ignore[index]
+    assert "- scout: " in shown[0]["function"]["description"]  # type: ignore[index]
+
+
+async def test_a_local_only_folder_keeps_the_helper_local(
+    database: Database, project: Path, tmp_path: Path
+) -> None:
+    settings = GolemSettings(
+        default_model="ollama/qwen3:8b",
+        routing=RoutingSettings(
+            roles=RoleSettings(explore="anthropic/big"), local_only=[str(project)]
+        ),
+    )
+    model = ToolCallingChatModel(replies=[[("delegate", {"brief": "look"})], "found", "ok"])
+    chat = _Chat(database, model, settings=settings, tier_of=_tiers, agents=_registry(tmp_path))
+    _, _, events = await chat.run(project)
+
+    started = next(e for e in events if e.type == "helper.started")
+    assert started.data.model == "ollama/qwen3:8b"
+    assert _delegate_result(events) == "found"
+
+
+async def test_a_cloud_only_setup_runs_the_helper_on_the_cheapest_budget_model(
+    database: Database, project: Path, tmp_path: Path
+) -> None:
+    model = ToolCallingChatModel(replies=[[("delegate", {"brief": "look"})], "found", "ok"])
+    chat = _Chat(
+        database,
+        model,
+        settings=GolemSettings(default_model="anthropic/big"),
+        tier_of=_paid,
+        paid_ok=_answers(),
+        budget_refs=lambda: ["deepseek/chat"],
+        agents=_registry(tmp_path),
+    )
+    _, _, events = await chat.run(project)
+
+    started = next(e for e in events if e.type == "helper.started")
+    assert started.data.model == "deepseek/chat"
+    assert started.data.pick_reason == "cheapest budget model"
