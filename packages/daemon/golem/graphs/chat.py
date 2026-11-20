@@ -453,6 +453,7 @@ class ChatRuntime:
         checks: bool | None = None,
         plan_first: bool = False,
         local_only: bool = False,
+        child: ChildScope | None = None,
     ) -> AsyncGenerator[object]:
         """Run the thread from its last checkpoint with no new input.
 
@@ -473,6 +474,7 @@ class ChatRuntime:
                 CHECKS_KEY: checks,
                 PLAN_KEY: plan_first,
                 LOCAL_ONLY_KEY: local_only,
+                **({} if child is None else {CHILD_KEY: child}),
             },
             "recursion_limit": _RECURSION_LIMIT,
         }

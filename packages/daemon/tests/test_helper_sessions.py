@@ -220,8 +220,11 @@ async def test_the_events_are_in_the_helpers_own_log_and_the_summaries_in_the_le
     assert {"run.started", "message.completed", "session.completed"} <= set(kinds)
     brief = next(e for e in own if e.type == "message.completed" and e.data.role == "user")
     assert brief.data.text == "find a"
-    led = await chat.stored(lead)
-    assert [e.type for e in led if e.type != "session.created"] == ["helper.started"]
+    led = await chat.until(lead, "helper.ended")
+    assert [e.type for e in led if e.type != "session.created"] == [
+        "helper.started",
+        "helper.ended",
+    ]
     started = next(e for e in led if e.type == "helper.started")
     assert (started.data.helper_id, started.data.agent, started.data.wish) == (
         helper,

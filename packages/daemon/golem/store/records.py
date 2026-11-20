@@ -22,9 +22,12 @@ _ACTIVITY = (
     " s.forked_from_session_id, s.origin,"
     " s.parent_session_id, s.parent_call_id, s.helper_index, s.agent,"
     " EXISTS (SELECT 1 FROM runs r"
-    "  WHERE r.session_id = s.session_id AND r.status = 'running') AS running,"
+    "  WHERE r.session_id = s.session_id"
+    "  AND (r.status = 'running' OR (r.status = 'waiting' AND r.wait_reason = 'team')))"
+    " AS running,"
     " EXISTS (SELECT 1 FROM runs r"
-    "  WHERE r.session_id = s.session_id AND r.status = 'waiting') AS waiting,"
+    "  WHERE r.session_id = s.session_id AND r.status = 'waiting'"
+    "  AND r.wait_reason IS NOT 'team') AS waiting,"
     " (SELECT COALESCE(MAX(e.seq), 0) FROM events e"
     "  WHERE e.session_id = s.session_id) AS last_seq"
     " FROM sessions s"
@@ -88,6 +91,8 @@ class RunRecord:
     started_at: str
     ended_at: str | None
     error: str | None
+    wait_reason: str | None = None
+    """Why a ``waiting`` run waits, ``team`` for a lead parked for its helpers. None: for you."""
 
 
 class SessionRecords:
@@ -130,6 +135,23 @@ class SessionRecords:
             (parent_session_id, call_id, index),
         )
         return None if row is None else _session(row)
+
+    async def helpers_of(self, parent_session_id: str, call_id: str) -> list[SessionRecord]:
+        """Every helper session made for ``call_id`` of ``parent_session_id``, closed ones too.
+
+        In the order of the call.
+        """
+        rows = await self._database.fetch_all(
+            "SELECT session_id, model_profile, title, created_at, updated_at, closed_at, cwd,"
+            " allowed_tools, mcp_servers, skills, options, permission_mode, checks, route,"
+            " plan_first, paid_ok,"
+            " forked_from_session_id, origin,"
+            " parent_session_id, parent_call_id, helper_index, agent"
+            " FROM sessions WHERE parent_session_id = ? AND parent_call_id = ?"
+            " ORDER BY helper_index",
+            (parent_session_id, call_id),
+        )
+        return [_session(row) for row in rows]
 
     async def open_helpers(self, parent_session_id: str) -> list[str]:
         """The ids of the helper sessions of ``parent_session_id`` that are not closed."""
@@ -191,7 +213,7 @@ class RunRecords:
 
     async def get(self, run_id: str) -> RunRecord | None:
         row = await self._database.fetch_one(
-            "SELECT run_id, session_id, status, started_at, ended_at, error"
+            "SELECT run_id, session_id, status, started_at, ended_at, error, wait_reason"
             " FROM runs WHERE run_id = ?",
             (run_id,),
         )
@@ -200,17 +222,34 @@ class RunRecords:
     async def waiting(self, session_id: str) -> RunRecord | None:
         """The run of ``session_id`` that waits for an approval, if any."""
         row = await self._database.fetch_one(
-            "SELECT run_id, session_id, status, started_at, ended_at, error"
+            "SELECT run_id, session_id, status, started_at, ended_at, error, wait_reason"
             " FROM runs WHERE session_id = ? AND status = 'waiting'"
             " ORDER BY started_at DESC LIMIT 1",
             (session_id,),
         )
         return None if row is None else _run(row)
 
+    async def latest(self, session_id: str) -> RunRecord | None:
+        """The newest run of ``session_id``, if it has one."""
+        row = await self._database.fetch_one(
+            "SELECT run_id, session_id, status, started_at, ended_at, error, wait_reason"
+            " FROM runs WHERE session_id = ? ORDER BY started_at DESC, rowid DESC LIMIT 1",
+            (session_id,),
+        )
+        return None if row is None else _run(row)
+
+    async def parked(self) -> list[RunRecord]:
+        """Runs of leads that wait for their helpers, oldest first."""
+        rows = await self._database.fetch_all(
+            "SELECT run_id, session_id, status, started_at, ended_at, error, wait_reason"
+            " FROM runs WHERE status = 'waiting' AND wait_reason = 'team' ORDER BY started_at",
+        )
+        return [_run(row) for row in rows]
+
     async def running(self) -> list[RunRecord]:
         """Runs a stopped daemon left open, oldest first."""
         rows = await self._database.fetch_all(
-            "SELECT run_id, session_id, status, started_at, ended_at, error"
+            "SELECT run_id, session_id, status, started_at, ended_at, error, wait_reason"
             " FROM runs WHERE status = 'running' ORDER BY started_at",
         )
         return [_run(row) for row in rows]
@@ -321,6 +360,7 @@ def _run(row: sqlite3.Row) -> RunRecord:
         started_at=row["started_at"],
         ended_at=row["ended_at"],
         error=row["error"],
+        wait_reason=row["wait_reason"],
     )
 
 

@@ -22,6 +22,7 @@ from pathlib import Path
 from typing import Literal, cast
 
 from langchain_core.messages import BaseMessage
+from langchain_core.runnables import RunnableConfig
 
 from golem.config import ModelPrice, PermissionMode, RouteMode
 from golem.evals.whatif import build_report, session_model
@@ -29,9 +30,9 @@ from golem.graphs.adapter import PlainMessage, plain_messages, trace_messages
 from golem.graphs.chat import ChatRuntime, Growth
 from golem.graphs.child import child_thread
 from golem.graphs.context_view import ContextView, view
-from golem.graphs.state import SCHEMA_VERSION
+from golem.graphs.state import SCHEMA_VERSION, AgentState
 from golem.graphs.step_up import Consent, StepAsk, StepRequest, StepUp
-from golem.graphs.tools_node import ChildScope
+from golem.graphs.tools_node import CWD_KEY, ChildScope
 from golem.memory.privacy import ChatPrivacy
 from golem.memory.project import project_key
 from golem.memory.project_privacy import project_memory_private
@@ -55,16 +56,23 @@ from golem.sessions.context import context_breakdown
 from golem.sessions.helpers import (
     NO_NESTED,
     NO_SEND,
+    ORIGIN_PREFIX,
     HelperRef,
     check_agent,
     cut_allowances,
+    explorer_agent,
     helper_mode,
     origin_of,
+    parked_calls,
     scope_of_agent,
+    stopped_of,
+    summarize_run,
 )
 from golem.sessions.ids import new_id
 from golem.sessions.log import SessionLog
+from golem.sessions.recovery import end_run, open_turn
 from golem.sessions.runner import (
+    CANCELLED_TOOL,
     CancelReason,
     Resume,
     RunControl,
@@ -88,7 +96,8 @@ from golem.skills.invoke import Invocation, SkillInvokeError, invoke
 from golem.skills.pinned import PinMemory, SkillPinError, pinnable, pinned_folders
 from golem.skills.registry import SkillRegistry
 from golem.store.blobs import BlobStore
-from golem.store.records import RunRecords, SessionActivity, SessionRecords
+from golem.store.records import RunRecord, RunRecords, SessionActivity, SessionRecords
+from golem.tools.delegate import HelperOutcome, HelperSpec
 from golem.tools.registry import ToolError, ToolScope
 from golem_protocol.commands import (
     EvalRoutingResult,
@@ -108,7 +117,11 @@ from golem_protocol.events import (
     EmptyEventData,
     FileChangedData,
     ForkedFrom,
+    HelperEndedData,
+    HelperEndedEvent,
     HelperStartedData,
+    HelperStartedEvent,
+    HelperWaitData,
     MessageCompletedEvent,
     ModelOptionsChangedData,
     ModelRoutedEvent,
@@ -363,6 +376,9 @@ class SessionManager:
         self._sessions: dict[str, _LiveSession] = {}
         self._runs: dict[str, _LiveRun] = {}
         self._naming: set[asyncio.Task[None]] = set()
+        self._wakes: set[asyncio.Task[None]] = set()
+        self._stopping: set[str] = set()
+        """Leads being cancelled or closed: a helper that ends must not wake them."""
         self._lock = asyncio.Lock()
         self.clock: Callable[[], float] = time.monotonic
         """Seconds for the limit on growing, replaceable in tests."""
@@ -747,6 +763,13 @@ class SessionManager:
 
         Raises :class:`SessionNotFoundError`.
         """
+        self._stopping.add(session_id)
+        try:
+            return await self._close(session_id)
+        finally:
+            self._stopping.discard(session_id)
+
+    async def _close(self, session_id: str) -> str:
         for helper in await self._records.open_helpers(session_id):
             await self.close(helper)
         while True:
@@ -1233,6 +1256,281 @@ class SessionManager:
                 self._sessions.pop(sid, None)
                 raise
             return HelperRef(sid, role.profile, True)
+
+    async def start_helpers(
+        self,
+        *,
+        state: AgentState,
+        config: RunnableConfig,
+        call_id: str,
+        helpers: Sequence[HelperSpec],
+    ) -> None:
+        """Start the helpers of the ``delegate`` call ``call_id``, or find them again.
+
+        The agent is the explorer as ``[agents.explorer]`` sets it, since no agent files are read
+        yet. Raises :class:`~golem.tools.registry.ToolError` as :meth:`start_helper` does.
+        """
+        configurable = cast(Mapping[str, object], config.get("configurable", {}))
+        raw = configurable.get(CWD_KEY)
+        cwd = raw if isinstance(raw, str) and raw != "" else None
+        agent = explorer_agent(self._runtime.child_limits)
+        for index, spec in enumerate(helpers):
+            if spec.agent != agent.name:
+                raise ToolError(f"unknown agent {spec.agent}")
+            await self.start_helper(
+                state["session_id"],
+                call_id,
+                index,
+                agent,
+                spec.brief,
+                state["model_profile"],
+                cwd,
+                label=spec.label,
+            )
+
+    async def helpers_ended(self, session_id: str, call_id: str) -> bool:
+        """Whether every helper of the call has ended: its last run is over, or it was closed.
+
+        A helper whose first send failed is closed and has no run: it counts as ended.
+        """
+        for helper in await self._records.helpers_of(session_id, call_id):
+            if helper.closed_at is not None:
+                continue
+            run = await self._run_records.latest(helper.session_id)
+            if run is None or run.status in ("running", "waiting"):
+                return False
+        return True
+
+    async def helper_results(self, session_id: str, call_id: str) -> list[HelperOutcome]:
+        """How each helper of the call ended, in the order of the call."""
+        labels = {
+            e.data.helper_id: e.data.label
+            for e in await self._events.stored(session_id)
+            if isinstance(e, HelperStartedEvent) and e.data.call_id == call_id
+        }
+        limit = self._runtime.child_limits.answer_chars
+        found: list[HelperOutcome] = []
+        for helper in await self._records.helpers_of(session_id, call_id):
+            run = await self._run_records.latest(helper.session_id)
+            answer = ""
+            if run is not None:
+                answer = summarize_run(await self._events.for_run(run.run_id)).answer
+            found.append(
+                HelperOutcome(
+                    agent=helper.agent or "explorer",
+                    stopped=stopped_of(None if run is None else run.status),
+                    text=answer[:limit],
+                    label=labels.get(helper.session_id, ""),
+                )
+            )
+        return found
+
+    async def _helper_ended(self, session_id: str, run_id: str | None) -> None:
+        """Store ``helper.ended`` in the lead's log, once, and see whether the lead can go on."""
+        record = await self._records.get(session_id)
+        if (
+            record is None
+            or record.parent_session_id is None
+            or record.parent_call_id is None
+            or record.helper_index is None
+        ):
+            return
+        lead, call_id, index = record.parent_session_id, record.parent_call_id, record.helper_index
+        stored = await self._events.stored(lead)
+        if not any(
+            isinstance(e, HelperEndedEvent) and e.data.call_id == call_id and e.data.index == index
+            for e in stored
+        ):
+            started = next(
+                (
+                    e
+                    for e in stored
+                    if isinstance(e, HelperStartedEvent) and e.data.helper_id == session_id
+                ),
+                None,
+            )
+            run = None if run_id is None else await self._run_records.get(run_id)
+            summary = summarize_run([] if run_id is None else await self._events.for_run(run_id))
+            await self._events.emit(
+                lead,
+                None if started is None else started.run_id,
+                "helper.ended",
+                HelperEndedData(
+                    call_id=call_id,
+                    index=index,
+                    stopped=stopped_of(None if run is None else run.status),
+                    model_calls=summary.model_calls,
+                    tokens=summary.tokens,
+                    answer_tokens=len(summary.answer) // 4,
+                    cost_usd=summary.cost_usd,
+                    duration_ms=summary.duration_ms,
+                    working_ms=summary.working_ms,
+                ),
+            )
+        self._spawn_wake(lead)
+
+    def _spawn_wake(self, lead_id: str) -> None:
+        task = asyncio.create_task(self._wake(lead_id), name=f"golem-wake-{lead_id}")
+        self._wakes.add(task)
+        task.add_done_callback(self._woke)
+
+    def _woke(self, task: asyncio.Task[None]) -> None:
+        self._wakes.discard(task)
+        _report(task, "wake task failed")
+
+    async def _wake(self, lead_id: str) -> None:
+        """Go on with a lead parked for its helpers, when all of them have ended.
+
+        Stores ``helper.wait`` resumed for each call it waited on, then runs the lead on with
+        ``Answer.helpers_done()``. Does nothing for a lead that is not parked, that is being
+        cancelled or closed, or that still has a helper at work.
+        """
+        async with self._lock:
+            if lead_id in self._stopping:
+                return
+            run = await self._run_records.waiting(lead_id)
+            if run is None or run.wait_reason != "team":
+                return
+            try:
+                session = await self._resolve(lead_id)
+            except (SessionNotFoundError, SchemaMismatchError):
+                return
+            if session.task is not None and not session.task.done():
+                # helper.wait is stored before the parked task has finished closing its stream.
+                await asyncio.wait({session.task})
+            found = await self._events.for_run(run.run_id)
+            calls = parked_calls(found)
+            for call_id in calls:
+                if not await self.helpers_ended(lead_id, call_id):
+                    return
+            for call_id in calls:
+                ids = [h.session_id for h in await self._records.helpers_of(lead_id, call_id)]
+                await self._events.emit(
+                    lead_id,
+                    run.run_id,
+                    "helper.wait",
+                    HelperWaitData(call_id=call_id, state="resumed", helper_ids=ids),
+                )
+            turn = open_turn(found)
+            asked = tuple(
+                dict.fromkeys(e.data.call_id for e in found if e.type == "approval.needed")
+            )
+            resume = self._resume_of(
+                session, run.run_id, "wake", turn.user_message_id, tuple(turn.open_calls), asked
+            )
+            control = RunControl()
+            work = self._resumed(session, resume, control, None)
+            await self._start(session, run.run_id, control, work)
+
+    def _resume_of(
+        self,
+        session: _LiveSession,
+        run_id: str,
+        go: Literal["wake", "continue"],
+        user_message_id: str | None,
+        open_calls: tuple[str, ...] = (),
+        asked: tuple[str, ...] = (),
+    ) -> Resume:
+        """A run that goes on with no answer from you, with the session as it is now."""
+        return Resume(
+            session_id=session.session_id,
+            run_id=run_id,
+            call_id="",
+            name="",
+            decision="allow",
+            user_message_id=user_message_id,
+            open_calls=open_calls,
+            cwd=session.cwd,
+            allowed_tools=_ordered(session.allowed_tools),
+            asked=asked,
+            mcp_servers=tuple(sorted(session.mcp_servers)),
+            pinned=tuple(session.skills),
+            pinned_folders=self._pinned_folders(session),
+            options=dict(session.options),
+            permission_mode=session.permission_mode,
+            checks=session.checks,
+            plan_first=session.plan_first,
+            local_only=self.local_only(session.cwd) or session.route == "local",
+            pins=session.pins,
+            child=self._child_of(session),
+            go=go,
+        )
+
+    async def _after_run(self, session_id: str, run_id: str) -> None:
+        """What a run that stopped without finishing means for its helpers.
+
+        A failed lead takes its helpers with it. A lead parked for its helpers is looked at once
+        more, since a helper may have ended before the park was stored.
+        """
+        run = await self._run_records.get(run_id)
+        if run is None:
+            return
+        if run.status == "failed":
+            await self._cancel_helpers(session_id)
+        elif run.status == "waiting" and run.wait_reason == "team":
+            self._spawn_wake(session_id)
+
+    async def _cancel_helpers(self, lead_id: str) -> None:
+        """Cancel the runs of the helpers of ``lead_id`` that have not ended.
+
+        A stopped helper ends ``cancelled``. Their sessions stay open.
+        """
+        for helper in await self._records.open_helpers(lead_id):
+            run = await self._run_records.latest(helper)
+            if run is None or run.status not in ("running", "waiting"):
+                continue
+            live = self._runs.get(run.run_id)
+            if live is not None and not live.task.done():
+                await self._stop([live], "user")
+            elif run.status == "waiting":
+                async with self._lock:
+                    await self._cancel_waiting(helper, run.run_id)
+            else:
+                # A run a stopped daemon left open: it has no task to cancel.
+                found = await self._events.for_run(run.run_id)
+                cancelled = RunCancelledData(reason="shutdown")
+                await end_run(run, found, self._events, self._runtime, cancelled)
+                await self._ended(helper, run.run_id, None)
+
+    async def is_helper(self, session_id: str) -> bool:
+        """Whether the session is a helper session."""
+        record = await self._records.get(session_id)
+        return record is not None and record.parent_session_id is not None
+
+    async def cancel_helpers(self, lead_id: str) -> None:
+        """End the runs of the helpers of ``lead_id`` that are still open."""
+        await self._cancel_helpers(lead_id)
+
+    async def resume_helper(self, run: RunRecord) -> None:
+        """Run a helper's ``running`` run on from its checkpoint, with no new input.
+
+        A helper that was closed meanwhile has its run cancelled instead.
+        """
+        async with self._lock:
+            try:
+                session = await self._resolve(run.session_id)
+            except SessionNotFoundError:
+                found = await self._events.for_run(run.run_id)
+                cancelled = RunCancelledData(reason="shutdown")
+                await end_run(run, found, self._events, self._runtime, cancelled)
+                await self._ended(run.session_id, run.run_id, None)
+                return
+            resume = self._resume_of(session, run.run_id, "continue", None)
+            control = RunControl()
+            work = self._resumed(session, resume, control, None)
+            await self._start(session, run.run_id, control, work)
+
+    async def reconcile_helpers(self) -> None:
+        """Write the ``helper.ended`` a crash lost, and wake each lead whose helpers have ended."""
+        for run in await self._run_records.parked():
+            found = await self._events.for_run(run.run_id)
+            for call_id in parked_calls(found):
+                for helper in await self._records.helpers_of(run.session_id, call_id):
+                    last = await self._run_records.latest(helper.session_id)
+                    if last is None or last.status not in ("running", "waiting"):
+                        ended_run = None if last is None else last.run_id
+                        await self._helper_ended(helper.session_id, ended_run)
+            await self._wake(run.session_id)
 
     def _turn_of(
         self,
@@ -2107,7 +2405,21 @@ class SessionManager:
 
         Returns False for a run that already ended. Raises
         :class:`RunNotFoundError` for an id the daemon never ran.
+
+        The helpers of a lead are cancelled first, also while the lead is parked for them.
         """
+        record = await self._run_records.get(run_id)
+        lead = None if record is None or record.status not in ("running", "waiting") else record
+        if lead is None:
+            return await self._cancel_run(run_id)
+        self._stopping.add(lead.session_id)
+        try:
+            await self._cancel_helpers(lead.session_id)
+            return await self._cancel_run(run_id)
+        finally:
+            self._stopping.discard(lead.session_id)
+
+    async def _cancel_run(self, run_id: str) -> bool:
         live = self._runs.get(run_id)
         if live is not None and not live.task.done():
             await self._stop([live], "user")
@@ -2125,9 +2437,14 @@ class SessionManager:
         current = await self._run_records.get(run_id)
         if current is None or current.status != "waiting":
             return False
-        pending = pending_approval(await self._events.for_run(run_id))
-        calls = () if pending is None else pending.open_calls
-        await fail_calls(self._events, session_id, run_id, calls, NOT_APPROVED)
+        found = await self._events.for_run(run_id)
+        pending = pending_approval(found)
+        if pending is not None:
+            await fail_calls(self._events, session_id, run_id, pending.open_calls, NOT_APPROVED)
+        elif current.wait_reason == "team":
+            # A lead parked for its helpers: its open delegate calls end with it.
+            calls = open_turn(found).open_calls
+            await fail_calls(self._events, session_id, run_id, calls, CANCELLED_TOOL)
         await self._events.emit(
             session_id, run_id, "run.cancelled", RunCancelledData(reason="user")
         )
@@ -2140,7 +2457,7 @@ class SessionManager:
         A session whose title was cancelled gets one after its next completed run.
         """
         await self._stop(list(self._runs.values()), "shutdown")
-        naming = set(self._naming)
+        naming = set(self._naming) | set(self._wakes)
         for task in naming:
             task.cancel()
         if naming:
@@ -2165,12 +2482,15 @@ class SessionManager:
         try:
             reply = await run_turn(self._runtime, self._events, turn, control)
         except asyncio.CancelledError:
-            await self._ended(session.session_id, turn.run_id, None)
+            await self._ended(
+                session.session_id, turn.run_id, None, stopping=control.reason == "shutdown"
+            )
             raise
         finally:
             if self.budget is not None:
                 self.budget.restore(session.session_id)
         await self._ended(session.session_id, turn.run_id, reply)
+        await self._after_run(session.session_id, turn.run_id)
         self._title_after(
             session,
             turn.typed or turn.text,
@@ -2186,9 +2506,12 @@ class SessionManager:
         try:
             reply = await resume_turn(self._runtime, self._events, resume, control)
         except asyncio.CancelledError:
-            await self._ended(resume.session_id, resume.run_id, None)
+            await self._ended(
+                resume.session_id, resume.run_id, None, stopping=control.reason == "shutdown"
+            )
             raise
         await self._ended(resume.session_id, resume.run_id, reply)
+        await self._after_run(resume.session_id, resume.run_id)
         if prompt is not None:
             self._title_after(session, prompt, reply, local_only=resume.local_only)
 
@@ -2197,12 +2520,16 @@ class SessionManager:
         live = self._sessions.get(session_id)
         return None if live is None else live.origin
 
-    async def _ended(self, session_id: str, run_id: str, reply: str | None) -> None:
+    async def _ended(
+        self, session_id: str, run_id: str, reply: str | None, *, stopping: bool = False
+    ) -> None:
         """Store ``session.completed`` when a run of a headless session ended.
 
         A run that stopped on an approval, or that is still open, says nothing:
         ``approval.needed`` is its event. ``reply`` is the model's answer of a
-        run that completed.
+        run that completed. The end of a helper's run also stores ``helper.ended`` in its
+        lead's log and may wake the lead, unless the daemon is ``stopping``: the next start
+        reconciles it.
         """
         live = self._sessions.get(session_id)
         if live is not None:
@@ -2225,6 +2552,8 @@ class SessionManager:
                 summary=None if run.status != "completed" else cut_summary(reply),
             ),
         )
+        if origin.startswith(ORIGIN_PREFIX) and not stopping:
+            await self._helper_ended(session_id, run_id)
 
     def _title_after(
         self,

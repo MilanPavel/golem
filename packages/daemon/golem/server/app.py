@@ -729,10 +729,11 @@ async def _open_sessions(
     records = SessionRecords(database)
     session_log = SessionLog(events, bus, records)
     runs = RunRecords(database)
-    await recover_runs(runs, events, session_log, runtime)
-    return SessionManager(
+    manager = SessionManager(
         runtime, session_log, records, runs, titles=titles, skills=skills, blobs=blobs
     )
+    await recover_runs(runs, events, session_log, runtime, manager)
+    return manager
 
 
 def _install_signals(
