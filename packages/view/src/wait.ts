@@ -104,7 +104,8 @@ export function waitWords(wait: WaitState, length: WaitLength): string {
       return parts.join(" · ");
     }
     case "team":
-      return web ? "helpers are at their limit · next when one ends" : "helpers at the limit · next when one ends";
+      // A lead that waits for its helpers, or a helper held by its batch limit: the event does not say which.
+      return web ? "waiting for the helpers" : "waiting for helpers";
     case "budget":
       return web ? "the spend cap is reached · ask me, or go local" : "spend cap reached · ask me, or go local";
     case "you":

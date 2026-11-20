@@ -38,10 +38,10 @@ test("provider: the provider's name and the time left", () => {
   assert.equal(waitWords(wait({ reason: "provider", line: "anthropic", position: 3 }), "web"), "anthropic is busy · 3rd in line");
 });
 
-test("team: the helpers' limit", () => {
+test("team: a lead waits for its helpers", () => {
   const w = wait({ reason: "team", line: null });
-  assert.equal(waitWords(w, "web"), "helpers are at their limit · next when one ends");
-  assert.equal(waitWords(w, "tui"), "helpers at the limit · next when one ends");
+  assert.equal(waitWords(w, "web"), "waiting for the helpers");
+  assert.equal(waitWords(w, "tui"), "waiting for helpers");
 });
 
 test("budget: the spend cap asks", () => {
