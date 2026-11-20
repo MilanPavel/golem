@@ -9,6 +9,7 @@ import {
   type PendingConsent,
 } from "@golem/view";
 import { Button } from "../../ui/button.tsx";
+import { Code } from "../../ui/code.tsx";
 import { Seal } from "../approval/approval-bar.tsx";
 
 /**
@@ -38,10 +39,10 @@ export function ConsentBar({
         <div className="min-w-0">
           <p className="text-sm leading-snug font-semibold wrap-anywhere">{CONSENT_TITLE}</p>
           <p className="mt-0.5 text-sm leading-snug text-muted wrap-anywhere">{consentReason(consent)}</p>
-          <p className="mt-1 font-mono text-xs leading-snug wrap-anywhere" data-consent-line="">
-            {consentLine(consent)}
+          <p className="mt-1 leading-snug wrap-anywhere" data-consent-line="">
+            <Code>{consentLine(consent)}</Code>
           </p>
-          {caps === "" ? null : <p className="mt-0.5 font-mono text-xs leading-snug text-faint wrap-anywhere">{caps}</p>}
+          {caps === "" ? null : <p className="mt-0.5 text-meta leading-snug text-faint wrap-anywhere">{caps}</p>}
         </div>
       </div>
       <div className="flex flex-wrap items-center gap-2 px-3 pb-3">

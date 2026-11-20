@@ -191,6 +191,12 @@
   }
 }
 
+/* A field that holds a literal (a path, a cron line, a time): the one way to set an input in mono. */
+@utility field-literal {
+  font-family: var(--font-mono);
+  font-size: var(--text-code);
+}
+
 /* Column sets of Settings › Routing. */
 @utility cols-route-track {
   grid-template-columns: minmax(0, 1fr) 150px minmax(0, 1fr) 84px minmax(0, 1fr);

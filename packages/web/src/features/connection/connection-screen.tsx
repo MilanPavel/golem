@@ -1,12 +1,13 @@
 import { Card } from "../../ui/card.tsx";
+import { Code } from "../../ui/code.tsx";
 import { CopyButton } from "../../ui/copy-command.tsx";
 import { PixelGolem } from "../../ui/pixel-golem.tsx";
 import type { ScreenSpec } from "./connection-screen.ts";
 
 function CommandRow({ command }: { command: string }) {
   return (
-    <div className="flex max-w-full items-center gap-2 rounded-md border border-line-strong bg-code-bg py-1.5 pr-1.5 pl-3.5 font-mono text-sm">
-      <code className="overflow-x-auto whitespace-nowrap">{command}</code>
+    <div className="flex max-w-full items-center gap-2 rounded-md border border-line-strong bg-code-bg py-1.5 pr-1.5 pl-3.5">
+      <Code className="overflow-x-auto whitespace-nowrap">{command}</Code>
       <CopyButton text={command} label="command" />
     </div>
   );
@@ -25,7 +26,7 @@ export function ConnectionScreen({ spec, headingLevel: Heading = "h1" }: Connect
       <Card className="flex w-full max-w-xl flex-col items-center gap-5 p-7 text-center sm:px-6">
         <PixelGolem state={spec.golem} size="lg" />
         <div role="status" aria-live="polite" className="flex flex-col items-center gap-4">
-          <span className="rounded-full bg-sunken px-2 py-1.5 font-mono text-xs leading-none text-muted">
+          <span className="rounded-full bg-sunken px-2 py-1.5 text-meta leading-none text-muted">
             {spec.tag}
           </span>
           <Heading className="font-prose text-2xl font-normal tracking-tight text-balance">{spec.heading}</Heading>

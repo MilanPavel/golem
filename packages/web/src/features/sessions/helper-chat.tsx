@@ -52,7 +52,7 @@ function firstWords(text: string | null, count = 7): string {
   return words.length <= count ? words.join(" ") : `${words.slice(0, count).join(" ")}…`;
 }
 
-const LABEL = "font-mono text-xs text-faint";
+const LABEL = "text-meta text-faint";
 
 /** The two-way switch: Summary or Everything. The arrows move between them. */
 function ViewSwitch({ view, onView }: { view: HelperView; onView: (view: HelperView) => void }) {
@@ -138,7 +138,7 @@ export function HelperPanelView({ lead, helper, chat, nowMs, view, onView, onClo
       <div className="flex flex-col gap-1.5 border-b border-line px-3 py-2">
         <ViewSwitch view={view} onView={onView} />
         {limits === "" ? null : (
-          <p aria-label="Limits" className="font-mono text-xs text-faint">
+          <p aria-label="Limits" className="text-meta text-faint">
             {limits}
           </p>
         )}

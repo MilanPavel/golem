@@ -54,11 +54,11 @@ function Block({ block, leadId, actions }: { block: HelperBlock; leadId: string;
         <span className="min-w-0 flex-1 truncate text-muted" title={block.title}>
           {block.title}
         </span>
-        {block.working === null ? null : <span className="shrink-0 font-mono text-xs text-faint">{block.working}</span>}
+        {block.working === null ? null : <span className="shrink-0 text-meta text-faint">{block.working}</span>}
       </div>
       {block.waiting === null ? null : <p className="text-xs text-muted">{block.waiting}</p>}
       {block.step === null ? null : (
-        <p className="truncate font-mono text-xs text-faint" title={block.step}>
+        <p className="truncate text-meta text-faint" title={block.step}>
           {block.step}
         </p>
       )}

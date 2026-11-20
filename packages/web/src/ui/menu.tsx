@@ -73,7 +73,7 @@ export function MenuCheckboxItem({ className, children, ...props }: ComponentPro
 }
 
 export function MenuLabel({ className, ...props }: ComponentProps<typeof M.Label>) {
-  return <M.Label className={cn("px-2 py-1.5 font-mono text-xs text-faint", className)} {...props} />;
+  return <M.Label className={cn("px-2 py-1.5 text-meta text-faint", className)} {...props} />;
 }
 
 export function MenuSeparator({ className, ...props }: ComponentProps<typeof M.Separator>) {

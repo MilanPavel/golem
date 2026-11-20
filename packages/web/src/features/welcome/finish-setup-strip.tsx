@@ -8,7 +8,7 @@ import { useWelcomeProgress } from "./welcome-store.ts";
 export function FinishSetupStripView({ onFinish }: { onFinish: () => void }) {
   return (
     <div role="status" className="flex w-full items-center gap-3 rounded-md border border-line bg-surface px-3 py-2.5 text-left text-sm text-muted">
-      <span aria-hidden="true" className="font-mono font-semibold text-wait">
+      <span aria-hidden="true" className="font-semibold text-wait">
         !
       </span>
       <span className="min-w-0 flex-1">

@@ -26,6 +26,7 @@ import { resolveActive } from "../../ui/search-list.tsx";
 import { CategoryChips } from "./category-chips.tsx";
 import { listRows, ModelList } from "./model-list.tsx";
 import { TuneView, type TryBackend, type TuneBackend } from "./tune-view.tsx";
+import { Code } from "../../ui/code.tsx";
 import { diskText, downloadText, removable, removeText, shortName, tooBigText, withActivePulls } from "./model-text.ts";
 
 /** What the dialog does, with the session already bound. Each call rejects with the daemon's message. */
@@ -104,7 +105,7 @@ function ProviderNotes({ listing }: { listing: ModelListResult }) {
     if (item.status === "needs_key") {
       return [
         <li key={item.provider}>
-          {item.provider}: run <code className="font-mono text-ink">golem auth set {item.provider}</code> to list its models
+          {item.provider}: run <Code>golem auth set {item.provider}</Code> to list its models
         </li>,
       ];
     }

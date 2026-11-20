@@ -12,6 +12,7 @@ import {
   type SessionState,
 } from "@golem/view";
 import { cn } from "../../ui/cn.ts";
+import { Code } from "../../ui/code.tsx";
 import { IconButton } from "../../ui/icon-button.tsx";
 import { ClockIcon, FolderIcon, MoreIcon, SlidersIcon } from "../../ui/icons.tsx";
 import { Link } from "../../ui/link.tsx";
@@ -168,17 +169,17 @@ function SessionRow({
                   <span className="sr-only">started by a routine</span>
                 </>
               ) : null}
-              {isHelperSession(session) ? <span className="shrink-0 font-mono text-xs text-faint">helper</span> : null}
+              {isHelperSession(session) ? <span className="shrink-0 text-meta text-faint">helper</span> : null}
             </span>
             <span className="flex items-center gap-2">
               {session.cwd ? (
-                <span title={session.cwd} className="flex min-w-0 items-center gap-1 font-mono text-xs text-faint">
+                <span title={session.cwd} className="flex min-w-0 items-center gap-1 text-meta text-faint">
                   <FolderIcon className="size-3 shrink-0 text-faint" aria-hidden="true" />
-                  <span className="truncate">{folderName(session.cwd)}</span>
+                  <Code tone="muted" className="truncate">{folderName(session.cwd)}</Code>
                 </span>
               ) : null}
               <HelperSquares squares={squares} />
-              <time dateTime={session.updated_at} className="ml-auto shrink-0 font-mono text-xs text-faint">
+              <time dateTime={session.updated_at} className="ml-auto shrink-0 text-meta text-faint">
                 {timeAgo(session.updated_at, now)}
               </time>
             </span>

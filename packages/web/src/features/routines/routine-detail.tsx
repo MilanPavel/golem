@@ -5,6 +5,7 @@ import { sessionPath } from "../../store/router.ts";
 import type { RoutineInfo, RoutineRunResult, RoutineRunSummary } from "../../store/routines.ts";
 import { Button } from "../../ui/button.tsx";
 import { cn } from "../../ui/cn.ts";
+import { Code } from "../../ui/code.tsx";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from "../../ui/dialog.tsx";
 import { IconButton } from "../../ui/icon-button.tsx";
 import { MoreIcon } from "../../ui/icons.tsx";
@@ -47,11 +48,11 @@ function HistoryRow({ run, now, onNavigate }: { run: RoutineRunSummary; now: num
     <li className="flex items-center gap-3 px-3 py-2.5">
       <RunDot status={run.status} word={word} />
       <span className="w-28 shrink-0 text-sm font-medium">{runWhenText(run.started_at ?? run.due_at, now)}</span>
-      <span className="w-16 shrink-0 font-mono text-xs text-muted">{duration(run)}</span>
+      <span className="w-16 shrink-0 text-meta text-muted">{duration(run)}</span>
       {run.watch_path === null || run.watch_path === undefined ? null : (
-        <span title={run.watch_path} className="max-w-48 shrink-0 truncate font-mono text-xs text-muted">
+        <Code tone="muted" title={run.watch_path} className="max-w-48 shrink-0 truncate">
           {fileName(run.watch_path)}
-        </span>
+        </Code>
       )}
       <span className={cn("min-w-0 flex-1 truncate text-sm", TONE[run.status] ?? "text-ink")}>{lastResultText(run)}</span>
       {run.session_id === null || run.session_id === undefined ? null : (
@@ -75,7 +76,7 @@ export function History({ runs, now, onNavigate }: { runs: readonly RoutineRunSu
           <HistoryRow key={run.routine_run_id} run={run} now={now} onNavigate={onNavigate} />
         ))}
       </ul>
-      <p className="font-mono text-xs text-faint">{runs.length === 1 ? "Showing the last run" : `Showing the last ${runs.length} runs`}</p>
+      <p className="text-meta text-faint">{runs.length === 1 ? "Showing the last run" : `Showing the last ${runs.length} runs`}</p>
     </div>
   );
 }
@@ -162,7 +163,7 @@ function ProjectNote({ path, onOpenConfig }: { path: string; onOpenConfig: () =>
   return (
     <div className="flex flex-col items-start gap-2">
       <p className="text-sm text-muted">This routine is in its project, so it is edited in the project's config file, which is committed with the project.</p>
-      <p className="font-mono text-xs text-faint wrap-anywhere">{path}</p>
+      <p className="wrap-anywhere"><Code tone="muted">{path}</Code></p>
       <Button size="sm" onClick={onOpenConfig}>
         Open config
       </Button>
@@ -206,7 +207,7 @@ export function RoutineDetail({ routine, runs, now, onNavigate, onRun, onRemove,
             <RoutineDot state={state} />
             <span className="min-w-0 truncate">{config.name}</span>
           </h1>
-          <p className="font-mono text-xs text-muted">{routineHeadline(routine, now)}</p>
+          <p className="text-meta text-muted">{routineHeadline(routine, now)}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Button kind="primary" size="sm" disabled={running || routine.blocked === true} onClick={run}>
@@ -263,12 +264,12 @@ export function RoutineDetail({ routine, runs, now, onNavigate, onRun, onRemove,
       {routine.blocked === true ? <p className="text-sm text-muted">This project is not trusted, so its routines are listed and never run.</p> : null}
       <dl className="flex flex-col gap-1.5 text-sm">
         <Fact label="Runs">
-          <span className="font-mono text-xs">{config.prompt}</span>
+          <span className="text-meta">{config.prompt}</span>
         </Fact>
-        <Fact label="Folder">{config.folder ? <span className="font-mono text-xs">{config.folder}</span> : <span className="text-muted">none</span>}</Fact>
-        <Fact label="Model">{config.model ? <span className="font-mono text-xs">{config.model}</span> : <span className="text-muted">the default</span>}</Fact>
+        <Fact label="Folder">{config.folder ? <Code>{config.folder}</Code> : <span className="text-muted">none</span>}</Fact>
+        <Fact label="Model">{config.model ? <Code>{config.model}</Code> : <span className="text-muted">the default</span>}</Fact>
         <Fact label="MCP servers">
-          {config.mcp && config.mcp.length > 0 ? <span className="font-mono text-xs">{config.mcp.join(", ")}</span> : <span className="text-muted">none</span>}
+          {config.mcp && config.mcp.length > 0 ? <Code>{config.mcp.join(", ")}</Code> : <span className="text-muted">none</span>}
         </Fact>
       </dl>
       <Tabs value={tab} onValueChange={(next) => setTab(next as Tab)} className="flex flex-col gap-4">
@@ -293,9 +294,9 @@ export function RoutineDetail({ routine, runs, now, onNavigate, onRun, onRemove,
           </TabsContent>
         ) : null}
         <TabsContent value="config" className="flex flex-col gap-2">
-          <p className="font-mono text-xs text-faint wrap-anywhere">{routine.path}</p>
-          <pre aria-label="Config as TOML" className="overflow-x-auto rounded-lg border border-line bg-surface p-3 font-mono text-xs whitespace-pre-wrap">
-            {routineToml(config)}
+          <p className="wrap-anywhere"><Code tone="muted">{routine.path}</Code></p>
+          <pre aria-label="Config as TOML" className="overflow-x-auto rounded-lg border border-line bg-surface p-3 whitespace-pre-wrap">
+            <Code>{routineToml(config)}</Code>
           </pre>
         </TabsContent>
       </Tabs>

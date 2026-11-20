@@ -1,6 +1,7 @@
 import { useRef, useState, type ReactNode } from "react";
 import { badgeVariants } from "../../ui/badge.tsx";
 import { cn } from "../../ui/cn.ts";
+import { Code } from "../../ui/code.tsx";
 import { ChevronDownIcon, FolderIcon } from "../../ui/icons.tsx";
 import { Menu, MenuContent, MenuItem, MenuSeparator, MenuTrigger } from "../../ui/menu.tsx";
 import { Popover, PopoverAnchor, PopoverContent } from "../../ui/popover.tsx";
@@ -50,7 +51,7 @@ export function FolderChip({ folder, folders, onChange, browser }: FolderChipPro
         >
           {folders.map((path) => (
             <MenuItem key={path} title={path} aria-current={path === folder ? "true" : undefined} onSelect={() => onChange(path)}>
-              <span className="max-w-80 truncate font-mono text-xs">{path}</span>
+              <Code className="max-w-80 truncate">{path}</Code>
               {path === folder ? <span aria-hidden="true" className="ml-auto text-clay-ink">✓</span> : null}
             </MenuItem>
           ))}

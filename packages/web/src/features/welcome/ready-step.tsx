@@ -37,7 +37,7 @@ function Line({ mark, name, waitWord, children }: { mark: CardMark; name: string
     <li className="flex items-center gap-2.5 text-sm">
       <StepMark mark={mark} {...(waitWord === undefined ? {} : { waitWord })} />
       <span>{name}</span>
-      <span className="ml-auto text-right font-mono text-muted">{children}</span>
+      <span className="ml-auto text-right text-muted">{children}</span>
     </li>
   );
 }

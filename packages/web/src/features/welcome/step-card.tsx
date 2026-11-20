@@ -8,7 +8,7 @@ export type CardMark = "ok" | "attn" | "fail" | "spin" | "wait";
 export function StepMark({ mark, waitWord = "waiting" }: { mark: CardMark; waitWord?: string }) {
   if (mark === "wait") {
     return (
-      <span className="grid size-4 shrink-0 place-items-center font-mono text-sm leading-none text-faint">
+      <span className="grid size-4 shrink-0 place-items-center text-body leading-none text-faint">
         <span aria-hidden="true">–</span>
         <span className="sr-only">{waitWord}: </span>
       </span>

@@ -34,6 +34,7 @@ import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
 import { actionErrorText } from "../../store/errors.ts";
 import { sessionPath } from "../../store/router.ts";
 import { Button } from "../../ui/button.tsx";
+import { Code } from "../../ui/code.tsx";
 import { ChevronLeftIcon, RefreshIcon } from "../../ui/icons.tsx";
 import { IconButton } from "../../ui/icon-button.tsx";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../../ui/tooltip.tsx";
@@ -113,7 +114,7 @@ const SEG_CLASS = "inline-flex w-fit max-w-full gap-0.5 rounded-md border border
 const SEG_BUTTON_CLASS =
   "rounded-sm border border-transparent px-3 py-1 text-xs text-muted outline-offset-2 outline-clay hover:text-ink focus-visible:outline-2 aria-checked:border-line-strong aria-checked:bg-surface aria-checked:text-ink disabled:pointer-events-none disabled:opacity-50";
 const NUMBER_CLASS =
-  "w-24 rounded-md border border-line-strong bg-surface px-2 py-1 font-mono text-sm text-ink outline-offset-2 outline-clay focus-visible:outline-2 disabled:bg-sunken disabled:text-faint";
+  "w-24 rounded-md border border-line-strong bg-surface px-2 py-1 text-body text-ink outline-offset-2 outline-clay focus-visible:outline-2 disabled:bg-sunken disabled:text-faint";
 
 /** A row of radios in one box. Arrow keys move and pick; with nothing checked, the first can take focus. */
 function Segmented({
@@ -268,7 +269,7 @@ function TryBlock({ run, onOpen }: { run: TryRun; onOpen: () => void }) {
   const answer = tryAnswer(run);
   return (
     <section aria-label="Try" aria-live="polite" aria-busy={answer === null || answer.streaming} className="flex flex-col gap-1 rounded-md border border-line bg-surface px-3 py-2 text-sm">
-      <p className="font-mono text-xs text-ink">{run.heading}</p>
+      <p className="text-meta text-ink">{run.heading}</p>
       {run.original === null ? null : <p className="truncate text-xs text-muted">was: {run.original}</p>}
       {answer === null || (answer.text === "" && answer.error === null) ? (
         <p className="text-muted">…</p>
@@ -602,7 +603,7 @@ export function TuneView({
             <section key={group.id} aria-labelledby={`${ids}-group-${group.id}`}>
               <h3
                 id={`${ids}-group-${group.id}`}
-                className="mb-1 mt-4 border-b border-line pb-1 font-mono text-xs uppercase tracking-wider text-faint"
+                className="mb-1 mt-4 border-b border-line pb-1 text-meta font-medium text-faint"
               >
                 {group.label}
               </h3>
@@ -647,7 +648,7 @@ export function TuneView({
                           </TooltipContent>
                         </Tooltip>
                         {slider ? (
-                          <span className={cn("ml-auto font-mono text-sm font-medium", differsFromDefault(view, row) ? "text-clay-ink" : "text-ink", row.value === null && "text-faint")}>
+                          <span className={cn("ml-auto text-body font-medium", differsFromDefault(view, row) ? "text-clay-ink" : "text-ink", row.value === null && "text-faint")}>
                             {formatTuneValue(option, row.value)}
                           </span>
                         ) : (
@@ -718,7 +719,7 @@ export function TuneView({
           <h2 ref={heading} tabIndex={-1} aria-label={`Tune ${label}`} className="text-base font-semibold outline-none">
             {label}
           </h2>
-          <p className="font-mono text-xs text-faint">{model}</p>
+          <p><Code tone="muted">{model}</Code></p>
         </div>
       </div>
       <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto">{body}</div>

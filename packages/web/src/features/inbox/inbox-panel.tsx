@@ -1,6 +1,7 @@
 import type { InboxItem } from "@golem/view";
 import { Fragment } from "react";
 import { Button } from "../../ui/button.tsx";
+import { Code } from "../../ui/code.tsx";
 import { inboxKey, type InboxChoice } from "../../store/inbox.ts";
 
 /** The headline with its `code` parts set in mono. */
@@ -10,9 +11,9 @@ function Headline({ text }: { text: string }) {
     <>
       {parts.map((part, index) =>
         index % 2 === 1 ? (
-          <code key={index} className="rounded-sm bg-code-bg px-1 font-mono text-xs">
+          <Code key={index} className="rounded-sm bg-code-bg px-1">
             {part}
-          </code>
+          </Code>
         ) : (
           <Fragment key={index}>{part}</Fragment>
         ),
@@ -49,7 +50,7 @@ function InboxCard({
         <span className="min-w-0 truncate">{item.sessionTitle}</span>
         {item.age === "" ? null : <span className="flex-none text-faint">{item.age}</span>}
       </p>
-      {item.source === null ? null : <p className="mt-0.5 font-mono text-xs text-faint wrap-anywhere">{item.source}</p>}
+      {item.source === null ? null : <p className="mt-0.5 text-meta text-faint wrap-anywhere">{item.source}</p>}
       <div className="mt-2 flex flex-wrap items-center gap-1.5">
         {item.kind === "approval" && item.callId !== null
           ? ANSWERS.map(({ choice, label }) => (

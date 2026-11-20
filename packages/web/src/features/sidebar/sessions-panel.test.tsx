@@ -140,9 +140,9 @@ test("the folder shows as its basename, with the full path in the title; no fold
   setup();
   const label = screen.getByText("golem").parentElement!;
   expect(label.getAttribute("title")).toBe("/Users/you/repos/golem");
-  expect(label.className).toContain("font-mono");
-  expect(label.className).toContain("text-xs");
+  expect(label.className).toContain("text-meta");
   expect(label.className).toContain("text-faint");
+  expect(screen.getByText("golem").className).toContain("font-mono");
   const none = screen.getByRole("link", { name: /Ancient work/ });
   expect(none.querySelector("[title]")).toBeNull();
 });

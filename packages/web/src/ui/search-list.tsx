@@ -150,7 +150,7 @@ export function SearchList<T extends SearchListItem>({
               const headingId = `${base}-group-${at}`;
               return (
                 <div key={section.group} role="presentation">
-                  <div id={headingId} aria-hidden="true" className="px-3 pt-1 pb-1 font-mono text-xs text-faint">
+                  <div id={headingId} aria-hidden="true" className="px-3 pt-1 pb-1 text-meta text-faint">
                     {section.group}
                   </div>
                   <div role="group" aria-labelledby={headingId} className="flex flex-col gap-0.5">

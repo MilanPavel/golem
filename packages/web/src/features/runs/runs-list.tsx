@@ -24,13 +24,13 @@ export function RunRow({ run, now, onNavigate }: { run: RunInfo; now: number; on
         <span className="flex min-w-0 flex-1 flex-col gap-y-0.5">
           <span className="flex items-center gap-x-2">
             <span className="truncate text-sm font-medium">{runName(run)}</span>
-            <span className="font-mono text-xs text-faint">{run.kind}</span>
+            <span className="text-meta text-faint">{run.kind}</span>
           </span>
-          <span className="truncate font-mono text-xs text-muted">{runRowLine(run, now)}</span>
+          <span className="truncate text-meta text-muted">{runRowLine(run, now)}</span>
         </span>
         <span className="flex min-w-0 max-w-sm flex-col items-end gap-y-0.5 text-right">
           <span className={cn("max-w-full truncate text-sm", TONE[run.status] ?? "text-ink")}>{runResultLine(run)}</span>
-          {duration === "" ? null : <span className="font-mono text-xs text-muted">{duration}</span>}
+          {duration === "" ? null : <span className="text-meta text-muted">{duration}</span>}
         </span>
       </Link>
     </li>
@@ -41,7 +41,7 @@ function Group({ group, now, onNavigate }: { group: RunGroup<RunInfo>; now: numb
   const headingId = useId();
   return (
     <section aria-labelledby={headingId} className="flex flex-col gap-1">
-      <h2 id={headingId} className="px-3 font-mono text-xs font-normal text-faint">
+      <h2 id={headingId} className="px-3 text-meta font-normal text-faint">
         {runGroupHeading(group)}
       </h2>
       <ul className="flex flex-col gap-0.5">

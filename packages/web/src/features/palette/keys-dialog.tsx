@@ -22,7 +22,7 @@ export function KeysDialog({
             const headingId = `keys-${section.title.toLowerCase().replace(/\s+/g, "-")}`;
             return (
               <section key={section.title} aria-labelledby={headingId}>
-                <h3 id={headingId} className="px-1 pb-1 font-mono text-xs font-normal text-faint">
+                <h3 id={headingId} className="px-1 pb-1 text-meta font-normal text-faint">
                   {section.title}
                 </h3>
                 {section.note === undefined ? null : <p className="px-1 pb-1 text-xs text-muted">{section.note}</p>}

@@ -5,12 +5,13 @@ import type { RoutineConfig } from "../../store/routines.ts";
 import type { ListedSkill } from "../../store/skills.ts";
 import { Button } from "../../ui/button.tsx";
 import { cn } from "../../ui/cn.ts";
+import { Code } from "../../ui/code.tsx";
 import { Input } from "../../ui/input.tsx";
 import { Popover, PopoverClose, PopoverContent, PopoverTrigger } from "../../ui/popover.tsx";
 import { Textarea } from "../../ui/textarea.tsx";
 import type { FolderBrowserSlot } from "../settings/routing-exceptions.tsx";
 
-const GROUP = "mb-1 mt-4 border-b border-line pb-1 font-mono text-xs uppercase tracking-wider text-faint first:mt-0";
+const GROUP = "mb-1 mt-4 border-b border-line pb-1 text-meta font-medium text-faint first:mt-0";
 const ROW = "flex flex-col gap-1 border-t border-dashed border-line py-2 first:border-t-0";
 const SEG_CLASS = "inline-flex w-fit max-w-full flex-wrap gap-0.5 rounded-md border border-line-strong bg-bg p-0.5";
 const SEG_BUTTON_CLASS =
@@ -240,7 +241,7 @@ export function RoutineEditor({ create, draft, now, skills, servers, folderBrows
       value={when.time}
       onChange={(event) => change({ time: event.target.value })}
       aria-invalid={schedule === null && touched ? true : undefined}
-      className="w-32 font-mono"
+      className="w-32 field-literal"
     />
   );
 
@@ -274,7 +275,7 @@ export function RoutineEditor({ create, draft, now, skills, servers, folderBrows
                     value={watchFolder}
                     aria-invalid={errors.on === undefined ? undefined : true}
                     onChange={(event) => setWatchFolder(event.target.value)}
-                    className="min-w-0 flex-1 font-mono"
+                    className="min-w-0 flex-1 field-literal"
                   />
                   <Button size="sm" onClick={() => setWatchBrowsing(true)}>
                     Browse…
@@ -301,11 +302,11 @@ export function RoutineEditor({ create, draft, now, skills, servers, folderBrows
                   spellCheck={false}
                   value={glob}
                   onChange={(event) => setGlob(event.target.value)}
-                  className="font-mono"
+                  className="field-literal"
                 />
               </Row>
               <li className={cn(ROW, "min-h-9")}>
-                <p aria-live="polite" className="font-mono text-xs text-muted">
+                <p aria-live="polite" className="text-meta text-muted">
                   {watchPreviewText(watchFolder, glob.trim() === "" ? undefined : glob, prompt)}
                 </p>
               </li>
@@ -329,7 +330,7 @@ export function RoutineEditor({ create, draft, now, skills, servers, folderBrows
                       aria-label="Every N hours"
                       value={when.hours}
                       onChange={(event) => change({ hours: event.target.value })}
-                      className="w-24 font-mono"
+                      className="w-24 field-literal"
                     />
                     <span className="text-sm text-muted">hours</span>
                   </div>
@@ -345,12 +346,12 @@ export function RoutineEditor({ create, draft, now, skills, servers, folderBrows
                     spellCheck={false}
                     value={when.cron}
                     onChange={(event) => change({ cron: event.target.value })}
-                    className="font-mono"
+                    className="field-literal"
                   />
                 </Row>
               ) : null}
               <li className={cn(ROW, "min-h-9")}>
-                <p aria-live="polite" className={cn("font-mono text-xs", previewError === null ? "text-muted" : "text-deny")} role={previewError === null ? undefined : "alert"}>
+                <p aria-live="polite" className={cn("text-meta", previewError === null ? "text-muted" : "text-deny")} role={previewError === null ? undefined : "alert"}>
                   {previewError ?? previewText}
                 </p>
               </li>
@@ -379,7 +380,7 @@ export function RoutineEditor({ create, draft, now, skills, servers, folderBrows
                 value={name}
                 aria-invalid={errors.name === undefined ? undefined : true}
                 onChange={(event) => setName(event.target.value)}
-                className="font-mono"
+                className="field-literal"
               />
             </Row>
           ) : null}
@@ -404,7 +405,7 @@ export function RoutineEditor({ create, draft, now, skills, servers, folderBrows
                             onClick={() => pickSkill(skill.name)}
                             className="flex w-full flex-col items-start gap-0.5 rounded-md px-2.5 py-1.5 text-left outline-offset-2 outline-clay hover:bg-line focus-visible:outline-2"
                           >
-                            <span className="font-mono text-sm">/{skill.name}</span>
+                            <Code>/{skill.name}</Code>
                             <span className="line-clamp-2 text-xs text-muted">{skill.description}</span>
                           </button>
                         </PopoverClose>
@@ -424,7 +425,7 @@ export function RoutineEditor({ create, draft, now, skills, servers, folderBrows
                     type="button"
                     title={chip.meaning}
                     onClick={() => insertChip(chip.token)}
-                    className="rounded-md border border-line px-2 py-0.5 font-mono text-xs text-ink outline-offset-2 outline-clay hover:bg-line focus-visible:outline-2"
+                    className="rounded-md border border-line px-2 py-0.5 text-ink outline-offset-2 outline-clay hover:bg-line focus-visible:outline-2"
                   >
                     {chip.token}
                   </button>
@@ -439,7 +440,6 @@ export function RoutineEditor({ create, draft, now, skills, servers, folderBrows
               value={prompt}
               aria-invalid={errors.prompt === undefined ? undefined : true}
               onChange={(event) => setPrompt(event.target.value)}
-              className="font-mono"
             />
           </Row>
         </ul>
@@ -456,7 +456,7 @@ export function RoutineEditor({ create, draft, now, skills, servers, folderBrows
             error={errors.folder}
             control={
               <>
-                <span className={cn("font-mono text-sm", folder === null && "text-faint")}>{folder ?? "none"}</span>
+                {folder === null ? <span className="text-body text-faint">none</span> : <Code>{folder}</Code>}
                 <Button size="sm" onClick={() => setBrowsing(true)}>
                   Change…
                 </Button>
@@ -495,7 +495,7 @@ export function RoutineEditor({ create, draft, now, skills, servers, folderBrows
                       checked={mcp.includes(server)}
                       onChange={(event) => setMcp(event.target.checked ? [...mcp, server] : mcp.filter((each) => each !== server))}
                     />
-                    <span className="font-mono">{server}</span>
+                    <Code>{server}</Code>
                   </label>
                 ))}
               </div>
