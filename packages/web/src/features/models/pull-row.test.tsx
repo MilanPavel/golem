@@ -70,11 +70,20 @@ test("a download shows in the sidebar on home, in a session and in Settings, and
   expect(row()).not.toBeNull();
   await user.click(within(screen.getByRole("navigation", { name: "Sidebar rail" })).getByRole("button", { name: "Settings" }));
   expect(location.pathname).toBe("/settings");
-  // Settings hides the panel until it is asked for.
-  await user.click(within(screen.getByRole("navigation", { name: "Sidebar rail" })).getByRole("button", { name: "Sessions" }));
-  expect(row()).not.toBeNull();
+  // Settings hides the panel, and the row stays in view at the foot of the page.
+  expect(screen.queryByRole("complementary", { name: "Sessions" })).toBeNull();
+  expect(screen.getByRole("button", { name: /^Downloading / })).toBeTruthy();
   done(fake, true);
-  await waitFor(() => expect(row()).toBeNull());
+  await waitFor(() => expect(screen.queryByRole("button", { name: /^Downloading / })).toBeNull());
+});
+
+test("on Settings with the panel hidden the download row shows once, and with the panel peeked open it moves into the panel", async () => {
+  const { fake, user } = await mount("/settings");
+  progress(fake, 1_200_000_000);
+  expect(await screen.findAllByRole("button", { name: /^Downloading / })).toHaveLength(1);
+  await user.click(within(screen.getByRole("navigation", { name: "Sidebar rail" })).getByRole("button", { name: "Sessions" }));
+  expect(screen.getAllByRole("button", { name: /^Downloading / })).toHaveLength(1);
+  expect(row()).not.toBeNull();
 });
 
 test("on home the row opens the model dialog for no session", async () => {

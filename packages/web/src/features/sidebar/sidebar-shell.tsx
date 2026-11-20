@@ -4,6 +4,7 @@ import { useConnection } from "../../store/connection-context.tsx";
 import { useNavigate, useRoute, useSessionList, useSetupStatus } from "../../store/page-context.tsx";
 import { useInbox } from "../../store/inbox.ts";
 import { settingsPath } from "../../store/router.ts";
+import { cn } from "../../ui/cn.ts";
 import { IconButton } from "../../ui/icon-button.tsx";
 import { PlusIcon } from "../../ui/icons.tsx";
 import { hasMod } from "../../ui/platform.ts";
@@ -174,7 +175,7 @@ export function SidebarShell() {
       }
       foot={
         <div className="flex flex-col gap-2">
-          <PullStatus />
+          {open ? <PullStatus /> : null}
           <ConnectionStrip snapshot={connection} />
         </div>
       }
@@ -190,18 +191,27 @@ export function SidebarShell() {
 
   // The model dialog stays mounted with the panel hidden: Settings opens it too.
   const modelDialog = <NewSessionModelDialog />;
+  // Settings hides the panel, so the download row sits at the foot of the page instead; the panel's foot has it otherwise.
+  const strip =
+    inSettings && !open ? (
+      <div className={cn("pointer-events-none fixed bottom-0 z-30 w-64 max-w-full p-2", narrow ? "left-0" : "left-rail")}>
+        <div className="pointer-events-auto rounded-md bg-sunken">
+          <PullStatus />
+        </div>
+      </div>
+    ) : null;
   if (wide) {
     return (
       <>
         {rail}
         {open ? panelBox : null}
-        {modelDialog}
+        {modelDialog}{strip}
       </>
     );
   }
   const scrim = <div aria-hidden="true" data-testid="sidebar-scrim" onClick={closeFloating} className="fixed inset-0 z-40 bg-ink/40" />;
   if (narrow) {
-    if (!open) return modelDialog;
+    if (!open) return <>{modelDialog}{strip}</>;
     return (
       <>
         {scrim}
@@ -216,7 +226,7 @@ export function SidebarShell() {
           {rail}
           {panelBox}
         </div>
-        {modelDialog}
+        {modelDialog}{strip}
       </>
     );
   }
@@ -231,7 +241,7 @@ export function SidebarShell() {
           </div>
         </>
       ) : null}
-      {modelDialog}
+      {modelDialog}{strip}
     </>
   );
 }
