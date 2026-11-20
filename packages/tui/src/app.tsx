@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process";
-import { readFile } from "node:fs/promises";
-import { homedir } from "node:os";
+import { existsSync, realpathSync } from "node:fs";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { homedir, tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Box, Text, useApp, useInput, usePaste, useStdin, useWindowSize } from "ink";
@@ -410,6 +411,23 @@ import {
   type RunList,
   type RunsManagerState,
 } from "./runs-manager.ts";
+import {
+  closedMemoryManager,
+  emptyMemoryList,
+  layoutMemoryManager,
+  memoryEdited,
+  memoryListParams,
+  memoryManagerKeyOf,
+  memoryManagerTyping,
+  type MemoryList,
+  type MemoryManagerAction,
+  type MemoryManagerState,
+  openMemoryManager,
+  pressMemoryManager,
+  projectFolderOf,
+  withMemoryMessage,
+} from "./memory-manager.ts";
+import { MemoryManagerView } from "./memory-manager.tsx";
 import { assistantChars, elapsedSeconds, meterLine, meterPhase, writingNow } from "./progress.ts";
 import {
   alertLabel,
@@ -663,6 +681,14 @@ export function App({
   const [runList, setRunList] = useState<RunList>({ runs: null, error: null });
   const runListRef = useRef(runList);
   runListRef.current = runList;
+  const [memoryManager, setMemoryManager] = useState<MemoryManagerState>(closedMemoryManager);
+  const memoryManagerRef = useRef(memoryManager);
+  memoryManagerRef.current = memoryManager;
+  const [memoryList, setMemoryList] = useState<MemoryList>(emptyMemoryList);
+  const memoryListRef = useRef(memoryList);
+  memoryListRef.current = memoryList;
+  /** Counts the reads, so an answer for a tab or a search the user has left is dropped. */
+  const memoryRead = useRef(0);
   /** Sessions whose "needs you" banner Esc put away, until they stop waiting. */
   const [dismissedRuns, setDismissedRuns] = useState<ReadonlySet<string>>(new Set());
   const [changesManager, setChangesManager] = useState<ChangesManagerState>(closedChangesManager);
@@ -899,6 +925,7 @@ export function App({
     skillsManager.open ||
     routinesManager.open ||
     runsManager.open ||
+    memoryManager.open ||
     changesManager.open ||
     undoBand !== null ||
     picker.open ||
@@ -1419,6 +1446,21 @@ export function App({
       return;
     }
     loadModels(false);
+  }, [client, connection.status]);
+
+  // `/memory` reads its list again when memory changes anywhere, and after a reconnect.
+  useEffect(() => {
+    if (connection.status !== "connected") {
+      return;
+    }
+    if (memoryManagerRef.current.open) {
+      loadMemory();
+    }
+    return client.onMemoryChanged(() => {
+      if (memoryManagerRef.current.open) {
+        loadMemory();
+      }
+    });
   }, [client, connection.status]);
 
   useEffect(() => {
@@ -2024,6 +2066,133 @@ export function App({
     );
   }
 
+  /** The project folder of this chat's folder, which the project tab of `/memory` reads. */
+  function memoryFolder(): string {
+    return projectFolderOf(skillsFolder(), existsSync, (path) => {
+      try {
+        return realpathSync(path);
+      } catch {
+        return path;
+      }
+    });
+  }
+
+  /** Read `/memory`'s list for the tab and search it shows. With `after`, the next page is added to it. */
+  function loadMemory(after?: string): void {
+    const read = ++memoryRead.current;
+    client.listMemories(memoryListParams(memoryManagerRef.current, memoryFolder(), after)).then(
+      (result) => {
+        if (read !== memoryRead.current) {
+          return;
+        }
+        const before = after === undefined ? [] : (memoryListRef.current.items ?? []);
+        setMemoryList({
+          items: [...before, ...result.items],
+          total: result.total,
+          counts: result.counts,
+          settings: result.settings,
+          error: null,
+        });
+      },
+      (error: unknown) => {
+        if (read === memoryRead.current) {
+          setMemoryList({ ...emptyMemoryList, error: messageOf(error) });
+        }
+      },
+    );
+  }
+
+  function showMemoryManager(next: MemoryManagerState): void {
+    memoryManagerRef.current = next;
+    setMemoryManager(next);
+  }
+
+  function onMemoryManagerPress(press: Press): void {
+    const key = memoryManagerKeyOf(press, memoryManagerTyping(memoryManagerRef.current));
+    if (key === null) {
+      return;
+    }
+    const pressed = pressMemoryManager(memoryManagerRef.current, memoryListRef.current, key);
+    showMemoryManager(pressed.state);
+    runMemoryAction(pressed.action);
+  }
+
+  function runMemoryAction(action: MemoryManagerAction): void {
+    const say = (message: string) => showMemoryManager(withMemoryMessage(memoryManagerRef.current, message));
+    const failed = (error: unknown) => say(messageOf(error));
+    if (action.kind === "close") {
+      showMemoryManager(closedMemoryManager);
+    } else if (action.kind === "reload") {
+      memoryListRef.current = { ...emptyMemoryList, counts: memoryListRef.current.counts, settings: memoryListRef.current.settings };
+      setMemoryList(memoryListRef.current);
+      loadMemory();
+    } else if (action.kind === "more") {
+      loadMemory(action.after);
+    } else if (action.kind === "edit") {
+      void editMemoryText(action.id, action.text);
+    } else if (action.kind === "delete") {
+      client.deleteMemories([action.id]).then(() => {
+        say("deleted");
+        loadMemory();
+      }, failed);
+    } else if (action.kind === "pin") {
+      client.updateMemory({ id: action.id, always: action.always }).then(() => {
+        say(action.always ? "in every chat" : "not in every chat");
+        loadMemory();
+      }, failed);
+    } else if (action.kind === "export") {
+      const folder = action.scope === "project" ? memoryFolder() : undefined;
+      client.exportMemories({ format: "markdown", scope: action.scope, ...(folder === undefined ? {} : { folder }) }).then(
+        async (exported) => {
+          const path = join(skillsFolder(), action.file);
+          try {
+            // Never over a file that is there, and readable by you only: it may hold private notes.
+            await writeFile(path, exported.text, { encoding: "utf8", flag: "wx", mode: 0o600 });
+            say(`exported ${exported.count} to ${path}`);
+          } catch (error) {
+            const exists = error instanceof Error && "code" in error && error.code === "EEXIST";
+            say(exists ? `${path} is already there. Move it away, then export again.` : messageOf(error));
+          }
+        },
+        failed,
+      );
+    }
+  }
+
+  /** Edit a memory's text in `$EDITOR` on a temporary file, then save it with `memory.update`. */
+  async function editMemoryText(id: string, text: string): Promise<void> {
+    if (editing.current) {
+      return;
+    }
+    editing.current = true;
+    let message = "";
+    const dir = await mkdtemp(join(tmpdir(), "golem-memory-"));
+    try {
+      const file = join(dir, "memory.md");
+      await writeFile(file, text, "utf8");
+      if (!(await editFile(file, suspendTerminal))) {
+        message = "the editor did not exit cleanly";
+      } else {
+        const edited = memoryEdited(text, await readFile(file, "utf8"));
+        if (edited.kind === "same") {
+          message = "no change";
+        } else if (edited.kind === "empty") {
+          message = "an empty memory is not saved, use d to delete it";
+        } else {
+          await client.updateMemory({ id, text: edited.text });
+          message = "saved";
+        }
+      }
+    } catch (error) {
+      message = messageOf(error);
+    } finally {
+      editing.current = false;
+      await rm(dir, { recursive: true, force: true });
+    }
+    showMemoryManager(withMemoryMessage(memoryManagerRef.current, message));
+    loadMemory();
+  }
+
   function submit(): void {
     const outcome = applyComposer(
       debugRef.current,
@@ -2201,9 +2370,13 @@ export function App({
       return;
     }
     if (outcome.kind === "memory") {
-      // The browser is a later ticket. Until then the command only says so.
       setDraft(draftAt(""));
-      setChat((state) => ({ ...state, notice: "the memory browser is not here yet" }));
+      setKeysOpen(false);
+      setSwitcher(closedSwitcher);
+      showMemoryManager(openMemoryManager());
+      memoryListRef.current = emptyMemoryList;
+      setMemoryList(emptyMemoryList);
+      loadMemory();
       return;
     }
     if (outcome.kind === "skill-new") {
@@ -5115,6 +5288,10 @@ export function App({
       onRunsManagerPress(press);
       return;
     }
+    if (memoryManagerRef.current.open && !keysOpenRef.current && press.name !== "f1" && press.name !== "ctrl-c") {
+      onMemoryManagerPress(press);
+      return;
+    }
     if (undoRef.current !== null && !keysOpenRef.current && press.name !== "f1" && press.name !== "ctrl-c") {
       onUndoPress(press);
       return;
@@ -5320,6 +5497,7 @@ export function App({
       skillsManagerRef.current.open ||
       routinesManagerRef.current.open ||
       runsManagerRef.current.open ||
+      memoryManagerRef.current.open ||
       changesManagerRef.current.open ||
       tuneRef.current !== null ||
       keysOpenRef.current
@@ -5365,7 +5543,7 @@ export function App({
     },
     all: transcript.all,
     pinned: transcript.pinned === null ? null : { row: budget.header, offset: transcript.pinned.offset },
-    shown: !keysOpen && !picker.open && !mcpManager.open && !skillsManager.open && !routinesManager.open && !runsManager.open && !changesManager.open && !perms.open && !switcher.open,
+    shown: !keysOpen && !picker.open && !mcpManager.open && !skillsManager.open && !routinesManager.open && !runsManager.open && !memoryManager.open && !changesManager.open && !perms.open && !switcher.open,
   };
   const composer =
     argsEdit !== null
@@ -5496,6 +5674,19 @@ export function App({
             ),
           )}
         </Box>
+      ) : memoryManager.open ? (
+        <MemoryManagerView
+          lines={layoutMemoryManager({
+            state: memoryManager,
+            list: memoryList,
+            folder: memoryFolder(),
+            home: homedir(),
+            columns,
+            rows: budget.body,
+          })}
+          columns={columns}
+          height={budget.body}
+        />
       ) : changesManager.open ? (
         <Box flexDirection="column" width={columns} height={budget.body} flexShrink={0} overflow="hidden">
           {layoutChanges(changesManager, { ...changes, notes: notesOf(sessionId).notes }, columns, budget.body).map((line, index) => (
