@@ -40,7 +40,7 @@ export function BrandIcon({ id, label, size = "md" }: { id: string; label?: stri
       )}
     >
       {path === null ? (
-        <span className="font-mono text-xs uppercase">{text.slice(0, 1)}</span>
+        <span className="text-meta uppercase">{text.slice(0, 1)}</span>
       ) : (
         <svg viewBox="0 0 24 24" fill="currentColor" className={size === "sm" ? "size-3" : "size-4"}>
           <path d={path} />

@@ -42,7 +42,7 @@ export function SkillEditor({ skill, cwd, onCopy }: { skill: ListedSkill; cwd: s
       </div>
     );
   }
-  if (file.data === undefined) return <p className="font-mono text-sm text-muted">asking the daemon…</p>;
+  if (file.data === undefined) return <p className="text-body text-muted">asking the daemon…</p>;
   return (
     <Editor
       key={`${file.data.path}:${round}`}
@@ -148,7 +148,7 @@ function Editor({
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
       {saved && !dirty ? (
-        <p role="status" className="font-mono text-xs text-allow">
+        <p role="status" className="text-meta text-allow">
           Saved. The registry reloaded.
         </p>
       ) : null}
@@ -177,7 +177,7 @@ function Editor({
         readOnly={bundled}
       />
       {errors.length > 0 ? (
-        <ul aria-label="Errors" role="alert" className="flex flex-col gap-1 rounded-md border border-deny bg-deny-soft px-3 py-2 font-mono text-xs text-deny">
+        <ul aria-label="Errors" role="alert" className="flex flex-col gap-1 rounded-md border border-deny bg-deny-soft px-3 py-2 text-meta text-deny">
           {errors.map((issue, at) => (
             <li key={at} className="wrap-anywhere">
               {problemLine(issue)}
@@ -186,7 +186,7 @@ function Editor({
         </ul>
       ) : null}
       {warnings.length > 0 ? (
-        <ul aria-label="Warnings" className="flex flex-col gap-1 font-mono text-xs text-wait">
+        <ul aria-label="Warnings" className="flex flex-col gap-1 text-meta text-wait">
           {warnings.map((issue, at) => (
             <li key={at} className="wrap-anywhere">
               {problemLine(issue)}
@@ -224,7 +224,7 @@ function Editor({
           <Button size="sm" disabled={!dirty} onClick={() => setText(original)}>
             Revert
           </Button>
-          <span role="status" aria-live="polite" className="ml-auto font-mono text-xs text-muted">
+          <span role="status" aria-live="polite" className="ml-auto text-meta text-muted">
             {dirty ? (checking ? "checking…" : "Not saved · the registry reloads on save") : "No changes"}
           </span>
         </div>

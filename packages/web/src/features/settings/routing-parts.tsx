@@ -55,7 +55,7 @@ export function Spans({ spans }: { spans: readonly (Span | ContextSpan)[] }) {
         switch (span.kind) {
           case "chip":
             return (
-              <span key={index} className="whitespace-nowrap rounded-md border border-line-strong bg-slip px-1.5 py-0.5 font-mono text-xs font-medium text-ink">
+              <span key={index} className="whitespace-nowrap rounded-md border border-line-strong bg-slip px-1.5 py-0.5 text-meta font-medium text-ink">
                 {span.text}
               </span>
             );
@@ -324,7 +324,7 @@ export function Stepper({
       <button type="button" aria-label={`${label}: less`} disabled={lessDisabled} onClick={onLess} className={button}>
         −
       </button>
-      <output aria-label={`${label}: value`} className="min-w-9 text-center font-mono text-note font-medium">
+      <output aria-label={`${label}: value`} className="min-w-9 text-center text-meta font-medium">
         {shown}
       </output>
       <button type="button" aria-label={`${label}: more`} onClick={onMore} className={button}>

@@ -24,6 +24,7 @@ import { useModelList, useRouting } from "../../store/page-context.tsx";
 import type { RoutingGetResult, RoutingSetParams } from "../../store/routing.ts";
 import { Button } from "../../ui/button.tsx";
 import { cn } from "../../ui/cn.ts";
+import { Code } from "../../ui/code.tsx";
 import { WindowBarView } from "./context-bar.tsx";
 import { HEAD, ShareSlider, Stage } from "./context-controls.tsx";
 import { ContextRightNow } from "./context-right-now.tsx";
@@ -54,7 +55,7 @@ function ScopeTag({ tone, children }: { tone: "local" | "all"; children: ReactNo
   return (
     <span
       className={cn(
-        "self-start rounded-xs px-1.5 py-1 font-mono text-micro font-semibold tracking-wider whitespace-nowrap uppercase sm:self-center",
+        "self-start rounded-xs px-1.5 py-1 text-meta font-semibold whitespace-nowrap sm:self-center",
         tone === "local" ? "bg-allow-soft text-allow" : "bg-clay-soft text-clay-ink",
       )}
     >
@@ -148,7 +149,7 @@ function WindowSource({ kind, window }: { kind: "auto" | "fixed" | "ollama"; win
   return (
     <div className="flex flex-col gap-1 text-note text-muted">
       {kind === "ollama" ? <p>{CONTEXT_WORDS.window.captions.ollama}</p> : <p>golem plans the window from the model and this Mac's memory.</p>}
-      {line === null ? null : <p className="font-mono">{line}</p>}
+      {line === null ? null : <p>{line}</p>}
       {window.reason === null || kind !== "auto" ? null : <p>{`${sentence(window.reason)}.`}</p>}
       {window.tokens === null ? <p>{CONTEXT_WORDS.windowAfterChat}</p> : null}
     </div>
@@ -161,7 +162,7 @@ function RulesLine() {
   return (
     <p className="text-note text-muted">
       {before}
-      <code className="font-mono text-ink-soft">{code}</code>
+      <Code tone="muted">{code}</Code>
       {after}
     </p>
   );
@@ -385,7 +386,7 @@ export function ContextSection() {
       </div>
     );
   }
-  if (routing.data === undefined) return <p className="font-mono text-sm text-muted">asking the daemon…</p>;
+  if (routing.data === undefined) return <p className="text-body text-muted">asking the daemon…</p>;
   return (
     <div className="flex flex-col gap-4">
       {failure === null ? null : (

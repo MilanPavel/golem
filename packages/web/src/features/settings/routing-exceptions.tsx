@@ -4,6 +4,7 @@ import type { ModelListResult } from "../../store/models.ts";
 import type { PullsSnapshot } from "../../store/pulls.ts";
 import type { RoutingGetResult, RoutingSetParams } from "../../store/routing.ts";
 import { Button } from "../../ui/button.tsx";
+import { Code } from "../../ui/code.tsx";
 import { ModelPick } from "./routing-model-pick.tsx";
 import { CARD, FieldError, Part, type RoutingErrors } from "./routing-parts.tsx";
 import { usableModels } from "./routing-derive.ts";
@@ -39,7 +40,7 @@ function Folders({
                 <rect x="3.5" y="7" width="9" height="6.5" rx="1.5" />
                 <path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2" />
               </svg>
-              <span className="min-w-0 flex-1 font-mono text-xs wrap-anywhere">{folder}</span>
+              <Code className="min-w-0 flex-1 wrap-anywhere">{folder}</Code>
               <button
                 type="button"
                 aria-label={`Remove ${folder}`}
@@ -114,7 +115,7 @@ function Jobs({
                 onPick={(ref) => onChange({ roles: { [role]: ref ?? "session" } })}
                 describedBy={errors[path] === undefined ? undefined : errorId}
                 invalid={errors[path] !== undefined}
-                className="w-full font-mono text-note"
+                className="w-full text-meta"
               />
               <FieldError id={errorId} path={path} errors={errors} />
             </div>

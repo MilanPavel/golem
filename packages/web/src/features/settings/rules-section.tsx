@@ -18,6 +18,7 @@ import { actionErrorText } from "../../store/errors.ts";
 import { usePageActions, useConfig } from "../../store/page-context.tsx";
 import { Button } from "../../ui/button.tsx";
 import { cn } from "../../ui/cn.ts";
+import { Code } from "../../ui/code.tsx";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "../../ui/dialog.tsx";
 import { useSettingsContext, useSettingsFolder } from "./context.ts";
 
@@ -97,9 +98,9 @@ export function RulesSection() {
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="font-mono text-xs text-muted wrap-anywhere">
-          {folder === null ? "no folder" : folder}
-          {sessionId === null ? "" : ` · session ${sessionId}`}
+        <p className="text-meta text-muted wrap-anywhere">
+          {folder === null ? "no folder" : <Code tone="muted">{folder}</Code>}
+          {sessionId === null ? null : <> · session <Code tone="muted">{sessionId}</Code></>}
         </p>
         <Button size="sm" onClick={() => void config.refetch()}>
           Refresh
@@ -109,7 +110,7 @@ export function RulesSection() {
       {trusted === false ? (
         <p className="text-sm text-muted">This folder's allow rules do not count until the folder is trusted.</p>
       ) : null}
-      <p role="status" aria-live="polite" className="min-h-5 font-mono text-xs text-muted">
+      <p role="status" aria-live="polite" className="min-h-5 text-meta text-muted">
         {notice}
       </p>
       {error === null ? null : (
@@ -130,7 +131,7 @@ export function RulesSection() {
           </Button>
         </div>
       ) : config.data === undefined ? (
-        <p className="font-mono text-sm text-muted">loading…</p>
+        <p className="text-body text-muted">loading…</p>
       ) : (
         <ul aria-label="Tool rules" data-setting="rules" className="flex flex-col gap-2">
           {items.map((item, at) => (
@@ -187,7 +188,7 @@ function DefaultMode({ mode }: { mode: PermissionMode }) {
 
   return (
     <section aria-labelledby="default-mode" data-setting="default mode" className="flex flex-col gap-2 rounded-lg border border-line bg-surface px-3 py-3">
-      <h3 id="default-mode" className="font-mono text-xs text-faint">
+      <h3 id="default-mode" className="text-meta text-faint">
         Default mode
       </h3>
       <div role="radiogroup" aria-labelledby="default-mode" className="flex flex-wrap gap-1">
@@ -243,9 +244,9 @@ function Row({ item, canRevoke, onPress }: { item: PermissionItem; canRevoke: bo
     const what = item.subject === null ? item.tool : `${item.tool} ${item.subject}`;
     return (
       <li className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-line bg-surface px-3 py-2">
-        <p className="min-w-0 flex-1 font-mono text-sm wrap-anywhere">
+        <p className="min-w-0 flex-1 text-body wrap-anywhere">
           <span className="text-faint">session </span>
-          <span className="text-allow">allow</span> {what} <span className="text-muted">(for this session)</span>
+          <span className="text-allow">allow</span> <Code>{what}</Code> <span className="text-muted">(for this session)</span>
         </p>
         {canRevoke ? (
           <Button size="sm" aria-label={`Revoke ${what}`} onClick={() => onPress(item, "delete")}>
@@ -258,8 +259,8 @@ function Row({ item, canRevoke, onPress }: { item: PermissionItem; canRevoke: bo
   const locked = item.file === "default" || item.index === null;
   return (
     <li className={cn("flex flex-col gap-2 rounded-lg border border-line bg-surface px-3 py-2", (locked || item.ignored !== null) && "opacity-70")}>
-      <p className="font-mono text-sm wrap-anywhere">
-        <span className={TONE[item.action]}>{item.action}</span> {scopeOf(item)}{" "}
+      <p className="text-body wrap-anywhere">
+        <span className={TONE[item.action]}>{item.action}</span> <Code>{scopeOf(item)}</Code>{" "}
         <span className="text-muted">{item.source}</span>
         {item.ignored === null ? null : <span className="text-muted">, ignored: {item.ignored}</span>}
       </p>
@@ -290,9 +291,9 @@ function Confirm({ pending, onCancel, onConfirm }: { pending: Pending; onCancel:
     <>
       <DialogTitle>{allowing ? `Allow ${item.tool} without asking?` : "Remove this rule?"}</DialogTitle>
       <DialogDescription>
-        <span className="font-mono">
+        <Code>
           {item.action} {scopeOf(item)}
-        </span>{" "}
+        </Code>{" "}
         from {item.source}. golem will not ask before it runs this on your Mac.
       </DialogDescription>
       <div className="mt-4 flex justify-end gap-2">

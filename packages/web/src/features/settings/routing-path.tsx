@@ -27,7 +27,7 @@ import { tierInfo, usableModels, type Tier, type TierInfo } from "./routing-deri
 /** What the try-it playback has lit so far: a state for each part of the path it passes. */
 export type Lit = Partial<Record<PathPart, PartState>>;
 
-const BADGE = "absolute -top-2.75 rounded-sm px-1.75 py-1 font-mono text-micro font-semibold leading-none";
+const BADGE = "absolute -top-2.75 rounded-sm px-1.75 py-1 text-meta font-semibold leading-none";
 
 function Lock({ closed }: { closed: boolean }) {
   return (
@@ -103,7 +103,7 @@ function Station({
         <h4 className="text-chat font-semibold">{title}</h4>
         <span
           className={cn(
-            "rounded-sm px-1.5 py-1 font-mono text-micro font-semibold leading-none whitespace-nowrap",
+            "rounded-sm px-1.5 py-1 text-meta font-semibold leading-none whitespace-nowrap",
             tier === "local" ? "bg-allow-soft text-allow" : "bg-clay-soft text-clay-ink",
           )}
         >

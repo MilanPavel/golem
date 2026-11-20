@@ -5,6 +5,7 @@ import type { McpServer, McpToolsResult } from "../../../store/mcp.ts";
 import { usePageActions } from "../../../store/page-context.tsx";
 import { Button } from "../../../ui/button.tsx";
 import { cn } from "../../../ui/cn.ts";
+import { Code } from "../../../ui/code.tsx";
 import { fieldClass, Input } from "../../../ui/input.tsx";
 import { TryTool } from "./try-tool.tsx";
 
@@ -74,20 +75,20 @@ export function ToolsTab({ server, sessionId, tools, onTry }: { server: McpServe
   }
 
   if (tools.isError) return <QueryError tools={tools} />;
-  if (tools.data === undefined) return <p className="font-mono text-sm text-muted">loading…</p>;
+  if (tools.data === undefined) return <p className="text-body text-muted">loading…</p>;
   if (list.length === 0) return <p className="text-sm text-muted">This server has no tools.</p>;
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-2">
         <h4 className="text-sm">
           <span className="font-semibold">Tools</span>{" "}
-          <span className="font-mono text-xs text-muted">
+          <span className="text-meta text-muted">
             {on.length} of {list.length} on · about {formatTokens(tokens)} tokens a turn
           </span>
         </h4>
         <Input type="search" aria-label="Search tools" placeholder="Search tools" className="w-56" value={query} onChange={(event) => setQuery(event.target.value)} />
       </div>
-      <p role="status" aria-live="polite" className="font-mono text-xs text-muted empty:hidden">
+      <p role="status" aria-live="polite" className="text-meta text-muted empty:hidden">
         {notice}
       </p>
       {error === null ? null : (
@@ -119,8 +120,8 @@ export function ToolsTab({ server, sessionId, tools, onTry }: { server: McpServe
                   <span aria-hidden="true" className={cn("absolute top-0.5 left-0.5 size-4 rounded-full bg-surface transition-transform motion-reduce:transition-none", shown && "translate-x-4")} />
                 </button>
                 <span className="flex min-w-0 flex-1 flex-col">
-                  <span className={cn("font-mono text-sm wrap-anywhere", !shown && "text-faint line-through")}>
-                    {own}
+                  <span className={cn("text-body wrap-anywhere", !shown && "text-faint line-through")}>
+                    <Code tone={shown ? "ink" : "muted"}>{own}</Code>
                     {tool.read_only === true ? (
                       <span
                         title={server.approval === "ask" ? "The server says this tool only reads. It still asks, as every tool of this server does." : "The server says this tool only reads."}
@@ -134,7 +135,7 @@ export function ToolsTab({ server, sessionId, tools, onTry }: { server: McpServe
                     {firstLine(tool.description)}
                   </span>
                 </span>
-                <span className="shrink-0 font-mono text-xs text-muted">{shown ? formatTokens(tool.schema_tokens ?? 0) : "hidden"}</span>
+                <span className="shrink-0 text-meta text-muted">{shown ? formatTokens(tool.schema_tokens ?? 0) : "hidden"}</span>
                 <button
                   type="button"
                   aria-label={`Try ${own}`}
@@ -156,7 +157,7 @@ export function ToolsTab({ server, sessionId, tools, onTry }: { server: McpServe
 export function TryTab({ server, sessionId, tools, chosen, onChoose }: { server: McpServer; sessionId: string | null; tools: ToolsQuery; chosen: string | null; onChoose: (tool: string) => void }) {
   const id = useId();
   if (tools.isError) return <QueryError tools={tools} />;
-  if (tools.data === undefined) return <p className="font-mono text-sm text-muted">loading…</p>;
+  if (tools.data === undefined) return <p className="text-body text-muted">loading…</p>;
   const list = tools.data.tools;
   if (list.length === 0) return <p className="text-sm text-muted">This server has no tools.</p>;
   const tool = list.find((item) => item.name === chosen) ?? list[0];

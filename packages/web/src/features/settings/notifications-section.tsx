@@ -4,8 +4,9 @@ import type { NotificationsSetParams, NotificationsSetResult, NotificationsValue
 import { useNotifications, usePageActions } from "../../store/page-context.tsx";
 import { Button } from "../../ui/button.tsx";
 import { cn } from "../../ui/cn.ts";
+import { Code } from "../../ui/code.tsx";
 
-const GROUP = "mb-1 mt-4 border-b border-line pb-1 font-mono text-xs uppercase tracking-wider text-faint";
+const GROUP = "mb-1 mt-4 border-b border-line pb-1 text-meta text-faint";
 const ROW = "flex flex-col gap-1 border-t border-dashed border-line py-2 first:border-t-0";
 const SEG_CLASS = "inline-flex w-fit max-w-full flex-wrap gap-0.5 rounded-md border border-line-strong bg-bg p-0.5";
 const SEG_BUTTON_CLASS =
@@ -70,7 +71,7 @@ function names(list: readonly string[]): ReactNode {
   return list.map((name, index) => (
     <span key={name}>
       {index === 0 ? "" : index === list.length - 1 ? " and " : ", "}
-      <span className="font-mono">{name}</span>
+      <Code>{name}</Code>
     </span>
   ));
 }
@@ -115,7 +116,7 @@ export function NotificationsView({ values, onChange, onTest, error, tested }: N
           labelId="notify-finished"
           control={<Switch labelledBy="notify-finished" checked={values.finished} onToggle={() => onChange({ finished: !values.finished })} />}
         >
-          Off by default. Each routine can override this with <span className="font-mono">notify_finished</span>.
+          Off by default. Each routine can override this with <Code>notify_finished</Code>.
           {(values.finished_routines ?? []).length === 0 ? null : <> {names(values.finished_routines ?? [])} tell me when done.</>}
         </Row>
       </ul>
@@ -137,7 +138,7 @@ export function NotificationsView({ values, onChange, onTest, error, tested }: N
             />
           }
         >
-          Web opens the session in your browser. Terminal runs <span className="font-mono">golem attach</span> in a terminal tab.
+          Web opens the session in your browser. Terminal runs <Code>golem attach</Code> in a terminal tab.
         </Row>
         <Row
           label="Terminal app"
@@ -153,7 +154,7 @@ export function NotificationsView({ values, onChange, onTest, error, tested }: N
             />
           }
         >
-          The app Terminal clicks use. A click on a banner cannot open it yet; <span className="font-mono">golem open --notified</span> does.
+          The app Terminal clicks use. A click on a banner cannot open it yet; <Code>golem open --notified</Code> does.
         </Row>
       </ul>
 

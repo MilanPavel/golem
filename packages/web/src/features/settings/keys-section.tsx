@@ -5,6 +5,7 @@ import type { AuthKeyStatus } from "../../store/keys.ts";
 import { useKeys, useMcpCatalog, useMcpList, useNavigate } from "../../store/page-context.tsx";
 import { settingsPath } from "../../store/router.ts";
 import { Button } from "../../ui/button.tsx";
+import { Code } from "../../ui/code.tsx";
 import { cn } from "../../ui/cn.ts";
 import { CopyCommand } from "../../ui/copy-command.tsx";
 import { ChevronDownIcon, CpuIcon, LockIcon, PlugIcon } from "../../ui/icons.tsx";
@@ -44,7 +45,7 @@ export function KeysSection() {
   }
   // The server names decide which row belongs to which server, so the page waits for them (a failure leaves the rows plain).
   if (keys.data === undefined || servers.isPending) {
-    return <p className="font-mono text-sm text-muted">asking the daemon…</p>;
+    return <p className="text-body text-muted">asking the daemon…</p>;
   }
   return (
     <KeysView
@@ -87,7 +88,7 @@ export function KeysView({ providers, servers, refreshing = false, onRefresh, on
           Keys for cloud models and for MCP servers that need a token. Golem keeps them in the macOS Keychain or reads them from its environment.
         </p>
         <span className="flex items-center gap-2">
-          <span className="font-mono text-xs text-faint">
+          <span className="text-meta text-faint">
             {all.saved} of {all.total} saved
           </span>
           <Button size="sm" disabled={refreshing} onClick={onRefresh}>
@@ -154,7 +155,7 @@ function KeyGroup({
         </h3>
         <span className="text-sm text-muted">{purpose}</span>
         {rows.length === 0 ? null : (
-          <span className="ml-auto font-mono text-xs text-faint">
+          <span className="ml-auto text-meta text-faint">
             <b className="font-medium text-allow">{count.saved}</b> of {count.total} saved
           </span>
         )}
@@ -255,15 +256,15 @@ function KeyItem({
               {row.saved ? "saved" : "missing"}
             </span>
           </span>
-          <span className="flex flex-wrap items-center gap-x-1.5 font-mono text-xs text-faint">
+          <span className="flex flex-wrap items-center gap-x-1.5 text-meta text-faint">
             {row.source === "keychain" ? (
               <>
                 <LockIcon className="size-3" /> in the Keychain
               </>
             ) : row.source === "env" ? (
-              <>from ${row.envVar ?? "the environment"}</>
+              <>from <Code tone="muted">${row.envVar ?? "the environment"}</Code></>
             ) : mcp ? (
-              <span className="wrap-anywhere">{row.ref}</span>
+              <Code tone="muted" className="wrap-anywhere">{row.ref}</Code>
             ) : (
               "not set"
             )}
@@ -302,7 +303,7 @@ function KeyItem({
           {row.removeCommand === null ? (
             <DrawerLine label="Source">
               <span>
-                Set by <code className="rounded-sm bg-code-bg px-1 font-mono text-xs">${row.envVar ?? "the variable"}</code> in the daemon&apos;s environment. Unset it there to remove.
+                Set by <Code>${row.envVar ?? "the variable"}</Code> in the daemon&apos;s environment. Unset it there to remove.
               </span>
             </DrawerLine>
           ) : (
@@ -332,7 +333,7 @@ function ServerLink({ name, href, onNavigate }: { name: string; href: string; on
 function DrawerLine({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
-      <span className="w-16 font-mono text-xs font-medium tracking-wide text-faint uppercase">{label}</span>
+      <span className="w-16 text-meta font-medium text-faint">{label}</span>
       {children}
     </div>
   );

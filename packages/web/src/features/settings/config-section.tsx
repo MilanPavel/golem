@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { actionErrorText } from "../../store/errors.ts";
 import { usePageActions } from "../../store/page-context.tsx";
 import { Button } from "../../ui/button.tsx";
+import { Code } from "../../ui/code.tsx";
 import { CopyCommand } from "../../ui/copy-command.tsx";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "../../ui/dialog.tsx";
 import { DiffModeSwitch, DiffView, useDiffMode } from "../diff/index.ts";
@@ -70,7 +71,7 @@ export function ConfigSection() {
           </Button>
         </div>
       ) : file.data === undefined ? (
-        <p className="font-mono text-sm text-muted">asking the daemon…</p>
+        <p className="text-body text-muted">asking the daemon…</p>
       ) : (
         <Editor
           key={`${project}:${round}`}
@@ -174,8 +175,8 @@ function Editor({
   const diff = unifiedDiff(original, text, shortPath(path, ""));
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
-      <p className="font-mono text-xs text-muted wrap-anywhere">
-        {shortPath(path, "")}
+      <p className="text-meta text-muted wrap-anywhere">
+        <Code tone="muted">{shortPath(path, "")}</Code>
         {exists ? "" : " (does not exist yet: saving creates it)"}
       </p>
       {saved === null ? null : (
@@ -199,11 +200,11 @@ function Editor({
         </div>
       ) : null}
       <CodeEditor value={text} onChange={setText} marked={problemLines(problems)} label="Config file text" />
-      <p role="status" aria-live="polite" className="min-h-5 font-mono text-xs text-muted">
+      <p role="status" aria-live="polite" className="min-h-5 text-meta text-muted">
         {!dirty ? "no changes" : checking ? "checking…" : current !== null && "failed" in current ? current.failed : blocked ? `${problems.length} ${problems.length === 1 ? "problem" : "problems"}` : "✔ valid"}
       </p>
       {blocked ? (
-        <ul aria-label="Problems" data-setting="problems" className="flex flex-col gap-1 font-mono text-xs text-deny">
+        <ul aria-label="Problems" data-setting="problems" className="flex flex-col gap-1 text-meta text-deny">
           {problems.map((problem, at) => (
             <li key={at} className="wrap-anywhere">
               {problemLine(problem)}

@@ -4,6 +4,7 @@ import { actionErrorText } from "../../../store/errors.ts";
 import type { McpCallResult, McpServer } from "../../../store/mcp.ts";
 import { usePageActions } from "../../../store/page-context.tsx";
 import { Button } from "../../../ui/button.tsx";
+import { Code } from "../../../ui/code.tsx";
 import { DialogDescription, DialogTitle } from "../../../ui/dialog.tsx";
 import { fieldClass, Input } from "../../../ui/input.tsx";
 import { Textarea } from "../../../ui/textarea.tsx";
@@ -65,7 +66,7 @@ export function TryTool({ server, tool, sessionId, onClose }: { server: McpServe
         <p className="text-sm text-muted">Runs now, without asking. It is not part of any chat.</p>
       ) : (
         <>
-          <DialogTitle className="font-mono">Try {own}</DialogTitle>
+          <DialogTitle>Try <Code>{own}</Code></DialogTitle>
           <DialogDescription>Runs now, without asking. It is not part of any chat.</DialogDescription>
         </>
       )}

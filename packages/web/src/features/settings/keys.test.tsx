@@ -126,7 +126,7 @@ test("an mcp ref goes to the longest server name, with its blurb and the command
   expect(oauth.getByText("golem mcp login linear").tagName).toBe("CODE");
   const acme = rowOf(mcp, "acme");
   expect(acme.getByText("api_key input")).toBeTruthy();
-  expect(acme.getByText("from $ACME_KEY")).toBeTruthy();
+  expect(acme.getByText("$ACME_KEY")).toBeTruthy();
   // The title comes from the catalog when the server is in it.
   expect(rowOf(mcp, "GitHub").getByText("token")).toBeTruthy();
 });
@@ -145,10 +145,10 @@ test("a key in the Keychain opens a drawer with Replace and Remove", async () =>
 test("a key from the environment says where it is set, and has no Remove command", async () => {
   const { user } = mount();
   const anthropic = rowOf(await group("Model providers"), "Anthropic");
-  expect(anthropic.getByText("from $ANTHROPIC_API_KEY")).toBeTruthy();
+  expect(anthropic.getAllByText("$ANTHROPIC_API_KEY").length).toBeTruthy();
   await user.click(anthropic.getByRole("button", { name: /Replace or remove/ }));
   expect(anthropic.getByText("golem auth set anthropic")).toBeTruthy();
-  expect(anthropic.getByText("$ANTHROPIC_API_KEY", { selector: "code" })).toBeTruthy();
+  expect(anthropic.getAllByText("$ANTHROPIC_API_KEY", { selector: "code" }).length).toBe(2);
   expect(anthropic.getByText(/in the daemon's environment\. Unset it there to remove\./)).toBeTruthy();
   expect(anthropic.queryByText(/golem auth remove/)).toBeNull();
 });

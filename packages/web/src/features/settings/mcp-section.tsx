@@ -25,6 +25,7 @@ import { Dot, needsAuth, serverKey, serverSummary, SignInPanel, useSignIns, type
 import { NotRunning, ToolsTab, TryTab } from "./mcp/tools-tab.tsx";
 import { Button } from "../../ui/button.tsx";
 import { cn } from "../../ui/cn.ts";
+import { Code } from "../../ui/code.tsx";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "../../ui/dialog.tsx";
 import { IconButton } from "../../ui/icon-button.tsx";
 import { Menu, MenuContent, MenuItem, MenuSeparator, MenuTrigger } from "../../ui/menu.tsx";
@@ -165,7 +166,7 @@ function Installed({ sessionId, added, onCatalog }: { sessionId: string | null; 
     );
   }
   if (list.data === undefined) {
-    return <p className="font-mono text-sm text-muted">asking the daemon…</p>;
+    return <p className="text-body text-muted">asking the daemon…</p>;
   }
   const servers = orderedServers(list.data.servers);
   const wide = !narrow;
@@ -231,7 +232,7 @@ function ServerList({
   onOpen: (server: McpServer) => void;
 }) {
   const status = (
-    <p role="status" aria-live="polite" className="font-mono text-xs text-muted empty:hidden">
+    <p role="status" aria-live="polite" className="text-meta text-muted empty:hidden">
       {added === null ? null : `added ${added}`}
     </p>
   );
@@ -265,16 +266,16 @@ function ServerList({
       {groups.map((group) => (
         <section key={group.project ?? ""} aria-label={group.project === null ? "Yours" : "This project"} className="flex flex-col gap-2">
           {wide ? (
-            <h3 className="min-w-0 px-2 font-mono text-xs font-normal text-faint">
+            <h3 className="min-w-0 px-2 text-meta font-normal text-faint">
               {group.project === null ? "Yours" : "This project"}
               <span className="block truncate" title={groupFile(group)}>
-                {tilde(groupFile(group))}
+                <Code tone="muted">{tilde(groupFile(group))}</Code>
               </span>
             </h3>
           ) : (
             <h3 className="text-sm font-semibold">
               {group.project === null ? "Yours" : "This project"}{" "}
-              <span className="font-mono text-xs font-normal text-muted wrap-anywhere">({shortPath(groupFile(group), "")})</span>
+              <span className="text-meta font-normal text-muted wrap-anywhere">(<Code tone="muted">{shortPath(groupFile(group), "")}</Code>)</span>
             </h3>
           )}
           <ul className={cn("flex flex-col", wide ? "gap-0.5" : "gap-2")}>
@@ -302,12 +303,12 @@ function ServerList({
                       <BrandIcon id={server.name} size="sm" />
                       <span className="sr-only">{mcpStatusWord(server)}, </span>
                       <span className={cn("min-w-0 font-ui text-sm font-medium", wide ? "truncate" : "wrap-anywhere")}>{server.name}</span>
-                      <span aria-hidden="true" className="shrink-0 font-mono text-xs whitespace-nowrap text-faint">
+                      <span aria-hidden="true" className="shrink-0 text-meta whitespace-nowrap text-faint">
                         {mcpStatusWord(server)}
                       </span>
                     </span>
                     {second === null ? null : (
-                      <span className={cn("min-w-0 font-mono text-xs wrap-anywhere", server.state === "failed" || logins.get(keyOf(server))?.kind === "failed" ? "text-deny" : "text-muted", wide ? "pl-4" : "flex-1")}>
+                      <span className={cn("min-w-0 text-meta wrap-anywhere", server.state === "failed" || logins.get(keyOf(server))?.kind === "failed" ? "text-deny" : "text-muted", wide ? "pl-4" : "flex-1")}>
                         {second}
                       </span>
                     )}
@@ -439,15 +440,15 @@ function Detail({ server, sessionId, signIns, onBack }: { server: McpServer; ses
             <BrandIcon id={server.name} />
             {server.name}
           </h3>
-          <p className="font-mono text-xs text-muted wrap-anywhere">
+          <p className="text-meta text-muted wrap-anywhere">
             <span className="sr-only">{isUrl ? "URL: " : "Command: "}</span>
-            {server.command}
+            <Code tone="muted">{server.command}</Code>
           </p>
-          <p className="font-mono text-xs text-muted wrap-anywhere">
-            {server.project == null ? "Yours" : "This project"} · {tilde(file)}
+          <p className="text-meta text-muted wrap-anywhere">
+            {server.project == null ? "Yours" : "This project"} · <Code tone="muted">{tilde(file)}</Code>
           </p>
         </div>
-        <p className="flex shrink-0 items-center gap-2 pt-1.5 font-mono text-xs text-muted">
+        <p className="flex shrink-0 items-center gap-2 pt-1.5 text-meta text-muted">
           <Dot server={server} />
           {mcpStatusWord(server)}
         </p>
@@ -494,7 +495,7 @@ function Detail({ server, sessionId, signIns, onBack }: { server: McpServer; ses
           </MenuContent>
         </Menu>
       </div>
-      <p role="status" aria-live="polite" className="font-mono text-xs text-muted empty:hidden">
+      <p role="status" aria-live="polite" className="text-meta text-muted empty:hidden">
         {login?.kind === "done" && !signedOut ? login.text : shownNotice}
       </p>
       {error === null ? null : (
@@ -551,7 +552,7 @@ function Detail({ server, sessionId, signIns, onBack }: { server: McpServer; ses
         <DialogContent>
           <DialogTitle>Remove {server.name}?</DialogTitle>
           <DialogDescription>
-            Its entry leaves <span className="font-mono wrap-anywhere">{shortPath(server.config ?? DEFAULT_FILE, "")}</span>, and the token it stored leaves the Keychain.
+            Its entry leaves <Code className="wrap-anywhere">{shortPath(server.config ?? DEFAULT_FILE, "")}</Code>, and the token it stored leaves the Keychain.
           </DialogDescription>
           <div className="mt-4 flex justify-end gap-2">
             <Button autoFocus onClick={() => setRemoving(false)}>
@@ -575,7 +576,7 @@ function Detail({ server, sessionId, signIns, onBack }: { server: McpServer; ses
             <>
               <DialogTitle>Enable {server.name}?</DialogTitle>
               <DialogDescription>
-                <span className="font-mono wrap-anywhere">{server.command}</span>
+                <Code className="wrap-anywhere">{server.command}</Code>
                 <br />
                 golem will run this on your Mac.
               </DialogDescription>

@@ -2,6 +2,7 @@ import { CONTEXT_WORDS, localSize, localWindow, namesModel, shortModel, type Loc
 import { useQueries } from "@tanstack/react-query";
 import { usePageActions, useRouting } from "../../store/page-context.tsx";
 import type { ListedModel, ModelListResult } from "../../store/models.ts";
+import { Code } from "../../ui/code.tsx";
 import { usableModels } from "./routing-derive.ts";
 
 /** The most rows the table shows. */
@@ -72,7 +73,7 @@ const sentence = (text: string) => `${text.charAt(0).toUpperCase()}${text.slice(
 
 /** The window each local model on this Mac gets with the current choice. */
 export function WindowTable({ rows }: { rows: readonly WindowRow[] }) {
-  const head = "pr-2 pb-2 text-left font-mono text-micro font-semibold tracking-wider text-faint uppercase";
+  const head = "pr-2 pb-2 text-left text-meta font-semibold text-faint";
   return (
     <table className="w-full border-collapse text-sm">
       <thead>
@@ -93,12 +94,12 @@ export function WindowTable({ rows }: { rows: readonly WindowRow[] }) {
           const cell = windowCell(row.window);
           return (
             <tr key={row.ref} className="border-t border-line">
-              <td className="py-2 pr-2 font-mono text-note">
-                {row.name}
-                {row.inUse ? <span className="ml-2 rounded-xs bg-allow-soft px-1.5 py-0.5 align-middle font-mono text-micro font-semibold text-allow">in use</span> : null}
+              <td className="py-2 pr-2 text-meta">
+                <Code>{row.name}</Code>
+                {row.inUse ? <span className="ml-2 rounded-xs bg-allow-soft px-1.5 py-0.5 align-middle text-meta font-semibold text-allow">in use</span> : null}
               </td>
-              <td className="py-2 pr-2 font-mono text-note text-muted">{row.sizeGb === null ? "—" : `${row.sizeGb} GB`}</td>
-              <td className="py-2 text-right font-mono text-note" title={cell.title ?? undefined}>
+              <td className="py-2 pr-2 text-meta text-muted">{row.sizeGb === null ? "—" : `${row.sizeGb} GB`}</td>
+              <td className="py-2 text-right text-meta" title={cell.title ?? undefined}>
                 {cell.text}
                 {cell.note === null ? null : <span className="block font-ui text-micro text-muted">{cell.note}</span>}
               </td>
