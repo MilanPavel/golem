@@ -190,6 +190,19 @@ const SESSIONS: SessionSummary[] = [
   fakeSession("g", "Closed, so hidden", "/Users/you/notes", "closed", 5),
 ];
 
+/** Three leads: two helpers working, one asks you, and all done. The helpers are not rows. */
+const HELPER_SESSIONS: SessionSummary[] = [
+  fakeSession("lead-a", "Map the daemon modules", "/Users/you/repos/golem", "running", 1),
+  { ...fakeSession("lead-a1", "explorer · routing", "/Users/you/repos/golem", "running", 1), parent_session_id: "lead-a", agent: "explorer" },
+  { ...fakeSession("lead-a2", "explorer · titles", "/Users/you/repos/golem", "running", 2), parent_session_id: "lead-a", agent: "explorer" },
+  fakeSession("lead-b", "Check the retry code", "/Users/you/repos/golem", "running", 5),
+  { ...fakeSession("lead-b1", "explorer · retries", "/Users/you/repos/golem", "waiting", 5), parent_session_id: "lead-b", agent: "explorer" },
+  { ...fakeSession("lead-b2", "explorer · backoff", "/Users/you/repos/golem", "running", 6), parent_session_id: "lead-b", agent: "explorer" },
+  fakeSession("lead-c", "Read the ADRs", "/Users/you/repos/golem", "idle", 20),
+  { ...fakeSession("lead-c1", "explorer · ADR-059", "/Users/you/repos/golem", "idle", 20), parent_session_id: "lead-c", agent: "explorer" },
+  { ...fakeSession("lead-c2", "explorer · ADR-060", "/Users/you/repos/golem", "idle", 21), parent_session_id: "lead-c", agent: "explorer" },
+];
+
 const RECONNECTING: ConnectionSnapshot = { state: { status: "reconnecting", attempt: 1, delayMs: 1000 }, daemonVersion: "0.4.0" };
 
 const STATES: GolemState[] = ["idle", "thinking", "waiting", "failed", "offline"];
@@ -1558,6 +1571,15 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
               <SessionsPanel sessions={[]} selectedId={null} now={NOW} onNavigate={() => {}} />
             </SidebarPanel>
           </div>
+        </div>
+      </section>
+
+      <section className="mt-6" id={anchor("Helpers in the list")}>
+        <h3 className="mb-2 font-mono text-xs text-faint">Helpers in the list</h3>
+        <div className="h-72 w-67 overflow-hidden rounded-lg border border-line">
+          <SidebarPanel title="Sessions" label={`Sessions with helpers, ${theme}`} onHide={() => {}}>
+            <SessionsPanel sessions={HELPER_SESSIONS} selectedId="lead-a" now={NOW} onNavigate={() => {}} />
+          </SidebarPanel>
         </div>
       </section>
 

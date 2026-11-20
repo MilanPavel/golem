@@ -740,7 +740,9 @@ async def test_a_watcher_follows_every_session_without_attaching(short_home: Pat
             watcher, lambda found: any(s.get("title") == "Greeting" for s in found)
         )
         assert {s["session_id"] for s in summaries} == {session_id}
-        assert [s["status"] for s in summaries][:3] == ["idle", "idle", "running"]
+        assert [s["status"] for s in summaries][:2] == ["idle", "idle"]
+        # The first words of the message name the session until the generated title arrives.
+        assert "hello" in [s.get("title") for s in summaries]
         last = summaries[-1]
         assert (last["status"], last["title"]) == ("idle", "Greeting")
         seqs = [cast(int, s["last_seq"]) for s in summaries]
@@ -813,7 +815,13 @@ async def test_fork_returns_a_session_whose_replay_is_the_copied_history(short_h
         before = len(client.events)
         await _attach(client, fork)
         replay = (await client.take_events())[before:]
-        assert _event_types(replay) == ["session.created", "message.completed", "message.completed"]
+        # The fork takes the source's title, which the first message gave it.
+        assert _event_types(replay) == [
+            "session.created",
+            "message.completed",
+            "message.completed",
+            "session.updated",
+        ]
         assert _completed_text(replay, "assistant") == ["Hi"]
         created = _event_data(replay[0])
         assert created["forked_from"] == {"session_id": source, "message_id": reply["message_id"]}

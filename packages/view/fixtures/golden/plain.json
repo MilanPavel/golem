@@ -20,6 +20,21 @@
     },
     {
       "data": {
+        "allowed_tools": null,
+        "cwd": null,
+        "mcp_servers": null,
+        "paid_ok": null,
+        "route": null,
+        "title": "say hi"
+      },
+      "run_id": null,
+      "seq": 2,
+      "session_id": "id-1",
+      "ts": "2026-01-01T00:00:01Z",
+      "type": "session.updated"
+    },
+    {
+      "data": {
         "interrupted": false,
         "message_id": "id-3",
         "role": "user",
@@ -29,17 +44,17 @@
         "thinking_ms": null
       },
       "run_id": "id-2",
-      "seq": 2,
+      "seq": 3,
       "session_id": "id-1",
-      "ts": "2026-01-01T00:00:01Z",
+      "ts": "2026-01-01T00:00:02Z",
       "type": "message.completed"
     },
     {
       "data": {},
       "run_id": "id-2",
-      "seq": 3,
+      "seq": 4,
       "session_id": "id-1",
-      "ts": "2026-01-01T00:00:02Z",
+      "ts": "2026-01-01T00:00:03Z",
       "type": "run.started"
     },
     {
@@ -48,9 +63,9 @@
         "role": "assistant"
       },
       "run_id": "id-2",
-      "seq": 4,
+      "seq": 5,
       "session_id": "id-1",
-      "ts": "2026-01-01T00:00:03Z",
+      "ts": "2026-01-01T00:00:04Z",
       "type": "message.started"
     },
     {
@@ -92,26 +107,15 @@
         "window_planned": false
       },
       "run_id": "id-2",
-      "seq": 5,
+      "seq": 6,
       "session_id": "id-1",
-      "ts": "2026-01-01T00:00:04Z",
+      "ts": "2026-01-01T00:00:05Z",
       "type": "model.call.started"
     },
     {
       "data": {
         "message_id": "id-4",
         "text": "H"
-      },
-      "run_id": "id-2",
-      "seq": 6,
-      "session_id": "id-1",
-      "ts": "2026-01-01T00:00:05Z",
-      "type": "message.delta"
-    },
-    {
-      "data": {
-        "message_id": "id-4",
-        "text": "e"
       },
       "run_id": "id-2",
       "seq": 7,
@@ -122,7 +126,7 @@
     {
       "data": {
         "message_id": "id-4",
-        "text": "l"
+        "text": "e"
       },
       "run_id": "id-2",
       "seq": 8,
@@ -144,7 +148,7 @@
     {
       "data": {
         "message_id": "id-4",
-        "text": "o"
+        "text": "l"
       },
       "run_id": "id-2",
       "seq": 10,
@@ -155,7 +159,7 @@
     {
       "data": {
         "message_id": "id-4",
-        "text": " "
+        "text": "o"
       },
       "run_id": "id-2",
       "seq": 11,
@@ -166,7 +170,7 @@
     {
       "data": {
         "message_id": "id-4",
-        "text": "t"
+        "text": " "
       },
       "run_id": "id-2",
       "seq": 12,
@@ -177,7 +181,7 @@
     {
       "data": {
         "message_id": "id-4",
-        "text": "h"
+        "text": "t"
       },
       "run_id": "id-2",
       "seq": 13,
@@ -188,7 +192,7 @@
     {
       "data": {
         "message_id": "id-4",
-        "text": "e"
+        "text": "h"
       },
       "run_id": "id-2",
       "seq": 14,
@@ -199,7 +203,7 @@
     {
       "data": {
         "message_id": "id-4",
-        "text": "r"
+        "text": "e"
       },
       "run_id": "id-2",
       "seq": 15,
@@ -210,7 +214,7 @@
     {
       "data": {
         "message_id": "id-4",
-        "text": "e"
+        "text": "r"
       },
       "run_id": "id-2",
       "seq": 16,
@@ -221,12 +225,23 @@
     {
       "data": {
         "message_id": "id-4",
-        "text": "."
+        "text": "e"
       },
       "run_id": "id-2",
       "seq": 17,
       "session_id": "id-1",
       "ts": "2026-01-01T00:00:16Z",
+      "type": "message.delta"
+    },
+    {
+      "data": {
+        "message_id": "id-4",
+        "text": "."
+      },
+      "run_id": "id-2",
+      "seq": 18,
+      "session_id": "id-1",
+      "ts": "2026-01-01T00:00:17Z",
       "type": "message.delta"
     },
     {
@@ -240,9 +255,9 @@
         "thinking_ms": null
       },
       "run_id": "id-2",
-      "seq": 18,
+      "seq": 19,
       "session_id": "id-1",
-      "ts": "2026-01-01T00:00:17Z",
+      "ts": "2026-01-01T00:00:18Z",
       "type": "message.completed"
     },
     {
@@ -263,17 +278,17 @@
         "usage": null
       },
       "run_id": "id-2",
-      "seq": 19,
+      "seq": 20,
       "session_id": "id-1",
-      "ts": "2026-01-01T00:00:18Z",
+      "ts": "2026-01-01T00:00:19Z",
       "type": "model.call.completed"
     },
     {
       "data": {},
       "run_id": "id-2",
-      "seq": 20,
+      "seq": 21,
       "session_id": "id-1",
-      "ts": "2026-01-01T00:00:19Z",
+      "ts": "2026-01-01T00:00:20Z",
       "type": "run.completed"
     }
   ],
@@ -298,6 +313,21 @@
     },
     {
       "data": {
+        "allowed_tools": null,
+        "cwd": null,
+        "mcp_servers": null,
+        "paid_ok": null,
+        "route": null,
+        "title": "say hi"
+      },
+      "run_id": null,
+      "seq": 2,
+      "session_id": "id-1",
+      "ts": "2026-01-01T00:00:01Z",
+      "type": "session.updated"
+    },
+    {
+      "data": {
         "interrupted": false,
         "message_id": "id-3",
         "role": "user",
@@ -307,17 +337,17 @@
         "thinking_ms": null
       },
       "run_id": "id-2",
-      "seq": 2,
+      "seq": 3,
       "session_id": "id-1",
-      "ts": "2026-01-01T00:00:01Z",
+      "ts": "2026-01-01T00:00:02Z",
       "type": "message.completed"
     },
     {
       "data": {},
       "run_id": "id-2",
-      "seq": 3,
+      "seq": 4,
       "session_id": "id-1",
-      "ts": "2026-01-01T00:00:02Z",
+      "ts": "2026-01-01T00:00:03Z",
       "type": "run.started"
     },
     {
@@ -326,9 +356,9 @@
         "role": "assistant"
       },
       "run_id": "id-2",
-      "seq": 4,
+      "seq": 5,
       "session_id": "id-1",
-      "ts": "2026-01-01T00:00:03Z",
+      "ts": "2026-01-01T00:00:04Z",
       "type": "message.started"
     },
     {
@@ -370,9 +400,9 @@
         "window_planned": false
       },
       "run_id": "id-2",
-      "seq": 5,
+      "seq": 6,
       "session_id": "id-1",
-      "ts": "2026-01-01T00:00:04Z",
+      "ts": "2026-01-01T00:00:05Z",
       "type": "model.call.started"
     },
     {
@@ -386,9 +416,9 @@
         "thinking_ms": null
       },
       "run_id": "id-2",
-      "seq": 18,
+      "seq": 19,
       "session_id": "id-1",
-      "ts": "2026-01-01T00:00:17Z",
+      "ts": "2026-01-01T00:00:18Z",
       "type": "message.completed"
     },
     {
@@ -409,17 +439,17 @@
         "usage": null
       },
       "run_id": "id-2",
-      "seq": 19,
+      "seq": 20,
       "session_id": "id-1",
-      "ts": "2026-01-01T00:00:18Z",
+      "ts": "2026-01-01T00:00:19Z",
       "type": "model.call.completed"
     },
     {
       "data": {},
       "run_id": "id-2",
-      "seq": 20,
+      "seq": 21,
       "session_id": "id-1",
-      "ts": "2026-01-01T00:00:19Z",
+      "ts": "2026-01-01T00:00:20Z",
       "type": "run.completed"
     }
   ]

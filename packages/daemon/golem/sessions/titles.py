@@ -248,11 +248,43 @@ def clean_title(text: str) -> str:
     return words[: TITLE_MAX_CHARS - 1].rstrip() + "…"
 
 
+def first_words(text: str, limit: int = TITLE_MAX_CHARS) -> str:
+    """The first line of ``text`` cut after a whole word, at most ``limit`` characters, one line.
+
+    A cut ends with ``…``. Returns ``""`` when nothing is left.
+    """
+    line = next((line for line in text.splitlines() if line.strip()), "")
+    words = " ".join(line.split()).strip("\"'`*#").strip()
+    if len(words) <= limit:
+        return words
+    cut = words[: limit - 1]
+    # Cut at the last space when the cut is inside a word and a word is left before it.
+    if words[limit - 1] != " " and " " in cut:
+        cut = cut.rsplit(" ", 1)[0]
+    return cut.rstrip() + "…"
+
+
+def provisional_title(message: str) -> str:
+    """The title until the generated one arrives: the first words of the first message."""
+    return first_words(message)
+
+
+def helper_title(agent: str, label: str, brief: str) -> str:
+    """``<agent> · <label>``, or ``<agent> · <first words of the brief>``, at most 60 characters."""
+    head = f"{agent} · "
+    room = max(TITLE_MAX_CHARS - len(head), 1)
+    rest = first_words(label, room) or first_words(brief, room)
+    return head.rstrip(" ·") if rest == "" else head + rest
+
+
 __all__ = [
     "TITLE_MAX_CHARS",
     "ModelTitles",
     "TitleGenerator",
     "choose_title",
     "clean_title",
+    "first_words",
     "fork_title",
+    "helper_title",
+    "provisional_title",
 ]

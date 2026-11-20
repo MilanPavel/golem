@@ -1,5 +1,5 @@
 import type { SessionSummary } from "@golem/client";
-import { isRoutineSession, isWaiting, sessionState } from "@golem/view";
+import { groupHelpers, helperWords, isRoutineSession, isWaiting, sessionState, type HelperSquare } from "@golem/view";
 
 /** The selection is a session id, so it stays put while live summaries reorder the list. */
 export type SwitcherState = {
@@ -44,6 +44,10 @@ export type SwitcherRow = {
   routine: boolean;
   title: string;
   age: string;
+  /** One square for each helper of this session that is not done. */
+  helpers: HelperSquare[];
+  /** `2 helpers working`, or null for no squares. */
+  helperWords: string | null;
 };
 
 export const NO_SESSIONS = "No sessions yet. Press n to start one.";
@@ -55,13 +59,17 @@ export function openSwitcher(current: string | null): SwitcherState {
   return { open: true, selected: current, query: "", confirm: false };
 }
 
-/** Sessions whose title contains `query`, ignoring case. An empty query keeps every session. */
+/**
+ * Sessions whose title contains `query`, ignoring case. An empty query keeps every session.
+ * A helper is not a row: its lead shows it (see `groupHelpers`).
+ */
 export function visibleSessions(sessions: readonly SessionSummary[], query: string): SessionSummary[] {
+  const { rows } = groupHelpers(sessions);
   if (query.length === 0) {
-    return [...sessions];
+    return rows;
   }
   const needle = query.toLowerCase();
-  return sessions.filter((summary) => (summary.title ?? UNTITLED).toLowerCase().includes(needle));
+  return rows.filter((summary) => (summary.title ?? UNTITLED).toLowerCase().includes(needle));
 }
 
 /** The hint under the switcher header. Confirm, a typed filter, then the idle list. */
@@ -152,8 +160,10 @@ export function layoutSwitcher(input: {
   }
   const index = selectedIndex(input.state, sessions);
   const start = Math.min(Math.max(0, index - rows + 1), Math.max(0, sessions.length - rows));
+  const { squares } = groupHelpers(input.sessions);
   return sessions.slice(start, start + rows).map((summary, offset) => {
     const age = relativeAge(summary.updated_at, input.now);
+    const helpers = squares.get(summary.session_id) ?? [];
     return {
       sessionId: summary.session_id,
       selected: start + offset === index,
@@ -162,8 +172,13 @@ export function layoutSwitcher(input: {
       queued: sessionState(summary) === "queued",
       waiting: isWaiting(summary),
       routine: isRoutineSession(summary),
-      title: fit(summary.title ?? UNTITLED, input.columns - ROW_CHROME - age.length - (isRoutineSession(summary) ? 2 : 0)),
+      title: fit(
+        summary.title ?? UNTITLED,
+        input.columns - ROW_CHROME - age.length - (isRoutineSession(summary) ? 2 : 0) - (helpers.length > 0 ? helpers.length + 1 : 0),
+      ),
       age,
+      helpers,
+      helperWords: helperWords(helpers),
     };
   });
 }

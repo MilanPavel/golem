@@ -99,7 +99,9 @@ async def test_fork_at_an_assistant_message_keeps_history_up_to_it(database: Dat
     source_completed = (await chat.completed(source))[:2]
     copied = await chat.completed(fork)
     assert [(e.run_id, e.data) for e in copied] == [(e.run_id, e.data) for e in source_completed]
-    assert [event.seq for event in logged] == [1, 2, 3]
+    # The last one is the fork's title, taken from the source.
+    assert [event.seq for event in logged] == [1, 2, 3, 4]
+    assert logged[3].type == "session.updated"
 
     await chat.turn(fork, "three")
     assert model.seen[-1] == ["one", "A1", "three"]

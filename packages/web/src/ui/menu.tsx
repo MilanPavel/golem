@@ -54,6 +54,24 @@ export function MenuRadioItem({ className, children, ...props }: ComponentProps<
   );
 }
 
+/** A switch in a menu: the check marks it when on, and Radix sets `role="menuitemcheckbox"`. */
+export function MenuCheckboxItem({ className, children, ...props }: ComponentProps<typeof M.CheckboxItem>) {
+  return (
+    <M.CheckboxItem
+      className={cn(
+        "flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 outline-none data-disabled:opacity-50 data-highlighted:bg-line",
+        className,
+      )}
+      {...props}
+    >
+      <span aria-hidden="true" className="flex size-3 shrink-0 items-center justify-center rounded-xs border border-line-strong">
+        <M.ItemIndicator className="size-1.5 rounded-xs bg-ink" />
+      </span>
+      {children}
+    </M.CheckboxItem>
+  );
+}
+
 export function MenuLabel({ className, ...props }: ComponentProps<typeof M.Label>) {
   return <M.Label className={cn("px-2 py-1.5 font-mono text-xs text-faint", className)} {...props} />;
 }

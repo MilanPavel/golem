@@ -4,6 +4,7 @@ import axe from "axe-core";
 import { expect, test, vi } from "vitest";
 import type { SessionSummary } from "../../store/session-list.ts";
 import { SessionsPanel } from "./sessions-panel.tsx";
+import { SHOW_HELPERS_KEY, showHelpersStore } from "./show-helpers.ts";
 
 const NOW = new Date(2026, 10, 17, 12, 0).getTime();
 const at = (days: number, hour = 11) => new Date(2026, 10, 17 - days, hour, 0).toISOString();
@@ -102,6 +103,8 @@ test("the time is on the folder line and stays visible on hover and focus; the b
   expect(screen.getByText("Fix the socket").parentElement?.className).toContain("pr-6");
   expect(button.className).toContain("group-hover:opacity-100");
   await user.hover(row);
+  // The filter, the list options, the row's link, then its button.
+  await user.tab();
   await user.tab();
   await user.tab();
   await user.tab();
@@ -195,4 +198,59 @@ test("the selected row is current, and the panel has no accessibility violations
   expect(screen.getByRole("link", { name: /Fix the socket/ }).getAttribute("aria-current")).toBe("page");
   const result = await axe.run(container, { rules: { "color-contrast": { enabled: false }, region: { enabled: false } } });
   expect(result.violations).toEqual([]);
+});
+
+const helper = (id: string, lead: string, status: SessionSummary["status"], extra: Partial<SessionSummary> = {}) =>
+  session(id, `explorer · ${id}`, "/Users/you/repos/golem", at(0, 10), { status, parent_session_id: lead, agent: "explorer", ...extra });
+const LEAD = session("lead", "The lead", "/Users/you/repos/golem", at(0, 11), { status: "running" });
+const squaresOf = (container: HTMLElement) => [...container.querySelectorAll("[data-square]")].map((node) => node.getAttribute("data-square"));
+
+test("a lead with two helpers is one row with two squares", () => {
+  const { container } = setup([LEAD, helper("h1", "lead", "running"), helper("h2", "lead", "running")]);
+  expect(screen.getAllByRole("link")).toHaveLength(1);
+  expect(squaresOf(container)).toEqual(["working", "working"]);
+  expect(screen.getByTestId("helper-squares").getAttribute("title")).toBe("2 helpers working");
+  expect(screen.getByText("2 helpers working").className).toContain("sr-only");
+});
+
+test("a helper that asks has the wait colour, a queued one the hollow ring", () => {
+  const { container } = setup([LEAD, helper("h1", "lead", "waiting"), helper("h2", "lead", "running", { wait_reason: "slot" })]);
+  expect(squaresOf(container)).toEqual(["asking", "queued"]);
+  expect(container.querySelector("[data-square=asking]")!.className).toContain("bg-wait");
+  expect(container.querySelector("[data-square=queued]")!.className).toContain("border-clay");
+  expect(screen.getByTestId("helper-squares").getAttribute("title")).toBe("1 helper queued, 1 helper asks you");
+});
+
+test("helpers that are done leave no squares, and a helper without its lead is no row", () => {
+  const { container } = setup([LEAD, helper("h1", "lead", "idle"), helper("h2", "gone", "running")]);
+  expect(screen.getAllByRole("link")).toHaveLength(1);
+  expect(container.querySelector("[data-testid=helper-squares]")).toBeNull();
+});
+
+test("the filter does not find helpers", async () => {
+  const user = userEvent.setup();
+  setup([LEAD, helper("h1", "lead", "running")]);
+  await user.type(screen.getByRole("textbox", { name: "Filter sessions" }), "explorer");
+  expect(screen.getByText("No sessions match.")).toBeTruthy();
+});
+
+test("an older daemon, with no parent_session_id, shows the list as before", () => {
+  const { container } = setup([LEAD, session("o", "Other", null, at(0, 9))]);
+  expect(screen.getAllByRole("link")).toHaveLength(2);
+  expect(container.querySelector("[data-testid=helper-squares]")).toBeNull();
+});
+
+test("Show helpers is off by default, brings the helper rows back, and is kept", async () => {
+  const user = userEvent.setup();
+  localStorage.clear();
+  showHelpersStore.set(false);
+  setup([LEAD, helper("h1", "lead", "running")]);
+  await user.click(screen.getByRole("button", { name: "List options" }));
+  const item = screen.getByRole("menuitemcheckbox", { name: "Show helpers" });
+  expect(item.getAttribute("aria-checked")).toBe("false");
+  await user.click(item);
+  expect(screen.getAllByRole("link")).toHaveLength(2);
+  expect(localStorage.getItem(SHOW_HELPERS_KEY)).toBe("1");
+  showHelpersStore.set(false);
+  localStorage.clear();
 });
