@@ -18,6 +18,7 @@ test("a border colour and a border width are different groups", () => {
 });
 
 test("font families conflict with each other, not with weights", () => {
+  // eslint-disable-next-line golem/no-font-mono -- the test names the class it merges
   expect(cn("font-ui font-mono")).toBe("font-mono");
   expect(cn("font-prose font-medium")).toBe("font-prose font-medium");
 });

@@ -33,7 +33,7 @@ export function LeadRun({ title, model = null, running, waiting, batches, href, 
         <Link href={href} onNavigate={onNavigate} className="min-w-0 truncate text-sm font-medium outline-offset-2 outline-clay hover:underline focus-visible:outline-2">
           {title}
         </Link>
-        <span className="flex items-baseline gap-3 whitespace-nowrap font-mono text-xs text-muted">
+        <span className="flex items-baseline gap-3 whitespace-nowrap text-meta text-muted">
           {model === null ? null : <span className="text-faint">{model}</span>}
           <span data-helper-count>{words ?? "no helpers working"}</span>
         </span>

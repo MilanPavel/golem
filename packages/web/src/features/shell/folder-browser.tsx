@@ -1,6 +1,7 @@
 import { useEffect, useId, useState, type KeyboardEvent } from "react";
 import { Button } from "../../ui/button.tsx";
 import { cn } from "../../ui/cn.ts";
+import { Code } from "../../ui/code.tsx";
 import { Input } from "../../ui/input.tsx";
 import type { FsListDirsResult } from "../../store/dirs.ts";
 import { useDirs } from "../../store/page-context.tsx";
@@ -141,7 +142,7 @@ export function FolderBrowserView({
   return (
     <div className="flex flex-col gap-3">
       {listing === null ? null : (
-        <nav aria-label={navLabel} className="flex flex-wrap items-center gap-0.5 font-mono text-xs">
+        <nav aria-label={navLabel} className="flex flex-wrap items-center gap-0.5">
           {crumbs(listing).map((crumb, index, all) => (
             <span key={crumb.path} className="flex items-center gap-0.5">
               {index === 0 ? null : (
@@ -158,7 +159,7 @@ export function FolderBrowserView({
                   index === all.length - 1 ? "text-ink" : "text-muted",
                 )}
               >
-                {crumb.label}
+                <Code>{crumb.label}</Code>
               </button>
             </span>
           ))}
@@ -176,7 +177,7 @@ export function FolderBrowserView({
         autoFocus={autoFocus}
         placeholder="Filter, or type a path"
         value={query}
-        className="font-mono"
+        className="field-literal"
         onChange={(event) => onQueryChange(event.target.value)}
         onKeyDown={onKeyDown}
       />
@@ -206,8 +207,8 @@ export function FolderBrowserView({
                 onClick={() => onOpen(entry.path)}
                 className="flex cursor-default items-center gap-2 rounded-md px-3 py-1.5 aria-selected:bg-sunken aria-selected:ring-1 aria-selected:ring-line-strong"
               >
-                <span className="min-w-0 flex-1 truncate">{entry.name}</span>
-                {entry.git ? <span className="rounded-full border border-line px-1.5 font-mono text-xs text-faint">git</span> : null}
+                <Code className="min-w-0 flex-1 truncate">{entry.name}</Code>
+                {entry.git ? <span className="rounded-full border border-line px-1.5 text-meta text-faint">git</span> : null}
               </div>
             ))}
           </div>

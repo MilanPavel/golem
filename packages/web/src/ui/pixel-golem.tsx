@@ -49,7 +49,7 @@ export function PixelGolem({ state, size, showLabel = false, className }: PixelG
         ))}
       </svg>
       {showLabel ? (
-        <span aria-hidden="true" className="font-mono text-xs text-muted">
+        <span aria-hidden="true" className="text-meta text-muted">
           {label}
         </span>
       ) : null}

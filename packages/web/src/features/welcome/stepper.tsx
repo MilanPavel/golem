@@ -45,7 +45,7 @@ export function Stepper({ states, onStep }: { states: readonly StepState[]; onSt
                   {name}
                 </span>
               )}
-              <span className={cn("font-mono text-xs leading-none", WORD_TONE[state])}>{STEP_WORDS[state]}</span>
+              <span className={cn("text-meta leading-none", WORD_TONE[state])}>{STEP_WORDS[state]}</span>
             </span>
           </li>
         );

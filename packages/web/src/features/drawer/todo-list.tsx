@@ -59,7 +59,7 @@ export function TodoList({ todos }: { todos: readonly TodoItem[] }) {
   const done = todos.filter((todo) => todo.status === "done").length;
   return (
     <>
-      <div className="flex items-center gap-2.5 font-mono text-xs text-muted">
+      <div className="flex items-center gap-2.5 text-meta text-muted">
         <p>
           {done} of {todos.length}
         </p>

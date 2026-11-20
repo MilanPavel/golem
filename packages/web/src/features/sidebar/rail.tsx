@@ -129,7 +129,7 @@ export function Rail({
           <span
             data-testid="inbox-count"
             aria-hidden="true"
-            className="absolute top-0.5 right-0 inline-flex items-center gap-0.5 rounded-sm bg-wait-soft px-1 font-mono text-xs leading-4 text-wait"
+            className="absolute top-0.5 right-0 inline-flex items-center gap-0.5 rounded-sm bg-wait-soft px-1 text-meta leading-4 text-wait"
           >
             <span className="size-1.5 rounded-xs bg-wait" />
             {inboxCount > 9 ? "9+" : inboxCount}

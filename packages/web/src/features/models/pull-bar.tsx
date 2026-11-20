@@ -13,7 +13,7 @@ export function PullBar({ label, share, text }: { label: string; share: number |
       >
         <div className="h-full rounded-full bg-clay" style={{ width: `${percent ?? 0}%` }} />
       </div>
-      <span className="font-mono text-xs text-muted">{text}</span>
+      <span className="text-meta text-muted">{text}</span>
     </div>
   );
 }

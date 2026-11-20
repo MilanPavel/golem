@@ -33,7 +33,7 @@ export function LiveRoutineEditor({ create, draft, now, onSaved, onCancel }: Liv
       servers={(servers.data?.servers ?? []).map((server) => server.name)}
       folderBrowser={({ onPick, onCancel: close }) => <FolderBrowser initialPath={draft.folder ?? null} autoFocus onPick={onPick} onCancel={close} />}
       modelPick={({ value, onPick }) => (
-        <ModelPick label="Model" value={value} listing={listing} models={usableModels(listing)} pulls={pulls} emptyText="Default" onPick={onPick} className="font-mono text-xs" />
+        <ModelPick label="Model" value={value} listing={listing} models={usableModels(listing)} pulls={pulls} emptyText="Default" onPick={onPick} className="text-meta" />
       )}
       onPreview={onPreview}
       onSave={async (name, fields) => {

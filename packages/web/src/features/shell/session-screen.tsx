@@ -147,7 +147,7 @@ function DrawerToggle({
     >
       <PanelIcon />
       {count === null ? null : (
-        <span aria-hidden="true" className="font-mono text-xs text-muted">
+        <span aria-hidden="true" className="text-meta text-muted">
           {count}
         </span>
       )}

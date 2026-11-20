@@ -3,13 +3,14 @@ import type { ReactNode } from "react";
 import type { ListedModel } from "../../store/models.ts";
 import type { PullEntry } from "../../store/pulls.ts";
 import { Badge } from "../../ui/badge.tsx";
+import { Code } from "../../ui/code.tsx";
 import { cn } from "../../ui/cn.ts";
 import { CheckIcon } from "../../ui/icons.tsx";
 import { PullBar } from "./pull-bar.tsx";
 import { pullShare, pullText, shortName } from "./model-text.ts";
 
 function Command({ children }: { children: ReactNode }) {
-  return <code className="font-mono text-ink">{children}</code>;
+  return <Code>{children}</Code>;
 }
 
 /** Why a model cannot be used yet, in words for a page that never takes a key. Null when it can be. */
@@ -101,7 +102,7 @@ export function ModelRow({ model, providerMissing, current, isDefault, category,
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-baseline gap-x-2">
           <span className={cn("text-sm font-medium", ready ? "text-ink" : "text-muted")}>{label}</span>
-          {detail === "" ? null : <span className="font-mono text-xs text-faint">{detail}</span>}
+          {detail === "" ? null : <span className="text-meta text-faint">{detail}</span>}
           {isDefault ? <Badge className="px-1.5 py-0">default</Badge> : null}
           {tag === undefined || tag === "" ? null : <Badge className="px-1.5 py-0 text-allow">{tag}</Badge>}
           {tierLabel(model) === "" ? null : <Badge className="px-1.5 py-0 text-faint">{tierLabel(model)}</Badge>}
@@ -119,7 +120,7 @@ export function ModelRow({ model, providerMissing, current, isDefault, category,
         {model.status === "pulling" ? <Progress model={model} entry={pull} /> : null}
         {failed === undefined ? null : <p className="mt-0.5 text-xs text-deny">Download failed: {failed}</p>}
       </div>
-      <span className="flex shrink-0 flex-col items-end font-mono text-xs">
+      <span className="flex shrink-0 flex-col items-end text-meta">
         {facts.map((fact) => (
           <span key={fact.text} className={cn("whitespace-nowrap", fact.tone)}>
             {fact.text}

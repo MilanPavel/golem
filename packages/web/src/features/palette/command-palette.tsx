@@ -1,6 +1,7 @@
 import { COMMANDS, type Command } from "@golem/view";
 import { useState } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "../../ui/dialog.tsx";
+import { Code } from "../../ui/code.tsx";
 import { Kbd } from "../../ui/kbd.tsx";
 import { resolveActive, SearchList } from "../../ui/search-list.tsx";
 import { IN_TERMINAL_LABEL, TERMINAL_ONLY } from "../composer/terminal-only.ts";
@@ -35,8 +36,8 @@ function Row({ row }: { row: PaletteRow }) {
       return (
         <span className="flex flex-col gap-0.5">
           <span className="flex items-baseline gap-2">
-            <span className="font-mono text-sm text-clay-ink">{name}</span>
-            {args === "" ? null : <span className="font-mono text-xs text-faint">{args}</span>}
+            {row.kind === "command" ? <Code className="text-clay-ink">{name}</Code> : <span className="text-body text-clay-ink">{name}</span>}
+            {args === "" ? null : <Code tone="muted">{args}</Code>}
             {row.key === null ? null : (
               <Kbd className="ml-auto" aria-hidden="true">
                 {row.key}
@@ -80,7 +81,7 @@ function Body({ hasComposer, hasSession = false, onPick, commands, initialQuery 
         empty={<p className="px-3 py-2 text-sm text-muted">Nothing to show.</p>}
       />
       {hasComposer ? null : <p className="mt-3 text-sm text-muted">{NO_COMPOSER}</p>}
-      <p className="mt-3 font-mono text-xs text-faint">{"↵ run · ↑↓ move · esc close"}</p>
+      <p className="mt-3 text-meta text-faint">{"↵ run · ↑↓ move · esc close"}</p>
     </>
   );
 }

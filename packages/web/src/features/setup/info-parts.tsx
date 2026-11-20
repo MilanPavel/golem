@@ -1,6 +1,7 @@
 import { tildePath } from "@golem/view";
 import { useEffect, useId, useState, type ReactNode } from "react";
 import type { SetupStatusResult } from "../../store/models.ts";
+import { Badge } from "../../ui/badge.tsx";
 import { Button } from "../../ui/button.tsx";
 import { Code } from "../../ui/code.tsx";
 import { CopyButton } from "../../ui/copy-command.tsx";
@@ -34,20 +35,6 @@ function useNow(): number {
   return now;
 }
 
-/** A chip of the hero card: Geist, a word or a version. */
-function Chip({ clay = false, children }: { clay?: boolean; children: ReactNode }) {
-  return (
-    <span
-      className={cn(
-        "inline-flex items-center rounded-full border px-2.5 py-0.5 text-meta font-medium whitespace-nowrap",
-        clay ? "border-transparent bg-clay-soft text-clay-ink" : "border-line bg-surface text-muted",
-      )}
-    >
-      {children}
-    </span>
-  );
-}
-
 export type HeroCardProps = {
   install: Install | null | undefined;
   /** The version to show when the daemon sent no install facts. */
@@ -76,8 +63,8 @@ export function HeroCard({ install, fallbackVersion, checkedAt, checking, busy, 
       <div className="flex min-w-0 flex-1 flex-col gap-1">
         <div className="flex flex-wrap items-center gap-2">
           <h3 className="text-base font-semibold">golem</h3>
-          {version === "" ? null : <Chip>v{version}</Chip>}
-          {install == null ? null : <Chip clay>{KIND_WORDS[install.method]}</Chip>}
+          {version === "" ? null : <Badge className="py-0.5">v{version}</Badge>}
+          {install == null ? null : <Badge tone="clay" className="py-0.5">{KIND_WORDS[install.method]}</Badge>}
         </div>
         <p className="min-w-0 text-meta break-all text-muted">
           {from === null ? null : (
