@@ -13,8 +13,6 @@ from typing import Literal, cast
 from pydantic import BaseModel, ConfigDict
 
 from golem import __version__, install_info
-from golem.agents.model import Agent
-from golem.agents.registry import Listed
 from golem.coding import commit as commit_git
 from golem.coding import plain_changes
 from golem.coding.changes import (
@@ -53,6 +51,7 @@ from golem.models.router import OLLAMA_BASE_URL, ModelConfigError, ModelRouter
 from golem.models.tiers import blended
 from golem.permissions.policy import PROJECT_POLICY
 from golem.secrets import SecretStore, SecretStoreError, check_name
+from golem.server.agents_edit import agent_infos, agents_set_wish
 from golem.server.dispatcher import (
     APPROVAL_NOT_FOUND,
     ARTIFACT_NOT_FOUND,
@@ -147,11 +146,11 @@ from golem.tools.paths import NO_FOLDER, writable
 from golem.tools.registry import ToolError, ToolScope
 from golem.tools.write import DIFF_CHARS, Change, apply, diff_counts, diff_text
 from golem_protocol.commands import (
-    AgentInfo,
     AgentsGetParams,
     AgentsGetResult,
     AgentsListParams,
     AgentsListResult,
+    AgentsSetWishParams,
     ApprovalRespondParams,
     ApprovalRespondResult,
     ArtifactReadParams,
@@ -348,7 +347,7 @@ from golem_protocol.commands import (
     TraceSpanParams,
     TraceSpanResult,
 )
-from golem_protocol.events import AgentLimits, AgentOrigin, FileChangedData, Ping
+from golem_protocol.events import FileChangedData, Ping
 from golem_protocol.rpc import ModelOptionsSavedNotification
 from golem_protocol.version import PROTOCOL_MAJOR, PROTOCOL_MINOR
 
@@ -1600,62 +1599,12 @@ async def _skill_list(ctx: RequestContext, params: SkillListParams) -> SkillList
     )
 
 
-async def _agent_infos(ctx: RequestContext, cwd: str | None) -> list[tuple[AgentInfo, Agent]]:
-    """Every agent type a session in ``cwd`` sees, highest origin first, each with its file.
-
-    A valid agent that lost its name is not listed on its own: its origin is in ``shadowed``
-    of the winner. A broken agent is always listed. A project agent in a folder that is not
-    trusted comes first with ``trusted = False``; it never wins a name.
-    """
-    _check_cwd(cwd)
-    registry = ctx.state.agents
-    if registry is None:
-        return []
-    root = None if cwd is None else Path(cwd)
-    view = registry.view(root)
-    counts = await ctx.state.agent_usage.counts() if ctx.state.agent_usage is not None else None
-
-    def info(entry: Listed, *, trusted: bool) -> tuple[AgentInfo, Agent]:
-        agent = entry.agent
-        shadowed: list[AgentOrigin] = [
-            other.origin
-            for other in view.listed
-            if other.shadowed_by == agent.path and other.agent.valid
-        ]
-        count = None if counts is None else counts.get(agent.name)
-        return AgentInfo(
-            name=agent.name,
-            description=agent.description,
-            origin=entry.origin,
-            wish=agent.wish,
-            tools=list(agent.tools),
-            limits=AgentLimits(
-                max_calls=agent.limits.max_calls,
-                max_seconds=agent.limits.max_seconds,
-                max_cost_usd=agent.limits.max_cost_usd,
-                answer_chars=agent.limits.answer_chars,
-            ),
-            asks=agent.asks,
-            errors=list(agent.errors),
-            shadowed=shadowed,
-            trusted=trusted,
-            used=0 if count is None else count.used,
-            finished=None if counts is None else (0 if count is None else count.finished),
-        ), agent
-
-    held_back = [info(Listed(agent, "project"), trusted=False) for agent in registry.blocked(root)]
-    shown = [
-        info(entry, trusted=True) for entry in view.listed if entry.usable or not entry.agent.valid
-    ]
-    return held_back + shown
-
-
 async def _agents_list(ctx: RequestContext, params: AgentsListParams) -> AgentsListResult:
-    return AgentsListResult(agents=[info for info, _ in await _agent_infos(ctx, params.cwd)])
+    return AgentsListResult(agents=[info for info, _ in await agent_infos(ctx, params.cwd)])
 
 
 async def _agents_get(ctx: RequestContext, params: AgentsGetParams) -> AgentsGetResult:
-    found = await _agent_infos(ctx, params.cwd)
+    found = await agent_infos(ctx, params.cwd)
     named = [pair for pair in found if pair[0].name == params.name]
     # The one a name resolves to: a usable one (trusted, no errors), else any listed copy, so a
     # blocked or broken file can still be looked at. The protocol defines no error for an unknown
@@ -2035,6 +1984,7 @@ def standard_methods() -> dict[str, Method]:
         "routing.set": Method("routing.set", RoutingSetParams, True, routing_set),
         "agents.list": Method("agents.list", AgentsListParams, True, _agents_list),
         "agents.get": Method("agents.get", AgentsGetParams, True, _agents_get),
+        "agents.set_wish": Method("agents.set_wish", AgentsSetWishParams, True, agents_set_wish),
         "skill.list": Method("skill.list", SkillListParams, True, _skill_list),
         "skill.read": Method("skill.read", SkillReadParams, True, skill_read),
         "skill.write": Method("skill.write", SkillWriteParams, True, skill_write),
