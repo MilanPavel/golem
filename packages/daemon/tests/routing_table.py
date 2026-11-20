@@ -29,6 +29,7 @@ class Case:
     step_floor: str | None = None
     local_only_folder: bool = False
     action: str = "send"
+    wish: str = ""  # a helper wish, for the action `pick_helper`
     settings: dict[str, Any] = field(default_factory=dict[str, Any])
     expect: dict[str, Any] = field(default_factory=dict[str, Any])
 
@@ -72,6 +73,8 @@ def _inputs(case: Case, fixtures: dict[str, dict[str, Any]]) -> str:
         parts.append(f"paid = {routing['paid']}")
     for role, ref in routing.get("roles", {}).items():
         parts.append(f"{role} = {ref}")
+    if case.wish:
+        parts.append(f"wish {case.wish}")
     if case.action in ("stronger", "struggle", "provider_down", "rate_limited"):
         parts.append(case.action.replace("_", " "))
     known = ", ".join(fixtures[name]["ref"].partition("/")[2] for name in case.models)
@@ -85,6 +88,8 @@ def _outcome(case: Case) -> tuple[str, str]:
     model = f"`{expect['model']}`"
     if expect.get("asks"):
         model += " after the paid question"
+    if expect.get("fresh"):
+        model += " in a fresh window"
     return model, f"`{expect['reason']}`" if "reason" in expect else ""
 
 
@@ -97,7 +102,7 @@ def render() -> str:
     ]
     for case in cases:
         model, reason = _outcome(case)
-        route = "" if case.action.endswith("_role") else f"`{case.route}`"
+        route = "" if case.action.endswith("_role") or case.wish else f"`{case.route}`"
         session = f"`{fixtures[case.session_model]['ref']}`"
         cells = [case.name, route, session, _inputs(case, fixtures), model, reason]
         rows.append("| " + " | ".join(cells) + " |")

@@ -30,6 +30,8 @@ from golem.config import GolemSettings, ModelPrice
 from golem.graphs.chat import open_chat
 from golem.models import dispatcher, ollama
 from golem.models.facts import ModelFacts
+from golem.models.pick import Traits
+from golem.models.pick_helper import pick_helper
 from golem.models.roles import for_role
 from golem.models.router import ModelRouter
 from golem.models.tiers import Tier, blended
@@ -260,14 +262,33 @@ def _run_role(case: Case) -> dict[str, Any]:
     return {"model": role.profile, "reason": role.reason}
 
 
+def _run_pick_helper(case: Case) -> dict[str, Any]:
+    """The model of a helper for the wish, in a setup the case names."""
+    facts = {n: _facts(FIXTURES[n]) for n in case.models}
+    lead = facts[case.session_model]
+    traits = Traits(local_only=case.local_only_folder, paid_allowed=case.paid_ok)
+    found = pick_helper(case.wish, lead, list(facts.values()), traits)
+    return {
+        "model": found.model.ref,
+        "reason": found.reason,
+        "rejected": sorted(r.ref for r in found.rejected),
+        "fresh": found.fresh_window,
+        "asks": found.needs_consent,
+    }
+
+
 @pytest.mark.parametrize("case", CASES, ids=[case.name for case in CASES])
 async def test_the_case_gets_its_model(case: Case, short_home: Path) -> None:
-    if case.action.endswith("_role"):
+    if case.action == "pick_helper":
+        found = _run_pick_helper(case)
+    elif case.action.endswith("_role"):
         found = _run_role(case)
     else:
         found = await _run_send(case, short_home)
     expect = case.expect
-    wanted = {key: expect[key] for key in ("model", "reason", "asks", "error") if key in expect}
+    wanted = {
+        key: expect[key] for key in ("model", "reason", "asks", "error", "fresh") if key in expect
+    }
     if "rejected" in expect:
         wanted["rejected"] = sorted(expect["rejected"])
     assert {key: found.get(key) for key in wanted} == wanted

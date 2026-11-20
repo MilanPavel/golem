@@ -223,6 +223,43 @@ The table below lists situations and the decision each must lead to. It is made 
 | a title takes the model the settings name |  | `ollama/qwen3:27b` | titles = deepseek/deepseek-chat; models qwen3:27b, deepseek-chat | `deepseek/deepseek-chat` | `configured` |
 | a helper in a local-only session stays on the local model |  | `ollama/qwen3:27b` | local-only folder; explore = anthropic/opus; models qwen3:27b, opus | `ollama/qwen3:27b` | `session is local` |
 | a helper that the settings send to a hosted model, outside a local-only folder |  | `ollama/qwen3:27b` | explore = anthropic/opus; models qwen3:27b, opus | `anthropic/opus` | `configured` |
+| local only: cheapest is the lead's own loaded model |  | `ollama/qwen3:27b` | wish cheapest; models qwen3:27b, qwen3:8b | `ollama/qwen3:27b` | `cheapest` |
+| local only: same is the lead's model |  | `ollama/qwen3:27b` | wish same; models qwen3:27b, qwen3:8b | `ollama/qwen3:27b` | `same` |
+| local only: stronger is the lead's model with a fresh window |  | `ollama/qwen3:27b` | wish stronger; models qwen3:27b, qwen3:8b | `ollama/qwen3:27b` in a fresh window | `lead` |
+| local only: a budget wish takes the nearest tier, local |  | `ollama/qwen3:27b` | wish budget; models qwen3:27b, qwen3:8b | `ollama/qwen3:27b` | `nearest` |
+| local only: a frontier wish takes the nearest tier, local |  | `ollama/qwen3:27b` | wish frontier; models qwen3:27b, qwen3:8b | `ollama/qwen3:27b` | `nearest` |
+| local only: a local wish takes the local model |  | `ollama/qwen3:27b` | wish local; models qwen3:27b, qwen3:8b | `ollama/qwen3:27b` | `tier` |
+| local only: a named local model |  | `ollama/qwen3:27b` | wish ollama/qwen3:8b; models qwen3:27b, qwen3:8b | `ollama/qwen3:8b` | `named` |
+| local only: a named hosted model that is not here is the lead's model |  | `ollama/qwen3:27b` | wish anthropic/opus; models qwen3:27b, qwen3:8b | `ollama/qwen3:27b` in a fresh window | `lead` |
+| local only folder: a frontier wish stays on the local model |  | `ollama/qwen3:27b` | local-only folder; wish frontier; models qwen3:27b, opus | `ollama/qwen3:27b` in a fresh window | `privacy` |
+| mixed: cheapest is the lead's local model |  | `ollama/qwen3:27b` | wish cheapest; models qwen3:27b, deepseek-chat, opus | `ollama/qwen3:27b` | `cheapest` |
+| mixed: same is the lead's model |  | `ollama/qwen3:27b` | wish same; models qwen3:27b, deepseek-chat, opus | `ollama/qwen3:27b` | `same` |
+| mixed, local lead: stronger is the budget tier, after the paid question |  | `ollama/qwen3:27b` | wish stronger; models qwen3:27b, deepseek-chat, opus | `deepseek/deepseek-chat` after the paid question | `stronger` |
+| mixed, local lead, chat already paid: stronger asks nothing |  | `ollama/qwen3:27b` | paid yes; wish stronger; models qwen3:27b, deepseek-chat, opus | `deepseek/deepseek-chat` | `stronger` |
+| mixed, local lead: a budget wish asks the paid question |  | `ollama/qwen3:27b` | wish budget; models qwen3:27b, deepseek-chat, opus | `deepseek/deepseek-chat` after the paid question | `tier` |
+| mixed, local lead: a frontier wish asks the paid question |  | `ollama/qwen3:27b` | wish frontier; models qwen3:27b, deepseek-chat, opus | `anthropic/opus` after the paid question | `tier` |
+| mixed, local lead: a named hosted model asks the paid question |  | `ollama/qwen3:27b` | wish anthropic/opus; models qwen3:27b, deepseek-chat, opus | `anthropic/opus` after the paid question | `named` |
+| mixed, budget lead: cheapest goes down to the local model |  | `deepseek/deepseek-chat` | wish cheapest; models qwen3:27b, deepseek-chat, opus | `ollama/qwen3:27b` | `cheapest` |
+| mixed, budget lead: stronger is the frontier tier, after the paid question |  | `deepseek/deepseek-chat` | wish stronger; models qwen3:27b, deepseek-chat, opus | `anthropic/opus` after the paid question | `stronger` |
+| mixed, budget lead: same is the lead's model without a question |  | `deepseek/deepseek-chat` | wish same; models qwen3:27b, deepseek-chat, opus | `deepseek/deepseek-chat` | `same` |
+| mixed, frontier lead: cheapest goes down to the local model |  | `anthropic/opus` | wish cheapest; models qwen3:27b, deepseek-chat, opus | `ollama/qwen3:27b` | `cheapest` |
+| mixed, frontier lead: stronger is the lead's model with a fresh window |  | `anthropic/opus` | wish stronger; models qwen3:27b, deepseek-chat, opus | `anthropic/opus` in a fresh window | `lead` |
+| mixed, frontier lead: a budget wish takes the budget model |  | `anthropic/opus` | wish budget; models qwen3:27b, deepseek-chat, opus | `deepseek/deepseek-chat` after the paid question | `tier` |
+| mixed without a budget model: a budget wish takes the nearest tier, the cheaper one |  | `ollama/qwen3:27b` | wish budget; models qwen3:27b, opus | `ollama/qwen3:27b` | `nearest` |
+| mixed in a local-only folder: stronger stays local with a fresh window |  | `ollama/qwen3:27b` | local-only folder; wish stronger; models qwen3:27b, deepseek-chat, opus | `ollama/qwen3:27b` in a fresh window | `lead` |
+| mixed in a local-only folder: cheapest is the local model |  | `ollama/qwen3:27b` | local-only folder; wish cheapest; models qwen3:27b, deepseek-chat, opus | `ollama/qwen3:27b` | `cheapest` |
+| mixed in a local-only folder: a named hosted model stays local |  | `ollama/qwen3:27b` | local-only folder; wish anthropic/opus; models qwen3:27b, deepseek-chat, opus | `ollama/qwen3:27b` in a fresh window | `privacy` |
+| cloud only, budget lead: cheapest is the lead's model, no question |  | `deepseek/deepseek-chat` | wish cheapest; models deepseek-chat, opus | `deepseek/deepseek-chat` | `cheapest` |
+| cloud only, budget lead: stronger is the frontier model, after the paid question |  | `deepseek/deepseek-chat` | wish stronger; models deepseek-chat, opus | `anthropic/opus` after the paid question | `stronger` |
+| cloud only, budget lead: same is the lead's model |  | `deepseek/deepseek-chat` | wish same; models deepseek-chat, opus | `deepseek/deepseek-chat` | `same` |
+| cloud only, budget lead: a local wish takes the nearest tier, budget |  | `deepseek/deepseek-chat` | wish local; models deepseek-chat, opus | `deepseek/deepseek-chat` | `nearest` |
+| cloud only, budget lead: a frontier wish asks the paid question |  | `deepseek/deepseek-chat` | wish frontier; models deepseek-chat, opus | `anthropic/opus` after the paid question | `tier` |
+| cloud only, frontier lead: cheapest is the budget model |  | `anthropic/opus` | wish cheapest; models deepseek-chat, opus | `deepseek/deepseek-chat` after the paid question | `cheapest` |
+| cloud only, frontier lead: stronger is the lead's model with a fresh window |  | `anthropic/opus` | wish stronger; models deepseek-chat, opus | `anthropic/opus` in a fresh window | `lead` |
+| cloud only, frontier lead: same is the lead's model |  | `anthropic/opus` | wish same; models deepseek-chat, opus | `anthropic/opus` | `same` |
+| cloud only, frontier lead: a named model that is not here is the lead's model |  | `anthropic/opus` | wish moonshot/kimi; models deepseek-chat, opus | `anthropic/opus` in a fresh window | `lead` |
+| cloud only, one frontier model: cheapest is the lead's model |  | `anthropic/opus` | wish cheapest; models opus | `anthropic/opus` | `cheapest` |
+| cloud only, one frontier model: a budget wish takes the nearest tier, frontier |  | `anthropic/opus` | wish budget; models opus | `anthropic/opus` | `nearest` |
 <!-- routing-table:end -->
 
 ### Stepping up inside a run
