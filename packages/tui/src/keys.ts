@@ -1,6 +1,9 @@
 import { type EditOp } from "./edit.ts";
 import { type SwitcherKey } from "./switcher.ts";
 
+/** What a key does to a helper's question: the ids of `approvalAnswerOptions`. */
+export type HelperAskAnswer = "once" | "helper" | "all-helpers" | "deny";
+
 /** Where a binding applies. The overlay groups rows by these names. */
 export type KeyContext = "composer" | "transcript" | "switcher" | "debug" | "approval";
 
@@ -91,6 +94,10 @@ export type KeyPlace = {
   question?: boolean;
   /** The run waits for an answer about a paid model. */
   consent?: boolean;
+  /** The question shown is a helper's tool call (ADR-059), answered for once, this helper, or all helpers. */
+  helperAsk?: boolean;
+  /** Two or more questions wait, so Tab moves to the next. */
+  askPages?: boolean;
 };
 
 export type ScrollToward = "up" | "down" | "start" | "end";
@@ -119,6 +126,8 @@ export type KeyEffect =
   | { kind: "restart-service" }
   | { kind: "approve"; decision: "allow" | "allow_session" | "allow_always" | "deny" }
   | { kind: "consent"; answer: "session" | "once" | "local" }
+  | { kind: "helper-ask"; answer: HelperAskAnswer }
+  | { kind: "ask-next" }
   | { kind: "scroll-diff"; toward: ScrollToward; line: boolean }
   | { kind: "edit-args" }
   | { kind: "checks"; on: boolean }
@@ -147,6 +156,8 @@ type KeyWhen = {
   approvalEdit?: boolean;
   question?: boolean;
   consent?: boolean;
+  helperAsk?: boolean;
+  askPages?: boolean;
 };
 
 export type KeyBinding = {
@@ -211,6 +222,7 @@ export const KEYS: readonly KeyBinding[] = [
     run: () => ({ kind: "close-overlay" }),
   },
   ...argsEditKeys(),
+  ...helperAskKeys(),
   ...approvalKeys(),
   ...checksKeys(),
   ...consentKeys(),
@@ -486,6 +498,45 @@ export const KEYS: readonly KeyBinding[] = [
   },
   ...editKeys(),
 ];
+
+function helperAskKeys(): KeyBinding[] {
+  const answer = (
+    id: string,
+    label: string,
+    description: string,
+    press: { name?: PressName; input?: string },
+    choice: HelperAskAnswer,
+  ): KeyBinding => ({
+    id,
+    label,
+    contexts: ["approval"],
+    description,
+    when: { ...press, overlay: false, switcher: false, helperAsk: true },
+    run: () => ({ kind: "helper-ask", answer: choice }),
+  });
+  return [
+    answer("helper-once", "a", "While a helper asks: allows its call once. Enter does the same.", { input: "a" }, "once"),
+    answer("helper-enter", "Enter", "While a helper asks: allows its call once.", { name: "return" }, "once"),
+    answer("helper-session", "h", "While a helper asks: allows the call, and this tool for that helper.", { input: "h" }, "helper"),
+    answer(
+      "helper-all",
+      "t",
+      "While several helpers ask the same: allows the call for all of them.",
+      { input: "t" },
+      "all-helpers",
+    ),
+    answer("helper-deny", "d", "While a helper asks: denies its call. Esc does the same.", { input: "d" }, "deny"),
+    answer("helper-deny-esc", "Esc", "While a helper asks: denies its call.", { name: "escape" }, "deny"),
+    {
+      id: "ask-next",
+      label: "Tab",
+      contexts: ["approval"],
+      description: "While two or more questions wait: shows the next one.",
+      when: { name: "tab", shift: false, overlay: false, switcher: false, askPages: true },
+      run: () => ({ kind: "ask-next" }),
+    },
+  ];
+}
 
 function approvalKeys(): KeyBinding[] {
   const answer = (
@@ -874,6 +925,12 @@ function whenMatches(when: KeyWhen, place: KeyPlace, press: Press): boolean {
     return false;
   }
   if (when.consent !== undefined && when.consent !== (place.consent === true)) {
+    return false;
+  }
+  if (when.helperAsk !== undefined && when.helperAsk !== (place.helperAsk === true)) {
+    return false;
+  }
+  if (when.askPages !== undefined && when.askPages !== (place.askPages === true)) {
     return false;
   }
   if (when.approvalEdit !== undefined && when.approvalEdit !== (place.approvalEdit === true)) {

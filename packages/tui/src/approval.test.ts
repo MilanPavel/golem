@@ -65,3 +65,8 @@ test("attaching to a waiting headless session replays into the approval band", (
   assert.ok(state.approval !== null);
   assert.equal(approvalLines(state.approval, 80)[0]?.text, "Allow edit_file a.py?");
 });
+
+test("a pager ends the keys line when several questions wait", () => {
+  const lines = approvalLines(pending({ name: "read_file", args: { path: "notes.txt" } }), 120, APPROVAL_ROWS, 0, "1 of 2 · tab next");
+  assert.equal(lines.at(-1)?.text, "a once · s this session · w always (saves a rule) · e edit · d deny · 1 of 2 · tab next");
+});

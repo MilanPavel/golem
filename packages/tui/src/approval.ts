@@ -32,6 +32,7 @@ export function approvalLines(
   columns: number,
   rows: number = APPROVAL_ROWS,
   offset = 0,
+  pager: string | null = null,
 ): ApprovalLine[] {
   const width = Math.max(1, columns);
   const label = toolLabel(approval.args);
@@ -40,7 +41,7 @@ export function approvalLines(
   const diffRows = Math.max(0, rows - APPROVAL_ROWS);
   const shown = diffWindow(diff, offset, diffRows, width);
   const scrolls = diff.length > diffRows && diffRows > 0;
-  const keys = "a once · s this session · w always (saves a rule) · e edit · d deny";
+  const keys = `a once · s this session · w always (saves a rule) · e edit · d deny${pager === null ? "" : ` · ${pager}`}`;
   return [
     { text: fit(approvalQuestion(approval.name, approval.args) ?? `Allow ${call}?`, width), bold: true, tone: "question" },
     ...shown.map((line) => ({ text: line.text, tone: line.tone })),

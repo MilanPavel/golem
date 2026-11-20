@@ -283,6 +283,7 @@ import {
   moveOverlayOffset,
   pressKey,
   type ArgsKey,
+  type HelperAskAnswer,
   type KeyEffect,
   type KeyPlace,
   type Press,
@@ -314,6 +315,18 @@ import {
 } from "./undo.ts";
 import { ConsentBand } from "./consent-band.tsx";
 import { consentRows } from "./consent.ts";
+import { HelperAskBand } from "./helper-ask-band.tsx";
+import {
+  helperAskAnswer,
+  helperAskLines,
+  helperAskRows,
+  helperDock,
+  isHelperApproval,
+  isHelperConsent,
+  nextAskKey,
+  pagerText,
+} from "./helper-ask.ts";
+import { useHelperConsent } from "./use-helper-consent.ts";
 import {
   ARGS_EDIT_ROWS,
   type ArgsEdit,
@@ -847,6 +860,9 @@ export function App({
   approvalRef.current = chat.approval;
   const consentRef = useRef(chat.consent);
   consentRef.current = chat.consent;
+  const dockRef = useRef<ReturnType<typeof helperDock>>(null);
+  /** The helper session whose paid question the band shows; null for the chat's own. */
+  const consentSessionRef = useRef<string | null>(null);
   const argsEdit = liveArgsEdit(argsEditState, chat.approval);
   const argsEditRef = useRef(argsEdit);
   argsEditRef.current = argsEdit;
@@ -952,6 +968,24 @@ export function App({
   }, firstSession);
   const sessionRef = session.ref;
   const sessionId = session.id;
+  // What the lead waits for when a helper asks: the items of its summary, one shown at a time (ADR-059).
+  const [askPick, setAskPick] = useState<string | null>(null);
+  const dock = helperDock(
+    sessionId === null ? undefined : sessions.find((summary) => summary.session_id === sessionId),
+    askPick,
+    Date.now(),
+  );
+  dockRef.current = dock;
+  const helperConsent = useHelperConsent(client, isHelperConsent(dock) ? dock.item.answerSessionId : null);
+  // The lead's own approval and question show unless a helper's item is the one shown.
+  const ownShown = dock === null || dock.item.helper === null;
+  const shownApproval = ownShown ? chat.approval : null;
+  const shownConsent = ownShown ? chat.consent : (helperConsent?.consent ?? null);
+  const helperBand = !ownShown && shownConsent === null && dock !== null;
+  const pager = pagerText(dock);
+  approvalRef.current = shownApproval;
+  consentRef.current = shownConsent;
+  consentSessionRef.current = ownShown ? null : (helperConsent?.sessionId ?? null);
 
   const unreadNotice = chat.unreadCall ? unreadCallNotice("tui") : null;
   const planNotice = planOffered() && panel === null ? PLAN_KEYS : null;
@@ -1004,12 +1038,14 @@ export function App({
     debug: debug.open,
     suggestions: suggestMatches.length,
     approval:
-      chat.consent !== null
-        ? consentRows(chat.consent)
-        : chat.approval !== null
+      helperBand && dock !== null
+        ? helperAskRows(dock)
+        : shownConsent !== null
+        ? consentRows(shownConsent)
+        : shownApproval !== null
           ? argsEdit !== null
             ? APPROVAL_ROWS
-            : approvalRows(chat.approval, rows)
+            : approvalRows(shownApproval, rows)
           : undoBand !== null
             ? undoRows(undoBand, rows)
             : 0,
@@ -5176,6 +5212,8 @@ export function App({
       suggestions: suggestRef.current.open,
       history: historyCursorRef.current !== null,
       approval: approvalRef.current !== null,
+      helperAsk: isHelperApproval(dockRef.current),
+      askPages: (dockRef.current?.items.length ?? 0) > 1,
       approvalDiff: approvalRef.current !== null && approvalRef.current.diff !== null,
       approvalEdit: argsEditRef.current !== null,
       question: chatRef.current.checks.allowed === null && chatRef.current.checks.offered !== null,
@@ -5256,6 +5294,12 @@ export function App({
         return;
       case "consent":
         answerConsent(effect.answer);
+        return;
+      case "helper-ask":
+        answerHelperAsk(effect.answer);
+        return;
+      case "ask-next":
+        if (dockRef.current !== null) setAskPick(nextAskKey(dockRef.current));
         return;
       case "edit-args":
         if (approvalRef.current !== null) {
@@ -5339,9 +5383,24 @@ export function App({
     });
   }
 
+  /** A key on a helper's tool call: the answer goes to the helper's session, with the scope. */
+  function answerHelperAsk(answer: HelperAskAnswer): void {
+    const shown = dockRef.current;
+    if (shown === null) return;
+    const sent = helperAskAnswer(shown.item, answer);
+    if (sent === null) return;
+    const done =
+      sent.scope === undefined
+        ? client.respondApproval(sent.sessionId, sent.callId, sent.decision)
+        : client.respondApproval(sent.sessionId, sent.callId, sent.decision, undefined, sent.scope);
+    void done.catch((error: unknown) => {
+      setChat((state) => ({ ...state, error: messageOf(error) }));
+    });
+  }
+
   function answerConsent(answer: "session" | "once" | "local"): void {
     const pending = consentRef.current;
-    const current = sessionRef.current;
+    const current = consentSessionRef.current ?? sessionRef.current;
     if (pending === null || current === null || !pending.alternatives.includes(answer)) {
       return;
     }
@@ -6082,15 +6141,18 @@ export function App({
         <ChecksBand offered={checksOffer} columns={columns} height={budget.checks} />
       ) : null}
       {budget.todos > 0 ? <TodoBand todos={chat.todos} columns={columns} height={budget.todos} /> : null}
-      {budget.approval > 0 && chat.consent !== null ? (
-        <ConsentBand consent={chat.consent} columns={columns} height={budget.approval} />
-      ) : budget.approval > 0 && chat.approval !== null ? (
+      {budget.approval > 0 && helperBand && dock !== null ? (
+        <HelperAskBand lines={helperAskLines(dock, columns)} columns={columns} height={budget.approval} />
+      ) : budget.approval > 0 && shownConsent !== null ? (
+        <ConsentBand consent={shownConsent} columns={columns} height={budget.approval} pager={pager} />
+      ) : budget.approval > 0 && shownApproval !== null ? (
         <ApprovalBand
-          approval={chat.approval}
+          approval={shownApproval}
           edit={argsEdit}
           columns={columns}
           height={budget.approval}
           offset={diffOffset}
+          pager={pager}
         />
       ) : budget.approval > 0 && undoBand !== null ? (
         <UndoBand band={undoBand} columns={columns} height={budget.approval} />
