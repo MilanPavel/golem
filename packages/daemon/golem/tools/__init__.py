@@ -4,6 +4,7 @@ from golem.config import WebSettings
 from golem.tools.artifacts import READ_ARTIFACT
 from golem.tools.delegate import DELEGATE
 from golem.tools.fs import READ_ONLY_TOOLS
+from golem.tools.memory import MEMORY_TOOLS
 from golem.tools.plan import PROPOSE_PLAN
 from golem.tools.registry import ToolRegistry, ToolSource
 from golem.tools.search import WEB_SEARCH
@@ -19,7 +20,8 @@ def default_registry(
 ) -> ToolRegistry:
     """The tools every agent session gets, plus ``source``'s, such as MCP servers'.
 
-    ``web_search`` is left out when ``web.search`` is ``"off"``.
+    ``web_search`` is left out when ``web.search`` is ``"off"``. ``recall`` and ``remember`` are
+    offered only to a run that carries memory (see :class:`ToolScope`).
     """
     search = [] if web is not None and web.search == "off" else [WEB_SEARCH]
     return ToolRegistry(
@@ -34,6 +36,7 @@ def default_registry(
             TODO_WRITE,
             PROPOSE_PLAN,
             LOAD_SKILL,
+            *MEMORY_TOOLS,
         ],
         source,
     )

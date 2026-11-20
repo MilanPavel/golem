@@ -28,6 +28,8 @@ READ_ONLY = {
     "todo_write",
     "propose_plan",
     "load_skill",
+    "recall",
+    "remember",
 }
 BALANCED = READ_ONLY | {"web_search", "web_fetch"}
 AUTOPILOT = BALANCED | {"shell", "write_file", "edit_file"}

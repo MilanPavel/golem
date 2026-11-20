@@ -215,8 +215,11 @@ async def test_a_model_that_gets_every_case_right_passes_ten_of_ten() -> None:
     assert (report.passed, report.recovered, report.working) == (10, 0, 10)
     assert seen[0] == (1, 10, "pass") and seen[-1] == (10, 10, "pass")
     assert invoke.offered["read_file"] == ["read_file", "list_dir", "glob", "grep"]
+    # The memory tools are offered only to a run that carries memory, which a check does not.
     assert set(invoke.offered["long_list"]) == set(TOOLS.schemas() and TOOLS.names) - {
-        "propose_plan"
+        "propose_plan",
+        "recall",
+        "remember",
     }
 
 
