@@ -135,6 +135,7 @@ export {
   ROUTE_MODE_NAMES,
   routedNote,
   routeHeadline,
+  routeReasonLabel,
   routeForSpan,
   routeLabel,
   routeReport,

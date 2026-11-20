@@ -11173,8 +11173,14 @@ public enum ModelRoutedDataReason: String, Codable {
     case escalated = "escalated"
     case fallback = "fallback"
     case fit = "fit"
+    case lead = "lead"
+    case named = "named"
+    case nearest = "nearest"
     case pinned = "pinned"
     case privacy = "privacy"
+    case same = "same"
+    case stronger = "stronger"
+    case tier = "tier"
     case user = "user"
 }
 

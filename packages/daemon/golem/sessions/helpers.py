@@ -85,18 +85,12 @@ def pick_local(
     return replace(again, detail=detail, fresh_window=True, needs_consent=False)
 
 
-_ROUTED_REASON = {"privacy": "privacy", "cheapest": "cheapest"}
-
-
 def routed_of(wish: str, choice: HelperChoice) -> Choice:
-    """The pick as a turn writes it into ``model.routed``: the log's reasons are the turn's.
-
-    Only ``privacy`` and ``cheapest`` have a word of their own there; the rest read as ``pinned``,
-    and the detail says what the wish was and why.
-    """
+    """The pick as a turn writes it into ``model.routed``: the pick's own reason, and the detail
+    says what the wish was and why."""
     return Choice(
         choice.model,
-        _ROUTED_REASON.get(choice.reason, "pinned"),  # pyright: ignore[reportArgumentType]
+        choice.reason,
         f"{wish}: {choice.detail}",
         choice.rejected,
     )

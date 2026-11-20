@@ -284,6 +284,56 @@ async def test_the_picked_model_pins_the_helper_and_its_log_has_model_routed(
     assert started.data.pick_reason in routed.data.detail
 
 
+async def test_each_wish_writes_its_own_reason_with_local_models_only(
+    database: Database, project: Path, tmp_path: Path
+) -> None:
+    wishes = {
+        "same": "same",
+        "cheapest": "cheapest",
+        "stronger": "lead",  # nothing is above a local tier: the lead's model, fresh window
+        "local": "tier",
+        "frontier": "nearest",  # no frontier model here: the nearest tier you have
+        OTHER_LOCAL: "named",
+    }
+    for wish, reason in wishes.items():
+        chat = _Chat(database, ["done"], settings=_settings(LOCAL), home=tmp_path)
+        chat.manager.facts = _local_setup()
+        helper, _, _ = await _start(chat, LOCAL, project, _agent(wish))
+        (routed,) = _routed(await chat.stored(helper))
+        assert routed.data.reason == reason, wish
+        assert routed.data.detail.startswith(f"{wish}: ")
+
+
+async def test_each_wish_writes_its_own_reason_with_cloud_models_only(
+    database: Database, project: Path, tmp_path: Path
+) -> None:
+    cases = [
+        (CHEAP, "same", "same"),
+        (CHEAP, "cheapest", "cheapest"),
+        (CHEAP, "stronger", "stronger"),
+        (BIG, "stronger", "lead"),  # the top tier has nothing above it
+        (CHEAP, "frontier", "tier"),
+        (CHEAP, BIG, "named"),
+    ]
+    for lead_model, wish, reason in cases:
+        chat = _Chat(database, ["done"], settings=_settings(lead_model), home=tmp_path)
+        chat.manager.facts = _cloud_setup()
+        helper, _, _ = await _start(chat, lead_model, project, _agent(wish))
+        (routed,) = _routed(await chat.stored(helper))
+        assert routed.data.reason == reason, (lead_model, wish)
+        assert routed.data.detail.startswith(f"{wish}: ")
+
+
+async def test_a_private_chat_writes_privacy_for_a_paid_wish(
+    database: Database, project: Path, tmp_path: Path
+) -> None:
+    chat = _Chat(database, ["done"], settings=_settings(LOCAL, local_only=project), home=tmp_path)
+    chat.manager.facts = _mixed_setup()
+    helper, _, _ = await _start(chat, LOCAL, project, _agent("frontier"))
+    (routed,) = _routed(await chat.stored(helper))
+    assert routed.data.reason == "privacy"
+
+
 async def test_model_routed_of_a_hosted_pick_names_the_rejected_models(
     database: Database, project: Path, tmp_path: Path
 ) -> None:

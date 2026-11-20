@@ -4,7 +4,21 @@ export type Detail = string;
 export type Model = string | null;
 export type ModelProfile = string;
 export type Provider = string | null;
-export type Reason = 'pinned' | 'privacy' | 'fit' | 'budget' | 'cheapest' | 'escalated' | 'fallback' | 'user';
+export type Reason =
+  | 'pinned'
+  | 'privacy'
+  | 'fit'
+  | 'budget'
+  | 'cheapest'
+  | 'escalated'
+  | 'fallback'
+  | 'user'
+  | 'same'
+  | 'stronger'
+  | 'tier'
+  | 'named'
+  | 'nearest'
+  | 'lead';
 export type Ref = string;
 export type Tier = 'local' | 'budget' | 'frontier';
 export type Why = string;
