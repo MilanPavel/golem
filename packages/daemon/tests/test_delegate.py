@@ -282,6 +282,49 @@ async def test_the_helpers_events_are_in_its_own_log_and_the_parent_log_has_a_su
         ],
         key=str,
     )
+    # The ended step carries the tool's own one-line summary; the running step carries none.
+    own = await chat.helper_events(helper_id)
+    summaries = {e.data.call_id: e.data.summary for e in own if e.type == "tool.completed"}
+    for e in events:
+        if e.type == "helper.step":
+            want = summaries[e.data.step_id] if e.data.status == "done" else None
+            assert e.data.summary == want
+    assert all(summaries.values())
+
+
+async def test_a_long_or_multi_line_step_summary_is_cut_to_one_line_of_200_characters(
+    database: Database, project: Path
+) -> None:
+    model = ToolCallingChatModel(
+        replies=[
+            [("delegate", {"brief": "look"})],
+            [("list_dir", {"path": "."})],
+            "found it",
+            "ok",
+        ],
+        usage=USAGE,
+    )
+    chat = _Chat(database, model)
+    relay = chat.manager._events.after_emit  # pyright: ignore[reportPrivateUsage]
+    assert relay is not None
+
+    async def long_summary(event: ChatEvent) -> None:
+        if event.type == "tool.completed":
+            event = event.model_copy(
+                update={"data": event.data.model_copy(update={"summary": "a\n  b\t" + "c" * 400})}
+            )
+        await relay(event)
+
+    chat.manager._events.after_emit = long_summary  # pyright: ignore[reportPrivateUsage]
+    _, _, events = await chat.run(project)
+
+    steps = [e for e in events if e.type == "helper.step" and e.data.status == "done"]
+    assert len(steps) == 1
+    summary = steps[0].data.summary
+    assert summary is not None
+    assert len(summary) == 200
+    assert summary.startswith("a b ccc")
+    assert "\n" not in summary
 
 
 async def test_helper_calls_carry_cost_and_are_usage_rows_of_the_helper_role(

@@ -1240,6 +1240,8 @@ class HelperStepData(BaseModel):
     Thin on purpose: the card shows what ran, and the helper's own log has the detail.
     ``args`` holds only the path, pattern, query or ref of the call. ``step_id`` is the
     helper's own tool call id. ``calls`` is how many tool calls the helper has made so far.
+    ``summary`` is the one-line summary of the tool call, such as ``3 lines``, set when the
+    call ended and None while it runs or in an older log. One line, at most 200 characters.
     """
 
     model_config = _CONFIG
@@ -1251,6 +1253,7 @@ class HelperStepData(BaseModel):
     args: dict[str, Any] = Field(default_factory=dict[str, Any])
     status: HelperStep
     calls: int = Field(ge=0)
+    summary: str | None = Field(default=None, max_length=200)
 
 
 class HelperStateData(BaseModel):

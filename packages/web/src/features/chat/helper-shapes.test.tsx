@@ -18,7 +18,7 @@ const lead = (): ChatEvent[] => [
   { ...base, ts: T, seq: 3, type: "tool.requested", data: { call_id: "d1", message_id: "a", name: "delegate", args: { brief: "look d1" } } },
 ];
 
-const oldRead = (call: string, path: string, seq: number, finish: boolean, summary = "done"): ChatEvent[] => {
+const oldRead = (call: string, path: string, seq: number, finish: boolean, summary = "3 lines"): ChatEvent[] => {
   const p = { parent_call_id: "d1" };
   const opened: ChatEvent[] = [
     { ...base, ts: T, seq, type: "tool.requested", data: { call_id: call, message_id: "m", name: "read_file", args: { path }, ...p } },
@@ -34,9 +34,9 @@ const oldCall = (seq: number, usage: { input: number; output: number }, cost: nu
     { ...base, ts: T, seq: seq + 1, type: "model.call.completed", data: { message_id: `m${String(seq)}`, latency_ms: 10, usage, cost_usd: cost, ...p } },
   ];
 };
-const newStep = (seq: number, id: string, path: string, status: "running" | "done"): ChatEvent => ({
+const newStep = (seq: number, id: string, path: string, status: "running" | "done", summary?: string): ChatEvent => ({
   ...base, ts: T, seq, type: "helper.step",
-  data: { call_id: "d1", index: 0, step_id: id, name: "read_file", args: { path }, status, calls: 1 },
+  data: { call_id: "d1", index: 0, step_id: id, name: "read_file", args: { path }, status, calls: 1, ...(summary === undefined ? {} : { summary }) },
 });
 const newStart: ChatEvent = {
   ...base, ts: T, seq: 10, type: "helper.started",
@@ -73,7 +73,7 @@ function cards(tool: ToolBlock): string[] {
 
 test("a running helper draws the same card in the old and the new log shape", () => {
   const old = delegateOf([...lead(), ...oldCall(10, { input: 100, output: 20 }, 0), ...oldRead("k1", "a.py", 12, true), ...oldRead("k2", "b.py", 15, false)]);
-  const now = delegateOf([...lead(), newStart, newRunning, newStep(12, "k1", "a.py", "running"), newStep(13, "k1", "a.py", "done"), newStep(14, "k2", "b.py", "running")]);
+  const now = delegateOf([...lead(), newStart, newRunning, newStep(12, "k1", "a.py", "running"), newStep(13, "k1", "a.py", "done", "3 lines"), newStep(14, "k2", "b.py", "running")]);
   expect(old.child?.status).toBe("running");
   expect(now.child?.status).toBe("running");
   expect(cards(now)).toEqual(cards(old));
@@ -90,8 +90,8 @@ test("a done helper draws the same card in the old and the new log shape", () =>
   ]);
   const now = delegateOf([
     ...lead(), newStart, newRunning,
-    newStep(12, "k1", "a.py", "running"), newStep(13, "k1", "a.py", "done"),
-    newStep(14, "k2", "b.py", "running"), newStep(15, "k2", "b.py", "done"),
+    newStep(12, "k1", "a.py", "running"), newStep(13, "k1", "a.py", "done", "3 lines"),
+    newStep(14, "k2", "b.py", "running"), newStep(15, "k2", "b.py", "done", "3 lines"),
     newEnd, delegateEnd,
   ]);
   expect(old.child?.status).toBe("done");
@@ -99,16 +99,18 @@ test("a done helper draws the same card in the old and the new log shape", () =>
   expect(cards(now)).toEqual(cards(old));
 });
 
-// The one thing the old shape carries and the new one does not: a step's one-line summary
-// ("3 lines"). helper.step is thin on purpose (no summary field), so the new card says "done".
-// The two tests above give the old steps the summary "done", the text the card shows when a step
-// has none, so they compare like with like.
-test("a finished step shows its summary in the old shape only: helper.step has no summary", () => {
+// A finished step shows its one-line summary ("3 lines") in both shapes. An older log has no
+// summary on helper.step: the step then says "done".
+test("a finished step shows its summary in both shapes", () => {
   const old = delegateOf([...lead(), ...oldRead("k1", "a.py", 12, true, "3 lines")]);
+  const now = delegateOf([...lead(), newStart, newStep(13, "k1", "a.py", "done", "3 lines")]);
+  expect(cards(old)[1]).toContain("3 lines");
+  expect(cards(now)[1]).toContain("3 lines");
+});
+
+test("a step of an older log with no summary still shows done", () => {
   const now = delegateOf([...lead(), newStart, newStep(13, "k1", "a.py", "done")]);
-  const oldOpen = cards(old)[1];
-  const newOpen = cards(now)[1];
-  expect(oldOpen).toContain("3 lines");
-  expect(newOpen).not.toContain("3 lines");
-  expect(newOpen).toContain("done");
+  const open = cards(now)[1];
+  expect(open).toContain("done");
+  expect(open).not.toContain("3 lines");
 });

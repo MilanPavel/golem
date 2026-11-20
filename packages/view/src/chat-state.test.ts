@@ -725,6 +725,19 @@ test("helper events fold into the same helper run as the events with a parent ca
   assert.equal(now.messages.length, old.messages.length);
 });
 
+test("a helper step carries the summary of its ended call, and a step without one has none", () => {
+  const summarised = helperEvents().map((event): ChatEvent =>
+    event.type === "helper.step" && event.data.status === "done" && event.data.step_id === "k1"
+      ? { ...event, data: { ...event.data, summary: "3 lines" } }
+      : event,
+  );
+  const steps = [...delegateTurn("d1"), ...summarised].reduce(reduceChat, emptyChat).messages[0]?.tools?.[0]?.child?.toolSteps;
+  assert.equal(steps?.find((step) => step.callId === "k1")?.summary, "3 lines");
+  // An older log has no summary: the step has none, and the card says "done".
+  assert.equal(steps?.find((step) => step.callId === "k2")?.summary, undefined);
+  assert.equal("summary" in (steps?.find((step) => step.callId === "k2") ?? {}), false);
+});
+
 test("a helper that stopped with failed is failed, and a helper event with no delegate call changes nothing", () => {
   const failed = helperEvents().map((event): ChatEvent =>
     event.type === "helper.ended" ? { ...event, data: { ...event.data, stopped: "failed" } } : event,

@@ -3461,6 +3461,8 @@ public enum HelperStateEventType: String, Codable {
 /// Thin on purpose: the card shows what ran, and the helper's own log has the detail.
 /// ``args`` holds only the path, pattern, query or ref of the call. ``step_id`` is the
 /// helper's own tool call id. ``calls`` is how many tool calls the helper has made so far.
+/// ``summary`` is the one-line summary of the tool call, such as ``3 lines``, set when the
+/// call ended and None while it runs or in an older log. One line, at most 200 characters.
 // MARK: - HelperStepData
 public struct HelperStepData: Codable {
     public let args: [String: JSONAny]?
@@ -3470,6 +3472,7 @@ public struct HelperStepData: Codable {
     public let name: String
     public let status: HelperStepDataStatus
     public let stepID: String
+    public let summary: String?
 
     public enum CodingKeys: String, CodingKey {
         case args = "args"
@@ -3479,9 +3482,10 @@ public struct HelperStepData: Codable {
         case name = "name"
         case status = "status"
         case stepID = "step_id"
+        case summary = "summary"
     }
 
-    public init(args: [String: JSONAny]?, callID: String, calls: Int, index: Int, name: String, status: HelperStepDataStatus, stepID: String) {
+    public init(args: [String: JSONAny]?, callID: String, calls: Int, index: Int, name: String, status: HelperStepDataStatus, stepID: String, summary: String?) {
         self.args = args
         self.callID = callID
         self.calls = calls
@@ -3489,6 +3493,7 @@ public struct HelperStepData: Codable {
         self.name = name
         self.status = status
         self.stepID = stepID
+        self.summary = summary
     }
 }
 
@@ -3532,6 +3537,8 @@ public struct HelperStepEvent: Codable {
 /// Thin on purpose: the card shows what ran, and the helper's own log has the detail.
 /// ``args`` holds only the path, pattern, query or ref of the call. ``step_id`` is the
 /// helper's own tool call id. ``calls`` is how many tool calls the helper has made so far.
+/// ``summary`` is the one-line summary of the tool call, such as ``3 lines``, set when the
+/// call ended and None while it runs or in an older log. One line, at most 200 characters.
 // MARK: - HelperStepEventData
 public struct HelperStepEventData: Codable {
     public let args: [String: JSONAny]?
@@ -3541,6 +3548,7 @@ public struct HelperStepEventData: Codable {
     public let name: String
     public let status: HelperStepDataStatus
     public let stepID: String
+    public let summary: String?
 
     public enum CodingKeys: String, CodingKey {
         case args = "args"
@@ -3550,9 +3558,10 @@ public struct HelperStepEventData: Codable {
         case name = "name"
         case status = "status"
         case stepID = "step_id"
+        case summary = "summary"
     }
 
-    public init(args: [String: JSONAny]?, callID: String, calls: Int, index: Int, name: String, status: HelperStepDataStatus, stepID: String) {
+    public init(args: [String: JSONAny]?, callID: String, calls: Int, index: Int, name: String, status: HelperStepDataStatus, stepID: String, summary: String?) {
         self.args = args
         self.callID = callID
         self.calls = calls
@@ -3560,6 +3569,7 @@ public struct HelperStepEventData: Codable {
         self.name = name
         self.status = status
         self.stepID = stepID
+        self.summary = summary
     }
 }
 
@@ -15134,6 +15144,8 @@ public struct Params: Codable {
 /// Thin on purpose: the card shows what ran, and the helper's own log has the detail.
 /// ``args`` holds only the path, pattern, query or ref of the call. ``step_id`` is the
 /// helper's own tool call id. ``calls`` is how many tool calls the helper has made so far.
+/// ``summary`` is the one-line summary of the tool call, such as ``3 lines``, set when the
+/// call ended and None while it runs or in an older log. One line, at most 200 characters.
 ///
 /// A helper queued, started running, started waiting, or went on.
 ///

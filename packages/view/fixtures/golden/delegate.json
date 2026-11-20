@@ -209,7 +209,8 @@
         "index": 0,
         "name": "read_file",
         "status": "running",
-        "step_id": "call_2"
+        "step_id": "call_2",
+        "summary": null
       },
       "run_id": "id-2",
       "seq": 12,
@@ -227,7 +228,8 @@
         "index": 0,
         "name": "read_file",
         "status": "done",
-        "step_id": "call_2"
+        "step_id": "call_2",
+        "summary": "1 line"
       },
       "run_id": "id-2",
       "seq": 13,
@@ -610,7 +612,8 @@
         "index": 0,
         "name": "read_file",
         "status": "running",
-        "step_id": "call_2"
+        "step_id": "call_2",
+        "summary": null
       },
       "run_id": "id-2",
       "seq": 12,
@@ -628,7 +631,8 @@
         "index": 0,
         "name": "read_file",
         "status": "done",
-        "step_id": "call_2"
+        "step_id": "call_2",
+        "summary": "1 line"
       },
       "run_id": "id-2",
       "seq": 13,
