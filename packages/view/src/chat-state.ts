@@ -6,6 +6,7 @@ import { contextChangedNote, emptyLiveContext, foldLiveContext, type ContextChan
 import { emptyRoute, foldRoute, type RouteState } from "./route.ts";
 import { replyWasCut } from "./stop.ts";
 import type { ToolSource } from "./sources.ts";
+import type { WaitReason, WaitScope, WaitState } from "./wait.ts";
 import type { TodoItem } from "./todos.ts";
 
 export type ToolStatus = "requested" | "waiting" | "running" | "done" | "failed";
@@ -217,6 +218,8 @@ export type ChatState = {
   localWait: boolean;
   /** What a call loads while the model reloads with a larger window, from `model.waiting`. */
   loading: { model: string; window: number } | null;
+  /** Why the call waits, from the `reason` and the fields after it in `model.waiting`. Null from a daemon that sends no `reason`. */
+  wait: WaitState | null;
   /** True after a model call wrote a tool call as text that golem could not read, until the next run starts. */
   unreadCall: boolean;
   /** The context of the newest model call that reported its input, from the `model.call.*` events. */
@@ -253,6 +256,7 @@ export const emptyChat: ChatState = {
   retry: null,
   localWait: false,
   loading: null,
+  wait: null,
   unreadCall: false,
   context: emptyLiveContext,
   calls: {},
@@ -264,8 +268,7 @@ export const emptyChat: ChatState = {
 };
 
 /** What to do after a model server did not answer, besides fixing it. */
-/** What the meter says while a chat call waits for the local model. */
-export const WAITING_FOR_LOCAL_MODEL = "waiting for the local model";
+export { WAITING_FOR_LOCAL_MODEL } from "./wait.ts";
 
 export const SWITCH_HINT = "/model to switch";
 /** The picker installs a missing Ollama, so that beats the daemon's brew hint. */
@@ -556,10 +559,16 @@ function reduceChatEvent(state: ChatState, event: ChatEvent): ChatState {
     case "model.waiting": {
       const { waiting, model, window } = event.data;
       const loading = waiting && model != null && window != null ? { model, window } : null;
-      if (waiting === state.localWait && loading?.model === state.loading?.model && loading?.window === state.loading?.window) {
+      const wait = waiting ? waitOf(event.data) : null;
+      if (
+        waiting === state.localWait &&
+        loading?.model === state.loading?.model &&
+        loading?.window === state.loading?.window &&
+        sameWait(wait, state.wait)
+      ) {
         return state;
       }
-      return { ...state, localWait: waiting, loading };
+      return { ...state, localWait: waiting, loading, wait };
     }
     case "message.completed":
       return { ...notWaiting(state), messages: upsertCompleted(state.messages, event, state.runStartedAt, state.calls) };
@@ -923,7 +932,50 @@ function upsertCompleted(
 }
 
 function notWaiting(state: ChatState): ChatState {
-  return state.localWait || state.loading !== null ? { ...state, localWait: false, loading: null } : state;
+  return state.localWait || state.loading !== null || state.wait !== null
+    ? { ...state, localWait: false, loading: null, wait: null }
+    : state;
+}
+
+/** The wait a `model.waiting` event describes, or null from a daemon that sends no `reason`. */
+function waitOf(data: {
+  reason?: WaitReason | null;
+  line?: string | null;
+  model?: string | null;
+  position?: number | null;
+  holder?: string | null;
+  retry_in_ms?: number | null;
+  silent_ms?: number | null;
+  scope?: WaitScope | null;
+  will_retry?: boolean | null;
+}): WaitState | null {
+  if (data.reason == null) return null;
+  return {
+    reason: data.reason,
+    line: data.line ?? null,
+    model: data.model ?? null,
+    position: data.position ?? null,
+    holder: data.holder ?? null,
+    retryInMs: data.retry_in_ms ?? null,
+    silentMs: data.silent_ms ?? null,
+    scope: data.scope ?? null,
+    willRetry: data.will_retry ?? null,
+  };
+}
+
+function sameWait(a: WaitState | null, b: WaitState | null): boolean {
+  if (a === null || b === null) return a === b;
+  return (
+    a.reason === b.reason &&
+    a.line === b.line &&
+    a.model === b.model &&
+    a.position === b.position &&
+    a.holder === b.holder &&
+    a.retryInMs === b.retryInMs &&
+    a.silentMs === b.silentMs &&
+    a.scope === b.scope &&
+    a.willRetry === b.willRetry
+  );
 }
 
 function withoutWriting(message: ChatMessage): ChatMessage {
