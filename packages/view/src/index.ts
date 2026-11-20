@@ -892,6 +892,7 @@ export {
   groupHelpers,
   helperSquare,
   helperWords,
+  helperCountWords,
   isHelperSession,
   type HelperRows,
   type HelperSession,

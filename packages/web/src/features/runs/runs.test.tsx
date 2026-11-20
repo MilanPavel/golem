@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import axe from "axe-core";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
@@ -11,6 +11,9 @@ import { PageProvider } from "../../store/page-context.tsx";
 import type { RunInfo } from "../../store/runs.ts";
 import { ev, fakeClient, fakeFrame, summary } from "../../store/test-support.ts";
 import { sidebarItemStore } from "../sidebar/sidebar-item.ts";
+import { cloudFinishedChat, localRunningChat, STEPS_NOW } from "../workbench/steps-sample.ts";
+import { stepsBatches } from "../workbench/index.ts";
+import { LeadRun } from "./lead-run.tsx";
 import { RunBanner } from "./run-banner.tsx";
 import { RunsList } from "./runs-list.tsx";
 import { RunsPanel } from "./runs-panel.tsx";
@@ -194,3 +197,31 @@ test("a chat of yours has no banner", async () => {
   await act(() => new Promise<void>((resolve) => setTimeout(resolve, 20)));
   expect(screen.queryByRole("region", { name: "Routine run" })).toBeNull();
 });
+
+test("a lead's row says how many helpers work, over the full-width step list that opens a helper", () => {
+  const { container } = render(
+    <LeadRun title="Fix the login redirect" model="Qwen3 Coder" running={2} waiting={1} batches={stepsBatches(localRunningChat(), STEPS_NOW)} href="/s/lead" onNavigate={() => {}} />,
+  );
+  const region = screen.getByRole("region", { name: "Helpers of Fix the login redirect" });
+  expect(within(region).getByText("2 helpers working, 1 helper asks you")).toBeTruthy();
+  expect(within(region).getByText("Qwen3 Coder")).toBeTruthy();
+  expect(within(region).getByRole("link", { name: "Fix the login redirect" }).getAttribute("href")).toBe("/s/lead");
+  expect(container.querySelectorAll("[data-step-row]").length).toBeGreaterThan(0);
+});
+
+test("a lead with nothing working says so", () => {
+  render(<LeadRun title="Map the auth code" running={0} waiting={null} batches={stepsBatches(cloudFinishedChat(), STEPS_NOW)} href="/s/lead" onNavigate={() => {}} />);
+  expect(screen.getByText("no helpers working")).toBeTruthy();
+});
+
+test("a step row in Runs opens its helper and goes to the lead's chat", () => {
+  const went: string[] = [];
+  render(
+    <LeadRun title="Fix the login redirect" running={2} waiting={0} batches={stepsBatches(localRunningChat(), STEPS_NOW)} href="/s/lead" leadId="lead" onNavigate={(path) => went.push(path)} />,
+  );
+  const row = screen.getAllByRole("button", { name: /^Open / })[0];
+  if (row === undefined) throw new Error("no helper row");
+  fireEvent.click(row);
+  expect(went).toEqual(["/s/lead"]);
+});
+

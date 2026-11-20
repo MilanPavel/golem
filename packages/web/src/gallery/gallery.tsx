@@ -80,7 +80,7 @@ import { ALL_CLOUD, ALL_LOCAL, askingBatchChat, cloudBatchChat, localBatchChat }
 import { ASKING_HELPER, DONE_HELPER, HELPER_NOW, RUNNING_HELPER } from "../features/sessions/helper-sample.ts";
 import { RoutineDetail, RoutinesEmpty, RoutinesPanel } from "../features/routines/index.ts";
 import { SAMPLE_LIST, SAMPLE_MORNING_BRIEF, ROUTINES_NOW, SAMPLE_RUNS } from "../features/routines/sample.ts";
-import { RunBanner, RunsList, RunsPanel } from "../features/runs/index.ts";
+import { LeadRun, RunBanner, RunsList, RunsPanel } from "../features/runs/index.ts";
 import { RUNS_NOW, SAMPLE_RUN_LIST, SAMPLE_WAITING_RUN } from "../features/runs/sample.ts";
 import { HelperRowCardBody, Rail, SessionsPanel, SidebarPanel, WaitingChip } from "../features/sidebar/index.ts";
 import { ConnectionStrip } from "../features/connection/index.ts";
@@ -477,6 +477,20 @@ function StepsTabDemo() {
             <StepsView batches={stepsBatches(chat, STEPS_NOW)} />
           </div>
         ))}
+      </div>
+    </section>
+  );
+}
+
+/** Runs in the rail: a lead's row with its helper count over the full-width step list. */
+function LeadRunDemo() {
+  const anchor = useAnchor();
+  return (
+    <section className="mt-6" id={anchor("Runs, helpers")}>
+      <h3 className="mb-2 font-mono text-xs text-faint">Runs, helpers</h3>
+      <div className="flex max-w-4xl flex-col gap-3">
+        <LeadRun title="Fix the login redirect" model="Qwen3 Coder" running={1} waiting={1} batches={stepsBatches(localRunningChat(), STEPS_NOW)} href="/s/lead" onNavigate={() => {}} />
+        <LeadRun title="Map the auth code" model="Claude Sonnet" running={0} waiting={0} batches={stepsBatches(cloudFinishedChat(), STEPS_NOW)} href="/s/lead" onNavigate={() => {}} />
       </div>
     </section>
   );
@@ -2252,6 +2266,7 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
       <WorkbenchDemo />
       <BatchCardDemo />
       <StepsTabDemo />
+      <LeadRunDemo />
       <HelperPanelDemo />
 
       <ChangesDemo />
