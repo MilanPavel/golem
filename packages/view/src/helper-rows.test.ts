@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { groupHelpers, helperSquare, helperWords, isHelperSession, type HelperSession } from "./helper-rows.ts";
+import { groupHelpers, helperCountWords, helperSquare, helperWords, isHelperSession, type HelperSession } from "./helper-rows.ts";
 
 function s(id: string, status: string, extra: Partial<HelperSession> = {}): HelperSession {
   return { session_id: id, status, ...extra };
@@ -66,4 +66,10 @@ test("words say how many helpers do what", () => {
   assert.equal(helperWords(["working", "working"]), "2 helpers working");
   assert.equal(helperWords(["asking"]), "1 helper asks you");
   assert.equal(helperWords(["working", "queued", "asking", "asking"]), "1 helper working, 1 helper queued, 2 helpers ask you");
+});
+
+test("helperCountWords words a lead's counts", () => {
+  assert.equal(helperCountWords(2, 1), "2 helpers working, 1 helper asks you");
+  assert.equal(helperCountWords(1, null), "1 helper working");
+  assert.equal(helperCountWords(0, undefined), null);
 });

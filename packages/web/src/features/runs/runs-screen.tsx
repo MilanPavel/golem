@@ -2,6 +2,7 @@ import { needsYouCount } from "@golem/view";
 import { useNavigate, useRunList } from "../../store/page-context.tsx";
 import type { RunInfo } from "../../store/runs.ts";
 import { useNow } from "../sessions/use-now.ts";
+import { LiveLeadRuns } from "./lead-run.tsx";
 import { RunsList } from "./runs-list.tsx";
 
 /** The summary line under the title: what needs you, and how many runs there are. */
@@ -24,6 +25,7 @@ export function RunsScreen() {
           <h1 className="font-prose text-2xl font-normal tracking-tight">Runs</h1>
           <p className="text-sm text-muted">{runs === null || runs.length === 0 ? "What golem did while you were away, and what needs you." : runsSummary(runs)}</p>
         </div>
+        <LiveLeadRuns onNavigate={navigate} />
         <RunsList runs={runs} error={query.error?.message ?? null} now={now} onNavigate={navigate} />
       </div>
     </div>

@@ -60,6 +60,7 @@ export const GALLERY_SECTIONS = [
   "workbench",
   "batch-card",
   "steps-tab",
+  "runs-helpers",
   "helper-panel",
   "changes-tab",
   "files-tab",

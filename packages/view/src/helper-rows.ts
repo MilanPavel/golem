@@ -81,3 +81,9 @@ export function helperWords(squares: readonly HelperSquare[]): string | null {
   }
   return parts.length === 0 ? null : parts.join(", ");
 }
+
+/** `2 helpers working, 1 helper asks you` from the counts on a lead's summary (`helpers_running`, `helpers_waiting`). Null for none. */
+export function helperCountWords(running: number | null | undefined, waiting: number | null | undefined): string | null {
+  const squares: HelperSquare[] = [...Array<HelperSquare>(Math.max(0, running ?? 0)).fill("working"), ...Array<HelperSquare>(Math.max(0, waiting ?? 0)).fill("asking")];
+  return helperWords(squares);
+}
