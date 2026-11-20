@@ -20,6 +20,7 @@ import { RulesSection } from "./rules-section.tsx";
 import { SECTIONS } from "./sections.ts";
 import { UsageSection } from "./usage-section.tsx";
 import { SkillsSection } from "./skills-section.tsx";
+import { AgentsSection } from "./agents-section.tsx";
 import { DetailSwitch } from "../chat/index.ts";
 import { AppCard } from "../setup/index.ts";
 import { SetupSection } from "./setup-section.tsx";
@@ -47,6 +48,8 @@ function Body({ section }: { section: string }) {
       return <McpSection />;
     case "skills":
       return <SkillsSection />;
+    case "agents":
+      return <AgentsSection />;
     case "memory":
       return <MemorySection />;
     case "keys":

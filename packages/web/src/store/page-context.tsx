@@ -16,7 +16,8 @@ import type { AppInstallSnapshot } from "./app-install.ts";
 import type { PageHostSnapshot } from "./page-host.ts";
 import type { PullsSnapshot } from "./pulls.ts";
 import type { Route } from "./router.ts";
-import type { AuthListResult, FileListResult, CostGetResult, NotificationsValues, RoutingGetResult, McpListResult, SessionSummary, SetupStatusResult, SkillListResult } from "@golem/client";
+import type { AuthListResult, FileListResult, CostGetResult, NotificationsValues, RoutingGetResult, McpListResult, SessionSummary, SetupStatusResult, SkillListResult, AgentsListResult } from "@golem/client";
+import { isAgentsMissing } from "./agents.ts";
 import { ARTIFACT_PAGE, artifactKey, traceKey, traceSpanKey, type ArtifactReadResult, type TraceGetResult, type TraceSpanResult } from "./trace.ts";
 import { ROUTINE_LIST_KEY, routineGetKey, type RoutineGetResult, type RoutineListResult } from "./routines.ts";
 import { RUN_LIST_KEY, sessionRunKey, type RunInfo, type RunListResult } from "./runs.ts";
@@ -275,6 +276,17 @@ export function useNotifications(enabled = true): UseQueryResult<NotificationsVa
 export function useSkillList(cwd: string | null, enabled = true): UseQueryResult<SkillListResult> {
   const { queries } = usePage();
   return useQuery({ queryKey: ["skill.list", cwd], queryFn: () => queries.skillList(cwd), enabled });
+}
+
+/** The agent types a folder sees (the user's and golem's for null), and again after an agents change. An older daemon is not retried. */
+export function useAgentList(cwd: string | null, enabled = true): UseQueryResult<AgentsListResult> {
+  const { queries } = usePage();
+  return useQuery({
+    queryKey: ["agents.list", cwd],
+    queryFn: () => queries.agentList(cwd),
+    enabled,
+    retry: (count, error) => !isAgentsMissing(error) && count < 1,
+  });
 }
 
 /** A session's trace, read once. It does not follow a run as it streams; the page's Refresh reads it again. */

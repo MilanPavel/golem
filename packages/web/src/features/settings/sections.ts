@@ -5,6 +5,7 @@ export const SECTIONS: readonly SettingsSection[] = [
   { id: "setup", title: "Setup" },
   { id: "mcp", title: "MCP servers" },
   { id: "skills", title: "Skills" },
+  { id: "agents", title: "Agents" },
   { id: "memory", title: "Memory" },
   { id: "keys", title: "API keys" },
   { id: "routing", title: "Routing" },

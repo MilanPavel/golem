@@ -78,6 +78,7 @@ export function fakeClient() {
   const event = listeners<ChatEvent>();
   const summaries = listeners<SessionSummary>();
   const skills = listeners<string | null>();
+  const agents = listeners<string | null>();
   const memory = listeners<MemoryChanged>();
   const routines = listeners<"changed" | "fired" | "finished">();
   const mcp = listeners<unknown>();
@@ -98,6 +99,8 @@ export function fakeClient() {
     onEvent: event.on,
     onSessionSummary: summaries.on,
     onSkillsChanged: skills.on,
+    onAgentsChanged: agents.on,
+    listAgents: vi.fn<PageClient["listAgents"]>(async () => ({ agents: [] })),
     onMemoryChanged: memory.on,
     listMemories: vi.fn<PageClient["listMemories"]>(async () => ({ items: [], total: 0, counts: {}, settings: {} })),
     updateMemory: vi.fn<PageClient["updateMemory"]>(async () => ({}) as never),
@@ -236,6 +239,9 @@ export function fakeClient() {
     emitMemory: memory.emit,
     emitSkills: (root: string | null = null) => {
       skills.emit(root);
+    },
+    emitAgents: (root: string | null = null) => {
+      agents.emit(root);
     },
     emitRoutines: (kind: "changed" | "fired" | "finished" = "changed") => {
       routines.emit(kind);

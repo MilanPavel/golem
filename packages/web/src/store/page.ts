@@ -1,4 +1,4 @@
-import { OLLAMA_FAILED, RpcError, type ApprovalChoice, type ConfigGetResult, type ConfigRawGetResult, type ConfigRawResult, type FsListDirsResult, type McpAddParams, type McpCallResult, type McpImportApplyParams, type McpImportApplyResult, type McpImportScanResult, type McpCatalogResult, type McpListResult, type McpLogsResult, type McpServerConfig, type McpServerDetail, type McpServerLog, type McpLoginDone, type McpTestProgress, type McpTestResult, type GolemClient, type RuntimeName, type SetupStatusResult, type SkillListResult, type TraceGetResult, type TraceSpanResult, type ArtifactReadResult, type ChangesDiffResult, type ChangesDiffTarget, type ChangesListResult, type ChangesRevertResult, type ChangesRevertTarget, type ChangesCommitResult, type ChangesCommitInfoResult, type ChangesSuggestMessageResult, type ModelOptionsGetResult, type ModelOptionsSetResult, type SessionSetOptionsResult, type SkillCreateResult, type SkillReadResult, type SkillWriteResult, type AuthListResult, type FileListResult, type FileReadResult, type CostGetResult, type SessionCompactResult, type ConsentChoice, type RoutingGetResult, type RoutingSetParams, type RoutingSetResult, type NotificationsValues, type NotificationsSetParams, type NotificationsSetResult, type NotifyTestResult } from "@golem/client";
+import { OLLAMA_FAILED, RpcError, type ApprovalChoice, type ConfigGetResult, type ConfigRawGetResult, type ConfigRawResult, type FsListDirsResult, type McpAddParams, type McpCallResult, type McpImportApplyParams, type McpImportApplyResult, type McpImportScanResult, type McpCatalogResult, type McpListResult, type McpLogsResult, type McpServerConfig, type McpServerDetail, type McpServerLog, type McpLoginDone, type McpTestProgress, type McpTestResult, type GolemClient, type RuntimeName, type SetupStatusResult, type SkillListResult, type AgentsListResult, type TraceGetResult, type TraceSpanResult, type ArtifactReadResult, type ChangesDiffResult, type ChangesDiffTarget, type ChangesListResult, type ChangesRevertResult, type ChangesRevertTarget, type ChangesCommitResult, type ChangesCommitInfoResult, type ChangesSuggestMessageResult, type ModelOptionsGetResult, type ModelOptionsSetResult, type SessionSetOptionsResult, type SkillCreateResult, type SkillReadResult, type SkillWriteResult, type AuthListResult, type FileListResult, type FileReadResult, type CostGetResult, type SessionCompactResult, type ConsentChoice, type RoutingGetResult, type RoutingSetParams, type RoutingSetResult, type NotificationsValues, type NotificationsSetParams, type NotificationsSetResult, type NotifyTestResult } from "@golem/client";
 import { changeToolFilter, installEventOf, type InstallEvent, type PermissionMode, type CompactAction, type RouteMode } from "@golem/view";
 import type { QueryClient } from "@tanstack/react-query";
 import { createDrafts, type Drafts } from "./drafts.ts";
@@ -33,6 +33,8 @@ export type PageClient = Pick<
   | "onEvent"
   | "onSessionSummary"
   | "onSkillsChanged"
+  | "onAgentsChanged"
+  | "listAgents"
   | "onMemoryChanged"
   | "listMemories"
   | "updateMemory"
@@ -343,6 +345,8 @@ export type PageQueries = {
   keys(): Promise<AuthListResult>;
   /** The skills a folder sees. `null` is no folder. */
   skillList(cwd: string | null): Promise<SkillListResult>;
+  /** The agent types a folder sees. `null` is no folder. */
+  agentList(cwd: string | null): Promise<AgentsListResult>;
   /** One page of a scope's memories, with the counts of every scope and the `[memory]` settings. */
   memoryList(request: MemoryListRequest): Promise<MemoryListResult>;
   /** The routines, with each one's next and last run. */
@@ -465,6 +469,7 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
         providers: (await client.listKeys()).providers.map(({ provider, takes_key, needs_key, source, env_var }) => ({ provider, takes_key, needs_key, source, env_var })),
       }),
       skillList: (cwd) => (cwd === null ? client.listSkills() : client.listSkills(cwd)),
+      agentList: (cwd) => (cwd === null ? client.listAgents() : client.listAgents(cwd)),
       memoryList: ({ scope, query, after }) =>
         client.listMemories({ scope, limit: MEMORY_PAGE, ...(query === "" ? {} : { query }), ...(after === null ? {} : { after }) }),
       routineList: () => client.listRoutines(),
