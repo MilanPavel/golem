@@ -436,6 +436,28 @@ def test_the_six_helper_events_round_trip() -> None:
     assert {e.type for e in events} <= set(get_args(EventType))  # type: ignore[attr-defined]
 
 
+def test_model_routed_has_the_reasons_of_a_helpers_pick_and_still_reads_pinned() -> None:
+    for reason in ("pinned", "same", "stronger", "tier", "named", "nearest", "lead"):
+        event = {
+            "seq": 1,
+            "session_id": "s_helper",
+            "run_id": "r1",
+            "ts": "2026-11-01T10:00:00.000Z",
+            "type": "model.routed",
+            "data": {
+                "model_profile": "qwen3:14b",
+                "tier": "local",
+                "reason": reason,
+                "detail": "same: the lead's model",
+            },
+        }
+        parsed = _ADAPTER.validate_python(event)  # type: ignore[attr-defined]
+        assert parsed.data.reason == reason  # type: ignore[attr-defined]
+        assert _ADAPTER.validate_json(parsed.model_dump_json()) == parsed  # type: ignore[attr-defined]
+    with pytest.raises(ValidationError):
+        _ADAPTER.validate_python({**event, "data": {**event["data"], "reason": "whim"}})  # type: ignore[attr-defined,index]
+
+
 def test_a_helper_state_reason_is_any_word_and_optional() -> None:
     assert HelperStateData(call_id="c", index=0, state="running").reason is None
     assert HelperStateData(call_id="c", index=0, state="queued", reason="slot").reason == "slot"

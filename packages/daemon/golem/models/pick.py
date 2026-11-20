@@ -10,7 +10,23 @@ from golem.config import LadderSettings, RouteMode
 from golem.models.facts import ModelFacts
 from golem.models.tiers import TIERS, Tier
 
-Reason = Literal["pinned", "privacy", "fit", "budget", "cheapest", "escalated", "fallback", "user"]
+Reason = Literal[
+    "pinned",
+    "privacy",
+    "fit",
+    "budget",
+    "cheapest",
+    "escalated",
+    "fallback",
+    "user",
+    # The words of a helper's pick (``pick_helper``), written into ``model.routed`` as they are.
+    "same",
+    "stronger",
+    "tier",
+    "named",
+    "nearest",
+    "lead",
+]
 
 MIN_LOCAL_TOOL_SCORE = 0.5
 """A local model whose measured tool score is below this does not take a call that needs tools,

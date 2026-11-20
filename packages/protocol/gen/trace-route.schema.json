@@ -62,7 +62,13 @@
         "cheapest",
         "escalated",
         "fallback",
-        "user"
+        "user",
+        "same",
+        "stronger",
+        "tier",
+        "named",
+        "nearest",
+        "lead"
       ],
       "title": "Reason",
       "type": "string"

@@ -92,7 +92,21 @@ export type Preview4 = string;
 export type Recorded4 = boolean;
 export type Detail = string;
 export type Model5 = string | null;
-export type Reason = 'pinned' | 'privacy' | 'fit' | 'budget' | 'cheapest' | 'escalated' | 'fallback' | 'user';
+export type Reason =
+  | 'pinned'
+  | 'privacy'
+  | 'fit'
+  | 'budget'
+  | 'cheapest'
+  | 'escalated'
+  | 'fallback'
+  | 'user'
+  | 'same'
+  | 'stronger'
+  | 'tier'
+  | 'named'
+  | 'nearest'
+  | 'lead';
 export type Ref = string;
 export type Tier = 'local' | 'budget' | 'frontier';
 export type Why = string;

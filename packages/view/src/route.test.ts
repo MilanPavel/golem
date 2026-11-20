@@ -16,6 +16,7 @@ import {
   lastQuestion,
   routeForSpan,
   routeHeadline,
+  routeReasonLabel,
   routeLabel,
   routeReport,
   routeReportLines,
@@ -380,4 +381,14 @@ test("shownModel: a turn that ran pinned does not decide where auto starts", () 
 test("shownModel: auto before the list is known shows the session's model, not as a pick", () => {
   const shown = shownModel({ mode: "auto", session: SESSION, last: null, models: null, routing: null });
   assert.deepEqual(shown, { name: "qwen3:27b", pick: false });
+});
+
+test("a helper's reasons have a plain label, an older word and an unknown one read as they are", () => {
+  assert.deepEqual(
+    ["same", "stronger", "tier", "named", "nearest", "lead"].map(routeReasonLabel),
+    ["same as the lead", "stronger than the lead", "the tier it wished for", "the model it was told to use", "the nearest tier", "the lead's model"],
+  );
+  for (const old of ["pinned", "privacy", "fit", "budget", "cheapest", "escalated", "fallback", "user", "a later word"]) assert.equal(routeReasonLabel(old), old);
+  assert.equal(routeHeadline("stronger", "pinned"), "Route: pinned · reason: stronger than the lead");
+  assert.equal(routeHeadline("toString", null), "Route · reason: toString");
 });

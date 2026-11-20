@@ -761,7 +761,20 @@ class TraceRoute(BaseModel):
     model: str | None = Field(default=None, min_length=1)
     tier: Literal["local", "budget", "frontier"] | None = None
     reason: Literal[
-        "pinned", "privacy", "fit", "budget", "cheapest", "escalated", "fallback", "user"
+        "pinned",
+        "privacy",
+        "fit",
+        "budget",
+        "cheapest",
+        "escalated",
+        "fallback",
+        "user",
+        "same",
+        "stronger",
+        "tier",
+        "named",
+        "nearest",
+        "lead",
     ]
     detail: str
     rejected: list[ModelRejection] = Field(default_factory=list[ModelRejection])

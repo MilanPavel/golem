@@ -355,9 +355,25 @@ export function spendRows(cost: CostGetResult | null | undefined, routing: Confi
 
 export type WhyRow = { model: string; tier: string; result: string };
 
+/** The words of a helper's pick (ADR-059, section 5), as a plain label. The other reasons read as they are. */
+const HELPER_REASON_LABELS: Readonly<Record<string, string>> = {
+  same: "same as the lead",
+  stronger: "stronger than the lead",
+  tier: "the tier it wished for",
+  named: "the model it was told to use",
+  nearest: "the nearest tier",
+  lead: "the lead's model",
+};
+
+/** A `model.routed` reason as the words the user reads. A word this build does not know reads as it is. */
+export function routeReasonLabel(reason: string): string {
+  return Object.hasOwn(HELPER_REASON_LABELS, reason) ? (HELPER_REASON_LABELS[reason] ?? reason) : reason;
+}
+
 /** The `Route: auto · reason: fit` line over the table. The mode is left out when it is not known. */
 export function routeHeadline(reason: string, mode: RouteMode | null): string {
-  return mode === null ? `Route · reason: ${reason}` : `Route: ${routeLabel(mode)} · reason: ${reason}`;
+  const label = routeReasonLabel(reason);
+  return mode === null ? `Route · reason: ${label}` : `Route: ${routeLabel(mode)} · reason: ${label}`;
 }
 
 /** What `whyRows` reads: a `model.routed`, or the route of a run in the trace. */
