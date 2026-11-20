@@ -12,9 +12,11 @@ from fakes import ToolCallingChatModel
 from langgraph.checkpoint.memory import InMemorySaver
 
 from golem.config import ContextSettings, LadderSettings, ModelPrice, RoutingSettings
-from golem.evals.whatif import Scenario, build_report, recorded, replay, scenarios_for
+from golem.evals.whatif import Scenario, build_report, helper_rows, recorded, replay, scenarios_for
 from golem.graphs.chat import open_chat
 from golem.models.facts import ModelFacts
+from golem.models.pick import Traits, ladder
+from golem.models.pick_helper import pick_helper
 from golem.models.router import ModelRouter
 from golem.models.tiers import Tier, blended
 from golem.sessions.bus import EventBus
@@ -133,6 +135,20 @@ class Log:
             data = {"call_id": call_id, "message_id": message_id, "name": name, "args": args}
             self.add(run, "tool.requested", data)
         return message_id
+
+    def helper(self, index: int, agent: str, wish: str, picked: ModelFacts, why: str) -> None:
+        """A ``helper.started`` on the lead's log, as the daemon stores it."""
+        data = {
+            "call_id": "c1",
+            "index": index,
+            "helper_id": f"{self.session_id}_h{index}",
+            "agent": agent,
+            "label": agent,
+            "model": picked.profile,
+            "wish": wish,
+            "pick_reason": why,
+        }
+        self.add("r1", "helper.started", data)
 
     def tool_ok(self, call_id: str, run: str = "r1") -> None:
         self.add(run, "tool.completed", {"call_id": call_id, "summary": "", "preview": ""})
@@ -369,3 +385,64 @@ async def test_the_manager_reads_the_stored_sessions(database: Database, tmp_pat
     assert report.top and report.top[0].session_id == "s1"
     old = await manager.eval_routing(14, None, datetime(2030, 1, 1, tzinfo=UTC))
     assert old.sessions == 0
+
+
+LOCAL_ONLY = [LOCAL, facts("ollama/big", "local", 32768, 0.0)]
+CLOUD_ONLY = [CHEAP, BIG]
+WISHES = [("explorer", "cheapest"), ("reviewer", "stronger"), ("planner", "same")]
+
+
+def lead_with_helpers(setup: Sequence[ModelFacts], profile: str) -> Log:
+    """A lead with three helpers, recorded as the daemon would pick them in ``setup``."""
+    log = Log("lead", profile)
+    log.user("u1")
+    log.call([("u1", 400)], tier=setup[0].tier, window=setup[0].window)
+    lead = next(m for m in setup if m.profile == profile)
+    traits = Traits(needs_tools=True, paid_allowed=lead.tier != "local")
+    for index, (agent, wish) in enumerate(WISHES):
+        choice = pick_helper(wish, lead, ladder(LadderSettings(), profile, setup), traits)
+        log.helper(index, agent, wish, choice.model, choice.detail)
+    return log
+
+
+@pytest.mark.parametrize(
+    ("setup", "profile", "tiers"),
+    [
+        (LOCAL_ONLY, "ollama/small", {"local"}),
+        (CLOUD_ONLY, "deepseek/cheap", {"budget", "frontier"}),
+    ],
+)
+def test_the_report_shows_the_helper_picks_in_a_local_only_and_a_cloud_only_setup(
+    setup: list[ModelFacts], profile: str, tiers: set[str]
+) -> None:
+    log = lead_with_helpers(setup, profile)
+    report = build_report(
+        {"lead": log.events},
+        routing=RoutingSettings(),
+        context=CONTEXT,
+        facts=setup,
+        days=14,
+    )
+    assert [(h.agent, h.wish) for h in report.helpers] == WISHES
+    assert {h.would_tier for h in report.helpers} <= tiers
+    assert all(h.would_why and h.ran_why for h in report.helpers)
+    # The setup is the one they were recorded in, so the pick gives what ran.
+    assert [h.would for h in report.helpers] == [h.ran for h in report.helpers]
+    assert all(h.session_id == "lead" for h in report.helpers)
+
+
+def test_a_helper_recorded_in_one_setup_is_picked_again_in_the_other() -> None:
+    log = lead_with_helpers(LOCAL_ONLY, "ollama/small")
+    rows = helper_rows(log.events, routing=RoutingSettings(), context=CONTEXT, facts=ALL)
+    stronger = next(r for r in rows if r.wish == "stronger")
+    assert stronger.ran == "ollama/small"
+    assert stronger.would == "deepseek/cheap"  # ALL has a budget model, the tier above local
+    assert stronger.would_asks  # a paid model, and a local chat has not agreed
+    cheapest = next(r for r in rows if r.wish == "cheapest")
+    assert cheapest.would_tier == "local"
+    assert not cheapest.would_asks
+
+
+def test_a_session_without_helpers_has_no_helper_rows() -> None:
+    assert helper_rows(small_session().events, routing=RoutingSettings(), context=CONTEXT,
+                       facts=ALL) == []  # fmt: skip

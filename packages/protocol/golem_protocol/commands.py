@@ -598,10 +598,33 @@ class EvalTopSession(BaseModel):
     cost_usd: float = Field(ge=0)
 
 
+class EvalHelperRow(BaseModel):
+    """One helper of a recorded session, and the model ``pick_helper`` gives it in this setup.
+
+    ``ran`` and ``ran_why`` are what ``helper.started`` recorded: the model, and the reason
+    in plain words. ``would`` and ``would_why`` are the pick made again now, on the models
+    that are ready. ``would_asks`` is true when that pick is paid and the chat has not agreed,
+    so the daemon would ask first. No title and no text.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    session_id: str = Field(min_length=1)
+    agent: str = Field(min_length=1)
+    wish: str = Field(min_length=1)
+    ran: str = Field(min_length=1)
+    ran_why: str
+    would: str = Field(min_length=1)
+    would_tier: str = Field(min_length=1)
+    would_why: str
+    would_asks: bool = False
+
+
 class EvalRoutingResult(BaseModel):
     """``scenarios`` are the what-if rows, ``actual`` is what really ran. ``skipped`` counts the
     model calls that could not be sized (an old event, or a failed call) and are in no row.
-    ``top`` are the sessions where ``auto`` would have spent most, the dearest first."""
+    ``top`` are the sessions where ``auto`` would have spent most, the dearest first.
+    ``helpers`` are the helpers of those sessions, one row per ``helper.started``."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -612,6 +635,7 @@ class EvalRoutingResult(BaseModel):
     scenarios: list[EvalScenarioRow] = Field(default_factory=list[EvalScenarioRow])
     actual: EvalScenarioRow
     top: list[EvalTopSession] = Field(default_factory=list[EvalTopSession])
+    helpers: list[EvalHelperRow] = Field(default_factory=list[EvalHelperRow])
 
 
 class TraceGetParams(BaseModel):
@@ -4339,6 +4363,7 @@ __all__ = [
     "CostTotals",
     "DaemonStatus",
     "DirEntry",
+    "EvalHelperRow",
     "EvalRoutingParams",
     "EvalRoutingResult",
     "EvalScenarioRow",

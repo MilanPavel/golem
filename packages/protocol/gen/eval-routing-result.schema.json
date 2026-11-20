@@ -1,5 +1,66 @@
 {
   "$defs": {
+    "EvalHelperRow": {
+      "additionalProperties": false,
+      "description": "One helper of a recorded session, and the model ``pick_helper`` gives it in this setup.\n\n``ran`` and ``ran_why`` are what ``helper.started`` recorded: the model, and the reason\nin plain words. ``would`` and ``would_why`` are the pick made again now, on the models\nthat are ready. ``would_asks`` is true when that pick is paid and the chat has not agreed,\nso the daemon would ask first. No title and no text.",
+      "properties": {
+        "agent": {
+          "minLength": 1,
+          "title": "Agent",
+          "type": "string"
+        },
+        "ran": {
+          "minLength": 1,
+          "title": "Ran",
+          "type": "string"
+        },
+        "ran_why": {
+          "title": "Ran Why",
+          "type": "string"
+        },
+        "session_id": {
+          "minLength": 1,
+          "title": "Session Id",
+          "type": "string"
+        },
+        "wish": {
+          "minLength": 1,
+          "title": "Wish",
+          "type": "string"
+        },
+        "would": {
+          "minLength": 1,
+          "title": "Would",
+          "type": "string"
+        },
+        "would_asks": {
+          "default": false,
+          "title": "Would Asks",
+          "type": "boolean"
+        },
+        "would_tier": {
+          "minLength": 1,
+          "title": "Would Tier",
+          "type": "string"
+        },
+        "would_why": {
+          "title": "Would Why",
+          "type": "string"
+        }
+      },
+      "required": [
+        "session_id",
+        "agent",
+        "wish",
+        "ran",
+        "ran_why",
+        "would",
+        "would_tier",
+        "would_why"
+      ],
+      "title": "EvalHelperRow",
+      "type": "object"
+    },
     "EvalScenarioRow": {
       "additionalProperties": false,
       "description": "One scenario over every session asked for.\n\n``cuts`` are prompts that would not fit the model's window. ``step_ups`` is null for a\nscenario that never steps up. ``peak_share`` is the largest share of a window one prompt\ntook, from 0 to 1, and null when no window was known.",
@@ -115,7 +176,7 @@
     }
   },
   "additionalProperties": false,
-  "description": "``scenarios`` are the what-if rows, ``actual`` is what really ran. ``skipped`` counts the\nmodel calls that could not be sized (an old event, or a failed call) and are in no row.\n``top`` are the sessions where ``auto`` would have spent most, the dearest first.",
+  "description": "``scenarios`` are the what-if rows, ``actual`` is what really ran. ``skipped`` counts the\nmodel calls that could not be sized (an old event, or a failed call) and are in no row.\n``top`` are the sessions where ``auto`` would have spent most, the dearest first.\n``helpers`` are the helpers of those sessions, one row per ``helper.started``.",
   "properties": {
     "actual": {
       "$ref": "#/$defs/EvalScenarioRow"
@@ -129,6 +190,13 @@
       "minimum": 1,
       "title": "Days",
       "type": "integer"
+    },
+    "helpers": {
+      "items": {
+        "$ref": "#/$defs/EvalHelperRow"
+      },
+      "title": "Helpers",
+      "type": "array"
     },
     "scenarios": {
       "items": {
