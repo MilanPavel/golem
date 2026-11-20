@@ -5818,6 +5818,7 @@ export function App({
             chat.localWait,
             writingText,
             chat.loading === null ? null : loadingLine(chat.loading.model, chat.loading.window),
+            chat.wait,
           )}
         </Text>
       ) : null}

@@ -201,7 +201,6 @@ export {
   SHUTDOWN_NOTICE,
   skippedNotice,
   SWITCH_HINT,
-  WAITING_FOR_LOCAL_MODEL,
   thinkingLine,
   type ApprovalAnswer,
   type ChatMessage,
@@ -837,3 +836,14 @@ export {
   skillStatusWord,
   skillSummary,
 } from "./skills-view.ts";
+export {
+  lineName,
+  ordinal,
+  waitText,
+  waitWords,
+  WAITING_FOR_LOCAL_MODEL,
+  type WaitLength,
+  type WaitReason,
+  type WaitScope,
+  type WaitState,
+} from "./wait.ts";

@@ -28,6 +28,24 @@ test("while a chat call waits for the local model, the meter says so", () => {
   assert.match(meterLine("thinking", 0, 0, 0, 40, null, false), /^thinking/);
 });
 
+test("a wait with a reason says the short sentence in the meter", () => {
+  const wait = {
+    reason: "slot",
+    line: "qwen3:14b",
+    model: null,
+    position: 2,
+    holder: "Refactor auth",
+    retryInMs: null,
+    silentMs: null,
+    scope: null,
+    willRetry: null,
+  } as const;
+  assert.match(
+    meterLine("thinking", 0, 0, 0, 80, null, true, null, null, wait),
+    /^waiting for qwen3:14b · 2nd · behind Refactor auth {2}█/,
+  );
+});
+
 test("while the model loads with a larger window, the meter says which", () => {
   const line = meterLine("thinking", 0, 0, 0, 60, null, true, null, "loading qwen3:8b with a 64K window");
   assert.match(line, /^loading qwen3:8b with a 64K window {2}█/);

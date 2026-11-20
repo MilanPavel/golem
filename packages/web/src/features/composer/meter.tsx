@@ -28,6 +28,8 @@ export type MeterProps = {
   runStartedAt: string | null;
   /** A chat call waits for its turn on the local model. */
   localWait?: boolean;
+  /** The sentence for why it waits, from `waitText`. Null keeps the old words. */
+  wait?: string | null;
   /** What a call loads while the local model reloads with a larger window. */
   loading?: string | null;
   /** Something small at the right end of the row, such as the context chip. */
@@ -49,13 +51,13 @@ export function meterText(state: GolemState, seconds: number): string {
 }
 
 /** The small golem and what golem is doing, above the composer. */
-export function Meter({ state, runStartedAt, localWait = false, loading = null, aside }: MeterProps) {
+export function Meter({ state, runStartedAt, localWait = false, wait = null, loading = null, aside }: MeterProps) {
   const now = useTicker(state === "thinking");
   const text =
     state === "thinking" && loading !== null
       ? loading
       : localWait && state === "thinking"
-        ? WAITING_FOR_LOCAL_MODEL
+        ? (wait ?? WAITING_FOR_LOCAL_MODEL)
         : meterText(state, elapsedSeconds(runStartedAt, now));
   return (
     <div data-meter={state} className="flex min-h-5 items-center gap-2.5 px-1 font-mono text-xs text-muted">

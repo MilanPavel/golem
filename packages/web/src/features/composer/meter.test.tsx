@@ -35,6 +35,15 @@ test("while the model loads with a larger window, the meter says which", () => {
   expect(screen.getByText("loading qwen3:8b with a 64K window")).toBeTruthy();
 });
 
+test("a wait with a reason says the web sentence; without one, the old words", () => {
+  const { rerender } = render(
+    <Meter state="thinking" runStartedAt={START} localWait wait="waiting for qwen3:14b · 2nd in line, behind Refactor auth" />,
+  );
+  expect(screen.getByText("waiting for qwen3:14b · 2nd in line, behind Refactor auth")).toBeTruthy();
+  rerender(<Meter state="thinking" runStartedAt={START} localWait />);
+  expect(screen.getByText("waiting for the local model")).toBeTruthy();
+});
+
 test("elapsed seconds never go below zero or come out as NaN", () => {
   expect(elapsedSeconds(null, 5000)).toBe(0);
   expect(elapsedSeconds("nonsense", 5000)).toBe(0);
