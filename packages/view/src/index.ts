@@ -162,6 +162,28 @@ export {
 } from "./route.ts";
 export { costReportLines, formatCost, formatCount, referenceName, roleName, sessionCostLabel, turnFooterParts, turnTotals, type TurnTotals } from "./cost.ts";
 export {
+  batchCard,
+  batchHead,
+  batchNumber,
+  emptyBatch,
+  foldBatch,
+  helperNumber,
+  helperRight,
+  helperSummary,
+  lastSentence,
+  reduceBatch,
+  windowK,
+  windowSaved,
+  type BatchCard,
+  type BatchHelper,
+  type CardRow,
+  type CardTone,
+  type HelperBatch,
+  type HelperState,
+  type HelperSummary,
+  type IsLocal,
+} from "./helper-card.ts";
+export {
   DEFAULT_HELPER,
   DELEGATE_TOOL,
   helperCounts,
