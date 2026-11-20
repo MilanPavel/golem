@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { inboxItems, type InboxPending, type InboxSession } from "./inbox.ts";
+import { inboxItems, pendingItemsOf, type InboxPending, type InboxSession } from "./inbox.ts";
 
 const NOW = Date.parse("2026-11-16T12:00:00Z");
 
@@ -77,5 +77,24 @@ describe("inboxItems", () => {
     assert.equal(age("2026-11-16T11:56:00Z"), "4m");
     assert.equal(age("2026-11-16T10:00:00Z"), "2h");
     assert.equal(age("2026-11-13T12:00:00Z"), "3d");
+  });
+});
+
+describe("pendingItemsOf", () => {
+  const one = approval("shell", "ls");
+  const two = approval("shell", "uv lock", { count: 5, helper: { session_id: "h1", agent: "worker", index: 0 } });
+
+  it("reads pending_items when the daemon sends them", () => {
+    assert.deepEqual(pendingItemsOf({ pending: one, pending_items: [one, two] }), [one, two]);
+  });
+
+  it("falls back to [pending] for an older daemon", () => {
+    assert.deepEqual(pendingItemsOf({ pending: one }), [one]);
+    assert.deepEqual(pendingItemsOf({ pending: one, pending_items: [] }), [one]);
+  });
+
+  it("is empty when nothing waits", () => {
+    assert.deepEqual(pendingItemsOf({ pending: null }), []);
+    assert.deepEqual(pendingItemsOf({}), []);
   });
 });

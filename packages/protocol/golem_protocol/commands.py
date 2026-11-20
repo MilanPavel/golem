@@ -198,6 +198,19 @@ ShortText = Annotated[str, Field(min_length=1, max_length=120)]
 """One short line of the paid question: what is sent, or what is not."""
 
 
+class PendingHelper(BaseModel):
+    """The helper a pending item belongs to: its session, its agent type, its label and its
+    place (``index``) in the ``delegate`` call. For a grouped item (``count`` above 1) it is the
+    first of the helpers that ask."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    session_id: str = Field(min_length=1)
+    agent: str = Field(min_length=1)
+    label: str | None = Field(default=None, max_length=120)
+    index: int = Field(ge=0)
+
+
 class PendingItem(BaseModel):
     """What a waiting session waits for, in a form a client can list without opening it.
 
@@ -211,6 +224,11 @@ class PendingItem(BaseModel):
     ``route.consent.needed`` event. The full diff
     stays in the session's events: a summary goes to every watcher on every event, so it
     carries counts only. An older daemon leaves ``pending`` out of the summary.
+
+    In ``SessionSummary.pending_items`` an item of a lead's helper also carries ``helper``
+    (the helper's ``session_id``, ``agent``, ``label`` and ``index``). ``count`` is the number
+    of helpers that ask this same question (the same ``kind``, ``name`` and ``subject``), which
+    the lead lists once; null for a single item. An older daemon leaves both out.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -229,6 +247,8 @@ class PendingItem(BaseModel):
     label: str | None = Field(default=None, max_length=120)
     sent: list[ShortText] | None = Field(default=None, max_length=10)
     not_sent: list[ShortText] | None = Field(default=None, max_length=10)
+    helper: PendingHelper | None = None
+    count: int | None = Field(default=None, ge=2)
 
 
 class SessionSummary(BaseModel):
@@ -249,6 +269,10 @@ class SessionSummary(BaseModel):
     An older daemon leaves it out.
     ``pending`` says what a ``waiting`` session waits for, null otherwise. An older daemon
     leaves it out.
+    ``pending_items`` is the list of everything the session waits for, oldest first: for a lead
+    its own items and those of its helpers (a question several helpers ask is one item with a
+    ``count``). ``pending`` is its first item. An older daemon leaves ``pending_items`` out, and
+    a client then reads ``[pending]``.
     ``parent_session_id`` and ``agent`` are set on a helper session: the id of the
     session. An older daemon leaves them out.
     ``wait_reason`` and ``wait_line`` say that the running run's model call waits in line:
@@ -278,6 +302,7 @@ class SessionSummary(BaseModel):
     plan_first: bool = False
     local_only: bool = False
     pending: PendingItem | None = None
+    pending_items: list[PendingItem] = Field(default_factory=list, max_length=200)
     parent_session_id: str | None = Field(default=None, min_length=1)
     agent: str | None = Field(default=None, min_length=1)
     wait_reason: WaitReason | None = None
@@ -4078,6 +4103,11 @@ class ApprovalRespondParams(BaseModel):
 
     ``args`` replaces the call's arguments, edited by the user, and goes only
     with ``allow``: an edited call runs once.
+
+    ``scope`` is ``batch`` to answer for all the helpers of one ``delegate`` call: the
+    decision applies to the same call in each unfinished helper of that call and answers those
+    waiting on it. Without it the answer is for ``session_id`` alone (once, or for that session
+    with ``allow_session``, which for a helper ends with it). ``batch`` is not for an edited call.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -4086,11 +4116,14 @@ class ApprovalRespondParams(BaseModel):
     call_id: str = Field(min_length=1)
     decision: Literal["allow", "allow_session", "allow_always", "deny"]
     args: dict[str, Any] | None = None
+    scope: Literal["batch"] | None = None
 
     @model_validator(mode="after")
     def _edited_runs_once(self) -> Self:
         if self.args is not None and self.decision != "allow":
             raise ValueError("edited args go only with decision allow")
+        if self.args is not None and self.scope is not None:
+            raise ValueError("an edited call runs once, not for a batch")
         return self
 
 
