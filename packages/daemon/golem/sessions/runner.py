@@ -427,9 +427,15 @@ async def ask_consent(
             caps=consent.caps,
             signal=consent.signal,
             replaces_model=consent.replaces,
+            helper_id=consent.helper_id,
+            agent=consent.agent,
+            label=consent.label,
+            sent=None if consent.sent is None else list(consent.sent),
+            not_sent=None if consent.not_sent is None else list(consent.not_sent),
         ),
     )
-    await _run_wait(emit, turn.user_message_id, "budget")
+    # A helper asks you; a lead's own question is the one about its budget (ADR-060).
+    await _run_wait(emit, turn.user_message_id, "budget" if consent.helper_id is None else "you")
 
 
 def _routed(

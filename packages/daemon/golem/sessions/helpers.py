@@ -66,25 +66,22 @@ def wish_of(agent: AgentSnapshot, roles: RoleSettings) -> str:
     return agent.wish
 
 
-def pick_without_paid(
-    wish: str, lead: ModelFacts, candidates: Sequence[ModelFacts], traits: Traits
+def pick_local(
+    wish: str,
+    lead: ModelFacts,
+    candidates: Sequence[ModelFacts],
+    traits: Traits,
+    why: str = "you chose to stay local",
 ) -> HelperChoice:
-    """The model of a helper while it cannot ask the paid question.
+    """The model of a helper whose user said no to the paid question (ADR-059, section 5).
 
-    This is the one place that stands in for the question of 15.3.4 (#1303): a pick that needs
-    the user's yes, which the chat has not given, is made again without the paid models, so the
-    helper gets the local or the lead's model with a fresh window, and the reason says so. When
-    the helper can ask, this is replaced by the question, and a "no" lands on the same answer.
+    The pick is made again among the local models only, so the helper gets a local model, or
+    the lead's, with a fresh window, and the reason says so. It is also what the helper would
+    get when the question is not asked and a no is the answer that is left.
     """
-    choice = pick_helper(wish, lead, candidates, traits)
-    if not choice.needs_consent:
-        return choice
     local = [m for m in candidates if m.tier == "local"]
     again = pick_helper(wish, lead, local, traits)
-    detail = (
-        f"{again.detail}; the paid model it wished for needs your yes, "
-        "which a helper cannot ask yet"
-    )
+    detail = f"{again.detail}; {why}, so it runs on {again.model.profile} with a fresh window"
     return replace(again, detail=detail, fresh_window=True, needs_consent=False)
 
 
@@ -326,7 +323,7 @@ __all__ = [
     "helper_mode",
     "origin_of",
     "parked_calls",
-    "pick_without_paid",
+    "pick_local",
     "routed_of",
     "scope_of_agent",
     "snapshot_of",
