@@ -133,56 +133,54 @@ function kindOfState(state: string, reason: string | null): BarKind {
   return reason === "you" ? "you" : "line";
 }
 
-type Timeline = { startMs: number; endMs: number | null; tookMs: number | null; marks: PhaseMark[] };
+/**
+ * The timing of one helper: start, end and phase changes, with the phase it is in now. `fresh` is true
+ * until its first state or step, since a step of a helper that only started means it runs, as the batch card has it.
+ */
+export type HelperTimes = { startMs: number; endMs: number | null; tookMs: number | null; marks: PhaseMark[]; kind: BarKind; fresh: boolean };
+
+/** The timing of the helpers of one `delegate` call, by helper index. */
+export type BatchTimes = Readonly<Record<number, HelperTimes>>;
 
 function parseTs(ts: string): number | null {
   const ms = Date.parse(ts);
   return Number.isNaN(ms) ? null : ms;
 }
 
-/** The start, end and phase changes of each helper of one `delegate` call, from the lead's events. */
-function timelines(callId: string, events: readonly ChatEvent[]): Map<number, Timeline> {
-  const byIndex = new Map<number, Timeline>();
-  const current = new Map<number, BarKind>();
-  // Helpers that only started: a step of theirs means they run, as the batch card has it.
-  const fresh = new Set<number>();
+/**
+ * The timing after one `helper.*` event of one call (the caller picks the call). Other events change
+ * nothing. The reducer path keeps this beside the batch, since the batch itself holds no times.
+ */
+export function reduceTimes(times: BatchTimes, event: ChatEvent): BatchTimes {
+  if (event.type !== "helper.started" && event.type !== "helper.state" && event.type !== "helper.step" && event.type !== "helper.ended") return times;
+  const at = parseTs(event.ts);
+  if (at === null) return times;
+  const index = event.data.index;
+  const line = times[index];
+  if (event.type === "helper.started") {
+    if (line !== undefined) return times;
+    // A helper starts in line until a state or a step says it runs, as the batch card has it.
+    return { ...times, [index]: { startMs: at, endMs: null, tookMs: null, marks: [{ atMs: at, kind: "line" }], kind: "line", fresh: true } };
+  }
+  // An event before `helper.started` (a lost event) opens the row at that time.
+  const base: HelperTimes = line ?? { startMs: at, endMs: null, tookMs: null, marks: [], kind: "work", fresh: false };
+  if (event.type === "helper.ended") return { ...times, [index]: { ...base, endMs: at, tookMs: event.data.duration_ms } };
+  if (base.endMs !== null) return times;
+  const wasFresh = base.fresh && event.type === "helper.step";
+  const next: BarKind | null = event.type === "helper.state" ? kindOfState(event.data.state, event.data.reason ?? null) : wasFresh ? "work" : null;
+  if (next === null || next === base.kind) return { ...times, [index]: { ...base, fresh: false } };
+  return { ...times, [index]: { ...base, fresh: false, kind: next, marks: [...base.marks, { atMs: at, kind: next }] } };
+}
+
+/** The timing of each helper of one `delegate` call, from the lead's events. */
+function timelines(callId: string, events: readonly ChatEvent[]): BatchTimes {
+  let times: BatchTimes = {};
   for (const event of events) {
-    if (event.type !== "helper.started" && event.type !== "helper.state" && event.type !== "helper.step" && event.type !== "helper.ended") continue;
-    if (event.data.call_id !== callId) continue;
-    const at = parseTs(event.ts);
-    if (at === null) continue;
-    const index = event.data.index;
-    let line = byIndex.get(index);
-    if (event.type === "helper.started") {
-      if (line === undefined) {
-        // A helper starts in line until a state or a step says it runs, as the batch card has it.
-        line = { startMs: at, endMs: null, tookMs: null, marks: [{ atMs: at, kind: "line" }] };
-        byIndex.set(index, line);
-        current.set(index, "line");
-        fresh.add(index);
-      }
-      continue;
-    }
-    // An event before `helper.started` (a lost event) opens the row at that time.
-    if (line === undefined) {
-      line = { startMs: at, endMs: null, tookMs: null, marks: [] };
-      byIndex.set(index, line);
-      current.set(index, "work");
-    }
-    if (event.type === "helper.ended") {
-      line.endMs = at;
-      line.tookMs = event.data.duration_ms;
-      continue;
-    }
-    if (line.endMs !== null) continue;
-    const wasFresh = fresh.delete(index) && event.type === "helper.step";
-    const next: BarKind | null = event.type === "helper.state" ? kindOfState(event.data.state, event.data.reason ?? null) : wasFresh ? "work" : null;
-    if (next !== null && next !== current.get(index)) {
-      line.marks.push({ atMs: at, kind: next });
-      current.set(index, next);
+    if ((event.type === "helper.started" || event.type === "helper.state" || event.type === "helper.step" || event.type === "helper.ended") && event.data.call_id === callId) {
+      times = reduceTimes(times, event);
     }
   }
-  return byIndex;
+  return times;
 }
 
 export type HelperStepsOptions = {
@@ -222,11 +220,15 @@ function leadSpan(batch: HelperBatch, rows: readonly StepSpan[], lead: NonNullab
  * - Cloud models only: helpers overlap, their bars start together and have no `line` segment.
  */
 export function helperSteps(callId: string, events: readonly ChatEvent[], nowMs: number, options: HelperStepsOptions = {}): StepsList {
-  const batch = foldBatch(callId, events, options.isLocal);
-  const lines = timelines(callId, events);
+  return batchSteps(foldBatch(callId, events, options.isLocal), timelines(callId, events), nowMs, options);
+}
+
+/** The same list from a reduced batch and its timing (`ChatState.batches` and `ChatState.batchTimes`). */
+export function batchSteps(batch: HelperBatch, times: BatchTimes, nowMs: number, options: HelperStepsOptions = {}): StepsList {
+  const callId = batch.callId;
   const spans: StepSpan[] = [];
   for (const helper of batch.helpers) {
-    const line = lines.get(helper.index);
+    const line = times[helper.index];
     if (line === undefined) continue;
     spans.push({
       id: `${callId}:${String(helper.index)}`,

@@ -6,6 +6,7 @@ import { contextChangedNote, emptyLiveContext, foldLiveContext, type ContextChan
 import { emptyBatch, reduceBatch, type HelperBatch } from "./helper-card.ts";
 import { emptyRoute, foldRoute, type RouteState } from "./route.ts";
 import { replyWasCut } from "./stop.ts";
+import { reduceTimes, type BatchTimes } from "./steps-list.ts";
 import type { ToolSource } from "./sources.ts";
 import type { WaitReason, WaitScope, WaitState } from "./wait.ts";
 import type { TodoItem } from "./todos.ts";
@@ -265,6 +266,8 @@ export type ChatState = {
   route: RouteState;
   /** The helpers of each `delegate` call that sent `helper.*` events, by the id of the call. Old logs have none. */
   batches: Readonly<Record<string, HelperBatch>>;
+  /** The timing the Steps tab's bars need, per call, kept beside `batches`. */
+  batchTimes: Readonly<Record<string, BatchTimes>>;
 };
 
 export const emptyChat: ChatState = {
@@ -295,6 +298,7 @@ export const emptyChat: ChatState = {
   checks: noChecks,
   route: emptyRoute,
   batches: {},
+  batchTimes: {},
 };
 
 /** What to do after a model server did not answer, besides fixing it. */
@@ -550,7 +554,8 @@ function endHelper(tool: ToolBlock, event: ChatEvent): ToolBlock {
 /** The batch of the call a `helper.*` event names, after the event. */
 function withBatch(state: ChatState, callId: string, event: ChatEvent): ChatState {
   const batch = reduceBatch(state.batches[callId] ?? emptyBatch(callId), event);
-  return { ...state, batches: { ...state.batches, [callId]: batch } };
+  const times = reduceTimes(state.batchTimes[callId] ?? {}, event);
+  return { ...state, batches: { ...state.batches, [callId]: batch }, batchTimes: { ...state.batchTimes, [callId]: times } };
 }
 
 export function reduceChat(state: ChatState, event: ChatEvent): ChatState {

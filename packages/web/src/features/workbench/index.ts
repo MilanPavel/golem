@@ -2,6 +2,7 @@ export { ChangesTab, ChangesView } from "./changes-tab.tsx";
 export { FilesTab, FilesView } from "./files-tab.tsx";
 export { TurnsView } from "./turns-view.tsx";
 export { changesViewStore } from "./changes-view.tsx";
+export { hasSteps, StepsTab, StepsView, stepsBatches, type StepsBatch } from "./steps-tab.tsx";
 export { checksBadge, ChecksTab, ChecksView } from "./checks-tab.tsx";
 export { CommitDialogView, type CommitDialogViewProps } from "./commit-dialog.tsx";
 export { ConflictDialogView, RewindDialogView, type ConflictDialogViewProps, type RewindDialogViewProps } from "./undo.tsx";

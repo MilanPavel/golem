@@ -59,6 +59,7 @@ export const GALLERY_SECTIONS = [
   "todo-list",
   "workbench",
   "batch-card",
+  "steps-tab",
   "helper-panel",
   "changes-tab",
   "files-tab",

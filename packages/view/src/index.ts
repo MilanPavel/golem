@@ -203,11 +203,15 @@ export {
   type HelperStop,
 } from "./helper.ts";
 export {
+  batchSteps,
   helperSteps,
   layoutSteps,
+  reduceTimes,
   type BarKind,
   type BarSegment,
+  type BatchTimes,
   type HelperStepsOptions,
+  type HelperTimes,
   type PhaseMark,
   type StepRow,
   type StepSpan,
