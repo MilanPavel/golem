@@ -3,7 +3,7 @@ import { test } from "node:test";
 
 import type { AgentInfo } from "@golem/client";
 
-import { agentFinished, agentRow, agentRows, agentUsed, agentWish } from "./agents-view.ts";
+import { agentFinished, agentRow, agentRows, agentsTable, agentUsed, agentWish } from "./agents-view.ts";
 
 const bundled = (over: Partial<AgentInfo>): AgentInfo => ({
   name: "explorer",
@@ -28,11 +28,11 @@ test("the four bundled types and a project type make rows", () => {
   assert.deepEqual(
     rows.map((row) => [row.name, row.sourceLabel, row.wish, row.used, row.finished, row.tone]),
     [
-      ["explorer", "comes with golem", "Cheapest that fits", "41", "95%", "ok"],
+      ["explorer", "comes with golem", "Cheapest that fits", "41", "39", "ok"],
       ["worker", "comes with golem", "Cheapest that fits", "—", "—", "ok"],
-      ["reviewer", "comes with golem", "Stronger than the lead", "20", "95%", "ok"],
+      ["reviewer", "comes with golem", "Stronger than the lead", "20", "19", "ok"],
       ["advisor", "comes with golem", "Stronger than the lead", "4", "—", "ok"],
-      ["docs", "this project", "Always local", "3", "100%", "ok"],
+      ["docs", "this project", "Always local", "3", "3", "ok"],
     ],
   );
   assert.equal(rows[0]?.description, "Reads and searches.");
@@ -51,6 +51,16 @@ test("an unused type shows a dash for both counts", () => {
   assert.equal(agentUsed(unused), "—");
   assert.equal(agentFinished(unused), "—");
   assert.equal(agentFinished(bundled({ used: undefined, finished: undefined })), "—");
+});
+
+test("the table holds back a project agent of a folder that is not trusted, and names it", () => {
+  const table = agentsTable([
+    bundled({}),
+    { name: "docs", description: "", origin: "project", wish: "same", trusted: false },
+    { name: "mine", description: "", origin: "user", wish: "same" },
+  ]);
+  assert.deepEqual(table.rows.map((row) => row.name), ["explorer", "mine"]);
+  assert.deepEqual(table.untrusted, ["docs"]);
 });
 
 test("errors give a bad row and an untrusted project agent a wait row", () => {

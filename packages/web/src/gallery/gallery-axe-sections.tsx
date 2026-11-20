@@ -23,6 +23,7 @@ export const GALLERY_SECTIONS = [
   "setup-form",
   "mcp-servers",
   "skills",
+  "agents",
   "memory",
   "api-keys",
   "routing",

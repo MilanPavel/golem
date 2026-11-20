@@ -38,13 +38,12 @@ export function agentUsed(agent: AgentInfo): string {
   return (agent.used ?? 0) > 0 ? String(agent.used) : "—";
 }
 
-/** The share of started helpers that finished, as `95%`, or `—` when there is nothing to say. */
+/** How many helpers of this type ended, as `39`, or `—` when none were started or the daemon cannot count them. */
 export function agentFinished(agent: AgentInfo): string {
-  const used = agent.used ?? 0;
-  if (used <= 0 || agent.finished === null || agent.finished === undefined) {
+  if ((agent.used ?? 0) <= 0 || agent.finished === null || agent.finished === undefined) {
     return "—";
   }
-  return `${Math.round((agent.finished / used) * 100)}%`;
+  return String(agent.finished);
 }
 
 /** The warnings: the file's errors, then a note for a project agent that is not trusted. */
@@ -83,6 +82,15 @@ export function agentRow(agent: AgentInfo): AgentRow {
     finished: agentFinished(agent),
     warnings,
     tone: broken ? "bad" : warnings.length > 0 ? "wait" : "ok",
+  };
+}
+
+/** The agents table: the rows to show, and the names of project agents held back because the folder is not trusted. */
+export function agentsTable(agents: readonly AgentInfo[]): { rows: AgentRow[]; untrusted: string[] } {
+  const blocked = (agent: AgentInfo): boolean => agent.origin === "project" && agent.trusted === false;
+  return {
+    rows: agentRows(agents.filter((agent) => !blocked(agent))),
+    untrusted: agents.filter(blocked).map((agent) => agent.name),
   };
 }
 

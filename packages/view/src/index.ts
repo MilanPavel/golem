@@ -812,6 +812,7 @@ export {
   agentRow,
   agentRows,
   agentUsed,
+  agentsTable,
   agentWarnings,
   agentWish,
   type AgentOrigin,
