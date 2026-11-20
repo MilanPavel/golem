@@ -14,6 +14,8 @@ from golem_protocol.commands import (
     AgentsGetResult,
     AgentsListParams,
     AgentsListResult,
+    AgentsSetWishParams,
+    AgentsSetWishResult,
     ApprovalRespondParams,
     ApprovalRespondResult,
     ArtifactReadParams,
@@ -318,6 +320,7 @@ from golem_protocol.commands import (
     TraceSpanResult,
     TraceTokens,
     TraceToolSpan,
+    WishResolution,
 )
 from golem_protocol.events import (
     AgentLimits,
@@ -808,6 +811,9 @@ MODELS: tuple[type[BaseModel], ...] = (
     AgentsGetResult,
     AgentsListParams,
     AgentsListResult,
+    AgentsSetWishParams,
+    AgentsSetWishResult,
+    WishResolution,
     HelperStopParams,
     HelperStopResult,
     SkillRegistryChanged,

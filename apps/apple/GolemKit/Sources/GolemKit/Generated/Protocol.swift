@@ -12,7 +12,8 @@ import Foundation
 /// false for a project agent in a folder that is not trusted, which is listed and
 /// never started. ``used`` and ``finished`` count helpers of this type started and
 /// ended in the last 30 days (``helper.ended``). ``finished`` is ``None`` when the
-/// daemon cannot count them.
+/// daemon cannot count them. ``resolves_to`` is what ``wish`` becomes in this setup;
+/// ``None`` when the daemon does not say. An older daemon leaves it out.
 // MARK: - AgentInfo
 public struct AgentInfo: Codable {
     public let asks: Bool?
@@ -22,6 +23,7 @@ public struct AgentInfo: Codable {
     public let limits: AgentInfoLimits?
     public let name: String
     public let origin: Origin
+    public let resolvesTo: AgentInfoWishResolution?
     public let shadowed: [Origin]?
     public let tools: [String]?
     public let trusted: Bool?
@@ -36,6 +38,7 @@ public struct AgentInfo: Codable {
         case limits = "limits"
         case name = "name"
         case origin = "origin"
+        case resolvesTo = "resolves_to"
         case shadowed = "shadowed"
         case tools = "tools"
         case trusted = "trusted"
@@ -43,7 +46,7 @@ public struct AgentInfo: Codable {
         case wish = "wish"
     }
 
-    public init(asks: Bool?, description: String, errors: [String]?, finished: Int?, limits: AgentInfoLimits?, name: String, origin: Origin, shadowed: [Origin]?, tools: [String]?, trusted: Bool?, used: Int?, wish: String) {
+    public init(asks: Bool?, description: String, errors: [String]?, finished: Int?, limits: AgentInfoLimits?, name: String, origin: Origin, resolvesTo: AgentInfoWishResolution?, shadowed: [Origin]?, tools: [String]?, trusted: Bool?, used: Int?, wish: String) {
         self.asks = asks
         self.description = description
         self.errors = errors
@@ -51,6 +54,7 @@ public struct AgentInfo: Codable {
         self.limits = limits
         self.name = name
         self.origin = origin
+        self.resolvesTo = resolvesTo
         self.shadowed = shadowed
         self.tools = tools
         self.trusted = trusted
@@ -92,6 +96,39 @@ public enum Origin: String, Codable {
     case bundled = "bundled"
     case project = "project"
     case user = "user"
+}
+
+/// What a type's wish becomes in this setup.
+///
+/// ``model`` is the model the wish picks now and ``tier`` its tier. ``reason`` is one plain
+/// line on why, at most 200 characters. ``fresh_window`` is true when the helper starts
+/// with an empty context window on that model. Every field may be left out.
+// MARK: - AgentInfoWishResolution
+public struct AgentInfoWishResolution: Codable {
+    public let freshWindow: Bool?
+    public let model: String?
+    public let reason: String?
+    public let tier: Tier?
+
+    public enum CodingKeys: String, CodingKey {
+        case freshWindow = "fresh_window"
+        case model = "model"
+        case reason = "reason"
+        case tier = "tier"
+    }
+
+    public init(freshWindow: Bool?, model: String?, reason: String?, tier: Tier?) {
+        self.freshWindow = freshWindow
+        self.model = model
+        self.reason = reason
+        self.tier = tier
+    }
+}
+
+public enum Tier: String, Codable {
+    case budget = "budget"
+    case frontier = "frontier"
+    case local = "local"
 }
 
 /// What bounds one helper of this type. ``None`` means the file sets no limit of that kind.
@@ -278,6 +315,7 @@ public struct AgentsGetResult: Codable {
     public let name: String
     public let origin: Origin
     public let prompt: String
+    public let resolvesTo: AgentsGetResultWishResolution?
     public let shadowed: [Origin]?
     public let tools: [String]?
     public let trusted: Bool?
@@ -293,6 +331,7 @@ public struct AgentsGetResult: Codable {
         case name = "name"
         case origin = "origin"
         case prompt = "prompt"
+        case resolvesTo = "resolves_to"
         case shadowed = "shadowed"
         case tools = "tools"
         case trusted = "trusted"
@@ -300,7 +339,7 @@ public struct AgentsGetResult: Codable {
         case wish = "wish"
     }
 
-    public init(asks: Bool?, description: String, errors: [String]?, finished: Int?, limits: AgentsGetResultLimits?, name: String, origin: Origin, prompt: String, shadowed: [Origin]?, tools: [String]?, trusted: Bool?, used: Int?, wish: String) {
+    public init(asks: Bool?, description: String, errors: [String]?, finished: Int?, limits: AgentsGetResultLimits?, name: String, origin: Origin, prompt: String, resolvesTo: AgentsGetResultWishResolution?, shadowed: [Origin]?, tools: [String]?, trusted: Bool?, used: Int?, wish: String) {
         self.asks = asks
         self.description = description
         self.errors = errors
@@ -309,6 +348,7 @@ public struct AgentsGetResult: Codable {
         self.name = name
         self.origin = origin
         self.prompt = prompt
+        self.resolvesTo = resolvesTo
         self.shadowed = shadowed
         self.tools = tools
         self.trusted = trusted
@@ -343,6 +383,33 @@ public struct AgentsGetResultLimits: Codable {
         self.maxCostUsd = maxCostUsd
         self.maxSeconds = maxSeconds
         self.maxTokens = maxTokens
+    }
+}
+
+/// What a type's wish becomes in this setup.
+///
+/// ``model`` is the model the wish picks now and ``tier`` its tier. ``reason`` is one plain
+/// line on why, at most 200 characters. ``fresh_window`` is true when the helper starts
+/// with an empty context window on that model. Every field may be left out.
+// MARK: - AgentsGetResultWishResolution
+public struct AgentsGetResultWishResolution: Codable {
+    public let freshWindow: Bool?
+    public let model: String?
+    public let reason: String?
+    public let tier: Tier?
+
+    public enum CodingKeys: String, CodingKey {
+        case freshWindow = "fresh_window"
+        case model = "model"
+        case reason = "reason"
+        case tier = "tier"
+    }
+
+    public init(freshWindow: Bool?, model: String?, reason: String?, tier: Tier?) {
+        self.freshWindow = freshWindow
+        self.model = model
+        self.reason = reason
+        self.tier = tier
     }
 }
 
@@ -384,7 +451,8 @@ public struct AgentsListResult: Codable {
 /// false for a project agent in a folder that is not trusted, which is listed and
 /// never started. ``used`` and ``finished`` count helpers of this type started and
 /// ended in the last 30 days (``helper.ended``). ``finished`` is ``None`` when the
-/// daemon cannot count them.
+/// daemon cannot count them. ``resolves_to`` is what ``wish`` becomes in this setup;
+/// ``None`` when the daemon does not say. An older daemon leaves it out.
 // MARK: - AgentElement
 public struct AgentElement: Codable {
     public let asks: Bool?
@@ -394,6 +462,7 @@ public struct AgentElement: Codable {
     public let limits: AgentLimitsClass?
     public let name: String
     public let origin: Origin
+    public let resolvesTo: AgentWishResolution?
     public let shadowed: [Origin]?
     public let tools: [String]?
     public let trusted: Bool?
@@ -408,6 +477,7 @@ public struct AgentElement: Codable {
         case limits = "limits"
         case name = "name"
         case origin = "origin"
+        case resolvesTo = "resolves_to"
         case shadowed = "shadowed"
         case tools = "tools"
         case trusted = "trusted"
@@ -415,7 +485,7 @@ public struct AgentElement: Codable {
         case wish = "wish"
     }
 
-    public init(asks: Bool?, description: String, errors: [String]?, finished: Int?, limits: AgentLimitsClass?, name: String, origin: Origin, shadowed: [Origin]?, tools: [String]?, trusted: Bool?, used: Int?, wish: String) {
+    public init(asks: Bool?, description: String, errors: [String]?, finished: Int?, limits: AgentLimitsClass?, name: String, origin: Origin, resolvesTo: AgentWishResolution?, shadowed: [Origin]?, tools: [String]?, trusted: Bool?, used: Int?, wish: String) {
         self.asks = asks
         self.description = description
         self.errors = errors
@@ -423,6 +493,7 @@ public struct AgentElement: Codable {
         self.limits = limits
         self.name = name
         self.origin = origin
+        self.resolvesTo = resolvesTo
         self.shadowed = shadowed
         self.tools = tools
         self.trusted = trusted
@@ -457,6 +528,161 @@ public struct AgentLimitsClass: Codable {
         self.maxCostUsd = maxCostUsd
         self.maxSeconds = maxSeconds
         self.maxTokens = maxTokens
+    }
+}
+
+/// What a type's wish becomes in this setup.
+///
+/// ``model`` is the model the wish picks now and ``tier`` its tier. ``reason`` is one plain
+/// line on why, at most 200 characters. ``fresh_window`` is true when the helper starts
+/// with an empty context window on that model. Every field may be left out.
+// MARK: - AgentWishResolution
+public struct AgentWishResolution: Codable {
+    public let freshWindow: Bool?
+    public let model: String?
+    public let reason: String?
+    public let tier: Tier?
+
+    public enum CodingKeys: String, CodingKey {
+        case freshWindow = "fresh_window"
+        case model = "model"
+        case reason = "reason"
+        case tier = "tier"
+    }
+
+    public init(freshWindow: Bool?, model: String?, reason: String?, tier: Tier?) {
+        self.freshWindow = freshWindow
+        self.model = model
+        self.reason = reason
+        self.tier = tier
+    }
+}
+
+/// ``agents.set_wish``. Set the model wish of the agent type ``name``.
+///
+/// ``wish`` is ``cheapest``, ``same``, ``stronger``, a tier or a model name.
+// MARK: - AgentsSetWishParams
+public struct AgentsSetWishParams: Codable {
+    public let cwd: String?
+    public let name: String
+    public let wish: String
+
+    public enum CodingKeys: String, CodingKey {
+        case cwd = "cwd"
+        case name = "name"
+        case wish = "wish"
+    }
+
+    public init(cwd: String?, name: String, wish: String) {
+        self.cwd = cwd
+        self.name = name
+        self.wish = wish
+    }
+}
+
+/// The agent type after the change.
+// MARK: - AgentsSetWishResult
+public struct AgentsSetWishResult: Codable {
+    public let asks: Bool?
+    public let description: String
+    public let errors: [String]?
+    public let finished: Int?
+    public let limits: AgentsSetWishResultLimits?
+    public let name: String
+    public let origin: Origin
+    public let resolvesTo: AgentsSetWishResultWishResolution?
+    public let shadowed: [Origin]?
+    public let tools: [String]?
+    public let trusted: Bool?
+    public let used: Int?
+    public let wish: String
+
+    public enum CodingKeys: String, CodingKey {
+        case asks = "asks"
+        case description = "description"
+        case errors = "errors"
+        case finished = "finished"
+        case limits = "limits"
+        case name = "name"
+        case origin = "origin"
+        case resolvesTo = "resolves_to"
+        case shadowed = "shadowed"
+        case tools = "tools"
+        case trusted = "trusted"
+        case used = "used"
+        case wish = "wish"
+    }
+
+    public init(asks: Bool?, description: String, errors: [String]?, finished: Int?, limits: AgentsSetWishResultLimits?, name: String, origin: Origin, resolvesTo: AgentsSetWishResultWishResolution?, shadowed: [Origin]?, tools: [String]?, trusted: Bool?, used: Int?, wish: String) {
+        self.asks = asks
+        self.description = description
+        self.errors = errors
+        self.finished = finished
+        self.limits = limits
+        self.name = name
+        self.origin = origin
+        self.resolvesTo = resolvesTo
+        self.shadowed = shadowed
+        self.tools = tools
+        self.trusted = trusted
+        self.used = used
+        self.wish = wish
+    }
+}
+
+/// What bounds one helper of this type. ``None`` means the file sets no limit of that kind.
+///
+/// ``max_seconds`` is working time: it does not count the time spent waiting for
+/// you, for a slot or for a provider. ``answer_chars`` cuts the helper's final answer.
+// MARK: - AgentsSetWishResultLimits
+public struct AgentsSetWishResultLimits: Codable {
+    public let answerChars: Int?
+    public let maxCalls: Int?
+    public let maxCostUsd: Double?
+    public let maxSeconds: Int?
+    public let maxTokens: Int?
+
+    public enum CodingKeys: String, CodingKey {
+        case answerChars = "answer_chars"
+        case maxCalls = "max_calls"
+        case maxCostUsd = "max_cost_usd"
+        case maxSeconds = "max_seconds"
+        case maxTokens = "max_tokens"
+    }
+
+    public init(answerChars: Int?, maxCalls: Int?, maxCostUsd: Double?, maxSeconds: Int?, maxTokens: Int?) {
+        self.answerChars = answerChars
+        self.maxCalls = maxCalls
+        self.maxCostUsd = maxCostUsd
+        self.maxSeconds = maxSeconds
+        self.maxTokens = maxTokens
+    }
+}
+
+/// What a type's wish becomes in this setup.
+///
+/// ``model`` is the model the wish picks now and ``tier`` its tier. ``reason`` is one plain
+/// line on why, at most 200 characters. ``fresh_window`` is true when the helper starts
+/// with an empty context window on that model. Every field may be left out.
+// MARK: - AgentsSetWishResultWishResolution
+public struct AgentsSetWishResultWishResolution: Codable {
+    public let freshWindow: Bool?
+    public let model: String?
+    public let reason: String?
+    public let tier: Tier?
+
+    public enum CodingKeys: String, CodingKey {
+        case freshWindow = "fresh_window"
+        case model = "model"
+        case reason = "reason"
+        case tier = "tier"
+    }
+
+    public init(freshWindow: Bool?, model: String?, reason: String?, tier: Tier?) {
+        self.freshWindow = freshWindow
+        self.model = model
+        self.reason = reason
+        self.tier = tier
     }
 }
 
@@ -2358,12 +2584,6 @@ public struct ByModelElement: Codable {
         self.provider = provider
         self.tier = tier
     }
-}
-
-public enum Tier: String, Codable {
-    case budget = "budget"
-    case frontier = "frontier"
-    case local = "local"
 }
 
 /// One job's calls over the last 7 days: ``chat``, ``explore`` (a helper), ``title``...
@@ -23210,6 +23430,33 @@ public struct TraceToolSpanTraceTokens: Codable {
         self.cacheWrite = cacheWrite
         self.input = input
         self.output = output
+    }
+}
+
+/// What a type's wish becomes in this setup.
+///
+/// ``model`` is the model the wish picks now and ``tier`` its tier. ``reason`` is one plain
+/// line on why, at most 200 characters. ``fresh_window`` is true when the helper starts
+/// with an empty context window on that model. Every field may be left out.
+// MARK: - WishResolution
+public struct WishResolution: Codable {
+    public let freshWindow: Bool?
+    public let model: String?
+    public let reason: String?
+    public let tier: Tier?
+
+    public enum CodingKeys: String, CodingKey {
+        case freshWindow = "fresh_window"
+        case model = "model"
+        case reason = "reason"
+        case tier = "tier"
+    }
+
+    public init(freshWindow: Bool?, model: String?, reason: String?, tier: Tier?) {
+        self.freshWindow = freshWindow
+        self.model = model
+        self.reason = reason
+        self.tier = tier
     }
 }
 

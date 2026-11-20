@@ -2,7 +2,7 @@
   "$defs": {
     "AgentInfo": {
       "additionalProperties": false,
-      "description": "One agent type: an ``agents/<name>.md`` file, valid or not.\n\n``wish`` is the model wish as written: ``cheapest``, ``same``, ``stronger``, a tier\nor a model. ``tools`` are the tool names the helper may use, empty for none. ``asks``\nis true when the helper may ask you a question. ``errors`` are what is wrong with\nthe file: a type with errors is never the one a name resolves to. ``shadowed`` lists\nthe origins of lower files of the same name that this one hides. ``trusted`` is\nfalse for a project agent in a folder that is not trusted, which is listed and\nnever started. ``used`` and ``finished`` count helpers of this type started and\nended in the last 30 days (``helper.ended``). ``finished`` is ``None`` when the\ndaemon cannot count them.",
+      "description": "One agent type: an ``agents/<name>.md`` file, valid or not.\n\n``wish`` is the model wish as written: ``cheapest``, ``same``, ``stronger``, a tier\nor a model. ``tools`` are the tool names the helper may use, empty for none. ``asks``\nis true when the helper may ask you a question. ``errors`` are what is wrong with\nthe file: a type with errors is never the one a name resolves to. ``shadowed`` lists\nthe origins of lower files of the same name that this one hides. ``trusted`` is\nfalse for a project agent in a folder that is not trusted, which is listed and\nnever started. ``used`` and ``finished`` count helpers of this type started and\nended in the last 30 days (``helper.ended``). ``finished`` is ``None`` when the\ndaemon cannot count them. ``resolves_to`` is what ``wish`` becomes in this setup;\n``None`` when the daemon does not say. An older daemon leaves it out.",
       "properties": {
         "asks": {
           "default": false,
@@ -49,6 +49,17 @@
           ],
           "title": "Origin",
           "type": "string"
+        },
+        "resolves_to": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/WishResolution"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         },
         "shadowed": {
           "items": {
@@ -166,6 +177,71 @@
         }
       },
       "title": "AgentLimits",
+      "type": "object"
+    },
+    "WishResolution": {
+      "additionalProperties": false,
+      "description": "What a type's wish becomes in this setup.\n\n``model`` is the model the wish picks now and ``tier`` its tier. ``reason`` is one plain\nline on why, at most 200 characters. ``fresh_window`` is true when the helper starts\nwith an empty context window on that model. Every field may be left out.",
+      "properties": {
+        "fresh_window": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Fresh Window"
+        },
+        "model": {
+          "anyOf": [
+            {
+              "maxLength": 200,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Model"
+        },
+        "reason": {
+          "anyOf": [
+            {
+              "maxLength": 200,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reason"
+        },
+        "tier": {
+          "anyOf": [
+            {
+              "enum": [
+                "local",
+                "budget",
+                "frontier"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tier"
+        }
+      },
+      "title": "WishResolution",
       "type": "object"
     }
   },

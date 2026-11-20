@@ -1,0 +1,65 @@
+{
+  "additionalProperties": false,
+  "description": "What a type's wish becomes in this setup.\n\n``model`` is the model the wish picks now and ``tier`` its tier. ``reason`` is one plain\nline on why, at most 200 characters. ``fresh_window`` is true when the helper starts\nwith an empty context window on that model. Every field may be left out.",
+  "properties": {
+    "fresh_window": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Fresh Window"
+    },
+    "model": {
+      "anyOf": [
+        {
+          "maxLength": 200,
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Model"
+    },
+    "reason": {
+      "anyOf": [
+        {
+          "maxLength": 200,
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Reason"
+    },
+    "tier": {
+      "anyOf": [
+        {
+          "enum": [
+            "local",
+            "budget",
+            "frontier"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Tier"
+    }
+  },
+  "title": "WishResolution",
+  "type": "object"
+}

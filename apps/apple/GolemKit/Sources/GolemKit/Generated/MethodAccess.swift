@@ -4,6 +4,7 @@ public enum MethodAccess {
     public static let browser: Set<String> = [
         "agents.get",
         "agents.list",
+        "agents.set_wish",
         "approval.respond",
         "artifact.read",
         "auth.list",

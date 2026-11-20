@@ -11,6 +11,8 @@ from golem_protocol.commands import (
     AgentsGetResult,
     AgentsListParams,
     AgentsListResult,
+    AgentsSetWishParams,
+    AgentsSetWishResult,
     DaemonStatus,
     HelloParams,
     HelloResult,
@@ -51,6 +53,7 @@ from golem_protocol.commands import (
     SessionSummary,
     TraceContextPart,
     TraceSpanResult,
+    WishResolution,
 )
 from golem_protocol.events import Ping
 from golem_protocol.rpc import (
@@ -327,6 +330,41 @@ def test_agent_info_defaults_and_nullable_finished() -> None:
     assert info.tools == [] and info.errors == [] and info.shadowed == []
     assert info.limits == AgentLimits()
     assert info.trusted is True and info.used == 0 and info.finished is None
+
+
+def test_agent_wish_resolution_round_trip_and_optional() -> None:
+    plain = AgentInfo.model_validate(
+        {"name": "worker", "description": "", "origin": "user", "wish": "same"}
+    )
+    assert plain.resolves_to is None
+    res = WishResolution(
+        model="qwen3:8b", tier="local", reason="Cheapest model you have.", fresh_window=True
+    )
+    info = AgentInfo(name="w", description="", origin="user", wish="cheapest", resolves_to=res)
+    assert AgentInfo.model_validate_json(info.model_dump_json()) == info
+    assert WishResolution.model_validate({}) == WishResolution()
+    with pytest.raises(ValidationError):
+        WishResolution.model_validate({"tier": "free"})
+    with pytest.raises(ValidationError):
+        WishResolution.model_validate({"reason": "x" * 201})
+    with pytest.raises(ValidationError):
+        WishResolution.model_validate({"model": ""})
+
+
+def test_agents_set_wish_round_trip_and_limits() -> None:
+    params = AgentsSetWishParams(name="explorer", wish="qwen3:8b", cwd="/work")
+    assert AgentsSetWishParams.model_validate_json(params.model_dump_json()) == params
+    assert AgentsSetWishParams(name="a", wish="stronger").cwd is None
+    result = AgentsSetWishResult(name="a", description="", origin="user", wish="stronger")
+    assert AgentsSetWishResult.model_validate_json(result.model_dump_json()) == result
+    for bad in (
+        {"name": "", "wish": "same"},
+        {"name": "a", "wish": ""},
+        {"name": "a", "wish": "x" * 201},
+        {"name": "a", "wish": "same", "extra": 1},
+    ):
+        with pytest.raises(ValidationError):
+            AgentsSetWishParams.model_validate(bad)
 
 
 def test_agents_reject_bad_input() -> None:
