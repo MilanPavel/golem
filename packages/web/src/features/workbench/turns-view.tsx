@@ -83,9 +83,9 @@ export function TurnsView({ cards, open, onToggle, renderDiff, now, undo }: Turn
           >
             <p className={cn("break-words text-sm font-medium", card.reverted ? "text-muted" : "text-ink")}>
               {card.number} · {titleOf(card)}
-              {card.reverted ? <span className="ml-2 font-mono text-xs font-normal">undone</span> : null}
+              {card.reverted ? <span className="ml-2 text-meta font-normal">undone</span> : null}
             </p>
-            <p className="font-mono text-xs text-muted">{card.at === null ? card.line : `${agoText(card.at, now)} · ${card.line}`}</p>
+            <p className="text-meta text-muted">{card.at === null ? card.line : `${agoText(card.at, now)} · ${card.line}`}</p>
             {undo === undefined ? null : (
               <div>
                 <Button
@@ -122,7 +122,7 @@ export function TurnsView({ cards, open, onToggle, renderDiff, now, undo }: Turn
             </ul>
           </li>
         ))}
-        <li className="font-mono text-xs text-faint">session start</li>
+        <li className="text-meta text-faint">session start</li>
       </ul>
     </div>
   );

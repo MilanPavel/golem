@@ -65,7 +65,7 @@ export function ChangesView({ files, error, open, onToggle, renderDiff, onOpenFi
         ))}
       </ul>
       <div className="flex flex-wrap items-center justify-between gap-2 border-t border-line pt-2">
-        <p className="flex flex-wrap items-center gap-x-2 font-mono text-xs text-muted">
+        <p className="flex flex-wrap items-center gap-x-2 text-meta text-muted">
           <span>{plural(files.length, "file")}</span>
           <span aria-hidden="true">·</span>
           <Counts added={added} removed={removed} />
@@ -209,7 +209,7 @@ function ByFileTab({ sessionId }: { sessionId: string }) {
         }
       />
       {notice === null ? null : (
-        <p role="status" className="font-mono text-xs text-ink">
+        <p role="status" className="text-meta text-ink">
           {notice}
         </p>
       )}

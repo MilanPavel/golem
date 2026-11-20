@@ -314,7 +314,7 @@
 
 .prose .src-chip-unread::before {
   content: "?";
-  font: 600 0.6875rem var(--font-mono);
+  font: 600 0.75rem var(--font-ui);
   color: var(--color-wait);
 }
 
@@ -327,7 +327,7 @@
 }
 
 .prose .src-more {
-  font: 500 0.6875rem var(--font-mono);
+  font: 500 0.75rem var(--font-ui);
   opacity: 0.75;
 }
 
@@ -341,7 +341,7 @@
   border-radius: 4px;
   background: light-dark(hsl(var(--mark-hue, 30) 48% 38%), hsl(var(--mark-hue, 30) 42% 62%));
   color: light-dark(var(--color-bg), var(--color-on-clay));
-  font: 600 9px/1 var(--font-mono);
+  font: 600 9px/1 var(--font-ui);
 }
 
 .src-mark-blank {

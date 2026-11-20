@@ -70,9 +70,9 @@ function Rows({ panel, suggested, running, onRun }: { panel: ContextPanel; sugge
             <span className="flex min-w-0 flex-1 flex-col">
               <span className={cn("flex items-baseline gap-2 text-sm", row.enabled ? "text-ink" : "text-faint")}>
                 {row.label}
-                {suggested === row.id ? <span className="rounded-full bg-clay-soft px-1.5 font-mono text-xs text-clay-ink">suggested</span> : null}
+                {suggested === row.id ? <span className="rounded-full bg-clay-soft px-1.5 text-meta text-clay-ink">suggested</span> : null}
               </span>
-              <span className="font-mono text-xs text-muted">{row.enabled ? row.consequence : (row.why ?? "")}</span>
+              <span className="text-meta text-muted">{row.enabled ? row.consequence : (row.why ?? "")}</span>
             </span>
             {running === row.id ? <Spinner /> : null}
           </button>
@@ -148,7 +148,7 @@ export function ContextChipView({
       </PopoverTrigger>
       <PopoverContent align="end" aria-label="Context" className="flex w-80 flex-col gap-3 max-sm:w-72">
         <FillBar used={used} window={window} reserve={panel.reserve} />
-        <div className="flex flex-col gap-0.5 font-mono text-xs text-muted">
+        <div className="flex flex-col gap-0.5 text-meta text-muted">
           <span>{contextFillLine(used, window, panel.reserve)}</span>
           <span>{windowSourceLine(window, panel.source)}</span>
         </div>

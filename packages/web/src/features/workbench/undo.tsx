@@ -5,6 +5,7 @@ import type { ChangesRevertTarget } from "../../store/changes.ts";
 import { usePageActions, useSession } from "../../store/page-context.tsx";
 import { Button } from "../../ui/button.tsx";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from "../../ui/dialog.tsx";
+import { Code } from "../../ui/code.tsx";
 
 /** `1 turn`, `2 turns`. */
 function count(n: number, word: string): string {
@@ -41,10 +42,10 @@ export function RewindDialogView({ open, onOpenChange, plan, working, onConfirm 
           ))}
         </ul>
         <p className="mt-3 text-xs font-medium text-muted">Files</p>
-        <ul aria-label="Files to put back" className="mt-1 flex max-h-40 flex-col gap-1 overflow-y-auto rounded-md border border-line p-2 font-mono text-xs text-ink">
+        <ul aria-label="Files to put back" className="mt-1 flex max-h-40 flex-col gap-1 overflow-y-auto rounded-md border border-line p-2 text-meta">
           {plan.paths.map((path) => (
             <li key={path} className="truncate" title={path}>
-              {path}
+              <Code>{path}</Code>
             </li>
           ))}
         </ul>
@@ -79,10 +80,10 @@ export function ConflictDialogView({ open, onOpenChange, paths, working, onOverw
     <Dialog open={open} onOpenChange={(next) => (working ? undefined : onOpenChange(next))}>
       <DialogContent className="max-w-lg">
         <DialogTitle>{UNDO_CONFLICT_TITLE}</DialogTitle>
-        <ul aria-label="Files changed since golem wrote them" className="mt-3 flex max-h-48 flex-col gap-1 overflow-y-auto rounded-md border border-line p-2 font-mono text-xs text-ink">
+        <ul aria-label="Files changed since golem wrote them" className="mt-3 flex max-h-48 flex-col gap-1 overflow-y-auto rounded-md border border-line p-2 text-meta">
           {paths.map((path) => (
             <li key={path} className="truncate" title={path}>
-              {path}
+              <Code>{path}</Code>
             </li>
           ))}
         </ul>

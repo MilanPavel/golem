@@ -46,7 +46,7 @@ export function ContextMeter({ context, provider }: { context: TraceContext; pro
   return (
     <section aria-label="Context window" className="flex flex-col gap-2 border-b border-line px-4 py-3">
       <div className="flex items-baseline gap-2">
-        <p className="font-mono text-xs text-ink">
+        <p className="text-meta text-ink">
           Context · {(context.used ?? null) === null ? "≈" : ""}
           {summary}
           {size === null ? " · window unknown" : ""}
@@ -75,7 +75,7 @@ export function ContextMeter({ context, provider }: { context: TraceContext; pro
           {note.text}
         </p>
       )}
-      <ul aria-label="What fills the context" className="flex max-w-sm flex-col gap-0.5 font-mono text-xs">
+      <ul aria-label="What fills the context" className="flex max-w-sm flex-col gap-0.5 text-meta">
         {parts.map((part) => (
           <li key={part.key} className="flex items-center gap-2">
             <span aria-hidden="true" className={`size-2 shrink-0 rounded-xs ${PART_COLOR[part.key]}`} />

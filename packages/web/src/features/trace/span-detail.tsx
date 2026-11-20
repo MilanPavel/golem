@@ -2,6 +2,7 @@ import { Fragment, useRef, useState, type ComponentType, type ReactNode } from "
 import { formatTokens, summaryOfLine, routeHeadline, whyRows, type RouteMode } from "@golem/view";
 import type { TraceMessage, TraceSpanResult, TraceRoute } from "../../store/trace.ts";
 import { Button } from "../../ui/button.tsx";
+import { Code } from "../../ui/code.tsx";
 import { CopyButton, selectText } from "../../ui/copy-command.tsx";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../ui/tabs.tsx";
 import { Markdown } from "../chat/index.ts";
@@ -42,7 +43,7 @@ export function RouteBlock({ route, mode }: { route: TraceRoute; mode: RouteMode
   const rows = whyRows(route);
   return (
     <section aria-label="Route" className="flex flex-col gap-2 border-b border-line px-4 py-3">
-      <h3 className="font-mono text-xs text-muted">{routeHeadline(route.reason, mode)}</h3>
+      <h3 className="text-meta text-muted">{routeHeadline(route.reason, mode)}</h3>
       <table className="w-full text-left text-xs">
         <thead>
           <tr className="text-faint">
@@ -54,8 +55,8 @@ export function RouteBlock({ route, mode }: { route: TraceRoute; mode: RouteMode
         <tbody>
           {rows.map((row, index) => (
             <tr key={`${row.model}:${index}`} className={index === 0 ? "text-ink" : "text-muted"}>
-              <td className="py-0.5 pr-3 align-top font-mono">{row.model}</td>
-              <td className="py-0.5 pr-3 align-top font-mono">{row.tier}</td>
+              <td className="py-0.5 pr-3 align-top"><Code tone="muted">{row.model}</Code></td>
+              <td className="py-0.5 pr-3 align-top">{row.tier}</td>
               <td className="py-0.5 align-top">{row.result}</td>
             </tr>
           ))}
@@ -106,7 +107,7 @@ function MessageRow({ message, names, total, notSeen = null }: { message: TraceM
   const [showOriginal, setShowOriginal] = useState(false);
   return (
     <li className={`flex gap-3 ${notSeen === null ? "" : "opacity-60"}`}>
-      <span className="flex w-16 shrink-0 flex-col items-end pt-0.5 font-mono text-xs text-faint">
+      <span className="flex w-16 shrink-0 flex-col items-end pt-0.5 text-meta text-faint">
         <span>{labelOf(message, names)}</span>
         {notSeen === null ? null : <span className="whitespace-nowrap rounded-xs border border-line-strong px-1 text-wait">{notSeen}</span>}
         {original === null ? null : <span className="whitespace-nowrap rounded-xs border border-dashed border-line-strong px-1 text-muted">cleared</span>}
@@ -133,7 +134,7 @@ function MessageRow({ message, names, total, notSeen = null }: { message: TraceM
               </div>
             )}
             {calls.map((call, index) => (
-              <p key={index} className="font-mono text-xs text-muted">
+              <p key={index} className="text-meta text-muted">
                 {callLine(call)}
               </p>
             ))}
@@ -149,7 +150,7 @@ function Messages({ messages, newFrom, names, total, notSeen, summaryOf = null }
     <ul aria-label="Messages" className="flex flex-col gap-3">
       {summaryOf === null ? null : (
         <li className="flex gap-3">
-          <span className="flex w-16 shrink-0 flex-col items-end pt-0.5 font-mono text-xs text-faint">summary</span>
+          <span className="flex w-16 shrink-0 flex-col items-end pt-0.5 text-meta text-faint">summary</span>
           <p className="min-w-0 flex-1 text-sm text-muted">{summaryOfLine(summaryOf)}</p>
         </li>
       )}
@@ -275,7 +276,7 @@ function Reply({ result }: { result: TraceSpanResult }) {
 
 function Pairs({ rows }: { rows: readonly (readonly [string, string])[] }) {
   return (
-    <dl className="grid gap-x-4 gap-y-1 font-mono text-xs sm:grid-cols-2">
+    <dl className="grid gap-x-4 gap-y-1 text-meta sm:grid-cols-2">
       {rows.map(([label, value]) => (
         <div key={label} className="contents">
           <dt className="text-faint">{label}</dt>
@@ -367,7 +368,7 @@ function Header({ result }: { result: TraceSpanResult }) {
       <h2 className="flex items-baseline gap-2 text-base font-medium">
         {span.kind === "model" ? <span aria-hidden="true" className="text-clay">◆</span> : null}
         {span.kind === "tool" ? <span aria-hidden="true" className="text-muted">⚙</span> : null}
-        <span className={span.kind === "tool" ? "font-mono text-sm" : ""}>{span.kind === "run" ? `Run · ${span.name}` : span.name}</span>
+        {span.kind === "tool" ? <Code className="text-label">{span.name}</Code> : <span>{span.kind === "run" ? `Run · ${span.name}` : span.name}</span>}
         {span.kind === "tool" ? (
           <>
             {span.status === "ok" ? <span className="text-allow"><span aria-hidden="true">✓</span><span className="sr-only">ok</span></span> : null}
@@ -376,7 +377,7 @@ function Header({ result }: { result: TraceSpanResult }) {
           </>
         ) : null}
       </h2>
-      <p className="font-mono text-xs text-muted">
+      <p className="text-meta text-muted">
         {span.kind === "model"
           ? modelLine(result)
           : span.kind === "tool"

@@ -8,6 +8,7 @@ import type { LanguageId } from "../chat/languages.ts";
 import { languageForPath } from "../chat/languages.ts";
 import { useHiddenFiles } from "./hidden-files.ts";
 import { useRequestedFile, type FileRequest } from "./workbench-state.ts";
+import { Code } from "../../ui/code.tsx";
 
 /** How long typing waits before the list is asked for, in ms. */
 export const FILE_LIST_WAIT_MS = 150;
@@ -126,10 +127,10 @@ function PathButton({ path, onOpen }: { path: string; onOpen: (path: string) => 
       onClick={() => {
         onOpen(path);
       }}
-      className="flex w-full min-w-0 items-baseline rounded-sm px-1.5 py-1 text-left font-mono text-xs outline-offset-2 outline-clay hover:bg-sunken focus-visible:outline-2"
+      className="flex w-full min-w-0 items-baseline rounded-sm px-1.5 py-1 text-left text-meta outline-offset-2 outline-clay hover:bg-sunken focus-visible:outline-2"
     >
-      {folder === "" ? null : <span className="min-w-0 truncate text-muted">{folder}</span>}
-      <span className="flex-none text-ink">{name}</span>
+      {folder === "" ? null : <Code tone="muted" className="min-w-0 truncate">{folder}</Code>}
+      <Code className="flex-none">{name}</Code>
     </button>
   );
 }
@@ -138,7 +139,7 @@ function PathGroup({ title, paths, onOpen }: { title: string | null; paths: read
   if (paths.length === 0) return null;
   return (
     <div className="flex flex-col gap-0.5">
-      {title === null ? null : <h4 className="px-1.5 pt-1 font-mono text-xs text-faint">{title}</h4>}
+      {title === null ? null : <h4 className="px-1.5 pt-1 text-meta text-faint">{title}</h4>}
       <ul className="flex flex-col gap-0.5">
         {paths.map((path) => (
           <li key={path}>
@@ -184,10 +185,10 @@ export function FilesView({ typed, onTyped, hidden, onHidden, changed, found, mo
           </Button>
           <CopyButton text={open} label="path" />
         </div>
-        <p className="flex min-w-0 items-baseline gap-2 font-mono text-xs">
-          <span title={open} className="min-w-0 truncate text-ink">
+        <p className="flex min-w-0 items-baseline gap-2 text-meta">
+          <Code title={open} className="min-w-0 truncate">
             {open}
-          </span>
+          </Code>
           {count === undefined ? null : <span className="flex-none text-muted">{count === 1 ? "1 line" : `${count} lines`}</span>}
         </p>
         {file.error !== null ? (

@@ -1,4 +1,5 @@
 import type { Command, CommandGroup } from "@golem/view";
+import { Code } from "../../ui/code.tsx";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "../../ui/dialog.tsx";
 import { IN_TERMINAL_LABEL, TERMINAL_ONLY } from "./terminal-only.ts";
 
@@ -33,16 +34,16 @@ export function CommandsDialog({
             const headingId = `commands-${group}`;
             return (
               <section key={group} aria-labelledby={headingId}>
-                <h3 id={headingId} className="px-1 pb-1 font-mono text-xs font-normal text-faint">
+                <h3 id={headingId} className="px-1 pb-1 text-meta font-normal text-faint">
                   {title}
                 </h3>
                 <ul className="flex list-none flex-col gap-0.5 p-0">
                   {rows.map((command) => (
                     <li key={command.name} className="flex flex-col gap-0.5 rounded-md px-3 py-2 sm:flex-row sm:items-baseline sm:gap-4">
-                      <span className="shrink-0 font-mono text-sm text-clay-ink sm:w-56">
+                      <Code className="shrink-0 text-clay-ink sm:w-56">
                         {command.name}
                         {command.args === "" ? null : <span> {command.args}</span>}
-                      </span>
+                      </Code>
                       <span className="min-w-0 text-sm text-muted">
                         {command.description}
                         {TERMINAL_ONLY.has(command.name) ? (

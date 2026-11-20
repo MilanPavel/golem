@@ -5,6 +5,7 @@ import { formatDuration, tokenCell, type TokenCell } from "./format.ts";
 import { NOT_RECORDED_LINE } from "./span-text.ts";
 import { barFor, runExtent, ticksFor } from "./waterfall.ts";
 import { WaterfallBar } from "./waterfall-bar.tsx";
+import { Code } from "../../ui/code.tsx";
 
 type Row = {
   span: TraceNode;
@@ -162,8 +163,8 @@ function TreeRow({
           {row.hasChildren ? (open ? "▾" : "▸") : ""}
         </span>
         <Glyph span={span} />
-        <span className={`truncate ${span.kind === "tool" ? "font-mono text-xs" : ""}`}>
-          {span.kind === "run" ? `Run · ${span.name}` : span.name}
+        <span className="truncate">
+          {span.kind === "tool" ? <Code>{span.name}</Code> : span.kind === "run" ? `Run · ${span.name}` : span.name}
         </span>
         {unrecorded ? (
           <Tooltip>
@@ -180,11 +181,11 @@ function TreeRow({
         ticks={span.kind === "run" ? ticksFor(runExtent(span)) : undefined}
         compact={compact}
       />
-      <span className={`shrink-0 text-right font-mono text-xs text-muted tabular-nums ${compact ? "w-18 whitespace-nowrap" : "w-20"}`}>
+      <span className={`shrink-0 text-right text-meta text-muted tabular-nums ${compact ? "w-18 whitespace-nowrap" : "w-20"}`}>
         {formatDuration(span.duration_ms)}
       </span>
       {compact ? null : (
-        <span className="w-32 shrink-0 text-right font-mono text-xs text-muted tabular-nums max-narrow:hidden">
+        <span className="w-32 shrink-0 text-right text-meta text-muted tabular-nums max-narrow:hidden">
           <TokenCellView cell={cell} />
         </span>
       )}

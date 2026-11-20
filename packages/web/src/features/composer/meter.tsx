@@ -60,7 +60,7 @@ export function Meter({ state, runStartedAt, localWait = false, wait = null, loa
         ? (wait ?? WAITING_FOR_LOCAL_MODEL)
         : meterText(state, elapsedSeconds(runStartedAt, now));
   return (
-    <div data-meter={state} className="flex min-h-5 items-center gap-2.5 px-1 font-mono text-xs text-muted">
+    <div data-meter={state} className="flex min-h-5 items-center gap-2.5 px-1 text-meta text-muted">
       <PixelGolem state={state} size="sm" />
       {text === "" ? null : <span>{text}</span>}
       {aside === undefined ? null : <span className="ml-auto">{aside}</span>}

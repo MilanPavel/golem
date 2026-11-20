@@ -47,7 +47,7 @@ export function CommitDialogView(props: CommitDialogViewProps) {
           <ul className="relative flex max-h-48 flex-col gap-1 overflow-y-auto rounded-md border border-line p-2">
             {paths.map((path) => (
               <li key={path}>
-                <label className="flex min-w-0 items-center gap-2 font-mono text-xs text-ink">
+                <label className="flex min-w-0 items-center gap-2 text-meta text-ink">
                   <input
                     type="checkbox"
                     className="size-4 flex-none accent-clay"

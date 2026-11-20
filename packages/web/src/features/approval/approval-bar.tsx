@@ -100,7 +100,7 @@ function ArgsEditor({
           }}
         />
         {parsed.ok ? null : (
-          <p id={reasonId} role="status" className="mt-1 font-mono text-xs text-deny wrap-anywhere">
+          <p id={reasonId} role="status" className="mt-1 text-meta text-deny wrap-anywhere">
             {parsed.error}
           </p>
         )}
@@ -186,7 +186,7 @@ export function ApprovalBar({
               </>
             )}
           </p>
-          <p className="mt-0.5 font-mono text-xs leading-snug text-faint wrap-anywhere">asks: {approval.source ? approval.source : "your rules"}</p>
+          <p className="mt-0.5 text-meta leading-snug text-faint wrap-anywhere">asks: {approval.source ? approval.source : "your rules"}</p>
         </div>
       </div>
       {showEditor ? (
@@ -248,7 +248,10 @@ export function ApprovalBar({
                   <div className="flex justify-end px-3 pt-2">
                     <DiffModeSwitch mode={mode} onChange={setMode} />
                   </div>
-                  <div className="max-h-72 overflow-auto px-3 py-2 font-mono text-xs">
+                  <div
+                    // eslint-disable-next-line golem/no-font-mono -- a diff keeps mono
+                    className="max-h-72 overflow-auto px-3 py-2 font-mono text-xs"
+                  >
                     <DiffView diff={tool.diff} mode={mode} />
                   </div>
                 </>

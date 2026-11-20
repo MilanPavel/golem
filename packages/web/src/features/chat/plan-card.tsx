@@ -1,6 +1,7 @@
 import { planFooter, planOfCall, PROPOSE_PLAN_TOOL, type PlanStepView, type ToolBlock } from "@golem/view";
 import { useState } from "react";
 import { Button } from "../../ui/button.tsx";
+import { Code } from "../../ui/code.tsx";
 
 /** The `propose_plan` calls of a turn that have a whole plan: the ones drawn as a card. */
 export function isPlanCard(tool: ToolBlock): boolean {
@@ -49,12 +50,12 @@ export function PlanCardView({
         <span aria-hidden="true" className="mr-1.5 text-clay-ink">◇</span>
         Plan: {title}
       </h3>
-      <ol className="m-0 flex list-decimal flex-col gap-1 pl-5 text-sm text-ink marker:font-mono marker:text-muted">
+      <ol className="m-0 flex list-decimal flex-col gap-1 pl-5 text-sm text-ink marker:text-muted">
         {steps.map((step, index) => (
           <li key={index}>
             {step.text}
             {step.files.length === 0 ? null : (
-              <span className="ml-2 font-mono text-xs text-muted">{step.files.join(" · ")}</span>
+              <span className="ml-2 text-meta text-muted">{step.files.map((file, at) => (<span key={file}>{at === 0 ? null : " · "}<Code tone="muted">{file}</Code></span>))}</span>
             )}
           </li>
         ))}
@@ -70,7 +71,7 @@ export function PlanCardView({
             </Button>
           </>
         )}
-        <span className="font-mono text-xs text-muted">{planFooter({ steps })}</span>
+        <span className="text-meta text-muted">{planFooter({ steps })}</span>
       </div>
       {error === null ? null : (
         <p role="alert" className="text-sm text-deny">

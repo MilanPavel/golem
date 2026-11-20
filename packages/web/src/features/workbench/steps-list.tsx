@@ -56,7 +56,7 @@ function Bar({ row, spanMs }: { row: StepRow; spanMs: number }) {
 
 function Legend() {
   return (
-    <p data-legend className="flex flex-wrap items-center gap-x-4 gap-y-1 font-mono text-xs text-muted">
+    <p data-legend className="flex flex-wrap items-center gap-x-4 gap-y-1 text-meta text-muted">
       {LEGEND.map(([kind, word]) => (
         <span key={kind} className="flex items-center gap-1.5">
           <span aria-hidden="true" className={cn("inline-block h-2 w-4 rounded-sm border border-line", SEGMENT[kind])} />
@@ -75,7 +75,7 @@ function Legend() {
  */
 export function StepsView({ batches, onOpen = openHelper }: { batches: readonly StepsBatch[]; onOpen?: (open: HelperOpen) => void }) {
   return (
-    <div data-steps className="flex flex-col gap-5 font-mono text-xs leading-snug">
+    <div data-steps className="flex flex-col gap-5 text-meta leading-snug">
       <Legend />
       {batches.map(({ callId, head, list, refs }) => (
         <section key={callId} aria-label={`Steps, ${head}`} data-steps-batch className="flex flex-col gap-1.5">

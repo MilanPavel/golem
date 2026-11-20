@@ -7,6 +7,7 @@ import { ChevronDownIcon, OpenIcon, UndoIcon } from "../../ui/icons.tsx";
 import { useChangeDiff, useFileDiff } from "../../store/page-context.tsx";
 import type { ChangedFile, FileDiff } from "../../store/changes.ts";
 import { DiffModeSwitch, DiffView, type DiffMode } from "../diff/index.ts";
+import { Code } from "../../ui/code.tsx";
 
 const SMALL = "px-1.5 py-0 text-xs";
 
@@ -65,12 +66,12 @@ export function Row({
         aria-controls={open ? panel : undefined}
         title={file.path}
         onClick={onToggle}
-        className="flex min-w-0 flex-1 items-center gap-2 rounded-sm px-1.5 py-1 text-left font-mono text-xs outline-offset-2 outline-clay hover:bg-sunken focus-visible:outline-2"
+        className="flex min-w-0 flex-1 items-center gap-2 rounded-sm px-1.5 py-1 text-left text-meta outline-offset-2 outline-clay hover:bg-sunken focus-visible:outline-2"
       >
         <ChevronDownIcon aria-hidden="true" className={cn("size-3.5 flex-none text-muted", !open && "-rotate-90")} />
         <span className="flex min-w-0 flex-1 items-baseline">
-          {folder === "" ? null : <span className="min-w-0 truncate text-muted">{folder}</span>}
-          <span className="flex-none text-ink">{name}</span>
+          {folder === "" ? null : <Code tone="muted" className="min-w-0 truncate">{folder}</Code>}
+          <Code className="flex-none">{name}</Code>
         </span>
         {file.status === "created" ? <Badge tone="allow" className={SMALL}>new</Badge> : null}
         {file.status === "deleted" ? <Badge tone="deny" className={SMALL}>deleted</Badge> : null}
