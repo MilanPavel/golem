@@ -248,13 +248,14 @@ class DaemonApp:
                     load_ms=timings.get("load_ms"),
                 )
 
+            bench_store = BenchStore(self.paths.cache_dir, ram_gb=models.ram_gb)
             router.plans = WindowPlans(
                 settings=router.context_settings,
                 discovery=models,
                 ram_gb=models.ram_gb,
                 cache_dir=self.paths.cache_dir,
                 parallel=lambda: local.settings.parallel,
-                measured=BenchStore(self.paths.cache_dir, ram_gb=models.ram_gb).measured,
+                measured=bench_store.measured,
             )
 
             async def note_loaded(profile: str, sent_num_ctx: int | None) -> Loaded:
@@ -417,7 +418,9 @@ class DaemonApp:
                     price_of=lambda profile: _price_of(router, models, profile),
                 )
                 self.state.checks = checks
-                self.state.benches = BenchManager(router, local, broadcast=self._broadcast)
+                self.state.benches = BenchManager(
+                    router, local, broadcast=self._broadcast, store=bench_store
+                )
                 self.state.installer = OllamaInstaller(broadcast=self._broadcast)
                 self.state.runtimes = {
                     name: runtime_installer(name, broadcast=self._broadcast) for name in RUNTIMES

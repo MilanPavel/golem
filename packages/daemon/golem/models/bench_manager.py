@@ -16,6 +16,7 @@ from typing import Protocol
 from pydantic import BaseModel
 
 from golem.models.bench import MAX_AT_ONCE, NoLocalModel, OnRow, Result, Row, bench, local_profile
+from golem.models.bench_store import BenchStore
 from golem.models.engine import OLLAMA
 from golem.models.errors import ModelUnreachable, failure_of, provider_error
 from golem.models.ollama import LocalServers
@@ -67,11 +68,13 @@ class BenchManager:
         *,
         broadcast: Broadcast | None = None,
         run: Run = bench,
+        store: BenchStore | None = None,
     ) -> None:
         self._router = router
         self._local = local
         self.broadcast: Broadcast = broadcast or (lambda _model: None)
         self._run_bench = run
+        self._store = store
         self._runs: dict[str, asyncio.Task[None]] = {}
 
     def benching(self) -> list[str]:
@@ -120,7 +123,10 @@ class BenchManager:
 
         try:
             limit = await self._limit(profile, target)
-            await self._run_bench(self._router, self._local, profile, limit=limit, on_row=progress)
+            result = await self._run_bench(
+                self._router, self._local, profile, limit=limit, on_row=progress
+            )
+            self._save(profile, result)
         except asyncio.CancelledError:
             error = "cancelled"
         except NoLocalModel as exc:
@@ -134,6 +140,15 @@ class BenchManager:
             )
             self._send(ModelBenchDoneNotification(params=done))
             log.info("bench ended ref=%s error=%s", ref, error)
+
+    def _save(self, profile: str, result: Result) -> None:
+        """Keep a finished run. The store is asked by model id, which the router knows."""
+        if self._store is None:
+            return
+        try:
+            self._store.save(result, model_id=self._router.resolve(profile).model_id)
+        except Exception:
+            log.warning("could not save the bench of %s", result.model, exc_info=True)
 
     async def _limit(self, profile: str, target: tuple[str, str]) -> int:
         """Calls at once for a server golem did not start: 1 when the probe saw no overlap."""
