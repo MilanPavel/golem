@@ -1,7 +1,33 @@
 {
   "additionalProperties": false,
-  "description": "A chat call waits, or no longer waits, for its turn on a local model server.\n\nSent for the reply ``message_id`` only, so other sessions never show it. Stored only\nuntil its message completes. With ``waiting`` true, ``model`` and ``window`` say the call\nis loading ``model`` again with a larger ``window``, and the meter says so.",
+  "description": "A chat call waits, or no longer waits, for its turn on a model line.\n\nSent for the reply ``message_id`` only, so other sessions never show it. Stored only\nuntil its message completes. With ``waiting`` true, ``model`` and ``window`` say the call\nis loading ``model`` again with a larger ``window``, and the meter says so.\n\nThe fields after ``window`` are all optional, so an old daemon's event still reads. A\ndaemon that sends ``waiting`` true always sends ``reason``. ``line`` names the model, the\nprovider or ``shell``. ``position`` (1 is next) is for ``slot`` and ``provider``.\n``holder`` is the label of the call that frees a slot first. ``retry_in_ms`` is the\nbackoff left, for ``provider``. ``silent_ms``, ``scope`` and ``will_retry`` are for\n``stalled``.",
   "properties": {
+    "holder": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Holder"
+    },
+    "line": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Line"
+    },
     "message_id": {
       "minLength": 1,
       "title": "Message Id",
@@ -20,9 +46,97 @@
       "default": null,
       "title": "Model"
     },
+    "position": {
+      "anyOf": [
+        {
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Position"
+    },
+    "reason": {
+      "anyOf": [
+        {
+          "enum": [
+            "slot",
+            "load",
+            "provider",
+            "team",
+            "budget",
+            "you",
+            "stalled"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Reason"
+    },
+    "retry_in_ms": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Retry In Ms"
+    },
+    "scope": {
+      "anyOf": [
+        {
+          "enum": [
+            "call",
+            "team"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Scope"
+    },
+    "silent_ms": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Silent Ms"
+    },
     "waiting": {
       "title": "Waiting",
       "type": "boolean"
+    },
+    "will_retry": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Will Retry"
     },
     "window": {
       "anyOf": [

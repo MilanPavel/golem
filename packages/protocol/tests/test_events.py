@@ -265,6 +265,33 @@ def test_a_model_waiting_event_round_trips() -> None:
         ModelWaitingData(message_id="", waiting=True)
 
 
+def test_a_model_waiting_event_carries_the_wait_fields_and_reads_without_them() -> None:
+    old = ModelWaitingData.model_validate({"message_id": "m_abc", "waiting": True})
+    assert old.reason is None and old.line is None and old.position is None
+    hosted = ModelWaitingData(
+        message_id="m_abc",
+        waiting=True,
+        reason="provider",
+        line="anthropic",
+        position=1,
+        retry_in_ms=2000,
+    )
+    assert ModelWaitingData.model_validate(hosted.model_dump()) == hosted
+    stalled = ModelWaitingData(
+        message_id="m_abc",
+        waiting=True,
+        reason="stalled",
+        silent_ms=45000,
+        scope="team",
+        will_retry=True,
+    )
+    assert stalled.scope == "team" and stalled.will_retry is True
+    with pytest.raises(ValidationError):
+        ModelWaitingData.model_validate({"message_id": "m_abc", "waiting": True, "reason": "later"})
+    with pytest.raises(ValidationError):
+        ModelWaitingData.model_validate({"message_id": "m_abc", "waiting": True, "scope": "batch"})
+
+
 def test_session_created_names_its_parent_and_agent() -> None:
     data = SessionCreatedData(
         model_profile="remote",

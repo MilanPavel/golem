@@ -307,9 +307,17 @@ export type Seq22 = number;
 export type SessionId24 = string;
 export type Ts22 = string;
 export type Type22 = 'tool.writing';
+export type Holder = string | null;
+export type Line = string | null;
 export type MessageId9 = string;
 export type Model2 = string | null;
+export type Position = number | null;
+export type Reason3 = ('slot' | 'load' | 'provider' | 'team' | 'budget' | 'you' | 'stalled') | null;
+export type RetryInMs = number | null;
+export type Scope = ('call' | 'team') | null;
+export type SilentMs = number | null;
 export type Waiting = boolean;
+export type WillRetry = boolean | null;
 export type Window = number | null;
 export type RunId24 = string;
 export type Seq23 = number;
@@ -763,7 +771,7 @@ export type SessionId37 = string;
 export type Ts35 = string;
 export type Type35 = 'skill.activated';
 export type Name8 = string;
-export type Reason3 = 'unpinned';
+export type Reason4 = 'unpinned';
 export type RunId37 = string | null;
 export type Seq36 = number;
 export type SessionId38 = string;
@@ -771,7 +779,7 @@ export type Ts36 = string;
 export type Type36 = 'skill.deactivated';
 export type Message2 = string;
 export type Name9 = string;
-export type Reason4 = 'missing' | 'disabled' | 'broken';
+export type Reason5 = 'missing' | 'disabled' | 'broken';
 export type RunId38 = string | null;
 export type Seq37 = number;
 export type SessionId39 = string;
@@ -833,7 +841,7 @@ export type Ts42 = string;
 export type Type42 = 'helper.step';
 export type CallId13 = string;
 export type Index5 = number;
-export type Reason5 = string | null;
+export type Reason6 = string | null;
 export type State = 'queued' | 'running' | 'waiting';
 export type RunId44 = string | null;
 export type Seq43 = number;
@@ -1773,19 +1781,34 @@ export interface ModelWaitingEvent {
   type: Type23;
 }
 /**
- * A chat call waits, or no longer waits, for its turn on a local model server.
+ * A chat call waits, or no longer waits, for its turn on a model line.
  *
  * Sent for the reply ``message_id`` only, so other sessions never show it. Stored only
  * until its message completes. With ``waiting`` true, ``model`` and ``window`` say the call
  * is loading ``model`` again with a larger ``window``, and the meter says so.
  *
+ * The fields after ``window`` are all optional, so an old daemon's event still reads. A
+ * daemon that sends ``waiting`` true always sends ``reason``. ``line`` names the model, the
+ * provider or ``shell``. ``position`` (1 is next) is for ``slot`` and ``provider``.
+ * ``holder`` is the label of the call that frees a slot first. ``retry_in_ms`` is the
+ * backoff left, for ``provider``. ``silent_ms``, ``scope`` and ``will_retry`` are for
+ * ``stalled``.
+ *
  * This interface was referenced by `RpcNotification`'s JSON-Schema
  * via the `definition` "ModelWaitingData".
  */
 export interface ModelWaitingData {
+  holder?: Holder;
+  line?: Line;
   message_id: MessageId9;
   model?: Model2;
+  position?: Position;
+  reason?: Reason3;
+  retry_in_ms?: RetryInMs;
+  scope?: Scope;
+  silent_ms?: SilentMs;
   waiting: Waiting;
+  will_retry?: WillRetry;
   window?: Window;
 }
 /**
@@ -2268,7 +2291,7 @@ export interface SkillDeactivatedEvent {
  */
 export interface SkillDeactivatedData {
   name: Name8;
-  reason: Reason3;
+  reason: Reason4;
 }
 /**
  * A pinned skill was left out of the run's model calls.
@@ -2300,7 +2323,7 @@ export interface SkillSkippedEvent {
 export interface SkillSkippedData {
   message: Message2;
   name: Name9;
-  reason: Reason4;
+  reason: Reason5;
 }
 /**
  * The turn changed files and golem asks whether it may run the project's checks.
@@ -2496,7 +2519,7 @@ export interface HelperStateEvent {
 export interface HelperStateData {
   call_id: CallId13;
   index: Index5;
-  reason?: Reason5;
+  reason?: Reason6;
   state: State;
 }
 /**
