@@ -44,7 +44,7 @@ function Toolbar({ scope, settings, onScopePrivacy, onExport, disabled }: Pick<M
   const mayGo = scopeMayGoToPaid(settings, scope);
   const labelId = useId();
   return (
-    <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+    <div data-setting="paid model" className="flex flex-wrap items-center gap-x-4 gap-y-2">
       <span className="flex items-center gap-2 text-sm text-ink">
         <MemorySwitch checked={mayGo} labelledBy={labelId} onToggle={() => void onScopePrivacy(scope, mayGo ? "local" : "chat")} />
         <span id={labelId}>May be sent to a paid model</span>
@@ -76,7 +76,7 @@ export function MemoryView(props: MemoryViewProps) {
     <div className="flex max-w-column flex-col gap-4">
       <Input type="search" aria-label="Search memory" placeholder="Search memory" value={query} onChange={(event) => onQuery(event.target.value)} />
       <Tabs value={scope} onValueChange={(next) => onScope(next as MemoryScope)} className="flex flex-col gap-3">
-        <TabsList aria-label="Memory scopes">
+        <TabsList aria-label="Memory scopes" data-setting="scopes">
           {SCOPES.map((value) => (
             <TabsTrigger key={value} value={value}>
               {MEMORY_GROUPS[value]}{" "}

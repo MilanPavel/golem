@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ThemeSwitch } from "../../theme-switch.tsx";
 import { sessionPath, settingsPath } from "../../store/router.ts";
 import { installOffer } from "../../store/app-install.ts";
@@ -18,6 +18,8 @@ import { RoutingSection } from "./routing-section.tsx";
 import { RulesSection } from "./rules-section.tsx";
 import { GROUPS, SECTIONS } from "./sections.ts";
 import { SettingsNav, SettingsPicker } from "./settings-nav.tsx";
+import { searchSettings, useSettingJump, type SettingsMatch } from "./settings-search.ts";
+import { SettingsSearchBox, SettingsSearchResults } from "./settings-search.tsx";
 import { UsageSection } from "./usage-section.tsx";
 import { SkillsSection } from "./skills-section.tsx";
 import { AgentsSection } from "./agents-section.tsx";
@@ -93,9 +95,39 @@ export function SettingsScreen({ section }: { section: string }) {
   useEffect(() => {
     if (section === "info" && location.pathname === "/settings/setup") navigate(settingsPath("info"), { replace: true });
   }, [section, navigate]);
+  const [query, setQuery] = useState("");
+  const [jump, setJump] = useState<{ section: string; keyword: string } | null>(null);
+  const searchBox = useRef<HTMLInputElement>(null);
+  const matches = searchSettings(query);
+  const finishJump = useCallback(() => {
+    setJump(null);
+  }, []);
+  useSettingJump(jump, section, finishJump);
+  // Opening a result leaves the search, and a keyword result then goes to its row.
+  const open = (match: SettingsMatch | null, href: string) => {
+    setQuery("");
+    setJump(match?.keyword == null ? null : { section: match.section.id, keyword: match.keyword });
+    navigate(href);
+  };
   return (
     <div data-screen="settings" className="flex min-h-0 flex-1 flex-col md:flex-row">
-      <SettingsNav section={section} version={version} onNavigate={navigate} />
+      <SettingsNav
+        section={section}
+        version={version}
+        onNavigate={navigate}
+        search={
+          <SettingsSearchBox
+            value={query}
+            inputRef={searchBox}
+            onChange={setQuery}
+            onEnter={() => {
+              const first = matches[0];
+              if (first !== undefined) open(first, settingsPath(first.section.id));
+            }}
+          />
+        }
+        results={query.trim() === "" ? undefined : <SettingsSearchResults query={query} matches={matches} section={section} onPick={open} />}
+      />
       <SettingsPicker section={section} current={current} onNavigate={navigate} />
       {/* `relative`: the close button sits in the corner of this pane, and a visually hidden input is positioned against it, so it scrolls with it and cannot make the window taller. */}
       <section className="relative flex min-h-0 min-w-0 flex-1 flex-col gap-3 overflow-y-auto px-7 py-5">

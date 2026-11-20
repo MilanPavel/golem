@@ -96,7 +96,18 @@
   --animate-fade-out: fade-out 150ms ease-in;
   --animate-pop-in: pop-in 180ms ease-out;
   --animate-pop-out: pop-out 150ms ease-in;
+  /* The ring on the row a settings search lands on. */
+  --animate-flash: flash 1500ms ease-out;
 
+  @keyframes flash {
+    0%,
+    30% {
+      box-shadow: 0 0 0 3px var(--color-clay);
+    }
+    100% {
+      box-shadow: 0 0 0 0 transparent;
+    }
+  }
   @keyframes fade-in {
     from {
       opacity: 0;

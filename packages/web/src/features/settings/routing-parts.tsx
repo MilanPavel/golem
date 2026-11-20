@@ -16,10 +16,10 @@ export function FieldError({ id, path, errors }: { id: string; path: string; err
 }
 
 /** A part of the page: a heading with a line beside it, then the body. */
-export function Part({ id, title, tag, line, children }: { id?: string; title: string; tag?: ReactNode; line?: string; children: ReactNode }) {
+export function Part({ id, setting, title, tag, line, children }: { id?: string; setting?: string; title: string; tag?: ReactNode; line?: string; children: ReactNode }) {
   const heading = useId();
   return (
-    <section id={id} aria-labelledby={heading} className="flex scroll-mt-6 flex-col gap-3">
+    <section id={id} data-setting={setting} aria-labelledby={heading} className="flex scroll-mt-6 flex-col gap-3">
       <div className="flex flex-col gap-0.5 sm:flex-row sm:items-baseline sm:gap-3">
         <h3 id={heading} className="text-base font-semibold">
           {title}

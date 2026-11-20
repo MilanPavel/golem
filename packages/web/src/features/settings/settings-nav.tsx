@@ -49,11 +49,14 @@ export function SettingsNav({
   section,
   version,
   search,
+  results,
   onNavigate,
 }: {
   section: string;
   version: string | null;
   search?: ReactNode;
+  /** Shown in place of the grouped list while there is a query. */
+  results?: ReactNode;
   onNavigate: (href: string) => void;
 }) {
   return (
@@ -63,7 +66,7 @@ export function SettingsNav({
         {search}
       </div>
       <nav aria-label="Settings sections" className="min-h-0 flex-1 overflow-y-auto px-2.5 pb-3">
-        <Groups section={section} onNavigate={onNavigate} />
+        {results ?? <Groups section={section} onNavigate={onNavigate} />}
       </nav>
       <div className="flex items-center gap-2 border-t border-line px-4 pt-2.5 pb-3 font-mono text-xs text-faint">
         <span aria-hidden="true" className="size-1.75 rounded-full bg-allow" />

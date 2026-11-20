@@ -19,7 +19,7 @@ export function DetailSwitch() {
     group.current?.querySelectorAll<HTMLElement>("[role=radio]")[DETAILS.indexOf(next)]?.focus();
   };
   return (
-    <div>
+    <div data-setting="chat detail">
       <div ref={group} role="radiogroup" aria-label="Chat detail" aria-describedby={hintId} className="flex items-center gap-2">
         <span className="text-sm text-muted">Chat detail</span>
         {DETAILS.map((level, index) => (

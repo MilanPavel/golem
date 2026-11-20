@@ -243,7 +243,7 @@ export function RoutingPath({
     />
   );
   return (
-    <Part title={ROUTING_WORDS.path.title} line={ROUTING_WORDS.path.line}>
+    <Part setting="path of a turn" title={ROUTING_WORDS.path.title} line={ROUTING_WORDS.path.line}>
       <div className={cn(CARD, "flex flex-col gap-4 p-5")}>
         <div className="grid grid-cols-1 items-end @route:cols-route-track">
           {station("local", "")}
