@@ -21,6 +21,7 @@ export const BROWSER_METHODS: ReadonlySet<string> = new Set([
   "file.read",
   "fs.list_dirs",
   "hello",
+  "helper.stop",
   "mcp.add",
   "mcp.call",
   "mcp.catalog",

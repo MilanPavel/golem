@@ -244,6 +244,11 @@ class SessionSummary(BaseModel):
     the reason (``slot``, ``provider`` or ``load``) and the plain name of the model or provider.
     Null when no call waits, and for the waits the status already shows. An older daemon
     leaves them out.
+    ``helpers_running`` and ``helpers_waiting`` are set on a lead: how many of its helpers have
+    a run in progress, and how many wait for an answer. Null for a session with no helpers.
+    ``step`` is set on a helper: its newest step as one line (the ``summary`` of its last
+    ``helper.step``), at most 200 characters. Null before the first step. An older daemon
+    leaves all three out.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -266,6 +271,9 @@ class SessionSummary(BaseModel):
     agent: str | None = Field(default=None, min_length=1)
     wait_reason: WaitReason | None = None
     wait_line: str | None = Field(default=None, min_length=1)
+    helpers_running: int | None = Field(default=None, ge=0)
+    helpers_waiting: int | None = Field(default=None, ge=0)
+    step: str | None = Field(default=None, min_length=1, max_length=200)
 
 
 class SessionListResult(BaseModel):
@@ -1956,6 +1964,28 @@ class AgentsGetResult(AgentInfo):
     """The agent type and its prompt, the body of its file."""
 
     prompt: str
+
+
+class HelperStopParams(BaseModel):
+    """``helper.stop``. Cancel the run of a helper session.
+
+    The lead goes on with ``stopped: cancelled`` as the helper's result (ADR-059).
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    session_id: str = Field(min_length=1)
+
+
+class HelperStopResult(BaseModel):
+    """Whether a run was stopped.
+
+    ``stopped`` is false when the helper had no run in progress.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    stopped: bool
 
 
 RoutineSource = Literal["user", "project"]
@@ -4273,6 +4303,8 @@ __all__ = [
     "FsListDirsResult",
     "HelloParams",
     "HelloResult",
+    "HelperStopParams",
+    "HelperStopResult",
     "InspectMessage",
     "InstallMethod",
     "KeychainWait",

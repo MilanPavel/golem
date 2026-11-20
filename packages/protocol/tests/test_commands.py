@@ -14,6 +14,8 @@ from golem_protocol.commands import (
     DaemonStatus,
     HelloParams,
     HelloResult,
+    HelperStopParams,
+    HelperStopResult,
     InspectMessage,
     ListedProvider,
     LocalServer,
@@ -255,6 +257,37 @@ def test_summary_wait_fields_are_optional_and_round_trip() -> None:
         _summary(wait_reason="nonsense")
     with pytest.raises(ValidationError):
         _summary(wait_line="")
+
+
+def test_summary_helper_fields_are_optional_and_round_trip() -> None:
+    old = _summary()
+    assert (old.helpers_running, old.helpers_waiting, old.step) == (None, None, None)
+    lead = _summary(helpers_running=2, helpers_waiting=1)
+    assert SessionSummary.model_validate_json(lead.model_dump_json()) == lead
+    assert (lead.helpers_running, lead.helpers_waiting) == (2, 1)
+    helper = _summary(parent_session_id="s1", agent="explorer", step="3 lines")
+    assert SessionSummary.model_validate_json(helper.model_dump_json()) == helper
+    assert _summary(step="x" * 200).step == "x" * 200
+    with pytest.raises(ValidationError):
+        _summary(step="x" * 201)
+    with pytest.raises(ValidationError):
+        _summary(step="")
+    with pytest.raises(ValidationError):
+        _summary(helpers_running=-1)
+
+
+def test_helper_stop_round_trips_and_refuses_bad_input() -> None:
+    params = HelperStopParams(session_id="h1")
+    assert HelperStopParams.model_validate_json(params.model_dump_json()) == params
+    for stopped in (True, False):
+        result = HelperStopResult(stopped=stopped)
+        assert HelperStopResult.model_validate_json(result.model_dump_json()) == result
+    with pytest.raises(ValidationError):
+        HelperStopParams.model_validate({"session_id": ""})
+    with pytest.raises(ValidationError):
+        HelperStopParams.model_validate({"session_id": "h1", "extra": 1})
+    with pytest.raises(ValidationError):
+        HelperStopResult.model_validate({})
 
 
 def test_pending_item_refuses_unknown_fields_and_negative_counts() -> None:
