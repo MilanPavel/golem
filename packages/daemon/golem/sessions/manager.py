@@ -1856,7 +1856,12 @@ class SessionManager:
             ),
         )
         if summary is not None:
-            await self._events.note_step(event.session_id, summary)
+            # The run may have ended while the step was stored: its steps are cleared by then.
+            await self._events.note_step(
+                event.session_id,
+                summary,
+                lambda: self._steps.get(event.session_id) is calls,
+            )
 
     def _stop_for_limit(self, helper_id: str, run_id: str, timed_out: bool) -> None:
         """Cancel the helper's run from a task of its own: the caller may be that run."""

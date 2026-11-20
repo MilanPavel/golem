@@ -81,10 +81,15 @@ class SessionLog:
         """A helper's newest step, None before its first or once its run ended."""
         return self._steps.get(session_id)
 
-    async def note_step(self, session_id: str, line: str) -> None:
+    async def note_step(
+        self, session_id: str, line: str, live: Callable[[], bool] = lambda: True
+    ) -> None:
         """Remember ``line`` as the helper's newest step, and push its summary, at most once a
-        second. A step inside that second shows with the next summary."""
+        second. A step inside that second shows with the next summary. ``live`` says the run
+        that took the step goes on: a step that comes in after its run ended is dropped."""
         async with self._lock(session_id):
+            if not live():
+                return
             self._steps[session_id] = line
             now = self.clock()
             last = self._step_pushed.get(session_id)
