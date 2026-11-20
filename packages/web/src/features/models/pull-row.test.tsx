@@ -70,6 +70,8 @@ test("a download shows in the sidebar on home, in a session and in Settings, and
   expect(row()).not.toBeNull();
   await user.click(within(screen.getByRole("navigation", { name: "Sidebar rail" })).getByRole("button", { name: "Settings" }));
   expect(location.pathname).toBe("/settings");
+  // Settings hides the panel until it is asked for.
+  await user.click(within(screen.getByRole("navigation", { name: "Sidebar rail" })).getByRole("button", { name: "Sessions" }));
   expect(row()).not.toBeNull();
   done(fake, true);
   await waitFor(() => expect(row()).toBeNull());
