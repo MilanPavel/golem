@@ -600,6 +600,7 @@ class SessionManager:
                 profile=session.model_profile,
                 options=dict(session.options),
                 tools=self._offered(session),
+                memory=self._memory_access(session, session.model_profile, ""),
             )
             messages = plain_messages(_as_sent(values))
             return SessionView(
@@ -644,6 +645,7 @@ class SessionManager:
                 profile=session.model_profile,
                 options=dict(session.options),
                 tools=self._offered(session),
+                memory=self._memory_access(session, session.model_profile, ""),
             )
             schemas = self._runtime.tools.scoped(_scope(session)).schemas()
             done = await self._runtime.compact(

@@ -135,6 +135,18 @@ class MemoryStore:
         found = {str(row["scope"]): int(row["n"]) for row in rows}
         return {scope: found.get(scope, 0) for scope in SCOPES}
 
+    async def tally(self, folder: str | None) -> list[tuple[Scope, Privacy, int]]:
+        """How many kept memories there are by scope and stamp: yours, ``folder``'s, history."""
+        rows = await self._database.fetch_all(
+            "SELECT scope, privacy, count(*) AS n FROM memories WHERE state = 'kept' AND"
+            " (scope != 'project' OR folder = ?) GROUP BY scope, privacy",
+            (folder,),
+        )
+        return [
+            (cast(Scope, str(r["scope"])), cast(Privacy, str(r["privacy"])), int(r["n"]))
+            for r in rows
+        ]
+
     async def search(
         self,
         query: str,

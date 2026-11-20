@@ -8,7 +8,7 @@ enabled = false`` turns every method off: writes return None, reads return nothi
 from __future__ import annotations
 
 from collections.abc import Callable, Iterable
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 from typing import Literal
 
@@ -84,6 +84,22 @@ class MemoryService:
     @property
     def enabled(self) -> bool:
         return self._settings().enabled
+
+    def setting_of(self, scope: Scope) -> MemoryPrivacyLevel:
+        """The ``[memory]`` privacy setting of ``scope``."""
+        return _setting(self._settings(), scope)
+
+    async def snapshot(self, folder: str | None) -> MemorySnapshot:
+        """What the fixed block reads: your ``always`` lines and the counts, as of now.
+
+        An ``always`` line must be yours (author or kept by ``you``) and ``kept``.
+        """
+        always: list[MemoryRecord] = []
+        after: str | None = None
+        while page := await self._store.list(scope="you", state="kept", limit=200, after=after):
+            always.extend(r for r in page if r.always and "you" in (r.author, r.kept_by))
+            after = page[-1].id
+        return MemorySnapshot(tuple(always), tuple(await self._store.tally(folder)))
 
     @property
     def store(self) -> MemoryStore:
@@ -375,6 +391,18 @@ class MemoryService:
 
 
 @dataclass(frozen=True, slots=True)
+class MemorySnapshot:
+    """The memory a run's fixed block is made from, read once when the run starts.
+
+    ``always`` are the lines, newest first. ``tally`` is how many kept memories there are by
+    scope and stamp, so each call can count only what its model may read.
+    """
+
+    always: tuple[MemoryRecord, ...] = ()
+    tally: tuple[tuple[Scope, Privacy, int], ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
 class MemoryAccess:
     """What one run carries: the service, its project, its chat, and the message it answers.
 
@@ -388,10 +416,24 @@ class MemoryAccess:
     user_message: str
     project_private: bool = False
     """The project's own ``[memory] private = true``."""
+    held: list[MemorySnapshot] = field(
+        default_factory=list[MemorySnapshot], compare=False, repr=False
+    )
+    """The run's snapshot once read. Copies of this access (``replace``) share it."""
 
     @property
     def enabled(self) -> bool:
         return self.service.enabled
+
+    async def snapshot(self) -> MemorySnapshot:
+        """The snapshot of this run: read on the first call, the same for every call after.
+
+        An access is built once for each run, and again for a run that resumes, so a memory
+        written during a run is not in the run's later calls.
+        """
+        if not self.held:
+            self.held.append(await self.service.snapshot(self.project))
+        return self.held[0]
 
     async def remember(
         self, text: str, scope: Scope, quote: str, session_id: str | None = None
@@ -464,6 +506,7 @@ __all__ = [
     "MemoryAccess",
     "MemoryChange",
     "MemoryService",
+    "MemorySnapshot",
     "MemoryTextError",
     "title_of",
 ]

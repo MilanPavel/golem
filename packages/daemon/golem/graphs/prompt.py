@@ -44,6 +44,8 @@ class PromptContext:
     """The names of the tools offered on this call. Empty for a model that takes no tools."""
     window: int | None = None
     """The context window of this call's model in tokens, or None when unknown."""
+    memory: str | None = None
+    """The fixed memory block made for this call's model, or None (ADR-061)."""
 
 
 SectionFn = Callable[[PromptContext], str | None]
