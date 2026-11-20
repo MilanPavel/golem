@@ -27,7 +27,13 @@ from golem.store.events import EventLog
 from golem.store.records import RunRecords, SessionRecords
 from golem.tools import default_registry
 from golem.tools.registry import Tool, ToolContext, ToolError, ToolRegistry, ToolResult
-from golem_protocol.events import AgentSnapshot, ChatEvent
+from golem_protocol.events import (
+    AgentSnapshot,
+    ChatEvent,
+    EmptyEventData,
+    MessageStartedData,
+    ToolRequestedData,
+)
 
 SETTINGS = GolemSettings(default_model="ollama/qwen3:8b")
 
@@ -453,3 +459,31 @@ async def test_a_helper_started_in_a_run_of_its_lead_stores_tool_started_once(
     assert [e.run_id for e in tool_started] == [run_id]
     for helper in started:
         await chat.until(helper, "session.completed")
+
+
+async def test_trace_span_of_a_helper_call_reads_the_helpers_own_thread(
+    database: Database, project: Path, tmp_path: Path
+) -> None:
+    chat = _Chat(database, ["the answer"], home=tmp_path)
+    lead = await chat.manager.create(None, cwd=str(project))
+    helper = await chat.helper(lead, project, brief="find a")
+    own = await chat.until(helper, "session.completed")
+    reply = next(e for e in own if e.type == "message.completed" and e.data.role == "assistant")
+    # The lead asked with a `delegate` call, in a run of its own.
+    log = chat.manager._events  # pyright: ignore[reportPrivateUsage]
+    await log.emit(lead, "r_lead", "run.started", EmptyEventData())
+    await log.emit(
+        lead, "r_lead", "message.started", MessageStartedData(message_id="m_lead", role="assistant")
+    )
+    await log.emit(
+        lead,
+        "r_lead",
+        "tool.requested",
+        ToolRequestedData(call_id="call-1", message_id="m_lead", name="delegate", args={}),
+    )
+
+    _title, runs = await chat.manager.trace(lead)
+    (delegate,) = runs[0].children[0].children
+    assert [m.id for m in delegate.children] == [reply.data.message_id]
+    found = await chat.manager.trace_span(lead, reply.data.message_id)
+    assert [m.text for m in found.messages or [] if m.role == "user"] == ["find a"]

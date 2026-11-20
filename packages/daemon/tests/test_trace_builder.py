@@ -6,7 +6,14 @@ from typing import Any
 
 from pydantic import TypeAdapter
 
-from golem.sessions.trace import build_trace, helper_of, spans, with_windows
+from golem.sessions.trace import (
+    build_trace,
+    helper_ids,
+    helper_of,
+    helper_owning,
+    spans,
+    with_windows,
+)
 from golem_protocol.events import ChatEvent
 
 _EVENT: TypeAdapter[ChatEvent] = TypeAdapter(ChatEvent)
@@ -525,3 +532,79 @@ def test_with_windows_fills_a_helpers_model_span_too() -> None:
     runs = with_windows(build_trace(log.events), lambda name: 32000, "p")
     helper = runs[0].children[0].children[0].children[0]
     assert (helper.context_window, helper.context_window_estimated) == (32000, True)
+
+
+def _helper_session_log() -> _Log:
+    """The events of a helper session: one run, two model calls, one tool call."""
+    log = _Log()
+    log.user("look around", run="hr1")
+    log.model("k_1", run="hr1", window={"context_window": 8000}, used=4000)
+    log.add(
+        "tool.requested",
+        {"call_id": "kc_1", "message_id": "k_1", "name": "read_file", "args": {}},
+        "hr1",
+    )
+    log.add("tool.completed", {"call_id": "kc_1", "summary": "3 lines", "preview": "x"}, "hr1")
+    log.model("k_2", run="hr1")
+    log.add("run.completed", {}, "hr1")
+    return log
+
+
+def _lead_with_helper_sessions() -> _Log:
+    lead = _Log()
+    lead.user("look around")
+    lead.model("m_1", text="I will ask helpers")
+    lead.tool("d1", "m_1", name="delegate", end=None)
+    for index in (1, 0):
+        lead.add(
+            "helper.started",
+            {
+                "call_id": "d1",
+                "index": index,
+                "helper_id": f"s_h{index}",
+                "agent": "explorer",
+                "label": "",
+                "model": "p",
+                "wish": "cheapest",
+                "pick_reason": "",
+            },
+        )
+    lead.add("tool.completed", {"call_id": "d1", "summary": "explorer", "preview": "found"})
+    lead.model("m_2", text="done", used=900)
+    lead.add("run.completed", {})
+    return lead
+
+
+def test_a_helper_sessions_trace_nests_under_its_delegate_span() -> None:
+    lead = _lead_with_helper_sessions()
+    assert helper_ids(lead.events) == {"d1": ["s_h0", "s_h1"]}
+    helper = _helper_session_log().events
+    (run,) = build_trace(lead.events, {"d1": [helper, helper]})
+    assert _ids(run.children) == ["m_1", "m_2"]
+    delegate = run.children[0].children[0]
+    assert (delegate.id, delegate.status) == ("d1", "ok")
+    assert _ids(delegate.children) == ["k_1", "k_2", "k_1", "k_2"]
+    first = delegate.children[0]
+    assert (first.model, first.context_window) == ("x/y", 8000)
+    assert _ids(first.children) == ["kc_1"]
+    assert run.children[1].children == []
+
+
+def test_the_old_and_the_new_shape_both_nest() -> None:
+    (old,) = build_trace(_helper_log().events)
+    lead = _lead_with_helper_sessions()
+    (new,) = build_trace(lead.events, {"d1": [_helper_session_log().events]})
+    assert _ids(old.children[0].children[0].children) == ["k_1", "k_2"]
+    assert _ids(new.children[0].children[0].children) == ["k_1", "k_2"]
+    assert helper_of([new], "kc_1") == "d1"
+
+
+def test_a_span_is_found_in_the_helper_session_that_made_it() -> None:
+    a, b = _Log(), _Log()
+    a.user("a", run="ra")
+    a.model("a_1", run="ra")
+    b.user("b", run="rb")
+    b.model("b_1", run="rb")
+    assert helper_owning([a.events, b.events], "b_1") == 1
+    assert helper_owning([a.events, b.events], "a_1") == 0
+    assert helper_owning([a.events, b.events], "nope") is None

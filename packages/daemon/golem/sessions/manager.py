@@ -88,7 +88,9 @@ from golem.sessions.trace import (
     build_trace,
     context_events,
     filled_window,
+    helper_ids,
     helper_of,
+    helper_owning,
     read_span,
     with_windows,
 )
@@ -658,13 +660,21 @@ class SessionManager:
         """
         async with self._lock:
             session = await self._resolve(session_id)
-            runs = build_trace(await self._events.stored(session_id))
+            stored = await self._events.stored(session_id)
+            runs = build_trace(stored, await self._helper_logs(stored))
             window_of = self._runtime.window_of
             if window_of is not None:
                 runs = with_windows(
                     runs, lambda name: window_of(name, None).window, session.model_profile
                 )
             return session.title, runs
+
+    async def _helper_logs(self, events: Sequence[ChatEvent]) -> dict[str, list[list[ChatEvent]]]:
+        """The stored events of each helper session of ``events``, by ``delegate`` call id."""
+        return {
+            call: [await self._events.stored(h) for h in ids]
+            for call, ids in helper_ids(events).items()
+        }
 
     async def trace_context_events(self, session_id: str) -> list[TraceContextEvent]:
         """The session's ``context.changed`` events, for the trace.
@@ -687,10 +697,17 @@ class SessionManager:
         async with self._lock:
             session = await self._resolve(session_id)
             events = await self._events.stored(session_id)
-            runs = build_trace(events)
+            logs = await self._helper_logs(events)
+            runs = build_trace(events, logs)
             # A helper's calls are read from its own thread, not the session's.
             parent = helper_of(runs, span_id)
             thread = session_id if parent is None else child_thread(session_id, parent)
+            if parent in logs:
+                ids = helper_ids(events)[parent]
+                at = helper_owning(logs[parent], span_id)
+                if at is not None:
+                    thread = ids[at]
+                    events = [*events, *logs[parent][at]]
             messages = trace_messages(await self._runtime.values(thread))
         found = read_span(runs, events, messages, span_id)
         if found is None:

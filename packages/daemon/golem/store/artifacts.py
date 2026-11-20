@@ -2,7 +2,7 @@
 
 The model gets a preview and the artifact's id, and reads the rest in pages
 with ``read_artifact``. An artifact belongs to one session and is read only
-through it.
+through it, or through the lead of a helper session that made it.
 """
 
 from __future__ import annotations
@@ -40,11 +40,16 @@ class ArtifactStore:
     async def read(
         self, session_id: str, artifact_id: str, offset: int, limit: int
     ) -> ArtifactPage | None:
-        """``limit`` characters from ``offset``, or None for an artifact of another session."""
+        """``limit`` characters from ``offset``, or None for an artifact of another session.
+
+        The artifacts of the helper sessions of ``session_id`` (those with it as their root)
+        count as its own.
+        """
         row = await self._database.fetch_one(
             "SELECT size, kind, substr(data, ?, ?) AS page FROM artifacts"
-            " WHERE artifact_id = ? AND session_id = ?",
-            (max(0, offset) + 1, max(0, limit), artifact_id, session_id),
+            " WHERE artifact_id = ? AND (session_id = ? OR session_id IN"
+            " (SELECT s.session_id FROM sessions s WHERE s.root_session_id = ?))",
+            (max(0, offset) + 1, max(0, limit), artifact_id, session_id, session_id),
         )
         if row is None:
             return None
