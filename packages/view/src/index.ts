@@ -837,6 +837,15 @@ export {
   skillSummary,
 } from "./skills-view.ts";
 export {
+  groupHelpers,
+  helperSquare,
+  helperWords,
+  isHelperSession,
+  type HelperRows,
+  type HelperSession,
+  type HelperSquare,
+} from "./helper-rows.ts";
+export {
   lineName,
   ordinal,
   queuedWords,

@@ -212,3 +212,43 @@ test("a routine's session carries the routine mark, and a waiting one the waitin
     ],
   );
 });
+
+function helper(id: string, lead: string, status: SessionSummary["status"]): SessionSummary {
+  return { ...summary(id, `explorer · ${id}`), status, parent_session_id: lead, agent: "explorer" };
+}
+
+function rowsOf(sessions: SessionSummary[], query = "") {
+  return layoutSwitcher({ state: { ...openSwitcher("s_a"), query }, sessions, current: null, now: NOW, columns: 60, rows: 10 });
+}
+
+test("a lead with two helpers is one row with two squares; the helpers are not rows", () => {
+  const rows = rowsOf([summary("s_a", "Lead", true), helper("h1", "s_a", "running"), helper("h2", "s_a", "running")]);
+  assert.deepEqual(rows.map((row) => row.sessionId), ["s_a"]);
+  assert.deepEqual(rows[0]?.helpers, ["working", "working"]);
+  assert.equal(rows[0]?.helperWords, "2 helpers working");
+});
+
+test("a helper that asks has the asking square", () => {
+  const rows = rowsOf([summary("s_a", "Lead", true), helper("h1", "s_a", "running"), helper("h2", "s_a", "waiting")]);
+  assert.deepEqual(rows[0]?.helpers, ["working", "asking"]);
+  assert.equal(rows[0]?.helperWords, "1 helper working, 1 helper asks you");
+});
+
+test("helpers that are done leave no squares", () => {
+  const rows = rowsOf([summary("s_a", "Lead"), helper("h1", "s_a", "idle"), helper("h2", "s_a", "closed")]);
+  assert.deepEqual(rows.map((row) => row.sessionId), ["s_a"]);
+  assert.deepEqual(rows[0]?.helpers, []);
+  assert.equal(rows[0]?.helperWords, null);
+});
+
+test("a helper whose lead is not listed is not a row, and the filter skips it", () => {
+  const sessions = [summary("s_a", "Lead"), helper("h1", "gone", "running")];
+  assert.deepEqual(rowsOf(sessions).map((row) => row.sessionId), ["s_a"]);
+  assert.deepEqual(rowsOf(sessions, "explorer").map((row) => row.sessionId), []);
+});
+
+test("an older daemon, with no parent_session_id, shows the list as before", () => {
+  const rows = rowsOf(SESSIONS);
+  assert.deepEqual(rows.map((row) => row.sessionId), ["s_a", "s_b", "s_c"]);
+  assert.ok(rows.every((row) => row.helpers.length === 0));
+});

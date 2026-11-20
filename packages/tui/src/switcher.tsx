@@ -27,7 +27,8 @@ export function SwitcherView({
       {rows.length === 0 ? <Text dimColor>{empty}</Text> : null}
       {rows.map((row) => {
         const mark = row.routine ? `${ROUTINE_MARK} ` : "";
-        const pad = " ".repeat(Math.max(1, columns - mark.length - row.title.length - row.age.length - 5));
+        const squares = row.helpers.length > 0 ? row.helpers.length + 1 : 0;
+        const pad = " ".repeat(Math.max(1, columns - mark.length - row.title.length - squares - row.age.length - 5));
         return (
           <Text key={row.sessionId} wrap="truncate-end" inverse={row.selected}>
             <Text color={CLAY}>{row.selected ? "›" : " "}</Text>
@@ -39,6 +40,16 @@ export function SwitcherView({
             </Text>
             {row.routine ? <Text dimColor>{mark}</Text> : null}
             <Text bold={row.current}>{row.title}</Text>
+            {row.helpers.length > 0 ? (
+              <Text>
+                {" "}
+                {row.helpers.map((square, index) => (
+                  <Text key={index} color={square === "asking" ? "yellow" : square === "working" ? "green" : undefined} dimColor={square === "queued"}>
+                    {square === "queued" ? "□" : "■"}
+                  </Text>
+                ))}
+              </Text>
+            ) : null}
             <Text dimColor>{`${pad}${row.age}`}</Text>
           </Text>
         );

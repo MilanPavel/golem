@@ -97,7 +97,14 @@ from golem.sessions.runner import (
     run_turn,
 )
 from golem.sessions.summaries import cut_summary
-from golem.sessions.titles import TitleGenerator, choose_title, clean_title, fork_title
+from golem.sessions.titles import (
+    TitleGenerator,
+    choose_title,
+    clean_title,
+    fork_title,
+    helper_title,
+    provisional_title,
+)
 from golem.sessions.trace import (
     build_trace,
     context_events,
@@ -305,6 +312,8 @@ class _LiveSession:
     pins: PinMemory = field(default_factory=PinMemory)
     """What the log last said about each pin, so a run logs only a change."""
     title: str | None = None
+    provisional: bool = False
+    """The title is the first words of the first message, and a generated title replaces it."""
     titling: bool = False
     closed: bool = False
     task: asyncio.Task[None] | None = None
@@ -1190,6 +1199,10 @@ class SessionManager:
                 session_id, None, "session.updated", SessionUpdatedData(cwd=cwd)
             )
             session.cwd = cwd
+        if session.title is None and session.parent is None:
+            first = provisional_title(text)
+            if first != "":
+                await self._set_title(session, first, provisional=True)
         memory = self._memory_access(session, routed.profile, text)
         turn = self._turn_of(
             session,
@@ -1298,6 +1311,8 @@ class SessionManager:
                     ModelOptionsChangedData(options=dict(helper.options)),
                 )
             self._sessions[sid] = helper
+            # A helper is named where it shows (a card, a panel, the Inbox), never untitled.
+            await self._set_title(helper, helper_title(agent.name, label, brief))
             run_id = next((r for r, live in self._runs.items() if live.task is lead.task), None)
             await self._events.emit(
                 parent,
@@ -2833,7 +2848,9 @@ class SessionManager:
         local_only: bool = False,
         profile: str | None = None,
     ) -> None:
-        if reply is None or self._titles is None or session.title is not None or session.titling:
+        if reply is None or self._titles is None or session.titling:
+            return
+        if session.title is not None and not session.provisional:
             return
         if session.parent is not None:
             return  # a helper is not in the list, so it has no title to show
@@ -2865,16 +2882,19 @@ class SessionManager:
                 local_only=local_only,
             )
             async with self._lock:
-                if session.title is None and not session.closed:
+                if (session.title is None or session.provisional) and not session.closed:
                     await self._set_title(session, title)
         finally:
             session.titling = False
 
-    async def _set_title(self, session: _LiveSession, title: str) -> None:
+    async def _set_title(
+        self, session: _LiveSession, title: str, *, provisional: bool = False
+    ) -> None:
         await self._events.emit(
             session.session_id, None, "session.updated", SessionUpdatedData(title=title)
         )
         session.title = title
+        session.provisional = provisional
 
     def _run_for(self, session: _LiveSession | None) -> _LiveRun | None:
         if session is None or session.task is None or session.task.done():

@@ -1,11 +1,22 @@
 import { useId, useMemo, useRef, useState } from "react";
-import { groupByTime, isRoutineSession, queuedWords, sessionState, type SessionState } from "@golem/view";
+import {
+  groupByTime,
+  groupHelpers,
+  helperWords,
+  isHelperSession,
+  isRoutineSession,
+  queuedWords,
+  sessionState,
+  type HelperSquare,
+  type SessionState,
+} from "@golem/view";
 import { cn } from "../../ui/cn.ts";
 import { IconButton } from "../../ui/icon-button.tsx";
-import { ClockIcon, FolderIcon, MoreIcon } from "../../ui/icons.tsx";
+import { ClockIcon, FolderIcon, MoreIcon, SlidersIcon } from "../../ui/icons.tsx";
 import { Link } from "../../ui/link.tsx";
 import { Input } from "../../ui/input.tsx";
-import { Menu, MenuContent, MenuItem, MenuTrigger } from "../../ui/menu.tsx";
+import { Menu, MenuCheckboxItem, MenuContent, MenuItem, MenuTrigger } from "../../ui/menu.tsx";
+import { useShowHelpers } from "./show-helpers.ts";
 import { useNavigate, useRoute, useSessionList } from "../../store/page-context.tsx";
 import type { SessionSummary } from "../../store/session-list.ts";
 import { sessionPath } from "../../store/router.ts";
@@ -36,7 +47,30 @@ function SessionDot({ session }: { session: SessionSummary }) {
   );
 }
 
-const INDENT = ["", "pl-3", "pl-6", "pl-9"] as const;
+const SQUARE: Record<HelperSquare, string> = {
+  working: "bg-clay",
+  // Hollow, as the queued dot: the helper has not started its call.
+  queued: "border border-clay",
+  asking: "bg-wait",
+};
+
+/** One small square for each helper that is not done, next to the folder. Nothing when all are done. */
+function HelperSquares({ squares }: { squares: readonly HelperSquare[] }) {
+  const words = helperWords(squares);
+  if (words === null) return null;
+  return (
+    <span data-testid="helper-squares" title={words} className="flex shrink-0 items-center gap-0.5">
+      <span aria-hidden="true" className="flex items-center gap-0.5">
+        {squares.map((square, index) => (
+          <span key={index} data-square={square} className={cn("size-1.5 rounded-xs", SQUARE[square])} />
+        ))}
+      </span>
+      <span className="sr-only">{words}</span>
+    </span>
+  );
+}
+
+const INDENT =["", "pl-3", "pl-6", "pl-9"] as const;
 
 /** What the sidebar can do to a session. Without it a row has no menu. */
 export type SidebarActions = {
@@ -62,6 +96,7 @@ function ForkMark({ row }: { row: ForkRow }) {
 
 function SessionRow({
   row,
+  squares,
   selected,
   now,
   onNavigate,
@@ -69,6 +104,7 @@ function SessionRow({
   onAskClose,
 }: {
   row: ForkRow;
+  squares: readonly HelperSquare[];
   selected: boolean;
   now: number;
   onNavigate: (path: string) => void;
@@ -131,6 +167,7 @@ function SessionRow({
                   <span className="sr-only">started by a routine</span>
                 </>
               ) : null}
+              {isHelperSession(session) ? <span className="shrink-0 font-mono text-xs text-faint">helper</span> : null}
             </span>
             <span className="flex items-center gap-2">
               {session.cwd ? (
@@ -139,6 +176,7 @@ function SessionRow({
                   <span className="truncate">{folderName(session.cwd)}</span>
                 </span>
               ) : null}
+              <HelperSquares squares={squares} />
               <time dateTime={session.updated_at} className="ml-auto shrink-0 font-mono text-xs text-faint">
                 {timeAgo(session.updated_at, now)}
               </time>
@@ -200,6 +238,7 @@ type Chunk = { root: SessionSummary; rows: ForkRow[] };
 function TimeGroupSection({
   label,
   chunks,
+  squares,
   selectedId,
   now,
   onNavigate,
@@ -208,6 +247,7 @@ function TimeGroupSection({
 }: {
   label: string;
   chunks: Chunk[];
+  squares: ReadonlyMap<string, readonly HelperSquare[]>;
   selectedId: string | null;
   now: number;
   onNavigate: (path: string) => void;
@@ -226,6 +266,7 @@ function TimeGroupSection({
             <SessionRow
               key={row.session.session_id}
               row={row}
+              squares={squares.get(row.session.session_id) ?? []}
               selected={row.session.session_id === selectedId}
               now={now}
               onNavigate={onNavigate}
@@ -281,37 +322,54 @@ export function SessionsPanel({ sessions, selectedId, now, onNavigate, actions }
     setClosing(session);
   };
   const open = useMemo(() => sessions.filter((session) => session.status !== "closed"), [sessions]);
+  const [showHelpers, setShowHelpers] = useShowHelpers();
+  // A helper is not a row (ADR-059): its lead shows a square for it. The filter reads the rows only.
+  const grouped = useMemo(() => groupHelpers(open, { showHelpers }), [open, showHelpers]);
   const needle = filter.trim().toLowerCase();
   const shown = useMemo(
     () =>
       needle === ""
-        ? open
-        : open.filter(
+        ? grouped.rows
+        : grouped.rows.filter(
             (session) =>
               (session.title ?? "").toLowerCase().includes(needle) ||
               (session.cwd ? folderName(session.cwd) : "").toLowerCase().includes(needle),
           ),
-    [open, needle],
+    [grouped, needle],
   );
   const groups = useMemo(() => timeChunks(shown, now), [shown, now]);
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2">
-      <Input
-        type="text"
-        aria-label="Filter sessions"
-        placeholder="Filter sessions"
-        autoComplete="off"
-        spellCheck={false}
-        value={filter}
-        onChange={(event) => setFilter(event.target.value)}
-        onKeyDown={(event) => {
-          if (event.key === "Escape" && filter !== "") {
-            event.preventDefault();
-            setFilter("");
-          }
-        }}
-        className="py-1.5"
-      />
+      <div className="flex items-center gap-1">
+        <Input
+          type="text"
+          aria-label="Filter sessions"
+          placeholder="Filter sessions"
+          autoComplete="off"
+          spellCheck={false}
+          value={filter}
+          onChange={(event) => setFilter(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Escape" && filter !== "") {
+              event.preventDefault();
+              setFilter("");
+            }
+          }}
+          className="py-1.5"
+        />
+        <Menu>
+          <MenuTrigger asChild>
+            <IconButton label="List options" tooltip="List options" className="size-8 shrink-0">
+              <SlidersIcon />
+            </IconButton>
+          </MenuTrigger>
+          <MenuContent align="end">
+            <MenuCheckboxItem checked={showHelpers} onCheckedChange={(next) => setShowHelpers(next === true)}>
+              Show helpers
+            </MenuCheckboxItem>
+          </MenuContent>
+        </Menu>
+      </div>
       <div ref={list} tabIndex={-1} className="flex min-h-0 flex-1 flex-col gap-3.5 overflow-y-auto pr-0.5 outline-none">
         {groups.length === 0 ? (
           <p className="px-2.5 py-2 text-sm text-muted">{open.length === 0 ? "No sessions yet." : "No sessions match."}</p>
@@ -321,6 +379,7 @@ export function SessionsPanel({ sessions, selectedId, now, onNavigate, actions }
               key={group.label}
               label={group.label}
               chunks={group.chunks}
+              squares={grouped.squares}
               selectedId={selectedId}
               now={now}
               onNavigate={onNavigate}

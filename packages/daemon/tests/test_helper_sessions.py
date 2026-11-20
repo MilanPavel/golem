@@ -178,6 +178,35 @@ async def test_starting_twice_with_one_key_returns_one_session(
     assert [m.data.role for m in messages] == ["user", "assistant"]
 
 
+async def test_a_helper_is_titled_with_its_agent_and_its_label_or_brief(
+    database: Database, project: Path, tmp_path: Path
+) -> None:
+    chat = _Chat(database, ["done"], home=tmp_path)
+    lead = await chat.manager.create(None, cwd=str(project))
+    labelled = await chat.manager.start_helper(
+        lead,
+        "call-1",
+        0,
+        EXPLORER,
+        "look at everything",
+        "ollama/qwen3:8b",
+        str(project),
+        label="routing",
+    )
+    plain = await chat.manager.start_helper(
+        lead, "call-1", 1, EXPLORER, "x" * 30 + " " + "y" * 80, "ollama/qwen3:8b", str(project)
+    )
+    first = await chat.records.get(labelled.session_id)
+    second = await chat.records.get(plain.session_id)
+    assert first is not None
+    assert second is not None
+    assert first.title == "explorer · routing"
+    assert second.title is not None
+    assert second.title.startswith("explorer · xxxx")
+    assert len(second.title) <= 60
+    assert "\n" not in second.title
+
+
 async def test_a_helper_session_is_linked_to_its_lead_and_its_agent(
     database: Database, project: Path, tmp_path: Path
 ) -> None:
@@ -197,6 +226,7 @@ async def test_a_helper_session_is_linked_to_its_lead_and_its_agent(
         2,
     )
     assert record.agent == "worker"
+    assert record.title == "worker · change a.py"
     assert record.model_profile == "ollama/qwen3:8b"
     # Cut to the agent's tools, and the lead's mode because this agent may ask.
     assert set(record.allowed_tools) == {("write_file", None), ("shell", "git status")}

@@ -24,6 +24,8 @@ from golem.sessions.titles import (
     TitleGenerator,
     choose_title,
     clean_title,
+    first_words,
+    helper_title,
 )
 from golem.sessions.usage import Usage
 from golem.store.database import Database
@@ -198,7 +200,7 @@ async def test_the_first_completed_run_names_the_session_once(database: Database
     await manager.send(session_id, "hello")
 
     async def named() -> bool:
-        return await _titled(events, session_id) == ["Greeting"]
+        return await _titled(events, session_id) == ["hello", "Greeting"]
 
     await _until(named)
     record = await SessionRecords(database).get(session_id)
@@ -213,8 +215,73 @@ async def test_the_first_completed_run_names_the_session_once(database: Database
 
     await _until(ended)
     await manager.cancel_all()
-    assert await _titled(events, session_id) == ["Greeting"]
+    assert await _titled(events, session_id) == ["hello", "Greeting"]
     assert len(titles.asked) == 1
+
+
+def test_first_words_cut_after_a_whole_word_on_one_line() -> None:
+    assert first_words("fix the socket\nand more") == "fix the socket"
+    cut = first_words("word " * 30)
+    assert len(cut) <= TITLE_MAX_CHARS
+    assert cut.endswith("word…")
+    assert first_words("   \n ") == ""
+
+
+def test_helper_title_is_the_agent_and_the_label_or_the_brief() -> None:
+    assert helper_title("explorer", "routing", "ignored") == "explorer · routing"
+    assert helper_title("explorer", "", "look at\nthe daemon") == "explorer · look at"
+    assert len(helper_title("explorer", "", "word " * 40)) <= TITLE_MAX_CHARS
+    assert helper_title("explorer", "", "") == "explorer"
+
+
+async def test_a_session_has_the_first_words_of_its_first_message_until_the_generated_title(
+    database: Database,
+) -> None:
+    gate = asyncio.Event()
+
+    class _Slow:
+        async def title(
+            self,
+            model_profile: str,
+            prompt: str,
+            reply: str,
+            options: Mapping[str, float | str] | None = None,
+            session_id: str | None = None,
+            local_only: bool = False,
+        ) -> str:
+            await gate.wait()
+            return "Greeting"
+
+    manager, events = _manager(database, ScriptedChatModel(replies=["Hi"]), _Slow())
+    session_id = await manager.create(None)
+    await manager.send(session_id, "hello there, how are you")
+
+    record = await SessionRecords(database).get(session_id)
+    assert record is not None
+    assert record.title == "hello there, how are you"
+
+    gate.set()
+
+    async def named() -> bool:
+        return await _titled(events, session_id) == ["hello there, how are you", "Greeting"]
+
+    await _until(named)
+    await manager.cancel_all()
+    record = await SessionRecords(database).get(session_id)
+    assert record is not None
+    assert record.title == "Greeting"
+
+
+async def test_a_title_set_by_hand_is_not_replaced_by_the_generated_one(database: Database) -> None:
+    titles = _Titles("Generated")
+    manager, _events = _manager(database, ScriptedChatModel(replies=["Hi"]), titles)
+    session_id = await manager.create(None)
+    await manager.send(session_id, "hello")
+    await manager.rename(session_id, "Mine")
+    await manager.cancel_all()
+    record = await SessionRecords(database).get(session_id)
+    assert record is not None
+    assert record.title == "Mine"
 
 
 async def test_a_failed_run_does_not_name_the_session(database: Database) -> None:
@@ -229,7 +296,8 @@ async def test_a_failed_run_does_not_name_the_session(database: Database) -> Non
     await _until(failed)
     await manager.cancel_all()
     assert titles.asked == []
-    assert await _titled(events, session_id) == []
+    # Only the provisional title: the first words of the message.
+    assert await _titled(events, session_id) == ["hello"]
 
 
 async def test_shutdown_cancels_a_title_still_being_chosen(database: Database) -> None:
@@ -241,7 +309,7 @@ async def test_shutdown_cancels_a_title_still_being_chosen(database: Database) -
 
     await manager.cancel_all()
 
-    assert await _titled(events, session_id) == []
+    assert await _titled(events, session_id) == ["hello"]
 
 
 async def test_rename_stores_the_cleaned_title(database: Database) -> None:
@@ -281,7 +349,7 @@ async def test_a_title_set_by_hand_wins_over_one_being_chosen(database: Database
 
     await _until(ended)
     await manager.cancel_all()
-    assert await _titled(events, session_id) == ["Mine"]
+    assert await _titled(events, session_id) == ["hello", "Mine"]
 
 
 class _RecordingRouter(ModelRouter):

@@ -498,7 +498,8 @@ async def test_a_session_without_a_folder_takes_the_senders(
         "tool.completed",
     ]
     updated = [e for e in await chat.events.after(session_id) if e.type == "session.updated"]
-    assert [e.data.cwd for e in updated] == [str(project)]  # type: ignore[union-attr]
+    # The other update is the provisional title.
+    assert [e.data.cwd for e in updated if e.data.cwd is not None] == [str(project)]  # type: ignore[union-attr]
     record = await chat.records.get(session_id)
     assert record is not None and record.cwd == str(project)
 
