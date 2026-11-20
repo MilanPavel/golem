@@ -30,6 +30,8 @@ import { SAMPLE_EDIT_DIFF, SAMPLE_LONG_LINE_DIFF, SAMPLE_NEW_FILE_DIFF } from ".
 import { TodoList } from "../features/drawer/index.ts";
 import { DiffPanel } from "../features/workbench/file-row.tsx";
 import { rowKey } from "../features/workbench/turns-view.tsx";
+import { cloudFinishedChat, cloudRunningChat, localFinishedChat, localRunningChat, STEPS_NOW } from "../features/workbench/steps-sample.ts";
+import { StepsView, stepsBatches } from "../features/workbench/steps-tab.tsx";
 import { ChangesView, ChecksView, Workbench, type WorkbenchTab, CommitDialogView, ConflictDialogView, RewindDialogView, TurnsView, FilesView } from "../features/workbench/index.ts";
 import type { ChangedFile } from "../store/changes.ts";
 import { Composer, ContextBannerView, ContextChipView, DockView, Meter, ModeChipView, NotesChipView, PlanChipView, TuneChipView, ChecksQuestionView, RouteChipView, WaitHintView } from "../features/composer/index.ts";
@@ -449,6 +451,30 @@ function BatchCardDemo() {
           <div key={title} aria-label={`Batch card, ${title}`} role="group" className="flex flex-col gap-4 rounded-lg border border-line bg-bg p-4">
             <p className="font-mono text-xs text-faint">{title}</p>
             <TranscriptMessages chat={chat} detail={detail} isLocal={isLocal} />
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+/** The Inspector's Steps tab: a finished and a running batch, on local models (turns, hatched waits) and on cloud models (overlap). */
+function StepsTabDemo() {
+  const anchor = useAnchor();
+  const cases = [
+    ["local only, finished", localFinishedChat()],
+    ["local only, running", localRunningChat()],
+    ["cloud only, finished", cloudFinishedChat()],
+    ["cloud only, running", cloudRunningChat()],
+  ] as const;
+  return (
+    <section className="mt-6" id={anchor("Steps tab")}>
+      <h3 className="mb-2 font-mono text-xs text-faint">Steps tab</h3>
+      <div className="grid gap-3 md:grid-cols-2">
+        {cases.map(([title, chat]) => (
+          <div key={title} aria-label={`Steps tab, ${title}`} role="group" className="flex flex-col gap-3 rounded-lg border border-line bg-surface p-4">
+            <p className="font-mono text-xs text-faint">{title}</p>
+            <StepsView batches={stepsBatches(chat, STEPS_NOW)} />
           </div>
         ))}
       </div>
@@ -2225,6 +2251,7 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
 
       <WorkbenchDemo />
       <BatchCardDemo />
+      <StepsTabDemo />
       <HelperPanelDemo />
 
       <ChangesDemo />

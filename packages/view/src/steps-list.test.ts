@@ -3,7 +3,8 @@ import { test } from "node:test";
 
 import type { ChatEvent } from "@golem/client";
 
-import { helperSteps, layoutSteps } from "./steps-list.ts";
+import { emptyChat, reduceChat } from "./chat-state.ts";
+import { batchSteps, helperSteps, layoutSteps } from "./steps-list.ts";
 
 const T0 = Date.parse("2026-01-01T00:00:00Z");
 let seq = 0;
@@ -157,4 +158,27 @@ test("layoutSteps takes spans of any source, such as workflow runs", () => {
     { kind: "line", from: 0.25, to: 0.5 },
   ]);
   assert.equal(list.spanMs, 100);
+});
+
+test("the reduced chat keeps the timing: batchSteps over reduceChat equals helperSteps over the log", () => {
+  const events: ChatEvent[] = [
+    ev(0, "message.started", { message_id: "m", role: "assistant" }),
+    ev(0, "message.completed", { message_id: "m", role: "assistant", text: "go" }),
+    ev(0, "tool.requested", { call_id: "d1", message_id: "m", name: "delegate", args: {} }),
+    started(0, 0, "ollama/q"),
+    state(0, 0, "running"),
+    started(0, 1, "ollama/q"),
+    state(0, 1, "queued", "slot"),
+    ended(20, 0, 20_000),
+    state(20, 1, "running"),
+  ];
+  const chat = events.reduce(reduceChat, emptyChat);
+  const batch = chat.batches.d1;
+  assert.ok(batch !== undefined);
+  const fromState = batchSteps(batch, chat.batchTimes.d1 ?? {}, now);
+  assert.deepEqual(fromState, helperSteps("d1", events, now));
+  assert.deepEqual(
+    fromState.rows[1]?.segments.map((s) => s.kind),
+    ["line", "work"],
+  );
 });

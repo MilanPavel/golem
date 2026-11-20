@@ -14,7 +14,7 @@ import type { SessionModel, SessionView } from "../../store/session-store.ts";
 import { closeHelperNotOf, closeHelperOf, Transcript, useHelperOpen } from "../chat/index.ts";
 import { SessionDock } from "../composer/index.ts";
 import { TodoList, useDrawerOpen } from "../drawer/index.ts";
-import { ChangesTab, checksBadge, ChecksTab, FilesTab, Workbench, WORKBENCH_ID, type WorkbenchTab } from "../workbench/index.ts";
+import { ChangesTab, checksBadge, ChecksTab, FilesTab, hasSteps, StepsTab, Workbench, WORKBENCH_ID, type WorkbenchTab } from "../workbench/index.ts";
 import { closeModelDialog, ModelDialog, useModelDialogOpen } from "../models/index.ts";
 import { folderName, HelperPanel, useSessionActions } from "../sessions/index.ts";
 import { useRememberSettingsContext } from "../settings/index.ts";
@@ -33,6 +33,7 @@ const selectTodos = (view: SessionView) => view.chat.todos;
 
 const selectChecksMark = (view: SessionView) => checksBadge(view.chat.checks, view.chat.busy ? view.chat.runId : null);
 
+const selectHasSteps = (view: SessionView) => hasSteps(view.chat);
 const selectForkPoint = (view: SessionView) => forkPoint(view.chat.messages);
 
 const selectHeader = (view: SessionView): Header => ({
@@ -186,6 +187,7 @@ export function SessionFrame({ id, children }: { id: string; children: ReactNode
   const [drawerOpen, setDrawerOpen] = useDrawerOpen();
   const changed = useChangedFiles(id).files;
   const checksMark = useSession(id, selectChecksMark);
+  const hasBatches = useSession(id, selectHasSteps);
   const hasFolder = typeof summary?.cwd === "string" || (summary === undefined && typeof header.cwd === "string");
   const tabs = useMemo<readonly WorkbenchTab[]>(
     () => [
@@ -206,6 +208,7 @@ export function SessionFrame({ id, children }: { id: string; children: ReactNode
             },
           ]
         : []),
+      ...(hasBatches ? [{ id: "steps", label: "Steps", render: () => <StepsTab sessionId={id} /> }] : []),
       {
         id: "todos",
         label: "Todos",
@@ -213,7 +216,7 @@ export function SessionFrame({ id, children }: { id: string; children: ReactNode
         render: () => <TodoList todos={todos} />,
       },
     ],
-    [todos, hasFolder, changed, checksMark, id],
+    [todos, hasFolder, changed, checksMark, id, hasBatches],
   );
   const helperOpen = useHelperOpen();
   // A helper panel belongs to the chat that opened it: it closes when the chat does.
