@@ -50,7 +50,7 @@ function AgentCells({ row }: { row: AgentRow }) {
 export function AgentsTable({ agents }: { agents: readonly AgentInfo[] }) {
   const { rows, untrusted } = agentsTable(agents);
   return (
-    <div className="flex max-w-column flex-col gap-3">
+    <div data-setting="helpers" className="flex max-w-column flex-col gap-3">
       <p className="text-sm text-muted">{countLine(rows.length)}</p>
       {rows.length === 0 ? (
         <p className="text-sm text-muted">{AGENTS_HINT}</p>

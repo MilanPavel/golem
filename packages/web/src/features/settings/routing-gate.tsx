@@ -60,7 +60,7 @@ export function RoutingGate({
     />
   );
   return (
-    <Part id={id} title={words.title} line={words.line}>
+    <Part id={id} setting="paid gate" title={words.title} line={words.line}>
       <div className={cn(CARD, "grid grid-cols-1 @route:grid-cols-2", state.mode === "local" && "opacity-45")}>
         <div className="p-5">
           <h4 className="text-sm font-semibold">{words.before}</h4>

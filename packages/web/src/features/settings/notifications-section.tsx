@@ -98,7 +98,7 @@ export function NotificationsView({ values, onChange, onTest, error, tested }: N
       )}
 
       <h3 className={GROUP}>Tell me</h3>
-      <ul aria-label="Tell me">
+      <ul aria-label="Tell me" data-setting="tell me">
         <Row label="When something needs me" labelId="notify-needs-you" control={<Switch labelledBy="notify-needs-you" checked disabled onToggle={() => {}} />}>
           An approval or a question is waiting. Always on: this one cannot be turned off.
         </Row>
@@ -121,7 +121,7 @@ export function NotificationsView({ values, onChange, onTest, error, tested }: N
       </ul>
 
       <h3 className={GROUP}>Clicking a notification</h3>
-      <ul aria-label="Clicking a notification">
+      <ul aria-label="Clicking a notification" data-setting="clicking a notification">
         <Row
           label="Open clicks in"
           labelId="notify-open-in"
@@ -158,14 +158,14 @@ export function NotificationsView({ values, onChange, onTest, error, tested }: N
       </ul>
 
       <h3 className={GROUP}>Quiet hours</h3>
-      <ul aria-label="Quiet hours">
+      <ul aria-label="Quiet hours" data-setting="quiet hours">
         <Row label="Quiet hours" labelId="notify-quiet" control={<Switch labelledBy="notify-quiet" checked={false} disabled onToggle={() => {}} />}>
           {LATER} Notifications will wait until the end; runs still run.
         </Row>
       </ul>
 
       <h3 className={GROUP}>Pause</h3>
-      <ul aria-label="Pause">
+      <ul aria-label="Pause" data-setting="pause">
         <Row
           label="Pause all routines"
           labelId="notify-pause"

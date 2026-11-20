@@ -23,6 +23,7 @@ export function AppCard({ offer, host, where, onInstall }: AppCardProps) {
   return (
     <section
       aria-label={title}
+      data-setting={settings ? "app" : undefined}
       className={cn("flex w-full flex-col gap-2 text-left", !settings && "rounded-md border border-line bg-surface px-3.5 py-3")}
     >
       {settings ? <h3 className="text-sm font-semibold">{title}</h3> : <span className="font-semibold">{title}</span>}

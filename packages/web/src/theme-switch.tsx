@@ -15,7 +15,7 @@ export function ThemeSwitch() {
     setTheme(value);
   };
   return (
-    <div role="group" aria-label="Theme" className={"mt-6 flex items-center gap-2"}>
+    <div role="group" aria-label="Theme" data-setting="theme" className={"mt-6 flex items-center gap-2"}>
       <span className="text-sm text-muted">Theme</span>
       {CHOICES.map(({ value, label }) => (
         <button

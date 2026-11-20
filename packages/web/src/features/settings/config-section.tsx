@@ -46,7 +46,7 @@ export function ConfigSection() {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
-      <div role="group" aria-label="Which file" className="flex gap-2">
+      <div role="group" aria-label="Which file" data-setting="which file" className="flex gap-2">
         <Button size="sm" aria-pressed={!project} onClick={() => choose(false)}>
           Yours
         </Button>
@@ -203,7 +203,7 @@ function Editor({
         {!dirty ? "no changes" : checking ? "checking…" : current !== null && "failed" in current ? current.failed : blocked ? `${problems.length} ${problems.length === 1 ? "problem" : "problems"}` : "✔ valid"}
       </p>
       {blocked ? (
-        <ul aria-label="Problems" className="flex flex-col gap-1 font-mono text-xs text-deny">
+        <ul aria-label="Problems" data-setting="problems" className="flex flex-col gap-1 font-mono text-xs text-deny">
           {problems.map((problem, at) => (
             <li key={at} className="wrap-anywhere">
               {problemLine(problem)}

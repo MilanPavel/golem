@@ -132,7 +132,7 @@ export function RulesSection() {
       ) : config.data === undefined ? (
         <p className="font-mono text-sm text-muted">loading…</p>
       ) : (
-        <ul aria-label="Tool rules" className="flex flex-col gap-2">
+        <ul aria-label="Tool rules" data-setting="rules" className="flex flex-col gap-2">
           {items.map((item, at) => (
             <Row key={`${at}-${itemText(item)}`} item={item} canRevoke={sessionId !== null} onPress={press} />
           ))}
@@ -186,7 +186,7 @@ function DefaultMode({ mode }: { mode: PermissionMode }) {
   }
 
   return (
-    <section aria-labelledby="default-mode" className="flex flex-col gap-2 rounded-lg border border-line bg-surface px-3 py-3">
+    <section aria-labelledby="default-mode" data-setting="default mode" className="flex flex-col gap-2 rounded-lg border border-line bg-surface px-3 py-3">
       <h3 id="default-mode" className="font-mono text-xs text-faint">
         Default mode
       </h3>

@@ -93,7 +93,7 @@ function WindowSize({
   const kind = wantNumber ? "fixed" : windowKind(context);
   const fixed = kind === "fixed";
   return (
-    <Part title={words.title} tag={<ScopeTag tone="local">{words.scope}</ScopeTag>} line={words.line}>
+    <Part setting="window size" title={words.title} tag={<ScopeTag tone="local">{words.scope}</ScopeTag>} line={words.line}>
       <div className={cn(CARD, "grid grid-cols-1 items-start gap-x-7 gap-y-4 p-5", models.length > 0 && "@route:cols-route-long")}>
         <div className="flex flex-col gap-2">
           <PillChoices
@@ -232,7 +232,7 @@ export function ContextView({ values, listing, errors: saved, window = NO_LOCAL_
         }}
       />
       <WindowSize context={context} window={window} errors={errors} commit={commit} onChange={onChange} models={models} />
-      <Part title={words.fill.title} tag={<ScopeTag tone="all">{words.fill.scope}</ScopeTag>} line={words.fill.line}>
+      <Part setting="when it fills up" title={words.fill.title} tag={<ScopeTag tone="all">{words.fill.scope}</ScopeTag>} line={words.fill.line}>
         <div className={cn(CARD, "flex flex-col gap-4 p-5")}>
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-note text-muted">
             {hosted !== null && localName !== null ? (

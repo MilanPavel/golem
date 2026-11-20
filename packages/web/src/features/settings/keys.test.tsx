@@ -175,8 +175,9 @@ test("the page has no input, and says keys are set in a terminal", async () => {
   await screen.findByRole("list", { name: "Model providers" });
   expect(screen.getByText("Keys are set and removed in a terminal. This page never sees, stores or sends one; it only shows where each key is.")).toBeTruthy();
   const main = within(screen.getByRole("main"));
-  expect(main.queryByRole("textbox")).toBeNull();
-  expect(document.querySelector("main input")).toBeNull();
+  // The search box in the sidebar is the one field on the page.
+  expect(main.queryAllByRole("textbox").filter((box) => box.getAttribute("aria-label") !== "Search settings")).toEqual([]);
+  expect(document.querySelector('main input:not([aria-label="Search settings"])')).toBeNull();
 });
 
 test("Refresh and a tab that is seen again read auth.list again", async () => {

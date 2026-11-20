@@ -35,7 +35,7 @@ const PICTURES: Readonly<Record<RouteMode, ReactNode>> = {
 /** Part B: the default route, three cards with a picture each. Choosing one saves `routing.mode`. */
 export function RoutingModes({ mode, errors, onChoose }: { mode: RouteMode; errors: RoutingErrors; onChoose: (mode: RouteMode) => void }) {
   return (
-    <Part title={ROUTING_WORDS.route.title} line={ROUTING_WORDS.route.line}>
+    <Part setting="new chats" title={ROUTING_WORDS.route.title} line={ROUTING_WORDS.route.line}>
       <CardChoices legend="Default route" path="routing.mode" choices={ROUTE_MODES} value={mode} errors={errors} onChoose={onChoose} pictures={PICTURES} />
     </Part>
   );

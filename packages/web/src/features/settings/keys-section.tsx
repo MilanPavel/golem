@@ -184,7 +184,7 @@ function KeyList({
   onNavigate: (path: string) => void;
 }) {
   return (
-    <ul aria-label={label} className="divide-y divide-line overflow-hidden rounded-lg border border-line bg-surface">
+    <ul aria-label={label} data-setting={label === "Model providers" ? "provider" : "mcp keys"} className="divide-y divide-line overflow-hidden rounded-lg border border-line bg-surface">
       {rows.map((row) => (
         <KeyItem key={row.ref} row={row} open={open === row.ref} onToggle={onToggle} onServer={onServer} onNavigate={onNavigate} />
       ))}
@@ -223,7 +223,7 @@ function KeyItem({
       />
     ) : null;
   return (
-    <li className="flex flex-col gap-2 px-3.5 py-2.5">
+    <li data-setting={row.name.toLowerCase()} className="flex flex-col gap-2 px-3.5 py-2.5">
       <div className="flex flex-wrap items-center gap-x-3.5 gap-y-2">
         <span
           aria-hidden="true"

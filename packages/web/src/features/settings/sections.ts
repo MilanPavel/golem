@@ -24,6 +24,8 @@ export type SettingsSection = {
   /** One line under the title. */
   description: string;
   icon: ComponentType<SVGProps<SVGSVGElement>>;
+  /** The names of the options on the page, in the person's words. Search matches them, and the row with the same `data-setting` is where a jump lands. */
+  keywords: readonly string[];
 };
 
 /** The groups, in the order of the sidebar. */
@@ -37,17 +39,17 @@ export const GROUPS: readonly SettingsGroup[] = [
 
 /** The sections, grouped, in the order of the sidebar. A new section adds an entry here and a case in the screen. */
 export const SECTIONS: readonly SettingsSection[] = [
-  { id: "info", title: "Info", group: "general", icon: SettingsInfoIcon, description: "What is installed, where it lives, and whether it is healthy." },
-  { id: "appearance", title: "Appearance", group: "general", icon: SettingsAppearanceIcon, description: "Theme, how much detail a chat shows, and the desktop app." },
-  { id: "notifications", title: "Notifications", group: "general", icon: SettingsNotificationsIcon, description: "When golem tells you something, and when it keeps quiet." },
-  { id: "keys", title: "API keys", group: "models", icon: SettingsKeysIcon, description: "Keys for hosted providers. Stored in the system keychain." },
-  { id: "routing", title: "Routing", group: "models", icon: SettingsRoutingIcon, description: "Which model new chats start on, and when golem switches." },
-  { id: "context", title: "Context", group: "models", icon: SettingsContextIcon, description: "Window size, when to clear old tool output, when to summarize." },
-  { id: "usage", title: "Usage", group: "models", icon: SettingsUsageIcon, description: "Tokens and spend per model, per day." },
-  { id: "mcp", title: "MCP servers", group: "abilities", icon: SettingsMcpIcon, description: "Tool servers golem can call." },
-  { id: "skills", title: "Skills", group: "abilities", icon: SettingsSkillsIcon, description: "Instructions golem loads when a task matches." },
-  { id: "agents", title: "Agents", group: "abilities", icon: SettingsAgentsIcon, description: "Helpers the lead can start, and the models they use." },
-  { id: "memory", title: "Memory", group: "abilities", icon: SettingsMemoryIcon, description: "What golem remembers between chats." },
-  { id: "rules", title: "Tool rules", group: "permissions", icon: SettingsRulesIcon, description: "Allow, ask or deny, per tool and per path." },
-  { id: "config", title: "Config file", group: "advanced", icon: SettingsConfigIcon, description: "Edit config.toml directly. The other sections write to it too." },
+  { id: "info", title: "Info", group: "general", icon: SettingsInfoIcon, description: "What is installed, where it lives, and whether it is healthy.", keywords: ["golem", "version", "service", "ollama", "model", "disk", "socket", "logs", "data", "daemon", "jobs", "install"] },
+  { id: "appearance", title: "Appearance", group: "general", icon: SettingsAppearanceIcon, description: "Theme, how much detail a chat shows, and the desktop app.", keywords: ["theme", "chat detail", "app"] },
+  { id: "notifications", title: "Notifications", group: "general", icon: SettingsNotificationsIcon, description: "When golem tells you something, and when it keeps quiet.", keywords: ["tell me", "clicking a notification", "quiet hours", "pause"] },
+  { id: "keys", title: "API keys", group: "models", icon: SettingsKeysIcon, description: "Keys for hosted providers. Stored in the system keychain.", keywords: ["provider", "anthropic", "openai", "keychain"] },
+  { id: "routing", title: "Routing", group: "models", icon: SettingsRoutingIcon, description: "Which model new chats start on, and when golem switches.", keywords: ["new chats", "path of a turn", "paid gate", "exceptions", "ollama"] },
+  { id: "context", title: "Context", group: "models", icon: SettingsContextIcon, description: "Window size, when to clear old tool output, when to summarize.", keywords: ["window size", "when it fills up", "tokens", "summarize"] },
+  { id: "usage", title: "Usage", group: "models", icon: SettingsUsageIcon, description: "Tokens and spend per model, per day.", keywords: ["today", "this week", "last 7 days", "saved by running locally", "cost"] },
+  { id: "mcp", title: "MCP servers", group: "abilities", icon: SettingsMcpIcon, description: "Tool servers golem can call.", keywords: ["catalog", "import", "server", "stdio"] },
+  { id: "skills", title: "Skills", group: "abilities", icon: SettingsSkillsIcon, description: "Instructions golem loads when a task matches.", keywords: ["project", "user", "bundled", "instructions"] },
+  { id: "agents", title: "Agents", group: "abilities", icon: SettingsAgentsIcon, description: "Helpers the lead can start, and the models they use.", keywords: ["helpers", "explorer", "sub-agent"] },
+  { id: "memory", title: "Memory", group: "abilities", icon: SettingsMemoryIcon, description: "What golem remembers between chats.", keywords: ["paid model", "scopes", "remember", "forget"] },
+  { id: "rules", title: "Tool rules", group: "permissions", icon: SettingsRulesIcon, description: "Allow, ask or deny, per tool and per path.", keywords: ["default mode", "rules", "allow", "deny", "permission"] },
+  { id: "config", title: "Config file", group: "advanced", icon: SettingsConfigIcon, description: "Edit config.toml directly. The other sections write to it too.", keywords: ["which file", "problems", "toml", "raw"] },
 ];

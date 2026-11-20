@@ -87,7 +87,7 @@ export function McpSection() {
   };
   return (
     <Tabs value={page} onValueChange={(next) => setPage(next as Page)} className="flex min-h-0 flex-1 flex-col gap-4">
-      <TabsList aria-label="MCP servers">
+      <TabsList aria-label="MCP servers" data-setting="catalog">
         <TabsTrigger value="installed">Installed</TabsTrigger>
         <TabsTrigger value="catalog">Catalog</TabsTrigger>
         <TabsTrigger value="import">Import</TabsTrigger>

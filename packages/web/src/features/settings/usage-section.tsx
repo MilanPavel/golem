@@ -15,7 +15,7 @@ function weekday(day: string): string {
 
 function Tile({ title, value, caption }: { title: string; value: string; caption: string }) {
   return (
-    <div role="group" aria-label={title} className="flex flex-col gap-1 rounded-lg border border-line bg-surface p-4">
+    <div role="group" aria-label={title} data-setting={title.toLowerCase()} className="flex flex-col gap-1 rounded-lg border border-line bg-surface p-4">
       <span className="text-sm text-muted">{title}</span>
       <span className="font-mono text-2xl">{value}</span>
       <span className="text-xs text-faint">{caption}</span>
@@ -75,7 +75,7 @@ export function UsageView({ result }: { result: CostGetResult }) {
         )}
       </div>
       {days.length === 0 ? null : (
-        <section aria-label="Last 7 days" className="flex flex-col gap-2">
+        <section aria-label="Last 7 days" data-setting="last 7 days" className="flex flex-col gap-2">
           <div className="flex items-center gap-4 text-xs text-muted">
             <span className="flex items-center gap-1">
               <span aria-hidden="true" className="size-2 bg-allow" /> Local tokens

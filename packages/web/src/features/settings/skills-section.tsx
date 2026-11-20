@@ -195,7 +195,7 @@ export function SkillList({
       <p className="text-sm text-muted">{countLine(skills)}</p>
       <div className="flex flex-wrap items-center gap-2">{newButton}</div>
       {groups.map((group) => (
-        <section key={group.source} aria-label={GROUPS[group.source]} className="flex flex-col gap-2">
+        <section key={group.source} data-setting={group.source} aria-label={GROUPS[group.source]} className="flex flex-col gap-2">
           <h3 className="min-w-0 px-2 font-mono text-xs font-normal text-faint">
             {GROUPS[group.source]}
             <span className="block truncate" title={groupFolder(group.skills)}>

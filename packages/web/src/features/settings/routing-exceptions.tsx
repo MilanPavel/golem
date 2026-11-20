@@ -143,7 +143,7 @@ export function RoutingExceptions({
   folderBrowser: FolderBrowserSlot;
 }) {
   return (
-    <Part title={ROUTING_WORDS.exceptions.title}>
+    <Part setting="exceptions" title={ROUTING_WORDS.exceptions.title}>
       <div className="grid grid-cols-1 items-start gap-4 @route:grid-cols-2">
         <Folders folders={values.routing.local_only} errors={errors} onChange={onChange} folderBrowser={folderBrowser} />
         <Jobs roles={values.roles} listing={listing} pulls={pulls} errors={errors} onChange={onChange} />
