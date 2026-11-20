@@ -263,9 +263,11 @@ class OllamaSettings(BaseModel):
     nothing answers. ``idle_stop_minutes`` stops a server golem started after
     that long unused, and 0 keeps it running. A server golem did not start is
     never stopped. ``parallel`` is how many generations golem sends to a local server at
-    once, 1 to 8. golem passes it to the ``ollama serve`` it starts as ``OLLAMA_NUM_PARALLEL``
-    and restarts that server between calls when it changes. A server golem did not start
-    keeps whatever it was started with, so set ``OLLAMA_NUM_PARALLEL`` there yourself.
+    once, 1 to 8 (the default is 1), or ``"auto"``: the most slots, up to 4, for which the
+    model still fits in memory with its planned window. golem passes a number to the
+    ``ollama serve`` it starts as ``OLLAMA_NUM_PARALLEL`` and restarts that server between
+    calls when it changes. A server golem did not start keeps whatever it was started with,
+    so set ``OLLAMA_NUM_PARALLEL`` there yourself.
     ``models`` holds the options saved for each model, by its Ollama name, such as
     ``qwen3:8b``.
     """
@@ -274,8 +276,15 @@ class OllamaSettings(BaseModel):
 
     start: bool = True
     idle_stop_minutes: int = Field(default=30, ge=0)
-    parallel: int = Field(default=1, ge=1, le=8)
+    # "auto" loads but is not the default yet: it needs the real KV size of a model (from
+    # /api/ps), or a higher KV_GB_PER_1K_TOKENS, or it picks too many slots (ADR-060).
+    parallel: Annotated[int, Field(ge=1, le=8)] | Literal["auto"] = 1
     models: dict[str, ModelOptions] = Field(default_factory=dict[str, ModelOptions])
+
+    @property
+    def fixed_parallel(self) -> int:
+        """The number in ``parallel``, or 1 for ``"auto"``, which a server start does not read."""
+        return 1 if self.parallel == "auto" else self.parallel
 
 
 Role = Literal["titles", "summarise", "explore"]

@@ -253,7 +253,7 @@ class LocalServer:
             and self._users == 0
             and not self._restarting
             and self._parallel is not None
-            and self._parallel != self.settings.parallel
+            and self._parallel != self.settings.fixed_parallel
         )
 
     async def _restart(self) -> None:
@@ -269,7 +269,7 @@ class LocalServer:
                     "restarting ollama at %s: parallel changed from %s to %d",
                     self.base_url,
                     self._parallel,
-                    self.settings.parallel,
+                    self.settings.fixed_parallel,
                 )
                 if self._process is not None:
                     await self._stop_child(self._process)
@@ -316,7 +316,7 @@ class LocalServer:
     async def _start(self, path: str) -> None:
         self.listener("starting", None)
         log.info("starting %s serve for %s", path, self.base_url)
-        parallel = self.settings.parallel
+        parallel = self.settings.fixed_parallel
         env = {
             **os.environ,
             "OLLAMA_HOST": self._host(),
@@ -494,7 +494,7 @@ class LocalServers:
         result = await probe_overlap(
             server.base_url,
             model,
-            parallel=self._settings.parallel,
+            parallel=self._settings.fixed_parallel,
             transport=server._transport,  # pyright: ignore[reportPrivateUsage]
         )
         if result is not None:
