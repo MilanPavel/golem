@@ -25,11 +25,11 @@ export function SwitcherView({
         {`Sessions  ${hint}`}
       </Text>
       {rows.length === 0 ? <Text dimColor>{empty}</Text> : null}
-      {rows.map((row) => {
+      {rows.flatMap((row) => {
         const mark = row.routine ? `${ROUTINE_MARK} ` : "";
         const squares = row.helpers.length > 0 ? row.helpers.length + 1 : 0;
         const pad = " ".repeat(Math.max(1, columns - mark.length - row.title.length - squares - row.age.length - 5));
-        return (
+        const line = (
           <Text key={row.sessionId} wrap="truncate-end" inverse={row.selected}>
             <Text color={CLAY}>{row.selected ? "›" : " "}</Text>
             <Text
@@ -53,6 +53,17 @@ export function SwitcherView({
             <Text dimColor>{`${pad}${row.age}`}</Text>
           </Text>
         );
+        // The selected lead's helpers, one line each: the mark, the agent and title, the newest step.
+        const under = row.lines.map((item) => (
+          <Text key={`${row.sessionId}:${item.sessionId}`} wrap="truncate-end">
+            <Text color={item.square === "asking" ? "yellow" : item.square === "working" ? "green" : undefined} dimColor={item.square === "queued"}>
+              {`    ${item.square === "queued" ? "□" : "■"} `}
+            </Text>
+            <Text>{item.text}</Text>
+            {item.step === null ? null : <Text dimColor>{`  ${item.step}`}</Text>}
+          </Text>
+        ));
+        return [line, ...under];
       })}
     </Box>
   );

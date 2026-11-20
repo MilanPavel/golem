@@ -11,7 +11,7 @@ import { useChangedFiles, useNavigate, useRememberOpenedFolder, useRoute, useSes
 import { inspectPath, sessionPath } from "../../store/router.ts";
 import { hasMod, modShortcut } from "../../ui/platform.ts";
 import type { SessionModel, SessionView } from "../../store/session-store.ts";
-import { closeHelper, Transcript, useHelperOpen } from "../chat/index.ts";
+import { closeHelperNotOf, closeHelperOf, Transcript, useHelperOpen } from "../chat/index.ts";
 import { SessionDock } from "../composer/index.ts";
 import { TodoList, useDrawerOpen } from "../drawer/index.ts";
 import { ChangesTab, checksBadge, ChecksTab, FilesTab, Workbench, WORKBENCH_ID, type WorkbenchTab } from "../workbench/index.ts";
@@ -217,7 +217,13 @@ export function SessionFrame({ id, children }: { id: string; children: ReactNode
   );
   const helperOpen = useHelperOpen();
   // A helper panel belongs to the chat that opened it: it closes when the chat does.
-  useEffect(() => closeHelper, [id]);
+  // One opened from the sidebar for this chat stays.
+  useEffect(() => {
+    closeHelperNotOf(id);
+    return () => {
+      closeHelperOf(id);
+    };
+  }, [id]);
   const toggle = useRef<HTMLButtonElement>(null);
   const inspectToggle = useRef<HTMLButtonElement>(null);
   const route = useRoute();

@@ -145,6 +145,8 @@ test("routes, actions, and the visibility check", async () => {
   expect(fake.raw.sendMessage).toHaveBeenCalledWith("s", "hi");
   await actions.cancel("r");
   expect(fake.raw.cancelRun).toHaveBeenCalledWith("r");
+  await actions.stopHelper("h1");
+  expect(fake.raw.stopHelper).toHaveBeenCalledWith("h1");
 
   (doc as { visibilityState: string }).visibilityState = "hidden";
   doc.dispatchEvent(new Event("visibilitychange"));

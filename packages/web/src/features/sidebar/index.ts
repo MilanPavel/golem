@@ -20,4 +20,5 @@ export {
   useSidebarWidth,
 } from "./sidebar-width.ts";
 export { SHOW_HELPERS_KEY, showHelpersStore, useShowHelpers } from "./show-helpers.ts";
+export { HelperRowCardBody, type HelperCardActions } from "./helper-row-card.tsx";
 export { LiveSessionsPanel, SessionsPanel, type SessionsPanelProps, type SidebarActions } from "./sessions-panel.tsx";

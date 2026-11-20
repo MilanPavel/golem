@@ -267,15 +267,25 @@ function useLeadTitle(leadId: string): string | null {
 
 const NO_HELPERS: readonly HelperRef[] = [];
 
-/** The helpers of one `delegate` call of the lead, from the lead's own log. */
-function useBatch(leadId: string, callId: string): readonly HelperRef[] {
-  return useSession(leadId, (view) => {
+type Batch = { callId: string | null; helpers: readonly HelperRef[] };
+const NO_BATCH: Batch = { callId: null, helpers: NO_HELPERS };
+
+/**
+ * The helpers of one `delegate` call of the lead, from the lead's own log. With no call id (opened from
+ * the sidebar), the call is the one that has the helper, found once the lead's chat has loaded.
+ */
+function useBatch(leadId: string, callId: string | undefined, helperId: string): Batch {
+  const found = useSession(leadId, (view) => {
     for (const message of view.chat.messages) {
-      const tool = message.tools?.find((item) => item.callId === callId);
-      if (tool !== undefined) return tool.child?.helpers ?? NO_HELPERS;
+      for (const tool of message.tools ?? []) {
+        const helpers = tool.child?.helpers;
+        if (helpers === undefined) continue;
+        if (callId !== undefined ? tool.callId === callId : helpers.some((item) => item.id === helperId)) return tool;
+      }
     }
-    return NO_HELPERS;
+    return null;
   });
+  return found === null ? NO_BATCH : { callId: found.callId, helpers: found.child?.helpers ?? NO_HELPERS };
 }
 
 /**
@@ -283,11 +293,11 @@ function useBatch(leadId: string, callId: string): readonly HelperRef[] {
  * open and detaches when it closes. Escape inside it closes it; Next helper steps through the batch.
  */
 export function HelperPanel({ leadId, open }: { leadId: string; open: HelperOpen }) {
-  const batch = useBatch(leadId, open.callId);
+  const { callId, helpers: batch } = useBatch(leadId, open.callId, open.helperId);
   const helper = batch.find((item) => item.id === open.helperId);
   const lead = useLeadTitle(leadId);
   const chat = useSession(open.helperId, (view) => view.chat);
-  const { cancel } = usePageActions();
+  const { stopHelper } = usePageActions();
   const navigate = useNavigate();
   const now = useNow(5_000);
   const [view, setView] = useState<HelperView>("summary");
@@ -301,7 +311,6 @@ export function HelperPanel({ leadId, open }: { leadId: string; open: HelperOpen
   const state = helperPanelState(helper, chat);
   const index = batch.indexOf(helper);
   const next = batch.length > 1 ? batch[(index + 1) % batch.length] : undefined;
-  const runId = chat.runId;
   return (
     <aside
       ref={panel}
@@ -332,12 +341,11 @@ export function HelperPanel({ leadId, open }: { leadId: string; open: HelperOpen
         view={view}
         onView={setView}
         onClose={closeHelper}
-        onNext={next === undefined ? null : () => openHelper({ callId: open.callId, helperId: next.id })}
+        onNext={next === undefined || callId === null ? null : () => openHelper({ callId, helperId: next.id })}
         onStop={
-          (state === "running" || state === "waiting") && runId !== null
+          state === "running" || state === "waiting"
             ? () => {
-                // The protocol's `helper.stop` is not in this client yet, so Stop cancels the helper's own run.
-                cancel(runId).catch(() => undefined);
+                stopHelper(helper.id).catch(() => undefined);
               }
             : null
         }

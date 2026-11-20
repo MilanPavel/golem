@@ -19,3 +19,13 @@ test("the gallery's helper section shows three leads: helpers working, one asks,
   const done = panel.getByRole("link", { name: /Read the ADRs/ });
   expect(done.querySelector("[data-square]")).toBeNull();
 });
+
+test("the gallery's helper card shows two working, one asking, one queued", () => {
+  showTheme("slip");
+  render(<Gallery />);
+  const group = within(screen.getByRole("group", { name: "Helpers of Map the daemon modules, slip" }));
+  expect(group.getByText("4 helpers · 1 asks you")).toBeTruthy();
+  const states = [...document.querySelectorAll("[data-helper-block]")].map((block) => block.getAttribute("data-helper-block"));
+  expect(states).toEqual(["working", "working", "asking", "queued"]);
+  expect(group.getByRole("button", { name: "Stop explorer routing" })).toBeTruthy();
+});

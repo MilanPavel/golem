@@ -32,6 +32,8 @@ export type HelperRows<T> = {
   rows: T[];
   /** For a lead that has helpers not done, one square each, in the order the helpers came. */
   squares: Map<string, HelperSquare[]>;
+  /** The same helpers' summaries, in the same order, for the card on the lead's row. */
+  helpers: Map<string, T[]>;
 };
 
 /**
@@ -42,6 +44,7 @@ export type HelperRows<T> = {
 export function groupHelpers<T extends HelperSession>(sessions: readonly T[], options: { showHelpers?: boolean } = {}): HelperRows<T> {
   const ids = new Set(sessions.map((session) => session.session_id));
   const squares = new Map<string, HelperSquare[]>();
+  const helpers = new Map<string, T[]>();
   const rows: T[] = [];
   for (const session of sessions) {
     const lead = session.parent_session_id;
@@ -55,9 +58,12 @@ export function groupHelpers<T extends HelperSession>(sessions: readonly T[], op
       const list = squares.get(lead);
       if (list) list.push(square);
       else squares.set(lead, [square]);
+      const mine = helpers.get(lead);
+      if (mine) mine.push(session);
+      else helpers.set(lead, [session]);
     }
   }
-  return { rows, squares };
+  return { rows, squares, helpers };
 }
 
 const WORDS: Record<HelperSquare, [one: string, many: string]> = {

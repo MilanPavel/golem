@@ -128,6 +128,7 @@ import type { SessionSetOptionsResult } from "../../protocol/gen/session-set-opt
 import type { SessionSetModelResult } from "../../protocol/gen/session-set-model-result.ts";
 import type { Params as ChatEvent } from "../../protocol/gen/rpc-notification.ts";
 import type { RunCancelResult } from "../../protocol/gen/run-cancel-result.ts";
+import type { HelperStopResult } from "../../protocol/gen/helper-stop-result.ts";
 import type { SessionAttachResult } from "../../protocol/gen/session-attach-result.ts";
 import type { SessionCloseResult } from "../../protocol/gen/session-close-result.ts";
 import type { SessionCreateResult } from "../../protocol/gen/session-create-result.ts";
@@ -235,6 +236,7 @@ import {
   isPing,
   isRecord,
   isRunCancelResult,
+  isHelperStopResult,
   isSessionAttachResult,
   isSessionCloseResult,
   isSessionCreateResult,
@@ -365,6 +367,8 @@ export interface GolemClient {
   sendMessage(sessionId: string, text: string, options?: SendOptions): Promise<MessageSendResult>;
   /** Stop a run. Resolves after `run.cancelled` is in the log; `cancelled` is false when it had ended. */
   cancelRun(runId: string): Promise<RunCancelResult>;
+  /** `helper.stop`: cancel the run of a helper session. The lead goes on with `stopped: cancelled` as its result. */
+  stopHelper(sessionId: string): Promise<HelperStopResult>;
   inspectSession(sessionId: string): Promise<SessionInspectResult>;
   /** A session's runs as a tree: run, then model call, then tool call. Oldest run first. */
   /** What model calls cost: today, the week, and with a session id that session. */
@@ -1495,6 +1499,14 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       const result = await call("run.cancel", { run_id: runId });
       if (!isRunCancelResult(result)) {
         throw new Error("invalid run.cancel result");
+      }
+      return result;
+    },
+    async stopHelper(sessionId: string): Promise<HelperStopResult> {
+      await ready;
+      const result = await call("helper.stop", { session_id: sessionId });
+      if (!isHelperStopResult(result)) {
+        throw new Error("invalid helper.stop result");
       }
       return result;
     },

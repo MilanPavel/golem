@@ -62,6 +62,7 @@ export type PageClient = Pick<
   | "forkSession"
   | "closeSession"
   | "cancelRun"
+  | "stopHelper"
   | "listModels"
   | "listSkills"
   | "readSkill"
@@ -186,6 +187,8 @@ export type PageActions = {
    */
   setDefaultMode(mode: PermissionMode): Promise<string>;
   cancel(runId: string): Promise<void>;
+  /** Stops one helper's run (`helper.stop`). The lead goes on with `stopped: cancelled` as its result. */
+  stopHelper(sessionId: string): Promise<void>;
   /**
    * Clears old tool results, or summarises old turns with `focus` kept, so the next call sends less.
    * The summary can take a minute. Nothing leaves the transcript. Rejects with `SESSION_BUSY` while a run is open.
@@ -596,6 +599,9 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
       },
       async cancel(runId) {
         await client.cancelRun(runId);
+      },
+      async stopHelper(sessionId) {
+        await client.stopHelper(sessionId);
       },
       async rename(sessionId, title) {
         await client.renameSession(sessionId, title);
