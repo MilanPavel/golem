@@ -8,6 +8,9 @@ import type { Press } from "./keys.ts";
 import {
   agentCounts,
   agentListFailed,
+  agentsWithSaved,
+  agentWishFailed,
+  WISH_OLD,
   agentsManagerKeyOf,
   AGENTS_HINT,
   closedAgentsManager,
@@ -226,4 +229,80 @@ test("an older daemon without resolves_to shows the wish alone, and no why line"
   assert.ok(!lines.some((line) => line.includes("now ")));
   const detail = texts(layout({ open: true, view: { kind: "detail", name: "scout", origin: "bundled" } }, [scout]));
   assert.ok(!detail.some((line) => line.startsWith("Why:")));
+});
+
+const DETAIL_SCOUT: AgentsManagerState = { open: true, view: { kind: "detail", name: "scout", origin: "bundled" } };
+const LOCAL_MODELS = [
+  { ref: "ollama/qwen3:14b", label: "qwen3:14b", status: "ready" as const },
+  { ref: "ollama/gemma", label: "gemma", status: "not_installed" as const },
+];
+const CLOUD_MODELS = [{ ref: "anthropic/claude-haiku", label: "claude-haiku", status: "ready" as const }];
+
+function pick(state: AgentsManagerState, agents: readonly AgentInfo[], key: AgentsManagerKey, setup: WishSetup, models: typeof LOCAL_MODELS) {
+  return pressAgentsManager(state, agents, key, { setup, models });
+}
+
+test("w opens the choices in a detail, the footer says so, and the current one is marked", () => {
+  assert.equal(agentsManagerKeyOf(press(null, "w")), "wish");
+  assert.ok(texts(layout(DETAIL_SCOUT, [scout])).includes("w to change the wish · Esc to go back"));
+  const opened = pick(DETAIL_SCOUT, [scout], "wish", "mixed", []).state;
+  assert.deepEqual(opened.view, { kind: "detail", name: "scout", origin: "bundled", pick: { selected: 0 } });
+  const lines = texts(layoutAgentsManager({ state: opened, agents: [scout], error: null, cwd: CWD, home: HOME, columns: 140, rows: 40 }));
+  assert.ok(lines.includes("↑/↓ to choose · Enter to save · Esc to cancel"));
+  assert.ok(lines.some((line) => line.includes("✔") && line.includes("Cheapest")));
+});
+
+test("local only: the choices name no hosted wish, and ready models are listed", () => {
+  const opened = pick(DETAIL_SCOUT, [localScout], "wish", "local", LOCAL_MODELS).state;
+  const lines = texts(layoutAgentsManager({ state: opened, agents: [localScout], error: null, cwd: CWD, home: HOME, columns: 140, rows: 40, setup: "local", models: LOCAL_MODELS }));
+  assert.ok(lines.some((line) => line.includes("qwen3:14b")));
+  assert.ok(!lines.some((line) => line.includes("gemma")));
+  assert.ok(!lines.some((line) => hostedWords.test(line)));
+});
+
+test("cloud only: the choices have no local words", () => {
+  const opened = pick(DETAIL_SCOUT, [cloudScout], "wish", "cloud", CLOUD_MODELS).state;
+  const lines = texts(layoutAgentsManager({ state: opened, agents: [cloudScout], error: null, cwd: CWD, home: HOME, columns: 140, rows: 40, setup: "cloud", models: CLOUD_MODELS }));
+  assert.ok(lines.some((line) => line.includes("claude-haiku")));
+  assert.ok(!lines.some((line) => /local/i.test(line)));
+});
+
+test("arrows move, Enter saves the chosen wish, Esc cancels, and the same wish saves nothing", () => {
+  const opened = pick(DETAIL_SCOUT, [scout], "wish", "cloud", []).state;
+  const moved = pick(opened, [scout], "down", "cloud", []).state;
+  const saved = pick(moved, [scout], "enter", "cloud", []);
+  assert.deepEqual(saved.action, { kind: "set_wish", name: "scout", wish: "same" });
+  assert.deepEqual(saved.state.view, { kind: "detail", name: "scout", origin: "bundled" });
+  assert.deepEqual(pick(opened, [scout], "enter", "cloud", []).action, { kind: "none" });
+  const cancelled = pick(moved, [scout], "back", "cloud", []);
+  assert.deepEqual(cancelled.state.view, { kind: "detail", name: "scout", origin: "bundled" });
+  assert.deepEqual(cancelled.action, { kind: "none" });
+});
+
+test("after saving, the row shows the new wish and now from the answer", () => {
+  const answer: AgentInfo = { ...scout, wish: "stronger", resolves_to: { model: "claude-opus", reason: "one step above the lead", fresh_window: false } };
+  const next = agentsWithSaved([scout, mine], answer);
+  assert.equal(next[0], answer);
+  assert.equal(next[1], mine);
+  const lines = texts(layout(DETAIL_SCOUT, next, null, 40, "cloud"));
+  assert.ok(lines.some((line) => line.startsWith("Wish:") && line.includes("now claude-opus")));
+});
+
+test("a refusal is one plain line and the old value stays; an old daemon says so", () => {
+  const refused = agentWishFailed(DETAIL_SCOUT, new Error("this agent file is read-only"));
+  const lines = texts(layout(refused, [scout]));
+  assert.ok(lines.some((line) => line.includes("this agent file is read-only")));
+  assert.ok(lines.some((line) => line.startsWith("Model:") && line.includes("Cheapest")));
+  const old = agentWishFailed(DETAIL_SCOUT, new RpcError(-32601, "method not found"));
+  assert.equal(old.view.kind === "detail" ? old.view.notice : "", WISH_OLD);
+  assert.equal(WISH_OLD, "This golem is too old to change a wish. Update golem.");
+});
+
+test("a broken type and an untrusted project type have no w key and no hint", () => {
+  for (const agent of [broken, untrusted]) {
+    const state: AgentsManagerState = { open: true, view: { kind: "detail", name: agent.name, origin: agent.origin } };
+    const pressed = pick(state, [agent], "wish", "mixed", []);
+    assert.deepEqual(pressed.state, state);
+    assert.ok(texts(layout(state, [agent])).includes("Esc to go back"));
+  }
 });

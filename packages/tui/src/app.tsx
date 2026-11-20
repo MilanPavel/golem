@@ -383,6 +383,8 @@ import {
 import {
   agentListFailed,
   agentsManagerKeyOf,
+  agentsWithSaved,
+  agentWishFailed,
   closedAgentsManager,
   layoutAgentsManager,
   openAgentsManager,
@@ -4757,8 +4759,27 @@ export function App({
     if (key === null) {
       return;
     }
-    const pressed = pressAgentsManager(agentsManagerRef.current, agentListRef.current.agents ?? [], key);
+    const pressed = pressAgentsManager(agentsManagerRef.current, agentListRef.current.agents ?? [], key, {
+      setup: wishSetup(listing?.models),
+      models: listing?.models ?? [],
+    });
     showAgentsManager(pressed.state);
+    if (pressed.action.kind === "set_wish") {
+      saveAgentWish(pressed.action.name, pressed.action.wish);
+    }
+  }
+
+  /** `agents.set_wish`: on an answer the row shows it; on a refusal one plain line shows and the old value stays. */
+  function saveAgentWish(name: string, wish: string): void {
+    client.setAgentWish(name, wish, skillsFolder()).then(
+      (saved) => {
+        const list = agentListRef.current.agents;
+        if (list !== null) {
+          setAgentList({ agents: agentsWithSaved(list, saved), error: null });
+        }
+      },
+      (error: unknown) => showAgentsManager(agentWishFailed(agentsManagerRef.current, error)),
+    );
   }
 
   function showAgentsManager(next: AgentsManagerState): void {
@@ -5862,6 +5883,7 @@ export function App({
             columns,
             rows: budget.body,
             setup: wishSetup(listing?.models),
+            models: listing?.models,
           }).map((line, index) => (
             <McpManagerRow key={index} line={line} />
           ))}

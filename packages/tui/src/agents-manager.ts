@@ -1,5 +1,5 @@
 import { RpcError, type AgentInfo } from "@golem/client";
-import { AGENT_GROUPS, agentWarnings, agentWish, wishLine, wishNow, type WishSetup } from "@golem/view";
+import { AGENT_GROUPS, agentWarnings, agentWish, wishLine, wishNow, wishOptions, type WishModel, type WishOption, type WishSetup } from "@golem/view";
 
 import type { Press } from "./keys.ts";
 import type { McpManagerLine, McpTone } from "./mcp-manager.ts";
@@ -7,11 +7,22 @@ import type { McpManagerLine, McpTone } from "./mcp-manager.ts";
 /**
  * `/agents`: every agent type this folder sees, grouped by where it comes from,
  * then one type's details. Broken and untrusted types are listed too, with why.
- * Nothing here changes a file, and no model is asked. The list is read with
+ * The one change is a type's wish: `w` in the detail opens the choices and Enter asks
+ * the daemon to save it (`agents.set_wish`). No model is asked. The list is read with
  * `agents.list` and read again on `agent.registry.changed`, so this state only
  * says where the user is.
  */
-export type AgentsManagerView = { kind: "list"; selected: number } | { kind: "detail"; name: string; origin: string };
+export type AgentsManagerView =
+  | { kind: "list"; selected: number }
+  | {
+      kind: "detail";
+      name: string;
+      origin: string;
+      /** The wish choices are open, with this one under the cursor. */
+      pick?: { selected: number };
+      /** One plain line: why the last save was refused. */
+      notice?: string;
+    };
 
 export type AgentsManagerState = { open: boolean; view: AgentsManagerView };
 
@@ -20,9 +31,14 @@ export type AgentList = { agents: readonly AgentInfo[] | null; error: string | n
 
 export const closedAgentsManager: AgentsManagerState = { open: false, view: { kind: "list", selected: 0 } };
 
-export type AgentsManagerKey = "up" | "down" | "enter" | "back";
+export type AgentsManagerKey = "up" | "down" | "enter" | "back" | "wish";
 
-export type AgentsManagerAction = { kind: "none" } | { kind: "close" };
+export type AgentsManagerAction = { kind: "none" } | { kind: "close" } | { kind: "set_wish"; name: string; wish: string };
+
+/** What the wish choices are made of: the setup and the models `model.list` says are there. */
+export type AgentsWishContext = { setup: WishSetup; models: readonly WishModel[] };
+
+export const WISH_OLD = "This golem is too old to change a wish. Update golem.";
 
 /** The same row shape as the MCP manager, so one component draws both. */
 export type AgentsManagerLine = McpManagerLine;
@@ -32,6 +48,8 @@ export const NO_AGENTS = "this daemon has no agents yet";
 export const AGENTS_HINT = "Add one as ~/.golem/agents/<name>.md, or .golem/agents/<name>.md in a project.";
 const LIST_HINT = "↑/↓ to navigate · Enter to open · Esc to close";
 const DETAIL_HINT = "Esc to go back";
+const DETAIL_WISH_HINT = "w to change the wish · Esc to go back";
+const PICK_HINT = "↑/↓ to choose · Enter to save · Esc to cancel";
 const METHOD_NOT_FOUND = -32601;
 const ORDER = ["project", "user", "bundled"] as const;
 
@@ -47,7 +65,35 @@ export function agentListFailed(error: unknown): AgentList {
   return { agents: null, error: error instanceof Error && error.message.length > 0 ? error.message : "request failed" };
 }
 
+/** Whether this type's wish can be changed here: not a broken type, not an untrusted project one. */
+export function wishEditable(agent: AgentInfo): boolean {
+  return (agent.errors ?? []).length === 0 && !(agent.origin === "project" && agent.trusted === false);
+}
+
+/** The state after a refused save: one plain line, the old value stays. */
+export function agentWishFailed(state: AgentsManagerState, error: unknown): AgentsManagerState {
+  const view = state.view;
+  if (view.kind !== "detail") {
+    return state;
+  }
+  const text =
+    error instanceof RpcError && error.code === METHOD_NOT_FOUND
+      ? WISH_OLD
+      : error instanceof Error && error.message.length > 0
+        ? error.message
+        : "Could not change the wish.";
+  return { ...state, view: { kind: "detail", name: view.name, origin: view.origin, notice: text } };
+}
+
+/** The list with the type the daemon answered with in place of the one it had. */
+export function agentsWithSaved(agents: readonly AgentInfo[], saved: AgentInfo): AgentInfo[] {
+  return agents.map((agent) => (agent.name === saved.name && agent.origin === saved.origin ? saved : agent));
+}
+
 export function agentsManagerKeyOf(press: Press): AgentsManagerKey | null {
+  if (press.name === null && press.input === "w" && !press.ctrl && !press.meta) {
+    return "wish";
+  }
   if (press.name === "up" || press.name === "down") {
     return press.name;
   }
@@ -66,6 +112,7 @@ export function pressAgentsManager(
   state: AgentsManagerState,
   agents: readonly AgentInfo[],
   key: AgentsManagerKey,
+  wish: AgentsWishContext = { setup: "mixed", models: [] },
 ): { state: AgentsManagerState; action: AgentsManagerAction } {
   const none = { kind: "none" } as const;
   const ordered = orderedAgents(agents);
@@ -85,6 +132,31 @@ export function pressAgentsManager(
     }
     return { state, action: none };
   }
+  const agent = ordered.find((item) => item.name === view.name && item.origin === view.origin);
+  if (view.pick !== undefined) {
+    if (agent === undefined) {
+      return { state: { ...state, view: { kind: "detail", name: view.name, origin: view.origin } }, action: none };
+    }
+    const options = wishOptions(agent.wish, wish.setup, wish.models);
+    if (key === "back") {
+      return { state: { ...state, view: { kind: "detail", name: view.name, origin: view.origin } }, action: none };
+    }
+    if (key === "up" || key === "down") {
+      const next = clamp(view.pick.selected + (key === "up" ? -1 : 1), options.length);
+      return { state: { ...state, view: { ...view, pick: { selected: next } } }, action: none };
+    }
+    const chosen = options[clamp(view.pick.selected, options.length)];
+    if (key === "enter" && chosen !== undefined) {
+      const closed = { ...state, view: { kind: "detail" as const, name: view.name, origin: view.origin } };
+      return chosen.value === agent.wish ? { state: closed, action: none } : { state: closed, action: { kind: "set_wish", name: agent.name, wish: chosen.value } };
+    }
+    return { state, action: none };
+  }
+  if (key === "wish" && agent !== undefined && wishEditable(agent)) {
+    const options = wishOptions(agent.wish, wish.setup, wish.models);
+    const current = Math.max(0, options.findIndex((option) => option.value === agent.wish));
+    return { state: { ...state, view: { kind: "detail", name: view.name, origin: view.origin, pick: { selected: current } } }, action: none };
+  }
   if (key === "back") {
     const index = ordered.findIndex((item) => item.name === view.name && item.origin === view.origin);
     return { state: { ...state, view: { kind: "list", selected: Math.max(0, index) } }, action: none };
@@ -102,6 +174,8 @@ export function layoutAgentsManager(input: {
   rows: number;
   /** The setup the wish words are for; `mixed` when the model list is not known. */
   setup?: WishSetup;
+  /** The models the wish choices may name. */
+  models?: readonly WishModel[];
 }): AgentsManagerLine[] {
   const width = Math.max(1, input.columns);
   const room = Math.max(0, input.rows - 2);
@@ -120,8 +194,16 @@ export function layoutAgentsManager(input: {
     if (agent === undefined) {
       body = scrollToSelected(listLines(input.agents, 0, input.cwd, input.home, setup), room);
     } else {
-      body = detailLines(agent, width, setup);
-      hint = DETAIL_HINT;
+      if (view.pick !== undefined) {
+        body = pickLines(agent, view.pick.selected, setup, input.models ?? [], width);
+        hint = PICK_HINT;
+      } else {
+        body = detailLines(agent, width, setup);
+        if (view.notice !== undefined) {
+          body.push({ text: "" }, { mark: { text: "✘", tone: "bad" }, text: view.notice });
+        }
+        hint = wishEditable(agent) ? DETAIL_WISH_HINT : DETAIL_HINT;
+      }
     }
   }
   const lines = [...body.slice(0, room), { text: "" }, { text: hint, dim: true }];
@@ -214,6 +296,20 @@ function detailLines(agent: AgentInfo, width: number, setup: WishSetup): AgentsM
       });
     }
   }
+  return lines;
+}
+
+/** The choices: wishes, tiers the setup has, ready models, with the current one marked. */
+function pickLines(agent: AgentInfo, selected: number, setup: WishSetup, models: readonly WishModel[], width: number): AgentsManagerLine[] {
+  const options: WishOption[] = wishOptions(agent.wish, setup, models);
+  const chosen = clamp(selected, options.length);
+  const labelWidth = Math.max(...options.map((option) => option.label.length));
+  const lines: AgentsManagerLine[] = [{ text: `Wish for ${agent.name}`, bold: true }, { text: "" }];
+  options.forEach((option, index) => {
+    const now = option.value === agent.wish ? "✔ " : "  ";
+    const hint = option.hint.length > 0 ? `  ${option.hint}` : "";
+    lines.push({ prefix: index === chosen ? "❯ " : "  ", text: fit(`${now}${option.label.padEnd(labelWidth)}${hint}`, Math.max(10, width - 2)), selected: index === chosen });
+  });
   return lines;
 }
 
