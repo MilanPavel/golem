@@ -203,7 +203,7 @@ export function useCommands({ session, cwd, typing, send }: UseCommandsOptions):
             navigate(settingsPath("memory"));
             return "handled";
           case "setup":
-            navigate(settingsPath("setup"));
+            navigate(settingsPath("info"));
             return "handled";
           case "sessions":
             return say(NOT_YET.sessions);

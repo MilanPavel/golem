@@ -87,8 +87,9 @@ test("/routines?new is the form for a new routine, with a starter when named", (
 });
 
 test("parseRoute reads the settings page and its sections", () => {
-  expect(parseRoute("/settings")).toEqual({ name: "settings", section: "setup" });
-  expect(parseRoute("/settings/setup")).toEqual({ name: "settings", section: "setup" });
+  expect(parseRoute("/settings")).toEqual({ name: "settings", section: "info" });
+  // The old name still lands on Info.
+  expect(parseRoute("/settings/setup")).toEqual({ name: "settings", section: "info" });
   expect(parseRoute("/settings/mcp")).toEqual({ name: "settings", section: "mcp" });
   expect(parseRoute("/settings/tool-rules")).toEqual({ name: "settings", section: "tool-rules" });
   for (const bad of ["/settings/", "/settings/a/b", "/settings/A", "/settings/a1", "/settingsx"]) {
@@ -98,7 +99,7 @@ test("parseRoute reads the settings page and its sections", () => {
 
 test("settingsPath round-trips through parseRoute", () => {
   expect(settingsPath()).toBe("/settings");
-  expect(settingsPath("setup")).toBe("/settings");
+  expect(settingsPath("info")).toBe("/settings");
   expect(settingsPath("appearance")).toBe("/settings/appearance");
   expect(parseRoute(settingsPath("appearance"))).toEqual({ name: "settings", section: "appearance" });
 });
@@ -108,11 +109,11 @@ test("moving between sections is a new route, and back reaches the section, then
   router.navigate("/s/one");
   router.navigate("/settings");
   const first = router.getSnapshot();
-  router.navigate("/settings/setup", { replace: true });
+  router.navigate("/settings/info", { replace: true });
   expect(router.getSnapshot()).toBe(first);
   router.navigate("/settings/appearance");
   expect(router.getSnapshot()).toEqual({ name: "settings", section: "appearance" });
-  for (const expected of [{ name: "settings", section: "setup" }, { name: "session", id: "one", inspect: null }]) {
+  for (const expected of [{ name: "settings", section: "info" }, { name: "session", id: "one", inspect: null }]) {
     const popped = new Promise<void>((resolve) => window.addEventListener("popstate", () => resolve(), { once: true }));
     history.back();
     await popped;

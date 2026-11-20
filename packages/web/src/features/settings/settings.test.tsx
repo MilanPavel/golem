@@ -12,6 +12,7 @@ import { fakeClient, fakeFrame, summary } from "../../store/test-support.ts";
 import { closePalette } from "../palette/index.ts";
 import { OK_ROWS, STATUS_ROWS, WORKING_LISTING } from "../setup/sample.ts";
 import { settingsContextStore, useSettingsFolder } from "./index.ts";
+import { GROUPS, SECTIONS } from "./sections.ts";
 
 const noContrast = { rules: { "color-contrast": { enabled: false } } };
 
@@ -91,13 +92,54 @@ test("a click opens /settings without a page load, and the button is current the
 test("the section list marks the current section, and a link moves between them", async () => {
   const { user } = mount("/settings", OK_ROWS);
   const nav = screen.getByRole("navigation", { name: "Settings sections" });
-  expect(within(nav).getByRole("link", { name: "Setup" }).getAttribute("aria-current")).toBe("page");
+  expect(within(nav).getByRole("link", { name: "Info" }).getAttribute("aria-current")).toBe("page");
   expect(within(nav).getByRole("link", { name: "Appearance" }).getAttribute("aria-current")).toBeNull();
-  expect(screen.getByRole("heading", { level: 2, name: "Setup" })).toBeTruthy();
+  expect(screen.getByRole("heading", { level: 2, name: "Info" })).toBeTruthy();
   await user.click(within(nav).getByRole("link", { name: "Appearance" }));
   expect(location.pathname).toBe("/settings/appearance");
   expect(within(nav).getByRole("link", { name: "Appearance" }).getAttribute("aria-current")).toBe("page");
   expect(screen.getByRole("heading", { level: 2, name: "Appearance" })).toBeTruthy();
+});
+
+test("every section appears once in the sidebar, under its group, in order", () => {
+  mount("/settings", OK_ROWS);
+  const nav = screen.getByRole("navigation", { name: "Settings sections" });
+  const links = within(nav).getAllByRole("link");
+  const expected = GROUPS.flatMap((group) => SECTIONS.filter((item) => item.group === group.id).map((item) => item.title));
+  expect(expected).toHaveLength(SECTIONS.length);
+  expect(links.map((link) => link.textContent.trim())).toEqual(["Info", "Appearance", "Notifications", "API keys", "Routing", "Context", "Usage", "MCP servers", "Skills", "Agents", "Memory", "Tool rules", "Config file"]);
+  expect(links.map((link) => link.textContent.trim())).toEqual(expected);
+  const headings = Array.from(nav.querySelectorAll("div > span")).map((node) => node.textContent);
+  expect(headings).toEqual(GROUPS.map((group) => group.title));
+});
+
+test("the page head shows the group, the title and the description", () => {
+  mount("/settings/routing", OK_ROWS);
+  const head = screen.getByRole("heading", { level: 2, name: "Routing" }).parentElement as HTMLElement;
+  expect(within(head).getByText("Models")).toBeTruthy();
+  expect(within(head).getByText(SECTIONS.find((item) => item.id === "routing")?.description ?? "")).toBeTruthy();
+});
+
+test("/settings/setup lands on Info, and the address follows", async () => {
+  mount("/settings/setup", OK_ROWS);
+  const nav = screen.getByRole("navigation", { name: "Settings sections" });
+  expect(within(nav).getByRole("link", { name: "Info" }).getAttribute("aria-current")).toBe("page");
+  expect(screen.getByRole("heading", { level: 2, name: "Info" })).toBeTruthy();
+  await waitFor(() => expect(location.pathname).toBe("/settings"));
+});
+
+test("the narrow picker shows the current section and lists every group", async () => {
+  const { user } = mount("/settings/usage", OK_ROWS);
+  const picker = screen.getByRole("button", { name: /Usage/ });
+  expect(picker.getAttribute("aria-expanded")).toBe("false");
+  await user.click(picker);
+  const list = screen.getByRole("group", { name: "All settings sections" });
+  for (const group of GROUPS) expect(within(list).getByText(group.title)).toBeTruthy();
+  expect(within(list).getAllByRole("link")).toHaveLength(SECTIONS.length);
+  expect(within(list).getByRole("link", { name: "Usage" }).getAttribute("aria-current")).toBe("page");
+  await user.click(within(list).getByRole("link", { name: "Skills" }));
+  expect(location.pathname).toBe("/settings/skills");
+  expect(screen.queryByRole("group", { name: "All settings sections" })).toBeNull();
 });
 
 test("a section the page does not list says so, with a way back", async () => {
@@ -105,7 +147,7 @@ test("a section the page does not list says so, with a way back", async () => {
   expect(screen.getByText("There is no such section.")).toBeTruthy();
   await user.click(screen.getByRole("link", { name: "Go to Settings" }));
   expect(location.pathname).toBe("/settings");
-  expect(screen.getByRole("heading", { level: 2, name: "Setup" })).toBeTruthy();
+  expect(screen.getByRole("heading", { level: 2, name: "Info" })).toBeTruthy();
 });
 
 test("the Health list counts what needs fixing, and counts again once it is fixed", async () => {
