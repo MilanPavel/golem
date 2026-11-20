@@ -16,14 +16,14 @@ export function ThemeSwitch() {
   };
   return (
     <div role="group" aria-label="Theme" data-setting="theme" className={"mt-6 flex items-center gap-2"}>
-      <span className="text-sm text-muted">Theme</span>
+      <span className="text-label font-medium text-muted">Theme</span>
       {CHOICES.map(({ value, label }) => (
         <button
           key={value}
           type="button"
           aria-pressed={theme === value}
           onClick={() => choose(value)}
-          className="rounded-md border border-line-strong bg-surface px-3 py-1 text-sm outline-offset-2 outline-clay focus-visible:outline-2 aria-pressed:bg-clay-soft aria-pressed:text-clay-ink"
+          className="rounded-md border border-line-strong bg-surface px-3 py-1 text-meta font-medium outline-offset-2 outline-clay focus-visible:outline-2 aria-pressed:bg-clay-soft aria-pressed:text-clay-ink"
         >
           {label}
         </button>

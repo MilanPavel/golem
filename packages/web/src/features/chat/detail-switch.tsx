@@ -21,7 +21,7 @@ export function DetailSwitch() {
   return (
     <div data-setting="chat detail">
       <div ref={group} role="radiogroup" aria-label="Chat detail" aria-describedby={hintId} className="flex items-center gap-2">
-        <span className="text-sm text-muted">Chat detail</span>
+        <span className="text-label font-medium text-muted">Chat detail</span>
         {DETAILS.map((level, index) => (
           <button
             key={level}
@@ -29,7 +29,7 @@ export function DetailSwitch() {
             role="radio"
             aria-checked={detail === level}
             tabIndex={detail === level ? 0 : -1}
-            className="cursor-pointer rounded-md border border-line-strong bg-surface px-3 py-1 text-sm outline-offset-2 outline-clay focus-visible:outline-2 aria-checked:bg-clay-soft aria-checked:text-clay-ink"
+            className="cursor-pointer rounded-md border border-line-strong bg-surface px-3 py-1 text-meta font-medium outline-offset-2 outline-clay focus-visible:outline-2 aria-checked:bg-clay-soft aria-checked:text-clay-ink"
             onClick={() => {
               setDetail(level);
             }}
@@ -41,7 +41,7 @@ export function DetailSwitch() {
           </button>
         ))}
       </div>
-      <p id={hintId} className="mt-1 text-sm text-muted">
+      <p id={hintId} className="mt-1 text-meta text-muted">
         How much of each step the chat shows. Quiet: a step count. Normal: a summary. Verbose: every step open.
       </p>
     </div>

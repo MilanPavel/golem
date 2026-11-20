@@ -4,6 +4,7 @@ import { actionErrorText } from "../../store/errors.ts";
 import { useCost } from "../../store/page-context.tsx";
 import { Button } from "../../ui/button.tsx";
 import { cn } from "../../ui/cn.ts";
+import { Code } from "../../ui/code.tsx";
 
 export const NO_CALLS = "No model calls yet.";
 
@@ -17,7 +18,7 @@ function Tile({ title, value, caption }: { title: string; value: string; caption
   return (
     <div role="group" aria-label={title} data-setting={title.toLowerCase()} className="flex flex-col gap-1 rounded-lg border border-line bg-surface p-4">
       <span className="text-sm text-muted">{title}</span>
-      <span className="font-mono text-2xl">{value}</span>
+      <span className="text-title font-semibold">{value}</span>
       <span className="text-xs text-faint">{caption}</span>
     </div>
   );
@@ -54,7 +55,7 @@ function Bars({ days }: { days: NonNullable<CostGetResult["by_day"]> }) {
 }
 
 const CELL = "px-3 py-1.5";
-const NUM = cn(CELL, "text-right font-mono");
+const NUM = cn(CELL, "text-right");
 
 /** The page's body for one `cost.get` result. */
 export function UsageView({ result }: { result: CostGetResult }) {
@@ -103,7 +104,7 @@ export function UsageView({ result }: { result: CostGetResult }) {
         <tbody>
           {models.map((row) => (
             <tr key={`${row.provider ?? ""}/${row.model ?? ""}`} className="border-b border-line">
-              <td className={cn(CELL, "font-mono")}>{row.model ?? "unknown"}</td>
+              <td className={CELL}>{row.model === null ? "unknown" : <Code>{row.model}</Code>}</td>
               <td className={CELL}>{row.tier ?? "unknown"}</td>
               <td className={NUM}>{row.calls}</td>
               <td className={NUM}>{formatCount(row.input)}</td>
@@ -117,7 +118,7 @@ export function UsageView({ result }: { result: CostGetResult }) {
         <section aria-label="Helpers" className="flex flex-col gap-1">
           <h3 className="text-sm font-medium">Helpers, last 7 days</h3>
           <p className="text-sm">
-            <span className="font-mono">{helpers.cost}</span>
+            <span>{helpers.cost}</span>
             {helpers.share === "" ? "" : `, ${helpers.share} of the week`}
             {` · ${helpers.calls} ${helpers.calls === 1 ? "call" : "calls"} · ${helpers.tokens} tokens`}
           </p>
@@ -168,6 +169,6 @@ export function UsageSection() {
       </div>
     );
   }
-  if (cost.data === undefined) return <p className="font-mono text-sm text-muted">asking the daemon…</p>;
+  if (cost.data === undefined) return <p className="text-body text-muted">asking the daemon…</p>;
   return <UsageView result={cost.data} />;
 }

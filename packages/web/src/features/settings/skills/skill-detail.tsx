@@ -4,6 +4,7 @@ import { NEW_DRAFT_KEY } from "../../../store/drafts.ts";
 import { useDraft, useNavigate, usePageActions } from "../../../store/page-context.tsx";
 import { skillErrorText, type ListedSkill } from "../../../store/skills.ts";
 import { Badge } from "../../../ui/badge.tsx";
+import { Code } from "../../../ui/code.tsx";
 import { Button } from "../../../ui/button.tsx";
 import { cn } from "../../../ui/cn.ts";
 import { IconButton } from "../../../ui/icon-button.tsx";
@@ -82,13 +83,13 @@ export function SkillOverview({ skill }: { skill: ListedSkill }) {
     <div className="flex flex-col gap-1 pt-1">
       {groups(skill).map((group) => (
         <section key={group.title} aria-label={group.title}>
-          <h4 className="mb-1 mt-4 border-b border-line pb-1 font-mono text-xs tracking-wider text-faint uppercase first:mt-0">{group.title}</h4>
+          <h4 className="mb-1 mt-4 border-b border-line pb-1 text-meta text-faint first:mt-0">{group.title}</h4>
           <ul className="flex flex-col">
             {group.rows.map((fact) => (
               <li key={fact.label} className="flex flex-col gap-1 border-t border-dashed border-line py-2 first:border-t-0">
                 <div className="flex flex-wrap items-baseline gap-x-2">
                   <span className="text-sm font-medium text-ink">{fact.label}</span>
-                  <span className="ml-auto min-w-0 text-right font-mono text-sm text-ink wrap-anywhere">{fact.text}</span>
+                  <span className="ml-auto min-w-0 text-right text-body text-ink wrap-anywhere">{fact.text}</span>
                 </div>
                 <p className="text-xs text-muted">{fact.note}</p>
               </li>
@@ -102,10 +103,10 @@ export function SkillOverview({ skill }: { skill: ListedSkill }) {
         const title = tone === "bad" ? "Errors" : "Warnings";
         return (
           <section key={tone} aria-label={title}>
-            <h4 className="mb-1 mt-4 border-b border-line pb-1 font-mono text-xs tracking-wider text-faint uppercase">{title}</h4>
+            <h4 className="mb-1 mt-4 border-b border-line pb-1 text-meta text-faint">{title}</h4>
             <ul className="flex flex-col gap-1">
               {items.map((issue, at) => (
-                <li key={at} className={cn("font-mono text-xs wrap-anywhere", tone === "bad" ? "text-deny" : "text-wait")}>
+                <li key={at} className={cn("text-meta wrap-anywhere", tone === "bad" ? "text-deny" : "text-wait")}>
                   <span aria-hidden="true">{tone === "bad" ? "✘ " : "! "}</span>
                   {issue.text}
                 </li>
@@ -205,11 +206,11 @@ export function SkillDetail({
       <header className="flex flex-wrap-reverse items-start justify-between gap-x-3 gap-y-1">
         <div className="flex min-w-0 flex-1 basis-48 flex-col gap-0.5">
           <h3 className="font-ui text-lg font-semibold wrap-anywhere">{skill.name}</h3>
-          <p className="font-mono text-xs text-muted wrap-anywhere">{`${skill.path}/SKILL.md`}</p>
-          <p className="font-mono text-xs text-muted">{GROUPS[skill.source]}</p>
+          <p className="text-meta text-muted wrap-anywhere"><Code tone="muted">{`${skill.path}/SKILL.md`}</Code></p>
+          <p className="text-meta text-muted">{GROUPS[skill.source]}</p>
         </div>
         <div className="flex shrink-0 flex-col items-end gap-1.5 pt-1.5">
-          <p className="flex items-center gap-2 font-mono text-xs text-muted">
+          <p className="flex items-center gap-2 text-meta text-muted">
             <SkillDot skill={skill} />
             {skillStatusWord(skill, "")}
           </p>
@@ -249,7 +250,7 @@ export function SkillDetail({
           </MenuContent>
         </Menu>
       </div>
-      <p role="status" aria-live="polite" className="font-mono text-xs text-muted empty:hidden">
+      <p role="status" aria-live="polite" className="text-meta text-muted empty:hidden">
         {notice}
       </p>
       {error === null ? null : (

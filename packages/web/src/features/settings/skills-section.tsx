@@ -4,6 +4,7 @@ import { actionErrorText } from "../../store/errors.ts";
 import { useSkillList } from "../../store/page-context.tsx";
 import type { ListedSkill } from "../../store/skills.ts";
 import { Button } from "../../ui/button.tsx";
+import { Code } from "../../ui/code.tsx";
 import { cn } from "../../ui/cn.ts";
 import { useNarrow } from "../trace/use-narrow.ts";
 import { useSettingsContext, useSettingsFolder } from "./context.ts";
@@ -92,7 +93,7 @@ export function SkillsSection() {
       </div>
     );
   }
-  if (list.data === undefined) return <p className="font-mono text-sm text-muted">asking the daemon…</p>;
+  if (list.data === undefined) return <p className="text-body text-muted">asking the daemon…</p>;
 
   const listPane = (
     <SkillList
@@ -196,10 +197,10 @@ export function SkillList({
       <div className="flex flex-wrap items-center gap-2">{newButton}</div>
       {groups.map((group) => (
         <section key={group.source} data-setting={group.source} aria-label={GROUPS[group.source]} className="flex flex-col gap-2">
-          <h3 className="min-w-0 px-2 font-mono text-xs font-normal text-faint">
+          <h3 className="min-w-0 px-2 text-meta font-normal text-faint">
             {GROUPS[group.source]}
             <span className="block truncate" title={groupFolder(group.skills)}>
-              {group.source === "bundled" ? "built in" : groupFolder(group.skills)}
+              {group.source === "bundled" ? "built in" : <Code>{groupFolder(group.skills)}</Code>}
             </span>
           </h3>
           <ul className={cn("flex flex-col", wide ? "gap-0.5" : "gap-2")}>
@@ -223,10 +224,10 @@ export function SkillList({
                     <span className="flex min-w-0 items-center gap-x-2">
                       <SkillDot skill={skill} />
                       <span className="min-w-0 truncate font-ui text-sm font-medium">{skill.name}</span>
-                      <span className="shrink-0 font-mono text-xs whitespace-nowrap text-faint">{skillWord(skill)}</span>
+                      <span className="shrink-0 text-meta whitespace-nowrap text-faint">{skillWord(skill)}</span>
                     </span>
-                    <span className={cn("min-w-0 pl-4 font-mono text-xs wrap-anywhere", (skill.errors ?? []).length > 0 ? "text-deny" : "text-muted")}>
-                      {why ? skillSummary(skill, "") : skillRunAs(skill)}
+                    <span className={cn("min-w-0 pl-4 text-meta wrap-anywhere", (skill.errors ?? []).length > 0 ? "text-deny" : "text-muted")}>
+                      {why ? skillSummary(skill, "") : <Code tone="muted">{skillRunAs(skill)}</Code>}
                     </span>
                   </button>
                 </li>

@@ -67,7 +67,7 @@ export function SignInPanel({ name, login, onSignIn }: { name: string; login: Lo
       <p className="text-sm font-medium">{name} needs a sign-in.</p>
       <p className="text-sm text-muted">Sign in to see its tools. golem opens the sign-in page in a new tab and keeps the token in the Keychain.</p>
       {waiting ? (
-        <p role="status" className="font-mono text-xs text-muted">
+        <p role="status" className="text-meta text-muted">
           {line}
           {login.url === null ? null : (
             <>
@@ -86,7 +86,7 @@ export function SignInPanel({ name, login, onSignIn }: { name: string; login: Lo
             </p>
           ) : null}
           {login?.kind === "done" ? (
-            <p role="status" className="font-mono text-xs text-muted">
+            <p role="status" className="text-meta text-muted">
               {line}
             </p>
           ) : null}

@@ -19,6 +19,7 @@ import { actionErrorText } from "../../../store/errors.ts";
 import { useMcpCatalog, usePageActions } from "../../../store/page-context.tsx";
 import { Button } from "../../../ui/button.tsx";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "../../../ui/dialog.tsx";
+import { Code } from "../../../ui/code.tsx";
 import { fieldClass, Input } from "../../../ui/input.tsx";
 import { FolderBrowser } from "../../shell/folder-browser.tsx";
 import { TestRun } from "./test-view.tsx";
@@ -70,7 +71,7 @@ function Body({ sessionId, folder, initial, onClose, onAdded }: Omit<Props, "ope
           </Button>
         </div>
       ) : (
-        <p className="mt-3 font-mono text-sm text-muted">{catalog.data !== undefined && initial !== null ? `${initial} is not in the list.` : "asking the daemon…"}</p>
+        <p className="mt-3 text-body text-muted">{catalog.data !== undefined && initial !== null ? `${initial} is not in the list.` : "asking the daemon…"}</p>
       )}
       <div className="mt-4 flex justify-end">
         <Button onClick={onClose}>Close</Button>
@@ -287,7 +288,7 @@ function OtherForm({ sessionId, onAdded, onClose }: { sessionId: string | null; 
       </label>
       {"spec" in spec && line.trim().length > 0 ? (
         <p className="text-xs text-muted">
-          <span className="font-mono wrap-anywhere">{draftLine(spec.spec)}</span>
+          <Code className="wrap-anywhere">{draftLine(spec.spec)}</Code>
           <br />
           {spec.spec.url == null ? "golem will run this on your Mac." : "golem will connect to this address."}
         </p>
@@ -380,7 +381,7 @@ function Install({ name }: { name: "node" | "uv" }) {
         )}
       </div>
       {running ? (
-        <p role="status" aria-live="polite" className="font-mono text-xs text-muted wrap-anywhere">
+        <p role="status" aria-live="polite" className="text-meta text-muted wrap-anywhere">
           {tail.partial.trim().length > 0 ? tail.partial.split("\r").at(-1) : tail.last || `installing ${label}…`}
         </p>
       ) : null}

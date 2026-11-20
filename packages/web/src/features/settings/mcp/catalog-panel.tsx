@@ -35,7 +35,7 @@ export function CatalogView({ entries, onAdd }: { entries: readonly McpCatalogEn
               <div className="flex items-center justify-between gap-2">
                 <span className="min-w-0 text-xs text-faint wrap-anywhere">{hint}</span>
                 {entry.added === true ? (
-                  <span className="font-mono text-xs text-allow">Added</span>
+                  <span className="text-meta text-allow">Added</span>
                 ) : (
                   <Button size="sm" disabled={!usable} aria-label={`Add ${entry.title}`} onClick={() => onAdd(entry.id)}>
                     Add
@@ -47,7 +47,7 @@ export function CatalogView({ entries, onAdd }: { entries: readonly McpCatalogEn
         })}
         <li className="flex flex-col gap-2 rounded-lg border border-dashed border-line-strong p-3">
           <div className="flex items-center gap-2">
-            <span aria-hidden="true" className="inline-flex size-7 shrink-0 items-center justify-center rounded-md border border-line font-mono text-xs">
+            <span aria-hidden="true" className="inline-flex size-7 shrink-0 items-center justify-center rounded-md border border-line text-meta">
               +
             </span>
             <h3 className="text-sm font-semibold">Another server</h3>
@@ -82,7 +82,7 @@ export function CatalogPanel({ sessionId, onAdd }: { sessionId: string | null; o
     );
   }
   if (catalog.data === undefined) {
-    return <p className="font-mono text-sm text-muted">asking the daemon…</p>;
+    return <p className="text-body text-muted">asking the daemon…</p>;
   }
   return <CatalogView entries={catalog.data.entries} onAdd={onAdd} />;
 }

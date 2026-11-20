@@ -6,7 +6,7 @@ export function Stage({ when, tone, children }: { when?: string; tone?: "wait" |
   return (
     <div className="flex flex-col">
       {when === undefined ? null : (
-        <div className={cn("mb-1.5 font-mono text-micro font-semibold uppercase leading-none tracking-wider", tone === "wait" ? "text-wait" : tone === "summary" ? "text-ctx-summary" : "text-faint")}>
+        <div className={cn("mb-1.5 text-meta font-semibold leading-none", tone === "wait" ? "text-wait" : tone === "summary" ? "text-ctx-summary" : "text-faint")}>
           {when}
         </div>
       )}

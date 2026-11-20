@@ -15,6 +15,7 @@ import { actionErrorText } from "../../../store/errors.ts";
 import type { McpImportApplyResult, McpImportScanResult } from "../../../store/mcp.ts";
 import { usePageActions } from "../../../store/page-context.tsx";
 import { Button } from "../../../ui/button.tsx";
+import { Code } from "../../../ui/code.tsx";
 import { cn } from "../../../ui/cn.ts";
 import { Input } from "../../../ui/input.tsx";
 import { Textarea } from "../../../ui/textarea.tsx";
@@ -106,10 +107,10 @@ function Body({ sessionId, onDone, onImported }: Props) {
       <div className="flex flex-col gap-3">
         <h3 className="text-sm font-semibold">Import finished</h3>
         <p className="text-sm text-muted">{stage.result.added.length === 0 ? "Nothing was added." : `Added ${stage.result.added.length} ${stage.result.added.length === 1 ? "server" : "servers"}.`}</p>
-        <ul aria-label="Added" className="flex flex-col gap-1 font-mono text-sm">
+        <ul aria-label="Added" className="flex flex-col gap-1 text-body">
           {stage.result.added.map((server) => (
             <li key={server.name}>
-              {server.name} · {server.state}
+              <Code>{server.name}</Code> · {server.state}
             </li>
           ))}
         </ul>
@@ -147,7 +148,7 @@ function Body({ sessionId, onDone, onImported }: Props) {
   return (
     <div className="flex flex-col gap-3">
       <p className="text-sm text-muted">golem reads the config files of Claude Desktop, Claude Code, Cursor, VS Code, and Windsurf. It never changes them. A token goes to your Keychain.</p>
-      {stage.kind === "loading" ? <p className="font-mono text-sm text-muted">looking…</p> : null}
+      {stage.kind === "loading" ? <p className="text-body text-muted">looking…</p> : null}
       {stage.kind === "failed" ? (
         <div className="flex flex-col items-start gap-2">
           <p role="alert" className="text-sm text-deny">
@@ -247,9 +248,9 @@ export function ImportListView({
             <div className="flex flex-wrap items-baseline gap-x-3 px-1">
               <h3 className="text-sm font-semibold">{source.label}</h3>
               {source.path == null ? null : (
-                <span className="min-w-0 truncate font-mono text-xs text-muted" title={source.path}>
+                <Code tone="muted" className="min-w-0 truncate" title={source.path}>
                   {source.path}
-                </span>
+                </Code>
               )}
               {own.length === 0 ? null : <span className="text-xs text-muted">{own.length} found</span>}
               {keys.length === 0 ? null : (
@@ -284,7 +285,7 @@ export function ImportListView({
           <legend className="text-sm font-semibold">Values the other app only named</legend>
           {refs.map((ref) => (
             <label key={ref} className="flex flex-col gap-1 text-sm">
-              <span className="font-mono text-xs">{ref}</span>
+              <Code>{ref}</Code>
               <Input
                 type="password"
                 value={values[ref] ?? ""}
@@ -298,7 +299,7 @@ export function ImportListView({
         </fieldset>
       )}
       <div className="sticky bottom-0 -mx-1 flex items-center gap-3 border-t border-line bg-bg px-1 py-2">
-        <span role="status" aria-live="polite" className="font-mono text-xs text-muted">
+        <span role="status" aria-live="polite" className="text-meta text-muted">
           {count} selected
         </span>
         <Button kind="primary" className="ml-auto" disabled={busy || count === 0} onClick={onImport}>
@@ -340,7 +341,7 @@ function Row({ item, checked, name, onToggle, onName }: { item: ImportItem; chec
             />
           ) : (
             <>
-              <span className="min-w-0 truncate font-mono text-sm">{name}</span>
+              <Code className="min-w-0 truncate">{name}</Code>
               {same ? null : (
                 <button
                   type="button"
@@ -354,9 +355,9 @@ function Row({ item, checked, name, onToggle, onName }: { item: ImportItem; chec
             </>
           )}
         </span>
-        <span className="min-w-0 flex-1 truncate font-mono text-xs text-muted" title={target}>
+        <Code tone="muted" className="min-w-0 flex-1 truncate" title={target}>
           {target}
-        </span>
+        </Code>
         {notes.length === 0 ? null : <span className="shrink-0 text-xs text-muted">{notes.join(", ")}</span>}
       </div>
       {(candidate.warnings ?? []).map((warning) => (

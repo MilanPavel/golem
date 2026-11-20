@@ -4,6 +4,7 @@ import { actionErrorText } from "../../../store/errors.ts";
 import type { McpServer } from "../../../store/mcp.ts";
 import { usePageActions } from "../../../store/page-context.tsx";
 import { Button } from "../../../ui/button.tsx";
+import { Code } from "../../../ui/code.tsx";
 
 const KEPT = 500;
 
@@ -53,13 +54,13 @@ export function LogsView({ server, sessionId, onBack }: { server: McpServer; ses
           Follow
         </label>
       </div>
-      {onBack === undefined ? null : <h3 className="font-mono text-base font-semibold wrap-anywhere">{name} log</h3>}
+      {onBack === undefined ? null : <h3 className="text-heading font-semibold wrap-anywhere"><Code>{name}</Code> log</h3>}
       {error === null ? null : (
         <p role="alert" className="text-sm text-deny">
           {error}
         </p>
       )}
-      {lines === null && error === null ? <p className="font-mono text-sm text-muted">loading…</p> : null}
+      {lines === null && error === null ? <p className="text-body text-muted">loading…</p> : null}
       {lines !== null && lines.length === 0 ? <p className="text-sm text-muted">Nothing logged yet.</p> : null}
       {lines !== null && lines.length > 0 ? (
         <div
@@ -68,12 +69,12 @@ export function LogsView({ server, sessionId, onBack }: { server: McpServer; ses
           aria-label={`${name} log`}
           aria-live="off"
           tabIndex={0}
-          className="max-h-96 overflow-y-auto rounded-lg border border-line bg-sunken p-3 font-mono text-xs outline-offset-2 outline-clay focus-visible:outline-2"
+          className="max-h-96 overflow-y-auto rounded-lg border border-line bg-sunken p-3 outline-offset-2 outline-clay focus-visible:outline-2"
         >
           {lines.map((line, index) => (
-            <p key={index} className="wrap-anywhere whitespace-pre-wrap">
+            <Code key={index} className="block wrap-anywhere whitespace-pre-wrap">
               {line}
-            </p>
+            </Code>
           ))}
         </div>
       ) : null}

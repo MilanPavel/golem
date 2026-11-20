@@ -159,7 +159,7 @@ test("a server's detail shows what the terminal shows, and a failed one says why
   const facts = within(main());
   expect(facts.getByRole("heading", { level: 3, name: "github" })).toBeTruthy();
   expect(facts.getByText("https://api.githubcopilot.com/mcp/")).toBeTruthy();
-  expect(facts.getByText("Yours · ~/.golem/config.toml")).toBeTruthy();
+  expect(facts.getByText("~/.golem/config.toml")).toBeTruthy();
   expect(facts.getByText("401 Unauthorized · retry in 5s")).toBeTruthy();
   expect(facts.getByText("failed")).toBeTruthy();
   await user.click(facts.getByRole("button", { name: "Back" }));
@@ -854,7 +854,7 @@ test("Import adds the picked servers under the names typed, with a typed secret 
     secrets: { "mcp/gh-2": "tok" },
   });
   expect(await within(dialog).findByText("Added 2 servers.")).toBeTruthy();
-  expect(within(dialog).getByText("my-git · running")).toBeTruthy();
+  expect(within(dialog).getByText("my-git")).toBeTruthy();
   await user.click(within(dialog).getByRole("button", { name: "Done" }));
   expect(screen.queryByRole("tabpanel", { name: "Import" })).toBeNull();
   expect(await screen.findByText("added my-git, gh-2")).toBeTruthy();
@@ -883,7 +883,7 @@ test("a pick that failed is shown with the daemon's reason, and the rest are sti
   await user.click(await within(dialog).findByRole("button", { name: "Select all in Cursor" }));
   await user.click(within(dialog).getByRole("button", { name: "Import 2" }));
   expect((await screen.findByRole("alert")).textContent).toContain("gh-2 is already in use");
-  expect(screen.getByText("git · running")).toBeTruthy();
+  expect(screen.getByText("git")).toBeTruthy();
 });
 
 test("a refused import keeps the list and shows the message", async () => {

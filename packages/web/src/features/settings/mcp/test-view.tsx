@@ -4,6 +4,7 @@ import { actionErrorText } from "../../../store/errors.ts";
 import type { McpServer, McpTestProgress, McpTestResult } from "../../../store/mcp.ts";
 import { usePageActions } from "../../../store/page-context.tsx";
 import { Button } from "../../../ui/button.tsx";
+import { Code } from "../../../ui/code.tsx";
 
 /** A test of the saved server, each step shown as it ends, and then what it found. */
 export function TestView({ server, sessionId, onBack }: { server: McpServer; sessionId: string | null; onBack: () => void }) {
@@ -19,7 +20,7 @@ export function TestView({ server, sessionId, onBack }: { server: McpServer; ses
           Test again
         </Button>
       </div>
-      <h3 className="font-mono text-base font-semibold wrap-anywhere">Test {server.name}</h3>
+      <h3 className="text-heading font-semibold wrap-anywhere">Test <Code>{server.name}</Code></h3>
       <TestRun key={round} start={(onStep) => actions.testMcp(server.name, sessionId, onStep)} />
     </div>
   );
@@ -51,7 +52,7 @@ export function TestRun({ start }: { start: (onStep: (step: McpTestProgress) => 
   }, []);
   return (
     <>
-      <ol aria-label="Test steps" aria-live="polite" className="flex flex-col gap-1 font-mono text-sm">
+      <ol aria-label="Test steps" aria-live="polite" className="flex flex-col gap-1 text-body">
         {steps.map((line, index) => (
           <li key={index} className="wrap-anywhere">
             {line}
@@ -59,13 +60,13 @@ export function TestRun({ start }: { start: (onStep: (step: McpTestProgress) => 
         ))}
       </ol>
       {outcome === null ? (
-        <p className="font-mono text-sm text-muted">testing…</p>
+        <p className="text-body text-muted">testing…</p>
       ) : "error" in outcome ? (
         <p role="alert" className="text-sm text-deny">
           {outcome.error}
         </p>
       ) : (
-        <div role="status" className="flex flex-col gap-1 font-mono text-sm">
+        <div role="status" className="flex flex-col gap-1 text-body">
           {formatTestResult(outcome)
             .split("\n")
             .map((line, index) => (

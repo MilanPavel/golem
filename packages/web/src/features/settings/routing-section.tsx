@@ -51,7 +51,7 @@ function ContextHandoff({ values, window, onOpen }: { values: RoutingGetResult; 
         <p className="text-note text-muted">{words.line}</p>
         <ul className="flex flex-wrap gap-1.5">
           {handoffChips(values.context, window, windowKind(values.context)).map((chip) => (
-            <li key={chip} className="rounded-md border border-line-strong bg-slip px-1.5 py-0.5 font-mono text-xs font-medium whitespace-nowrap text-ink">
+            <li key={chip} className="rounded-md border border-line-strong bg-slip px-1.5 py-0.5 text-meta font-medium whitespace-nowrap text-ink">
               {chip}
             </li>
           ))}
@@ -157,7 +157,7 @@ export function RoutingSection() {
       </div>
     );
   }
-  if (routing.data === undefined) return <p className="font-mono text-sm text-muted">asking the daemon…</p>;
+  if (routing.data === undefined) return <p className="text-body text-muted">asking the daemon…</p>;
   return (
     <div className="flex flex-col gap-4">
       {failure === null ? null : (

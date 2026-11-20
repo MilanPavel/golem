@@ -5,6 +5,7 @@ import { actionErrorText } from "../../../store/errors.ts";
 import type { McpServer } from "../../../store/mcp.ts";
 import { usePageActions } from "../../../store/page-context.tsx";
 import { Button } from "../../../ui/button.tsx";
+import { Code } from "../../../ui/code.tsx";
 import { fieldClass, Input } from "../../../ui/input.tsx";
 import { Textarea } from "../../../ui/textarea.tsx";
 
@@ -27,7 +28,7 @@ export function EditServer({ server, sessionId, onBack, onCancel, onSaved }: { s
               Back
             </Button>
           </div>
-          <h3 className="font-mono text-base font-semibold wrap-anywhere">Edit {server.name}</h3>
+          <h3 className="text-heading font-semibold wrap-anywhere">Edit <Code>{server.name}</Code></h3>
         </>
       )}
       {detail.isError ? (
@@ -40,7 +41,7 @@ export function EditServer({ server, sessionId, onBack, onCancel, onSaved }: { s
           </Button>
         </div>
       ) : detail.data === undefined ? (
-        <p className="font-mono text-sm text-muted">loading…</p>
+        <p className="text-body text-muted">loading…</p>
       ) : (
         <Fields name={server.name} original={detail.data.config} path={detail.data.path} sessionId={sessionId} onCancel={onCancel ?? onBack} onSaved={onSaved} />
       )}
@@ -82,7 +83,7 @@ function Fields({ name, original, path, sessionId, onCancel, onSaved }: { name: 
         void save();
       }}
     >
-      <p className="font-mono text-xs text-muted wrap-anywhere">{path}</p>
+      <p className="text-meta text-muted wrap-anywhere"><Code tone="muted">{path}</Code></p>
       <fieldset className="flex flex-col gap-2">
         <legend className="text-sm font-semibold">Runs</legend>
         <div className="flex gap-4 text-sm">

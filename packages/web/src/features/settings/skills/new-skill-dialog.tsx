@@ -2,6 +2,7 @@ import { useId, useState } from "react";
 import { usePageActions } from "../../../store/page-context.tsx";
 import { SKILL_NAME, skillErrorText } from "../../../store/skills.ts";
 import { Button } from "../../../ui/button.tsx";
+import { Code } from "../../../ui/code.tsx";
 import { cn } from "../../../ui/cn.ts";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "../../../ui/dialog.tsx";
 import { Input } from "../../../ui/input.tsx";
@@ -115,7 +116,7 @@ function Form({ folder, onCancel, onCreated }: { folder: string | null; onCancel
             This project
           </Button>
         </div>
-        <p className="font-mono text-xs text-muted wrap-anywhere">{scope === "project" && folder !== null ? `${folder}/${WHERE.project}` : WHERE[scope]}</p>
+        <p className="text-meta text-muted wrap-anywhere"><Code tone="muted">{scope === "project" && folder !== null ? `${folder}/${WHERE.project}` : WHERE[scope]}</Code></p>
       </div>
       <div className="flex flex-col gap-1">
         <label htmlFor={`${ids}-description`} className="text-sm font-medium">

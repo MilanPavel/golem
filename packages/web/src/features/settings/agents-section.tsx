@@ -11,7 +11,7 @@ import { useSettingsFolder } from "./context.ts";
 /** Where an agent type is written, said once under the table. */
 const AGENTS_HINT = "Add one as ~/.golem/agents/<name>.md, or .golem/agents/<name>.md in a project.";
 
-const HEAD = "pr-3 pb-2 text-left font-mono text-micro font-semibold tracking-wider text-faint uppercase";
+const HEAD = "pr-3 pb-2 text-left text-meta font-semibold text-faint";
 
 function countLine(count: number): string {
   return `${count} ${count === 1 ? "agent" : "agents"}`;
@@ -34,7 +34,7 @@ function wishErrorText(error: unknown, name: string): string {
 function NowLine({ row }: { row: AgentRow }) {
   if (row.now === null) return null;
   return (
-    <span className="block font-mono text-xs text-muted" title={row.now.reason === "" ? undefined : row.now.reason}>
+    <span className="block text-meta text-muted" title={row.now.reason === "" ? undefined : row.now.reason}>
       {row.now.text}
       {row.now.freshWindow === "" ? null : `, ${row.now.freshWindow}`}
       {row.now.reason === "" ? null : <span className="sr-only">{`. ${row.now.reason}`}</span>}
@@ -105,10 +105,10 @@ function AgentCells({ row, onSetWish }: { row: AgentRow; onSetWish: ((name: stri
     <tr className="border-t border-line align-top">
       <th scope="row" className="py-2 pr-3 text-left font-normal">
         <span className="font-ui text-sm font-medium">{row.name}</span>{" "}
-        <span className="ml-2 font-mono text-xs whitespace-nowrap text-faint">{AGENT_GROUPS[row.source]}</span>{" "}
+        <span className="ml-2 text-meta whitespace-nowrap text-faint">{AGENT_GROUPS[row.source]}</span>{" "}
         {row.description === "" ? null : <span className="block text-xs text-muted">{row.description}</span>}
         {row.warnings.map((text) => (
-          <span key={text} role="note" className={cn("block font-mono text-xs wrap-anywhere", row.tone === "bad" ? "text-deny" : "text-muted")}>
+          <span key={text} role="note" className={cn("block text-meta wrap-anywhere", row.tone === "bad" ? "text-deny" : "text-muted")}>
             {text}
           </span>
         ))}
@@ -116,8 +116,8 @@ function AgentCells({ row, onSetWish }: { row: AgentRow; onSetWish: ((name: stri
       <td className="py-2 pr-3 text-sm text-muted">
         <WishCell row={row} onSetWish={onSetWish} />
       </td>
-      <td className="py-2 pr-3 text-right font-mono text-sm">{row.used}</td>
-      <td className="py-2 text-right font-mono text-sm">{row.finished}</td>
+      <td className="py-2 pr-3 text-right text-body">{row.used}</td>
+      <td className="py-2 text-right text-body">{row.finished}</td>
     </tr>
   );
 }
@@ -198,7 +198,7 @@ export function AgentsSection() {
       </div>
     );
   }
-  if (list.data === undefined) return <p className="font-mono text-sm text-muted">asking the daemon…</p>;
+  if (list.data === undefined) return <p className="text-body text-muted">asking the daemon…</p>;
   return (
     <AgentsTable
       agents={list.data.agents}

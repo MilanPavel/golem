@@ -3,6 +3,7 @@ import { useState } from "react";
 import { itemMayGoToPaid, memoryErrorText, type MemoryItem, type MemoryPrivacy } from "../../../store/memory.ts";
 import { Button } from "../../../ui/button.tsx";
 import { cn } from "../../../ui/cn.ts";
+import { Code } from "../../../ui/code.tsx";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from "../../../ui/dialog.tsx";
 import { Textarea } from "../../../ui/textarea.tsx";
 import { MemorySwitch } from "./memory-switch.tsx";
@@ -57,10 +58,10 @@ export function MemoryRow({ item, actions }: { item: MemoryItem; actions: Memory
     <li aria-label={item.title} className="flex flex-col gap-2 rounded-lg border border-line bg-surface px-4 py-3">
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
         <h3 className="min-w-0 flex-1 text-sm font-medium wrap-anywhere">{item.title}</h3>
-        <span className="font-mono text-xs whitespace-nowrap text-faint">{memoryLabel(item)}</span>
+        <span className="text-meta whitespace-nowrap text-faint">{memoryLabel(item)}</span>
       </div>
       {state === "" && note === null ? null : (
-        <p className={cn("font-mono text-xs", item.state === "stale" ? "text-wait" : "text-muted")}>
+        <p className={cn("text-meta", item.state === "stale" ? "text-wait" : "text-muted")}>
           {state}
           {state !== "" && note !== null ? " · " : ""}
           {note}
@@ -90,7 +91,7 @@ export function MemoryRow({ item, actions }: { item: MemoryItem; actions: Memory
             >
               Cancel
             </Button>
-            <span className="ml-auto font-mono text-xs text-faint">
+            <span className="ml-auto text-meta text-faint">
               {draft.length} / {MEMORY_MAX_CHARS}
             </span>
           </div>
@@ -99,10 +100,10 @@ export function MemoryRow({ item, actions }: { item: MemoryItem; actions: Memory
         <p className="text-sm whitespace-pre-wrap wrap-anywhere text-ink">{item.text}</p>
       )}
       {sources.length === 0 ? null : (
-        <ul aria-label="Sources" className="flex flex-col gap-0.5 font-mono text-xs text-muted">
+        <ul aria-label="Sources" className="flex flex-col gap-0.5 text-meta text-muted">
           {sources.map((source) => (
             <li key={source.path} className="wrap-anywhere">
-              {source.path}
+              <Code tone="muted">{source.path}</Code>
             </li>
           ))}
         </ul>

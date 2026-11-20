@@ -19,7 +19,7 @@ const WORDS: Record<WindowZoneKind, string> = {
 function Mark({ at, label, tone }: { at: number; label: string; tone: "wait" | "summary" }) {
   return (
     <div aria-hidden="true" className={cn("pointer-events-none absolute inset-y-0 w-0", tone === "wait" ? "text-wait" : "text-ctx-summary")} style={{ left: `${at}%` }}>
-      <span className="absolute top-0 -translate-x-1/2 rounded-xs border border-current bg-surface px-1.5 py-1 font-mono text-micro font-semibold whitespace-nowrap text-ink">
+      <span className="absolute top-0 -translate-x-1/2 rounded-xs border border-current bg-surface px-1.5 py-1 text-meta font-semibold whitespace-nowrap text-ink">
         {label}
       </span>
       <span className="absolute -left-px top-6 bottom-0 border-l-2 border-current" />
@@ -36,7 +36,7 @@ export function WindowBarView({ bar, window, reserve, estimated = false }: { bar
           {bar.zones.map((zone) => (
             <div
               key={zone.kind}
-              className={cn("flex items-center overflow-hidden px-2.5 font-mono text-micro font-semibold whitespace-nowrap", zone.kind === "reply" ? "text-faint" : "text-ink-soft", ZONE[zone.kind])}
+              className={cn("flex items-center overflow-hidden px-2.5 text-meta font-semibold whitespace-nowrap", zone.kind === "reply" ? "text-faint" : "text-ink-soft", ZONE[zone.kind])}
               style={{ width: `${zone.to - zone.from}%` }}
             >
               {window === null && zone.kind === "reply" ? `reply · ${windowSize(reserve)}` : WORDS[zone.kind]}
@@ -46,7 +46,7 @@ export function WindowBarView({ bar, window, reserve, estimated = false }: { bar
         <Mark at={bar.marks.clear.at} label={bar.marks.clear.label} tone="wait" />
         <Mark at={bar.marks.summarise.at} label={bar.marks.summarise.label} tone="summary" />
       </div>
-      <div aria-hidden="true" className="mt-1.5 flex justify-between font-mono text-micro text-faint">
+      <div aria-hidden="true" className="mt-1.5 flex justify-between text-meta text-faint">
         <span>0</span>
         <span>the chat grows →</span>
         <span>{window === null ? "the window" : `${estimated ? "≈ " : ""}${windowSize(window)}`}</span>

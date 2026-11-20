@@ -71,7 +71,7 @@ export function MemoryView(props: MemoryViewProps) {
       </p>
     );
   }
-  if (notice !== null) return <p className="font-mono text-sm text-muted">asking the daemon…</p>;
+  if (notice !== null) return <p className="text-body text-muted">asking the daemon…</p>;
   return (
     <div className="flex max-w-column flex-col gap-4">
       <Input type="search" aria-label="Search memory" placeholder="Search memory" value={query} onChange={(event) => onQuery(event.target.value)} />
@@ -80,7 +80,7 @@ export function MemoryView(props: MemoryViewProps) {
           {SCOPES.map((value) => (
             <TabsTrigger key={value} value={value}>
               {MEMORY_GROUPS[value]}{" "}
-              <span className="ml-1 font-mono text-xs text-faint">{counts?.[value] ?? 0}</span>
+              <span className="ml-1 text-meta text-faint">{counts?.[value] ?? 0}</span>
             </TabsTrigger>
           ))}
         </TabsList>
@@ -94,12 +94,12 @@ export function MemoryView(props: MemoryViewProps) {
               </p>
             )}
             {props.listLoading ? (
-              <p className="font-mono text-sm text-muted">asking the daemon…</p>
+              <p className="text-body text-muted">asking the daemon…</p>
             ) : items.length === 0 ? (
               <p className="text-sm text-muted">{query === "" ? EMPTY_TEXT : NO_MATCH_TEXT}</p>
             ) : (
               <>
-                <p className="font-mono text-xs text-faint">{items.length === total ? `${total} shown` : `${items.length} of ${total} shown`}</p>
+                <p className="text-meta text-faint">{items.length === total ? `${total} shown` : `${items.length} of ${total} shown`}</p>
                 <ul className="flex flex-col gap-2">
                   {items.map((item) => (
                     <MemoryRow key={item.id} item={item} actions={rowActions} />
