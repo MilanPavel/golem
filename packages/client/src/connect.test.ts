@@ -1496,6 +1496,44 @@ test("skill.list reads the skills, and skill.registry.changed reaches onSkillsCh
   }
 });
 
+test("agents.list reads the agent types, and agent.registry.changed reaches onAgentsChanged", async () => {
+  const scout = { name: "scout", description: "Looks around.", origin: "bundled", wish: "cheapest", used: 3, finished: 2 };
+  const sent: Record<string, unknown>[] = [];
+  const server = await listen((socket) => {
+    attach(socket, {
+      answerPing: true,
+      results: { "agents.list": { agents: [scout] } },
+      onRequest: (_socket, method, params) => {
+        if (method.startsWith("agents.")) {
+          sent.push({ method, ...params });
+        }
+      },
+      onHello: (current) => {
+        write(current, { jsonrpc: "2.0", method: "agent.registry.changed", params: { root: "/repo" } });
+        write(current, { jsonrpc: "2.0", method: "agent.registry.changed", params: {} });
+      },
+    });
+  });
+  const client = connectGolem({ socketPath: server.socketPath, clientName: "tui", reconnect: false, heartbeatMs: 60_000 });
+  const seen: (string | null)[] = [];
+  const stop = client.onAgentsChanged((root) => {
+    seen.push(root);
+  });
+  try {
+    assert.deepEqual(await client.listAgents("/repo"), { agents: [scout] });
+    await client.listAgents();
+    assert.deepEqual(sent, [{ method: "agents.list", cwd: "/repo" }, { method: "agents.list" }]);
+    for (let tries = 0; tries < 50 && seen.length < 2; tries += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+    assert.deepEqual(seen, ["/repo", null]);
+  } finally {
+    stop();
+    client.close();
+    await server.close();
+  }
+});
+
 test("memory.list reads a page, and memory.changed reaches onMemoryChanged unless it is malformed", async () => {
   const note = { id: "mem_1", scope: "you", title: "pnpm", text: "Use pnpm.", author: "you", state: "kept", sources: [] };
   const page = {

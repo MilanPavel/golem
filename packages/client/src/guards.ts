@@ -36,6 +36,7 @@ import type { SessionSetPlanResult } from "../../protocol/gen/session-set-plan-r
 import type { SessionSetModeResult } from "../../protocol/gen/session-set-mode-result.ts";
 import type { SessionSetOptionsResult } from "../../protocol/gen/session-set-options-result.ts";
 import type { ListedSkill, SkillListResult } from "../../protocol/gen/skill-list-result.ts";
+import type { AgentsListResult } from "../../protocol/gen/agents-list-result.ts";
 import type { MemoryDeleteResult } from "../../protocol/gen/memory-delete-result.ts";
 import type { MemoryExportResult } from "../../protocol/gen/memory-export-result.ts";
 import type { MemoryGetResult } from "../../protocol/gen/memory-get-result.ts";
@@ -309,6 +310,21 @@ export function isListedSkill(value: unknown): value is ListedSkill {
 
 export function isSkillListResult(value: unknown): value is SkillListResult {
   return isRecord(value) && Array.isArray(value["skills"]) && value["skills"].every(isListedSkill);
+}
+
+export function isAgentsListResult(value: unknown): value is AgentsListResult {
+  return (
+    isRecord(value) &&
+    Array.isArray(value["agents"]) &&
+    value["agents"].every(
+      (agent) =>
+        isRecord(agent) &&
+        typeof agent["name"] === "string" &&
+        typeof agent["description"] === "string" &&
+        typeof agent["origin"] === "string" &&
+        typeof agent["wish"] === "string",
+    )
+  );
 }
 
 export function isSkillReadResult(value: unknown): value is SkillReadResult {

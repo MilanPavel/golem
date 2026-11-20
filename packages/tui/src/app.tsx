@@ -378,6 +378,16 @@ import {
   type CommitBand,
 } from "./commit-band.ts";
 import {
+  agentListFailed,
+  agentsManagerKeyOf,
+  closedAgentsManager,
+  layoutAgentsManager,
+  openAgentsManager,
+  pressAgentsManager,
+  type AgentList,
+  type AgentsManagerState,
+} from "./agents-manager.ts";
+import {
   closedSkillsManager,
   layoutSkillsManager,
   openNewSkill,
@@ -667,6 +677,12 @@ export function App({
   const [skillList, setSkillList] = useState<SkillList>({ skills: null, error: null });
   const skillListRef = useRef(skillList);
   skillListRef.current = skillList;
+  const [agentsManager, setAgentsManager] = useState<AgentsManagerState>(closedAgentsManager);
+  const agentsManagerRef = useRef(agentsManager);
+  agentsManagerRef.current = agentsManager;
+  const [agentList, setAgentList] = useState<AgentList>({ agents: null, error: null });
+  const agentListRef = useRef(agentList);
+  agentListRef.current = agentList;
   const [routinesManager, setRoutinesManager] = useState<RoutinesManagerState>(closedRoutinesManager);
   const routinesManagerRef = useRef(routinesManager);
   routinesManagerRef.current = routinesManager;
@@ -923,6 +939,7 @@ export function App({
     perms.open ||
     mcpManager.open ||
     skillsManager.open ||
+    agentsManager.open ||
     routinesManager.open ||
     runsManager.open ||
     memoryManager.open ||
@@ -1513,6 +1530,15 @@ export function App({
     });
   }, [client]);
 
+  // `/agents` reads its list again when agent files change, but only while it is open.
+  useEffect(() => {
+    return client.onAgentsChanged((root) => {
+      if (agentsManagerRef.current.open && (root === null || root === skillsFolder())) {
+        loadAgents();
+      }
+    });
+  }, [client]);
+
   useEffect(() => {
     return client.onMcpStatus((server) => {
       setMcp((current) =>
@@ -2054,6 +2080,18 @@ export function App({
     );
   }
 
+  /** Ask for this folder's agent types again. `/agents` reads them. */
+  function loadAgents(): void {
+    client.listAgents(skillsFolder()).then(
+      (listed) => {
+        setAgentList({ agents: listed.agents, error: null });
+      },
+      (error: unknown) => {
+        setAgentList(agentListFailed(error));
+      },
+    );
+  }
+
   /** Ask for this folder's skills again. `/skills` reads them. */
   function loadSkills(): void {
     client.listSkills(skillsFolder()).then(
@@ -2351,6 +2389,15 @@ export function App({
       skillsManagerRef.current = opened;
       setSkillsManager(opened);
       loadSkills();
+      return;
+    }
+    if (outcome.kind === "agents") {
+      setDraft(draftAt(""));
+      setKeysOpen(false);
+      setSwitcher(closedSwitcher);
+      showAgentsManager(openAgentsManager());
+      setAgentList({ agents: null, error: null });
+      loadAgents();
       return;
     }
     if (outcome.kind === "routines") {
@@ -4577,6 +4624,20 @@ export function App({
     setChat((state) => ({ ...state, notice }));
   }
 
+  function onAgentsManagerPress(press: Press): void {
+    const key = agentsManagerKeyOf(press);
+    if (key === null) {
+      return;
+    }
+    const pressed = pressAgentsManager(agentsManagerRef.current, agentListRef.current.agents ?? [], key);
+    showAgentsManager(pressed.state);
+  }
+
+  function showAgentsManager(next: AgentsManagerState): void {
+    agentsManagerRef.current = next;
+    setAgentsManager(next);
+  }
+
   function onSkillsManagerPress(press: Press): void {
     const key = skillsManagerKeyOf(press, skillsManagerTyping(skillsManagerRef.current));
     if (key === null) {
@@ -5280,6 +5341,10 @@ export function App({
       onSkillsManagerPress(press);
       return;
     }
+    if (agentsManagerRef.current.open && !keysOpenRef.current && press.name !== "f1" && press.name !== "ctrl-c") {
+      onAgentsManagerPress(press);
+      return;
+    }
     if (routinesManagerRef.current.open && !keysOpenRef.current && press.name !== "f1" && press.name !== "ctrl-c") {
       onRoutinesManagerPress(press);
       return;
@@ -5495,6 +5560,7 @@ export function App({
       permsRef.current.open ||
       mcpManagerRef.current.open ||
       skillsManagerRef.current.open ||
+      agentsManagerRef.current.open ||
       routinesManagerRef.current.open ||
       runsManagerRef.current.open ||
       memoryManagerRef.current.open ||
@@ -5543,7 +5609,7 @@ export function App({
     },
     all: transcript.all,
     pinned: transcript.pinned === null ? null : { row: budget.header, offset: transcript.pinned.offset },
-    shown: !keysOpen && !picker.open && !mcpManager.open && !skillsManager.open && !routinesManager.open && !runsManager.open && !memoryManager.open && !changesManager.open && !perms.open && !switcher.open,
+    shown: !keysOpen && !picker.open && !mcpManager.open && !skillsManager.open && !agentsManager.open && !routinesManager.open && !runsManager.open && !memoryManager.open && !changesManager.open && !perms.open && !switcher.open,
   };
   const composer =
     argsEdit !== null
@@ -5648,6 +5714,20 @@ export function App({
             columns,
             rows: budget.body,
             pinned: chat.activeSkills,
+          }).map((line, index) => (
+            <McpManagerRow key={index} line={line} />
+          ))}
+        </Box>
+      ) : agentsManager.open ? (
+        <Box flexDirection="column" width={columns} height={budget.body} flexShrink={0} overflow="hidden">
+          {layoutAgentsManager({
+            state: agentsManager,
+            agents: agentList.agents,
+            error: agentList.error,
+            cwd: sessionCwd ?? process.cwd(),
+            home: homedir(),
+            columns,
+            rows: budget.body,
           }).map((line, index) => (
             <McpManagerRow key={index} line={line} />
           ))}

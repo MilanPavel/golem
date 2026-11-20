@@ -77,6 +77,7 @@ import type { RunListResult } from "../../protocol/gen/run-list-result.ts";
 import type { SkillCall } from "../../protocol/gen/skill-call.ts";
 import type { SkillCreateResult } from "../../protocol/gen/skill-create-result.ts";
 import type { SkillListResult } from "../../protocol/gen/skill-list-result.ts";
+import type { AgentsListResult } from "../../protocol/gen/agents-list-result.ts";
 import type { SkillReadResult } from "../../protocol/gen/skill-read-result.ts";
 import type { RoutineUpdateResult } from "../../protocol/gen/routine-update-result.ts";
 import type { SkillSetDisabledResult } from "../../protocol/gen/skill-set-disabled-result.ts";
@@ -224,6 +225,7 @@ import {
   isRoutineRunResult,
   isRunListResult,
   isSkillCreateResult,
+  isAgentsListResult,
   isSkillListResult,
   isSkillReadResult,
   isRoutineUpdateResult,
@@ -618,6 +620,10 @@ export interface GolemClient {
    * whose project skills changed, or `null` when every folder's did.
    */
   onSkillsChanged(listener: (root: string | null) => void): () => void;
+  /** `agents.list`: the agent types a session in `cwd` sees. Without `cwd`, only the user's. */
+  listAgents(cwd?: string): Promise<AgentsListResult>;
+  /** `agent.registry.changed`: agent files changed. `root` is the folder whose project agents changed, or `null` for every folder. */
+  onAgentsChanged(listener: (root: string | null) => void): () => void;
   /** `routine.remove`: delete a user routine from `config.toml`. */
   removeRoutine(name: string): Promise<RoutineRemoveResult>;
   /**
@@ -703,6 +709,7 @@ export function connectGolem(options: ConnectOptions): GolemClient {
   const testListeners = new Set<(progress: McpTestProgress) => void>();
   const logListeners = new Set<(log: McpServerLog) => void>();
   const skillListeners = new Set<(root: string | null) => void>();
+  const agentListeners = new Set<(root: string | null) => void>();
   const routineListeners = new Set<(kind: "changed" | "fired" | "finished") => void>();
   const memoryListeners = new Set<(change: MemoryChanged) => void>();
   const serverListeners = new Set<(status: ModelServerStatus) => void>();
@@ -1058,6 +1065,19 @@ export function connectGolem(options: ConnectOptions): GolemClient {
           } catch {
             // A listener must not tear the socket down.
           }
+        }
+      }
+      return;
+    }
+    if (isRecord(message) && message["method"] === "agent.registry.changed") {
+      const params = message["params"];
+      const root = isRecord(params) && typeof params["root"] === "string" ? params["root"] : null;
+      record({ direction: "in", kind: "agent.registry.changed", detail: root ?? "all", json: line });
+      for (const listener of agentListeners) {
+        try {
+          listener(root);
+        } catch {
+          // A listener must not tear the socket down.
         }
       }
       return;
@@ -2292,6 +2312,20 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       skillListeners.add(listener);
       return () => {
         skillListeners.delete(listener);
+      };
+    },
+    async listAgents(cwd?: string): Promise<AgentsListResult> {
+      await ready;
+      const result = await call("agents.list", cwd === undefined ? {} : { cwd });
+      if (!isAgentsListResult(result)) {
+        throw new Error("invalid agents.list result");
+      }
+      return result;
+    },
+    onAgentsChanged(listener: (root: string | null) => void): () => void {
+      agentListeners.add(listener);
+      return () => {
+        agentListeners.delete(listener);
       };
     },
     async removeRoutine(name: string): Promise<RoutineRemoveResult> {
