@@ -4,6 +4,17 @@ import { cn } from "../../ui/cn.ts";
 import { ChevronDownIcon, SettingsConfigIcon } from "../../ui/icons.tsx";
 import { Link } from "../../ui/link.tsx";
 import { GROUPS, SECTIONS, type SettingsSection } from "./sections.ts";
+import { useSectionBadges } from "./use-section-badges.ts";
+
+/** The amber count of what needs attention: shows nothing for 0. */
+function Badge({ count, className }: { count: number; className?: string }) {
+  if (count <= 0) return null;
+  return (
+    <span title={`${count} to fix`} className={cn("inline-grid h-4.5 min-w-4.5 place-items-center rounded-full bg-wait-soft px-1.25 font-mono text-micro leading-none font-bold text-wait", className)}>
+      {count}
+    </span>
+  );
+}
 
 const ITEM = cn(
   "relative flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm text-ink-soft outline-offset-2 outline-clay hover:bg-surface/70 focus-visible:outline-2",
@@ -15,6 +26,7 @@ const ITEM = cn(
 
 /** The groups with their sections as links, in order. */
 function Groups({ section, onNavigate, onPick }: { section: string; onNavigate: (href: string) => void; onPick?: () => void }) {
+  const badges = useSectionBadges();
   return (
     <>
       {GROUPS.map((group) => (
@@ -33,6 +45,7 @@ function Groups({ section, onNavigate, onPick }: { section: string; onNavigate: 
             >
               <item.icon />
               <span>{item.title}</span>
+              <Badge count={badges[item.id] ?? 0} className="ml-auto" />
             </Link>
           ))}
         </div>
@@ -94,6 +107,7 @@ export function SettingsPicker({
 }) {
   const [open, setOpen] = useState(false);
   const group = GROUPS.find((item) => item.id === current?.group);
+  const total = Object.values(useSectionBadges()).reduce((sum, count) => sum + count, 0);
   return (
     <div className="border-b border-line px-4 py-3 md:hidden">
       <button
@@ -108,7 +122,8 @@ export function SettingsPicker({
         {current === undefined ? null : <current.icon className="text-clay" />}
         <span>{current?.title ?? "Settings"}</span>
         {group === undefined ? null : <small className="font-mono text-micro font-normal text-faint uppercase">{group.title}</small>}
-        <ChevronDownIcon className={cn("ml-auto text-faint", open && "rotate-180")} />
+        <Badge count={total} className="ml-auto" />
+        <ChevronDownIcon className={cn(total === 0 && "ml-auto", "text-faint", open && "rotate-180")} />
       </button>
       {open ? (
         <div id="settings-picker-list" role="group" aria-label="All settings sections" className="mt-2 flex flex-col">

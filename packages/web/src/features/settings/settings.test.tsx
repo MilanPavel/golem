@@ -16,10 +16,11 @@ import { GROUPS, SECTIONS } from "./sections.ts";
 
 const noContrast = { rules: { "color-contrast": { enabled: false } } };
 
-function mount(path: string, rows: typeof OK_ROWS | "fail" = OK_ROWS, extra: { kept?: boolean; appInstall?: ReturnType<typeof createAppInstall> } = {}) {
+function mount(path: string, rows: typeof OK_ROWS | "fail" = OK_ROWS, extra: { kept?: boolean; appInstall?: ReturnType<typeof createAppInstall>; servers?: unknown[] } = {}) {
   history.replaceState(null, "", path);
   const fake = fakeClient();
   fake.raw.listModels.mockResolvedValue(WORKING_LISTING);
+  if (extra.servers !== undefined) fake.raw.listMcp.mockResolvedValue({ servers: extra.servers } as never);
   if (rows === "fail") fake.raw.setupStatus.mockRejectedValue(new Error("no status"));
   else fake.raw.setupStatus.mockResolvedValue({ rows });
   fake.raw.status.mockResolvedValue({ version: "0.5.0" });
@@ -302,3 +303,33 @@ for (const theme of ["slip", "kiln"] as const) {
     expect((await axe.run(container, noContrast)).violations).toEqual([]);
   });
 }
+
+const nav = () => screen.getByTestId("settings-nav");
+
+test("a badge shows the count of checks to fix next to Info, and goes away once they are fixed", async () => {
+  const { fake } = mount("/settings/appearance", STATUS_ROWS);
+  const badge = await within(nav()).findByTitle("2 to fix");
+  expect(badge.textContent).toBe("2");
+  expect(within(nav()).getByRole("link", { name: /^Info/ }).contains(badge)).toBe(true);
+  fake.raw.setupStatus.mockResolvedValue({ rows: OK_ROWS });
+  act(() => {
+    focusManager.setFocused(false);
+    focusManager.setFocused(true);
+  });
+  await waitFor(() => expect(within(nav()).queryByTitle(/to fix/)).toBeNull());
+});
+
+test("nothing is rendered for a section with 0 to fix", async () => {
+  const { fake } = mount("/settings/appearance", OK_ROWS);
+  await waitFor(() => expect(fake.raw.setupStatus).toHaveBeenCalled());
+  expect(within(nav()).queryByTitle(/to fix/)).toBeNull();
+});
+
+test("a server that failed to start badges MCP servers, and the narrow picker button shows the sum", async () => {
+  const server = { name: "git", state: "failed", error: "exited", tools: [], config: "/c.json" };
+  mount("/settings/appearance", STATUS_ROWS, { servers: [server] });
+  const link = within(nav()).getByRole("link", { name: /^MCP servers/ });
+  await waitFor(() => expect(within(link).getByTitle("1 to fix")).toBeTruthy());
+  const button = screen.getByRole("button", { name: /Appearance/ });
+  expect(within(button).getByTitle("3 to fix").textContent).toBe("3");
+});

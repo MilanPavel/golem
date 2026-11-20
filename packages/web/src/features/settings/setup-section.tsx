@@ -1,7 +1,7 @@
-import { daemonServiceRow, pageServiceRow, setupFormRows, toolsSettled, type FormButtonId } from "@golem/view";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { toolsSettled, type FormButtonId } from "@golem/view";
+import { useCallback, useEffect, useState } from "react";
 import { useConnection } from "../../store/connection-context.tsx";
-import { useNavigate, usePageHost, useSetupStatus } from "../../store/page-context.tsx";
+import { useNavigate, useSetupStatus } from "../../store/page-context.tsx";
 import { Button } from "../../ui/button.tsx";
 import { openModelDialog } from "../models/index.ts";
 import { HeroCard, PathsGrid } from "../setup/info-parts.tsx";
@@ -11,6 +11,7 @@ import { useSetupActions } from "../setup/use-setup-actions.ts";
 import { useTools } from "../setup/use-tools.ts";
 import { welcomePath } from "../../store/router.ts";
 import { SECTIONS } from "./sections.ts";
+import { useSetupFormRows } from "./use-setup-form-rows.ts";
 
 const HERO = "hero";
 
@@ -63,7 +64,6 @@ function AddTools({ onClose, onAdded }: { onClose: () => void; onAdded: () => vo
 export function SetupSection() {
   const status = useSetupStatus();
   const connection = useConnection();
-  const pageHost = usePageHost();
   const navigate = useNavigate();
   const { refetch } = status;
   const actions = useSetupActions(refetch);
@@ -75,14 +75,7 @@ export function SetupSection() {
     void refetch();
   }, [refetch]);
 
-  const sourceRows = status.isError ? null : (status.data?.rows ?? null);
-  const form = useMemo(
-    () =>
-      sourceRows === null
-        ? null
-        : setupFormRows(sourceRows, pageServiceRow(daemonServiceRow(sourceRows), connection.daemonVersion ?? ""), pageHost.kept),
-    [sourceRows, connection.daemonVersion, pageHost.kept],
-  );
+  const form = useSetupFormRows();
 
   function press(id: FormButtonId, card: string, from: HTMLElement): void {
     switch (id) {
