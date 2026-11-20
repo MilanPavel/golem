@@ -1,4 +1,4 @@
-import { golemBlock, pageServiceRow, setupFormRows, setupProblem, setupProblemState, type FormRow, type GolemBlock, type Mark } from "@golem/view";
+import { pageServiceRow, setupFormRows, type FormRow } from "@golem/view";
 import type { ListedModel, ModelListResult, SetupRow, SetupStatusResult } from "../../store/models.ts";
 import type { SetupActionsState } from "./use-setup-actions.ts";
 
@@ -126,8 +126,8 @@ export type FormCase = {
   label: string;
   rows: FormRow[];
   actions: SetupActionsState;
-  header: { mark: Mark; text: string };
-  block: GolemBlock | null;
+  /** What the daemon sent of the install, or null for an older daemon. */
+  facts: Pick<SetupStatusResult, "install" | "paths" | "jobs"> | null;
 };
 
 const NO_ACTION: SetupActionsState = { running: null, output: "", noBrew: false, error: null, from: null };
@@ -137,14 +137,6 @@ const PROBLEM_ROWS: SetupRow[] = [
   { part: "engine", name: "anthropic", state: "fail", detail: "no API key", action: "set_key", target: "anthropic" },
   ...STATUS_ROWS.slice(4),
 ];
-
-const HEAD_MARKS = { ok: "ok", warn: "attn", fail: "fail" } as const;
-const BLOCK = golemBlock(INSTALL_FACTS);
-
-function head(rows: SetupRow[]): FormCase["header"] {
-  const line = setupProblem(rows) ?? "all set";
-  return { mark: HEAD_MARKS[setupProblemState(rows)], text: line.charAt(0).toUpperCase() + line.slice(1) };
-}
 
 const OLLAMA_STOPPED: SetupRow[] = OK_ROWS.map((row) =>
   row.part === "engine"
@@ -158,34 +150,30 @@ const ONE_FAILING: SetupRow[] = OK_ROWS.map((row) =>
 
 /** Settings → Setup in the states the page draws, for the gallery. */
 export const FORM_CASES: FormCase[] = [
-  { label: "All set", rows: setupFormRows(OK_ROWS, KEPT, true), actions: NO_ACTION, header: head(OK_ROWS), block: BLOCK },
+  { label: "All set", rows: setupFormRows(OK_ROWS, KEPT, true), actions: NO_ACTION, facts: INSTALL_FACTS },
   {
     label: "Ollama stopped",
     rows: setupFormRows(OLLAMA_STOPPED, KEPT, true),
     actions: NO_ACTION,
-    header: head(OLLAMA_STOPPED),
-    block: BLOCK,
+    facts: INSTALL_FACTS,
   },
   {
     label: "One failing row",
     rows: setupFormRows(ONE_FAILING, KEPT, true),
     actions: NO_ACTION,
-    header: head(ONE_FAILING),
-    block: BLOCK,
+    facts: INSTALL_FACTS,
   },
   {
     label: "All set, page run by hand, an older daemon",
     rows: setupFormRows(OK_ROWS, KEPT, false),
     actions: NO_ACTION,
-    header: head(OK_ROWS),
-    block: null,
+    facts: null,
   },
   {
     label: "Ollama missing, service not kept, a key missing",
     rows: setupFormRows(PROBLEM_ROWS, pageServiceRow(null, "0.5.0")),
     actions: NO_ACTION,
-    header: head(PROBLEM_ROWS),
-    block: BLOCK,
+    facts: INSTALL_FACTS,
   },
   {
     label: "Installing Ollama",
@@ -195,14 +183,12 @@ export const FORM_CASES: FormCase[] = [
       running: "install",
       output: "==> Fetching ollama\n==> Downloading https://ghcr.io/v2/homebrew/core/ollama\n==> Pouring ollama--0.12.0.arm64_sequoia.bottle.tar.gz\n",
     },
-    header: head(PROBLEM_ROWS),
-    block: BLOCK,
+    facts: INSTALL_FACTS,
   },
   {
     label: "Install failed",
     rows: setupFormRows(PROBLEM_ROWS, KEPT),
     actions: { ...NO_ACTION, error: { action: "install", text: "Error: no space left on device" } },
-    header: head(PROBLEM_ROWS),
-    block: BLOCK,
+    facts: INSTALL_FACTS,
   },
 ];

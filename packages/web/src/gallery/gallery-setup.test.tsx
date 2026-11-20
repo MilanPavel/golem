@@ -14,16 +14,14 @@ for (const theme of ["slip", "kiln"] as const) {
       render(<Gallery />);
       const region = screen.getByRole("region", { name: `Setup, ${label}` });
       const group = within(region);
-      const status = group.getAllByRole("status")[0]?.textContent;
-      const rows = group.getByRole("list", { name: "Setup" });
+      const rows = group.getByRole("list", { name: "Health" });
       const tinted = (tone: string) => [...rows.querySelectorAll("li")].filter((item) => item.className.includes(tone));
       if (label === "All set") {
-        expect(status).toBe("All set");
-        expect(group.getByRole("group", { name: "golem" }).textContent).toContain("Homebrew · /opt/homebrew/bin/golem");
+        expect(group.getByRole("group", { name: "golem" }).textContent).toContain("/opt/homebrew/bin/golem");
         expect(tinted("-soft")).toHaveLength(0);
       }
       if (label === "Ollama stopped") {
-        expect(status).toContain("not running");
+        expect(group.getByText("Ollama isn't running, so models can't load.")).toBeTruthy();
         expect(tinted("bg-wait-soft")).toHaveLength(1);
         expect(group.getByRole("button", { name: "Start Ollama" })).toBeTruthy();
       }

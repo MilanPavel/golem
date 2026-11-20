@@ -50,9 +50,9 @@ function mount(
   return { fake, page, user, ...view };
 }
 
-const cards = () => within(screen.getByRole("list", { name: "Setup" }));
+const cards = () => within(screen.getByRole("list", { name: "Health" }));
 const card = (name: string) => {
-  const found = within(screen.getByRole("list", { name: "Setup" }))
+  const found = within(screen.getByRole("list", { name: "Health" }))
     .getAllByRole("listitem")
     .find((item) => within(item).queryByText(name, { selector: "p" }) !== null);
   if (found === undefined) throw new Error(`no card named ${name}`);
@@ -74,8 +74,8 @@ afterEach(() => {
 
 test("a setup that works: a row for each part with its word, and nothing to fix", async () => {
   mount(OK_ROWS);
-  await screen.findByText("All set", { selector: "p" });
-  const names = within(screen.getByRole("list", { name: "Setup" }))
+  await screen.findByRole("list", { name: "Health" });
+  const names = within(screen.getByRole("list", { name: "Health" }))
     .getAllByRole("listitem")
     .map((item) => item.querySelector("p")?.textContent);
   expect(names).toEqual(["Service", "Ollama", "Model", "Tools", "Disk"]);
@@ -90,44 +90,88 @@ test("a setup that works: a row for each part with its word, and nothing to fix"
   expect(screen.queryByText(/available/)).toBeNull();
 });
 
-test("a row that needs attention is tinted, and the header carries the problem and its mark", async () => {
+test("rows that need fixing come first, tinted, with the counts in the heading", async () => {
   mount(STATUS_ROWS);
-  const header = await screen.findByText("Ollama: Ollama is not installed", { selector: "p" });
-  expect(header.parentElement?.textContent).toContain("failed:");
-  expect(within(header.parentElement as HTMLElement).getByRole("button", { name: "Run setup again" })).toBeTruthy();
-  const ollama = screen.getByText("Ollama", { selector: "p" }).closest("li");
-  expect(ollama?.className).toContain("bg-deny-soft");
+  await screen.findByRole("list", { name: "Health" });
+  // Ollama (failed) and Model (warn) move above Service, Tools and Disk, which are fine.
+  expect(cardNames()).toEqual(["Ollama", "Model", "Service", "Tools", "Disk"]);
+  expect(screen.getByText("2 to fix · 3 fine")).toBeTruthy();
+  expect(screen.getByText("Ollama", { selector: "p" }).closest("li")?.className).toContain("bg-deny-soft");
   expect(screen.getByText("Model", { selector: "p" }).closest("li")?.className).toContain("bg-wait-soft");
   expect(screen.getByText("Disk", { selector: "p" }).closest("li")?.className).not.toContain("soft");
+  // A row that needs fixing says it plainly, with the raw state below.
+  expect(card("Ollama").getByText("Ollama isn't installed.")).toBeTruthy();
+  expect(card("Ollama").getByText("Ollama is not installed")).toBeTruthy();
+  expect(card("Ollama").getByText("failed:")).toBeTruthy();
+  expect(card("Disk").getByText("97 GB free")).toBeTruthy();
+  expect(screen.getByRole("list", { name: "Health" }).querySelector("[data-setting=ollama]")).toBeTruthy();
 });
 
-test("the golem block says where golem is installed, and Copy is on each path only", async () => {
-  const { user } = mount(OK_ROWS, WORKING_LISTING, "/settings", undefined, INSTALL_FACTS);
-  const block = within(await screen.findByRole("group", { name: "golem" }));
-  expect(block.getByText("v0.13.1")).toBeTruthy();
-  expect(block.getByText("Homebrew · /opt/homebrew/bin/golem")).toBeTruthy();
-  expect(block.getByText("~/.golem")).toBeTruthy();
-  expect(block.getByText("~/.golem/config.toml")).toBeTruthy();
-  expect(block.getByText("~/.golem/logs/golem.jsonl")).toBeTruthy();
-  expect(block.getByText("~/.golem/run/golem.sock")).toBeTruthy();
-  expect(block.getByText("dev.golem.daemon · pid 4821")).toBeTruthy();
-  expect(block.getByText("dev.golem.web · pid 4833")).toBeTruthy();
-  // Six paths (golem, daemon, data, config, logs, socket), and no button on a job.
-  expect(block.getAllByRole("button")).toHaveLength(6);
-  await user.click(block.getByRole("button", { name: "Copy config path" }));
-  expect(writeText).toHaveBeenCalledWith("/Users/ann/.golem/config.toml");
-  await user.click(block.getByRole("button", { name: "Copy data path" }));
-  expect(writeText).toHaveBeenLastCalledWith("/Users/ann/.golem");
+test("the hero card has the version, the install kind, where it runs from, and the two actions", async () => {
+  mount(OK_ROWS, WORKING_LISTING, "/settings", undefined, INSTALL_FACTS);
+  const hero = within(await screen.findByRole("group", { name: "golem" }));
+  expect(hero.getByText("v0.13.1")).toBeTruthy();
+  expect(hero.getByText("homebrew")).toBeTruthy();
+  expect(hero.getByText("/opt/homebrew/bin/golem")).toBeTruthy();
+  expect(hero.getByText(/checked just now/)).toBeTruthy();
+  expect(hero.getByRole("button", { name: "Run setup again" })).toBeTruthy();
+  expect(hero.getByRole("button", { name: "Check again" })).toBeTruthy();
+  // The page title belongs to the screen; the body draws none of its own.
+  expect(screen.queryAllByRole("heading", { level: 2 }).filter((each) => hero.queryByText(each.textContent ?? "") !== null)).toHaveLength(0);
 });
 
-test("a daemon that sends no install facts has no golem block", async () => {
+test("Where things live has a cell for each path and job, and Copy writes the whole path", async () => {
+  const { user, container } = mount(OK_ROWS, WORKING_LISTING, "/settings", undefined, INSTALL_FACTS);
+  const where = within(await screen.findByRole("group", { name: "Where things live" }));
+  expect(where.getByText("~/.golem")).toBeTruthy();
+  expect(where.getByText("~/.golem/config.toml")).toBeTruthy();
+  expect(where.getByText("~/.golem/logs/golem.jsonl")).toBeTruthy();
+  expect(where.getByText("~/.golem/run/golem.sock")).toBeTruthy();
+  expect(where.getByText("dev.golem.daemon · pid 4821")).toBeTruthy();
+  expect(where.getAllByText("loaded")).toHaveLength(2);
+  for (const key of ["data", "daemon", "config", "socket", "logs", "jobs"]) {
+    expect(container.querySelector(`[data-setting=${key}]`)).toBeTruthy();
+  }
+  // Five paths and two jobs: each cell copies.
+  expect(where.getAllByRole("button")).toHaveLength(7);
+  const copies: [string, string][] = [
+    ["Copy data path", "/Users/ann/.golem"],
+    ["Copy daemon path", "/opt/homebrew/opt/golem/libexec/golem-daemon/golem-daemon"],
+    ["Copy config path", "/Users/ann/.golem/config.toml"],
+    ["Copy socket path", "/Users/ann/.golem/run/golem.sock"],
+    ["Copy logs path", "/Users/ann/.golem/logs/golem.jsonl"],
+  ];
+  for (const [name, text] of copies) {
+    await user.click(where.getByRole("button", { name }));
+    expect(writeText).toHaveBeenLastCalledWith(text);
+  }
+  await user.click(where.getAllByRole("button", { name: "Copy jobs path" })[0] as HTMLElement);
+  expect(writeText).toHaveBeenLastCalledWith("/Users/ann/Library/LaunchAgents/dev.golem.daemon.plist");
+  // The page cannot reveal a folder: there is no Open in Finder.
+  expect(screen.queryByRole("button", { name: /Finder|Reveal/ })).toBeNull();
+});
+
+test("a job that is not loaded is tagged NOT LOADED", async () => {
+  const facts = { ...INSTALL_FACTS, jobs: [{ label: "dev.golem.daemon", plist: "/Users/ann/Library/LaunchAgents/dev.golem.daemon.plist", loaded: false }] };
+  mount(OK_ROWS, WORKING_LISTING, "/settings", undefined, facts);
+  expect(await screen.findByText("NOT LOADED")).toBeTruthy();
+});
+
+test("the fine rows link to Routing and MCP servers", async () => {
   mount(OK_ROWS);
-  await screen.findByText("All set", { selector: "p" });
-  expect(screen.queryByRole("group", { name: "golem" })).toBeNull();
+  await screen.findByRole("list", { name: "Health" });
+  expect(card("Model").getByRole("link", { name: "Routing →" }).getAttribute("href")).toBe("/settings/routing");
+  expect(card("Tools").getByRole("link", { name: "MCP servers →" }).getAttribute("href")).toBe("/settings/mcp");
+});
+
+test("a daemon that sends no install facts has no Where things live", async () => {
+  mount(OK_ROWS);
+  await screen.findByRole("list", { name: "Health" });
+  expect(screen.queryByRole("group", { name: "Where things live" })).toBeNull();
 });
 
 const cardNames = () =>
-  within(screen.getByRole("list", { name: "Setup" }))
+  within(screen.getByRole("list", { name: "Health" }))
     .getAllByRole("listitem")
     .map((item) => item.querySelector("p")?.textContent);
 
@@ -169,7 +213,7 @@ test("a service not kept while the page is kept keeps its own command", async ()
 
 test("an unknown page host has no Web page card", async () => {
   mount(OK_ROWS);
-  await screen.findByText("All set", { selector: "p" });
+  await screen.findByRole("list", { name: "Health" });
   expect(cardNames()).not.toContain("Web page");
 });
 
@@ -182,13 +226,13 @@ test.each(["slip", "kiln"])("the Web page card has no axe violations in %s", asy
 
 test("Open setup is gone from Settings", async () => {
   mount(OK_ROWS);
-  await screen.findByRole("list", { name: "Setup" });
+  await screen.findByRole("list", { name: "Health" });
   expect(screen.queryByRole("button", { name: "Open setup" })).toBeNull();
 });
 
 test("with Ollama missing and no model: Install Ollama, Pick a model…, and the problem in the status line", async () => {
   mount(STATUS_ROWS);
-  expect(await screen.findByText("Ollama: Ollama is not installed", { selector: "p" })).toBeTruthy();
+  await screen.findByText("Ollama isn't installed.");
   expect(card("Ollama").getByText("failed:")).toBeTruthy();
   expect(card("Ollama").getByRole("button", { name: "Install Ollama" })).toBeTruthy();
   expect(card("Model").getByText("needs attention:")).toBeTruthy();
@@ -208,12 +252,11 @@ test("a service that is not kept shows the command with Copy, and Copy writes it
 test("Check again looks at the machine again: the listing and the rows", async () => {
   const rows = OK_ROWS.map((row) => (row.part === "service" ? { ...row, state: "warn" as const } : row));
   const { fake, user } = mount(rows);
-  const service = await waitFor(() => card("Service"));
-  await waitFor(() => expect(service.getByRole("button", { name: "Check again" })).toBeTruthy());
+  await waitFor(() => card("Service"));
   await waitFor(() => expect(fake.raw.setupStatus).toHaveBeenCalled());
   const before = fake.raw.setupStatus.mock.calls.length;
   const listed = fake.raw.listModels.mock.calls.length;
-  await user.click(service.getByRole("button", { name: "Check again" }));
+  await user.click(screen.getByRole("button", { name: "Check again" }));
   await waitFor(() => expect(fake.raw.setupStatus.mock.calls.length).toBeGreaterThan(before));
   await waitFor(() => expect(fake.raw.listModels.mock.calls.length).toBeGreaterThan(listed));
   expect(fake.raw.listModels).toHaveBeenLastCalledWith(true, false);
@@ -221,7 +264,7 @@ test("Check again looks at the machine again: the listing and the rows", async (
 
 test("Change… opens the model dialog in default mode: Make default is the main button, and there is no session to use it for", async () => {
   const { fake, user } = mount(OK_ROWS, TWO_READY);
-  const change = await within(await screen.findByRole("list", { name: "Setup" })).findByRole("button", { name: "Change…" });
+  const change = await within(await screen.findByRole("list", { name: "Health" })).findByRole("button", { name: "Change…" });
   await user.click(change);
   const dialog = await screen.findByRole("dialog", { name: "Choose a model" });
   expect(within(dialog).getByText(/New sessions use ollama\/gemma4:e4b\./)).toBeTruthy();
@@ -244,7 +287,7 @@ test("Change… opens the model dialog in default mode: Make default is the main
 
 test("Enter on a model in default mode makes it the default", async () => {
   const { fake, user } = mount(OK_ROWS, TWO_READY);
-  await user.click(await within(await screen.findByRole("list", { name: "Setup" })).findByRole("button", { name: "Change…" }));
+  await user.click(await within(await screen.findByRole("list", { name: "Health" })).findByRole("button", { name: "Change…" }));
   const dialog = await screen.findByRole("dialog", { name: "Choose a model" });
   await user.click(within(dialog).getByRole("option", { name: /qwen3:8b/ }));
   await user.type(within(dialog).getByRole("combobox", { name: "Search models" }), "{Enter}");
@@ -337,12 +380,12 @@ test("a provider that needs a key: the command to copy for it, and Check again",
   expect(openai.getByText("golem auth set openai")).toBeTruthy();
   await user.click(openai.getByRole("button", { name: /^Copy / }));
   expect(writeText).toHaveBeenCalledWith("golem auth set openai");
-  expect(openai.getByRole("button", { name: "Check again" })).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Check again" })).toBeTruthy();
 });
 
 test("Setup has no API keys section: the keys are on their own page", async () => {
   mount(OK_ROWS, WORKING_LISTING);
-  await screen.findByRole("list", { name: "Setup" });
+  await screen.findByRole("list", { name: "Health" });
   expect(screen.queryByRole("group", { name: "API keys" })).toBeNull();
   expect(screen.queryByRole("button", { name: /^Anthropic/ })).toBeNull();
 });
@@ -352,7 +395,7 @@ test("Run setup again goes to /welcome, and there is no setup dialog", async () 
   await user.click(await screen.findByRole("button", { name: "Run setup again" }));
   await screen.findByRole("heading", { level: 1, name: "Welcome to golem" });
   expect(location.pathname).toBe("/welcome");
-  expect(screen.queryByRole("dialog", { name: "Setup" })).toBeNull();
+  expect(screen.queryByRole("dialog", { name: "Health" })).toBeNull();
 });
 
 test("with no server yet, Add tools opens the offer in place; the servers added show as done, and then Manage links to the MCP section", async () => {
@@ -377,7 +420,7 @@ test("with no server yet, Add tools opens the offer in place; the servers added 
   await user.click(panel.getByRole("button", { name: "Add 1" }));
   await waitFor(() => expect(fake.raw.addMcpServer).toHaveBeenCalledWith(expect.objectContaining({ catalog_id: "context7" })));
   await waitFor(() => expect(panel.getAllByText(/^added · /).length).toBe(1));
-  await waitFor(() => expect(card("Tools").getByRole("link", { name: "Manage" }).getAttribute("href")).toBe("/settings/mcp"));
+  await waitFor(() => expect(card("Tools").getByRole("link", { name: "MCP servers →" }).getAttribute("href")).toBe("/settings/mcp"));
   await user.click(panel.getByRole("button", { name: "Done" }));
   expect(screen.queryByRole("group", { name: "Add tools" })).toBeNull();
 });
@@ -409,7 +452,7 @@ test("a failed setup.status says so, with a way to try again", async () => {
   expect((await screen.findByRole("alert", {}, { timeout: 4000 })).textContent).toContain("Could not read the setup");
   fake.raw.setupStatus.mockResolvedValue({ rows: OK_ROWS });
   await user.click(screen.getByRole("button", { name: "Try again" }));
-  await screen.findByRole("list", { name: "Setup" });
+  await screen.findByRole("list", { name: "Health" });
 }, 10_000);
 
 for (const theme of ["slip", "kiln"] as const) {
@@ -427,6 +470,6 @@ for (const theme of ["slip", "kiln"] as const) {
 
 test("cards is the list of the form", async () => {
   mount(OK_ROWS);
-  await screen.findByRole("list", { name: "Setup" });
+  await screen.findByRole("list", { name: "Health" });
   expect(cards().getAllByRole("listitem").length).toBe(5);
 });

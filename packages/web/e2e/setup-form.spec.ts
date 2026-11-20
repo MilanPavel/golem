@@ -8,7 +8,7 @@ import { railConnected, setTheme, startStack } from "./stack.ts";
 
 const NAME = "llama3.2:3b";
 
-const cards = (page: Page) => page.getByRole("list", { name: "Setup" });
+const cards = (page: Page) => page.getByRole("list", { name: "Health" });
 const card = (page: Page, name: string) => cards(page).getByRole("listitem").filter({ has: page.getByText(name, { exact: true }) });
 const picker = (page: Page) => page.getByRole("dialog", { name: "Choose a model" });
 
@@ -34,13 +34,15 @@ test("Settings → Setup has a row for each part, and no dialog button", async (
   await expect(page.getByRole("button", { name: /Update|Reveal|Restart/ })).toHaveCount(0);
 });
 
-test("the golem block says where golem is installed: the daemon's own facts, with Copy on each path", async ({ page, rig }) => {
+test("the hero and Where things live say where golem is installed: the daemon's own facts, with Copy on each path", async ({ page, rig }) => {
   const { gateway, home } = await startStack(rig, { ollama: { installed: [NAME] } });
   await open(page, gateway.url);
-  const block = page.getByRole("group", { name: "golem" });
-  await expect(block).toBeVisible();
+  const hero = page.getByRole("group", { name: "golem" });
+  await expect(hero).toBeVisible();
   // The e2e daemon runs from the checkout, so it is a dev install, and its files are in the temp home.
-  await expect(block).toContainText("Dev checkout");
+  await expect(hero).toContainText("dev checkout");
+  const block = page.getByRole("group", { name: "Where things live" });
+  await expect(block).toBeVisible();
   await expect(block.getByText(realpathSync(home), { exact: true })).toBeVisible();
   await expect(block.getByText(`${realpathSync(home)}/config.toml`, { exact: true })).toBeVisible();
   await expect(block.getByText(`${realpathSync(home)}/run/golem.sock`, { exact: true })).toBeVisible();
