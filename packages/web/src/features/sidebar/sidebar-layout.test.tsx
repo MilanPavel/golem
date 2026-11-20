@@ -197,3 +197,14 @@ test("a window that grows wide closes the floating panel and shows the stored la
   resize(900);
   expect(panel()).toBeNull();
 });
+
+test("medium on Settings: the rail floats the panel as it does elsewhere", async () => {
+  windowWidth(900);
+  history.replaceState(null, "", "/settings");
+  const user = userEvent.setup();
+  mount();
+  expect(panel()).toBeNull();
+  await user.click(within(rail()!).getByRole("button", { name: "Sessions" }));
+  expect(panel()).not.toBeNull();
+  expect(scrim()).not.toBeNull();
+});

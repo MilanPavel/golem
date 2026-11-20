@@ -174,6 +174,7 @@ test("the + in the Sessions panel starts a new session", async () => {
   const user = userEvent.setup();
   history.replaceState(null, "", "/settings");
   mount();
+  await user.click(railButton("Sessions"));
   await user.click(within(panel()!).getByRole("button", { name: "Start new session" }));
   expect(location.pathname).toBe("/");
 });
@@ -258,4 +259,42 @@ test("a waiting session shows the rail count and the chip, and the chip opens th
 test("with nothing waiting the Sessions header has no chip", () => {
   mount();
   expect(within(panel()!).queryByText(/waiting/)).toBeNull();
+});
+
+test("Settings hides the wide panel and leaving Settings brings the stored choice back", async () => {
+  localStorage.setItem(SIDEBAR_OPEN_KEY, "1");
+  sidebarOpenStore.set(true);
+  history.replaceState(null, "", "/settings");
+  const user = userEvent.setup();
+  mount();
+  expect(panel()).toBeNull();
+  await user.click(railButton("New session"));
+  expect(panel()).not.toBeNull();
+  expect(localStorage.getItem(SIDEBAR_OPEN_KEY)).toBe("1");
+});
+
+test("on Settings the Sessions icon shows the panel and leaves the stored choice alone", async () => {
+  localStorage.setItem(SIDEBAR_OPEN_KEY, "1");
+  sidebarOpenStore.set(true);
+  history.replaceState(null, "", "/settings");
+  const user = userEvent.setup();
+  mount();
+  await user.click(railButton("Sessions"));
+  expect(panel()).not.toBeNull();
+  await user.click(within(panel()!).getByRole("button", { name: "Hide sidebar" }));
+  expect(panel()).toBeNull();
+  expect(localStorage.getItem(SIDEBAR_OPEN_KEY)).toBe("1");
+  expect(sidebarOpenStore.getSnapshot()).toBe(true);
+});
+
+test("on Settings the mod key with B peeks at the panel without writing the stored choice", async () => {
+  history.replaceState(null, "", "/settings");
+  const user = userEvent.setup();
+  mount();
+  expect(panel()).toBeNull();
+  await user.keyboard("{Control>}b{/Control}");
+  expect(panel()).not.toBeNull();
+  await user.keyboard("{Control>}b{/Control}");
+  expect(panel()).toBeNull();
+  expect(localStorage.getItem(SIDEBAR_OPEN_KEY)).toBeNull();
 });

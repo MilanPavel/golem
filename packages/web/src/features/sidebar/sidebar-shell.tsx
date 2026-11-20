@@ -1,5 +1,5 @@
 import { setupProblem } from "@golem/view";
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useConnection } from "../../store/connection-context.tsx";
 import { useNavigate, useRoute, useSessionList, useSetupStatus } from "../../store/page-context.tsx";
 import { useInbox } from "../../store/inbox.ts";
@@ -30,7 +30,8 @@ const EDITABLE_RICH = "[contenteditable]:not([contenteditable='false'])";
  * its open state is kept. From 760 px the rail stays and the panel floats over the page, closed until it
  * is asked for. Below that the rail is hidden too: the ☰ in the top bar opens rail and panel together
  * over the page. The page's own keys: ⌘B (Ctrl+B elsewhere) hides or shows the panel; Esc closes a
- * floating one.
+ * floating one. On the Settings page the wide layout hides the panel, as Settings lists its own sections;
+ * the rail, ⌘B and the hide button then peek at it for that visit only, and the kept choice stays as it was.
  */
 export function SidebarShell() {
   const sessions = useSessionList();
@@ -48,8 +49,16 @@ export function SidebarShell() {
   const floating = useRef<HTMLDivElement>(null);
   const opener = useRef<HTMLElement | null>(null);
   // The wide layout opens the panel until the person chooses; a floating one opens only when asked.
-  const open = wide ? (stored ?? true) : overlay;
-  const setOpen = wide ? setStored : setOverlay;
+  // On Settings the wide panel is hidden until peeked at; the peek is not kept and ends with the visit.
+  const inSettings = route.name === "settings";
+  const [peek, setPeek] = useState(false);
+  const [wasInSettings, setWasInSettings] = useState(inSettings);
+  if (inSettings !== wasInSettings) {
+    setWasInSettings(inSettings);
+    setPeek(false);
+  }
+  const open = wide ? (inSettings ? peek : (stored ?? true)) : overlay;
+  const setOpen = wide ? (inSettings ? setPeek : setStored) : setOverlay;
   const routeKey = JSON.stringify(route);
 
   const waiting = useInbox().items.length;
@@ -166,7 +175,6 @@ export function SidebarShell() {
       foot={
         <div className="flex flex-col gap-2">
           <PullStatus />
-          <NewSessionModelDialog />
           <ConnectionStrip snapshot={connection} />
         </div>
       }
@@ -180,17 +188,20 @@ export function SidebarShell() {
     </div>
   );
 
+  // The model dialog stays mounted with the panel hidden: Settings opens it too.
+  const modelDialog = <NewSessionModelDialog />;
   if (wide) {
     return (
       <>
         {rail}
         {open ? panelBox : null}
+        {modelDialog}
       </>
     );
   }
   const scrim = <div aria-hidden="true" data-testid="sidebar-scrim" onClick={closeFloating} className="fixed inset-0 z-40 bg-ink/40" />;
   if (narrow) {
-    if (!open) return null;
+    if (!open) return modelDialog;
     return (
       <>
         {scrim}
@@ -205,6 +216,7 @@ export function SidebarShell() {
           {rail}
           {panelBox}
         </div>
+        {modelDialog}
       </>
     );
   }
@@ -219,6 +231,7 @@ export function SidebarShell() {
           </div>
         </>
       ) : null}
+      {modelDialog}
     </>
   );
 }
