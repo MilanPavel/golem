@@ -7,9 +7,11 @@ Not run in CI. Plays one broad prompt in a fresh session, twice, in a throwaway 
 (never ``~/.golem``). The model has a 32768 token window in the first run, so the line is in
 the system prompt. In the second it has a 131072 token window, so the line is left out. The
 two runs differ in window as well, because golem has no switch for the line. For each run it
-prints the ``delegate`` calls, the direct ``read_file`` calls, and the parent's peak context
-share (estimated prompt tokens over the window, of the parent's own calls). Needs the model
-to be reachable. It sends no approvals: the config sets ``autopilot``.
+prints the ``delegate`` calls, the helper sessions they started (a helper is a session with a
+parent, ADR-059: the lead's log holds ``helper.started``), the direct ``read_file`` calls, and the
+parent's peak context share (estimated prompt tokens over the window, of the parent's own calls).
+A run ends at the lead's own ``run.completed``, after it was parked for its helpers and woken.
+Needs the model to be reachable. It sends no approvals: the config sets ``autopilot``.
 """
 
 from __future__ import annotations
@@ -36,7 +38,7 @@ async def play(client: Client, project: Path, timeout: float) -> dict[str, Any]:
     session_id = created["session_id"]
     await client.call("session.attach", {"session_id": session_id, "after_seq": 0})
     await client.call("message.send", {"session_id": session_id, "text": PROMPT})
-    delegates = reads = 0
+    delegates = helpers = reads = 0
     peak = 0.0
     end = "timeout"
     deadline = time.monotonic() + timeout
@@ -46,11 +48,12 @@ async def play(client: Client, project: Path, timeout: float) -> dict[str, Any]:
         except TimeoutError:
             break
         kind, data = event.get("type"), event.get("data", {})
-        own = data.get("parent_call_id") is None
-        if kind == "tool.requested" and own:
+        if kind == "tool.requested":
             delegates += data["name"] == "delegate"
             reads += data["name"] == "read_file"
-        elif kind == "model.call.started" and own:
+        elif kind == "helper.started":
+            helpers += 1
+        elif kind == "model.call.started":
             used, window = data.get("estimated_tokens"), data.get("context_window")
             if used and window:
                 peak = max(peak, used / window)
@@ -59,6 +62,7 @@ async def play(client: Client, project: Path, timeout: float) -> dict[str, Any]:
             break
     return {
         "delegate_calls": delegates,
+        "helper_sessions": helpers,
         "read_file_calls": reads,
         "peak_share": round(peak, 3),
         "end": end,

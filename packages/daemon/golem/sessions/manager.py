@@ -14,7 +14,15 @@ import asyncio
 import json
 import logging
 import time
-from collections.abc import AsyncGenerator, Callable, Coroutine, Iterable, Mapping, Sequence
+from collections.abc import (
+    AsyncGenerator,
+    Awaitable,
+    Callable,
+    Coroutine,
+    Iterable,
+    Mapping,
+    Sequence,
+)
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field, replace
 from datetime import datetime, timedelta
@@ -65,8 +73,10 @@ from golem.sessions.helpers import (
     origin_of,
     parked_calls,
     scope_of_agent,
-    stopped_of,
+    started_at,
+    stop_reason,
     summarize_run,
+    tokens_over,
 )
 from golem.sessions.ids import new_id
 from golem.sessions.log import SessionLog
@@ -123,6 +133,8 @@ from golem_protocol.events import (
     HelperEndedEvent,
     HelperStartedData,
     HelperStartedEvent,
+    HelperStepData,
+    HelperStopped,
     HelperWaitData,
     MessageCompletedEvent,
     ModelOptionsChangedData,
@@ -135,6 +147,7 @@ from golem_protocol.events import (
     SessionChecksChangedData,
     SessionCompletedData,
     SessionCreatedData,
+    SessionCreatedEvent,
     SessionModeChangedData,
     SessionParent,
     SessionPlanChangedData,
@@ -145,7 +158,11 @@ from golem_protocol.events import (
     SkillDeactivatedData,
     SkillSkippedEvent,
     TodosUpdatedData,
+    ToolCompletedEvent,
+    ToolFailedEvent,
+    ToolRequestedEvent,
     ToolStartedData,
+    ToolStartedEvent,
 )
 
 NOT_APPROVED = "cancelled before it was approved"
@@ -365,6 +382,19 @@ class SessionManager:
         self._titles = titles
         events.local_only = self.local_only
         runtime.next_model = self._next_model
+        runtime.helpers = self
+        events.after_emit = self._relay_step
+        self._steps: dict[str, dict[str, tuple[str, dict[str, object]]]] = {}
+        """The name and the shown arguments of each tool call a helper asked for, by its session."""
+        self._step_counts: dict[str, int] = {}
+        self.clock: Callable[[], float] = _now
+        """Seconds since the epoch. A helper's time limit counts from its ``session.created``."""
+        self.pause: Callable[[float], Awaitable[None]] = _pause
+        """Waits that many seconds, for the time limit of a helper."""
+        self._timers: dict[str, asyncio.Task[None]] = {}
+        self._limit_stops: set[asyncio.Task[None]] = set()
+        self._timed_out: set[str] = set()
+        """Helper sessions stopped at their time limit."""
         self.memory: MemoryService | None = None
         """Long-term memory. None: a run carries no memory access."""
         self.golem_home: Path | None = None
@@ -1332,17 +1362,41 @@ class SessionManager:
         for helper in await self._records.helpers_of(session_id, call_id):
             run = await self._run_records.latest(helper.session_id)
             answer = ""
+            run_events = [] if run is None else await self._events.for_run(run.run_id)
             if run is not None:
-                answer = summarize_run(await self._events.for_run(run.run_id)).answer
+                answer = summarize_run(run_events).answer
             found.append(
                 HelperOutcome(
                     agent=helper.agent or "explorer",
-                    stopped=stopped_of(None if run is None else run.status),
+                    stopped=await self._stopped(helper.session_id, run, run_events),
                     text=answer[:limit],
                     label=labels.get(helper.session_id, ""),
                 )
             )
         return found
+
+    async def _stopped(
+        self, helper_id: str, run: RunRecord | None, run_events: list[ChatEvent]
+    ) -> HelperStopped:
+        """Why the helper's last run ended: its status and events, and its agent's limits."""
+        stored = await self._events.stored(helper_id)
+        agent = next((e.data.agent for e in stored if isinstance(e, SessionCreatedEvent)), None)
+        limit = None if agent is None else agent.limits.max_seconds
+        began = started_at(stored)
+        ended = None if not run_events else run_events[-1].ts
+        timed_out = helper_id in self._timed_out
+        if not timed_out and limit is not None and began is not None and ended is not None:
+            # A stop at the limit that the daemon lost to a crash still reads as time.
+            at = _epoch(ended)
+            timed_out = (
+                at is not None
+                and run is not None
+                and run.status == "cancelled"
+                and (at - began >= limit)
+            )
+        return stop_reason(
+            None if run is None else run.status, run_events, agent, timed_out=timed_out
+        )
 
     async def _helper_ended(self, session_id: str, run_id: str | None) -> None:
         """Store ``helper.ended`` in the lead's log, once, and see whether the lead can go on."""
@@ -1355,6 +1409,8 @@ class SessionManager:
         ):
             return
         lead, call_id, index = record.parent_session_id, record.parent_call_id, record.helper_index
+        self._steps.pop(session_id, None)
+        self._step_counts.pop(session_id, None)
         stored = await self._events.stored(lead)
         if not any(
             isinstance(e, HelperEndedEvent) and e.data.call_id == call_id and e.data.index == index
@@ -1369,7 +1425,8 @@ class SessionManager:
                 None,
             )
             run = None if run_id is None else await self._run_records.get(run_id)
-            summary = summarize_run([] if run_id is None else await self._events.for_run(run_id))
+            run_events = [] if run_id is None else await self._events.for_run(run_id)
+            summary = summarize_run(run_events)
             await self._events.emit(
                 lead,
                 None if started is None else started.run_id,
@@ -1377,7 +1434,7 @@ class SessionManager:
                 HelperEndedData(
                     call_id=call_id,
                     index=index,
-                    stopped=stopped_of(None if run is None else run.status),
+                    stopped=await self._stopped(session_id, run, run_events),
                     model_calls=summary.model_calls,
                     tokens=summary.tokens,
                     answer_tokens=len(summary.answer) // 4,
@@ -1387,6 +1444,79 @@ class SessionManager:
                 ),
             )
         self._spawn_wake(lead)
+
+    async def _relay_step(self, event: ChatEvent) -> None:
+        """Put a tool call of a helper into its lead's log as ``helper.step``, thin on purpose."""
+        if not isinstance(
+            event, ToolRequestedEvent | ToolStartedEvent | ToolCompletedEvent | ToolFailedEvent
+        ):
+            return
+        helper = self._sessions.get(event.session_id)
+        parent = None if helper is None else helper.parent
+        if parent is None:
+            return
+        calls = self._steps.setdefault(event.session_id, {})
+        status: Literal["running", "done", "failed"]
+        if isinstance(event, ToolRequestedEvent):
+            calls[event.data.call_id] = (event.data.name, _shown_args(event.data.args))
+            if tokens_over(await self._events.for_run(event.run_id)):
+                self._stop_for_limit(event.session_id, event.run_id, False)
+            return
+        if isinstance(event, ToolStartedEvent):
+            status = "running"
+            self._step_counts[event.session_id] = self._step_counts.get(event.session_id, 0) + 1
+        elif isinstance(event, ToolFailedEvent) or event.data.failed:
+            status = "failed"
+        else:
+            status = "done"
+        known = calls.get(event.data.call_id)
+        if known is None:
+            return
+        lead = await self._run_records.latest(parent.session_id)
+        await self._events.emit(
+            parent.session_id,
+            None if lead is None else lead.run_id,
+            "helper.step",
+            HelperStepData(
+                call_id=parent.call_id,
+                index=parent.index,
+                step_id=event.data.call_id,
+                name=known[0],
+                args=known[1],
+                status=status,
+                calls=self._step_counts.get(event.session_id, 0),
+            ),
+        )
+
+    def _stop_for_limit(self, helper_id: str, run_id: str, timed_out: bool) -> None:
+        """Cancel the helper's run from a task of its own: the caller may be that run."""
+        task = asyncio.create_task(self._limit_stop(helper_id, run_id, timed_out))
+        self._limit_stops.add(task)
+        task.add_done_callback(self._limit_stops.discard)
+
+    async def _limit_stop(self, helper_id: str, run_id: str, timed_out: bool) -> None:
+        live = self._runs.get(run_id)
+        if live is None or live.task.done():
+            return
+        if timed_out:
+            self._timed_out.add(helper_id)
+        await self._stop([live], "user")
+
+    def _arm_time_limit(self, session: _LiveSession, run_id: str) -> None:
+        """Stop the helper's run when its agent's time limit has passed since it was made."""
+        seconds = None if session.agent is None else session.agent.limits.max_seconds
+        if session.parent is None or seconds is None:
+            return
+        self._timers[run_id] = asyncio.create_task(
+            self._time_limit(session.session_id, run_id, seconds)
+        )
+
+    async def _time_limit(self, helper_id: str, run_id: str, seconds: int) -> None:
+        # Plain elapsed time since the helper was made; its working clock is 15.6.2.
+        began = started_at(await self._events.stored(helper_id))
+        left = 0.0 if began is None else began + seconds - self.clock()
+        await self.pause(max(0.0, left))
+        await self._limit_stop(helper_id, run_id, True)
 
     def _spawn_wake(self, lead_id: str) -> None:
         task = asyncio.create_task(self._wake(lead_id), name=f"golem-wake-{lead_id}")
@@ -2448,6 +2578,7 @@ class SessionManager:
         session.task = task
         self._runs[run_id] = _LiveRun(task=task, control=control, memory=memory)
         task.add_done_callback(lambda done: self._finished(run_id, done))
+        self._arm_time_limit(session, run_id)
         await control.started.wait()
 
     async def cancel(self, run_id: str) -> bool:
@@ -2747,6 +2878,9 @@ class SessionManager:
 
     def _finished(self, run_id: str, task: asyncio.Task[None]) -> None:
         self._runs.pop(run_id, None)
+        timer = self._timers.pop(run_id, None)
+        if timer is not None:
+            timer.cancel()
         _report(task, "run task failed")
 
     def _named(self, task: asyncio.Task[None]) -> None:
@@ -2796,6 +2930,29 @@ def _completed_through(
             if event.data.message_id == message_id:
                 return completed
     return None
+
+
+def _now() -> float:
+    return time.time()
+
+
+async def _pause(seconds: float) -> None:
+    await asyncio.sleep(seconds)
+
+
+def _epoch(ts: str) -> float | None:
+    try:
+        return datetime.fromisoformat(ts).timestamp()
+    except ValueError:
+        return None
+
+
+_SHOWN_ARGS = ("path", "pattern", "query", "ref")
+
+
+def _shown_args(args: Mapping[str, object]) -> dict[str, object]:
+    """The path, pattern, query or ref of a tool call: all the card of a helper shows."""
+    return {key: args[key] for key in _SHOWN_ARGS if isinstance(args.get(key), str)}
 
 
 def _report(task: asyncio.Task[None], message: str) -> None:

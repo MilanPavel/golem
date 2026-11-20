@@ -68,14 +68,6 @@ class Artifacts(Protocol):
 
 
 @dataclass(frozen=True, slots=True)
-class Delegated:
-    """What a helper run gave back: its answer, and why it stopped (``done`` or a limit)."""
-
-    text: str
-    stopped: str
-
-
-@dataclass(frozen=True, slots=True)
 class ToolContext:
     """What a call may touch. ``root`` is the session folder, or None without one.
 
@@ -106,8 +98,6 @@ class ToolContext:
     """The skills the session's folder sees, for ``load_skill``."""
     page_chars: int | None = None
     """The most characters of a result page for the model's window, for ``read_artifact``."""
-    delegate: Callable[[str], Awaitable[Delegated]] | None = None
-    """Runs a helper on a brief and waits for its answer, for ``delegate``. None in a helper."""
     memory: MemoryAccess | None = None
     """What the run may use of memory, for ``recall`` and ``remember``. None: memory is off."""
     memory_target: Target | None = None
@@ -413,7 +403,6 @@ __all__ = [
     "MAX_OUTPUT_CHARS",
     "ArtifactPage",
     "Artifacts",
-    "Delegated",
     "InvalidArguments",
     "Network",
     "Preview",

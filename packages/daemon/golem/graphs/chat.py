@@ -44,11 +44,8 @@ from golem.graphs.adapter import CONSENT_KIND, STREAM_KEY, message_text, stop_re
 from golem.graphs.checks_node import CHECKS_KEY, checks_node
 from golem.graphs.child import (
     CHILD_PROMPT,
-    EXPLORER_TOOLS,
     FINAL_REQUEST,
     ChildLimits,
-    ChildResult,
-    run_child,
 )
 from golem.graphs.compact import Compaction, clear_now, summarise_now
 from golem.graphs.context_view import (
@@ -68,7 +65,7 @@ from golem.graphs.memory_stub import stub_local_notes
 from golem.graphs.notes import is_note, note
 from golem.graphs.prompt import PINNED_KEY, PromptContext, SystemPrompt
 from golem.graphs.result_budget import ResultBudget, result_budget
-from golem.graphs.state import SCHEMA_VERSION, AgentState
+from golem.graphs.state import AgentState
 from golem.graphs.step_up import NextModel, StepAsk, StepRequest, StepUp
 from golem.graphs.struggle import Struggle, detect
 from golem.graphs.summarise import Summariser
@@ -125,7 +122,7 @@ from golem.sessions.ids import new_id
 from golem.skills.registry import SkillRegistry
 from golem.tools import default_registry
 from golem.tools.delegate import HelperOutcome, HelperSpec
-from golem.tools.registry import Artifacts, ToolRegistry
+from golem.tools.registry import Artifacts, ToolError, ToolRegistry
 
 log = logging.getLogger("golem.graphs")
 
@@ -254,7 +251,8 @@ class ChatRuntime:
         """Ready budget models that take tools, cheapest first, for the ``explore`` role."""
         self._child_limits: ChildLimits | None = None
         self.helpers: HelperHost | None = None
-        """Starts and reads helper sessions, for ``delegate``. None: a helper is a child run."""
+        """Starts and reads helper sessions, for ``delegate``. The session manager sets it. None: a
+        ``delegate`` call is refused, since a helper cannot be started."""
         self.next_model: NextModel | None = None
         """Names the model a run steps up to. None: a run never steps up."""
 
@@ -492,53 +490,6 @@ class ChatRuntime:
             async for part in parts:
                 yield part
 
-    async def stream_child(
-        self,
-        *,
-        thread_id: str,
-        session_id: str,
-        brief: str,
-        model_profile: str,
-        cwd: str | None,
-        options: Mapping[str, float | str] | None,
-        max_calls: int,
-    ) -> AsyncGenerator[object]:
-        """Stream a child run: the same graph on ``thread_id``, with ``brief`` as its first message.
-
-        The run has the helper's tools only, the strictest permission mode, none of the
-        session's allowances, and no checks. Its state names ``session_id`` so that its
-        artifacts and its budget check are the session's. Close the generator when you stop early.
-        """
-        config: RunnableConfig = {
-            "configurable": {
-                "thread_id": thread_id,
-                CWD_KEY: cwd or "",
-                ALLOWED_KEY: [],
-                MCP_KEY: [],
-                MCP_NOW_KEY: set[str](),
-                PINNED_KEY: [],
-                PINNED_FOLDERS_KEY: [],
-                OPTIONS_KEY: dict(options or {}),
-                MODE_KEY: "careful",
-                CHECKS_KEY: False,
-                PLAN_KEY: False,
-                CHILD_KEY: ChildScope(tools=EXPLORER_TOOLS, max_calls=max_calls),
-            },
-            "recursion_limit": 2 * (max_calls + 2) + 6,
-        }
-        await self.answer_dangling(thread_id)
-        existing = await self.values(thread_id)
-        graph_input = _turn_input(
-            [HumanMessage(content=brief, id=new_id("m"))],
-            session_id=session_id,
-            model_profile=model_profile,
-            schema_version=SCHEMA_VERSION,
-            has_checkpoint=bool(existing),
-        )
-        async with aclosing(self._parts(graph_input, config)) as parts:
-            async for part in parts:
-                yield part
-
     def explore_role(self, session_profile: str, *, local_only: bool = False) -> RoleModel:
         """The model of the ``explore`` role. A session that stays local keeps a local one."""
         role = for_role(
@@ -552,34 +503,6 @@ class ChatRuntime:
         if local_only and tier not in (None, "local"):
             return RoleModel(session_profile, True, "session is local")
         return role
-
-    async def delegate(
-        self,
-        *,
-        state: AgentState,
-        config: RunnableConfig,
-        call_id: str,
-        brief: str,
-        emit_fact: Callable[[object], None],
-    ) -> ChildResult:
-        """Run a helper for the ``delegate`` call ``call_id`` of the run that has ``state``."""
-        role = self.explore_role(state["model_profile"], local_only=_local_only(config))
-        return await run_child(
-            self,
-            session_id=state["session_id"],
-            call_id=call_id,
-            brief=brief,
-            model_profile=role.profile,
-            cwd=_cwd(config),
-            emit_fact=emit_fact,
-            limits=self.child_limits,
-            options=_options(config) if role.same_as_session else {},
-        )
-
-    @property
-    def parks_lead(self) -> bool:
-        """Whether ``delegate`` starts helper sessions and parks the run for them."""
-        return self.helpers is not None
 
     async def start_helpers(
         self,
@@ -601,7 +524,7 @@ class ChatRuntime:
 
     def _helper_host(self) -> HelperHost:
         if self.helpers is None:
-            raise RuntimeError("no helper host is set")
+            raise ToolError("a helper cannot be started here")
         return self.helpers
 
     async def waiting(self, session_id: str) -> bool:
