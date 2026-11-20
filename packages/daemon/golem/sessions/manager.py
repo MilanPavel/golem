@@ -53,12 +53,13 @@ from golem.models.budget import Budget, Room, spent_text
 from golem.models.cost import cost_usd
 from golem.models.errors import BUDGET_HINT
 from golem.models.facts import FactsSource, ModelFacts
+from golem.models.keys import KeyStoreError
 from golem.models.pick import Choice, Rejected, Traits, ladder, pick
 from golem.models.pick_helper import HelperChoice, pick_helper
 from golem.models.privacy import LOCAL_ONLY_REFUSAL, is_local_only
 from golem.models.project_privacy import project_local_only
 from golem.models.router import ModelConfigError, ModelIdentity, ModelRouter
-from golem.models.tiers import TIERS, Tier
+from golem.models.tiers import TIERS, Tier, blended
 from golem.models.window_plan import should_grow
 from golem.permissions.engine import MCP_ENABLE, Allowance, server_grant
 from golem.permissions.policy import explain
@@ -352,6 +353,9 @@ class _LiveSession:
     restart the question is in the helper's log."""
     lead_model: str | None = None
     """The model the lead's run used when it started this helper. In memory only."""
+    asked_model: str | None = None
+    """The model the lead named for this helper in its ``delegate`` call. It is the helper's wish
+    again when the paid question is answered. In memory only."""
 
 
 def _schemas(text: str | None) -> list[dict[str, object]] | None:
@@ -403,6 +407,9 @@ class _HelperSetup:
     candidates: list[ModelFacts]
     traits: Traits
     room: Room | None
+    held: tuple[tuple[ModelFacts, str], ...] = ()
+    """Models taken out of ``candidates`` by the settings, with why: ``pick_helper`` reads them
+    only to explain a wish that names one."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -1318,6 +1325,7 @@ class SessionManager:
         *,
         label: str = "",
         prompt: str = "",
+        asked_model: str | None = None,
     ) -> HelperRef:
         """Start the helper of the ``delegate`` call ``call_id`` of ``parent`` at ``index``, once.
 
@@ -1331,8 +1339,9 @@ class SessionManager:
         body of the agent's file, its system prompt.
 
         ``model_profile`` is the model the lead's run uses. The helper's model is what
-        ``pick_helper`` makes of the agent's wish (see :meth:`_helper_model`). The helper is
-        pinned to it, and its first run writes the pick as ``model.routed``.
+        ``pick_helper`` makes of the agent's wish (see :meth:`_helper_model`), or of
+        ``asked_model``, the model the lead named for this one helper, when there is one.
+        The helper is pinned to it, and its first run writes the pick as ``model.routed``.
 
         Raises :class:`~golem.tools.registry.ToolError` for a helper of a helper, an agent with
         ``delegate`` in its tools, and a model that may not run here. Raises
@@ -1347,7 +1356,9 @@ class SessionManager:
             if found is not None:
                 return HelperRef(found.session_id, found.model_profile, False)
             local_only = self.local_only(cwd) or lead.route == "local"
-            picked = await self._helper_model(lead, model_profile, agent, local_only, brief=brief)
+            picked = await self._helper_model(
+                lead, model_profile, agent, local_only, brief=brief, asked=asked_model
+            )
             try:
                 self._runtime.router.chat_model(picked.profile, local_only=local_only)
             except ModelConfigError as exc:
@@ -1366,6 +1377,7 @@ class SessionManager:
                 options=dict(lead.options) if picked.same_as_lead else {},
                 helper_pick=picked.choice,
                 lead_model=model_profile,
+                asked_model=asked_model,
                 permission_mode=helper_mode(agent, self._effective_mode(lead)),
             )
             await self._announce(helper)
@@ -1438,6 +1450,7 @@ class SessionManager:
         *,
         brief: str = "",
         answer: ConsentAnswer | None = None,
+        asked: str | None = None,
     ) -> _HelperModel:
         """The model of a helper of ``lead``, from the wish of its agent. Reads cached facts only.
 
@@ -1447,9 +1460,17 @@ class SessionManager:
         A pick that is paid, with a chat that has not agreed, comes back with the question to
         ask (``ask``) and the paid model; its reason says what a no becomes. ``answer`` is the
         user's answer to that question: a yes takes the paid pick, ``local`` the local one.
+
+        ``asked`` is the model the lead named in its ``delegate`` call. It is the wish of this one
+        helper: it replaces the agent's wish and ``[routing.roles] explore``, and goes through the
+        same pick, so privacy, the paid question and the spent cap apply to it as to any wish.
         """
         settings = self._runtime.router.routing_settings()
-        wish = wish_of(agent, settings.roles)
+        wish = asked or wish_of(agent, settings.roles)
+
+        def said(detail: str) -> str:
+            return detail if asked is None else f"the lead asked for {asked}: {detail}"
+
         setup = await self._helper_setup(
             wish,
             model_profile,
@@ -1462,9 +1483,9 @@ class SessionManager:
         )
         if setup is None:
             # Only a setup without facts gets here (the daemon always has them).
-            return _HelperModel(model_profile, wish, "no budget model ready", True)
+            return _HelperModel(model_profile, wish, said("no budget model ready"), True)
         own, candidates, traits, room = setup.own, setup.candidates, setup.traits, setup.room
-        choice = pick_helper(wish, own, candidates, traits)
+        choice = pick_helper(wish, own, candidates, traits, setup.held)
         if answer == "local":
             choice = pick_local(wish, own, candidates, traits)
         elif choice.needs_consent:
@@ -1485,14 +1506,14 @@ class SessionManager:
                     wish, own, candidates, traits, "the paid question cannot be asked here"
                 )
             else:
-                detail = _asks_first(choice, local)
+                detail = said(_asks_first(choice, local))
                 return _HelperModel(
                     choice.model.profile, wish, detail, False, routed_of(wish, choice), question
                 )
         return _HelperModel(
             choice.model.profile,
             wish,
-            choice.detail,
+            said(choice.detail),
             choice.model.ref == own.ref,
             routed_of(wish, choice),
         )
@@ -1526,7 +1547,10 @@ class SessionManager:
         named = next((m for m in everything if wish in (m.profile, m.ref)), None)
         if named is not None and all(named.ref != m.ref for m in candidates):
             candidates.append(named)  # a model the agent names, though the ladder does not
+        held: tuple[tuple[ModelFacts, str], ...] = ()
         if settings.paid == "never" or not interactive:  # privacy is the pick's own rule
+            why = "paid models are off in your settings" if interactive else "a routine runs local"
+            held = tuple((m, why) for m in candidates if m.tier != "local")
             candidates = [m for m in candidates if m.tier == "local"]
         room = (
             None
@@ -1544,7 +1568,7 @@ class SessionManager:
             # A spent cap takes the paid models out, so the helper lands on a local one.
             paid_room_usd=None if room is None else room.usd,
         )
-        return _HelperSetup(own, candidates, traits, room)
+        return _HelperSetup(own, candidates, traits, room, held)
 
     async def resolve_wish(self, agent: Agent | AgentSnapshot, cwd: str | None) -> WishPick | None:
         """What the wish of ``agent`` becomes for a new chat in ``cwd``: the pick a helper of it
@@ -1568,7 +1592,7 @@ class SessionManager:
         )
         if setup is None:
             return None
-        choice = pick_helper(wish, setup.own, setup.candidates, setup.traits)
+        choice = pick_helper(wish, setup.own, setup.candidates, setup.traits, setup.held)
         detail = choice.detail
         if choice.needs_consent:
             local = pick_local(wish, setup.own, setup.candidates, setup.traits)
@@ -1643,6 +1667,7 @@ class SessionManager:
                 cwd,
                 label=spec.label,
                 prompt=prompt,
+                asked_model=spec.model,
             )
 
     def _is_read_only(self, name: str) -> bool:
@@ -1652,7 +1677,30 @@ class SessionManager:
     def _delegate_text(self, root: Path | None) -> str:
         """The description of ``delegate`` for a folder: the agent types its sessions see."""
         agents = self._agents.view(root).usable()
-        return describe([(agent.name, agent.description) for agent in agents])
+        return describe([(agent.name, agent.description) for agent in agents], self._named_models())
+
+    def _named_models(self) -> list[str]:
+        """What a lead may name as a helper's ``model``, for the description of ``delegate``.
+
+        Read from the settings alone (no listing, no clock), so the text is the same on every
+        turn until the settings or the keys change. The tiers that exist come first, then the
+        profiles that can run: local ones, then hosted ones with a key, cheapest first.
+        """
+        router = self._runtime.router
+        local: list[str] = []
+        hosted: list[tuple[float, str]] = []
+        for name, settings in sorted(router.profiles().items()):
+            try:
+                resolved = router.resolve(name)
+                if resolved.provider.kind == "ollama":
+                    local.append(name)
+                elif router.api_key(resolved.provider_name) is not None:
+                    cost = None if settings.price is None else blended(settings.price)
+                    hosted.append((float("inf") if cost is None else cost, name))
+            except (ModelConfigError, KeyStoreError):
+                continue
+        tiers = [*(["local"] if local else []), *(["budget", "frontier"] if hosted else [])]
+        return [*tiers, *local, *(name for _, name in sorted(hosted))]
 
     async def helpers_ended(self, session_id: str, call_id: str) -> bool:
         """Whether every helper of the call has ended: its last run is over, or it was closed.
@@ -2257,6 +2305,7 @@ class SessionManager:
             helper.agent,
             local_only,
             answer=answer,
+            asked=helper.asked_model,
         )
         if picked.profile != helper.model_profile:
             identity = self._runtime.router.identity(picked.profile)
