@@ -57,7 +57,7 @@
       "data": {
         "cleared_ids": [],
         "context_window": null,
-        "estimated_tokens": 3043,
+        "estimated_tokens": 3593,
         "index": 1,
         "message_bytes": [
           10
@@ -85,9 +85,9 @@
           }
         ],
         "tier": null,
-        "tools_bytes": 9858,
-        "tools_chars": 9858,
-        "tools_sha": "55153538b30b199d91498f166762712cbd8738111dfa68799b398e16ee612855",
+        "tools_bytes": 11690,
+        "tools_chars": 11690,
+        "tools_sha": "96612a01fa461427edf699fe8e493392e697268a50b2f377e2f37b56ffc6e3e7",
         "window_estimated": false,
         "window_planned": false
       },
@@ -230,7 +230,7 @@
       "data": {
         "cleared_ids": [],
         "context_window": null,
-        "estimated_tokens": 3083,
+        "estimated_tokens": 3633,
         "index": 1,
         "message_bytes": [
           10,
@@ -264,9 +264,9 @@
           }
         ],
         "tier": null,
-        "tools_bytes": 9858,
-        "tools_chars": 9858,
-        "tools_sha": "55153538b30b199d91498f166762712cbd8738111dfa68799b398e16ee612855",
+        "tools_bytes": 11690,
+        "tools_chars": 11690,
+        "tools_sha": "96612a01fa461427edf699fe8e493392e697268a50b2f377e2f37b56ffc6e3e7",
         "window_estimated": false,
         "window_planned": false
       },
@@ -382,7 +382,7 @@
       "data": {
         "cleared_ids": [],
         "context_window": null,
-        "estimated_tokens": 3043,
+        "estimated_tokens": 3593,
         "index": 1,
         "message_bytes": [
           10
@@ -410,9 +410,9 @@
           }
         ],
         "tier": null,
-        "tools_bytes": 9858,
-        "tools_chars": 9858,
-        "tools_sha": "55153538b30b199d91498f166762712cbd8738111dfa68799b398e16ee612855",
+        "tools_bytes": 11690,
+        "tools_chars": 11690,
+        "tools_sha": "96612a01fa461427edf699fe8e493392e697268a50b2f377e2f37b56ffc6e3e7",
         "window_estimated": false,
         "window_planned": false
       },
@@ -555,7 +555,7 @@
       "data": {
         "cleared_ids": [],
         "context_window": null,
-        "estimated_tokens": 3083,
+        "estimated_tokens": 3633,
         "index": 1,
         "message_bytes": [
           10,
@@ -589,9 +589,9 @@
           }
         ],
         "tier": null,
-        "tools_bytes": 9858,
-        "tools_chars": 9858,
-        "tools_sha": "55153538b30b199d91498f166762712cbd8738111dfa68799b398e16ee612855",
+        "tools_bytes": 11690,
+        "tools_chars": 11690,
+        "tools_sha": "96612a01fa461427edf699fe8e493392e697268a50b2f377e2f37b56ffc6e3e7",
         "window_estimated": false,
         "window_planned": false
       },

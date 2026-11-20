@@ -201,6 +201,9 @@ STATE_KEYS = frozenset({"todos", "skill_folders"})
 ERROR_KEY = "golem_error"
 """``additional_kwargs`` key on a failed ``ToolMessage``: why the call did not give a result."""
 
+MEMORY_IDS_KEY = "golem_memory_ids"
+"""``additional_kwargs`` key on a ``recall`` result: the ids of the memories it shows, in order."""
+
 ErrorKind = Literal["invalid_args", "unknown_tool", "tool_error", "denied", "cancelled"]
 
 CANCELLED_RESULT = "cancelled: the run stopped before this tool call finished"
@@ -294,7 +297,7 @@ def tools_node(
             enable_mcp=enable_here if enabler is not None and session_id else None,
             skills=None if skill_registry is None else skill_registry.view(root),
             page_chars=budget.page_chars,
-            memory=None if child_of(config) is not None else _memory(config),
+            memory=None if child_of(config) is not None else _memory_for(state, config, tier_of),
             memory_target=_target(state, tier_of),
         )
         allowed = _allowed(config)
@@ -470,7 +473,7 @@ def tools_node(
             )
             if verdict.args is not None:
                 output = _edited(verdict.args, output)
-            results.append(_result(call_id, call["name"], output))
+            results.append(_result(call_id, call["name"], output, memory_ids=result.memory_ids))
             changed = {k: v for k, v in (result.update or {}).items() if k in STATE_KEYS}
             if "todos" in changed:
                 write({STREAM_KEY: "todos.updated", "call_id": call_id, "todos": changed["todos"]})
@@ -636,15 +639,23 @@ def cancelled_results(calls: Sequence[ToolCall]) -> list[ToolMessage]:
 
 
 def _result(
-    call_id: str, name: str, content: str, *, error: ErrorKind | None = None
+    call_id: str,
+    name: str,
+    content: str,
+    *,
+    error: ErrorKind | None = None,
+    memory_ids: tuple[str, ...] | None = None,
 ) -> ToolMessage:
+    extra: dict[str, object] = {} if error is None else {ERROR_KEY: error}
+    if memory_ids is not None:
+        extra[MEMORY_IDS_KEY] = list(memory_ids)
     return ToolMessage(
         content=content,
         tool_call_id=call_id,
         name=name,
         id=f"t_{call_id}",
         status="success" if error is None else "error",
-        additional_kwargs={} if error is None else {ERROR_KEY: error},
+        additional_kwargs=extra,
     )
 
 
@@ -763,9 +774,24 @@ def child_of(config: RunnableConfig) -> ChildScope | None:
     return raw if isinstance(raw, ChildScope) else None
 
 
-def _memory(config: RunnableConfig) -> MemoryAccess | None:
+def memory_of(config: RunnableConfig) -> MemoryAccess | None:
     raw = cast(Mapping[str, object], config.get("configurable", {})).get(MEMORY_KEY)
     return raw if isinstance(raw, MemoryAccess) else None
+
+
+def _memory_for(
+    state: AgentState, config: RunnableConfig, tier_of: Callable[[str], Tier | None] | None
+) -> MemoryAccess | None:
+    """The run's access, with the chat's ``model_local`` set to the model of this call.
+
+    The run may have started on a local model and moved to a hosted one, so the value the
+    manager built it with is not the call's.
+    """
+    access = memory_of(config)
+    if access is None:
+        return None
+    local = _target(state, tier_of).local
+    return replace(access, chat=replace(access.chat, model_local=local))
 
 
 def _target(state: AgentState, tier_of: Callable[[str], Tier | None] | None) -> Target:
@@ -792,7 +818,7 @@ def scope_of(config: RunnableConfig) -> ToolScope:
     return ToolScope(
         root=_root(config),
         enabled=frozenset(name for name in names if isinstance(name, str)),
-        memory=_memory(config) is not None,
+        memory=memory_of(config) is not None,
     )
 
 
@@ -827,6 +853,7 @@ __all__ = [
     "LOCAL_ONLY_KEY",
     "MCP_KEY",
     "MCP_NOW_KEY",
+    "MEMORY_IDS_KEY",
     "MEMORY_KEY",
     "MODE_KEY",
     "NO_ASK_REFUSAL",
@@ -845,6 +872,7 @@ __all__ = [
     "call_id_of",
     "cancelled_results",
     "child_of",
+    "memory_of",
     "scope_of",
     "tools_node",
     "unanswered_calls",

@@ -62,6 +62,7 @@ from golem.graphs.adapter import (
 from golem.graphs.chat import ChatRuntime, Growth
 from golem.graphs.step_up import Consent
 from golem.graphs.tools_node import Answer, ChildScope
+from golem.memory.service import MemoryAccess
 from golem.models.cost import cost_usd
 from golem.models.errors import ContextFull, ModelUnreachable
 from golem.models.pick import Choice
@@ -166,6 +167,8 @@ class Turn:
     """Folders the read tools may read from this turn on (a watch firing's folder)."""
     child: ChildScope | None = field(default=None, compare=False)
     """The scope of a helper session, from its record. None for any other session."""
+    memory: MemoryAccess | None = field(default=None, compare=False)
+    """What the run may use of long-term memory. None when memory is off, and for a helper."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -211,6 +214,8 @@ class Resume:
     whose helpers have ended, which has no answer to give. ``continue``: the checkpoint with no
     input, for a helper run a restart cut off. The two last ignore ``call_id``, ``name`` and
     ``decision``."""
+    memory: MemoryAccess | None = field(default=None, compare=False)
+    """What the run may use of long-term memory. None when memory is off, and for a helper."""
 
 
 @dataclass
@@ -343,6 +348,7 @@ async def run_turn(
             skill_folder=None if skill is None else str(skill.path),
             read_folders=turn.read_folders,
             child=turn.child,
+            memory=turn.memory,
         )
         return await _finish(stream, progress, emit)
     except asyncio.CancelledError:
@@ -499,6 +505,7 @@ async def resume_turn(
                 plan_first=resume.plan_first,
                 local_only=resume.local_only,
                 child=resume.child,
+                memory=resume.memory,
             )
             return await _finish(stream, progress, emit)
         if resume.go == "continue":
@@ -547,6 +554,7 @@ async def resume_turn(
             plan_first=resume.plan_first,
             local_only=resume.local_only,
             child=resume.child,
+            memory=resume.memory,
         )
         return await _finish(stream, progress, emit)
     except asyncio.CancelledError:

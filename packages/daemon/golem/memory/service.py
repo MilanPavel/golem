@@ -273,6 +273,40 @@ class MemoryService:
                     found.append(record)
         return found[:limit]
 
+    async def allowed(
+        self,
+        ids: Iterable[str],
+        chat: ChatPrivacy,
+        target: Target,
+        *,
+        folder_local_only: bool = False,
+        project_private: bool = False,
+    ) -> set[str]:
+        """The ids among ``ids`` whose memory ``target`` may read now.
+
+        A memory that is gone, or a service that is off, is not allowed: what cannot be
+        checked is not sent.
+        """
+        if not self.enabled:
+            return set()
+        settings = self._settings()
+        found: set[str] = set()
+        for memory_id in ids:
+            record = await self._store.get(memory_id)
+            if record is None:
+                continue
+            project = record.scope == "project"
+            memory = MemoryPrivacy(
+                record.scope,
+                record.privacy,
+                _setting(settings, record.scope),
+                folder_local_only and project,
+                project_private and project,
+            )
+            if may_use(memory, chat, target).allowed:
+                found.add(memory_id)
+        return found
+
     async def export(self, fmt: ExportFormat = "json") -> str:
         """Every memory, newest first: JSON with every field, or Markdown for reading."""
         if not self.enabled:
@@ -384,6 +418,19 @@ class MemoryAccess:
             folder=self.project,
             scope=scope,
             limit=limit,
+            folder_local_only=self.chat.local_only,
+            project_private=self.project_private,
+        )
+
+    async def allowed(self, ids: Iterable[str], target: Target) -> set[str]:
+        """The ids among ``ids`` that ``target`` may read, for a history about to be sent.
+
+        ``model_local`` of the chat is the call's own, so it is set from ``target``.
+        """
+        return await self.service.allowed(
+            ids,
+            replace(self.chat, model_local=target.local),
+            target,
             folder_local_only=self.chat.local_only,
             project_private=self.project_private,
         )

@@ -1125,6 +1125,7 @@ class SessionManager:
                 session_id, None, "session.updated", SessionUpdatedData(cwd=cwd)
             )
             session.cwd = cwd
+        memory = self._memory_access(session, routed.profile, text)
         turn = self._turn_of(
             session,
             routed,
@@ -1136,6 +1137,7 @@ class SessionManager:
             growth=growth,
             local_only=local_only,
             read_folders=read_folders,
+            memory=memory,
         )
         if routed.ask is not None:
             await ask_consent(self._runtime, self._events, turn, routed.ask)
@@ -1146,7 +1148,7 @@ class SessionManager:
             turn.run_id,
             control,
             self._turn(session, turn, control),
-            self._memory_access(session, routed.profile, text),
+            memory,
         )
         return turn.run_id
 
@@ -1415,12 +1417,28 @@ class SessionManager:
             asked = tuple(
                 dict.fromkeys(e.data.call_id for e in found if e.type == "approval.needed")
             )
+            prompt = next(
+                (
+                    e.data.text
+                    for e in reversed(found)
+                    if isinstance(e, MessageCompletedEvent) and e.data.role == "user"
+                ),
+                "",
+            )
+            # A woken lead is an ordinary session, so it carries memory like any other run.
+            memory = self._memory_access(session, session.model_profile, prompt)
             resume = self._resume_of(
-                session, run.run_id, "wake", turn.user_message_id, tuple(turn.open_calls), asked
+                session,
+                run.run_id,
+                "wake",
+                turn.user_message_id,
+                tuple(turn.open_calls),
+                asked,
+                memory,
             )
             control = RunControl()
             work = self._resumed(session, resume, control, None)
-            await self._start(session, run.run_id, control, work)
+            await self._start(session, run.run_id, control, work, memory)
 
     def _resume_of(
         self,
@@ -1430,8 +1448,12 @@ class SessionManager:
         user_message_id: str | None,
         open_calls: tuple[str, ...] = (),
         asked: tuple[str, ...] = (),
+        memory: MemoryAccess | None = None,
     ) -> Resume:
-        """A run that goes on with no answer from you, with the session as it is now."""
+        """A run that goes on with no answer from you, with the session as it is now.
+
+        ``memory`` is for a woken lead. A helper's run never carries it.
+        """
         return Resume(
             session_id=session.session_id,
             run_id=run_id,
@@ -1454,6 +1476,7 @@ class SessionManager:
             pins=session.pins,
             child=self._child_of(session),
             go=go,
+            memory=memory if go == "wake" else None,
         )
 
     async def _after_run(self, session_id: str, run_id: str) -> None:
@@ -1546,6 +1569,7 @@ class SessionManager:
         growth: Growth | None = None,
         local_only: bool = False,
         read_folders: tuple[str, ...] = (),
+        memory: MemoryAccess | None = None,
     ) -> Turn:
         return Turn(
             session_id=session.session_id,
@@ -1575,6 +1599,7 @@ class SessionManager:
             replaces=routed.replaces,
             read_folders=read_folders,
             child=self._child_of(session),
+            memory=memory,
         )
 
     async def answer_consent(self, session_id: str, run_id: str, answer: ConsentAnswer) -> str:
@@ -1609,6 +1634,7 @@ class SessionManager:
                 )
                 session.paid_ok = True
             if pending.signal is not None:
+                memory = self._memory_access(session, session.model_profile, pending.text)
                 # The run is paused in its middle: it goes on with the answer, not a new turn.
                 resume = Resume(
                     session_id=session_id,
@@ -1631,10 +1657,11 @@ class SessionManager:
                     local_only=self.local_only(session.cwd) or session.route == "local",
                     pins=session.pins,
                     child=self._child_of(session),
+                    memory=memory,
                 )
                 control = RunControl()
                 work = self._resumed(session, resume, control, None)
-                await self._start(session, run_id, control, work)
+                await self._start(session, run_id, control, work, memory)
                 return run_id
             room = None if self.budget is None else await self.budget.room(session_id)
             try:
@@ -1663,6 +1690,7 @@ class SessionManager:
                     invocation = self._invoke(session_id, session.cwd, pending.skill)
                 except SkillInvokeError:
                     invocation = None
+            memory = self._memory_access(session, routed.profile, pending.text)
             turn = self._turn_of(
                 session,
                 routed,
@@ -1674,6 +1702,7 @@ class SessionManager:
                 begun=True,
                 growth=await self._growth_for(session, routed.profile),
                 local_only=local_only,
+                memory=memory,
             )
             if answer == "once" and room is not None and room.spent and self.budget is not None:
                 self.budget.exempt(session_id)
@@ -1683,7 +1712,7 @@ class SessionManager:
                 run_id,
                 control,
                 self._turn(session, turn, control),
-                self._memory_access(session, routed.profile, pending.text),
+                memory,
             )
             return run_id
 
@@ -2195,6 +2224,7 @@ class SessionManager:
                 server = (args if args is not None else pending.args).get("name")
                 if isinstance(server, str) and server != "":
                     session.allowed_tools.add(server_grant(server))
+            memory = self._memory_access(session, session.model_profile, pending.prompt or "")
             resume = Resume(
                 session_id=session_id,
                 run_id=run.run_id,
@@ -2220,10 +2250,11 @@ class SessionManager:
                 local_only=self.local_only(session.cwd) or session.route == "local",
                 pins=session.pins,
                 child=self._child_of(session),
+                memory=memory,
             )
             control = RunControl()
             work = self._resumed(session, resume, control, pending.prompt)
-            await self._start(session, run.run_id, control, work)
+            await self._start(session, run.run_id, control, work, memory)
             return run.run_id
 
     async def allowances(self, session_id: str) -> list[Allowance]:
@@ -2371,6 +2402,8 @@ class SessionManager:
     def _memory_access(self, session: _LiveSession, profile: str, text: str) -> MemoryAccess | None:
         """What a run carries of memory, built once as it starts. None when memory is off."""
         if self.memory is None or not self.memory.enabled:
+            return None
+        if session.agent is not None or session.parent is not None:
             return None
         tier = None if self._runtime.tier_of is None else self._runtime.tier_of(profile)
         chat = ChatPrivacy(
