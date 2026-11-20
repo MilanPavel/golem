@@ -8384,6 +8384,330 @@ public enum MessageThinkingDeltaEventType: String, Codable {
     case messageThinkingDelta = "message.thinking.delta"
 }
 
+/// Server → every connection: a speed run ended. Not stored.
+// MARK: - ModelBenchDoneNotification
+public struct ModelBenchDoneNotification: Codable {
+    public let jsonrpc: Jsonrpc?
+    public let method: ModelBenchDoneNotificationMethod?
+    public let params: ModelBenchDoneNotificationParams
+
+    public enum CodingKeys: String, CodingKey {
+        case jsonrpc = "jsonrpc"
+        case method = "method"
+        case params = "params"
+    }
+
+    public init(jsonrpc: Jsonrpc?, method: ModelBenchDoneNotificationMethod?, params: ModelBenchDoneNotificationParams) {
+        self.jsonrpc = jsonrpc
+        self.method = method
+        self.params = params
+    }
+}
+
+public enum ModelBenchDoneNotificationMethod: String, Codable {
+    case modelBenchDone = "model.bench.done"
+}
+
+/// A run ended. ``error`` says why when ``ok`` is false, and then ``rows`` may be short.
+// MARK: - ModelBenchDoneNotificationParams
+public struct ModelBenchDoneNotificationParams: Codable {
+    public let error: String?
+    public let ok: Bool
+    public let ref: String
+    public let rows: [PurpleModelBenchRow]?
+
+    public enum CodingKeys: String, CodingKey {
+        case error = "error"
+        case ok = "ok"
+        case ref = "ref"
+        case rows = "rows"
+    }
+
+    public init(error: String?, ok: Bool, ref: String, rows: [PurpleModelBenchRow]?) {
+        self.error = error
+        self.ok = ok
+        self.ref = ref
+        self.rows = rows
+    }
+}
+
+/// One shape at one count. ``each`` is the tokens per second of each call, ``total`` their
+/// sum,
+/// ``window`` the seconds from the first start to the last end.
+// MARK: - PurpleModelBenchRow
+public struct PurpleModelBenchRow: Codable {
+    public let atOnce: Int
+    public let each: [Double]
+    public let shape: Shape
+    public let total: Double
+    public let window: Double
+
+    public enum CodingKeys: String, CodingKey {
+        case atOnce = "at_once"
+        case each = "each"
+        case shape = "shape"
+        case total = "total"
+        case window = "window"
+    }
+
+    public init(atOnce: Int, each: [Double], shape: Shape, total: Double, window: Double) {
+        self.atOnce = atOnce
+        self.each = each
+        self.shape = shape
+        self.total = total
+        self.window = window
+    }
+}
+
+public enum Shape: String, Codable {
+    case prompt = "prompt"
+    case tools = "tools"
+}
+
+/// A run ended. ``error`` says why when ``ok`` is false, and then ``rows`` may be short.
+// MARK: - ModelBenchDone
+public struct ModelBenchDone: Codable {
+    public let error: String?
+    public let ok: Bool
+    public let ref: String
+    public let rows: [ModelBenchDoneRow]?
+
+    public enum CodingKeys: String, CodingKey {
+        case error = "error"
+        case ok = "ok"
+        case ref = "ref"
+        case rows = "rows"
+    }
+
+    public init(error: String?, ok: Bool, ref: String, rows: [ModelBenchDoneRow]?) {
+        self.error = error
+        self.ok = ok
+        self.ref = ref
+        self.rows = rows
+    }
+}
+
+/// One shape at one count. ``each`` is the tokens per second of each call, ``total`` their
+/// sum,
+/// ``window`` the seconds from the first start to the last end.
+// MARK: - ModelBenchDoneRow
+public struct ModelBenchDoneRow: Codable {
+    public let atOnce: Int
+    public let each: [Double]
+    public let shape: Shape
+    public let total: Double
+    public let window: Double
+
+    public enum CodingKeys: String, CodingKey {
+        case atOnce = "at_once"
+        case each = "each"
+        case shape = "shape"
+        case total = "total"
+        case window = "window"
+    }
+
+    public init(atOnce: Int, each: [Double], shape: Shape, total: Double, window: Double) {
+        self.atOnce = atOnce
+        self.each = each
+        self.shape = shape
+        self.total = total
+        self.window = window
+    }
+}
+
+/// ``model.bench``. Measure how fast a local model answers at 1 to 4 calls at once.
+///
+/// ``ref`` is a local model ref (``ollama/qwen3:8b``); a hosted ref is an error. ``engine``
+/// names
+/// the server that runs it when more than one could. Each count's row arrives as
+/// ``model.bench.progress`` and the end as ``model.bench.done``.
+// MARK: - ModelBenchParams
+public struct ModelBenchParams: Codable {
+    public let engine: String?
+    public let ref: String
+
+    public enum CodingKeys: String, CodingKey {
+        case engine = "engine"
+        case ref = "ref"
+    }
+
+    public init(engine: String?, ref: String) {
+        self.engine = engine
+        self.ref = ref
+    }
+}
+
+/// Server → every connection: one row of a speed run finished. Not stored.
+// MARK: - ModelBenchProgressNotification
+public struct ModelBenchProgressNotification: Codable {
+    public let jsonrpc: Jsonrpc?
+    public let method: ModelBenchProgressNotificationMethod?
+    public let params: ModelBenchProgressNotificationParams
+
+    public enum CodingKeys: String, CodingKey {
+        case jsonrpc = "jsonrpc"
+        case method = "method"
+        case params = "params"
+    }
+
+    public init(jsonrpc: Jsonrpc?, method: ModelBenchProgressNotificationMethod?, params: ModelBenchProgressNotificationParams) {
+        self.jsonrpc = jsonrpc
+        self.method = method
+        self.params = params
+    }
+}
+
+public enum ModelBenchProgressNotificationMethod: String, Codable {
+    case modelBenchProgress = "model.bench.progress"
+}
+
+/// One row finished. ``index`` counts from 1 of ``total``.
+// MARK: - ModelBenchProgressNotificationParams
+public struct ModelBenchProgressNotificationParams: Codable {
+    public let index: Int
+    public let ref: String
+    public let row: FluffyModelBenchRow
+    public let total: Int
+
+    public enum CodingKeys: String, CodingKey {
+        case index = "index"
+        case ref = "ref"
+        case row = "row"
+        case total = "total"
+    }
+
+    public init(index: Int, ref: String, row: FluffyModelBenchRow, total: Int) {
+        self.index = index
+        self.ref = ref
+        self.row = row
+        self.total = total
+    }
+}
+
+/// One shape at one count. ``each`` is the tokens per second of each call, ``total`` their
+/// sum,
+/// ``window`` the seconds from the first start to the last end.
+// MARK: - FluffyModelBenchRow
+public struct FluffyModelBenchRow: Codable {
+    public let atOnce: Int
+    public let each: [Double]
+    public let shape: Shape
+    public let total: Double
+    public let window: Double
+
+    public enum CodingKeys: String, CodingKey {
+        case atOnce = "at_once"
+        case each = "each"
+        case shape = "shape"
+        case total = "total"
+        case window = "window"
+    }
+
+    public init(atOnce: Int, each: [Double], shape: Shape, total: Double, window: Double) {
+        self.atOnce = atOnce
+        self.each = each
+        self.shape = shape
+        self.total = total
+        self.window = window
+    }
+}
+
+/// One row finished. ``index`` counts from 1 of ``total``.
+// MARK: - ModelBenchProgress
+public struct ModelBenchProgress: Codable {
+    public let index: Int
+    public let ref: String
+    public let row: ModelBenchProgressRow
+    public let total: Int
+
+    public enum CodingKeys: String, CodingKey {
+        case index = "index"
+        case ref = "ref"
+        case row = "row"
+        case total = "total"
+    }
+
+    public init(index: Int, ref: String, row: ModelBenchProgressRow, total: Int) {
+        self.index = index
+        self.ref = ref
+        self.row = row
+        self.total = total
+    }
+}
+
+/// One shape at one count. ``each`` is the tokens per second of each call, ``total`` their
+/// sum,
+/// ``window`` the seconds from the first start to the last end.
+// MARK: - ModelBenchProgressRow
+public struct ModelBenchProgressRow: Codable {
+    public let atOnce: Int
+    public let each: [Double]
+    public let shape: Shape
+    public let total: Double
+    public let window: Double
+
+    public enum CodingKeys: String, CodingKey {
+        case atOnce = "at_once"
+        case each = "each"
+        case shape = "shape"
+        case total = "total"
+        case window = "window"
+    }
+
+    public init(atOnce: Int, each: [Double], shape: Shape, total: Double, window: Double) {
+        self.atOnce = atOnce
+        self.each = each
+        self.shape = shape
+        self.total = total
+        self.window = window
+    }
+}
+
+/// ``started`` is false when this model was already being measured.
+// MARK: - ModelBenchResult
+public struct ModelBenchResult: Codable {
+    public let ref: String
+    public let started: Bool
+
+    public enum CodingKeys: String, CodingKey {
+        case ref = "ref"
+        case started = "started"
+    }
+
+    public init(ref: String, started: Bool) {
+        self.ref = ref
+        self.started = started
+    }
+}
+
+/// One shape at one count. ``each`` is the tokens per second of each call, ``total`` their
+/// sum,
+/// ``window`` the seconds from the first start to the last end.
+// MARK: - ModelBenchRow
+public struct ModelBenchRow: Codable {
+    public let atOnce: Int
+    public let each: [Double]
+    public let shape: Shape
+    public let total: Double
+    public let window: Double
+
+    public enum CodingKeys: String, CodingKey {
+        case atOnce = "at_once"
+        case each = "each"
+        case shape = "shape"
+        case total = "total"
+        case window = "window"
+    }
+
+    public init(atOnce: Int, each: [Double], shape: Shape, total: Double, window: Double) {
+        self.atOnce = atOnce
+        self.each = each
+        self.shape = shape
+        self.total = total
+        self.window = window
+    }
+}
+
 /// A model call ended.
 ///
 /// ``first_token_ms`` is the time from the request to the first text, and

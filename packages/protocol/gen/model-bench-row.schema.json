@@ -1,0 +1,45 @@
+{
+  "additionalProperties": false,
+  "description": "One shape at one count. ``each`` is the tokens per second of each call, ``total`` their sum,\n``window`` the seconds from the first start to the last end.",
+  "properties": {
+    "at_once": {
+      "minimum": 1,
+      "title": "At Once",
+      "type": "integer"
+    },
+    "each": {
+      "items": {
+        "type": "number"
+      },
+      "title": "Each",
+      "type": "array"
+    },
+    "shape": {
+      "enum": [
+        "tools",
+        "prompt"
+      ],
+      "title": "Shape",
+      "type": "string"
+    },
+    "total": {
+      "minimum": 0,
+      "title": "Total",
+      "type": "number"
+    },
+    "window": {
+      "minimum": 0,
+      "title": "Window",
+      "type": "number"
+    }
+  },
+  "required": [
+    "shape",
+    "at_once",
+    "each",
+    "total",
+    "window"
+  ],
+  "title": "ModelBenchRow",
+  "type": "object"
+}

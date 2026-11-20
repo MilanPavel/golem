@@ -1,0 +1,105 @@
+{
+  "$defs": {
+    "ModelBenchProgress": {
+      "additionalProperties": false,
+      "description": "One row finished. ``index`` counts from 1 of ``total``.",
+      "properties": {
+        "index": {
+          "minimum": 1,
+          "title": "Index",
+          "type": "integer"
+        },
+        "ref": {
+          "minLength": 3,
+          "title": "Ref",
+          "type": "string"
+        },
+        "row": {
+          "$ref": "#/$defs/ModelBenchRow"
+        },
+        "total": {
+          "minimum": 1,
+          "title": "Total",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "ref",
+        "index",
+        "total",
+        "row"
+      ],
+      "title": "ModelBenchProgress",
+      "type": "object"
+    },
+    "ModelBenchRow": {
+      "additionalProperties": false,
+      "description": "One shape at one count. ``each`` is the tokens per second of each call, ``total`` their sum,\n``window`` the seconds from the first start to the last end.",
+      "properties": {
+        "at_once": {
+          "minimum": 1,
+          "title": "At Once",
+          "type": "integer"
+        },
+        "each": {
+          "items": {
+            "type": "number"
+          },
+          "title": "Each",
+          "type": "array"
+        },
+        "shape": {
+          "enum": [
+            "tools",
+            "prompt"
+          ],
+          "title": "Shape",
+          "type": "string"
+        },
+        "total": {
+          "minimum": 0,
+          "title": "Total",
+          "type": "number"
+        },
+        "window": {
+          "minimum": 0,
+          "title": "Window",
+          "type": "number"
+        }
+      },
+      "required": [
+        "shape",
+        "at_once",
+        "each",
+        "total",
+        "window"
+      ],
+      "title": "ModelBenchRow",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Server → every connection: one row of a speed run finished. Not stored.",
+  "properties": {
+    "jsonrpc": {
+      "const": "2.0",
+      "default": "2.0",
+      "title": "Jsonrpc",
+      "type": "string"
+    },
+    "method": {
+      "const": "model.bench.progress",
+      "default": "model.bench.progress",
+      "title": "Method",
+      "type": "string"
+    },
+    "params": {
+      "$ref": "#/$defs/ModelBenchProgress"
+    }
+  },
+  "required": [
+    "params"
+  ],
+  "title": "ModelBenchProgressNotification",
+  "type": "object"
+}

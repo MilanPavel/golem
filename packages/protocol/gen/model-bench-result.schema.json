@@ -1,0 +1,21 @@
+{
+  "additionalProperties": false,
+  "description": "``started`` is false when this model was already being measured.",
+  "properties": {
+    "ref": {
+      "minLength": 3,
+      "title": "Ref",
+      "type": "string"
+    },
+    "started": {
+      "title": "Started",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "ref",
+    "started"
+  ],
+  "title": "ModelBenchResult",
+  "type": "object"
+}

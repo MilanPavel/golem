@@ -36,6 +36,11 @@ from golem_protocol.commands import (
     MemoryUpdateResult,
     MemoryWriteParams,
     MemoryWriteResult,
+    ModelBenchDone,
+    ModelBenchParams,
+    ModelBenchProgress,
+    ModelBenchResult,
+    ModelBenchRow,
     ModelOptionsSaved,
     ModelServerStatus,
     PendingItem,
@@ -49,6 +54,8 @@ from golem_protocol.events import Ping
 from golem_protocol.rpc import (
     AgentRegistryChangedNotification,
     MemoryChangedNotification,
+    ModelBenchDoneNotification,
+    ModelBenchProgressNotification,
     ModelOptionsSavedNotification,
     ModelServerStatusNotification,
     RpcErrorBody,
@@ -430,3 +437,45 @@ def test_memory_changed_is_a_notification_with_the_five_changes() -> None:
         assert note.params.folder is None
     with pytest.raises(ValidationError):
         MemoryChanged(id="m_1", change="moved", scope="you")  # type: ignore[arg-type]
+
+
+def test_model_bench_types_round_trip() -> None:
+    params = ModelBenchParams(ref="ollama/qwen3:8b", engine="ollama")
+    assert ModelBenchParams.model_validate_json(params.model_dump_json()) == params
+    assert ModelBenchParams(ref="ollama/qwen3:8b").engine is None
+    result = ModelBenchResult(ref="ollama/qwen3:8b", started=True)
+    assert ModelBenchResult.model_validate_json(result.model_dump_json()) == result
+    row = ModelBenchRow(shape="tools", at_once=2, each=[31.5, 29.0], total=60.5, window=8.2)
+    assert ModelBenchRow.model_validate_json(row.model_dump_json()) == row
+    progress = ModelBenchProgress(ref="ollama/qwen3:8b", index=1, total=8, row=row)
+    assert ModelBenchProgress.model_validate_json(progress.model_dump_json()) == progress
+    done = ModelBenchDone(ref="ollama/qwen3:8b", ok=True, rows=[row])
+    assert ModelBenchDone.model_validate_json(done.model_dump_json()) == done
+    assert ModelBenchDone(ref="ollama/qwen3:8b", ok=False, error="hosted model").rows == []
+
+
+def test_model_bench_refuses_a_bad_row_or_params() -> None:
+    with pytest.raises(ValidationError):
+        ModelBenchRow(shape="chat", at_once=1, each=[1.0], total=1.0, window=1.0)  # type: ignore[arg-type]
+    with pytest.raises(ValidationError):
+        ModelBenchRow(shape="tools", at_once=0, each=[], total=0, window=0)
+    with pytest.raises(ValidationError):
+        ModelBenchParams(ref="ab")
+    with pytest.raises(ValidationError):
+        ModelBenchParams(ref="ollama/qwen3:8b", engine="")
+
+
+def test_model_bench_notifications() -> None:
+    row = ModelBenchRow(shape="prompt", at_once=1, each=[40.0], total=40.0, window=3.0)
+    progress = ModelBenchProgressNotification(
+        params=ModelBenchProgress(ref="ollama/qwen3:8b", index=1, total=8, row=row)
+    )
+    assert progress.method == "model.bench.progress"
+    assert (
+        ModelBenchProgressNotification.model_validate_json(progress.model_dump_json()) == progress
+    )
+    done = ModelBenchDoneNotification(
+        params=ModelBenchDone(ref="ollama/qwen3:8b", ok=True, rows=[row])
+    )
+    assert done.method == "model.bench.done"
+    assert ModelBenchDoneNotification.model_validate_json(done.model_dump_json()) == done
