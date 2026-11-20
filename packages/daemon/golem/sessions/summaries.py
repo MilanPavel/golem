@@ -60,6 +60,8 @@ def summarize(
         cwd=session.cwd,
         forked_from=session.forked_from,
         origin=session.origin,
+        parent_session_id=session.parent_session_id,
+        agent=session.agent,
         route=session.route,
         plan_first=session.plan_first,
         local_only=local_only,
