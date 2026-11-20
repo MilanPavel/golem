@@ -12,23 +12,35 @@ export type StepUps = number | null;
 export type Summaries = number;
 export type Calls1 = number;
 export type Days = number;
+export type Agent = string;
+export type Ran = string;
+export type RanWhy = string;
+export type SessionId = string;
+export type Wish = string;
+export type Would = string;
+export type WouldAsks = boolean;
+export type WouldTier = string;
+export type WouldWhy = string;
+export type Helpers = EvalHelperRow[];
 export type Scenarios = EvalScenarioRow[];
 export type Sessions = number;
 export type Skipped = number;
 export type Calls2 = number;
 export type CostUsd1 = number;
-export type SessionId = string;
+export type SessionId1 = string;
 export type Top = EvalTopSession[];
 
 /**
  * ``scenarios`` are the what-if rows, ``actual`` is what really ran. ``skipped`` counts the
  * model calls that could not be sized (an old event, or a failed call) and are in no row.
  * ``top`` are the sessions where ``auto`` would have spent most, the dearest first.
+ * ``helpers`` are the helpers of those sessions, one row per ``helper.started``.
  */
 export interface EvalRoutingResult {
   actual: EvalScenarioRow;
   calls: Calls1;
   days: Days;
+  helpers?: Helpers;
   scenarios?: Scenarios;
   sessions: Sessions;
   skipped: Skipped;
@@ -57,6 +69,28 @@ export interface EvalScenarioRow {
   summaries: Summaries;
 }
 /**
+ * One helper of a recorded session, and the model ``pick_helper`` gives it in this setup.
+ *
+ * ``ran`` and ``ran_why`` are what ``helper.started`` recorded: the model, and the reason
+ * in plain words. ``would`` and ``would_why`` are the pick made again now, on the models
+ * that are ready. ``would_asks`` is true when that pick is paid and the chat has not agreed,
+ * so the daemon would ask first. No title and no text.
+ *
+ * This interface was referenced by `EvalRoutingResult`'s JSON-Schema
+ * via the `definition` "EvalHelperRow".
+ */
+export interface EvalHelperRow {
+  agent: Agent;
+  ran: Ran;
+  ran_why: RanWhy;
+  session_id: SessionId;
+  wish: Wish;
+  would: Would;
+  would_asks?: WouldAsks;
+  would_tier: WouldTier;
+  would_why: WouldWhy;
+}
+/**
  * A session where ``auto`` would have spent much. No title and no text.
  *
  * This interface was referenced by `EvalRoutingResult`'s JSON-Schema
@@ -65,5 +99,5 @@ export interface EvalScenarioRow {
 export interface EvalTopSession {
   calls: Calls2;
   cost_usd: CostUsd1;
-  session_id: SessionId;
+  session_id: SessionId1;
 }

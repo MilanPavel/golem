@@ -162,6 +162,8 @@ as it really ran  $0.00   187
 
 The numbers above only show the shape of the report. Run the command to get the real ones. `--days` sets how far back to look and `--session <id>` replays one session.
 
+When a session started helpers, the report lists each one under the table: the agent, its wish, the model it ran on and why (as recorded), and the model `pick_helper` gives now on the models that are ready, so a local-only and a cloud-only setup each show their own picks. A pick that is paid, in a chat that has not agreed, says "asks first". A folder that stays local is not in the events, so the list does not apply it.
+
 What it cannot say:
 
 - A stronger model would have made different calls, with fewer retries or a shorter way to the answer. The report estimates cost and cut prompts, not quality.

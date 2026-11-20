@@ -39,6 +39,31 @@ test("formatEvalRouting prints the table, the skipped calls and the dearest sess
   );
 });
 
+test("formatEvalRouting lists the helpers, as they ran and as the pick gives them now", () => {
+  const text = formatEvalRouting({
+    ...REPORT,
+    top: [],
+    helpers: [
+      {
+        session_id: "s_1",
+        agent: "explorer",
+        wish: "cheapest",
+        ran: "ollama/small",
+        ran_why: "a local model, which costs nothing",
+        would: "deepseek/cheap",
+        would_tier: "budget",
+        would_why: "the cheapest hosted model at or below the lead's tier",
+        would_asks: true,
+      },
+    ],
+  });
+  assert.match(text, /helpers, as they ran and what the pick gives now:/);
+  assert.match(
+    text,
+    /  s_1  explorer  wish cheapest  ran on ollama\/small \(a local model, which costs nothing\)  would run on deepseek\/cheap \(the cheapest hosted model at or below the lead's tier, asks first\)/,
+  );
+});
+
 test("formatEvalRouting says so when nothing could be sized", () => {
   const text = formatEvalRouting({ ...REPORT, sessions: 0, calls: 0, scenarios: [], top: [] });
   assert.match(text, /no recorded model call could be sized \(3 skipped\)/);

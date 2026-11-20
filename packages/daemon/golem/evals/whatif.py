@@ -48,11 +48,18 @@ from golem.graphs.struggle import CUT_REASONS, INVALID_IN_A_ROW, REPEATS
 from golem.models.cost import cost_usd
 from golem.models.facts import ModelFacts
 from golem.models.pick import Traits, ladder, pick, tier_picks
+from golem.models.pick_helper import pick_helper
 from golem.models.tiers import TIERS, Tier
-from golem_protocol.commands import EvalRoutingResult, EvalScenarioRow, EvalTopSession
+from golem_protocol.commands import (
+    EvalHelperRow,
+    EvalRoutingResult,
+    EvalScenarioRow,
+    EvalTopSession,
+)
 from golem_protocol.events import (
     ChatEvent,
     ContextChangedEvent,
+    HelperStartedEvent,
     MessageCompletedEvent,
     ModelCallCompletedEvent,
     ModelCallStartedEvent,
@@ -646,6 +653,58 @@ def scenarios_for(
     return found
 
 
+def helper_rows(
+    events: Sequence[ChatEvent],
+    *,
+    routing: RoutingSettings,
+    context: ContextSettings,
+    facts: Sequence[ModelFacts],
+) -> list[EvalHelperRow]:
+    """The helpers of one session, as recorded and as ``pick_helper`` would pick them now.
+
+    The lead's model is the session's own. The candidates and traits are the ones the daemon
+    builds for a helper (``SessionManager._helper_model``), on the models that are ready:
+    ``paid = "never"`` keeps them local, and a lead on a hosted model has agreed to paid
+    models already. A folder that stays local is not in the events, so it is not applied.
+    Calls no model.
+    """
+    helpers = [e for e in sorted(events, key=lambda e: e.seq) if isinstance(e, HelperStartedEvent)]
+    profile = session_model(events)
+    if not helpers or profile is None:
+        return []
+    own = _find(facts, profile) or _unknown(profile)
+    candidates = ladder(routing.ladder, profile, facts)
+    if routing.paid == "never":
+        candidates = [m for m in candidates if m.tier == "local"]
+    traits = Traits(
+        reply_reserve=context.reply_reserve,
+        needs_tools=True,
+        paid_allowed=own.tier != "local",
+    )
+    rows: list[EvalHelperRow] = []
+    for event in helpers:
+        data = event.data
+        pool = list(candidates)
+        named = _find(facts, data.wish)
+        if named is not None and routing.paid != "never" and all(named.ref != m.ref for m in pool):
+            pool.append(named)
+        choice = pick_helper(data.wish, own, pool, traits)
+        rows.append(
+            EvalHelperRow(
+                session_id=event.session_id,
+                agent=data.agent,
+                wish=data.wish,
+                ran=data.model,
+                ran_why=data.pick_reason,
+                would=choice.model.profile,
+                would_tier=choice.model.tier,
+                would_why=choice.detail,
+                would_asks=choice.needs_consent,
+            )
+        )
+    return rows
+
+
 def _row(name: str, reports: Sequence[SessionReport]) -> EvalScenarioRow:
     shares = [r.peak_share for r in reports if r.peak_share is not None]
     ups = [r.step_ups for r in reports if r.step_ups is not None]
@@ -671,11 +730,14 @@ def build_report(
     facts: Sequence[ModelFacts],
     days: int,
 ) -> EvalRoutingResult:
-    """The three scenarios and the recorded run over every session in ``sessions``."""
+    """The three scenarios and the recorded run over every session in ``sessions``, and the
+    helpers they started: what each ran on and what ``pick_helper`` gives now."""
     by_name: dict[str, list[SessionReport]] = {}
     actual: list[SessionReport] = []
     auto: list[SessionReport] = []
+    helpers: list[EvalHelperRow] = []
     for events in sessions.values():
+        helpers += helper_rows(events, routing=routing, context=context, facts=facts)
         real = recorded(events)
         profile = session_model(events)
         actual.append(real)
@@ -702,6 +764,7 @@ def build_report(
         scenarios=rows,
         actual=_row(ACTUAL, actual),
         top=top,
+        helpers=helpers,
     )
 
 
@@ -710,6 +773,7 @@ __all__ = [
     "Scenario",
     "SessionReport",
     "build_report",
+    "helper_rows",
     "recorded",
     "replay",
     "scenarios_for",

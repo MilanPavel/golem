@@ -72,5 +72,15 @@ export function formatEvalRouting(report: EvalRoutingResult): string {
       notes.push(`  ${item.session_id}  ${money(item.cost_usd)}  ${plural(item.calls, "call")}`);
     }
   }
+  const helpers = report.helpers ?? [];
+  if (helpers.length > 0) {
+    notes.push("", "helpers, as they ran and what the pick gives now:");
+    for (const item of helpers) {
+      const asks = item.would_asks ? ", asks first" : "";
+      notes.push(
+        `  ${item.session_id}  ${item.agent}  wish ${item.wish}  ran on ${item.ran} (${item.ran_why})  would run on ${item.would} (${item.would_why}${asks})`,
+      );
+    }
+  }
   return [head, ...lines, ...(notes.length > 0 ? ["", ...notes] : [])].join("\n");
 }
