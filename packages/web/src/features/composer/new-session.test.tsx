@@ -88,10 +88,11 @@ test("a send with no model goes to /welcome?from=send and nothing opens as a dia
   expect(screen.queryByRole("dialog", { name: "Setup" })).toBeNull();
 });
 
-test("/setup opens Settings → Setup", async () => {
+test("/setup opens Settings → Info", async () => {
   const { user } = setup();
   await user.type(box(), "/setup{Enter}");
   await wait();
   expect(location.pathname).toBe("/settings");
+  expect(screen.getByRole("heading", { level: 2, name: "Info" })).toBeTruthy();
   expect(screen.queryByRole("dialog", { name: "Setup" })).toBeNull();
 });

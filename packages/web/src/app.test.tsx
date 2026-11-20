@@ -161,12 +161,12 @@ test("the strip turns into the connection screen once the link has been gone for
   }
 });
 
-test("the Settings page shows the daemon version at the foot of its section list", () => {
+test("the Settings page shows the daemon version at the foot of its sidebar", () => {
   history.replaceState(null, "", "/settings");
   try {
     renderApp({ state: { status: "connected" }, daemonVersion: "0.9.1" });
-    const nav = screen.getByRole("navigation", { name: "Settings sections" });
-    expect(nav.textContent).toContain("golem v0.9.1");
+    const sidebar = screen.getByRole("navigation", { name: "Settings sections" }).closest("aside");
+    expect(sidebar?.textContent).toContain("golem v0.9.1");
   } finally {
     history.replaceState(null, "", "/");
   }

@@ -20,7 +20,7 @@ export type WelcomeStep = (typeof WELCOME_STEPS)[number];
 export type Inspect = { span: string | null };
 
 /** The section `/settings` opens. */
-export const DEFAULT_SETTINGS_SECTION = "setup";
+export const DEFAULT_SETTINGS_SECTION = "info";
 
 export type Router = StoreSource<Route> & {
   navigate(path: string, options?: { replace?: boolean }): void;
@@ -74,7 +74,8 @@ export function parseRoute(pathname: string, search = ""): Route {
   }
   const section = /^\/settings\/([a-z-]+)$/.exec(pathname)?.[1];
   if (section !== undefined) {
-    return { name: "settings", section };
+    // `setup` was renamed `info`: old links and bookmarks still land on it.
+    return { name: "settings", section: section === "setup" ? "info" : section };
   }
   const match = /^\/s\/([^/]+)(\/trace)?$/.exec(pathname);
   if (match?.[1] !== undefined) {

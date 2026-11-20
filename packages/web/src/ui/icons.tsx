@@ -198,3 +198,83 @@ export const RunsIcon = (props: IconProps) => (
     <path d="M6.8 5.8v4.4L10.4 8z" />
   </Icon>
 );
+
+// Settings sidebar icons: the 1.4 stroke of the mock.
+/** A letter i in a ring. */
+export const SettingsInfoIcon = (props: IconProps) => (
+  <Icon strokeWidth="1.4" {...props}>
+    <circle cx="8" cy="8" r="6.5" /><path d="M8 7.2v4M8 4.9v.1" />
+  </Icon>
+);
+/** A half-filled disc. */
+export const SettingsAppearanceIcon = (props: IconProps) => (
+  <Icon strokeWidth="1.4" {...props}>
+    <circle cx="8" cy="8" r="6.5" /><path d="M8 1.5a6.5 6.5 0 0 0 0 13z" fill="currentColor" />
+  </Icon>
+);
+/** A bell. */
+export const SettingsNotificationsIcon = (props: IconProps) => (
+  <Icon strokeWidth="1.4" {...props}>
+    <path d="M4 11V7a4 4 0 0 1 8 0v4l1.2 1.5H2.8zM6.5 14h3" />
+  </Icon>
+);
+/** A key. */
+export const SettingsKeysIcon = (props: IconProps) => (
+  <Icon strokeWidth="1.4" {...props}>
+    <circle cx="5.5" cy="10.5" r="3" /><path d="M7.6 8.4 13.5 2.5M11.5 4.5l1.6 1.6" />
+  </Icon>
+);
+/** A path that turns. */
+export const SettingsRoutingIcon = (props: IconProps) => (
+  <Icon strokeWidth="1.4" {...props}>
+    <path d="M3 13V9a3 3 0 0 1 3-3h7M10.5 3.5 13 6l-2.5 2.5M3 3v2" />
+  </Icon>
+);
+/** A window with lines. */
+export const SettingsContextIcon = (props: IconProps) => (
+  <Icon strokeWidth="1.4" {...props}>
+    <rect x="2" y="3" width="12" height="10" rx="2" /><path d="M5 6.5h6M5 9.5h3.5" />
+  </Icon>
+);
+/** Three bars. */
+export const SettingsUsageIcon = (props: IconProps) => (
+  <Icon strokeWidth="1.4" {...props}>
+    <path d="M2.5 13.5h11M4.5 11V8M8 11V4.5M11.5 11V6.5" />
+  </Icon>
+);
+/** Three boxes and a plus. */
+export const SettingsMcpIcon = (props: IconProps) => (
+  <Icon strokeWidth="1.4" {...props}>
+    <rect x="2.5" y="2.5" width="4.5" height="4.5" rx="1" /><rect x="9" y="2.5" width="4.5" height="4.5" rx="1" /><rect x="2.5" y="9" width="4.5" height="4.5" rx="1" /><path d="M11.25 9v4.5M9 11.25h4.5" />
+  </Icon>
+);
+/** A star. */
+export const SettingsSkillsIcon = (props: IconProps) => (
+  <Icon strokeWidth="1.4" {...props}>
+    <path d="M8 2l1.7 3.6 3.8.5-2.8 2.7.7 3.8L8 10.8l-3.4 1.8.7-3.8L2.5 6.1l3.8-.5z" />
+  </Icon>
+);
+/** Two people. */
+export const SettingsAgentsIcon = (props: IconProps) => (
+  <Icon strokeWidth="1.4" {...props}>
+    <circle cx="5.5" cy="6" r="2.2" /><circle cx="11" cy="6.5" r="1.8" /><path d="M1.8 13a3.8 3.8 0 0 1 7.4 0M9.2 10.4a3 3 0 0 1 5 2.6" />
+  </Icon>
+);
+/** Stacked cards. */
+export const SettingsMemoryIcon = (props: IconProps) => (
+  <Icon strokeWidth="1.4" {...props}>
+    <path d="M5 2.5h6M4 5.5h8M3 8.5h10v5H3z" />
+  </Icon>
+);
+/** A shield with a tick. */
+export const SettingsRulesIcon = (props: IconProps) => (
+  <Icon strokeWidth="1.4" {...props}>
+    <path d="M8 1.8 13 4v4c0 3-2.2 5.2-5 6.2C5.2 13.2 3 11 3 8V4z" /><path d="m5.8 8 1.6 1.6 3-3" />
+  </Icon>
+);
+/** A file with lines. */
+export const SettingsConfigIcon = (props: IconProps) => (
+  <Icon strokeWidth="1.4" {...props}>
+    <path d="M4 2h5.5L12 4.5V14H4z" /><path d="M9.5 2v2.5H12M6 8h4M6 10.5h4" />
+  </Icon>
+);
