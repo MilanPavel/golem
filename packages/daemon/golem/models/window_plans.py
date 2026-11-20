@@ -50,8 +50,12 @@ class WindowPlans:
         self._saved = self._read()
         self._memo: dict[str, tuple[_Key, int | None]] = {}
 
-    def planned(self, model_id: str) -> int | None:
-        """The window to send for ``model_id``, or None when golem should send nothing."""
+    def planned(self, model_id: str, slots: int = 1) -> int | None:
+        """The window to send for ``model_id``, or None when golem should send nothing.
+
+        ``slots`` is how many calls the model runs at once; the KV cache is the window
+        times that.
+        """
         window = self._settings().window
         if window == "ollama":
             return None
@@ -59,11 +63,11 @@ class WindowPlans:
         saved = self._saved.get(model_id, {})
         lowered = saved.get("lowered_to")
         raised = saved.get("raised_to")
-        key: _Key = (window, model_max, size_gb, self._ram_gb, lowered, raised)
+        key: _Key = (window, model_max, size_gb, self._ram_gb, lowered, raised, slots)
         memo = self._memo.get(model_id)
         if memo is not None and memo[0] == key:
             return memo[1]
-        plan = self._plan(window, model_max, size_gb, lowered, raised)
+        plan = self._plan(window, model_max, size_gb, lowered, raised, slots)
         self._memo[model_id] = (key, plan)
         return plan
 
@@ -115,13 +119,18 @@ class WindowPlans:
         size_gb: float | None,
         lowered: int | None,
         raised: int | None,
+        slots: int,
     ) -> int | None:
         if isinstance(window, int):
             return min(window, model_max) if model_max is not None else window
         if raised is not None:
             return min(raised, model_max) if model_max is not None else raised
         return plan_window(
-            model_max=model_max, size_gb=size_gb, ram_gb=self._ram_gb, lowered_to=lowered
+            model_max=model_max,
+            size_gb=size_gb,
+            ram_gb=self._ram_gb,
+            lowered_to=lowered,
+            slots=slots,
         )
 
     def _facts(self, model_id: str) -> tuple[int | None, float | None]:

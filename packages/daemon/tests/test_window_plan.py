@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import pytest
 
+from golem.models.hardware import fit, kv_gb
 from golem.models.window_plan import (
     CEILING,
     next_step,
@@ -102,3 +103,18 @@ def test_should_not_grow_below_four_fifths_of_the_room() -> None:
 
 def test_should_not_grow_with_no_room() -> None:
     assert _grow(window=4096) is False
+
+
+def test_slots_multiply_the_kv_cache() -> None:
+    # 9.3 GB 14B model on a 36 GB Mac: 32K x 4 slots is 7.68 GB of cache at
+    # 0.06 GB per 1K tokens, so 9.3 + 7.68 + 1 = 17.98 GB, under half of 36.
+    assert fit(9.3, 36, 32768, 4) == "fits"
+    assert fit(9.3, 36, 32768, 5) != "fits"
+    assert plan_window(model_max=None, size_gb=9.3, ram_gb=36, slots=4) == 32768
+    assert plan_window(model_max=None, size_gb=9.3, ram_gb=36) == 65536
+
+
+def test_no_slots_means_one_slot() -> None:
+    assert fit(9.3, 36, 32768) == fit(9.3, 36, 32768, 1)
+    assert kv_gb(32768) == kv_gb(32768, 1)
+    assert kv_gb(32768, 4) == 4 * kv_gb(32768)
