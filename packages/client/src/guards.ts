@@ -145,6 +145,7 @@ const EVENT_TYPES = new Set([
   "check.started",
   "check.completed",
   "helper.started",
+  "helper.model",
   "helper.step",
   "helper.state",
   "helper.wait",

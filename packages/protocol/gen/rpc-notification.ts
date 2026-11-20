@@ -45,6 +45,7 @@ export type Params =
   | CheckStartedEvent
   | CheckCompletedEvent
   | HelperStartedEvent
+  | HelperModelEvent
   | HelperStepEvent
   | HelperStateEvent
   | HelperWaitEvent
@@ -858,48 +859,58 @@ export type SessionId43 = string;
 export type Ts41 = string;
 export type Type41 = 'helper.started';
 export type CallId12 = string;
-export type Calls = number;
+export type HelperId2 = string;
 export type Index4 = number;
-export type Name13 = string;
-export type Status4 = 'running' | 'done' | 'failed';
-export type StepId = string;
-export type Summary2 = string | null;
+export type Model5 = string;
+export type PickReason1 = string;
 export type RunId43 = string | null;
 export type Seq42 = number;
 export type SessionId44 = string;
 export type Ts42 = string;
-export type Type42 = 'helper.step';
+export type Type42 = 'helper.model';
 export type CallId13 = string;
+export type Calls = number;
 export type Index5 = number;
-export type Reason6 = string | null;
-export type State = 'queued' | 'running' | 'waiting';
+export type Name13 = string;
+export type Status4 = 'running' | 'done' | 'failed';
+export type StepId = string;
+export type Summary2 = string | null;
 export type RunId44 = string | null;
 export type Seq43 = number;
 export type SessionId45 = string;
 export type Ts43 = string;
-export type Type43 = 'helper.state';
+export type Type43 = 'helper.step';
 export type CallId14 = string;
-export type HelperIds = string[];
-export type State1 = 'parked' | 'resumed';
+export type Index6 = number;
+export type Reason6 = string | null;
+export type State = 'queued' | 'running' | 'waiting';
 export type RunId45 = string | null;
 export type Seq44 = number;
 export type SessionId46 = string;
 export type Ts44 = string;
-export type Type44 = 'helper.wait';
-export type AnswerTokens = number;
+export type Type44 = 'helper.state';
 export type CallId15 = string;
-export type CostUsd1 = number;
-export type DurationMs3 = number;
-export type Index6 = number;
-export type ModelCalls = number;
-export type Stopped = 'done' | 'calls' | 'time' | 'budget' | 'tokens' | 'cancelled' | 'failed';
-export type Tokens = number;
-export type WorkingMs = number;
+export type HelperIds = string[];
+export type State1 = 'parked' | 'resumed';
 export type RunId46 = string | null;
 export type Seq45 = number;
 export type SessionId47 = string;
 export type Ts45 = string;
-export type Type45 = 'helper.ended';
+export type Type45 = 'helper.wait';
+export type AnswerTokens = number;
+export type CallId16 = string;
+export type CostUsd1 = number;
+export type DurationMs3 = number;
+export type Index7 = number;
+export type ModelCalls = number;
+export type Stopped = 'done' | 'calls' | 'time' | 'budget' | 'tokens' | 'cancelled' | 'failed';
+export type Tokens = number;
+export type WorkingMs = number;
+export type RunId47 = string | null;
+export type Seq46 = number;
+export type SessionId48 = string;
+export type Ts46 = string;
+export type Type46 = 'helper.ended';
 
 /**
  * Server → client event. No ``id``; this is not a response to a request.
@@ -2498,6 +2509,38 @@ export interface HelperStartedData {
   wish: Wish1;
 }
 /**
+ * The model of a helper changed after it started. A summary on the lead's log.
+ *
+ * This interface was referenced by `RpcNotification`'s JSON-Schema
+ * via the `definition` "HelperModelEvent".
+ */
+export interface HelperModelEvent {
+  data: HelperModelData;
+  run_id?: RunId43;
+  seq: Seq42;
+  session_id: SessionId44;
+  ts: Ts42;
+  type: Type42;
+}
+/**
+ * The model a helper runs on changed after ``helper.started``.
+ *
+ * This is on the lead's log, with the same ``call_id``, ``index`` and ``helper_id`` as
+ * ``helper.started``. It is written when the paid question is answered with a no: the
+ * helper then runs on a local model. ``model`` is the model it runs on and ``pick_reason``
+ * says in plain words why. A yes writes nothing.
+ *
+ * This interface was referenced by `RpcNotification`'s JSON-Schema
+ * via the `definition` "HelperModelData".
+ */
+export interface HelperModelData {
+  call_id: CallId12;
+  helper_id: HelperId2;
+  index: Index4;
+  model: Model5;
+  pick_reason: PickReason1;
+}
+/**
  * A tool call of a helper started or ended.
  *
  * This interface was referenced by `RpcNotification`'s JSON-Schema
@@ -2505,11 +2548,11 @@ export interface HelperStartedData {
  */
 export interface HelperStepEvent {
   data: HelperStepData;
-  run_id?: RunId43;
-  seq: Seq42;
-  session_id: SessionId44;
-  ts: Ts42;
-  type: Type42;
+  run_id?: RunId44;
+  seq: Seq43;
+  session_id: SessionId45;
+  ts: Ts43;
+  type: Type43;
 }
 /**
  * A tool call of a helper started or ended.
@@ -2525,9 +2568,9 @@ export interface HelperStepEvent {
  */
 export interface HelperStepData {
   args?: Args4;
-  call_id: CallId12;
+  call_id: CallId13;
   calls: Calls;
-  index: Index4;
+  index: Index5;
   name: Name13;
   status: Status4;
   step_id: StepId;
@@ -2544,11 +2587,11 @@ export interface Args4 {
  */
 export interface HelperStateEvent {
   data: HelperStateData;
-  run_id?: RunId44;
-  seq: Seq43;
-  session_id: SessionId45;
-  ts: Ts43;
-  type: Type43;
+  run_id?: RunId45;
+  seq: Seq44;
+  session_id: SessionId46;
+  ts: Ts44;
+  type: Type44;
 }
 /**
  * A helper queued, started running, started waiting, or went on.
@@ -2561,8 +2604,8 @@ export interface HelperStateEvent {
  * via the `definition` "HelperStateData".
  */
 export interface HelperStateData {
-  call_id: CallId13;
-  index: Index5;
+  call_id: CallId14;
+  index: Index6;
   reason?: Reason6;
   state: State;
 }
@@ -2574,11 +2617,11 @@ export interface HelperStateData {
  */
 export interface HelperWaitEvent {
   data: HelperWaitData;
-  run_id?: RunId45;
-  seq: Seq44;
-  session_id: SessionId46;
-  ts: Ts44;
-  type: Type44;
+  run_id?: RunId46;
+  seq: Seq45;
+  session_id: SessionId47;
+  ts: Ts45;
+  type: Type45;
 }
 /**
  * The lead parked to wait for its helpers, or went on.
@@ -2589,7 +2632,7 @@ export interface HelperWaitEvent {
  * via the `definition` "HelperWaitData".
  */
 export interface HelperWaitData {
-  call_id: CallId14;
+  call_id: CallId15;
   helper_ids?: HelperIds;
   state: State1;
 }
@@ -2601,11 +2644,11 @@ export interface HelperWaitData {
  */
 export interface HelperEndedEvent {
   data: HelperEndedData;
-  run_id?: RunId46;
-  seq: Seq45;
-  session_id: SessionId47;
-  ts: Ts45;
-  type: Type45;
+  run_id?: RunId47;
+  seq: Seq46;
+  session_id: SessionId48;
+  ts: Ts46;
+  type: Type46;
 }
 /**
  * A helper's run ended.
@@ -2621,10 +2664,10 @@ export interface HelperEndedEvent {
  */
 export interface HelperEndedData {
   answer_tokens: AnswerTokens;
-  call_id: CallId15;
+  call_id: CallId16;
   cost_usd: CostUsd1;
   duration_ms: DurationMs3;
-  index: Index6;
+  index: Index7;
   model_calls: ModelCalls;
   stopped: Stopped;
   tokens: Tokens;

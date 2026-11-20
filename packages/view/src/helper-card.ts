@@ -108,6 +108,17 @@ export function reduceBatch(batch: HelperBatch, event: ChatEvent, isLocal: IsLoc
         local: isLocal(data.model),
       }));
     }
+    case "helper.model": {
+      // A no to the paid question: the model that ran and why replace the paid one `helper.started` named.
+      const data = event.data;
+      if (data.call_id !== batch.callId) return batch;
+      return withHelper(batch, data.index, (helper) => ({
+        ...helper,
+        model: data.model,
+        pickReason: data.pick_reason === "" ? null : data.pick_reason,
+        local: isLocal(data.model),
+      }));
+    }
     case "helper.state": {
       const data = event.data;
       if (data.call_id !== batch.callId) return batch;

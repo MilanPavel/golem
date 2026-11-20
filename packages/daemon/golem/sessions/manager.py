@@ -149,6 +149,7 @@ from golem_protocol.events import (
     ForkedFrom,
     HelperEndedData,
     HelperEndedEvent,
+    HelperModelData,
     HelperStartedData,
     HelperStartedEvent,
     HelperStepData,
@@ -2321,6 +2322,19 @@ class SessionManager:
                 ),
             )
             helper.model_profile = picked.profile
+            # The lead's log named the paid model; it now says which one the helper runs on.
+            await self._events.emit(
+                helper.parent.session_id,
+                None,
+                "helper.model",
+                HelperModelData(
+                    call_id=helper.parent.call_id,
+                    index=helper.parent.index,
+                    helper_id=helper.session_id,
+                    model=picked.profile,
+                    pick_reason=picked.reason,
+                ),
+            )
         if picked.same_as_lead and not helper.options and lead.options:
             helper.options = dict(lead.options)
             await self._events.emit(

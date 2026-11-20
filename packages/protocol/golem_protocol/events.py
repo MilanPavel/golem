@@ -1249,6 +1249,24 @@ class HelperStartedData(BaseModel):
     pick_reason: str
 
 
+class HelperModelData(BaseModel):
+    """The model a helper runs on changed after ``helper.started``.
+
+    This is on the lead's log, with the same ``call_id``, ``index`` and ``helper_id`` as
+    ``helper.started``. It is written when the paid question is answered with a no: the
+    helper then runs on a local model. ``model`` is the model it runs on and ``pick_reason``
+    says in plain words why. A yes writes nothing.
+    """
+
+    model_config = _CONFIG
+
+    call_id: str = Field(min_length=1)
+    index: int = Field(ge=0)
+    helper_id: str = Field(min_length=1)
+    model: str = Field(min_length=1)
+    pick_reason: str
+
+
 class HelperStepData(BaseModel):
     """A tool call of a helper started or ended.
 
@@ -1334,6 +1352,19 @@ class HelperStartedEvent(BaseModel):
     ts: str = Field(min_length=1)
     type: Literal["helper.started"]
     data: HelperStartedData
+
+
+class HelperModelEvent(BaseModel):
+    """The model of a helper changed after it started. A summary on the lead's log."""
+
+    model_config = _CONFIG
+
+    seq: int = Field(ge=1)
+    session_id: str = Field(min_length=1)
+    run_id: str | None = Field(default=None, min_length=1)
+    ts: str = Field(min_length=1)
+    type: Literal["helper.model"]
+    data: HelperModelData
 
 
 class HelperStepEvent(BaseModel):
@@ -1795,6 +1826,7 @@ EventType = Literal[
     "check.started",
     "check.completed",
     "helper.started",
+    "helper.model",
     "helper.step",
     "helper.state",
     "helper.wait",
@@ -1846,6 +1878,7 @@ ChatEvent = Annotated[
     | CheckStartedEvent
     | CheckCompletedEvent
     | HelperStartedEvent
+    | HelperModelEvent
     | HelperStepEvent
     | HelperStateEvent
     | HelperWaitEvent
@@ -1887,6 +1920,8 @@ __all__ = [
     "ForkedFrom",
     "HelperEndedData",
     "HelperEndedEvent",
+    "HelperModelData",
+    "HelperModelEvent",
     "HelperStartedData",
     "HelperStartedEvent",
     "HelperState",

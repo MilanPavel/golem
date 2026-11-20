@@ -30,7 +30,7 @@ from test_helper_sessions import _LIVE, _Chat  # pyright: ignore
 from golem.config import GolemSettings, RoutingSettings
 from golem.store.database import Database
 from golem_protocol.commands import PendingItem
-from golem_protocol.events import ChatEvent, RouteConsentNeededEvent
+from golem_protocol.events import ChatEvent, HelperModelEvent, RouteConsentNeededEvent
 
 
 @pytest.fixture(autouse=True)
@@ -93,6 +93,10 @@ async def _asked(chat: _Chat, helper: str) -> RouteConsentNeededEvent:
 
 def _kinds(events: list[ChatEvent]) -> set[str]:
     return {e.type for e in events}
+
+
+def _moved(events: list[ChatEvent]) -> list[HelperModelEvent]:
+    return [e for e in events if isinstance(e, HelperModelEvent)]
 
 
 async def _pending(chat: _Chat, session: str) -> PendingItem | None:
@@ -206,6 +210,7 @@ async def test_once_runs_the_helper_on_the_paid_model_and_the_next_one_asks_agai
     (routed,) = _routed(await chat.stored(first))
     assert routed.data.model_profile == BIG
     assert not await _paid_ok(chat, lead)
+    assert _moved(await chat.stored(lead)) == []
 
     second = await _helper(chat, lead, project, call="call-2")
     await _asked(chat, second)
@@ -238,6 +243,11 @@ async def test_no_runs_the_helper_on_the_local_model_with_a_fresh_window(
     assert "waits for your yes" in reason
     assert f"on a no it runs on {LOCAL}" in reason
     assert _started(await chat.stored(lead)).data.model == BIG
+    # The lead's log then says which model the helper ran on.
+    (moved,) = _moved(await chat.stored(lead))
+    assert (moved.data.call_id, moved.data.index, moved.data.helper_id) == ("call-1", 0, helper)
+    assert moved.data.model == LOCAL
+    assert "fresh window" in moved.data.pick_reason
 
 
 async def test_the_always_ask_setting_asks_again_though_the_chat_said_yes(
@@ -314,6 +324,7 @@ async def test_local_models_only_never_ask_and_a_paid_wish_is_the_local_fresh_wi
     await chat.until(helper, "session.completed")
     assert "route.consent.needed" not in _kinds(await chat.stored(helper))
     assert "fresh window" in _started(await chat.stored(lead)).data.pick_reason
+    assert _moved(await chat.stored(lead)) == []
 
 
 async def test_cloud_models_only_never_ask(
@@ -326,6 +337,7 @@ async def test_cloud_models_only_never_ask(
     assert "route.consent.needed" not in _kinds(await chat.stored(helper))
     assert _started(await chat.stored(lead)).data.model == BIG
     assert not await _paid_ok(chat, lead)
+    assert _moved(await chat.stored(lead)) == []
 
 
 async def test_a_local_only_folder_never_asks_and_stays_local(

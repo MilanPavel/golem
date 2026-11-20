@@ -408,12 +408,16 @@ function parentCallOf(event: ChatEvent): string | null {
   return "parent_call_id" in data && typeof data.parent_call_id === "string" ? data.parent_call_id : null;
 }
 
-type HelperEvent = Extract<ChatEvent, { type: "helper.started" | "helper.step" | "helper.state" | "helper.ended" }>;
+type HelperEvent = Extract<ChatEvent, { type: "helper.started" | "helper.model" | "helper.step" | "helper.state" | "helper.ended" }>;
 
 /** The events a helper session sends to its lead's log, each naming the `delegate` call as `call_id`. `helper.wait` is the lead's own. */
 function isHelperEvent(event: ChatEvent): event is HelperEvent {
   return (
-    event.type === "helper.started" || event.type === "helper.step" || event.type === "helper.state" || event.type === "helper.ended"
+    event.type === "helper.started" ||
+    event.type === "helper.model" ||
+    event.type === "helper.step" ||
+    event.type === "helper.state" ||
+    event.type === "helper.ended"
   );
 }
 
@@ -485,6 +489,12 @@ function foldHelper(child: HelperRun, event: ChatEvent): HelperRun {
       const { helper_id: id, index, agent, label, model } = event.data;
       const ref: HelperRef = { id, index, agent, label, model, startedAt: event.ts, ended: null };
       const helpers = [...child.helpers.filter((item) => item.index !== index), ref].sort((a, b) => a.index - b.index);
+      return { ...next, model, helpers };
+    }
+    case "helper.model": {
+      // The model changed after `helper.started` (a no to the paid question): this is the one that ran.
+      const { helper_id: id, index, model } = event.data;
+      const helpers = child.helpers.map((item) => (item.index === index && item.id === id ? { ...item, model } : item));
       return { ...next, model, helpers };
     }
     case "helper.step": {

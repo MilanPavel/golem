@@ -3514,6 +3514,101 @@ public enum HelperEndedEventType: String, Codable {
     case helperEnded = "helper.ended"
 }
 
+/// The model a helper runs on changed after ``helper.started``.
+///
+/// This is on the lead's log, with the same ``call_id``, ``index`` and ``helper_id`` as
+/// ``helper.started``. It is written when the paid question is answered with a no: the
+/// helper then runs on a local model. ``model`` is the model it runs on and ``pick_reason``
+/// says in plain words why. A yes writes nothing.
+// MARK: - HelperModelData
+public struct HelperModelData: Codable {
+    public let callID: String
+    public let helperID: String
+    public let index: Int
+    public let model: String
+    public let pickReason: String
+
+    public enum CodingKeys: String, CodingKey {
+        case callID = "call_id"
+        case helperID = "helper_id"
+        case index = "index"
+        case model = "model"
+        case pickReason = "pick_reason"
+    }
+
+    public init(callID: String, helperID: String, index: Int, model: String, pickReason: String) {
+        self.callID = callID
+        self.helperID = helperID
+        self.index = index
+        self.model = model
+        self.pickReason = pickReason
+    }
+}
+
+/// The model of a helper changed after it started. A summary on the lead's log.
+// MARK: - HelperModelEvent
+public struct HelperModelEvent: Codable {
+    public let data: HelperModelEventData
+    public let runID: String?
+    public let seq: Int
+    public let sessionID: String
+    public let ts: String
+    public let type: HelperModelEventType
+
+    public enum CodingKeys: String, CodingKey {
+        case data = "data"
+        case runID = "run_id"
+        case seq = "seq"
+        case sessionID = "session_id"
+        case ts = "ts"
+        case type = "type"
+    }
+
+    public init(data: HelperModelEventData, runID: String?, seq: Int, sessionID: String, ts: String, type: HelperModelEventType) {
+        self.data = data
+        self.runID = runID
+        self.seq = seq
+        self.sessionID = sessionID
+        self.ts = ts
+        self.type = type
+    }
+}
+
+/// The model a helper runs on changed after ``helper.started``.
+///
+/// This is on the lead's log, with the same ``call_id``, ``index`` and ``helper_id`` as
+/// ``helper.started``. It is written when the paid question is answered with a no: the
+/// helper then runs on a local model. ``model`` is the model it runs on and ``pick_reason``
+/// says in plain words why. A yes writes nothing.
+// MARK: - HelperModelEventData
+public struct HelperModelEventData: Codable {
+    public let callID: String
+    public let helperID: String
+    public let index: Int
+    public let model: String
+    public let pickReason: String
+
+    public enum CodingKeys: String, CodingKey {
+        case callID = "call_id"
+        case helperID = "helper_id"
+        case index = "index"
+        case model = "model"
+        case pickReason = "pick_reason"
+    }
+
+    public init(callID: String, helperID: String, index: Int, model: String, pickReason: String) {
+        self.callID = callID
+        self.helperID = helperID
+        self.index = index
+        self.model = model
+        self.pickReason = pickReason
+    }
+}
+
+public enum HelperModelEventType: String, Codable {
+    case helperModel = "helper.model"
+}
+
 /// A helper session was made for one ``delegate`` call.
 ///
 /// This is on the lead's log, with the ``delegate`` call's id as ``call_id``. ``index``
@@ -15115,6 +15210,8 @@ public enum RPCNotificationMethod: String, Codable {
 /// A helper session was made. A summary on the lead's log; the helper's own log has the
 /// rest.
 ///
+/// The model of a helper changed after it started. A summary on the lead's log.
+///
 /// A tool call of a helper started or ended.
 ///
 /// A helper queued, started running, started waiting, or went on.
@@ -15495,6 +15592,13 @@ public struct Params: Codable {
 /// the model it was given. ``wish`` is what the agent file asked for (``cheapest``,
 /// ``same``, ``stronger``, a tier or a model) and ``pick_reason`` says in plain words
 /// why that model came out of it.
+///
+/// The model a helper runs on changed after ``helper.started``.
+///
+/// This is on the lead's log, with the same ``call_id``, ``index`` and ``helper_id`` as
+/// ``helper.started``. It is written when the paid question is answered with a no: the
+/// helper then runs on a local model. ``model`` is the model it runs on and ``pick_reason``
+/// says in plain words why. A yes writes nothing.
 ///
 /// A tool call of a helper started or ended.
 ///
@@ -16357,6 +16461,7 @@ public enum ParamsType: String, Codable {
     case contextChanged = "context.changed"
     case fileChanged = "file.changed"
     case helperEnded = "helper.ended"
+    case helperModel = "helper.model"
     case helperStarted = "helper.started"
     case helperState = "helper.state"
     case helperStep = "helper.step"

@@ -695,6 +695,21 @@ function helperEvents(): ChatEvent[] {
   ];
 }
 
+test("helper.model puts the model that ran on the helper of the lead's log", () => {
+  const moved: ChatEvent = {
+    ...helperBase,
+    ts: "2026-11-01T10:00:03.000Z",
+    seq: 11,
+    type: "helper.model",
+    data: { call_id: "d1", index: 0, helper_id: "h1", model: "qwen3:14b", pick_reason: "you said no" },
+  };
+  const [started] = helperEvents();
+  const state = [...delegateTurn("d1"), started!, moved].reduce(reduceChat, emptyChat);
+  const child = state.messages[0]?.tools?.[0]?.child;
+  assert.deepEqual(child?.helpers.map(({ id, model }) => ({ id, model })), [{ id: "h1", model: "qwen3:14b" }]);
+  assert.equal(child?.model, "qwen3:14b");
+});
+
 test("helper events fold into the same helper run as the events with a parent call id", () => {
   const end: ChatEvent = {
     ...helperBase,
