@@ -46,6 +46,8 @@ export type ComposerOutcome =
   | { kind: "sessions" }
   | { kind: "setup" }
   | { kind: "skills" }
+  /** `/memory`: the memory browser. */
+  | { kind: "memory" }
   /** `/routines`: the routine manager. */
   | { kind: "routines" }
   /** `/runs`: everything automation did. */
@@ -423,6 +425,13 @@ export const COMMANDS: readonly Command[] = [
     args: "",
     description: "Lists the skills this folder sees, with broken and hidden ones and why.",
     run: withoutArgs({ kind: "skills" }),
+  },
+  {
+    name: "/memory",
+    group: "tools",
+    args: "",
+    description: "Lists what golem remembers, to keep, edit or delete.",
+    run: withoutArgs({ kind: "memory" }),
   },
   {
     name: "/routines",

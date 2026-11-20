@@ -132,6 +132,13 @@ test("/sessions and /new are commands without arguments", () => {
   assert.equal(applyComposer(closedDebug, "/session").kind, "unknown");
 });
 
+test("/memory opens the memory browser and takes no arguments", async () => {
+  assert.deepEqual(applyComposer(closedDebug, "/memory"), { kind: "memory" });
+  assert.equal(applyComposer(closedDebug, "/memory all").kind, "unknown");
+  const { suggest } = await import("./suggest.ts");
+  assert.ok(suggest("/mem", COMMANDS).map((item) => item.label).includes("/memory"));
+});
+
 test("/routines and /runs open their lists and take no arguments", () => {
   assert.deepEqual(applyComposer(closedDebug, "/routines"), { kind: "routines" });
   assert.deepEqual(applyComposer(closedDebug, " /runs "), { kind: "runs" });
