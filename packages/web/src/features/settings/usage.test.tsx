@@ -7,7 +7,7 @@ import { createPage } from "../../store/page.ts";
 import { PageProvider } from "../../store/page-context.tsx";
 import { fakeClient, fakeFrame } from "../../store/test-support.ts";
 import { settingsContextStore } from "./index.ts";
-import { EMPTY_USAGE, SAMPLE_USAGE } from "./usage-sample.ts";
+import { EMPTY_USAGE, SAMPLE_USAGE, SAMPLE_USAGE_WITH_HELPERS } from "./usage-sample.ts";
 
 function mount(result: typeof SAMPLE_USAGE | "fail") {
   history.replaceState(null, "", "/settings/usage");
@@ -101,4 +101,17 @@ test("a failed read shows the error and Retry reads again", async () => {
   fake.raw.getCost.mockResolvedValue(SAMPLE_USAGE);
   await user.click(screen.getByRole("button", { name: "Retry" }));
   expect(await screen.findByRole("group", { name: "Today" })).toBeTruthy();
+});
+
+test("Usage says what the helpers cost, all types together, and leaves it out with no helper calls", async () => {
+  mount(SAMPLE_USAGE_WITH_HELPERS);
+  const section = await screen.findByRole("region", { name: "Helpers" });
+  expect(section.textContent).toContain("$0.50, 24% of the week · 26 calls · 330.0K tokens");
+  expect(section.textContent).toContain("does not split the cost by type yet");
+});
+
+test("Usage has no helpers line when no helper called a model", async () => {
+  mount({ ...SAMPLE_USAGE, by_role: [{ role: "chat", calls: 96, input: 1_400_000, output: 120_000, cost_usd: 2.1 }] });
+  await screen.findByText("Today");
+  expect(screen.queryByRole("region", { name: "Helpers" })).toBeNull();
 });

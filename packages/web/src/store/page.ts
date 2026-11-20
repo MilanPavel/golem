@@ -11,6 +11,7 @@ import { CONFIG_KEY } from "./config.ts";
 import { MCP_CATALOG_KEY, MCP_LIST_KEY, MCP_TOOLS_KEY, type McpToolsResult } from "./mcp.ts";
 import { NOTIFICATIONS_KEY } from "./notifications.ts";
 import { ROUTING_KEY } from "./routing.ts";
+import type { AgentInfo, AgentsListResult as AgentsListed } from "./agents.ts";
 import { MODEL_LIST_ALL_KEY, MODEL_LIST_KEY, SETUP_STATUS_KEY, type ModelListResult } from "./models.ts";
 import { SKILL_LIST_KEY } from "./skills.ts";
 import { MEMORY_LIST_KEY, MEMORY_PAGE, type MemoryExportParams, type MemoryExportResult, type MemoryListRequest, type MemoryListResult, type MemoryPrivacy, type MemoryScope } from "./memory.ts";
@@ -35,6 +36,7 @@ export type PageClient = Pick<
   | "onSkillsChanged"
   | "onAgentsChanged"
   | "listAgents"
+  | "setAgentWish"
   | "onMemoryChanged"
   | "listMemories"
   | "updateMemory"
@@ -171,6 +173,8 @@ export type PageActions = {
   writeSkill(params: { path: string; text: string; baseMtimeNs: number; cwd: string | null; dryRun: boolean }): Promise<SkillWriteResult>;
   /** Makes a skill folder with a `SKILL.md`. A project skill of an untrusted project rejects. */
   createSkill(params: { name: string; description: string; scope: "user" | "project"; cwd: string | null; modelInvocable: boolean }): Promise<SkillCreateResult>;
+  /** Sets the model wish of an agent type in the folder's list. Resolves to the type as it is now, and puts it in the list the page holds. */
+  setAgentWish(name: string, wish: string, cwd: string | null): Promise<AgentInfo>;
   /** Adds or removes a skill in `[skills] disabled` of config.toml. */
   setSkillDisabled(name: string, disabled: boolean): Promise<void>;
   /** Sets the session's permission mode, or with null follows config.toml. The chip changes from `session.mode.changed`. */
@@ -547,6 +551,13 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
         const created = await client.createSkill({ name, description, scope, modelInvocable, ...(cwd === null ? {} : { cwd }) });
         void queryClient.invalidateQueries({ queryKey: SKILL_LIST_KEY });
         return created;
+      },
+      async setAgentWish(name, wish, cwd) {
+        const updated = cwd === null ? await client.setAgentWish(name, wish) : await client.setAgentWish(name, wish, cwd);
+        queryClient.setQueryData<AgentsListed>(["agents.list", cwd], (list) =>
+          list === undefined ? list : { ...list, agents: list.agents.map((agent) => (agent.name === name && agent.origin === updated.origin ? updated : agent)) },
+        );
+        return updated;
       },
       async setSkillDisabled(name, disabled) {
         await client.setSkillDisabled(name, disabled);

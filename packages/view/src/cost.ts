@@ -97,6 +97,31 @@ export function roleName(role: string): string {
   return role === "explore" ? "helper" : role;
 }
 
+/** What the helpers cost over the week, as words. */
+export interface HelperCost {
+  calls: number;
+  tokens: string;
+  cost: string;
+  /** Their share of the week's cost, as `12%`, or an empty string when the week cost nothing. */
+  share: string;
+}
+
+/**
+ * The helpers' calls over the last 7 days: the `explore` row of `by_role`, which holds every helper type together.
+ * `cost.get` does not split it by agent type, so this is one line for all of them. Null when no helper called a model.
+ */
+export function helperCost(result: CostGetResult): HelperCost | null {
+  const row = (result.by_role ?? []).find((item) => item.role === "explore");
+  if (row === undefined || row.calls <= 0) return null;
+  const week = result.week.cost_usd;
+  return {
+    calls: row.calls,
+    tokens: formatCount(row.input + row.output),
+    cost: formatCost(row.cost_usd),
+    share: week > 0 ? `${Math.round((row.cost_usd / week) * 100)}%` : "",
+  };
+}
+
 /**
  * `/cost` and `golem cost` as plain lines: tokens and cost for the session (when the result has
  * one), today and the week, the week by model and by job, and what running locally saved.

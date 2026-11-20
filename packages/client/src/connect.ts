@@ -78,6 +78,7 @@ import type { SkillCall } from "../../protocol/gen/skill-call.ts";
 import type { SkillCreateResult } from "../../protocol/gen/skill-create-result.ts";
 import type { SkillListResult } from "../../protocol/gen/skill-list-result.ts";
 import type { AgentsListResult } from "../../protocol/gen/agents-list-result.ts";
+import type { AgentsSetWishResult } from "../../protocol/gen/agents-set-wish-result.ts";
 import type { SkillReadResult } from "../../protocol/gen/skill-read-result.ts";
 import type { RoutineUpdateResult } from "../../protocol/gen/routine-update-result.ts";
 import type { SkillSetDisabledResult } from "../../protocol/gen/skill-set-disabled-result.ts";
@@ -227,6 +228,7 @@ import {
   isRunListResult,
   isSkillCreateResult,
   isAgentsListResult,
+  isAgentsSetWishResult,
   isSkillListResult,
   isSkillReadResult,
   isRoutineUpdateResult,
@@ -626,6 +628,8 @@ export interface GolemClient {
   onSkillsChanged(listener: (root: string | null) => void): () => void;
   /** `agents.list`: the agent types a session in `cwd` sees. Without `cwd`, only the user's. */
   listAgents(cwd?: string): Promise<AgentsListResult>;
+  /** `agents.set_wish`: set the model wish of an agent type. Resolves to the type as it is now. */
+  setAgentWish(name: string, wish: string, cwd?: string): Promise<AgentsSetWishResult>;
   /** `agent.registry.changed`: agent files changed. `root` is the folder whose project agents changed, or `null` for every folder. */
   onAgentsChanged(listener: (root: string | null) => void): () => void;
   /** `routine.remove`: delete a user routine from `config.toml`. */
@@ -2331,6 +2335,14 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       const result = await call("agents.list", cwd === undefined ? {} : { cwd });
       if (!isAgentsListResult(result)) {
         throw new Error("invalid agents.list result");
+      }
+      return result;
+    },
+    async setAgentWish(name: string, wish: string, cwd?: string): Promise<AgentsSetWishResult> {
+      await ready;
+      const result = await call("agents.set_wish", cwd === undefined ? { name, wish } : { name, wish, cwd });
+      if (!isAgentsSetWishResult(result)) {
+        throw new Error("invalid agents.set_wish result");
       }
       return result;
     },
