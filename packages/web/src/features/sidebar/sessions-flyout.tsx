@@ -55,7 +55,11 @@ export function SessionsFlyout({ enabled, width, children }: SessionsFlyoutProps
 
   const icon = () => anchor.current?.querySelector("button") ?? null;
   const inside = (node: EventTarget | null) =>
-    node instanceof Node && (anchor.current?.contains(node) === true || content.current?.contains(node) === true);
+    node instanceof Node &&
+    (anchor.current?.contains(node) === true ||
+      content.current?.contains(node) === true ||
+      // The helper card of a row is a portal of its own.
+      (node instanceof Element && node.closest("[data-helper-card]") !== null));
 
   function onFocus(event: FocusEvent): void {
     if (!enabled || event.target !== icon() || quiet.current) return;

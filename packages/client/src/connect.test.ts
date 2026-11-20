@@ -592,6 +592,39 @@ test("cancelRun reads the run.cancel result", async () => {
   }
 });
 
+test("stopHelper sends helper.stop with the session id and reads stopped; a bad result throws", async () => {
+  const sent: Record<string, unknown>[] = [];
+  const server = await listen((socket) => {
+    attach(socket, {
+      answerPing: true,
+      results: { "helper.stop": { stopped: true } },
+      onRequest: (_socket, method, params) => {
+        if (method === "helper.stop") {
+          sent.push({ ...params });
+        }
+      },
+    });
+  });
+  const client = connectGolem({ socketPath: server.socketPath, clientName: "web", reconnect: false, heartbeatMs: 60_000 });
+  try {
+    assert.deepEqual(await client.stopHelper("h_1"), { stopped: true });
+    assert.deepEqual(sent, [{ session_id: "h_1" }]);
+  } finally {
+    client.close();
+    await server.close();
+  }
+  const bad = await listen((socket) => {
+    attach(socket, { answerPing: true, results: { "helper.stop": { stopped: "yes" } } });
+  });
+  const other = connectGolem({ socketPath: bad.socketPath, clientName: "web", reconnect: false, heartbeatMs: 60_000 });
+  try {
+    await assert.rejects(other.stopHelper("h_1"), /invalid helper.stop result/);
+  } finally {
+    other.close();
+    await bad.close();
+  }
+});
+
 function summary(lastSeq: number, title: string | null = null): SessionSummary {
   return {
     session_id: "s_test",

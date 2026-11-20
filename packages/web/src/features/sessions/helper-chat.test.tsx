@@ -5,7 +5,7 @@ import { App } from "../../app.tsx";
 import { createPage } from "../../store/page.ts";
 import { PageProvider } from "../../store/page-context.tsx";
 import { ev, fakeClient, fakeFrame, summary } from "../../store/test-support.ts";
-import { closeHelper, setDetail } from "../chat/index.ts";
+import { closeHelper, openHelper, setDetail } from "../chat/index.ts";
 import { drawerOpenStore } from "../drawer/drawer-open.ts";
 
 const wait = () => act(() => new Promise<void>((resolve) => setTimeout(resolve, 5)));
@@ -172,12 +172,28 @@ test("a done helper shows its answer to the lead and no Stop", async () => {
   expect(next.queryByRole("button", { name: "Stop" })).toBeNull();
 });
 
-test("Stop cancels the helper's run while it works", async () => {
+test("a helper opened by its id alone, as the sidebar card does, finds its call in the lead's log", async () => {
+  await setup();
+  expect(panel()).toBeNull();
+  act(() => {
+    openHelper({ helperId: "h2", leadId: "a" });
+  });
+  await wait();
+  const inside = within(panel() as HTMLElement);
+  expect(inside.getByRole("heading", { name: "docs" })).toBeTruthy();
+  // Next helper works too: the call came from the lead's log.
+  await userEvent.setup().click(inside.getByRole("button", { name: "Next helper" }));
+  await wait();
+  expect(within(panel() as HTMLElement).getByRole("heading", { name: "explorer" })).toBeTruthy();
+});
+
+test("Stop stops the helper through helper.stop while it works", async () => {
   const user = userEvent.setup();
   const { fake } = await setup();
   const inside = await openFirst(user);
   await user.click(inside.getByRole("button", { name: "Stop" }));
-  expect(fake.raw.cancelRun).toHaveBeenCalledWith("r1");
+  expect(fake.raw.stopHelper).toHaveBeenCalledWith("h1");
+  expect(fake.raw.cancelRun).not.toHaveBeenCalled();
 });
 
 test("Next helper moves on in the batch and round again; esc closes the panel and detaches", async () => {

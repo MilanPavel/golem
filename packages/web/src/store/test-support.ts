@@ -133,6 +133,7 @@ export function fakeClient() {
     closeSession: vi.fn<PageClient["closeSession"]>(async () => ({}) as never),
     sendMessage: vi.fn<PageClient["sendMessage"]>(async () => ({}) as never),
     cancelRun: vi.fn<PageClient["cancelRun"]>(async () => ({}) as never),
+    stopHelper: vi.fn<PageClient["stopHelper"]>(async () => ({ stopped: true })),
     respondApproval: vi.fn<PageClient["respondApproval"]>(async () => ({}) as never),
     answerConsent: vi.fn<PageClient["answerConsent"]>(async () => ({}) as never),
     listSkills: vi.fn<PageClient["listSkills"]>(async () => ({ skills: [] })),

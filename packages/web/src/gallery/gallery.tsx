@@ -79,7 +79,7 @@ import { RoutineDetail, RoutinesEmpty, RoutinesPanel } from "../features/routine
 import { SAMPLE_LIST, SAMPLE_MORNING_BRIEF, ROUTINES_NOW, SAMPLE_RUNS } from "../features/routines/sample.ts";
 import { RunBanner, RunsList, RunsPanel } from "../features/runs/index.ts";
 import { RUNS_NOW, SAMPLE_RUN_LIST, SAMPLE_WAITING_RUN } from "../features/runs/sample.ts";
-import { Rail, SessionsPanel, SidebarPanel, WaitingChip } from "../features/sidebar/index.ts";
+import { HelperRowCardBody, Rail, SessionsPanel, SidebarPanel, WaitingChip } from "../features/sidebar/index.ts";
 import { ConnectionStrip } from "../features/connection/index.ts";
 import { InboxPanel } from "../features/inbox/index.ts";
 import { SAMPLE_INBOX } from "../features/inbox/sample.ts";
@@ -203,6 +203,22 @@ const HELPER_SESSIONS: SessionSummary[] = [
   { ...fakeSession("lead-c1", "explorer · ADR-059", "/Users/you/repos/golem", "idle", 20), parent_session_id: "lead-c", agent: "explorer" },
   { ...fakeSession("lead-c2", "explorer · ADR-060", "/Users/you/repos/golem", "idle", 21), parent_session_id: "lead-c", agent: "explorer" },
 ];
+
+/** The card on a lead's row: two helpers working, one asks you, one queued. */
+const CARD_HELPERS: SessionSummary[] = [
+  { ...fakeSession("card-1", "explorer · routing", "/Users/you/repos/golem", "running", 3), parent_session_id: "lead-a", agent: "explorer", step: "read daemon/routing.py" },
+  { ...fakeSession("card-2", "explorer · titles", "/Users/you/repos/golem", "running", 2), parent_session_id: "lead-a", agent: "explorer", step: "grep title_of" },
+  {
+    ...fakeSession("card-3", "explorer · retries", "/Users/you/repos/golem", "waiting", 1),
+    parent_session_id: "lead-a",
+    agent: "explorer",
+    step: "write notes/retry.md",
+    pending: { kind: "approval", since: new Date(NOW - 60_000).toISOString(), call_id: "card-call", name: "write_file", subject: "notes/retry.md", source: "built-in default" },
+  },
+  { ...fakeSession("card-4", "explorer · backoff", "/Users/you/repos/golem", "running", 1), parent_session_id: "lead-a", agent: "explorer", wait_reason: "slot", wait_line: "qwen3:14b" },
+];
+
+const CARD_ACTIONS = { open: () => {}, stop: () => Promise.resolve(), answer: () => Promise.resolve() };
 
 const RECONNECTING: ConnectionSnapshot = { state: { status: "reconnecting", attempt: 1, delayMs: 1000 }, daemonVersion: "0.4.0" };
 
@@ -1618,6 +1634,13 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
           <SidebarPanel title="Sessions" label={`Sessions with helpers, ${theme}`} onHide={() => {}}>
             <SessionsPanel sessions={HELPER_SESSIONS} selectedId="lead-a" now={NOW} onNavigate={() => {}} />
           </SidebarPanel>
+        </div>
+      </section>
+
+      <section className="mt-6" id={anchor("Helper card")}>
+        <h3 className="mb-2 font-mono text-xs text-faint">Helper card</h3>
+        <div aria-label={`Helpers of Map the daemon modules, ${theme}`} role="group" className="w-80 overflow-hidden rounded-lg border border-line bg-surface text-sm text-ink shadow-soft">
+          <HelperRowCardBody helpers={CARD_HELPERS} leadId="lead-a" now={NOW} actions={CARD_ACTIONS} />
         </div>
       </section>
 

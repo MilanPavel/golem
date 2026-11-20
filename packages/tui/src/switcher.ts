@@ -1,5 +1,5 @@
 import type { SessionSummary } from "@golem/client";
-import { groupHelpers, helperWords, isRoutineSession, isWaiting, sessionState, type HelperSquare } from "@golem/view";
+import { groupHelpers, helperRowCard, helperWords, isRoutineSession, isWaiting, sessionState, type HelperSquare } from "@golem/view";
 
 /** The selection is a session id, so it stays put while live summaries reorder the list. */
 export type SwitcherState = {
@@ -31,7 +31,19 @@ export type SwitcherAction =
   | { kind: "close" }
   | { kind: "close-session"; sessionId: string };
 
+/** One helper of the selected lead, as a line under its row. */
+export type SwitcherHelperLine = {
+  sessionId: string;
+  square: HelperSquare;
+  /** The agent type and the rest of its title. */
+  text: string;
+  /** Its newest step, or null before the first step. */
+  step: string | null;
+};
+
 export type SwitcherRow = {
+  /** The helpers of this session that are not done, under its row. Only the selected row has any. */
+  lines: SwitcherHelperLine[];
   sessionId: string;
   selected: boolean;
   current: boolean;
@@ -159,12 +171,16 @@ export function layoutSwitcher(input: {
     return [];
   }
   const index = selectedIndex(input.state, sessions);
-  const start = Math.min(Math.max(0, index - rows + 1), Math.max(0, sessions.length - rows));
-  const { squares } = groupHelpers(input.sessions);
-  return sessions.slice(start, start + rows).map((summary, offset) => {
+  const { squares, helpers: summaries } = groupHelpers(input.sessions);
+  // The selected lead shows its helpers as lines under its row; they take their share of the height.
+  const selectedLines = helperLines(summaries.get(sessions[index]?.session_id ?? "") ?? [], input.now, input.columns).slice(0, Math.max(0, rows - 1));
+  const budget = rows - selectedLines.length;
+  const start = Math.min(Math.max(0, index - budget + 1), Math.max(0, sessions.length - budget));
+  return sessions.slice(start, start + budget).map((summary, offset) => {
     const age = relativeAge(summary.updated_at, input.now);
     const helpers = squares.get(summary.session_id) ?? [];
     return {
+      lines: start + offset === index ? selectedLines : [],
       sessionId: summary.session_id,
       selected: start + offset === index,
       current: summary.session_id === input.current,
@@ -182,6 +198,27 @@ export function layoutSwitcher(input: {
     };
   });
 }
+
+/** The card of a lead as lines: a mark, the agent type and title, the newest step. Nothing for a lead with no helper to show. */
+function helperLines(helpers: readonly SessionSummary[], now: number, columns: number): SwitcherHelperLine[] {
+  const card = helperRowCard(helpers, now);
+  if (card === null) {
+    return [];
+  }
+  return card.blocks.map((block) => {
+    const text = fit([block.agent, block.title].filter((part) => part !== "").join(" "), Math.max(8, Math.floor((columns - LINE_CHROME) / 2)));
+    const room = columns - LINE_CHROME - text.length - 2;
+    return {
+      sessionId: block.sessionId,
+      square: block.square,
+      text,
+      step: block.step === null || room < 4 ? null : fit(block.step, room),
+    };
+  });
+}
+
+/** The indent, the mark and the spaces around the text of a helper line. */
+const LINE_CHROME = 7;
 
 /** `now`, then minutes, hours, and days, then the date. */
 export function relativeAge(iso: string, now: number): string {

@@ -15,6 +15,7 @@ export const GALLERY_SECTIONS = [
   "connection-screens",
   "sessions-panel",
   "helpers-in-the-list",
+  "helper-card",
   "routines",
   "runs",
   "rail",

@@ -876,6 +876,13 @@ export {
   skillSummary,
 } from "./skills-view.ts";
 export {
+  helperRowCard,
+  type HelperAsk,
+  type HelperBlock,
+  type HelperCardSession,
+  type HelperRowCard,
+} from "./helper-row-card.ts";
+export {
   groupHelpers,
   helperSquare,
   helperWords,

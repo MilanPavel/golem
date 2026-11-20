@@ -3,6 +3,7 @@ import {
   groupByTime,
   groupHelpers,
   helperWords,
+  type HelperCardSession,
   isHelperSession,
   isRoutineSession,
   queuedWords,
@@ -17,7 +18,9 @@ import { Link } from "../../ui/link.tsx";
 import { Input } from "../../ui/input.tsx";
 import { Menu, MenuCheckboxItem, MenuContent, MenuItem, MenuTrigger } from "../../ui/menu.tsx";
 import { useShowHelpers } from "./show-helpers.ts";
-import { useNavigate, useRoute, useSessionList } from "../../store/page-context.tsx";
+import { HelperRowCard, SQUARE, type HelperCardActions } from "./helper-row-card.tsx";
+import { openHelper } from "../chat/index.ts";
+import { useNavigate, usePageActions, useRoute, useSessionList } from "../../store/page-context.tsx";
 import type { SessionSummary } from "../../store/session-list.ts";
 import { sessionPath } from "../../store/router.ts";
 import { CloseSessionDialog } from "../sessions/close-dialog.tsx";
@@ -46,13 +49,6 @@ function SessionDot({ session }: { session: SessionSummary }) {
     </span>
   );
 }
-
-const SQUARE: Record<HelperSquare, string> = {
-  working: "bg-clay",
-  // Hollow, as the queued dot: the helper has not started its call.
-  queued: "border border-clay",
-  asking: "bg-wait",
-};
 
 /** One small square for each helper that is not done, next to the folder. Nothing when all are done. */
 function HelperSquares({ squares }: { squares: readonly HelperSquare[] }) {
@@ -97,6 +93,8 @@ function ForkMark({ row }: { row: ForkRow }) {
 function SessionRow({
   row,
   squares,
+  helpers,
+  cardActions,
   selected,
   now,
   onNavigate,
@@ -105,6 +103,9 @@ function SessionRow({
 }: {
   row: ForkRow;
   squares: readonly HelperSquare[];
+  /** The summaries of its helpers that are not done, for the card. */
+  helpers: readonly HelperCardSession[];
+  cardActions?: HelperCardActions;
   selected: boolean;
   now: number;
   onNavigate: (path: string) => void;
@@ -120,7 +121,7 @@ function SessionRow({
   const name = session.title ?? "Untitled";
   const hasMenu = onRename !== undefined && onAskClose !== undefined;
   const routine = isRoutineSession(session);
-  return (
+  const item = (
     <li
       aria-level={row.depth + 1}
       className={cn("group relative", INDENT[row.indent])}
@@ -230,6 +231,11 @@ function SessionRow({
       )}
     </li>
   );
+  return (
+    <HelperRowCard helpers={helpers} leadId={session.session_id} title={name} now={now} actions={cardActions}>
+      {item}
+    </HelperRowCard>
+  );
 }
 
 /** Rows for one root: the session, then its forks. */
@@ -239,6 +245,8 @@ function TimeGroupSection({
   label,
   chunks,
   squares,
+  helpers,
+  cardActions,
   selectedId,
   now,
   onNavigate,
@@ -248,6 +256,8 @@ function TimeGroupSection({
   label: string;
   chunks: Chunk[];
   squares: ReadonlyMap<string, readonly HelperSquare[]>;
+  helpers: ReadonlyMap<string, readonly HelperCardSession[]>;
+  cardActions?: HelperCardActions;
   selectedId: string | null;
   now: number;
   onNavigate: (path: string) => void;
@@ -267,6 +277,8 @@ function TimeGroupSection({
               key={row.session.session_id}
               row={row}
               squares={squares.get(row.session.session_id) ?? []}
+              helpers={helpers.get(row.session.session_id) ?? []}
+              cardActions={cardActions}
               selected={row.session.session_id === selectedId}
               now={now}
               onNavigate={onNavigate}
@@ -308,10 +320,12 @@ export type SessionsPanelProps = {
   onNavigate: (path: string) => void;
   /** Rename and close from each row's menu. Without it the rows have no menu. */
   actions?: SidebarActions;
+  /** Open, Stop and the answer buttons of the helper card. Without it a lead shows its squares and no card. */
+  helperActions?: HelperCardActions;
 };
 
 /** The sessions panel's body: a filter, then sessions by time, closed ones left out. */
-export function SessionsPanel({ sessions, selectedId, now, onNavigate, actions }: SessionsPanelProps) {
+export function SessionsPanel({ sessions, selectedId, now, onNavigate, actions, helperActions }: SessionsPanelProps) {
   const [closing, setClosing] = useState<SessionSummary | null>(null);
   const [filter, setFilter] = useState("");
   // Where focus goes when the dialog shuts: the row's menu button, or the list once the row is gone.
@@ -380,6 +394,8 @@ export function SessionsPanel({ sessions, selectedId, now, onNavigate, actions }
               label={group.label}
               chunks={group.chunks}
               squares={grouped.squares}
+              helpers={grouped.helpers}
+              cardActions={helperActions}
               selectedId={selectedId}
               now={now}
               onNavigate={onNavigate}
@@ -416,6 +432,19 @@ export function LiveSessionsPanel() {
   const now = useNow();
   const { rename, close } = useSessionActions();
   const actions = useMemo(() => ({ rename, close }), [rename, close]);
+  const page = usePageActions();
+  const helperActions = useMemo<HelperCardActions>(
+    () => ({
+      open(leadId, helperId) {
+        // The chat that shows keeps a helper opened for it (see `closeHelperOf`), so open first.
+        openHelper({ helperId, leadId });
+        navigate(sessionPath(leadId));
+      },
+      stop: (helperId) => page.stopHelper(helperId),
+      answer: (helperId, callId, choice) => page.respond(helperId, callId, choice),
+    }),
+    [page, navigate],
+  );
   return (
     <SessionsPanel
       sessions={sessions}
@@ -423,6 +452,7 @@ export function LiveSessionsPanel() {
       now={now}
       onNavigate={navigate}
       actions={actions}
+      helperActions={helperActions}
     />
   );
 }
