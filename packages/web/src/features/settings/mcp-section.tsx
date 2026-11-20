@@ -301,7 +301,7 @@ function ServerList({
                       <Dot server={server} />
                       <BrandIcon id={server.name} size="sm" />
                       <span className="sr-only">{mcpStatusWord(server)}, </span>
-                      <span className={cn("min-w-0 font-sans text-sm font-medium", wide ? "truncate" : "wrap-anywhere")}>{server.name}</span>
+                      <span className={cn("min-w-0 font-ui text-sm font-medium", wide ? "truncate" : "wrap-anywhere")}>{server.name}</span>
                       <span aria-hidden="true" className="shrink-0 font-mono text-xs whitespace-nowrap text-faint">
                         {mcpStatusWord(server)}
                       </span>
@@ -435,7 +435,7 @@ function Detail({ server, sessionId, signIns, onBack }: { server: McpServer; ses
       )}
       <header className="flex flex-wrap-reverse items-start justify-between gap-x-3 gap-y-1">
         <div className="flex min-w-0 flex-1 basis-48 flex-col gap-0.5">
-          <h3 className="flex items-center gap-2 font-sans text-lg font-semibold wrap-anywhere">
+          <h3 className="flex items-center gap-2 font-ui text-lg font-semibold wrap-anywhere">
             <BrandIcon id={server.name} />
             {server.name}
           </h3>

@@ -636,7 +636,7 @@ export function TuneView({
                             <button
                               type="button"
                               aria-label={`About ${option.label}`}
-                              className="inline-grid size-4 place-items-center rounded-full border border-line-strong font-sans text-xs leading-none text-faint outline-offset-2 outline-clay hover:text-ink focus-visible:outline-2"
+                              className="inline-grid size-4 place-items-center rounded-full border border-line-strong font-ui text-xs leading-none text-faint outline-offset-2 outline-clay hover:text-ink focus-visible:outline-2"
                             >
                               i
                             </button>

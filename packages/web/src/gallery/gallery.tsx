@@ -10,6 +10,7 @@ import { GOLEM_STATE_LABEL, type GolemState } from "../ui/golem-state.ts";
 import { IconButton } from "../ui/icon-button.tsx";
 import { CheckIcon, ChevronDownIcon, CloseIcon, CopyIcon, PlusIcon, SearchIcon, SendIcon, StopIcon } from "../ui/icons.tsx";
 import { Input } from "../ui/input.tsx";
+import { Code } from "../ui/code.tsx";
 import { Kbd } from "../ui/kbd.tsx";
 import { Menu, MenuContent, MenuItem, MenuLabel, MenuSeparator, MenuTrigger } from "../ui/menu.tsx";
 import { PixelGolem } from "../ui/pixel-golem.tsx";
@@ -252,6 +253,16 @@ const PLAN_DEMO_STEPS = [
   { text: "Add fetch_retries to settings", files: ["src/config.py"] },
   { text: "Test three failures then success", files: ["tests/test_fetch.py"] },
 ];
+
+/** The type tokens of tokens.css, each with a line to read it by. Class names are written out for Tailwind. */
+const TYPE_SCALE = [
+  ["title", "Settings", "text-title"],
+  ["heading", "Model providers", "text-heading"],
+  ["label", "Default model", "text-label"],
+  ["body", "Golem picks a model for each helper.", "text-body"],
+  ["meta", "Used by 3 sessions", "text-meta"],
+  ["code", "claude-sonnet-5-5", "font-mono text-code"],
+] as const;
 
 function Group({ title, children }: { title: string; children: ReactNode }) {
   const anchor = useAnchor();
@@ -1264,7 +1275,7 @@ function McpSignInDemo() {
           <div className="flex max-w-xl flex-col gap-0.5 rounded-lg border border-line-strong bg-surface px-3 py-2">
             <span className="flex items-center gap-x-2">
               <Dot server={server} />
-              <span className="font-sans text-sm font-medium">{server.name}</span>
+              <span className="font-ui text-sm font-medium">{server.name}</span>
               <span className="font-mono text-xs text-faint">{mcpStatusWord(server)}</span>
             </span>
             <span className={login?.kind === "failed" ? "pl-4 font-mono text-xs text-deny" : "pl-4 font-mono text-xs text-muted"}>{serverSummary(server, false, login)}</span>
@@ -1649,6 +1660,18 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
         <IconButton label="Stop"><StopIcon /></IconButton>
         <IconButton label="Search"><SearchIcon /></IconButton>
         <IconButton label="Disabled" disabled><CopyIcon /></IconButton>
+      </Group>
+
+      <Group title="Type">
+        {TYPE_SCALE.map(([token, sample, className]) => (
+          <p key={token} className="flex w-full items-baseline gap-3">
+            <span className="w-20 shrink-0 text-meta text-faint">{token}</span>
+            <span className={className}>{sample}</span>
+          </p>
+        ))}
+        <p className="w-full text-body">
+          A literal sits in the sentence as <Code>golem install</Code>, or muted as <Code tone="muted">~/.golem/config.toml</Code>.
+        </p>
       </Group>
 
       <Group title="Copy">

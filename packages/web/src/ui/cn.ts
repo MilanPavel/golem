@@ -12,7 +12,7 @@ const merge = extendTailwindMerge({
         "allow", "allow-soft", "deny", "deny-soft", "wait", "wait-soft", "on-clay", "code-bg",
       ],
       font: ["ui", "prose", "mono"],
-      text: ["chat", "micro", "note", "lead", "axis"],
+      text: ["chat", "micro", "note", "lead", "axis", "title", "heading", "label", "body", "meta", "code"],
       radius: ["xs", "sm", "md", "lg", "xl"],
       shadow: ["soft"],
     },

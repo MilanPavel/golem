@@ -101,7 +101,7 @@ export function RoutineNewScreen({ starter }: { starter: string | null }) {
   return (
     <Frame>
       <div className="flex max-w-3xl flex-col gap-2">
-        <h1 className="font-sans text-lg font-semibold">New routine</h1>
+        <h1 className="font-ui text-lg font-semibold">New routine</h1>
         <LiveRoutineEditor
           key={starter ?? ""}
           create

@@ -40,6 +40,22 @@
   --color-ctx-summary: light-dark(#3F8A8A, #6FB5B5);
   --color-ctx-summary-soft: light-dark(#D8EBEA, #182A2A);
 
+  /* Type scale: one voice. Geist for words, Geist Mono only for literals (through <Code>, <Path>, <Kbd>).
+     title: a page title (24 px). heading: a section heading (14 px). label: a nav item or row label (14 px).
+     body: running text (14 px). meta: a sub line, hint or count (13 px). code: a literal in mono (12.5 px). */
+  --text-title: 1.5rem;
+  --text-title--line-height: 1.25;
+  --text-heading: 0.875rem;
+  --text-heading--line-height: 1.4;
+  --text-label: 0.875rem;
+  --text-label--line-height: 1.4;
+  --text-body: 0.875rem;
+  --text-body--line-height: 1.5;
+  --text-meta: 0.8125rem;
+  --text-meta--line-height: 1.45;
+  --text-code: 0.78125rem;
+  --text-code--line-height: 1.5;
+
   /* A user message in the chat: 15 px. */
   --text-chat: 0.9375rem;
   --text-chat--line-height: 1.5;
@@ -169,6 +185,7 @@
 @layer base {
   body {
     @apply bg-bg font-ui text-ink;
+    font-feature-settings: "tnum";
   }
 }
 

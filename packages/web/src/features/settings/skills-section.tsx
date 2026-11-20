@@ -222,7 +222,7 @@ export function SkillList({
                   >
                     <span className="flex min-w-0 items-center gap-x-2">
                       <SkillDot skill={skill} />
-                      <span className="min-w-0 truncate font-sans text-sm font-medium">{skill.name}</span>
+                      <span className="min-w-0 truncate font-ui text-sm font-medium">{skill.name}</span>
                       <span className="shrink-0 font-mono text-xs whitespace-nowrap text-faint">{skillWord(skill)}</span>
                     </span>
                     <span className={cn("min-w-0 pl-4 font-mono text-xs wrap-anywhere", (skill.errors ?? []).length > 0 ? "text-deny" : "text-muted")}>

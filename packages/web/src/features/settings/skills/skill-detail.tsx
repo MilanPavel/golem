@@ -204,7 +204,7 @@ export function SkillDetail({
       )}
       <header className="flex flex-wrap-reverse items-start justify-between gap-x-3 gap-y-1">
         <div className="flex min-w-0 flex-1 basis-48 flex-col gap-0.5">
-          <h3 className="font-sans text-lg font-semibold wrap-anywhere">{skill.name}</h3>
+          <h3 className="font-ui text-lg font-semibold wrap-anywhere">{skill.name}</h3>
           <p className="font-mono text-xs text-muted wrap-anywhere">{`${skill.path}/SKILL.md`}</p>
           <p className="font-mono text-xs text-muted">{GROUPS[skill.source]}</p>
         </div>
