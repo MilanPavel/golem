@@ -49,7 +49,7 @@ def test_a_full_file_is_read(tmp_path: Path) -> None:
     assert len(agent.hash) == 64
 
 
-def test_defaults_are_the_lead_model_no_tools_no_limits_and_no_questions(tmp_path: Path) -> None:
+def test_defaults_are_the_cheapest_wish_no_tools_no_limits_and_no_questions(tmp_path: Path) -> None:
     path = _write(tmp_path, "plain.md", "---\ndescription: Plain.\n---\nDo it.\n")
 
     agent = parse_agent(path, known_tools=TOOLS)
@@ -57,7 +57,7 @@ def test_defaults_are_the_lead_model_no_tools_no_limits_and_no_questions(tmp_pat
     assert agent.valid
     assert agent.name == "plain"
     assert (agent.wish, agent.tools, agent.limits, agent.asks) == (
-        "same",
+        "cheapest",
         (),
         AgentLimits(),
         False,

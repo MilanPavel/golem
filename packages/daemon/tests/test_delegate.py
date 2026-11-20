@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any, cast
 
 import pytest
-from fakes import ToolCallingChatModel
+from fakes import FixedFacts, ToolCallingChatModel, model_facts
 from langchain_core.messages import (
     BaseMessage,
     HumanMessage,
@@ -1008,8 +1008,12 @@ async def test_a_cloud_only_setup_runs_the_helper_on_the_cheapest_budget_model(
         budget_refs=lambda: ["deepseek/chat"],
         agents=_registry(tmp_path),
     )
+    chat.manager.facts = FixedFacts(
+        model_facts("anthropic/big", "frontier", price=5.0),
+        model_facts("deepseek/chat", "budget", price=0.5),
+    )
     _, _, events = await chat.run(project)
 
     started = next(e for e in events if e.type == "helper.started")
     assert started.data.model == "deepseek/chat"
-    assert started.data.pick_reason == "cheapest budget model"
+    assert started.data.pick_reason == "the cheapest hosted model at or below the lead's tier"

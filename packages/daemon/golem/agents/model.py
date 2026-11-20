@@ -42,7 +42,7 @@ class Agent:
     """The file with symlinks resolved, so one file reached twice counts once."""
     hash: str
     """sha256 of the file, or empty when it could not be read."""
-    wish: str = "same"
+    wish: str = "cheapest"
     """One of :data:`WISHES`, or a model name."""
     tools: tuple[str, ...] = ()
     """Names of golem's own tools. A file that leaves ``tools`` out gets none."""

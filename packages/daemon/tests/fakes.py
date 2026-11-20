@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
-from collections.abc import AsyncIterator, Callable, Iterator
+from collections.abc import AsyncIterator, Callable, Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
@@ -21,6 +21,10 @@ from langchain_core.messages import (
 )
 from langchain_core.outputs import ChatGeneration, ChatGenerationChunk, ChatResult
 from pydantic import Field, PrivateAttr
+
+from golem.config import ModelPrice
+from golem.models.facts import ModelFacts
+from golem.models.tiers import Tier, blended
 
 
 def _no_prompts() -> list[list[str]]:
@@ -318,3 +322,39 @@ class GatedChatModel(BaseChatModel):
         self._started.set()
         await self._release.wait()
         yield ChatGenerationChunk(message=AIMessageChunk(content=self.reply))
+
+
+def model_facts(
+    ref: str, tier: Tier, window: int = 32000, price: float | None = None
+) -> ModelFacts:
+    """The facts of one ready model that takes tools. ``price`` is per million, in and out."""
+    model_price = None if price is None else ModelPrice(input=price, output=price)
+    return ModelFacts(
+        ref=ref,
+        profile=ref,
+        tier=tier,
+        ready=True,
+        why_not_ready=None,
+        window=window,
+        window_exact=True,
+        tools=True,
+        vision=False,
+        price=model_price,
+        blended=None if model_price is None else blended(model_price),
+        prompt_tps=None,
+        reply_tps=None,
+        tool_score=None,
+    )
+
+
+class FixedFacts:
+    """A fixed list of model facts, whatever refs are asked for."""
+
+    def __init__(self, *models: ModelFacts) -> None:
+        self.models = list(models)
+
+    async def facts(
+        self, refs: Sequence[str], *, overrides: Mapping[str, float | str] | None = None
+    ) -> list[ModelFacts]:
+        del refs, overrides
+        return list(self.models)
