@@ -3,6 +3,7 @@ import type { ApprovalChoice, ChatEvent, ConsentChoice, SkillCall } from "@golem
 import { noChecks, reduceChecks, type ChecksState } from "./checks.ts";
 import { emptyPlan, reducePlan, type PlanState } from "./plan.ts";
 import { contextChangedNote, emptyLiveContext, foldLiveContext, type ContextChangeData, type LiveContextState } from "./context.ts";
+import { emptyBatch, reduceBatch, type HelperBatch } from "./helper-card.ts";
 import { emptyRoute, foldRoute, type RouteState } from "./route.ts";
 import { replyWasCut } from "./stop.ts";
 import type { ToolSource } from "./sources.ts";
@@ -262,6 +263,8 @@ export type ChatState = {
   checks: ChecksState;
   /** The session's route mode and the pick of each run, from `session.updated` and `model.routed`. */
   route: RouteState;
+  /** The helpers of each `delegate` call that sent `helper.*` events, by the id of the call. Old logs have none. */
+  batches: Readonly<Record<string, HelperBatch>>;
 };
 
 export const emptyChat: ChatState = {
@@ -291,6 +294,7 @@ export const emptyChat: ChatState = {
   plan: emptyPlan,
   checks: noChecks,
   route: emptyRoute,
+  batches: {},
 };
 
 /** What to do after a model server did not answer, besides fixing it. */
@@ -543,10 +547,21 @@ function endHelper(tool: ToolBlock, event: ChatEvent): ToolBlock {
   };
 }
 
+/** The batch of the call a `helper.*` event names, after the event. */
+function withBatch(state: ChatState, callId: string, event: ChatEvent): ChatState {
+  const batch = reduceBatch(state.batches[callId] ?? emptyBatch(callId), event);
+  return { ...state, batches: { ...state.batches, [callId]: batch } };
+}
+
 export function reduceChat(state: ChatState, event: ChatEvent): ChatState {
   const parent = parentCallOf(event);
   if (parent !== null) return reduceChild(state, parent, event);
-  if (isHelperEvent(event)) return reduceChild(state, event.data.call_id, event);
+  if (isHelperEvent(event)) {
+    const child = reduceChild(state, event.data.call_id, event);
+    // An event for a call that is not there changes nothing.
+    return child === state ? state : withBatch(child, event.data.call_id, event);
+  }
+  if (event.type === "helper.wait") return state.batches[event.data.call_id] === undefined ? state : withBatch(state, event.data.call_id, event);
   const base = reduceChatEvent(state, event);
   const plan = reducePlan(state.plan, event);
   const next = plan === state.plan ? base : { ...base, plan };

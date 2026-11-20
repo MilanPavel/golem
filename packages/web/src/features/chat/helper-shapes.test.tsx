@@ -1,7 +1,7 @@
 import { emptyChat, reduceChat, type ToolBlock } from "@golem/view";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, expect, test } from "vitest";
-import { ToolLine } from "./transcript.tsx";
+import { ToolLine, TranscriptMessages } from "./transcript.tsx";
 
 type ChatEvent = Parameters<typeof reduceChat>[1];
 
@@ -107,6 +107,21 @@ test("a finished step shows its summary in both shapes", () => {
   const now = delegateOf([...lead(), newStart, newStep(13, "k1", "a.py", "done", "3 lines")]);
   expect(cards(old)[1]).toContain("3 lines");
   expect(cards(now)[1]).toContain("3 lines");
+});
+
+// The new shape is a batch card in the transcript; the old shape (child run) keeps the helper line in the steps group.
+test("the transcript draws a card for the new shape and the old line for the old shape", () => {
+  const old = [...lead(), ...oldCall(10, { input: 100, output: 20 }, 0), ...oldRead("k1", "a.py", 12, true), delegateEnd].reduce(reduceChat, emptyChat);
+  const now = [...lead(), newStart, newRunning, newStep(13, "k1", "a.py", "done", "3 lines"), newEnd, delegateEnd].reduce(reduceChat, emptyChat);
+  expect(Object.keys(old.batches)).toEqual([]);
+  expect(Object.keys(now.batches)).toEqual(["d1"]);
+  render(<TranscriptMessages chat={old} detail="normal" />);
+  expect(document.querySelector("[data-batch-card]")).toBeNull();
+  expect(screen.getByRole("button", { name: /1 helper/ })).toBeTruthy();
+  cleanup();
+  render(<TranscriptMessages chat={now} detail="normal" />);
+  expect(document.querySelector("[data-batch-card]")).not.toBeNull();
+  expect(document.querySelector("[data-activity]")).toBeNull();
 });
 
 test("a step of an older log with no summary still shows done", () => {

@@ -90,7 +90,7 @@ async function setup(helpers: readonly string[] = ["h1", "h2"]) {
 const panel = () => screen.queryByRole("complementary", { name: "Helper panel" });
 
 async function openFirst(user: ReturnType<typeof userEvent.setup>) {
-  await user.click(await screen.findByRole("button", { name: "Open explorer" }));
+  await user.click(await screen.findByRole("button", { name: /^Open explorer, / }));
   await wait();
   return within(panel() as HTMLElement);
 }
@@ -98,7 +98,7 @@ async function openFirst(user: ReturnType<typeof userEvent.setup>) {
 beforeEach(() => {
   localStorage.clear();
   drawerOpenStore.set(true);
-  // At Verbose the lead's steps are all on screen, with the helper line and its Open buttons.
+  // At Verbose the batch card shows its rows, and each row is a button that opens its helper.
   setDetail("verbose");
 });
 afterEach(() => {
@@ -148,7 +148,7 @@ test("the lead's transcript is still on screen while the panel is open", async (
 test("a helper that asks shows its question in both views and the buttons answer for its session", async () => {
   const user = userEvent.setup();
   const { fake } = await setup(["h3"]);
-  await user.click(await screen.findByRole("button", { name: "Open helper" }));
+  await user.click(await screen.findByRole("button", { name: /^Open explorer, / }));
   await wait();
   const inside = within(panel() as HTMLElement);
   expect(inside.getByText("wants to use write_file: notes/refresh.md")).toBeTruthy();

@@ -1,4 +1,4 @@
-import type { ChatEvent } from "@golem/client";
+import type { ChatEvent, ListedModel } from "@golem/client";
 
 import type { ChatState, HelperRef, ToolBlock } from "./chat-state.ts";
 import type { Detail } from "./activity.ts";
@@ -148,6 +148,28 @@ export function reduceBatch(batch: HelperBatch, event: ChatEvent, isLocal: IsLoc
     default:
       return batch;
   }
+}
+
+/**
+ * `IsLocal` from the model list: a model is local when the listing says its tier is local. The helper's
+ * model is a `provider/name` ref or a bare name. Null when the list does not have it.
+ */
+export function isLocalFrom(models: readonly Pick<ListedModel, "ref" | "tier">[] | null | undefined): IsLocal {
+  return (model) => {
+    const found = models?.find((item) => item.ref === model || item.ref.endsWith(`/${model}`));
+    return found === undefined ? null : found.tier === "local";
+  };
+}
+
+/** The batch with each helper's `local` told by `isLocal` where it can say, so a model list can come after the fold. */
+export function withLocal(batch: HelperBatch, isLocal: IsLocal): HelperBatch {
+  return {
+    ...batch,
+    helpers: batch.helpers.map((helper) => {
+      const local = helper.model === null ? null : isLocal(helper.model);
+      return local === null ? helper : { ...helper, local };
+    }),
+  };
 }
 
 /** The batch of one `delegate` call, folded from a lead's events. */

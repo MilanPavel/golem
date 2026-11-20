@@ -4,6 +4,7 @@ import { test } from "node:test";
 import type { ChatEvent } from "@golem/client";
 
 import { emptyChat, reduceChat, type ChatMessage, type ChatState, type ToolBlock } from "./chat-state.ts";
+import { isLocalFrom, withLocal } from "./helper-card.ts";
 import { batchCard, batchNumber, foldBatch, helperLimits, helperNumber, helperPanelState, helperRight, helperSummary, lastSentence, windowK } from "./helper-card.ts";
 
 let seq = 0;
@@ -237,4 +238,26 @@ test("the limits line: calls and time from the helper's own log while it runs, t
   assert.equal(helperPanelState({ ended: end }, running), "done");
   assert.equal(helperPanelState({ ended: { ...end, stopped: "calls" } }, running), "stopped");
   assert.equal(helperPanelState({ ended: null }, helperChat({ busy: true })), "running");
+});
+
+test("reduceChat keeps a batch per delegate call, from the helper.* events and helper.wait", () => {
+  const events = [
+    ev("message.started", { message_id: "a", role: "assistant" }),
+    ev("tool.requested", { call_id: "d1", message_id: "a", name: "delegate", args: { brief: "x" } }),
+    started(0, "explorer", "m1"),
+    ev("helper.wait", { call_id: "d1", state: "parked" }),
+  ];
+  const chat = events.reduce(reduceChat, emptyChat);
+  assert.deepEqual(Object.keys(chat.batches), ["d1"]);
+  assert.equal(chat.batches.d1?.helpers.length, 1);
+  assert.equal(chat.batches.d1?.parked, true);
+});
+
+test("isLocalFrom reads the tier of the model list, and withLocal applies it", () => {
+  const isLocal = isLocalFrom([{ ref: "ollama/qwen3:8b", tier: "local" }, { ref: "anthropic/haiku", tier: "budget" }]);
+  assert.equal(isLocal("qwen3:8b"), true);
+  assert.equal(isLocal("anthropic/haiku"), false);
+  assert.equal(isLocal("nope"), null);
+  const batch = withLocal(foldBatch("d1", [started(0, "a", "qwen3:8b")]), isLocal);
+  assert.equal(batch.helpers[0]?.local, true);
 });

@@ -1,4 +1,4 @@
-import { BUILD_TEXT, canTryStronger, lastQuestion, NO_STRONGER_NOTICE, STRONGER_ACTION, strongerLabel, helperLine, isDelegate, openPlan, displayToolName, formatTurnTime, groupTurns, turnFooterParts, stepCount, stepMark, summarizeSteps, turnFooter, LIVE_OUTPUT_CHARS, thinkingLine, unreadCallNotice, writingLabel, REPLY_CUT_NOTE, type ChatMessage, type ChatState, type Detail, type StepMark, type ToolBlock, type WritingBlock, noticesAfter, type ChatNotice, turnSources, type TurnSource, checksOf, checksSummary, turnRoutedNote, sessionModelOf, type SessionModelRef, rewoundLine, UNDO_WAIT } from "@golem/view";
+import { BUILD_TEXT, canTryStronger, lastQuestion, NO_STRONGER_NOTICE, STRONGER_ACTION, strongerLabel, helperLine, isDelegate, openPlan, displayToolName, formatTurnTime, groupTurns, turnFooterParts, stepCount, stepMark, summarizeSteps, turnFooter, LIVE_OUTPUT_CHARS, thinkingLine, unreadCallNotice, writingLabel, REPLY_CUT_NOTE, type ChatMessage, type ChatState, type Detail, type HelperBatch, type IsLocal, isLocalFrom, type StepMark, type ToolBlock, type WritingBlock, noticesAfter, type ChatNotice, turnSources, type TurnSource, checksOf, checksSummary, turnRoutedNote, sessionModelOf, type SessionModelRef, rewoundLine, UNDO_WAIT } from "@golem/view";
 import { Fragment, memo, useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { useConfig, usePageActions, usePulls, useSession, useModelList, useTurnCards } from "../../store/page-context.tsx";
 import type { PullsSnapshot } from "../../store/pulls.ts";
@@ -10,6 +10,7 @@ import { cn } from "../../ui/cn.ts";
 import type { GolemState } from "../../ui/golem-state.ts";
 import { PixelGolem } from "../../ui/pixel-golem.tsx";
 import { useDetail } from "./detail.ts";
+import { BatchCardView } from "./helper-card.tsx";
 import { openHelper } from "./helper-open.ts";
 import { useThinkingShown } from "./thinking-shown.ts";
 import { useTimesShown } from "./times-shown.ts";
@@ -432,7 +433,9 @@ export function GolemTurn({
   routedNote = "",
   undo,
   stronger,
-}: { steps: readonly ChatMessage[]; pendingId?: string | null; thinkingShown?: boolean; detail?: Detail; plan?: PlanActions; checks?: ReturnType<typeof checksSummary> | null; notices?: readonly ChatNotice[]; routedNote?: string; undo?: TurnUndo; stronger?: StrongerAction }) {
+  batches,
+  isLocal,
+}: { batches?: ChatState["batches"]; isLocal?: IsLocal; steps: readonly ChatMessage[]; pendingId?: string | null; thinkingShown?: boolean; detail?: Detail; plan?: PlanActions; checks?: ReturnType<typeof checksSummary> | null; notices?: readonly ChatNotice[]; routedNote?: string; undo?: TurnUndo; stronger?: StrongerAction }) {
   const chosenDetail = useDetail();
   const detail = detailOverride ?? chosenDetail;
   const footer = turnFooter(steps);
@@ -441,7 +444,9 @@ export function GolemTurn({
   const turnUndo = undo === undefined || runId === undefined ? undefined : undo.turns[runId];
   const reverted = turnUndo?.reverted === true;
   const planCards = allTools.filter(isPlanCard);
-  const tools = allTools.filter((tool) => !isPlanCard(tool));
+  // A `delegate` call whose log has `helper.*` events is a card in the transcript, at the place of the call, not a row in the steps.
+  const batchOf = (tool: ToolBlock): HelperBatch | undefined => (isDelegate(tool) ? batches?.[tool.callId] : undefined);
+  const tools = allTools.filter((tool) => !isPlanCard(tool) && batchOf(tool) === undefined);
   // Links become source chips only in a turn that searched or fetched: elsewhere a link is a plain link.
   const sources: TurnSource[] | undefined = tools.some((tool) => WEB_TOOLS.has(tool.name)) ? turnSources(tools) : undefined;
   const sourcesBar =
@@ -455,6 +460,12 @@ export function GolemTurn({
       {steps.map((message) => (
         <Fragment key={message.id}>
           <GolemStep message={message} thinkingShown={thinkingShown} sources={sources} />
+          {(message.tools ?? []).map((tool) => {
+            const batch = batchOf(tool);
+            return batch === undefined ? null : (
+              <BatchCardView key={tool.callId} callId={tool.callId} batch={batch} refs={tool.child?.helpers ?? []} detail={detail} {...(isLocal === undefined ? {} : { isLocal })} />
+            );
+          })}
           {noticesAfter(notices, message.id, detail === "quiet").map((notice) => (
             <NoticeLine key={notice.id} notice={notice} />
           ))}
@@ -519,7 +530,7 @@ export function GolemTurn({
 }
 
 /** What the transcript draws of the chat. `approval` names the call whose approval waits in the dock. */
-export type TranscriptChat = Pick<ChatState, "messages" | "error" | "notice"> & Partial<Pick<ChatState, "approval" | "unreadCall" | "plan" | "checks" | "busy" | "runId" | "notices" | "route">>;
+export type TranscriptChat = Pick<ChatState, "messages" | "error" | "notice"> & Partial<Pick<ChatState, "approval" | "unreadCall" | "plan" | "checks" | "busy" | "runId" | "notices" | "route" | "batches">>;
 
 /** How a turn's checks went, or null when its run ran none. It is being fixed while that run goes on. */
 function turnChecks(chat: TranscriptChat, steps: readonly ChatMessage[]): ReturnType<typeof checksSummary> | null {
@@ -530,7 +541,7 @@ function turnChecks(chat: TranscriptChat, steps: readonly ChatMessage[]): Return
 }
 
 /** The messages and the closing error or notice. Pure: the page's stores are not read here. */
-export function TranscriptMessages({ chat, thinkingShown, detail, waiting = null, plan, session = null, undo, stronger }: { session?: SessionModelRef | null; chat: TranscriptChat; thinkingShown?: boolean; detail?: Detail; waiting?: string | null; plan?: Omit<PlanActions, "open">; undo?: TurnUndo; stronger?: StrongerAction }) {
+export function TranscriptMessages({ chat, thinkingShown, detail, waiting = null, plan, session = null, undo, stronger, isLocal }: { isLocal?: IsLocal; session?: SessionModelRef | null; chat: TranscriptChat; thinkingShown?: boolean; detail?: Detail; waiting?: string | null; plan?: Omit<PlanActions, "open">; undo?: TurnUndo; stronger?: StrongerAction }) {
   const pendingId = chat.approval?.callId ?? null;
   const planActions: PlanActions | undefined =
     plan === undefined || chat.plan === undefined ? undefined : { ...plan, open: openPlan(chat.plan)?.callId ?? null };
@@ -560,8 +571,10 @@ export function TranscriptMessages({ chat, thinkingShown, detail, waiting = null
             steps={turn.steps}
             pendingId={pendingId}
             thinkingShown={thinkingShown}
-            detail={detail}
+            detail={detail ?? chosenDetail}
             plan={planActions}
+            {...(chat.batches === undefined ? {} : { batches: chat.batches })}
+            {...(isLocal === undefined ? {} : { isLocal })}
             checks={turnChecks(chat, turn.steps)}
             notices={notices}
             routedNote={turnRoutedNote(turn.steps, chat.route, session)}
@@ -581,7 +594,7 @@ export function TranscriptMessages({ chat, thinkingShown, detail, waiting = null
  * The scrolling column. While you are at the bottom it follows the text; once you scroll up it
  * stays where you are and offers a way back down.
  */
-export function TranscriptColumn({ chat, className, waiting = null, plan, session = null, undo, stronger, detail, thinkingShown }: { detail?: Detail; thinkingShown?: boolean; session?: SessionModelRef | null; chat: TranscriptChat; className?: string; waiting?: string | null; plan?: Omit<PlanActions, "open">; undo?: TurnUndo; stronger?: StrongerAction }) {
+export function TranscriptColumn({ chat, className, waiting = null, plan, session = null, undo, stronger, detail, thinkingShown, isLocal }: { isLocal?: IsLocal; detail?: Detail; thinkingShown?: boolean; session?: SessionModelRef | null; chat: TranscriptChat; className?: string; waiting?: string | null; plan?: Omit<PlanActions, "open">; undo?: TurnUndo; stronger?: StrongerAction }) {
   const scroller = useRef<HTMLDivElement>(null);
   const content = useRef<HTMLDivElement>(null);
   const stuck = useRef(true);
@@ -621,7 +634,7 @@ export function TranscriptColumn({ chat, className, waiting = null, plan, sessio
     <div className={cn("relative flex min-h-0 flex-1 flex-col", className)}>
       <div ref={scroller} onScroll={onScroll} className="relative min-h-0 flex-1 overflow-y-auto" data-transcript-scroller>
         <div ref={content} className="mx-auto flex max-w-column flex-col gap-8 px-5 py-7">
-          <TranscriptMessages chat={chat} waiting={waiting} plan={plan} session={session} {...(detail === undefined ? {} : { detail })} {...(thinkingShown === undefined ? {} : { thinkingShown })} {...(undo === undefined ? {} : { undo })} {...(stronger === undefined ? {} : { stronger })} />
+          <TranscriptMessages chat={chat} waiting={waiting} plan={plan} session={session} {...(isLocal === undefined ? {} : { isLocal })} {...(detail === undefined ? {} : { detail })} {...(thinkingShown === undefined ? {} : { thinkingShown })} {...(undo === undefined ? {} : { undo })} {...(stronger === undefined ? {} : { stronger })} />
         </div>
       </div>
       {atBottom ? null : (
@@ -659,7 +672,8 @@ export function Transcript({ id }: { id: string }) {
   const model = useSession(id, (view) => view.model);
   const pulls = usePulls();
   // The tier of the session's model comes from the listing, read only once a turn has been routed.
-  const models = useModelList(chat.route.last !== null);
+  const models = useModelList(chat.route.last !== null || Object.keys(chat.batches).length > 0);
+  const isLocal = isLocalFrom(models.data?.models);
   const session = sessionModelOf({ profile: model?.profile ?? null, provider: model?.provider ?? null, name: model?.name ?? null }, models.data?.models);
   const actions = usePageActions();
   const plan = {
@@ -705,7 +719,7 @@ export function Transcript({ id }: { id: string }) {
       : undefined;
   return (
     <>
-      <TranscriptColumn chat={failure === null ? chat : { ...chat, error: failure }} waiting={waitingLine(chat.busy, model, pulls)} plan={plan} session={session} undo={turnUndo} {...(stronger === undefined ? {} : { stronger })} />
+      <TranscriptColumn chat={failure === null ? chat : { ...chat, error: failure }} waiting={waitingLine(chat.busy, model, pulls)} plan={plan} session={session} isLocal={isLocal} undo={turnUndo} {...(stronger === undefined ? {} : { stronger })} />
       {undo.dialogs}
     </>
   );
