@@ -29,6 +29,7 @@ from golem.mcp.prompt import mcp_section
 from golem.memory.service import MemoryChange, MemoryService
 from golem.memory.store import MemoryStore
 from golem.models.bench_manager import BenchManager
+from golem.models.bench_store import BenchStore
 from golem.models.budget import Budget
 from golem.models.check import CheckManager
 from golem.models.discovery import Loaded, ModelDiscovery
@@ -253,6 +254,7 @@ class DaemonApp:
                 ram_gb=models.ram_gb,
                 cache_dir=self.paths.cache_dir,
                 parallel=lambda: local.settings.parallel,
+                measured=BenchStore(self.paths.cache_dir, ram_gb=models.ram_gb).measured,
             )
 
             async def note_loaded(profile: str, sent_num_ctx: int | None) -> Loaded:

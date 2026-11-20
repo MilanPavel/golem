@@ -95,7 +95,7 @@ class WindowPlans:
             size_gb=size_gb,
             ram_gb=self._ram_gb,
             max_slots=OLLAMA.max_slots,
-            measured=self._measured(model_id),
+            measured=None if plan is None else self._measured(model_id),
         )
 
     def lower(self, model_id: str) -> int | None:
