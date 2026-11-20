@@ -10,6 +10,7 @@ from typing import Literal
 
 from pydantic import BaseModel
 
+from golem.agents.registry import AgentRegistry
 from golem.coding.changes import ChangeStore
 from golem.mcp import McpSupervisor
 from golem.mcp.importer import ScanStore
@@ -29,6 +30,7 @@ from golem.routine_scheduler import RoutineScheduler
 from golem.routine_watcher import FileWatcher
 from golem.routines import local_zone
 from golem.secrets import SecretStore
+from golem.sessions.agent_usage import AgentUsage
 from golem.sessions.manager import SessionManager
 from golem.sessions.usage import Usage
 from golem.skills.registry import SkillRegistry
@@ -65,6 +67,9 @@ class DaemonState:
     mcp: McpSupervisor | None = None
     secrets: SecretStore | None = None
     skills: SkillRegistry | None = None
+    agents: AgentRegistry | None = None
+    agent_usage: AgentUsage | None = None
+    """Counts of helpers per agent type. None until the database is open."""
     memory: MemoryService | None = None
     """The memory service. None when ``[memory] enabled = false``."""
     local_servers: LocalServers | None = None

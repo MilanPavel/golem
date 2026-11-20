@@ -14,6 +14,8 @@ from pathlib import Path
 
 from pydantic import BaseModel
 
+from golem.agents.bundled import bundled_agents_dir
+from golem.agents.registry import AgentRegistry
 from golem.coding.changes import ChangeStore
 from golem.config import MemorySettings, ModelPrice, load_settings
 from golem.graphs.chat import ChatRuntime, open_chat
@@ -72,6 +74,7 @@ from golem.server.start_error import (
     write_start_error,
 )
 from golem.server.state import DaemonState
+from golem.sessions.agent_usage import AgentUsage
 from golem.sessions.bus import EventBus
 from golem.sessions.log import SessionLog
 from golem.sessions.manager import SessionManager
@@ -91,8 +94,14 @@ from golem.store.records import RunRecords, SessionRecords
 from golem.store.routine_runs import RoutineRuns
 from golem.tools import default_registry
 from golem.tools.registry import ToolScope
-from golem_protocol.commands import KeychainWait, MemoryChanged, ModelServerStatus
+from golem_protocol.commands import (
+    AgentRegistryChanged,
+    KeychainWait,
+    MemoryChanged,
+    ModelServerStatus,
+)
 from golem_protocol.rpc import (
+    AgentRegistryChangedNotification,
     KeychainWaitNotification,
     MemoryChangedNotification,
     ModelServerStatusNotification,
@@ -140,6 +149,7 @@ class DaemonApp:
         secrets: SecretStore | None = None,
         user_home: Path | None = None,
         bundled_skills: Path | None = None,
+        bundled_agents: Path | None = None,
         local_servers: LocalServers | None = None,
         socket_check_seconds: float = SOCKET_CHECK_SECONDS,
         poster: Poster | None = None,
@@ -149,6 +159,7 @@ class DaemonApp:
         self._socket_inode: int | None = None
         self._user_home = user_home
         self._bundled_skills = bundled_skills
+        self._bundled_agents = bundled_agents
         self._router = router
         self._titles = titles
         self._discovery = discovery
@@ -227,6 +238,24 @@ class DaemonApp:
                 load_settings=lambda: load_settings(home=home, project_dir=home).skills,
                 broadcast=self._broadcast,
             )
+
+            def agents_changed(root: Path | None) -> None:
+                self._broadcast(
+                    AgentRegistryChangedNotification(
+                        params=AgentRegistryChanged(root=None if root is None else str(root))
+                    )
+                )
+
+            self.state.agents = AgentRegistry(
+                settings.agents,
+                golem_agents=self.paths.agents_dir,
+                trusted=policy.trusted,
+                user_home=self._user_home,
+                bundled=self._bundled_agents,
+                config_file=self.paths.config_file,
+                load_settings=lambda: load_settings(home=home, project_dir=home).agents,
+                on_change=agents_changed,
+            )
             if self._discovery is None:
                 models = ModelDiscovery(router, self.paths.cache_dir)
             else:
@@ -288,6 +317,7 @@ class DaemonApp:
                 if replayed:
                     log.info("filled model_calls from %d stored model call events", replayed)
                 self.state.usage = usage
+                self.state.agent_usage = AgentUsage(database)
                 budget = Budget(usage, router.budget_settings)
                 if isinstance(self._titles, ModelTitles):
                     self._titles.limit(budget.paid_ok)
@@ -441,6 +471,7 @@ class DaemonApp:
                     log.info("listening on %s", self.paths.socket_path)
                     mcp.start()
                     self.state.skills.start()
+                    self.state.agents.start()
                     routines.start()
                     watcher.start()
                     idle = asyncio.create_task(
@@ -465,6 +496,9 @@ class DaemonApp:
             if self.state.skills is not None:
                 await self.state.skills.aclose()
             self.state.skills = None
+            if self.state.agents is not None:
+                await self.state.agents.aclose()
+            self.state.agents = None
             if self.state.installer is not None:
                 await self.state.installer.aclose()
             self.state.installer = None
@@ -489,6 +523,7 @@ class DaemonApp:
                 await self.state.local_servers.aclose()
             self.state.local_servers = None
             self.state.usage = None
+            self.state.agent_usage = None
             self.state.notifier = None
             self.state.routines = None
             self.state.watcher = None
@@ -800,6 +835,7 @@ async def serve_forever() -> int:
         titles=titles,
         secrets=secrets,
         bundled_skills=bundled_skills_dir(),
+        bundled_agents=bundled_agents_dir(),
     )
     try:
         await app.serve()
