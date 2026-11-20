@@ -49,7 +49,7 @@ import { SpanDetail, TraceSummary, TraceTree } from "../features/trace/index.ts"
 import { APPROVAL_DETAIL, APPROVAL_TRACE, CLEARED_DETAIL, GROWING_EVENTS, CUT_LIKELY_DETAIL, CUT_MIDDLE_DETAIL, CUT_YES_DETAIL, FULL_DETAIL, MODEL_DETAIL, NO_PROMPT_DETAIL, NUM_CTX_DETAIL, OLD_DETAIL, SECTIONS_DETAIL, TOOL_DETAIL, UNKNOWN_WINDOW_DETAIL, FAILED_TRACE, GROWING_TRACE, LONG_TRACE, OLD_TRACE, SHORT_TRACE } from "../features/trace/sample.ts";
 import type { TraceContextEvent, TraceRunSpan, TraceSpanResult } from "../store/trace.ts";
 import { FORM_CASES } from "../features/setup/sample.ts";
-import { GolemBlockView } from "../features/setup/golem-block.tsx";
+import { HeroCard, PathsGrid } from "../features/setup/info-parts.tsx";
 import { KeysView } from "../features/settings/keys-section.tsx";
 import { KEYS_CASES } from "../features/settings/keys-sample.ts";
 import { MemoryView } from "../features/settings/memory/memory-view.tsx";
@@ -70,7 +70,7 @@ import { CodeEditor } from "../features/settings/config/code-editor.tsx";
 import { CatalogView } from "../features/settings/mcp/catalog-panel.tsx";
 import { ImportListView } from "../features/settings/mcp/import-panel.tsx";
 import { SAMPLE_CATALOG, SAMPLE_SCAN } from "../features/settings/mcp/sample.ts";
-import { SetupFormView, SetupHeader } from "../features/setup/setup-form.tsx";
+import { SetupFormView } from "../features/setup/setup-form.tsx";
 import { ToolsOfferView } from "../features/setup/tools-offer.tsx";
 import { TOOLS_CASES } from "../features/setup/tools-sample.ts";
 import { PullStatusView, pullSummary } from "../features/models/index.ts";
@@ -1280,15 +1280,24 @@ function McpSignInDemo() {
   );
 }
 
-/** Settings → Setup: the golem block and the status rows, in each state. */
+const SAMPLE_CHECKED_AT = Date.now();
+
+/** Settings → Info: the hero card, the health list and the paths, in each state. */
 function SetupFormDemo() {
   return (
     <div className="flex flex-col gap-4">
-      {FORM_CASES.map(({ label, rows, actions, header, block }) => (
+      {FORM_CASES.map(({ label, rows, actions, facts }) => (
         <section key={label} aria-label={`Setup, ${label}`} className="flex flex-col gap-3 rounded-lg border border-line bg-bg p-4">
           <span className="font-mono text-xs text-faint">{label}</span>
-          <SetupHeader mark={header.mark} text={header.text} onRunAgain={() => {}} />
-          {block === null ? null : <GolemBlockView block={block} />}
+          <HeroCard
+            install={facts?.install}
+            fallbackVersion="0.5.0"
+            checkedAt={SAMPLE_CHECKED_AT}
+            checking={false}
+            busy={false}
+            onRunAgain={() => {}}
+            onCheckAgain={() => {}}
+          />
           <SetupFormView
             rows={rows}
             actions={actions}
@@ -1297,6 +1306,7 @@ function SetupFormDemo() {
             onNavigate={() => {}}
             hasPage={() => false}
           />
+          {facts === null ? null : <PathsGrid facts={facts} />}
         </section>
       ))}
     </div>

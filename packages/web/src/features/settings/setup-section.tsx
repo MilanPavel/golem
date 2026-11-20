@@ -1,24 +1,24 @@
-import { daemonServiceRow, golemBlock, pageServiceRow, setupFormRows, setupProblem, setupProblemState, toolsSettled, type FormButtonId, type Mark } from "@golem/view";
+import { daemonServiceRow, pageServiceRow, setupFormRows, toolsSettled, type FormButtonId } from "@golem/view";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useConnection } from "../../store/connection-context.tsx";
 import { useNavigate, usePageHost, useSetupStatus } from "../../store/page-context.tsx";
 import { Button } from "../../ui/button.tsx";
 import { openModelDialog } from "../models/index.ts";
-import { GolemBlockView } from "../setup/golem-block.tsx";
-import { SetupFormView, SetupHeader } from "../setup/setup-form.tsx";
+import { HeroCard, PathsGrid } from "../setup/info-parts.tsx";
+import { SetupFormView } from "../setup/setup-form.tsx";
 import { ToolsOfferView } from "../setup/tools-offer.tsx";
 import { useSetupActions } from "../setup/use-setup-actions.ts";
 import { useTools } from "../setup/use-tools.ts";
 import { welcomePath } from "../../store/router.ts";
 import { SECTIONS } from "./sections.ts";
 
+const HERO = "hero";
+
 /** A link of the form points at `/settings/<section>`: it is shown once the page has that section. */
 function hasPage(path: string): boolean {
   const section = path.replace(/^\/settings\//, "");
   return path.startsWith("/settings/") && SECTIONS.some((item) => item.id === section);
 }
-
-const HEAD_MARKS: Record<"ok" | "warn" | "fail", Mark> = { ok: "ok", warn: "attn", fail: "fail" };
 
 /** The Tools offer of Settings → Setup, in place under the cards. The status is read again once the servers are added. */
 function AddTools({ onClose, onAdded }: { onClose: () => void; onAdded: () => void }) {
@@ -56,7 +56,7 @@ function AddTools({ onClose, onAdded }: { onClose: () => void; onAdded: () => vo
 }
 
 /**
- * Settings → Setup: the golem block, then each part of setup as a row with its fix on the right. It reads `setup.status`
+ * Settings → Info: the hero card, the health list (what needs fixing first), then where things live. It reads `setup.status`
  * again when it opens and whenever the tab is seen again, because a key set in a terminal pushes
  * no event.
  */
@@ -83,9 +83,6 @@ export function SetupSection() {
         : setupFormRows(sourceRows, pageServiceRow(daemonServiceRow(sourceRows), connection.daemonVersion ?? ""), pageHost.kept),
     [sourceRows, connection.daemonVersion, pageHost.kept],
   );
-  const line = sourceRows === null ? null : (setupProblem(sourceRows) ?? "all set");
-  const headMark: Mark = sourceRows === null ? "spin" : HEAD_MARKS[setupProblemState(sourceRows)];
-  const block = useMemo(() => (status.data === undefined || status.isError ? null : golemBlock(status.data)), [status.data, status.isError]);
 
   function press(id: FormButtonId, card: string, from: HTMLElement): void {
     switch (id) {
@@ -127,14 +124,26 @@ export function SetupSection() {
 
   return (
     <div className="flex flex-col gap-3">
-      <SetupHeader
-        mark={headMark}
-        text={line === null ? "Checking…" : line.charAt(0).toUpperCase() + line.slice(1)}
-        onRunAgain={() => {
-          navigate(welcomePath());
-        }}
-      />
-      {block === null ? null : <GolemBlockView block={block} />}
+      {status.data === undefined ? null : (
+        <HeroCard
+          install={status.data.install}
+          fallbackVersion={connection.daemonVersion ?? ""}
+          checkedAt={status.dataUpdatedAt}
+          checking={actions.state.running === "check" && actions.state.from === HERO}
+          busy={actions.state.running !== null}
+          onRunAgain={() => {
+            navigate(welcomePath());
+          }}
+          onCheckAgain={() => {
+            actions.checkAgain(HERO);
+          }}
+        />
+      )}
+      {actions.state.error?.action === "check" && actions.state.from === HERO ? (
+        <p role="alert" className="text-sm text-deny">
+          {actions.state.error.text}
+        </p>
+      ) : null}
       {form === null ? null : (
         <>
           <SetupFormView
@@ -155,6 +164,7 @@ export function SetupSection() {
           ) : null}
         </>
       )}
+      {status.data === undefined ? null : <PathsGrid facts={status.data} />}
     </div>
   );
 }

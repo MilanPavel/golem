@@ -1,7 +1,8 @@
 import { OLLAMA_DOWNLOAD_URL, providerName, type FormButtonId, type FormFix, type FormMark, type FormRow, type Mark } from "@golem/view";
-import type { ReactNode } from "react";
+import { useId, type ReactNode } from "react";
 import { Button } from "../../ui/button.tsx";
 import { CopyCommand } from "../../ui/copy-command.tsx";
+import { settingsPath } from "../../store/router.ts";
 import { Link } from "../../ui/link.tsx";
 import { MarkGlyph } from "./mark-glyph.tsx";
 import { installLog, type SetupActionsState } from "./use-setup-actions.ts";
@@ -53,13 +54,7 @@ function Fix({ row, fix, actions, onButton, onCancelInstall, onNavigate, hasPage
     </Button>
   );
   if (fix.kind === "command") {
-    if (fix.recheck === false) return <CopyCommand command={fix.text} />;
-    return (
-      <>
-        <CopyCommand command={fix.text} />
-        {checking ? <Working>Checking…</Working> : checkButton}
-      </>
-    );
+    return <CopyCommand command={fix.text} />;
   }
   if (fix.kind === "link") {
     if (!hasPage(fix.to)) return null;
@@ -69,7 +64,7 @@ function Fix({ row, fix, actions, onButton, onCancelInstall, onNavigate, hasPage
         onNavigate={onNavigate}
         className="rounded-md px-2 py-1 text-sm text-clay-ink underline underline-offset-2 outline-offset-2 outline-clay focus-visible:outline-2"
       >
-        {fix.label}
+        {row.part === "tools" ? "MCP servers →" : fix.label}
       </Link>
     );
   }
@@ -107,7 +102,7 @@ function Fix({ row, fix, actions, onButton, onCancelInstall, onNavigate, hasPage
   return (
     <Button
       size="sm"
-      kind={fix.id === "change_model" ? "secondary" : "ink"}
+      kind={fix.id === "change_model" && row.mark === "ok" ? "secondary" : "primary"}
       disabled={actions.running !== null}
       onClick={(event) => {
         onButton(fix.id, card, event.currentTarget);
@@ -135,28 +130,23 @@ export function Output({ output, running }: { output: string; running: boolean }
   );
 }
 
-export type SetupHeaderProps = { mark: Mark; text: string; onRunAgain: () => void };
-
-/** `All set`, or the first problem, with its mark, and the way to walk through setup again. */
-export function SetupHeader({ mark, text, onRunAgain }: SetupHeaderProps) {
-  return (
-    <div className="flex items-center gap-2.5">
-      <MarkGlyph mark={mark} />
-      <p role="status" className="font-semibold">
-        {text}
-      </p>
-      <Button kind="ghost" size="sm" className="ml-auto" onClick={onRunAgain}>
-        Run setup again
-      </Button>
-    </div>
-  );
-}
-
 const TINT: Record<FormMark, string> = { ok: "", warn: "bg-wait-soft", fail: "bg-deny-soft" };
 const DETAIL_TONE: Record<FormMark, string> = { ok: "text-muted", warn: "text-wait", fail: "text-deny" };
+const CIRCLE: Record<FormMark, string> = { ok: "bg-allow-soft", warn: "bg-wait-soft", fail: "bg-deny-soft" };
+
+/** A plain sentence for a row that needs fixing; null when the daemon's own words are the best there are. */
+function sentence(row: FormRow): string | null {
+  if (row.mark === "ok") return null;
+  if (row.name === "Service") return "Running, but stops when you log out.";
+  if (row.name === "Web page") return "Only works while a terminal runs golem.";
+  if (row.name === OLLAMA) return row.mark === "fail" ? "Ollama isn't installed." : "Ollama isn't running, so models can't load.";
+  if (row.part === "model") return "No model is chosen yet.";
+  if (row.part === "engine" && row.fix?.kind === "command") return "Needs an API key.";
+  return null;
+}
 
 function Card(props: SetupFormViewProps & { row: FormRow }) {
-  const { row, actions } = props;
+  const { row, actions, hasPage, onNavigate } = props;
   const card = cardKey(row);
   const ollama = row.part === "engine" && row.name === OLLAMA;
   const error =
@@ -170,20 +160,34 @@ function Card(props: SetupFormViewProps & { row: FormRow }) {
           ? actions.error.text
           : null;
   const extra = (actions.noBrew && ollama) || error !== null || ollama;
+  const plain = sentence(row);
+  const routing = settingsPath("routing");
   return (
-    <li className={`flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-1.5 ${TINT[row.mark]}`}>
-      <MarkGlyph mark={MARKS[row.mark]} />
+    <li data-setting={row.name.toLowerCase()} className={`flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2 ${TINT[row.mark]}`}>
+      <span className={`grid size-6 shrink-0 place-items-center rounded-full ${CIRCLE[row.mark]}`}>
+        <MarkGlyph mark={MARKS[row.mark]} />
+      </span>
       <p className="w-24 shrink-0 font-semibold">{row.name}</p>
-      <p title={row.detail} className={`min-w-0 flex-1 truncate text-sm ${DETAIL_TONE[row.mark]}`}>
-        {row.detail}
-      </p>
-      {row.fix === null ? null : (
-        <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
-          <Fix {...props} fix={row.fix} />
-        </div>
-      )}
+      <div className="min-w-0 flex-1 basis-48">
+        <p title={row.detail} className={`text-sm ${plain === null ? DETAIL_TONE[row.mark] : "text-ink"}`}>
+          {plain ?? row.detail}
+        </p>
+        {plain === null ? null : <p className="text-xs text-muted">{row.detail}</p>}
+      </div>
+      <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+        {row.fix === null ? null : <Fix {...props} fix={row.fix} />}
+        {row.part === "model" && row.mark === "ok" && hasPage(routing) ? (
+          <Link
+            href={routing}
+            onNavigate={onNavigate}
+            className="rounded-md px-2 py-1 text-sm text-clay-ink underline underline-offset-2 outline-offset-2 outline-clay focus-visible:outline-2"
+          >
+            Routing →
+          </Link>
+        ) : null}
+      </div>
       {extra ? (
-        <div className="w-full pl-7">
+        <div className="w-full pl-9">
           {actions.noBrew && ollama ? <p className="text-sm text-muted">Homebrew isn't installed. Download Ollama, then check again.</p> : null}
           {error === null ? null : (
             <p role="alert" className="text-sm text-deny">
@@ -197,14 +201,27 @@ function Card(props: SetupFormViewProps & { row: FormRow }) {
   );
 }
 
-/** Settings → Setup: one bordered panel with a row for each part of setup, the fix on the right. */
+/** Settings → Info › Health: one bordered list with the rows that need fixing first, and the count in the heading. */
 export function SetupFormView(props: SetupFormViewProps) {
+  const broken = props.rows.filter((row) => row.mark !== "ok");
+  const fine = props.rows.filter((row) => row.mark === "ok");
+  const heading = useId();
   return (
-    <ul aria-label="Setup" className="divide-y divide-line overflow-hidden rounded-md border border-line bg-surface">
-      {props.rows.map((row) => (
-        <Card key={cardKey(row)} {...props} row={row} />
-      ))}
-    </ul>
+    <div role="group" aria-labelledby={heading} className="flex flex-col gap-2">
+      <div className="flex items-baseline gap-2">
+        <h3 id={heading} className="text-sm font-semibold">
+          Health
+        </h3>
+        <span className="text-xs text-muted">
+          {broken.length} to fix · {fine.length} fine
+        </span>
+      </div>
+      <ul aria-labelledby={heading} className="divide-y divide-line overflow-hidden rounded-md border border-line bg-surface">
+        {[...broken, ...fine].map((row) => (
+          <Card key={cardKey(row)} {...props} row={row} />
+        ))}
+      </ul>
+    </div>
   );
 }
 

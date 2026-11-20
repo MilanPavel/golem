@@ -14,7 +14,6 @@ import { OK_ROWS, STATUS_ROWS, WORKING_LISTING } from "../setup/sample.ts";
 import { settingsContextStore, useSettingsFolder } from "./index.ts";
 
 const noContrast = { rules: { "color-contrast": { enabled: false } } };
-const PROBLEM = "Ollama: Ollama is not installed";
 
 function mount(path: string, rows: typeof OK_ROWS | "fail" = OK_ROWS, extra: { kept?: boolean; appInstall?: ReturnType<typeof createAppInstall> } = {}) {
   history.replaceState(null, "", path);
@@ -109,20 +108,15 @@ test("a section the page does not list says so, with a way back", async () => {
   expect(screen.getByRole("heading", { level: 2, name: "Setup" })).toBeTruthy();
 });
 
-test("the Setup section says the problem in a status line, and all set once it is fixed", async () => {
+test("the Health list counts what needs fixing, and counts again once it is fixed", async () => {
   const { fake } = mount("/settings", STATUS_ROWS);
-  expect(await screen.findByText(PROBLEM, { selector: "p" })).toBeTruthy();
+  expect(await screen.findByText("2 to fix · 3 fine")).toBeTruthy();
   fake.raw.setupStatus.mockResolvedValue({ rows: OK_ROWS });
   act(() => {
     focusManager.setFocused(false);
     focusManager.setFocused(true);
   });
-  expect(await screen.findByText("All set", { selector: "p" })).toBeTruthy();
-});
-
-test("the Setup section reads all set when nothing is wrong", async () => {
-  mount("/settings", OK_ROWS);
-  expect(await screen.findByText("All set", { selector: "p" })).toBeTruthy();
+  expect(await screen.findByText("0 to fix · 5 fine")).toBeTruthy();
 });
 
 test("Appearance offers Match system, Light and Dark, and the sidebar has no theme switch", async () => {
