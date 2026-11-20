@@ -41,7 +41,7 @@ export function WaterfallBar({ span, bar, ticks, compact = false }: { span: Trac
           <span className="absolute bottom-0 block h-1.5 w-px bg-line-strong" style={{ left: `${tick.left}%` }} />
           {compact ? null : <span
             data-part="tick-label"
-            className="absolute top-0 -translate-x-1/2 font-mono text-xs leading-none text-faint max-wide:hidden"
+            className="absolute top-0 -translate-x-1/2 text-meta leading-none text-faint max-wide:hidden"
             style={{ left: `${tick.left}%` }}
           >
             {tick.label}

@@ -3,6 +3,7 @@ import { useState } from "react";
 import { actionErrorText } from "../../store/errors.ts";
 import { usePageActions, useSession } from "../../store/page-context.tsx";
 import { Button } from "../../ui/button.tsx";
+import { Code } from "../../ui/code.tsx";
 
 type Offered = readonly { name: string; command: string }[];
 
@@ -26,7 +27,7 @@ export function ChecksQuestionView({
         {question.commands.map((command, index) => (
           <span key={command}>
             {index === 0 ? null : <span aria-hidden="true"> · </span>}
-            <code className="font-mono text-xs">{command}</code>
+            <Code>{command}</Code>
           </span>
         ))}
       </p>

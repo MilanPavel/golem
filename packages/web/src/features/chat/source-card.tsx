@@ -27,7 +27,7 @@ export function SourceMark({ host, size }: { host: string; size?: "md" | "lg" })
 
 function Tag({ kind }: { kind: "read" | "search" | "unread" }) {
   const look = kind === "read" ? "bg-allow-soft text-allow" : kind === "search" ? "bg-sunken text-muted" : "bg-wait-soft text-wait";
-  return <span className={cn("rounded-full px-1.5 py-px font-mono text-xs", look)}>{kind === "read" ? "read" : kind === "search" ? "search hit" : "not read"}</span>;
+  return <span className={cn("rounded-full px-1.5 py-px text-meta", look)}>{kind === "read" ? "read" : kind === "search" ? "search hit" : "not read"}</span>;
 }
 
 /** The body of a card for one address: host, title, what golem saw, and what it did with the page. */
@@ -129,7 +129,7 @@ export function SourceCard({
 
   const paging =
     count > 1 ? (
-      <span className="ml-auto flex items-center gap-0.5 font-mono text-xs text-faint">
+      <span className="ml-auto flex items-center gap-0.5 text-meta text-faint">
         <PageButton label="Previous source" onClick={() => { setPage((page + count - 1) % count); }}>
           ‹
         </PageButton>

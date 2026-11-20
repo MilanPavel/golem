@@ -19,13 +19,13 @@ export function BatchCardView({ callId, batch, refs, detail, isLocal }: { callId
   const card = batchCard(told, detail);
   if (detail === "quiet") {
     return (
-      <p data-batch-card data-detail="quiet" className="font-mono text-xs text-muted">
+      <p data-batch-card data-detail="quiet" className="text-meta text-muted">
         <span className="text-faint">{card.head}</span>
       </p>
     );
   }
   return (
-    <div role="group" aria-label="Helpers" data-batch-card data-detail={detail} className="flex min-w-0 flex-col rounded-md border border-line bg-sunken font-mono text-xs leading-snug">
+    <div role="group" aria-label="Helpers" data-batch-card data-detail={detail} className="flex min-w-0 flex-col rounded-md border border-line bg-sunken text-meta leading-snug">
       <p className="flex flex-wrap items-baseline justify-between gap-x-3 px-3 py-1.5 text-muted">
         <span>{card.total ?? card.head}</span>
         <span className={cn("whitespace-nowrap", TONE[card.tone])}>{card.right}</span>

@@ -5,6 +5,7 @@ import { actionErrorText } from "../../store/errors.ts";
 import { Badge } from "../../ui/badge.tsx";
 import { Button } from "../../ui/button.tsx";
 import { cn } from "../../ui/cn.ts";
+import { Code } from "../../ui/code.tsx";
 
 /** Characters of a check's output the tab shows. The event carries no more. */
 export const OUTPUT_CHARS = 4000;
@@ -34,12 +35,12 @@ function CheckBlock({ run, readAll }: { run: CheckRun; readAll: (run: CheckRun) 
   return (
     <li data-check={run.checkId} className="flex min-w-0 flex-col gap-1.5 rounded-md border border-line p-3">
       <div className="flex flex-wrap items-center gap-2">
-        <span className="font-mono text-sm font-medium">{run.name}</span>
+        <span className="text-label font-medium">{run.name}</span>
         <Badge tone={status.tone}>{status.label}</Badge>
-        {run.durationMs === null ? null : <span className="font-mono text-xs text-muted">{checkSeconds(run.durationMs)}</span>}
-        {run.round > 0 ? <span className="font-mono text-xs text-faint">{`round ${run.round + 1}`}</span> : null}
+        {run.durationMs === null ? null : <span className="text-meta text-muted">{checkSeconds(run.durationMs)}</span>}
+        {run.round > 0 ? <span className="text-meta text-faint">{`round ${run.round + 1}`}</span> : null}
       </div>
-      {run.command === "" ? null : <code className="min-w-0 truncate font-mono text-xs text-muted" title={run.command}>{run.command}</code>}
+      {run.command === "" ? null : <Code tone="muted" className="min-w-0 truncate" title={run.command}>{run.command}</Code>}
       {all && run.artifactId !== null ? (
         readAll(run)
       ) : output === "" ? (
@@ -135,7 +136,7 @@ export function ChecksView({ checks, running, onAllow, error, readAll }: ChecksV
           {(() => {
             const summary = checksSummary(newest, newest.runId === running);
             return (
-              <p className={cn("font-mono text-xs", TONE[summary.tone])}>
+              <p className={cn("text-meta", TONE[summary.tone])}>
                 <span className="font-medium">{summary.text}</span>
                 {summary.detail === "" ? null : ` · ${summary.detail}`}
               </p>
@@ -151,7 +152,7 @@ export function ChecksView({ checks, running, onAllow, error, readAll }: ChecksV
             const summary = checksSummary(turn, false);
             return (
               <details key={turn.runId} data-turn={turn.runId} className="group">
-                <summary className="cursor-pointer rounded-sm px-1 py-1 font-mono text-xs outline-offset-2 outline-clay hover:bg-sunken focus-visible:outline-2">
+                <summary className="cursor-pointer rounded-sm px-1 py-1 text-meta outline-offset-2 outline-clay hover:bg-sunken focus-visible:outline-2">
                   <span className={TONE[summary.tone]}>{summary.text}</span>
                   {summary.detail === "" ? null : <span className="text-muted">{` · ${summary.detail}`}</span>}
                 </summary>

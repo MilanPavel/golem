@@ -3,6 +3,7 @@ import { useId, useMemo, useState } from "react";
 import { cn } from "../../ui/cn.ts";
 import { DiffView } from "../diff/diff-view.tsx";
 import { openChange } from "../workbench/workbench-state.ts";
+import { Code } from "../../ui/code.tsx";
 
 const EDIT_TOOLS = new Set(["write_file", "edit_file"]);
 
@@ -25,7 +26,7 @@ export function EditCard({ tool }: { tool: ToolBlock }) {
   const [open, setOpen] = useState(false);
   const diffId = useId();
   return (
-    <li data-edit-card className="flex min-w-0 flex-col font-mono text-xs leading-snug">
+    <li data-edit-card className="flex min-w-0 flex-col text-meta leading-snug">
       <div className="flex min-w-0 items-center rounded-md border border-line bg-sunken">
         <button
           type="button"
@@ -36,7 +37,7 @@ export function EditCard({ tool }: { tool: ToolBlock }) {
           }}
         >
           <span aria-hidden="true" className="text-muted">{counts?.created ? "＋" : "✎"}</span>
-          <span className="truncate text-ink" title={path}>{path}</span>
+          <Code className="truncate" title={path}>{path}</Code>
           {counts ? (
             <>
               <span className="text-allow">+{counts.added}</span>

@@ -39,7 +39,7 @@ export function ContextBannerView({
           disabled={running !== null}
           aria-busy={running === row.id}
           onClick={() => run(row.id)}
-          className="cursor-pointer rounded-full border border-wait px-2.5 py-0.5 font-mono outline-offset-2 outline-clay hover:bg-surface focus-visible:outline-2 disabled:cursor-default disabled:opacity-60"
+          className="cursor-pointer rounded-full border border-wait px-2.5 py-0.5 outline-offset-2 outline-clay hover:bg-surface focus-visible:outline-2 disabled:cursor-default disabled:opacity-60"
         >
           {row.label}
         </button>

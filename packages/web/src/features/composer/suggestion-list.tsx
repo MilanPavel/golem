@@ -1,4 +1,5 @@
 import type { Suggestion } from "@golem/view";
+import { Code } from "../../ui/code.tsx";
 
 /**
  * The slash suggestions above the composer: a listbox whose active option the textarea names with
@@ -34,7 +35,7 @@ export function SuggestionList({
           onClick={() => onPick(index)}
           className="flex cursor-default items-baseline gap-3 rounded-md px-3 py-1.5 aria-selected:bg-line"
         >
-          <span className="shrink-0 font-mono text-sm text-clay-ink">{item.label}</span>
+          <Code className="shrink-0 text-clay-ink">{item.label}</Code>
           <span className="min-w-0 truncate text-xs text-muted">{item.description}</span>
         </div>
       ))}

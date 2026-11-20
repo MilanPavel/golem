@@ -13,7 +13,7 @@ export function ApprovalChip({ tool }: { tool: ToolBlock }) {
       data-approval-chip={answer?.decision ?? "none"}
       title={answer === undefined ? "Not answered" : verdictText(answer)}
       className={cn(
-        "mt-0.5 mb-1 ml-4 inline-flex w-fit max-w-full items-center gap-1 rounded-sm px-1.5 py-0.5 font-mono text-xs",
+        "mt-0.5 mb-1 ml-4 inline-flex w-fit max-w-full items-center gap-1 rounded-sm px-1.5 py-0.5 text-meta",
         answer === undefined ? "bg-sunken text-muted" : denied ? "bg-deny-soft text-deny" : "bg-allow-soft text-allow",
       )}
     >

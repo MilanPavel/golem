@@ -17,6 +17,7 @@ import { badgeVariants } from "../../ui/badge.tsx";
 import { cn } from "../../ui/cn.ts";
 import { Link } from "../../ui/link.tsx";
 import { Popover, PopoverContent, PopoverTrigger } from "../../ui/popover.tsx";
+import { Code } from "../../ui/code.tsx";
 
 const DOT: Record<RouteMode, string> = { pinned: "bg-muted", local: "bg-allow", auto: "bg-clay" };
 
@@ -37,8 +38,8 @@ function Ladder({ title, rows, onNavigate }: { title: string; rows: readonly Lad
     <ul aria-label={title} className="m-0 flex list-none flex-col gap-1 p-0">
       {rows.map((row) => (
         <li key={row.tier} data-ready={row.ready} className={cn("flex items-baseline gap-2 text-xs", row.ready ? "text-ink" : "text-faint")}>
-          <span className="w-16 shrink-0 font-mono">{row.tier}</span>
-          <span className="min-w-0 flex-1 truncate font-mono">{row.model ?? "none"}</span>
+          <span className="w-16 shrink-0">{row.tier}</span>
+          <span className="min-w-0 flex-1 truncate">{row.model === null ? "none" : <Code tone="muted">{row.model}</Code>}</span>
           <span className="shrink-0">{row.state}</span>
           {row.needsKey ? (
             <Link href={settingsPath("keys")} onNavigate={onNavigate} className="shrink-0 text-clay-ink underline">
@@ -110,7 +111,7 @@ export function RouteChipView({
         <p className="text-xs text-muted">{ROUTE_CHOICES.find((choice) => choice.mode === mode)?.hint}</p>
         {ladder.length === 0 ? null : (
           <section className="flex flex-col gap-1.5">
-            <h3 className="font-mono text-xs text-faint">{routeRowsTitle(mode)}</h3>
+            <h3 className="text-meta text-faint">{routeRowsTitle(mode)}</h3>
             <Ladder title={routeRowsTitle(mode)} rows={ladder} onNavigate={onNavigate} />
           </section>
         )}
@@ -118,7 +119,7 @@ export function RouteChipView({
           <section aria-label="Spend" className="flex flex-col gap-2">
             {spend.map((row) => (
               <div key={row.label} className="flex flex-col gap-1">
-                <span className="font-mono text-xs text-muted">{row.text}</span>
+                <span className="text-meta text-muted">{row.text}</span>
                 <Bar row={row} />
               </div>
             ))}

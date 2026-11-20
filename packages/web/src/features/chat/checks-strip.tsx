@@ -14,7 +14,7 @@ const TONE: Record<ChecksTone, string> = {
  */
 export function ChecksStrip({ tone, text, detail, onShow = () => openWorkbench("checks") }: { tone: ChecksTone; text: string; detail: string; onShow?: () => void }) {
   return (
-    <div data-checks-strip data-tone={tone} className={cn("flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 rounded-md px-2.5 py-1.5 font-mono text-xs", TONE[tone])}>
+    <div data-checks-strip data-tone={tone} className={cn("flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 rounded-md px-2.5 py-1.5 text-meta", TONE[tone])}>
       <span className="font-medium">{text}</span>
       {detail === "" ? null : <span className="min-w-0 flex-1 truncate">{detail}</span>}
       <button

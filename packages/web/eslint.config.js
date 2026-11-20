@@ -4,12 +4,23 @@ import tseslint from "typescript-eslint";
 // A local rule, so the font-mono check can warn while the dangerouslySetInnerHTML check stays an error
 // (one no-restricted-syntax setting has one severity). It matches string and template literals inside a
 // JSX className and inside cn(...), the way no-restricted-syntax selectors would.
+// The className of an <input>, <textarea>, <select> or <pre> (or the Input and Textarea components) is
+// allowed: those hold literals you could paste.
 const FONT_MONO = /\bfont-mono\b/;
+const FIELDS = new Set(["input", "textarea", "select", "pre", "Input", "Textarea"]);
 const noFontMono = {
   meta: { type: "suggestion", schema: [], messages: { raw: "Use <Code> for literals; labels and meta are Geist." } },
   create(context) {
+    // Fields and <pre> hold literals you could paste, so they may be mono.
+    const inField = (node) => {
+      for (let n = node.parent; n; n = n.parent) {
+        if (n.type === "JSXOpeningElement") return FIELDS.has(n.name.name);
+        if (n.type === "JSXElement") return false;
+      }
+      return false;
+    };
     const check = (node, text) => {
-      if (FONT_MONO.test(text)) context.report({ node, messageId: "raw" });
+      if (FONT_MONO.test(text) && !inField(node)) context.report({ node, messageId: "raw" });
     };
     const literal = (node) => typeof node.value === "string" && check(node, node.value);
     const template = (node) => check(node, node.value.raw);

@@ -5,7 +5,7 @@ import type { SessionView } from "../../store/session-store.ts";
 /** The line above the composer. Empty text draws nothing. */
 export function WaitHintView({ text }: { text: string }) {
   if (text === "") return null;
-  return <p className="px-1 font-mono text-xs text-muted">{text}</p>;
+  return <p className="px-1 text-meta text-muted">{text}</p>;
 }
 
 const selectMode = ({ chat }: SessionView) => chat.route.mode;

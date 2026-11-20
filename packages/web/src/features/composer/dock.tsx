@@ -39,7 +39,7 @@ export function DockView({
         </p>
       ) : null}
       {notice === null ? null : <NoticeLine notice={notice} />}
-      <p className="px-1 font-mono text-xs text-faint max-sm:hidden">
+      <p className="px-1 text-meta text-faint max-sm:hidden">
         {busy ? "↵ send · ⇧↵ new line · esc stop" : "↵ send · ⇧↵ new line"}
       </p>
     </div>

@@ -8,7 +8,7 @@ export function TraceSummary({ runs, events = [], stacked = false }: { runs: rea
   const latest = latestContext(runs);
   return (
     <div className={`flex min-w-0 flex-1 items-center gap-x-3 gap-y-1.5 ${stacked ? "flex-wrap" : ""}`}>
-      <p className={`min-w-0 font-mono text-xs text-muted ${stacked ? "basis-full" : "truncate"}`}>{summaryLine(runs)}</p>
+      <p className={`min-w-0 text-meta text-muted ${stacked ? "basis-full" : "truncate"}`}>{summaryLine(runs)}</p>
       {latest ? <ContextBar used={latest.used} window={latest.window} /> : null}
       <Sparkline values={inputSeries(runs)} marks={inputMarks(runs, events)} />
     </div>

@@ -228,7 +228,11 @@ export function ThinkingLine({ message, defaultOpen = false, shown }: { message:
   const textId = useId();
   if (line === null || !(shown ?? chosen)) return null;
   return (
-    <div className="tool-line font-mono text-xs leading-snug" data-thinking>
+    <div
+      // eslint-disable-next-line golem/no-font-mono -- a terminal-like stream of thinking
+      className="tool-line font-mono text-xs leading-snug"
+      data-thinking
+    >
       <button
         type="button"
         aria-expanded={open}
@@ -263,14 +267,14 @@ export const UserMessage = memo(function UserMessage({ message }: { message: Cha
       <div className="min-w-0 rounded-lg rounded-br-xs bg-slip px-3.5 py-2.5 text-chat wrap-anywhere whitespace-pre-wrap">
         {message.skill ? (
           <span className="mb-1 block">
-            <span className="inline-block rounded-full bg-clay-soft px-2 py-0.5 font-mono text-xs text-clay-ink">
+            <span className="inline-block rounded-full bg-clay-soft px-2 py-0.5 text-meta text-clay-ink">
               {message.skill.name}
             </span>
           </span>
         ) : null}
         {message.text}
       </div>
-      {time ? <time dateTime={message.at} className="mt-1 font-mono text-xs text-muted">{time}</time> : null}
+      {time ? <time dateTime={message.at} className="mt-1 text-meta text-muted">{time}</time> : null}
     </article>
   );
 });
@@ -293,7 +297,7 @@ const GolemStep = memo(function GolemStep({ message, thinkingShown, sources }: {
         </div>
       ) : null}
       {message.streaming ? <span aria-hidden="true" data-cursor className="transcript-cursor" /> : null}
-      {message.interrupted ? <p className="font-mono text-xs text-muted">stopped</p> : null}
+      {message.interrupted ? <p className="text-meta text-muted">stopped</p> : null}
       {message.cut === true ? <p className="text-sm text-muted">{REPLY_CUT_NOTE}</p> : null}
     </div>
   );
@@ -322,7 +326,7 @@ export function WritingRow({ writing }: { writing: WritingBlock }) {
     };
   }, []);
   return (
-    <p aria-live="off" data-writing className="flex items-center gap-2 font-mono text-xs leading-snug text-muted">
+    <p aria-live="off" data-writing className="flex items-center gap-2 text-meta leading-snug text-muted">
       <span aria-hidden="true" className="block size-1.5 shrink-0 animate-pulse rounded-full bg-wait motion-reduce:animate-none" />
       <span className="truncate">{writingLabel(writing, (now - started) / 1000)}</span>
     </p>
@@ -370,7 +374,12 @@ export function ActivityLine({ tools, detail, streaming = false, pendingId = nul
         <span>{text}</span>
       </button>
       {open && rows.length > 0 ? (
-        <ul id={listId} aria-label="Tool calls" className="flex list-none flex-col gap-0.5 border-l border-line py-0.5 pl-3 font-mono text-xs leading-snug">
+        <ul
+          id={listId}
+          aria-label="Tool calls"
+          // eslint-disable-next-line golem/no-font-mono -- tool calls are a terminal-like stream
+          className="flex list-none flex-col gap-0.5 border-l border-line py-0.5 pl-3 font-mono text-xs leading-snug"
+        >
           {rows.map((tool) => (
             <ToolLine key={`${tool.callId}:${verbose}`} tool={tool} defaultOpen={verbose} pending={tool.callId === pendingId} detail={detail} />
           ))}
@@ -502,7 +511,7 @@ export function GolemTurn({
         </div>
       )}
       {undo !== undefined && runId !== undefined && turnUndo !== undefined && reverted ? (
-        <p data-rewound className="flex flex-wrap items-center gap-x-1 font-mono text-xs text-muted">
+        <p data-rewound className="flex flex-wrap items-center gap-x-1 text-meta text-muted">
           <span>{rewoundLine(turnUndo.files)}</span>
           <span aria-hidden="true">·</span>
           <TurnUndoLink disabled={undo.disabled} onClick={() => undo.onRedo(runId)}>
@@ -513,7 +522,7 @@ export function GolemTurn({
       {steps.map((step) => (step.writing == null ? null : <WritingRow key={step.id} writing={step.writing} />))}
       {checks === null ? null : <ChecksStrip {...checks} />}
       {foot.length > 0 || stronger !== undefined ? (
-        <p className="font-mono text-xs text-faint">
+        <p className="text-meta text-faint">
           {foot.join(" · ")}
           {stronger === undefined ? null : (
             <>
@@ -583,7 +592,7 @@ export function TranscriptMessages({ chat, thinkingShown, detail, waiting = null
           />
         ),
       )}
-      {waiting === null ? null : <p role="status" className="font-mono text-xs text-muted">{waiting}</p>}
+      {waiting === null ? null : <p role="status" className="text-meta text-muted">{waiting}</p>}
       {chat.error ? <p role="alert" className="text-sm text-deny">{chat.error}</p> : null}
       {notice ? <p role="status" className="text-sm text-muted">{notice}</p> : null}
     </>

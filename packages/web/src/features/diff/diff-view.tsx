@@ -166,7 +166,7 @@ export function DiffView({
   return (
     <div data-diff-mode={mode} className="min-w-0">
       {file.path !== null ? (
-        <p className="mb-1 flex flex-wrap items-center gap-2 font-mono text-xs text-muted">
+        <p className="mb-1 flex flex-wrap items-center gap-2 text-meta text-muted">
           <span className="wrap-anywhere text-ink">{file.path}</span>
           {file.added ? <span className="rounded-xs bg-allow-soft px-1.5 text-allow">new file</span> : null}
           {file.deleted ? <span className="rounded-xs bg-deny-soft px-1.5 text-deny">deleted</span> : null}

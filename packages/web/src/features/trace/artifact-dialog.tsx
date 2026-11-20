@@ -1,6 +1,7 @@
 import { useArtifact } from "../../store/page-context.tsx";
 import { Button } from "../../ui/button.tsx";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from "../../ui/dialog.tsx";
+import { Code } from "../../ui/code.tsx";
 
 function Body({ sessionId, artifactId }: { sessionId: string; artifactId: string }) {
   const query = useArtifact(sessionId, artifactId);
@@ -32,7 +33,7 @@ function Body({ sessionId, artifactId }: { sessionId: string; artifactId: string
             Show more
           </Button>
         ) : null}
-        <p className="font-mono text-xs text-faint">
+        <p className="text-meta text-faint">
           {text.length.toLocaleString("en-US")} of {(last?.size ?? 0).toLocaleString("en-US")} characters
         </p>
       </div>
@@ -47,7 +48,7 @@ export function ArtifactDialog({ sessionId, artifactId, open, onOpenChange }: { 
       <DialogContent className="max-w-3xl">
         <DialogTitle>Full output</DialogTitle>
         <DialogDescription>
-          Artifact <span className="font-mono">{artifactId}</span>
+          Artifact <Code tone="muted">{artifactId}</Code>
         </DialogDescription>
         {open ? <Body sessionId={sessionId} artifactId={artifactId} /> : null}
         <div className="mt-3 flex justify-end">

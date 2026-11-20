@@ -2,6 +2,7 @@ import { citeCounts, citedTimes, displayUrl, hostOf, type TurnSource } from "@go
 import { useId, useMemo, useState } from "react";
 import { cn } from "../../ui/cn.ts";
 import { SourceMark } from "./source-card.tsx";
+import { Code } from "../../ui/code.tsx";
 
 type Filter = "cited" | "all";
 const STACK = 4;
@@ -49,9 +50,9 @@ export function TurnSources({ sources, answer }: { sources: readonly TurnSource[
       </button>
       {open ? (
         <section id={listId} aria-label="Sources" data-sources-list className="basis-full overflow-hidden rounded-lg border border-line bg-surface">
-          <header className="flex items-center gap-2.5 border-b border-line px-3.5 py-2 font-mono text-xs tracking-wide text-faint uppercase">
+          <header className="flex items-center gap-2.5 border-b border-line px-3.5 py-2 text-meta text-faint">
             <span>Sources</span>
-            <span className="ml-auto flex gap-1 tracking-normal normal-case">
+            <span className="ml-auto flex gap-1">
               <FilterButton pressed={filter === "cited"} onClick={() => { setChosen("cited"); }}>
                 {`Cited · ${cited.length}`}
               </FilterButton>
@@ -103,7 +104,7 @@ function SourceRow({ source, times }: { source: TurnSource; times: number }) {
         </span>
         <span className="min-w-0">
           <span className="block truncate font-medium">{source.title === "" ? displayUrl(source.url) : source.title}</span>
-          <small className="block truncate font-mono text-xs text-faint">{displayUrl(source.url)}</small>
+          <small className="block truncate text-meta text-faint"><Code tone="muted">{displayUrl(source.url)}</Code></small>
         </span>
         <span className="flex flex-col items-end gap-0.5 text-xs whitespace-nowrap text-faint">
           <span>{source.kind === "read" ? "read" : "search hit"}</span>
