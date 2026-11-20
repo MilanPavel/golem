@@ -13,7 +13,7 @@ Normalized, because it differs on every run:
   appearance, the same map for live and replay of one scenario;
 - ``ts``: a fixed, increasing clock, one second per distinct original value, so
   live and replay events with the same original ``ts`` share a time;
-- ``duration_ms`` and ``elapsed_ms`` fields: 0;
+- ``duration_ms``, ``elapsed_ms`` and ``working_ms`` fields: 0;
 - the temporary folder: ``/tmp/golem-golden``.
 """
 
@@ -31,6 +31,9 @@ from typing import Any, cast
 
 from fakes import GatedChatModel, ScriptedChatModel, ToolCallingChatModel
 from langchain_core.language_models.chat_models import BaseChatModel
+from langchain_core.messages import BaseMessage
+from langchain_core.outputs import ChatResult
+from pydantic import PrivateAttr
 from test_server import HELLO, RpcClient, rpc_result, start_daemon, stop_daemon
 
 from golem.models.router import ModelRouter
@@ -78,6 +81,32 @@ async def _tool(client: RpcClient, session_id: str, model: BaseChatModel) -> Non
     await _send(client, session_id, "read notes")
 
 
+class _HelperAfterPark(ToolCallingChatModel):
+    """Answers the lead's first call at once and holds every later call until :meth:`release`.
+
+    The helper runs beside its lead, so without this its steps could come before or after the
+    lead's ``helper.wait``. The client releases it when it has seen the lead park."""
+
+    _parked: asyncio.Event = PrivateAttr(default_factory=asyncio.Event)
+
+    def release(self) -> None:
+        self._parked.set()
+
+    async def _agenerate(
+        self, messages: list[BaseMessage], stop: Any = None, run_manager: Any = None, **kwargs: Any
+    ) -> ChatResult:
+        if self.seen:
+            await self._parked.wait()
+        return self._generate(messages, stop, run_manager, **kwargs)
+
+
+async def _delegate(client: RpcClient, session_id: str, model: BaseChatModel) -> None:
+    assert isinstance(model, _HelperAfterPark)
+    await _send(client, session_id, "read notes")
+    await client.wait_for_event("helper.wait")
+    model.release()
+
+
 async def _approval(client: RpcClient, session_id: str, model: BaseChatModel) -> None:
     del model
     await _send(client, session_id, "read notes")
@@ -111,7 +140,7 @@ def scenarios() -> dict[str, Scenario]:
         "plain": Scenario(ScriptedChatModel(replies=["Hello there."]), _plain),
         "tool": Scenario(ToolCallingChatModel(replies=[read, "It is 42."]), _tool, files=notes),
         "delegate": Scenario(
-            ToolCallingChatModel(
+            _HelperAfterPark(
                 replies=[
                     [("delegate", {"brief": "find the answer in notes.txt"})],
                     read,
@@ -120,7 +149,7 @@ def scenarios() -> dict[str, Scenario]:
                 ],
                 usage={"input_tokens": 100, "output_tokens": 20, "total_tokens": 120},
             ),
-            _tool,
+            _delegate,
             files=notes,
         ),
         "approval": Scenario(
@@ -191,7 +220,7 @@ async def _record(name: str, scenario: Scenario, home: Path) -> dict[str, list[E
         await stop_daemon(app, task)
 
 
-TIMES = ("duration_ms", "elapsed_ms", "first_token_ms", "latency_ms")
+TIMES = ("duration_ms", "elapsed_ms", "first_token_ms", "latency_ms", "working_ms")
 """Keys of a measured time. Its number is zero in a fixture; a missing one stays null."""
 
 

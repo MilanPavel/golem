@@ -159,221 +159,113 @@
     },
     {
       "data": {
+        "agent": "explorer",
         "call_id": "call_1",
-        "parent_call_id": null
+        "helper_id": "id-5",
+        "index": 0,
+        "label": "",
+        "model": "remote",
+        "pick_reason": "no budget model ready",
+        "wish": "cheapest"
       },
       "run_id": "id-2",
       "seq": 9,
       "session_id": "id-1",
       "ts": "2026-01-01T00:00:08Z",
-      "type": "tool.started"
+      "type": "helper.started"
     },
     {
       "data": {
-        "cleared_ids": [],
-        "context_window": null,
-        "estimated_tokens": 600,
-        "index": 1,
-        "message_bytes": [
-          28
-        ],
-        "message_chars": [
-          28
-        ],
-        "message_id": "id-5",
-        "message_ids": [
-          "id-6"
-        ],
-        "model": null,
-        "num_ctx": null,
-        "parent_call_id": "call_1",
-        "profile": "remote",
-        "provider": null,
-        "summary_chars": null,
-        "system_bytes": 151,
-        "system_chars": 151,
-        "system_prompt_sha": "94cff5ff7742789c32bda702fceb2a5e2c2495b3268879654314eda57881036b",
-        "system_sections": [
-          {
-            "chars": 151,
-            "name": "helper"
-          }
-        ],
-        "tier": null,
-        "tools_bytes": 3804,
-        "tools_chars": 3804,
-        "tools_sha": "3b76d4f959c08e94c96bf90e3de0597dc2f6545dea99f5d68071583b25ad5618",
-        "window_estimated": false,
-        "window_planned": false
+        "call_id": "call_1",
+        "parent_call_id": null
       },
       "run_id": "id-2",
       "seq": 10,
       "session_id": "id-1",
       "ts": "2026-01-01T00:00:09Z",
-      "type": "model.call.started"
+      "type": "tool.started"
     },
     {
       "data": {
-        "context_window": null,
-        "cost_usd": null,
-        "failed": false,
-        "first_token_ms": null,
-        "latency_ms": 0,
-        "load_ms": null,
-        "message_id": "id-5",
-        "parent_call_id": "call_1",
-        "price": null,
-        "prompt_ms": null,
-        "reply_ms": null,
-        "stop_reason": null,
-        "text_tool_calls": null,
-        "usage": {
-          "cache_read": null,
-          "cache_write": null,
-          "input": 100,
-          "output": 20
-        }
+        "call_id": "call_1",
+        "helper_ids": [
+          "id-5"
+        ],
+        "state": "parked"
       },
       "run_id": "id-2",
       "seq": 11,
       "session_id": "id-1",
       "ts": "2026-01-01T00:00:10Z",
-      "type": "model.call.completed"
+      "type": "helper.wait"
     },
     {
       "data": {
         "args": {
           "path": "notes.txt"
         },
-        "call_id": "call_2",
-        "message_id": "id-5",
+        "call_id": "call_1",
+        "calls": 1,
+        "index": 0,
         "name": "read_file",
-        "parent_call_id": "call_1"
+        "status": "running",
+        "step_id": "call_2"
       },
       "run_id": "id-2",
       "seq": 12,
       "session_id": "id-1",
       "ts": "2026-01-01T00:00:11Z",
-      "type": "tool.requested"
+      "type": "helper.step"
     },
     {
       "data": {
-        "call_id": "call_2",
-        "parent_call_id": "call_1"
+        "args": {
+          "path": "notes.txt"
+        },
+        "call_id": "call_1",
+        "calls": 1,
+        "index": 0,
+        "name": "read_file",
+        "status": "done",
+        "step_id": "call_2"
       },
       "run_id": "id-2",
       "seq": 13,
       "session_id": "id-1",
       "ts": "2026-01-01T00:00:12Z",
-      "type": "tool.started"
+      "type": "helper.step"
     },
     {
       "data": {
+        "answer_tokens": 8,
         "call_id": "call_1",
-        "text": "read_file notes.txt\n"
+        "cost_usd": 0.0,
+        "duration_ms": 0,
+        "index": 0,
+        "model_calls": 2,
+        "stopped": "done",
+        "tokens": 240,
+        "working_ms": 0
       },
       "run_id": "id-2",
       "seq": 14,
       "session_id": "id-1",
       "ts": "2026-01-01T00:00:13Z",
-      "type": "tool.output"
+      "type": "helper.ended"
     },
     {
       "data": {
-        "artifact_id": null,
-        "call_id": "call_2",
-        "diff": null,
-        "duration_ms": 0,
-        "failed": false,
-        "parent_call_id": "call_1",
-        "preview": "     1|the answer is 42",
-        "sources": null,
-        "summary": "1 line",
-        "truncated": false
+        "call_id": "call_1",
+        "helper_ids": [
+          "id-5"
+        ],
+        "state": "resumed"
       },
       "run_id": "id-2",
       "seq": 15,
       "session_id": "id-1",
       "ts": "2026-01-01T00:00:14Z",
-      "type": "tool.completed"
-    },
-    {
-      "data": {
-        "cleared_ids": [],
-        "context_window": null,
-        "estimated_tokens": 624,
-        "index": 2,
-        "message_bytes": [
-          28,
-          91,
-          23
-        ],
-        "message_chars": [
-          28,
-          91,
-          23
-        ],
-        "message_id": "id-7",
-        "message_ids": [
-          "id-6",
-          "id-5",
-          "t_call_2"
-        ],
-        "model": null,
-        "num_ctx": null,
-        "parent_call_id": "call_1",
-        "profile": "remote",
-        "provider": null,
-        "summary_chars": null,
-        "system_bytes": 151,
-        "system_chars": 151,
-        "system_prompt_sha": "94cff5ff7742789c32bda702fceb2a5e2c2495b3268879654314eda57881036b",
-        "system_sections": [
-          {
-            "chars": 151,
-            "name": "helper"
-          }
-        ],
-        "tier": null,
-        "tools_bytes": 3804,
-        "tools_chars": 3804,
-        "tools_sha": "3b76d4f959c08e94c96bf90e3de0597dc2f6545dea99f5d68071583b25ad5618",
-        "window_estimated": false,
-        "window_planned": false
-      },
-      "run_id": "id-2",
-      "seq": 16,
-      "session_id": "id-1",
-      "ts": "2026-01-01T00:00:15Z",
-      "type": "model.call.started"
-    },
-    {
-      "data": {
-        "context_window": null,
-        "cost_usd": null,
-        "failed": false,
-        "first_token_ms": null,
-        "latency_ms": 0,
-        "load_ms": null,
-        "message_id": "id-7",
-        "parent_call_id": "call_1",
-        "price": null,
-        "prompt_ms": null,
-        "reply_ms": null,
-        "stop_reason": null,
-        "text_tool_calls": null,
-        "usage": {
-          "cache_read": null,
-          "cache_write": null,
-          "input": 100,
-          "output": 20
-        }
-      },
-      "run_id": "id-2",
-      "seq": 17,
-      "session_id": "id-1",
-      "ts": "2026-01-01T00:00:16Z",
-      "type": "model.call.completed"
+      "type": "helper.wait"
     },
     {
       "data": {
@@ -389,20 +281,20 @@
         "truncated": false
       },
       "run_id": "id-2",
-      "seq": 18,
+      "seq": 16,
       "session_id": "id-1",
-      "ts": "2026-01-01T00:00:17Z",
+      "ts": "2026-01-01T00:00:15Z",
       "type": "tool.completed"
     },
     {
       "data": {
-        "message_id": "id-8",
+        "message_id": "id-6",
         "role": "assistant"
       },
       "run_id": "id-2",
-      "seq": 19,
+      "seq": 17,
       "session_id": "id-1",
-      "ts": "2026-01-01T00:00:18Z",
+      "ts": "2026-01-01T00:00:16Z",
       "type": "message.started"
     },
     {
@@ -421,7 +313,7 @@
           110,
           32
         ],
-        "message_id": "id-8",
+        "message_id": "id-6",
         "message_ids": [
           "id-3",
           "id-4",
@@ -450,15 +342,15 @@
         "window_planned": false
       },
       "run_id": "id-2",
-      "seq": 20,
+      "seq": 18,
       "session_id": "id-1",
-      "ts": "2026-01-01T00:00:19Z",
+      "ts": "2026-01-01T00:00:17Z",
       "type": "model.call.started"
     },
     {
       "data": {
         "interrupted": false,
-        "message_id": "id-8",
+        "message_id": "id-6",
         "role": "assistant",
         "skill": null,
         "text": "It is 42.",
@@ -466,9 +358,9 @@
         "thinking_ms": null
       },
       "run_id": "id-2",
-      "seq": 21,
+      "seq": 19,
       "session_id": "id-1",
-      "ts": "2026-01-01T00:00:20Z",
+      "ts": "2026-01-01T00:00:18Z",
       "type": "message.completed"
     },
     {
@@ -479,7 +371,7 @@
         "first_token_ms": null,
         "latency_ms": 0,
         "load_ms": null,
-        "message_id": "id-8",
+        "message_id": "id-6",
         "parent_call_id": null,
         "price": null,
         "prompt_ms": null,
@@ -494,17 +386,17 @@
         }
       },
       "run_id": "id-2",
-      "seq": 22,
+      "seq": 20,
       "session_id": "id-1",
-      "ts": "2026-01-01T00:00:21Z",
+      "ts": "2026-01-01T00:00:19Z",
       "type": "model.call.completed"
     },
     {
       "data": {},
       "run_id": "id-2",
-      "seq": 23,
+      "seq": 21,
       "session_id": "id-1",
-      "ts": "2026-01-01T00:00:22Z",
+      "ts": "2026-01-01T00:00:20Z",
       "type": "run.completed"
     }
   ],
@@ -668,210 +560,113 @@
     },
     {
       "data": {
+        "agent": "explorer",
         "call_id": "call_1",
-        "parent_call_id": null
+        "helper_id": "id-5",
+        "index": 0,
+        "label": "",
+        "model": "remote",
+        "pick_reason": "no budget model ready",
+        "wish": "cheapest"
       },
       "run_id": "id-2",
       "seq": 9,
       "session_id": "id-1",
       "ts": "2026-01-01T00:00:08Z",
-      "type": "tool.started"
+      "type": "helper.started"
     },
     {
       "data": {
-        "cleared_ids": [],
-        "context_window": null,
-        "estimated_tokens": 600,
-        "index": 1,
-        "message_bytes": [
-          28
-        ],
-        "message_chars": [
-          28
-        ],
-        "message_id": "id-5",
-        "message_ids": [
-          "id-6"
-        ],
-        "model": null,
-        "num_ctx": null,
-        "parent_call_id": "call_1",
-        "profile": "remote",
-        "provider": null,
-        "summary_chars": null,
-        "system_bytes": 151,
-        "system_chars": 151,
-        "system_prompt_sha": "94cff5ff7742789c32bda702fceb2a5e2c2495b3268879654314eda57881036b",
-        "system_sections": [
-          {
-            "chars": 151,
-            "name": "helper"
-          }
-        ],
-        "tier": null,
-        "tools_bytes": 3804,
-        "tools_chars": 3804,
-        "tools_sha": "3b76d4f959c08e94c96bf90e3de0597dc2f6545dea99f5d68071583b25ad5618",
-        "window_estimated": false,
-        "window_planned": false
+        "call_id": "call_1",
+        "parent_call_id": null
       },
       "run_id": "id-2",
       "seq": 10,
       "session_id": "id-1",
       "ts": "2026-01-01T00:00:09Z",
-      "type": "model.call.started"
+      "type": "tool.started"
     },
     {
       "data": {
-        "context_window": null,
-        "cost_usd": null,
-        "failed": false,
-        "first_token_ms": null,
-        "latency_ms": 0,
-        "load_ms": null,
-        "message_id": "id-5",
-        "parent_call_id": "call_1",
-        "price": null,
-        "prompt_ms": null,
-        "reply_ms": null,
-        "stop_reason": null,
-        "text_tool_calls": null,
-        "usage": {
-          "cache_read": null,
-          "cache_write": null,
-          "input": 100,
-          "output": 20
-        }
+        "call_id": "call_1",
+        "helper_ids": [
+          "id-5"
+        ],
+        "state": "parked"
       },
       "run_id": "id-2",
       "seq": 11,
       "session_id": "id-1",
       "ts": "2026-01-01T00:00:10Z",
-      "type": "model.call.completed"
+      "type": "helper.wait"
     },
     {
       "data": {
         "args": {
           "path": "notes.txt"
         },
-        "call_id": "call_2",
-        "message_id": "id-5",
+        "call_id": "call_1",
+        "calls": 1,
+        "index": 0,
         "name": "read_file",
-        "parent_call_id": "call_1"
+        "status": "running",
+        "step_id": "call_2"
       },
       "run_id": "id-2",
       "seq": 12,
       "session_id": "id-1",
       "ts": "2026-01-01T00:00:11Z",
-      "type": "tool.requested"
+      "type": "helper.step"
     },
     {
       "data": {
-        "call_id": "call_2",
-        "parent_call_id": "call_1"
+        "args": {
+          "path": "notes.txt"
+        },
+        "call_id": "call_1",
+        "calls": 1,
+        "index": 0,
+        "name": "read_file",
+        "status": "done",
+        "step_id": "call_2"
       },
       "run_id": "id-2",
       "seq": 13,
       "session_id": "id-1",
       "ts": "2026-01-01T00:00:12Z",
-      "type": "tool.started"
+      "type": "helper.step"
     },
     {
       "data": {
-        "artifact_id": null,
-        "call_id": "call_2",
-        "diff": null,
+        "answer_tokens": 8,
+        "call_id": "call_1",
+        "cost_usd": 0.0,
         "duration_ms": 0,
-        "failed": false,
-        "parent_call_id": "call_1",
-        "preview": "     1|the answer is 42",
-        "sources": null,
-        "summary": "1 line",
-        "truncated": false
+        "index": 0,
+        "model_calls": 2,
+        "stopped": "done",
+        "tokens": 240,
+        "working_ms": 0
+      },
+      "run_id": "id-2",
+      "seq": 14,
+      "session_id": "id-1",
+      "ts": "2026-01-01T00:00:13Z",
+      "type": "helper.ended"
+    },
+    {
+      "data": {
+        "call_id": "call_1",
+        "helper_ids": [
+          "id-5"
+        ],
+        "state": "resumed"
       },
       "run_id": "id-2",
       "seq": 15,
       "session_id": "id-1",
       "ts": "2026-01-01T00:00:14Z",
-      "type": "tool.completed"
-    },
-    {
-      "data": {
-        "cleared_ids": [],
-        "context_window": null,
-        "estimated_tokens": 624,
-        "index": 2,
-        "message_bytes": [
-          28,
-          91,
-          23
-        ],
-        "message_chars": [
-          28,
-          91,
-          23
-        ],
-        "message_id": "id-7",
-        "message_ids": [
-          "id-6",
-          "id-5",
-          "t_call_2"
-        ],
-        "model": null,
-        "num_ctx": null,
-        "parent_call_id": "call_1",
-        "profile": "remote",
-        "provider": null,
-        "summary_chars": null,
-        "system_bytes": 151,
-        "system_chars": 151,
-        "system_prompt_sha": "94cff5ff7742789c32bda702fceb2a5e2c2495b3268879654314eda57881036b",
-        "system_sections": [
-          {
-            "chars": 151,
-            "name": "helper"
-          }
-        ],
-        "tier": null,
-        "tools_bytes": 3804,
-        "tools_chars": 3804,
-        "tools_sha": "3b76d4f959c08e94c96bf90e3de0597dc2f6545dea99f5d68071583b25ad5618",
-        "window_estimated": false,
-        "window_planned": false
-      },
-      "run_id": "id-2",
-      "seq": 16,
-      "session_id": "id-1",
-      "ts": "2026-01-01T00:00:15Z",
-      "type": "model.call.started"
-    },
-    {
-      "data": {
-        "context_window": null,
-        "cost_usd": null,
-        "failed": false,
-        "first_token_ms": null,
-        "latency_ms": 0,
-        "load_ms": null,
-        "message_id": "id-7",
-        "parent_call_id": "call_1",
-        "price": null,
-        "prompt_ms": null,
-        "reply_ms": null,
-        "stop_reason": null,
-        "text_tool_calls": null,
-        "usage": {
-          "cache_read": null,
-          "cache_write": null,
-          "input": 100,
-          "output": 20
-        }
-      },
-      "run_id": "id-2",
-      "seq": 17,
-      "session_id": "id-1",
-      "ts": "2026-01-01T00:00:16Z",
-      "type": "model.call.completed"
+      "type": "helper.wait"
     },
     {
       "data": {
@@ -887,20 +682,20 @@
         "truncated": false
       },
       "run_id": "id-2",
-      "seq": 18,
+      "seq": 16,
       "session_id": "id-1",
-      "ts": "2026-01-01T00:00:17Z",
+      "ts": "2026-01-01T00:00:15Z",
       "type": "tool.completed"
     },
     {
       "data": {
-        "message_id": "id-8",
+        "message_id": "id-6",
         "role": "assistant"
       },
       "run_id": "id-2",
-      "seq": 19,
+      "seq": 17,
       "session_id": "id-1",
-      "ts": "2026-01-01T00:00:18Z",
+      "ts": "2026-01-01T00:00:16Z",
       "type": "message.started"
     },
     {
@@ -919,7 +714,7 @@
           110,
           32
         ],
-        "message_id": "id-8",
+        "message_id": "id-6",
         "message_ids": [
           "id-3",
           "id-4",
@@ -948,15 +743,15 @@
         "window_planned": false
       },
       "run_id": "id-2",
-      "seq": 20,
+      "seq": 18,
       "session_id": "id-1",
-      "ts": "2026-01-01T00:00:19Z",
+      "ts": "2026-01-01T00:00:17Z",
       "type": "model.call.started"
     },
     {
       "data": {
         "interrupted": false,
-        "message_id": "id-8",
+        "message_id": "id-6",
         "role": "assistant",
         "skill": null,
         "text": "It is 42.",
@@ -964,9 +759,9 @@
         "thinking_ms": null
       },
       "run_id": "id-2",
-      "seq": 21,
+      "seq": 19,
       "session_id": "id-1",
-      "ts": "2026-01-01T00:00:20Z",
+      "ts": "2026-01-01T00:00:18Z",
       "type": "message.completed"
     },
     {
@@ -977,7 +772,7 @@
         "first_token_ms": null,
         "latency_ms": 0,
         "load_ms": null,
-        "message_id": "id-8",
+        "message_id": "id-6",
         "parent_call_id": null,
         "price": null,
         "prompt_ms": null,
@@ -992,17 +787,17 @@
         }
       },
       "run_id": "id-2",
-      "seq": 22,
+      "seq": 20,
       "session_id": "id-1",
-      "ts": "2026-01-01T00:00:21Z",
+      "ts": "2026-01-01T00:00:19Z",
       "type": "model.call.completed"
     },
     {
       "data": {},
       "run_id": "id-2",
-      "seq": 23,
+      "seq": 21,
       "session_id": "id-1",
-      "ts": "2026-01-01T00:00:22Z",
+      "ts": "2026-01-01T00:00:20Z",
       "type": "run.completed"
     }
   ]

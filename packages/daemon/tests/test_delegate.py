@@ -1,11 +1,11 @@
-"""The ``delegate`` tool and the explorer: a child run on its own thread (ADR-058)."""
+"""The ``delegate`` tool and the explorer: a helper session the lead parks for (ADR-059)."""
 
 from __future__ import annotations
 
 import asyncio
 from collections.abc import Awaitable, Callable
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import pytest
 from fakes import ToolCallingChatModel
@@ -35,6 +35,7 @@ from golem.models.router import ModelRouter
 from golem.models.tiers import Tier
 from golem.models.window import ContextWindow
 from golem.permissions.policy import Policy
+from golem.sessions import manager as manager_module
 from golem.sessions.bus import EventBus
 from golem.sessions.log import SessionLog
 from golem.sessions.manager import SessionManager
@@ -127,10 +128,19 @@ class _Chat:
         run_id = await self.manager.send(session_id, text)
         return session_id, run_id, await self.finished(run_id)
 
+    async def helper_ids(self, events: list[ChatEvent]) -> list[str]:
+        """The helper sessions the lead's ``events`` started, in the order of the call."""
+        return [e.data.helper_id for e in events if e.type == "helper.started"]
+
+    async def helper_events(self, helper_id: str) -> list[ChatEvent]:
+        return await self.events.after(helper_id, 0)
+
     async def finished(self, run_id: str) -> list[ChatEvent]:
+        """Wait until the run ends. The lead parks for its helpers and is woken in the same run."""
+
         async def done() -> bool:
             run = await self.runs.get(run_id)
-            return run is not None and run.status != "running"
+            return run is not None and run.status not in ("running", "waiting")
 
         await _until(done)
         return await self.events.for_run(run_id)
@@ -151,11 +161,6 @@ def project(tmp_path: Path) -> Path:
     return root
 
 
-def _parent(event: ChatEvent) -> str | None:
-    value: object = getattr(event.data, "parent_call_id", None)
-    return value if isinstance(value, str) else None
-
-
 def _call_ids(events: list[ChatEvent], *types: str) -> list[str]:
     found: list[str] = []
     for event in events:
@@ -165,19 +170,28 @@ def _call_ids(events: list[ChatEvent], *types: str) -> list[str]:
     return sorted(found)
 
 
-def _own(events: list[ChatEvent]) -> list[ChatEvent]:
-    return [e for e in events if _parent(e) is None]
-
-
-def _child(events: list[ChatEvent]) -> list[ChatEvent]:
-    return [e for e in events if _parent(e) is not None]
-
-
-def _delegate_result(events: list[ChatEvent]) -> str:
-    done = [e for e in events if e.type == "tool.completed" and e.data.call_id == "call_1"]
+def _delegate_result(events: list[ChatEvent], call_id: str = "call_1") -> str:
+    done = [e for e in events if e.type == "tool.completed" and e.data.call_id == call_id]
     assert len(done) == 1
     assert done[0].type == "tool.completed"
     return done[0].data.preview
+
+
+def _result_of(events: list[ChatEvent], call_id: str) -> str:
+    for event in events:
+        if event.type == "tool.completed" and event.data.call_id == call_id:
+            return event.data.preview
+        if event.type == "tool.failed" and event.data.call_id == call_id:
+            return event.data.message
+    raise AssertionError(f"no result for {call_id}")
+
+
+def _ended(events: list[ChatEvent]) -> Any:
+    return next(e for e in events if e.type == "helper.ended")
+
+
+def _calls(events: list[ChatEvent]) -> list[ChatEvent]:
+    return [e for e in events if e.type == "model.call.started"]
 
 
 async def test_the_parent_delegates_and_keeps_only_the_answer(
@@ -194,7 +208,7 @@ async def test_the_parent_delegates_and_keeps_only_the_answer(
         usage=USAGE,
     )
     chat = _Chat(database, model, dispatcher=Dispatcher(lambda _call: 2))
-    session_id, run_id, _ = await chat.run(project)
+    session_id, run_id, events = await chat.run(project)
 
     run = await chat.runs.get(run_id)
     assert run is not None
@@ -205,29 +219,23 @@ async def test_the_parent_delegates_and_keeps_only_the_answer(
     assert [m.role for m in messages] == ["user", "assistant", "tool", "assistant"]
     assert messages[2].text == "A tiny Python repo. a.py matters."
     assert "def a()" not in "".join(m.text for m in messages)
-    # The helper has a thread of its own, which starts with the brief.
-    thread = await chat.runtime.values(f"{session_id}/c/call_1")
-    helper = plain_messages(thread)
-    assert [m.role for m in helper] == [
-        "user",
-        "assistant",
-        "tool",
-        "assistant",
-        "tool",
-        "assistant",
-    ]
+    # The helper is a session with its own thread, which starts with the brief.
+    (helper_id,) = await chat.helper_ids(events)
+    helper = plain_messages(await chat.runtime.values(helper_id))
+    roles = [m.role for m in helper]
+    assert roles == ["user", "assistant", "tool", "assistant", "tool", "assistant"]
     assert helper[0].text == "what is this repo, and which files matter"
     assert "def a()" in helper[4].text
     # It saw the helper's prompt and tools, and the parent saw the parent's.
-    first_child_call = model.seen[1]
-    assert isinstance(first_child_call[0], SystemMessage)
-    assert first_child_call[0].content == CHILD_PROMPT
+    first_helper_call = model.seen[1]
+    assert isinstance(first_helper_call[0], SystemMessage)
+    assert first_helper_call[0].content == CHILD_PROMPT
     assert set(model.offered[1]) == EXPLORER_TOOLS
     assert "delegate" in model.offered[0]
     assert "delegate" not in model.offered[1]
 
 
-async def test_child_events_are_in_the_parent_log_with_the_call_id(
+async def test_the_helpers_events_are_in_its_own_log_and_the_parent_log_has_a_summary(
     database: Database, project: Path
 ) -> None:
     model = ToolCallingChatModel(
@@ -242,33 +250,41 @@ async def test_child_events_are_in_the_parent_log_with_the_call_id(
     chat = _Chat(database, model)
     _, _, events = await chat.run(project)
 
-    inside = _child(events)
-    assert {_parent(e) for e in inside} == {"call_1"}
-    assert {e.type for e in inside} == {
-        "model.call.started",
-        "model.call.completed",
-        "tool.requested",
-        "tool.started",
-        "tool.completed",
-    }
-    assert not [e for e in events if e.type.startswith("message.") and e in inside]
-    # Its calls are counted apart from the run's own.
-    own_calls = [e for e in _own(events) if e.type == "model.call.started"]
-    child_calls = [e for e in inside if e.type == "model.call.started"]
-    assert [e.data.index for e in own_calls] == [1, 2]
-    assert [e.data.index for e in child_calls] == [1, 2]
-    # Only the run's own replies are messages.
+    # A new helper writes no ``parent_call_id``: its calls are not in the parent's log.
+    assert not [e for e in events if getattr(e.data, "parent_call_id", None) is not None]
+    # The lead's two calls: one before it parked, one after it was woken.
+    assert len(_calls(events)) == 2
+    kinds = [e.type for e in events]
+    assert kinds.index("helper.started") < kinds.index("helper.ended")
+    ended = next(e for e in events if e.type == "helper.ended")
+    assert (ended.data.stopped, ended.data.model_calls) == ("done", 2)
+    assert ended.data.cost_usd == pytest.approx(0.004)
+    # The helper's own log has what a session has.
+    (helper_id,) = await chat.helper_ids(events)
+    own = await chat.helper_events(helper_id)
+    assert len(_calls(own)) == 2
+    requested = _call_ids(own, "tool.requested")
+    assert len(requested) == 2
+    assert requested == _call_ids(own, "tool.completed", "tool.failed")
+    assert len([e for e in own if e.type == "model.call.completed"]) == 2
+    # Only the run's own replies are messages of the parent.
     replies = [e for e in events if e.type == "message.completed" and e.data.role == "assistant"]
     assert len(replies) == 2
-    # Every call of the helper ended.
-    requested = _call_ids(inside, "tool.requested")
-    assert requested
-    assert requested == _call_ids(inside, "tool.completed", "tool.failed")
-    done = [e for e in inside if e.type == "model.call.completed"]
-    assert len(done) == len(child_calls) == 2
+    # Each tool call of the helper is a thin ``helper.step`` of the lead's log: started, then ended.
+    steps = [(e.data.name, e.data.status, e.data.args) for e in events if e.type == "helper.step"]
+    grep, listing = {"pattern": "def"}, {"path": "."}
+    assert sorted(steps, key=str) == sorted(
+        [
+            ("grep", "running", grep),
+            ("list_dir", "running", listing),
+            ("grep", "done", grep),
+            ("list_dir", "done", listing),
+        ],
+        key=str,
+    )
 
 
-async def test_child_calls_carry_cost_and_are_usage_rows_of_the_explore_role(
+async def test_helper_calls_carry_cost_and_are_usage_rows_of_the_helper_role(
     database: Database, project: Path
 ) -> None:
     model = ToolCallingChatModel(
@@ -277,13 +293,12 @@ async def test_child_calls_carry_cost_and_are_usage_rows_of_the_explore_role(
     chat = _Chat(database, model)
     _, _, events = await chat.run(project)
 
-    inside = [e for e in _child(events) if e.type == "model.call.completed"]
+    (helper_id,) = await chat.helper_ids(events)
+    inside = [e for e in await chat.helper_events(helper_id) if e.type == "model.call.completed"]
     assert len(inside) == 1
     assert inside[0].data.cost_usd == pytest.approx(0.002)
-    assert inside[0].data.usage is not None
     rows = await database.fetch_all("SELECT role FROM model_calls ORDER BY started_at")
-    assert sorted(row["role"] for row in rows) == ["chat", "chat", "explore"]
-    # The routing question "how big was the last prompt" counts the run's own calls only.
+    assert sorted(row["role"] for row in rows) == ["chat", "chat", "helper"]
 
 
 async def test_the_helper_cannot_call_delegate_shell_or_write(
@@ -317,7 +332,8 @@ async def test_the_helper_cannot_call_delegate_shell_or_write(
     assert all(m.text.startswith("error: ") for m in results)
     assert "unknown tool" in results[0].text
     assert "cannot ask for approval" in results[3].text
-    failed = [e for e in _child(events) if e.type == "tool.failed"]
+    (helper_id,) = await chat.helper_ids(events)
+    failed = [e for e in await chat.helper_events(helper_id) if e.type == "tool.failed"]
     assert len(failed) == 4
     assert not (project / "x.py").exists()
     # The helper went on and answered.
@@ -339,21 +355,22 @@ async def test_past_the_call_limit_the_last_call_has_no_tools(
         ],
     )
     chat = _Chat(database, model, limits=ChildLimits(max_calls=2))
-    session_id, _, events = await chat.run(project)
+    _, _, events = await chat.run(project)
 
-    # parent, child, child, last child call, parent: the last child call offered no tools.
+    # parent, helper, helper, last helper call, parent: the last helper call offered no tools.
     assert len(model.seen) == 5
     assert len(model.offered) == 4
     last = model.seen[3]
     assert isinstance(last[-1], HumanMessage)
     assert last[-1].content == FINAL_REQUEST
     assert _delegate_result(events) == "explorer finished: calls\n\nwhat I know so far"
+    assert _ended(events).data.stopped == "calls"
     # The request to answer is sent, never stored.
-    thread = await chat.runtime.values(f"{session_id}/c/call_1")
+    (helper_id,) = await chat.helper_ids(events)
+    thread = await chat.runtime.values(helper_id)
     assert FINAL_REQUEST not in "".join(m.text for m in plain_messages(thread))
     # The helper's calls do not count against the parent's.
-    own_calls = [e for e in _own(events) if e.type == "model.call.started"]
-    assert len(own_calls) == 2
+    assert len(_calls(events)) == 2
 
 
 async def test_a_reply_with_tool_calls_at_the_last_call_is_cut_to_its_text(
@@ -368,10 +385,12 @@ async def test_a_reply_with_tool_calls_at_the_last_call_is_cut_to_its_text(
         ],
     )
     chat = _Chat(database, model, limits=ChildLimits(max_calls=1))
-    session_id, _, events = await chat.run(project)
+    _, _, events = await chat.run(project)
 
     assert _delegate_result(events) == "explorer finished: calls\n\n(the helper gave no answer)"
-    thread = plain_messages(await chat.runtime.values(f"{session_id}/c/call_1"))
+    assert _ended(events).data.stopped == "calls"
+    (helper_id,) = await chat.helper_ids(events)
+    thread = plain_messages(await chat.runtime.values(helper_id))
     assert thread[-1].role == "assistant"
     assert "→" not in thread[-1].text
 
@@ -388,28 +407,6 @@ async def test_the_answer_is_cut_to_answer_chars(database: Database, project: Pa
     assert messages[2].text == "x" * 10
 
 
-async def test_a_helper_that_never_answers_stops_at_the_time_limit(
-    database: Database, project: Path
-) -> None:
-    model = _Hanging(replies=[[("delegate", {"brief": "hang"})], "after the limit"])
-    chat = _Chat(database, model, limits=ChildLimits(timeout_s=0.2))
-    session_id, run_id, events = await chat.run(project)
-
-    run = await chat.runs.get(run_id)
-    assert run is not None
-    assert run.status == "completed"
-    assert model.stopped
-    assert _delegate_result(events).startswith("explorer finished: time")
-    # The call that never ended is closed in the log.
-    inside = _child(events)
-    started = [e for e in inside if e.type == "model.call.started"]
-    completed = [e for e in inside if e.type == "model.call.completed"]
-    assert len(started) == len(completed) == 1
-    assert completed[0].type == "model.call.completed"
-    assert completed[0].data.failed is True
-    assert plain_messages(await chat.runtime.values(session_id))[-1].text == "after the limit"
-
-
 async def test_cancelling_the_parent_cancels_the_helper(database: Database, project: Path) -> None:
     model = _Hanging(replies=[[("delegate", {"brief": "hang"})]])
     chat = _Chat(database, model)
@@ -417,11 +414,8 @@ async def test_cancelling_the_parent_cancels_the_helper(database: Database, proj
     run_id = await chat.manager.send(session_id, "go")
     async with asyncio.timeout(5):
         await model.waiting.wait()
-        # The helper's model call is open in the log before the cancel.
-        while not [e for e in await chat.events.for_run(run_id) if e.type == "model.call.started"][
-            1:
-        ]:
-            await asyncio.sleep(0.01)
+    parked = await chat.runs.waiting(session_id)
+    assert parked is not None and parked.run_id == run_id
 
     assert await chat.manager.cancel(run_id) is True
     events = await chat.finished(run_id)
@@ -430,15 +424,11 @@ async def test_cancelling_the_parent_cancels_the_helper(database: Database, proj
     run = await chat.runs.get(run_id)
     assert run is not None
     assert run.status == "cancelled"
-    assert events[-1].type == "run.cancelled"
-    requested = _call_ids(events, "tool.requested")
-    assert requested == _call_ids(events, "tool.completed", "tool.failed")
-    started = [e for e in events if e.type == "model.call.started"]
-    completed = [e for e in events if e.type == "model.call.completed"]
-    assert len(started) == len(completed) == 2
-    assert all(e.data.failed for e in completed if getattr(e.data, "parent_call_id", None))
-    # The next turn answers the delegate call as cancelled, so the provider takes the history.
-    assert await chat.runtime.answer_dangling(session_id) == 1
+    ended = next(e for e in events if e.type == "helper.ended")
+    assert ended.data.stopped == "cancelled"
+    (helper_id,) = await chat.helper_ids(events)
+    helper_run = await chat.runs.latest(helper_id)
+    assert helper_run is not None and helper_run.status == "cancelled"
 
 
 async def test_the_default_registry_has_delegate_and_a_scope_can_leave_it_out() -> None:
@@ -452,6 +442,17 @@ async def test_the_default_registry_has_delegate_and_a_scope_can_leave_it_out() 
     assert set(helper.names) == EXPLORER_TOOLS
     assert {s["function"]["name"] for s in helper.schemas()} == EXPLORER_TOOLS  # type: ignore[index]
     assert helper.get("shell") is None
+
+
+async def test_without_a_helper_host_delegate_is_refused_with_a_message(
+    database: Database, project: Path
+) -> None:
+    model = ToolCallingChatModel(replies=[[("delegate", {"brief": "look"})], "ok"])
+    chat = _Chat(database, model)
+    chat.runtime.helpers = None
+    _, _, events = await chat.run(project)
+
+    assert "a helper cannot be started here" in _result_of(events, "call_1")
 
 
 def _tiers(profile: str) -> Tier:
@@ -481,15 +482,6 @@ def test_the_explore_role_on_a_local_session_is_the_same_model() -> None:
     )
     role = runtime.explore_role("ollama/qwen3:8b")
     assert (role.profile, role.same_as_session) == ("ollama/qwen3:8b", True)
-
-
-def _result_of(events: list[ChatEvent], call_id: str) -> str:
-    for event in events:
-        if event.type == "tool.completed" and event.data.call_id == call_id:
-            return event.data.preview
-        if event.type == "tool.failed" and event.data.call_id == call_id:
-            return event.data.message
-    raise AssertionError(f"no result for {call_id}")
 
 
 def test_the_explorer_settings_have_limits() -> None:
@@ -527,12 +519,13 @@ async def test_the_fourth_delegate_of_a_run_gets_an_error_result(
     run = await chat.runs.get(run_id)
     assert run is not None
     assert run.status == "completed"
-    assert _result_of(events, "call_3") == "three"
+    # Three helpers ran beside each other: which answered first does not matter.
+    answers = sorted(_result_of(events, f"call_{n}") for n in (1, 2, 3))
+    assert answers == ["one", "three", "two"]
     assert "no more helpers in this turn; continue with what you have" in _result_of(
         events, "call_4"
     )
-    # Only three helpers ran.
-    assert len([e for e in _child(events) if e.type == "model.call.started"]) == 3
+    assert len(await chat.helper_ids(events)) == 3
     tools = [m for m in plain_messages(await chat.runtime.values(session_id)) if m.role == "tool"]
     assert len(tools) == 4
 
@@ -561,17 +554,25 @@ async def test_a_new_turn_has_its_own_helpers(database: Database, project: Path)
     assert _result_of(events, "call_3") == "three"
 
 
-async def test_two_delegates_in_one_reply_run_in_order(database: Database, project: Path) -> None:
+async def test_two_delegates_in_one_reply_start_two_helpers_that_run_beside_each_other(
+    database: Database, project: Path
+) -> None:
     calls = [("delegate", {"brief": "first"}), ("delegate", {"brief": "second"})]
     model = ToolCallingChatModel(replies=[calls, "one", "two", "ok"])
     chat = _Chat(database, model)
-    _, _, events = await chat.run(project)
+    session_id, _, events = await chat.run(project)
 
-    parents = [_parent(e) for e in _child(events)]
-    assert set(parents) == {"call_1", "call_2"}
-    assert parents == sorted(parents, key=str)
-    assert _result_of(events, "call_1") == "one"
-    assert _result_of(events, "call_2") == "two"
+    started = [e for e in events if e.type == "helper.started"]
+    assert [e.data.call_id for e in started] == ["call_1", "call_2"]
+    assert len({e.data.helper_id for e in started}) == 2
+    assert sorted(_result_of(events, c) for c in ("call_1", "call_2")) == ["one", "two"]
+    # The lead parked once for both, and went on once.
+    states = [
+        e.data.state for e in events if e.type == "helper.wait" and e.data.call_id == "call_1"
+    ]
+    assert states == ["parked", "resumed"]
+    messages = plain_messages(await chat.runtime.values(session_id))
+    assert len([m for m in messages if m.role == "tool"]) == 2
 
 
 async def test_usage_rows_of_a_helper_are_grouped_as_helper_by_cost_get(
@@ -585,43 +586,7 @@ async def test_usage_rows_of_a_helper_are_grouped_as_helper_by_cost_get(
 
     summary = await Usage(database).summary(since_day=EVER)
     by_role = {row.role: row.calls for row in summary.by_role}
-    # The stored role of a child run is still ``explore``; usage reads it as ``helper``.
     assert by_role == {"chat": 2, "helper": 1}
-
-
-def _paid(profile: str) -> Tier:
-    del profile
-    return "budget"
-
-
-def _answers(*oks: bool) -> Callable[[str | None], Awaitable[bool]]:
-    left = list(oks)
-
-    async def paid_ok(session_id: str | None) -> bool:
-        del session_id
-        return left.pop(0) if left else True
-
-    return paid_ok
-
-
-async def test_a_spent_cap_stops_a_paid_helper_with_budget(
-    database: Database, project: Path
-) -> None:
-    model = ToolCallingChatModel(
-        replies=[
-            [("delegate", {"brief": "look"})],
-            [("list_dir", {"path": "."})],
-            "after the helper",
-        ],
-    )
-    # The parent's call, the helper's first call, then the cap is spent, then the parent again.
-    chat = _Chat(database, model, tier_of=_paid, paid_ok=_answers(True, True, False, True))
-    _, run_id, events = await chat.run(project)
-
-    run = await chat.runs.get(run_id)
-    assert run is not None
-    assert run.status == "completed"
-    assert _delegate_result(events).startswith("explorer finished: budget")
 
 
 async def test_a_local_helper_is_not_stopped_by_a_spent_cap(
@@ -636,27 +601,6 @@ async def test_a_local_helper_is_not_stopped_by_a_spent_cap(
     chat = _Chat(database, model, tier_of=lambda _profile: "local", paid_ok=spent)
     _, _, events = await chat.run(project)
     assert _delegate_result(events) == "found it"
-
-
-async def test_a_helper_that_reads_past_eight_windows_stops_with_tokens(
-    database: Database, project: Path
-) -> None:
-    model = ToolCallingChatModel(
-        replies=[
-            [("delegate", {"brief": "look"})],
-            [("read_file", {"path": "a.py"})],
-            [("read_file", {"path": "b.py"})],
-            "never reached",
-            "ok",
-        ],
-        usage=USAGE,
-    )
-    # Each call takes in 1,000 tokens: the window is 100, so the ceiling is 800.
-    chat = _Chat(database, model, window_of=lambda _profile, _options: ContextWindow(window=100))
-    _, _, events = await chat.run(project)
-
-    assert _delegate_result(events).startswith("explorer finished: tokens")
-    assert len([e for e in _child(events) if e.type == "model.call.started"]) == 1
 
 
 def test_a_note_of_golem_does_not_start_a_new_count_of_helpers() -> None:
@@ -695,7 +639,6 @@ async def test_the_trace_nests_the_helper_and_trace_span_reads_its_thread(
     assert [t.name for t in helper_calls[0].children] == ["read_file"]
     # The run's own calls are two; the helper's are under delegate.
     assert len(run.children) == 2
-    # Tokens of the helper are in its spans, so a total over them includes it.
     own = sum(m.tokens.input or 0 for m in run.children if m.tokens is not None)
     inside = sum(m.tokens.input or 0 for m in helper_calls if m.tokens is not None)
     assert inside == 2 * USAGE["input_tokens"] and own == 2 * USAGE["input_tokens"]
@@ -705,7 +648,6 @@ async def test_the_trace_nests_the_helper_and_trace_span_reads_its_thread(
     assert read.span.id == helper_calls[0].id
     assert [m.role for m in read.messages][:1] == ["user"]
     assert read.messages[0].text == "look at a.py"
-    # Its reply is the helper's, not the parent's.
     assert read.reply is not None and read.reply.id == helper_calls[0].id
     # A helper's tool call has its result from the same thread.
     step = helper_calls[0].children[0]
@@ -715,3 +657,104 @@ async def test_the_trace_nests_the_helper_and_trace_span_reads_its_thread(
     # The parent's own call still reads the parent's thread.
     top = await chat.manager.trace_span(session_id, run.children[1].id)
     assert top.messages[0].text == "go"
+
+
+async def test_a_helper_that_never_answers_stops_at_the_time_limit(
+    database: Database, project: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    gate = asyncio.Event()
+
+    async def pause(seconds: float) -> None:
+        del seconds
+        await gate.wait()
+
+    monkeypatch.setattr(manager_module, "_pause", pause)
+    model = _Hanging(replies=[[("delegate", {"brief": "hang"})], "after the limit"])
+    chat = _Chat(database, model)
+    session_id = await chat.manager.create(None, cwd=str(project))
+    run_id = await chat.manager.send(session_id, "go")
+    async with asyncio.timeout(5):
+        await model.waiting.wait()
+    gate.set()
+    events = await chat.finished(run_id)
+
+    run = await chat.runs.get(run_id)
+    assert run is not None
+    assert run.status == "completed"
+    assert model.stopped
+    assert _ended(events).data.stopped == "time"
+    assert _delegate_result(events).startswith("explorer finished: time\n\n")
+    assert plain_messages(await chat.runtime.values(session_id))[-1].text == "after the limit"
+
+
+async def test_a_helper_that_reads_past_eight_windows_stops_with_tokens(
+    database: Database, project: Path
+) -> None:
+    model = ToolCallingChatModel(
+        replies=[
+            [("delegate", {"brief": "look"})],
+            [("read_file", {"path": "a.py"})],
+            [("read_file", {"path": "b.py"})],
+            "never reached",
+            "ok",
+        ],
+        usage=USAGE,
+    )
+    # Each call takes in 1,000 tokens: the window is 100, so the ceiling is 800.
+    chat = _Chat(database, model, window_of=lambda _profile, _options: ContextWindow(window=100))
+    _, _, events = await chat.run(project)
+
+    assert _ended(events).data.stopped == "tokens"
+    assert _delegate_result(events).startswith("explorer finished: tokens\n\n")
+
+
+def _paid(profile: str) -> Tier:
+    del profile
+    return "budget"
+
+
+def _answers(*oks: bool) -> Callable[[str | None], Awaitable[bool]]:
+    left = list(oks)
+
+    async def paid_ok(session_id: str | None) -> bool:
+        del session_id
+        return left.pop(0) if left else True
+
+    return paid_ok
+
+
+async def test_a_spent_cap_stops_a_paid_helper_with_budget_cloud_only(
+    database: Database, project: Path
+) -> None:
+    model = ToolCallingChatModel(
+        replies=[
+            [("delegate", {"brief": "look"})],
+            [("list_dir", {"path": "."})],
+            "after the helper",
+        ],
+    )
+    # The parent's call, the helper's first call, then the cap is spent, then the parent again.
+    chat = _Chat(
+        database,
+        model,
+        settings=GolemSettings(default_model="anthropic/big"),
+        tier_of=_paid,
+        paid_ok=_answers(True, True, False, True),
+    )
+    _, run_id, events = await chat.run(project)
+
+    run = await chat.runs.get(run_id)
+    assert run is not None
+    assert run.status == "completed"
+    assert _ended(events).data.stopped == "budget"
+    assert _delegate_result(events).startswith("explorer finished: budget\n\n")
+
+
+async def test_the_calls_of_a_lead_go_on_counting_after_it_was_woken(
+    database: Database, project: Path
+) -> None:
+    model = ToolCallingChatModel(replies=[[("delegate", {"brief": "look"})], "found", "ok"])
+    chat = _Chat(database, model)
+    _, _, events = await chat.run(project)
+
+    assert [cast(Any, e.data).index for e in _calls(events)] == [1, 2]

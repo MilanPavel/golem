@@ -231,7 +231,7 @@
         "cleared_ids": [],
         "context_window": null,
         "estimated_tokens": 3633,
-        "index": 1,
+        "index": 2,
         "message_bytes": [
           10,
           91,
@@ -556,7 +556,7 @@
         "cleared_ids": [],
         "context_window": null,
         "estimated_tokens": 3633,
-        "index": 1,
+        "index": 2,
         "message_bytes": [
           10,
           91,

@@ -34,7 +34,6 @@ from golem.graphs.adapter import (
     CheckCompleted,
     CheckOffered,
     CheckStarted,
-    ChildFact,
     ConsentAsked,
     ContextChanged,
     FileChanged,
@@ -280,9 +279,6 @@ class _Progress:
     run_id: str = ""
     helper_ids: Callable[[str], Awaitable[list[str]]] | None = None
     """The helper sessions of a ``delegate`` call, by the call's id, for ``helper.wait``."""
-    children: dict[str, _Progress] = field(default_factory=dict[str, "_Progress"])
-    """The state of each child run, by the id of the ``delegate`` call that started it. A child's
-    calls are counted and kept here, apart from the run's own."""
 
 
 async def run_turn(
@@ -482,6 +478,8 @@ async def resume_turn(
         run_id=resume.run_id,
         note_speed=runtime.note_speed,
         helper_ids=_helper_ids(events, resume.run_id),
+        # The calls of a run that goes on after a park or a restart go on counting.
+        index=sum(e.type == "model.call.started" for e in await events.for_run(resume.run_id)),
     )
 
     async def emit(kind: EventType, data: BaseModel) -> None:
@@ -594,7 +592,6 @@ async def _failed(
     emit: Callable[[EventType, BaseModel], Awaitable[None]],
 ) -> None:
     await _end_call(progress, emit, failed=True)
-    await _end_children(progress, emit, CANCELLED_TOOL)
     if isinstance(exc, ModelUnreachable):
         log.warning("run %s failed: %s (%s)", run_id, exc.message, exc.__cause__)
         data = RunFailedData(
@@ -791,15 +788,12 @@ async def _apply(
                     call_id=call.call_id, message_id=message_id, name=call.name, args=call.args
                 ),
             )
-    elif isinstance(fact, ChildFact):
-        await _apply_child(fact, progress, emit)
     elif isinstance(fact, ToolStarted):
         await emit("tool.started", ToolStartedData(call_id=fact.call_id))
     elif isinstance(fact, ToolOutput):
         await emit("tool.output", ToolOutputData(call_id=fact.call_id, text=fact.text))
     elif isinstance(fact, ToolFinished):
         _done(progress, fact.call_id)
-        await _end_child(progress, emit, fact.call_id, "the helper's tool call has no result")
         await emit(
             "tool.completed",
             ToolCompletedData(
@@ -816,7 +810,6 @@ async def _apply(
         )
     elif isinstance(fact, ToolErrored):
         _done(progress, fact.call_id)
-        await _end_child(progress, emit, fact.call_id, "the helper stopped")
         await emit(
             "tool.failed",
             ToolFailedData(
@@ -934,86 +927,6 @@ def _helper_ids(events: SessionLog, run_id: str) -> Callable[[str], Awaitable[li
         ]
 
     return ids
-
-
-def _tagged(
-    emit: Callable[[EventType, BaseModel], Awaitable[None]], parent_call_id: str
-) -> Callable[[EventType, BaseModel], Awaitable[None]]:
-    """``emit`` that names the ``delegate`` call on each event, which only a child's have."""
-
-    async def tagged(kind: EventType, data: BaseModel) -> None:
-        await emit(kind, data.model_copy(update={"parent_call_id": parent_call_id}))
-
-    return tagged
-
-
-async def _apply_child(
-    child: ChildFact,
-    progress: _Progress,
-    emit: Callable[[EventType, BaseModel], Awaitable[None]],
-) -> None:
-    """Emit a fact of a child run, with its parent call id, in the parent's run.
-
-    The child has its own state, so its calls never move the run's own counters. It has no
-    messages: its reply text, thinking and waiting are not emitted.
-    """
-    mine = progress.children.get(child.parent_call_id)
-    if mine is None:
-        mine = _Progress(
-            model=progress.model,
-            identify=progress.identify,
-            price_of=progress.price_of,
-            tier_of=progress.tier_of,
-            note_speed=progress.note_speed,
-            run_started=True,
-            session_id=progress.session_id,
-            run_id=progress.run_id,
-        )
-        progress.children[child.parent_call_id] = mine
-    fact = child.fact
-    tagged = _tagged(emit, child.parent_call_id)
-    if isinstance(fact, TextCompleted):
-        await _end_call(mine, tagged, fact)
-        for call in fact.calls:
-            mine.calls.append(call.call_id)
-            await tagged(
-                "tool.requested",
-                ToolRequestedData(
-                    call_id=call.call_id,
-                    message_id=fact.message_id or "child",
-                    name=call.name,
-                    args=call.args,
-                ),
-            )
-    elif isinstance(
-        fact, ModelRequested | ModelResponded | ToolStarted | ToolFinished | ToolErrored
-    ):
-        await _apply(fact, mine, tagged)
-
-
-async def _end_child(
-    progress: _Progress,
-    emit: Callable[[EventType, BaseModel], Awaitable[None]],
-    parent_call_id: str,
-    message: str,
-) -> None:
-    """Close what a child run left open: its model call, and each tool call of it."""
-    mine = progress.children.pop(parent_call_id, None)
-    if mine is None:
-        return
-    tagged = _tagged(emit, parent_call_id)
-    await _end_call(mine, tagged, failed=True)
-    for call_id in mine.calls:
-        await tagged("tool.failed", ToolFailedData(call_id=call_id, message=message))
-
-
-async def _end_children(
-    progress: _Progress,
-    emit: Callable[[EventType, BaseModel], Awaitable[None]],
-    message: str,
-) -> None:
-    for parent_call_id in list(progress.children):
-        await _end_child(progress, emit, parent_call_id, message)
 
 
 async def _record_change(
@@ -1142,7 +1055,6 @@ async def _stopped(
             await events.emit(session_id, run_id, kind, data)
 
         await _end_call(progress, emit, failed=True)
-        await _end_children(progress, emit, CANCELLED_TOOL)
         await fail_calls(events, session_id, run_id, progress.calls, CANCELLED_TOOL)
         if progress.open is not None:
             await close_reply(

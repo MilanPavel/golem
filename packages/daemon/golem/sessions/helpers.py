@@ -25,8 +25,11 @@ from golem_protocol.events import (
     HelperWaitEvent,
     MessageCompletedEvent,
     ModelCallCompletedEvent,
+    ModelCallStartedEvent,
     RouteConsentAnsweredEvent,
     RouteConsentNeededEvent,
+    RunFailedEvent,
+    SessionCreatedEvent,
 )
 
 NO_NESTED = "a helper cannot start helpers"
@@ -156,6 +159,57 @@ def stopped_of(status: str | None) -> HelperStopped:
     return "done" if status == "completed" else "cancelled" if status == "cancelled" else "failed"
 
 
+TOKEN_FACTOR = 8
+"""A helper stops when its calls took in more than this many times its window, in all."""
+
+
+def tokens_over(events: Sequence[ChatEvent]) -> bool:
+    """Whether the model calls of the run took in more than ``TOKEN_FACTOR`` windows."""
+    window: int | None = None
+    taken = 0
+    for event in events:
+        if isinstance(event, ModelCallStartedEvent):
+            window = event.data.context_window or window
+        elif isinstance(event, ModelCallCompletedEvent) and event.data.usage is not None:
+            taken += event.data.usage.input or 0
+    return window is not None and taken > TOKEN_FACTOR * window
+
+
+def started_at(events: Sequence[ChatEvent]) -> float | None:
+    """When the helper session was made, in seconds, from its ``session.created``."""
+    for event in events:
+        if isinstance(event, SessionCreatedEvent):
+            return _seconds(event.ts)
+    return None
+
+
+def stop_reason(
+    status: str | None,
+    run_events: Sequence[ChatEvent],
+    agent: AgentSnapshot | None,
+    *,
+    timed_out: bool = False,
+) -> HelperStopped:
+    """Why a helper ended, from its last run: its status, its events and its agent's limits.
+
+    ``timed_out``: the manager stopped the run at its time limit. A run that was cancelled
+    after it took in more than ``TOKEN_FACTOR`` windows was stopped for tokens. A run that
+    answered after more model calls than the limit allows ended on its last call: ``calls``.
+    A run that failed because a cap in ``[budget]`` is spent ended ``budget``.
+    """
+    if status == "completed":
+        limit = (agent.limits.max_calls if agent is not None else None) or ChildLimits().max_calls
+        calls = sum(isinstance(e, ModelCallCompletedEvent) for e in run_events)
+        return "calls" if calls > limit else "done"
+    if status == "cancelled":
+        if timed_out:
+            return "time"
+        return "tokens" if tokens_over(run_events) else "cancelled"
+    if any(isinstance(e, RunFailedEvent) and e.data.code == "budget_spent" for e in run_events):
+        return "budget"
+    return "failed"
+
+
 def parked_calls(events: Sequence[ChatEvent]) -> list[str]:
     """The ``delegate`` calls a lead is parked on, from the ``helper.wait`` events of its run."""
     parked: list[str] = []
@@ -173,6 +227,7 @@ __all__ = [
     "NO_NESTED",
     "NO_SEND",
     "ORIGIN_PREFIX",
+    "TOKEN_FACTOR",
     "HelperRef",
     "RunSummary",
     "check_agent",
@@ -182,6 +237,9 @@ __all__ = [
     "origin_of",
     "parked_calls",
     "scope_of_agent",
+    "started_at",
+    "stop_reason",
     "stopped_of",
     "summarize_run",
+    "tokens_over",
 ]

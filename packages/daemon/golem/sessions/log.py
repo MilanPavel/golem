@@ -14,7 +14,8 @@ event except deltas, read in the same lock, so summaries arrive in order.
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Callable
+import logging
+from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
 
 from pydantic import BaseModel
@@ -25,6 +26,8 @@ from golem.store.events import EventLog
 from golem.store.records import SessionActivity, SessionRecords
 from golem_protocol.commands import PendingItem
 from golem_protocol.events import CHAT_EVENT, ChatEvent, EventType
+
+log = logging.getLogger("golem.sessions")
 
 _DELTAS = (
     "message.delta",
@@ -45,6 +48,10 @@ class SessionLog:
         self._records = records
         self.local_only: Callable[[str | None], bool] = lambda _cwd: False
         """Says whether a folder stays on this Mac, for the summaries."""
+        self.after_emit: Callable[[ChatEvent], Awaitable[None]] | None = None
+        """Told of each event once it is stored and published, outside the session's lock.
+
+        The session manager uses it to put a helper's tool calls into its lead's log."""
         self._seq: dict[str, int] = {}
         self._locks: dict[str, asyncio.Lock] = {}
 
@@ -63,7 +70,14 @@ class SessionLog:
         Raises :class:`pydantic.ValidationError` when ``data`` is not the
         payload ``kind`` carries.
         """
-        return await asyncio.shield(self._emit(session_id, run_id, kind, data))
+        event = await asyncio.shield(self._emit(session_id, run_id, kind, data))
+        if self.after_emit is not None:
+            try:
+                await self.after_emit(event)
+            except Exception:
+                # The event is stored. What follows it must not fail the run that emitted it.
+                log.exception("after_emit failed for %s", event.type)
+        return event
 
     async def attach(self, session_id: str, after_seq: int, target: EventTarget) -> int:
         """Queue stored events after ``after_seq`` on ``target``, then subscribe it.

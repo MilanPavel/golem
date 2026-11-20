@@ -45,14 +45,13 @@ from pydantic import ValidationError
 from golem.config import PERMISSION_MODES, PermissionMode
 from golem.graphs.adapter import (
     APPROVAL_KIND,
-    CHILD_FACT_KIND,
     FILE_CHANGED_KIND,
     HELPERS_KIND,
     PLAN_PROPOSED_KIND,
     SKILL_LOADED_KIND,
     STREAM_KEY,
 )
-from golem.graphs.child import ChildLimits, ChildProgress, ChildResult
+from golem.graphs.child import ChildLimits
 from golem.graphs.notes import is_note
 from golem.graphs.result_budget import DEFAULT_BUDGET, ResultBudget
 from golem.graphs.state import AgentState
@@ -71,7 +70,6 @@ from golem.tools.delegate import (
 )
 from golem.tools.registry import (
     Artifacts,
-    Delegated,
     InvalidArguments,
     Preview,
     ToolContext,
@@ -164,21 +162,6 @@ class ChildHost(HelperHost, Protocol):
 
     @property
     def child_limits(self) -> ChildLimits: ...
-
-    @property
-    def parks_lead(self) -> bool:
-        """Whether helpers are sessions the lead parks for. False: ``delegate`` below runs them."""
-        ...
-
-    async def delegate(
-        self,
-        *,
-        state: AgentState,
-        config: RunnableConfig,
-        call_id: str,
-        brief: str,
-        emit_fact: Callable[[object], None],
-    ) -> ChildResult: ...
 
 
 EnableMcp = Callable[[str, ToolScope, str], Awaitable[list[str]]]
@@ -307,7 +290,7 @@ def tools_node(
         helper = child is not None
         never_ask = child is not None and not child.asks
         host = children()
-        parking = host is not None and host.parks_lead and bool(session_id)
+        parking = host is not None and not helper and bool(session_id)
         parked: list[str] = []
         delegated = _delegated_this_turn(state["messages"])
         asked = _asked(config)
@@ -377,20 +360,8 @@ def tools_node(
         write = get_stream_writer()
         results: list[BaseMessage] = []
         updates: dict[str, object] = {}
-        # A child run's helpers run one after the other: this loop awaits each call before the next.
         for call, verdict in zip(last.tool_calls, verdicts, strict=True):
             call_id = call_id_of(call)
-            if (
-                verdict.run
-                and call_id not in parked
-                and call["name"] == "delegate"
-                and host is not None
-                and not helper
-            ):
-                if delegated >= host.child_limits.max_per_turn:
-                    verdict = _Verdict(run=False, message=NO_MORE_HELPERS, kind="denied")
-                else:
-                    delegated += 1
             if not verdict.run:
                 write({STREAM_KEY: "tool.failed", "call_id": call_id, "message": verdict.message})
                 results.append(
@@ -407,10 +378,6 @@ def tools_node(
                 write({STREAM_KEY: "tool.started", "call_id": call_id})
                 output = _streamer(write, call_id)
                 ctx = replace(base, output=output, approved_diff=verdict.approved_diff)
-                if host is not None and not helper and call["name"] == "delegate" and session_id:
-                    ctx = replace(
-                        ctx, delegate=_delegation(host, state, config, call_id, write, output)
-                    )
                 args = call["args"] if verdict.args is None else verdict.args
                 try:
                     result = await session_tools.call(call["name"], args, ctx)
@@ -684,33 +651,6 @@ def _specs(call: ToolCall) -> list[HelperSpec]:
         message = f"invalid arguments for delegate: {exc.error_count()} problem(s)"
         raise InvalidArguments(message) from exc
     return [HelperSpec(agent=args.agent, brief=args.brief)]
-
-
-def _delegation(
-    host: ChildHost,
-    state: AgentState,
-    config: RunnableConfig,
-    call_id: str,
-    write: Callable[[object], None],
-    output: Callable[[str], None],
-) -> Callable[[str], Awaitable[Delegated]]:
-    """The way a ``delegate`` call runs its helper: its facts go out on the parent's stream."""
-
-    async def delegate(brief: str) -> Delegated:
-        progress = ChildProgress()
-
-        def emit(fact: object) -> None:
-            write({STREAM_KEY: CHILD_FACT_KIND, "parent_call_id": call_id, "fact": fact})
-            line = progress.see(fact)
-            if line is not None:
-                output(line + "\n")
-
-        done = await host.delegate(
-            state=state, config=config, call_id=call_id, brief=brief, emit_fact=emit
-        )
-        return Delegated(done.text, done.stopped)
-
-    return delegate
 
 
 def _streamer(write: Callable[[object], None], call_id: str) -> Callable[[str], None]:
