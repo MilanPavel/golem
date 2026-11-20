@@ -165,6 +165,7 @@ The turn runs on the picked profile. `sessions.model_profile` stays the user's c
 The table below lists situations and the decision each must lead to. It is made from `packages/daemon/tests/data/routing_cases.toml`, which `packages/daemon/tests/test_routing_table.py` runs through `SessionManager.send` (and, for the mid-run cases, the graph) on a daemon with fake facts and scripted models. A change to a rule that moves a decision fails the case that names it. After you change a case, run `just routing-table` and paste its output between the two markers; a test fails while the table here differs. A case that asks the paid question shows the model and reason the answer "once" runs.
 
 <!-- routing-table:begin -->
+
 | Case | Route | Session model | Situation | Model | Reason |
 | --- | --- | --- | --- | --- | --- |
 | pinned keeps its model, whatever the prompt | `pinned` | `ollama/qwen3:27b` | prompt 41K; models qwen3:27b, deepseek-chat, opus | `ollama/qwen3:27b` | `pinned` |
@@ -258,8 +259,11 @@ The table below lists situations and the decision each must lead to. It is made 
 | cloud only, frontier lead: stronger is the lead's model with a fresh window |  | `anthropic/opus` | wish stronger; models deepseek-chat, opus | `anthropic/opus` in a fresh window | `lead` |
 | cloud only, frontier lead: same is the lead's model |  | `anthropic/opus` | wish same; models deepseek-chat, opus | `anthropic/opus` | `same` |
 | cloud only, frontier lead: a named model that is not here is the lead's model |  | `anthropic/opus` | wish moonshot/kimi; models deepseek-chat, opus | `anthropic/opus` in a fresh window | `lead` |
+| mixed, local lead: an unknown name is the lead's model |  | `ollama/qwen3:27b` | wish gpt6-luna; models qwen3:27b, deepseek-chat, opus | `ollama/qwen3:27b` in a fresh window | `lead` |
+| cloud only, frontier lead: a named budget model is used, no question |  | `anthropic/opus` | wish deepseek/deepseek-chat; models deepseek-chat, opus | `deepseek/deepseek-chat` | `named` |
 | cloud only, one frontier model: cheapest is the lead's model |  | `anthropic/opus` | wish cheapest; models opus | `anthropic/opus` | `cheapest` |
 | cloud only, one frontier model: a budget wish takes the nearest tier, frontier |  | `anthropic/opus` | wish budget; models opus | `anthropic/opus` | `nearest` |
+
 <!-- routing-table:end -->
 
 ### Stepping up inside a run

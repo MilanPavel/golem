@@ -45,13 +45,15 @@ def pick_helper(
     lead: ModelFacts,
     candidates: Sequence[ModelFacts],
     traits: Traits,
+    held: Sequence[tuple[ModelFacts, str]] = (),
 ) -> HelperChoice:
     """The model of one helper.
 
     ``candidates`` are the models of the setup; the lead's model joins when it is not among
     them. ``traits.local_only`` keeps every helper local. When nothing qualifies the answer is
     the lead's model (or, in a private chat whose lead is hosted, the best local one), so a
-    ready lead always gives a model.
+    ready lead always gives a model. ``held`` are models the caller took out before the pick, each
+    with its reason: only a wish that names one of them reads them, to say why it was refused.
     """
     pool: list[ModelFacts] = list(candidates)
     if all(m.ref != lead.ref for m in pool):
@@ -176,9 +178,14 @@ def pick_helper(
     named = next((m for m in pool if wish in (m.ref, m.profile)), None)
     if named is not None:
         return done(named, "named", f"the model you named, {named.ref}")
-    known = next((m for m in candidates if wish in (m.ref, m.profile)), None)
+    reasons = {r.ref: r.why for r in rejected}
+    reasons.update({m.ref: why for m, why in held})
+    known = next(
+        (m for m in [*candidates, *(m for m, _ in held)] if wish in (m.ref, m.profile)), None
+    )
     if known is not None:
         # The named model is known but not usable now: its tier, and the line says why.
         choice = wished_tier(known.tier, known.tier)
-        return replace(choice, detail=f"{known.ref} cannot be used now; {choice.detail}")
-    return lead_model("lead", f"{wish} is not a model that is ready, so the lead's model")
+        why = reasons.get(known.ref) or known.why_not_ready or "it is not ready"
+        return replace(choice, detail=f"{known.ref} cannot be used now ({why}); {choice.detail}")
+    return lead_model("lead", f"{wish} is not set up, so the lead's model")

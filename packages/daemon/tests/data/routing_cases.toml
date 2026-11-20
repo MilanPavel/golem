@@ -1079,6 +1079,27 @@ reason = "lead"
 fresh = true
 
 [[case]]
+name = "mixed, local lead: an unknown name is the lead's model"
+session_model = "local-32k"
+models = ["local-32k", "budget-128k", "frontier-200k"]
+action = "pick_helper"
+wish = "gpt6-luna"
+[case.expect]
+model = "ollama/qwen3:27b"
+reason = "lead"
+fresh = true
+
+[[case]]
+name = "cloud only, frontier lead: a named budget model is used, no question"
+session_model = "frontier-200k"
+models = ["budget-128k", "frontier-200k"]
+action = "pick_helper"
+wish = "deepseek/deepseek-chat"
+[case.expect]
+model = "deepseek/deepseek-chat"
+reason = "named"
+
+[[case]]
 name = "cloud only, one frontier model: cheapest is the lead's model"
 session_model = "frontier-200k"
 models = ["frontier-200k"]

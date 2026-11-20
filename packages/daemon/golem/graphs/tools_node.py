@@ -650,9 +650,12 @@ def _specs(call: ToolCall) -> list[HelperSpec]:
     try:
         args = DelegateArgs.model_validate(dict(call["args"]))
     except ValidationError as exc:
-        message = f"invalid arguments for delegate: {exc.error_count()} problem(s)"
+        first = exc.errors()[0]
+        field = ".".join(str(part) for part in first["loc"])
+        said = first["msg"].removeprefix("Value error, ")
+        message = f"invalid arguments for delegate: {exc.error_count()} problem(s); {field}: {said}"
         raise InvalidArguments(message) from exc
-    return [HelperSpec(agent=args.agent, brief=args.brief)]
+    return [HelperSpec(agent=args.agent, brief=args.brief, model=args.model)]
 
 
 def _streamer(write: Callable[[object], None], call_id: str) -> Callable[[str], None]:

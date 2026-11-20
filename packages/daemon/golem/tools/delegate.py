@@ -10,11 +10,15 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from golem.tools.registry import Tool, ToolContext, ToolError, ToolResult
 
 AGENT = "explorer"
+MODEL_MAX = 100
+"""The longest ``model`` a call may name."""
+MODELS_SHOWN = 8
+"""How many models the description lists."""
 
 
 class DelegateArgs(BaseModel):
@@ -27,6 +31,27 @@ class DelegateArgs(BaseModel):
         default=AGENT,
         description="Which helper to use: the name of an agent type listed in this tool.",
     )
+    model: str | None = Field(
+        default=None,
+        description=(
+            "Optional: the model of this one helper. A tier (local, budget, frontier), "
+            "a model name listed in this tool, or provider/model. Leave it out to use the "
+            "helper's own choice."
+        ),
+    )
+
+    @field_validator("model")
+    @classmethod
+    def _named(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        if value.strip() == "":
+            raise ValueError("model is empty: name a model or leave it out")
+        if value != value.strip() or any(c.isspace() for c in value):
+            raise ValueError("model must be one name with no spaces, such as local or ollama/qwen3")
+        if len(value) > MODEL_MAX:
+            raise ValueError(f"model is longer than {MODEL_MAX} characters")
+        return value
 
 
 @dataclass(frozen=True, slots=True)
@@ -36,6 +61,8 @@ class HelperSpec:
     agent: str
     brief: str
     label: str = ""
+    model: str | None = None
+    """The model the lead named for this helper: a wish for this one call."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -97,12 +124,20 @@ DESCRIPTION = (
 )
 
 
-def describe(types: Sequence[tuple[str, str]]) -> str:
-    """The description of ``delegate`` with the agent types a session may name, one to a line."""
-    if not types:
-        return DESCRIPTION
-    lines = "\n".join(f"- {name}: {text}" for name, text in types)
-    return f"{DESCRIPTION}\nThe agent argument is one of these types:\n{lines}"
+def describe(types: Sequence[tuple[str, str]], models: Sequence[str] = ()) -> str:
+    """The description of ``delegate`` with the agent types a session may name, one to a line,
+    and the models it may ask for: tiers and names, the first :data:`MODELS_SHOWN` of them."""
+    text = DESCRIPTION
+    if types:
+        lines = "\n".join(f"- {name}: {about}" for name, about in types)
+        text = f"{text}\nThe agent argument is one of these types:\n{lines}"
+    if models:
+        shown = ", ".join(models[:MODELS_SHOWN])
+        text = (
+            f"{text}\nThe model argument is optional and picks the model of one helper: "
+            f"one of {shown}. Do not invent other names."
+        )
+    return text
 
 
 DELEGATE = Tool(
@@ -117,6 +152,8 @@ __all__ = [
     "AGENT",
     "DELEGATE",
     "DESCRIPTION",
+    "MODELS_SHOWN",
+    "MODEL_MAX",
     "DelegateArgs",
     "HelperOutcome",
     "HelperSpec",

@@ -78,6 +78,7 @@ The agent file names a wish: `cheapest`, `same`, `stronger`, a tier, or a model.
 - The paid question is asked at the first paid call of a chat, worded for a helper: what is sent (the brief, not the chat), what is not, and the cost. It is the helper session's own consent item. A chat that is already paid is not asked. A "no" becomes the local fresh-window answer.
 - A cloud-only setup gets caps and an estimate before a large batch (15.6) instead of the question.
 - The helper session is pinned to its picked model. `model.routed` in its log records the pick. A helper on the lead's own model starts with the lead's options.
+- The lead may name the model of one helper: `delegate` takes an optional `model` (a tier, a profile name or `provider/model`). It is the wish of that one helper, in place of the agent's wish and of `[roles] explore`, and goes through the same `pick_helper`, so privacy, the paid question and the spent cap hold. A name that is unknown, or that the rules refuse, never fails the call: the helper runs on what the pick gives, and its `pick_reason` names the asked model and why ("gpt6-luna is not set up, so the lead's model"). `helper.started.wish` is that call's wish. The tool description lists the models the lead may name, read from the settings so it is the same text on every turn.
 - The `explore` role of `models/roles.py` is retired when 15.3 lands. `[roles] explore` is read as the wish of `explorer` until then.
 
 ### 6. Where the events live

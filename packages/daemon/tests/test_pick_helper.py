@@ -108,6 +108,29 @@ def test_a_named_model_that_is_not_ready_falls_to_its_tier_then_the_lead() -> No
     assert pick_helper("nobody/none", DEEP, CLOUD_ONLY, Traits()).model == DEEP
 
 
+def test_a_name_that_is_not_set_up_is_the_leads_model_and_the_line_names_it() -> None:
+    got = pick_helper("gpt6-luna", QWEN, LOCAL_ONLY, Traits())
+    assert got.model == QWEN and got.reason == "lead" and got.fresh_window
+    assert got.detail == "gpt6-luna is not set up, so the lead's model"
+
+
+def test_a_named_model_the_rules_refuse_says_which_rule() -> None:
+    got = pick_helper(OPUS.ref, QWEN, [QWEN, DEEP, OPUS], PRIVATE)
+    assert got.model == QWEN and got.reason == "privacy"
+    assert got.detail.startswith(f"{OPUS.ref} cannot be used now (this chat stays on this Mac);")
+    spent = pick_helper(OPUS.ref, QWEN, [QWEN, OPUS], Traits(paid_room_usd=0))
+    assert spent.model == QWEN and "(the budget is spent)" in spent.detail
+
+
+def test_a_model_the_caller_held_back_is_named_with_its_reason() -> None:
+    held = [(OPUS, "paid models are off in your settings")]
+    got = pick_helper(OPUS.ref, QWEN, [QWEN], Traits(), held)
+    assert got.model == QWEN
+    assert "anthropic/opus cannot be used now (paid models are off in your settings)" in got.detail
+    # Held models are never picked, and a wish that does not name one ignores them.
+    assert pick_helper("frontier", QWEN, [QWEN], Traits(), held).model == QWEN
+
+
 def test_privacy_keeps_every_helper_local() -> None:
     mixed = [QWEN, DEEP, OPUS]
     for wish in ("cheapest", "same", "stronger", "local", "budget", "frontier", OPUS.ref):
