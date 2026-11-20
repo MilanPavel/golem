@@ -87,13 +87,13 @@ The helper's session log has everything a session has: `session.created`, the br
 | Event | When | Fields |
 |---|---|---|
 | `helper.started` | a helper session is made | `call_id`, `index`, `helper_id`, `agent`, `label`, `model`, `wish`, `pick_reason` |
-| `helper.step` | a tool call of the helper starts or ends | `call_id`, `index`, `step_id`, `name`, `args` (path, pattern, query, ref only), `status`, `calls` |
+| `helper.step` | a tool call of the helper starts or ends | `call_id`, `index`, `step_id`, `name`, `args` (path, pattern, query, ref only), `status`, `calls`, `summary` (when the call ended) |
 | `helper.state` | a helper queues, runs, waits or goes on | `call_id`, `index`, `state` (`queued`, `running`, `waiting`), `reason` |
 | `helper.wait` | the lead parks or goes on | `call_id`, `state` (`parked`, `resumed`), `helper_ids` |
 | `helper.ended` | a helper's run ends | `call_id`, `index`, `stopped`, `model_calls`, `tokens`, `answer_tokens`, `cost_usd`, `duration_ms`, `working_ms` |
 
 - A wait reason is one of the seven words of ADR-060, which owns the list: `you` (an approval or the paid question) and `team` (a lead waits for its helpers) now; `slot`, `load`, `provider`, `budget` and `stalled` as Phase 18 and 15.6 land. Every wait has one and an event (invariant 2).
-- `helper.step` is thin on purpose: the card shows what ran, and the helper's own log has the detail. `helper.ended` carries the cost, because the lead's footer sums its own log.
+- `helper.step` is thin on purpose: the card shows what ran, and the helper's own log has the detail. `summary` is the tool's own one-line summary (such as `3 lines`), set when the call ends, cut to 200 characters; it is never the preview or the output, and the step still has no cost, no tokens and no output. `helper.ended` carries the cost, because the lead's footer sums its own log.
 - `parent_call_id` stays on the event models and on old events, marked legacy. A new helper writes none. Removing a field is a break, so it stays.
 
 ### 7. How `delegate` waits

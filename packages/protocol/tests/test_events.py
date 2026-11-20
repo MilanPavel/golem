@@ -428,6 +428,22 @@ def test_a_helper_state_reason_is_any_word_and_optional() -> None:
     assert HelperStateData(call_id="c", index=0, state="waiting", reason="a later word").reason
 
 
+def test_a_helper_step_summary_is_optional_and_at_most_200_characters() -> None:
+    step = {
+        "call_id": "c",
+        "index": 0,
+        "step_id": "t",
+        "name": "grep",
+        "status": "done",
+        "calls": 1,
+    }
+    assert HelperStepData.model_validate(step).summary is None
+    assert HelperStepData.model_validate({**step, "summary": "3 lines"}).summary == "3 lines"
+    assert HelperStepData.model_validate({**step, "summary": "x" * 200}).summary
+    with pytest.raises(ValidationError):
+        HelperStepData.model_validate({**step, "summary": "x" * 201})
+
+
 def test_helper_events_refuse_values_outside_their_lists() -> None:
     with pytest.raises(ValidationError):
         HelperStateData(call_id="c", index=0, state="sleeping")  # type: ignore[arg-type]

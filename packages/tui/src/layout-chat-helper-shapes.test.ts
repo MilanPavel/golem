@@ -60,7 +60,7 @@ function newStep(seq: number, id: string, path: string, status: "running" | "don
     ts: "2026-11-01T10:00:02.000Z",
     seq,
     type: "helper.step",
-    data: { call_id: "d1", index: 0, step_id: id, name: "read_file", args: { path }, status, calls: 1 },
+    data: { call_id: "d1", index: 0, step_id: id, name: "read_file", args: { path }, status, calls: 1, ...(status === "done" ? { summary: "3 lines" } : {}) },
   };
 }
 
@@ -134,4 +134,8 @@ test("a finished helper has the same head and tree rows in the old and the new l
   assert.equal(now.child?.status, "done");
   assert.equal(helperHead(now), helperHead(old));
   assert.deepEqual(helperTreeRows(now), helperTreeRows(old));
+  // A finished step has the same summary in both shapes.
+  const summaries = (step: ToolBlock) => step.child?.toolSteps.map((s) => s.summary);
+  assert.deepEqual(summaries(now), ["3 lines", "3 lines"]);
+  assert.deepEqual(summaries(now), summaries(old));
 });

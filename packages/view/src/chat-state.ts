@@ -449,10 +449,11 @@ function foldHelper(child: HelperRun, event: ChatEvent): HelperRun {
     case "helper.step": {
       const { step_id: callId, name, status } = event.data;
       const args = event.data.args ?? {};
+      const summary = event.data.summary == null ? {} : { summary: event.data.summary };
       const known = child.toolSteps.some((tool) => tool.callId === callId);
       const toolSteps = known
-        ? child.toolSteps.map((tool) => (tool.callId === callId ? { ...tool, status } : tool))
-        : [...child.toolSteps, { callId, name, args, status }];
+        ? child.toolSteps.map((tool) => (tool.callId === callId ? { ...tool, status, ...summary } : tool))
+        : [...child.toolSteps, { callId, name, args, status, ...summary }];
       return { ...next, toolSteps };
     }
     case "helper.ended":

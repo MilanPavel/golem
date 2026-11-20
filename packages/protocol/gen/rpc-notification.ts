@@ -834,6 +834,7 @@ export type Index4 = number;
 export type Name13 = string;
 export type Status4 = 'running' | 'done' | 'failed';
 export type StepId = string;
+export type Summary2 = string | null;
 export type RunId43 = string | null;
 export type Seq42 = number;
 export type SessionId44 = string;
@@ -2476,6 +2477,8 @@ export interface HelperStepEvent {
  * Thin on purpose: the card shows what ran, and the helper's own log has the detail.
  * ``args`` holds only the path, pattern, query or ref of the call. ``step_id`` is the
  * helper's own tool call id. ``calls`` is how many tool calls the helper has made so far.
+ * ``summary`` is the one-line summary of the tool call, such as ``3 lines``, set when the
+ * call ended and None while it runs or in an older log. One line, at most 200 characters.
  *
  * This interface was referenced by `RpcNotification`'s JSON-Schema
  * via the `definition` "HelperStepData".
@@ -2488,6 +2491,7 @@ export interface HelperStepData {
   name: Name13;
   status: Status4;
   step_id: StepId;
+  summary?: Summary2;
 }
 export interface Args4 {
   [k: string]: unknown;

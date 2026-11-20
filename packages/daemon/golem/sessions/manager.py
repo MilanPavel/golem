@@ -1474,6 +1474,7 @@ class SessionManager:
         known = calls.get(event.data.call_id)
         if known is None:
             return
+        summary = _one_line(event.data.summary) if isinstance(event, ToolCompletedEvent) else None
         lead = await self._run_records.latest(parent.session_id)
         await self._events.emit(
             parent.session_id,
@@ -1487,6 +1488,7 @@ class SessionManager:
                 args=known[1],
                 status=status,
                 calls=self._step_counts.get(event.session_id, 0),
+                summary=summary,
             ),
         )
 
@@ -2955,6 +2957,15 @@ _SHOWN_ARGS = ("path", "pattern", "query", "ref")
 def _shown_args(args: Mapping[str, object]) -> dict[str, object]:
     """The path, pattern, query or ref of a tool call: all the card of a helper shows."""
     return {key: args[key] for key in _SHOWN_ARGS if isinstance(args.get(key), str)}
+
+
+_STEP_SUMMARY_CHARS = 200
+
+
+def _one_line(text: str) -> str | None:
+    """The text on one line, cut to 200 characters. None when nothing is left."""
+    line = " ".join(text.split())
+    return line[:_STEP_SUMMARY_CHARS] or None
 
 
 def _report(task: asyncio.Task[None], message: str) -> None:
