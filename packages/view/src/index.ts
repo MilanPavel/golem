@@ -219,8 +219,30 @@ export {
   type StepsList,
 } from "./steps-list.ts";
 export { groupTurns, turnFooter, type Turn } from "./turns.ts";
-export { editedArgs, parseArgs, type ParsedArgs } from "./approval-args.ts";
-export { inboxItems, pendingItemsOf, type InboxItem, type InboxPending, type InboxSession } from "./inbox.ts";
+export {
+  answerTarget,
+  approvalAnswerForKey,
+  approvalAnswerOptions,
+  editedArgs,
+  inboxAnswerOptions,
+  parseArgs,
+  type ApprovalAnswerContext,
+  type ApprovalAnswerOption,
+  type ParsedArgs,
+} from "./approval-args.ts";
+export {
+  inboxCount,
+  inboxGroups,
+  inboxHelperAskWords,
+  inboxHelperCountWords,
+  inboxItems,
+  pendingItemsOf,
+  type InboxGroup,
+  type InboxHelper,
+  type InboxItem,
+  type InboxPending,
+  type InboxSession,
+} from "./inbox.ts";
 export { isRoutineSession, isWaiting, originLabel, ROUTINE_MARK, routineName, type OriginSession } from "./origin.ts";
 export {
   appendDelta,
