@@ -178,7 +178,7 @@ test("turnFooterParts puts the routed note before the model", () => {
   assert.deepEqual(turnFooterParts(totals), ["deepseek-chat", "1.2K tok", "$0.004"]);
 });
 
-test("helperCost reads the explore row of by_role, and is null with no helper calls", () => {
+test("helperCost reads the helper row of by_role (explore in an older daemon), and is null with no helper calls", () => {
   const totals = { input: 0, output: 0, calls: 0, cost_usd: 0, saved_usd: 0 };
   const result: CostGetResult = {
     today: totals,
@@ -188,8 +188,64 @@ test("helperCost reads the explore row of by_role, and is null with no helper ca
       { role: "explore", calls: 4, input: 38_000, output: 200, cost_usd: 0.5 },
     ],
   };
-  assert.deepEqual(helperCost(result), { calls: 4, tokens: "38.2K", cost: "$0.50", share: "25%" });
+  assert.deepEqual(helperCost(result), { calls: 4, tokens: "38.2K", cost: "$0.50", share: "25%", agents: [] });
   assert.equal(helperCost({ ...result, by_role: [result.by_role![0]!] }), null);
   assert.equal(helperCost({ ...result, by_role: undefined }), null);
   assert.equal(helperCost({ ...result, week: { ...totals, calls: 4 } })?.share, "");
+});
+
+const FREE = { input: 0, output: 0, calls: 0, cost_usd: 0, saved_usd: 0 };
+
+test("helperCost has a row per agent type, the dearest first, with its share of the helpers", () => {
+  const result: CostGetResult = {
+    today: FREE,
+    week: { ...FREE, calls: 10, cost_usd: 2 },
+    by_role: [
+      { role: "chat", calls: 6, input: 100, output: 50, cost_usd: 1.5 },
+      { role: "helper", calls: 4, input: 38_000, output: 200, cost_usd: 0.5 },
+    ],
+    by_agent: [
+      { agent: "explorer", calls: 3, input: 8000, output: 100, cost_usd: 0.1 },
+      { agent: "reviewer", calls: 1, input: 30_000, output: 100, cost_usd: 0.4 },
+    ],
+  };
+  assert.deepEqual(helperCost(result)?.agents, [
+    { agent: "reviewer", calls: 1, tokens: "30.1K", cost: "$0.40", share: "80%" },
+    { agent: "explorer", calls: 3, tokens: "8.1K", cost: "$0.10", share: "20%" },
+  ]);
+});
+
+test("helperCost rows of local models have calls and tokens, a dash for cost and no share", () => {
+  const result: CostGetResult = {
+    today: FREE,
+    week: { ...FREE, calls: 2 },
+    by_role: [{ role: "helper", calls: 2, input: 300, output: 30, cost_usd: 0 }],
+    by_agent: [{ agent: "explorer", calls: 2, input: 300, output: 30, cost_usd: 0 }],
+  };
+  assert.deepEqual(helperCost(result)?.agents, [{ agent: "explorer", calls: 2, tokens: "330", cost: "\u2014", share: "" }]);
+});
+
+test("helperCost from a daemon with no by_agent keeps the one total", () => {
+  const result: CostGetResult = {
+    today: FREE,
+    week: { ...FREE, calls: 4, cost_usd: 1 },
+    by_role: [{ role: "explore", calls: 4, input: 10, output: 10, cost_usd: 1 }],
+  };
+  assert.deepEqual(helperCost(result), { calls: 4, tokens: "20", cost: "$1.00", share: "100%", agents: [] });
+});
+
+test("costReportLines lists the helpers by type under the jobs, and not without by_agent", () => {
+  const result: CostGetResult = {
+    today: FREE,
+    week: { ...FREE, calls: 4, cost_usd: 1 },
+    by_role: [
+      { role: "chat", calls: 1, input: 10, output: 10, cost_usd: 0.5 },
+      { role: "helper", calls: 3, input: 10, output: 10, cost_usd: 0.5 },
+    ],
+    by_agent: [{ agent: "explorer", calls: 3, input: 10, output: 10, cost_usd: 0.5 }],
+  };
+  const lines = costReportLines(result);
+  assert.ok(lines.includes("helpers by type (7 days)"));
+  assert.match(lines.at(-1) ?? "", /^explorer\s+3 calls\s+20\s+\$0\.50\s+100%$/);
+  assert.ok(!costReportLines({ ...result, by_agent: undefined }).includes("helpers by type (7 days)"));
 });

@@ -97,6 +97,17 @@ export function roleName(role: string): string {
   return role === "explore" ? "helper" : role;
 }
 
+/** One agent type's helper calls over the week, as words. */
+export interface HelperAgentCost {
+  agent: string;
+  calls: number;
+  tokens: string;
+  /** `$0.50`, or a dash when the type's calls cost nothing (local models). */
+  cost: string;
+  /** Its share of the helpers' cost, as `40%`, or an empty string when the helpers cost nothing. */
+  share: string;
+}
+
 /** What the helpers cost over the week, as words. */
 export interface HelperCost {
   calls: number;
@@ -104,21 +115,39 @@ export interface HelperCost {
   cost: string;
   /** Their share of the week's cost, as `12%`, or an empty string when the week cost nothing. */
   share: string;
+  /** A row per agent type, the dearest first. Empty when the daemon does not split the cost by type. */
+  agents: HelperAgentCost[];
+}
+
+/** A cost row's money: a dash for a call that cost nothing, as a local model's does. */
+function agentCost(usd: number): string {
+  return usd > 0 ? formatCost(usd) : "\u2014";
 }
 
 /**
- * The helpers' calls over the last 7 days: the `explore` row of `by_role`, which holds every helper type together.
- * `cost.get` does not split it by agent type, so this is one line for all of them. Null when no helper called a model.
+ * The helpers' calls over the last 7 days: the `helper` row of `by_role` (`explore` in an older daemon), which holds every
+ * helper type together, and `by_agent`, which splits it by type. An older daemon has no `by_agent`: `agents` is empty and
+ * the total is all there is. Null when no helper called a model.
  */
 export function helperCost(result: CostGetResult): HelperCost | null {
-  const row = (result.by_role ?? []).find((item) => item.role === "explore");
+  const row = (result.by_role ?? []).find((item) => item.role === "helper" || item.role === "explore");
   if (row === undefined || row.calls <= 0) return null;
   const week = result.week.cost_usd;
+  const agents = [...(result.by_agent ?? [])]
+    .sort((a, b) => b.cost_usd - a.cost_usd || b.calls - a.calls || a.agent.localeCompare(b.agent))
+    .map((item) => ({
+      agent: item.agent,
+      calls: item.calls,
+      tokens: formatCount(item.input + item.output),
+      cost: agentCost(item.cost_usd),
+      share: row.cost_usd > 0 ? `${Math.round((item.cost_usd / row.cost_usd) * 100)}%` : "",
+    }));
   return {
     calls: row.calls,
     tokens: formatCount(row.input + row.output),
     cost: formatCost(row.cost_usd),
     share: week > 0 ? `${Math.round((row.cost_usd / week) * 100)}%` : "",
+    agents,
   };
 }
 
@@ -161,6 +190,17 @@ export function costReportLines(result: CostGetResult): string[] {
       ...table(
         roles.map((row) => [roleName(row.role), formatCount(row.input + row.output), formatCost(row.cost_usd)]),
         [false, true, true],
+      ),
+    );
+  }
+  const helpers = helperCost(result);
+  if (helpers !== null && helpers.agents.length > 0) {
+    lines.push(
+      "",
+      "helpers by type (7 days)",
+      ...table(
+        helpers.agents.map((row) => [row.agent, `${row.calls} ${row.calls === 1 ? "call" : "calls"}`, row.tokens, row.cost, row.share]),
+        [false, true, true, true, true],
       ),
     );
   }

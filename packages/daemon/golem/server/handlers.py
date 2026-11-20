@@ -183,6 +183,7 @@ from golem_protocol.commands import (
     ConfigRawSetParams,
     ConfigRouting,
     ConfigRule,
+    CostAgentRow,
     CostDayRow,
     CostGetParams,
     CostGetResult,
@@ -1032,6 +1033,16 @@ async def _cost_get(ctx: RequestContext, params: CostGetParams) -> CostGetResult
                 cost_usd=row.cost_usd,
             )
             for row in week.by_role
+        ],
+        by_agent=[
+            CostAgentRow(
+                agent=row.agent,
+                calls=row.calls,
+                input=row.input,
+                output=row.output,
+                cost_usd=row.cost_usd,
+            )
+            for row in week.by_agent
         ],
         saved_reference=week.saved_reference,
     )

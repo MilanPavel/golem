@@ -122,7 +122,33 @@ export function UsageView({ result }: { result: CostGetResult }) {
             {helpers.share === "" ? "" : `, ${helpers.share} of the week`}
             {` · ${helpers.calls} ${helpers.calls === 1 ? "call" : "calls"} · ${helpers.tokens} tokens`}
           </p>
-          <p className="text-xs text-faint">All helper types together. The daemon does not split the cost by type yet.</p>
+          {helpers.agents.length === 0 ? (
+            <p className="text-xs text-faint">All helper types together.</p>
+          ) : (
+            <table className="w-full text-left text-sm">
+              <caption className="sr-only">Helpers by type, last 7 days</caption>
+              <thead className="border-b border-line text-muted">
+                <tr>
+                  <th scope="col" className={CELL}>Type</th>
+                  <th scope="col" className={cn(CELL, "text-right")}>Calls</th>
+                  <th scope="col" className={cn(CELL, "text-right")}>Tokens</th>
+                  <th scope="col" className={cn(CELL, "text-right")}>Cost</th>
+                  <th scope="col" className={cn(CELL, "text-right")}>Share</th>
+                </tr>
+              </thead>
+              <tbody>
+                {helpers.agents.map((row) => (
+                  <tr key={row.agent} className="border-b border-line">
+                    <td className={CELL}><Code>{row.agent}</Code></td>
+                    <td className={NUM}>{row.calls}</td>
+                    <td className={NUM}>{row.tokens}</td>
+                    <td className={NUM}>{row.cost}</td>
+                    <td className={NUM}>{row.share === "" ? "\u2014" : row.share}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </section>
       )}
       {roles.length < 2 ? null : (

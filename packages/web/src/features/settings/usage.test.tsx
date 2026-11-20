@@ -103,11 +103,30 @@ test("a failed read shows the error and Retry reads again", async () => {
   expect(await screen.findByRole("group", { name: "Today" })).toBeTruthy();
 });
 
-test("Usage says what the helpers cost, all types together, and leaves it out with no helper calls", async () => {
+test("Usage says what the helpers cost and has a row per agent type, and leaves it out with no helper calls", async () => {
   mount(SAMPLE_USAGE_WITH_HELPERS);
   const section = await screen.findByRole("region", { name: "Helpers" });
   expect(section.textContent).toContain("$0.50, 24% of the week · 26 calls · 330.0K tokens");
-  expect(section.textContent).toContain("does not split the cost by type yet");
+  expect(section.textContent).not.toContain("does not split");
+  const rows = within(section).getAllByRole("row").map((row) => row.textContent);
+  expect(rows).toEqual(["TypeCallsTokensCostShare", "reviewer6160.0K$0.4080%", "explorer20170.0K$0.1020%"]);
+});
+
+test("Usage shows a dash for the cost of helpers on local models", async () => {
+  mount({
+    ...SAMPLE_USAGE_WITH_HELPERS,
+    by_role: [{ role: "helper", calls: 4, input: 300, output: 30, cost_usd: 0 }],
+    by_agent: [{ agent: "explorer", calls: 4, input: 300, output: 30, cost_usd: 0 }],
+  });
+  const section = await screen.findByRole("region", { name: "Helpers" });
+  expect(within(section).getAllByRole("row")[1]?.textContent).toBe("explorer4330\u2014\u2014");
+});
+
+test("Usage shows the one helpers total from a daemon with no split by type", async () => {
+  mount({ ...SAMPLE_USAGE_WITH_HELPERS, by_agent: undefined });
+  const total = await screen.findByRole("region", { name: "Helpers" });
+  expect(within(total).queryByRole("table")).toBeNull();
+  expect(total.textContent).toContain("$0.50, 24% of the week");
 });
 
 test("Usage has no helpers line when no helper called a model", async () => {
