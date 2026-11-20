@@ -1169,6 +1169,96 @@
       "title": "HelperEndedEvent",
       "type": "object"
     },
+    "HelperModelData": {
+      "additionalProperties": false,
+      "description": "The model a helper runs on changed after ``helper.started``.\n\nThis is on the lead's log, with the same ``call_id``, ``index`` and ``helper_id`` as\n``helper.started``. It is written when the paid question is answered with a no: the\nhelper then runs on a local model. ``model`` is the model it runs on and ``pick_reason``\nsays in plain words why. A yes writes nothing.",
+      "properties": {
+        "call_id": {
+          "minLength": 1,
+          "title": "Call Id",
+          "type": "string"
+        },
+        "helper_id": {
+          "minLength": 1,
+          "title": "Helper Id",
+          "type": "string"
+        },
+        "index": {
+          "minimum": 0,
+          "title": "Index",
+          "type": "integer"
+        },
+        "model": {
+          "minLength": 1,
+          "title": "Model",
+          "type": "string"
+        },
+        "pick_reason": {
+          "title": "Pick Reason",
+          "type": "string"
+        }
+      },
+      "required": [
+        "call_id",
+        "index",
+        "helper_id",
+        "model",
+        "pick_reason"
+      ],
+      "title": "HelperModelData",
+      "type": "object"
+    },
+    "HelperModelEvent": {
+      "additionalProperties": false,
+      "description": "The model of a helper changed after it started. A summary on the lead's log.",
+      "properties": {
+        "data": {
+          "$ref": "#/$defs/HelperModelData"
+        },
+        "run_id": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Run Id"
+        },
+        "seq": {
+          "minimum": 1,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "session_id": {
+          "minLength": 1,
+          "title": "Session Id",
+          "type": "string"
+        },
+        "ts": {
+          "minLength": 1,
+          "title": "Ts",
+          "type": "string"
+        },
+        "type": {
+          "const": "helper.model",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "seq",
+        "session_id",
+        "ts",
+        "type",
+        "data"
+      ],
+      "title": "HelperModelEvent",
+      "type": "object"
+    },
     "HelperStartedData": {
       "additionalProperties": false,
       "description": "A helper session was made for one ``delegate`` call.\n\nThis is on the lead's log, with the ``delegate`` call's id as ``call_id``. ``index``\nis the helper's place in that call, and ``helper_id`` is its own session id.\n``agent`` is the agent type and ``label`` the short name the card shows. ``model`` is\nthe model it was given. ``wish`` is what the agent file asked for (``cheapest``,\n``same``, ``stronger``, a tier or a model) and ``pick_reason`` says in plain words\nwhy that model came out of it.",
@@ -5387,6 +5477,7 @@
           "context.changed": "#/$defs/ContextChangedEvent",
           "file.changed": "#/$defs/FileChangedEvent",
           "helper.ended": "#/$defs/HelperEndedEvent",
+          "helper.model": "#/$defs/HelperModelEvent",
           "helper.started": "#/$defs/HelperStartedEvent",
           "helper.state": "#/$defs/HelperStateEvent",
           "helper.step": "#/$defs/HelperStepEvent",
@@ -5554,6 +5645,9 @@
         },
         {
           "$ref": "#/$defs/HelperStartedEvent"
+        },
+        {
+          "$ref": "#/$defs/HelperModelEvent"
         },
         {
           "$ref": "#/$defs/HelperStepEvent"

@@ -18,6 +18,8 @@ from golem_protocol.events import (
     EventType,
     HelperEndedData,
     HelperEndedEvent,
+    HelperModelData,
+    HelperModelEvent,
     HelperStartedData,
     HelperStartedEvent,
     HelperStateData,
@@ -362,7 +364,7 @@ def _helper_event(cls: type, type_: str, data: object) -> object:
     )
 
 
-def test_the_five_helper_events_round_trip() -> None:
+def test_the_six_helper_events_round_trip() -> None:
     events = [
         _helper_event(
             HelperStartedEvent,
@@ -376,6 +378,17 @@ def test_the_five_helper_events_round_trip() -> None:
                 model="qwen3:14b",
                 wish="cheapest",
                 pick_reason="the loaded local model",
+            ),
+        ),
+        _helper_event(
+            HelperModelEvent,
+            "helper.model",
+            HelperModelData(
+                call_id="call_1",
+                index=0,
+                helper_id="s_helper",
+                model="qwen3:14b",
+                pick_reason="you said no, so a local model with a fresh window",
             ),
         ),
         _helper_event(

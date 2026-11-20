@@ -115,6 +115,20 @@ test("a cost says cloud when nobody said, and no cost says local only when told"
   assert.equal(unknown.helpers[0]?.local, false);
 });
 
+test("helper.model replaces the model and the reason that helper.started named, and an older log reads as before", () => {
+  const moved = ev("helper.model", { call_id: "d1", index: 0, helper_id: "h0", model: "qwen3:27b", pick_reason: "you said no, so a local model" });
+  const other = ev("helper.model", { call_id: "d2", index: 0, helper_id: "h0", model: "elsewhere", pick_reason: "x" });
+  const isLocal = (model: string): boolean => model.startsWith("qwen");
+  const batch = foldBatch("d1", [started(0, "a", "claude-opus"), moved, other, ended(0)], isLocal);
+  const helper = batch.helpers[0];
+  assert.equal(helper?.model, "qwen3:27b");
+  assert.equal(helper?.pickReason, "you said no, so a local model");
+  assert.equal(helper?.local, true);
+  const older = foldBatch("d1", [started(0, "a", "claude-opus"), ended(0)], isLocal);
+  assert.equal(older.helpers[0]?.model, "claude-opus");
+  assert.equal(older.helpers[0]?.pickReason, "the cheapest ready model");
+});
+
 test("a mixed batch shows cost first", () => {
   const events = [started(0, "a", "qwen3:27b"), started(1, "b", "claude-haiku"), ended(0), ended(1, { cost_usd: 0.1 })];
   const batch = foldBatch("d1", events, (model) => model.startsWith("qwen"));
