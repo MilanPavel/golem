@@ -719,8 +719,12 @@ def open_chat(
     paid_ok: Callable[[str | None], Awaitable[bool]] | None = None,
     budget_refs: Callable[[], list[str]] | None = None,
     next_model: NextModel | None = None,
+    label_of: Callable[[str | None, str], str] | None = None,
 ) -> ChatRuntime:
     """Compile the chat graph against ``checkpointer``.
+
+    ``label_of`` is called with a session id and ``chat`` or ``helper`` and returns how a call
+    holding a slot is named to the calls waiting behind it: the session title.
 
     ``tools`` defaults to the default registry. ``policy`` defaults to the
     built-in rules only, with no user or project file. Without ``artifacts``,
@@ -937,6 +941,7 @@ def open_chat(
                     state.get("session_id"),
                     "chat" if child is None else "helper",
                     arrived,
+                    label_of,
                 ) as grant:
                     if grant is not None:
                         arrived = grant.arrived
@@ -949,6 +954,8 @@ def open_chat(
                                 "waiting": True,
                                 "model": router.resolve(profile).model_id,
                                 "window": growth.window_to,
+                                "reason": "load",
+                                "line": router.resolve(profile).model_id,
                             }
                         )
                     return await binder.invoke(profile, chat, sent, schemas)
@@ -1745,11 +1752,15 @@ async def _gated(
     session_id: object,
     role: Literal["chat", "helper"],
     arrived: float | None,
+    label_of: Callable[[str | None, str], str] | None = None,
 ) -> AsyncGenerator[Grant | None]:
     """Hold a slot of the line ``profile`` runs on: a local model's, or a hosted provider's.
 
-    A wait of over a second writes ``model.waiting``, and it ends when the call has its turn.
-    ``arrived`` is the first arrival of a call that is tried again, so it keeps its place.
+    A wait of over a second writes ``model.waiting`` with its reason (``slot`` on a local line,
+    ``provider`` on a hosted one), the line's plain name, the position and the holder, and it
+    ends when the call has its turn. ``arrived`` is the first arrival of a call that is tried
+    again, so it keeps its place. ``label_of`` names the call for the waiters behind it, by
+    the session title.
     """
     line = None if dispatcher is None else router.local_line(profile)
     if dispatcher is not None and line is None:
@@ -1764,16 +1775,32 @@ async def _gated(
     told = False
 
     def notice(wait: Wait | None) -> None:
+        # The dispatcher decides when to call: after 1 s, on a new reason or position, and
+        # at most once a second. Each call is written as it comes.
         nonlocal told
-        if wait is not None and not told:
+        if wait is not None:
             told = True
-            write({STREAM_KEY: "model.waiting", "message_id": message_id, "waiting": True})
-        elif wait is None and told:
+            item: dict[str, object] = {
+                STREAM_KEY: "model.waiting",
+                "message_id": message_id,
+                "waiting": True,
+                "reason": wait.reason,
+                "line": wait.line,
+                "position": wait.position,
+            }
+            if wait.holder:
+                item["holder"] = wait.holder
+            if wait.reason == "provider" and wait.retry_in is not None:
+                item["retry_in_ms"] = round(wait.retry_in * 1000)
+            write(item)
+        elif told:
             told = False
             write({STREAM_KEY: "model.waiting", "message_id": message_id, "waiting": False})
 
-    label = "a chat" if role == "chat" else "a helper"
     sid = session_id if isinstance(session_id, str) else None
+    label = label_of(sid, role) if label_of is not None else None
+    if not label:
+        label = "a chat" if role == "chat" else "a helper"
     async with dispatcher.hold(Call(line, sid, role, label, arrived), notice) as grant:
         yield grant
 

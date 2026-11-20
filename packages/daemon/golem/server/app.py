@@ -332,6 +332,9 @@ class DaemonApp:
                     context=router.context_settings(),
                     price_of=lambda profile: _price_of(router, models, profile),
                     dispatcher=dispatch,
+                    label_of=lambda sid, role: (
+                        "a chat" if state.sessions is None else state.sessions.label_of(sid, role)
+                    ),
                     tier_of=lambda profile: _tier_of(router, models, profile),
                     ratios=TokenRatios(),
                     paid_ok=budget.paid_ok,

@@ -76,6 +76,7 @@ from golem.skills.pinned import PinMemory
 from golem_protocol.events import (
     ApprovalDecision,
     ApprovalNeededData,
+    ApprovalNeededEvent,
     ApprovalResolvedData,
     CallPrice,
     CheckCompletedData,
@@ -279,6 +280,9 @@ class _Progress:
     run_id: str = ""
     helper_ids: Callable[[str], Awaitable[list[str]]] | None = None
     """The helper sessions of a ``delegate`` call, by the call's id, for ``helper.wait``."""
+    user_message_id: str | None = None
+    """The message that started the run. The waits of the run itself (``team``, ``budget``,
+    and ``you`` when the approval names no message) are written for it."""
 
 
 async def run_turn(
@@ -301,6 +305,7 @@ async def run_turn(
         run_id=turn.run_id,
         note_speed=runtime.note_speed,
         helper_ids=_helper_ids(events, turn.run_id),
+        user_message_id=turn.user_message_id,
     )
 
     async def emit(kind: EventType, data: BaseModel) -> None:
@@ -424,6 +429,7 @@ async def ask_consent(
             replaces_model=consent.replaces,
         ),
     )
+    await _run_wait(emit, turn.user_message_id, "budget")
 
 
 def _routed(
@@ -478,6 +484,7 @@ async def resume_turn(
         run_id=resume.run_id,
         note_speed=runtime.note_speed,
         helper_ids=_helper_ids(events, resume.run_id),
+        user_message_id=resume.user_message_id,
         # The calls of a run that goes on after a park or a restart go on counting.
         index=sum(e.type == "model.call.started" for e in await events.for_run(resume.run_id)),
     )
@@ -488,6 +495,7 @@ async def resume_turn(
     try:
         control.started.set()
         if resume.go == "wake":
+            await _run_wait(emit, resume.user_message_id, "team", waiting=False)
             stream = runtime.resume(
                 session_id=resume.session_id,
                 answer=Answer.helpers_done(),
@@ -522,6 +530,11 @@ async def resume_turn(
                 child=resume.child,
             )
             return await _finish(stream, progress, emit)
+        if resume.consent is not None:
+            await _run_wait(emit, resume.user_message_id, "budget", waiting=False)
+        else:
+            asked_on = await _approval_message(events, resume)
+            await _run_wait(emit, asked_on, "you", waiting=False)
         if resume.consent is None:
             await emit(
                 "approval.resolved",
@@ -666,6 +679,11 @@ async def _apply(
                 waiting=fact.waiting,
                 model=fact.model,
                 window=fact.window,
+                reason=fact.reason,
+                line=fact.line,
+                position=fact.position,
+                holder=fact.holder,
+                retry_in_ms=fact.retry_in_ms,
             ),
         )
     elif isinstance(fact, ModelRequested):
@@ -892,8 +910,10 @@ async def _apply(
                 signal=fact.signal,
             ),
         )
+        await _run_wait(emit, progress.user_message_id, "budget")
     elif isinstance(fact, HelpersParked):
         progress.waiting = True
+        await _run_wait(emit, progress.user_message_id, "team")
         for call_id in fact.call_ids:
             ids = [] if progress.helper_ids is None else await progress.helper_ids(call_id)
             await emit(
@@ -914,6 +934,33 @@ async def _apply(
                 diff=fact.diff,
             ),
         )
+        await _run_wait(emit, fact.message_id or progress.user_message_id, "you")
+
+
+async def _run_wait(
+    emit: Callable[[EventType, BaseModel], Awaitable[None]],
+    message_id: str | None,
+    reason: Literal["you", "budget", "team"],
+    *,
+    waiting: bool = True,
+) -> None:
+    """``model.waiting`` for a wait the run itself is in: the answer of a person, a spend cap,
+    or its helpers (ADR-060, section 6). It is sent at once, and again with ``waiting`` false
+    when the run goes on. ``message_id`` is the message the wait is shown on; without one
+    nothing is sent."""
+    if message_id:
+        await emit(
+            "model.waiting",
+            ModelWaitingData(message_id=message_id, waiting=waiting, reason=reason),
+        )
+
+
+async def _approval_message(events: SessionLog, resume: Resume) -> str | None:
+    """The message the approval of ``resume`` was asked on: where ``you`` was shown."""
+    for event in await events.for_run(resume.run_id):
+        if isinstance(event, ApprovalNeededEvent) and event.data.call_id == resume.call_id:
+            return event.data.message_id or resume.user_message_id
+    return resume.user_message_id
 
 
 def _helper_ids(events: SessionLog, run_id: str) -> Callable[[str], Awaitable[list[str]]]:

@@ -457,8 +457,10 @@ async def test_cancelling_the_parent_cancels_the_helper(database: Database, proj
     run_id = await chat.manager.send(session_id, "go")
     async with asyncio.timeout(5):
         await model.waiting.wait()
-    parked = await chat.runs.waiting(session_id)
-    assert parked is not None and parked.run_id == run_id
+        # The helper may reach its model before the lead's run is stored as parked.
+        while (parked := await chat.runs.waiting(session_id)) is None:
+            await asyncio.sleep(0.01)
+    assert parked.run_id == run_id
 
     assert await chat.manager.cancel(run_id) is True
     events = await chat.finished(run_id)

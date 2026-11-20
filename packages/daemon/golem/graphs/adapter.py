@@ -10,13 +10,13 @@ import json
 import time
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
-from typing import Literal, cast
+from typing import Literal, cast, get_args
 
 from langchain_core.messages import AIMessage, AIMessageChunk, BaseMessage, ToolMessage
 
 from golem.graphs.partial_args import partial_field, partial_string
 from golem_protocol.commands import TraceMessage
-from golem_protocol.events import ConsentAnswer, ConsentCaps, RouteConsentNeededData
+from golem_protocol.events import ConsentAnswer, ConsentCaps, RouteConsentNeededData, WaitReason
 
 STREAM_KEY = "golem"
 """Key of every golem item on the custom stream. The graph writes, the adapter reads."""
@@ -56,12 +56,19 @@ class ModelWaiting:
     """The call with this ``message_id`` waits, or stopped waiting, for the local model.
 
     ``model`` and ``window`` are set while it loads the model again with a larger window.
+    ``reason``, ``line``, ``position``, ``holder`` and ``retry_in_ms`` say why it waits
+    (ADR-060, section 6).
     """
 
     message_id: str
     waiting: bool
     model: str | None = None
     window: int | None = None
+    reason: WaitReason | None = None
+    line: str | None = None
+    position: int | None = None
+    holder: str | None = None
+    retry_in_ms: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -926,12 +933,20 @@ def _custom(data: object) -> Fact | None:
     if kind == "model.started" and isinstance(message_id, str):
         return ModelStarted(message_id)
     if kind == "model.waiting" and isinstance(message_id, str):
-        model = item.get("model")
+        reason = item.get("reason")
+        retry = item.get("retry_in_ms")
         return ModelWaiting(
             message_id,
             item.get("waiting") is True,
-            model if isinstance(model, str) and model else None,
+            _text(item.get("model")),
             _positive(item.get("window")),
+            cast(WaitReason, reason) if reason in get_args(WaitReason) else None,
+            _text(item.get("line")),
+            _positive(item.get("position")),
+            _text(item.get("holder")),
+            retry
+            if isinstance(retry, int) and not isinstance(retry, bool) and retry >= 0
+            else None,
         )
     if kind == "model.routed":
         return _routed_fact(item)
@@ -1116,6 +1131,10 @@ def _counts(value: object) -> tuple[int, ...] | None:
         return None
     found = [_count(v) for v in cast(list[object], value)]
     return None if any(v is None for v in found) else tuple(v for v in found if v is not None)
+
+
+def _text(value: object) -> str | None:
+    return value if isinstance(value, str) and value else None
 
 
 def _positive(value: object) -> int | None:
