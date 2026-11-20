@@ -74,6 +74,7 @@ import { TOOLS_CASES } from "../features/setup/tools-sample.ts";
 import { PullStatusView, pullSummary } from "../features/models/index.ts";
 import { NO_OLLAMA_LISTING, OLLAMA_DOWN_LISTING, SAMPLE_LISTING, SAMPLE_PULLS, THINKING_LISTING } from "../features/models/sample.ts";
 import { CloseSessionDialog, HelperPanelView, RenameField, type HelperView } from "../features/sessions/index.ts";
+import { ALL_CLOUD, ALL_LOCAL, askingBatchChat, cloudBatchChat, localBatchChat } from "../features/chat/helper-card-sample.ts";
 import { ASKING_HELPER, DONE_HELPER, HELPER_NOW, RUNNING_HELPER } from "../features/sessions/helper-sample.ts";
 import { RoutineDetail, RoutinesEmpty, RoutinesPanel } from "../features/routines/index.ts";
 import { SAMPLE_LIST, SAMPLE_MORNING_BRIEF, ROUTINES_NOW, SAMPLE_RUNS } from "../features/routines/sample.ts";
@@ -409,6 +410,31 @@ function WorkbenchDemo() {
       <h3 className="mb-2 font-mono text-xs text-faint">Workbench</h3>
       <div className="flex h-96 max-w-full justify-end overflow-hidden rounded-lg border border-line">
         <Workbench id={id} tabs={DEMO_TABS} floating={false} onClose={() => {}} />
+      </div>
+    </section>
+  );
+}
+
+/** The batch card in the transcript: local only at three levels, cloud only at Normal, and a helper that asks. */
+function BatchCardDemo() {
+  const anchor = useAnchor();
+  const cases = [
+    ["local only, quiet", localBatchChat(), ALL_LOCAL, "quiet"],
+    ["local only, normal", localBatchChat(), ALL_LOCAL, "normal"],
+    ["local only, verbose", localBatchChat(), ALL_LOCAL, "verbose"],
+    ["cloud only, normal", cloudBatchChat(), ALL_CLOUD, "normal"],
+    ["one helper asking, normal", askingBatchChat(), ALL_LOCAL, "normal"],
+  ] as const;
+  return (
+    <section className="mt-6" id={anchor("Batch card")}>
+      <h3 className="mb-2 font-mono text-xs text-faint">Batch card</h3>
+      <div className="flex flex-col gap-3">
+        {cases.map(([title, chat, isLocal, detail]) => (
+          <div key={title} aria-label={`Batch card, ${title}`} role="group" className="flex flex-col gap-4 rounded-lg border border-line bg-bg p-4">
+            <p className="font-mono text-xs text-faint">{title}</p>
+            <TranscriptMessages chat={chat} detail={detail} isLocal={isLocal} />
+          </div>
+        ))}
       </div>
     </section>
   );
@@ -2175,6 +2201,7 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
       <TodoListDemo />
 
       <WorkbenchDemo />
+      <BatchCardDemo />
       <HelperPanelDemo />
 
       <ChangesDemo />

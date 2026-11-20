@@ -175,6 +175,8 @@ export {
   helperWorkingMs,
   lastSentence,
   reduceBatch,
+  isLocalFrom,
+  withLocal,
   windowK,
   windowSaved,
   type BatchCard,
