@@ -40,6 +40,7 @@ from golem.folders import FolderError, list_dirs
 from golem.mcp import McpServerError, McpSupervisor
 from golem.models import hardware, ollama
 from golem.models import options as model_options
+from golem.models.bench import NoLocalModel
 from golem.models.check import CheckError
 from golem.models.discovery import KeyRejected, KeyUnchecked
 from golem.models.errors import ModelUnreachable
@@ -223,6 +224,8 @@ from golem_protocol.commands import (
     MemoryWriteParams,
     MessageSendParams,
     MessageSendResult,
+    ModelBenchParams,
+    ModelBenchResult,
     ModelCategory,
     ModelCheckParams,
     ModelCheckResult,
@@ -1705,6 +1708,22 @@ async def _model_check(ctx: RequestContext, params: ModelCheckParams) -> ModelCh
     return ModelCheckResult(ref=ref, started=started)
 
 
+async def _model_bench(ctx: RequestContext, params: ModelBenchParams) -> ModelBenchResult:
+    """Start a benchmark of a local model. The numbers are only right on an idle machine.
+
+    The run's calls do not take dispatcher slots and the run holds no line, so a chat that
+    uses the same server during it shares the server and slows the numbers down.
+    """
+    benches = ctx.state.benches
+    if benches is None:
+        raise RpcCallError(INTERNAL_ERROR, "benchmarks are not ready")
+    try:
+        ref, started = benches.start(params.ref, params.engine)
+    except NoLocalModel as exc:
+        raise RpcCallError(MODEL_NOT_CONFIGURED, str(exc)) from exc
+    return ModelBenchResult(ref=ref, started=started)
+
+
 async def _model_pull(ctx: RequestContext, params: ModelPullParams) -> ModelPullResult:
     try:
         ref, started = await _pulls(ctx).start(params.name)
@@ -1940,6 +1959,7 @@ def standard_methods() -> dict[str, Method]:
             "session.set_skills", SessionSetSkillsParams, True, _session_set_skills
         ),
         "model.probe": Method("model.probe", ModelProbeParams, True, _model_probe),
+        "model.bench": Method("model.bench", ModelBenchParams, True, _model_bench),
         "model.check": Method("model.check", ModelCheckParams, True, _model_check),
         "model.pull": Method("model.pull", ModelPullParams, True, _model_pull),
         "model.pull_cancel": Method(

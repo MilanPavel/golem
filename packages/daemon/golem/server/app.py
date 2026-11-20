@@ -28,6 +28,7 @@ from golem.mcp import McpSupervisor
 from golem.mcp.prompt import mcp_section
 from golem.memory.service import MemoryChange, MemoryService
 from golem.memory.store import MemoryStore
+from golem.models.bench_manager import BenchManager
 from golem.models.budget import Budget
 from golem.models.check import CheckManager
 from golem.models.discovery import Loaded, ModelDiscovery
@@ -414,6 +415,7 @@ class DaemonApp:
                     price_of=lambda profile: _price_of(router, models, profile),
                 )
                 self.state.checks = checks
+                self.state.benches = BenchManager(router, local, broadcast=self._broadcast)
                 self.state.installer = OllamaInstaller(broadcast=self._broadcast)
                 self.state.runtimes = {
                     name: runtime_installer(name, broadcast=self._broadcast) for name in RUNTIMES
@@ -462,6 +464,9 @@ class DaemonApp:
             if self.state.checks is not None:
                 await self.state.checks.aclose()
             self.state.checks = None
+            if self.state.benches is not None:
+                await self.state.benches.aclose()
+            self.state.benches = None
             if self.state.pulls is not None:
                 await self.state.pulls.aclose()
             self.state.pulls = None

@@ -115,21 +115,28 @@ class Result:
 Call = Callable[[Shape], Awaitable[Sample]]
 """Makes one call of a shape and says what it wrote and how long it took."""
 
+OnRow = Callable[[int, int, Row], None]
+"""Hears each finished row: its place from 1, the number of rows, and the row."""
+
 
 async def run_levels(
     call: Call,
     levels: Sequence[int],
     shapes: Sequence[Shape] = SHAPES,
     *,
+    on_row: OnRow | None = None,
     clock: Callable[[], float] = time.monotonic,
 ) -> list[Row]:
     """Run each shape at each count in ``levels``. A level's calls start together."""
     rows: list[Row] = []
+    total = len(shapes) * len(levels)
     for shape in shapes:
         for at_once in levels:
             started = clock()
             samples = await asyncio.gather(*(call(shape) for _ in range(at_once)))
             rows.append(Row(shape, at_once, tuple(samples), clock() - started))
+            if on_row is not None:
+                on_row(len(rows), total, rows[-1])
     return rows
 
 
@@ -158,13 +165,14 @@ async def bench(
     *,
     limit: int = 1,
     shapes: Sequence[Shape] = SHAPES,
+    on_row: OnRow | None = None,
     clock: Callable[[], float] = time.monotonic,
 ) -> Result:
     """Measure a local model at 1 to 4 calls at once.
 
     ``limit`` is how many calls at once an external server took in the probe. It is
-    used only for a server golem does not own. Raises :class:`NoLocalModel` before
-    anything starts when there is no local model.
+    used only for a server golem does not own. ``on_row`` hears each row as it ends.
+    Raises :class:`NoLocalModel` before anything starts when there is no local model.
     """
     profile = local_profile(router, model)
     target = router.ollama_server(profile)
@@ -180,7 +188,7 @@ async def bench(
             top = min(top, OLLAMA.max_slots)
             call = _model_call(router, profile)
             await _warm(router, profile)
-            rows = await run_levels(call, range(1, top + 1), shapes, clock=clock)
+            rows = await run_levels(call, range(1, top + 1), shapes, on_row=on_row, clock=clock)
     finally:
         local.settings = saved
     return Result(router.resolve(profile).ref, tuple(rows))
@@ -251,6 +259,7 @@ __all__ = [
     "SHAPES",
     "Call",
     "NoLocalModel",
+    "OnRow",
     "Result",
     "Row",
     "Sample",

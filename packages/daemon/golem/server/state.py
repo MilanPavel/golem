@@ -14,6 +14,7 @@ from golem.coding.changes import ChangeStore
 from golem.mcp import McpSupervisor
 from golem.mcp.importer import ScanStore
 from golem.memory.service import MemoryService
+from golem.models.bench_manager import BenchManager
 from golem.models.check import CheckManager
 from golem.models.discovery import ModelDiscovery
 from golem.models.facts import FactsSource
@@ -54,6 +55,7 @@ class DaemonState:
     facts: FactsSource | None = None
     pulls: PullManager | None = None
     checks: CheckManager | None = None
+    benches: BenchManager | None = None
     policy: Policy | None = None
     tools: ToolRegistry | None = None
     artifacts: ArtifactStore | None = None
