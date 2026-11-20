@@ -118,7 +118,7 @@ export function UsageView({ result }: { result: CostGetResult }) {
         <section aria-label="Helpers" className="flex flex-col gap-1">
           <h3 className="text-sm font-medium">Helpers, last 7 days</h3>
           <p className="text-sm">
-            <span className="font-mono">{helpers.cost}</span>
+            <span>{helpers.cost}</span>
             {helpers.share === "" ? "" : `, ${helpers.share} of the week`}
             {` · ${helpers.calls} ${helpers.calls === 1 ? "call" : "calls"} · ${helpers.tokens} tokens`}
           </p>

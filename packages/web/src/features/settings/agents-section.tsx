@@ -34,7 +34,7 @@ function wishErrorText(error: unknown, name: string): string {
 function NowLine({ row }: { row: AgentRow }) {
   if (row.now === null) return null;
   return (
-    <span className="block font-mono text-xs text-muted" title={row.now.reason === "" ? undefined : row.now.reason}>
+    <span className="block text-meta text-muted" title={row.now.reason === "" ? undefined : row.now.reason}>
       {row.now.text}
       {row.now.freshWindow === "" ? null : `, ${row.now.freshWindow}`}
       {row.now.reason === "" ? null : <span className="sr-only">{`. ${row.now.reason}`}</span>}
