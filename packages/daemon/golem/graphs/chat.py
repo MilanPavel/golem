@@ -97,6 +97,8 @@ from golem.graphs.tools_node import (
     tools_node,
     unanswered_calls,
 )
+from golem.memory.privacy import Target
+from golem.memory.section import memory_block
 from golem.memory.service import MemoryAccess
 from golem.models.discovery import Loaded
 from golem.models.dispatcher import Call, Dispatcher, Grant, LineKey, Wait
@@ -293,11 +295,13 @@ class ChatRuntime:
         profile: str | None = None,
         options: Mapping[str, float | str] | None = None,
         tools: Sequence[str] = (),
+        memory: MemoryAccess | None = None,
     ) -> str:
         """The system prompt the next model call of ``session_id`` would get, or ``""``.
 
         With ``profile``, the sections that depend on the model's window see it, and ``tools``
-        are the names of the tools the call would offer.
+        are the names of the tools the call would offer. ``memory`` is the access a run would
+        carry, for the memory block.
         """
         values = await self.values(session_id)
         window = None
@@ -310,6 +314,7 @@ class ChatRuntime:
             mcp_servers=tuple(mcp_servers),
             tools=tuple(tools),
             window=window,
+            memory=await _memory_block(memory, self.tier_of, profile),
         )
         return self.prompt.text(context)
 
@@ -884,6 +889,7 @@ def open_chat(
                 plan_first=plan_first,
                 tools=offered,
                 window=window.window,
+                memory=await _memory_block(memory_of(config), tier_of, profile),
             )
             parts = (
                 [("helper", CHILD_PROMPT)] if child is not None else system_prompt.parts(context)
@@ -1885,6 +1891,18 @@ def _outgoing(
     if final:
         sent.append(HumanMessage(content=FINAL_REQUEST))
     return sent
+
+
+async def _memory_block(
+    access: MemoryAccess | None,
+    tier_of: Callable[[str], Tier | None] | None,
+    profile: str | None,
+) -> str | None:
+    """The fixed memory block for the model of this call. A model of unknown tier is hosted."""
+    if access is None:
+        return None
+    tier = None if tier_of is None or not profile else tier_of(profile)
+    return await memory_block(access, Target(local=tier == "local"))
 
 
 def _local_only(config: RunnableConfig) -> bool:

@@ -26,6 +26,7 @@ from golem.lock import DaemonAlreadyRunning, DaemonLock
 from golem.logging import configure_logging
 from golem.mcp import McpSupervisor
 from golem.mcp.prompt import mcp_section
+from golem.memory.section import memory_section
 from golem.memory.service import MemoryChange, MemoryService
 from golem.memory.store import MemoryStore
 from golem.models.bench_manager import BenchManager
@@ -315,6 +316,7 @@ class DaemonApp:
                         sections=(
                             pinned_section(self.state.skills),
                             index_section(self.state.skills),
+                            memory_section(),
                             mcp_section(mcp),
                             DELEGATE_PROMPT,
                             CITE_PROMPT,
