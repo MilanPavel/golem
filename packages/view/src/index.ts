@@ -160,7 +160,7 @@ export {
   type WhyInput,
   type WhyRow,
 } from "./route.ts";
-export { costReportLines, formatCost, formatCount, referenceName, roleName, sessionCostLabel, turnFooterParts, turnTotals, type TurnTotals } from "./cost.ts";
+export { costReportLines, formatCost, helperCost, type HelperCost, formatCount, referenceName, roleName, sessionCostLabel, turnFooterParts, turnTotals, type TurnTotals } from "./cost.ts";
 export {
   batchCard,
   batchHead,
@@ -859,8 +859,15 @@ export {
   agentsTable,
   agentWarnings,
   agentWish,
+  wishNow,
+  wishOptions,
+  type WishModel,
+  wishSetup,
   type AgentOrigin,
   type AgentRow,
+  type WishNow,
+  type WishOption,
+  type WishSetup,
 } from "./agents-view.ts";
 export {
   groupMemories,

@@ -101,6 +101,7 @@ export function fakeClient() {
     onSkillsChanged: skills.on,
     onAgentsChanged: agents.on,
     listAgents: vi.fn<PageClient["listAgents"]>(async () => ({ agents: [] })),
+    setAgentWish: vi.fn<PageClient["setAgentWish"]>(async (name, wish) => ({ name, description: "", origin: "user", wish })),
     onMemoryChanged: memory.on,
     listMemories: vi.fn<PageClient["listMemories"]>(async () => ({ items: [], total: 0, counts: {}, settings: {} })),
     updateMemory: vi.fn<PageClient["updateMemory"]>(async () => ({}) as never),

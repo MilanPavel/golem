@@ -57,7 +57,7 @@ import { MemoryView } from "../features/settings/memory/memory-view.tsx";
 import { SAMPLE_MEMORIES, SAMPLE_MEMORY_COUNTS, SAMPLE_MEMORY_SETTINGS } from "../features/settings/memory/sample.ts";
 import { MEMORY_OFF_TEXT } from "../store/memory.ts";
 import { AgentsTable } from "../features/settings/agents-section.tsx";
-import { SAMPLE_AGENTS } from "../features/settings/agents-sample.ts";
+import { SAMPLE_AGENTS, WISH_AGENTS_CLOUD, WISH_AGENTS_LOCAL, WISH_AGENTS_MIXED } from "../features/settings/agents-sample.ts";
 import { SkillList } from "../features/settings/skills-section.tsx";
 import { SkillOverview } from "../features/settings/skills/skill-detail.tsx";
 import { SAMPLE_BROKEN_SKILL_MD, SAMPLE_SKILLS } from "../features/settings/skills/sample.ts";
@@ -66,7 +66,7 @@ import { CONTEXT_CASES, PLANNED_WINDOW } from "../features/settings/context-samp
 import { RoutingView } from "../features/settings/routing-section.tsx";
 import { ROUTING_CASES, ROUTING_LISTING } from "../features/settings/routing-sample.ts";
 import { UsageView } from "../features/settings/usage-section.tsx";
-import { EMPTY_USAGE, SAMPLE_USAGE } from "../features/settings/usage-sample.ts";
+import { EMPTY_USAGE, SAMPLE_USAGE, SAMPLE_USAGE_WITH_HELPERS } from "../features/settings/usage-sample.ts";
 import { CodeEditor } from "../features/settings/config/code-editor.tsx";
 import { CatalogView } from "../features/settings/mcp/catalog-panel.tsx";
 import { ImportListView } from "../features/settings/mcp/import-panel.tsx";
@@ -1356,6 +1356,18 @@ function AgentsDemo() {
         <span className="font-mono text-xs text-faint">Table, with a broken file and a project agent that is not trusted</span>
         <AgentsTable agents={SAMPLE_AGENTS} />
       </section>
+      {(
+        [
+          ["Wish table, local models only", "local", WISH_AGENTS_LOCAL],
+          ["Wish table, mixed", "mixed", WISH_AGENTS_MIXED],
+          ["Wish table, cloud models only", "cloud", WISH_AGENTS_CLOUD],
+        ] as const
+      ).map(([title, setup, agents]) => (
+        <section key={setup} aria-label={title} className="flex flex-col gap-3 rounded-lg border border-line bg-bg p-4">
+          <span className="font-mono text-xs text-faint">{title}</span>
+          <AgentsTable agents={agents} setup={setup} onSetWish={async () => {}} />
+        </section>
+      ))}
       <section aria-label="Agents, empty" className="flex flex-col gap-3 rounded-lg border border-line bg-bg p-4">
         <span className="font-mono text-xs text-faint">Empty</span>
         <AgentsTable agents={[]} />
@@ -1461,7 +1473,7 @@ function UsageDemo() {
   return (
     <div className="flex flex-col gap-4">
       {[
-        ["Usage, filled", SAMPLE_USAGE],
+        ["Usage, filled, with the cost of helpers", SAMPLE_USAGE_WITH_HELPERS],
         ["Usage, empty", EMPTY_USAGE],
       ].map(([label, result]) => (
         <section key={label as string} aria-label={label as string} className="flex flex-col gap-3 rounded-lg border border-line bg-bg p-4">

@@ -25,3 +25,12 @@ export const SAMPLE_USAGE: CostGetResult = {
 
 /** No call in the week. */
 export const EMPTY_USAGE: CostGetResult = { today: NONE, week: NONE, by_model: [], by_day: [] };
+
+/** The same week with the jobs split: the chat, and the helpers (`explore`) that cost a part of it. */
+export const SAMPLE_USAGE_WITH_HELPERS: CostGetResult = {
+  ...SAMPLE_USAGE,
+  by_role: [
+    { role: "chat", calls: 70, input: 1_100_000, output: 90_000, cost_usd: 1.6 },
+    { role: "explore", calls: 26, input: 300_000, output: 30_000, cost_usd: 0.5 },
+  ],
+};

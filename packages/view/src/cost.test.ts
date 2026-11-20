@@ -4,7 +4,7 @@ import { test } from "node:test";
 import type { ChatEvent, CostGetResult } from "@golem/client";
 
 import { emptyChat, reduceChat, type ChatMessage } from "./chat-state.ts";
-import { costReportLines, formatCost, sessionCostLabel, turnFooterParts, turnTotals } from "./cost.ts";
+import { costReportLines, formatCost, helperCost, sessionCostLabel, turnFooterParts, turnTotals } from "./cost.ts";
 import { turnFooter } from "./turns.ts";
 
 function ev(type: string, data: Record<string, unknown>): ChatEvent {
@@ -176,4 +176,20 @@ test("turnFooterParts puts the routed note before the model", () => {
     "$0.004",
   ]);
   assert.deepEqual(turnFooterParts(totals), ["deepseek-chat", "1.2K tok", "$0.004"]);
+});
+
+test("helperCost reads the explore row of by_role, and is null with no helper calls", () => {
+  const totals = { input: 0, output: 0, calls: 0, cost_usd: 0, saved_usd: 0 };
+  const result: CostGetResult = {
+    today: totals,
+    week: { ...totals, calls: 10, cost_usd: 2 },
+    by_role: [
+      { role: "chat", calls: 6, input: 100, output: 50, cost_usd: 1.5 },
+      { role: "explore", calls: 4, input: 38_000, output: 200, cost_usd: 0.5 },
+    ],
+  };
+  assert.deepEqual(helperCost(result), { calls: 4, tokens: "38.2K", cost: "$0.50", share: "25%" });
+  assert.equal(helperCost({ ...result, by_role: [result.by_role![0]!] }), null);
+  assert.equal(helperCost({ ...result, by_role: undefined }), null);
+  assert.equal(helperCost({ ...result, week: { ...totals, calls: 4 } })?.share, "");
 });

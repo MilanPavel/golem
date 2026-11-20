@@ -33,6 +33,7 @@ from langchain_core.messages import BaseMessage
 from langchain_core.runnables import RunnableConfig
 
 from golem.agents.bundled import bundled_agents_dir
+from golem.agents.model import Agent
 from golem.agents.registry import AgentRegistry
 from golem.config import AgentSettings, ModelPrice, PermissionMode, RouteMode
 from golem.evals.whatif import build_report, session_model
@@ -53,7 +54,7 @@ from golem.models.cost import cost_usd
 from golem.models.errors import BUDGET_HINT
 from golem.models.facts import FactsSource, ModelFacts
 from golem.models.pick import Choice, Rejected, Traits, ladder, pick
-from golem.models.pick_helper import pick_helper
+from golem.models.pick_helper import HelperChoice, pick_helper
 from golem.models.privacy import LOCAL_ONLY_REFUSAL, is_local_only
 from golem.models.project_privacy import project_local_only
 from golem.models.router import ModelConfigError, ModelIdentity, ModelRouter
@@ -392,6 +393,36 @@ class _HelperModel:
     ask: Consent | None = None
     """The paid question to ask before the helper runs on this model. Without the helper's own
     fields: :meth:`start_helper` fills them in."""
+
+
+@dataclass(frozen=True, slots=True)
+class _HelperSetup:
+    """The inputs of :func:`pick_helper` for one lead."""
+
+    own: ModelFacts
+    candidates: list[ModelFacts]
+    traits: Traits
+    room: Room | None
+
+
+@dataclass(frozen=True, slots=True)
+class WishPick:
+    """What a wish becomes, as :meth:`SessionManager.resolve_wish` answers."""
+
+    profile: str
+    tier: Tier | None
+    detail: str
+    fresh_window: bool
+    overridden_by: str | None = None
+    """The wish that ``[routing.roles] explore`` put in place of the agent file's."""
+
+
+def _asks_first(choice: HelperChoice, local: HelperChoice) -> str:
+    """The reason of a paid pick that waits for the user's yes."""
+    return (
+        f"{choice.detail}; it waits for your yes, and on a no it runs on "
+        f"{local.model.profile} with a fresh window"
+    )
 
 
 class _NoLocalFit(Exception):
@@ -1417,35 +1448,22 @@ class SessionManager:
         ask (``ask``) and the paid model; its reason says what a no becomes. ``answer`` is the
         user's answer to that question: a yes takes the paid pick, ``local`` the local one.
         """
-        router = self._runtime.router
-        settings = router.routing_settings()
+        settings = self._runtime.router.routing_settings()
         wish = wish_of(agent, settings.roles)
-        everything = await self._facts_of(
-            lead, settings.ladder.model_dump().values(), model_profile
+        setup = await self._helper_setup(
+            wish,
+            model_profile,
+            lead.options,
+            lead.session_id,
+            interactive=not lead.origin.startswith("routine:"),
+            local_only=local_only,
+            chat_paid=lead.paid_ok,
+            answer=answer,
         )
-        own = next((m for m in everything if model_profile in (m.profile, m.ref)), None)
-        if own is None:
+        if setup is None:
             # Only a setup without facts gets here (the daemon always has them).
             return _HelperModel(model_profile, wish, "no budget model ready", True)
-        candidates = ladder(settings.ladder, model_profile, everything)
-        named = next((m for m in everything if wish in (m.profile, m.ref)), None)
-        if named is not None and all(named.ref != m.ref for m in candidates):
-            candidates.append(named)  # a model the agent names, though the ladder does not
-        interactive = not lead.origin.startswith("routine:")
-        if settings.paid == "never" or not interactive:  # privacy is the pick's own rule
-            candidates = [m for m in candidates if m.tier == "local"]
-        room = None if self.budget is None else await self.budget.room(lead.session_id)
-        traits = Traits(
-            reply_reserve=router.context_settings().reply_reserve,
-            needs_tools=True,
-            local_only=local_only,
-            # A chat on a hosted model is paid already; on a local one the user has not agreed.
-            paid_allowed=own.tier != "local"
-            or answer in ("session", "once")
-            or (lead.paid_ok and settings.paid != "always_ask"),
-            # A spent cap takes the paid models out, so the helper lands on a local one.
-            paid_room_usd=None if room is None else room.usd,
-        )
+        own, candidates, traits, room = setup.own, setup.candidates, setup.traits, setup.room
         choice = pick_helper(wish, own, candidates, traits)
         if answer == "local":
             choice = pick_local(wish, own, candidates, traits)
@@ -1467,10 +1485,7 @@ class SessionManager:
                     wish, own, candidates, traits, "the paid question cannot be asked here"
                 )
             else:
-                detail = (
-                    f"{choice.detail}; it waits for your yes, and on a no it runs on "
-                    f"{local.model.profile} with a fresh window"
-                )
+                detail = _asks_first(choice, local)
                 return _HelperModel(
                     choice.model.profile, wish, detail, False, routed_of(wish, choice), question
                 )
@@ -1480,6 +1495,91 @@ class SessionManager:
             choice.detail,
             choice.model.ref == own.ref,
             routed_of(wish, choice),
+        )
+
+    async def _helper_setup(
+        self,
+        wish: str,
+        profile: str,
+        options: Mapping[str, float | str],
+        session_id: str | None,
+        *,
+        interactive: bool,
+        local_only: bool,
+        chat_paid: bool,
+        answer: ConsentAnswer | None = None,
+    ) -> _HelperSetup | None:
+        """What :func:`pick_helper` needs for a lead on ``profile``: its facts, the candidates of
+        the setup and the traits. None without model facts.
+
+        The candidates and the traits are the ones a turn of the lead builds (:meth:`_route`).
+        :meth:`_helper_model` and :meth:`resolve_wish` both take them from here, so a helper and
+        ``agents.list`` never pick differently.
+        """
+        router = self._runtime.router
+        settings = router.routing_settings()
+        everything = await self._facts_for(profile, options, settings.ladder.model_dump().values())
+        own = next((m for m in everything if profile in (m.profile, m.ref)), None)
+        if own is None:
+            return None
+        candidates = ladder(settings.ladder, profile, everything)
+        named = next((m for m in everything if wish in (m.profile, m.ref)), None)
+        if named is not None and all(named.ref != m.ref for m in candidates):
+            candidates.append(named)  # a model the agent names, though the ladder does not
+        if settings.paid == "never" or not interactive:  # privacy is the pick's own rule
+            candidates = [m for m in candidates if m.tier == "local"]
+        room = (
+            None
+            if self.budget is None or session_id is None
+            else await self.budget.room(session_id)
+        )
+        traits = Traits(
+            reply_reserve=router.context_settings().reply_reserve,
+            needs_tools=True,
+            local_only=local_only,
+            # A chat on a hosted model is paid already; on a local one the user has not agreed.
+            paid_allowed=own.tier != "local"
+            or answer in ("session", "once")
+            or (chat_paid and settings.paid != "always_ask"),
+            # A spent cap takes the paid models out, so the helper lands on a local one.
+            paid_room_usd=None if room is None else room.usd,
+        )
+        return _HelperSetup(own, candidates, traits, room)
+
+    async def resolve_wish(self, agent: Agent | AgentSnapshot, cwd: str | None) -> WishPick | None:
+        """What the wish of ``agent`` becomes for a new chat in ``cwd``: the pick a helper of it
+        would get, for the default model as the lead, with no paid consent given yet.
+
+        None without model facts. A paid pick is reported as it is, and says it asks first.
+        """
+        settings = self._runtime.router.routing_settings()
+        wish = wish_of(agent, settings.roles)
+        lead = self._runtime.router.default
+        if lead is None:
+            return None
+        setup = await self._helper_setup(
+            wish,
+            lead,
+            {},
+            None,
+            interactive=True,
+            local_only=self.local_only(cwd),
+            chat_paid=False,
+        )
+        if setup is None:
+            return None
+        choice = pick_helper(wish, setup.own, setup.candidates, setup.traits)
+        detail = choice.detail
+        if choice.needs_consent:
+            local = pick_local(wish, setup.own, setup.candidates, setup.traits)
+            detail = _asks_first(choice, local)
+        override = wish != agent.wish
+        return WishPick(
+            profile=choice.model.profile,
+            tier=choice.model.tier,
+            detail=detail,
+            fresh_window=choice.fresh_window,
+            overridden_by=wish if override else None,
         )
 
     async def start_helpers(
@@ -2633,17 +2733,23 @@ class SessionManager:
     ) -> list[ModelFacts]:
         """The facts of the session's model (or ``profile``), the ladder's names and every listed
         model."""
+        return await self._facts_for(profile or session.model_profile, session.options, named)
+
+    async def _facts_for(
+        self, profile: str, options: Mapping[str, float | str], named: Iterable[object]
+    ) -> list[ModelFacts]:
+        """The facts of ``profile``, the ladder's names and every listed model."""
         if self.facts is None:
             return []
         router = self._runtime.router
         refs: list[str] = []
-        for name in (profile or session.model_profile, *(n for n in named if isinstance(n, str))):
+        for name in (profile, *(n for n in named if isinstance(n, str))):
             try:
                 refs.append(router.resolve(name).ref)
             except ModelConfigError:
                 continue
         refs.extend(self.listed_refs())
-        return await self.facts.facts(list(dict.fromkeys(refs)), overrides=dict(session.options))
+        return await self.facts.facts(list(dict.fromkeys(refs)), overrides=dict(options))
 
     async def respond(
         self,

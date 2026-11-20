@@ -2843,11 +2843,13 @@ public struct EvalRoutingParams: Codable {
 /// ``scenarios`` are the what-if rows, ``actual`` is what really ran. ``skipped`` counts the
 /// model calls that could not be sized (an old event, or a failed call) and are in no row.
 /// ``top`` are the sessions where ``auto`` would have spent most, the dearest first.
+/// ``helpers`` are the helpers of those sessions, one row per ``helper.started``.
 // MARK: - EvalRoutingResult
 public struct EvalRoutingResult: Codable {
     public let actual: ActualClass
     public let calls: Int
     public let days: Int
+    public let helpers: [EvalHelperRow]?
     public let scenarios: [ActualClass]?
     public let sessions: Int
     public let skipped: Int
@@ -2857,16 +2859,18 @@ public struct EvalRoutingResult: Codable {
         case actual = "actual"
         case calls = "calls"
         case days = "days"
+        case helpers = "helpers"
         case scenarios = "scenarios"
         case sessions = "sessions"
         case skipped = "skipped"
         case top = "top"
     }
 
-    public init(actual: ActualClass, calls: Int, days: Int, scenarios: [ActualClass]?, sessions: Int, skipped: Int, top: [TopElement]?) {
+    public init(actual: ActualClass, calls: Int, days: Int, helpers: [EvalHelperRow]?, scenarios: [ActualClass]?, sessions: Int, skipped: Int, top: [TopElement]?) {
         self.actual = actual
         self.calls = calls
         self.days = days
+        self.helpers = helpers
         self.scenarios = scenarios
         self.sessions = sessions
         self.skipped = skipped
@@ -2916,6 +2920,50 @@ public struct ActualClass: Codable {
         self.peakShare = peakShare
         self.stepUPS = stepUPS
         self.summaries = summaries
+    }
+}
+
+/// One helper of a recorded session, and the model ``pick_helper`` gives it in this setup.
+///
+/// ``ran`` and ``ran_why`` are what ``helper.started`` recorded: the model, and the reason
+/// in plain words. ``would`` and ``would_why`` are the pick made again now, on the models
+/// that are ready. ``would_asks`` is true when that pick is paid and the chat has not
+/// agreed,
+/// so the daemon would ask first. No title and no text.
+// MARK: - EvalHelperRow
+public struct EvalHelperRow: Codable {
+    public let agent: String
+    public let ran: String
+    public let ranWhy: String
+    public let sessionID: String
+    public let wish: String
+    public let would: String
+    public let wouldAsks: Bool?
+    public let wouldTier: String
+    public let wouldWhy: String
+
+    public enum CodingKeys: String, CodingKey {
+        case agent = "agent"
+        case ran = "ran"
+        case ranWhy = "ran_why"
+        case sessionID = "session_id"
+        case wish = "wish"
+        case would = "would"
+        case wouldAsks = "would_asks"
+        case wouldTier = "would_tier"
+        case wouldWhy = "would_why"
+    }
+
+    public init(agent: String, ran: String, ranWhy: String, sessionID: String, wish: String, would: String, wouldAsks: Bool?, wouldTier: String, wouldWhy: String) {
+        self.agent = agent
+        self.ran = ran
+        self.ranWhy = ranWhy
+        self.sessionID = sessionID
+        self.wish = wish
+        self.would = would
+        self.wouldAsks = wouldAsks
+        self.wouldTier = wouldTier
+        self.wouldWhy = wouldWhy
     }
 }
 

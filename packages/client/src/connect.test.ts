@@ -1567,6 +1567,29 @@ test("agents.list reads the agent types, and agent.registry.changed reaches onAg
   }
 });
 
+test("agents.set_wish sends the name and wish, and a result that is not an agent is refused", async () => {
+  const sent: Record<string, unknown>[] = [];
+  const updated = { name: "scout", description: "Reads.", origin: "user", wish: "stronger", resolves_to: { model: "claude-sonnet", tier: "frontier" } };
+  const server = await listen((socket) => {
+    attach(socket, {
+      answerPing: true,
+      results: { "agents.set_wish": updated },
+      onRequest: (_socket, method, params) => {
+        if (method === "agents.set_wish") sent.push({ ...params });
+      },
+    });
+  });
+  const client = connectGolem({ socketPath: server.socketPath, clientName: "tui", reconnect: false, heartbeatMs: 60_000 });
+  try {
+    assert.deepEqual(await client.setAgentWish("scout", "stronger", "/repo"), updated);
+    await client.setAgentWish("scout", "stronger");
+    assert.deepEqual(sent, [{ name: "scout", wish: "stronger", cwd: "/repo" }, { name: "scout", wish: "stronger" }]);
+  } finally {
+    client.close();
+    await server.close();
+  }
+});
+
 test("memory.list reads a page, and memory.changed reaches onMemoryChanged unless it is malformed", async () => {
   const note = { id: "mem_1", scope: "you", title: "pnpm", text: "Use pnpm.", author: "you", state: "kept", sources: [] };
   const page = {
