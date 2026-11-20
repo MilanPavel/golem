@@ -68,6 +68,8 @@ import type { HelloResult } from "../../protocol/gen/hello-result.ts";
 import type { MessageSendResult } from "../../protocol/gen/message-send-result.ts";
 import type { ModelListResult } from "../../protocol/gen/model-list-result.ts";
 import type { ModelProbeResult } from "../../protocol/gen/model-probe-result.ts";
+import type { ModelBenchDone } from "../../protocol/gen/model-bench-done.ts";
+import type { ModelBenchProgress } from "../../protocol/gen/model-bench-progress.ts";
 import type { ModelCheckDone } from "../../protocol/gen/model-check-done.ts";
 import type { ModelCheckProgress } from "../../protocol/gen/model-check-progress.ts";
 import type { ModelPullDone } from "../../protocol/gen/model-pull-done.ts";
@@ -449,6 +451,26 @@ export function isCheckProgress(value: unknown): value is ModelCheckProgress {
     typeof value["index"] === "number" &&
     typeof value["total"] === "number" &&
     isRecord(value["result"])
+  );
+}
+
+export function isBenchProgress(value: unknown): value is ModelBenchProgress {
+  return (
+    isRecord(value) &&
+    typeof value["ref"] === "string" &&
+    typeof value["index"] === "number" &&
+    typeof value["total"] === "number" &&
+    isRecord(value["row"]) &&
+    Array.isArray(value["row"]["each"])
+  );
+}
+
+export function isBenchDone(value: unknown): value is ModelBenchDone {
+  return (
+    isRecord(value) &&
+    typeof value["ref"] === "string" &&
+    typeof value["ok"] === "boolean" &&
+    (value["rows"] === undefined || Array.isArray(value["rows"]))
   );
 }
 

@@ -99,6 +99,9 @@ import type { MessageSendResult } from "../../protocol/gen/message-send-result.t
 import type { ModelListResult } from "../../protocol/gen/model-list-result.ts";
 import type { ModelDeleteResult } from "../../protocol/gen/model-delete-result.ts";
 import type { ModelProbeResult } from "../../protocol/gen/model-probe-result.ts";
+import type { ModelBenchDone } from "../../protocol/gen/model-bench-done.ts";
+import type { ModelBenchProgress } from "../../protocol/gen/model-bench-progress.ts";
+import type { ModelBenchResult } from "../../protocol/gen/model-bench-result.ts";
 import type { ModelCheckDone } from "../../protocol/gen/model-check-done.ts";
 import type { ModelCheckProgress } from "../../protocol/gen/model-check-progress.ts";
 import type { ModelCheckResult } from "../../protocol/gen/model-check-result.ts";
@@ -199,6 +202,8 @@ import {
   isSessionSetPlanResult,
   isSessionSetModeResult,
   isSessionSetOptionsResult,
+  isBenchDone,
+  isBenchProgress,
   isCheckDone,
   isCheckProgress,
   isPullDone,
@@ -475,6 +480,13 @@ export interface GolemClient {
   /** `model.check.progress` and `model.check.done`, from any client's check. */
   onCheck(listener: (update: CheckUpdate) => void): () => void;
   /**
+   * Start the speed measurement of a local model at several calls at once. It answers at once;
+   * rows reach {@link GolemClient.onBench}. A hosted model is refused with {@link MODEL_NOT_CONFIGURED}.
+   */
+  benchModel(ref: string, engine?: string): Promise<ModelBenchResult>;
+  /** `model.bench.progress` and `model.bench.done`, from any client's measurement. */
+  onBench(listener: (update: BenchUpdate) => void): () => void;
+  /**
    * The MCP servers, with their state and tools. With `sessionId`, also the
    * servers of that session's trusted project, and whether each is on for it.
    */
@@ -650,6 +662,10 @@ export type CheckUpdate =
   | { kind: "progress"; progress: ModelCheckProgress }
   | { kind: "done"; done: ModelCheckDone };
 
+export type BenchUpdate =
+  | { kind: "progress"; progress: ModelBenchProgress }
+  | { kind: "done"; done: ModelBenchDone };
+
 interface Pending {
   method: string;
   resolve: (value: unknown) => void;
@@ -681,6 +697,7 @@ export function connectGolem(options: ConnectOptions): GolemClient {
   const wireListeners = new Set<(lines: readonly WireLine[]) => void>();
   const pullListeners = new Set<(update: PullUpdate) => void>();
   const checkListeners = new Set<(update: CheckUpdate) => void>();
+  const benchListeners = new Set<(update: BenchUpdate) => void>();
   const mcpListeners = new Set<(server: McpServer) => void>();
   const loginListeners = new Set<(done: McpLoginDone) => void>();
   const testListeners = new Set<(progress: McpTestProgress) => void>();
@@ -863,6 +880,27 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       }
       if (update !== undefined) {
         for (const listener of checkListeners) {
+          try {
+            listener(update);
+          } catch {
+            // A listener must not tear the socket down.
+          }
+        }
+      }
+      return;
+    }
+    if (isRecord(message) && (message["method"] === "model.bench.progress" || message["method"] === "model.bench.done")) {
+      const params = message["params"];
+      const ref = isRecord(params) && typeof params["ref"] === "string" ? params["ref"] : "";
+      record({ direction: "in", kind: message["method"], detail: ref, json: line });
+      let update: BenchUpdate | undefined;
+      if (message["method"] === "model.bench.progress" && isBenchProgress(params)) {
+        update = { kind: "progress", progress: params };
+      } else if (message["method"] === "model.bench.done" && isBenchDone(params)) {
+        update = { kind: "done", done: params };
+      }
+      if (update !== undefined) {
+        for (const listener of benchListeners) {
           try {
             listener(update);
           } catch {
@@ -1861,6 +1899,20 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       checkListeners.add(listener);
       return () => {
         checkListeners.delete(listener);
+      };
+    },
+    async benchModel(ref: string, engine?: string): Promise<ModelBenchResult> {
+      await ready;
+      const result = await call("model.bench", engine === undefined ? { ref } : { ref, engine });
+      if (!isRefResult(result, "started")) {
+        throw new Error("invalid model.bench result");
+      }
+      return result as ModelBenchResult;
+    },
+    onBench(listener: (update: BenchUpdate) => void): () => void {
+      benchListeners.add(listener);
+      return () => {
+        benchListeners.delete(listener);
       };
     },
     async listMcp(sessionId?: string): Promise<McpListResult> {

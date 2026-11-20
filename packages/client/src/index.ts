@@ -32,6 +32,7 @@ export {
   type GolemClient,
   type OllamaInstallUpdate,
   type RuntimeInstallUpdate,
+  type BenchUpdate,
   type CheckUpdate,
   type PullUpdate,
   type SessionSummary,
