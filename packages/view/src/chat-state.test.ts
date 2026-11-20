@@ -718,8 +718,14 @@ test("helper events fold into the same helper run as the events with a parent ca
     ...step?.child,
     toolSteps: step?.child?.toolSteps.map(({ callId, name, args, status }) => ({ callId, name, args, status })),
     startedAt: null,
+    // Only the new events name the helper's own session.
+    helpers: [],
   });
   assert.deepEqual(plain(newStep), plain(oldStep));
+  assert.deepEqual(
+    newStep?.child?.helpers.map(({ id, index, agent, model, ended }) => ({ id, index, agent, model, calls: ended?.modelCalls })),
+    [{ id: "h1", index: 0, agent: "explorer", model: "qwen3:27b", calls: 2 }],
+  );
   assert.equal(newStep?.child?.status, "done");
   assert.equal(helperLine(newStep!), helperLine(oldStep!));
   assert.equal(now.messages.length, old.messages.length);

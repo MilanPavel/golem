@@ -73,7 +73,8 @@ import { ToolsOfferView } from "../features/setup/tools-offer.tsx";
 import { TOOLS_CASES } from "../features/setup/tools-sample.ts";
 import { PullStatusView, pullSummary } from "../features/models/index.ts";
 import { NO_OLLAMA_LISTING, OLLAMA_DOWN_LISTING, SAMPLE_LISTING, SAMPLE_PULLS, THINKING_LISTING } from "../features/models/sample.ts";
-import { CloseSessionDialog, RenameField } from "../features/sessions/index.ts";
+import { CloseSessionDialog, HelperPanelView, RenameField, type HelperView } from "../features/sessions/index.ts";
+import { ASKING_HELPER, DONE_HELPER, HELPER_NOW, RUNNING_HELPER } from "../features/sessions/helper-sample.ts";
 import { RoutineDetail, RoutinesEmpty, RoutinesPanel } from "../features/routines/index.ts";
 import { SAMPLE_LIST, SAMPLE_MORNING_BRIEF, ROUTINES_NOW, SAMPLE_RUNS } from "../features/routines/sample.ts";
 import { RunBanner, RunsList, RunsPanel } from "../features/runs/index.ts";
@@ -408,6 +409,43 @@ function WorkbenchDemo() {
       <h3 className="mb-2 font-mono text-xs text-faint">Workbench</h3>
       <div className="flex h-96 max-w-full justify-end overflow-hidden rounded-lg border border-line">
         <Workbench id={id} tabs={DEMO_TABS} floating={false} onClose={() => {}} />
+      </div>
+    </section>
+  );
+}
+
+/** The helper panel beside a chat: one that runs, one that asks, one that is done and shows everything. */
+function HelperPanelDemo() {
+  const anchor = useAnchor();
+  const [views, setViews] = useState<Record<string, HelperView>>({ running: "summary", asking: "summary", done: "everything" });
+  const cases = [
+    ["running", RUNNING_HELPER, null],
+    ["asking", ASKING_HELPER, <ApprovalBar key="a" tool={PENDING_EDIT} onAnswer={() => {}} />],
+    ["done", DONE_HELPER, null],
+  ] as const;
+  return (
+    <section className="mt-6" id={anchor("Helper panel")}>
+      <h3 className="mb-2 font-mono text-xs text-faint">Helper panel</h3>
+      <div className="flex flex-wrap items-start gap-4">
+        {cases.map(([key, sample, answer]) => (
+          <div key={key} className="flex h-128 w-80 flex-col overflow-hidden rounded-lg border border-line bg-surface">
+            <HelperPanelView
+              lead="Fix the token refresh"
+              helper={sample.helper}
+              chat={sample.chat}
+              nowMs={HELPER_NOW}
+              view={views[key] ?? "summary"}
+              onView={(view) => {
+                setViews((current) => ({ ...current, [key]: view }));
+              }}
+              onClose={() => {}}
+              onNext={key === "done" ? null : () => {}}
+              onStop={key === "done" ? null : () => {}}
+              onOpenChat={() => {}}
+              answer={answer}
+            />
+          </div>
+        ))}
       </div>
     </section>
   );
@@ -2137,6 +2175,7 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
       <TodoListDemo />
 
       <WorkbenchDemo />
+      <HelperPanelDemo />
 
       <ChangesDemo />
 

@@ -16,4 +16,4 @@ export {
   useRequestedFile,
   useWorkbenchTab,
 } from "./workbench-state.ts";
-export { useWorkbenchWidth } from "./workbench-width.ts";
+export { WORKBENCH_DEFAULT, WORKBENCH_MAX, WORKBENCH_MIN, WORKBENCH_STEP, useWorkbenchWidth } from "./workbench-width.ts";

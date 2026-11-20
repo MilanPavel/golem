@@ -1,6 +1,6 @@
 import type { ChatEvent } from "@golem/client";
 
-import type { ChatState, ToolBlock } from "./chat-state.ts";
+import type { ChatState, HelperRef, ToolBlock } from "./chat-state.ts";
 import type { Detail } from "./activity.ts";
 import { formatCost } from "./cost.ts";
 import { formatElapsed } from "./duration.ts";
@@ -413,6 +413,41 @@ export function helperSummary(chat: ChatState): HelperSummary {
     answer: answer === "" ? null : answer,
     hidden: hidden.length === 0 ? null : hidden.join(" · "),
   };
+}
+
+/** A helper's state from the lead's log and its own: it asks, runs, is done, or stopped. */
+export function helperPanelState(ref: Pick<HelperRef, "ended">, chat: ChatState): HelperState {
+  if (ref.ended !== null) return endState(ref.ended.stopped);
+  if (chat.approval !== null || chat.consent !== null) return "waiting";
+  return chat.busy || chat.messages.length === 0 ? "running" : "done";
+}
+
+/** How long a helper worked: what its end says, or the time since it started. Null when the start time is not a date. */
+export function helperWorkingMs(ref: Pick<HelperRef, "ended" | "startedAt">, nowMs: number): number | null {
+  if (ref.ended !== null) return ref.ended.workingMs;
+  const startedMs = Date.parse(ref.startedAt);
+  return Number.isNaN(startedMs) ? null : Math.max(0, nowMs - startedMs);
+}
+
+/**
+ * The limits line of the panel: `3 calls · 1m 11s · $0.50 · 14K to 0.6K`. Calls come from the helper's own
+ * log until the lead's log says how it ended; the time is what it spent working, not waiting. A local model
+ * costs nothing, so with `local` true the cost is left out. `nowMs` is the clock, for a helper still running.
+ */
+export function helperLimits(ref: Pick<HelperRef, "ended" | "startedAt">, chat: ChatState, nowMs: number, local: boolean | null = null): string {
+  const ended = ref.ended;
+  const calls = ended === null ? Object.keys(chat.calls).length : ended.modelCalls;
+  const time = helperWorkingMs(ref, nowMs);
+  const live = Object.values(chat.calls).reduce<number | null>((sum, call) => (call.costUsd === null ? sum : (sum ?? 0) + call.costUsd), null);
+  const cost = ended === null ? live : ended.costUsd;
+  const window = ended === null ? null : windowSaved(ended.tokens, ended.answerTokens);
+  const parts = [
+    `${String(calls)} ${calls === 1 ? "call" : "calls"}`,
+    time === null ? null : formatElapsed(time),
+    local === true || cost === null ? null : formatCost(cost),
+    window,
+  ];
+  return parts.filter((part): part is string => part !== null && part !== "").join(" · ");
 }
 
 /** What a helper waits to do: the tool and its target, such as `wants to use write_file: src/a.py`. */

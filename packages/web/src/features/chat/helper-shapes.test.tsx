@@ -63,7 +63,8 @@ function cards(tool: ToolBlock): string[] {
   const out: string[] = [];
   const { container } = render(<ul><ToolLine tool={tool} /></ul>);
   // useId counts up across renders, so the ids differ between two cards that are the same.
-  const html = () => container.innerHTML.replace(/_r_[0-9a-z]+_/g, "_id_");
+  // The Open helper link is only there when the log names the helper's session, so it is not part of the card shape.
+  const html = () => container.innerHTML.replace(/_r_[0-9a-z]+_/g, "_id_").replace(/<div data-helper-open[^>]*>.*?<\/div>/, "");
   out.push(html());
   fireEvent.click(screen.getAllByRole("button")[0]!);
   out.push(html());

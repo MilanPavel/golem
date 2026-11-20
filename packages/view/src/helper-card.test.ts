@@ -4,7 +4,7 @@ import { test } from "node:test";
 import type { ChatEvent } from "@golem/client";
 
 import { emptyChat, reduceChat, type ChatMessage, type ChatState, type ToolBlock } from "./chat-state.ts";
-import { batchCard, batchNumber, foldBatch, helperNumber, helperRight, helperSummary, lastSentence, windowK } from "./helper-card.ts";
+import { batchCard, batchNumber, foldBatch, helperLimits, helperNumber, helperPanelState, helperRight, helperSummary, lastSentence, windowK } from "./helper-card.ts";
 
 let seq = 0;
 function ev(type: string, data: Record<string, unknown>): ChatEvent {
@@ -224,4 +224,17 @@ test("the last sentence", () => {
   assert.equal(lastSentence("no mark"), "no mark");
   assert.equal(lastSentence("  "), null);
   assert.equal(lastSentence("see auth/session.py. Then src/a.py"), "Then src/a.py");
+});
+
+test("the limits line: calls and time from the helper's own log while it runs, the end's numbers after", () => {
+  const ref = { startedAt: "2026-01-01T00:00:00Z", ended: null };
+  const now = Date.parse("2026-01-01T00:01:11Z");
+  const running = helperChat({ calls: { a: { model: "m", tier: null, tokens: null, costUsd: 0.01, done: true } } });
+  assert.equal(helperLimits(ref, running, now), "1 call · 1m 11s · $0.01");
+  assert.equal(helperLimits(ref, running, now, true), "1 call · 1m 11s");
+  const end = { stopped: "done", modelCalls: 3, tokens: 14_000, answerTokens: 620, costUsd: 0.04, durationMs: 72_000, workingMs: 70_000 };
+  assert.equal(helperLimits({ ...ref, ended: end }, running, now), "3 calls · 1m 10s · $0.04 · 14K to 0.6K");
+  assert.equal(helperPanelState({ ended: end }, running), "done");
+  assert.equal(helperPanelState({ ended: { ...end, stopped: "calls" } }, running), "stopped");
+  assert.equal(helperPanelState({ ended: null }, helperChat({ busy: true })), "running");
 });

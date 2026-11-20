@@ -11,12 +11,12 @@ import { useChangedFiles, useNavigate, useRememberOpenedFolder, useRoute, useSes
 import { inspectPath, sessionPath } from "../../store/router.ts";
 import { hasMod, modShortcut } from "../../ui/platform.ts";
 import type { SessionModel, SessionView } from "../../store/session-store.ts";
-import { Transcript } from "../chat/index.ts";
+import { closeHelper, Transcript, useHelperOpen } from "../chat/index.ts";
 import { SessionDock } from "../composer/index.ts";
 import { TodoList, useDrawerOpen } from "../drawer/index.ts";
 import { ChangesTab, checksBadge, ChecksTab, FilesTab, Workbench, WORKBENCH_ID, type WorkbenchTab } from "../workbench/index.ts";
 import { closeModelDialog, ModelDialog, useModelDialogOpen } from "../models/index.ts";
-import { folderName, useSessionActions } from "../sessions/index.ts";
+import { folderName, HelperPanel, useSessionActions } from "../sessions/index.ts";
 import { useRememberSettingsContext } from "../settings/index.ts";
 import { MenuBar, MenuButton } from "../sidebar/index.ts";
 import { LiveRunBanner } from "../runs/index.ts";
@@ -215,6 +215,9 @@ export function SessionFrame({ id, children }: { id: string; children: ReactNode
     ],
     [todos, hasFolder, changed, checksMark, id],
   );
+  const helperOpen = useHelperOpen();
+  // A helper panel belongs to the chat that opened it: it closes when the chat does.
+  useEffect(() => closeHelper, [id]);
   const toggle = useRef<HTMLButtonElement>(null);
   const inspectToggle = useRef<HTMLButtonElement>(null);
   const route = useRoute();
@@ -302,7 +305,9 @@ export function SessionFrame({ id, children }: { id: string; children: ReactNode
         />
       )}
       <SessionModelDialog sessionId={id} model={model} chip={chip} />
-      {drawerOpen ? (
+      {helperOpen !== null ? (
+        <HelperPanel leadId={id} open={helperOpen} />
+      ) : drawerOpen ? (
         <Workbench
           tabs={tabs}
           onClose={() => {

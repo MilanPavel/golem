@@ -11,6 +11,7 @@ function step(callId: string, name: string, args: Record<string, unknown>, statu
 
 function helper(over: Partial<HelperRun> = {}): HelperRun {
   return {
+    helpers: [],
     model: "qwen3:27b",
     modelCalls: 3,
     toolSteps: [],
