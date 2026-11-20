@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, cast
 
@@ -13,6 +14,7 @@ from pydantic import BaseModel
 from golem.config import GolemSettings, ModelSettings, OllamaSettings, ProviderSettings
 from golem.models.bench import NoLocalModel, OnRow, Result, Row, Sample, Shape
 from golem.models.bench_manager import BenchManager
+from golem.models.bench_store import BenchStore
 from golem.models.ollama import LocalServers
 from golem.models.router import ModelRouter
 from golem.server.dispatcher import MODEL_NOT_CONFIGURED, RequestContext, RpcCallError
@@ -105,9 +107,15 @@ class FakeRun:
 
 
 def _manager(
-    router: ModelRouter, local: FakeLocal, run: FakeRun, sent: list[BaseModel]
+    router: ModelRouter,
+    local: FakeLocal,
+    run: FakeRun,
+    sent: list[BaseModel],
+    store: BenchStore | None = None,
 ) -> BenchManager:
-    return BenchManager(router, cast("LocalServers", local), broadcast=sent.append, run=run)
+    return BenchManager(
+        router, cast("LocalServers", local), broadcast=sent.append, run=run, store=store
+    )
 
 
 def _notes(sent: list[BaseModel]) -> list[dict[str, Any]]:
@@ -217,3 +225,59 @@ async def test_the_limit_comes_from_the_probe_or_the_parallel_setting(
     assert run.limits == [limit]
     assert local.probes == [("http://127.0.0.1:11434", "qwen3:8b")]
     assert local.server.ensured == 1
+
+
+async def test_a_finished_run_is_saved_by_model_id(tmp_path: Path) -> None:
+    store = BenchStore(tmp_path, ram_gb=16)
+    rows = [_row("tools", 1), _row("tools", 2)]
+    manager = _manager(_router(LOCAL), FakeLocal(), FakeRun(rows), [], store)
+    manager.start(LOCAL)
+    await manager.wait(LOCAL)
+    assert store.measured("qwen3:8b") == {1: 50.0, 2: 100.0}
+    assert store.measured(LOCAL) is None
+    assert BenchStore(tmp_path, ram_gb=16).measured("qwen3:8b") == {1: 50.0, 2: 100.0}
+
+
+async def test_a_failed_run_leaves_the_store_as_it_was(tmp_path: Path) -> None:
+    store = BenchStore(tmp_path, ram_gb=16)
+    run = FakeRun([_row("tools", 1)], fail=RuntimeError("the model fell over"))
+    manager = _manager(_router(LOCAL), FakeLocal(), run, [], store)
+    manager.start(LOCAL)
+    await manager.wait(LOCAL)
+    assert store.measured("qwen3:8b") is None
+    assert not (tmp_path / "bench.json").exists()
+
+
+async def test_a_cut_short_run_saves_nothing(tmp_path: Path) -> None:
+    store = BenchStore(tmp_path, ram_gb=16)
+    run = FakeRun([_row("tools", 1)])
+    run.gate = asyncio.Event()
+    manager = _manager(_router(LOCAL), FakeLocal(), run, [], store)
+    manager.start(LOCAL)
+    await run.running.wait()
+    await manager.aclose()
+    assert store.measured("qwen3:8b") is None
+    assert not (tmp_path / "bench.json").exists()
+
+
+async def test_a_hosted_ref_writes_nothing(tmp_path: Path) -> None:
+    store = BenchStore(tmp_path, ram_gb=16)
+    manager = _manager(_router(HOSTED, LOCAL), FakeLocal(), FakeRun([]), [], store)
+    with pytest.raises(NoLocalModel):
+        manager.start(HOSTED)
+    assert not (tmp_path / "bench.json").exists()
+
+
+async def test_a_save_that_raises_still_sends_done() -> None:
+    class Broken(BenchStore):
+        def save(self, result: Result, model_id: str | None = None) -> None:
+            raise OSError("disk full")
+
+    sent: list[BaseModel] = []
+    run = FakeRun([_row("tools", 1)])
+    manager = _manager(_router(LOCAL), FakeLocal(), run, sent, Broken(None, ram_gb=16))
+    manager.start(LOCAL)
+    await manager.wait(LOCAL)
+    done = _notes(sent)[-1]
+    assert done["method"] == "model.bench.done"
+    assert done["params"]["ok"] is True and done["params"]["error"] is None
