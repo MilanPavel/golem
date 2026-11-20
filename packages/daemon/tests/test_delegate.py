@@ -566,7 +566,13 @@ def test_the_explorer_settings_have_limits() -> None:
     assert (explorer.max_calls, explorer.timeout_seconds) == (15, 300)
     assert (explorer.answer_chars, explorer.max_per_turn) == (6_000, 3)
     assert GolemSettings().agents == AgentSettings()
-    for bad in ({"max_calls": 0}, {"max_calls": 51}, {"timeout_seconds": 0}, {"max_per_turn": 0}):
+    bad_values: list[dict[str, Any]] = [
+        {"max_calls": 0},
+        {"max_calls": 51},
+        {"timeout_seconds": 0},
+        {"max_per_turn": 0},
+    ]
+    for bad in bad_values:
         with pytest.raises(ValueError):
             ExplorerSettings(**bad)
     with pytest.raises(ValueError):

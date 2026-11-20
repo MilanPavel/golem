@@ -63,6 +63,8 @@ An agent type is `agents/<name>.md`: a header (name, description, model wish, to
 
 `agents.list {cwd?}` returns each type with its source, wish, tools, limits, errors, shadowed copies and `used` and `finished` counts for 30 days (counted from `helper.ended`). `agents.get {name, cwd?}` adds the prompt. `agent.registry.changed` mirrors `skill.registry.changed`. The explorer of 9.7 becomes the bundled `explorer.md`. Limits come from the file, and `[agents.<type>]` in `config.toml` overrides them; `[agents.explorer]` keeps working.
 
+The wish of a bundled type is changed in `config.toml`, not in a copy of its file: `agents.set_wish` writes `[agents.<name>] model = "<wish>"` (comments and other keys kept), and the registry applies the key over the bundled file's wish when it builds a view, so `agents.list`, `resolves_to` and a helper's start all read the same value while the prompt, tools and limits stay the bundled ones of the running release. A file of the same name in the user's or the project's `agents` folder still wins over the bundled type, and `set_wish` then edits that file. A copy written by an earlier version keeps working and is not migrated.
+
 ### 5. A helper's model is a wish
 
 The agent file names a wish: `cheapest`, `same`, `stronger`, a tier, or a model. A pure `pick_helper(wish, lead, candidates, traits)` in `models/pick.py` turns it into a model. It reads no clock and no file, and **it never fails on an empty tier**: the wished tier, then the nearest tier you have, then the lead's model. Its result says which and why.

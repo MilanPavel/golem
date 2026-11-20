@@ -9,7 +9,10 @@ Sources, highest first:
    folder is trusted (``trusted_projects``), because an agent file picks tools
    and a prompt.
 2. **user**: ``~/.golem/agents``, then ``[agents] extra_dirs``.
-3. **bundled**: the agent files that ship with golem.
+3. **bundled**: the agent files that ship with golem. Their wish is the one place
+   ``[agents.<name>] model`` in ``config.toml`` can change: :meth:`AgentRegistry.view` applies
+   it, so ``agents.list``, ``resolves_to`` and a helper's start all see it, and the prompt,
+   tools and limits stay the file's.
 
 The first valid agent of a name wins and the rest are listed as shadowed. An
 agent with errors never wins, so a broken copy does not hide a working one. The
@@ -184,6 +187,10 @@ class AgentRegistry:
             for agent in self._agents_in(source.path):
                 if agent.real_path in seen:
                     continue
+                if source.origin == "bundled" and agent.valid:
+                    wish = self._settings.wish_for(agent.name)
+                    if wish is not None:
+                        agent = replace(agent, wish=wish)
                 seen.add(agent.real_path)
                 found.append(Listed(agent, source.origin))
                 if agent.valid:

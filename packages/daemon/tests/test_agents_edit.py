@@ -20,7 +20,15 @@ from test_server import HELLO, RpcClient, error_code, rpc_result, start_daemon, 
 from golem.agents.bundled import bundled_agents_dir
 from golem.agents.edit import AgentEditError, with_wish
 from golem.agents.registry import AgentRegistry
-from golem.config import AgentSettings, GolemSettings, LadderSettings, RoleSettings, RoutingSettings
+from golem.config import (
+    BUNDLED_TYPES,
+    AgentSettings,
+    GolemSettings,
+    LadderSettings,
+    RoleSettings,
+    RoutingSettings,
+    load_settings,
+)
 from golem.paths import resolve_paths
 from golem.server.dispatcher import INVALID_PARAMS, RequestContext, RpcCallError
 from golem.server.handlers import standard_methods
@@ -81,14 +89,24 @@ def _write(folder: Path, name: str, text: str = FILE) -> Path:
 
 
 class _World:
-    def __init__(self, home: Path, project: Path, chat: _Chat, trusted: set[Path]) -> None:
+    def __init__(
+        self,
+        home: Path,
+        project: Path,
+        chat: _Chat,
+        trusted: set[Path],
+        bundled: Path | None = None,
+    ) -> None:
         self.home, self.project, self.chat, self.trusted = home, project, chat, trusted
+        self.config = resolve_paths(home).config_file
         self.registry = AgentRegistry(
             AgentSettings(),
             golem_agents=home / "agents",
             trusted=lambda root: root in trusted,
             user_home=home,
-            bundled=bundled_agents_dir(),
+            bundled=bundled if bundled is not None else bundled_agents_dir(),
+            config_file=self.config,
+            load_settings=lambda: load_settings(home=home, project_dir=home).agents,
         )
         self.state = DaemonState(paths=resolve_paths(home), started_at=0.0)
         self.state.agents = self.registry
@@ -122,6 +140,7 @@ def make(database: Database, tmp_path: Path) -> Any:
         *,
         local_only: bool = False,
         explore: str = "session",
+        bundled: Path | None = None,
     ) -> _World:
         home = tmp_path / "home"
         project = tmp_path / "project"
@@ -131,7 +150,7 @@ def make(database: Database, tmp_path: Path) -> Any:
         chat = _Chat(database, ["done"], settings=settings, home=tmp_path)
         if facts is not None:
             chat.manager.facts = facts
-        return _World(home, project, chat, set())
+        return _World(home, project, chat, set(), bundled)
 
     return build
 
@@ -255,41 +274,129 @@ async def test_a_user_agent_keeps_its_comments_and_body(make: Any) -> None:
     assert (await world.agent("mine")).wish == "stronger"
 
 
-async def test_a_bundled_type_gets_a_user_copy_and_the_bundled_file_stays(make: Any) -> None:
+def _agents_folder_files(world: _World) -> list[Path]:
+    folder = world.home / "agents"
+    return sorted(folder.iterdir()) if folder.is_dir() else []
+
+
+async def test_a_bundled_type_gets_a_config_key_not_a_copy(make: Any) -> None:
     world = make(CHEAP, _cloud())
+    world.config.write_text("# my settings\n[agents.explorer]\nmax_calls = 20  # keep\n")
     bundled = bundled_agents_dir() / "explorer.md"
     before = hashlib.sha256(bundled.read_bytes()).hexdigest()
 
     result = await world.call("agents.set_wish", {"name": "explorer", "wish": "stronger"})
 
-    copy = world.home / "agents" / "explorer.md"
-    assert copy.is_file()
-    assert copy.read_text(encoding="utf-8") == bundled.read_text(encoding="utf-8").replace(
-        "model: cheapest", "model: stronger"
-    )
+    config = world.config.read_text(encoding="utf-8")
+    assert config.startswith("# my settings\n")
+    assert "max_calls = 20  # keep" in config
+    assert 'model = "stronger"' in config
+    assert _agents_folder_files(world) == []
     assert hashlib.sha256(bundled.read_bytes()).hexdigest() == before
-    assert (result.origin, result.wish, result.shadowed) == ("user", "stronger", ["bundled"])
+    assert (result.origin, result.wish, result.shadowed) == ("bundled", "stronger", [])
     assert result.resolves_to.model == BIG
+    assert (await world.agent("explorer")).wish == "stronger"
+    assert load_settings(home=world.home, project_dir=world.home).agents.explorer.max_calls == 20
 
 
-async def test_a_helper_started_after_set_wish_uses_the_new_wish(make: Any, tmp_path: Path) -> None:
-    world = make(CHEAP, _cloud())
+async def test_a_helper_gets_the_new_bundled_prompt_and_the_set_wish(
+    make: Any, tmp_path: Path
+) -> None:
+    folder = tmp_path / "bundled"
+    folder.mkdir()
+    explorer = (bundled_agents_dir() / "explorer.md").read_text(encoding="utf-8")
+    (folder / "explorer.md").write_text(explorer, encoding="utf-8")
+    world = make(CHEAP, _cloud(), bundled=folder)
     await world.call("agents.set_wish", {"name": "explorer", "wish": "stronger"})
-    agent = world.registry.view(world.project).get("explorer")
-    assert agent is not None
-    snapshot = snapshot_of(agent, "user", agent.tools, world.chat.runtime.child_limits)
-    lead = await world.chat.manager.create(CHEAP, cwd=str(world.project))
 
+    # A new release ships another prompt for the same type.
+    (folder / "explorer.md").write_text(explorer + "\nNew release line.\n", encoding="utf-8")
+    agent = world.registry.view(world.project).get("explorer")
+
+    assert agent is not None
+    assert "New release line." in agent.body
+    assert agent.wish == "stronger"
+    snapshot = snapshot_of(agent, "bundled", agent.tools, world.chat.runtime.child_limits)
+    lead = await world.chat.manager.create(CHEAP, cwd=str(world.project))
     ref = await world.chat.manager.start_helper(
         lead, "call-1", 0, snapshot, "look", CHEAP, str(world.project)
     )
     await world.chat.until(ref.session_id, "session.completed")
-
-    assert snapshot.wish == "stronger"
     assert ref.model == BIG
 
 
-async def test_set_wish_on_the_explorer_writes_the_file_and_roles_explore_still_wins(
+async def test_a_user_file_of_the_same_name_wins_and_is_edited_in_place(make: Any) -> None:
+    world = make(CHEAP, _cloud())
+    path = _write(world.home / "agents", "explorer")
+    world.config.write_text('[agents.explorer]\nmodel = "frontier"\n')
+    world.registry.check()
+
+    assert (await world.agent("explorer")).wish == "cheapest"  # the file wins over the key
+    result = await world.call("agents.set_wish", {"name": "explorer", "wish": "same"})
+
+    assert "model: same   # was cheap" in path.read_text(encoding="utf-8")
+    assert world.config.read_text(encoding="utf-8") == '[agents.explorer]\nmodel = "frontier"\n'
+    assert (result.origin, result.wish) == ("user", "same")
+
+
+async def test_a_copy_from_the_earlier_version_keeps_working(make: Any) -> None:
+    world = make(CHEAP, _cloud())
+    bundled = (bundled_agents_dir() / "explorer.md").read_text(encoding="utf-8")
+    copy = _write(
+        world.home / "agents", "explorer", bundled.replace("model: cheapest", "model: stronger")
+    )
+
+    found = await world.agent("explorer")
+
+    assert (found.origin, found.wish, found.shadowed) == ("user", "stronger", ["bundled"])
+    assert copy.is_file()
+
+
+async def test_a_bad_wish_for_a_bundled_type_writes_nothing(make: Any) -> None:
+    world = make(CHEAP, _cloud())
+    with pytest.raises(RpcCallError) as raised:
+        await world.call("agents.set_wish", {"name": "explorer", "wish": "a b"})
+    assert raised.value.code == INVALID_PARAMS
+    assert not world.config.exists()
+
+
+async def test_resolves_to_follows_the_key_with_local_models_only(make: Any) -> None:
+    world = make(LOCAL, _local())
+
+    result = await world.call("agents.set_wish", {"name": "reviewer", "wish": OTHER_LOCAL})
+
+    assert result.wish == OTHER_LOCAL
+    assert result.resolves_to.tier == "local"
+    assert result.resolves_to.model == OTHER_LOCAL
+    assert not (world.home / "agents").exists()
+
+
+async def test_resolves_to_follows_the_key_with_cloud_models_only(make: Any) -> None:
+    world = make(CHEAP, _cloud())
+
+    result = await world.call("agents.set_wish", {"name": "reviewer", "wish": "frontier"})
+
+    assert result.wish == "frontier"
+    assert result.resolves_to.model == BIG
+    assert result.resolves_to.tier == "frontier"
+
+
+def test_the_config_takes_a_model_for_every_bundled_type_and_old_configs_load() -> None:
+    names = {path.stem for path in bundled_agents_dir().glob("*.md")}
+    assert names == set(BUNDLED_TYPES)
+    old = AgentSettings.model_validate({"explorer": {"max_calls": 9}})
+    assert old.explorer.max_calls == 9
+    assert old.wish_for("explorer") is None
+    new = AgentSettings.model_validate({name: {"model": "same"} for name in BUNDLED_TYPES})
+    assert all(new.wish_for(name) == "same" for name in BUNDLED_TYPES)
+    assert new.wish_for("mine") is None
+    with pytest.raises(ValueError):
+        AgentSettings.model_validate({"mine": {"model": "same"}})
+    with pytest.raises(ValueError):
+        AgentSettings.model_validate({"worker": {"model": "a b"}})
+
+
+async def test_set_wish_on_the_explorer_writes_the_key_and_roles_explore_still_wins(
     make: Any,
 ) -> None:
     world = make(CHEAP, _cloud(), explore=CHEAP)
@@ -327,7 +434,8 @@ async def test_an_untrusted_project_cannot_shadow_a_bundled_type_either(make: An
     )
 
     assert look_alike.read_text(encoding="utf-8") == FILE
-    assert (world.home / "agents" / "explorer.md").is_file()
+    assert 'model = "same"' in world.config.read_text(encoding="utf-8")
+    assert not (world.home / "agents").exists()
 
 
 @pytest.mark.parametrize(
@@ -360,14 +468,13 @@ async def test_a_broken_agent_file_is_a_readable_error_and_is_not_touched(make: 
     assert path.read_text(encoding="utf-8") == "no frontmatter at all\n"
 
 
-async def test_a_broken_user_copy_of_a_bundled_type_is_not_overwritten(make: Any) -> None:
+async def test_a_broken_user_copy_of_a_bundled_type_is_left_alone(make: Any) -> None:
     world = make(CHEAP, _cloud())
     path = _write(world.home / "agents", "explorer", "broken\n")
 
-    with pytest.raises(RpcCallError) as raised:
-        await world.call("agents.set_wish", {"name": "explorer", "wish": "same"})
+    result = await world.call("agents.set_wish", {"name": "explorer", "wish": "same"})
 
-    assert raised.value.code == INVALID_PARAMS
+    assert (result.origin, result.wish) == ("bundled", "same")  # a broken file never wins
     assert path.read_text(encoding="utf-8") == "broken\n"
 
 
