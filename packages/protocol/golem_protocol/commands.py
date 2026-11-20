@@ -3,7 +3,7 @@
 ``Ping`` in :mod:`golem_protocol.events` is the result of ``ping``.
 """
 
-from typing import Any, Literal, Self
+from typing import Annotated, Any, Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, SecretStr, model_validator
 
@@ -194,6 +194,10 @@ class SessionListParams(BaseModel):
         return self
 
 
+ShortText = Annotated[str, Field(min_length=1, max_length=120)]
+"""One short line of the paid question: what is sent, or what is not."""
+
+
 class PendingItem(BaseModel):
     """What a waiting session waits for, in a form a client can list without opening it.
 
@@ -202,7 +206,9 @@ class PendingItem(BaseModel):
     (``approval.needed`` or ``route.consent.needed``). For an approval, ``call_id``, ``name``,
     ``subject`` and ``source`` are those of the ``approval.needed`` event, and ``added`` and
     ``removed`` count the lines its diff adds and removes (null when the call has no diff).
-    For a consent, ``alternatives`` is the number of answers the user may give. The full diff
+    For a consent, ``alternatives`` is the number of answers the user may give. A helper's
+    consent also carries ``helper_id``, ``agent``, ``label``, ``sent`` and ``not_sent`` of its
+    ``route.consent.needed`` event. The full diff
     stays in the session's events: a summary goes to every watcher on every event, so it
     carries counts only. An older daemon leaves ``pending`` out of the summary.
     """
@@ -218,6 +224,11 @@ class PendingItem(BaseModel):
     added: int | None = Field(default=None, ge=0)
     removed: int | None = Field(default=None, ge=0)
     alternatives: int | None = Field(default=None, ge=0)
+    helper_id: str | None = Field(default=None, min_length=1)
+    agent: str | None = Field(default=None, min_length=1)
+    label: str | None = Field(default=None, max_length=120)
+    sent: list[ShortText] | None = Field(default=None, max_length=10)
+    not_sent: list[ShortText] | None = Field(default=None, max_length=10)
 
 
 class SessionSummary(BaseModel):

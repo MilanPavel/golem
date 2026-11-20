@@ -524,3 +524,22 @@ def test_model_bench_notifications() -> None:
     )
     assert done.method == "model.bench.done"
     assert ModelBenchDoneNotification.model_validate_json(done.model_dump_json()) == done
+
+
+def test_pending_consent_helper_fields_round_trip_and_are_bounded() -> None:
+    item = PendingItem(
+        kind="consent",
+        since="t",
+        alternatives=2,
+        helper_id="h1",
+        agent="reviewer",
+        label="Review",
+        sent=["the brief"],
+        not_sent=["this chat"],
+    )
+    assert PendingItem.model_validate_json(item.model_dump_json()) == item
+    assert PendingItem(kind="consent", since="t").sent is None
+    with pytest.raises(ValidationError):
+        PendingItem(kind="consent", since="t", sent=["x"] * 11)
+    with pytest.raises(ValidationError):
+        PendingItem(kind="consent", since="t", not_sent=["x" * 121])
