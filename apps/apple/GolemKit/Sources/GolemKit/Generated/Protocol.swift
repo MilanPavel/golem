@@ -11211,31 +11211,77 @@ public struct ModelSpeedInfo: Codable {
     }
 }
 
-/// A chat call waits, or no longer waits, for its turn on a local model server.
+/// A chat call waits, or no longer waits, for its turn on a model line.
 ///
 /// Sent for the reply ``message_id`` only, so other sessions never show it. Stored only
 /// until its message completes. With ``waiting`` true, ``model`` and ``window`` say the call
 /// is loading ``model`` again with a larger ``window``, and the meter says so.
+///
+/// The fields after ``window`` are all optional, so an old daemon's event still reads. A
+/// daemon that sends ``waiting`` true always sends ``reason``. ``line`` names the model, the
+/// provider or ``shell``. ``position`` (1 is next) is for ``slot`` and ``provider``.
+/// ``holder`` is the label of the call that frees a slot first. ``retry_in_ms`` is the
+/// backoff left, for ``provider``. ``silent_ms``, ``scope`` and ``will_retry`` are for
+/// ``stalled``.
 // MARK: - ModelWaitingData
 public struct ModelWaitingData: Codable {
+    public let holder: String?
+    public let line: String?
     public let messageID: String
     public let model: String?
+    public let position: Int?
+    public let reason: ModelWaitingDataReason?
+    public let retryInMS: Int?
+    public let scope: ModelWaitingDataScope?
+    public let silentMS: Int?
     public let waiting: Bool
+    public let willRetry: Bool?
     public let window: Int?
 
     public enum CodingKeys: String, CodingKey {
+        case holder = "holder"
+        case line = "line"
         case messageID = "message_id"
         case model = "model"
+        case position = "position"
+        case reason = "reason"
+        case retryInMS = "retry_in_ms"
+        case scope = "scope"
+        case silentMS = "silent_ms"
         case waiting = "waiting"
+        case willRetry = "will_retry"
         case window = "window"
     }
 
-    public init(messageID: String, model: String?, waiting: Bool, window: Int?) {
+    public init(holder: String?, line: String?, messageID: String, model: String?, position: Int?, reason: ModelWaitingDataReason?, retryInMS: Int?, scope: ModelWaitingDataScope?, silentMS: Int?, waiting: Bool, willRetry: Bool?, window: Int?) {
+        self.holder = holder
+        self.line = line
         self.messageID = messageID
         self.model = model
+        self.position = position
+        self.reason = reason
+        self.retryInMS = retryInMS
+        self.scope = scope
+        self.silentMS = silentMS
         self.waiting = waiting
+        self.willRetry = willRetry
         self.window = window
     }
+}
+
+public enum ModelWaitingDataReason: String, Codable {
+    case budget = "budget"
+    case load = "load"
+    case provider = "provider"
+    case slot = "slot"
+    case stalled = "stalled"
+    case team = "team"
+    case you = "you"
+}
+
+public enum ModelWaitingDataScope: String, Codable {
+    case call = "call"
+    case team = "team"
 }
 
 /// A chat call waits for the local model. A live signal: ``message.completed`` replaces it.
@@ -11267,29 +11313,60 @@ public struct ModelWaitingEvent: Codable {
     }
 }
 
-/// A chat call waits, or no longer waits, for its turn on a local model server.
+/// A chat call waits, or no longer waits, for its turn on a model line.
 ///
 /// Sent for the reply ``message_id`` only, so other sessions never show it. Stored only
 /// until its message completes. With ``waiting`` true, ``model`` and ``window`` say the call
 /// is loading ``model`` again with a larger ``window``, and the meter says so.
+///
+/// The fields after ``window`` are all optional, so an old daemon's event still reads. A
+/// daemon that sends ``waiting`` true always sends ``reason``. ``line`` names the model, the
+/// provider or ``shell``. ``position`` (1 is next) is for ``slot`` and ``provider``.
+/// ``holder`` is the label of the call that frees a slot first. ``retry_in_ms`` is the
+/// backoff left, for ``provider``. ``silent_ms``, ``scope`` and ``will_retry`` are for
+/// ``stalled``.
 // MARK: - ModelWaitingEventData
 public struct ModelWaitingEventData: Codable {
+    public let holder: String?
+    public let line: String?
     public let messageID: String
     public let model: String?
+    public let position: Int?
+    public let reason: ModelWaitingDataReason?
+    public let retryInMS: Int?
+    public let scope: ModelWaitingDataScope?
+    public let silentMS: Int?
     public let waiting: Bool
+    public let willRetry: Bool?
     public let window: Int?
 
     public enum CodingKeys: String, CodingKey {
+        case holder = "holder"
+        case line = "line"
         case messageID = "message_id"
         case model = "model"
+        case position = "position"
+        case reason = "reason"
+        case retryInMS = "retry_in_ms"
+        case scope = "scope"
+        case silentMS = "silent_ms"
         case waiting = "waiting"
+        case willRetry = "will_retry"
         case window = "window"
     }
 
-    public init(messageID: String, model: String?, waiting: Bool, window: Int?) {
+    public init(holder: String?, line: String?, messageID: String, model: String?, position: Int?, reason: ModelWaitingDataReason?, retryInMS: Int?, scope: ModelWaitingDataScope?, silentMS: Int?, waiting: Bool, willRetry: Bool?, window: Int?) {
+        self.holder = holder
+        self.line = line
         self.messageID = messageID
         self.model = model
+        self.position = position
+        self.reason = reason
+        self.retryInMS = retryInMS
+        self.scope = scope
+        self.silentMS = silentMS
         self.waiting = waiting
+        self.willRetry = willRetry
         self.window = window
     }
 }
@@ -14908,11 +14985,18 @@ public struct Params: Codable {
 /// ``path`` is None until the model has written the whole path. ``lines`` and ``chars``
 /// count the file text written so far.
 ///
-/// A chat call waits, or no longer waits, for its turn on a local model server.
+/// A chat call waits, or no longer waits, for its turn on a model line.
 ///
 /// Sent for the reply ``message_id`` only, so other sessions never show it. Stored only
 /// until its message completes. With ``waiting`` true, ``model`` and ``window`` say the call
 /// is loading ``model`` again with a larger ``window``, and the meter says so.
+///
+/// The fields after ``window`` are all optional, so an old daemon's event still reads. A
+/// daemon that sends ``waiting`` true always sends ``reason``. ``line`` names the model, the
+/// provider or ``shell``. ``position`` (1 is next) is for ``slot`` and ``provider``.
+/// ``holder`` is the label of the call that frees a slot first. ``retry_in_ms`` is the
+/// backoff left, for ``provider``. ``silent_ms``, ``scope`` and ``will_retry`` are for
+/// ``stalled``.
 ///
 /// A requested tool call is running.
 ///
@@ -15151,7 +15235,14 @@ public struct ParamsData: Codable {
     public let chars: Int?
     public let lines: Int?
     public let path: String?
+    public let holder: String?
+    public let line: String?
+    public let position: Int?
+    public let retryInMS: Int?
+    public let scope: ModelWaitingDataScope?
+    public let silentMS: Int?
     public let waiting: Bool?
+    public let willRetry: Bool?
     public let window: Int?
     public let artifactID: String?
     public let diff: String?
@@ -15280,7 +15371,14 @@ public struct ParamsData: Codable {
         case chars = "chars"
         case lines = "lines"
         case path = "path"
+        case holder = "holder"
+        case line = "line"
+        case position = "position"
+        case retryInMS = "retry_in_ms"
+        case scope = "scope"
+        case silentMS = "silent_ms"
         case waiting = "waiting"
+        case willRetry = "will_retry"
         case window = "window"
         case artifactID = "artifact_id"
         case diff = "diff"
@@ -15328,7 +15426,7 @@ public struct ParamsData: Codable {
         case workingMS = "working_ms"
     }
 
-    public init(agent: Agent?, cwd: String?, forkedFrom: PurpleForkedFrom?, modelName: String?, modelProfile: String?, modelProvider: String?, origin: String?, parent: PurpleSessionParent?, route: RouteEnum?, allowedTools: [PurpleSessionAllowance]?, mcpServers: [String]?, paidOk: Bool?, title: String?, runID: String?, status: PurpleStatus?, summary: String?, reason: String?, detail: String?, model: String?, provider: String?, rejected: [FluffyModelRejection]?, replacesModel: String?, tier: Tier?, options: [String: Option]?, mode: DefaultPermissionModeEnum?, on: Bool?, messageID: String?, role: MessageCompletedDataRole?, text: String?, interrupted: Bool?, skill: FluffySkillCall?, thinking: String?, thinkingMS: Int?, clearedIDS: [String]?, contextWindow: Int?, estimatedTokens: Int?, index: Int?, messageBytes: [Int]?, messageChars: [Int]?, messageIDS: [String]?, numCtx: Int?, parentCallID: String?, profile: String?, summaryChars: Int?, systemBytes: Int?, systemChars: Int?, systemPromptSHA: String?, systemSections: [TentacledPromptSectionInfo]?, toolsBytes: Int?, toolsChars: Int?, toolsSHA: String?, windowEstimated: Bool?, windowPlanned: Bool?, costUsd: Double?, failed: Bool?, firstTokenMS: Int?, latencyMS: Int?, loadMS: Int?, price: FluffyCallPrice?, promptMS: Int?, replyMS: Int?, stopReason: String?, textToolCalls: TextToolCalls?, usage: FluffyTokenUsage?, action: ContextChangedDataAction?, afterTokens: Int?, beforeTokens: Int?, count: Int?, reloadMS: Int?, room: Int?, windowFrom: Int?, windowTo: Int?, code: Code?, hint: String?, message: String?, args: [String: JSONAny]?, callID: String?, name: String?, chars: Int?, lines: Int?, path: String?, waiting: Bool?, window: Int?, artifactID: String?, diff: String?, durationMS: Int?, preview: String?, sources: [PurpleToolSource]?, truncated: Bool?, source: String?, subject: String?, decision: Decision?, rule: String?, alternatives: [Answer]?, caps: FluffyConsentCaps?, estimatedUsd: Double?, signal: String?, why: String?, answer: Answer?, todos: [PurpleTodo]?, planID: String?, steps: [FluffyPlanStep]?, added: Int?, changeID: String?, removed: Int?, reverts: String?, hash: String?, how: How?, checks: [FluffyCheckInfo]?, checkID: String?, command: String?, round: Int?, exitCode: Int?, output: String?, helperID: String?, label: String?, pickReason: String?, wish: String?, calls: Int?, stepID: String?, state: PurpleState?, helperIDS: [String]?, answerTokens: Int?, modelCalls: Int?, stopped: Stopped?, tokens: Int?, workingMS: Int?) {
+    public init(agent: Agent?, cwd: String?, forkedFrom: PurpleForkedFrom?, modelName: String?, modelProfile: String?, modelProvider: String?, origin: String?, parent: PurpleSessionParent?, route: RouteEnum?, allowedTools: [PurpleSessionAllowance]?, mcpServers: [String]?, paidOk: Bool?, title: String?, runID: String?, status: PurpleStatus?, summary: String?, reason: String?, detail: String?, model: String?, provider: String?, rejected: [FluffyModelRejection]?, replacesModel: String?, tier: Tier?, options: [String: Option]?, mode: DefaultPermissionModeEnum?, on: Bool?, messageID: String?, role: MessageCompletedDataRole?, text: String?, interrupted: Bool?, skill: FluffySkillCall?, thinking: String?, thinkingMS: Int?, clearedIDS: [String]?, contextWindow: Int?, estimatedTokens: Int?, index: Int?, messageBytes: [Int]?, messageChars: [Int]?, messageIDS: [String]?, numCtx: Int?, parentCallID: String?, profile: String?, summaryChars: Int?, systemBytes: Int?, systemChars: Int?, systemPromptSHA: String?, systemSections: [TentacledPromptSectionInfo]?, toolsBytes: Int?, toolsChars: Int?, toolsSHA: String?, windowEstimated: Bool?, windowPlanned: Bool?, costUsd: Double?, failed: Bool?, firstTokenMS: Int?, latencyMS: Int?, loadMS: Int?, price: FluffyCallPrice?, promptMS: Int?, replyMS: Int?, stopReason: String?, textToolCalls: TextToolCalls?, usage: FluffyTokenUsage?, action: ContextChangedDataAction?, afterTokens: Int?, beforeTokens: Int?, count: Int?, reloadMS: Int?, room: Int?, windowFrom: Int?, windowTo: Int?, code: Code?, hint: String?, message: String?, args: [String: JSONAny]?, callID: String?, name: String?, chars: Int?, lines: Int?, path: String?, holder: String?, line: String?, position: Int?, retryInMS: Int?, scope: ModelWaitingDataScope?, silentMS: Int?, waiting: Bool?, willRetry: Bool?, window: Int?, artifactID: String?, diff: String?, durationMS: Int?, preview: String?, sources: [PurpleToolSource]?, truncated: Bool?, source: String?, subject: String?, decision: Decision?, rule: String?, alternatives: [Answer]?, caps: FluffyConsentCaps?, estimatedUsd: Double?, signal: String?, why: String?, answer: Answer?, todos: [PurpleTodo]?, planID: String?, steps: [FluffyPlanStep]?, added: Int?, changeID: String?, removed: Int?, reverts: String?, hash: String?, how: How?, checks: [FluffyCheckInfo]?, checkID: String?, command: String?, round: Int?, exitCode: Int?, output: String?, helperID: String?, label: String?, pickReason: String?, wish: String?, calls: Int?, stepID: String?, state: PurpleState?, helperIDS: [String]?, answerTokens: Int?, modelCalls: Int?, stopped: Stopped?, tokens: Int?, workingMS: Int?) {
         self.agent = agent
         self.cwd = cwd
         self.forkedFrom = forkedFrom
@@ -15410,7 +15508,14 @@ public struct ParamsData: Codable {
         self.chars = chars
         self.lines = lines
         self.path = path
+        self.holder = holder
+        self.line = line
+        self.position = position
+        self.retryInMS = retryInMS
+        self.scope = scope
+        self.silentMS = silentMS
         self.waiting = waiting
+        self.willRetry = willRetry
         self.window = window
         self.artifactID = artifactID
         self.diff = diff

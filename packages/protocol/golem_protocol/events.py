@@ -620,12 +620,23 @@ class ToolWritingData(BaseModel):
     chars: int = Field(ge=0)
 
 
+WaitReason = Literal["slot", "load", "provider", "team", "budget", "you", "stalled"]
+WaitScope = Literal["call", "team"]
+
+
 class ModelWaitingData(BaseModel):
-    """A chat call waits, or no longer waits, for its turn on a local model server.
+    """A chat call waits, or no longer waits, for its turn on a model line.
 
     Sent for the reply ``message_id`` only, so other sessions never show it. Stored only
     until its message completes. With ``waiting`` true, ``model`` and ``window`` say the call
     is loading ``model`` again with a larger ``window``, and the meter says so.
+
+    The fields after ``window`` are all optional, so an old daemon's event still reads. A
+    daemon that sends ``waiting`` true always sends ``reason``. ``line`` names the model, the
+    provider or ``shell``. ``position`` (1 is next) is for ``slot`` and ``provider``.
+    ``holder`` is the label of the call that frees a slot first. ``retry_in_ms`` is the
+    backoff left, for ``provider``. ``silent_ms``, ``scope`` and ``will_retry`` are for
+    ``stalled``.
     """
 
     model_config = _CONFIG
@@ -634,6 +645,14 @@ class ModelWaitingData(BaseModel):
     waiting: bool
     model: str | None = Field(default=None, min_length=1)
     window: int | None = Field(default=None, ge=1)
+    reason: WaitReason | None = None
+    line: str | None = Field(default=None, min_length=1)
+    position: int | None = Field(default=None, ge=1)
+    holder: str | None = Field(default=None, min_length=1)
+    retry_in_ms: int | None = Field(default=None, ge=0)
+    silent_ms: int | None = Field(default=None, ge=0)
+    scope: WaitScope | None = None
+    will_retry: bool | None = None
 
 
 class PromptSectionInfo(BaseModel):
