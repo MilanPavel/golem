@@ -37,6 +37,7 @@ import type { SessionSetModeResult } from "../../protocol/gen/session-set-mode-r
 import type { SessionSetOptionsResult } from "../../protocol/gen/session-set-options-result.ts";
 import type { ListedSkill, SkillListResult } from "../../protocol/gen/skill-list-result.ts";
 import type { AgentsListResult } from "../../protocol/gen/agents-list-result.ts";
+import type { AgentsSetWishResult } from "../../protocol/gen/agents-set-wish-result.ts";
 import type { MemoryDeleteResult } from "../../protocol/gen/memory-delete-result.ts";
 import type { MemoryExportResult } from "../../protocol/gen/memory-export-result.ts";
 import type { MemoryGetResult } from "../../protocol/gen/memory-get-result.ts";
@@ -325,6 +326,16 @@ export function isAgentsListResult(value: unknown): value is AgentsListResult {
         typeof agent["origin"] === "string" &&
         typeof agent["wish"] === "string",
     )
+  );
+}
+
+export function isAgentsSetWishResult(value: unknown): value is AgentsSetWishResult {
+  return (
+    isRecord(value) &&
+    typeof value["name"] === "string" &&
+    typeof value["description"] === "string" &&
+    typeof value["origin"] === "string" &&
+    typeof value["wish"] === "string"
   );
 }
 

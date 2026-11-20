@@ -5,19 +5,38 @@ import { afterEach, beforeEach, expect, test } from "vitest";
 import { App } from "../../app.tsx";
 import { createPage } from "../../store/page.ts";
 import { PageProvider } from "../../store/page-context.tsx";
+import type { ModelListResult } from "../../store/models.ts";
 import { fakeClient, fakeFrame, rpcError, summary } from "../../store/test-support.ts";
 import { closePalette } from "../palette/index.ts";
-import { SAMPLE_AGENTS } from "./agents-sample.ts";
+import { SAMPLE_AGENTS, WISH_AGENTS_CLOUD, WISH_AGENTS_LOCAL, WISH_AGENTS_MIXED } from "./agents-sample.ts";
 import { settingsContextStore } from "./index.ts";
 
 const noContrast = { rules: { "color-contrast": { enabled: false } } };
 const FOLDER = "/Users/you/repos/golem";
 const METHOD_NOT_FOUND = -32601;
 
-function mount(agents = SAMPLE_AGENTS) {
+function listing(tiers: ("local" | "budget" | "frontier")[]): ModelListResult {
+  return {
+    default: `${tiers[0] === "local" ? "ollama" : "anthropic"}/m0`,
+    providers: [],
+    setup: { ollama_installed: true, ollama_running: true },
+    models: tiers.map((tier, at) => ({
+      ref: `${tier === "local" ? "ollama" : "anthropic"}/m${at}`,
+      label: `M${at}`,
+      provider: tier === "local" ? "ollama" : "anthropic",
+      source: "installed",
+      status: "ready",
+      price: { input: 0, output: 0 },
+      tier,
+    })),
+  } as ModelListResult;
+}
+
+function mount(agents = SAMPLE_AGENTS, models?: ModelListResult) {
   history.replaceState(null, "", "/settings/agents");
   const fake = fakeClient();
   fake.raw.listAgents.mockResolvedValue({ agents });
+  if (models !== undefined) fake.raw.listModels.mockResolvedValue(models);
   fake.raw.status.mockResolvedValue({ version: "0.5.0" });
   const page = createPage(fake.client, { frame: fakeFrame() });
   page.start();
@@ -183,5 +202,102 @@ test("axe is clean in both themes", async () => {
   for (const theme of ["slip", "kiln"]) {
     document.documentElement.dataset.theme = theme;
     expect((await axe.run(container, noContrast)).violations).toEqual([]);
+  }
+});
+
+const LOCAL_WORDS = /local|computer|ollama|qwen/i;
+const HOSTED_WORDS = /paid|hosted|budget|frontier|claude|cloud/i;
+
+/** The page's text with the dropdown of the first type open. */
+async function openFirst(user: ReturnType<typeof userEvent.setup>): Promise<void> {
+  await user.click(screen.getByRole("button", { name: /^Model wish of explorer/ }));
+  await screen.findByRole("menuitemradio", { name: /Same as the lead/ });
+}
+
+test("cloud models only: now says the hosted model, and no word of local models shows, even in the menu", async () => {
+  const { user } = mount(WISH_AGENTS_CLOUD, listing(["budget", "frontier"]));
+  await screen.findByText("5 agents");
+  await screen.findAllByText("now: claude-haiku", {}, { timeout: 4000 });
+  await openFirst(user);
+  expect(screen.queryByRole("menuitemradio", { name: /Always local/ })).toBeNull();
+  expect(screen.getByRole("menuitemradio", { name: /Always frontier/ })).toBeTruthy();
+  expect(document.body.textContent).not.toMatch(LOCAL_WORDS);
+});
+
+test("local models only: now says the local model, and no hosted word shows, even in the menu", async () => {
+  const { user } = mount(WISH_AGENTS_LOCAL, listing(["local", "local"]));
+  await screen.findByText("5 agents");
+  await screen.findAllByText("now: qwen3:8b");
+  expect(screen.getByText(/now: qwen3:14b, fresh window/)).toBeTruthy();
+  await openFirst(user);
+  expect(screen.queryByRole("menuitemradio", { name: /Always budget/ })).toBeNull();
+  expect(screen.queryByRole("menuitemradio", { name: /Always frontier/ })).toBeNull();
+  expect(screen.getByRole("menuitemradio", { name: /Always local/ })).toBeTruthy();
+  expect(document.body.textContent).not.toMatch(HOSTED_WORDS);
+});
+
+test("mixed: every wish is offered, and now says local or hosted per type", async () => {
+  const { user } = mount(WISH_AGENTS_MIXED, listing(["local", "budget"]));
+  await screen.findByText("5 agents");
+  expect(await screen.findAllByText("now: qwen3:14b")).toHaveLength(2);
+  expect(screen.getAllByText("now: claude-sonnet")).toHaveLength(2);
+  await openFirst(user);
+  // The six wishes, then the two ready models of the listing, each a choice by name.
+  expect(screen.getAllByRole("menuitemradio")).toHaveLength(8);
+  expect(screen.getAllByText("this model, always")).toHaveLength(2);
+});
+
+test("changing a wish calls agents.set_wish with the folder and shows what the result says", async () => {
+  const { fake, user } = mount(WISH_AGENTS_MIXED, listing(["local", "budget"]));
+  await screen.findByText("5 agents");
+  fake.raw.setAgentWish.mockResolvedValue({ ...WISH_AGENTS_MIXED[0]!, wish: "stronger", resolves_to: { model: "claude-opus", reason: "one step above the lead" } });
+  await openFirst(user);
+  await user.click(screen.getByRole("menuitemradio", { name: /Stronger than the lead/ }));
+  await waitFor(() => expect(fake.raw.setAgentWish).toHaveBeenCalledWith("explorer", "stronger", FOLDER));
+  expect(await screen.findByText("now: claude-opus")).toBeTruthy();
+  expect(screen.getByRole("button", { name: /^Model wish of explorer: Stronger than the lead/ })).toBeTruthy();
+});
+
+test("a refused change shows a plain line and the old value stays", async () => {
+  const { fake, user } = mount(WISH_AGENTS_MIXED, listing(["local", "budget"]));
+  await screen.findByText("5 agents");
+  fake.raw.setAgentWish.mockRejectedValue(new Error("this agent file is read-only"));
+  await openFirst(user);
+  await user.click(screen.getByRole("menuitemradio", { name: /Stronger than the lead/ }));
+  expect((await screen.findByRole("alert")).textContent).toBe("this agent file is read-only");
+  expect(screen.getByRole("button", { name: /^Model wish of explorer: Cheapest that fits/ })).toBeTruthy();
+});
+
+test("a daemon that does not answer agents.set_wish gets a plain line, and the old value stays", async () => {
+  const { fake, user } = mount(WISH_AGENTS_MIXED, listing(["local", "budget"]));
+  await screen.findByText("5 agents");
+  fake.raw.setAgentWish.mockRejectedValue(rpcError(METHOD_NOT_FOUND, "method not found"));
+  await openFirst(user);
+  await user.click(screen.getByRole("menuitemradio", { name: /Always frontier/ }));
+  expect((await screen.findByRole("alert")).textContent).toBe("This golem is too old to change a wish. Update golem.");
+  expect(screen.getByRole("button", { name: /^Model wish of explorer: Cheapest that fits/ })).toBeTruthy();
+});
+
+test("a broken agent has no dropdown, and an older daemon's type shows the wish without now", async () => {
+  mount(WISH_AGENTS_MIXED.map((agent) => (agent.name === "worker" ? { ...agent, resolves_to: undefined } : agent)), listing(["local", "budget"]));
+  await screen.findByText("5 agents");
+  expect(screen.queryByRole("button", { name: /^Model wish of broken-one/ })).toBeNull();
+  expect(screen.getByRole("button", { name: /^Model wish of worker/ })).toBeTruthy();
+  expect(screen.getAllByText(/^now: /)).toHaveLength(3);
+});
+
+test("axe is clean for the three setups with the menu open", async () => {
+  for (const [agents, tiers] of [
+    [WISH_AGENTS_LOCAL, ["local"]],
+    [WISH_AGENTS_MIXED, ["local", "budget"]],
+    [WISH_AGENTS_CLOUD, ["frontier"]],
+  ] as const) {
+    const { user, container, unmount } = mount(agents, listing([...tiers]));
+    await screen.findByText("5 agents");
+    await openFirst(user);
+    // The open menu is outside the page's landmarks, so the region rule is left out for the whole body.
+    expect((await axe.run(document.body, { rules: { "color-contrast": { enabled: false }, region: { enabled: false } } })).violations).toEqual([]);
+    expect((await axe.run(container, noContrast)).violations).toEqual([]);
+    unmount();
   }
 });

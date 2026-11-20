@@ -1,4 +1,4 @@
-import { formatCost, formatCount, referenceName, roleName } from "@golem/view";
+import { formatCost, formatCount, helperCost, referenceName, roleName } from "@golem/view";
 import type { CostGetResult } from "../../store/cost.ts";
 import { actionErrorText } from "../../store/errors.ts";
 import { useCost } from "../../store/page-context.tsx";
@@ -65,6 +65,7 @@ export function UsageView({ result }: { result: CostGetResult }) {
     (a, b) => b.cost_usd - a.cost_usd || b.input + b.output - (a.input + a.output),
   );
   const roles = result.by_role ?? [];
+  const helpers = helperCost(result);
   return (
     <div className="flex max-w-column flex-col gap-6">
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -112,6 +113,17 @@ export function UsageView({ result }: { result: CostGetResult }) {
           ))}
         </tbody>
       </table>
+      {helpers === null ? null : (
+        <section aria-label="Helpers" className="flex flex-col gap-1">
+          <h3 className="text-sm font-medium">Helpers, last 7 days</h3>
+          <p className="text-sm">
+            <span className="font-mono">{helpers.cost}</span>
+            {helpers.share === "" ? "" : `, ${helpers.share} of the week`}
+            {` · ${helpers.calls} ${helpers.calls === 1 ? "call" : "calls"} · ${helpers.tokens} tokens`}
+          </p>
+          <p className="text-xs text-faint">All helper types together. The daemon does not split the cost by type yet.</p>
+        </section>
+      )}
       {roles.length < 2 ? null : (
         <table className="w-full text-left text-sm">
           <caption className="sr-only">By job, last 7 days</caption>
