@@ -584,6 +584,13 @@ test("/skills opens the Skills section of Settings", async () => {
   expect(location.pathname).toBe("/settings/skills");
 });
 
+test("/memory opens the Memory section of Settings", async () => {
+  const { user } = await session();
+  await say(user, "/memory");
+  expect(location.pathname).toBe("/settings/memory");
+  expect(screen.getByRole("heading", { level: 2, name: "Memory" })).toBeTruthy();
+});
+
 test("/mcp opens the MCP servers section of Settings", async () => {
   const { user } = await session();
   await say(user, "/mcp");

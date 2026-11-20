@@ -1,4 +1,4 @@
-import { OLLAMA_FAILED, RpcError, SESSION_BUSY, type ChatEvent, type ConnectionState, type OllamaInstallUpdate, type RuntimeInstallUpdate, type McpServerLog, type McpLoginDone, type ModelServerStatus, type PullUpdate, type SessionSummary } from "@golem/client";
+import { OLLAMA_FAILED, RpcError, SESSION_BUSY, type ChatEvent, type ConnectionState, type OllamaInstallUpdate, type RuntimeInstallUpdate, type McpServerLog, type McpLoginDone, type ModelServerStatus, type MemoryChanged, type PullUpdate, type SessionSummary } from "@golem/client";
 import { vi } from "vitest";
 import type { ModelListResult } from "./models.ts";
 import type { PageClient } from "./page.ts";
@@ -78,6 +78,7 @@ export function fakeClient() {
   const event = listeners<ChatEvent>();
   const summaries = listeners<SessionSummary>();
   const skills = listeners<string | null>();
+  const memory = listeners<MemoryChanged>();
   const routines = listeners<"changed" | "fired" | "finished">();
   const mcp = listeners<unknown>();
   const mcpLog = listeners<McpServerLog>();
@@ -97,6 +98,12 @@ export function fakeClient() {
     onEvent: event.on,
     onSessionSummary: summaries.on,
     onSkillsChanged: skills.on,
+    onMemoryChanged: memory.on,
+    listMemories: vi.fn<PageClient["listMemories"]>(async () => ({ items: [], total: 0, counts: {}, settings: {} })),
+    updateMemory: vi.fn<PageClient["updateMemory"]>(async () => ({}) as never),
+    deleteMemories: vi.fn<PageClient["deleteMemories"]>(async (ids) => ({ deleted: ids, missing: [] })),
+    exportMemories: vi.fn<PageClient["exportMemories"]>(async (params) => ({ format: params.format, text: "", count: 0 })),
+    memorySettings: vi.fn<PageClient["memorySettings"]>(async () => ({ settings: {} })),
     onRoutinesChanged: routines.on,
     listRoutines: vi.fn<PageClient["listRoutines"]>(async () => ({ routines: [] })),
     listRuns: vi.fn<PageClient["listRuns"]>(async () => ({ runs: [] })),
@@ -226,6 +233,7 @@ export function fakeClient() {
     },
     emitEvent: event.emit,
     emitSummary: summaries.emit,
+    emitMemory: memory.emit,
     emitSkills: (root: string | null = null) => {
       skills.emit(root);
     },
