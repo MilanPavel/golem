@@ -61,7 +61,7 @@ export function SidebarShell() {
   const setOpen = wide ? (inSettings ? setPeek : setStored) : setOverlay;
   const routeKey = JSON.stringify(route);
 
-  const waiting = useInbox().items.length;
+  const waiting = useInbox().count;
 
   const status = useSetupStatus();
   const problem = status.isError || status.data === undefined ? null : setupProblem(status.data.rows);

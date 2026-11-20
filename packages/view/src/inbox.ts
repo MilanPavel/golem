@@ -19,6 +19,9 @@ export interface InboxPending {
   helper?: { session_id: string; agent: string; label?: string | null; index: number } | null;
   /** How many helpers ask this same question; the item is listed once. */
   count?: number | null;
+  /** For a helper's paid question: what goes to the paid model, and what does not. */
+  sent?: readonly string[] | null;
+  not_sent?: readonly string[] | null;
 }
 
 /** The part of a session summary the Inbox reads. */
@@ -62,6 +65,10 @@ export interface InboxItem {
   count: number;
   /** Where the answer goes: the helper's session for a helper's item, else `sessionId`. */
   answerSessionId: string;
+  /** For a paid question: what goes to the paid model ("the brief"); empty when the daemon does not say. */
+  sent: string[];
+  /** For a paid question: what does not go ("this chat"). */
+  notSent: string[];
 }
 
 /** The helper behind an item, with the words that name it. */
@@ -201,6 +208,8 @@ export function inboxItems(sessions: readonly InboxSession[], now: number): Inbo
         helper,
         count: Math.max(1, pending.count ?? 1),
         answerSessionId: helper === null ? session.session_id : helper.sessionId,
+        sent: approval ? [] : [...(pending.sent ?? [])],
+        notSent: approval ? [] : [...(pending.not_sent ?? [])],
       });
     }
   }

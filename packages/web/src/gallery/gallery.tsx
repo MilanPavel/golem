@@ -25,6 +25,9 @@ import { connectionScreen, type ConnectionHost } from "../features/connection/co
 import { ChecksStrip, DetailSwitch, EditCards, ToolLine, TranscriptMessages, WritingRow, type TurnUndo } from "../features/chat/index.ts";
 import { COST_CASES, CUT_REPLY, SAMPLE_CHAT, SAMPLE_TOOLS, THINKING_CASES, TURN_CHAT, NOTICE_CHAT, ROUTED_CASES, ROUTED_SESSION } from "../features/chat/sample.ts";
 import { ApprovalBar } from "../features/approval/index.ts";
+import { DockCounter } from "../features/approval/dock-counter.tsx";
+import { HelperQuestion } from "../features/approval/helper-question.tsx";
+import { ConsentBar } from "../features/consent/consent-bar.tsx";
 import { ANSWERED, PENDING_EDIT, PENDING_SHELL } from "../features/approval/sample.ts";
 import { DiffModeSwitch, DiffView } from "../features/diff/index.ts";
 import { SAMPLE_EDIT_DIFF, SAMPLE_LONG_LINE_DIFF, SAMPLE_NEW_FILE_DIFF } from "../features/diff/sample.ts";
@@ -86,7 +89,7 @@ import { RUNS_NOW, SAMPLE_RUN_LIST, SAMPLE_WAITING_RUN } from "../features/runs/
 import { HelperRowCardBody, Rail, SessionsPanel, SidebarPanel, WaitingChip } from "../features/sidebar/index.ts";
 import { ConnectionStrip } from "../features/connection/index.ts";
 import { InboxPanel } from "../features/inbox/index.ts";
-import { SAMPLE_INBOX } from "../features/inbox/sample.ts";
+import { SAMPLE_HELPER_CONSENT, SAMPLE_HELPER_GROUPS, SAMPLE_HELPER_INBOX, SAMPLE_INBOX } from "../features/inbox/sample.ts";
 import { inboxKey } from "../store/inbox.ts";
 import { faviconHref, tabTitle } from "../features/tab-status/index.ts";
 import type { ConnectionSnapshot } from "../store/connection.ts";
@@ -930,6 +933,52 @@ function DockedApprovalDemo({ tool, label }: { tool: typeof PENDING_EDIT; label:
   );
 }
 
+/** The dock when helpers ask: the counter over a helper's question, and a helper's paid question. */
+function HelperDockDemo() {
+  const [index, setIndex] = useState(0);
+  const items = SAMPLE_HELPER_INBOX;
+  const current = items[index];
+  const demo = (label: string, node: ReactNode) => (
+    <div>
+      <p className="mb-1 text-xs text-muted">{label}</p>
+      <div className="rounded-lg border border-line bg-bg p-4">
+        <DockView busy meter={<Meter state="waiting" runStartedAt={null} />} approval={node} composer={<DemoComposer busy />} />
+      </div>
+    </div>
+  );
+  return (
+    <>
+      {demo(
+        "Docked above the lead's composer, a helper's command: 1 of 2, and the second is asked by five helpers",
+        <>
+          <DockCounter index={index} total={items.length} onPick={setIndex} />
+          {current === undefined ? null : <HelperQuestion item={current} onAnswer={() => {}} onOpen={() => {}} />}
+        </>,
+      )}
+      {demo(
+        "A helper's paid question: what is sent and not sent",
+        <ConsentBar
+          consent={{
+            runId: "r1",
+            modelProfile: "deepseek/deepseek-chat",
+            model: "deepseek-chat",
+            tier: "budget",
+            why: "The brief needs a model with a bigger window.",
+            estimatedUsd: 0.0213,
+            alternatives: ["once", "local"],
+            caps: null,
+            signal: null,
+            helper: SAMPLE_HELPER_CONSENT.helper?.name ?? null,
+            sent: SAMPLE_HELPER_CONSENT.sent,
+            notSent: SAMPLE_HELPER_CONSENT.notSent,
+          }}
+          onAnswer={() => {}}
+        />,
+      )}
+    </>
+  );
+}
+
 /** The approval bar, waiting in the dock, and the chips it leaves in the steps. */
 function ApprovalDemo() {
   const anchor = useAnchor();
@@ -937,6 +986,7 @@ function ApprovalDemo() {
     <section className="mt-6" id={anchor("Approval")}>
       <h3 className="mb-2 font-mono text-xs text-faint">Approval</h3>
       <div className="flex flex-col gap-4">
+        <HelperDockDemo />
         <DockedApprovalDemo label="Docked above the composer, an edit: the diff is open" tool={PENDING_EDIT} />
         <DockedApprovalDemo label="Docked above the composer, a command: Details is closed" tool={PENDING_SHELL} />
         <div className="max-w-sm">
@@ -1883,6 +1933,10 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
               onOpen={() => {}}
             />
             <figcaption className="mt-1 font-mono text-xs text-faint">one card answering, one with an error</figcaption>
+          </figure>
+          <figure className="m-0 w-72">
+            <InboxPanel items={SAMPLE_HELPER_INBOX} groups={SAMPLE_HELPER_GROUPS} label={`Inbox, helpers ask, ${theme}`} onAnswer={() => {}} onOpen={() => {}} />
+            <figcaption className="mt-1 font-mono text-xs text-faint">a lead whose helpers ask, one of them five helpers</figcaption>
           </figure>
         </div>
       </section>

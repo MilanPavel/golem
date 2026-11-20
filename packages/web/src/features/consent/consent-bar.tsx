@@ -4,7 +4,9 @@ import {
   consentAnswers,
   consentCapsLine,
   consentLine,
+  consentNotSentLine,
   consentReason,
+  consentSentLine,
   type ConsentChoice,
   type PendingConsent,
 } from "@golem/view";
@@ -32,16 +34,27 @@ export function ConsentBar({
 }) {
   const caps = consentCapsLine(consent);
   const answers = consentAnswers(consent);
+  const sentLines = [consentSentLine(consent), consentNotSentLine(consent)].filter((line) => line !== "");
   return (
     <section id={id} role="group" aria-label="Paid model" data-consent-bar="" className="overflow-hidden rounded-lg border border-line-strong bg-surface shadow-soft">
       <div className="flex items-start gap-2.5 px-3 pt-3 pb-2">
         <Seal />
         <div className="min-w-0">
+          {consent.helper === null ? null : (
+            <p className="text-sm leading-snug font-semibold wrap-anywhere" data-helper-name="">
+              {consent.helper} asks
+            </p>
+          )}
           <p className="text-sm leading-snug font-semibold wrap-anywhere">{CONSENT_TITLE}</p>
           <p className="mt-0.5 text-sm leading-snug text-muted wrap-anywhere">{consentReason(consent)}</p>
           <p className="mt-1 leading-snug wrap-anywhere" data-consent-line="">
             <Code>{consentLine(consent)}</Code>
           </p>
+          {sentLines.map((line) => (
+            <p key={line} className="mt-0.5 text-sm leading-snug wrap-anywhere" data-consent-sent="">
+              {line}
+            </p>
+          ))}
           {caps === "" ? null : <p className="mt-0.5 text-meta leading-snug text-faint wrap-anywhere">{caps}</p>}
         </div>
       </div>

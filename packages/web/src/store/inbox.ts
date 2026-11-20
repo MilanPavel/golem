@@ -1,4 +1,4 @@
-import { inboxItems, type InboxItem } from "@golem/view";
+import { answerTarget, inboxCount, inboxGroups, inboxItems, type ApprovalChoice, type InboxGroup, type InboxItem } from "@golem/view";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { usePageActions, useNavigate, useSessionList } from "./page-context.tsx";
 import { sendErrorText } from "./errors.ts";
@@ -19,17 +19,23 @@ export const CONSENT_CARD_ID = "consent-card";
 const MINUTE = 60_000;
 const SCROLL_WAIT = 10_000;
 
-/** The id of an item in the busy and error maps: its session and its call, or the session's consent. */
-export function inboxKey(item: Pick<InboxItem, "sessionId" | "callId">): string {
-  return `${item.sessionId}:${item.callId ?? "consent"}`;
+/** The id of an item in the busy and error maps: the session that answers and its call, or its consent. */
+export function inboxKey(item: Pick<InboxItem, "answerSessionId" | "callId">): string {
+  return `${item.answerSessionId}:${item.callId ?? "consent"}`;
 }
 
 /**
  * Answers an approval through the page's `respond`. It removes nothing: the item leaves when the
  * session's next summary says nothing waits, wherever the answer came from.
  */
-export function answerInboxItem(actions: Pick<PageActions, "respond">, sessionId: string, callId: string, choice: InboxChoice): Promise<void> {
-  return actions.respond(sessionId, callId, choice);
+export function answerInboxItem(
+  actions: Pick<PageActions, "respond">,
+  sessionId: string,
+  callId: string,
+  choice: ApprovalChoice,
+  scope?: "batch",
+): Promise<void> {
+  return scope === undefined ? actions.respond(sessionId, callId, choice) : actions.respond(sessionId, callId, choice, undefined, scope);
 }
 
 type Doc = Pick<Document, "getElementById" | "body">;
@@ -68,11 +74,16 @@ export function openInboxItem(item: Pick<InboxItem, "sessionId" | "callId">, nav
 
 export type Inbox = {
   items: InboxItem[];
+  /** The items by lead, the lead with the oldest item first. */
+  groups: InboxGroup[];
+  /** How many askers wait: a question several helpers ask counts once for each. */
+  count: number;
   /** The items whose answer is on its way, by `inboxKey`. */
   busy: Readonly<Record<string, boolean>>;
   /** The line a failed answer left on its card, by `inboxKey`. */
   errors: Readonly<Record<string, string>>;
-  answer(item: InboxItem, choice: InboxChoice): void;
+  /** Answers to the item's target: the helper's session for a helper's item. `scope: "batch"` is all helpers. */
+  answer(item: InboxItem, choice: ApprovalChoice, scope?: "batch"): void;
   open(item: InboxItem): void;
 };
 
@@ -94,6 +105,7 @@ export function useInbox(): Inbox {
     };
   }, []);
   const items = useMemo(() => inboxItems(list, now), [list, now]);
+  const groups = useMemo(() => inboxGroups(list, now), [list, now]);
   const [sent, setSent] = useState<ReadonlySet<string>>(new Set());
   const [failed, setFailed] = useState<Readonly<Record<string, string>>>({});
 
@@ -102,12 +114,13 @@ export function useInbox(): Inbox {
   const errors = useMemo(() => Object.fromEntries(Object.entries(failed).filter(([key]) => live.has(key))), [failed, live]);
 
   const answer = useCallback(
-    (item: InboxItem, choice: InboxChoice) => {
-      if (item.callId === null) return;
+    (item: InboxItem, choice: ApprovalChoice, scope?: "batch") => {
+      const target = answerTarget(item);
+      if (target === null) return;
       const key = inboxKey(item);
       setSent((current) => new Set(current).add(key));
       setFailed((current) => Object.fromEntries(Object.entries(current).filter(([each]) => each !== key)));
-      answerInboxItem(actions, item.sessionId, item.callId, choice).catch((err: unknown) => {
+      answerInboxItem(actions, target.sessionId, target.callId, choice, scope).catch((err: unknown) => {
         setSent((current) => {
           const next = new Set(current);
           next.delete(key);
@@ -124,5 +137,6 @@ export function useInbox(): Inbox {
     },
     [navigate],
   );
-  return { items, busy, errors, answer, open };
+  const count = useMemo(() => inboxCount(items), [items]);
+  return { items, groups, count, busy, errors, answer, open };
 }

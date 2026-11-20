@@ -10,7 +10,7 @@ import type { RailItem } from "./rail.tsx";
 /** The Inbox item's body: what waits for you, answered through the store. */
 function InboxBody() {
   const inbox = useInbox();
-  return <InboxPanel items={inbox.items} busy={inbox.busy} errors={inbox.errors} onAnswer={inbox.answer} onOpen={inbox.open} />;
+  return <InboxPanel items={inbox.items} groups={inbox.groups} busy={inbox.busy} errors={inbox.errors} onAnswer={inbox.answer} onOpen={inbox.open} />;
 }
 
 /** What each rail item shows in the panel. Mounting a real panel for an item is a change to its line. */

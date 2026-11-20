@@ -47,6 +47,12 @@ export type PendingConsent = {
   caps: ConsentCaps | null;
   /** The struggle that made the run ask in its middle. Null for the question before a turn. */
   signal: string | null;
+  /** For a helper's question: `worker · upgrade httpx`, or just the agent; null for the session's own. */
+  helper: string | null;
+  /** For a helper's question: what goes to the paid model, such as "the brief". Empty for the session's own. */
+  sent: readonly string[];
+  /** For a helper's question: what does not go, such as "this chat". */
+  notSent: readonly string[];
 };
 
 /** How a question about a tool call was answered. */
@@ -203,6 +209,13 @@ export type ChatNotice = {
   text: string;
   at: string;
 };
+
+/** `worker · upgrade httpx`, or just the agent; null when no helper asks. */
+function consentHelperName(agent: string | null | undefined, label: string | null | undefined): string | null {
+  if (agent === undefined || agent === null || agent === "") return null;
+  const short = label?.trim() ?? "";
+  return short === "" ? agent : `${agent} \u00b7 ${short}`;
+}
 
 /** The notices that follow message `id`, or the ones at the top for null. In Quiet, a clear is hidden. */
 export function noticesAfter(notices: readonly ChatNotice[], id: string | null, quiet = false): ChatNotice[] {
@@ -787,6 +800,9 @@ function reduceChatEvent(state: ChatState, event: ChatEvent): ChatState {
           estimatedUsd: event.data.estimated_usd ?? null,
           alternatives: event.data.alternatives,
           signal: event.data.signal ?? null,
+          helper: consentHelperName(event.data.agent, event.data.label),
+          sent: event.data.sent ?? [],
+          notSent: event.data.not_sent ?? [],
           caps:
             caps === null
               ? null

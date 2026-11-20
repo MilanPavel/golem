@@ -215,7 +215,8 @@ export type PageActions = {
   /** Forks at a message and resolves with the new session's id. */
   fork(sessionId: string, atMessageId: string): Promise<string>;
   close(sessionId: string): Promise<void>;
-  respond(sessionId: string, callId: string, decision: ApprovalChoice, args?: Readonly<Record<string, unknown>>): Promise<void>;
+  /** `scope: "batch"` answers for all the helpers of one delegate call; it does not go with `args`. */
+  respond(sessionId: string, callId: string, decision: ApprovalChoice, args?: Readonly<Record<string, unknown>>, scope?: "batch"): Promise<void>;
   /** Answers the paid step-up question the session's run waits on. The run goes on in its events. */
   answerConsent(sessionId: string, runId: string, answer: ConsentChoice): Promise<void>;
   /** Switches the session's model. The chip changes from the daemon's `model.selected` event. */
@@ -624,8 +625,9 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
       async close(sessionId) {
         await client.closeSession(sessionId);
       },
-      async respond(sessionId, callId, decision, args) {
-        if (args === undefined) await client.respondApproval(sessionId, callId, decision);
+      async respond(sessionId, callId, decision, args, scope) {
+        if (scope !== undefined) await client.respondApproval(sessionId, callId, decision, args, scope);
+        else if (args === undefined) await client.respondApproval(sessionId, callId, decision);
         else await client.respondApproval(sessionId, callId, decision, args);
       },
       async answerConsent(sessionId, runId, answer) {

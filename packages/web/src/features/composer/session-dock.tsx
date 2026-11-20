@@ -4,9 +4,8 @@ import { useConnection } from "../../store/connection-context.tsx";
 import { actionErrorText, sendErrorText } from "../../store/errors.ts";
 import { useDraft, useDraftPastes, useNotes, usePageActions, useSession } from "../../store/page-context.tsx";
 import type { SessionView } from "../../store/session-store.ts";
-import { DockedApproval } from "../approval/docked-approval.tsx";
+import { PendingDock } from "./pending-dock.tsx";
 import { DockedChecksQuestion } from "./checks-question.tsx";
-import { DockedConsent } from "../consent/docked-consent.tsx";
 import { Composer } from "./composer.tsx";
 import { ModeChip } from "./mode-chip.tsx";
 import { PlanChip } from "./plan-chip.tsx";
@@ -130,12 +129,7 @@ export function SessionDock({ sessionId }: { sessionId: string }) {
                 <ContextChip sessionId={sessionId} />
               </span>
             } />}
-        approval={
-          <>
-            <DockedApproval sessionId={sessionId} />
-            <DockedConsent sessionId={sessionId} />
-          </>
-        }
+        approval={<PendingDock sessionId={sessionId} />}
         question={<DockedChecksQuestion sessionId={sessionId} />}
         hint={
           <>
