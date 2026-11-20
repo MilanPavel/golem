@@ -9,7 +9,6 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -24,7 +23,10 @@ class DelegateArgs(BaseModel):
     brief: str = Field(
         min_length=1, description="What to find out, and what to return. The helper sees only this."
     )
-    agent: Literal["explorer"] = Field(default=AGENT, description="Which helper to use.")
+    agent: str = Field(
+        default=AGENT,
+        description="Which helper to use: the name of an agent type listed in this tool.",
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -88,13 +90,24 @@ async def _delegate(args: DelegateArgs, ctx: ToolContext) -> ToolResult:
     raise ToolError("a helper cannot be started here")
 
 
+DESCRIPTION = (
+    "Hand a reading or searching job to a helper that starts with an empty context. "
+    "Use it for wide questions about many files. It returns a short answer, not the files. "
+    "It cannot change anything."
+)
+
+
+def describe(types: Sequence[tuple[str, str]]) -> str:
+    """The description of ``delegate`` with the agent types a session may name, one to a line."""
+    if not types:
+        return DESCRIPTION
+    lines = "\n".join(f"- {name}: {text}" for name, text in types)
+    return f"{DESCRIPTION}\nThe agent argument is one of these types:\n{lines}"
+
+
 DELEGATE = Tool(
     name="delegate",
-    description=(
-        "Hand a reading or searching job to a helper that starts with an empty context. "
-        "Use it for wide questions about many files. It returns a short answer, not the files. "
-        "It cannot change anything."
-    ),
+    description=DESCRIPTION,
     args=DelegateArgs,
     run=_delegate,
     read_only=True,
@@ -103,9 +116,11 @@ DELEGATE = Tool(
 __all__ = [
     "AGENT",
     "DELEGATE",
+    "DESCRIPTION",
     "DelegateArgs",
     "HelperOutcome",
     "HelperSpec",
+    "describe",
     "results_summary",
     "results_text",
 ]

@@ -446,7 +446,7 @@ class NotificationSettings(BaseModel):
 
 
 class ExplorerSettings(BaseModel):
-    """``[agents.explorer]``. What bounds the helper that ``delegate`` starts."""
+    """``[agents.explorer]``. What bounds the explorer, over the limits in its agent file."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 

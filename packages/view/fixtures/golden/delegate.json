@@ -57,7 +57,7 @@
       "data": {
         "cleared_ids": [],
         "context_window": null,
-        "estimated_tokens": 3593,
+        "estimated_tokens": 3809,
         "index": 1,
         "message_bytes": [
           10
@@ -85,9 +85,9 @@
           }
         ],
         "tier": null,
-        "tools_bytes": 11690,
-        "tools_chars": 11690,
-        "tools_sha": "96612a01fa461427edf699fe8e493392e697268a50b2f377e2f37b56ffc6e3e7",
+        "tools_bytes": 12409,
+        "tools_chars": 12409,
+        "tools_sha": "d250d8a2e59b1a4ac5002eadddc4c775b8ead0a6163066d1c0556a16c6c9b2ec",
         "window_estimated": false,
         "window_planned": false
       },
@@ -345,7 +345,7 @@
       "data": {
         "cleared_ids": [],
         "context_window": null,
-        "estimated_tokens": 1825,
+        "estimated_tokens": 1933,
         "index": 2,
         "message_bytes": [
           10,
@@ -379,9 +379,9 @@
           }
         ],
         "tier": null,
-        "tools_bytes": 11690,
-        "tools_chars": 11690,
-        "tools_sha": "96612a01fa461427edf699fe8e493392e697268a50b2f377e2f37b56ffc6e3e7",
+        "tools_bytes": 12409,
+        "tools_chars": 12409,
+        "tools_sha": "d250d8a2e59b1a4ac5002eadddc4c775b8ead0a6163066d1c0556a16c6c9b2ec",
         "window_estimated": false,
         "window_planned": false
       },
@@ -502,7 +502,7 @@
       "data": {
         "cleared_ids": [],
         "context_window": null,
-        "estimated_tokens": 3593,
+        "estimated_tokens": 3809,
         "index": 1,
         "message_bytes": [
           10
@@ -530,9 +530,9 @@
           }
         ],
         "tier": null,
-        "tools_bytes": 11690,
-        "tools_chars": 11690,
-        "tools_sha": "96612a01fa461427edf699fe8e493392e697268a50b2f377e2f37b56ffc6e3e7",
+        "tools_bytes": 12409,
+        "tools_chars": 12409,
+        "tools_sha": "d250d8a2e59b1a4ac5002eadddc4c775b8ead0a6163066d1c0556a16c6c9b2ec",
         "window_estimated": false,
         "window_planned": false
       },
@@ -790,7 +790,7 @@
       "data": {
         "cleared_ids": [],
         "context_window": null,
-        "estimated_tokens": 1825,
+        "estimated_tokens": 1933,
         "index": 2,
         "message_bytes": [
           10,
@@ -824,9 +824,9 @@
           }
         ],
         "tier": null,
-        "tools_bytes": 11690,
-        "tools_chars": 11690,
-        "tools_sha": "96612a01fa461427edf699fe8e493392e697268a50b2f377e2f37b56ffc6e3e7",
+        "tools_bytes": 12409,
+        "tools_chars": 12409,
+        "tools_sha": "d250d8a2e59b1a4ac5002eadddc4c775b8ead0a6163066d1c0556a16c6c9b2ec",
         "window_estimated": false,
         "window_planned": false
       },

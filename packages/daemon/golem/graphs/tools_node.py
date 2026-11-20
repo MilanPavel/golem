@@ -128,6 +128,8 @@ class ChildScope:
     max_calls: int
     asks: bool = False
     """Whether the helper may ask you, as a helper session of an agent that has ``asks``."""
+    prompt: str = ""
+    """The helper's whole system prompt: the body of its agent file."""
 
 
 class HelperHost(Protocol):

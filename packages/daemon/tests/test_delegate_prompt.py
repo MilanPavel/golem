@@ -11,8 +11,9 @@ from fakes import ToolCallingChatModel
 from langchain_core.messages import SystemMessage
 from langgraph.checkpoint.memory import InMemorySaver
 
+from golem.agents.bundled import bundled_agents_dir
+from golem.agents.parse import parse_agent
 from golem.graphs.chat import ChatRuntime, open_chat
-from golem.graphs.child import CHILD_PROMPT
 from golem.graphs.delegate_prompt import DELEGATE_PROMPT, DELEGATE_TEXT, delegate_section
 from golem.graphs.prompt import PromptContext, SystemPrompt
 from golem.models.dispatcher import Dispatcher
@@ -51,6 +52,9 @@ def test_the_section_needs_delegate_and_a_known_small_window(
 def test_the_text_is_short() -> None:
     assert len(DELEGATE_TEXT.splitlines()) <= 4
     assert len(DELEGATE_TEXT) < 300
+
+
+CHILD_PROMPT = parse_agent(bundled_agents_dir() / "explorer.md").body
 
 
 class _Chat:

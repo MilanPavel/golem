@@ -389,6 +389,7 @@ class DaemonApp:
                     self._titles,
                     self.state.skills,
                     BlobStore(database),
+                    self.state.agents,
                 )
                 sessions = self.state.sessions
                 sessions.memory = memory
@@ -775,13 +776,21 @@ async def _open_sessions(
     titles: TitleGenerator | None,
     skills: SkillRegistry | None,
     blobs: BlobStore,
+    agents: AgentRegistry | None,
 ) -> SessionManager:
     events = EventLog(database)
     records = SessionRecords(database)
     session_log = SessionLog(events, bus, records)
     runs = RunRecords(database)
     manager = SessionManager(
-        runtime, session_log, records, runs, titles=titles, skills=skills, blobs=blobs
+        runtime,
+        session_log,
+        records,
+        runs,
+        titles=titles,
+        skills=skills,
+        blobs=blobs,
+        agents=agents,
     )
     await recover_runs(runs, events, session_log, runtime, manager)
     return manager

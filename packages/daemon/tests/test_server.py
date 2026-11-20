@@ -228,6 +228,7 @@ async def start_daemon(
     user_home: Path | None = None,
     local_servers: LocalServers | None = None,
     socket_check_seconds: float = 5.0,
+    bundled_agents: Path | None = None,
 ) -> tuple[DaemonApp, asyncio.Task[None]]:
     """Serve in this process. Unless a test passes ``local_servers``, golem never starts Ollama."""
     paths = resolve_paths(home)
@@ -250,6 +251,7 @@ async def start_daemon(
         user_home=user_home if user_home is not None else home,
         local_servers=local_servers,
         socket_check_seconds=socket_check_seconds,
+        bundled_agents=bundled_agents,
     )
     task = asyncio.create_task(app.serve(install_signals=False))
     await _wait_listening(paths.socket_path, task)

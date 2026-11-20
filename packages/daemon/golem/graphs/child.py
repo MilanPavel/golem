@@ -1,7 +1,7 @@
 """What a helper is made of: its tools, its prompt and its limits (ADR-059).
 
-A helper is a session with a parent, run by the session manager. The chat graph runs it with a
-fixed read-only set of tools and the one-section prompt below, and it stops at its limits.
+A helper is a session with a parent, run by the session manager. The chat graph runs it with the
+tools and the prompt of its agent file, and it stops at its limits.
 ``child_thread`` names the checkpoint thread of a helper of the older shape (ADR-058), which old
 logs still point at.
 """
@@ -9,26 +9,6 @@ logs still point at.
 from __future__ import annotations
 
 from dataclasses import dataclass
-
-EXPLORER_TOOLS = frozenset(
-    {
-        "read_file",
-        "list_dir",
-        "glob",
-        "grep",
-        "git_log",
-        "git_diff",
-        "git_status",
-        "read_artifact",
-    }
-)
-"""The tools a helper has: golem's read-only ones. No ``delegate``, shell, writes, web or MCP."""
-
-CHILD_PROMPT = (
-    "You are a helper. Answer the brief. Read only what you need. End with a short answer: "
-    "findings first, then the paths that matter. Do not ask questions."
-)
-"""The helper's whole system prompt."""
 
 FINAL_REQUEST = (
     "You have used all the steps you were given. Answer the brief now from what you know. "
@@ -54,8 +34,6 @@ def child_thread(session_id: str, call_id: str) -> str:
 
 
 __all__ = [
-    "CHILD_PROMPT",
-    "EXPLORER_TOOLS",
     "FINAL_REQUEST",
     "ChildLimits",
     "child_thread",
