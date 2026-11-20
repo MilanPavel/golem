@@ -36,6 +36,10 @@ _BY_ROOT = (
     "COALESCE((SELECT s.root_session_id FROM sessions s"
     " WHERE s.session_id = model_calls.session_id), session_id) = ?"
 )
+_BY_ROOT_M = (
+    "COALESCE((SELECT r.root_session_id FROM sessions r"
+    " WHERE r.session_id = m.session_id), m.session_id) = ?"
+)
 # Calls written before helpers were sessions have the role ``explore``.
 _ROLE = "CASE role WHEN 'explore' THEN 'helper' ELSE role END"
 
@@ -78,6 +82,15 @@ class RoleUsage:
 
 
 @dataclass(frozen=True, slots=True)
+class AgentUsage:
+    agent: str
+    calls: int
+    input: int
+    output: int
+    cost_usd: float
+
+
+@dataclass(frozen=True, slots=True)
 class DayUsage:
     day: str
     local_tokens: int
@@ -95,6 +108,7 @@ class UsageSummary:
     by_model: list[ModelUsage] = field(default_factory=list[ModelUsage])
     by_day: list[DayUsage] = field(default_factory=list[DayUsage])
     by_role: list[RoleUsage] = field(default_factory=list[RoleUsage])
+    by_agent: list[AgentUsage] = field(default_factory=list[AgentUsage])
     saved_reference: str | None = None
 
 
@@ -247,6 +261,17 @@ class Usage:
             " ORDER BY spent DESC, COUNT(*) DESC, role",
             args,
         )
+        # The agent type comes from the session a call belongs to, so calls recorded before
+        # this was asked for still count. A lead (no parent) is under none.
+        agents = await self._database.fetch_all(
+            "SELECT s.agent, COUNT(*), COALESCE(SUM(m.input), 0), COALESCE(SUM(m.output), 0),"
+            " COALESCE(SUM(m.cost_usd), 0) AS spent"
+            " FROM model_calls m JOIN sessions s ON s.session_id = m.session_id"
+            f" WHERE {where.replace('day', 'm.day').replace(_BY_ROOT, _BY_ROOT_M)}"
+            " AND s.parent_session_id IS NOT NULL AND s.agent IS NOT NULL"
+            " GROUP BY s.agent ORDER BY spent DESC, COUNT(*) DESC, s.agent",
+            args,
+        )
         return UsageSummary(
             totals=totals,
             by_model=[
@@ -255,6 +280,9 @@ class Usage:
             ],
             by_day=await self._by_day(where, args, since_day),
             by_role=[RoleUsage(r[0], int(r[1]), int(r[2]), int(r[3]), float(r[4])) for r in roles],
+            by_agent=[
+                AgentUsage(r[0], int(r[1]), int(r[2]), int(r[3]), float(r[4])) for r in agents
+            ],
             saved_reference=None if reference is None else reference.ref,
         )
 
@@ -320,6 +348,7 @@ async def backfill(database: Database) -> int:
 
 __all__ = [
     "EVER",
+    "AgentUsage",
     "DayUsage",
     "ModelUsage",
     "Reference",

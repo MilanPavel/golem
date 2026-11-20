@@ -525,6 +525,19 @@ class CostRoleRow(BaseModel):
     cost_usd: float = Field(ge=0)
 
 
+class CostAgentRow(BaseModel):
+    """One agent type's helper calls over the last 7 days. A lead's own calls are in no row.
+    ``cost_usd`` is 0 for a local model."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    agent: str = Field(min_length=1)
+    calls: int = Field(ge=0)
+    input: int = Field(ge=0)
+    output: int = Field(ge=0)
+    cost_usd: float = Field(ge=0)
+
+
 class CostDayRow(BaseModel):
     """One local day. ``local_tokens`` are input plus output of ``local`` calls, and
     ``paid_tokens`` those of every other call."""
@@ -541,7 +554,8 @@ class CostGetResult(BaseModel):
     """``week`` is the last 7 local days, today included. ``session`` is set when the
     request named a session. ``by_model`` is sorted by cost, highest first, and ``by_day``
     has one row for each of the 7 days, oldest first. ``by_role`` is sorted by cost, highest
-    first. ``saved_reference`` is the
+    first. ``by_agent`` splits the helpers' calls by agent type, highest cost first; it is
+    empty from a daemon that does not split them. ``saved_reference`` is the
     ``provider/model`` ref whose prices ``saved_usd`` uses, or null when there is none."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -552,6 +566,7 @@ class CostGetResult(BaseModel):
     by_model: list[CostModelRow] = Field(default_factory=list[CostModelRow])
     by_day: list[CostDayRow] = Field(default_factory=list[CostDayRow])
     by_role: list[CostRoleRow] = Field(default_factory=list[CostRoleRow])
+    by_agent: list[CostAgentRow] = Field(default_factory=list[CostAgentRow])
     saved_reference: str | None = None
 
 

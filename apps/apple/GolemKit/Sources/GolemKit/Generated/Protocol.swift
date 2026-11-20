@@ -2495,10 +2495,12 @@ public struct CostGetParams: Codable {
 /// ``week`` is the last 7 local days, today included. ``session`` is set when the
 /// request named a session. ``by_model`` is sorted by cost, highest first, and ``by_day``
 /// has one row for each of the 7 days, oldest first. ``by_role`` is sorted by cost, highest
-/// first. ``saved_reference`` is the
+/// first. ``by_agent`` splits the helpers' calls by agent type, highest cost first; it is
+/// empty from a daemon that does not split them. ``saved_reference`` is the
 /// ``provider/model`` ref whose prices ``saved_usd`` uses, or null when there is none.
 // MARK: - CostGetResult
 public struct CostGetResult: Codable {
+    public let byAgent: [CostAgentRow]?
     public let byDay: [ByDayElement]?
     public let byModel: [ByModelElement]?
     public let byRole: [CostRoleRow]?
@@ -2508,6 +2510,7 @@ public struct CostGetResult: Codable {
     public let week: CostTotalsClass
 
     public enum CodingKeys: String, CodingKey {
+        case byAgent = "by_agent"
         case byDay = "by_day"
         case byModel = "by_model"
         case byRole = "by_role"
@@ -2517,7 +2520,8 @@ public struct CostGetResult: Codable {
         case week = "week"
     }
 
-    public init(byDay: [ByDayElement]?, byModel: [ByModelElement]?, byRole: [CostRoleRow]?, savedReference: String?, session: CostTotalsClass?, today: CostTotalsClass, week: CostTotalsClass) {
+    public init(byAgent: [CostAgentRow]?, byDay: [ByDayElement]?, byModel: [ByModelElement]?, byRole: [CostRoleRow]?, savedReference: String?, session: CostTotalsClass?, today: CostTotalsClass, week: CostTotalsClass) {
+        self.byAgent = byAgent
         self.byDay = byDay
         self.byModel = byModel
         self.byRole = byRole
@@ -2525,6 +2529,33 @@ public struct CostGetResult: Codable {
         self.session = session
         self.today = today
         self.week = week
+    }
+}
+
+/// One agent type's helper calls over the last 7 days. A lead's own calls are in no row.
+/// ``cost_usd`` is 0 for a local model.
+// MARK: - CostAgentRow
+public struct CostAgentRow: Codable {
+    public let agent: String
+    public let calls: Int
+    public let costUsd: Double
+    public let input: Int
+    public let output: Int
+
+    public enum CodingKeys: String, CodingKey {
+        case agent = "agent"
+        case calls = "calls"
+        case costUsd = "cost_usd"
+        case input = "input"
+        case output = "output"
+    }
+
+    public init(agent: String, calls: Int, costUsd: Double, input: Int, output: Int) {
+        self.agent = agent
+        self.calls = calls
+        self.costUsd = costUsd
+        self.input = input
+        self.output = output
     }
 }
 

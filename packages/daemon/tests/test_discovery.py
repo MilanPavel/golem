@@ -662,6 +662,59 @@ async def test_cost_get_sums_the_calls_of_a_session(short_home: Path) -> None:
         await stop_daemon(app, task)
 
 
+async def test_cost_get_splits_the_helpers_by_agent_type(short_home: Path) -> None:
+    network = Network(_ollama_routes())
+    router = ModelRouter(
+        GolemSettings(models={"qwen": ModelSettings(model="ollama/qwen3:8b")}, default_model="qwen")
+    )
+    app, task = await start_daemon(
+        short_home,
+        router=router,
+        discovery=lambda routed: _discovery(routed, network, short_home),
+    )
+    client = await RpcClient.connect(app.paths.socket_path)
+    try:
+        await client.call("hello", HELLO)
+        usage = app.state.usage
+        assert usage is not None
+        database = usage._database  # pyright: ignore[reportPrivateUsage]
+        async with database.transaction() as tx:
+            for sid, parent, agent, index in (
+                ("s_lead", None, None, None),
+                ("s_a", "s_lead", "explorer", 0),
+                ("s_b", "s_lead", "reviewer", 1),
+            ):
+                await tx.execute(
+                    "INSERT INTO sessions (session_id, model_profile, created_at, updated_at,"
+                    " parent_session_id, root_session_id, parent_call_id, helper_index, agent)"
+                    " VALUES (?, 'x', 't', 't', ?, ?, ?, ?, ?)",
+                    (sid, parent, parent, None if parent is None else "c_1", index, agent),
+                )
+        for session, provider, tier, cost in (
+            ("s_lead", "deepseek", "budget", 5.0),
+            ("s_a", "deepseek", "budget", 0.5),
+            ("s_b", "ollama", "local", None),
+        ):
+            await usage.record_role_call(
+                session_id=session,
+                role="helper",
+                provider=provider,
+                model="m",
+                tier=tier,
+                usage=TokenUsage(input=100, output=10),
+                cost_usd=cost,
+            )
+        result = rpc_result(await client.call("cost.get", {}))
+        by_agent = cast(list[dict[str, object]], result["by_agent"])
+        assert [(a["agent"], a["calls"], a["cost_usd"]) for a in by_agent] == [
+            ("explorer", 1, 0.5),
+            ("reviewer", 1, 0.0),
+        ]
+    finally:
+        await client.close()
+        await stop_daemon(app, task)
+
+
 async def test_a_ref_as_default_is_listed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     settings = GolemSettings(default_model="anthropic/claude-test")

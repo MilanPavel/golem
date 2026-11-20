@@ -338,16 +338,18 @@ async def test_a_real_run_fills_the_table_and_cost_get_sums_it(
     assert summary.totals.calls == 2
 
 
-async def _helper(log: SessionLog, session_id: str, lead: str) -> None:
+async def _helper(
+    log: SessionLog, session_id: str, lead: str, agent: str = "explorer", index: int = 0
+) -> None:
     await log.emit(
         session_id,
         None,
         "session.created",
         SessionCreatedData(
             model_profile="x",
-            origin="agent:explorer",
-            parent=SessionParent(session_id=lead, call_id="c_1", index=0),
-            agent=AgentSnapshot(name="explorer", source="bundled", wish="cheapest"),
+            origin=f"agent:{agent}",
+            parent=SessionParent(session_id=lead, call_id="c_1", index=index),
+            agent=AgentSnapshot(name=agent, source="bundled", wish="cheapest"),
         ),
     )
     await log.emit(session_id, f"r_{session_id}", "run.started", EmptyEventData())
@@ -392,3 +394,63 @@ async def test_replaying_helper_events_leaves_the_same_rows(database: Database) 
             if isinstance(event, ModelCallStartedEvent | ModelCallCompletedEvent):
                 await project_model_call(tx, event)
     assert await _rows(database) == first
+
+
+async def _two_types(log: SessionLog, *, provider: str, tier: str, paid: bool) -> None:
+    await _session(log, "s_lead")
+    await _helper(log, "s_a", "s_lead", "explorer")
+    await _helper(log, "s_b", "s_lead", "reviewer", 1)
+
+    async def call(message_id: str, session_id: str, tokens: int, cost: float) -> None:
+        await _call(
+            log,
+            message_id,
+            session_id=session_id,
+            provider=provider,
+            tier=tier,
+            usage=TokenUsage(input=tokens, output=tokens // 10),
+            cost=cost if paid else None,
+        )
+
+    await call("m_0", "s_lead", 50, 9.0)
+    await call("m_1", "s_a", 100, 0.25)
+    await call("m_2", "s_a", 100, 0.25)
+    await call("m_3", "s_b", 300, 1.0)
+
+
+async def test_cost_by_agent_type_sums_to_the_helpers_total(database: Database) -> None:
+    await _two_types(_log(database), provider="deepseek", tier="budget", paid=True)
+    summary = await Usage(database).summary(since_day=EVER)
+    assert [(r.agent, r.calls, r.input, r.output, r.cost_usd) for r in summary.by_agent] == [
+        ("reviewer", 1, 300, 30, 1.0),
+        ("explorer", 2, 200, 20, 0.5),
+    ]
+    helpers = next(r for r in summary.by_role if r.role == "helper")
+    assert sum(r.cost_usd for r in summary.by_agent) == helpers.cost_usd == 1.5
+    assert sum(r.calls for r in summary.by_agent) == helpers.calls
+
+
+async def test_cost_by_agent_type_with_local_models_has_calls_and_tokens_and_no_cost(
+    database: Database,
+) -> None:
+    await _two_types(_log(database), provider="ollama", tier="local", paid=False)
+    summary = await Usage(database).summary(since_day=EVER)
+    assert sorted((r.agent, r.calls, r.input + r.output, r.cost_usd) for r in summary.by_agent) == [
+        ("explorer", 2, 220, 0.0),
+        ("reviewer", 1, 330, 0.0),
+    ]
+
+
+async def test_a_lead_is_in_no_agent_row_and_a_session_filter_applies(database: Database) -> None:
+    log = _log(database)
+    await _two_types(log, provider="deepseek", tier="budget", paid=True)
+    await _session(log, "s_other")
+    await _helper(log, "s_c", "s_other", "explorer")
+    await _call(log, "m_9", session_id="s_c", usage=TokenUsage(input=1, output=1), cost=7.0)
+    usage = Usage(database)
+    whole = await usage.summary(since_day=EVER)
+    assert sum(r.calls for r in whole.by_agent) == 4  # the lead's m_0 is in none
+    one = await usage.summary(since_day=EVER, session_id="s_lead")
+    assert {r.agent: r.cost_usd for r in one.by_agent} == {"explorer": 0.5, "reviewer": 1.0}
+    nothing = await usage.summary(since_day="2999-01-01")
+    assert nothing.by_agent == []
