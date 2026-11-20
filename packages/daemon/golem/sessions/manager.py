@@ -2608,6 +2608,12 @@ class SessionManager:
         live = self._runs.get(run_id)
         if live is not None and not live.task.done():
             await self._stop([live], "user")
+            parked = await self._run_records.get(run_id)
+            if parked is not None and parked.status == "waiting":
+                # The run parked on a question in the moment it was stopped: its task ended
+                # by itself, so nothing wrote ``run.cancelled``. End it as a waiting run.
+                async with self._lock:
+                    await self._cancel_waiting(parked.session_id, run_id)
             return True
         record = await self._run_records.get(run_id)
         if record is None:

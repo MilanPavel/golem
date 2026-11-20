@@ -24,7 +24,9 @@ from golem.sessions.manager import (
     ApprovalNotFoundError,
     SessionBusyError,
     SessionManager,
+    _LiveRun,  # pyright: ignore[reportPrivateUsage]
 )
+from golem.sessions.runner import RunControl
 from golem.sessions.summaries import summarize
 from golem.store.database import Database
 from golem.store.events import EventLog
@@ -469,3 +471,27 @@ async def test_allow_for_the_session_keys_on_the_command_and_can_be_revoked(
     assert record is not None and record.allowed_tools == ()
     revoked = await daemon.settled(await daemon.manager.send(session_id, "once more"))
     assert [event.data.subject for event in _needed(revoked)] == ["git status"]
+
+
+async def test_a_cancel_that_meets_a_run_as_it_parks_still_ends_it(
+    database: Database, counter: _Counter, tmp_path: Path
+) -> None:
+    # The run's task was still alive when the cancel came, but the run had already parked on
+    # its question, so the task ended by itself and nothing wrote ``run.cancelled``.
+    replies: list[Reply] = [[("safe", {}), ("risky_a", {})], "fresh"]
+    daemon = _daemon(database, ToolCallingChatModel(replies=replies), counter, tmp_path)
+    session_id = await daemon.manager.create(None)
+    run_id = await daemon.manager.send(session_id, "go")
+    await daemon.settled(run_id)
+    runs = daemon.manager._runs  # pyright: ignore[reportPrivateUsage]
+    tail = asyncio.create_task(asyncio.sleep(60))
+    runs[run_id] = _LiveRun(tail, RunControl())
+
+    assert await daemon.manager.cancel(run_id) is True
+
+    events = await daemon.events.for_run(run_id)
+    assert events[-1].type == "run.cancelled"
+    assert await daemon.manager.cancel(run_id) is False
+    runs.pop(run_id, None)
+    next_events = await daemon.settled(await daemon.manager.send(session_id, "again"))
+    assert next_events[-1].type == "run.completed"
