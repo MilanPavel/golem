@@ -859,6 +859,7 @@ export {
   agentsTable,
   agentWarnings,
   agentWish,
+  wishLine,
   wishNow,
   wishOptions,
   type WishModel,

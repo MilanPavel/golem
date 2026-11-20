@@ -1,5 +1,5 @@
 import { RpcError, type AgentInfo } from "@golem/client";
-import { AGENT_GROUPS, agentWarnings, agentWish } from "@golem/view";
+import { AGENT_GROUPS, agentWarnings, agentWish, wishLine, wishNow, type WishSetup } from "@golem/view";
 
 import type { Press } from "./keys.ts";
 import type { McpManagerLine, McpTone } from "./mcp-manager.ts";
@@ -100,24 +100,27 @@ export function layoutAgentsManager(input: {
   home: string;
   columns: number;
   rows: number;
+  /** The setup the wish words are for; `mixed` when the model list is not known. */
+  setup?: WishSetup;
 }): AgentsManagerLine[] {
   const width = Math.max(1, input.columns);
   const room = Math.max(0, input.rows - 2);
   let body: AgentsManagerLine[];
   let hint = LIST_HINT;
+  const setup = input.setup ?? "mixed";
   const view = input.state.view;
   if (input.error !== null) {
     body = [{ text: "Agents", bold: true }, { text: "" }, { text: input.error }];
   } else if (input.agents === null) {
     body = [{ text: "Agents", bold: true }, { text: "" }, { text: "asking the daemon…", dim: true }];
   } else if (view.kind === "list") {
-    body = scrollToSelected(listLines(input.agents, view.selected, input.cwd, input.home), room);
+    body = scrollToSelected(listLines(input.agents, view.selected, input.cwd, input.home, setup), room);
   } else {
     const agent = input.agents.find((item) => item.name === view.name && item.origin === view.origin);
     if (agent === undefined) {
-      body = scrollToSelected(listLines(input.agents, 0, input.cwd, input.home), room);
+      body = scrollToSelected(listLines(input.agents, 0, input.cwd, input.home, setup), room);
     } else {
-      body = detailLines(agent, width);
+      body = detailLines(agent, width, setup);
       hint = DETAIL_HINT;
     }
   }
@@ -138,7 +141,7 @@ export function agentCounts(agent: AgentInfo): string {
   return finished === null || finished === undefined ? `used ${used}` : `used ${used} · finished ${finished}`;
 }
 
-function listLines(agents: readonly AgentInfo[], selected: number, cwd: string, home: string): AgentsManagerLine[] {
+function listLines(agents: readonly AgentInfo[], selected: number, cwd: string, home: string, setup: WishSetup): AgentsManagerLine[] {
   const count = `${agents.length} ${agents.length === 1 ? "agent" : "agents"}`;
   const lines: AgentsManagerLine[] = [{ text: "Agents", bold: true }, { text: `${count} · helpers, last 30 days`, dim: true }];
   if (agents.length === 0) {
@@ -159,7 +162,7 @@ function listLines(agents: readonly AgentInfo[], selected: number, cwd: string, 
     const text =
       warnings.length > 0
         ? `${agent.name.padEnd(nameWidth)}  ${warnings[0] ?? ""}`
-        : `${agent.name.padEnd(nameWidth)}  ${agentCounts(agent).padEnd(countWidth)}  ${firstLine(agent.description)}`;
+        : `${agent.name.padEnd(nameWidth)}  ${agentCounts(agent).padEnd(countWidth)}  ${wishLine(agent.wish, setup, agent.resolves_to)} · ${firstLine(agent.description)}`;
     lines.push({
       prefix: index === chosen ? "❯ " : "  ",
       mark: statusMark(agent),
@@ -171,7 +174,7 @@ function listLines(agents: readonly AgentInfo[], selected: number, cwd: string, 
   return lines;
 }
 
-function detailLines(agent: AgentInfo, width: number): AgentsManagerLine[] {
+function detailLines(agent: AgentInfo, width: number, setup: WishSetup): AgentsManagerLine[] {
   const label = (key: string) => `${key}:`.padEnd(15);
   const indent = " ".repeat(15);
   const lines: AgentsManagerLine[] = [
@@ -188,6 +191,11 @@ function detailLines(agent: AgentInfo, width: number): AgentsManagerLine[] {
     wrapped("Description", agent.description);
   }
   lines.push({ text: `${label("Model")}${agentWish(agent.wish)}` });
+  lines.push({ text: `${label("Wish")}${wishLine(agent.wish, setup, agent.resolves_to).replace(/^wish: /, "")}` });
+  const why = wishNow(agent.resolves_to)?.reason ?? "";
+  if (why.length > 0) {
+    wrapped("Why", why);
+  }
   wrapped("Tools", (agent.tools ?? []).length > 0 ? (agent.tools ?? []).join(", ") : "none");
   lines.push({ text: `${label("May ask you")}${agent.asks === true ? "yes" : "no"}` });
   const limits = limitWords(agent);

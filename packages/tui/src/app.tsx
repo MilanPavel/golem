@@ -192,6 +192,7 @@ import {
   spendRows,
   turnRoutedNote,
   whyLines,
+  wishSetup,
   type ChatMessage,
   tryTitle,
   loadingLine,
@@ -5860,6 +5861,7 @@ export function App({
             home: homedir(),
             columns,
             rows: budget.body,
+            setup: wishSetup(listing?.models),
           }).map((line, index) => (
             <McpManagerRow key={index} line={line} />
           ))}

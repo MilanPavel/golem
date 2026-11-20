@@ -132,6 +132,29 @@ export function wishNow(resolves: AgentInfo["resolves_to"]): WishNow | null {
   };
 }
 
+const WISH_WORDS: Record<string, string> = {
+  cheapest: "cheapest",
+  same: "same as the lead",
+  stronger: "stronger than the lead",
+  local: "always local",
+  budget: "always budget",
+  frontier: "always frontier",
+};
+
+/**
+ * One line for a type's wish, as `wish: cheapest, now qwen3:14b, fresh window`. The setup decides the words: a
+ * wish the setup cannot use (a hosted one with local models only, `local` with cloud models only) is said as
+ * `not available here`, so no hosted word shows for local models only and no local word for cloud only. Without
+ * `resolves_to` (an older daemon) it is the wish alone.
+ */
+export function wishLine(wish: string, setup: WishSetup, resolves: AgentInfo["resolves_to"]): string {
+  const known = Object.hasOwn(WISH_WORDS, wish);
+  const words = !known ? wish : offered(wish, setup) ? (WISH_WORDS[wish] ?? wish) : "not available here";
+  const now = wishNow(resolves);
+  if (now === null) return `wish: ${words}`;
+  return `wish: ${words}, ${now.text.replace(":", "")}${now.freshWindow === "" ? "" : `, ${now.freshWindow}`}`;
+}
+
 /** How many helpers of this type were started, as `41`, or `—` when none were. */
 export function agentUsed(agent: AgentInfo): string {
   return (agent.used ?? 0) > 0 ? String(agent.used) : "—";
