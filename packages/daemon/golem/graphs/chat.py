@@ -64,6 +64,7 @@ from golem.graphs.context_view import (
 )
 from golem.graphs.estimate import TokenRatios
 from golem.graphs.fit import Fitted, fit_prompt, num_predict_of, prompt_estimate, reply_reserve
+from golem.graphs.memory_stub import stub_local_notes
 from golem.graphs.notes import is_note, note
 from golem.graphs.prompt import PINNED_KEY, PromptContext, SystemPrompt
 from golem.graphs.result_budget import ResultBudget, result_budget
@@ -80,6 +81,7 @@ from golem.graphs.tools_node import (
     LOCAL_ONLY_KEY,
     MCP_KEY,
     MCP_NOW_KEY,
+    MEMORY_KEY,
     MODE_KEY,
     PINNED_FOLDERS_KEY,
     PLAN_KEY,
@@ -90,10 +92,12 @@ from golem.graphs.tools_node import (
     HelperHost,
     cancelled_results,
     child_of,
+    memory_of,
     scope_of,
     tools_node,
     unanswered_calls,
 )
+from golem.memory.service import MemoryAccess
 from golem.models.discovery import Loaded
 from golem.models.dispatcher import Call, Dispatcher, Grant, LineKey, Wait
 from golem.models.errors import (
@@ -333,6 +337,7 @@ class ChatRuntime:
         growth: Growth | None = None,
         step_up: bool = False,
         child: ChildScope | None = None,
+        memory: MemoryAccess | None = None,
     ) -> AsyncGenerator[object]:
         """Stream one user turn. The first turn writes the state fields.
 
@@ -366,6 +371,7 @@ class ChatRuntime:
                 LOCAL_ONLY_KEY: local_only,
                 GROWTH_KEY: growth,
                 **({} if child is None else {CHILD_KEY: child}),
+                **({} if memory is None else {MEMORY_KEY: memory}),
             },
             "recursion_limit": _RECURSION_LIMIT,
         }
@@ -406,6 +412,7 @@ class ChatRuntime:
         plan_first: bool = False,
         local_only: bool = False,
         child: ChildScope | None = None,
+        memory: MemoryAccess | None = None,
     ) -> AsyncGenerator[object]:
         """Go on with a run paused on a tool approval, with the user's ``answer``.
 
@@ -431,6 +438,7 @@ class ChatRuntime:
                 PLAN_KEY: plan_first,
                 LOCAL_ONLY_KEY: local_only,
                 **({} if child is None else {CHILD_KEY: child}),
+                **({} if memory is None else {MEMORY_KEY: memory}),
             },
             "recursion_limit": _RECURSION_LIMIT,
         }
@@ -454,6 +462,7 @@ class ChatRuntime:
         plan_first: bool = False,
         local_only: bool = False,
         child: ChildScope | None = None,
+        memory: MemoryAccess | None = None,
     ) -> AsyncGenerator[object]:
         """Run the thread from its last checkpoint with no new input.
 
@@ -475,6 +484,7 @@ class ChatRuntime:
                 PLAN_KEY: plan_first,
                 LOCAL_ONLY_KEY: local_only,
                 **({} if child is None else {CHILD_KEY: child}),
+                **({} if memory is None else {MEMORY_KEY: memory}),
             },
             "recursion_limit": _RECURSION_LIMIT,
         }
@@ -679,7 +689,8 @@ class ChatRuntime:
         else:
             done = await summarise_now(
                 self.summariser,
-                messages,
+                # No run is live, so no access: every note a recall result holds is stubbed.
+                await stub_local_notes(messages, None),
                 ctx,
                 keep_turns=settings.keep_turns,
                 focus=focus,
@@ -850,6 +861,9 @@ def open_chat(
         plan_first = _plan(config)
         schemas = [] if final else tools.schemas(plan_first=plan_first)
         plain = _portable(_without_thinking(messages), router.kind(profile))
+        if tier_of is None or tier_of(profile) != "local":
+            # A hosted model never reads a local note. Only the copy sent changes.
+            plain = await stub_local_notes(plain, memory_of(config))
         history = view(plain, state.get("context_view"))
         async with _held(router, local, profile):
             if learn_window is not None:
@@ -906,6 +920,7 @@ def open_chat(
                         profile=profile,
                         options=overrides,
                         local_only=local_only,
+                        access=memory_of(config),
                     )
                     if summed is not None:
                         current = summed.view
@@ -928,7 +943,7 @@ def open_chat(
                     fitted = await _fit(
                         learned, router, profile, plain, current, system_chars + tools_chars,
                         window.window, clearing, summariser, state.get("session_id"), overrides,
-                        local_only,
+                        local_only, memory_of(config),
                     )  # fmt: skip
                 except ContextFull as full:
                     if not _may_step_up(state):
@@ -1512,14 +1527,19 @@ async def _summarise_old(
     profile: str,
     options: Mapping[str, float | str],
     local_only: bool = False,
+    access: MemoryAccess | None = None,
 ) -> _Cleared | None:
     """The view that sends a summary of the old turns and its ``context.changed`` item.
+
+    The summary outlives the call and goes to any model later, so it is made from the history
+    as a hosted model may read it: a local note is stubbed, whatever model summarises.
 
     None when there is nothing to summarise by turns (too few, or one long turn), when
     there is no summariser, or when the summary failed: a failed summary never fails the run.
     """
     if summariser is None:
         return None
+    messages = await stub_local_notes(messages, access)
     found = plan_summary(messages, current, keep_turns=settings.keep_turns)
     if found is None:
         return None
@@ -1568,6 +1588,7 @@ async def _fit(
     session_id: str | None,
     options: Mapping[str, float | str],
     local_only: bool = False,
+    access: MemoryAccess | None = None,
 ) -> Fitted:
     """The view that fits ``window`` with the reply reserve, or raises ``ContextFull``."""
 
@@ -1576,6 +1597,7 @@ async def _fit(
         found = await _summarise_old(
             summariser, plain, ctx, last_turn, 0, 1.0,
             session_id=session_id, profile=profile, options=options, local_only=local_only,
+            access=access,
         )  # fmt: skip
         return None if found is None else (found.view, cast(int, found.item["count"]))
 

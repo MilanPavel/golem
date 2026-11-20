@@ -152,6 +152,8 @@ class ToolResult:
     tools node to report. They never reach the wire.
 
     ``sources`` are the web pages the call found or read, for the screen. Not sent to the model.
+    ``memory_ids`` are the memories a ``recall`` result shows, one line each in this order, so a
+    later call can tell which of them it may send. None for any other tool.
     """
 
     output: str
@@ -161,6 +163,7 @@ class ToolResult:
     diff: str | None = None
     edits: tuple[FileEdit, ...] = ()
     sources: tuple[Source, ...] = ()
+    memory_ids: tuple[str, ...] | None = None
 
 
 @dataclass(frozen=True, slots=True)

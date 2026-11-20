@@ -74,13 +74,14 @@ async def _recall(args: RecallArgs, ctx: ToolContext) -> ToolResult:
     found = await access.recall(args.query, target, args.scope, MAX_HITS)
     shown = found[: args.limit]
     if not shown:
-        return ToolResult(output="no memories found", summary="no memories")
+        return ToolResult(output="no memories found", summary="no memories", memory_ids=())
     await access.service.touch_used(record.id for record in shown)
     lines = [NOTE, *(_line(record) for record in shown)]
     left = len(found) - len(shown)
     if left:
         lines.append(f"{left} more hits left out: narrow the query or lower the limit")
-    return ToolResult(output="\n".join(lines), summary=f"{len(shown)} memories")
+    ids = tuple(record.id for record in shown)
+    return ToolResult(output="\n".join(lines), summary=f"{len(shown)} memories", memory_ids=ids)
 
 
 async def _remember(args: RememberArgs, ctx: ToolContext) -> ToolResult:
