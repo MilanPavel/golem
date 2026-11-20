@@ -10,6 +10,7 @@ import { cn } from "../../ui/cn.ts";
 import type { GolemState } from "../../ui/golem-state.ts";
 import { PixelGolem } from "../../ui/pixel-golem.tsx";
 import { useDetail } from "./detail.ts";
+import { openHelper } from "./helper-open.ts";
 import { useThinkingShown } from "./thinking-shown.ts";
 import { useTimesShown } from "./times-shown.ts";
 import { formatClock, shouldStick, squeezeArgs } from "./format.ts";
@@ -115,6 +116,7 @@ function HelperLine({ tool, defaultOpen, quiet }: { tool: ToolBlock; defaultOpen
   const [open, setOpen] = useState(defaultOpen);
   const bodyId = useId();
   const steps = tool.child?.toolSteps ?? [];
+  const helpers = tool.child?.helpers ?? [];
   const shown = open && !quiet;
   return (
     <li data-tool-status={tool.status} data-helper className="tool-line">
@@ -132,6 +134,22 @@ function HelperLine({ tool, defaultOpen, quiet }: { tool: ToolBlock; defaultOpen
         <span className="font-medium text-ink">{displayToolName(tool.name)}</span>
         <span className="truncate" title={helperLine(tool)}>{helperLine(tool)}</span>
       </button>
+      {helpers.length === 0 ? null : (
+        <div data-helper-open className="flex flex-wrap gap-x-3 pl-5 text-xs">
+          {helpers.map((ref) => (
+            <button
+              key={ref.id}
+              type="button"
+              className="cursor-pointer text-clay-ink underline underline-offset-2 outline-offset-2 outline-clay focus-visible:outline-2"
+              onClick={() => {
+                openHelper({ callId: tool.callId, helperId: ref.id });
+              }}
+            >
+              {helpers.length === 1 ? "Open helper" : `Open ${ref.label === "" ? ref.agent : ref.label}`}
+            </button>
+          ))}
+        </div>
+      )}
       {shown ? (
         <div id={bodyId} className="tool-tablet">
           {steps.length > 0 ? (
@@ -563,7 +581,7 @@ export function TranscriptMessages({ chat, thinkingShown, detail, waiting = null
  * The scrolling column. While you are at the bottom it follows the text; once you scroll up it
  * stays where you are and offers a way back down.
  */
-export function TranscriptColumn({ chat, className, waiting = null, plan, session = null, undo, stronger }: { session?: SessionModelRef | null; chat: TranscriptChat; className?: string; waiting?: string | null; plan?: Omit<PlanActions, "open">; undo?: TurnUndo; stronger?: StrongerAction }) {
+export function TranscriptColumn({ chat, className, waiting = null, plan, session = null, undo, stronger, detail, thinkingShown }: { detail?: Detail; thinkingShown?: boolean; session?: SessionModelRef | null; chat: TranscriptChat; className?: string; waiting?: string | null; plan?: Omit<PlanActions, "open">; undo?: TurnUndo; stronger?: StrongerAction }) {
   const scroller = useRef<HTMLDivElement>(null);
   const content = useRef<HTMLDivElement>(null);
   const stuck = useRef(true);
@@ -603,7 +621,7 @@ export function TranscriptColumn({ chat, className, waiting = null, plan, sessio
     <div className={cn("relative flex min-h-0 flex-1 flex-col", className)}>
       <div ref={scroller} onScroll={onScroll} className="relative min-h-0 flex-1 overflow-y-auto" data-transcript-scroller>
         <div ref={content} className="mx-auto flex max-w-column flex-col gap-8 px-5 py-7">
-          <TranscriptMessages chat={chat} waiting={waiting} plan={plan} session={session} {...(undo === undefined ? {} : { undo })} {...(stronger === undefined ? {} : { stronger })} />
+          <TranscriptMessages chat={chat} waiting={waiting} plan={plan} session={session} {...(detail === undefined ? {} : { detail })} {...(thinkingShown === undefined ? {} : { thinkingShown })} {...(undo === undefined ? {} : { undo })} {...(stronger === undefined ? {} : { stronger })} />
         </div>
       </div>
       {atBottom ? null : (

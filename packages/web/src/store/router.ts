@@ -2,7 +2,7 @@ import { createStore, type StoreSource } from "./create-store.ts";
 
 export type Route =
   | { name: "home" }
-  | { name: "session"; id: string; inspect: Inspect | null }
+  | { name: "session"; id: string; inspect: Inspect | null; /** Set when the session is a helper, opened as a chat: the lead it came from. */ lead?: string }
   | { name: "trace"; id: string; span: string | null }
   | { name: "settings"; section: string }
   | { name: "routines" }
@@ -84,7 +84,13 @@ export function parseRoute(pathname: string, search = ""): Route {
         const params = new URLSearchParams(search);
         if (match[2] === undefined) {
           const inspect = params.get("inspect");
-          return { name: "session", id, inspect: inspect === null ? null : { span: inspect === "" ? null : inspect } };
+          const lead = params.get("lead");
+          return {
+            name: "session",
+            id,
+            inspect: inspect === null ? null : { span: inspect === "" ? null : inspect },
+            ...(lead === null || lead === "" ? {} : { lead }),
+          };
         }
         const span = params.get("span");
         return { name: "trace", id, span: span === null || span === "" ? null : span };
@@ -99,6 +105,11 @@ export function parseRoute(pathname: string, search = ""): Route {
 /** The path for a route's `navigate`. */
 export function sessionPath(id: string): string {
   return `/s/${encodeURIComponent(id)}`;
+}
+
+/** The path of a helper session as a chat of its own, with the lead it came from. */
+export function helperPath(id: string, lead: string): string {
+  return `${sessionPath(id)}?lead=${encodeURIComponent(lead)}`;
 }
 
 /** The path of a session with the inspector open, at `span` when given. */

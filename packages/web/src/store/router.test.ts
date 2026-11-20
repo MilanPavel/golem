@@ -1,5 +1,5 @@
 import { afterEach, expect, test, vi } from "vitest";
-import { createRouter, inspectPath, parseRoute, routineNewPath, routinePath, runsPath, sessionPath, settingsPath, tracePath, welcomePath } from "./router.ts";
+import { createRouter, helperPath, inspectPath, parseRoute, routineNewPath, routinePath, runsPath, sessionPath, settingsPath, tracePath, welcomePath } from "./router.ts";
 
 afterEach(() => {
   history.replaceState(null, "", "/");
@@ -21,6 +21,14 @@ test("parseRoute reads ?inspect as the open inspector, and its value as the span
   expect(parseRoute("/s/abc", "?other=1")).toEqual({ name: "session", id: "abc", inspect: null });
   // The trace page ignores it.
   expect(parseRoute("/s/abc/trace", "?inspect")).toEqual({ name: "trace", id: "abc", span: null });
+});
+
+test("a helper opened as a chat names its lead, and helperPath round-trips", () => {
+  expect(parseRoute("/s/h1", "?lead=a")).toEqual({ name: "session", id: "h1", inspect: null, lead: "a" });
+  expect(parseRoute("/s/h1", "?lead=")).toEqual({ name: "session", id: "h1", inspect: null });
+  const path = helperPath("h 1", "a/b");
+  const [pathname = "", search = ""] = path.split("?");
+  expect(parseRoute(pathname, `?${search}`)).toEqual({ name: "session", id: "h 1", inspect: null, lead: "a/b" });
 });
 
 test("inspectPath round-trips through parseRoute", () => {

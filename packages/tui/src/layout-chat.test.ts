@@ -527,6 +527,7 @@ function delegateBlock(over: Partial<ToolBlock> = {}): ToolBlock {
     preview: "The router is in src/router.py.",
     child: {
       model: "qwen3:27b",
+      helpers: [],
       modelCalls: 3,
       toolSteps: steps,
       tokens: 5000,
@@ -561,6 +562,7 @@ test("a running delegate call says what its helper does", () => {
     preview: undefined,
     child: {
       model: "qwen3:27b",
+      helpers: [],
       modelCalls: 1,
       toolSteps: [{ callId: "k", name: "read_file", args: { path: "src/router.py" }, status: "running" }],
       tokens: null,

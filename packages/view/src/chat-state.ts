@@ -90,6 +90,8 @@ export type ToolBlock = {
  * finished model calls, and `answerTokens` is the output of its last one.
  */
 export type HelperRun = {
+  /** The helper sessions of this call, in order of `index`, from `helper.started` and `helper.ended`. */
+  helpers: HelperRef[];
   model: string | null;
   modelCalls: number;
   toolSteps: ToolBlock[];
@@ -103,7 +105,31 @@ export type HelperRun = {
   durationMs: number | null;
 };
 
+/** How a helper session ended, from `helper.ended` on the lead's log. */
+export type HelperEnd = {
+  stopped: string;
+  modelCalls: number;
+  tokens: number;
+  answerTokens: number;
+  costUsd: number;
+  durationMs: number;
+  workingMs: number;
+};
+
+/** One helper session of a `delegate` call: its own id, to attach to, and what the lead's log says about it. */
+export type HelperRef = {
+  id: string;
+  index: number;
+  agent: string;
+  label: string;
+  model: string;
+  /** Time of `helper.started`. */
+  startedAt: string;
+  ended: HelperEnd | null;
+};
+
 const emptyHelper: HelperRun = {
+  helpers: [],
   model: null,
   modelCalls: 0,
   toolSteps: [],
@@ -447,8 +473,12 @@ function foldHelper(child: HelperRun, event: ChatEvent): HelperRun {
       };
       return { ...next, toolSteps: [...child.toolSteps.filter((tool) => tool.callId !== block.callId), block] };
     }
-    case "helper.started":
-      return { ...next, model: event.data.model };
+    case "helper.started": {
+      const { helper_id: id, index, agent, label, model } = event.data;
+      const ref: HelperRef = { id, index, agent, label, model, startedAt: event.ts, ended: null };
+      const helpers = [...child.helpers.filter((item) => item.index !== index), ref].sort((a, b) => a.index - b.index);
+      return { ...next, model, helpers };
+    }
     case "helper.step": {
       const { step_id: callId, name, status } = event.data;
       const args = event.data.args ?? {};
@@ -459,9 +489,20 @@ function foldHelper(child: HelperRun, event: ChatEvent): HelperRun {
         : [...child.toolSteps, { callId, name, args, status, ...summary }];
       return { ...next, toolSteps };
     }
-    case "helper.ended":
+    case "helper.ended": {
+      const data = event.data;
+      const end: HelperEnd = {
+        stopped: data.stopped,
+        modelCalls: data.model_calls,
+        tokens: data.tokens,
+        answerTokens: data.answer_tokens,
+        costUsd: data.cost_usd,
+        durationMs: data.duration_ms,
+        workingMs: data.working_ms,
+      };
       return {
         ...next,
+        helpers: child.helpers.map((item) => (item.index === data.index ? { ...item, ended: end } : item)),
         modelCalls: event.data.model_calls,
         tokens: event.data.tokens,
         costUsd: event.data.cost_usd,
@@ -469,6 +510,7 @@ function foldHelper(child: HelperRun, event: ChatEvent): HelperRun {
         status: event.data.stopped === "failed" ? "failed" : "done",
         durationMs: event.data.duration_ms,
       };
+    }
     case "tool.started":
     case "tool.output":
     case "tool.completed":

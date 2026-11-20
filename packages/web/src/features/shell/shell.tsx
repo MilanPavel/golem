@@ -4,6 +4,7 @@ import { PaletteHost } from "../palette/index.ts";
 import { MenuBar, SidebarShell } from "../sidebar/index.ts";
 import { RoutineNewScreen, RoutineScreen, RoutinesScreen } from "../routines/index.ts";
 import { RunsScreen } from "../runs/index.ts";
+import { HelperChat } from "../sessions/index.ts";
 import { SettingsScreen } from "../settings/index.ts";
 import { TraceScreen } from "../trace/index.ts";
 import { SetupAtStart, WelcomeScreen } from "../welcome/index.ts";
@@ -37,7 +38,13 @@ function Content() {
       // session its own state, so the folder is remembered per opening.
       return (
         <SessionFrame key={route.id} id={route.id}>
-          {route.name === "session" ? <ChatView id={route.id} /> : <TraceScreen id={route.id} span={route.span} />}
+          {route.name === "trace" ? (
+            <TraceScreen id={route.id} span={route.span} />
+          ) : route.lead !== undefined ? (
+            <HelperChat id={route.id} lead={route.lead} />
+          ) : (
+            <ChatView id={route.id} />
+          )}
         </SessionFrame>
       );
     case "settings":

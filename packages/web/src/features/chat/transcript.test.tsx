@@ -565,6 +565,7 @@ test("notices draw as one muted line after the step they followed, and Quiet hid
 
 
 const helperRun = (over: Partial<NonNullable<ToolBlock["child"]>> = {}): NonNullable<ToolBlock["child"]> => ({
+  helpers: [],
   model: "qwen3:27b",
   modelCalls: 2,
   toolSteps: [
