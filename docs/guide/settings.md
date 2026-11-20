@@ -220,6 +220,8 @@ What bounds the helper that the `delegate` tool starts. A helper only reads: it 
 | `answer_chars` | `6000` | The most characters its answer may have. The rest is cut |
 | `max_per_turn` | `3` | The most helpers one run may start. A further `delegate` call gets an error the model reads: `no more helpers in this turn; continue with what you have` |
 
+`[agents.<name>]` takes one more key for each bundled type (`explorer`, `worker`, `reviewer`, `advisor`): `model`, a wish (`cheapest`, `same`, `stronger`, `local`, `budget`, `frontier`) or a model name. It replaces the wish in the bundled file and nothing else. Changing a wish in Settings or `/agents` writes it. A file of the same name in `~/.golem/agents` wins over both.
+
 A helper also stops when its calls have taken in more than 8 times its model's window in all (`tokens`), or when a cap in `[budget]` is spent before one of its paid calls (`budget`). It then returns what it has, and the result starts with `explorer finished: <reason>`. Its calls count against the same caps as the chat's, and `golem cost` and Settings → Usage list them as `helper` under "by job".
 
 ### `[routing.roles]`

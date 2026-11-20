@@ -6,8 +6,9 @@ setup, from the same code a helper uses to pick its model
 ``model:`` key of the agent file that wins the name (ADR-059, section 4):
 
 - a user or extra-folder file, and a project file of a trusted folder, are edited in place;
-- a bundled file cannot be, so the wish goes into a copy in ``~/.golem/agents``, which wins over
-  the bundled one. The copy keeps the bundled prompt as it was when the wish was set;
+- a bundled file cannot be, so the wish goes into ``[agents.<name>] model`` of ``config.toml``,
+  which the registry applies over the bundled file's wish. Nothing is copied, so the prompt,
+  tools and limits stay the bundled ones of the running release;
 - a project file of a folder that is not in ``trusted_projects`` is never edited: the registry
   does not even show it as a winner.
 """
@@ -21,9 +22,11 @@ import os
 import tempfile
 from pathlib import Path
 
-from golem.agents.edit import AgentEditError, with_wish
+from golem.agents.edit import AgentEditError, check_wish, with_wish
 from golem.agents.model import Agent
 from golem.agents.registry import AgentRegistry, Listed
+from golem.config import BUNDLED_TYPES
+from golem.config_edit import RawConflictError, set_keys
 from golem.server.dispatcher import (
     INTERNAL_ERROR,
     INVALID_PARAMS,
@@ -143,20 +146,27 @@ async def agents_set_wish(ctx: RequestContext, params: AgentsSetWishParams) -> A
         raise RpcCallError(INVALID_PARAMS, _why_not(registry, root, params.name, view.listed))
     target = winner.agent.path
     if winner.origin == "bundled":
-        target = ctx.state.paths.agents_dir / target.name
-        if target.exists():  # a broken copy, which never won: it must be fixed first
-            raise RpcCallError(
-                INVALID_PARAMS,
-                f"{target} exists but has errors, so it cannot be changed; fix or remove it",
+        target = ctx.state.paths.config_file
+        if params.name not in BUNDLED_TYPES:
+            raise RpcCallError(INVALID_PARAMS, f"the wish of {params.name} cannot be changed here")
+        try:
+            check_wish(params.wish)
+            await asyncio.to_thread(
+                set_keys, target, {f"agents.{params.name}": {"model": params.wish}}
             )
-    try:
-        text = await asyncio.to_thread(_read, winner.agent.path)
-        changed = with_wish(text, params.wish)
-        await asyncio.to_thread(_write, target, changed, winner.origin == "bundled")
-    except AgentEditError as exc:
-        raise RpcCallError(INVALID_PARAMS, str(exc)) from exc
-    except OSError as exc:
-        raise RpcCallError(INTERNAL_ERROR, f"could not write {target}: {exc}") from exc
+        except AgentEditError as exc:
+            raise RpcCallError(INVALID_PARAMS, str(exc)) from exc
+        except (OSError, ValueError, RawConflictError) as exc:
+            raise RpcCallError(INTERNAL_ERROR, f"could not write {target}: {exc}") from exc
+    else:
+        try:
+            text = await asyncio.to_thread(_read, target)
+            changed = with_wish(text, params.wish)
+            await asyncio.to_thread(_write, target, changed, False)
+        except AgentEditError as exc:
+            raise RpcCallError(INVALID_PARAMS, str(exc)) from exc
+        except OSError as exc:
+            raise RpcCallError(INTERNAL_ERROR, f"could not write {target}: {exc}") from exc
     registry.check()
     log.info("set the wish of %s to %s in %s", params.name, params.wish, target)
     found = await agent_infos(ctx, params.cwd)

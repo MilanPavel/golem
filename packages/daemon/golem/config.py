@@ -445,15 +445,36 @@ class NotificationSettings(BaseModel):
         return value
 
 
-class ExplorerSettings(BaseModel):
-    """``[agents.explorer]``. What bounds the explorer, over the limits in its agent file."""
+class AgentModelSettings(BaseModel):
+    """``[agents.<name>]`` of a bundled type: the wish its file has, unless a file of yours wins.
+
+    ``model`` is a wish word or a model name (ADR-059, section 4). Only the wish is a key: the
+    prompt, tools and limits stay the bundled ones of the running release.
+    """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
+
+    model: str | None = None
+
+    @field_validator("model")
+    @classmethod
+    def _model_is_one_word(cls, value: str | None) -> str | None:
+        if value is not None and (value != value.strip() or not value or len(value.split()) != 1):
+            raise ValueError("model is a wish or a model name, with no spaces")
+        return value
+
+
+class ExplorerSettings(AgentModelSettings):
+    """``[agents.explorer]``. What bounds the explorer, over the limits in its agent file."""
 
     max_calls: int = Field(default=15, ge=1, le=50)
     timeout_seconds: int = Field(default=300, ge=1)
     answer_chars: int = Field(default=6_000, ge=1)
     max_per_turn: int = Field(default=3, ge=1)
+
+
+BUNDLED_TYPES = ("explorer", "worker", "reviewer", "advisor")
+"""The agent types that ship with golem: the names ``[agents.<name>]`` may set a wish for."""
 
 
 class AgentSettings(BaseModel):
@@ -467,6 +488,14 @@ class AgentSettings(BaseModel):
 
     extra_dirs: list[str] = Field(default_factory=list[str])
     explorer: ExplorerSettings = Field(default_factory=ExplorerSettings)
+    worker: AgentModelSettings = Field(default_factory=AgentModelSettings)
+    reviewer: AgentModelSettings = Field(default_factory=AgentModelSettings)
+    advisor: AgentModelSettings = Field(default_factory=AgentModelSettings)
+
+    def wish_for(self, name: str) -> str | None:
+        """``model`` of ``[agents.<name>]``, or None when unset or not a bundled type."""
+        table = cast(object, getattr(self, name, None)) if name in BUNDLED_TYPES else None
+        return table.model if isinstance(table, AgentModelSettings) else None
 
 
 class WebSettings(BaseModel):
