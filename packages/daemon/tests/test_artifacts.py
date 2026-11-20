@@ -113,6 +113,31 @@ async def test_read_artifact_pages_and_stays_in_its_session(database: Database) 
         raise AssertionError("another session read the artifact")
 
 
+async def test_a_lead_reads_its_helpers_artifact_and_not_another_leads(database: Database) -> None:
+    store = ArtifactStore(database)
+    async with database.transaction() as tx:
+        for session_id, root in (
+            ("s_lead", None),
+            ("s_helper", "s_lead"),
+            ("s_other", None),
+            ("s_other_helper", "s_other"),
+        ):
+            await tx.execute(
+                "INSERT INTO sessions (session_id, model_profile, created_at, updated_at,"
+                " root_session_id) VALUES (?, 'p', 't', 't', ?)",
+                (session_id, root),
+            )
+    mine = await store.put("s_helper", "c1", "tool_output", "from my helper")
+    theirs = await store.put("s_other_helper", "c2", "tool_output", "from another")
+    page = await store.read("s_lead", mine, 0, 100)
+    assert page is not None and page.text == "from my helper"
+    assert await store.read("s_lead", theirs, 0, 100) is None
+    assert await store.read("s_other", mine, 0, 100) is None
+    # A helper reads its own, and nothing of another helper's.
+    assert await store.read("s_helper", mine, 0, 100) is not None
+    assert await store.read("s_helper", theirs, 0, 100) is None
+
+
 async def test_pages_of_outside_content_stay_marked_as_data(database: Database) -> None:
     store = ArtifactStore(database)
     async with database.transaction() as tx:

@@ -15,7 +15,7 @@ not record is filled from today's config, and marked estimated.
 from __future__ import annotations
 
 import logging
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from datetime import datetime
 from typing import Literal, TypeVar
@@ -39,6 +39,7 @@ from golem_protocol.events import (
     ApprovalResolvedEvent,
     ChatEvent,
     ContextChangedEvent,
+    HelperStartedEvent,
     MessageCompletedEvent,
     MessageStartedEvent,
     ModelCallCompletedEvent,
@@ -63,11 +64,28 @@ _PREVIEW_CHARS = 200
 log = logging.getLogger(__name__)
 
 
-def build_trace(events: Sequence[ChatEvent]) -> list[TraceRunSpan]:
+Helpers = Mapping[str, Sequence[Sequence[ChatEvent]]]
+"""The stored events of each helper session, by the ``delegate`` call that started it, in order."""
+
+
+def helper_ids(events: Sequence[ChatEvent]) -> dict[str, list[str]]:
+    """The helper sessions of each ``delegate`` call, from ``helper.started``, in index order."""
+    found: dict[str, list[tuple[int, str]]] = {}
+    for event in events:
+        if isinstance(event, HelperStartedEvent):
+            found.setdefault(event.data.call_id, []).append(
+                (event.data.index, event.data.helper_id)
+            )
+    return {call: [h for _, h in sorted(pairs)] for call, pairs in found.items()}
+
+
+def build_trace(events: Sequence[ChatEvent], helpers: Helpers | None = None) -> list[TraceRunSpan]:
     """The runs found in ``events``, oldest first, each with its model and tool spans.
 
     The events of a child run are nested under the ``delegate`` tool span that started it. They
     are not part of the run's own calls, so the cut of a prompt is judged without them.
+    A helper session of ``helpers`` is nested under its ``delegate`` span the same way, from
+    its own events. A call with helper sessions does not also read child run events.
     """
     kids = _children(events)
     events = _own(events)
@@ -82,7 +100,7 @@ def build_trace(events: Sequence[ChatEvent]) -> list[TraceRunSpan]:
         by_run[event.run_id].append(event)
     runs: list[TraceRunSpan] = []
     for run_id in order:
-        run = _run(run_id, by_run[run_id], kids)
+        run = _run(run_id, by_run[run_id], kids, helpers or {})
         if run is not None:
             runs.append(run)
     return _with_cuts(runs, events)
@@ -156,7 +174,7 @@ def _with_cuts(runs: list[TraceRunSpan], events: Sequence[ChatEvent]) -> list[Tr
 
 
 def _run(
-    run_id: str, events: list[ChatEvent], kids: dict[str, list[ChatEvent]]
+    run_id: str, events: list[ChatEvent], kids: dict[str, list[ChatEvent]], helpers: Helpers
 ) -> TraceRunSpan | None:
     start: str | None = None
     end: str | None = None
@@ -184,7 +202,13 @@ def _run(
             end, status = event.ts, "cancelled"
     if start is None:
         start = events[0].ts
-    models = _models(events, ended=end is not None, cancelled=status == "cancelled", kids=kids)
+    models = _models(
+        events,
+        ended=end is not None,
+        cancelled=status == "cancelled",
+        kids=kids,
+        helpers=helpers,
+    )
     return TraceRunSpan(
         id=run_id,
         kind="run",
@@ -204,6 +228,7 @@ def _models(
     ended: bool,
     cancelled: bool,
     kids: dict[str, list[ChatEvent]] | None = None,
+    helpers: Helpers | None = None,
 ) -> list[TraceModelSpan]:
     started = [e for e in events if isinstance(e, ModelCallStartedEvent)]
     models = (
@@ -218,7 +243,15 @@ def _models(
     for event in events:
         if isinstance(event, ToolRequestedEvent):
             tool = _tool(event, events, ended=ended)
-            if kids is not None and event.data.call_id in kids:
+            if helpers and event.data.call_id in helpers:
+                own = [
+                    _helper_model(m)
+                    for helper in helpers[event.data.call_id]
+                    for run in build_trace(helper)
+                    for m in run.children
+                ]
+                tool = tool.model_copy(update={"children": own})
+            elif kids is not None and event.data.call_id in kids:
                 inner = _models(kids[event.data.call_id], ended=ended, cancelled=cancelled)
                 tool = tool.model_copy(update={"children": [_helper_model(m) for m in inner]})
             tools[by_message.get(event.data.message_id, _last_before(models, event.ts))].append(
@@ -417,6 +450,16 @@ def helper_of(runs: Sequence[TraceRunSpan], span_id: str) -> str | None:
                 for helper in tool.children:
                     if helper.id == span_id or any(t.id == span_id for t in helper.children):
                         return tool.id
+    return None
+
+
+def helper_owning(logs: Sequence[Sequence[ChatEvent]], span_id: str) -> int | None:
+    """The index of the helper session whose events made span ``span_id``, else None."""
+    for at, events in enumerate(logs):
+        for event in events:
+            data = event.data
+            if span_id in (getattr(data, "message_id", None), getattr(data, "call_id", None)):
+                return at
     return None
 
 
