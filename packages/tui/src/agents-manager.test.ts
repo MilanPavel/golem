@@ -18,6 +18,7 @@ import {
   type AgentsManagerKey,
   type AgentsManagerState,
 } from "./agents-manager.ts";
+import type { WishSetup } from "@golem/view";
 
 const HOME = "/Users/me";
 const CWD = "/Users/me/repo";
@@ -62,8 +63,8 @@ const ALL = [mine, untrusted, reviewer, broken, scout];
 
 const press = (name: Press["name"], input = ""): Press => ({ name, input, ctrl: false, meta: false });
 
-function layout(state: AgentsManagerState, agents: readonly AgentInfo[] | null, error: string | null = null, rows = 40) {
-  return layoutAgentsManager({ state, agents, error, cwd: CWD, home: HOME, columns: 100, rows });
+function layout(state: AgentsManagerState, agents: readonly AgentInfo[] | null, error: string | null = null, rows = 40, setup?: WishSetup) {
+  return layoutAgentsManager({ state, agents, error, cwd: CWD, home: HOME, columns: 140, rows, setup });
 }
 
 function texts(lines: ReturnType<typeof layout>): string[] {
@@ -185,4 +186,44 @@ test("a short screen keeps the selected row on screen", () => {
   const lines = layout(state, ALL, null, 6);
   assert.equal(lines.length, 6);
   assert.ok(lines.some((line) => line.selected === true));
+});
+
+const localScout: AgentInfo = {
+  ...scout,
+  resolves_to: { model: "qwen3:14b", tier: "local", reason: "the smallest local model that fits", fresh_window: false },
+};
+const cloudScout: AgentInfo = {
+  ...scout,
+  resolves_to: { model: "claude-haiku", tier: "budget", reason: "the cheapest model that fits", fresh_window: false },
+};
+const hostedWords = /hosted|cloud|budget|frontier/i;
+
+test("a local-only setup: the list says what the wish becomes, with no hosted words", () => {
+  const lines = texts(layout(openAgentsManager(), [localScout, { ...localScout, name: "deep", wish: "frontier" }], null, 40, "local"));
+  assert.ok(lines.some((line) => line.includes("scout") && line.includes("wish: cheapest, now qwen3:14b")));
+  assert.ok(lines.some((line) => line.includes("deep") && line.includes("wish: not available here")));
+  assert.ok(!lines.some((line) => hostedWords.test(line)));
+  const detail = texts(layout({ open: true, view: { kind: "detail", name: "scout", origin: "bundled" } }, [localScout], null, 40, "local"));
+  assert.ok(detail.some((line) => line.startsWith("Why:") && line.includes("the smallest local model that fits")));
+  assert.ok(detail.some((line) => line.startsWith("Wish:") && line.includes("cheapest, now qwen3:14b")));
+});
+
+test("a cloud-only setup: the list says what the wish becomes, with no local words", () => {
+  const lines = texts(layout(openAgentsManager(), [cloudScout, { ...cloudScout, name: "home", wish: "local" }], null, 40, "cloud"));
+  assert.ok(lines.some((line) => line.includes("scout") && line.includes("wish: cheapest, now claude-haiku")));
+  assert.ok(lines.some((line) => line.includes("home") && line.includes("wish: not available here")));
+  assert.ok(!lines.some((line) => /local/i.test(line)));
+});
+
+test("a stronger wish with a fresh window says so", () => {
+  const fresh: AgentInfo = { ...localScout, wish: "stronger", resolves_to: { model: "qwen3:14b", tier: "local", fresh_window: true } };
+  assert.ok(texts(layout(openAgentsManager(), [fresh], null, 40, "local")).some((line) => line.includes("wish: stronger than the lead, now qwen3:14b, fresh window")));
+});
+
+test("an older daemon without resolves_to shows the wish alone, and no why line", () => {
+  const lines = texts(layout(openAgentsManager(), [scout]));
+  assert.ok(lines.some((line) => line.includes("wish: cheapest ·")));
+  assert.ok(!lines.some((line) => line.includes("now ")));
+  const detail = texts(layout({ open: true, view: { kind: "detail", name: "scout", origin: "bundled" } }, [scout]));
+  assert.ok(!detail.some((line) => line.startsWith("Why:")));
 });

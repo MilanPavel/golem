@@ -3,7 +3,7 @@ import { test } from "node:test";
 
 import type { AgentInfo } from "@golem/client";
 
-import { agentFinished, agentRow, agentRows, agentsTable, agentUsed, agentWish, wishNow, wishOptions, wishSetup } from "./agents-view.ts";
+import { agentFinished, agentRow, agentRows, agentsTable, agentUsed, agentWish, wishLine, wishNow, wishOptions, wishSetup } from "./agents-view.ts";
 
 const bundled = (over: Partial<AgentInfo>): AgentInfo => ({
   name: "explorer",
@@ -146,4 +146,13 @@ test("a ready model can be named in the wish dropdown, one that is not ready can
   assert.equal(options.some((option) => option.value === "ollama/qwen3:8b"), false);
   // The model that is set is listed once.
   assert.equal(wishOptions("openai/gpt6-luna", "mixed", [{ ref: "openai/gpt6-luna", label: "GPT-6 Luna", status: "ready" }]).filter((option) => option.value === "openai/gpt6-luna").length, 1);
+});
+
+test("wishLine: the wish, what it becomes, and the setup decides the words", () => {
+  const now = { model: "qwen3:14b", tier: "local" as const, reason: "x", fresh_window: true };
+  assert.equal(wishLine("cheapest", "local", now), "wish: cheapest, now qwen3:14b, fresh window");
+  assert.equal(wishLine("cheapest", "mixed", undefined), "wish: cheapest");
+  assert.equal(wishLine("frontier", "local", undefined), "wish: not available here");
+  assert.equal(wishLine("local", "cloud", { model: "m" }), "wish: not available here, now m");
+  assert.equal(wishLine("qwen3:14b", "local", null), "wish: qwen3:14b");
 });
