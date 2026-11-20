@@ -57,7 +57,7 @@ export function SettingsNav({
   onNavigate: (href: string) => void;
 }) {
   return (
-    <aside className="hidden min-h-0 w-62 shrink-0 flex-col border-r border-line bg-sunken/50 md:flex">
+    <div data-testid="settings-nav" className="hidden min-h-0 w-62 shrink-0 flex-col border-r border-line bg-sunken/50 md:flex">
       <div className="px-4 pt-5 pb-2.5">
         <h1 className="mb-3.5 ml-1 font-prose text-2xl leading-none font-normal tracking-tight">Settings</h1>
         {search}
@@ -78,7 +78,7 @@ export function SettingsNav({
           toml
         </Link>
       </div>
-    </aside>
+    </div>
   );
 }
 
