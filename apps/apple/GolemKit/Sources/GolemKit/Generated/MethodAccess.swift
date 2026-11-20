@@ -22,6 +22,7 @@ public enum MethodAccess {
         "file.read",
         "fs.list_dirs",
         "hello",
+        "helper.stop",
         "mcp.add",
         "mcp.call",
         "mcp.catalog",

@@ -3577,6 +3577,38 @@ public enum HelperStepEventType: String, Codable {
     case helperStep = "helper.step"
 }
 
+/// ``helper.stop``. Cancel the run of a helper session.
+///
+/// The lead goes on with ``stopped: cancelled`` as the helper's result (ADR-059).
+// MARK: - HelperStopParams
+public struct HelperStopParams: Codable {
+    public let sessionID: String
+
+    public enum CodingKeys: String, CodingKey {
+        case sessionID = "session_id"
+    }
+
+    public init(sessionID: String) {
+        self.sessionID = sessionID
+    }
+}
+
+/// Whether a run was stopped.
+///
+/// ``stopped`` is false when the helper had no run in progress.
+// MARK: - HelperStopResult
+public struct HelperStopResult: Codable {
+    public let stopped: Bool
+
+    public enum CodingKeys: String, CodingKey {
+        case stopped = "stopped"
+    }
+
+    public init(stopped: Bool) {
+        self.stopped = stopped
+    }
+}
+
 /// The lead parked to wait for its helpers, or went on.
 ///
 /// ``helper_ids`` are the helpers of this ``delegate`` call that it waits for.
@@ -17689,12 +17721,20 @@ public struct SessionListResult: Codable {
 /// provider.
 /// Null when no call waits, and for the waits the status already shows. An older daemon
 /// leaves them out.
+/// ``helpers_running`` and ``helpers_waiting`` are set on a lead: how many of its helpers
+/// have
+/// a run in progress, and how many wait for an answer. Null for a session with no helpers.
+/// ``step`` is set on a helper: its newest step as one line (the ``summary`` of its last
+/// ``helper.step``), at most 200 characters. Null before the first step. An older daemon
+/// leaves all three out.
 // MARK: - SessionElement
 public struct SessionElement: Codable {
     public let agent: String?
     public let createdAt: String
     public let cwd: String?
     public let forkedFrom: String?
+    public let helpersRunning: Int?
+    public let helpersWaiting: Int?
     public let lastSeq: Int
     public let localOnly: Bool?
     public let modelProfile: String
@@ -17705,6 +17745,7 @@ public struct SessionElement: Codable {
     public let route: RouteEnum?
     public let sessionID: String
     public let status: SessionStatus
+    public let step: String?
     public let title: String?
     public let updatedAt: String
     public let waitLine: String?
@@ -17715,6 +17756,8 @@ public struct SessionElement: Codable {
         case createdAt = "created_at"
         case cwd = "cwd"
         case forkedFrom = "forked_from"
+        case helpersRunning = "helpers_running"
+        case helpersWaiting = "helpers_waiting"
         case lastSeq = "last_seq"
         case localOnly = "local_only"
         case modelProfile = "model_profile"
@@ -17725,17 +17768,20 @@ public struct SessionElement: Codable {
         case route = "route"
         case sessionID = "session_id"
         case status = "status"
+        case step = "step"
         case title = "title"
         case updatedAt = "updated_at"
         case waitLine = "wait_line"
         case waitReason = "wait_reason"
     }
 
-    public init(agent: String?, createdAt: String, cwd: String?, forkedFrom: String?, lastSeq: Int, localOnly: Bool?, modelProfile: String, origin: String?, parentSessionID: String?, pending: SessionPendingItem?, planFirst: Bool?, route: RouteEnum?, sessionID: String, status: SessionStatus, title: String?, updatedAt: String, waitLine: String?, waitReason: Reason?) {
+    public init(agent: String?, createdAt: String, cwd: String?, forkedFrom: String?, helpersRunning: Int?, helpersWaiting: Int?, lastSeq: Int, localOnly: Bool?, modelProfile: String, origin: String?, parentSessionID: String?, pending: SessionPendingItem?, planFirst: Bool?, route: RouteEnum?, sessionID: String, status: SessionStatus, step: String?, title: String?, updatedAt: String, waitLine: String?, waitReason: Reason?) {
         self.agent = agent
         self.createdAt = createdAt
         self.cwd = cwd
         self.forkedFrom = forkedFrom
+        self.helpersRunning = helpersRunning
+        self.helpersWaiting = helpersWaiting
         self.lastSeq = lastSeq
         self.localOnly = localOnly
         self.modelProfile = modelProfile
@@ -17746,6 +17792,7 @@ public struct SessionElement: Codable {
         self.route = route
         self.sessionID = sessionID
         self.status = status
+        self.step = step
         self.title = title
         self.updatedAt = updatedAt
         self.waitLine = waitLine
@@ -18372,12 +18419,20 @@ public enum SessionSummaryNotificationMethod: String, Codable {
 /// provider.
 /// Null when no call waits, and for the waits the status already shows. An older daemon
 /// leaves them out.
+/// ``helpers_running`` and ``helpers_waiting`` are set on a lead: how many of its helpers
+/// have
+/// a run in progress, and how many wait for an answer. Null for a session with no helpers.
+/// ``step`` is set on a helper: its newest step as one line (the ``summary`` of its last
+/// ``helper.step``), at most 200 characters. Null before the first step. An older daemon
+/// leaves all three out.
 // MARK: - SessionSummaryNotificationParams
 public struct SessionSummaryNotificationParams: Codable {
     public let agent: String?
     public let createdAt: String
     public let cwd: String?
     public let forkedFrom: String?
+    public let helpersRunning: Int?
+    public let helpersWaiting: Int?
     public let lastSeq: Int
     public let localOnly: Bool?
     public let modelProfile: String
@@ -18388,6 +18443,7 @@ public struct SessionSummaryNotificationParams: Codable {
     public let route: RouteEnum?
     public let sessionID: String
     public let status: SessionStatus
+    public let step: String?
     public let title: String?
     public let updatedAt: String
     public let waitLine: String?
@@ -18398,6 +18454,8 @@ public struct SessionSummaryNotificationParams: Codable {
         case createdAt = "created_at"
         case cwd = "cwd"
         case forkedFrom = "forked_from"
+        case helpersRunning = "helpers_running"
+        case helpersWaiting = "helpers_waiting"
         case lastSeq = "last_seq"
         case localOnly = "local_only"
         case modelProfile = "model_profile"
@@ -18408,17 +18466,20 @@ public struct SessionSummaryNotificationParams: Codable {
         case route = "route"
         case sessionID = "session_id"
         case status = "status"
+        case step = "step"
         case title = "title"
         case updatedAt = "updated_at"
         case waitLine = "wait_line"
         case waitReason = "wait_reason"
     }
 
-    public init(agent: String?, createdAt: String, cwd: String?, forkedFrom: String?, lastSeq: Int, localOnly: Bool?, modelProfile: String, origin: String?, parentSessionID: String?, pending: ParamsPendingItem?, planFirst: Bool?, route: RouteEnum?, sessionID: String, status: SessionStatus, title: String?, updatedAt: String, waitLine: String?, waitReason: Reason?) {
+    public init(agent: String?, createdAt: String, cwd: String?, forkedFrom: String?, helpersRunning: Int?, helpersWaiting: Int?, lastSeq: Int, localOnly: Bool?, modelProfile: String, origin: String?, parentSessionID: String?, pending: ParamsPendingItem?, planFirst: Bool?, route: RouteEnum?, sessionID: String, status: SessionStatus, step: String?, title: String?, updatedAt: String, waitLine: String?, waitReason: Reason?) {
         self.agent = agent
         self.createdAt = createdAt
         self.cwd = cwd
         self.forkedFrom = forkedFrom
+        self.helpersRunning = helpersRunning
+        self.helpersWaiting = helpersWaiting
         self.lastSeq = lastSeq
         self.localOnly = localOnly
         self.modelProfile = modelProfile
@@ -18429,6 +18490,7 @@ public struct SessionSummaryNotificationParams: Codable {
         self.route = route
         self.sessionID = sessionID
         self.status = status
+        self.step = step
         self.title = title
         self.updatedAt = updatedAt
         self.waitLine = waitLine
@@ -18509,12 +18571,20 @@ public struct ParamsPendingItem: Codable {
 /// provider.
 /// Null when no call waits, and for the waits the status already shows. An older daemon
 /// leaves them out.
+/// ``helpers_running`` and ``helpers_waiting`` are set on a lead: how many of its helpers
+/// have
+/// a run in progress, and how many wait for an answer. Null for a session with no helpers.
+/// ``step`` is set on a helper: its newest step as one line (the ``summary`` of its last
+/// ``helper.step``), at most 200 characters. Null before the first step. An older daemon
+/// leaves all three out.
 // MARK: - SessionSummary
 public struct SessionSummary: Codable {
     public let agent: String?
     public let createdAt: String
     public let cwd: String?
     public let forkedFrom: String?
+    public let helpersRunning: Int?
+    public let helpersWaiting: Int?
     public let lastSeq: Int
     public let localOnly: Bool?
     public let modelProfile: String
@@ -18525,6 +18595,7 @@ public struct SessionSummary: Codable {
     public let route: RouteEnum?
     public let sessionID: String
     public let status: SessionStatus
+    public let step: String?
     public let title: String?
     public let updatedAt: String
     public let waitLine: String?
@@ -18535,6 +18606,8 @@ public struct SessionSummary: Codable {
         case createdAt = "created_at"
         case cwd = "cwd"
         case forkedFrom = "forked_from"
+        case helpersRunning = "helpers_running"
+        case helpersWaiting = "helpers_waiting"
         case lastSeq = "last_seq"
         case localOnly = "local_only"
         case modelProfile = "model_profile"
@@ -18545,17 +18618,20 @@ public struct SessionSummary: Codable {
         case route = "route"
         case sessionID = "session_id"
         case status = "status"
+        case step = "step"
         case title = "title"
         case updatedAt = "updated_at"
         case waitLine = "wait_line"
         case waitReason = "wait_reason"
     }
 
-    public init(agent: String?, createdAt: String, cwd: String?, forkedFrom: String?, lastSeq: Int, localOnly: Bool?, modelProfile: String, origin: String?, parentSessionID: String?, pending: SessionSummaryPendingItem?, planFirst: Bool?, route: RouteEnum?, sessionID: String, status: SessionStatus, title: String?, updatedAt: String, waitLine: String?, waitReason: Reason?) {
+    public init(agent: String?, createdAt: String, cwd: String?, forkedFrom: String?, helpersRunning: Int?, helpersWaiting: Int?, lastSeq: Int, localOnly: Bool?, modelProfile: String, origin: String?, parentSessionID: String?, pending: SessionSummaryPendingItem?, planFirst: Bool?, route: RouteEnum?, sessionID: String, status: SessionStatus, step: String?, title: String?, updatedAt: String, waitLine: String?, waitReason: Reason?) {
         self.agent = agent
         self.createdAt = createdAt
         self.cwd = cwd
         self.forkedFrom = forkedFrom
+        self.helpersRunning = helpersRunning
+        self.helpersWaiting = helpersWaiting
         self.lastSeq = lastSeq
         self.localOnly = localOnly
         self.modelProfile = modelProfile
@@ -18566,6 +18642,7 @@ public struct SessionSummary: Codable {
         self.route = route
         self.sessionID = sessionID
         self.status = status
+        self.step = step
         self.title = title
         self.updatedAt = updatedAt
         self.waitLine = waitLine

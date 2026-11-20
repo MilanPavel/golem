@@ -117,7 +117,7 @@
     },
     "SessionSummary": {
       "additionalProperties": false,
-      "description": "One session as ``session.list`` reports it.\n\n``status`` is ``running`` while a run is open, ``waiting`` while a run\nwaits for a tool approval, and ``closed`` after ``session.close``. ``last_seq`` is the newest\nstored event, so a client can tell what it has not seen, and which of\ntwo summaries of one session is newer. ``cwd`` is the session's project\nfolder, null for a session that has not been given one. ``forked_from`` is\nthe id of the session this one was forked from, null for a session that is\nnot a fork. An older daemon leaves it out. ``origin`` is who started the\nsession: ``user``, ``cli``, ``routine:<name>``. A session never changes it.\n``route`` is the session's route mode. An older daemon leaves it out.\n``plan_first`` is true while the session is in plan first (``session.set_plan``).\n``local_only`` is true while the session's folder stays on this Mac: only a local model\nreads its chat. It follows the settings of the moment, so it can change without an event.\nAn older daemon leaves it out.\n``pending`` says what a ``waiting`` session waits for, null otherwise. An older daemon\nleaves it out.\n``parent_session_id`` and ``agent`` are set on a helper session: the id of the\nsession. An older daemon leaves them out.\n``wait_reason`` and ``wait_line`` say that the running run's model call waits in line:\nthe reason (``slot``, ``provider`` or ``load``) and the plain name of the model or provider.\nNull when no call waits, and for the waits the status already shows. An older daemon\nleaves them out.",
+      "description": "One session as ``session.list`` reports it.\n\n``status`` is ``running`` while a run is open, ``waiting`` while a run\nwaits for a tool approval, and ``closed`` after ``session.close``. ``last_seq`` is the newest\nstored event, so a client can tell what it has not seen, and which of\ntwo summaries of one session is newer. ``cwd`` is the session's project\nfolder, null for a session that has not been given one. ``forked_from`` is\nthe id of the session this one was forked from, null for a session that is\nnot a fork. An older daemon leaves it out. ``origin`` is who started the\nsession: ``user``, ``cli``, ``routine:<name>``. A session never changes it.\n``route`` is the session's route mode. An older daemon leaves it out.\n``plan_first`` is true while the session is in plan first (``session.set_plan``).\n``local_only`` is true while the session's folder stays on this Mac: only a local model\nreads its chat. It follows the settings of the moment, so it can change without an event.\nAn older daemon leaves it out.\n``pending`` says what a ``waiting`` session waits for, null otherwise. An older daemon\nleaves it out.\n``parent_session_id`` and ``agent`` are set on a helper session: the id of the\nsession. An older daemon leaves them out.\n``wait_reason`` and ``wait_line`` say that the running run's model call waits in line:\nthe reason (``slot``, ``provider`` or ``load``) and the plain name of the model or provider.\nNull when no call waits, and for the waits the status already shows. An older daemon\nleaves them out.\n``helpers_running`` and ``helpers_waiting`` are set on a lead: how many of its helpers have\na run in progress, and how many wait for an answer. Null for a session with no helpers.\n``step`` is set on a helper: its newest step as one line (the ``summary`` of its last\n``helper.step``), at most 200 characters. Null before the first step. An older daemon\nleaves all three out.",
       "properties": {
         "agent": {
           "anyOf": [
@@ -162,6 +162,32 @@
           ],
           "default": null,
           "title": "Forked From"
+        },
+        "helpers_running": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Helpers Running"
+        },
+        "helpers_waiting": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Helpers Waiting"
         },
         "last_seq": {
           "minimum": 0,
@@ -237,6 +263,20 @@
           ],
           "title": "Status",
           "type": "string"
+        },
+        "step": {
+          "anyOf": [
+            {
+              "maxLength": 200,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Step"
         },
         "title": {
           "anyOf": [

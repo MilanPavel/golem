@@ -6,6 +6,8 @@ export type Agent = string | null;
 export type CreatedAt = string;
 export type Cwd = string | null;
 export type ForkedFrom = string | null;
+export type HelpersRunning = number | null;
+export type HelpersWaiting = number | null;
 export type LastSeq = number;
 export type LocalOnly = boolean;
 export type ModelProfile = string;
@@ -24,6 +26,7 @@ export type PlanFirst = boolean;
 export type Route = 'pinned' | 'local' | 'auto';
 export type SessionId = string;
 export type Status = 'idle' | 'running' | 'waiting' | 'closed';
+export type Step = string | null;
 export type Title = string | null;
 export type UpdatedAt = string;
 export type WaitLine = string | null;
@@ -64,6 +67,11 @@ export interface SessionSummaryNotification {
  * the reason (``slot``, ``provider`` or ``load``) and the plain name of the model or provider.
  * Null when no call waits, and for the waits the status already shows. An older daemon
  * leaves them out.
+ * ``helpers_running`` and ``helpers_waiting`` are set on a lead: how many of its helpers have
+ * a run in progress, and how many wait for an answer. Null for a session with no helpers.
+ * ``step`` is set on a helper: its newest step as one line (the ``summary`` of its last
+ * ``helper.step``), at most 200 characters. Null before the first step. An older daemon
+ * leaves all three out.
  *
  * This interface was referenced by `SessionSummaryNotification`'s JSON-Schema
  * via the `definition` "SessionSummary".
@@ -73,6 +81,8 @@ export interface SessionSummary {
   created_at: CreatedAt;
   cwd?: Cwd;
   forked_from?: ForkedFrom;
+  helpers_running?: HelpersRunning;
+  helpers_waiting?: HelpersWaiting;
   last_seq: LastSeq;
   local_only?: LocalOnly;
   model_profile: ModelProfile;
@@ -83,6 +93,7 @@ export interface SessionSummary {
   route?: Route;
   session_id: SessionId;
   status: Status;
+  step?: Step;
   title?: Title;
   updated_at: UpdatedAt;
   wait_line?: WaitLine;

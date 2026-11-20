@@ -130,6 +130,7 @@ METHOD_ACCESS: Final[Mapping[str, Access]] = {
     "memory.settings": "browser",
     "agents.list": "browser",
     "agents.get": "browser",
+    "helper.stop": "browser",
 }
 
 BROWSER_METHODS: Final[frozenset[str]] = frozenset(

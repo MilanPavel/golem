@@ -1,0 +1,15 @@
+{
+  "additionalProperties": false,
+  "description": "Whether a run was stopped.\n\n``stopped`` is false when the helper had no run in progress.",
+  "properties": {
+    "stopped": {
+      "title": "Stopped",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "stopped"
+  ],
+  "title": "HelperStopResult",
+  "type": "object"
+}

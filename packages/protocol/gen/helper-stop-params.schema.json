@@ -1,0 +1,16 @@
+{
+  "additionalProperties": false,
+  "description": "``helper.stop``. Cancel the run of a helper session.\n\nThe lead goes on with ``stopped: cancelled`` as the helper's result (ADR-059).",
+  "properties": {
+    "session_id": {
+      "minLength": 1,
+      "title": "Session Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "session_id"
+  ],
+  "title": "HelperStopParams",
+  "type": "object"
+}
