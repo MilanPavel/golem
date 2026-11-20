@@ -46,6 +46,8 @@ export type ComposerOutcome =
   | { kind: "sessions" }
   | { kind: "setup" }
   | { kind: "skills" }
+  /** `/agents`: the agent types, with what each was used for. */
+  | { kind: "agents" }
   /** `/memory`: the memory browser. */
   | { kind: "memory" }
   /** `/routines`: the routine manager. */
@@ -425,6 +427,13 @@ export const COMMANDS: readonly Command[] = [
     args: "",
     description: "Lists the skills this folder sees, with broken and hidden ones and why.",
     run: withoutArgs({ kind: "skills" }),
+  },
+  {
+    name: "/agents",
+    group: "tools",
+    args: "",
+    description: "Lists the agent types helpers can run as, with how often each was used.",
+    run: withoutArgs({ kind: "agents" }),
   },
   {
     name: "/memory",
