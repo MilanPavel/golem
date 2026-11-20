@@ -245,6 +245,13 @@ class SessionView:
         return sum(1 for message in self.messages if message.role != "system")
 
 
+class NotAHelperError(Exception):
+    """``helper.stop`` named a session that has no lead."""
+
+    def __init__(self) -> None:
+        super().__init__("This session is not a helper: only a helper can be stopped here.")
+
+
 class HelperSessionError(Exception):
     """A helper session answers its lead, so nobody sends it a message."""
 
@@ -600,6 +607,14 @@ class SessionManager:
     async def wait(self, activity: SessionActivity) -> tuple[WaitReason, str] | None:
         """The open slot, provider or load wait of a running session, read from its events."""
         return await self._events.wait(activity)
+
+    async def helpers(self, activity: SessionActivity) -> tuple[int, int] | None:
+        """``(running, waiting)`` of a lead's helpers, None when none has a run open."""
+        return await self._events.helpers(activity)
+
+    def step(self, session_id: str) -> str | None:
+        """A helper's newest step, as one line."""
+        return self._events.step(session_id)
 
     async def pending_of(self, session_id: str) -> PendingItem | None:
         """What the session waits for, None when it waits for nothing or does not exist."""
@@ -1488,6 +1503,7 @@ class SessionManager:
         lead, call_id, index = record.parent_session_id, record.parent_call_id, record.helper_index
         self._steps.pop(session_id, None)
         self._step_counts.pop(session_id, None)
+        self._events.clear_step(session_id)
         stored = await self._events.stored(lead)
         if not any(
             isinstance(e, HelperEndedEvent) and e.data.call_id == call_id and e.data.index == index
@@ -1566,6 +1582,8 @@ class SessionManager:
                 summary=summary,
             ),
         )
+        if summary is not None:
+            await self._events.note_step(event.session_id, summary)
 
     def _stop_for_limit(self, helper_id: str, run_id: str, timed_out: bool) -> None:
         """Cancel the helper's run from a task of its own: the caller may be that run."""
@@ -1745,6 +1763,23 @@ class SessionManager:
         """Whether the session is a helper session."""
         record = await self._records.get(session_id)
         return record is not None and record.parent_session_id is not None
+
+    async def stop_helper(self, session_id: str) -> bool:
+        """Cancel the run of one helper, a parked one too. The helper ends ``cancelled``, and its
+        lead and the other helpers go on.
+
+        Returns False when the helper has no run in progress. Raises
+        :class:`SessionNotFoundError`, or :class:`NotAHelperError` for a session with no lead.
+        """
+        record = await self._records.get(session_id)
+        if record is None:
+            raise SessionNotFoundError(session_id)
+        if record.parent_session_id is None:
+            raise NotAHelperError
+        run = await self._run_records.latest(session_id)
+        if run is None or run.status not in ("running", "waiting"):
+            return False
+        return await self._cancel_run(run.run_id)
 
     async def cancel_helpers(self, lead_id: str) -> None:
         """End the runs of the helpers of ``lead_id`` that are still open."""
