@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import sqlite3
 from pathlib import Path
 from typing import Literal
@@ -304,3 +305,21 @@ async def test_the_lead_parks_for_its_team_and_goes_on(database: Database) -> No
     assert run is not None and run.status == "running"
     reason = await database.fetch_one("SELECT wait_reason FROM runs WHERE run_id = ?", (_R,))
     assert reason is not None and reason[0] is None
+
+
+async def test_a_cancel_during_begin_leaves_no_transaction_open(database: Database) -> None:
+    # BEGIN runs on the connection's thread, so a cancelled caller cannot stop it. Left
+    # open, it made every later transaction fail with "cannot start a transaction within
+    # a transaction".
+    async def write() -> None:
+        async with database.transaction():
+            await asyncio.sleep(0)
+
+    for _ in range(50):
+        task = asyncio.create_task(write())
+        await asyncio.sleep(0)
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+        async with database.transaction():
+            pass

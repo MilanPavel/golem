@@ -122,13 +122,32 @@ class Database:
     async def transaction(self) -> AsyncGenerator[Transaction]:
         """``BEGIN IMMEDIATE`` … ``COMMIT``, or ``ROLLBACK`` on any exception."""
         async with self._lock:
-            await self._connection.execute("BEGIN IMMEDIATE")
+            await self._begin()
             try:
                 yield Transaction(self._connection)
             except BaseException:
                 await self._connection.execute("ROLLBACK")
                 raise
             await self._connection.execute("COMMIT")
+
+    async def _begin(self) -> None:
+        """``BEGIN IMMEDIATE`` that a cancel cannot leave open.
+
+        The statement runs on the connection's own thread, so cancelling the caller does
+        not stop it: it would begin a transaction nobody ends, and every later ``BEGIN``
+        on the connection would fail. A cancelled caller waits for it and rolls it back.
+        """
+        begin = asyncio.ensure_future(self._connection.execute("BEGIN IMMEDIATE"))
+        try:
+            await asyncio.shield(begin)
+        except asyncio.CancelledError:
+            try:
+                await begin
+            except Exception:
+                log.debug("a cancelled BEGIN did not start", exc_info=True)
+            else:
+                await self._connection.execute("ROLLBACK")
+            raise
 
     async def fetch_all(self, sql: str, params: Params = ()) -> list[sqlite3.Row]:
         async with self._lock:

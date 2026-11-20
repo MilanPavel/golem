@@ -130,6 +130,12 @@ async def test_a_helper_gets_its_own_prompt_not_the_section(
     chat = _Chat(database, model, 32_768)
     session_id = await chat.manager.create(None, cwd=str(tmp_path))
     await chat.send(session_id, "what is this repo")
+
+    # The lead's run parks as soon as the helper is started: wait for the helper's own call.
+    async def helper_called() -> bool:
+        return len(model.seen) >= 2
+
+    await _until(helper_called)
     await chat.manager.cancel_all()
 
     parent_first, helper_first = model.seen[0][0], model.seen[1][0]
