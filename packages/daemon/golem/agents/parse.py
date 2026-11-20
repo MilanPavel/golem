@@ -9,7 +9,7 @@ Frontmatter fields:
 - ``name``: optional; the file name (without ``.md``) names the agent.
 - ``description``: required; the lead model reads it to pick a type.
 - ``model``: the wish, one of ``cheapest``, ``same``, ``stronger``, ``local``,
-  ``budget``, ``frontier``, or a model name. Default ``same``.
+  ``budget``, ``frontier``, or a model name. Default ``cheapest``.
 - ``tools``: names of golem's tools, as text or a list. Left out means none.
 - ``max-calls``, ``max-seconds``, ``max-cost-usd``, ``max-answer-chars``: limits.
 - ``asks``: true when the helper may ask you a question. Default false.
@@ -149,10 +149,10 @@ def _name(fields: dict[str, Any], path: Path, errors: list[str]) -> str:
 def _wish(fields: dict[str, Any], errors: list[str]) -> str:
     wish = text_field(fields, "model", errors)
     if wish is None:
-        return "same"
+        return "cheapest"
     if not _WISH.fullmatch(wish):
         errors.append(f"`model` {wish!r} must be one of {', '.join(WISHES)}, or a model name")
-        return "same"
+        return "cheapest"
     return wish
 
 

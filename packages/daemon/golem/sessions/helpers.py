@@ -7,13 +7,16 @@ from its agent type, as the agent was when the helper started, and never from it
 from __future__ import annotations
 
 from collections.abc import Callable, Iterable, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 
 from golem.agents.model import Agent
-from golem.config import PermissionMode
+from golem.config import PermissionMode, RoleSettings
 from golem.graphs.child import ChildLimits
 from golem.graphs.tools_node import ChildScope
+from golem.models.facts import ModelFacts
+from golem.models.pick import Choice, Traits
+from golem.models.pick_helper import HelperChoice, pick_helper
 from golem.permissions.engine import Allowance
 from golem.tools.registry import ToolError
 from golem_protocol.events import (
@@ -49,6 +52,57 @@ class HelperRef:
     session_id: str
     model: str
     created: bool
+
+
+def wish_of(agent: AgentSnapshot, roles: RoleSettings) -> str:
+    """What the helper of ``agent`` wishes for its model (ADR-059, section 5).
+
+    The agent file's wish. ``[routing.roles] explore`` is read as the wish of the explorer, when
+    it is set to something other than its default, until the role is retired.
+    """
+    default = RoleSettings.model_fields["explore"].default
+    if agent.name == EXPLORER and roles.explore != default:
+        return roles.explore
+    return agent.wish
+
+
+def pick_without_paid(
+    wish: str, lead: ModelFacts, candidates: Sequence[ModelFacts], traits: Traits
+) -> HelperChoice:
+    """The model of a helper while it cannot ask the paid question.
+
+    This is the one place that stands in for the question of 15.3.4 (#1303): a pick that needs
+    the user's yes, which the chat has not given, is made again without the paid models, so the
+    helper gets the local or the lead's model with a fresh window, and the reason says so. When
+    the helper can ask, this is replaced by the question, and a "no" lands on the same answer.
+    """
+    choice = pick_helper(wish, lead, candidates, traits)
+    if not choice.needs_consent:
+        return choice
+    local = [m for m in candidates if m.tier == "local"]
+    again = pick_helper(wish, lead, local, traits)
+    detail = (
+        f"{again.detail}; the paid model it wished for needs your yes, "
+        "which a helper cannot ask yet"
+    )
+    return replace(again, detail=detail, fresh_window=True, needs_consent=False)
+
+
+_ROUTED_REASON = {"privacy": "privacy", "cheapest": "cheapest"}
+
+
+def routed_of(wish: str, choice: HelperChoice) -> Choice:
+    """The pick as a turn writes it into ``model.routed``: the log's reasons are the turn's.
+
+    Only ``privacy`` and ``cheapest`` have a word of their own there; the rest read as ``pinned``,
+    and the detail says what the wish was and why.
+    """
+    return Choice(
+        choice.model,
+        _ROUTED_REASON.get(choice.reason, "pinned"),  # pyright: ignore[reportArgumentType]
+        f"{wish}: {choice.detail}",
+        choice.rejected,
+    )
 
 
 def origin_of(agent: AgentSnapshot) -> str:
@@ -272,6 +326,8 @@ __all__ = [
     "helper_mode",
     "origin_of",
     "parked_calls",
+    "pick_without_paid",
+    "routed_of",
     "scope_of_agent",
     "snapshot_of",
     "started_at",
@@ -279,5 +335,6 @@ __all__ = [
     "stopped_of",
     "summarize_run",
     "tokens_over",
+    "wish_of",
     "writing_tools",
 ]

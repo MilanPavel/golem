@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from fakes import FixedFacts, model_facts
 from langchain_core.messages import ToolMessage
 from test_helper_restart import (  # pyright: ignore
     _LIVE,
@@ -107,6 +108,10 @@ async def test_cloud_only_the_explorer_runs_on_the_cheapest_ready_budget_model(
 ) -> None:
     setup = _Setup(True)
     chat = _chat(database, [_delegate("look"), "found it", "all done"], setup, project, tmp_path)
+    chat.manager.facts = FixedFacts(
+        model_facts("anthropic/big", "frontier", price=5.0),
+        model_facts("deepseek/chat", "budget", price=0.5),
+    )
     asked = _watch_profiles(chat)
     lead = await chat.lead(project)
     await chat.manager.send(lead, "go")
@@ -116,7 +121,7 @@ async def test_cloud_only_the_explorer_runs_on_the_cheapest_ready_budget_model(
     started = next(e for e in events if e.type == "helper.started")
     assert setup.profile == "anthropic/big"
     assert started.data.model == "deepseek/chat"
-    assert started.data.pick_reason == "cheapest budget model"
+    assert started.data.pick_reason == "the cheapest hosted model at or below the lead's tier"
     (record,) = await chat.records.helpers_of(lead, started.data.call_id)
     assert record.model_profile == "deepseek/chat"
     # The lead asked for its own model, the helper for the budget one.

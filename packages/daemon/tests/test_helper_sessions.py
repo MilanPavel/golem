@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from fakes import ToolCallingChatModel
+from fakes import FixedFacts, ToolCallingChatModel, model_facts
 from langgraph.checkpoint.memory import InMemorySaver
 from pydantic import BaseModel
 
@@ -433,6 +433,10 @@ async def test_a_cloud_only_setup_gets_the_cheapest_ready_budget_model(
         budget_refs=lambda: ["deepseek/chat"],
         home=tmp_path,
     )
+    chat.manager.facts = FixedFacts(
+        model_facts("anthropic/big", "frontier", price=5.0),
+        model_facts("deepseek/chat", "budget", price=0.5),
+    )
     lead = await chat.manager.create("anthropic/big", cwd=str(project))
     ref = await chat.manager.start_helper(
         lead, "call-1", 0, EXPLORER, "look", "anthropic/big", str(project)
@@ -445,7 +449,7 @@ async def test_a_cloud_only_setup_gets_the_cheapest_ready_budget_model(
     started = next(e for e in await chat.stored(lead) if e.type == "helper.started")
     assert (started.data.model, started.data.pick_reason) == (
         "deepseek/chat",
-        "cheapest budget model",
+        "the cheapest hosted model at or below the lead's tier",
     )
     await chat.until(ref.session_id, "session.completed")
 

@@ -74,12 +74,15 @@ from golem.sessions.helpers import (
     helper_mode,
     origin_of,
     parked_calls,
+    pick_without_paid,
+    routed_of,
     scope_of_agent,
     snapshot_of,
     started_at,
     stop_reason,
     summarize_run,
     tokens_over,
+    wish_of,
     writing_tools,
 )
 from golem.sessions.ids import new_id
@@ -340,6 +343,8 @@ class _LiveSession:
     """How many runs of this session stepped up on each signal. In memory only."""
     step_floor: Tier | None = None
     """The tier the picks of this session start at, after one signal stepped up in two runs."""
+    helper_pick: Choice | None = None
+    """The pick of a helper, which its first run writes as ``model.routed``. In memory only."""
 
 
 def _schemas(text: str | None) -> list[dict[str, object]] | None:
@@ -366,6 +371,18 @@ class _Routed:
     choice: Choice | None
     ask: Consent | None = None
     replaces: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class _HelperModel:
+    """The model a helper starts on: the profile, the wish, the reason in words."""
+
+    profile: str
+    wish: str
+    reason: str
+    same_as_lead: bool
+    choice: Choice | None = None
+    """The pick as ``model.routed`` writes it. None without model facts."""
 
 
 class _NoLocalFit(Exception):
@@ -1202,6 +1219,9 @@ class SessionManager:
             )
         elif local_only:
             self._refuse_hosted(routed.profile)
+        if session.route == "pinned" and session.helper_pick is not None:
+            routed = _Routed(routed.profile, session.helper_pick)
+            session.helper_pick = None
         if routed.ask is None:
             self._check_budget(routed.profile, room)
         self._runtime.router.chat_model(routed.profile, local_only=local_only)
@@ -1269,9 +1289,9 @@ class SessionManager:
         ``brief`` as the helper's first message through the normal run path. ``prompt`` is the
         body of the agent's file, its system prompt.
 
-        ``model_profile`` is the model the lead's run uses. The helper's model is the ``explore``
-        role of it: the lead's local model, a local one only in a local-only folder or on route
-        ``local``, else the cheapest ready budget model of a hosted lead.
+        ``model_profile`` is the model the lead's run uses. The helper's model is what
+        ``pick_helper`` makes of the agent's wish (see :meth:`_helper_model`). The helper is
+        pinned to it, and its first run writes the pick as ``model.routed``.
 
         Raises :class:`~golem.tools.registry.ToolError` for a helper of a helper, an agent with
         ``delegate`` in its tools, and a model that may not run here. Raises
@@ -1286,15 +1306,15 @@ class SessionManager:
             if found is not None:
                 return HelperRef(found.session_id, found.model_profile, False)
             local_only = self.local_only(cwd) or lead.route == "local"
-            role = self._runtime.explore_role(model_profile, local_only=local_only)
+            picked = await self._helper_model(lead, model_profile, agent, local_only)
             try:
-                self._runtime.router.chat_model(role.profile, local_only=local_only)
+                self._runtime.router.chat_model(picked.profile, local_only=local_only)
             except ModelConfigError as exc:
                 raise ToolError(str(exc)) from exc
             allowed = cut_allowances(lead.allowed_tools, agent)
             helper = _LiveSession(
                 session_id=new_id("s"),
-                model_profile=role.profile,
+                model_profile=picked.profile,
                 schema_version=SCHEMA_VERSION,
                 cwd=cwd,
                 origin=origin_of(agent),
@@ -1302,7 +1322,8 @@ class SessionManager:
                 agent=agent,
                 prompt=prompt,
                 allowed_tools=set(allowed),
-                options=dict(lead.options) if role.same_as_session else {},
+                options=dict(lead.options) if picked.same_as_lead else {},
+                helper_pick=picked.choice,
                 permission_mode=helper_mode(agent, self._effective_mode(lead)),
             )
             await self._announce(helper)
@@ -1339,9 +1360,9 @@ class SessionManager:
                     helper_id=sid,
                     agent=agent.name,
                     label=label,
-                    model=role.profile,
-                    wish=agent.wish,
-                    pick_reason=role.reason,
+                    model=picked.profile,
+                    wish=picked.wish,
+                    pick_reason=picked.reason,
                 ),
             )
             if index == 0 and run_id is not None:
@@ -1355,7 +1376,51 @@ class SessionManager:
                 await self._events.emit(sid, None, "session.closed", EmptyEventData())
                 self._sessions.pop(sid, None)
                 raise
-            return HelperRef(sid, role.profile, True)
+            return HelperRef(sid, picked.profile, True)
+
+    async def _helper_model(
+        self, lead: _LiveSession, model_profile: str, agent: AgentSnapshot, local_only: bool
+    ) -> _HelperModel:
+        """The model of a helper of ``lead``, from the wish of its agent. Reads cached facts only.
+
+        The candidates and the traits are the ones a turn of the lead builds (:meth:`_route`).
+        Without model facts the helper runs on the lead's model, as the lead does.
+        """
+        router = self._runtime.router
+        settings = router.routing_settings()
+        wish = wish_of(agent, settings.roles)
+        everything = await self._facts_of(
+            lead, settings.ladder.model_dump().values(), model_profile
+        )
+        own = next((m for m in everything if model_profile in (m.profile, m.ref)), None)
+        if own is None:
+            # Only a setup without facts gets here (the daemon always has them).
+            return _HelperModel(model_profile, wish, "no budget model ready", True)
+        candidates = ladder(settings.ladder, model_profile, everything)
+        named = next((m for m in everything if wish in (m.profile, m.ref)), None)
+        if named is not None and all(named.ref != m.ref for m in candidates):
+            candidates.append(named)  # a model the agent names, though the ladder does not
+        interactive = not lead.origin.startswith("routine:")
+        if settings.paid == "never" or not interactive:  # privacy is the pick's own rule
+            candidates = [m for m in candidates if m.tier == "local"]
+        room = None if self.budget is None else await self.budget.room(lead.session_id)
+        traits = Traits(
+            reply_reserve=router.context_settings().reply_reserve,
+            needs_tools=True,
+            local_only=local_only,
+            # A chat on a hosted model is paid already; on a local one the user has not agreed.
+            paid_allowed=own.tier != "local" or (lead.paid_ok and settings.paid != "always_ask"),
+            # A spent cap takes the paid models out, so the helper lands on a local one.
+            paid_room_usd=None if room is None else room.usd,
+        )
+        choice = pick_without_paid(wish, own, candidates, traits)
+        return _HelperModel(
+            choice.model.profile,
+            wish,
+            choice.detail,
+            choice.model.ref == own.ref,
+            routed_of(wish, choice),
+        )
 
     async def start_helpers(
         self,
@@ -2423,13 +2488,16 @@ class SessionManager:
             return None
         return TIERS[TIERS.index(known) + 1]
 
-    async def _facts_of(self, session: _LiveSession, named: Iterable[object]) -> list[ModelFacts]:
-        """The facts of the session's model, the ladder's names and every listed model."""
+    async def _facts_of(
+        self, session: _LiveSession, named: Iterable[object], profile: str | None = None
+    ) -> list[ModelFacts]:
+        """The facts of the session's model (or ``profile``), the ladder's names and every listed
+        model."""
         if self.facts is None:
             return []
         router = self._runtime.router
         refs: list[str] = []
-        for name in (session.model_profile, *(n for n in named if isinstance(n, str))):
+        for name in (profile or session.model_profile, *(n for n in named if isinstance(n, str))):
             try:
                 refs.append(router.resolve(name).ref)
             except ModelConfigError:
