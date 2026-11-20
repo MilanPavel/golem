@@ -49,6 +49,7 @@ export const GALLERY_SECTIONS = [
   "tab-icon-and-title",
   "transcript",
   "turn",
+  "type",
   "thinking",
   "cost",
   "routed-answers",

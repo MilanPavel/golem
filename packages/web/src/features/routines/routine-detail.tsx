@@ -202,7 +202,7 @@ export function RoutineDetail({ routine, runs, now, onNavigate, onRun, onRemove,
     <div className="flex min-w-0 flex-col gap-4">
       <header className="flex flex-wrap-reverse items-start justify-between gap-x-3 gap-y-2">
         <div className="flex min-w-0 flex-1 basis-48 flex-col gap-1">
-          <h1 className="flex items-center gap-2 font-sans text-lg font-semibold">
+          <h1 className="flex items-center gap-2 font-ui text-lg font-semibold">
             <RoutineDot state={state} />
             <span className="min-w-0 truncate">{config.name}</span>
           </h1>

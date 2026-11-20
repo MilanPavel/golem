@@ -103,7 +103,7 @@ function SavedNote({ note, onEdit, onRemove }: { note: ReviewNote; onEdit: () =>
   return (
     <tr data-row="note">
       <td colSpan={5} className="p-2">
-        <div role="group" aria-label={`Note on line ${note.line}`} className="sticky left-0 flex w-full max-w-xl flex-col gap-1 rounded-sm bg-wait-soft px-3 py-2 font-sans text-sm whitespace-normal text-ink">
+        <div role="group" aria-label={`Note on line ${note.line}`} className="sticky left-0 flex w-full max-w-xl flex-col gap-1 rounded-sm bg-wait-soft px-3 py-2 font-ui text-sm whitespace-normal text-ink">
           <p className="whitespace-pre-wrap wrap-anywhere">{note.text}</p>
           <div className="flex gap-2">
             <button type="button" className={NOTE_BUTTON} aria-label={`Edit the note on line ${note.line}`} onClick={onEdit}>

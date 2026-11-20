@@ -124,7 +124,7 @@ export function ToolsTab({ server, sessionId, tools, onTry }: { server: McpServe
                     {tool.read_only === true ? (
                       <span
                         title={server.approval === "ask" ? "The server says this tool only reads. It still asks, as every tool of this server does." : "The server says this tool only reads."}
-                        className="ml-2 rounded-sm border border-line px-1 font-sans text-xs text-muted no-underline"
+                        className="ml-2 rounded-sm border border-line px-1 font-ui text-xs text-muted no-underline"
                       >
                         read-only
                       </span>

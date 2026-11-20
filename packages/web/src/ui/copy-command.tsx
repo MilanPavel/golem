@@ -58,7 +58,7 @@ export function selectText(node: Node | null): void {
 export function CopyCommand({ command }: { command: string }) {
   const code = useRef<HTMLElement>(null);
   return (
-    <span className="inline-flex max-w-full items-center gap-1 rounded-md bg-code-bg py-0.5 pr-0.5 pl-2 font-mono text-sm text-muted">
+    <span className="inline-flex max-w-full items-center gap-1 rounded-md bg-code-bg py-0.5 pr-0.5 pl-2 font-mono text-code text-muted">
       <code ref={code} className="min-w-0 break-all">
         {command}
       </code>

@@ -100,7 +100,7 @@ export function WindowTable({ rows }: { rows: readonly WindowRow[] }) {
               <td className="py-2 pr-2 font-mono text-note text-muted">{row.sizeGb === null ? "—" : `${row.sizeGb} GB`}</td>
               <td className="py-2 text-right font-mono text-note" title={cell.title ?? undefined}>
                 {cell.text}
-                {cell.note === null ? null : <span className="block font-sans text-micro text-muted">{cell.note}</span>}
+                {cell.note === null ? null : <span className="block font-ui text-micro text-muted">{cell.note}</span>}
               </td>
             </tr>
           );

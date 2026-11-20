@@ -26,7 +26,7 @@ function AgentCells({ row }: { row: AgentRow }) {
   return (
     <tr className="border-t border-line align-top">
       <th scope="row" className="py-2 pr-3 text-left font-normal">
-        <span className="font-sans text-sm font-medium">{row.name}</span>{" "}
+        <span className="font-ui text-sm font-medium">{row.name}</span>{" "}
         <span className="ml-2 font-mono text-xs whitespace-nowrap text-faint">{AGENT_GROUPS[row.source]}</span>{" "}
         {row.description === "" ? null : <span className="block text-xs text-muted">{row.description}</span>}
         {row.warnings.map((text) => (
