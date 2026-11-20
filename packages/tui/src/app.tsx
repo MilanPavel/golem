@@ -187,6 +187,7 @@ import {
   lastQuestion,
   NO_STRONGER_NOTICE,
   sessionModelOf,
+  isLocalFrom,
   spendRows,
   turnRoutedNote,
   whyLines,
@@ -1061,6 +1062,8 @@ export function App({
     liveRunId: chat.busy ? chat.runId : null,
     commands: COMMANDS.map((command) => command.name),
     notices: chat.notices,
+    batches: chat.batches,
+    isLocal: isLocalFrom(listing?.models),
     routedNote: (run: readonly ChatMessage[]) => turnRoutedNote(run, chat.route, sessionModelOf(model, listing?.models)),
   };
   const measured = layoutTranscript(chat.messages, columns, chatHeight, offset, transcriptOptions);

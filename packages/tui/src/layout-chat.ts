@@ -36,9 +36,12 @@ import {
   type Detail,
   type DiffExcerpt,
   type DiffLine,
+  type HelperBatch,
+  type IsLocal,
   type PlanStepView,
   type ToolBlock,
 } from "@golem/view";
+import { batchLines } from "./helper-tree.ts";
 import { formatMessageTime } from "./transcript.ts";
 
 export type Span = {
@@ -101,6 +104,10 @@ export type TranscriptOptions = {
   thinking?: boolean;
   /** How many diff rows an edit shows under its line: none, 10 or 30. Unset is `normal`. */
   detail?: Detail;
+  /** The helper batch of each `delegate` call, by call id. A call with a batch is drawn as a tree; one without keeps its line. */
+  batches?: Readonly<Record<string, HelperBatch>>;
+  /** Whether a model runs on this machine, from the model list. Unset leaves each helper as its events said. */
+  isLocal?: IsLocal;
   /** What golem cleared or summarised, each drawn dim after the message it followed. */
   notices?: readonly ChatNotice[];
   /** Whole seconds since the first `tool.writing` of the call a reply is writing. Unset counts 0. */
@@ -182,7 +189,12 @@ export function layoutMessages(
       lines.push(paint(wrappedLine(role, spans), width));
     }
     for (const tool of tools) {
-      for (const spans of toolLines(tool, width, options?.toolOutput === true, options?.detail)) {
+      const batch = options?.batches?.[tool.callId];
+      const rows =
+        batch !== undefined && isDelegate(tool)
+          ? batchLines(batch, width, options?.detail, options?.isLocal)
+          : toolLines(tool, width, options?.toolOutput === true, options?.detail);
+      for (const spans of rows) {
         lines.push(wrappedLine(role, spans));
       }
     }
