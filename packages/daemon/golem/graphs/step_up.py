@@ -41,6 +41,14 @@ class Consent:
     """The struggle that makes golem ask in the middle of a run, None before a turn."""
     replaces: str | None = None
     """The model whose answer the user asked to try again on a stronger one."""
+    helper_id: str | None = None
+    """The helper session that asks (ADR-059), None for the question of a lead's own turn."""
+    agent: str | None = None
+    label: str | None = None
+    sent: tuple[str, ...] | None = None
+    """What goes to the paid model, in a few short lines. Set with ``helper_id``."""
+    not_sent: tuple[str, ...] | None = None
+    """What does not go to it."""
 
 
 @dataclass(frozen=True, slots=True)

@@ -85,6 +85,12 @@ class PendingConsent:
     """The struggle that made the run ask in its middle, None for the question before a turn."""
     replaces: str | None = None
     """The model the user asked to try again on a stronger one, None for any other turn."""
+    helper_id: str | None = None
+    """The helper session that asks, None for the question of a lead's own turn."""
+    agent: str | None = None
+    label: str | None = None
+    sent: tuple[str, ...] | None = None
+    not_sent: tuple[str, ...] | None = None
 
 
 def pending_consent(events: list[ChatEvent]) -> PendingConsent | None:
@@ -108,6 +114,11 @@ def pending_consent(events: list[ChatEvent]) -> PendingConsent | None:
         since=asked.ts,
         signal=asked.data.signal,
         replaces=asked.data.replaces_model,
+        helper_id=asked.data.helper_id,
+        agent=asked.data.agent,
+        label=asked.data.label,
+        sent=None if asked.data.sent is None else tuple(asked.data.sent),
+        not_sent=None if asked.data.not_sent is None else tuple(asked.data.not_sent),
     )
 
 
@@ -143,7 +154,14 @@ def pending_item(events: list[ChatEvent]) -> PendingItem | None:
     consent = pending_consent(events)
     if consent is not None:
         return PendingItem(
-            kind="consent", since=consent.since, alternatives=len(consent.alternatives)
+            kind="consent",
+            since=consent.since,
+            alternatives=len(consent.alternatives),
+            helper_id=consent.helper_id,
+            agent=consent.agent,
+            label=consent.label,
+            sent=None if consent.sent is None else list(consent.sent),
+            not_sent=None if consent.not_sent is None else list(consent.not_sent),
         )
     return None
 

@@ -177,25 +177,31 @@ async def test_a_named_model_and_a_tier_are_wishes_too(
     assert got == {MID: MID, "frontier": BIG, "same": CHEAP}
 
 
-async def test_a_local_lead_with_no_consent_gets_the_pick_without_the_paid_models(
+async def test_a_local_lead_with_no_yes_parks_the_helper_on_the_paid_pick(
     database: Database, project: Path, tmp_path: Path
 ) -> None:
+    """The paid question is asked (``test_helper_consent``): the helper is pinned to the paid
+    pick and waits; the lead's reason says what a no becomes."""
     for wish in ("stronger", "frontier", BIG):
         chat = _Chat(database, ["done"], settings=_settings(LOCAL), home=tmp_path)
         chat.manager.facts = _mixed_setup()
-        helper, _lead, events = await _start(chat, LOCAL, project, _agent(wish))
-
-        started = _started(events)
-        assert started.data.model == LOCAL, wish
-        assert "needs your yes" in started.data.pick_reason
-        assert "route.consent.needed" not in {e.type for e in await chat.stored(helper)}
+        lead = await chat.manager.create(LOCAL, cwd=str(project))
+        ref = await chat.manager.start_helper(
+            lead, "call-1", 0, _agent(wish), "look", LOCAL, str(project)
+        )
+        started = _started(await chat.stored(lead))
+        assert started.data.model in (CHEAP, BIG), wish
+        assert "waits for your yes" in started.data.pick_reason
+        assert f"on a no it runs on {LOCAL}" in started.data.pick_reason
+        assert ref.model == started.data.model
+        assert "route.consent.needed" in {e.type for e in await chat.stored(ref.session_id)}
 
     # A wish that is not paid is left alone.
     chat = _Chat(database, ["done"], settings=_settings(LOCAL), home=tmp_path)
     chat.manager.facts = _mixed_setup()
     _, _, events = await _start(chat, LOCAL, project, _agent("cheapest"))
     assert _started(events).data.model == LOCAL
-    assert "needs your yes" not in _started(events).data.pick_reason
+    assert "waits for your yes" not in _started(events).data.pick_reason
 
 
 async def test_a_local_lead_that_agreed_to_paid_models_gets_the_wished_hosted_model(
@@ -259,7 +265,7 @@ async def test_the_picked_model_pins_the_helper_and_its_log_has_model_routed(
     database: Database, project: Path, tmp_path: Path
 ) -> None:
     chat = _Chat(database, ["done"], settings=_settings(LOCAL), home=tmp_path)
-    chat.manager.facts = _mixed_setup()
+    chat.manager.facts = _local_setup()
     helper, _, events = await _start(chat, LOCAL, project, _agent("stronger"))
 
     record = await chat.records.get(helper)
@@ -269,7 +275,7 @@ async def test_the_picked_model_pins_the_helper_and_its_log_has_model_routed(
     (routed,) = _routed(own)
     assert routed.data.model_profile == LOCAL
     assert routed.data.detail.startswith("stronger: ")
-    assert "needs your yes" in routed.data.detail
+    assert "fresh window" in routed.data.detail
     kinds = [e.type for e in own]
     assert kinds.index("model.routed") < kinds.index("message.started")
     # The lead's log has the summary: model, wish and the reason, in words.

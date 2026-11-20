@@ -53,6 +53,7 @@ from golem.models.cost import cost_usd
 from golem.models.errors import BUDGET_HINT
 from golem.models.facts import FactsSource, ModelFacts
 from golem.models.pick import Choice, Rejected, Traits, ladder, pick
+from golem.models.pick_helper import pick_helper
 from golem.models.privacy import LOCAL_ONLY_REFUSAL, is_local_only
 from golem.models.project_privacy import project_local_only
 from golem.models.router import ModelConfigError, ModelIdentity, ModelRouter
@@ -74,7 +75,7 @@ from golem.sessions.helpers import (
     helper_mode,
     origin_of,
     parked_calls,
-    pick_without_paid,
+    pick_local,
     routed_of,
     scope_of_agent,
     snapshot_of,
@@ -345,6 +346,11 @@ class _LiveSession:
     """The tier the picks of this session start at, after one signal stepped up in two runs."""
     helper_pick: Choice | None = None
     """The pick of a helper, which its first run writes as ``model.routed``. In memory only."""
+    helper_ask: Consent | None = None
+    """The paid question of a helper's first run, asked before it. In memory only: after a
+    restart the question is in the helper's log."""
+    lead_model: str | None = None
+    """The model the lead's run used when it started this helper. In memory only."""
 
 
 def _schemas(text: str | None) -> list[dict[str, object]] | None:
@@ -383,6 +389,9 @@ class _HelperModel:
     same_as_lead: bool
     choice: Choice | None = None
     """The pick as ``model.routed`` writes it. None without model facts."""
+    ask: Consent | None = None
+    """The paid question to ask before the helper runs on this model. Without the helper's own
+    fields: :meth:`start_helper` fills them in."""
 
 
 class _NoLocalFit(Exception):
@@ -1220,8 +1229,9 @@ class SessionManager:
         elif local_only:
             self._refuse_hosted(routed.profile)
         if session.route == "pinned" and session.helper_pick is not None:
-            routed = _Routed(routed.profile, session.helper_pick)
+            routed = _Routed(routed.profile, session.helper_pick, session.helper_ask)
             session.helper_pick = None
+            session.helper_ask = None
         if routed.ask is None:
             self._check_budget(routed.profile, room)
         self._runtime.router.chat_model(routed.profile, local_only=local_only)
@@ -1306,7 +1316,7 @@ class SessionManager:
             if found is not None:
                 return HelperRef(found.session_id, found.model_profile, False)
             local_only = self.local_only(cwd) or lead.route == "local"
-            picked = await self._helper_model(lead, model_profile, agent, local_only)
+            picked = await self._helper_model(lead, model_profile, agent, local_only, brief=brief)
             try:
                 self._runtime.router.chat_model(picked.profile, local_only=local_only)
             except ModelConfigError as exc:
@@ -1324,6 +1334,7 @@ class SessionManager:
                 allowed_tools=set(allowed),
                 options=dict(lead.options) if picked.same_as_lead else {},
                 helper_pick=picked.choice,
+                lead_model=model_profile,
                 permission_mode=helper_mode(agent, self._effective_mode(lead)),
             )
             await self._announce(helper)
@@ -1345,6 +1356,15 @@ class SessionManager:
                     None,
                     "model.options.changed",
                     ModelOptionsChangedData(options=dict(helper.options)),
+                )
+            if picked.ask is not None:
+                helper.helper_ask = replace(
+                    picked.ask,
+                    helper_id=sid,
+                    agent=agent.name,
+                    label=label[:120] or None,
+                    sent=("the brief",),
+                    not_sent=("this chat",),
                 )
             self._sessions[sid] = helper
             # A helper is named where it shows (a card, a panel, the Inbox), never untitled.
@@ -1379,12 +1399,23 @@ class SessionManager:
             return HelperRef(sid, picked.profile, True)
 
     async def _helper_model(
-        self, lead: _LiveSession, model_profile: str, agent: AgentSnapshot, local_only: bool
+        self,
+        lead: _LiveSession,
+        model_profile: str,
+        agent: AgentSnapshot,
+        local_only: bool,
+        *,
+        brief: str = "",
+        answer: ConsentAnswer | None = None,
     ) -> _HelperModel:
         """The model of a helper of ``lead``, from the wish of its agent. Reads cached facts only.
 
         The candidates and the traits are the ones a turn of the lead builds (:meth:`_route`).
         Without model facts the helper runs on the lead's model, as the lead does.
+
+        A pick that is paid, with a chat that has not agreed, comes back with the question to
+        ask (``ask``) and the paid model; its reason says what a no becomes. ``answer`` is the
+        user's answer to that question: a yes takes the paid pick, ``local`` the local one.
         """
         router = self._runtime.router
         settings = router.routing_settings()
@@ -1409,11 +1440,40 @@ class SessionManager:
             needs_tools=True,
             local_only=local_only,
             # A chat on a hosted model is paid already; on a local one the user has not agreed.
-            paid_allowed=own.tier != "local" or (lead.paid_ok and settings.paid != "always_ask"),
+            paid_allowed=own.tier != "local"
+            or answer in ("session", "once")
+            or (lead.paid_ok and settings.paid != "always_ask"),
             # A spent cap takes the paid models out, so the helper lands on a local one.
             paid_room_usd=None if room is None else room.usd,
         )
-        choice = pick_without_paid(wish, own, candidates, traits)
+        choice = pick_helper(wish, own, candidates, traits)
+        if answer == "local":
+            choice = pick_local(wish, own, candidates, traits)
+        elif choice.needs_consent:
+            local = pick_local(wish, own, candidates, traits)
+            question = self._question(
+                lead,
+                choice.model.profile,
+                choice.model.tier,
+                choice.model.price,
+                room,
+                routed_of(wish, choice),
+                brief,
+                None,
+                why=f"A helper ({agent.name}) wishes for a paid model: {choice.detail}.",
+            )
+            if question is None:  # nothing may ask: the answer that is left is the no
+                choice = pick_local(
+                    wish, own, candidates, traits, "the paid question cannot be asked here"
+                )
+            else:
+                detail = (
+                    f"{choice.detail}; it waits for your yes, and on a no it runs on "
+                    f"{local.model.profile} with a fresh window"
+                )
+                return _HelperModel(
+                    choice.model.profile, wish, detail, False, routed_of(wish, choice), question
+                )
         return _HelperModel(
             choice.model.profile,
             wish,
@@ -1935,112 +1995,192 @@ class SessionManager:
         is ``always_ask``) and runs the turn on the paid model. ``once`` runs this turn on it.
         ``local`` picks again among the local models. Returns the run's id.
 
+        A helper's question (ADR-059) is answered the same way, addressed to the helper. The
+        answer is the batch's: the other helpers of the same ``delegate`` call that wait on the
+        same question are answered with it, so the question is asked once. A ``session`` yes
+        is the lead's: ``paid_ok`` is set on the lead, not on the helper. ``local`` runs the
+        helper on a local model, or the lead's, with a fresh window.
+
         Raises :class:`ApprovalNotFoundError`, :class:`ConsentAnswerError`,
         :class:`SessionNotFoundError`, or :class:`SchemaMismatchError`.
         """
         async with self._lock:
-            session = await self._resolve(session_id)
-            waiting = await self._run_records.waiting(session_id)
-            pending = None
-            if waiting is not None and waiting.run_id == run_id:
-                pending = pending_consent(await self._events.for_run(run_id))
-            if pending is None:
-                raise ApprovalNotFoundError(run_id)
-            if answer not in pending.alternatives:
-                raise ConsentAnswerError(f"this question does not offer {answer}")
-            await self._events.emit(
-                session_id,
-                run_id,
-                "route.consent.answered",
-                RouteConsentAnsweredData(answer=answer),
-            )
-            if answer == "session" and self._runtime.router.routing_settings().paid != "always_ask":
+            started = await self._answer_consent(session_id, run_id, answer)
+            await self._answer_batch(session_id, answer)
+            return started
+
+    async def _answer_batch(self, helper_id: str, answer: ConsentAnswer) -> None:
+        """Give ``answer`` to the helpers of the same call that wait on the same question."""
+        record = await self._records.get(helper_id)
+        if record is None or record.parent_session_id is None or record.parent_call_id is None:
+            return
+        for other in await self._records.helpers_of(
+            record.parent_session_id, record.parent_call_id
+        ):
+            if other.session_id == helper_id:
+                continue
+            waiting = await self._run_records.waiting(other.session_id)
+            if waiting is None:
+                continue
+            found = pending_consent(await self._events.for_run(waiting.run_id))
+            if found is None or found.helper_id is None or answer not in found.alternatives:
+                continue
+            await self._answer_consent(other.session_id, waiting.run_id, answer)
+
+    async def _answer_consent(self, session_id: str, run_id: str, answer: ConsentAnswer) -> str:
+        """:meth:`answer_consent`, with the manager's lock held."""
+        session = await self._resolve(session_id)
+        waiting = await self._run_records.waiting(session_id)
+        pending = None
+        if waiting is not None and waiting.run_id == run_id:
+            pending = pending_consent(await self._events.for_run(run_id))
+        if pending is None:
+            raise ApprovalNotFoundError(run_id)
+        if answer not in pending.alternatives:
+            raise ConsentAnswerError(f"this question does not offer {answer}")
+        await self._events.emit(
+            session_id,
+            run_id,
+            "route.consent.answered",
+            RouteConsentAnsweredData(answer=answer),
+        )
+        if answer == "session" and self._runtime.router.routing_settings().paid != "always_ask":
+            # A helper's yes is the chat's: it is the lead that has agreed.
+            agreed = session
+            if pending.helper_id is not None and session.parent is not None:
+                agreed = await self._resolve(session.parent.session_id)
+            if not agreed.paid_ok:
                 await self._events.emit(
-                    session_id, None, "session.updated", SessionUpdatedData(paid_ok=True)
+                    agreed.session_id, None, "session.updated", SessionUpdatedData(paid_ok=True)
                 )
-                session.paid_ok = True
-            if pending.signal is not None:
-                memory = self._memory_access(session, session.model_profile, pending.text)
-                # The run is paused in its middle: it goes on with the answer, not a new turn.
-                resume = Resume(
-                    session_id=session_id,
-                    run_id=run_id,
-                    call_id="",
-                    name="",
-                    decision="deny",
-                    user_message_id=pending.user_message_id,
-                    open_calls=(),
-                    consent=answer,
-                    cwd=session.cwd,
-                    allowed_tools=_ordered(session.allowed_tools),
-                    mcp_servers=tuple(sorted(session.mcp_servers)),
-                    pinned=tuple(session.skills),
-                    pinned_folders=self._pinned_folders(session),
-                    options=dict(session.options),
-                    permission_mode=session.permission_mode,
-                    checks=session.checks,
-                    plan_first=session.plan_first,
-                    local_only=self.local_only(session.cwd) or session.route == "local",
-                    pins=session.pins,
-                    child=self._child_of(session),
-                    memory=memory,
-                )
-                control = RunControl()
-                work = self._resumed(session, resume, control, None)
-                await self._start(session, run_id, control, work, memory)
-                return run_id
-            room = None if self.budget is None else await self.budget.room(session_id)
-            try:
-                local_only = self.local_only(session.cwd)
+                agreed.paid_ok = True
+        if pending.signal is not None:
+            memory = self._memory_access(session, session.model_profile, pending.text)
+            # The run is paused in its middle: it goes on with the answer, not a new turn.
+            resume = Resume(
+                session_id=session_id,
+                run_id=run_id,
+                call_id="",
+                name="",
+                decision="deny",
+                user_message_id=pending.user_message_id,
+                open_calls=(),
+                consent=answer,
+                cwd=session.cwd,
+                allowed_tools=_ordered(session.allowed_tools),
+                mcp_servers=tuple(sorted(session.mcp_servers)),
+                pinned=tuple(session.skills),
+                pinned_folders=self._pinned_folders(session),
+                options=dict(session.options),
+                permission_mode=session.permission_mode,
+                checks=session.checks,
+                plan_first=session.plan_first,
+                local_only=self.local_only(session.cwd) or session.route == "local",
+                pins=session.pins,
+                child=self._child_of(session),
+                memory=memory,
+            )
+            control = RunControl()
+            work = self._resumed(session, resume, control, None)
+            await self._start(session, run_id, control, work, memory)
+            return run_id
+        room = None if self.budget is None else await self.budget.room(session_id)
+        try:
+            local_only = self.local_only(session.cwd)
+            if pending.helper_id is not None:
+                routed, local_only = await self._answered_helper(session, answer, local_only)
+            else:
                 routed = await self._route(
                     session, pending.text, room, answer, local_only, replaces=pending.replaces
                 )
-                self._runtime.router.chat_model(routed.profile, local_only=local_only)
-            except _NoLocalFit as exc:
-                fit = exc.choice.reason == "fit"
-                failed = RunFailedData(
-                    message=f"No local model can take this turn: {exc.choice.detail}.",
-                    code="context_full" if fit else None,
-                    hint="Use a model with a larger window, or start a new session."
-                    if fit
-                    else None,
-                )
-                await self._fail_waiting(session_id, run_id, failed)
-                return run_id
-            except ModelConfigError as exc:
-                await self._fail_waiting(session_id, run_id, RunFailedData(message=str(exc)))
-                return run_id
-            invocation = None
-            if pending.skill is not None:
-                try:
-                    invocation = self._invoke(session_id, session.cwd, pending.skill)
-                except SkillInvokeError:
-                    invocation = None
-            memory = self._memory_access(session, routed.profile, pending.text)
-            turn = self._turn_of(
-                session,
-                routed,
-                run_id=run_id,
-                user_message_id=pending.user_message_id,
-                text=pending.text,
-                skill=invocation,
-                typed=None,
-                begun=True,
-                growth=await self._growth_for(session, routed.profile),
-                local_only=local_only,
-                memory=memory,
+            self._runtime.router.chat_model(routed.profile, local_only=local_only)
+        except _NoLocalFit as exc:
+            fit = exc.choice.reason == "fit"
+            failed = RunFailedData(
+                message=f"No local model can take this turn: {exc.choice.detail}.",
+                code="context_full" if fit else None,
+                hint="Use a model with a larger window, or start a new session." if fit else None,
             )
-            if answer == "once" and room is not None and room.spent and self.budget is not None:
-                self.budget.exempt(session_id)
-            control = RunControl()
-            await self._start(
-                session,
-                run_id,
-                control,
-                self._turn(session, turn, control),
-                memory,
-            )
+            await self._fail_waiting(session_id, run_id, failed)
             return run_id
+        except ModelConfigError as exc:
+            await self._fail_waiting(session_id, run_id, RunFailedData(message=str(exc)))
+            return run_id
+        invocation = None
+        if pending.skill is not None:
+            try:
+                invocation = self._invoke(session_id, session.cwd, pending.skill)
+            except SkillInvokeError:
+                invocation = None
+        memory = self._memory_access(session, routed.profile, pending.text)
+        turn = self._turn_of(
+            session,
+            routed,
+            run_id=run_id,
+            user_message_id=pending.user_message_id,
+            text=pending.text,
+            skill=invocation,
+            typed=None,
+            begun=True,
+            growth=await self._growth_for(session, routed.profile),
+            local_only=local_only,
+            memory=memory,
+        )
+        if answer == "once" and room is not None and room.spent and self.budget is not None:
+            self.budget.exempt(session_id)
+        control = RunControl()
+        await self._start(
+            session,
+            run_id,
+            control,
+            self._turn(session, turn, control),
+            memory,
+        )
+        return run_id
+
+    async def _answered_helper(
+        self, helper: _LiveSession, answer: ConsentAnswer, local_only: bool
+    ) -> tuple[_Routed, bool]:
+        """The pick of a helper whose paid question was answered, and whether it stays local.
+
+        It is the pick of the start made again with the answer: a yes takes the paid model it
+        wished for, ``local`` a local one with a fresh window. The helper is pinned to it, which
+        a ``model.selected`` stores when it is not the model it was made with.
+        """
+        if helper.parent is None or helper.agent is None:
+            raise ModelConfigError("this session is not a helper")
+        lead = await self._resolve(helper.parent.session_id)
+        local_only = local_only or lead.route == "local"
+        picked = await self._helper_model(
+            lead,
+            helper.lead_model or lead.model_profile,
+            helper.agent,
+            local_only,
+            answer=answer,
+        )
+        if picked.profile != helper.model_profile:
+            identity = self._runtime.router.identity(picked.profile)
+            await self._events.emit(
+                helper.session_id,
+                None,
+                "model.selected",
+                ModelSelectedData(
+                    model_profile=picked.profile,
+                    model_provider=identity.provider,
+                    model_name=identity.name,
+                    reason="user",
+                ),
+            )
+            helper.model_profile = picked.profile
+        if picked.same_as_lead and not helper.options and lead.options:
+            helper.options = dict(lead.options)
+            await self._events.emit(
+                helper.session_id,
+                None,
+                "model.options.changed",
+                ModelOptionsChangedData(options=dict(helper.options)),
+            )
+        return _Routed(picked.profile, picked.choice), local_only
 
     async def _fail_waiting(self, session_id: str, run_id: str, failed: RunFailedData) -> None:
         await self._events.emit(session_id, run_id, "run.failed", failed)
