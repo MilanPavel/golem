@@ -197,6 +197,16 @@ class AgentRegistry:
             )
         )
 
+    def blocked(self, root: Path | None) -> list[Agent]:
+        """Agents in the project folder of ``root`` when ``root`` is not trusted.
+
+        :meth:`view` never reads that folder. This reads it only so a list can show what is
+        held back. These agents are never started and win no name.
+        """
+        if root is None or self._trusted(root):
+            return []
+        return list(self._agents_in(root / PROJECT_DIR))
+
     def _expand(self, folder: str) -> Path:
         if folder == "~" or folder.startswith("~/"):
             return self._home / folder[2:]
