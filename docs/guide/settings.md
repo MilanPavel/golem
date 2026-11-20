@@ -319,6 +319,17 @@ Only your own file sets these ([Skills](./skills.md)).
 | `extra_dirs` | none | More folders of skills, after your own |
 | `index_budget` | `4000` | How many characters the skill index in the system prompt may use. A skill that does not fit is left out of it, and `skill.list` shows `indexed: false` |
 
+### `[memory]`
+
+Only your own file sets these, and Settings › Memory writes the three privacy keys. A project's `.golem/config.toml` may set only `private = true`, which makes that project's notes local models only ([Memory](./memory.md)).
+
+| Key | Default | Meaning |
+|---|---|---|
+| `enabled` | `true` | `false` turns memory off: no file is opened, nothing is added to the prompt, and the model has no `recall` or `remember` |
+| `you`, `projects`, `history` | `"chat"` | The privacy of a scope. `"chat"` lets a note go where the chat goes. `"local"` keeps every note of that scope on local models |
+| `auto_keep` | none | Folders where a note with sources would be kept without asking. No effect yet, and the web page cannot change it |
+| `share`, `min_tokens`, `max_tokens`, `helper_share` | `0.02`, `200`, `1500`, `0.01` | The size of the memory block. No effect yet: the block is capped at 1500 characters |
+
 ### `[mcp.<name>]`
 
 One MCP server ([MCP servers](./mcp.md)). The name may use letters, digits, and `-`, up to 32 characters.

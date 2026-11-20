@@ -19,6 +19,7 @@ What talks to what, and how:
 ## Where to go next
 
 - Start with [The agent loop](architecture/agent-loop.md), and follow the Next links, through to [Coding](architecture/coding.md).
+- What golem keeps between chats, and which model may read it, is in [Memory](architecture/memory.md). The user's side is in [Memory](guide/memory.md).
 - The choice behind each part is an ADR in [Decisions](adr/README.md).
 - How the Python and TypeScript trees share one repository is in [The monorepo](monorepo.md).
 - Every setting in `config.toml` is in [Settings](guide/settings.md).
