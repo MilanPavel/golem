@@ -839,9 +839,13 @@ export {
 export {
   lineName,
   ordinal,
+  queuedWords,
+  sessionState,
   waitText,
   waitWords,
   WAITING_FOR_LOCAL_MODEL,
+  type SessionState,
+  type StateSession,
   type WaitLength,
   type WaitReason,
   type WaitScope,

@@ -33,9 +33,9 @@ export function SwitcherView({
             <Text color={CLAY}>{row.selected ? "›" : " "}</Text>
             <Text
               color={row.waiting ? "yellow" : row.running ? "green" : undefined}
-              dimColor={!row.running && !row.waiting}
+              dimColor={(!row.running && !row.waiting) || row.queued}
             >
-              {` ${row.waiting ? "?" : row.running ? "●" : "○"} `}
+              {` ${row.waiting ? "?" : row.queued ? "◌" : row.running ? "●" : "○"} `}
             </Text>
             {row.routine ? <Text dimColor>{mark}</Text> : null}
             <Text bold={row.current}>{row.title}</Text>

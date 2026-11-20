@@ -119,6 +119,43 @@ export function waitWords(wait: WaitState, length: WaitLength): string {
   }
 }
 
+/** The part of a session summary the row's state reads. An older daemon leaves the wait out. */
+export interface StateSession {
+  status: string;
+  wait_reason?: WaitReason | null;
+  wait_line?: string | null;
+}
+
+/** What a session row shows: `queued` is a running session whose model call waits in line. */
+export type SessionState = "idle" | "running" | "waiting" | "queued";
+
+/** The state of a session row. Closed and unknown statuses read as `idle`. */
+export function sessionState(session: StateSession): SessionState {
+  if (session.status === "running") {
+    return session.wait_reason === undefined || session.wait_reason === null ? "running" : "queued";
+  }
+  return session.status === "waiting" ? "waiting" : "idle";
+}
+
+/** The sentence for a `queued` row, from the reason and the line the summary carries. Null for any other row. */
+export function queuedWords(session: StateSession, length: WaitLength): string | null {
+  if (sessionState(session) !== "queued" || session.wait_reason === undefined || session.wait_reason === null) return null;
+  return waitText(
+    {
+      reason: session.wait_reason,
+      line: session.wait_line ?? null,
+      model: null,
+      position: null,
+      holder: null,
+      retryInMs: null,
+      silentMs: null,
+      scope: null,
+      willRetry: null,
+    },
+    length,
+  );
+}
+
 /** The words for the meter: the sentence for the reason, or the old words when the daemon sent none. */
 export function waitText(wait: WaitState | null, length: WaitLength): string {
   return wait === null ? WAITING_FOR_LOCAL_MODEL : waitWords(wait, length);

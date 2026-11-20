@@ -4,7 +4,16 @@ import { test } from "node:test";
 import type { ChatEvent } from "@golem/client";
 
 import { emptyChat, reduceChat } from "./chat-state.ts";
-import { lineName, ordinal, waitText, waitWords, WAITING_FOR_LOCAL_MODEL, type WaitState } from "./wait.ts";
+import {
+  lineName,
+  ordinal,
+  queuedWords,
+  sessionState,
+  waitText,
+  waitWords,
+  WAITING_FOR_LOCAL_MODEL,
+  type WaitState,
+} from "./wait.ts";
 
 const base: WaitState = {
   reason: "slot",
@@ -157,4 +166,18 @@ test("an event without a reason leaves wait null, so the old words show", () => 
   assert.equal(on.localWait, true);
   assert.equal(on.wait, null);
   assert.equal(waitText(on.wait, "web"), "waiting for the local model");
+});
+
+test("a running session with a wait is queued, and the words come from the reason and line", () => {
+  assert.equal(sessionState({ status: "running" }), "running");
+  assert.equal(sessionState({ status: "running", wait_reason: null, wait_line: null }), "running");
+  assert.equal(sessionState({ status: "running", wait_reason: "slot", wait_line: "qwen3:14b" }), "queued");
+  assert.equal(sessionState({ status: "waiting" }), "waiting");
+  assert.equal(sessionState({ status: "idle", wait_reason: "slot", wait_line: "qwen3:14b" }), "idle");
+  assert.equal(sessionState({ status: "closed" }), "idle");
+  assert.equal(queuedWords({ status: "running", wait_reason: "slot", wait_line: "qwen3:14b" }, "web"), "waiting for qwen3:14b");
+  assert.equal(queuedWords({ status: "running", wait_reason: "provider", wait_line: "anthropic" }, "web"), "anthropic is busy");
+  assert.equal(queuedWords({ status: "running", wait_reason: "load", wait_line: "qwen3:14b" }, "web"), "loading qwen3:14b");
+  assert.equal(queuedWords({ status: "running" }, "web"), null);
+  assert.equal(queuedWords({ status: "idle", wait_reason: "slot", wait_line: "x" }, "web"), null);
 });

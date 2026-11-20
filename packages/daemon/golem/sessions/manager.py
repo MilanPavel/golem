@@ -163,6 +163,7 @@ from golem_protocol.events import (
     ToolRequestedEvent,
     ToolStartedData,
     ToolStartedEvent,
+    WaitReason,
 )
 
 NOT_APPROVED = "cancelled before it was approved"
@@ -575,6 +576,10 @@ class SessionManager:
     async def pending(self, activity: SessionActivity) -> PendingItem | None:
         """What a waiting session waits for, read from its stored events."""
         return await self._events.pending(activity)
+
+    async def wait(self, activity: SessionActivity) -> tuple[WaitReason, str] | None:
+        """The open slot, provider or load wait of a running session, read from its events."""
+        return await self._events.wait(activity)
 
     async def pending_of(self, session_id: str) -> PendingItem | None:
         """What the session waits for, None when it waits for nothing or does not exist."""

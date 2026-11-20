@@ -171,6 +171,25 @@ test("ages read as now, minutes, hours, days, then a date", () => {
   }
 });
 
+test("a running session whose call waits in line is queued, and an older daemon's is just running", () => {
+  const queued = { ...summary("s_q", "In line", true), wait_reason: "slot" as const, wait_line: "qwen3:14b" };
+  const rows = layoutSwitcher({
+    state: openSwitcher("s_q"),
+    sessions: [summary("s_n", "Running", true), queued],
+    current: null,
+    now: NOW,
+    columns: 40,
+    rows: 10,
+  });
+  assert.deepEqual(
+    rows.map((row) => [row.sessionId, row.running, row.queued]),
+    [
+      ["s_n", true, false],
+      ["s_q", true, true],
+    ],
+  );
+});
+
 test("a routine's session carries the routine mark, and a waiting one the waiting flag", () => {
   const routine = { ...summary("s_r", "Digest"), origin: "routine:digest" };
   const waiting = { ...summary("s_w", "Needs you"), status: "waiting" as const, origin: "routine:digest" };

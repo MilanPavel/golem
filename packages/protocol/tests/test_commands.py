@@ -245,6 +245,18 @@ def test_summary_pending_defaults_to_none() -> None:
     assert _summary().pending is None
 
 
+def test_summary_wait_fields_are_optional_and_round_trip() -> None:
+    old = _summary(status="running")
+    assert (old.wait_reason, old.wait_line) == (None, None)
+    queued = _summary(status="running", wait_reason="slot", wait_line="qwen3:14b")
+    assert SessionSummary.model_validate_json(queued.model_dump_json()) == queued
+    assert (queued.wait_reason, queued.wait_line) == ("slot", "qwen3:14b")
+    with pytest.raises(ValidationError):
+        _summary(wait_reason="nonsense")
+    with pytest.raises(ValidationError):
+        _summary(wait_line="")
+
+
 def test_pending_item_refuses_unknown_fields_and_negative_counts() -> None:
     with pytest.raises(ValidationError):
         PendingItem.model_validate({"kind": "consent", "since": "t", "diff": "x"})

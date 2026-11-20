@@ -206,6 +206,15 @@ class SessionRecords:
         )
         return None if row is None else str(row[0])
 
+    async def running_run_id(self, session_id: str) -> str | None:
+        """The newest run of ``session_id`` whose status is ``running``, if any."""
+        row = await self._database.fetch_one(
+            "SELECT run_id FROM runs WHERE session_id = ? AND status = 'running'"
+            " ORDER BY started_at DESC LIMIT 1",
+            (session_id,),
+        )
+        return None if row is None else str(row[0])
+
 
 class RunRecords:
     def __init__(self, database: Database) -> None:
