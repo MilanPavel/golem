@@ -756,6 +756,55 @@ test("listModels asks for a refresh or show all only when told to, and takes a l
   }
 });
 
+test("benchModel sends ref and engine, checks the reply, and the rows reach onBench", async () => {
+  const sent: Record<string, unknown>[] = [];
+  const row = { shape: "tools", at_once: 2, each: [30.5, 29], total: 59.5, window: 8192 };
+  const server = await listen((socket) => {
+    attach(socket, {
+      answerPing: true,
+      results: { "model.bench": { ref: "ollama/qwen3:8b", started: true } },
+      onRequest: (current, method, params) => {
+        if (method !== "model.bench") return;
+        sent.push(params);
+        setImmediate(() => {
+          write(current, { jsonrpc: "2.0", method: "model.bench.progress", params: { ref: "ollama/qwen3:8b", index: 1, total: 2, row } });
+          write(current, { jsonrpc: "2.0", method: "model.bench.progress", params: { ref: "ollama/qwen3:8b" } });
+          write(current, { jsonrpc: "2.0", method: "model.bench.done", params: { ref: "ollama/qwen3:8b", ok: true, rows: [row] } });
+        });
+      },
+    });
+  });
+  const client = connectGolem({ socketPath: server.socketPath, clientName: "cli", reconnect: false, heartbeatMs: 60_000 });
+  const updates: string[] = [];
+  const stop = client.onBench((update) => {
+    updates.push(update.kind === "progress" ? `progress ${update.progress.row.at_once}` : `done ${update.done.rows?.length}`);
+  });
+  try {
+    assert.deepEqual(await client.benchModel("qwen3:8b", "ollama"), { ref: "ollama/qwen3:8b", started: true });
+    await client.benchModel("qwen3:8b");
+    for (let tries = 0; tries < 50 && updates.length < 2; tries += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+    assert.deepEqual(sent, [{ ref: "qwen3:8b", engine: "ollama" }, { ref: "qwen3:8b" }]);
+    // The malformed progress is dropped; each good event arrives once per start.
+    assert.deepEqual(updates.slice(0, 2), ["progress 2", "done 1"]);
+  } finally {
+    stop();
+    client.close();
+    await server.close();
+  }
+  const bad = await listen((socket) => {
+    attach(socket, { answerPing: true, results: { "model.bench": { ref: "x" } } });
+  });
+  const refused = connectGolem({ socketPath: bad.socketPath, clientName: "cli", reconnect: false, heartbeatMs: 60_000 });
+  try {
+    await assert.rejects(() => refused.benchModel("x"), /invalid model.bench result/);
+  } finally {
+    refused.close();
+    await bad.close();
+  }
+});
+
 test("download progress and its end reach onPull", async () => {
   const server = await listen((socket) => {
     attach(socket, {
