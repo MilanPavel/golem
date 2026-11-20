@@ -1585,6 +1585,64 @@ class ModelPullDone(BaseModel):
     error: str | None = None
 
 
+class ModelBenchParams(BaseModel):
+    """``model.bench``. Measure how fast a local model answers at 1 to 4 calls at once.
+
+    ``ref`` is a local model ref (``ollama/qwen3:8b``); a hosted ref is an error. ``engine`` names
+    the server that runs it when more than one could. Each count's row arrives as
+    ``model.bench.progress`` and the end as ``model.bench.done``.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    ref: str = Field(min_length=3)
+    engine: str | None = Field(default=None, min_length=1)
+
+
+class ModelBenchResult(BaseModel):
+    """``started`` is false when this model was already being measured."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    ref: str = Field(min_length=3)
+    started: bool
+
+
+class ModelBenchRow(BaseModel):
+    """One shape at one count. ``each`` is the tokens per second of each call, ``total`` their sum,
+    ``window`` the seconds from the first start to the last end."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    shape: Literal["tools", "prompt"]
+    at_once: int = Field(ge=1)
+    each: list[float]
+    total: float = Field(ge=0)
+    window: float = Field(ge=0)
+
+
+class ModelBenchProgress(BaseModel):
+    """One row finished. ``index`` counts from 1 of ``total``."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    ref: str = Field(min_length=3)
+    index: int = Field(ge=1)
+    total: int = Field(ge=1)
+    row: ModelBenchRow
+
+
+class ModelBenchDone(BaseModel):
+    """A run ended. ``error`` says why when ``ok`` is false, and then ``rows`` may be short."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    ref: str = Field(min_length=3)
+    ok: bool
+    error: str | None = None
+    rows: list[ModelBenchRow] = Field(default_factory=list[ModelBenchRow])
+
+
 class ModelCheckParams(BaseModel):
     """``model.check``. Run golem's tool-calling test against a model.
 
@@ -4288,6 +4346,11 @@ __all__ = [
     "MemoryWriteResult",
     "MessageSendParams",
     "MessageSendResult",
+    "ModelBenchDone",
+    "ModelBenchParams",
+    "ModelBenchProgress",
+    "ModelBenchResult",
+    "ModelBenchRow",
     "ModelCheckCase",
     "ModelCheckDone",
     "ModelCheckParams",

@@ -12,6 +12,8 @@ from golem_protocol.commands import (
     McpServerLog,
     McpTestProgress,
     MemoryChanged,
+    ModelBenchDone,
+    ModelBenchProgress,
     ModelCheckDone,
     ModelCheckProgress,
     ModelOptionsSaved,
@@ -123,6 +125,26 @@ class ModelPullDoneNotification(BaseModel):
     jsonrpc: Literal["2.0"] = "2.0"
     method: Literal["model.pull.done"] = "model.pull.done"
     params: ModelPullDone
+
+
+class ModelBenchProgressNotification(BaseModel):
+    """Server → every connection: one row of a speed run finished. Not stored."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    jsonrpc: Literal["2.0"] = "2.0"
+    method: Literal["model.bench.progress"] = "model.bench.progress"
+    params: ModelBenchProgress
+
+
+class ModelBenchDoneNotification(BaseModel):
+    """Server → every connection: a speed run ended. Not stored."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    jsonrpc: Literal["2.0"] = "2.0"
+    method: Literal["model.bench.done"] = "model.bench.done"
+    params: ModelBenchDone
 
 
 class ModelCheckProgressNotification(BaseModel):
@@ -293,6 +315,8 @@ __all__ = [
     "McpServerStatusNotification",
     "McpTestProgressNotification",
     "MemoryChangedNotification",
+    "ModelBenchDoneNotification",
+    "ModelBenchProgressNotification",
     "ModelCheckDoneNotification",
     "ModelCheckProgressNotification",
     "ModelOptionsSavedNotification",

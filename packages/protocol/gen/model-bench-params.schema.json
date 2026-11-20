@@ -1,0 +1,29 @@
+{
+  "additionalProperties": false,
+  "description": "``model.bench``. Measure how fast a local model answers at 1 to 4 calls at once.\n\n``ref`` is a local model ref (``ollama/qwen3:8b``); a hosted ref is an error. ``engine`` names\nthe server that runs it when more than one could. Each count's row arrives as\n``model.bench.progress`` and the end as ``model.bench.done``.",
+  "properties": {
+    "engine": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Engine"
+    },
+    "ref": {
+      "minLength": 3,
+      "title": "Ref",
+      "type": "string"
+    }
+  },
+  "required": [
+    "ref"
+  ],
+  "title": "ModelBenchParams",
+  "type": "object"
+}
