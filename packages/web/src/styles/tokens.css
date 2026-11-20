@@ -43,6 +43,8 @@
   /* Type scale: one voice. Geist for words, Geist Mono only for literals (through <Code>, <Path>, <Kbd>).
      title: a page title (24 px). heading: a section heading (14 px). label: a nav item or row label (14 px).
      body: running text (14 px). meta: a sub line, hint or count (13 px). code: a literal in mono (12.5 px). */
+  --text-panel: 1.0625rem;
+  --text-panel--line-height: 1.3;
   --text-title: 1.5rem;
   --text-title--line-height: 1.25;
   --text-heading: 0.875rem;

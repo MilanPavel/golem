@@ -2,6 +2,7 @@ import { toolsNeeds, toolsStatusText, type ToolsRow, type ToolsState } from "@go
 import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import { Button } from "../../ui/button.tsx";
 import { cn } from "../../ui/cn.ts";
+import { Code } from "../../ui/code.tsx";
 import { Input } from "../../ui/input.tsx";
 import { PullBar } from "../models/index.ts";
 import { MarkGlyph } from "./mark-glyph.tsx";
@@ -66,9 +67,9 @@ function OfferRow({ row, state, draft, onDraft, onTick }: { row: ToolsRow; state
           <span className="font-semibold">{row.title}</span>
           <span className="text-sm text-muted">{row.description}</span>
           {row.already ? (
-            <span className="font-mono text-xs text-faint">added</span>
+            <span className="text-meta text-faint">added</span>
           ) : note.length === 0 ? null : (
-            <span className="font-mono text-xs text-faint">{note.join(" · ")}</span>
+            <span className="text-meta text-faint">{note.join(" · ")}</span>
           )}
         </span>
       </label>
@@ -98,7 +99,7 @@ function OfferRow({ row, state, draft, onDraft, onTick }: { row: ToolsRow; state
 
 function Dash({ word }: { word: string }) {
   return (
-    <span className="grid size-4 shrink-0 place-items-center font-mono text-sm leading-none text-faint">
+    <span className="grid size-4 shrink-0 place-items-center text-body leading-none text-faint">
       <span aria-hidden="true">–</span>
       <span className="sr-only">{word}: </span>
     </span>
@@ -218,9 +219,9 @@ function RunCard({ row, log, onRetry, onSkipRow, onLog }: { row: ToolsRow; log: 
             <pre
               tabIndex={0}
               aria-label={`${row.title} log`}
-              className="max-h-48 overflow-auto rounded-md bg-code-bg p-2 font-mono text-xs whitespace-pre-wrap text-ink outline-offset-2 outline-clay focus-visible:outline-2"
+              className="max-h-48 overflow-auto rounded-md bg-code-bg p-2 whitespace-pre-wrap outline-offset-2 outline-clay focus-visible:outline-2"
             >
-              {log.lines.length === 0 ? "The log is empty." : log.lines.join("\n")}
+              <Code>{log.lines.length === 0 ? "The log is empty." : log.lines.join("\n")}</Code>
             </pre>
           ) : null}
         </div>

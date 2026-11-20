@@ -10,7 +10,7 @@ import { useSectionBadges } from "./use-section-badges.ts";
 function Badge({ count, className }: { count: number; className?: string }) {
   if (count <= 0) return null;
   return (
-    <span title={`${count} to fix`} className={cn("inline-grid h-4.5 min-w-4.5 place-items-center rounded-full bg-wait-soft px-1.25 font-mono text-micro leading-none font-bold text-wait", className)}>
+    <span title={`${count} to fix`} className={cn("inline-grid h-4.5 min-w-4.5 place-items-center rounded-full bg-wait-soft px-1.25 text-micro leading-none font-semibold text-wait", className)}>
       {count}
     </span>
   );
@@ -31,7 +31,7 @@ function Groups({ section, onNavigate, onPick }: { section: string; onNavigate: 
     <>
       {GROUPS.map((group) => (
         <div key={group.id} className="mt-3.5 first:mt-1.5">
-          <span className="block px-2.5 py-1.5 font-mono text-micro font-semibold tracking-widest text-faint uppercase">{group.title}</span>
+          <span className="block px-2.5 py-1.5 text-meta font-medium text-faint">{group.title}</span>
           {SECTIONS.filter((item) => item.group === group.id).map((item) => (
             <Link
               key={item.id}
@@ -75,13 +75,13 @@ export function SettingsNav({
   return (
     <div data-testid="settings-nav" className="hidden min-h-0 w-62 shrink-0 flex-col border-r border-line bg-sunken/50 md:flex">
       <div className="px-4 pt-5 pb-2.5">
-        <h1 className="mb-3.5 ml-1 font-prose text-2xl leading-none font-normal tracking-tight">Settings</h1>
+        <h1 className="mb-3.5 ml-1 text-panel font-semibold tracking-tight">Settings</h1>
         {search}
       </div>
       <nav aria-label="Settings sections" className="min-h-0 flex-1 overflow-y-auto px-2.5 pb-3">
         {results ?? <Groups section={section} onNavigate={onNavigate} />}
       </nav>
-      <div className="flex items-center gap-2 border-t border-line px-4 pt-2.5 pb-3 font-mono text-xs text-faint">
+      <div className="flex items-center gap-2 border-t border-line px-4 pt-2.5 pb-3 text-meta text-faint">
         <span aria-hidden="true" className="size-1.75 rounded-full bg-allow" />
         {version === null ? "golem" : `golem v${version}`}
         <Link
@@ -91,7 +91,7 @@ export function SettingsNav({
           className="ml-auto inline-flex items-center gap-1 outline-offset-2 outline-clay hover:text-clay-ink focus-visible:outline-2"
         >
           <SettingsConfigIcon className="size-3.5" />
-          toml
+          config.toml
         </Link>
       </div>
     </div>
@@ -124,7 +124,7 @@ export function SettingsPicker({
       >
         {current === undefined ? null : <current.icon className="text-clay" />}
         <span>{current?.title ?? "Settings"}</span>
-        {group === undefined ? null : <small className="font-mono text-micro font-normal text-faint uppercase">{group.title}</small>}
+        {group === undefined ? null : <small className="text-meta font-normal text-faint">{group.title}</small>}
         <Badge count={total} className="ml-auto" />
         <ChevronDownIcon className={cn(total === 0 && "ml-auto", "text-faint", open && "rotate-180")} />
       </button>
