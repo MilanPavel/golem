@@ -128,6 +128,7 @@ from golem.sessions.manager import (
     HelperSessionError,
     InvalidToolArgsError,
     MessageNotFoundError,
+    NotAHelperError,
     RuleWriteError,
     RunNotFoundError,
     SchemaMismatchError,
@@ -200,6 +201,8 @@ from golem_protocol.commands import (
     FsListDirsResult,
     HelloParams,
     HelloResult,
+    HelperStopParams,
+    HelperStopResult,
     InspectMessage,
     ListedModel,
     ListedProvider,
@@ -477,6 +480,8 @@ async def _session_list(ctx: RequestContext, params: SessionListParams) -> Sessi
                 sessions.local_only(item.session.cwd),
                 await sessions.pending(item),
                 await sessions.wait(item),
+                await sessions.helpers(item),
+                sessions.step(item.session.session_id),
             )
             for item in found
         ]
@@ -611,6 +616,16 @@ async def _run_cancel(ctx: RequestContext, params: RunCancelParams) -> RunCancel
     except RunNotFoundError as exc:
         raise RpcCallError(RUN_NOT_FOUND, "run not found") from exc
     return RunCancelResult(cancelled=cancelled)
+
+
+async def _helper_stop(ctx: RequestContext, params: HelperStopParams) -> HelperStopResult:
+    try:
+        stopped = await _sessions(ctx).stop_helper(params.session_id)
+    except SessionNotFoundError as exc:
+        raise RpcCallError(SESSION_NOT_FOUND, "session not found") from exc
+    except NotAHelperError as exc:
+        raise RpcCallError(INVALID_PARAMS, str(exc)) from exc
+    return HelperStopResult(stopped=stopped)
 
 
 async def _session_inspect(
@@ -1958,6 +1973,7 @@ def standard_methods() -> dict[str, Method]:
             "route.consent.answer", RouteConsentAnswerParams, True, _route_consent_answer
         ),
         "run.cancel": Method("run.cancel", RunCancelParams, True, _run_cancel),
+        "helper.stop": Method("helper.stop", HelperStopParams, True, _helper_stop),
         "artifact.read": Method("artifact.read", ArtifactReadParams, True, _artifact_read),
         "changes.list": Method("changes.list", ChangesListParams, True, _changes_list),
         "changes.diff": Method("changes.diff", ChangesDiffParams, True, _changes_diff),

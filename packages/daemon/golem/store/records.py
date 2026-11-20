@@ -162,6 +162,19 @@ class SessionRecords:
         )
         return [str(row["session_id"]) for row in rows]
 
+    async def helper_counts(self, parent_session_id: str) -> tuple[int, int]:
+        """How many open helpers of ``parent_session_id`` run, and how many wait for an answer,
+        as ``(running, waiting)``. A helper is in one of the two while its run is open."""
+        row = await self._database.fetch_one(
+            "SELECT"
+            " COUNT(DISTINCT CASE WHEN r.status = 'running' THEN s.session_id END),"
+            " COUNT(DISTINCT CASE WHEN r.status = 'waiting' THEN s.session_id END)"
+            " FROM sessions s JOIN runs r ON r.session_id = s.session_id"
+            " WHERE s.parent_session_id = ? AND s.closed_at IS NULL",
+            (parent_session_id,),
+        )
+        return (0, 0) if row is None else (int(row[0]), int(row[1]))
+
     async def activity(self, session_id: str) -> SessionActivity | None:
         """One session's row, whether a run is open, and its newest ``seq``."""
         row = await self._database.fetch_one(f"{_ACTIVITY} WHERE s.session_id = ?", (session_id,))

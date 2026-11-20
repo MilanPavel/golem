@@ -36,10 +36,16 @@ def summarize(
     local_only: bool = False,
     pending: PendingItem | None = None,
     wait: tuple[WaitReason, str] | None = None,
+    helpers: tuple[int, int] | None = None,
+    step: str | None = None,
 ) -> SessionSummary:
     """The row of ``activity``. ``wait`` is the open wait of its running run, and only a running
-    session carries it."""
+    session carries it. ``helpers`` is ``(running, waiting)`` of a lead's helpers, None for no
+    helper at work. ``step`` is a helper's newest step, and only a helper with a run open
+    carries it."""
     session = activity.session
+    at_work = (activity.running or activity.waiting) and session.closed_at is None
+    shown = step if at_work and session.parent_session_id is not None else None
     queued = wait if wait is not None and activity.running and session.closed_at is None else None
     return SessionSummary(
         session_id=session.session_id,
@@ -68,6 +74,9 @@ def summarize(
         pending=pending,
         wait_reason=None if queued is None else queued[0],
         wait_line=None if queued is None else queued[1],
+        helpers_running=None if helpers is None else helpers[0],
+        helpers_waiting=None if helpers is None else helpers[1],
+        step=shown,
     )
 
 

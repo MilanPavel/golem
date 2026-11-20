@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
 
@@ -25,10 +26,13 @@ from golem.sessions.bus import EventBus, EventTarget, SummaryTarget
 from golem.sessions.summaries import QUEUED_REASONS, summarize
 from golem.store.events import EventLog
 from golem.store.records import SessionActivity, SessionRecords
-from golem_protocol.commands import PendingItem
+from golem_protocol.commands import PendingItem, SessionSummary
 from golem_protocol.events import CHAT_EVENT, ChatEvent, EventType, WaitReason
 
 log = logging.getLogger("golem.sessions")
+
+STEP_EVERY = 1.0
+"""Seconds between two summaries a helper's new steps push."""
 
 _DELTAS = (
     "message.delta",
@@ -57,6 +61,73 @@ class SessionLog:
         self._locks: dict[str, asyncio.Lock] = {}
         self._waits: dict[str, tuple[WaitReason, str]] = {}
         """The wait each session's last summary carried, so a repeat is not sent again."""
+        self._helper_counts: dict[str, tuple[int, int]] = {}
+        """The helper counts each lead's last summary carried, so a repeat is not sent again."""
+        self._steps: dict[str, str] = {}
+        """A helper's newest step, as one line."""
+        self._step_pushed: dict[str, float] = {}
+        """When a helper's summary last went out for a step, on ``clock``."""
+        self.clock: Callable[[], float] = time.monotonic
+        """Seconds, replaceable in tests. It paces the summary a helper's new step pushes."""
+
+    async def helpers(self, activity: SessionActivity) -> tuple[int, int] | None:
+        """``(running, waiting)`` of a lead's helpers, None when none has a run in progress."""
+        if activity.session.closed_at is not None or activity.session.parent_session_id:
+            return None
+        counts = await self._records.helper_counts(activity.session.session_id)
+        return counts if counts != (0, 0) else None
+
+    def step(self, session_id: str) -> str | None:
+        """A helper's newest step, None before its first or once its run ended."""
+        return self._steps.get(session_id)
+
+    async def note_step(self, session_id: str, line: str) -> None:
+        """Remember ``line`` as the helper's newest step, and push its summary, at most once a
+        second. A step inside that second shows with the next summary."""
+        async with self._lock(session_id):
+            self._steps[session_id] = line
+            now = self.clock()
+            last = self._step_pushed.get(session_id)
+            if (last is not None and now - last < STEP_EVERY) or not self._bus.watched:
+                return
+            self._step_pushed[session_id] = now
+            activity = await self._records.activity(session_id)
+            if activity is not None:
+                self._bus.publish_summary(await self._summary(activity, await self.wait(activity)))
+
+    def clear_step(self, session_id: str) -> None:
+        """Forget a helper's steps: its run ended."""
+        self._steps.pop(session_id, None)
+        self._step_pushed.pop(session_id, None)
+
+    async def _summary(
+        self, activity: SessionActivity, wait: tuple[WaitReason, str] | None
+    ) -> SessionSummary:
+        session_id = activity.session.session_id
+        helpers = await self.helpers(activity)
+        if helpers is None:
+            self._helper_counts.pop(session_id, None)
+        else:
+            self._helper_counts[session_id] = helpers
+        return summarize(
+            activity,
+            self.local_only(activity.session.cwd),
+            await self.pending(activity),
+            wait,
+            helpers,
+            self.step(session_id),
+        )
+
+    async def _push_lead(self, lead_id: str) -> None:
+        """Send a lead's summary when what its helpers do changed: a helper's state is the
+        lead's too (ADR-059)."""
+        activity = await self._records.activity(lead_id)
+        if activity is None:
+            return
+        counts = await self.helpers(activity)
+        if counts == self._helper_counts.get(lead_id):
+            return
+        self._bus.publish_summary(await self._summary(activity, await self.wait(activity)))
 
     async def emit(
         self,
@@ -187,14 +258,10 @@ class SessionLog:
                     # the dispatcher's once-a-second notices (position moves) send no summary.
                     if event.type == "model.waiting" and wait == before:
                         return event
-                    self._bus.publish_summary(
-                        summarize(
-                            activity,
-                            self.local_only(activity.session.cwd),
-                            await self.pending(activity),
-                            wait,
-                        )
-                    )
+                    self._bus.publish_summary(await self._summary(activity, wait))
+                    lead = activity.session.parent_session_id
+                    if lead is not None:
+                        await self._push_lead(lead)
             return event
 
     async def _last(self, session_id: str) -> int:
