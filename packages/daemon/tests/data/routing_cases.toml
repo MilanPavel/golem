@@ -701,3 +701,399 @@ explore = "anthropic/opus"
 [case.expect]
 model = "anthropic/opus"
 reason = "configured"
+
+# Helper rows: the wish of a helper in three setups (ticket 15.3.1, ADR-059). `session_model` is
+# the lead; `wish` is cheapest, same, stronger, a tier or a model. `asks` is the paid question;
+# `fresh` is the lead's or a local model with a fresh window.
+
+[[case]]
+name = "local only: cheapest is the lead's own loaded model"
+session_model = "local-32k"
+models = ["local-32k", "local-8k"]
+action = "pick_helper"
+wish = "cheapest"
+[case.expect]
+model = "ollama/qwen3:27b"
+reason = "cheapest"
+
+[[case]]
+name = "local only: same is the lead's model"
+session_model = "local-32k"
+models = ["local-32k", "local-8k"]
+action = "pick_helper"
+wish = "same"
+[case.expect]
+model = "ollama/qwen3:27b"
+reason = "same"
+
+[[case]]
+name = "local only: stronger is the lead's model with a fresh window"
+session_model = "local-32k"
+models = ["local-32k", "local-8k"]
+action = "pick_helper"
+wish = "stronger"
+[case.expect]
+model = "ollama/qwen3:27b"
+reason = "lead"
+fresh = true
+
+[[case]]
+name = "local only: a budget wish takes the nearest tier, local"
+session_model = "local-32k"
+models = ["local-32k", "local-8k"]
+action = "pick_helper"
+wish = "budget"
+[case.expect]
+model = "ollama/qwen3:27b"
+reason = "nearest"
+
+[[case]]
+name = "local only: a frontier wish takes the nearest tier, local"
+session_model = "local-32k"
+models = ["local-32k", "local-8k"]
+action = "pick_helper"
+wish = "frontier"
+[case.expect]
+model = "ollama/qwen3:27b"
+reason = "nearest"
+
+[[case]]
+name = "local only: a local wish takes the local model"
+session_model = "local-32k"
+models = ["local-32k", "local-8k"]
+action = "pick_helper"
+wish = "local"
+[case.expect]
+model = "ollama/qwen3:27b"
+reason = "tier"
+
+[[case]]
+name = "local only: a named local model"
+session_model = "local-32k"
+models = ["local-32k", "local-8k"]
+action = "pick_helper"
+wish = "ollama/qwen3:8b"
+[case.expect]
+model = "ollama/qwen3:8b"
+reason = "named"
+
+[[case]]
+name = "local only: a named hosted model that is not here is the lead's model"
+session_model = "local-32k"
+models = ["local-32k", "local-8k"]
+action = "pick_helper"
+wish = "anthropic/opus"
+[case.expect]
+model = "ollama/qwen3:27b"
+reason = "lead"
+fresh = true
+
+[[case]]
+name = "local only folder: a frontier wish stays on the local model"
+session_model = "local-32k"
+models = ["local-32k", "frontier-200k"]
+action = "pick_helper"
+wish = "frontier"
+local_only_folder = true
+[case.expect]
+model = "ollama/qwen3:27b"
+reason = "privacy"
+fresh = true
+
+[[case]]
+name = "mixed: cheapest is the lead's local model"
+session_model = "local-32k"
+models = ["local-32k", "budget-128k", "frontier-200k"]
+action = "pick_helper"
+wish = "cheapest"
+[case.expect]
+model = "ollama/qwen3:27b"
+reason = "cheapest"
+
+[[case]]
+name = "mixed: same is the lead's model"
+session_model = "local-32k"
+models = ["local-32k", "budget-128k", "frontier-200k"]
+action = "pick_helper"
+wish = "same"
+[case.expect]
+model = "ollama/qwen3:27b"
+reason = "same"
+
+[[case]]
+name = "mixed, local lead: stronger is the budget tier, after the paid question"
+session_model = "local-32k"
+models = ["local-32k", "budget-128k", "frontier-200k"]
+action = "pick_helper"
+wish = "stronger"
+[case.expect]
+model = "deepseek/deepseek-chat"
+reason = "stronger"
+asks = true
+
+[[case]]
+name = "mixed, local lead, chat already paid: stronger asks nothing"
+session_model = "local-32k"
+models = ["local-32k", "budget-128k", "frontier-200k"]
+action = "pick_helper"
+wish = "stronger"
+paid_ok = true
+[case.expect]
+model = "deepseek/deepseek-chat"
+reason = "stronger"
+
+[[case]]
+name = "mixed, local lead: a budget wish asks the paid question"
+session_model = "local-32k"
+models = ["local-32k", "budget-128k", "frontier-200k"]
+action = "pick_helper"
+wish = "budget"
+[case.expect]
+model = "deepseek/deepseek-chat"
+reason = "tier"
+asks = true
+
+[[case]]
+name = "mixed, local lead: a frontier wish asks the paid question"
+session_model = "local-32k"
+models = ["local-32k", "budget-128k", "frontier-200k"]
+action = "pick_helper"
+wish = "frontier"
+[case.expect]
+model = "anthropic/opus"
+reason = "tier"
+asks = true
+
+[[case]]
+name = "mixed, local lead: a named hosted model asks the paid question"
+session_model = "local-32k"
+models = ["local-32k", "budget-128k", "frontier-200k"]
+action = "pick_helper"
+wish = "anthropic/opus"
+[case.expect]
+model = "anthropic/opus"
+reason = "named"
+asks = true
+
+[[case]]
+name = "mixed, budget lead: cheapest goes down to the local model"
+session_model = "budget-128k"
+models = ["local-32k", "budget-128k", "frontier-200k"]
+action = "pick_helper"
+wish = "cheapest"
+[case.expect]
+model = "ollama/qwen3:27b"
+reason = "cheapest"
+
+[[case]]
+name = "mixed, budget lead: stronger is the frontier tier, after the paid question"
+session_model = "budget-128k"
+models = ["local-32k", "budget-128k", "frontier-200k"]
+action = "pick_helper"
+wish = "stronger"
+[case.expect]
+model = "anthropic/opus"
+reason = "stronger"
+asks = true
+
+[[case]]
+name = "mixed, budget lead: same is the lead's model without a question"
+session_model = "budget-128k"
+models = ["local-32k", "budget-128k", "frontier-200k"]
+action = "pick_helper"
+wish = "same"
+[case.expect]
+model = "deepseek/deepseek-chat"
+reason = "same"
+
+[[case]]
+name = "mixed, frontier lead: cheapest goes down to the local model"
+session_model = "frontier-200k"
+models = ["local-32k", "budget-128k", "frontier-200k"]
+action = "pick_helper"
+wish = "cheapest"
+[case.expect]
+model = "ollama/qwen3:27b"
+reason = "cheapest"
+
+[[case]]
+name = "mixed, frontier lead: stronger is the lead's model with a fresh window"
+session_model = "frontier-200k"
+models = ["local-32k", "budget-128k", "frontier-200k"]
+action = "pick_helper"
+wish = "stronger"
+[case.expect]
+model = "anthropic/opus"
+reason = "lead"
+fresh = true
+
+[[case]]
+name = "mixed, frontier lead: a budget wish takes the budget model"
+session_model = "frontier-200k"
+models = ["local-32k", "budget-128k", "frontier-200k"]
+action = "pick_helper"
+wish = "budget"
+[case.expect]
+model = "deepseek/deepseek-chat"
+reason = "tier"
+asks = true
+
+[[case]]
+name = "mixed without a budget model: a budget wish takes the nearest tier, the cheaper one"
+session_model = "local-32k"
+models = ["local-32k", "frontier-200k"]
+action = "pick_helper"
+wish = "budget"
+[case.expect]
+model = "ollama/qwen3:27b"
+reason = "nearest"
+
+[[case]]
+name = "mixed in a local-only folder: stronger stays local with a fresh window"
+session_model = "local-32k"
+models = ["local-32k", "budget-128k", "frontier-200k"]
+action = "pick_helper"
+wish = "stronger"
+local_only_folder = true
+[case.expect]
+model = "ollama/qwen3:27b"
+reason = "lead"
+fresh = true
+
+[[case]]
+name = "mixed in a local-only folder: cheapest is the local model"
+session_model = "local-32k"
+models = ["local-32k", "budget-128k", "frontier-200k"]
+action = "pick_helper"
+wish = "cheapest"
+local_only_folder = true
+[case.expect]
+model = "ollama/qwen3:27b"
+reason = "cheapest"
+
+[[case]]
+name = "mixed in a local-only folder: a named hosted model stays local"
+session_model = "local-32k"
+models = ["local-32k", "budget-128k", "frontier-200k"]
+action = "pick_helper"
+wish = "anthropic/opus"
+local_only_folder = true
+[case.expect]
+model = "ollama/qwen3:27b"
+reason = "privacy"
+fresh = true
+
+[[case]]
+name = "cloud only, budget lead: cheapest is the lead's model, no question"
+session_model = "budget-128k"
+models = ["budget-128k", "frontier-200k"]
+action = "pick_helper"
+wish = "cheapest"
+[case.expect]
+model = "deepseek/deepseek-chat"
+reason = "cheapest"
+
+[[case]]
+name = "cloud only, budget lead: stronger is the frontier model, after the paid question"
+session_model = "budget-128k"
+models = ["budget-128k", "frontier-200k"]
+action = "pick_helper"
+wish = "stronger"
+[case.expect]
+model = "anthropic/opus"
+reason = "stronger"
+asks = true
+
+[[case]]
+name = "cloud only, budget lead: same is the lead's model"
+session_model = "budget-128k"
+models = ["budget-128k", "frontier-200k"]
+action = "pick_helper"
+wish = "same"
+[case.expect]
+model = "deepseek/deepseek-chat"
+reason = "same"
+
+[[case]]
+name = "cloud only, budget lead: a local wish takes the nearest tier, budget"
+session_model = "budget-128k"
+models = ["budget-128k", "frontier-200k"]
+action = "pick_helper"
+wish = "local"
+[case.expect]
+model = "deepseek/deepseek-chat"
+reason = "nearest"
+
+[[case]]
+name = "cloud only, budget lead: a frontier wish asks the paid question"
+session_model = "budget-128k"
+models = ["budget-128k", "frontier-200k"]
+action = "pick_helper"
+wish = "frontier"
+[case.expect]
+model = "anthropic/opus"
+reason = "tier"
+asks = true
+
+[[case]]
+name = "cloud only, frontier lead: cheapest is the budget model"
+session_model = "frontier-200k"
+models = ["budget-128k", "frontier-200k"]
+action = "pick_helper"
+wish = "cheapest"
+[case.expect]
+model = "deepseek/deepseek-chat"
+reason = "cheapest"
+asks = true
+
+[[case]]
+name = "cloud only, frontier lead: stronger is the lead's model with a fresh window"
+session_model = "frontier-200k"
+models = ["budget-128k", "frontier-200k"]
+action = "pick_helper"
+wish = "stronger"
+[case.expect]
+model = "anthropic/opus"
+reason = "lead"
+fresh = true
+
+[[case]]
+name = "cloud only, frontier lead: same is the lead's model"
+session_model = "frontier-200k"
+models = ["budget-128k", "frontier-200k"]
+action = "pick_helper"
+wish = "same"
+[case.expect]
+model = "anthropic/opus"
+reason = "same"
+
+[[case]]
+name = "cloud only, frontier lead: a named model that is not here is the lead's model"
+session_model = "frontier-200k"
+models = ["budget-128k", "frontier-200k"]
+action = "pick_helper"
+wish = "moonshot/kimi"
+[case.expect]
+model = "anthropic/opus"
+reason = "lead"
+fresh = true
+
+[[case]]
+name = "cloud only, one frontier model: cheapest is the lead's model"
+session_model = "frontier-200k"
+models = ["frontier-200k"]
+action = "pick_helper"
+wish = "cheapest"
+[case.expect]
+model = "anthropic/opus"
+reason = "cheapest"
+
+[[case]]
+name = "cloud only, one frontier model: a budget wish takes the nearest tier, frontier"
+session_model = "frontier-200k"
+models = ["frontier-200k"]
+action = "pick_helper"
+wish = "budget"
+[case.expect]
+model = "anthropic/opus"
+reason = "nearest"
