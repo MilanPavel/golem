@@ -6,9 +6,11 @@ from its agent type, as the agent was when the helper started, and never from it
 
 from __future__ import annotations
 
+import re
 from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass, replace
 from datetime import datetime
+from pathlib import Path
 
 from golem.agents.model import Agent
 from golem.config import PermissionMode, RoleSettings
@@ -329,3 +331,76 @@ __all__ = [
     "wish_of",
     "writing_tools",
 ]
+
+
+LINE_MAX = 120
+"""The longest line of the paid question (the protocol's limit)."""
+
+LINES_MAX = 10
+"""The most lines in the ``sent`` list and in the ``not_sent`` list."""
+
+PATHS_SHOWN = 4
+"""How many paths the brief names that the question lists, before "and N more"."""
+
+_READING = frozenset(
+    {"read_file", "list_dir", "glob", "grep", "git_log", "git_diff", "git_status", "read_artifact"}
+)
+_PATH = re.compile(r"[\w@%+~./-]+")
+_TOKENS_SEEN = 400
+
+
+def _cut(text: str, width: int = LINE_MAX) -> str:
+    """``text`` cut in the middle with an ellipsis when it is longer than ``width``."""
+    if len(text) <= width:
+        return text
+    keep = width - 1
+    head = keep // 2
+    return text[:head] + "\u2026" + text[len(text) - (keep - head) :]
+
+
+def paths_in(brief: str, cwd: str | None) -> list[str]:
+    """The paths the brief names that exist under ``cwd``, in order, each once.
+
+    A path is a word of the brief, minus a ``:line`` tail and sentence punctuation. It counts
+    only when it resolves to a file or folder inside ``cwd``. Reads no file's content.
+    """
+    if cwd is None or cwd == "":
+        return []
+    root = Path(cwd).resolve()
+    found: list[str] = []
+    for token in _PATH.findall(brief)[:_TOKENS_SEEN]:
+        name = token.removeprefix("./").rstrip(".,;:")
+        if name == "" or ("/" not in name and "." not in name.strip(".")):
+            continue
+        try:
+            target = (root / name).resolve()
+            inside = target.is_relative_to(root) and target != root and target.exists()
+        except (OSError, ValueError):
+            continue
+        shown = target.relative_to(root).as_posix() if inside else ""
+        if inside and shown not in found:
+            found.append(shown)
+    return found
+
+
+def what_is_sent(
+    agent: AgentSnapshot, brief: str, cwd: str | None = None
+) -> tuple[tuple[str, ...], tuple[str, ...]]:
+    """The two lists of a helper's paid question: ``(sent, not_sent)`` (ADR-059, section 5).
+
+    The first call of a helper carries the agent's instructions and the brief, and nothing
+    else: no chat, no memory, no diff. What it reads later, with its tools, is not known yet.
+    The brief's size is in words. The paths it names that exist under ``cwd`` are listed, at
+    most :data:`PATHS_SHOWN`. Every line fits :data:`LINE_MAX`, each list :data:`LINES_MAX`.
+    """
+    words = len(brief.split())
+    sent = [f"the brief, {words} {'word' if words == 1 else 'words'}"]
+    sent.append(_cut(f"the instructions of the {agent.name} agent"))
+    paths = paths_in(brief, cwd)
+    sent.extend(_cut(f"named in the brief: {path}") for path in paths[:PATHS_SHOWN])
+    if len(paths) > PATHS_SHOWN:
+        sent.append(f"and {len(paths) - PATHS_SHOWN} more paths named in the brief")
+    if _READING & set(agent.tools):
+        sent.append("what it reads with its tools, as it works")
+    not_sent = ["this chat", "your memory"]
+    return tuple(sent[:LINES_MAX]), tuple(not_sent[:LINES_MAX])

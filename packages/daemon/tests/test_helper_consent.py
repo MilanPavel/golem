@@ -32,6 +32,13 @@ from golem.store.database import Database
 from golem_protocol.commands import PendingItem
 from golem_protocol.events import ChatEvent, HelperModelEvent, RouteConsentNeededEvent
 
+SENT = [
+    "the brief, 1 word",
+    "the instructions of the explorer agent",
+    "what it reads with its tools, as it works",
+]
+NOT_SENT = ["this chat", "your memory"]
+
 
 @pytest.fixture(autouse=True)
 async def _settled(database: Database) -> AsyncIterator[None]:
@@ -79,9 +86,10 @@ async def _helper(
     call: str = "call-1",
     index: int = 0,
     model: str = LOCAL,
+    brief: str = "look",
 ) -> str:
     ref = await chat.manager.start_helper(
-        lead, call, index, _agent(wish), "look", model, str(project), label=f"look {index}"
+        lead, call, index, _agent(wish), brief, model, str(project), label=f"look {index}"
     )
     return ref.session_id
 
@@ -160,8 +168,8 @@ async def test_the_question_names_the_helper_and_what_is_sent(
     assert asked.helper_id == helper
     assert asked.agent == "explorer"
     assert asked.label == "look 0"
-    assert asked.sent == ["the brief"]
-    assert asked.not_sent == ["this chat"]
+    assert asked.sent == SENT
+    assert asked.not_sent == NOT_SENT
     assert "explorer" in asked.why
     # The question is the helper's own: nothing on the lead's log asks.
     assert "route.consent.needed" not in _kinds(await chat.stored(lead))
@@ -169,7 +177,29 @@ async def test_the_question_names_the_helper_and_what_is_sent(
     item = await _pending(chat, helper)
     assert item is not None and item.kind == "consent"
     assert (item.helper_id, item.agent, item.label) == (helper, "explorer", "look 0")
-    assert (item.sent, item.not_sent) == (["the brief"], ["this chat"])
+    assert (item.sent, item.not_sent) == (SENT, NOT_SENT)
+
+
+async def test_the_question_lists_the_files_the_brief_names_that_exist(
+    database: Database, project: Path, tmp_path: Path
+) -> None:
+    (project / "b.py").write_text("b = 2\n", encoding="utf-8")
+    chat = _chat(database, tmp_path, _mixed_setup())
+    lead = await _lead(chat, project)
+    brief = "Read a.py and ./b.py:3, not nope.py."
+    helper = await _helper(chat, lead, project, brief=brief)
+
+    asked = (await _asked(chat, helper)).data
+    assert asked.sent == [
+        "the brief, 6 words",
+        "the instructions of the explorer agent",
+        "named in the brief: a.py",
+        "named in the brief: b.py",
+        "what it reads with its tools, as it works",
+    ]
+    assert asked.not_sent == NOT_SENT
+    item = await _pending(chat, helper)
+    assert item is not None and item.sent == asked.sent
 
 
 # --- the answers ------------------------------------------------------------------------------
