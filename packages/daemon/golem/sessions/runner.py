@@ -38,6 +38,7 @@ from golem.graphs.adapter import (
     ConsentAsked,
     ContextChanged,
     FileChanged,
+    HelpersParked,
     ModelRequested,
     ModelResponded,
     ModelRouted,
@@ -86,6 +87,8 @@ from golem_protocol.events import (
     EmptyEventData,
     EventType,
     FileChangedData,
+    HelperStartedEvent,
+    HelperWaitData,
     MessageCompletedData,
     MessageDeltaData,
     MessageStartedData,
@@ -203,6 +206,11 @@ class Resume:
     pins: PinMemory = field(default_factory=PinMemory, compare=False)
     child: ChildScope | None = field(default=None, compare=False)
     """The scope of a helper session, from its record. None for any other session."""
+    go: Literal["answer", "wake", "continue"] = "answer"
+    """What the run goes on with. ``answer``: the approval or consent above. ``wake``: a lead
+    whose helpers have ended, which has no answer to give. ``continue``: the checkpoint with no
+    input, for a helper run a restart cut off. The two last ignore ``call_id``, ``name`` and
+    ``decision``."""
 
 
 @dataclass
@@ -265,6 +273,8 @@ class _Progress:
     """Records the files a tool wrote. None: they are not recorded and send no event."""
     session_id: str = ""
     run_id: str = ""
+    helper_ids: Callable[[str], Awaitable[list[str]]] | None = None
+    """The helper sessions of a ``delegate`` call, by the call's id, for ``helper.wait``."""
     children: dict[str, _Progress] = field(default_factory=dict[str, "_Progress"])
     """The state of each child run, by the id of the ``delegate`` call that started it. A child's
     calls are counted and kept here, apart from the run's own."""
@@ -289,6 +299,7 @@ async def run_turn(
         session_id=turn.session_id,
         run_id=turn.run_id,
         note_speed=runtime.note_speed,
+        helper_ids=_helper_ids(events, turn.run_id),
     )
 
     async def emit(kind: EventType, data: BaseModel) -> None:
@@ -464,6 +475,7 @@ async def resume_turn(
         session_id=resume.session_id,
         run_id=resume.run_id,
         note_speed=runtime.note_speed,
+        helper_ids=_helper_ids(events, resume.run_id),
     )
 
     async def emit(kind: EventType, data: BaseModel) -> None:
@@ -471,6 +483,40 @@ async def resume_turn(
 
     try:
         control.started.set()
+        if resume.go == "wake":
+            stream = runtime.resume(
+                session_id=resume.session_id,
+                answer=Answer.helpers_done(),
+                cwd=resume.cwd,
+                allowed_tools=resume.allowed_tools,
+                asked=resume.asked,
+                mcp_servers=resume.mcp_servers,
+                pinned=resume.pinned,
+                pinned_folders=resume.pinned_folders,
+                options=resume.options,
+                permission_mode=resume.permission_mode,
+                checks=resume.checks,
+                plan_first=resume.plan_first,
+                local_only=resume.local_only,
+                child=resume.child,
+            )
+            return await _finish(stream, progress, emit)
+        if resume.go == "continue":
+            stream = runtime.continue_thread(
+                session_id=resume.session_id,
+                cwd=resume.cwd,
+                allowed_tools=resume.allowed_tools,
+                mcp_servers=resume.mcp_servers,
+                pinned=resume.pinned,
+                pinned_folders=resume.pinned_folders,
+                options=resume.options,
+                permission_mode=resume.permission_mode,
+                checks=resume.checks,
+                plan_first=resume.plan_first,
+                local_only=resume.local_only,
+                child=resume.child,
+            )
+            return await _finish(stream, progress, emit)
         if resume.consent is None:
             await emit(
                 "approval.resolved",
@@ -845,6 +891,14 @@ async def _apply(
                 signal=fact.signal,
             ),
         )
+    elif isinstance(fact, HelpersParked):
+        progress.waiting = True
+        for call_id in fact.call_ids:
+            ids = [] if progress.helper_ids is None else await progress.helper_ids(call_id)
+            await emit(
+                "helper.wait",
+                HelperWaitData(call_id=call_id, state="parked", helper_ids=ids),
+            )
     elif isinstance(fact, ApprovalAsked):
         progress.waiting = True
         await emit(
@@ -859,6 +913,19 @@ async def _apply(
                 diff=fact.diff,
             ),
         )
+
+
+def _helper_ids(events: SessionLog, run_id: str) -> Callable[[str], Awaitable[list[str]]]:
+    """Reads the helper sessions of a ``delegate`` call from ``helper.started`` in ``run_id``."""
+
+    async def ids(call_id: str) -> list[str]:
+        return [
+            e.data.helper_id
+            for e in await events.for_run(run_id)
+            if isinstance(e, HelperStartedEvent) and e.data.call_id == call_id
+        ]
+
+    return ids
 
 
 def _tagged(

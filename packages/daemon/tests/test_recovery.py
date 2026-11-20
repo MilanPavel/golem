@@ -11,16 +11,19 @@ from fakes import GatedChatModel, ScriptedChatModel
 from langchain_core.messages import BaseMessage
 from langgraph.checkpoint.memory import InMemorySaver
 
+from golem.config import GolemSettings
 from golem.graphs.chat import INTERRUPTED_KEY, ChatRuntime, open_chat
 from golem.graphs.state import SCHEMA_VERSION
 from golem.models.router import ModelRouter
+from golem.permissions.policy import Policy
 from golem.sessions.bus import EventBus
 from golem.sessions.log import SessionLog
 from golem.sessions.manager import SessionManager
 from golem.sessions.recovery import STOPPED_MESSAGE, OpenTurn, open_turn, recover_runs
 from golem.store.database import Database
 from golem.store.events import EventLog
-from golem.store.records import RunRecords, SessionRecords
+from golem.store.records import RunRecord, RunRecords, SessionRecords
+from golem.tools import default_registry
 from golem_protocol.events import (
     CHAT_EVENT,
     ChatEvent,
@@ -33,6 +36,7 @@ from golem_protocol.events import (
     MessageStartedData,
     RunFailedEvent,
     SessionCreatedData,
+    SessionParent,
 )
 
 
@@ -193,3 +197,61 @@ async def test_a_reply_the_checkpoint_finished_is_kept(database: Database) -> No
     assert isinstance(completed, MessageCompletedEvent)
     assert (completed.data.text, completed.data.interrupted) == ("alpha", False)
     assert _last_message(await runtime.values(session_id)).text == "alpha"
+
+
+class _Helpers:
+    """Records what recovery asks of the manager for helper sessions."""
+
+    def __init__(self, helper_sessions: set[str]) -> None:
+        self.helper_sessions = helper_sessions
+        self.asked: list[tuple[str, str]] = []
+
+    async def is_helper(self, session_id: str) -> bool:
+        return session_id in self.helper_sessions
+
+    async def cancel_helpers(self, lead_id: str) -> None:
+        self.asked.append(("cancel", lead_id))
+
+    async def resume_helper(self, run: RunRecord) -> None:
+        self.asked.append(("resume", run.session_id))
+
+    async def reconcile_helpers(self) -> None:
+        self.asked.append(("reconcile", ""))
+
+
+async def test_recovery_closes_a_lead_cancels_its_helpers_and_resumes_the_rest(
+    database: Database,
+) -> None:
+    events = EventLog(database)
+    log = _session_log(database, events)
+    runtime = open_chat(
+        ModelRouter(
+            GolemSettings(default_model="ollama/qwen3:8b"), model=ScriptedChatModel(replies=[])
+        ),
+        InMemorySaver(),
+        default_registry(),
+        Policy(None),
+    )
+    await log.emit("s_lead", None, "session.created", SessionCreatedData(model_profile="remote"))
+    await log.emit("s_lead", "r_lead", "run.started", EmptyEventData())
+    for helper in ("s_h1", "s_h2"):
+        parent = SessionParent(session_id="s_lead", call_id="c1", index=int(helper[-1]) - 1)
+        data = SessionCreatedData(model_profile="remote", parent=parent)
+        await log.emit(helper, None, "session.created", data)
+        await log.emit(helper, f"r_{helper}", "run.started", EmptyEventData())
+    helpers = _Helpers({"s_h1", "s_h2"})
+
+    closed = await recover_runs(RunRecords(database), events, log, runtime, helpers)
+
+    assert closed == ["r_lead"]
+    # The lead's run was closed and its helpers cancelled first. Then both helper runs were
+    # offered for a resume (the manager skips what the cancel ended), and the reconcile ran.
+    assert helpers.asked == [
+        ("cancel", "s_lead"),
+        ("resume", "s_h1"),
+        ("resume", "s_h2"),
+        ("reconcile", ""),
+    ]
+    lead = [e.type for e in await events.after("s_lead", 0)]
+    assert lead[-1] == "run.failed"
+    assert "run.failed" not in [e.type for e in await events.after("s_h1", 0)]
