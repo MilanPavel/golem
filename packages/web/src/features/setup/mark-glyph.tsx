@@ -18,14 +18,14 @@ export function MarkGlyph({ mark }: { mark: Mark }) {
       );
     case "fail":
       return (
-        <span className="grid size-4 shrink-0 place-items-center font-mono text-sm leading-none text-deny">
+        <span className="grid size-4 shrink-0 place-items-center text-body leading-none text-deny">
           <span aria-hidden="true">✗</span>
           {word}
         </span>
       );
     case "attn":
       return (
-        <span className="grid size-4 shrink-0 place-items-center font-mono text-sm leading-none font-semibold text-wait">
+        <span className="grid size-4 shrink-0 place-items-center text-body leading-none font-semibold text-wait">
           <span aria-hidden="true">!</span>
           {word}
         </span>

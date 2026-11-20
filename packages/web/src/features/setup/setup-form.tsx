@@ -1,6 +1,7 @@
 import { OLLAMA_DOWNLOAD_URL, providerName, type FormButtonId, type FormFix, type FormMark, type FormRow, type Mark } from "@golem/view";
 import { useId, type ReactNode } from "react";
 import { Button } from "../../ui/button.tsx";
+import { Code } from "../../ui/code.tsx";
 import { CopyCommand } from "../../ui/copy-command.tsx";
 import { settingsPath } from "../../store/router.ts";
 import { Link } from "../../ui/link.tsx";
@@ -27,7 +28,7 @@ export type SetupFormViewProps = {
 
 function Working({ children }: { children: ReactNode }) {
   return (
-    <span className="inline-flex items-center gap-2 text-sm text-muted">
+    <span className="inline-flex items-center gap-2 text-body text-muted">
       <MarkGlyph mark="spin" />
       <span role="status">{children}</span>
     </span>
@@ -62,7 +63,7 @@ function Fix({ row, fix, actions, onButton, onCancelInstall, onNavigate, hasPage
       <Link
         href={fix.to}
         onNavigate={onNavigate}
-        className="rounded-md px-2 py-1 text-sm text-clay-ink underline underline-offset-2 outline-offset-2 outline-clay focus-visible:outline-2"
+        className="rounded-md px-2 py-1 text-body font-medium text-clay-ink outline-offset-2 hover:underline outline-clay focus-visible:outline-2"
       >
         {row.part === "tools" ? "MCP servers →" : fix.label}
       </Link>
@@ -77,7 +78,7 @@ function Fix({ row, fix, actions, onButton, onCancelInstall, onNavigate, hasPage
             href={OLLAMA_DOWNLOAD_URL}
             target="_blank"
             rel="noopener noreferrer"
-            className="rounded-md px-2 py-1 text-sm text-clay-ink underline underline-offset-2 outline-offset-2 outline-clay focus-visible:outline-2"
+            className="rounded-md px-2 py-1 text-body font-medium text-clay-ink outline-offset-2 hover:underline outline-clay focus-visible:outline-2"
           >
             Download Ollama
             <span className="sr-only"> (opens in a new tab)</span>
@@ -98,11 +99,13 @@ function Fix({ row, fix, actions, onButton, onCancelInstall, onNavigate, hasPage
     }
     if (actions.running === "start") return <Working>Starting Ollama…</Working>;
   }
+  // A model that works is changed in Routing: its row has the link, no button.
+  if (fix.id === "change_model" && row.mark === "ok") return null;
   if (fix.id === "check_again") return checking ? <Working>Checking…</Working> : checkButton;
   return (
     <Button
       size="sm"
-      kind={fix.id === "change_model" && row.mark === "ok" ? "secondary" : "primary"}
+      kind="primary"
       disabled={actions.running !== null}
       onClick={(event) => {
         onButton(fix.id, card, event.currentTarget);
@@ -118,13 +121,13 @@ export function Output({ output, running }: { output: string; running: boolean }
   const text = installLog(output);
   if (text === "") return null;
   return (
-    <details open={running} className="mt-2 text-sm">
+    <details open={running} className="mt-2 text-body">
       <summary className="cursor-pointer text-muted outline-offset-2 outline-clay focus-visible:outline-2">Output</summary>
       <pre
         tabIndex={0}
-        className="mt-1 max-h-48 overflow-auto rounded-md bg-code-bg p-2 font-mono text-xs whitespace-pre-wrap text-ink outline-offset-2 outline-clay focus-visible:outline-2"
+        className="mt-1 max-h-48 overflow-auto rounded-md bg-code-bg p-2 whitespace-pre-wrap outline-offset-2 outline-clay focus-visible:outline-2"
       >
-        {text}
+        <Code>{text}</Code>
       </pre>
     </details>
   );
@@ -132,6 +135,26 @@ export function Output({ output, running }: { output: string; running: boolean }
 
 const TINT: Record<FormMark, string> = { ok: "", warn: "bg-wait-soft", fail: "bg-deny-soft" };
 const DETAIL_TONE: Record<FormMark, string> = { ok: "text-muted", warn: "text-wait", fail: "text-deny" };
+
+// A model id (`ollama/qwen3:8b`) or a host and port, the literals a row's text can hold.
+const LITERAL = /(\b[a-z][\w-]*\/[\w.:-]+|\b(?:localhost|\d{1,3}(?:\.\d{1,3}){3}):\d+)/;
+
+/** The text with its model ids and hosts in `<Code>`. A model id drops `ollama/`: the row already says which provider. */
+function Literals({ text }: { text: string }) {
+  return (
+    <>
+      {text.split(LITERAL).map((part, index) =>
+        index % 2 === 0 ? (
+          part
+        ) : (
+          <Code key={index} tone="muted">
+            {part.replace(/^ollama\//, "")}
+          </Code>
+        ),
+      )}
+    </>
+  );
+}
 const CIRCLE: Record<FormMark, string> = { ok: "bg-allow-soft", warn: "bg-wait-soft", fail: "bg-deny-soft" };
 
 /** A plain sentence for a row that needs fixing; null when the daemon's own words are the best there are. */
@@ -167,20 +190,17 @@ function Card(props: SetupFormViewProps & { row: FormRow }) {
       <span className={`grid size-6 shrink-0 place-items-center rounded-full ${CIRCLE[row.mark]}`}>
         <MarkGlyph mark={MARKS[row.mark]} />
       </span>
-      <p className="w-24 shrink-0 font-semibold">{row.name}</p>
-      <div className="min-w-0 flex-1 basis-48">
-        <p title={row.detail} className={`text-sm ${plain === null ? DETAIL_TONE[row.mark] : "text-ink"}`}>
-          {plain ?? row.detail}
-        </p>
-        {plain === null ? null : <p className="text-xs text-muted">{row.detail}</p>}
-      </div>
+      <p className="w-24 shrink-0 text-label font-medium">{row.name}</p>
+      <p title={row.detail} className={`min-w-0 flex-1 basis-48 text-body ${plain === null ? DETAIL_TONE[row.mark] : "text-ink-soft"}`}>
+        {plain ?? <Literals text={row.detail} />}
+      </p>
       <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
         {row.fix === null ? null : <Fix {...props} fix={row.fix} />}
         {row.part === "model" && row.mark === "ok" && hasPage(routing) ? (
           <Link
             href={routing}
             onNavigate={onNavigate}
-            className="rounded-md px-2 py-1 text-sm text-clay-ink underline underline-offset-2 outline-offset-2 outline-clay focus-visible:outline-2"
+            className="rounded-md px-2 py-1 text-body font-medium text-clay-ink outline-offset-2 hover:underline outline-clay focus-visible:outline-2"
           >
             Routing →
           </Link>
@@ -188,9 +208,9 @@ function Card(props: SetupFormViewProps & { row: FormRow }) {
       </div>
       {extra ? (
         <div className="w-full pl-9">
-          {actions.noBrew && ollama ? <p className="text-sm text-muted">Homebrew isn't installed. Download Ollama, then check again.</p> : null}
+          {actions.noBrew && ollama ? <p className="text-body text-muted">Homebrew isn't installed. Download Ollama, then check again.</p> : null}
           {error === null ? null : (
-            <p role="alert" className="text-sm text-deny">
+            <p role="alert" className="text-body text-deny">
               {error}
             </p>
           )}
@@ -209,10 +229,10 @@ export function SetupFormView(props: SetupFormViewProps) {
   return (
     <div role="group" aria-labelledby={heading} className="flex flex-col gap-2">
       <div className="flex items-baseline gap-2">
-        <h3 id={heading} className="text-sm font-semibold">
+        <h3 id={heading} className="text-heading font-semibold">
           Health
         </h3>
-        <span className="text-xs text-muted">
+        <span className="text-meta text-muted">
           {broken.length} to fix · {fine.length} fine
         </span>
       </div>

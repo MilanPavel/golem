@@ -27,7 +27,7 @@ export function SidebarPanel({ title, label = title, chip, action, onHide, handl
   return (
     <aside aria-label={label} className={cn("relative flex h-full min-w-0 flex-col gap-2 bg-sunken px-2.5 pt-3 pb-2.5 text-sm", className)}>
       <div className="flex items-center gap-2 px-1.5">
-        <h2 className="text-base font-semibold tracking-tight">{title}</h2>
+        <h2 className="text-panel font-semibold tracking-tight">{title}</h2>
         {chip}
         <div className="flex-1" />
         {action}

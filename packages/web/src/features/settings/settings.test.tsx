@@ -114,10 +114,15 @@ test("every section appears once in the sidebar, under its group, in order", () 
   expect(headings).toEqual(GROUPS.map((group) => group.title));
 });
 
-test("the page head shows the group, the title and the description", () => {
+test("no group label is uppercase, and the page head has no group eyebrow", () => {
   mount("/settings/routing", OK_ROWS);
+  const nav = screen.getByRole("navigation", { name: "Settings sections" });
+  for (const node of nav.querySelectorAll("div > span")) {
+    expect(node.className).not.toMatch(/uppercase|tracking-(wide|widest)|font-mono/);
+  }
   const head = screen.getByRole("heading", { level: 2, name: "Routing" }).parentElement as HTMLElement;
-  expect(within(head).getByText("Models")).toBeTruthy();
+  expect(head.querySelector("span")).toBeNull();
+  expect(within(head).queryByText("Models")).toBeNull();
   expect(within(head).getByText(SECTIONS.find((item) => item.id === "routing")?.description ?? "")).toBeTruthy();
 });
 

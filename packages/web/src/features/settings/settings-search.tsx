@@ -2,6 +2,7 @@ import { useEffect, type RefObject } from "react";
 import { settingsPath } from "../../store/router.ts";
 import { cn } from "../../ui/cn.ts";
 import { SearchIcon } from "../../ui/icons.tsx";
+import { Kbd } from "../../ui/kbd.tsx";
 import { Link } from "../../ui/link.tsx";
 import type { SettingsMatch } from "./settings-search.ts";
 
@@ -70,9 +71,9 @@ export function SettingsSearchBox({
         }}
         className="min-w-0 flex-1 bg-transparent text-sm text-ink outline-none placeholder:text-faint"
       />
-      <kbd aria-hidden="true" className="rounded-xs border border-line px-1 font-mono text-micro text-faint">
+      <Kbd aria-hidden="true" className="px-1 py-0 text-micro text-faint">
         /
-      </kbd>
+      </Kbd>
     </label>
   );
 }
@@ -114,7 +115,7 @@ export function SettingsSearchResults({
   }
   return (
     <div className="mt-1.5">
-      <span aria-live="polite" className="block px-2.5 py-1.5 font-mono text-micro font-semibold tracking-widest text-faint uppercase">
+      <span aria-live="polite" className="block px-2.5 py-1.5 text-meta font-medium text-faint">
         {matches.length} {matches.length === 1 ? "result" : "results"}
       </span>
       {matches.map((match) => (
@@ -133,7 +134,7 @@ export function SettingsSearchResults({
               <Highlight text={match.section.title} query={query} />
             </span>
             {match.keyword === null ? null : (
-              <span className="text-xs font-normal text-muted">
+              <span className="text-meta font-normal text-muted">
                 <Highlight text={match.keyword} query={query} />
               </span>
             )}

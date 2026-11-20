@@ -30,7 +30,7 @@ function AddTools({ onClose, onAdded }: { onClose: () => void; onAdded: () => vo
   }, [settled, onAdded]);
   if (tools.state === null) {
     return (
-      <p role={tools.failed ? "alert" : "status"} className={tools.failed ? "text-sm text-deny" : "text-sm text-muted"}>
+      <p role={tools.failed ? "alert" : "status"} className={tools.failed ? "text-body text-deny" : "text-body text-muted"}>
         {tools.failed ? "Could not read the starter tools." : "Checking…"}
       </p>
     );
@@ -100,7 +100,7 @@ export function SetupSection() {
   if (status.isError) {
     return (
       <div className="flex flex-col items-start gap-3 rounded-lg border border-line bg-surface p-4">
-        <p role="alert" className="text-sm text-deny">
+        <p role="alert" className="text-body text-deny">
           Could not read the setup: {status.error.message}
         </p>
         <Button
@@ -133,7 +133,7 @@ export function SetupSection() {
         />
       )}
       {actions.state.error?.action === "check" && actions.state.from === HERO ? (
-        <p role="alert" className="text-sm text-deny">
+        <p role="alert" className="text-body text-deny">
           {actions.state.error.text}
         </p>
       ) : null}

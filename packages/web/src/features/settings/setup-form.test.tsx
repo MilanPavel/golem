@@ -99,9 +99,9 @@ test("rows that need fixing come first, tinted, with the counts in the heading",
   expect(screen.getByText("Ollama", { selector: "p" }).closest("li")?.className).toContain("bg-deny-soft");
   expect(screen.getByText("Model", { selector: "p" }).closest("li")?.className).toContain("bg-wait-soft");
   expect(screen.getByText("Disk", { selector: "p" }).closest("li")?.className).not.toContain("soft");
-  // A row that needs fixing says it plainly, with the raw state below.
+  // A row that needs fixing says it plainly, once: the raw state is only in the tooltip.
   expect(card("Ollama").getByText("Ollama isn't installed.")).toBeTruthy();
-  expect(card("Ollama").getByText("Ollama is not installed")).toBeTruthy();
+  expect(card("Ollama").queryByText("Ollama is not installed")).toBeNull();
   expect(card("Ollama").getByText("failed:")).toBeTruthy();
   expect(card("Disk").getByText("97 GB free")).toBeTruthy();
   expect(screen.getByRole("list", { name: "Health" }).querySelector("[data-setting=ollama]")).toBeTruthy();
@@ -127,13 +127,15 @@ test("Where things live has a cell for each path and job, and Copy writes the wh
   expect(where.getByText("~/.golem/config.toml")).toBeTruthy();
   expect(where.getByText("~/.golem/logs/golem.jsonl")).toBeTruthy();
   expect(where.getByText("~/.golem/run/golem.sock")).toBeTruthy();
-  expect(where.getByText("dev.golem.daemon · pid 4821")).toBeTruthy();
-  expect(where.getAllByText("loaded")).toHaveLength(2);
+  // The two jobs are one cell with one tag.
+  expect(where.getByText("daemon · web")).toBeTruthy();
+  expect(where.getAllByText("Loaded")).toHaveLength(1);
+  expect(container.querySelectorAll("[data-setting=jobs]")).toHaveLength(1);
   for (const key of ["data", "daemon", "config", "socket", "logs", "jobs"]) {
     expect(container.querySelector(`[data-setting=${key}]`)).toBeTruthy();
   }
-  // Five paths and two jobs: each cell copies.
-  expect(where.getAllByRole("button")).toHaveLength(7);
+  // Five paths and the jobs: each cell copies.
+  expect(where.getAllByRole("button")).toHaveLength(6);
   const copies: [string, string][] = [
     ["Copy data path", "/Users/ann/.golem"],
     ["Copy daemon path", "/opt/homebrew/opt/golem/libexec/golem-daemon/golem-daemon"],
@@ -145,22 +147,24 @@ test("Where things live has a cell for each path and job, and Copy writes the wh
     await user.click(where.getByRole("button", { name }));
     expect(writeText).toHaveBeenLastCalledWith(text);
   }
-  await user.click(where.getAllByRole("button", { name: "Copy jobs path" })[0] as HTMLElement);
-  expect(writeText).toHaveBeenLastCalledWith("/Users/ann/Library/LaunchAgents/dev.golem.daemon.plist");
+  await user.click(where.getByRole("button", { name: "Copy jobs path" }));
+  expect(writeText).toHaveBeenLastCalledWith(INSTALL_FACTS.jobs?.map((job) => job.plist).join("\n"));
   // The page cannot reveal a folder: there is no Open in Finder.
   expect(screen.queryByRole("button", { name: /Finder|Reveal/ })).toBeNull();
 });
 
-test("a job that is not loaded is tagged NOT LOADED", async () => {
+test("a job that is not loaded is tagged Not loaded", async () => {
   const facts = { ...INSTALL_FACTS, jobs: [{ label: "dev.golem.daemon", plist: "/Users/ann/Library/LaunchAgents/dev.golem.daemon.plist", loaded: false }] };
   mount(OK_ROWS, WORKING_LISTING, "/settings", undefined, facts);
-  expect(await screen.findByText("NOT LOADED")).toBeTruthy();
+  expect(await screen.findByText("Not loaded")).toBeTruthy();
 });
 
 test("the fine rows link to Routing and MCP servers", async () => {
   mount(OK_ROWS);
   await screen.findByRole("list", { name: "Health" });
   expect(card("Model").getByRole("link", { name: "Routing →" }).getAttribute("href")).toBe("/settings/routing");
+  // A model that works is changed in Routing: no Change… button.
+  expect(card("Model").queryByRole("button", { name: "Change…" })).toBeNull();
   expect(card("Tools").getByRole("link", { name: "MCP servers →" }).getAttribute("href")).toBe("/settings/mcp");
 });
 
@@ -187,7 +191,7 @@ test("a page kept running by a job: a Web page card after Service, no command", 
 test("a page run by hand: the card says so and copies golem web install when the service is kept", async () => {
   const { user } = mount(OK_ROWS, WORKING_LISTING, "/settings", false);
   const web = await waitFor(() => card("Web page"));
-  expect(web.getByText("runs only while a terminal runs golem")).toBeTruthy();
+  expect(web.getByText("Only works while a terminal runs golem.")).toBeTruthy();
   expect(web.getByText("needs attention:")).toBeTruthy();
   expect(web.getByText("golem web install")).toBeTruthy();
   // Nothing about the setup rows can change by looking again.
@@ -262,12 +266,13 @@ test("Check again looks at the machine again: the listing and the rows", async (
   expect(fake.raw.listModels).toHaveBeenLastCalledWith(true, false);
 });
 
-test("Change… opens the model dialog in default mode: Make default is the main button, and there is no session to use it for", async () => {
-  const { fake, user } = mount(OK_ROWS, TWO_READY);
-  const change = await within(await screen.findByRole("list", { name: "Health" })).findByRole("button", { name: "Change…" });
+const NO_MODEL = STATUS_ROWS.map((row) => (row.part === "engine" ? { ...row, state: "ok" as const, detail: "Ollama 0.12 · running", action: undefined } : row));
+
+test("Pick a model… opens the model dialog in default mode: Make default is the main button, and there is no session to use it for", async () => {
+  const { fake, user } = mount(NO_MODEL, TWO_READY);
+  const change = await within(await screen.findByRole("list", { name: "Health" })).findByRole("button", { name: "Pick a model…" });
   await user.click(change);
   const dialog = await screen.findByRole("dialog", { name: "Choose a model" });
-  expect(within(dialog).getByText(/New sessions use ollama\/gemma4:e4b\./)).toBeTruthy();
   await user.click(within(dialog).getByRole("option", { name: /qwen3:8b/ }));
   const actions = within(dialog).getByRole("group", { name: /^Actions for/ });
   expect(within(actions).queryByRole("button", { name: /^Use for/ })).toBeNull();
@@ -282,12 +287,11 @@ test("Change… opens the model dialog in default mode: Make default is the main
   await user.keyboard("{Escape}");
   await waitFor(() => expect(screen.queryByRole("dialog", { name: "Choose a model" })).toBeNull());
   await waitFor(() => expect(card("Model").getByText("Qwen3 8B · default")).toBeTruthy());
-  await waitFor(() => expect(document.activeElement).toBe(change));
 });
 
 test("Enter on a model in default mode makes it the default", async () => {
-  const { fake, user } = mount(OK_ROWS, TWO_READY);
-  await user.click(await within(await screen.findByRole("list", { name: "Health" })).findByRole("button", { name: "Change…" }));
+  const { fake, user } = mount(NO_MODEL, TWO_READY);
+  await user.click(await within(await screen.findByRole("list", { name: "Health" })).findByRole("button", { name: "Pick a model…" }));
   const dialog = await screen.findByRole("dialog", { name: "Choose a model" });
   await user.click(within(dialog).getByRole("option", { name: /qwen3:8b/ }));
   await user.type(within(dialog).getByRole("combobox", { name: "Search models" }), "{Enter}");

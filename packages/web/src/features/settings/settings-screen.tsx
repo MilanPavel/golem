@@ -16,7 +16,7 @@ import { MemorySection } from "./memory/memory-section.tsx";
 import { NotificationsSection } from "./notifications-section.tsx";
 import { RoutingSection } from "./routing-section.tsx";
 import { RulesSection } from "./rules-section.tsx";
-import { GROUPS, SECTIONS } from "./sections.ts";
+import { SECTIONS } from "./sections.ts";
 import { SettingsNav, SettingsPicker } from "./settings-nav.tsx";
 import { searchSettings, useSettingJump, type SettingsMatch } from "./settings-search.ts";
 import { SettingsSearchBox, SettingsSearchResults } from "./settings-search.tsx";
@@ -81,7 +81,7 @@ function Body({ section }: { section: string }) {
 
 /**
  * The settings page: a sidebar of the sections under their groups (a picker under `md`), and the
- * section beside it with a head (group, title, description) and its body. Close goes back to the
+ * section beside it with a head (title, description) and its body. Close goes back to the
  * session the person came from, else home.
  */
 export function SettingsScreen({ section }: { section: string }) {
@@ -89,7 +89,6 @@ export function SettingsScreen({ section }: { section: string }) {
   const context = useSettingsContext();
   const version = useConnection().daemonVersion;
   const current = SECTIONS.find((item) => item.id === section);
-  const group = GROUPS.find((item) => item.id === current?.group);
   const back = context === null ? "/" : sessionPath(context.sessionId);
   // `/settings/setup` is the old name of Info: the router reads it as Info, and the address follows.
   useEffect(() => {
@@ -151,9 +150,8 @@ export function SettingsScreen({ section }: { section: string }) {
         ) : (
           <>
             <header className="flex max-w-column flex-col gap-1.5 pr-10">
-              <span className="font-mono text-micro font-semibold tracking-widest text-faint uppercase">{group?.title}</span>
-              <h2 className="font-prose text-2xl font-normal tracking-tight">{current.title}</h2>
-              <p className="text-sm text-muted">{current.description}</p>
+              <h2 className="text-title font-semibold tracking-tight">{current.title}</h2>
+              <p className="text-body text-muted">{current.description}</p>
             </header>
             <div className="flex min-h-0 flex-1 flex-col">
               <Body section={current.id} />

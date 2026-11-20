@@ -1,6 +1,7 @@
 import type { InstallOffer } from "../../store/app-install.ts";
 import { Button } from "../../ui/button.tsx";
 import { cn } from "../../ui/cn.ts";
+import { Code } from "../../ui/code.tsx";
 
 export type AppCardProps = {
   /** The way this browser installs the page, `installed`, or `null`: the card is not drawn. */
@@ -19,14 +20,14 @@ export function AppCard({ offer, host, where, onInstall }: AppCardProps) {
   if (offer === null) return null;
   const settings = where === "settings";
   const title = settings ? "App" : "Keep golem one click away";
-  const bookmark = <code className="font-mono">{host}</code>;
+  const bookmark = <Code tone="muted">{host}</Code>;
   return (
     <section
       aria-label={title}
       data-setting={settings ? "app" : undefined}
       className={cn("flex w-full flex-col gap-2 text-left", !settings && "rounded-md border border-line bg-surface px-3.5 py-3")}
     >
-      {settings ? <h3 className="text-sm font-semibold">{title}</h3> : <span className="font-semibold">{title}</span>}
+      {settings ? <h3 className="text-heading font-semibold">{title}</h3> : <span className="font-semibold">{title}</span>}
       {offer === "installed" ? (
         <p className="text-sm text-muted">golem is installed as an app. Open it from the Dock, or with Open in app in Chrome's address bar.</p>
       ) : (
@@ -39,11 +40,11 @@ export function AppCard({ offer, host, where, onInstall }: AppCardProps) {
               </Button>
             ) : offer === "safari" ? (
               <span>
-                In Safari, choose <code className="font-mono text-ink">File → Add to Dock…</code>
+                In Safari, choose <Code>File → Add to Dock…</Code>
               </span>
             ) : offer === "chromium" ? (
               <span>
-                In Chrome, choose <code className="font-mono text-ink">⋮ → Cast, save and share → Install page as app</code>
+                In Chrome, choose <Code>⋮ → Cast, save and share → Install page as app</Code>
               </span>
             ) : null}
             <span>
