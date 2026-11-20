@@ -187,6 +187,27 @@
     },
     {
       "data": {
+        "holder": null,
+        "line": null,
+        "message_id": "id-3",
+        "model": null,
+        "position": null,
+        "reason": "team",
+        "retry_in_ms": null,
+        "scope": null,
+        "silent_ms": null,
+        "waiting": true,
+        "will_retry": null,
+        "window": null
+      },
+      "run_id": "id-2",
+      "seq": 11,
+      "session_id": "id-1",
+      "ts": "2026-01-01T00:00:10Z",
+      "type": "model.waiting"
+    },
+    {
+      "data": {
         "call_id": "call_1",
         "helper_ids": [
           "id-5"
@@ -194,9 +215,9 @@
         "state": "parked"
       },
       "run_id": "id-2",
-      "seq": 11,
+      "seq": 12,
       "session_id": "id-1",
-      "ts": "2026-01-01T00:00:10Z",
+      "ts": "2026-01-01T00:00:11Z",
       "type": "helper.wait"
     },
     {
@@ -213,9 +234,9 @@
         "summary": null
       },
       "run_id": "id-2",
-      "seq": 12,
+      "seq": 13,
       "session_id": "id-1",
-      "ts": "2026-01-01T00:00:11Z",
+      "ts": "2026-01-01T00:00:12Z",
       "type": "helper.step"
     },
     {
@@ -232,9 +253,9 @@
         "summary": "1 line"
       },
       "run_id": "id-2",
-      "seq": 13,
+      "seq": 14,
       "session_id": "id-1",
-      "ts": "2026-01-01T00:00:12Z",
+      "ts": "2026-01-01T00:00:13Z",
       "type": "helper.step"
     },
     {
@@ -250,9 +271,9 @@
         "working_ms": 0
       },
       "run_id": "id-2",
-      "seq": 14,
+      "seq": 15,
       "session_id": "id-1",
-      "ts": "2026-01-01T00:00:13Z",
+      "ts": "2026-01-01T00:00:14Z",
       "type": "helper.ended"
     },
     {
@@ -264,10 +285,31 @@
         "state": "resumed"
       },
       "run_id": "id-2",
-      "seq": 15,
+      "seq": 16,
       "session_id": "id-1",
-      "ts": "2026-01-01T00:00:14Z",
+      "ts": "2026-01-01T00:00:15Z",
       "type": "helper.wait"
+    },
+    {
+      "data": {
+        "holder": null,
+        "line": null,
+        "message_id": "id-3",
+        "model": null,
+        "position": null,
+        "reason": "team",
+        "retry_in_ms": null,
+        "scope": null,
+        "silent_ms": null,
+        "waiting": false,
+        "will_retry": null,
+        "window": null
+      },
+      "run_id": "id-2",
+      "seq": 17,
+      "session_id": "id-1",
+      "ts": "2026-01-01T00:00:16Z",
+      "type": "model.waiting"
     },
     {
       "data": {
@@ -283,9 +325,9 @@
         "truncated": false
       },
       "run_id": "id-2",
-      "seq": 16,
+      "seq": 18,
       "session_id": "id-1",
-      "ts": "2026-01-01T00:00:15Z",
+      "ts": "2026-01-01T00:00:17Z",
       "type": "tool.completed"
     },
     {
@@ -294,9 +336,9 @@
         "role": "assistant"
       },
       "run_id": "id-2",
-      "seq": 17,
+      "seq": 19,
       "session_id": "id-1",
-      "ts": "2026-01-01T00:00:16Z",
+      "ts": "2026-01-01T00:00:18Z",
       "type": "message.started"
     },
     {
@@ -344,9 +386,9 @@
         "window_planned": false
       },
       "run_id": "id-2",
-      "seq": 18,
+      "seq": 20,
       "session_id": "id-1",
-      "ts": "2026-01-01T00:00:17Z",
+      "ts": "2026-01-01T00:00:19Z",
       "type": "model.call.started"
     },
     {
@@ -360,9 +402,9 @@
         "thinking_ms": null
       },
       "run_id": "id-2",
-      "seq": 19,
+      "seq": 21,
       "session_id": "id-1",
-      "ts": "2026-01-01T00:00:18Z",
+      "ts": "2026-01-01T00:00:20Z",
       "type": "message.completed"
     },
     {
@@ -388,17 +430,17 @@
         }
       },
       "run_id": "id-2",
-      "seq": 20,
+      "seq": 22,
       "session_id": "id-1",
-      "ts": "2026-01-01T00:00:19Z",
+      "ts": "2026-01-01T00:00:21Z",
       "type": "model.call.completed"
     },
     {
       "data": {},
       "run_id": "id-2",
-      "seq": 21,
+      "seq": 23,
       "session_id": "id-1",
-      "ts": "2026-01-01T00:00:20Z",
+      "ts": "2026-01-01T00:00:22Z",
       "type": "run.completed"
     }
   ],
@@ -590,6 +632,27 @@
     },
     {
       "data": {
+        "holder": null,
+        "line": null,
+        "message_id": "id-3",
+        "model": null,
+        "position": null,
+        "reason": "team",
+        "retry_in_ms": null,
+        "scope": null,
+        "silent_ms": null,
+        "waiting": true,
+        "will_retry": null,
+        "window": null
+      },
+      "run_id": "id-2",
+      "seq": 11,
+      "session_id": "id-1",
+      "ts": "2026-01-01T00:00:10Z",
+      "type": "model.waiting"
+    },
+    {
+      "data": {
         "call_id": "call_1",
         "helper_ids": [
           "id-5"
@@ -597,9 +660,9 @@
         "state": "parked"
       },
       "run_id": "id-2",
-      "seq": 11,
+      "seq": 12,
       "session_id": "id-1",
-      "ts": "2026-01-01T00:00:10Z",
+      "ts": "2026-01-01T00:00:11Z",
       "type": "helper.wait"
     },
     {
@@ -616,9 +679,9 @@
         "summary": null
       },
       "run_id": "id-2",
-      "seq": 12,
+      "seq": 13,
       "session_id": "id-1",
-      "ts": "2026-01-01T00:00:11Z",
+      "ts": "2026-01-01T00:00:12Z",
       "type": "helper.step"
     },
     {
@@ -635,9 +698,9 @@
         "summary": "1 line"
       },
       "run_id": "id-2",
-      "seq": 13,
+      "seq": 14,
       "session_id": "id-1",
-      "ts": "2026-01-01T00:00:12Z",
+      "ts": "2026-01-01T00:00:13Z",
       "type": "helper.step"
     },
     {
@@ -653,9 +716,9 @@
         "working_ms": 0
       },
       "run_id": "id-2",
-      "seq": 14,
+      "seq": 15,
       "session_id": "id-1",
-      "ts": "2026-01-01T00:00:13Z",
+      "ts": "2026-01-01T00:00:14Z",
       "type": "helper.ended"
     },
     {
@@ -667,10 +730,31 @@
         "state": "resumed"
       },
       "run_id": "id-2",
-      "seq": 15,
+      "seq": 16,
       "session_id": "id-1",
-      "ts": "2026-01-01T00:00:14Z",
+      "ts": "2026-01-01T00:00:15Z",
       "type": "helper.wait"
+    },
+    {
+      "data": {
+        "holder": null,
+        "line": null,
+        "message_id": "id-3",
+        "model": null,
+        "position": null,
+        "reason": "team",
+        "retry_in_ms": null,
+        "scope": null,
+        "silent_ms": null,
+        "waiting": false,
+        "will_retry": null,
+        "window": null
+      },
+      "run_id": "id-2",
+      "seq": 17,
+      "session_id": "id-1",
+      "ts": "2026-01-01T00:00:16Z",
+      "type": "model.waiting"
     },
     {
       "data": {
@@ -686,9 +770,9 @@
         "truncated": false
       },
       "run_id": "id-2",
-      "seq": 16,
+      "seq": 18,
       "session_id": "id-1",
-      "ts": "2026-01-01T00:00:15Z",
+      "ts": "2026-01-01T00:00:17Z",
       "type": "tool.completed"
     },
     {
@@ -697,9 +781,9 @@
         "role": "assistant"
       },
       "run_id": "id-2",
-      "seq": 17,
+      "seq": 19,
       "session_id": "id-1",
-      "ts": "2026-01-01T00:00:16Z",
+      "ts": "2026-01-01T00:00:18Z",
       "type": "message.started"
     },
     {
@@ -747,9 +831,9 @@
         "window_planned": false
       },
       "run_id": "id-2",
-      "seq": 18,
+      "seq": 20,
       "session_id": "id-1",
-      "ts": "2026-01-01T00:00:17Z",
+      "ts": "2026-01-01T00:00:19Z",
       "type": "model.call.started"
     },
     {
@@ -763,9 +847,9 @@
         "thinking_ms": null
       },
       "run_id": "id-2",
-      "seq": 19,
+      "seq": 21,
       "session_id": "id-1",
-      "ts": "2026-01-01T00:00:18Z",
+      "ts": "2026-01-01T00:00:20Z",
       "type": "message.completed"
     },
     {
@@ -791,17 +875,17 @@
         }
       },
       "run_id": "id-2",
-      "seq": 20,
+      "seq": 22,
       "session_id": "id-1",
-      "ts": "2026-01-01T00:00:19Z",
+      "ts": "2026-01-01T00:00:21Z",
       "type": "model.call.completed"
     },
     {
       "data": {},
       "run_id": "id-2",
-      "seq": 21,
+      "seq": 23,
       "session_id": "id-1",
-      "ts": "2026-01-01T00:00:20Z",
+      "ts": "2026-01-01T00:00:22Z",
       "type": "run.completed"
     }
   ]

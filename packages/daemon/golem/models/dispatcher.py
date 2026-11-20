@@ -435,7 +435,7 @@ class Dispatcher:
             if entry.future.done():
                 return  # it got its turn, or left, while this task slept
             wait = self._wait_of(entry)
-            seen = (wait.reason, wait.position, wait.holder)
+            seen = (wait.reason, wait.position)  # ADR-060, section 6: reason or position
             if seen != last:
                 gap = self._clock() - last_at
                 if last is not None and gap < NOTICE_EVERY:

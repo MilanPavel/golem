@@ -2608,6 +2608,12 @@ class SessionManager:
         live = self._runs.get(run_id)
         if live is not None and not live.task.done():
             await self._stop([live], "user")
+            parked = await self._run_records.get(run_id)
+            if parked is not None and parked.status == "waiting":
+                # The run parked on a question in the moment it was stopped: its task ended
+                # by itself, so nothing wrote ``run.cancelled``. End it as a waiting run.
+                async with self._lock:
+                    await self._cancel_waiting(parked.session_id, run_id)
             return True
         record = await self._run_records.get(run_id)
         if record is None:
@@ -2703,6 +2709,20 @@ class SessionManager:
             await self._after_run(resume.session_id, resume.run_id)
         if prompt is not None:
             self._title_after(session, prompt, reply, local_only=resume.local_only)
+
+    def label_of(self, session_id: str | None, role: str) -> str:
+        """How a call of ``session_id`` is named to the calls waiting behind it (ADR-060).
+
+        A chat is its title, a helper is ``a helper of`` its lead's title. A session that is
+        not loaded or has no title yet is ``a chat`` or ``a helper``. It reads no storage.
+        """
+        live = None if session_id is None else self._sessions.get(session_id)
+        if role == "helper":
+            lead = None if live is None or live.parent is None else live.parent.session_id
+            lead_live = None if lead is None else self._sessions.get(lead)
+            title = None if lead_live is None else lead_live.title
+            return f"a helper of {title}" if title else "a helper"
+        return live.title if live is not None and live.title else "a chat"
 
     def origin_of(self, session_id: str) -> str | None:
         """The origin of a session that is loaded, else None. It reads no storage."""

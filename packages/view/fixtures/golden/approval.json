@@ -172,6 +172,48 @@
     },
     {
       "data": {
+        "holder": null,
+        "line": null,
+        "message_id": "id-4",
+        "model": null,
+        "position": null,
+        "reason": "you",
+        "retry_in_ms": null,
+        "scope": null,
+        "silent_ms": null,
+        "waiting": true,
+        "will_retry": null,
+        "window": null
+      },
+      "run_id": "id-2",
+      "seq": 10,
+      "session_id": "id-1",
+      "ts": "2026-01-01T00:00:09Z",
+      "type": "model.waiting"
+    },
+    {
+      "data": {
+        "holder": null,
+        "line": null,
+        "message_id": "id-4",
+        "model": null,
+        "position": null,
+        "reason": "you",
+        "retry_in_ms": null,
+        "scope": null,
+        "silent_ms": null,
+        "waiting": false,
+        "will_retry": null,
+        "window": null
+      },
+      "run_id": "id-2",
+      "seq": 11,
+      "session_id": "id-1",
+      "ts": "2026-01-01T00:00:10Z",
+      "type": "model.waiting"
+    },
+    {
+      "data": {
         "args": null,
         "call_id": "call_1",
         "decision": "allow",
@@ -180,9 +222,9 @@
         "subject": null
       },
       "run_id": "id-2",
-      "seq": 10,
+      "seq": 12,
       "session_id": "id-1",
-      "ts": "2026-01-01T00:00:09Z",
+      "ts": "2026-01-01T00:00:11Z",
       "type": "approval.resolved"
     },
     {
@@ -191,9 +233,9 @@
         "parent_call_id": null
       },
       "run_id": "id-2",
-      "seq": 11,
+      "seq": 13,
       "session_id": "id-1",
-      "ts": "2026-01-01T00:00:10Z",
+      "ts": "2026-01-01T00:00:12Z",
       "type": "tool.started"
     },
     {
@@ -210,9 +252,9 @@
         "truncated": false
       },
       "run_id": "id-2",
-      "seq": 12,
+      "seq": 14,
       "session_id": "id-1",
-      "ts": "2026-01-01T00:00:11Z",
+      "ts": "2026-01-01T00:00:13Z",
       "type": "tool.completed"
     },
     {
@@ -221,9 +263,9 @@
         "role": "assistant"
       },
       "run_id": "id-2",
-      "seq": 13,
+      "seq": 15,
       "session_id": "id-1",
-      "ts": "2026-01-01T00:00:12Z",
+      "ts": "2026-01-01T00:00:14Z",
       "type": "message.started"
     },
     {
@@ -271,9 +313,9 @@
         "window_planned": false
       },
       "run_id": "id-2",
-      "seq": 14,
+      "seq": 16,
       "session_id": "id-1",
-      "ts": "2026-01-01T00:00:13Z",
+      "ts": "2026-01-01T00:00:15Z",
       "type": "model.call.started"
     },
     {
@@ -287,9 +329,9 @@
         "thinking_ms": null
       },
       "run_id": "id-2",
-      "seq": 15,
+      "seq": 17,
       "session_id": "id-1",
-      "ts": "2026-01-01T00:00:14Z",
+      "ts": "2026-01-01T00:00:16Z",
       "type": "message.completed"
     },
     {
@@ -310,17 +352,17 @@
         "usage": null
       },
       "run_id": "id-2",
-      "seq": 16,
+      "seq": 18,
       "session_id": "id-1",
-      "ts": "2026-01-01T00:00:15Z",
+      "ts": "2026-01-01T00:00:17Z",
       "type": "model.call.completed"
     },
     {
       "data": {},
       "run_id": "id-2",
-      "seq": 17,
+      "seq": 19,
       "session_id": "id-1",
-      "ts": "2026-01-01T00:00:16Z",
+      "ts": "2026-01-01T00:00:18Z",
       "type": "run.completed"
     }
   ],
@@ -497,6 +539,48 @@
     },
     {
       "data": {
+        "holder": null,
+        "line": null,
+        "message_id": "id-4",
+        "model": null,
+        "position": null,
+        "reason": "you",
+        "retry_in_ms": null,
+        "scope": null,
+        "silent_ms": null,
+        "waiting": true,
+        "will_retry": null,
+        "window": null
+      },
+      "run_id": "id-2",
+      "seq": 10,
+      "session_id": "id-1",
+      "ts": "2026-01-01T00:00:09Z",
+      "type": "model.waiting"
+    },
+    {
+      "data": {
+        "holder": null,
+        "line": null,
+        "message_id": "id-4",
+        "model": null,
+        "position": null,
+        "reason": "you",
+        "retry_in_ms": null,
+        "scope": null,
+        "silent_ms": null,
+        "waiting": false,
+        "will_retry": null,
+        "window": null
+      },
+      "run_id": "id-2",
+      "seq": 11,
+      "session_id": "id-1",
+      "ts": "2026-01-01T00:00:10Z",
+      "type": "model.waiting"
+    },
+    {
+      "data": {
         "args": null,
         "call_id": "call_1",
         "decision": "allow",
@@ -505,9 +589,9 @@
         "subject": null
       },
       "run_id": "id-2",
-      "seq": 10,
+      "seq": 12,
       "session_id": "id-1",
-      "ts": "2026-01-01T00:00:09Z",
+      "ts": "2026-01-01T00:00:11Z",
       "type": "approval.resolved"
     },
     {
@@ -516,9 +600,9 @@
         "parent_call_id": null
       },
       "run_id": "id-2",
-      "seq": 11,
+      "seq": 13,
       "session_id": "id-1",
-      "ts": "2026-01-01T00:00:10Z",
+      "ts": "2026-01-01T00:00:12Z",
       "type": "tool.started"
     },
     {
@@ -535,9 +619,9 @@
         "truncated": false
       },
       "run_id": "id-2",
-      "seq": 12,
+      "seq": 14,
       "session_id": "id-1",
-      "ts": "2026-01-01T00:00:11Z",
+      "ts": "2026-01-01T00:00:13Z",
       "type": "tool.completed"
     },
     {
@@ -546,9 +630,9 @@
         "role": "assistant"
       },
       "run_id": "id-2",
-      "seq": 13,
+      "seq": 15,
       "session_id": "id-1",
-      "ts": "2026-01-01T00:00:12Z",
+      "ts": "2026-01-01T00:00:14Z",
       "type": "message.started"
     },
     {
@@ -596,9 +680,9 @@
         "window_planned": false
       },
       "run_id": "id-2",
-      "seq": 14,
+      "seq": 16,
       "session_id": "id-1",
-      "ts": "2026-01-01T00:00:13Z",
+      "ts": "2026-01-01T00:00:15Z",
       "type": "model.call.started"
     },
     {
@@ -612,9 +696,9 @@
         "thinking_ms": null
       },
       "run_id": "id-2",
-      "seq": 15,
+      "seq": 17,
       "session_id": "id-1",
-      "ts": "2026-01-01T00:00:14Z",
+      "ts": "2026-01-01T00:00:16Z",
       "type": "message.completed"
     },
     {
@@ -635,17 +719,17 @@
         "usage": null
       },
       "run_id": "id-2",
-      "seq": 16,
+      "seq": 18,
       "session_id": "id-1",
-      "ts": "2026-01-01T00:00:15Z",
+      "ts": "2026-01-01T00:00:17Z",
       "type": "model.call.completed"
     },
     {
       "data": {},
       "run_id": "id-2",
-      "seq": 17,
+      "seq": 19,
       "session_id": "id-1",
-      "ts": "2026-01-01T00:00:16Z",
+      "ts": "2026-01-01T00:00:18Z",
       "type": "run.completed"
     }
   ]

@@ -100,12 +100,14 @@ class _Harness:
         self.manager.clock = self.clock
         self.calls = 0
         self.loading: list[tuple[str | None, int | None]] = []
+        self.reasons: list[tuple[str | None, str | None]] = []
         emit = self.log.emit
 
         async def spy(session_id: str, run_id: str | None, kind: EventType, data: Any) -> Any:
             # A model.waiting event is dropped from the log once its reply completes.
             if kind == "model.waiting" and data.window is not None:
                 self.loading.append((data.model, data.window))
+                self.reasons.append((data.reason, data.line))
             return await emit(session_id, run_id, kind, data)
 
         self.log.emit = spy  # type: ignore[method-assign]
@@ -167,6 +169,7 @@ async def test_a_full_session_after_two_clears_grows_once_and_says_how_long(
     (grew,) = await h.grew(session_id)
     assert (grew.window_from, grew.window_to, grew.reload_ms) == (32768, 65536, 8200)
     assert h.loading == [(MODEL, 65536)]
+    assert h.reasons == [("load", MODEL)]  # the reload says why it waits, once
     await h.manager.cancel_all()
 
 
