@@ -22,6 +22,7 @@ from golem.sessions.bus import EventBus
 from golem.sessions.helpers import NO_DELEGATE, NO_NESTED
 from golem.sessions.log import SessionLog
 from golem.sessions.manager import HelperSessionError, SessionManager
+from golem.sessions.summaries import summarize
 from golem.store.database import Database
 from golem.store.events import EventLog
 from golem.store.records import RunRecords, SessionRecords
@@ -201,6 +202,13 @@ async def test_a_helper_is_titled_with_its_agent_and_its_label_or_brief(
     assert first is not None
     assert second is not None
     assert first.title == "explorer · routing"
+    # The list tells a helper from a chat by these two, and groups it under its lead.
+    row = await chat.records.activity(labelled.session_id)
+    assert row is not None
+    assert (summarize(row).parent_session_id, summarize(row).agent) == (lead, "explorer")
+    own = await chat.records.activity(lead)
+    assert own is not None
+    assert (summarize(own).parent_session_id, summarize(own).agent) == (None, None)
     assert second.title is not None
     assert second.title.startswith("explorer · xxxx")
     assert len(second.title) <= 60
