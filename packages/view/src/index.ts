@@ -197,6 +197,17 @@ export {
   isDelegate,
   type HelperStop,
 } from "./helper.ts";
+export {
+  helperSteps,
+  layoutSteps,
+  type BarKind,
+  type BarSegment,
+  type HelperStepsOptions,
+  type PhaseMark,
+  type StepRow,
+  type StepSpan,
+  type StepsList,
+} from "./steps-list.ts";
 export { groupTurns, turnFooter, type Turn } from "./turns.ts";
 export { editedArgs, parseArgs, type ParsedArgs } from "./approval-args.ts";
 export { inboxItems, type InboxItem, type InboxPending, type InboxSession } from "./inbox.ts";
