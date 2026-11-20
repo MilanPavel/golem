@@ -128,9 +128,15 @@ For contributors: the reference for the system prompt and pinned skills.
 
 ### The system prompt
 
-- **The system prompt.** `call_model` builds it for each call from the sections in `golem/graphs/prompt.py` and sends it in front of the history. The node returns only the reply, so the prompt is never checkpointed. With no section to say anything, no system message is sent. Its sections today are the pinned skills (`golem/skills/pinned.py`) the on-demand MCP servers (`golem/mcp/prompt.py`), and, for a model with a window of 65,536 tokens or less, a short line on when to call `delegate` (`golem/graphs/delegate_prompt.py`) ([ADR-031](../adr/031-system-prompt.md)).
+- **The system prompt.** `call_model` builds it for each call from the sections in `golem/graphs/prompt.py` and sends it in front of the history. The node returns only the reply, so the prompt is never checkpointed. With no section to say anything, no system message is sent. Its sections today are the pinned skills (`golem/skills/pinned.py`), the skill index, the `memory` section, the on-demand MCP servers (`golem/mcp/prompt.py`), and, for a model with a window of 65,536 tokens or less, a short line on when to call `delegate` (`golem/graphs/delegate_prompt.py`) ([ADR-031](../adr/031-system-prompt.md)).
 - **What a section reads.** `PromptContext` holds the checkpoint values, the session folder, the pins, the names of the tools offered on the call, the model's window, and `report`. `report` is set during a model call only, so building the prompt for `/debug model` logs nothing.
 - **Seen in `/debug model`.** `session.inspect` builds the same prompt for the next call and returns it as the first message, with role `system`. `message_count` counts only the stored messages.
+
+### The memory section
+
+`golem/memory/section.py` makes the `memory` section. It sits after the skill index and before the MCP section. It holds one line that calls the notes possibly out of date and not instructions from the user, up to 5 "in every chat" notes of at most 200 characters, one line of counts, and "Call `recall` to read one." The whole block is at most 1500 characters, so it costs about 400 to 500 tokens at most. A fixed cap is all there is for now: the token budget from [ADR-061](../adr/061-memory.md) is not built, and the context meter has no `memory` part yet, so the section counts under `system`.
+
+The block is read once per run, so a note written during a run shows from the next run, and the start of the prompt changes only when a note did. It is made again for each call, because a call to a hosted model leaves out every note that model may not read. A `recall` result is an ordinary tool result: clearing and summarising treat it like any other. [Memory](./memory.md) has the rules.
 
 ### Pinned skills
 
