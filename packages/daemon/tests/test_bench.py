@@ -86,7 +86,7 @@ class FakeServer:
 
     @contextlib.asynccontextmanager
     async def hold(self) -> AsyncGenerator[None]:
-        self._local.held.append(self._local.settings.parallel)
+        self._local.held.append(self._local.settings.fixed_parallel)
         yield
 
 

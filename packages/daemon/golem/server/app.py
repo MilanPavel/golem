@@ -251,6 +251,7 @@ class DaemonApp:
                 discovery=models,
                 ram_gb=models.ram_gb,
                 cache_dir=self.paths.cache_dir,
+                parallel=lambda: local.settings.parallel,
             )
 
             async def note_loaded(profile: str, sent_num_ctx: int | None) -> Loaded:
@@ -296,7 +297,7 @@ class DaemonApp:
                 def rank_of(call: Call) -> int:
                     return class_of(call, bus, state.sessions)
 
-                dispatch = ModelDispatcher(rank_of, local_slots=settings.ollama.parallel)
+                dispatch = ModelDispatcher(rank_of, local_slots=settings.ollama.fixed_parallel)
                 if isinstance(self._titles, ModelTitles):
                     self._titles.use(dispatch)
                 chat = open_chat(
@@ -836,8 +837,8 @@ def _apply_ollama_settings(
         log.debug("config.toml does not load; the local servers keep their settings")
         return
     if settings != local.settings:
-        if dispatch is not None and settings.parallel != local.settings.parallel:
-            dispatch.set_local_slots(settings.parallel)
+        if dispatch is not None and settings.fixed_parallel != local.settings.fixed_parallel:
+            dispatch.set_local_slots(settings.fixed_parallel)
         local.settings = settings
 
 

@@ -10,11 +10,13 @@ from __future__ import annotations
 
 import json
 import logging
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from pathlib import Path
-from typing import Protocol
+from typing import Literal, Protocol
 
 from golem.config import ContextSettings
+from golem.models.at_once import AtOnce, resolve
+from golem.models.engine import OLLAMA
 from golem.models.window_plan import next_step, plan_window, step_down
 
 log = logging.getLogger(__name__)
@@ -42,8 +44,12 @@ class WindowPlans:
         discovery: PlanFacts | None,
         ram_gb: float | None,
         cache_dir: Path | None,
+        parallel: Callable[[], int | Literal["auto"]] = lambda: "auto",
+        measured: Callable[[str], Mapping[int, float] | None] = lambda _: None,
     ) -> None:
         self._settings = settings
+        self._parallel = parallel
+        self._measured = measured
         self._discovery = discovery
         self._ram_gb = ram_gb
         self._file = None if cache_dir is None else cache_dir / CACHE_NAME
@@ -70,6 +76,27 @@ class WindowPlans:
         plan = self._plan(window, model_max, size_gb, lowered, raised, slots)
         self._memo[model_id] = (key, plan)
         return plan
+
+    def at_once(self, model_id: str) -> AtOnce:
+        """The slots ``model_id`` runs with, and the window and memory each slot gets.
+
+        The window is the plan for one slot. Only a planned window (``[context] window =
+        "auto"``, not raised) can give more than one slot with ``"auto"``. A number, ``"ollama"``
+        or a raised window stays at one slot.
+        """
+        plan = self.planned(model_id)
+        window = self._settings().window
+        if window != "auto" or "raised_to" in self._saved.get(model_id, {}):
+            return resolve(1, window=plan, size_gb=None, ram_gb=None, max_slots=1)
+        _, size_gb = self._facts(model_id)
+        return resolve(
+            self._parallel(),
+            window=plan,
+            size_gb=size_gb,
+            ram_gb=self._ram_gb,
+            max_slots=OLLAMA.max_slots,
+            measured=self._measured(model_id),
+        )
 
     def lower(self, model_id: str) -> int | None:
         """Step ``model_id`` down one window, remember it, and return the new plan.
