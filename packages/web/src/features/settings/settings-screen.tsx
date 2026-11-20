@@ -13,6 +13,7 @@ import { ContextSection } from "./context-section.tsx";
 import { useSettingsContext } from "./context.ts";
 import { KeysSection } from "./keys-section.tsx";
 import { McpSection } from "./mcp-section.tsx";
+import { MemorySection } from "./memory/memory-section.tsx";
 import { NotificationsSection } from "./notifications-section.tsx";
 import { RoutingSection } from "./routing-section.tsx";
 import { RulesSection } from "./rules-section.tsx";
@@ -46,6 +47,8 @@ function Body({ section }: { section: string }) {
       return <McpSection />;
     case "skills":
       return <SkillsSection />;
+    case "memory":
+      return <MemorySection />;
     case "keys":
       return <KeysSection />;
     case "routing":

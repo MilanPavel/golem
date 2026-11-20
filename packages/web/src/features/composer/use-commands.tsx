@@ -200,7 +200,8 @@ export function useCommands({ session, cwd, typing, send }: UseCommandsOptions):
           case "undo":
             return say(NOT_YET.undo);
           case "memory":
-            return say(NOT_YET.memory);
+            navigate(settingsPath("memory"));
+            return "handled";
           case "setup":
             navigate(settingsPath("setup"));
             return "handled";

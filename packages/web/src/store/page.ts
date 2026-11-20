@@ -13,6 +13,7 @@ import { NOTIFICATIONS_KEY } from "./notifications.ts";
 import { ROUTING_KEY } from "./routing.ts";
 import { MODEL_LIST_ALL_KEY, MODEL_LIST_KEY, SETUP_STATUS_KEY, type ModelListResult } from "./models.ts";
 import { SKILL_LIST_KEY } from "./skills.ts";
+import { MEMORY_LIST_KEY, MEMORY_PAGE, type MemoryExportParams, type MemoryExportResult, type MemoryListRequest, type MemoryListResult, type MemoryPrivacy, type MemoryScope } from "./memory.ts";
 import { ROUTINE_GET_KEY, ROUTINE_LIST_KEY, type RoutineGetResult, type RoutineInfo, type RoutineListResult, type RoutineRunResult } from "./routines.ts";
 import { type RunListResult } from "./runs.ts";
 import { createPulls, type Pulls } from "./pulls.ts";
@@ -32,6 +33,12 @@ export type PageClient = Pick<
   | "onEvent"
   | "onSessionSummary"
   | "onSkillsChanged"
+  | "onMemoryChanged"
+  | "listMemories"
+  | "updateMemory"
+  | "deleteMemories"
+  | "exportMemories"
+  | "memorySettings"
   | "onRoutinesChanged"
   | "listRoutines"
   | "listRuns"
@@ -138,6 +145,14 @@ export type PageClient = Pick<
 export type PageActions = {
   /** Starts a session in `cwd` on `model` (null: the default). */
   createSession(cwd: string | null, model: string | null): Promise<string>;
+  /** Edits a memory's text, or sets whether it is in every chat or may go to a paid model. The list is read again. */
+  updateMemory(id: string, change: { text?: string; always?: boolean; privacy?: MemoryPrivacy }): Promise<void>;
+  /** Deletes a memory. There is no trash. The list is read again. */
+  deleteMemory(id: string): Promise<void>;
+  /** The memories of a scope as Markdown or JSON text. */
+  exportMemories(params: MemoryExportParams): Promise<MemoryExportResult>;
+  /** Sets whether a scope's memories may go to a paid model. The list, which carries the settings, is read again. */
+  setMemoryPrivacy(scope: MemoryScope, privacy: MemoryPrivacy): Promise<void>;
   /** Sends a message. With `skill`, the daemon fills the skill's body in from `args`. */
   send(sessionId: string, text: string, skill?: { name: string; args: string }): Promise<void>;
   /** Sends `text` again as a new turn on the tier above the last answer. Rejects with the daemon's reason. */
@@ -328,6 +343,8 @@ export type PageQueries = {
   keys(): Promise<AuthListResult>;
   /** The skills a folder sees. `null` is no folder. */
   skillList(cwd: string | null): Promise<SkillListResult>;
+  /** One page of a scope's memories, with the counts of every scope and the `[memory]` settings. */
+  memoryList(request: MemoryListRequest): Promise<MemoryListResult>;
   /** The routines, with each one's next and last run. */
   routineList(): Promise<RoutineListResult>;
   /** The runs, one per headless session, newest first. With `sessionId`, that session's row alone. */
@@ -448,6 +465,8 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
         providers: (await client.listKeys()).providers.map(({ provider, takes_key, needs_key, source, env_var }) => ({ provider, takes_key, needs_key, source, env_var })),
       }),
       skillList: (cwd) => (cwd === null ? client.listSkills() : client.listSkills(cwd)),
+      memoryList: ({ scope, query, after }) =>
+        client.listMemories({ scope, limit: MEMORY_PAGE, ...(query === "" ? {} : { query }), ...(after === null ? {} : { after }) }),
       routineList: () => client.listRoutines(),
       runList: (sessionId) => (sessionId === null ? client.listRuns() : client.listRuns({ sessionId })),
       routineGet: (name, folder) => (folder === null ? client.getRoutine(name) : client.getRoutine(name, folder)),
@@ -484,6 +503,28 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
       },
       async sendStronger(sessionId, text) {
         await client.sendMessage(sessionId, text, { stronger: true });
+      },
+      async updateMemory(id, change) {
+        try {
+          await client.updateMemory({ id, ...change });
+        } finally {
+          void queryClient.invalidateQueries({ queryKey: MEMORY_LIST_KEY });
+        }
+      },
+      async deleteMemory(id) {
+        try {
+          await client.deleteMemories([id]);
+        } finally {
+          void queryClient.invalidateQueries({ queryKey: MEMORY_LIST_KEY });
+        }
+      },
+      exportMemories: (params) => client.exportMemories(params),
+      async setMemoryPrivacy(scope, privacy) {
+        try {
+          await client.memorySettings({ scope, privacy });
+        } finally {
+          void queryClient.invalidateQueries({ queryKey: MEMORY_LIST_KEY });
+        }
       },
       async pinSkill(sessionId, name, pin) {
         await client.setSkills(sessionId, pin ? { pin: [name] } : { unpin: [name] });

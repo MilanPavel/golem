@@ -50,6 +50,9 @@ import { FORM_CASES } from "../features/setup/sample.ts";
 import { GolemBlockView } from "../features/setup/golem-block.tsx";
 import { KeysView } from "../features/settings/keys-section.tsx";
 import { KEYS_CASES } from "../features/settings/keys-sample.ts";
+import { MemoryView } from "../features/settings/memory/memory-view.tsx";
+import { SAMPLE_MEMORIES, SAMPLE_MEMORY_COUNTS, SAMPLE_MEMORY_SETTINGS } from "../features/settings/memory/sample.ts";
+import { MEMORY_OFF_TEXT } from "../store/memory.ts";
 import { SkillList } from "../features/settings/skills-section.tsx";
 import { SkillOverview } from "../features/settings/skills/skill-detail.tsx";
 import { SAMPLE_BROKEN_SKILL_MD, SAMPLE_SKILLS } from "../features/settings/skills/sample.ts";
@@ -1188,6 +1191,43 @@ function SkillsDemo() {
   );
 }
 
+/** Settings → Memory: a tab with a row of each kind, a tab with nothing in it, and memory off. */
+function MemoryDemo() {
+  const rowActions = { onEdit: async () => {}, onDelete: async () => {}, onAlways: async () => {}, onPrivacy: async () => {} };
+  const common = {
+    onScope: () => {},
+    onQuery: () => {},
+    onMore: null,
+    rowActions,
+    onScopePrivacy: async () => {},
+    onExport: async () => {},
+    problem: null,
+    listLoading: false,
+    notice: null,
+    settings: SAMPLE_MEMORY_SETTINGS,
+  };
+  return (
+    <div className="flex flex-col gap-4">
+      <section aria-label="Memory, You" className="flex flex-col gap-3 rounded-lg border border-line bg-bg p-4">
+        <span className="font-mono text-xs text-faint">You, with a proposal and a local row with no local model</span>
+        <MemoryView {...common} scope="you" query="" counts={SAMPLE_MEMORY_COUNTS} items={SAMPLE_MEMORIES.slice(0, 3)} total={3} />
+      </section>
+      <section aria-label="Memory, This project" className="flex flex-col gap-3 rounded-lg border border-line bg-bg p-4">
+        <span className="font-mono text-xs text-faint">This project, with a note that may be out of date</span>
+        <MemoryView {...common} scope="project" query="" counts={SAMPLE_MEMORY_COUNTS} items={SAMPLE_MEMORIES.slice(3, 4)} total={1} />
+      </section>
+      <section aria-label="Memory, empty" className="flex flex-col gap-3 rounded-lg border border-line bg-bg p-4">
+        <span className="font-mono text-xs text-faint">Nothing remembered yet</span>
+        <MemoryView {...common} scope="history" query="" counts={{}} items={[]} total={0} />
+      </section>
+      <section aria-label="Memory, off" className="flex flex-col gap-3 rounded-lg border border-line bg-bg p-4">
+        <span className="font-mono text-xs text-faint">Memory off</span>
+        <MemoryView {...common} notice={{ kind: "off", text: MEMORY_OFF_TEXT }} scope="you" query="" counts={undefined} items={[]} total={0} />
+      </section>
+    </div>
+  );
+}
+
 /** Settings → API keys in each state: mixed, a fresh install, all set, no MCP keys, and a drawer open. */
 function ApiKeysDemo() {
   return (
@@ -1652,6 +1692,11 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
       <section className="mt-6" id={anchor("Skills")}>
         <h3 className="mb-2 font-mono text-xs text-faint">Skills</h3>
         <SkillsDemo />
+      </section>
+
+      <section className="mt-6" id={anchor("Memory")}>
+        <h3 className="mb-2 font-mono text-xs text-faint">Memory</h3>
+        <MemoryDemo />
       </section>
 
       <section className="mt-6" id={anchor("API keys")}>

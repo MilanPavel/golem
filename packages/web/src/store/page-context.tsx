@@ -6,6 +6,7 @@ import { changeDiffKey, changesDiffKey, changesListKey, commitInfoKey, type Chan
 import { fileListKey, fileReadKey, type FileRead } from "./files.ts";
 import { configKey, type ConfigGetResult } from "./config.ts";
 import { NOTIFICATIONS_KEY } from "./notifications.ts";
+import { memoryListKey, type MemoryListResult, type MemoryScope } from "./memory.ts";
 import { ROUTING_KEY } from "./routing.ts";
 import { KEYS_KEY } from "./keys.ts";
 import type { FsListDirsResult } from "./dirs.ts";
@@ -394,6 +395,23 @@ export function useArtifact(sessionId: string, artifactId: string, enabled = tru
     initialPageParam: 0,
     getNextPageParam: (last) => (last.offset + last.text.length < last.size ? last.offset + last.text.length : undefined),
     enabled,
+    retry: false,
+  });
+}
+
+/**
+ * A scope's memories, a page at a time, matching `query` when it is not empty. A pushed `memory.changed`
+ * and every memory action read the loaded pages again.
+ */
+export function useMemoryList(scope: MemoryScope, query: string): UseInfiniteQueryResult<InfiniteData<MemoryListResult, string | null>> {
+  const { queries } = usePage();
+  return useInfiniteQuery({
+    queryKey: memoryListKey(scope, query),
+    queryFn: ({ pageParam }) => queries.memoryList({ scope, query, after: pageParam }),
+    initialPageParam: null as string | null,
+    // The counts and settings of the last answer stay on screen while another tab or search is read.
+    placeholderData: keepPreviousData,
+    getNextPageParam: (last, pages) => (pages.reduce((count, page) => count + page.items.length, 0) < last.total ? (last.items.at(-1)?.id ?? null) : null),
     retry: false,
   });
 }
