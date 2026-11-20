@@ -457,10 +457,15 @@ class ExplorerSettings(BaseModel):
 
 
 class AgentSettings(BaseModel):
-    """``[agents]``. One table for each kind of helper."""
+    """``[agents]``. One table for each kind of helper, and where agent files are read.
+
+    ``extra_dirs`` adds folders of ``<name>.md`` agent files, with ``~`` for
+    the home folder, after ``~/.golem/agents``.
+    """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
+    extra_dirs: list[str] = Field(default_factory=list[str])
     explorer: ExplorerSettings = Field(default_factory=ExplorerSettings)
 
 

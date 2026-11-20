@@ -62,21 +62,21 @@ def parse_skill(folder: Path) -> Skill:
     errors: list[str] = []
     warnings: list[str] = []
     if size > MAX_FILE_BYTES:
-        errors.append(f"{SKILL_FILE} is {_kb(size)}, over the {_kb(MAX_FILE_BYTES)} limit")
+        errors.append(f"{SKILL_FILE} is {kb(size)}, over the {kb(MAX_FILE_BYTES)} limit")
 
-    split = _split(head, complete=size <= len(head))
+    split = split_frontmatter(head, complete=size <= len(head))
     if isinstance(split, str):
         return _broken(folder, real, split, digest)
     raw, body_offset = split
-    data = _fields(raw, errors)
+    data = frontmatter_fields(raw, errors)
 
     name = _name(data, folder, errors)
     argument_hint = _argument_hint(data, errors)
-    user_invocable = _flag(data, "user-invocable", True, errors)
-    model_invocable = not _flag(data, "disable-model-invocation", False, errors)
+    user_invocable = flag_field(data, "user-invocable", True, errors)
+    model_invocable = not flag_field(data, "disable-model-invocation", False, errors)
     allowed_tools = _allowed_tools(data, errors)
-    model = _text(data, "model", errors)
-    description = _text(data, "description", errors)
+    model = text_field(data, "model", errors)
+    description = text_field(data, "description", errors)
     if not description and "description" not in data:
         description = _first_paragraph(folder, body_offset) if size <= MAX_FILE_BYTES else ""
         if description:
@@ -120,7 +120,7 @@ def _read_from(path: Path, offset: int) -> str:
     return data.decode("utf-8", errors="replace").lstrip("\r\n")
 
 
-def _split(head: bytes, *, complete: bool) -> tuple[str, int] | str:
+def split_frontmatter(head: bytes, *, complete: bool) -> tuple[str, int] | str:
     """The frontmatter text and where the body starts, or an error.
 
     ``complete`` says whether ``head`` is the whole file. A file without a
@@ -141,14 +141,14 @@ def _split(head: bytes, *, complete: bool) -> tuple[str, int] | str:
         offset += len(line)
     if complete:
         return "the frontmatter has no closing `---` line"
-    return f"the frontmatter is not closed within the first {_kb(MAX_FRONTMATTER_BYTES)}"
+    return f"the frontmatter is not closed within the first {kb(MAX_FRONTMATTER_BYTES)}"
 
 
-def _fields(raw: str, errors: list[str]) -> dict[str, Any]:
+def frontmatter_fields(raw: str, errors: list[str]) -> dict[str, Any]:
     try:
         loaded: object = yaml.safe_load(raw)
     except yaml.YAMLError as error:
-        errors.append(f"the frontmatter is not valid YAML: {_yaml_problem(error)}")
+        errors.append(f"the frontmatter is not valid YAML: {yaml_problem(error)}")
         return {}
     if loaded is None:
         return {}
@@ -158,7 +158,7 @@ def _fields(raw: str, errors: list[str]) -> dict[str, Any]:
     return {str(key): value for key, value in cast(dict[object, Any], loaded).items()}
 
 
-def _yaml_problem(error: yaml.YAMLError) -> str:
+def yaml_problem(error: yaml.YAMLError) -> str:
     if isinstance(error, yaml.MarkedYAMLError) and error.problem_mark is not None:
         # +2: marks count from 0, and the opening `---` is line 1 of the file.
         return f"line {error.problem_mark.line + 2}: {error.problem}"
@@ -166,7 +166,7 @@ def _yaml_problem(error: yaml.YAMLError) -> str:
 
 
 def _name(data: dict[str, Any], folder: Path, errors: list[str]) -> str:
-    given = _text(data, "name", errors)
+    given = text_field(data, "name", errors)
     name = given or folder.name
     if len(name) > MAX_NAME or not NAME.fullmatch(name):
         what = "`name`" if given else "the folder name"
@@ -179,7 +179,7 @@ def _name(data: dict[str, Any], folder: Path, errors: list[str]) -> str:
     return name
 
 
-def _text(data: dict[str, Any], key: str, errors: list[str]) -> str | None:
+def text_field(data: dict[str, Any], key: str, errors: list[str]) -> str | None:
     value = data.get(key)
     if value is None:
         return None
@@ -189,7 +189,7 @@ def _text(data: dict[str, Any], key: str, errors: list[str]) -> str | None:
     return value.strip() or None
 
 
-def _flag(data: dict[str, Any], key: str, default: bool, errors: list[str]) -> bool:
+def flag_field(data: dict[str, Any], key: str, default: bool, errors: list[str]) -> bool:
     value = data.get(key)
     if value is None:
         return default
@@ -205,7 +205,7 @@ def _argument_hint(data: dict[str, Any], errors: list[str]) -> str | None:
     if isinstance(value, list):
         items = cast(list[object], value)
         return " ".join(f"[{item}]" for item in items) or None
-    return _text(data, "argument-hint", errors)
+    return text_field(data, "argument-hint", errors)
 
 
 def _allowed_tools(data: dict[str, Any], errors: list[str]) -> tuple[str, ...]:
@@ -214,14 +214,14 @@ def _allowed_tools(data: dict[str, Any], errors: list[str]) -> tuple[str, ...]:
     if value is None:
         return ()
     if isinstance(value, str):
-        return tuple(_split_tools(value))
+        return tuple(split_tools(value))
     if isinstance(value, list) and all(isinstance(item, str) for item in cast(list[object], value)):
         return tuple(item.strip() for item in cast(list[str], value) if item.strip())
     errors.append("`allowed-tools` must be text or a list of tool names")
     return ()
 
 
-def _split_tools(text: str) -> list[str]:
+def split_tools(text: str) -> list[str]:
     tools: list[str] = []
     current = ""
     depth = 0
@@ -268,8 +268,22 @@ def _broken(folder: Path, real: Path, error: str, digest: str = "") -> Skill:
     )
 
 
-def _kb(size: int) -> str:
+def kb(size: int) -> str:
     return f"{size / 1024:.0f} KB" if size < 1 << 20 else f"{size / (1 << 20):.1f} MB"
 
 
-__all__ = ["MAX_DESCRIPTION", "MAX_FILE_BYTES", "MAX_NAME", "parse_skill", "read_body"]
+__all__ = [
+    "MAX_DESCRIPTION",
+    "MAX_FILE_BYTES",
+    "MAX_FRONTMATTER_BYTES",
+    "MAX_NAME",
+    "NAME",
+    "flag_field",
+    "frontmatter_fields",
+    "kb",
+    "parse_skill",
+    "read_body",
+    "split_frontmatter",
+    "split_tools",
+    "text_field",
+]
