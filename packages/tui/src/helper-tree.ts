@@ -28,7 +28,7 @@ export function helperMark(helper: Pick<BatchHelper, "state" | "reason">): Span 
   }
 }
 
-function toneSpan(text: string, tone: CardTone): Span {
+export function toneSpan(text: string, tone: CardTone): Span {
   switch (tone) {
     case "ok":
       return { text, color: "green" };

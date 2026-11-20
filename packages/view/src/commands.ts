@@ -54,6 +54,8 @@ export type ComposerOutcome =
   | { kind: "routines" }
   /** `/runs`: everything automation did. */
   | { kind: "runs" }
+  /** `/steps`: the helper batches of this chat, each opening its Steps. */
+  | { kind: "steps" }
   /** `/skill new`: start the new-skill form. */
   | { kind: "skill-new" }
   | { kind: "permissions" }
@@ -455,6 +457,13 @@ export const COMMANDS: readonly Command[] = [
     args: "",
     description: "Lists what routines did: what needs you, what is running, and what finished.",
     run: withoutArgs({ kind: "runs" }),
+  },
+  {
+    name: "/steps",
+    group: "tools",
+    args: "",
+    description: "Lists this chat's helper runs, with their Steps and each helper's chat.",
+    run: withoutArgs({ kind: "steps" }),
   },
   {
     name: "/time",

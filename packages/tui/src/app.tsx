@@ -12,6 +12,7 @@ import {
   RpcError,
   SESSION_NOT_FOUND,
   type ApprovalChoice,
+  type ChatEvent,
   type ChangesRevertTarget,
   type ConfigGetResult,
   type ConfigRouting,
@@ -439,6 +440,21 @@ import {
   withMemoryMessage,
 } from "./memory-manager.ts";
 import { MemoryManagerView } from "./memory-manager.tsx";
+import { StepsManagerView } from "./helper-chat.tsx";
+import {
+  batchOrder,
+  chatScrollMax,
+  closedStepsManager,
+  layoutStepsManager,
+  openStepsManager,
+  pressStepsManager,
+  stepsHelpers,
+  stepsKeyOf,
+  type HelperChatData,
+  type StepsAction,
+  type StepsContext,
+  type StepsManagerState,
+} from "./steps-view.ts";
 import { assistantChars, elapsedSeconds, meterLine, meterPhase, writingNow } from "./progress.ts";
 import {
   alertLabel,
@@ -695,6 +711,14 @@ export function App({
   const [runsManager, setRunsManager] = useState<RunsManagerState>(closedRunsManager);
   const runsManagerRef = useRef(runsManager);
   runsManagerRef.current = runsManager;
+  const [stepsManager, setStepsManager] = useState<StepsManagerState>(closedStepsManager);
+  const stepsManagerRef = useRef(stepsManager);
+  stepsManagerRef.current = stepsManager;
+  /** The `helper.*` events of this chat's lead, which the Steps screen draws its bars from. */
+  const helperEventsRef = useRef<ChatEvent[]>([]);
+  /** The helper whose chat the Steps screen shows read-only, folded from its own session's events. */
+  const [helperChat, setHelperChat] = useState<HelperChatData | null>(null);
+  const helperChatRef = useRef<HelperChatData | null>(null);
   const [runList, setRunList] = useState<RunList>({ runs: null, error: null });
   const runListRef = useRef(runList);
   runListRef.current = runList;
@@ -726,6 +750,7 @@ export function App({
   // The paths whose diff is being read, so a key press does not ask twice.
   const changesAsked = useRef(new Set<string>());
   const budgetBodyRef = useRef(0);
+  const stepsSizeRef = useRef({ columns: 80, rows: 24 });
   const helpOpen = panel !== null;
   const [keysOpen, setKeysOpen] = useState(false);
   const [keysOffset, setKeysOffset] = useState(0);
@@ -905,6 +930,8 @@ export function App({
       changesFold.current = noChanges;
       promptsFold.current = noPrompts;
       setUndoBand(null);
+      helperEventsRef.current = [];
+      closeStepsManager();
       setChat((current) => ({ ...emptyChat, notice: current.notice }));
       setChangesState(noChanges);
       setSessionModel(null);
@@ -943,6 +970,7 @@ export function App({
     agentsManager.open ||
     routinesManager.open ||
     runsManager.open ||
+    stepsManager.open ||
     memoryManager.open ||
     changesManager.open ||
     undoBand !== null ||
@@ -994,6 +1022,7 @@ export function App({
   };
   overlayFrame.current = { columns, body: budget.body };
   budgetBodyRef.current = budget.body;
+  stepsSizeRef.current = { columns, rows: budget.body };
   const diffOffset = chat.approval !== null && diffScroll.callId === chat.approval.callId ? diffScroll.offset : 0;
   const contextSegmentRows = panel === "context" && tune === null ? contextSegments(contextReport, columns) : [];
   const panelLines =
@@ -1404,8 +1433,18 @@ export function App({
         setTry(foldTry(tried, event));
         return;
       }
+      const watched = helperChatRef.current;
+      if (watched !== null && event.session_id === watched.sessionId) {
+        const next = { ...watched, chat: reduceChat(watched.chat, event) };
+        helperChatRef.current = next;
+        setHelperChat(next);
+        return;
+      }
       if (event.session_id !== sessionRef.current) {
         return;
+      }
+      if (event.type.startsWith("helper.")) {
+        helperEventsRef.current = [...helperEventsRef.current, event].slice(-HELPER_EVENTS_KEPT);
       }
       changesFold.current = reduceChanges(changesFold.current, event);
       promptsFold.current = foldPrompts(promptsFold.current, event);
@@ -2409,6 +2448,13 @@ export function App({
       setSwitcher(closedSwitcher);
       showRoutinesManager(openRoutinesManager());
       loadRoutines();
+      return;
+    }
+    if (outcome.kind === "steps") {
+      setDraft(draftAt(""));
+      setKeysOpen(false);
+      setSwitcher(closedSwitcher);
+      showStepsManager(openStepsManager());
       return;
     }
     if (outcome.kind === "runs") {
@@ -4627,6 +4673,84 @@ export function App({
     setChat((state) => ({ ...state, notice }));
   }
 
+  function showStepsManager(next: StepsManagerState): void {
+    stepsManagerRef.current = next;
+    setStepsManager(next);
+  }
+
+  /** Leave the Steps screen and stop following any helper it showed. */
+  function closeStepsManager(): void {
+    stopWatching();
+    if (stepsManagerRef.current.open) showStepsManager(closedStepsManager);
+  }
+
+  function stopWatching(): void {
+    const watched = helperChatRef.current;
+    helperChatRef.current = null;
+    setHelperChat(null);
+    if (watched !== null) void client.detachSession(watched.sessionId).catch(() => undefined);
+  }
+
+  function stepsContext(): StepsContext {
+    const now = Date.now();
+    const events = helperEventsRef.current;
+    const isLocal = isLocalFrom(listingRef.current?.models);
+    const state = stepsManagerRef.current;
+    return {
+      order: batchOrder(chatRef.current.batches),
+      helpers: (callId) => stepsHelpers(callId, events, now, isLocal),
+      chatMax: chatScrollMax({ state, helper: helperChatRef.current, now, columns: stepsSizeRef.current.columns, rows: stepsSizeRef.current.rows }),
+    };
+  }
+
+  /** The helper sessions of a `delegate` call, from the lead's log. */
+  function helperRefsOf(callId: string) {
+    for (const message of chatRef.current.messages) {
+      const found = message.tools?.find((tool) => tool.callId === callId);
+      if (found !== undefined) return found.child?.helpers ?? [];
+    }
+    return [];
+  }
+
+  function onStepsAction(action: StepsAction): void {
+    if (action.kind === "close") {
+      closeStepsManager();
+      return;
+    }
+    if (action.kind === "leave-chat") {
+      stopWatching();
+      return;
+    }
+    if (action.kind === "none") return;
+    const ref = helperRefsOf(action.callId).find((item) => item.index === action.index);
+    if (ref === undefined) return;
+    if (action.kind === "stop") {
+      client.stopHelper(ref.id).then(
+        (result) => showHint(result.stopped ? `Stopped ${ref.label || ref.agent}` : `${ref.label || ref.agent} had already ended`),
+        (error: unknown) => showHint(`Could not stop ${ref.label || ref.agent}: ${messageOf(error)}`),
+      );
+      return;
+    }
+    stopWatching();
+    const data: HelperChatData = { sessionId: ref.id, chat: emptyChat, error: null };
+    helperChatRef.current = data;
+    setHelperChat(data);
+    client.attachSession(ref.id).catch((error: unknown) => {
+      if (helperChatRef.current?.sessionId !== ref.id) return;
+      const failed = { ...data, error: `Could not open this helper: ${messageOf(error)}` };
+      helperChatRef.current = failed;
+      setHelperChat(failed);
+    });
+  }
+
+  function onStepsManagerPress(press: Press): void {
+    const key = stepsKeyOf(press);
+    if (key === null) return;
+    const pressed = pressStepsManager(stepsManagerRef.current, stepsContext(), key);
+    showStepsManager(pressed.state);
+    onStepsAction(pressed.action);
+  }
+
   function onAgentsManagerPress(press: Press): void {
     const key = agentsManagerKeyOf(press);
     if (key === null) {
@@ -5352,6 +5476,10 @@ export function App({
       onRoutinesManagerPress(press);
       return;
     }
+    if (stepsManagerRef.current.open && !keysOpenRef.current && press.name !== "f1" && press.name !== "ctrl-c") {
+      onStepsManagerPress(press);
+      return;
+    }
     if (runsManagerRef.current.open && !keysOpenRef.current && press.name !== "f1" && press.name !== "ctrl-c") {
       onRunsManagerPress(press);
       return;
@@ -5566,6 +5694,7 @@ export function App({
       agentsManagerRef.current.open ||
       routinesManagerRef.current.open ||
       runsManagerRef.current.open ||
+      stepsManagerRef.current.open ||
       memoryManagerRef.current.open ||
       changesManagerRef.current.open ||
       tuneRef.current !== null ||
@@ -5612,7 +5741,7 @@ export function App({
     },
     all: transcript.all,
     pinned: transcript.pinned === null ? null : { row: budget.header, offset: transcript.pinned.offset },
-    shown: !keysOpen && !picker.open && !mcpManager.open && !skillsManager.open && !agentsManager.open && !routinesManager.open && !runsManager.open && !memoryManager.open && !changesManager.open && !perms.open && !switcher.open,
+    shown: !keysOpen && !picker.open && !mcpManager.open && !skillsManager.open && !agentsManager.open && !routinesManager.open && !runsManager.open && !stepsManager.open && !memoryManager.open && !changesManager.open && !perms.open && !switcher.open,
   };
   const composer =
     argsEdit !== null
@@ -5749,6 +5878,23 @@ export function App({
             <McpManagerRow key={index} line={line} />
           ))}
         </Box>
+      ) : stepsManager.open ? (
+        <StepsManagerView
+          lines={layoutStepsManager({
+            state: stepsManager,
+            batches: chat.batches,
+            events: helperEventsRef.current,
+            refs: helperRefsOf,
+            helper: helperChat,
+            lead: titleLabel,
+            now: Date.now(),
+            columns,
+            rows: budget.body,
+            isLocal: isLocalFrom(shownListing?.models),
+          })}
+          columns={columns}
+          height={budget.body}
+        />
       ) : runsManager.open ? (
         <Box flexDirection="column" width={columns} height={budget.body} flexShrink={0} overflow="hidden">
           {layoutRunsManager({ state: runsManager, list: runList, now: Date.now(), columns, rows: budget.body }).map(
@@ -6121,6 +6267,8 @@ function LineList({
 }
 
 /** Batcher key prefix that keeps a reply's thinking apart from its text. */
+/** How many `helper.*` events of the lead the Steps screen keeps. */
+const HELPER_EVENTS_KEPT = 4000;
 const THINKING_KEY = "thinking:";
 
 function deltaEvent(messageId: string, text: string, type: "message.delta" | "message.thinking.delta" = "message.delta") {
