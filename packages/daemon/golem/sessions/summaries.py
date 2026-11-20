@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from golem.store.records import SessionActivity
 from golem_protocol.commands import PendingItem, SessionSummary
+from golem_protocol.events import WaitReason
 
 SUMMARY_CHARS = 280
 """How much of the last reply ``session.completed`` carries (ADR-050)."""
@@ -26,10 +27,20 @@ def cut_summary(reply: str | None) -> str | None:
     return f"{text}…" if cut else text
 
 
+QUEUED_REASONS: tuple[WaitReason, ...] = ("slot", "provider", "load")
+"""The waits a summary carries. The others (``you``, ``budget``, ``team``) show in ``status``."""
+
+
 def summarize(
-    activity: SessionActivity, local_only: bool = False, pending: PendingItem | None = None
+    activity: SessionActivity,
+    local_only: bool = False,
+    pending: PendingItem | None = None,
+    wait: tuple[WaitReason, str] | None = None,
 ) -> SessionSummary:
+    """The row of ``activity``. ``wait`` is the open wait of its running run, and only a running
+    session carries it."""
     session = activity.session
+    queued = wait if wait is not None and activity.running and session.closed_at is None else None
     return SessionSummary(
         session_id=session.session_id,
         model_profile=session.model_profile,
@@ -53,7 +64,9 @@ def summarize(
         plan_first=session.plan_first,
         local_only=local_only,
         pending=pending,
+        wait_reason=None if queued is None else queued[0],
+        wait_line=None if queued is None else queued[1],
     )
 
 
-__all__ = ["SUMMARY_CHARS", "SUMMARY_LINES", "cut_summary", "summarize"]
+__all__ = ["QUEUED_REASONS", "SUMMARY_CHARS", "SUMMARY_LINES", "cut_summary", "summarize"]

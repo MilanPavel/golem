@@ -1,5 +1,5 @@
 import { useId, useMemo, useRef, useState } from "react";
-import { groupByTime, isRoutineSession } from "@golem/view";
+import { groupByTime, isRoutineSession, queuedWords, sessionState, type SessionState } from "@golem/view";
 import { cn } from "../../ui/cn.ts";
 import { IconButton } from "../../ui/icon-button.tsx";
 import { ClockIcon, FolderIcon, MoreIcon } from "../../ui/icons.tsx";
@@ -17,18 +17,21 @@ import { useSessionActions } from "../sessions/use-session-actions.ts";
 import { timeAgo } from "../sessions/time-ago.ts";
 import { useNow } from "../sessions/use-now.ts";
 
-const DOT: Record<"idle" | "running" | "waiting", string> = {
+const DOT: Record<SessionState, string> = {
   idle: "border border-line-strong",
   running: "bg-clay animate-pulse",
   waiting: "bg-wait",
+  // A ring in the running colour: the run is open, but its call has not started.
+  queued: "border border-clay",
 };
 
-function SessionDot({ status }: { status: SessionSummary["status"] }) {
-  const state = status === "running" || status === "waiting" ? status : "idle";
+function SessionDot({ session }: { session: SessionSummary }) {
+  const state = sessionState(session);
+  const words = queuedWords(session, "web");
   return (
-    <span className="inline-flex w-3.5 shrink-0 justify-center">
+    <span className="inline-flex w-3.5 shrink-0 justify-center" title={words ?? undefined}>
       <span aria-hidden="true" className={cn("size-2 rounded-xs", DOT[state])} />
-      <span className="sr-only">{state}</span>
+      <span className="sr-only">{words === null ? state : `${state}, ${words}`}</span>
     </span>
   );
 }
@@ -96,7 +99,7 @@ function SessionRow({
     >
       {renaming && onRename ? (
         <div className="flex items-center gap-2 px-2.5 py-1">
-          <SessionDot status={session.status} />
+          <SessionDot session={session} />
           <RenameField
             initial={session.title ?? ""}
             label={`Rename ${name}`}
@@ -117,7 +120,7 @@ function SessionRow({
             selected && "bg-surface text-ink ring-1 ring-line ring-inset",
           )}
         >
-          <SessionDot status={session.status} />
+          <SessionDot session={session} />
           {row.forked ? <ForkMark row={row} /> : null}
           <span className="flex min-w-0 flex-1 flex-col">
             <span className={cn("flex min-w-0 items-center gap-1.5", hasMenu && "pr-6")}>

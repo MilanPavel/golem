@@ -176,6 +176,7 @@ function fakeSession(
 const SESSIONS: SessionSummary[] = [
   fakeSession("a", "UTF-8 split in the socket client", "/Users/you/repos/golem", "waiting", 0),
   fakeSession("b", "ADR-028: the web gateway", "/Users/you/repos/golem", "running", 2),
+  { ...fakeSession("q", "Rename the config keys", "/Users/you/repos/golem", "running", 1), wait_reason: "slot", wait_line: "qwen3:14b" },
   fakeSession("c", "Invoke /ship from the composer", "/Users/you/repos/golem", "idle", 75),
   fakeSession("h", "Same fix, as a table", "/Users/you/repos/golem", "idle", 30, "a"),
   fakeSession("i", "Table with a decoder test", "/Users/you/repos/golem", "idle", 20, "h"),

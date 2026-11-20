@@ -139,6 +139,7 @@ Every wait has one reason, and a wait over 1 s has an event. The reasons are fix
 - `load` is sent when the load is expected to take over 1 s, or the first token has not come in 1 s after a load. `you` and `budget` are sent at once, since a person is the cause.
 - A new event is sent when the reason or the position changes, at most once a second. `waiting: false` ends a wait.
 - A shell wait uses `model.waiting` with `line: "shell"` and the `message_id` of the message that asked for the command. No new event type.
+- The session summary (`session.list` and its live summaries) carries the open wait of a running session as `wait_reason` and `wait_line`, for `slot`, `provider` and `load` only. `you`, `budget` and `team` are left out, since the status already says the session waits. The daemon reads it from the run's last stored `model.waiting`, so a cancelled run or a restart leaves none. The list shows such a session as `queued`, beside `running` and `waiting`, with the sentence of the reason as its title (18.4.5). A summary is sent when the carried wait changes, never for a new position.
 - The Activity panel (18.7) reads `activity.get`, which returns `snapshot()`: for each line its slots, who holds each (label and session id), who waits and why. `activity.changed` sends the whole snapshot at most four times a second.
 
 ### 7. The watchdog

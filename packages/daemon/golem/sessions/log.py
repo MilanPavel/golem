@@ -8,7 +8,8 @@ and subscribes before the next event can be stored, so a client sees every
 event once, in order.
 
 Watchers of the session list get the session's summary after every stored
-event except deltas, read in the same lock, so summaries arrive in order.
+event except deltas, read in the same lock, so summaries arrive in order. A
+``model.waiting`` counts only when the open wait the summary carries changes.
 """
 
 from __future__ import annotations
@@ -21,11 +22,11 @@ from datetime import UTC, datetime
 from pydantic import BaseModel
 
 from golem.sessions.bus import EventBus, EventTarget, SummaryTarget
-from golem.sessions.summaries import summarize
+from golem.sessions.summaries import QUEUED_REASONS, summarize
 from golem.store.events import EventLog
 from golem.store.records import SessionActivity, SessionRecords
 from golem_protocol.commands import PendingItem
-from golem_protocol.events import CHAT_EVENT, ChatEvent, EventType
+from golem_protocol.events import CHAT_EVENT, ChatEvent, EventType, WaitReason
 
 log = logging.getLogger("golem.sessions")
 
@@ -54,6 +55,8 @@ class SessionLog:
         The session manager uses it to put a helper's tool calls into its lead's log."""
         self._seq: dict[str, int] = {}
         self._locks: dict[str, asyncio.Lock] = {}
+        self._waits: dict[str, tuple[WaitReason, str]] = {}
+        """The wait each session's last summary carried, so a repeat is not sent again."""
 
     async def emit(
         self,
@@ -112,6 +115,26 @@ class SessionLog:
 
         return pending_item(await self._events.for_run(run_id))
 
+    async def wait(self, activity: SessionActivity) -> tuple[WaitReason, str] | None:
+        """The open wait of the session's running run, as ``(reason, line)``.
+
+        It is the run's newest stored ``model.waiting``: one that starts a ``slot``,
+        ``provider`` or ``load`` wait sets it, one that ends a wait clears it, and a message
+        that completes deletes its own. A run that ended, was cancelled or was recovered after a
+        restart is not running, so it reads nothing.
+        """
+        if not activity.running or activity.session.closed_at is not None:
+            return None
+        run_id = await self._records.running_run_id(activity.session.session_id)
+        if run_id is None:
+            return None
+        found = await self._events.last_wait(run_id)
+        if found is None or not found.data.waiting or found.data.line is None:
+            return None
+        if found.data.reason not in QUEUED_REASONS:
+            return None
+        return found.data.reason, found.data.line
+
     async def for_run(self, run_id: str) -> list[ChatEvent]:
         """Every stored event of one run, in order."""
         return await self._events.for_run(run_id)
@@ -151,14 +174,25 @@ class SessionLog:
             await self._events.append(event)
             self._seq[session_id] = event.seq
             self._bus.publish(event)
-            if event.type not in _DELTAS and self._bus.watched:
+            if (event.type not in _DELTAS or event.type == "model.waiting") and self._bus.watched:
                 activity = await self._records.activity(session_id)
                 if activity is not None:
+                    wait = await self.wait(activity)
+                    before = self._waits.get(session_id)
+                    if wait is None:
+                        self._waits.pop(session_id, None)
+                    else:
+                        self._waits[session_id] = wait
+                    # A wait event is a summary change only when the carried wait changed, so
+                    # the dispatcher's once-a-second notices (position moves) send no summary.
+                    if event.type == "model.waiting" and wait == before:
+                        return event
                     self._bus.publish_summary(
                         summarize(
                             activity,
                             self.local_only(activity.session.cwd),
                             await self.pending(activity),
+                            wait,
                         )
                     )
             return event

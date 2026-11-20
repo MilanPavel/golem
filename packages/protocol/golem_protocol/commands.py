@@ -17,6 +17,7 @@ from golem_protocol.events import (
     RouteMode,
     SkillCall,
     SkillSource,
+    WaitReason,
 )
 
 
@@ -238,8 +239,11 @@ class SessionSummary(BaseModel):
     ``pending`` says what a ``waiting`` session waits for, null otherwise. An older daemon
     leaves it out.
     ``parent_session_id`` and ``agent`` are set on a helper session: the id of the
-    session that started it, and the name of its agent type. Null for any other
     session. An older daemon leaves them out.
+    ``wait_reason`` and ``wait_line`` say that the running run's model call waits in line:
+    the reason (``slot``, ``provider`` or ``load``) and the plain name of the model or provider.
+    Null when no call waits, and for the waits the status already shows. An older daemon
+    leaves them out.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -260,6 +264,8 @@ class SessionSummary(BaseModel):
     pending: PendingItem | None = None
     parent_session_id: str | None = Field(default=None, min_length=1)
     agent: str | None = Field(default=None, min_length=1)
+    wait_reason: WaitReason | None = None
+    wait_line: str | None = Field(default=None, min_length=1)
 
 
 class SessionListResult(BaseModel):

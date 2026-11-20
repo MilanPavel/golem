@@ -11240,7 +11240,7 @@ public struct ModelWaitingData: Codable {
     public let messageID: String
     public let model: String?
     public let position: Int?
-    public let reason: ModelWaitingDataReason?
+    public let reason: Reason?
     public let retryInMS: Int?
     public let scope: ModelWaitingDataScope?
     public let silentMS: Int?
@@ -11263,7 +11263,7 @@ public struct ModelWaitingData: Codable {
         case window = "window"
     }
 
-    public init(holder: String?, line: String?, messageID: String, model: String?, position: Int?, reason: ModelWaitingDataReason?, retryInMS: Int?, scope: ModelWaitingDataScope?, silentMS: Int?, waiting: Bool, willRetry: Bool?, window: Int?) {
+    public init(holder: String?, line: String?, messageID: String, model: String?, position: Int?, reason: Reason?, retryInMS: Int?, scope: ModelWaitingDataScope?, silentMS: Int?, waiting: Bool, willRetry: Bool?, window: Int?) {
         self.holder = holder
         self.line = line
         self.messageID = messageID
@@ -11279,7 +11279,7 @@ public struct ModelWaitingData: Codable {
     }
 }
 
-public enum ModelWaitingDataReason: String, Codable {
+public enum Reason: String, Codable {
     case budget = "budget"
     case load = "load"
     case provider = "provider"
@@ -11342,7 +11342,7 @@ public struct ModelWaitingEventData: Codable {
     public let messageID: String
     public let model: String?
     public let position: Int?
-    public let reason: ModelWaitingDataReason?
+    public let reason: Reason?
     public let retryInMS: Int?
     public let scope: ModelWaitingDataScope?
     public let silentMS: Int?
@@ -11365,7 +11365,7 @@ public struct ModelWaitingEventData: Codable {
         case window = "window"
     }
 
-    public init(holder: String?, line: String?, messageID: String, model: String?, position: Int?, reason: ModelWaitingDataReason?, retryInMS: Int?, scope: ModelWaitingDataScope?, silentMS: Int?, waiting: Bool, willRetry: Bool?, window: Int?) {
+    public init(holder: String?, line: String?, messageID: String, model: String?, position: Int?, reason: Reason?, retryInMS: Int?, scope: ModelWaitingDataScope?, silentMS: Int?, waiting: Bool, willRetry: Bool?, window: Int?) {
         self.holder = holder
         self.line = line
         self.messageID = messageID
@@ -17683,8 +17683,12 @@ public struct SessionListResult: Codable {
 /// ``pending`` says what a ``waiting`` session waits for, null otherwise. An older daemon
 /// leaves it out.
 /// ``parent_session_id`` and ``agent`` are set on a helper session: the id of the
-/// session that started it, and the name of its agent type. Null for any other
 /// session. An older daemon leaves them out.
+/// ``wait_reason`` and ``wait_line`` say that the running run's model call waits in line:
+/// the reason (``slot``, ``provider`` or ``load``) and the plain name of the model or
+/// provider.
+/// Null when no call waits, and for the waits the status already shows. An older daemon
+/// leaves them out.
 // MARK: - SessionElement
 public struct SessionElement: Codable {
     public let agent: String?
@@ -17703,6 +17707,8 @@ public struct SessionElement: Codable {
     public let status: SessionStatus
     public let title: String?
     public let updatedAt: String
+    public let waitLine: String?
+    public let waitReason: Reason?
 
     public enum CodingKeys: String, CodingKey {
         case agent = "agent"
@@ -17721,9 +17727,11 @@ public struct SessionElement: Codable {
         case status = "status"
         case title = "title"
         case updatedAt = "updated_at"
+        case waitLine = "wait_line"
+        case waitReason = "wait_reason"
     }
 
-    public init(agent: String?, createdAt: String, cwd: String?, forkedFrom: String?, lastSeq: Int, localOnly: Bool?, modelProfile: String, origin: String?, parentSessionID: String?, pending: SessionPendingItem?, planFirst: Bool?, route: RouteEnum?, sessionID: String, status: SessionStatus, title: String?, updatedAt: String) {
+    public init(agent: String?, createdAt: String, cwd: String?, forkedFrom: String?, lastSeq: Int, localOnly: Bool?, modelProfile: String, origin: String?, parentSessionID: String?, pending: SessionPendingItem?, planFirst: Bool?, route: RouteEnum?, sessionID: String, status: SessionStatus, title: String?, updatedAt: String, waitLine: String?, waitReason: Reason?) {
         self.agent = agent
         self.createdAt = createdAt
         self.cwd = cwd
@@ -17740,6 +17748,8 @@ public struct SessionElement: Codable {
         self.status = status
         self.title = title
         self.updatedAt = updatedAt
+        self.waitLine = waitLine
+        self.waitReason = waitReason
     }
 }
 
@@ -18356,8 +18366,12 @@ public enum SessionSummaryNotificationMethod: String, Codable {
 /// ``pending`` says what a ``waiting`` session waits for, null otherwise. An older daemon
 /// leaves it out.
 /// ``parent_session_id`` and ``agent`` are set on a helper session: the id of the
-/// session that started it, and the name of its agent type. Null for any other
 /// session. An older daemon leaves them out.
+/// ``wait_reason`` and ``wait_line`` say that the running run's model call waits in line:
+/// the reason (``slot``, ``provider`` or ``load``) and the plain name of the model or
+/// provider.
+/// Null when no call waits, and for the waits the status already shows. An older daemon
+/// leaves them out.
 // MARK: - SessionSummaryNotificationParams
 public struct SessionSummaryNotificationParams: Codable {
     public let agent: String?
@@ -18376,6 +18390,8 @@ public struct SessionSummaryNotificationParams: Codable {
     public let status: SessionStatus
     public let title: String?
     public let updatedAt: String
+    public let waitLine: String?
+    public let waitReason: Reason?
 
     public enum CodingKeys: String, CodingKey {
         case agent = "agent"
@@ -18394,9 +18410,11 @@ public struct SessionSummaryNotificationParams: Codable {
         case status = "status"
         case title = "title"
         case updatedAt = "updated_at"
+        case waitLine = "wait_line"
+        case waitReason = "wait_reason"
     }
 
-    public init(agent: String?, createdAt: String, cwd: String?, forkedFrom: String?, lastSeq: Int, localOnly: Bool?, modelProfile: String, origin: String?, parentSessionID: String?, pending: ParamsPendingItem?, planFirst: Bool?, route: RouteEnum?, sessionID: String, status: SessionStatus, title: String?, updatedAt: String) {
+    public init(agent: String?, createdAt: String, cwd: String?, forkedFrom: String?, lastSeq: Int, localOnly: Bool?, modelProfile: String, origin: String?, parentSessionID: String?, pending: ParamsPendingItem?, planFirst: Bool?, route: RouteEnum?, sessionID: String, status: SessionStatus, title: String?, updatedAt: String, waitLine: String?, waitReason: Reason?) {
         self.agent = agent
         self.createdAt = createdAt
         self.cwd = cwd
@@ -18413,6 +18431,8 @@ public struct SessionSummaryNotificationParams: Codable {
         self.status = status
         self.title = title
         self.updatedAt = updatedAt
+        self.waitLine = waitLine
+        self.waitReason = waitReason
     }
 }
 
@@ -18483,8 +18503,12 @@ public struct ParamsPendingItem: Codable {
 /// ``pending`` says what a ``waiting`` session waits for, null otherwise. An older daemon
 /// leaves it out.
 /// ``parent_session_id`` and ``agent`` are set on a helper session: the id of the
-/// session that started it, and the name of its agent type. Null for any other
 /// session. An older daemon leaves them out.
+/// ``wait_reason`` and ``wait_line`` say that the running run's model call waits in line:
+/// the reason (``slot``, ``provider`` or ``load``) and the plain name of the model or
+/// provider.
+/// Null when no call waits, and for the waits the status already shows. An older daemon
+/// leaves them out.
 // MARK: - SessionSummary
 public struct SessionSummary: Codable {
     public let agent: String?
@@ -18503,6 +18527,8 @@ public struct SessionSummary: Codable {
     public let status: SessionStatus
     public let title: String?
     public let updatedAt: String
+    public let waitLine: String?
+    public let waitReason: Reason?
 
     public enum CodingKeys: String, CodingKey {
         case agent = "agent"
@@ -18521,9 +18547,11 @@ public struct SessionSummary: Codable {
         case status = "status"
         case title = "title"
         case updatedAt = "updated_at"
+        case waitLine = "wait_line"
+        case waitReason = "wait_reason"
     }
 
-    public init(agent: String?, createdAt: String, cwd: String?, forkedFrom: String?, lastSeq: Int, localOnly: Bool?, modelProfile: String, origin: String?, parentSessionID: String?, pending: SessionSummaryPendingItem?, planFirst: Bool?, route: RouteEnum?, sessionID: String, status: SessionStatus, title: String?, updatedAt: String) {
+    public init(agent: String?, createdAt: String, cwd: String?, forkedFrom: String?, lastSeq: Int, localOnly: Bool?, modelProfile: String, origin: String?, parentSessionID: String?, pending: SessionSummaryPendingItem?, planFirst: Bool?, route: RouteEnum?, sessionID: String, status: SessionStatus, title: String?, updatedAt: String, waitLine: String?, waitReason: Reason?) {
         self.agent = agent
         self.createdAt = createdAt
         self.cwd = cwd
@@ -18540,6 +18568,8 @@ public struct SessionSummary: Codable {
         self.status = status
         self.title = title
         self.updatedAt = updatedAt
+        self.waitLine = waitLine
+        self.waitReason = waitReason
     }
 }
 

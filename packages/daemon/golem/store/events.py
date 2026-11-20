@@ -96,6 +96,16 @@ class EventLog:
         )
         return [_decode(row) for row in rows]
 
+    async def last_wait(self, run_id: str) -> ModelWaitingEvent | None:
+        """The newest stored ``model.waiting`` of one run. A completed message deletes its own."""
+        rows = await self._database.fetch_all(
+            f"SELECT {_COLUMNS} FROM events WHERE run_id = ? AND type = 'model.waiting'"
+            " ORDER BY seq DESC LIMIT 1",
+            (run_id,),
+        )
+        found = [_decode(row) for row in rows]
+        return found[0] if found and isinstance(found[0], ModelWaitingEvent) else None
+
     async def last_seq(self, session_id: str) -> int:
         """The highest stored ``seq``, or 0 for a session with no events."""
         row = await self._database.fetch_one(

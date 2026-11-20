@@ -26,6 +26,8 @@ export type SessionId = string;
 export type Status = 'idle' | 'running' | 'waiting' | 'closed';
 export type Title = string | null;
 export type UpdatedAt = string;
+export type WaitLine = string | null;
+export type WaitReason = ('slot' | 'load' | 'provider' | 'team' | 'budget' | 'you' | 'stalled') | null;
 
 /**
  * Server → watcher: a session's summary after it changed.
@@ -57,8 +59,11 @@ export interface SessionSummaryNotification {
  * ``pending`` says what a ``waiting`` session waits for, null otherwise. An older daemon
  * leaves it out.
  * ``parent_session_id`` and ``agent`` are set on a helper session: the id of the
- * session that started it, and the name of its agent type. Null for any other
  * session. An older daemon leaves them out.
+ * ``wait_reason`` and ``wait_line`` say that the running run's model call waits in line:
+ * the reason (``slot``, ``provider`` or ``load``) and the plain name of the model or provider.
+ * Null when no call waits, and for the waits the status already shows. An older daemon
+ * leaves them out.
  *
  * This interface was referenced by `SessionSummaryNotification`'s JSON-Schema
  * via the `definition` "SessionSummary".
@@ -80,6 +85,8 @@ export interface SessionSummary {
   status: Status;
   title?: Title;
   updated_at: UpdatedAt;
+  wait_line?: WaitLine;
+  wait_reason?: WaitReason;
 }
 /**
  * What a waiting session waits for, in a form a client can list without opening it.

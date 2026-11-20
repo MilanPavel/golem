@@ -158,6 +158,38 @@ test("right-click opens the same menu as the button, with Rename and Close", () 
   expect(within(screen.getByRole("menu")).getAllByRole("menuitem").map((item) => item.textContent)).toEqual(["Rename", "Close"]);
 });
 
+const dotOf = (name: RegExp) => screen.getByRole("link", { name }).querySelector("span.inline-flex")!;
+
+test("the dot shows idle, running, waiting and queued, and queued reads its sentence from the wait", () => {
+  setup([
+    session("i", "Idle one", null, at(0)),
+    session("r", "Running one", null, at(0), { status: "running" }),
+    session("w", "Waiting one", null, at(0), { status: "waiting" }),
+    session("q", "Queued one", null, at(0), { status: "running", wait_reason: "slot", wait_line: "qwen3:14b" }),
+    session("p", "Provider one", null, at(0), { status: "running", wait_reason: "provider", wait_line: "anthropic" }),
+  ]);
+  expect(dotOf(/Idle one/).textContent).toBe("idle");
+  expect(dotOf(/Running one/).textContent).toBe("running");
+  expect(dotOf(/Waiting one/).textContent).toBe("waiting");
+  expect(dotOf(/Queued one/).textContent).toBe("queued, waiting for qwen3:14b");
+  expect(dotOf(/Queued one/).getAttribute("title")).toBe("waiting for qwen3:14b");
+  expect(dotOf(/Provider one/).getAttribute("title")).toBe("anthropic is busy");
+  expect(dotOf(/Provider one/).textContent).not.toMatch(/local/i);
+  expect(dotOf(/Running one/).getAttribute("title")).toBeNull();
+});
+
+test("a summary from an older daemon, with no wait fields, shows the dot as before", () => {
+  const old = session("o", "Old daemon", null, at(0), { status: "running" });
+  expect("wait_reason" in old).toBe(false);
+  setup([old]);
+  expect(dotOf(/Old daemon/).textContent).toBe("running");
+});
+
+test("a wait on an idle or closed session is not queued", () => {
+  setup([session("x", "Stale wait", null, at(0), { status: "idle", wait_reason: "slot", wait_line: "qwen3:14b" })]);
+  expect(dotOf(/Stale wait/).textContent).toBe("idle");
+});
+
 test("the selected row is current, and the panel has no accessibility violations", async () => {
   const { container } = setup();
   expect(screen.getByRole("link", { name: /Fix the socket/ }).getAttribute("aria-current")).toBe("page");
