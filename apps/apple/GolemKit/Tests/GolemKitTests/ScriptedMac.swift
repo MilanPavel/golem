@@ -43,6 +43,19 @@ actor ScriptedMac {
 
     var sessionList: [[String: Any]] = []
 
+    /// Open pair slots (base64url SHA-256 of a code) and what the owner does when one is used.
+    private var pairSlots: [String] = []
+    private var pairAnswer = "paired"
+    /// The words the Mac showed for the last pairing, and the name the phone gave.
+    private(set) var pairWordsShown: [String] = []
+    private(set) var pairedName: String?
+
+    func openPair(code: Data, answer: String = "paired") {
+        pairSlots = [Base64URL.encode(Data(SHA256.hash(data: code)))]
+        pairAnswer = answer
+        sendAllow()
+    }
+
     func config(relayURL: URL) -> ConnectionConfig {
         ConnectionConfig(
             relayURL: relayURL,
@@ -95,7 +108,7 @@ actor ScriptedMac {
         send(json: [
             "type": "allow", "seq": allowSeq,
             "devices": allowed.map { ["key": Base64URL.encode($0)] },
-            "pairs": [],
+            "pairs": pairSlots.map { ["slot": $0, "exp": Int(Date().timeIntervalSince1970) + 300] },
         ])
     }
 
@@ -165,6 +178,10 @@ actor ScriptedMac {
 
     /// The device proves its key: it must be on the allow list and have signed `"golem-auth-v1" || h`.
     private func handleControl(_ body: Data, channel: Channel) throws {
+        if let message = try JSONSerialization.jsonObject(with: body) as? [String: Any], message["type"] as? String == "pair" {
+            try handlePair(message, channel: channel)
+            return
+        }
         guard let message = try JSONSerialization.jsonObject(with: body) as? [String: Any],
               message["type"] as? String == "auth",
               let keyText = message["key"] as? String, let key = Base64URL.decode(keyText),
@@ -184,6 +201,34 @@ actor ScriptedMac {
         channel.open = true
         let ok = try JSONSerialization.data(withJSONObject: ["type": "ok", "device": channel.deviceID.map { String(format: "%02x", $0) }.joined()])
         sendChannel(.control, ok, to: channel)
+    }
+
+    /// `pair`: check the signature over `"golem-pair-v1" || h` and the code, show the words, then answer as the owner would.
+    private func handlePair(_ message: [String: Any], channel: Channel) throws {
+        guard let keyText = message["key"] as? String, let key = Base64URL.decode(keyText),
+              let sigText = message["sig"] as? String, let sig = Base64URL.decode(sigText),
+              let codeText = message["code"] as? String, let code = Base64URL.decode(codeText),
+              let hash = channel.transport?.handshakeHash
+        else { throw ScriptedMacError.badAuth }
+        let publicKey = try P256.Signing.PublicKey(x963Representation: key)
+        let signature = try P256.Signing.ECDSASignature(rawRepresentation: sig)
+        guard publicKey.isValidSignature(signature, for: Data("golem-pair-v1".utf8) + hash),
+              pairSlots.contains(Base64URL.encode(Data(SHA256.hash(data: code))))
+        else { throw ScriptedMacError.badAuth }
+        pairedName = message["name"] as? String
+        pairWordsShown = PairWords.words(handshakeHash: hash)
+        func control(_ object: [String: Any]) throws {
+            sendChannel(.control, try JSONSerialization.data(withJSONObject: object), to: channel)
+        }
+        try control(["type": "pair.words", "words": pairWordsShown])
+        if pairAnswer == "paired" {
+            allowed.append(key)
+            pairSlots = []
+            sendAllow()
+            try control(["type": "paired", "device": channel.deviceID.map { String(format: "%02x", $0) }.joined()])
+        } else {
+            try control(["type": "error", "code": pairAnswer, "message": "no"])
+        }
     }
 
     private func handleLine(_ body: Data, channel: Channel) {
