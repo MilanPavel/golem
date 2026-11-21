@@ -302,7 +302,7 @@ class SessionSummary(BaseModel):
     plan_first: bool = False
     local_only: bool = False
     pending: PendingItem | None = None
-    pending_items: list[PendingItem] = Field(default_factory=list, max_length=200)
+    pending_items: list[PendingItem] = Field(default_factory=list[PendingItem], max_length=200)
     parent_session_id: str | None = Field(default=None, min_length=1)
     agent: str | None = Field(default=None, min_length=1)
     wait_reason: WaitReason | None = None
