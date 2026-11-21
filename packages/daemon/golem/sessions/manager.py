@@ -85,6 +85,7 @@ from golem.sessions.helpers import (
     stop_reason,
     summarize_run,
     tokens_over,
+    what_is_sent,
     wish_of,
     writing_tools,
 )
@@ -1402,13 +1403,14 @@ class SessionManager:
                     ModelOptionsChangedData(options=dict(helper.options)),
                 )
             if picked.ask is not None:
+                sent, not_sent = what_is_sent(agent, brief, cwd)
                 helper.helper_ask = replace(
                     picked.ask,
                     helper_id=sid,
                     agent=agent.name,
                     label=label[:120] or None,
-                    sent=("the brief",),
-                    not_sent=("this chat",),
+                    sent=sent,
+                    not_sent=not_sent,
                 )
             self._sessions[sid] = helper
             # A helper is named where it shows (a card, a panel, the Inbox), never untitled.
