@@ -244,4 +244,5 @@ MIGRATIONS: tuple[tuple[str, ...], ...] = (
         """,
         "CREATE INDEX rule_origins_rule ON rule_origins (rule)",
     ),
+    ("ALTER TABLE sessions ADD COLUMN trimmed_at TEXT",),
 )

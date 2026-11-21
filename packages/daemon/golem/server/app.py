@@ -81,6 +81,7 @@ from golem.sessions.log import SessionLog
 from golem.sessions.manager import SessionManager
 from golem.sessions.recovery import recover_runs
 from golem.sessions.titles import ModelTitles, TitleGenerator
+from golem.sessions.trim import HelperTrimmer
 from golem.sessions.usage import Usage, backfill
 from golem.skills.bundled import bundled_skills_dir
 from golem.skills.index import index_section
@@ -188,6 +189,7 @@ class DaemonApp:
         self._connections: set[ClientConnection] = set()
         self._stop = asyncio.Event()
         self._draining = False
+        self._trimmer: HelperTrimmer | None = None
 
     def request_shutdown(self) -> None:
         """Ask :meth:`serve` to stop. Safe to call from a signal handler."""
@@ -490,6 +492,12 @@ class DaemonApp:
                     self.state.skills.start()
                     self.state.agents.start()
                     routines.start()
+                    self._trimmer = sessions.helper_trimmer(
+                        lambda: load_settings(home=home, project_dir=home).agents,
+                        lambda: self.state.clock(),
+                        saver.adelete_thread,
+                    )
+                    self._trimmer.start()
                     watcher.start()
                     idle = asyncio.create_task(
                         _stop_idle(local, self.paths.home, dispatch), name="golem-ollama-idle"
@@ -670,6 +678,8 @@ class DaemonApp:
             await self.state.watcher.aclose()
         if self.state.routines is not None:
             await self.state.routines.aclose()
+        if self._trimmer is not None:
+            await self._trimmer.aclose()
         if self.state.sessions is not None:
             await self.state.sessions.cancel_all()
         await self._dispatcher.drain()

@@ -16036,6 +16036,8 @@ public enum RPCNotificationMethod: String, Codable {
 /// The lead parked to wait for its helpers, or went on.
 ///
 /// A helper's run ended.
+///
+/// A helper's log was cut to its receipt. ``run_id`` is null: no run owns the change.
 // MARK: - Params
 public struct Params: Codable {
     public let data: ParamsData
@@ -16443,6 +16445,11 @@ public struct Params: Codable {
 /// model), because the lead's footer sums its own log. ``duration_ms`` is the whole time
 /// since it started and ``working_ms`` is the part that was not spent waiting for you, a
 /// slot or a provider.
+///
+/// A finished helper's steps were removed and a receipt kept (ADR-059, section 9).
+///
+/// ``removed`` is how many events were removed from the helper's log. The brief, the final
+/// answer and ``session.completed`` stay.
 // MARK: - ParamsData
 public struct ParamsData: Codable {
     public let agent: Agent?
@@ -17310,6 +17317,7 @@ public enum ParamsType: String, Codable {
     case sessionCreated = "session.created"
     case sessionModeChanged = "session.mode.changed"
     case sessionPlanChanged = "session.plan.changed"
+    case sessionTrimmed = "session.trimmed"
     case sessionUpdated = "session.updated"
     case skillActivated = "skill.activated"
     case skillDeactivated = "skill.deactivated"
@@ -18990,6 +18998,9 @@ public struct SessionListResult: Codable {
 /// ``step`` is set on a helper: its newest step as one line (the ``summary`` of its last
 /// ``helper.step``), at most 200 characters. Null before the first step. An older daemon
 /// leaves all three out.
+/// ``trimmed_at`` is set on a helper whose steps were removed after its keep days
+/// (``session.trimmed``): the time of the trim. Null for any other session. An older daemon
+/// leaves it out.
 // MARK: - SessionElement
 public struct SessionElement: Codable {
     public let agent: String?
@@ -19011,6 +19022,7 @@ public struct SessionElement: Codable {
     public let status: SessionStatus
     public let step: String?
     public let title: String?
+    public let trimmedAt: String?
     public let updatedAt: String
     public let waitLine: String?
     public let waitReason: Reason?
@@ -19035,12 +19047,13 @@ public struct SessionElement: Codable {
         case status = "status"
         case step = "step"
         case title = "title"
+        case trimmedAt = "trimmed_at"
         case updatedAt = "updated_at"
         case waitLine = "wait_line"
         case waitReason = "wait_reason"
     }
 
-    public init(agent: String?, createdAt: String, cwd: String?, forkedFrom: String?, helpersRunning: Int?, helpersWaiting: Int?, lastSeq: Int, localOnly: Bool?, modelProfile: String, origin: String?, parentSessionID: String?, pending: SessionPendingItem?, pendingItems: [SessionPendingItem]?, planFirst: Bool?, route: RouteEnum?, sessionID: String, status: SessionStatus, step: String?, title: String?, updatedAt: String, waitLine: String?, waitReason: Reason?) {
+    public init(agent: String?, createdAt: String, cwd: String?, forkedFrom: String?, helpersRunning: Int?, helpersWaiting: Int?, lastSeq: Int, localOnly: Bool?, modelProfile: String, origin: String?, parentSessionID: String?, pending: SessionPendingItem?, pendingItems: [SessionPendingItem]?, planFirst: Bool?, route: RouteEnum?, sessionID: String, status: SessionStatus, step: String?, title: String?, trimmedAt: String?, updatedAt: String, waitLine: String?, waitReason: Reason?) {
         self.agent = agent
         self.createdAt = createdAt
         self.cwd = cwd
@@ -19060,6 +19073,7 @@ public struct SessionElement: Codable {
         self.status = status
         self.step = step
         self.title = title
+        self.trimmedAt = trimmedAt
         self.updatedAt = updatedAt
         self.waitLine = waitLine
         self.waitReason = waitReason
@@ -19754,6 +19768,9 @@ public enum SessionSummaryNotificationMethod: String, Codable {
 /// ``step`` is set on a helper: its newest step as one line (the ``summary`` of its last
 /// ``helper.step``), at most 200 characters. Null before the first step. An older daemon
 /// leaves all three out.
+/// ``trimmed_at`` is set on a helper whose steps were removed after its keep days
+/// (``session.trimmed``): the time of the trim. Null for any other session. An older daemon
+/// leaves it out.
 // MARK: - SessionSummaryNotificationParams
 public struct SessionSummaryNotificationParams: Codable {
     public let agent: String?
@@ -19775,6 +19792,7 @@ public struct SessionSummaryNotificationParams: Codable {
     public let status: SessionStatus
     public let step: String?
     public let title: String?
+    public let trimmedAt: String?
     public let updatedAt: String
     public let waitLine: String?
     public let waitReason: Reason?
@@ -19799,12 +19817,13 @@ public struct SessionSummaryNotificationParams: Codable {
         case status = "status"
         case step = "step"
         case title = "title"
+        case trimmedAt = "trimmed_at"
         case updatedAt = "updated_at"
         case waitLine = "wait_line"
         case waitReason = "wait_reason"
     }
 
-    public init(agent: String?, createdAt: String, cwd: String?, forkedFrom: String?, helpersRunning: Int?, helpersWaiting: Int?, lastSeq: Int, localOnly: Bool?, modelProfile: String, origin: String?, parentSessionID: String?, pending: ParamsPendingItem?, pendingItems: [ParamsPendingItem]?, planFirst: Bool?, route: RouteEnum?, sessionID: String, status: SessionStatus, step: String?, title: String?, updatedAt: String, waitLine: String?, waitReason: Reason?) {
+    public init(agent: String?, createdAt: String, cwd: String?, forkedFrom: String?, helpersRunning: Int?, helpersWaiting: Int?, lastSeq: Int, localOnly: Bool?, modelProfile: String, origin: String?, parentSessionID: String?, pending: ParamsPendingItem?, pendingItems: [ParamsPendingItem]?, planFirst: Bool?, route: RouteEnum?, sessionID: String, status: SessionStatus, step: String?, title: String?, trimmedAt: String?, updatedAt: String, waitLine: String?, waitReason: Reason?) {
         self.agent = agent
         self.createdAt = createdAt
         self.cwd = cwd
@@ -19824,6 +19843,7 @@ public struct SessionSummaryNotificationParams: Codable {
         self.status = status
         self.step = step
         self.title = title
+        self.trimmedAt = trimmedAt
         self.updatedAt = updatedAt
         self.waitLine = waitLine
         self.waitReason = waitReason
@@ -19972,6 +19992,9 @@ public struct FluffyPendingHelper: Codable {
 /// ``step`` is set on a helper: its newest step as one line (the ``summary`` of its last
 /// ``helper.step``), at most 200 characters. Null before the first step. An older daemon
 /// leaves all three out.
+/// ``trimmed_at`` is set on a helper whose steps were removed after its keep days
+/// (``session.trimmed``): the time of the trim. Null for any other session. An older daemon
+/// leaves it out.
 // MARK: - SessionSummary
 public struct SessionSummary: Codable {
     public let agent: String?
@@ -19993,6 +20016,7 @@ public struct SessionSummary: Codable {
     public let status: SessionStatus
     public let step: String?
     public let title: String?
+    public let trimmedAt: String?
     public let updatedAt: String
     public let waitLine: String?
     public let waitReason: Reason?
@@ -20017,12 +20041,13 @@ public struct SessionSummary: Codable {
         case status = "status"
         case step = "step"
         case title = "title"
+        case trimmedAt = "trimmed_at"
         case updatedAt = "updated_at"
         case waitLine = "wait_line"
         case waitReason = "wait_reason"
     }
 
-    public init(agent: String?, createdAt: String, cwd: String?, forkedFrom: String?, helpersRunning: Int?, helpersWaiting: Int?, lastSeq: Int, localOnly: Bool?, modelProfile: String, origin: String?, parentSessionID: String?, pending: SessionSummaryPendingItem?, pendingItems: [SessionSummaryPendingItem]?, planFirst: Bool?, route: RouteEnum?, sessionID: String, status: SessionStatus, step: String?, title: String?, updatedAt: String, waitLine: String?, waitReason: Reason?) {
+    public init(agent: String?, createdAt: String, cwd: String?, forkedFrom: String?, helpersRunning: Int?, helpersWaiting: Int?, lastSeq: Int, localOnly: Bool?, modelProfile: String, origin: String?, parentSessionID: String?, pending: SessionSummaryPendingItem?, pendingItems: [SessionSummaryPendingItem]?, planFirst: Bool?, route: RouteEnum?, sessionID: String, status: SessionStatus, step: String?, title: String?, trimmedAt: String?, updatedAt: String, waitLine: String?, waitReason: Reason?) {
         self.agent = agent
         self.createdAt = createdAt
         self.cwd = cwd
@@ -20042,6 +20067,7 @@ public struct SessionSummary: Codable {
         self.status = status
         self.step = step
         self.title = title
+        self.trimmedAt = trimmedAt
         self.updatedAt = updatedAt
         self.waitLine = waitLine
         self.waitReason = waitReason
@@ -20151,6 +20177,73 @@ public struct TentacledPendingHelper: Codable {
         self.label = label
         self.sessionID = sessionID
     }
+}
+
+/// A finished helper's steps were removed and a receipt kept (ADR-059, section 9).
+///
+/// ``removed`` is how many events were removed from the helper's log. The brief, the final
+/// answer and ``session.completed`` stay.
+// MARK: - SessionTrimmedData
+public struct SessionTrimmedData: Codable {
+    public let removed: Int
+
+    public enum CodingKeys: String, CodingKey {
+        case removed = "removed"
+    }
+
+    public init(removed: Int) {
+        self.removed = removed
+    }
+}
+
+/// A helper's log was cut to its receipt. ``run_id`` is null: no run owns the change.
+// MARK: - SessionTrimmedEvent
+public struct SessionTrimmedEvent: Codable {
+    public let data: SessionTrimmedEventData
+    public let runID: JSONNull?
+    public let seq: Int
+    public let sessionID: String
+    public let ts: String
+    public let type: SessionTrimmedEventType
+
+    public enum CodingKeys: String, CodingKey {
+        case data = "data"
+        case runID = "run_id"
+        case seq = "seq"
+        case sessionID = "session_id"
+        case ts = "ts"
+        case type = "type"
+    }
+
+    public init(data: SessionTrimmedEventData, runID: JSONNull?, seq: Int, sessionID: String, ts: String, type: SessionTrimmedEventType) {
+        self.data = data
+        self.runID = runID
+        self.seq = seq
+        self.sessionID = sessionID
+        self.ts = ts
+        self.type = type
+    }
+}
+
+/// A finished helper's steps were removed and a receipt kept (ADR-059, section 9).
+///
+/// ``removed`` is how many events were removed from the helper's log. The brief, the final
+/// answer and ``session.completed`` stay.
+// MARK: - SessionTrimmedEventData
+public struct SessionTrimmedEventData: Codable {
+    public let removed: Int
+
+    public enum CodingKeys: String, CodingKey {
+        case removed = "removed"
+    }
+
+    public init(removed: Int) {
+        self.removed = removed
+    }
+}
+
+public enum SessionTrimmedEventType: String, Codable {
+    case sessionTrimmed = "session.trimmed"
 }
 
 /// A session attribute changed: its title, folder, allowed tools, MCP servers, or route.

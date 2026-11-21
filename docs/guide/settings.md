@@ -224,6 +224,17 @@ What bounds the helper that the `delegate` tool starts. A helper only reads: it 
 
 A helper also stops when its calls have taken in more than 8 times its model's window in all (`tokens`), or when a cap in `[budget]` is spent before one of its paid calls (`budget`). It then returns what it has, and the result starts with `explorer finished: <reason>`. Its calls count against the same caps as the chat's, and `golem cost` and Settings → Usage list them as `helper` under "by job".
 
+### `[agents]`
+
+How long a finished helper keeps its steps. After that only a receipt stays: its brief, its answer and its end. Its cost and usage totals, its runs and its artifacts do not change, and nothing in the lead's chat changes.
+
+| Key | Default | Meaning |
+|---|---|---|
+| `keep_days` | `7` | Days a finished helper keeps its steps, counted from the end of its last run, not from when you opened it. 0 keeps them for ever |
+| `keep_problem_days` | `30` | The same for a helper that failed, was cancelled or asked you something (an approval or the paid question). 0 keeps them for ever |
+
+A value below 0 is a config error that names the line. A helper that is running or waiting is never trimmed, and neither is one whose lead is waiting for its helpers. golem checks when it starts and then once an hour, and a change in `config.toml` applies to the next check without a restart.
+
 ### `[routing.roles]`
 
 The model for each internal job. A value is `"session"`, a profile name, or a `provider/model` ref.

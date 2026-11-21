@@ -4281,6 +4281,65 @@
       "title": "SessionPlanChangedEvent",
       "type": "object"
     },
+    "SessionTrimmedData": {
+      "additionalProperties": false,
+      "description": "A finished helper's steps were removed and a receipt kept (ADR-059, section 9).\n\n``removed`` is how many events were removed from the helper's log. The brief, the final\nanswer and ``session.completed`` stay.",
+      "properties": {
+        "removed": {
+          "minimum": 0,
+          "title": "Removed",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "removed"
+      ],
+      "title": "SessionTrimmedData",
+      "type": "object"
+    },
+    "SessionTrimmedEvent": {
+      "additionalProperties": false,
+      "description": "A helper's log was cut to its receipt. ``run_id`` is null: no run owns the change.",
+      "properties": {
+        "data": {
+          "$ref": "#/$defs/SessionTrimmedData"
+        },
+        "run_id": {
+          "default": null,
+          "title": "Run Id",
+          "type": "null"
+        },
+        "seq": {
+          "minimum": 1,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "session_id": {
+          "minLength": 1,
+          "title": "Session Id",
+          "type": "string"
+        },
+        "ts": {
+          "minLength": 1,
+          "title": "Ts",
+          "type": "string"
+        },
+        "type": {
+          "const": "session.trimmed",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "seq",
+        "session_id",
+        "ts",
+        "type",
+        "data"
+      ],
+      "title": "SessionTrimmedEvent",
+      "type": "object"
+    },
     "SessionUpdatedData": {
       "additionalProperties": false,
       "description": "A session attribute changed: its title, folder, allowed tools, MCP servers, or route.\n\nA field left null did not change. ``route`` is the session's route mode after\n``session.set_route``. ``cwd`` is set once, on a session made\nbefore sessions had a folder, by the first ``message.send`` that names one.\n``allowed_tools`` is the whole list after ``session.revoke``, and\n``mcp_servers`` the on-demand MCP servers the session turned on, after\n``mcp.enable`` or ``mcp.disable``. ``paid_ok`` true is the user's yes to paid\nmodels for the rest of the session (``route.consent.answer`` with ``session``).",
@@ -5524,6 +5583,7 @@
           "session.created": "#/$defs/SessionCreatedEvent",
           "session.mode.changed": "#/$defs/SessionModeChangedEvent",
           "session.plan.changed": "#/$defs/SessionPlanChangedEvent",
+          "session.trimmed": "#/$defs/SessionTrimmedEvent",
           "session.updated": "#/$defs/SessionUpdatedEvent",
           "skill.activated": "#/$defs/SkillActivatedEvent",
           "skill.deactivated": "#/$defs/SkillDeactivatedEvent",
@@ -5679,6 +5739,9 @@
         },
         {
           "$ref": "#/$defs/HelperEndedEvent"
+        },
+        {
+          "$ref": "#/$defs/SessionTrimmedEvent"
         }
       ],
       "title": "Params"

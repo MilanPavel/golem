@@ -284,6 +284,9 @@ class SessionSummary(BaseModel):
     ``step`` is set on a helper: its newest step as one line (the ``summary`` of its last
     ``helper.step``), at most 200 characters. Null before the first step. An older daemon
     leaves all three out.
+    ``trimmed_at`` is set on a helper whose steps were removed after its keep days
+    (``session.trimmed``): the time of the trim. Null for any other session. An older daemon
+    leaves it out.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -310,6 +313,7 @@ class SessionSummary(BaseModel):
     helpers_running: int | None = Field(default=None, ge=0)
     helpers_waiting: int | None = Field(default=None, ge=0)
     step: str | None = Field(default=None, min_length=1, max_length=200)
+    trimmed_at: str | None = Field(default=None, min_length=1)
 
 
 class SessionListResult(BaseModel):

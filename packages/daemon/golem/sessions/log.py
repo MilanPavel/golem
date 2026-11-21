@@ -222,6 +222,22 @@ class SessionLog:
                 log.exception("after_emit failed for %s", event.type)
         return event
 
+    async def trim(self, session_id: str, ts: str) -> ChatEvent | None:
+        """Cut a finished helper's log to its receipt (ADR-059, section 9), under the session's
+        lock so no attach reads half of it. Returns ``session.trimmed``, None when there is
+        nothing to trim."""
+        async with self._lock(session_id):
+            event = await self._events.trim(session_id, ts)
+            if event is None:
+                return None
+            self._seq[session_id] = event.seq
+            self._bus.publish(event)
+            if self._bus.watched:
+                activity = await self._records.activity(session_id)
+                if activity is not None:
+                    self._bus.publish_summary(await self._summary(activity, None))
+            return event
+
     async def attach(self, session_id: str, after_seq: int, target: EventTarget) -> int:
         """Queue stored events after ``after_seq`` on ``target``, then subscribe it.
 
