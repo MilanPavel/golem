@@ -757,7 +757,11 @@ def _open_notifier(records: SessionRecords, bus: EventBus, poster: Poster, home:
 
     async def lookup(session_id: str) -> SessionFacts | None:
         record = await records.get(session_id)
-        return None if record is None else SessionFacts(record.title, record.origin)
+        return (
+            None
+            if record is None
+            else SessionFacts(record.title, record.origin, record.parent_session_id, record.agent)
+        )
 
     notifier = Notifier(poster, lookup, bus.attached, _notifier_kinds(home))
     bus.observe(notifier.on_event)
