@@ -18,8 +18,15 @@ export type FilterResult =
 
 const encoder = new TextEncoder();
 
+export interface FilterOptions {
+  /** The methods that may pass. Default: the browser's list. A phone passes `DEVICE_METHODS`. */
+  methods?: ReadonlySet<string>;
+  /** A request whose string id starts with this is denied: the gateway keeps that prefix for itself. */
+  reservedIdPrefix?: string;
+}
+
 /** Decide what one WebSocket message may do. Never re-serializes the input. */
-export function filterMessage(data: string | ArrayBuffer | Uint8Array): FilterResult {
+export function filterMessage(data: string | ArrayBuffer | Uint8Array, options: FilterOptions = {}): FilterResult {
   if (typeof data !== "string") {
     return { kind: "refuse", reason: "binary" };
   }
@@ -43,10 +50,11 @@ export function filterMessage(data: string | ArrayBuffer | Uint8Array): FilterRe
   if (typeof method !== "string") {
     return { kind: "refuse", reason: "no-method" };
   }
-  if (BROWSER_METHODS.has(method)) {
+  const id = Object.hasOwn(request, "id") ? request["id"] : undefined;
+  const reserved = options.reservedIdPrefix !== undefined && typeof id === "string" && id.startsWith(options.reservedIdPrefix);
+  if (!reserved && (options.methods ?? BROWSER_METHODS).has(method)) {
     return { kind: "forward", line: `${data}\n` };
   }
-  const id = Object.hasOwn(request, "id") ? request["id"] : undefined;
   if (typeof id === "string" || typeof id === "number" || id === null) {
     return {
       kind: "deny",

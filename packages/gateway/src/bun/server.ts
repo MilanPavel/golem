@@ -1,5 +1,4 @@
-import { createConnection } from "node:net";
-import type { Socket } from "node:net";
+import { Socket, createConnection } from "node:net";
 
 import {
   CLOSE_DAEMON_DOWN,
@@ -17,6 +16,10 @@ import {
   withSecurityHeaders,
 } from "../core.ts";
 import type { Bridge, SessionStore } from "../core.ts";
+import type { DaemonHandlers, DaemonSocket, OpenDaemon } from "../daemon-rpc.ts";
+import type { Log } from "../device-session.ts";
+import { startRelayLink } from "../relay.ts";
+import type { RelayLink, RelayLinkOptions, RelayState } from "../relay.ts";
 
 export interface GatewayOptions {
   port: number;
@@ -31,10 +34,21 @@ export interface GatewayOptions {
   version?: string;
   /** True when a job keeps this gateway running, reported by `/healthz`. Default false. */
   kept?: boolean;
+  /**
+   * Connect out to the relay for paired phones (ADR-051). Default true. It connects only when the daemon's
+   * `device.sync` says `[relay] url` is set and a device is paired or a pairing is open.
+   */
+  relay?: boolean;
+  /** Settings for the relay link, for tests. */
+  relayOptions?: Partial<Omit<RelayLinkOptions, "openDaemon">>;
+  /** Where the relay link logs. Events carry no keys and no message text. Default nowhere. */
+  log?: Log;
 }
 
 export interface Gateway {
   port: number;
+  /** The relay link: `connected`, `connecting`, or `off`. */
+  relayState(): RelayState;
   stop(): Promise<void>;
 }
 
@@ -45,6 +59,35 @@ interface SocketData {
 }
 
 const DEFAULT_MAX_SOCKETS = 16;
+
+/** Open a connection to the daemon's Unix socket for the relay link. */
+function unixDaemon(socketPath: string): OpenDaemon {
+  return (handlers: DaemonHandlers): DaemonSocket => {
+    let socket: Socket;
+    let failed = false;
+    try {
+      socket = createConnection(socketPath);
+    } catch {
+      // Some bad paths throw at once instead of emitting "error".
+      failed = true;
+      socket = new Socket();
+      queueMicrotask(() => handlers.error());
+    }
+    socket.on("connect", () => handlers.open());
+    socket.on("data", (chunk) => handlers.data(chunk));
+    socket.on("close", () => {
+      if (!failed) handlers.close();
+    });
+    socket.on("error", () => handlers.error());
+    return {
+      write: (line) => void socket.write(line),
+      backlog: () => socket.writableLength,
+      destroy: () => void socket.destroy(),
+      pause: () => void socket.pause(),
+      resume: () => void socket.resume(),
+    };
+  };
+}
 
 function text(status: number, body: string, headers: Record<string, string> = {}): Response {
   return new Response(body, {
@@ -61,12 +104,16 @@ export function startGateway(opts: GatewayOptions): Gateway {
   const maxSockets = opts.maxSockets ?? DEFAULT_MAX_SOCKETS;
   const live = new Set<Bun.ServerWebSocket<SocketData>>();
   let counted = 0;
+  let relay: RelayLink | null = null;
 
   function health(req: Request, port: number): Response {
     if (req.method !== "GET") return text(405, "method not allowed");
     const checked = checkRequest(req, port, { requireOrigin: false });
     if (!checked.ok) return text(checked.status, checked.reason);
-    return Response.json({ golem: "web", pid: process.pid, version: opts.version ?? "unknown", kept: opts.kept ?? false }, { headers: { "Cache-Control": "no-store" } });
+    return Response.json(
+      { golem: "web", pid: process.pid, version: opts.version ?? "unknown", kept: opts.kept ?? false, relay: relay?.state() ?? "off" },
+      { headers: { "Cache-Control": "no-store" } },
+    );
   }
 
   const assets = opts.assets ?? new Map<string, string>();
@@ -182,9 +229,16 @@ export function startGateway(opts: GatewayOptions): Gateway {
     },
   });
 
+  // After the listener: a port that is taken throws above, and nothing is left running.
+  if (opts.relay !== false) {
+    relay = startRelayLink({ openDaemon: unixDaemon(opts.socketPath), log: opts.log, ...opts.relayOptions });
+  }
+
   return {
     port: server.port ?? 0,
+    relayState: () => relay?.state() ?? "off",
     async stop() {
+      relay?.stop();
       for (const ws of live) {
         ws.data.daemon?.destroy();
         ws.close(1001, "gateway stopping");

@@ -143,3 +143,17 @@ test("the reply has no trailing newline", () => {
   const result = filterMessage('{"id":1,"method":"auth.set"}');
   assert.equal(result.kind === "deny" && result.reply?.endsWith("\n"), false);
 });
+
+test("a device list passes a device method and denies a browser-only one", () => {
+  const methods = new Set(["session.list"]);
+  const ok = '{"jsonrpc":"2.0","id":1,"method":"session.list"}';
+  assert.deepEqual(filterMessage(ok, { methods }), { kind: "forward", line: `${ok}\n` });
+  assert.deepEqual(filterMessage('{"jsonrpc":"2.0","id":2,"method":"auth.set"}', { methods }), { kind: "deny", reply: deny(2) });
+});
+
+test("a request id with the reserved prefix is denied even for an allowed method", () => {
+  const methods = new Set(["session.list"]);
+  const text = '{"jsonrpc":"2.0","id":"gw:identify","method":"session.list"}';
+  assert.deepEqual(filterMessage(text, { methods, reservedIdPrefix: "gw:" }), { kind: "deny", reply: deny("gw:identify") });
+  assert.equal(filterMessage(text, { methods }).kind, "forward");
+});

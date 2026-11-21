@@ -116,6 +116,7 @@ interface Healthz {
   pid: number;
   version: string;
   kept: boolean;
+  relay: string;
 }
 
 async function health(port: number): Promise<Healthz> {
@@ -139,7 +140,7 @@ test("golem web starts, is reused, replaces a dead one, and cleans up on SIGTERM
   assert.match(a.url, new RegExp(`^http://127\\.0\\.0\\.1:${a.port}/#t=[A-Za-z0-9_-]{43}$`));
   assert.equal(mode("web.json"), 0o600);
   assert.equal(mode("web.token"), 0o600);
-  assert.deepEqual(await health(a.port), { golem: "web", pid: a.pid, version: GOLEM_VERSION, kept: false });
+  assert.deepEqual(await health(a.port), { golem: "web", pid: a.pid, version: GOLEM_VERSION, kept: false, relay: "off" });
 
   const second = golemWeb("--json");
   const b = await firstLine(second);
@@ -152,7 +153,7 @@ test("golem web starts, is reused, replaces a dead one, and cleans up on SIGTERM
   const c = await firstLine(third);
   assert.notEqual(c.pid, a.pid);
   assert.equal(c.pid, third.child.pid);
-  assert.deepEqual(await health(c.port), { golem: "web", pid: c.pid, version: GOLEM_VERSION, kept: false });
+  assert.deepEqual(await health(c.port), { golem: "web", pid: c.pid, version: GOLEM_VERSION, kept: false, relay: "off" });
   assert.equal(record().pid, c.pid);
   assert.notEqual(c.url, a.url);
 
@@ -232,7 +233,7 @@ test("golem web serve prints no token, reports kept, and cleans up on SIGTERM", 
   assert.match(out, /^golem web: serving http:\/\/127\.0\.0\.1:\d+\n$/);
   assert.equal(out.includes(fs.readFileSync(path.join(runDir, "web.token"), "utf8").trim()), false);
   const { port, pid } = record();
-  assert.deepEqual(await health(port), { golem: "web", pid, version: GOLEM_VERSION, kept: true });
+  assert.deepEqual(await health(port), { golem: "web", pid, version: GOLEM_VERSION, kept: true, relay: "off" });
   assert.equal(pid, run.child.pid);
   run.child.kill("SIGTERM");
   assert.equal(await run.exit, 0);

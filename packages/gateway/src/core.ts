@@ -1,5 +1,5 @@
 export { MAX_MESSAGE_BYTES, NOT_ALLOWED_FROM_BROWSER, filterMessage } from "./framing.ts";
-export type { FilterResult, Refusal } from "./framing.ts";
+export type { FilterOptions, FilterResult, Refusal } from "./framing.ts";
 export { createLineSplitter } from "./lines.ts";
 export type { LineSplitter } from "./lines.ts";
 export { MAX_EXCHANGE_BYTES, checkRequest, checkUpgrade, cookieName, exchangeToken, readCookie, sessionCookie } from "./auth.ts";
@@ -16,5 +16,5 @@ export {
   PAUSE_ABOVE_BYTES,
   createBridge,
 } from "./bridge.ts";
-export type { Bridge, BridgeIO } from "./bridge.ts";
+export type { Bridge, BridgeIO, BridgeOptions } from "./bridge.ts";
 export { assetCacheControl, assetContentType, assetKey, fallbackKey } from "./assets.ts";
