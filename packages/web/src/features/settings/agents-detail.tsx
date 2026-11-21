@@ -142,7 +142,7 @@ export function AgentDefinition({ row }: { row: AgentRow }) {
         className="overflow-x-auto rounded-lg border border-line bg-code-bg p-4 font-mono text-code whitespace-pre-wrap text-ink outline-offset-2 outline-clay focus-visible:outline-2"
       >
         {definitionLines(row.text).map((line, at) => (
-          <span key={at} className="block min-h-[1lh]">
+          <span key={at} className="block">
             {line.kind === "fence" ? <span className="text-faint">{line.text}</span> : null}
             {line.kind === "key" ? (
               <>
@@ -150,7 +150,8 @@ export function AgentDefinition({ row }: { row: AgentRow }) {
                 {line.text}
               </>
             ) : null}
-            {line.kind === "plain" ? line.text : null}
+            {/* A zero-width space keeps an empty line one line high. */}
+            {line.kind === "plain" ? line.text || "\u200b" : null}
           </span>
         ))}
       </pre>
