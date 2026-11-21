@@ -333,6 +333,8 @@ export interface AgentRow {
   text: string | null;
   /** The body of the file; null as for `text`. */
   prompt: string | null;
+  /** The origins of lower files of the same name that this one hides: `bundled` for a copy of a bundled agent. */
+  shadowed: AgentOrigin[];
   /** The tools that only read, and the ones that change things. */
   readingTools: string[];
   changingTools: string[];
@@ -372,6 +374,7 @@ export function agentRow(agent: AgentInfo, setup: WishSetup = "mixed", models: r
     readingTools: toolGroups(agent).reading,
     changingTools: toolGroups(agent).changing,
     unavailable: agent.unavailable ?? null,
+    shadowed: agent.shadowed ?? [],
     warnings,
     tone: broken ? "bad" : warnings.length > 0 ? "wait" : "ok",
   };

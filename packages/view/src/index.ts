@@ -873,6 +873,19 @@ export {
 } from "./setup-tools.ts";
 export { keyWhere } from "./key-where.ts";
 export { keyGroups, mcpRefParts, savedCount, type KeyGroups, type KeyRow, type KeyServer } from "./key-groups.ts";
+export { AGENT_TEMPLATE } from "./agent-template.ts";
+export {
+  agentActions,
+  agentKey,
+  agentProblemText,
+  definitionNote,
+  deleteQuestion,
+  hasUnsavedText,
+  replacesLine,
+  selectionAfter,
+  type AgentActions,
+  type AgentProblem,
+} from "./agents-edit.ts";
 export {
   AGENT_GROUPS,
   AGENT_SOURCES,

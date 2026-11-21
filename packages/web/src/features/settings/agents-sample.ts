@@ -101,6 +101,20 @@ export const SAMPLE_AGENTS: AgentInfo[] = [
   },
 ];
 
+/** Your copy of the bundled reviewer: it replaces the bundled one, which the list no longer shows on its own. */
+export const SAMPLE_COPY: AgentInfo = {
+  name: "reviewer",
+  description: "Reads a change and says what is wrong.",
+  origin: "user",
+  wish: "stronger",
+  tools: ["read_file", "grep"],
+  shadowed: ["bundled"],
+  used: 20,
+  finished: 19,
+  resolves_to: { model: "claude-sonnet", tier: "frontier", reason: "one step above the lead", fresh_window: false },
+  ...described("~/.golem/agents/reviewer.md", "reviewer", "Reads a change and says what is wrong.", "stronger", ["read_file", "grep"], "You are a reviewer. Say what is wrong, most serious first.", { max_calls: 20, max_seconds: 600, answer_chars: 6000 }),
+};
+
 const types = (resolves: Record<string, AgentInfo["resolves_to"]>, wishes: Record<string, string>): AgentInfo[] =>
   (
     [
