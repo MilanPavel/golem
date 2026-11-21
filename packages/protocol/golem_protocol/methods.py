@@ -1,4 +1,4 @@
-"""Which daemon methods a browser may call through the web gateway.
+"""Which daemon methods a browser or a paired phone may call through the gateways.
 
 Every daemon method is listed here, in the order the daemon registers them.
 ``auth.set`` and ``auth.remove`` are ``"local"``: a model provider's API key
@@ -9,6 +9,11 @@ page, with the daemon refusing edits that move a secret or widen trust
 writes ``gen/browser-methods.ts``), and a daemon test fails for any method that
 is missing here. ADR-028 and ADR-037 are the reference.
 
+``"device"`` is the level between: the browser and a paired phone may both call the method
+(``just gen`` writes ``gen/device-methods.ts``). A device never gets ``auth.*``, anything that
+edits ``config.toml``, rules, MCP servers, trust or runtimes, ``mcp.call``, ``daemon.shutdown``,
+or any ``device.*`` method. A method is ``"device"`` only when someone lists it so (ADR-051).
+
 A browser may edit user skills, and project skills only in a trusted project. The
 ``_protected`` skill methods are ``"local"`` and skip that check (ADR-054).
 """
@@ -16,29 +21,29 @@ A browser may edit user skills, and project skills only in a trusted project. Th
 from collections.abc import Mapping
 from typing import Final, Literal
 
-Access = Literal["browser", "local"]
+Access = Literal["device", "browser", "local"]
 
 METHOD_ACCESS: Final[Mapping[str, Access]] = {
-    "hello": "browser",
-    "daemon.status": "browser",
-    "ping": "browser",
-    "session.create": "browser",
+    "hello": "device",
+    "daemon.status": "device",
+    "ping": "device",
+    "session.create": "device",
     "config.get": "browser",
     "policy.update": "browser",
     "policy.remove": "browser",
     "session.revoke": "browser",
-    "session.attach": "browser",
-    "session.detach": "browser",
-    "session.list": "browser",
-    "session.fork": "browser",
-    "session.close": "browser",
-    "session.rename": "browser",
-    "message.send": "browser",
-    "approval.respond": "browser",
+    "session.attach": "device",
+    "session.detach": "device",
+    "session.list": "device",
+    "session.fork": "device",
+    "session.close": "device",
+    "session.rename": "device",
+    "message.send": "device",
+    "approval.respond": "device",
     "route.consent.answer": "browser",
-    "run.cancel": "browser",
-    "artifact.read": "browser",
-    "session.inspect": "browser",
+    "run.cancel": "device",
+    "artifact.read": "device",
+    "session.inspect": "device",
     "changes.list": "browser",
     "changes.diff": "browser",
     "changes.revert": "browser",
@@ -53,12 +58,12 @@ METHOD_ACCESS: Final[Mapping[str, Access]] = {
     "notifications.set": "browser",
     "routing.get": "browser",
     "routing.set": "browser",
-    "trace.get": "browser",
-    "trace.span": "browser",
+    "trace.get": "device",
+    "trace.span": "device",
     "auth.set": "local",
     "auth.remove": "local",
     "auth.list": "browser",
-    "model.list": "browser",
+    "model.list": "device",
     "mcp.list": "browser",
     "mcp.enable": "browser",
     "mcp.disable": "browser",
@@ -132,8 +137,18 @@ METHOD_ACCESS: Final[Mapping[str, Access]] = {
     "agents.get": "browser",
     "agents.set_wish": "browser",
     "helper.stop": "browser",
+    "relay.sign": "local",
+    "relay.dh": "local",
+    "device.sync": "local",
+    "connection.identify": "local",
 }
 
 BROWSER_METHODS: Final[frozenset[str]] = frozenset(
-    name for name, access in METHOD_ACCESS.items() if access == "browser"
+    name for name, access in METHOD_ACCESS.items() if access in ("browser", "device")
 )
+"""What a browser may call: the ``browser`` and the ``device`` methods."""
+
+DEVICE_METHODS: Final[frozenset[str]] = frozenset(
+    name for name, access in METHOD_ACCESS.items() if access == "device"
+)
+"""What a paired phone may call."""

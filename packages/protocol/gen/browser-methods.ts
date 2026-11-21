@@ -112,9 +112,13 @@ export const LOCAL_ONLY_METHODS: ReadonlySet<string> = new Set([
   "auth.remove",
   "auth.set",
   "config.raw.set_protected",
+  "connection.identify",
+  "device.sync",
   "eval.routing",
   "model.bench",
   "model.check",
+  "relay.dh",
+  "relay.sign",
   "skill.create_protected",
   "skill.write_protected",
 ]);

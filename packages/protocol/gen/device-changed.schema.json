@@ -1,0 +1,7 @@
+{
+  "additionalProperties": false,
+  "description": "The registry, the open pairings, or ``[relay] url`` changed. Call ``device.sync`` again.",
+  "properties": {},
+  "title": "DeviceChanged",
+  "type": "object"
+}

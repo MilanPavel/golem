@@ -6,6 +6,7 @@ from pydantic import BaseModel, BeforeValidator, ConfigDict, Field
 
 from golem_protocol.commands import (
     AgentRegistryChanged,
+    DeviceChanged,
     KeychainWait,
     McpLoginDone,
     McpServer,
@@ -307,8 +308,22 @@ class MemoryChangedNotification(BaseModel):
     params: MemoryChanged
 
 
+class DeviceChangedNotification(BaseModel):
+    """Server → every connection: the device registry changed. Not stored.
+
+    The gateway calls ``device.sync`` again (ADR-051).
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    jsonrpc: Literal["2.0"] = "2.0"
+    method: Literal["device.changed"] = "device.changed"
+    params: DeviceChanged = Field(default_factory=DeviceChanged)
+
+
 __all__ = [
     "AgentRegistryChangedNotification",
+    "DeviceChangedNotification",
     "KeychainWaitNotification",
     "McpLoginDoneNotification",
     "McpServerLogNotification",

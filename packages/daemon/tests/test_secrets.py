@@ -28,6 +28,7 @@ from golem.secrets import (
     SecretRef,
     SecretStoreError,
     account,
+    check_name,
     resolve,
 )
 
@@ -301,7 +302,13 @@ def test_the_platform_picks_the_store(monkeypatch: pytest.MonkeyPatch) -> None:
     assert KeychainSecrets()._security is True  # pyright: ignore[reportPrivateUsage]
 
 
-@pytest.mark.parametrize("name", ["anthropic", "mcp/", "provider/a b", "hook", "../x"])
+def test_the_relay_namespace_holds_the_macs_keys() -> None:
+    assert check_name("relay/identity") == "relay/identity"
+    assert account("relay/noise") == "relay/noise"
+    assert account("relay/push-0123abcd") == "relay/push-0123abcd"
+
+
+@pytest.mark.parametrize("name", ["anthropic", "mcp/", "provider/a b", "hook", "../x", "relay/"])
 def test_a_name_outside_the_namespaces_is_refused(name: str) -> None:
     with pytest.raises(ValueError, match="not a secret name"):
         account(name)

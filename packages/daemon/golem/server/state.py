@@ -35,6 +35,7 @@ from golem.sessions.manager import SessionManager
 from golem.sessions.usage import Usage
 from golem.skills.registry import SkillRegistry
 from golem.store.artifacts import ArtifactStore
+from golem.store.devices import DeviceStore
 from golem.store.routine_runs import RoutineRuns
 from golem.tools.registry import ToolRegistry
 
@@ -53,6 +54,8 @@ class DaemonState:
     watcher: FileWatcher | None = None
     """The file watcher of the ``on`` routines, once the daemon serves."""
     routine_runs: RoutineRuns | None = None
+    devices: DeviceStore | None = None
+    """The device registry, once the database is open."""
     models: ModelDiscovery | None = None
     facts: FactsSource | None = None
     pulls: PullManager | None = None

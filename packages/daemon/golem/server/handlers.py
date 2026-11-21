@@ -52,6 +52,7 @@ from golem.models.tiers import blended
 from golem.permissions.policy import PROJECT_POLICY
 from golem.secrets import SecretStore, SecretStoreError, check_name
 from golem.server.agents_edit import agent_infos, agents_set_wish
+from golem.server.device_rpc import connection_identify, device_sync, relay_dh, relay_sign
 from golem.server.dispatcher import (
     APPROVAL_NOT_FOUND,
     ARTIFACT_NOT_FOUND,
@@ -183,6 +184,7 @@ from golem_protocol.commands import (
     ConfigRawSetParams,
     ConfigRouting,
     ConfigRule,
+    ConnectionIdentifyParams,
     CostAgentRow,
     CostDayRow,
     CostGetParams,
@@ -191,6 +193,7 @@ from golem_protocol.commands import (
     CostRoleRow,
     CostTotals,
     DaemonStatus,
+    DeviceSyncParams,
     EvalRoutingParams,
     EvalRoutingResult,
     FileListParams,
@@ -280,6 +283,8 @@ from golem_protocol.commands import (
     PolicyEditResult,
     PolicyRemoveParams,
     PolicyUpdateParams,
+    RelayDhParams,
+    RelaySignParams,
     RevertConflict,
     RevertTarget,
     RouteConsentAnswerParams,
@@ -583,7 +588,11 @@ async def _approval_respond(
     sessions = _sessions(ctx)
     try:
         run_id = await sessions.respond(
-            params.session_id, params.call_id, params.decision, params.args
+            params.session_id,
+            params.call_id,
+            params.decision,
+            params.args,
+            device=ctx.connection.device,
         )
     except ApprovalNotFoundError as exc:
         raise RpcCallError(APPROVAL_NOT_FOUND, "no run waits on this tool call") from exc
@@ -2076,4 +2085,11 @@ def standard_methods() -> dict[str, Method]:
         "memory.delete": Method("memory.delete", MemoryDeleteParams, True, memory_delete),
         "memory.export": Method("memory.export", MemoryExportParams, True, memory_export),
         "memory.settings": Method("memory.settings", MemorySettingsParams, True, memory_settings),
+        "relay.sign": Method("relay.sign", RelaySignParams, True, relay_sign),
+        "relay.dh": Method("relay.dh", RelayDhParams, True, relay_dh),
+        "device.sync": Method("device.sync", DeviceSyncParams, True, device_sync),
+        # Before hello: the gateway names the device before anything the phone sent arrives.
+        "connection.identify": Method(
+            "connection.identify", ConnectionIdentifyParams, False, connection_identify
+        ),
     }

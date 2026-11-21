@@ -213,4 +213,35 @@ MIGRATIONS: tuple[tuple[str, ...], ...] = (
         " (parent_session_id, parent_call_id, helper_index)",
         "CREATE INDEX sessions_root ON sessions (root_session_id)",
     ),
+    (
+        """
+        CREATE TABLE devices (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            public_key BLOB,
+            paired_at TEXT NOT NULL,
+            last_seen TEXT,
+            apns_token TEXT,
+            apns_env TEXT,
+            revoked_at TEXT
+        )
+        """,
+        """
+        CREATE TABLE device_state (
+            id INTEGER PRIMARY KEY CHECK (id = 1),
+            seq INTEGER NOT NULL
+        )
+        """,
+        "INSERT INTO device_state (id, seq) VALUES (1, 0)",
+        """
+        CREATE TABLE rule_origins (
+            origin_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            rule TEXT NOT NULL,
+            device_id TEXT NOT NULL REFERENCES devices (id),
+            device_name TEXT NOT NULL,
+            at TEXT NOT NULL
+        )
+        """,
+        "CREATE INDEX rule_origins_rule ON rule_origins (rule)",
+    ),
 )

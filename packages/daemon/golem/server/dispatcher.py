@@ -40,8 +40,11 @@ KEY_UNCHECKED = -32015
 OLLAMA_FAILED = -32016
 BUDGET_SPENT = -32017
 LOCAL_ONLY = -32018
+DEVICE_REFUSED = -32021
+"""An unknown or revoked device: ``connection.identify``, or any call on its connection."""
 
 DRAIN_TIMEOUT_SECONDS = 5.0
+REVOKED_FLUSH_SECONDS = 1.0
 
 
 class RpcCallError(Exception):
@@ -128,6 +131,13 @@ class Dispatcher:
         except ValidationError:
             await send_failure(connection, INVALID_REQUEST, "invalid request", request_id)
             return
+        if connection.device is not None and not await _device_active(state, connection.device):
+            await send_failure(
+                connection, DEVICE_REFUSED, "device revoked", request.id, {"reason": "revoked"}
+            )
+            await connection.flush(REVOKED_FLUSH_SECONDS)
+            connection.abort()
+            return
         method = self.methods.get(request.method)
         if method is None:
             await send_failure(connection, METHOD_NOT_FOUND, "method not found", request.id)
@@ -158,6 +168,10 @@ class Dispatcher:
             await connection.send(success)
         except (ConnectionError, OSError):
             log.debug("client went away before the response was written")
+
+
+async def _device_active(state: DaemonState, device: str) -> bool:
+    return state.devices is not None and await state.devices.active(device)
 
 
 def _request_id(payload: object) -> str | int | None:

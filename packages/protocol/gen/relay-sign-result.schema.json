@@ -1,0 +1,16 @@
+{
+  "additionalProperties": false,
+  "description": "``sig`` is the 64-byte ECDSA P-256 signature, raw ``r || s``.",
+  "properties": {
+    "sig": {
+      "pattern": "^[A-Za-z0-9_-]{86}$",
+      "title": "Sig",
+      "type": "string"
+    }
+  },
+  "required": [
+    "sig"
+  ],
+  "title": "RelaySignResult",
+  "type": "object"
+}

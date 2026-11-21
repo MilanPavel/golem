@@ -89,6 +89,7 @@ from golem.store.artifacts import ArtifactStore
 from golem.store.blobs import BlobStore
 from golem.store.checkpoints import open_checkpoints
 from golem.store.database import Database, DatabaseTooNewError
+from golem.store.devices import DeviceStore
 from golem.store.events import EventLog
 from golem.store.records import RunRecords, SessionRecords
 from golem.store.routine_runs import RoutineRuns
@@ -102,6 +103,7 @@ from golem_protocol.commands import (
 )
 from golem_protocol.rpc import (
     AgentRegistryChangedNotification,
+    DeviceChangedNotification,
     KeychainWaitNotification,
     MemoryChangedNotification,
     ModelServerStatusNotification,
@@ -180,6 +182,7 @@ class DaemonApp:
         self._lock = DaemonLock(paths)
         self._server: asyncio.Server | None = None
         self._clients: set[asyncio.Task[None]] = set()
+        self._closers: set[asyncio.Task[None]] = set()
         self._connections: set[ClientConnection] = set()
         self._stop = asyncio.Event()
         self._draining = False
@@ -402,6 +405,10 @@ class DaemonApp:
                     self.paths.home,
                 )
                 self.state.routine_runs = RoutineRuns(database)
+                devices = DeviceStore(database)
+                devices.on_change = self._devices_changed
+                self.state.devices = devices
+                sessions.devices = devices
                 routines = RoutineScheduler(
                     runs=self.state.routine_runs,
                     launcher=SessionLauncher(sessions, mcp),
@@ -529,6 +536,7 @@ class DaemonApp:
             self.state.routines = None
             self.state.watcher = None
             self.state.routine_runs = None
+            self.state.devices = None
             self.state.sessions = None
             self.state.memory = None
             self._lock.release()
@@ -562,6 +570,22 @@ class DaemonApp:
             provider=server.provider, base_url=server.base_url, state=state, message=message
         )
         self._broadcast(ModelServerStatusNotification(params=status))
+
+    def _devices_changed(self) -> None:
+        """Tell every client, then close the connections of a device that was revoked."""
+        self._broadcast(DeviceChangedNotification())
+        task = asyncio.create_task(self._close_revoked(), name="golem-close-revoked")
+        self._closers.add(task)
+        task.add_done_callback(self._closers.discard)
+
+    async def _close_revoked(self) -> None:
+        devices = self.state.devices
+        if devices is None:
+            return
+        for connection in list(self._connections):
+            device = connection.device
+            if device is not None and not await devices.active(device):
+                connection.abort()
 
     def _broadcast(self, notification: BaseModel) -> None:
         """Queue ``notification`` on every connection that said hello."""

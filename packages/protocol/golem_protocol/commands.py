@@ -2111,6 +2111,123 @@ class HelperStopResult(BaseModel):
     stopped: bool
 
 
+DeviceId = Annotated[str, Field(pattern=r"^[0-9a-f]{32}$")]
+"""A device id: the first 16 bytes of the SHA-256 of its public key, in 32 lowercase hex."""
+
+B64Message = Annotated[str, Field(min_length=1, max_length=65536, pattern=r"^[A-Za-z0-9_-]+$")]
+"""Bytes of any length, base64url without padding (ADR-051, The wire in detail)."""
+
+B64Key32 = Annotated[str, Field(pattern=r"^[A-Za-z0-9_-]{43}$")]
+"""32 bytes (an X25519 key or a shared secret), base64url without padding."""
+
+B64Key65 = Annotated[str, Field(pattern=r"^[A-Za-z0-9_-]{87}$")]
+"""65 bytes (an uncompressed P-256 public key), base64url without padding."""
+
+B64Sig64 = Annotated[str, Field(pattern=r"^[A-Za-z0-9_-]{86}$")]
+"""64 bytes (a raw ``r || s`` ECDSA signature), base64url without padding."""
+
+
+class RelaySignParams(BaseModel):
+    """``relay.sign``. The gateway asks the daemon to sign with the Mac's relay key.
+
+    ``message`` is bytes. The daemon signs only a message that starts with
+    ``golem-relay-v1\\0``, so the gateway cannot use the key for anything else. ``local``: only
+    the gateway, on the Unix socket.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    message: B64Message
+
+
+class RelaySignResult(BaseModel):
+    """``sig`` is the 64-byte ECDSA P-256 signature, raw ``r || s``."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    sig: B64Sig64
+
+
+class RelayDhParams(BaseModel):
+    """``relay.dh``. A Diffie-Hellman of the Mac's Noise key with ``public_key``, an X25519 key."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    public_key: B64Key32
+
+
+class RelayDhResult(BaseModel):
+    """``shared`` is the 32-byte result. The daemon refuses a result of all zeros."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    shared: B64Key32
+
+
+class DeviceSyncParams(BaseModel):
+    """``device.sync``. What the gateway needs to serve phones. No params."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+
+class RelayDevice(BaseModel):
+    """A paired device that is not revoked: its id and its 65-byte public key."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    id: DeviceId
+    key: B64Key65
+
+
+class RelayPair(BaseModel):
+    """An open pairing slot: ``SHA-256(code)`` and its expiry in unix seconds."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    slot: Annotated[str, Field(min_length=1)]
+    exp: int = Field(ge=0)
+
+
+class DeviceSyncResult(BaseModel):
+    """The relay settings and the allow list.
+
+    ``url`` is ``[relay] url``, or null when it is not set. ``room`` is the Mac's room id,
+    the SHA-256 of ``mac_key``. ``noise_key`` is the public half of the Mac's Noise key.
+    ``seq`` grows by one with each change and is the ``seq`` of the relay's ``allow``
+    message. ``devices`` leaves out a revoked device.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    url: str | None = None
+    room: B64Key32
+    mac_key: B64Key65
+    noise_key: B64Key32
+    seq: int = Field(ge=0)
+    devices: list[RelayDevice]
+    pairs: list[RelayPair]
+
+
+class ConnectionIdentifyParams(BaseModel):
+    """``connection.identify``. The gateway names the device on this connection."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    device: DeviceId
+
+
+class ConnectionIdentifyResult(BaseModel):
+    """Empty. An unknown or revoked device gets an error instead."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+
+class DeviceChanged(BaseModel):
+    """The registry, the open pairings, or ``[relay] url`` changed. Call ``device.sync`` again."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+
 RoutineSource = Literal["user", "project"]
 """Where a routine is written: the user's ``config.toml``, or a project's."""
 
@@ -4394,6 +4511,10 @@ __all__ = [
     "AuthRemoveResult",
     "AuthSetParams",
     "AuthSetResult",
+    "B64Key32",
+    "B64Key65",
+    "B64Message",
+    "B64Sig64",
     "ChangedFile",
     "ChangesCommitInfoParams",
     "ChangesCommitInfoResult",
@@ -4416,6 +4537,8 @@ __all__ = [
     "ConfigRawSetParams",
     "ConfigRouting",
     "ConfigRule",
+    "ConnectionIdentifyParams",
+    "ConnectionIdentifyResult",
     "CostDayRow",
     "CostGetParams",
     "CostGetResult",
@@ -4423,6 +4546,10 @@ __all__ = [
     "CostRoleRow",
     "CostTotals",
     "DaemonStatus",
+    "DeviceChanged",
+    "DeviceId",
+    "DeviceSyncParams",
+    "DeviceSyncResult",
     "DirEntry",
     "EvalHelperRow",
     "EvalRoutingParams",
@@ -4574,6 +4701,12 @@ __all__ = [
     "PolicyEditResult",
     "PolicyRemoveParams",
     "PolicyUpdateParams",
+    "RelayDevice",
+    "RelayDhParams",
+    "RelayDhResult",
+    "RelayPair",
+    "RelaySignParams",
+    "RelaySignResult",
     "RouteConsentAnswerParams",
     "RouteConsentAnswerResult",
     "RoutineChanged",

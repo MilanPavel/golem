@@ -126,6 +126,7 @@ from golem.skills.invoke import Invocation, SkillInvokeError, invoke
 from golem.skills.pinned import PinMemory, SkillPinError, pinnable, pinned_folders
 from golem.skills.registry import SkillRegistry
 from golem.store.blobs import BlobStore
+from golem.store.devices import DeviceStore
 from golem.store.records import RunRecord, RunRecords, SessionActivity, SessionRecords
 from golem.tools.delegate import HelperOutcome, HelperSpec, describe
 from golem.tools.registry import ToolError, ToolScope
@@ -497,6 +498,8 @@ class SessionManager:
         """Where a routed turn reads the facts of the models. None: it has none."""
         self.budget: Budget | None = None
         """The caps of ``[budget]``. None: a turn is never held back for its cost."""
+        self.devices: DeviceStore | None = None
+        """The device registry. A rule a phone writes records its device here."""
         self.listed_refs: Callable[[], Sequence[str]] = lambda: ()
         """The refs of the models the daemon knows of, for the candidates of a pick."""
         self._sessions: dict[str, _LiveSession] = {}
@@ -2827,6 +2830,8 @@ class SessionManager:
         call_id: str,
         decision: ApprovalDecision,
         args: dict[str, object] | None = None,
+        *,
+        device: str | None = None,
     ) -> str:
         """Answer the tool call ``session_id``'s run waits on, and go on with that run.
 
@@ -2835,7 +2840,9 @@ class SessionManager:
         ``allow_always`` writes an allow rule for exactly this call first in
         the user's ``config.toml`` before the run goes on. ``args`` are the
         call's arguments as the user edited them, with ``allow``: the tool must
-        accept them, and no rule may deny the edited call.
+        accept them, and no rule may deny the edited call. ``device`` is the paired phone
+        that answered, from its connection. It goes with the rule and into
+        ``approval.resolved``.
 
         Raises :class:`ApprovalNotFoundError`, :class:`SessionNotFoundError`,
         :class:`SessionBusyError`, :class:`RuleWriteError`,
@@ -2861,7 +2868,7 @@ class SessionManager:
                 args = self._check_edited(session, pending.name, decision, args)
             rule: str | None = None
             if decision == "allow_always":
-                rule = await self._remember(session, pending.name, pending.args)
+                rule = await self._remember(session, pending.name, pending.args, device)
             if decision == "allow_session":
                 session.allowed_tools.add((pending.name, pending.subject))
             if pending.name == MCP_ENABLE and decision != "deny":
@@ -2883,6 +2890,7 @@ class SessionManager:
                 asked=pending.asked,
                 subject=pending.subject,
                 rule=rule,
+                device=device,
                 diff=pending.diff,
                 args=args,
                 mcp_servers=tuple(sorted(session.mcp_servers)),
@@ -3036,13 +3044,19 @@ class SessionManager:
             raise InvalidToolArgsError(explain(verdict, name))
         return checked
 
-    async def _remember(self, session: _LiveSession, name: str, args: dict[str, object]) -> str:
+    async def _remember(
+        self, session: _LiveSession, name: str, args: dict[str, object], device: str | None = None
+    ) -> str:
         root = None if session.cwd is None else Path(session.cwd)
         policy, tools = self._runtime.policy, self._runtime.tools.scoped(_scope(session))
         try:
-            return await asyncio.to_thread(policy.remember, tools, name, args, root)
+            rule = await asyncio.to_thread(policy.remember, tools, name, args, root)
         except (OSError, ValueError) as exc:
             raise RuleWriteError(str(exc)) from exc
+        if device is not None and self.devices is not None:
+            # The origin sits in the database next to the rule, never in config.toml.
+            await self.devices.note_rule(rule, device, datetime.now().astimezone().isoformat())
+        return rule
 
     def _memory_access(self, session: _LiveSession, profile: str, text: str) -> MemoryAccess | None:
         """What a run carries of memory, built once as it starts. None when memory is off."""

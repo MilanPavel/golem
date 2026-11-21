@@ -1,0 +1,16 @@
+{
+  "additionalProperties": false,
+  "description": "``shared`` is the 32-byte result. The daemon refuses a result of all zeros.",
+  "properties": {
+    "shared": {
+      "pattern": "^[A-Za-z0-9_-]{43}$",
+      "title": "Shared",
+      "type": "string"
+    }
+  },
+  "required": [
+    "shared"
+  ],
+  "title": "RelayDhResult",
+  "type": "object"
+}

@@ -19,8 +19,10 @@ from dataclasses import dataclass
 from fnmatch import fnmatchcase
 from pathlib import Path
 from typing import Annotated, Any, Literal, cast
+from urllib.parse import urlsplit
 
 from pydantic import (
+    AfterValidator,
     BaseModel,
     BeforeValidator,
     ConfigDict,
@@ -414,6 +416,32 @@ class MemorySettings(BaseModel):
         return self
 
 
+def _relay_url(value: str | None) -> str | None:
+    if value is None:
+        return None
+    parts = urlsplit(value)
+    if parts.scheme not in ("wss", "ws") or not parts.hostname:
+        raise ValueError("[relay] url must be a wss:// address")
+    if parts.username is not None or parts.password is not None or parts.query or parts.fragment:
+        raise ValueError("[relay] url has no user, query, or fragment")
+    if parts.scheme == "ws" and parts.hostname not in ("localhost", "127.0.0.1", "::1"):
+        raise ValueError("[relay] url must be wss://; ws:// is for a loopback address in tests")
+    return value
+
+
+class RelaySettings(BaseModel):
+    """``[relay]``. The relay a paired phone reaches this Mac through (ADR-051).
+
+    ``url`` is its ``wss://`` address, or a loopback ``ws://`` address for tests. Without it the
+    gateway opens no connection. It is read from the user's file only, and the browser may
+    not change it.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    url: Annotated[str | None, AfterValidator(_relay_url)] = None
+
+
 TerminalApp = Literal["Terminal", "iTerm", "Ghostty"]
 TERMINAL_APPS: tuple[TerminalApp, ...] = ("Terminal", "iTerm", "Ghostty")
 """The terminal apps a click can open a session in."""
@@ -741,6 +769,7 @@ PROTECTED_SETTINGS = frozenset(
         "web",
         "permissions",
         "coding",
+        "relay",
     }
 )
 """Top-level settings the browser's ``config.raw.set`` may not change (ADR-037).
@@ -787,13 +816,15 @@ class _ProjectToml(TomlConfigSettingsSource):
     ``[routing] local_only`` is a flag there (``true``), not the user's list of folders. The
     flag is read by ``golem.models.project_privacy``, so it is dropped here. The whole
     ``[memory]`` table is dropped too: a project may only set ``private = true``, which
-    ``golem.memory.project_privacy`` reads, and never ``auto_keep`` or the budget.
+    ``golem.memory.project_privacy`` reads, and never ``auto_keep`` or the budget. So is
+    ``[relay]``: a project never chooses where a phone connects.
     """
 
     def __call__(self) -> dict[str, Any]:
         data = dict(super().__call__())
         data.pop("routine", None)
         data.pop("memory", None)
+        data.pop("relay", None)
         routing = data.get("routing")
         if isinstance(routing, dict) and "local_only" in routing:
             data["routing"] = {k: v for k, v in routing.items() if k != "local_only"}  # pyright: ignore[reportUnknownVariableType]
@@ -846,6 +877,7 @@ class GolemSettings(BaseSettings):
     context: ContextSettings = Field(default_factory=ContextSettings)
     budget: BudgetSettings = Field(default_factory=BudgetSettings)
     memory: MemorySettings = Field(default_factory=MemorySettings)
+    relay: RelaySettings = Field(default_factory=RelaySettings)
     agents: AgentSettings = Field(default_factory=AgentSettings)
     notifications: NotificationSettings = Field(default_factory=NotificationSettings)
     routine: list[RoutineSettings] = Field(default_factory=list[RoutineSettings])

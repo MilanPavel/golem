@@ -798,12 +798,14 @@ public enum ApprovalNeededEventType: String, Codable {
 /// ``allow_session`` also allows ``name`` with this ``subject`` for the rest of
 /// the session, or every call of ``name`` when ``subject`` is null.
 /// ``allow_always`` wrote an allow rule, and ``rule`` names it. ``args`` are
-/// the arguments the user edited the call to, when they did.
+/// the arguments the user edited the call to, when they did. ``device`` is the id of the
+/// paired phone that answered, and null for an answer from a browser or a terminal.
 // MARK: - ApprovalResolvedData
 public struct ApprovalResolvedData: Codable {
     public let args: [String: JSONAny]?
     public let callID: String
     public let decision: Decision
+    public let device: String?
     public let name: String
     public let rule: String?
     public let subject: String?
@@ -812,15 +814,17 @@ public struct ApprovalResolvedData: Codable {
         case args = "args"
         case callID = "call_id"
         case decision = "decision"
+        case device = "device"
         case name = "name"
         case rule = "rule"
         case subject = "subject"
     }
 
-    public init(args: [String: JSONAny]?, callID: String, decision: Decision, name: String, rule: String?, subject: String?) {
+    public init(args: [String: JSONAny]?, callID: String, decision: Decision, device: String?, name: String, rule: String?, subject: String?) {
         self.args = args
         self.callID = callID
         self.decision = decision
+        self.device = device
         self.name = name
         self.rule = rule
         self.subject = subject
@@ -868,12 +872,14 @@ public struct ApprovalResolvedEvent: Codable {
 /// ``allow_session`` also allows ``name`` with this ``subject`` for the rest of
 /// the session, or every call of ``name`` when ``subject`` is null.
 /// ``allow_always`` wrote an allow rule, and ``rule`` names it. ``args`` are
-/// the arguments the user edited the call to, when they did.
+/// the arguments the user edited the call to, when they did. ``device`` is the id of the
+/// paired phone that answered, and null for an answer from a browser or a terminal.
 // MARK: - ApprovalResolvedEventData
 public struct ApprovalResolvedEventData: Codable {
     public let args: [String: JSONAny]?
     public let callID: String
     public let decision: Decision
+    public let device: String?
     public let name: String
     public let rule: String?
     public let subject: String?
@@ -882,15 +888,17 @@ public struct ApprovalResolvedEventData: Codable {
         case args = "args"
         case callID = "call_id"
         case decision = "decision"
+        case device = "device"
         case name = "name"
         case rule = "rule"
         case subject = "subject"
     }
 
-    public init(args: [String: JSONAny]?, callID: String, decision: Decision, name: String, rule: String?, subject: String?) {
+    public init(args: [String: JSONAny]?, callID: String, decision: Decision, device: String?, name: String, rule: String?, subject: String?) {
         self.args = args
         self.callID = callID
         self.decision = decision
+        self.device = device
         self.name = name
         self.rule = rule
         self.subject = subject
@@ -2315,6 +2323,28 @@ public struct ConfigRule: Codable {
     }
 }
 
+/// ``connection.identify``. The gateway names the device on this connection.
+// MARK: - ConnectionIdentifyParams
+public struct ConnectionIdentifyParams: Codable {
+    public let device: String
+
+    public enum CodingKeys: String, CodingKey {
+        case device = "device"
+    }
+
+    public init(device: String) {
+        self.device = device
+    }
+}
+
+/// Empty. An unknown or revoked device gets an error instead.
+// MARK: - ConnectionIdentifyResult
+public struct ConnectionIdentifyResult: Codable {
+
+    public init() {
+    }
+}
+
 /// The caps of ``[budget]`` and what is spent, in USD. A cap that is not set is null.
 // MARK: - ConsentCaps
 public struct ConsentCaps: Codable {
@@ -2837,6 +2867,127 @@ public enum Owner: String, Codable {
 public enum DaemonStatusState: String, Codable {
     case draining = "draining"
     case running = "running"
+}
+
+/// Server → every connection: the device registry changed. Not stored.
+///
+/// The gateway calls ``device.sync`` again (ADR-051).
+// MARK: - DeviceChangedNotification
+public struct DeviceChangedNotification: Codable {
+    public let jsonrpc: Jsonrpc?
+    public let method: DeviceChangedNotificationMethod?
+    public let params: DeviceChangedNotificationParams?
+
+    public enum CodingKeys: String, CodingKey {
+        case jsonrpc = "jsonrpc"
+        case method = "method"
+        case params = "params"
+    }
+
+    public init(jsonrpc: Jsonrpc?, method: DeviceChangedNotificationMethod?, params: DeviceChangedNotificationParams?) {
+        self.jsonrpc = jsonrpc
+        self.method = method
+        self.params = params
+    }
+}
+
+public enum DeviceChangedNotificationMethod: String, Codable {
+    case deviceChanged = "device.changed"
+}
+
+/// The registry, the open pairings, or ``[relay] url`` changed. Call ``device.sync`` again.
+// MARK: - DeviceChangedNotificationParams
+public struct DeviceChangedNotificationParams: Codable {
+
+    public init() {
+    }
+}
+
+/// The registry, the open pairings, or ``[relay] url`` changed. Call ``device.sync`` again.
+// MARK: - DeviceChanged
+public struct DeviceChanged: Codable {
+
+    public init() {
+    }
+}
+
+/// ``device.sync``. What the gateway needs to serve phones. No params.
+// MARK: - DeviceSyncParams
+public struct DeviceSyncParams: Codable {
+
+    public init() {
+    }
+}
+
+/// The relay settings and the allow list.
+///
+/// ``url`` is ``[relay] url``, or null when it is not set. ``room`` is the Mac's room id,
+/// the SHA-256 of ``mac_key``. ``noise_key`` is the public half of the Mac's Noise key.
+/// ``seq`` grows by one with each change and is the ``seq`` of the relay's ``allow``
+/// message. ``devices`` leaves out a revoked device.
+// MARK: - DeviceSyncResult
+public struct DeviceSyncResult: Codable {
+    public let devices: [DeviceElement]
+    public let macKey: String
+    public let noiseKey: String
+    public let pairs: [PairElement]
+    public let room: String
+    public let seq: Int
+    public let url: String?
+
+    public enum CodingKeys: String, CodingKey {
+        case devices = "devices"
+        case macKey = "mac_key"
+        case noiseKey = "noise_key"
+        case pairs = "pairs"
+        case room = "room"
+        case seq = "seq"
+        case url = "url"
+    }
+
+    public init(devices: [DeviceElement], macKey: String, noiseKey: String, pairs: [PairElement], room: String, seq: Int, url: String?) {
+        self.devices = devices
+        self.macKey = macKey
+        self.noiseKey = noiseKey
+        self.pairs = pairs
+        self.room = room
+        self.seq = seq
+        self.url = url
+    }
+}
+
+/// A paired device that is not revoked: its id and its 65-byte public key.
+// MARK: - DeviceElement
+public struct DeviceElement: Codable {
+    public let id: String
+    public let key: String
+
+    public enum CodingKeys: String, CodingKey {
+        case id = "id"
+        case key = "key"
+    }
+
+    public init(id: String, key: String) {
+        self.id = id
+        self.key = key
+    }
+}
+
+/// An open pairing slot: ``SHA-256(code)`` and its expiry in unix seconds.
+// MARK: - PairElement
+public struct PairElement: Codable {
+    public let exp: Int
+    public let slot: String
+
+    public enum CodingKeys: String, CodingKey {
+        case exp = "exp"
+        case slot = "slot"
+    }
+
+    public init(exp: Int, slot: String) {
+        self.exp = exp
+        self.slot = slot
+    }
 }
 
 /// A folder in a listing. ``git`` is true when it has a ``.git`` entry.
@@ -12482,6 +12633,101 @@ public struct PromptSectionInfo: Codable {
     }
 }
 
+/// A paired device that is not revoked: its id and its 65-byte public key.
+// MARK: - RelayDevice
+public struct RelayDevice: Codable {
+    public let id: String
+    public let key: String
+
+    public enum CodingKeys: String, CodingKey {
+        case id = "id"
+        case key = "key"
+    }
+
+    public init(id: String, key: String) {
+        self.id = id
+        self.key = key
+    }
+}
+
+/// ``relay.dh``. A Diffie-Hellman of the Mac's Noise key with ``public_key``, an X25519 key.
+// MARK: - RelayDhParams
+public struct RelayDhParams: Codable {
+    public let publicKey: String
+
+    public enum CodingKeys: String, CodingKey {
+        case publicKey = "public_key"
+    }
+
+    public init(publicKey: String) {
+        self.publicKey = publicKey
+    }
+}
+
+/// ``shared`` is the 32-byte result. The daemon refuses a result of all zeros.
+// MARK: - RelayDhResult
+public struct RelayDhResult: Codable {
+    public let shared: String
+
+    public enum CodingKeys: String, CodingKey {
+        case shared = "shared"
+    }
+
+    public init(shared: String) {
+        self.shared = shared
+    }
+}
+
+/// An open pairing slot: ``SHA-256(code)`` and its expiry in unix seconds.
+// MARK: - RelayPair
+public struct RelayPair: Codable {
+    public let exp: Int
+    public let slot: String
+
+    public enum CodingKeys: String, CodingKey {
+        case exp = "exp"
+        case slot = "slot"
+    }
+
+    public init(exp: Int, slot: String) {
+        self.exp = exp
+        self.slot = slot
+    }
+}
+
+/// ``relay.sign``. The gateway asks the daemon to sign with the Mac's relay key.
+///
+/// ``message`` is bytes. The daemon signs only a message that starts with
+/// ``golem-relay-v1\0``, so the gateway cannot use the key for anything else. ``local``:
+/// only
+/// the gateway, on the Unix socket.
+// MARK: - RelaySignParams
+public struct RelaySignParams: Codable {
+    public let message: String
+
+    public enum CodingKeys: String, CodingKey {
+        case message = "message"
+    }
+
+    public init(message: String) {
+        self.message = message
+    }
+}
+
+/// ``sig`` is the 64-byte ECDSA P-256 signature, raw ``r || s``.
+// MARK: - RelaySignResult
+public struct RelaySignResult: Codable {
+    public let sig: String
+
+    public enum CodingKeys: String, CodingKey {
+        case sig = "sig"
+    }
+
+    public init(sig: String) {
+        self.sig = sig
+    }
+}
+
 /// A file a revert did not touch.
 // MARK: - RevertConflict
 public struct RevertConflict: Codable {
@@ -15563,7 +15809,8 @@ public struct Params: Codable {
 /// ``allow_session`` also allows ``name`` with this ``subject`` for the rest of
 /// the session, or every call of ``name`` when ``subject`` is null.
 /// ``allow_always`` wrote an allow rule, and ``rule`` names it. ``args`` are
-/// the arguments the user edited the call to, when they did.
+/// the arguments the user edited the call to, when they did. ``device`` is the id of the
+/// paired phone that answered, and null for an answer from a browser or a terminal.
 ///
 /// The run waits for the user's yes to a paid model. It is paused until
 /// ``route.consent.answer``.
@@ -15778,6 +16025,7 @@ public struct ParamsData: Codable {
     public let source: String?
     public let subject: String?
     public let decision: Decision?
+    public let device: String?
     public let rule: String?
     public let alternatives: [Answer]?
     public let caps: FluffyConsentCaps?
@@ -15916,6 +16164,7 @@ public struct ParamsData: Codable {
         case source = "source"
         case subject = "subject"
         case decision = "decision"
+        case device = "device"
         case rule = "rule"
         case alternatives = "alternatives"
         case caps = "caps"
@@ -15955,7 +16204,7 @@ public struct ParamsData: Codable {
         case workingMS = "working_ms"
     }
 
-    public init(agent: Agent?, cwd: String?, forkedFrom: PurpleForkedFrom?, modelName: String?, modelProfile: String?, modelProvider: String?, origin: String?, parent: PurpleSessionParent?, route: RouteEnum?, allowedTools: [PurpleSessionAllowance]?, mcpServers: [String]?, paidOk: Bool?, title: String?, runID: String?, status: PurpleStatus?, summary: String?, reason: String?, detail: String?, model: String?, provider: String?, rejected: [FluffyModelRejection]?, replacesModel: String?, tier: Tier?, options: [String: Option]?, mode: DefaultPermissionModeEnum?, on: Bool?, messageID: String?, role: MessageCompletedDataRole?, text: String?, interrupted: Bool?, skill: FluffySkillCall?, thinking: String?, thinkingMS: Int?, clearedIDS: [String]?, contextWindow: Int?, estimatedTokens: Int?, index: Int?, messageBytes: [Int]?, messageChars: [Int]?, messageIDS: [String]?, numCtx: Int?, parentCallID: String?, profile: String?, summaryChars: Int?, systemBytes: Int?, systemChars: Int?, systemPromptSHA: String?, systemSections: [TentacledPromptSectionInfo]?, toolsBytes: Int?, toolsChars: Int?, toolsSHA: String?, windowEstimated: Bool?, windowPlanned: Bool?, costUsd: Double?, failed: Bool?, firstTokenMS: Int?, latencyMS: Int?, loadMS: Int?, price: FluffyCallPrice?, promptMS: Int?, replyMS: Int?, stopReason: String?, textToolCalls: TextToolCalls?, usage: FluffyTokenUsage?, action: ContextChangedDataAction?, afterTokens: Int?, beforeTokens: Int?, count: Int?, reloadMS: Int?, room: Int?, windowFrom: Int?, windowTo: Int?, code: Code?, hint: String?, message: String?, args: [String: JSONAny]?, callID: String?, name: String?, chars: Int?, lines: Int?, path: String?, holder: String?, line: String?, position: Int?, retryInMS: Int?, scope: ModelWaitingDataScope?, silentMS: Int?, waiting: Bool?, willRetry: Bool?, window: Int?, artifactID: String?, diff: String?, durationMS: Int?, preview: String?, sources: [PurpleToolSource]?, truncated: Bool?, source: String?, subject: String?, decision: Decision?, rule: String?, alternatives: [Answer]?, caps: FluffyConsentCaps?, estimatedUsd: Double?, helperID: String?, label: String?, notSent: [String]?, sent: [String]?, signal: String?, why: String?, answer: Answer?, todos: [PurpleTodo]?, planID: String?, steps: [FluffyPlanStep]?, added: Int?, changeID: String?, removed: Int?, reverts: String?, hash: String?, how: How?, checks: [FluffyCheckInfo]?, checkID: String?, command: String?, round: Int?, exitCode: Int?, output: String?, pickReason: String?, wish: String?, calls: Int?, stepID: String?, state: PurpleState?, helperIDS: [String]?, answerTokens: Int?, modelCalls: Int?, stopped: Stopped?, tokens: Int?, workingMS: Int?) {
+    public init(agent: Agent?, cwd: String?, forkedFrom: PurpleForkedFrom?, modelName: String?, modelProfile: String?, modelProvider: String?, origin: String?, parent: PurpleSessionParent?, route: RouteEnum?, allowedTools: [PurpleSessionAllowance]?, mcpServers: [String]?, paidOk: Bool?, title: String?, runID: String?, status: PurpleStatus?, summary: String?, reason: String?, detail: String?, model: String?, provider: String?, rejected: [FluffyModelRejection]?, replacesModel: String?, tier: Tier?, options: [String: Option]?, mode: DefaultPermissionModeEnum?, on: Bool?, messageID: String?, role: MessageCompletedDataRole?, text: String?, interrupted: Bool?, skill: FluffySkillCall?, thinking: String?, thinkingMS: Int?, clearedIDS: [String]?, contextWindow: Int?, estimatedTokens: Int?, index: Int?, messageBytes: [Int]?, messageChars: [Int]?, messageIDS: [String]?, numCtx: Int?, parentCallID: String?, profile: String?, summaryChars: Int?, systemBytes: Int?, systemChars: Int?, systemPromptSHA: String?, systemSections: [TentacledPromptSectionInfo]?, toolsBytes: Int?, toolsChars: Int?, toolsSHA: String?, windowEstimated: Bool?, windowPlanned: Bool?, costUsd: Double?, failed: Bool?, firstTokenMS: Int?, latencyMS: Int?, loadMS: Int?, price: FluffyCallPrice?, promptMS: Int?, replyMS: Int?, stopReason: String?, textToolCalls: TextToolCalls?, usage: FluffyTokenUsage?, action: ContextChangedDataAction?, afterTokens: Int?, beforeTokens: Int?, count: Int?, reloadMS: Int?, room: Int?, windowFrom: Int?, windowTo: Int?, code: Code?, hint: String?, message: String?, args: [String: JSONAny]?, callID: String?, name: String?, chars: Int?, lines: Int?, path: String?, holder: String?, line: String?, position: Int?, retryInMS: Int?, scope: ModelWaitingDataScope?, silentMS: Int?, waiting: Bool?, willRetry: Bool?, window: Int?, artifactID: String?, diff: String?, durationMS: Int?, preview: String?, sources: [PurpleToolSource]?, truncated: Bool?, source: String?, subject: String?, decision: Decision?, device: String?, rule: String?, alternatives: [Answer]?, caps: FluffyConsentCaps?, estimatedUsd: Double?, helperID: String?, label: String?, notSent: [String]?, sent: [String]?, signal: String?, why: String?, answer: Answer?, todos: [PurpleTodo]?, planID: String?, steps: [FluffyPlanStep]?, added: Int?, changeID: String?, removed: Int?, reverts: String?, hash: String?, how: How?, checks: [FluffyCheckInfo]?, checkID: String?, command: String?, round: Int?, exitCode: Int?, output: String?, pickReason: String?, wish: String?, calls: Int?, stepID: String?, state: PurpleState?, helperIDS: [String]?, answerTokens: Int?, modelCalls: Int?, stopped: Stopped?, tokens: Int?, workingMS: Int?) {
         self.agent = agent
         self.cwd = cwd
         self.forkedFrom = forkedFrom
@@ -16055,6 +16304,7 @@ public struct ParamsData: Codable {
         self.source = source
         self.subject = subject
         self.decision = decision
+        self.device = device
         self.rule = rule
         self.alternatives = alternatives
         self.caps = caps

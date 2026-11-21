@@ -5,6 +5,7 @@ export type Args = {
 } | null;
 export type CallId = string;
 export type Decision = 'allow' | 'allow_session' | 'allow_always' | 'deny';
+export type Device = string | null;
 export type Name = string;
 export type Rule = string | null;
 export type Subject = string | null;
@@ -15,12 +16,14 @@ export type Subject = string | null;
  * ``allow_session`` also allows ``name`` with this ``subject`` for the rest of
  * the session, or every call of ``name`` when ``subject`` is null.
  * ``allow_always`` wrote an allow rule, and ``rule`` names it. ``args`` are
- * the arguments the user edited the call to, when they did.
+ * the arguments the user edited the call to, when they did. ``device`` is the id of the
+ * paired phone that answered, and null for an answer from a browser or a terminal.
  */
 export interface ApprovalResolvedData {
   args?: Args;
   call_id: CallId;
   decision: Decision;
+  device?: Device;
   name: Name;
   rule?: Rule;
   subject?: Subject;
