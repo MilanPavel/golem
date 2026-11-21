@@ -10,12 +10,16 @@ protocol MacLink: AnyObject {
     /// Reads the Mac's sessions into the list.
     func refresh(into list: SessionListModel) async throws
     func stop() async
+    /// Answers approvals and hears when one is answered elsewhere.
+    var approvals: any ApprovalChannel { get }
 }
 
 /// The real link: one `Connection` to the Mac, through the relay.
 @MainActor
 final class ConnectionLink: MacLink {
     private let connection: Connection
+
+    var approvals: any ApprovalChannel { ConnectionApprovalChannel(connection: connection) }
 
     init(mac: PairedMac, key: any DeviceKey) {
         connection = Connection(config: mac.connectionConfig(), key: key)
@@ -49,6 +53,10 @@ struct AppEnvironment {
     var pairing: () throws -> any PairingService
     var link: (PairedMac) throws -> any MacLink
     var now: () -> Date = Date.init
+    /// Face ID or the passcode, for an Always allow and a risky Allow once.
+    var authenticator: any ApprovalAuthenticator = LocalAuthenticator()
+    /// This phone's name, as the rule note shows it.
+    var deviceName = "this iPhone"
 
     @MainActor
     static func live() -> AppEnvironment {
@@ -60,7 +68,8 @@ struct AppEnvironment {
                     key: try DeviceKeys.load(), deviceName: UIDevice.current.name,
                     deviceModel: UIDevice.current.model, store: store)
             },
-            link: { ConnectionLink(mac: $0, key: try DeviceKeys.load()) })
+            link: { ConnectionLink(mac: $0, key: try DeviceKeys.load()) },
+            deviceName: UIDevice.current.name)
     }
 }
 
@@ -83,6 +92,10 @@ final class AppModel {
     private(set) var connection: ConnectionState = .stopped(.stopped)
     private(set) var listError: String?
     let sessions = SessionListModel()
+    /// The approval sheet that is open, if any. Whoever lists approvals sets it with `present(approval:)`.
+    private(set) var presentedApproval: ApprovalSheetModel?
+    /// The review card that is open, if any. Only set while `ReviewFeature` is on.
+    private(set) var presentedReview: ReviewModel?
 
     private let environment: AppEnvironment
     private var pairingTask: Task<Void, Never>?
@@ -213,6 +226,32 @@ final class AppModel {
         sessions.replace(with: [])
         connection = .stopped(.stopped)
         screen = .scan(message: nil)
+    }
+
+    // MARK: - Approvals
+
+    /// Opens the approval sheet for a request. Nothing happens without a link to the Mac.
+    func present(approval request: ApprovalRequest) {
+        guard let link else { return }
+        presentedApproval = ApprovalSheetModel(
+            request: request, deviceName: environment.deviceName, authenticator: environment.authenticator,
+            channel: link.approvals)
+    }
+
+    func dismissApproval() {
+        presentedApproval?.stopFollowing()
+        presentedApproval = nil
+    }
+
+    /// Opens the review card for a draft. The protocol has no review events yet, so this is off in a
+    /// release build and a debug build opens a fixture.
+    func present(review request: ReviewRequest, responder: any ReviewResponder) {
+        guard ReviewFeature.isEnabled() else { return }
+        presentedReview = ReviewModel(request: request, responder: responder)
+    }
+
+    func dismissReview() {
+        presentedReview = nil
     }
 
     // MARK: - Words for people
