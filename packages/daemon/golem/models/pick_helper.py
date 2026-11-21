@@ -6,7 +6,7 @@ model. It never fails on an empty tier.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, replace
 from typing import Literal
 
@@ -28,6 +28,30 @@ Wish = Literal["cheapest", "same", "stronger", "local", "budget", "frontier"] | 
 HelperReason = Literal[
     "same", "cheapest", "stronger", "tier", "named", "nearest", "privacy", "lead"
 ]
+
+
+def _loose(name: str) -> str:
+    return name.casefold().replace("-", "").replace(".", "")
+
+
+def find_named(wish: str, models: Iterable[ModelFacts]) -> ModelFacts | None:
+    """The model a wish names: its exact ref or profile, else the one model whose name after
+    the slash is the same with case, hyphens and dots ignored. Two fits are no match."""
+    models = list(models)
+    for model in models:
+        if wish in (model.ref, model.profile):
+            return model
+    provider, slash, tail = wish.rpartition("/")
+    loose = _loose(tail)
+    if not loose:
+        return None
+    fits = {
+        m.ref: m
+        for m in models
+        if _loose(m.ref.partition("/")[2]) == loose
+        and (not slash or m.ref.partition("/")[0].casefold() == provider.casefold())
+    }
+    return next(iter(fits.values())) if len(fits) == 1 else None
 
 
 @dataclass(frozen=True, slots=True)
@@ -175,14 +199,12 @@ def pick_helper(
     if wish in TIERS:
         return wished_tier(wish, wish)  # pyright: ignore[reportArgumentType]
 
-    named = next((m for m in pool if wish in (m.ref, m.profile)), None)
+    named = find_named(wish, pool)
     if named is not None:
         return done(named, "named", f"the model you named, {named.ref}")
     reasons = {r.ref: r.why for r in rejected}
     reasons.update({m.ref: why for m, why in held})
-    known = next(
-        (m for m in [*candidates, *(m for m, _ in held)] if wish in (m.ref, m.profile)), None
-    )
+    known = find_named(wish, [*candidates, *(m for m, _ in held)])
     if known is not None:
         # The named model is known but not usable now: its tier, and the line says why.
         choice = wished_tier(known.tier, known.tier)

@@ -51,11 +51,12 @@ from golem.memory.service import MemoryAccess, MemoryService
 from golem.models import options as model_options
 from golem.models.budget import Budget, Room, spent_text
 from golem.models.cost import cost_usd
+from golem.models.discovery import ListedModel
 from golem.models.errors import BUDGET_HINT
 from golem.models.facts import FactsSource, ModelFacts
 from golem.models.keys import KeyStoreError
 from golem.models.pick import Choice, Rejected, Traits, ladder, pick
-from golem.models.pick_helper import HelperChoice, pick_helper
+from golem.models.pick_helper import HelperChoice, find_named, pick_helper
 from golem.models.privacy import LOCAL_ONLY_REFUSAL, is_local_only
 from golem.models.project_privacy import project_local_only
 from golem.models.router import ModelConfigError, ModelIdentity, ModelRouter
@@ -511,6 +512,8 @@ class SessionManager:
         """The device registry. A rule a phone writes records its device here."""
         self.listed_refs: Callable[[], Sequence[str]] = lambda: ()
         """The refs of the models the daemon knows of, for the candidates of a pick."""
+        self.listed_models: Callable[[], Sequence[ListedModel]] = lambda: ()
+        """The models of the last listing, as cached. No call: the ``delegate`` text reads it."""
         self._sessions: dict[str, _LiveSession] = {}
         self._runs: dict[str, _LiveRun] = {}
         self._naming: set[asyncio.Task[None]] = set()
@@ -1568,7 +1571,7 @@ class SessionManager:
         if own is None:
             return None
         candidates = ladder(settings.ladder, profile, everything)
-        named = next((m for m in everything if wish in (m.profile, m.ref)), None)
+        named = find_named(wish, everything)
         if named is not None and all(named.ref != m.ref for m in candidates):
             candidates.append(named)  # a model the agent names, though the ladder does not
         held: tuple[tuple[ModelFacts, str], ...] = ()
@@ -1706,13 +1709,17 @@ class SessionManager:
     def _named_models(self) -> list[str]:
         """What a lead may name as a helper's ``model``, for the description of ``delegate``.
 
-        Read from the settings alone (no listing, no clock), so the text is the same on every
-        turn until the settings or the keys change. The tiers that exist come first, then the
-        profiles that can run: local ones, then hosted ones with a key, cheapest first.
+        Read from the settings and the cached listing (no call, no clock), so the text is the
+        same on every turn until they change. The tiers that exist come first, then local
+        models, then hosted ones, cheapest first. Local ones are profiles that can run and
+        installed listed models, at most :data:`_LOCAL_NAMED` when a hosted one is ready, so the
+        hosted ones stay within what ``delegate`` shows. Hosted ones are profiles with a key and
+        listed models that are ready; a profile hides the listed model it points at.
         """
         router = self._runtime.router
         local: list[str] = []
         hosted: list[tuple[float, str]] = []
+        seen: set[str] = set()
         for name, settings in sorted(router.profiles().items()):
             try:
                 resolved = router.resolve(name)
@@ -1721,8 +1728,22 @@ class SessionManager:
                 elif router.api_key(resolved.provider_name) is not None:
                     cost = None if settings.price is None else blended(settings.price)
                     hosted.append((float("inf") if cost is None else cost, name))
+                else:
+                    continue
+                seen.add(resolved.ref)
             except (ModelConfigError, KeyStoreError):
                 continue
+        for listed in sorted(self.listed_models(), key=lambda m: m.ref):
+            if listed.status != "ready" or listed.ref in seen:
+                continue
+            seen.add(listed.ref)
+            if listed.provider == "ollama":
+                local.append(listed.ref)
+            else:
+                cost = None if listed.price is None else blended(listed.price)
+                hosted.append((float("inf") if cost is None else cost, listed.ref))
+        if hosted:
+            local = local[:_LOCAL_NAMED]
         tiers = [*(["local"] if local else []), *(["budget", "frontier"] if hosted else [])]
         return [*tiers, *local, *(name for _, name in sorted(hosted))]
 
@@ -3603,6 +3624,9 @@ def _epoch(ts: str) -> float | None:
     except ValueError:
         return None
 
+
+_LOCAL_NAMED = 2
+"""Local names in the model list of ``delegate`` when a hosted model is ready too."""
 
 _SHOWN_ARGS = ("path", "pattern", "query", "ref")
 

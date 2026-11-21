@@ -172,3 +172,35 @@ def test_a_ready_lead_always_gives_a_model(private: bool) -> None:
             assert got.reason and got.detail
             if private and any(m.tier == "local" for m in (*setup, lead)):
                 assert got.model.tier == "local"
+
+
+LUNA = make("openai/gpt-6-luna", "frontier")
+
+
+def test_a_loose_name_finds_the_model_by_the_part_after_the_slash() -> None:
+    for wish in ("gpt-6-luna", "gpt6-luna", "GPT-6-Luna", "gpt6luna", "openai/gpt6-luna"):
+        got = pick_helper(wish, QWEN, [QWEN, LUNA], Traits(paid_allowed=True))
+        assert got.model == LUNA and got.reason == "named", wish
+
+
+def test_a_loose_name_that_fits_two_models_is_no_match() -> None:
+    other = make("azure/gpt-6-luna", "frontier")
+    got = pick_helper("gpt6-luna", QWEN, [QWEN, LUNA, other], Traits())
+    assert got.model == QWEN and got.detail == "gpt6-luna is not set up, so the lead's model"
+    assert pick_helper("openai/gpt6-luna", QWEN, [QWEN, LUNA, other], Traits()).model == LUNA
+
+
+def test_an_exact_name_wins_over_a_loose_fit() -> None:
+    twin = make("azure/gpt-6-luna", "frontier")
+    got = pick_helper("azure/gpt-6-luna", QWEN, [QWEN, LUNA, twin], Traits())
+    assert got.model == twin
+
+
+def test_a_loosely_named_paid_model_stays_out_of_a_private_chat() -> None:
+    got = pick_helper("gpt6-luna", QWEN, [QWEN, LUNA], PRIVATE)
+    assert got.model == QWEN and got.reason == "privacy"
+    assert "openai/gpt-6-luna cannot be used now" in got.detail
+
+
+def test_a_loosely_named_paid_model_asks_for_consent() -> None:
+    assert pick_helper("gpt6-luna", QWEN, [QWEN, LUNA], Traits()).needs_consent
