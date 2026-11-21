@@ -1,15 +1,22 @@
 import GolemKit
 import Observation
 import SwiftUI
+import UserNotifications
 
 /// The live link to a paired Mac, as the session list needs it. A fake stands in for it in UI tests.
 @MainActor
 protocol MacLink: AnyObject {
     /// Starts connecting and reports each state.
     func start() -> AsyncStream<ConnectionState>
-    /// Reads the Mac's sessions into the list.
+    /// Reads the Mac's sessions into the list, and asks the Mac to push each change after this.
     func refresh(into list: SessionListModel) async throws
+    /// Reads the Mac's runs.
+    func refresh(into runs: RunsModel) async throws
+    /// A session's new summary, each time one changes.
+    func summaries() -> AsyncStream<InboxSession>
     func stop() async
+    /// The full request for an Inbox item: the arguments, diff and folder come from the session's events.
+    func approvalRequest(for item: InboxItem, folder: String?) async -> ApprovalRequest
     /// Answers approvals and hears when one is answered elsewhere.
     var approvals: any ApprovalChannel { get }
 }
@@ -20,6 +27,11 @@ final class ConnectionLink: MacLink {
     private let connection: Connection
 
     var approvals: any ApprovalChannel { ConnectionApprovalChannel(connection: connection) }
+
+    func approvalRequest(for item: InboxItem, folder: String?) async -> ApprovalRequest {
+        await ApprovalRequestLoader.load(item: item, folder: folder, connection: connection)
+            ?? ApprovalRequest(item: item, folder: folder)
+    }
 
     init(mac: PairedMac, key: any DeviceKey) {
         connection = Connection(config: mac.connectionConfig(), key: key)
@@ -41,6 +53,21 @@ final class ConnectionLink: MacLink {
         try await list.refresh(from: connection)
     }
 
+    func refresh(into runs: RunsModel) async throws {
+        try await runs.refresh(from: connection)
+    }
+
+    func summaries() -> AsyncStream<InboxSession> {
+        let connection = connection
+        return AsyncStream { continuation in
+            let task = Task {
+                for await summary in await connection.summaries() { continuation.yield(summary) }
+                continuation.finish()
+            }
+            continuation.onTermination = { _ in task.cancel() }
+        }
+    }
+
     func stop() async {
         await connection.stop()
     }
@@ -53,6 +80,8 @@ struct AppEnvironment {
     var pairing: () throws -> any PairingService
     var link: (PairedMac) throws -> any MacLink
     var now: () -> Date = Date.init
+    /// Puts the count on the app icon. Does nothing without the badge permission.
+    var setBadge: @MainActor (Int) -> Void = { _ in }
     /// Face ID or the passcode, for an Always allow and a risky Allow once.
     var authenticator: any ApprovalAuthenticator = LocalAuthenticator()
     /// This phone's name, as the rule note shows it.
@@ -69,6 +98,7 @@ struct AppEnvironment {
                     deviceModel: UIDevice.current.model, store: store)
             },
             link: { ConnectionLink(mac: $0, key: try DeviceKeys.load()) },
+            setBadge: { Badge.set($0) },
             deviceName: UIDevice.current.name)
     }
 }
@@ -82,7 +112,25 @@ enum Screen: Equatable {
     /// The words, waiting for the owner on the Mac.
     case confirm(words: [String])
     case paired(macName: String)
-    case sessions
+    /// The tabs: Inbox, Automations, Chats.
+    case tabs
+}
+
+/// The app icon's badge. It needs the user's permission for badges; without it, nothing happens.
+enum Badge {
+    @MainActor static func set(_ count: Int) {
+        Task {
+            let center = UNUserNotificationCenter.current()
+            let settings = await center.notificationSettings()
+            if settings.badgeSetting == .notSupported { return }
+            if settings.authorizationStatus == .notDetermined {
+                guard (try? await center.requestAuthorization(options: [.badge])) == true else { return }
+            } else if settings.badgeSetting != .enabled {
+                return
+            }
+            try? await center.setBadgeCount(count)
+        }
+    }
 }
 
 @MainActor @Observable
@@ -92,6 +140,7 @@ final class AppModel {
     private(set) var connection: ConnectionState = .stopped(.stopped)
     private(set) var listError: String?
     let sessions = SessionListModel()
+    let runs = RunsModel()
     /// The approval sheet that is open, if any. Whoever lists approvals sets it with `present(approval:)`.
     private(set) var presentedApproval: ApprovalSheetModel?
     /// The review card that is open, if any. Only set while `ReviewFeature` is on.
@@ -102,12 +151,17 @@ final class AppModel {
     private var pairingLink: PairLink?
     private var link: (any MacLink)?
     private var linkTask: Task<Void, Never>?
+    private var summaryTask: Task<Void, Never>?
+    private var runsTask: Task<Void, Never>?
+    private var openingApproval = false
+    @ObservationIgnored private let inboxModel: InboxModel
 
     init(environment: AppEnvironment) {
         self.environment = environment
+        inboxModel = InboxModel(sessions: sessions, runs: runs)
         if let mac = try? environment.store.load() {
             macName = mac.name
-            screen = .sessions
+            screen = .tabs
             startLink(to: mac)
         } else {
             screen = .scan(message: nil)
@@ -169,7 +223,7 @@ final class AppModel {
         guard case .paired = screen, let pairingLink else { return }
         let mac = PairedMac(link: pairingLink)
         self.pairingLink = nil
-        screen = .sessions
+        screen = .tabs
         startLink(to: mac)
     }
 
@@ -186,6 +240,14 @@ final class AppModel {
         }
         self.link = link
         let states = link.start()
+        let summaries = link.summaries()
+        summaryTask?.cancel()
+        summaryTask = Task { [weak self] in
+            for await summary in summaries {
+                guard let self else { return }
+                self.apply(summary)
+            }
+        }
         linkTask = Task { [weak self] in
             for await state in states {
                 guard let self else { return }
@@ -204,6 +266,36 @@ final class AppModel {
         } catch {
             listError = "The Mac's sessions could not be read."
         }
+        updateBadge()
+        // A Mac that does not answer `run.list` leaves Running and Today empty; the rest still works.
+        try? await link.refresh(into: runs)
+    }
+
+    /// What the Inbox shows now.
+    func inbox(now: Date) -> Inbox {
+        inboxModel.inbox(now: nowMilliseconds(now))
+    }
+
+    /// A summary from the Mac: the session list and the badge change at once. A routine run's row has no
+    /// event of its own, so the runs are read again, once for a burst of summaries.
+    private func apply(_ summary: InboxSession) {
+        if summary.status == "closed" {
+            sessions.remove(sessionID: summary.sessionId)
+        } else {
+            sessions.update(summary)
+        }
+        updateBadge()
+        guard runsTask == nil, let link else { return }
+        runsTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 300_000_000)
+            guard let self, !Task.isCancelled else { return }
+            try? await link.refresh(into: self.runs)
+            self.runsTask = nil
+        }
+    }
+
+    private func updateBadge() {
+        environment.setBadge(inboxModel.badgeCount(now: nowMilliseconds(environment.now())))
     }
 
     private func handleStop(_ reason: StopReason) {
@@ -219,11 +311,17 @@ final class AppModel {
     /// Forgets the Mac on this phone. The Mac's own list of devices is not touched.
     func forgetMac() {
         linkTask?.cancel()
+        summaryTask?.cancel()
+        runsTask?.cancel()
+        runsTask = nil
         let old = link
         link = nil
         Task { await old?.stop() }
         try? environment.store.forget()
         sessions.replace(with: [])
+        runs.replace(with: [])
+        dismissApproval()
+        environment.setBadge(0)
         connection = .stopped(.stopped)
         screen = .scan(message: nil)
     }
@@ -236,6 +334,20 @@ final class AppModel {
         presentedApproval = ApprovalSheetModel(
             request: request, deviceName: environment.deviceName, authenticator: environment.authenticator,
             channel: link.approvals)
+    }
+
+    /// Opens the sheet for an approval in the Inbox. The Inbox item has no arguments or diff, so the link
+    /// reads them from the session's events first; a tap while one is loading is ignored.
+    func present(item: InboxItem) {
+        guard let link, item.kind == .approval, item.callId != nil, !openingApproval else { return }
+        openingApproval = true
+        let folder = sessions.sessions.first { $0.sessionId == item.sessionId }?.cwd
+        Task { [weak self] in
+            let request = await link.approvalRequest(for: item, folder: folder)
+            guard let self else { return }
+            self.openingApproval = false
+            self.present(approval: request)
+        }
     }
 
     func dismissApproval() {

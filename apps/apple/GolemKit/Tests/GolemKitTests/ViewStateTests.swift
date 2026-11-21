@@ -591,3 +591,22 @@ private func event(_ type: String, seq: Int, session: String = "s1", run: String
         #"{"kind":"ask","origin":"cli","session_id":"s","status":"running","started_at":"2026-01-01T00:00:00Z"}"#.utf8))
     #expect(try RunLike(info: info).status == .running)
 }
+
+// MARK: - The badge
+
+@MainActor
+@Test func theBadgeCountsAskersLikeTheWebSidebarAndIgnoresReviews() {
+    let sessions = SessionListModel()
+    let ask = InboxPending(kind: .approval, since: "2026-11-21T10:00:00Z", callId: "c1", name: "shell", subject: "ls")
+    let shared = InboxPending(kind: .approval, since: "2026-11-21T10:01:00Z", callId: "c2", name: "shell", subject: "pwd", count: 3)
+    sessions.replace(with: [
+        InboxSession(sessionId: "a", title: "A", status: "waiting", pending: ask),
+        InboxSession(sessionId: "b", title: "B", status: "waiting", pending: shared),
+        InboxSession(sessionId: "c", title: "C", status: "closed", pending: ask),
+    ])
+    let runs = RunsModel()
+    runs.replace(with: [RunLike(sessionId: "r", status: .waiting, approvals: 1)])
+    let model = InboxModel(sessions: sessions, runs: runs)
+    #expect(model.badgeCount(now: nowMilliseconds()) == 4)
+    #expect(model.inbox(now: nowMilliseconds()).needsYouCount == 5)
+}

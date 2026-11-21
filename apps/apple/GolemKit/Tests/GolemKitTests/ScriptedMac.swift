@@ -12,6 +12,7 @@ actor ScriptedMac {
         var assembler = LineAssembler()
         var open = false
         var attached: Set<String> = []
+        var watching = false
         let deviceID: Data
         let sid: Data
 
@@ -42,6 +43,7 @@ actor ScriptedMac {
     private(set) var handshakes = 0
 
     var sessionList: [[String: Any]] = []
+    var runList: [[String: Any]] = []
 
     /// Open pair slots (base64url SHA-256 of a code) and what the owner does when one is used.
     private var pairSlots: [String] = []
@@ -74,6 +76,7 @@ actor ScriptedMac {
 
     func setReplayOverlap(_ value: Int) { replayOverlap = value }
     func setAnswerPings(_ value: Bool) { answerPings = value }
+    func setRunList(_ value: [[String: Any]]) { runList = value }
     func setSessionList(_ value: [[String: Any]]) { sessionList = value }
 
     /// Connects to the relay as the Mac and sends the allow list.
@@ -246,7 +249,10 @@ actor ScriptedMac {
         case "ping":
             if answerPings { answer([String: Any]()) }
         case "session.list":
+            if params["watch"] as? Bool == true { channel.watching = true }
             answer(["sessions": sessionList])
+        case "run.list":
+            answer(["runs": runList])
         case "session.attach":
             let sessionID = params["session_id"] as? String ?? ""
             let after = params["after_seq"] as? Int ?? 0
@@ -267,6 +273,22 @@ actor ScriptedMac {
     }
 
     // MARK: - Making events
+
+    /// Stores an `approval.needed` event in the session's log, for an attach to replay.
+    func recordApproval(session: String, callId: String, name: String, args: [String: Any], source: String = "built-in default") {
+        let seq = (log[session]?.count ?? 0) + 1
+        log[session, default: []].append([
+            "type": "approval.needed", "seq": seq, "session_id": session, "run_id": "r1", "ts": "2026-11-21T10:00:00Z",
+            "data": ["call_id": callId, "name": name, "args": args, "source": source],
+        ])
+    }
+
+    /// Pushes a `session.summary` to every channel that asked to watch.
+    func pushSummary(_ row: [String: Any]) {
+        for channel in channels.values where channel.watching {
+            sendLine(["jsonrpc": "2.0", "method": "session.summary", "params": row], to: channel)
+        }
+    }
 
     /// Appends the next event of `session` and pushes it to every channel that attached it.
     @discardableResult

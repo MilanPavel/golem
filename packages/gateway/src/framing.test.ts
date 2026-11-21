@@ -4,6 +4,7 @@ import path from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 
+import { DEVICE_METHODS } from "../../protocol/gen/device-methods.ts";
 import { MAX_MESSAGE_BYTES, NOT_ALLOWED_FROM_BROWSER, filterMessage } from "./core.ts";
 
 const refused = (reason: string) => ({ kind: "refuse", reason });
@@ -156,4 +157,11 @@ test("a request id with the reserved prefix is denied even for an allowed method
   const text = '{"jsonrpc":"2.0","id":"gw:identify","method":"session.list"}';
   assert.deepEqual(filterMessage(text, { methods, reservedIdPrefix: "gw:" }), { kind: "deny", reply: deny("gw:identify") });
   assert.equal(filterMessage(text, { methods }).kind, "forward");
+});
+
+test("a phone may read the runs for its Inbox but not fire a routine", () => {
+  const methods = DEVICE_METHODS;
+  const line = (method: string) => `{"jsonrpc":"2.0","id":1,"method":"${method}"}`;
+  assert.equal(filterMessage(line("run.list"), { methods }).kind, "forward");
+  assert.equal(filterMessage(line("routine.fire"), { methods }).kind, "deny");
 });

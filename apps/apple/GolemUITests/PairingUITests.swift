@@ -51,6 +51,8 @@ final class PairingUITests: XCTestCase {
         XCTAssertEqual(done.label, "Paired with Studio Mac")
 
         app.buttons["pair.continue"].tap()
+        XCTAssertTrue(app.staticTexts["Nothing needs you."].waitForExistence(timeout: 10))
+        app.tabBars.buttons["Chats"].tap()
         XCTAssertTrue(app.staticTexts["Fix the flaky test"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts["Upgrade httpx"].exists)
     }

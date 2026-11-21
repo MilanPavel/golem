@@ -22,6 +22,7 @@ public actor Connection {
     public private(set) var state: ConnectionState = .stopped(.stopped)
     private var stateSubscribers: [UUID: AsyncStream<ConnectionState>.Continuation] = [:]
     private var eventSubscribers: [UUID: AsyncStream<GolemEvent>.Continuation] = [:]
+    private var summarySubscribers: [UUID: AsyncStream<InboxSession>.Continuation] = [:]
     private var outcomeSubscribers: [UUID: AsyncStream<OutboxOutcome>.Continuation] = [:]
 
     private var runTask: Task<Void, Never>?
@@ -78,6 +79,18 @@ public actor Connection {
         return stream
     }
 
+    /// A session's new summary, each time one changes. The Mac sends these only after `listSessions`, which
+    /// asks to watch, and only on the connection that asked, so a new connection lists again.
+    public func summaries() -> AsyncStream<InboxSession> {
+        let id = UUID()
+        let (stream, continuation) = AsyncStream<InboxSession>.makeStream(bufferingPolicy: .unbounded)
+        summarySubscribers[id] = continuation
+        continuation.onTermination = { [weak self] _ in
+            Task { await self?.dropSummarySubscriber(id) }
+        }
+        return stream
+    }
+
     /// What became of each queued request.
     public func outboxOutcomes() -> AsyncStream<OutboxOutcome> {
         let id = UUID()
@@ -91,6 +104,7 @@ public actor Connection {
 
     private func dropStateSubscriber(_ id: UUID) { stateSubscribers[id] = nil }
     private func dropEventSubscriber(_ id: UUID) { eventSubscribers[id] = nil }
+    private func dropSummarySubscriber(_ id: UUID) { summarySubscribers[id] = nil }
     private func dropOutcomeSubscriber(_ id: UUID) { outcomeSubscribers[id] = nil }
 
     private func setState(_ next: ConnectionState) {
@@ -447,8 +461,13 @@ public actor Connection {
 
     /// The Mac's sessions.
     public func listSessions() async throws -> [SessionElement] {
-        let params = SessionListParams(cwd: nil, limit: nil, watch: nil)
+        let params = SessionListParams(cwd: nil, limit: nil, watch: true)
         return try await call("session.list", params, as: SessionListResult.self).sessions
+    }
+
+    /// The Mac's routine and ask runs, newest first.
+    public func listRuns(limit: Int? = 100) async throws -> [RunElement] {
+        try await call("run.list", RunListParams(limit: limit, sessionID: nil), as: RunListResult.self).runs
     }
 
     /// Follows a session: replays what came after `afterSeq`, then streams live events. After a
@@ -537,8 +556,14 @@ public actor Connection {
             }
             return
         }
-        if message["method"] as? String == "event", let params = message["params"] as? [String: Any] {
+        guard let params = message["params"] as? [String: Any] else { return }
+        switch message["method"] as? String {
+        case "event":
             deliver(params)
+        case "session.summary":
+            deliverSummary(params)
+        default:
+            break
         }
     }
 
@@ -553,6 +578,13 @@ public actor Connection {
               let event = try? JSONDecoder().decode(GolemEvent.self, from: data)
         else { return }
         for continuation in eventSubscribers.values { continuation.yield(event) }
+    }
+
+    private func deliverSummary(_ params: [String: Any]) {
+        guard let data = try? JSONSerialization.data(withJSONObject: params),
+              let summary = try? JSONDecoder().decode(InboxSession.self, from: data)
+        else { return }
+        for continuation in summarySubscribers.values { continuation.yield(summary) }
     }
 
     // MARK: - Sending

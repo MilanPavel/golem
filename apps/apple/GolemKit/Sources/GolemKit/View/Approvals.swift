@@ -135,3 +135,56 @@ public func alwaysAllowNote(_ request: ApprovalRequest, deviceName: String) -> S
     return "\u{201c}Always allow\u{201d} saves a rule on your Mac for \(alwaysAllowRuleText(request))\(place), "
         + "marked from \(deviceName). Deny rules still win."
 }
+
+// MARK: - From an Inbox item
+
+extension ApprovalRequest {
+    /// From what an Inbox item says alone: its headline and the rule. It has no tool name, arguments, diff or
+    /// folder, so the tool counts as one the app does not know and `isRiskyApproval` is true. `ApprovalRequestLoader`
+    /// finds the full request in the session's events; this is the fallback when it cannot.
+    public init(item: InboxItem, folder: String?) {
+        self.init(
+            sessionId: item.answerSessionId, callId: item.callId ?? "", name: "tool", subject: item.headline,
+            folder: folder, origin: item.sessionTitle, helper: item.helper?.name, source: item.source ?? "")
+    }
+}
+
+/// Finds the full approval request for an Inbox item. An item has no tool arguments, diff or folder: they are
+/// in the `approval.needed` event of the session, so this attaches the session (a call a phone may make), reads
+/// the replay until the event for the item's call shows, and detaches again.
+public enum ApprovalRequestLoader {
+    /// The request for `item`, or nil when the events do not show the call within `timeout` seconds (the call
+    /// was answered meanwhile, or the Mac is slow). The caller then falls back to `ApprovalRequest(item:…)`.
+    public static func load(
+        item: InboxItem, folder: String?, connection: Connection, timeout: Double = 4
+    ) async -> ApprovalRequest? {
+        guard let callId = item.callId else { return nil }
+        let sessionId = item.answerSessionId
+        let wasFollowed = await connection.lastSeq(sessionID: sessionId) != nil
+        let events = await connection.events()
+        let reader = Task { () -> PendingApproval? in
+            var chat = ChatState()
+            for await event in events {
+                guard event.sessionID == sessionId else { continue }
+                chat.apply(event)
+                if let pending = chat.approval, pending.callId == callId { return pending }
+            }
+            return nil
+        }
+        let timer = Task {
+            try? await Task.sleep(nanoseconds: UInt64(timeout * 1_000_000_000))
+            reader.cancel()
+        }
+        do {
+            try await connection.attach(sessionID: sessionId, afterSeq: 0)
+        } catch {
+            reader.cancel()
+        }
+        let pending = await reader.value
+        timer.cancel()
+        if !wasFollowed { try? await connection.detach(sessionID: sessionId) }
+        guard let pending else { return nil }
+        return ApprovalRequest(
+            pending: pending, sessionId: sessionId, origin: item.sessionTitle, folder: folder, helper: item.helper?.name)
+    }
+}

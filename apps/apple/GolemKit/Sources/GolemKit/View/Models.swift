@@ -85,6 +85,12 @@ public final class RunsModel {
         self.runs = runs
     }
 
+    /// Reads `run.list` from the Mac and replaces the runs with it.
+    public func refresh(from connection: Connection) async throws {
+        let listed = try await connection.listRuns()
+        replace(with: try listed.map { try RunLike(info: $0) })
+    }
+
     public func groups(now: Double, calendar: Calendar = .current) -> [RunGroup] {
         runGroups(runs, now: now, calendar: calendar)
     }
@@ -130,6 +136,12 @@ public final class InboxModel {
             running: group(.running),
             today: group(.today)
         )
+    }
+
+    /// The number on the app icon: the same count as the web sidebar's "N need you", one for each asker
+    /// of the sessions' pending items. A waiting run with no pending item in a session is not counted.
+    public func badgeCount(now: Double) -> Int {
+        inboxCount(inboxItems(sessions.sessions, now: now))
     }
 
     /// The tool calls that wait for an answer, oldest first.

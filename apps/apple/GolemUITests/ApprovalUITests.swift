@@ -31,6 +31,8 @@ final class ApprovalUITests: XCTestCase {
         app.buttons["pair.submit"].tap()
         XCTAssertTrue(app.buttons["pair.continue"].waitForExistence(timeout: 15))
         app.buttons["pair.continue"].tap()
+        XCTAssertTrue(app.tabBars.buttons["Chats"].waitForExistence(timeout: 10))
+        app.tabBars.buttons["Chats"].tap()
         XCTAssertTrue(app.buttons["debug.menu"].waitForExistence(timeout: 10))
         return app
     }
