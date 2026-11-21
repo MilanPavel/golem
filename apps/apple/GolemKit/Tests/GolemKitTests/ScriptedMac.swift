@@ -50,10 +50,13 @@ actor ScriptedMac {
     private(set) var pairWordsShown: [String] = []
     private(set) var pairedName: String?
 
-    func openPair(code: Data, answer: String = "paired") {
+    func openPair(code: Data, answer: String = "paired") async {
         pairSlots = [Base64URL.encode(Data(SHA256.hash(data: code)))]
         pairAnswer = answer
         sendAllow()
+        // The relay closes a device with "try later" until it has read the Mac's allow list.
+        // Give it that time, so a slow machine does not turn into a flaky test.
+        try? await Task.sleep(nanoseconds: 700_000_000)
     }
 
     func config(relayURL: URL) -> ConnectionConfig {
