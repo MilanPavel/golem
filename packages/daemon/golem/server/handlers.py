@@ -137,6 +137,7 @@ from golem.sessions.manager import (
     ConsentAnswerError,
     GrowRefusedError,
     HelperSessionError,
+    HelperTrimmedError,
     InvalidToolArgsError,
     MessageNotFoundError,
     NotAHelperBatchError,
@@ -523,6 +524,8 @@ async def _session_fork(ctx: RequestContext, params: SessionForkParams) -> Sessi
         raise RpcCallError(MESSAGE_NOT_FOUND, "message not found") from exc
     except SessionNotFoundError as exc:
         raise RpcCallError(SESSION_NOT_FOUND, "session not found") from exc
+    except HelperTrimmedError as exc:
+        raise RpcCallError(INVALID_PARAMS, str(exc)) from exc
     except SchemaMismatchError as exc:
         raise RpcCallError(SESSION_NOT_FOUND, str(exc)) from exc
     return SessionForkResult(session_id=session_id)

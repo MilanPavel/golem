@@ -225,8 +225,8 @@ export type PageActions = {
   revert(sessionId: string, target: ChangesRevertTarget, force?: boolean): Promise<ChangesRevertResult>;
   /** Sets the title. What the page shows afterwards comes from the daemon's summary. */
   rename(sessionId: string, title: string): Promise<void>;
-  /** Forks at a message and resolves with the new session's id. */
-  fork(sessionId: string, atMessageId: string): Promise<string>;
+  /** Forks at a message, or at the last one without `atMessageId`. Resolves with the new session's id. */
+  fork(sessionId: string, atMessageId?: string): Promise<string>;
   close(sessionId: string): Promise<void>;
   /** `scope: "batch"` answers for all the helpers of one delegate call; it does not go with `args`. */
   respond(sessionId: string, callId: string, decision: ApprovalChoice, args?: Readonly<Record<string, unknown>>, scope?: "batch"): Promise<void>;
@@ -665,7 +665,7 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
         await client.renameSession(sessionId, title);
       },
       async fork(sessionId, atMessageId) {
-        const forked = await client.forkSession(sessionId, atMessageId);
+        const forked = atMessageId === undefined ? await client.forkSession(sessionId) : await client.forkSession(sessionId, atMessageId);
         return forked.session_id;
       },
       async close(sessionId) {

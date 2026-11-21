@@ -30,6 +30,7 @@ import { ApprovalBar, useApprovalAnswer } from "../approval/index.ts";
 import { closeHelper, openHelper, TranscriptColumn, type HelperOpen } from "../chat/index.ts";
 import { ConsentBar } from "../consent/consent-bar.tsx";
 import { WORKBENCH_DEFAULT, WORKBENCH_MAX, WORKBENCH_MIN, WORKBENCH_STEP, useWorkbenchWidth } from "../workbench/index.ts";
+import { ContinueButton, ContinueError, useContinueAsChat, type ContinueAction } from "./continue-as-chat.tsx";
 import { HelperBannerBar, HelperReceiptCard } from "./helper-receipt.tsx";
 import { useNow } from "./use-now.ts";
 
@@ -112,13 +113,15 @@ export type HelperPanelViewProps = {
   answer?: ReactNode;
   /** When the daemon trimmed this helper to its receipt: the body shows the receipt, not the steps. */
   trimmedAt?: string | null;
+  /** Continue as chat. Null while the helper runs and once it was trimmed: the button is not shown. */
+  onContinue?: ContinueAction | null;
 };
 
 /**
  * One helper in the drawer, read-only: its head, the switch between Summary and Everything, its question
  * if it asks, the body, and the foot. There is no composer; the lead is the one who talks to it.
  */
-export function HelperPanelView({ lead, helper, chat, nowMs, view, onView, onClose, onNext, onStop, onOpenChat, answer, trimmedAt = null }: HelperPanelViewProps) {
+export function HelperPanelView({ lead, helper, chat, nowMs, view, onView, onClose, onNext, onStop, onOpenChat, answer, trimmedAt = null, onContinue = null }: HelperPanelViewProps) {
   const trimmed = trimmedAt !== null;
   const summary = helperSummary(chat);
   const state = helperPanelState(helper, chat);
@@ -200,9 +203,13 @@ export function HelperPanelView({ lead, helper, chat, nowMs, view, onView, onClo
             Stop
           </Button>
         )}
-        <Button size="sm" kind="ghost" className="ml-auto" onClick={onOpenChat}>
-          Open as chat
-        </Button>
+        <span className="ml-auto flex items-center gap-2">
+          {onContinue === null ? null : <ContinueButton action={onContinue} />}
+          <Button size="sm" kind="ghost" onClick={onOpenChat}>
+            Open as chat
+          </Button>
+        </span>
+        <ContinueError action={onContinue} />
       </footer>
     </section>
   );
@@ -317,6 +324,8 @@ export function HelperPanel({ leadId, open }: { leadId: string; open: HelperOpen
   const lead = useLeadTitle(leadId);
   const chat = useSession(open.helperId, (view) => view.chat);
   const trimmedAt = useTrimmedAt(open.helperId);
+  const panelState = helper === undefined ? null : helperPanelState(helper, chat);
+  const continueAsChat = useContinueAsChat(open.helperId, trimmedAt === null && panelState !== null && panelState !== "running" && panelState !== "waiting");
   const { stopHelper } = usePageActions();
   const navigate = useNavigate();
   const now = useNow(5_000);
@@ -375,6 +384,7 @@ export function HelperPanel({ leadId, open }: { leadId: string; open: HelperOpen
         }}
         answer={<HelperAnswer sessionId={helper.id} chat={chat} />}
         trimmedAt={trimmedAt}
+        onContinue={continueAsChat}
       />
     </aside>
   );
@@ -395,6 +405,7 @@ export function HelperChat({ id, lead }: { id: string; lead: string }) {
   const navigate = useNavigate();
   const summary = helperSummary(chat);
   const banner = helperBanner({ lead: leadTitle, ref, chat, agent: listedAgent });
+  const continueAsChat = useContinueAsChat(id, trimmedAt === null && !banner.running && chat.messages.length > 0);
   const back = () => {
     navigate(sessionPath(lead));
   };
@@ -404,6 +415,7 @@ export function HelperChat({ id, lead }: { id: string; lead: string }) {
         banner={banner}
         leadId={lead}
         onBack={back}
+        onContinue={continueAsChat}
         onStop={
           banner.running
             ? () => {

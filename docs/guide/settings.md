@@ -230,7 +230,7 @@ How long a finished helper keeps its steps. After that only a receipt stays: its
 
 | Key | Default | Meaning |
 |---|---|---|
-| `keep_days` | `7` | Days a finished helper keeps its steps, counted from the end of its last run, not from when you opened it. 0 keeps them for ever |
+| `keep_days` | `7` | Days a finished helper keeps its steps, counted from the end of its last run, not from when you opened it. 0 keeps them for ever. A helper whose steps were removed cannot be continued as a chat |
 | `keep_problem_days` | `30` | The same for a helper that failed, was cancelled or asked you something (an approval or the paid question). 0 keeps them for ever |
 
 Settings › Agents has a "Finished helpers" block for both keys, each with a "for ever" choice that writes 0, and `/agents` shows the two values on one line. A change there is written to `config.toml` with its comments kept. The terminal does not edit them.

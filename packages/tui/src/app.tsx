@@ -4777,6 +4777,21 @@ export function App({
       );
       return;
     }
+    if (action.kind === "continue") {
+      if (trimmedAtOf(sessionsRef.current, ref.id) !== null) {
+        showHint("This helper's steps were removed, so it cannot be continued.");
+        return;
+      }
+      client.forkSession(ref.id).then(
+        (result) => {
+          closeStepsManager();
+          session.switchTo(result.session_id);
+          setChat((state) => ({ ...state, notice: "continued as a chat of your own" }));
+        },
+        (error: unknown) => showHint(`Could not continue ${ref.label || ref.agent}: ${messageOf(error)}`),
+      );
+      return;
+    }
     stopWatching();
     const data: HelperChatData = { sessionId: ref.id, chat: emptyChat, error: null };
     helperChatRef.current = data;
