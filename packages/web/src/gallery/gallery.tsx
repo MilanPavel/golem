@@ -1,4 +1,4 @@
-import { checksSummary, COMMANDS, mcpStatusWord, noPastes, pickerGroups, withModelChoices, withSkillChoices, type CheckRun, type ChecksState, type ReviewNote, type TodoItem, type TurnChecks, type TurnCard, type ChatMessage, type ChatState, type RewindPlan, ladderRows, NO_LOCAL_WINDOW, routeRows, spendRows, contextActions, bestActions, windowSourceOf, type ContextActionsInput } from "@golem/view";
+import { checksSummary, COMMANDS, mcpStatusWord, noPastes, pickerGroups, withModelChoices, withSkillChoices, type CheckRun, type ChecksState, type ReviewNote, type TodoItem, type TurnChecks, type TurnCard, type ChatMessage, type ChatState, type RewindPlan, ladderRows, NO_LOCAL_WINDOW, routeRows, spendRows, contextActions, bestActions, windowSourceOf, helperBanner, helperReceipt, type ContextActionsInput } from "@golem/view";
 import type { ListedModel } from "@golem/client";
 import { createContext, useContext, useEffect, useId, useState, type ReactNode } from "react";
 import { Badge } from "../ui/badge.tsx";
@@ -80,9 +80,9 @@ import { ToolsOfferView } from "../features/setup/tools-offer.tsx";
 import { TOOLS_CASES } from "../features/setup/tools-sample.ts";
 import { PullStatusView, pullSummary } from "../features/models/index.ts";
 import { NO_OLLAMA_LISTING, OLLAMA_DOWN_LISTING, SAMPLE_LISTING, SAMPLE_PULLS, THINKING_LISTING } from "../features/models/sample.ts";
-import { CloseSessionDialog, HelperPanelView, RenameField, type HelperView } from "../features/sessions/index.ts";
+import { CloseSessionDialog, HelperBannerBar, HelperPanelView, HelperReceiptCard, RenameField, type HelperView } from "../features/sessions/index.ts";
 import { ALL_CLOUD, ALL_LOCAL, askingBatchChat, cloudBatchChat, localBatchChat } from "../features/chat/helper-card-sample.ts";
-import { ASKING_HELPER, DONE_HELPER, HELPER_NOW, RUNNING_HELPER } from "../features/sessions/helper-sample.ts";
+import { ASKING_HELPER, DONE_HELPER, HELPER_NOW, RUNNING_HELPER, TRIMMED_AT, TRIMMED_HELPER } from "../features/sessions/helper-sample.ts";
 import { RoutineDetail, RoutinesEmpty, RoutinesPanel } from "../features/routines/index.ts";
 import { SAMPLE_LIST, SAMPLE_MORNING_BRIEF, ROUTINES_NOW, SAMPLE_RUNS } from "../features/routines/sample.ts";
 import { LeadRun, RunBanner, RunsList, RunsPanel } from "../features/runs/index.ts";
@@ -526,6 +526,7 @@ function HelperPanelDemo() {
     ["running", RUNNING_HELPER, null],
     ["asking", ASKING_HELPER, <ApprovalBar key="a" tool={PENDING_EDIT} onAnswer={() => {}} />],
     ["done", DONE_HELPER, null],
+    ["trimmed", TRIMMED_HELPER, null],
   ] as const;
   return (
     <section className="mt-6" id={anchor("Helper panel")}>
@@ -543,13 +544,41 @@ function HelperPanelDemo() {
                 setViews((current) => ({ ...current, [key]: view }));
               }}
               onClose={() => {}}
-              onNext={key === "done" ? null : () => {}}
-              onStop={key === "done" ? null : () => {}}
+              onNext={key === "done" || key === "trimmed" ? null : () => {}}
+              onStop={key === "done" || key === "trimmed" ? null : () => {}}
               onOpenChat={() => {}}
               answer={answer}
+              trimmedAt={key === "trimmed" ? TRIMMED_AT : null}
             />
           </div>
         ))}
+      </div>
+    </section>
+  );
+}
+
+/** A helper's own chat: the banner of one that runs and one that is done, and the receipt of a trimmed one. */
+function HelperBannerDemo() {
+  const anchor = useAnchor();
+  const lead = "Fix the token refresh";
+  const running = helperBanner({ lead, ref: RUNNING_HELPER.helper, chat: RUNNING_HELPER.chat });
+  const finished = helperBanner({ lead, ref: DONE_HELPER.helper, chat: DONE_HELPER.chat });
+  const receipt = helperReceipt({ ref: TRIMMED_HELPER.helper, chat: TRIMMED_HELPER.chat, trimmedAt: TRIMMED_AT });
+  return (
+    <section className="mt-6" id={anchor("Helper banner, receipt")}>
+      <h3 className="mb-2 font-mono text-xs text-faint">Helper banner, receipt</h3>
+      <div className="flex max-w-3xl flex-col gap-4">
+        {(
+          [
+            ["running", running, () => {}],
+            ["finished", finished, null],
+          ] as const
+        ).map(([key, banner, onStop]) => (
+          <div key={key} className="overflow-hidden rounded-lg border border-line bg-surface">
+            <HelperBannerBar banner={banner} leadId="lead" onBack={() => {}} onStop={onStop} />
+          </div>
+        ))}
+        <HelperReceiptCard receipt={receipt} lead={{ id: "lead", onOpen: () => {} }} />
       </div>
     </section>
   );
@@ -2401,6 +2430,7 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
       <StepsTabDemo />
       <LeadRunDemo />
       <HelperPanelDemo />
+      <HelperBannerDemo />
 
       <ChangesDemo />
 

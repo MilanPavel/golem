@@ -466,6 +466,7 @@ import {
   openStepsManager,
   pressStepsManager,
   stepsHelpers,
+  trimmedAtOf,
   stepsKeyOf,
   type HelperChatData,
   type StepsAction,
@@ -4744,7 +4745,7 @@ export function App({
     return {
       order: batchOrder(chatRef.current.batches),
       helpers: (callId) => stepsHelpers(callId, events, now, isLocal),
-      chatMax: chatScrollMax({ state, helper: helperChatRef.current, now, columns: stepsSizeRef.current.columns, rows: stepsSizeRef.current.rows }),
+      chatMax: chatScrollMax({ state, helper: helperChatRef.current, trimmedAt: trimmedAtOf(sessionsRef.current, helperChatRef.current?.sessionId), now, columns: stepsSizeRef.current.columns, rows: stepsSizeRef.current.rows }),
     };
   }
 
@@ -5976,6 +5977,7 @@ export function App({
             events: helperEventsRef.current,
             refs: helperRefsOf,
             helper: helperChat,
+            trimmedAt: trimmedAtOf(sessions, helperChat?.sessionId),
             lead: titleLabel,
             now: Date.now(),
             columns,

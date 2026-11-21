@@ -8,13 +8,14 @@ import type { Span } from "./layout-chat.ts";
 import {
   barSpans,
   batchOrder,
-  breadcrumb,
+  bannerLine,
   closedStepsManager,
   layoutStepsManager,
   openStepsManager,
   pressStepsManager,
   stepsHelpers,
   stepsKeyOf,
+  trimmedAtOf,
   type StepsContext,
   type StepsManagerState,
 } from "./steps-view.ts";
@@ -204,7 +205,7 @@ test("local only: later helpers wait in line, and one waits for you", () => {
 
 const ref: HelperRef = { id: "h1", index: 1, agent: "explorer", label: "billing", model: "m", startedAt: new Date(T0).toISOString(), ended: null };
 
-test("a helper's chat is read-only with a breadcrumb, Summary first, then Everything", () => {
+test("a helper's chat is read-only under its header line, Summary first, then Everything", () => {
   let chat = emptyChat;
   chat = reduceChat(chat, ev(0, "message.completed", { message_id: "u1", role: "user", text: "Find the billing bug." }, "h1"));
   chat = reduceChat(chat, ev(1, "message.completed", { message_id: "a1", role: "assistant", text: "It is in invoice.py." }, "h1"));
@@ -214,7 +215,7 @@ test("a helper's chat is read-only with a breadcrumb, Summary first, then Everyt
     view: { kind: "chat", callId: "d1", index: 1, mode, offset: 0, fromList: false },
   });
   const summary = layout(cloud, view("summary"), data, [ref]);
-  assert.equal(summary[0], "Fix the login bug › explorer · billing");
+  assert.equal(summary[0], "Helper of Fix the login bug · explorer · m");
   assert.match(summary[1] ?? "", /read-only · Summary/);
   assert.ok(summary.some((row) => row === "Asked"));
   assert.ok(summary.some((row) => row.includes("Find the billing bug.")));
@@ -233,6 +234,50 @@ test("a helper's chat says when it is not there yet, or could not be read", () =
   assert.ok(failed.includes("Could not open this helper: gone"));
 });
 
-test("breadcrumb falls back when the label is the agent or the lead has no title", () => {
-  assert.equal(breadcrumb("", { agent: "explorer", label: "explorer" }), "this chat › explorer");
+test("the header line names the lead, the agent, the model and whether it runs", () => {
+  assert.equal(bannerLine({ lead: "Fix the login bug", agent: "explorer", model: "m", running: true }), "Helper of Fix the login bug · explorer · m · running");
+  assert.equal(bannerLine({ lead: null, agent: "explorer", model: null, running: false }), "Helper of this chat · explorer");
+});
+
+const chatView: StepsManagerState = { open: true, view: { kind: "chat", callId: "d1", index: 1, mode: "summary", offset: 0, fromList: false } };
+
+test("a running helper's chat says it runs, and a finished one does not", () => {
+  const brief = reduceChat(emptyChat, ev(0, "message.completed", { message_id: "u1", role: "user", text: "Find the billing bug." }, "h1"));
+  const running = layout(cloud, chatView, { sessionId: "h1", chat: { ...brief, busy: true }, error: null }, [ref]);
+  assert.equal(running[0], "Helper of Fix the login bug · explorer · m · running");
+  const done = { ...ref, ended: { stopped: "done", modelCalls: 1, tokens: 1000, answerTokens: 100, costUsd: 0, durationMs: 5000, workingMs: 5000 } };
+  const finished = layout(cloud, chatView, { sessionId: "h1", chat: brief, error: null }, [done]);
+  assert.equal(finished[0], "Helper of Fix the login bug · explorer · m");
+});
+
+test("a trimmed helper's chat is a receipt with the brief, how it ended and where the answer is", () => {
+  let chat = reduceChat(emptyChat, ev(0, "message.completed", { message_id: "u1", role: "user", text: "Find the billing bug." }, "h1"));
+  chat = reduceChat(chat, ev(1, "message.completed", { message_id: "a1", role: "assistant", text: "It is in invoice.py." }, "h1"));
+  const done = { ...ref, ended: { stopped: "done", modelCalls: 1, tokens: 1000, answerTokens: 100, costUsd: 0.01, durationMs: 5000, workingMs: 5000 } };
+  const rows = layoutStepsManager({
+    state: chatView,
+    batches: {},
+    events: [],
+    refs: () => [done],
+    helper: { sessionId: "h1", chat, error: null },
+    trimmedAt: "2026-11-19T03:00:00Z",
+    lead: "Fix the login bug",
+    now,
+    columns: 80,
+    rows: 20,
+  }).map((line) => text(line.spans));
+  assert.match(rows[1] ?? "", /read-only · receipt/);
+  assert.ok(rows.includes("Receipt"));
+  assert.ok(rows.some((row) => row.includes("Find the billing bug.")));
+  assert.ok(rows.includes("Answered · m · 1.0K tokens · $0.01 · 0m 05s"));
+  assert.ok(rows.includes("Steps removed on 2026-11-19"));
+  assert.ok(rows.includes("The answer is in the lead's chat."));
+  assert.ok(!rows.some((row) => row.includes("It is in invoice.py.")));
+});
+
+test("trimmedAtOf reads the session list, and an older daemon without it gives null", () => {
+  assert.equal(trimmedAtOf([{ session_id: "h1", trimmed_at: "2026-11-19T03:00:00Z" }], "h1"), "2026-11-19T03:00:00Z");
+  assert.equal(trimmedAtOf([{ session_id: "h1" }, { session_id: "h2", trimmed_at: null }], "h1"), null);
+  assert.equal(trimmedAtOf([{ session_id: "h2", trimmed_at: null }], "h2"), null);
+  assert.equal(trimmedAtOf([], undefined), null);
 });

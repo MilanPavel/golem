@@ -5,4 +5,5 @@ export { forkRows, type ForkRow } from "./fork-tree.ts";
 export { folderName } from "./folder.ts";
 export { overallState } from "./overall-state.ts";
 export { timeAgo } from "./time-ago.ts";
-export { HelperChat, HelperPanel, HelperPanelView, type HelperPanelViewProps, type HelperView } from "./helper-chat.tsx";
+export { HelperBannerBar, HelperReceiptCard } from "./helper-receipt.tsx";
+export { HelperChat,HelperPanel, HelperPanelView, type HelperPanelViewProps, type HelperView } from "./helper-chat.tsx";
