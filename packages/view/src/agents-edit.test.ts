@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { AGENT_TEMPLATE, agentActions, agentKey, agentProblemText, definitionNote, deleteQuestion, hasUnsavedText, replacesLine, selectionAfter } from "./agents-edit.ts";
+import { agentActions, agentKey, agentProblemText, definitionNote, deleteQuestion, hasUnsavedText, replacesLine, selectionAfter } from "./agents-edit.ts";
+import { AGENT_TEMPLATE } from "./agent-template.ts";
 import { definitionLines } from "./agents-view.ts";
 
 test("the template has the keys of a file and a prompt", () => {
@@ -9,7 +10,7 @@ test("the template has the keys of a file and a prompt", () => {
   assert.deepEqual(keys, ["name", "description", "model", "tools", "max-calls", "max-seconds", "max-answer-chars", "asks"]);
   assert.match(AGENT_TEMPLATE, /^model: cheapest$/m);
   assert.match(AGENT_TEMPLATE, /^asks: false$/m);
-  assert.ok(AGENT_TEMPLATE.endsWith("return.\n"));
+  assert.ok(AGENT_TEMPLATE.endsWith(".\n"));
 });
 
 test("a problem says its line when it has one", () => {

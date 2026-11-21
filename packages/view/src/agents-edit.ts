@@ -1,19 +1,5 @@
 import type { AgentOrigin } from "./agents-view.ts";
 
-/** The file "+ New agent" opens: valid for the parser, so Save works at once. */
-export const AGENT_TEMPLATE = `---
-name: my-agent
-description: What it does and when the lead should use it.
-model: cheapest
-tools: read_file, list_dir, glob, grep
-max-calls: 15
-max-seconds: 300
-max-answer-chars: 6000
-asks: false
----
-You are a helper. Say here how it should work and what it should return.
-`;
-
 /** One reason a save was refused: the daemon's words and the line of the text, or null when it has none. */
 export interface AgentProblem {
   message: string;
