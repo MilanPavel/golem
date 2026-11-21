@@ -76,3 +76,13 @@ test("while the question waits, a, o and l answer it", () => {
   assert.deepEqual(press("x"), { kind: "ignore" });
   assert.notDeepEqual(press("a", { ...place, consent: false }), { kind: "consent", answer: "session" });
 });
+
+test("a helper's question names the helper, says what is sent and not sent, and the pager ends the keys", () => {
+  const asked: PendingConsent = { ...CONSENT, helper: "worker \u00b7 upgrade httpx", sent: ["the brief"], notSent: ["this chat"] };
+  const lines = consentLines(asked, 120, "1 of 2 \u00b7 tab next").map((line) => line.text);
+  assert.equal(lines[0], "worker \u00b7 upgrade httpx asks \u00b7 Use a paid model for this?");
+  assert.deepEqual(lines.slice(3, 5), ["Sent: the brief", "Not sent: this chat"]);
+  assert.equal(lines.at(-1), "a allow for this session \u00b7 o just this once \u00b7 l stay local \u00b7 1 of 2 \u00b7 tab next");
+  assert.equal(consentRows(asked), lines.length);
+  assert.equal(consentRows(CONSENT), 5);
+});

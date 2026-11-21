@@ -8,14 +8,17 @@ export function ConsentBand({
   consent,
   columns,
   height,
+  pager = null,
 }: {
   consent: PendingConsent;
   columns: number;
   height: number;
+  /** `1 of 2 · tab next` when several questions wait. */
+  pager?: string | null;
 }) {
   return (
     <Box flexDirection="column" width={columns} height={height} flexShrink={0} overflow="hidden">
-      {consentLines(consent, columns)
+      {consentLines(consent, columns, pager)
         .slice(0, height)
         .map((line, index) => (
           <Text

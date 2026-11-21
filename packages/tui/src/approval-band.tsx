@@ -12,6 +12,7 @@ export function ApprovalBand({
   columns,
   height,
   offset,
+  pager = null,
 }: {
   approval: PendingApproval;
   /** The call's arguments open in the editor, which replaces the diff. */
@@ -19,10 +20,12 @@ export function ApprovalBand({
   columns: number;
   height: number;
   offset: number;
+  /** `1 of 2 · tab next` when several questions wait. */
+  pager?: string | null;
 }) {
   return (
     <Box flexDirection="column" width={columns} height={height} flexShrink={0} overflow="hidden">
-      {(edit === null ? approvalLines(approval, columns, height, offset) : argsEditLines(approval, edit, columns))
+      {(edit === null ? approvalLines(approval, columns, height, offset, pager) : argsEditLines(approval, edit, columns))
         .slice(0, height)
         .map((line, index) => (
           <Text
