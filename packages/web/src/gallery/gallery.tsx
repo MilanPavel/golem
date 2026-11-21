@@ -198,7 +198,7 @@ const SESSIONS: SessionSummary[] = [
   fakeSession("g", "Closed, so hidden", "/Users/you/notes", "closed", 5),
 ];
 
-/** Three leads: two helpers working, one asks you, and all done. The helpers are not rows. */
+/** Three leads: two helpers working, one asks you, and all done. The open lead shows its helpers as rows. */
 const HELPER_SESSIONS: SessionSummary[] = [
   fakeSession("lead-a", "Map the daemon modules", "/Users/you/repos/golem", "running", 1),
   { ...fakeSession("lead-a1", "explorer · routing", "/Users/you/repos/golem", "running", 1), parent_session_id: "lead-a", agent: "explorer" },
@@ -209,6 +209,13 @@ const HELPER_SESSIONS: SessionSummary[] = [
   fakeSession("lead-c", "Read the ADRs", "/Users/you/repos/golem", "idle", 20),
   { ...fakeSession("lead-c1", "explorer · ADR-059", "/Users/you/repos/golem", "idle", 20), parent_session_id: "lead-c", agent: "explorer" },
   { ...fakeSession("lead-c2", "explorer · ADR-060", "/Users/you/repos/golem", "idle", 21), parent_session_id: "lead-c", agent: "explorer" },
+];
+
+/** A lead with a helper still working and a fork of it, as the list shows them when the lead is open. */
+const HELPER_FORK_SESSIONS: SessionSummary[] = [
+  fakeSession("lead-a", "Map the daemon modules", "/Users/you/repos/golem", "running", 1),
+  { ...fakeSession("lead-a1", "explorer · routing", "/Users/you/repos/golem", "running", 1), parent_session_id: "lead-a", agent: "explorer" },
+  fakeSession("lead-a-fork", "Map the daemon modules (fork)", "/Users/you/repos/golem", "idle", 12, "lead-a"),
 ];
 
 /** The card on a lead's row: two helpers working, one asks you, one queued. */
@@ -1791,10 +1798,24 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
 
       <section className="mt-6" id={anchor("Helpers in the list")}>
         <h3 className="mb-2 font-mono text-xs text-faint">Helpers in the list</h3>
-        <div className="h-72 w-67 overflow-hidden rounded-lg border border-line">
-          <SidebarPanel title="Sessions" label={`Sessions with helpers, ${theme}`} onHide={() => {}}>
-            <SessionsPanel sessions={HELPER_SESSIONS} selectedId="lead-a" now={NOW} onNavigate={() => {}} />
-          </SidebarPanel>
+        <div className="flex flex-wrap gap-4">
+          {(
+            [
+              ["lead open, helpers working", HELPER_SESSIONS, "lead-a"],
+              ["lead open, helpers finished", HELPER_SESSIONS, "lead-c"],
+              ["another chat open: squares only", HELPER_SESSIONS, "other"],
+              ["a fork next to helpers", HELPER_FORK_SESSIONS, "lead-a"],
+            ] as const
+          ).map(([label, sessions, selected]) => (
+            <figure key={label} className="m-0 flex flex-col gap-1">
+              <figcaption className="font-mono text-xs text-faint">{label}</figcaption>
+              <div className="h-72 w-67 overflow-hidden rounded-lg border border-line">
+                <SidebarPanel title="Sessions" label={`Sessions, ${label}, ${theme}`} onHide={() => {}}>
+                  <SessionsPanel sessions={sessions} selectedId={selected} now={NOW} onNavigate={() => {}} />
+                </SidebarPanel>
+              </div>
+            </figure>
+          ))}
         </div>
       </section>
 

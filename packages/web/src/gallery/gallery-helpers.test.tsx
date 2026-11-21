@@ -5,19 +5,32 @@ import { resetThemeAfterEach, showTheme } from "./gallery-test-utils.ts";
 
 resetThemeAfterEach();
 
-test("the gallery's helper section shows three leads: helpers working, one asks, all done", () => {
+const panelOf = (label: string) => within(screen.getByRole("complementary", { name: `Sessions, ${label}, slip` }));
+
+test("the gallery's helper section: the open lead has its helpers nested, working and finished", () => {
   showTheme("slip");
   render(<Gallery />);
-  const panel = within(screen.getByRole("complementary", { name: "Sessions with helpers, slip" }));
-  // Only the three leads are rows.
-  expect(panel.getAllByRole("link")).toHaveLength(3);
-  const working = panel.getByRole("link", { name: /Map the daemon modules/ });
-  expect(working.querySelectorAll("[data-square=working]")).toHaveLength(2);
-  const asks = panel.getByRole("link", { name: /Check the retry code/ });
-  expect(asks.querySelectorAll("[data-square=asking]")).toHaveLength(1);
-  expect(asks.querySelectorAll("[data-square=working]")).toHaveLength(1);
-  const done = panel.getByRole("link", { name: /Read the ADRs/ });
-  expect(done.querySelector("[data-square]")).toBeNull();
+  const working = panelOf("lead open, helpers working");
+  // Three leads and the two helpers of the open one.
+  expect(working.getAllByRole("link")).toHaveLength(5);
+  expect(working.getAllByRole("link")[0]!.querySelector("[data-square]")).toBeNull();
+  expect(document.querySelectorAll("[data-helper-row=working]").length).toBeGreaterThanOrEqual(2);
+  const finished = panelOf("lead open, helpers finished");
+  expect(finished.getAllByRole("link")).toHaveLength(5);
+  expect(finished.getAllByRole("link", { name: /explorer · ADR/ })).toHaveLength(2);
+});
+
+test("the gallery's helper section: another chat open keeps the squares, and a fork has its tag", () => {
+  showTheme("slip");
+  render(<Gallery />);
+  const other = panelOf("another chat open: squares only");
+  expect(other.getAllByRole("link")).toHaveLength(3);
+  expect(other.getByRole("link", { name: /Map the daemon modules/ }).querySelectorAll("[data-square=working]")).toHaveLength(2);
+  expect(other.getByRole("link", { name: /Check the retry code/ }).querySelectorAll("[data-square=asking]")).toHaveLength(1);
+  expect(other.getByRole("link", { name: /Read the ADRs/ }).querySelector("[data-square]")).toBeNull();
+  const fork = panelOf("a fork next to helpers");
+  expect(fork.getAllByTestId("fork-tag")).toHaveLength(1);
+  expect(fork.getAllByRole("link")).toHaveLength(3);
 });
 
 test("the gallery's helper card shows two working, one asking, one queued", () => {

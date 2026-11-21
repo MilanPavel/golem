@@ -21,9 +21,16 @@ const SESSIONS: SessionSummary[] = [
   session("e", "Closed one", "/Users/you/notes", at(0), { status: "closed" }),
 ];
 
-function setup(sessions: SessionSummary[] = SESSIONS, actions = { rename: vi.fn(() => Promise.resolve()), close: vi.fn(() => Promise.resolve()) }) {
+function setup(
+  sessions: SessionSummary[] = SESSIONS,
+  actions = { rename: vi.fn(() => Promise.resolve()), close: vi.fn(() => Promise.resolve()) },
+  selectedId = "a",
+  openHelperId: string | null = null,
+) {
   const onNavigate = vi.fn();
-  const view = render(<SessionsPanel sessions={sessions} selectedId="a" now={NOW} onNavigate={onNavigate} actions={actions} />);
+  const view = render(
+    <SessionsPanel sessions={sessions} selectedId={selectedId} openHelperId={openHelperId} now={NOW} onNavigate={onNavigate} actions={actions} />,
+  );
   return { ...view, actions, onNavigate };
 }
 
@@ -205,12 +212,69 @@ const helper = (id: string, lead: string, status: SessionSummary["status"], extr
 const LEAD = session("lead", "The lead", "/Users/you/repos/golem", at(0, 11), { status: "running" });
 const squaresOf = (container: HTMLElement) => [...container.querySelectorAll("[data-square]")].map((node) => node.getAttribute("data-square"));
 
-test("a lead with two helpers is one row with two squares", () => {
-  const { container } = setup([LEAD, helper("h1", "lead", "running"), helper("h2", "lead", "running")]);
-  expect(screen.getAllByRole("link")).toHaveLength(1);
+test("a lead with two helpers is one row with two squares while another chat is open", () => {
+  const { container } = setup([LEAD, helper("h1", "lead", "running"), helper("h2", "lead", "running"), session("o", "Other", null, at(0, 9))], undefined, "o");
+  expect(screen.getAllByRole("link")).toHaveLength(2);
+  expect(container.querySelector("[data-helper-row]")).toBeNull();
   expect(squaresOf(container)).toEqual(["working", "working"]);
   expect(screen.getByTestId("helper-squares").getAttribute("title")).toBe("2 helpers working");
   expect(screen.getByText("2 helpers working").className).toContain("sr-only");
+});
+
+const helperRows = (container: HTMLElement) => [...container.querySelectorAll("[data-helper-row]")];
+
+test("the open lead shows its two helpers as rows under it, and no squares", () => {
+  const { container } = setup([LEAD, helper("h1", "lead", "running", { title: "explorer · Map approvals" }), helper("h2", "lead", "idle")], undefined, "lead");
+  expect(helperRows(container).map((row) => row.getAttribute("data-helper-row"))).toEqual(["working", "done"]);
+  expect(container.querySelector("[data-testid=helper-squares]")).toBeNull();
+  const links = screen.getAllByRole("link");
+  expect(links).toHaveLength(3);
+  expect(links[1]!.textContent).toContain("explorer · Map approvals");
+  expect(links[1]!.textContent).not.toContain("golem");
+  expect(links[1]!.querySelector("time")).toBeNull();
+  expect(helperRows(container)[0]!.className).toContain("ml-4");
+  expect(helperRows(container)[0]!.getAttribute("aria-level")).toBe("2");
+  expect(screen.getAllByText("helper of The lead")).toHaveLength(2);
+});
+
+test("a helper that is open keeps its lead's helpers shown, and is the current row", () => {
+  const { container } = setup([LEAD, helper("h1", "lead", "running"), helper("h2", "lead", "running")], undefined, "lead", "h2");
+  expect(helperRows(container)).toHaveLength(2);
+  const current = screen.getAllByRole("link").filter((link) => link.getAttribute("aria-current") !== null);
+  expect(current).toHaveLength(1);
+  expect(current[0]!.textContent).toContain("h2");
+});
+
+test("a helper row opens that helper", async () => {
+  const user = userEvent.setup();
+  const open = vi.fn();
+  const sessions = [LEAD, helper("h1", "lead", "running")];
+  const onNavigate = vi.fn();
+  render(<SessionsPanel sessions={sessions} selectedId="lead" now={NOW} onNavigate={onNavigate} helperActions={{ open, stop: vi.fn(), answer: vi.fn() }} />);
+  await user.click(screen.getByRole("link", { name: /explorer · h1/ }));
+  expect(open).toHaveBeenCalledWith("lead", "h1");
+});
+
+test("a helper the daemon has trimmed is not a row, and one with the field empty is", () => {
+  const trimmed = helper("h1", "lead", "idle") as SessionSummary & { trimmed_at?: string | null };
+  trimmed.trimmed_at = at(0, 10);
+  const { container } = setup([LEAD, trimmed, helper("h2", "lead", "idle", {})], undefined, "lead");
+  expect(helperRows(container)).toHaveLength(1);
+  expect(screen.queryByText(/explorer · h1/)).toBeNull();
+});
+
+test("a fork has the grey tag and a helper never has it", () => {
+  const fork = session("f", "The fork", "/Users/you/repos/golem", at(0, 8), { forked_from: "lead" });
+  setup([LEAD, helper("h1", "lead", "running"), fork], undefined, "lead");
+  expect(screen.getAllByTestId("fork-tag")).toHaveLength(1);
+  expect(screen.getByTestId("fork-tag").textContent).toBe("fork");
+  expect(screen.getByRole("link", { name: /explorer · h1/ }).textContent).not.toContain("fork");
+});
+
+test("the open lead with helpers has no accessibility violations", async () => {
+  const { container } = setup([LEAD, helper("h1", "lead", "running"), helper("h2", "lead", "waiting")], undefined, "lead");
+  const result = await axe.run(container, { rules: { "color-contrast": { enabled: false }, region: { enabled: false } } });
+  expect(result.violations).toEqual([]);
 });
 
 test("a helper that asks has the wait colour, a queued one the hollow ring", () => {
@@ -229,7 +293,7 @@ test("helpers that are done leave no squares, and a helper without its lead is n
 
 test("the filter does not find helpers", async () => {
   const user = userEvent.setup();
-  setup([LEAD, helper("h1", "lead", "running")]);
+  setup([LEAD, helper("h1", "lead", "running")], undefined, "lead");
   await user.type(screen.getByRole("textbox", { name: "Filter sessions" }), "explorer");
   expect(screen.getByText("No sessions match.")).toBeTruthy();
 });
@@ -240,17 +304,22 @@ test("an older daemon, with no parent_session_id, shows the list as before", () 
   expect(container.querySelector("[data-testid=helper-squares]")).toBeNull();
 });
 
-test("Show helpers is off by default, brings the helper rows back, and is kept", async () => {
+test("Show helpers is off by default, nests the helpers of every lead, and is kept", async () => {
   const user = userEvent.setup();
   localStorage.clear();
   showHelpersStore.set(false);
-  setup([LEAD, helper("h1", "lead", "running")]);
+  const other = session("o", "Other lead", "/Users/you/repos/golem", at(0, 9));
+  const { container } = setup([LEAD, helper("h1", "lead", "running"), other, helper("o1", "o", "idle")], undefined, "a");
+  expect(helperRows(container)).toHaveLength(0);
   await user.click(screen.getByRole("button", { name: "List options" }));
   const item = screen.getByRole("menuitemcheckbox", { name: "Show helpers" });
   expect(item.getAttribute("aria-checked")).toBe("false");
   await user.click(item);
-  expect(screen.getAllByRole("link")).toHaveLength(2);
+  expect(screen.getAllByRole("link")).toHaveLength(4);
+  expect(helperRows(container).map((row) => row.getAttribute("data-helper-row"))).toEqual(["working", "done"]);
   expect(localStorage.getItem(SHOW_HELPERS_KEY)).toBe("1");
+  await user.type(screen.getByRole("textbox", { name: "Filter sessions" }), "explorer · o1");
+  expect(screen.getAllByRole("link")).toHaveLength(2);
   showHelpersStore.set(false);
   localStorage.clear();
 });

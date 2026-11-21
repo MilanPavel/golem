@@ -921,10 +921,15 @@ export {
 } from "./helper-row-card.ts";
 export {
   groupHelpers,
+  helperLabel,
+  helperRowState,
   helperSquare,
   helperWords,
   helperCountWords,
   isHelperSession,
+  isTrimmedHelper,
+  type GroupHelpersOptions,
+  type HelperRowState,
   type HelperRows,
   type HelperSession,
   type HelperSquare,
