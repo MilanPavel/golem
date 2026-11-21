@@ -138,6 +138,7 @@ The line under an answer ends with the model, `local` for a model on your machin
 | `/artifact [id]` | Open the full output of a long tool call in your pager. With no id, the newest one |
 | `/skills` | See the skills this folder has, and why one is or is not used |
 | `/routines` | Your routines: run one now, pause or resume it, edit it in `$EDITOR`, open its last run |
+| `/agents` | The agents helpers run as, with where each comes from (bundled, yours, project), its model and how often it ran, or "not yet" when it cannot run. `Enter` reads one: its file, model, tools, limits, whether it asks you, and its prompt (arrows and page keys scroll, `Esc` goes back). `w` changes its model wish. `c` makes your own copy of a bundled agent, `e` edits your file in `$EDITOR`, `n` starts a new agent from a template, `d` deletes yours (the bundled one of that name comes back). An edit is saved only when the file parses; otherwise the problems show with their lines and you can edit again or drop the change |
 | `/runs` | What your routines did, grouped by what needs you |
 | `/<skill> [args]` | Run a skill once |
 | `/skill run <name> [args]` | Run a skill once, also one named like a command, such as `help` |
