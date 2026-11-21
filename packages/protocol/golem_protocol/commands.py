@@ -444,13 +444,16 @@ class SessionForkParams(BaseModel):
     """``session.fork``. A new session with this one's history up to ``at_message_id``.
 
     The source may be running: the fork reads completed checkpoints. The
-    caller is not attached to the new session.
+    caller is not attached to the new session. Without ``at_message_id`` the
+    history runs to the source's last completed message. A helper may be the
+    source: the fork is an ordinary chat that has no lead, which is how
+    "Continue as chat" works. A helper whose steps were removed cannot be forked.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     session_id: str = Field(min_length=1)
-    at_message_id: str = Field(min_length=1)
+    at_message_id: str | None = Field(default=None, min_length=1)
 
 
 class SessionForkResult(BaseModel):

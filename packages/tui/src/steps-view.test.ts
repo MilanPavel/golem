@@ -281,3 +281,36 @@ test("trimmedAtOf reads the session list, and an older daemon without it gives n
   assert.equal(trimmedAtOf([{ session_id: "h2", trimmed_at: null }], "h2"), null);
   assert.equal(trimmedAtOf([], undefined), null);
 });
+
+test("c continues a helper that ended and does nothing for one that runs", () => {
+  assert.equal(stepsKeyOf({ name: null, input: "c", ctrl: false, meta: false }), "continue");
+  assert.equal(stepsKeyOf({ name: null, input: "c", ctrl: true, meta: false }), null);
+  const ctx = context(cloud);
+  const chatOf = (index: number): StepsManagerState => ({ open: true, view: { kind: "chat", callId: "d1", index, mode: "summary", offset: 0, fromList: false } });
+  // Helper 0 (auth) ended, helper 2 (docs) runs.
+  assert.deepEqual(pressStepsManager(chatOf(0), ctx, "continue").action, { kind: "continue", callId: "d1", index: 0 });
+  assert.deepEqual(pressStepsManager(chatOf(2), ctx, "continue").action, { kind: "none" });
+  const steps: StepsManagerState = { open: true, view: { kind: "steps", callId: "d1", selected: 0, fromList: false } };
+  assert.deepEqual(pressStepsManager(steps, ctx, "continue").action, { kind: "none" });
+});
+
+test("the key hint of a helper's chat names c once it ended, and not while it runs or after the trim", () => {
+  const brief = reduceChat(emptyChat, ev(0, "message.completed", { message_id: "u1", role: "user", text: "Find the billing bug." }, "h1"));
+  const done = { ...ref, ended: { stopped: "done", modelCalls: 1, tokens: 1000, answerTokens: 100, costUsd: 0, durationMs: 5000, workingMs: 5000 } };
+  const hint = (rows: string[]) => rows.at(-1) ?? "";
+  assert.match(hint(layout(cloud, chatView, { sessionId: "h1", chat: brief, error: null }, [done])), /c continue as chat/);
+  assert.doesNotMatch(hint(layout(cloud, chatView, { sessionId: "h1", chat: { ...brief, busy: true }, error: null }, [ref])), /continue as chat/);
+  const trimmed = layoutStepsManager({
+    state: chatView,
+    batches: {},
+    events: [],
+    refs: () => [done],
+    helper: { sessionId: "h1", chat: brief, error: null },
+    trimmedAt: "2026-11-19T03:00:00Z",
+    lead: "Fix the login bug",
+    now,
+    columns: 80,
+    rows: 20,
+  }).map((line) => text(line.spans));
+  assert.doesNotMatch(hint(trimmed), /continue as chat/);
+});

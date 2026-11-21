@@ -830,6 +830,32 @@ async def test_fork_returns_a_session_whose_replay_is_the_copied_history(short_h
         await stop_daemon(app, task)
 
 
+async def test_fork_without_a_message_id_goes_to_the_last_message(short_home: Path) -> None:
+    app, task = await start_daemon(
+        short_home, router=ModelRouter(model=ScriptedChatModel(replies=["Hi"]))
+    )
+    client = await RpcClient.connect(app.paths.socket_path)
+    try:
+        await client.call("hello", HELLO)
+        source = await _open(client)
+        empty = await client.call("session.fork", {"session_id": source})
+        assert error_code(empty) == MESSAGE_NOT_FOUND
+        await client.call("message.send", {"session_id": source, "text": "hello"})
+        await client.wait_for_event("run.completed")
+        reply = _event_data(client.events[-3])
+        fork = rpc_result(await client.call("session.fork", {"session_id": source}))["session_id"]
+        assert isinstance(fork, str)
+        before = len(client.events)
+        await _attach(client, fork)
+        replay = (await client.take_events())[before:]
+        assert _completed_text(replay, "assistant") == ["Hi"]
+        created = _event_data(replay[0])
+        assert created["forked_from"] == {"session_id": source, "message_id": reply["message_id"]}
+    finally:
+        await client.close()
+        await stop_daemon(app, task)
+
+
 async def test_list_names_the_session_a_fork_came_from(short_home: Path) -> None:
     app, task = await start_daemon(
         short_home, router=ModelRouter(model=ScriptedChatModel(replies=["Hi"]))

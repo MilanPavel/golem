@@ -5,7 +5,7 @@ import { sessionPath } from "../../store/router.ts";
 export type SessionActions = {
   rename(sessionId: string, title: string): Promise<void>;
   /** Forks at a message, then opens the new session. */
-  fork(sessionId: string, atMessageId: string): Promise<void>;
+  fork(sessionId: string, atMessageId?: string): Promise<void>;
   /** Closes the session, then leaves its page when it is the one in view. */
   close(sessionId: string): Promise<void>;
 };
@@ -20,7 +20,7 @@ export function useSessionActions(): SessionActions {
     () => ({
       rename: (sessionId, title) => actions.rename(sessionId, title),
       async fork(sessionId, atMessageId) {
-        navigate(sessionPath(await actions.fork(sessionId, atMessageId)));
+        navigate(sessionPath(atMessageId === undefined ? await actions.fork(sessionId) : await actions.fork(sessionId, atMessageId)));
       },
       async close(sessionId) {
         await actions.close(sessionId);

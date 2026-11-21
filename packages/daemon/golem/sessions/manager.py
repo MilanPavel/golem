@@ -279,6 +279,13 @@ class HelperSessionError(Exception):
         super().__init__(NO_SEND)
 
 
+class HelperTrimmedError(Exception):
+    """A helper whose steps were removed cannot be continued as a chat."""
+
+    def __init__(self) -> None:
+        super().__init__("This helper's steps were removed, so it cannot be continued.")
+
+
 class BudgetSpentError(Exception):
     """A turn on a paid model was refused because a cap in ``[budget]`` is spent."""
 
@@ -562,25 +569,44 @@ class SessionManager:
             self._sessions[session.session_id] = session
             return session.session_id
 
-    async def fork(self, session_id: str, at_message_id: str) -> str:
+    async def fork(self, session_id: str, at_message_id: str | None = None) -> str:
         """A new session with ``session_id``'s history up to ``at_message_id``.
 
+        Without ``at_message_id`` the history runs to the last completed message.
         The new thread starts from the checkpoint that ends at that message.
         Its log gets the parent's ``message.completed`` events up to it, with
         their original ``run_id`` and new ``seq``. It also starts with the
         source's pinned skills and on-demand MCP servers as they are now. The
-        tools allowed for the session are not copied, so the fork asks again.
+        tools allowed for the session are not copied, so the fork asks again,
+        and the paid answer is not copied either.
         Nobody is attached yet.
 
+        A helper may be the source. The fork is then an ordinary chat: origin ``user``,
+        no lead, no agent, the normal prompt, tools and permission mode of a chat in the
+        folder, and the route ``local`` when the helper's lead was on it.
+
         Raises :class:`MessageNotFoundError`, :class:`SessionNotFoundError`,
-        or :class:`SchemaMismatchError`.
+        :class:`HelperTrimmedError` or :class:`SchemaMismatchError`.
         """
         async with self._lock:
             source = await self._resolve(session_id)
+            record = await self._records.get(session_id)
+            if record is not None and record.trimmed_at is not None:
+                raise HelperTrimmedError
             stored = await self._events.stored(session_id)
+            if at_message_id is None:
+                done = [e for e in stored if isinstance(e, MessageCompletedEvent)]
+                if not done:
+                    raise MessageNotFoundError("")
+                at_message_id = done[-1].data.message_id
             history = _completed_through(stored, at_message_id)
             if history is None:
                 raise MessageNotFoundError(at_message_id)
+            route = source.route
+            if source.parent is not None:
+                lead = await self._records.get(source.parent.session_id)
+                if lead is not None and lead.route == "local":
+                    route = "local"
             fork = _LiveSession(
                 session_id=new_id("s"),
                 model_profile=source.model_profile,
@@ -588,7 +614,7 @@ class SessionManager:
                 cwd=source.cwd,
                 mcp_servers=set(source.mcp_servers),
                 skills=list(source.skills),
-                route=source.route,
+                route=route,
             )
             if not await self._runtime.fork(
                 session_id, fork.session_id, at_message_id=at_message_id

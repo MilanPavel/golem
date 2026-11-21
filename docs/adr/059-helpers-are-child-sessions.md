@@ -128,7 +128,8 @@ At startup, after recovery, a reconcile pass finds each lead waiting on helpers,
 | the lead is waiting and you cancel | as above, through `_cancel_waiting` |
 | a restart | a helper's `running` run is resumed from its checkpoint (a new `ChatRuntime` entry that streams with no input); recovery still closes a `running` lead run. Helpers of a lead whose run was closed are cancelled. A parked helper and a parked lead stay parked |
 | `session.close` of the lead | its helpers are cancelled and closed; their logs stay readable |
-| `session.fork` | copies messages only, so a fork owns no helper. The original keeps them |
+| `session.fork` of a lead | copies messages only, so a fork owns no helper. The original keeps them |
+| `session.fork` of a helper ("Continue as chat") | the new session has the helper's messages (brief, steps, answer) and its model and folder. It is an ordinary chat: origin `user`, no `parent_session_id`, `root_session_id`, `parent_call_id`, `helper_index` or `agent`, and `forked_from` is the helper. It gets the normal prompt, tools and permission mode of a chat in that folder, is listed and writable, and is never trimmed since it has no parent. The helper and its lead are unchanged. `at_message_id` is optional: without it the fork ends at the last completed message. A trimmed helper is refused with `invalid params` ("This helper's steps were removed, so it cannot be continued."). A helper of a `local` lead continues on route `local`, and a local-only folder covers the new chat. The paid answer does not carry over: `paid_ok` starts false |
 
 The 058 rule that cancelling the parent cancels the child ([ADR-008](008-cancellation.md)) holds: the manager does it, since the helper no longer runs in the lead's task.
 

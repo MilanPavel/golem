@@ -65,7 +65,7 @@ You see as much as you want, and nothing new sits in the top bar.
 - **Quiet:** one grey line, "used 2 helpers".
 - **Normal:** one card for the batch, a row for each helper with what it read and what it saved. The right column is always a state or a wait reason.
 - **Verbose:** the model each helper got and why.
-- **A helper's chat** opens read-only from its name. **How it ran** is the Steps tab of the Inspector, and **Runs** in the rail lists the same steps full width. In the terminal a tree sits under the turn.
+- **A helper's chat** opens read-only from its name. **Continue as chat** turns a finished helper into a chat of your own: a fork with its messages, no lead, and the normal tools and prompt of a chat. **How it ran** is the Steps tab of the Inspector, and **Runs** in the rail lists the same steps full width. In the terminal a tree sits under the turn.
 - A worker's diff comes back in the Changes tab, one block for each worker, to view, apply or try again on a stronger model. Nothing in your folder changes until you apply.
 
 ### Somewhere else

@@ -18925,10 +18925,13 @@ public struct SessionDetachResult: Codable {
 /// ``session.fork``. A new session with this one's history up to ``at_message_id``.
 ///
 /// The source may be running: the fork reads completed checkpoints. The
-/// caller is not attached to the new session.
+/// caller is not attached to the new session. Without ``at_message_id`` the
+/// history runs to the source's last completed message. A helper may be the
+/// source: the fork is an ordinary chat that has no lead, which is how
+/// "Continue as chat" works. A helper whose steps were removed cannot be forked.
 // MARK: - SessionForkParams
 public struct SessionForkParams: Codable {
-    public let atMessageID: String
+    public let atMessageID: String?
     public let sessionID: String
 
     public enum CodingKeys: String, CodingKey {
@@ -18936,7 +18939,7 @@ public struct SessionForkParams: Codable {
         case sessionID = "session_id"
     }
 
-    public init(atMessageID: String, sessionID: String) {
+    public init(atMessageID: String?, sessionID: String) {
         self.atMessageID = atMessageID
         self.sessionID = sessionID
     }

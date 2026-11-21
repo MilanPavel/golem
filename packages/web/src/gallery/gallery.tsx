@@ -549,6 +549,7 @@ function HelperPanelDemo() {
               onOpenChat={() => {}}
               answer={answer}
               trimmedAt={key === "trimmed" ? TRIMMED_AT : null}
+              onContinue={key === "done" ? { onContinue: () => {}, busy: false, error: null } : null}
             />
           </div>
         ))}
@@ -570,12 +571,13 @@ function HelperBannerDemo() {
       <div className="flex max-w-3xl flex-col gap-4">
         {(
           [
-            ["running", running, () => {}],
-            ["finished", finished, null],
+            ["running", running, () => {}, null],
+            ["finished", finished, null, { onContinue: () => {}, busy: false, error: null }],
+            ["refused", finished, null, { onContinue: () => {}, busy: false, error: "This helper's steps were removed, so it cannot be continued." }],
           ] as const
-        ).map(([key, banner, onStop]) => (
+        ).map(([key, banner, onStop, onContinue]) => (
           <div key={key} className="overflow-hidden rounded-lg border border-line bg-surface">
-            <HelperBannerBar banner={banner} leadId="lead" onBack={() => {}} onStop={onStop} />
+            <HelperBannerBar banner={banner} leadId="lead" onBack={() => {}} onStop={onStop} onContinue={onContinue} />
           </div>
         ))}
         <HelperReceiptCard receipt={receipt} lead={{ id: "lead", onOpen: () => {} }} />

@@ -296,3 +296,65 @@ test("a daemon without trimmed_at shows the steps as before", async () => {
   expect(screen.queryByRole("region", { name: "Helper receipt" })).toBeNull();
   expect(within(panel() as HTMLElement).getByRole("radio", { name: "Summary" })).toBeTruthy();
 });
+
+async function openSecond(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(await screen.findByRole("button", { name: /^Open docs, / }));
+  await wait();
+  return within(panel() as HTMLElement);
+}
+
+test("a helper that runs or asks has no Continue as chat; a finished one forks and opens the new chat", async () => {
+  const user = userEvent.setup();
+  const { fake } = await setup(["h1", "h2"]);
+  const first = await openFirst(user);
+  expect(first.queryByRole("button", { name: "Continue as chat" })).toBeNull();
+  await user.click(first.getByRole("button", { name: "Next helper" }));
+  await wait();
+  const next = within(panel() as HTMLElement);
+  await user.click(next.getByRole("button", { name: "Continue as chat" }));
+  await wait();
+  expect(fake.raw.forkSession).toHaveBeenCalledWith("h2");
+  expect(location.pathname).toBe("/s/s_fork");
+});
+
+test("the banner of a finished helper has Continue as chat and a running one does not", async () => {
+  const user = userEvent.setup();
+  const { fake } = await setup(["h1", "h2"]);
+  const first = await openFirst(user);
+  await user.click(first.getByRole("button", { name: "Open as chat" }));
+  await wait();
+  const running = within(screen.getByRole("region", { name: "Helper banner" }));
+  expect(running.queryByRole("button", { name: "Continue as chat" })).toBeNull();
+  await user.click(running.getByRole("link", { name: "Back to lead" }));
+  await wait();
+  const inside = await openSecond(user);
+  await user.click(inside.getByRole("button", { name: "Open as chat" }));
+  await wait();
+  const banner = within(screen.getByRole("region", { name: "Helper banner" }));
+  await user.click(banner.getByRole("button", { name: "Continue as chat" }));
+  await wait();
+  expect(fake.raw.forkSession).toHaveBeenCalledWith("h2");
+  expect(location.pathname).toBe("/s/s_fork");
+});
+
+test("a refused Continue as chat says why next to the button and stays on the helper", async () => {
+  const user = userEvent.setup();
+  const { fake } = await setup(["h1", "h2"]);
+  fake.raw.forkSession.mockRejectedValueOnce(new Error("This helper's steps were removed, so it cannot be continued."));
+  const inside = await openSecond(user);
+  await user.click(inside.getByRole("button", { name: "Continue as chat" }));
+  await wait();
+  expect((await within(panel() as HTMLElement).findByRole("alert")).textContent).toBe("This helper's steps were removed, so it cannot be continued.");
+  expect(location.pathname).toBe("/s/a");
+});
+
+test("a trimmed helper has no Continue as chat, in the panel or as a chat", async () => {
+  const user = userEvent.setup();
+  await setupTrimmed();
+  const inside = await openSecond(user);
+  expect(inside.queryByRole("button", { name: "Continue as chat" })).toBeNull();
+  await user.click(inside.getByRole("button", { name: "Open as chat" }));
+  await wait();
+  const banner = within(screen.getByRole("region", { name: "Helper banner" }));
+  expect(banner.queryByRole("button", { name: "Continue as chat" })).toBeNull();
+});

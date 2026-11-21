@@ -4,6 +4,7 @@ import { Button } from "../../ui/button.tsx";
 import { cn } from "../../ui/cn.ts";
 import { Code } from "../../ui/code.tsx";
 import { HEADER_ROW } from "../../ui/header-row.ts";
+import { ContinueButton, ContinueError, type ContinueAction } from "./continue-as-chat.tsx";
 
 const LABEL = "text-meta text-faint";
 
@@ -14,13 +15,16 @@ export type HelperBannerBarProps = {
   onBack: () => void;
   /** Stops the helper. Null once it ended. */
   onStop: (() => void) | null;
+  /** Continue as chat. Null while the helper runs and once it was trimmed: the button is not shown. */
+  onContinue?: ContinueAction | null;
 };
 
 /**
  * The thin bar above a helper's own chat: whose helper it is, its agent type and model, a way back to
- * the lead, and Stop while it runs. A line under it says the chat is read-only.
+ * the lead, Stop while it runs, and Continue as chat once it ended. A line under it says the chat is
+ * read-only, and a refusal of Continue as chat shows under that.
  */
-export function HelperBannerBar({ banner, leadId, onBack, onStop }: HelperBannerBarProps) {
+export function HelperBannerBar({ banner, leadId, onBack, onStop, onContinue = null }: HelperBannerBarProps) {
   return (
     <section aria-label="Helper banner" className="flex flex-col">
       <div className={cn(HEADER_ROW, "flex-wrap gap-x-2 gap-y-1 px-4 text-sm")}>
@@ -45,9 +49,15 @@ export function HelperBannerBar({ banner, leadId, onBack, onStop }: HelperBanner
               Stop
             </Button>
           )}
+          {onContinue === null ? null : <ContinueButton action={onContinue} />}
         </span>
       </div>
       <p className="border-b border-line px-4 py-1.5 text-xs text-muted">Read-only: the lead talks to this helper.</p>
+      {onContinue?.error == null ? null : (
+        <div className="border-b border-line px-4 py-1.5">
+          <ContinueError action={onContinue} />
+        </div>
+      )}
     </section>
   );
 }

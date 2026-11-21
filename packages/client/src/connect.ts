@@ -375,7 +375,8 @@ export interface GolemClient {
    */
   /** Hide the session from the list. Its events stay in the log. */
   closeSession(sessionId: string): Promise<SessionCloseResult>;
-  forkSession(sessionId: string, atMessageId: string): Promise<SessionForkResult>;
+  /** Forks at a message, or at the last one without `atMessageId`. A helper may be the source: the fork is a chat of its own. */
+  forkSession(sessionId: string, atMessageId?: string): Promise<SessionForkResult>;
   /** Set the title by hand. Resolves with the title as stored: one line, at most 60 characters. */
   renameSession(sessionId: string, title: string): Promise<SessionRenameResult>;
   /** `cwd` gives a session without a project folder this one. A session with a folder keeps its own. */
@@ -1523,9 +1524,12 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       }
       return result;
     },
-    async forkSession(sessionId: string, atMessageId: string): Promise<SessionForkResult> {
+    async forkSession(sessionId: string, atMessageId?: string): Promise<SessionForkResult> {
       await ready;
-      const result = await call("session.fork", { session_id: sessionId, at_message_id: atMessageId });
+      const result = await call(
+        "session.fork",
+        atMessageId === undefined ? { session_id: sessionId } : { session_id: sessionId, at_message_id: atMessageId },
+      );
       if (!isSessionForkResult(result)) {
         throw new Error("invalid session.fork result");
       }

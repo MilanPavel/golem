@@ -1,11 +1,19 @@
 {
   "additionalProperties": false,
-  "description": "``session.fork``. A new session with this one's history up to ``at_message_id``.\n\nThe source may be running: the fork reads completed checkpoints. The\ncaller is not attached to the new session.",
+  "description": "``session.fork``. A new session with this one's history up to ``at_message_id``.\n\nThe source may be running: the fork reads completed checkpoints. The\ncaller is not attached to the new session. Without ``at_message_id`` the\nhistory runs to the source's last completed message. A helper may be the\nsource: the fork is an ordinary chat that has no lead, which is how\n\"Continue as chat\" works. A helper whose steps were removed cannot be forked.",
   "properties": {
     "at_message_id": {
-      "minLength": 1,
-      "title": "At Message Id",
-      "type": "string"
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "At Message Id"
     },
     "session_id": {
       "minLength": 1,
@@ -14,8 +22,7 @@
     }
   },
   "required": [
-    "session_id",
-    "at_message_id"
+    "session_id"
   ],
   "title": "SessionForkParams",
   "type": "object"

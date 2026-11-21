@@ -51,7 +51,7 @@ export function openStepsManager(callId: string | null = null): StepsManagerStat
   };
 }
 
-export type StepsKey = "up" | "down" | "enter" | "back" | "stop" | "mode" | "page-up" | "page-down";
+export type StepsKey = "up" | "down" | "enter" | "back" | "stop" | "mode" | "continue" | "page-up" | "page-down";
 
 export type StepsAction =
   | { kind: "none" }
@@ -60,14 +60,17 @@ export type StepsAction =
   | { kind: "open-chat"; callId: string; index: number }
   /** The chat closed: stop following the helper. */
   | { kind: "leave-chat"; callId: string; index: number }
-  | { kind: "stop"; callId: string; index: number };
+  | { kind: "stop"; callId: string; index: number }
+  /** Fork the open helper into a chat of your own and switch to it. Only for a helper that ended. */
+  | { kind: "continue"; callId: string; index: number };
 
 export function stepsKeyOf(press: Press): StepsKey | null {
   if (press.name === "up" || press.name === "down" || press.name === "page-up" || press.name === "page-down") return press.name;
   if (press.name === "return") return "enter";
   if (press.name === "escape") return "back";
   if (press.name === "tab") return "mode";
-  return press.name === null && press.input === "x" && !press.ctrl && !press.meta ? "stop" : null;
+  if (press.name !== null || press.ctrl || press.meta) return null;
+  return press.input === "x" ? "stop" : press.input === "c" ? "continue" : null;
 }
 
 /** What the keys need to know about the data. */
@@ -133,6 +136,9 @@ export function pressStepsManager(
   if (key === "mode") return to({ ...view, mode: view.mode === "summary" ? "everything" : "summary", offset: 0 });
   if (key === "stop") {
     return helpers[here]?.live === true ? { state, action: { kind: "stop", callId: view.callId, index: view.index } } : { state, action: NONE };
+  }
+  if (key === "continue") {
+    return helpers[here]?.live === false ? { state, action: { kind: "continue", callId: view.callId, index: view.index } } : { state, action: NONE };
   }
   const step = key === "up" ? -1 : key === "down" ? 1 : key === "page-up" ? -PAGE : key === "page-down" ? PAGE : 0;
   if (step === 0) return { state, action: NONE };
@@ -237,6 +243,7 @@ function cut(text: string, room: number): string {
 const STEPS_HINT = "↑/↓ choose · Enter opens its chat · x stops it · Esc back";
 const LIST_HINT = "↑/↓ choose · Enter opens Steps · Esc close";
 const CHAT_HINT = "↑/↓ scroll · Tab Summary or Everything · x stops it · Esc back";
+const CHAT_ENDED_HINT = "↑/↓ scroll · Tab Summary or Everything · c continue as chat · Esc back";
 const LEGEND: readonly Span[] = [
   { text: "█" },
   { text: " working   " },
@@ -479,7 +486,8 @@ export function layoutStepsManager(input: StepsLayoutInput): StepsLine[] {
       const start = Math.min(view.offset, Math.max(0, all.length - room));
       body = all.slice(start, start + room);
     }
-    hint = CHAT_HINT;
+    const ended = phase === "done" || phase === "failed" || phase === "stopped";
+    hint = trimmedAt === null && input.helper !== null && input.helper.error === null && ended ? CHAT_ENDED_HINT : CHAT_HINT;
   }
   const room = Math.max(0, rows - head.length - 2);
   const lines = [...head, ...body.slice(0, room), { spans: [] }, { spans: [{ text: hint, dim: true }] }];
