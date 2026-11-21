@@ -7,6 +7,7 @@ from pydantic import BaseModel, BeforeValidator, ConfigDict, Field
 from golem_protocol.commands import (
     AgentRegistryChanged,
     DeviceChanged,
+    DevicePairChanged,
     KeychainWait,
     McpLoginDone,
     McpServer,
@@ -321,9 +322,23 @@ class DeviceChangedNotification(BaseModel):
     params: DeviceChanged = Field(default_factory=DeviceChanged)
 
 
+class DevicePairChangedNotification(BaseModel):
+    """Server → the browser and local connections, never a phone: a pairing moved on. Not stored.
+
+    ``words`` is what the owner compares with the phone (ADR-051).
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    jsonrpc: Literal["2.0"] = "2.0"
+    method: Literal["device.pair.changed"] = "device.pair.changed"
+    params: DevicePairChanged
+
+
 __all__ = [
     "AgentRegistryChangedNotification",
     "DeviceChangedNotification",
+    "DevicePairChangedNotification",
     "KeychainWaitNotification",
     "McpLoginDoneNotification",
     "McpServerLogNotification",

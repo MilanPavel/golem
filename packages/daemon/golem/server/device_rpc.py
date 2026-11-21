@@ -8,8 +8,11 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import socket
+from urllib.parse import quote
 
 from golem.config import load_settings
+from golem.pairing import PairingError, PairingManager
 from golem.relay_keys import RelayKeyError, RelayKeys, b64, unb64
 from golem.secrets import SecretStoreError
 from golem.server.dispatcher import (
@@ -20,15 +23,30 @@ from golem.server.dispatcher import (
     RequestContext,
     RpcCallError,
 )
-from golem.store.devices import DeviceStore
+from golem.store.devices import Device, DeviceStore
 from golem_protocol.commands import (
     ConnectionIdentifyParams,
     ConnectionIdentifyResult,
+    DeviceInfo,
+    DeviceListParams,
+    DeviceListResult,
+    DevicePairBeginParams,
+    DevicePairBeginResult,
+    DevicePairConfirmParams,
+    DevicePairConfirmResult,
+    DevicePairRequestParams,
+    DevicePairRequestResult,
+    DeviceRenameParams,
+    DeviceRenameResult,
+    DeviceRevokeParams,
+    DeviceRevokeResult,
+    DeviceRule,
     DeviceSyncParams,
     DeviceSyncResult,
     RelayDevice,
     RelayDhParams,
     RelayDhResult,
+    RelayPair,
     RelaySignParams,
     RelaySignResult,
 )
@@ -41,6 +59,18 @@ def _keys(ctx: RequestContext) -> RelayKeys:
     if secrets is None:
         raise RpcCallError(KEYCHAIN_UNAVAILABLE, "this daemon has no key store")
     return RelayKeys(secrets)
+
+
+def _slots(ctx: RequestContext) -> list[tuple[str, int]]:
+    pairing = ctx.state.pairing
+    return [] if pairing is None else pairing.slots()
+
+
+def _pairing(ctx: RequestContext) -> PairingManager:
+    pairing = ctx.state.pairing
+    if pairing is None:
+        raise RpcCallError(INTERNAL_ERROR, "the device registry is not ready")
+    return pairing
 
 
 def _devices(ctx: RequestContext) -> DeviceStore:
@@ -100,7 +130,7 @@ async def device_sync(ctx: RequestContext, params: DeviceSyncParams) -> DeviceSy
             for device in paired
             if device.public_key is not None
         ],
-        pairs=[],
+        pairs=[RelayPair(slot=slot, exp=exp) for slot, exp in _slots(ctx)],
     )
 
 
@@ -116,3 +146,136 @@ async def connection_identify(
     ctx.connection.device = device.id
     await devices.touch(device.id, ctx.state.clock())
     return ConnectionIdentifyResult()
+
+
+# ---- the owner's methods (browser) and the pairing request (local) ----
+
+
+def _info(device: Device, rules: int) -> DeviceInfo:
+    return DeviceInfo(
+        id=device.id,
+        name=device.name,
+        paired_at=device.paired_at,
+        last_seen=device.last_seen,
+        revoked_at=device.revoked_at,
+        rules=rules,
+    )
+
+
+async def _known(devices: DeviceStore, device: str) -> Device:
+    found = await devices.get(device)
+    if found is None:
+        raise RpcCallError(INVALID_PARAMS, "unknown device", {"reason": "unknown_device"})
+    return found
+
+
+def _refused(error: PairingError) -> RpcCallError:
+    return RpcCallError(DEVICE_REFUSED, str(error), {"reason": error.reason})
+
+
+async def device_list(ctx: RequestContext, params: DeviceListParams) -> DeviceListResult:
+    del params
+    devices = _devices(ctx)
+    counts = await devices.rule_counts()
+    listed = await devices.list(include_revoked=True)
+    return DeviceListResult(devices=[_info(d, counts.get(d.id, 0)) for d in listed])
+
+
+def _mac_name() -> str:
+    name = socket.gethostname().removesuffix(".local").strip()
+    return "".join(ch for ch in name if ch.isprintable())[:64] or "Mac"
+
+
+def _compressed(key: bytes) -> bytes:
+    """A 65-byte uncompressed P-256 key as 33 bytes (the QR code's form)."""
+    return bytes([2 + (key[64] & 1)]) + key[1:33]
+
+
+async def device_pair_begin(
+    ctx: RequestContext, params: DevicePairBeginParams
+) -> DevicePairBeginResult:
+    del params
+    keys = _keys(ctx)
+    pairing = _pairing(ctx)
+    paths = ctx.state.paths
+    settings = await asyncio.to_thread(load_settings, home=paths.home, project_dir=paths.home)
+    relay = settings.relay.url
+    if relay is None:
+        raise RpcCallError(
+            INVALID_PARAMS,
+            'no relay is set: add [relay] url = "wss://..." to config.toml'
+            " (for a local test, run `just relay` and use ws://127.0.0.1:8080)",
+            {"reason": "relay_not_configured"},
+        )
+    try:
+        mac_key, noise_key = await asyncio.to_thread(lambda: (keys.mac_key(), keys.noise_key()))
+    except RelayKeyError as exc:
+        raise RpcCallError(INTERNAL_ERROR, str(exc)) from exc
+    except SecretStoreError as exc:
+        raise RpcCallError(KEYCHAIN_UNAVAILABLE, str(exc)) from exc
+    pair, code, expires = pairing.begin()
+    # The link holds the one-time code. It is returned to the caller and never logged.
+    uri = (
+        f"golem://pair?v=1&relay={quote(relay, safe=':/')}"
+        f"&mac={b64(_compressed(mac_key) + noise_key)}&code={b64(code)}"
+        f"&exp={int(expires.timestamp())}&name={quote(_mac_name(), safe='')}"
+    )
+    return DevicePairBeginResult(pair=pair, uri=uri, expires_at=int(expires.timestamp()))
+
+
+async def device_pair_request(
+    ctx: RequestContext, params: DevicePairRequestParams
+) -> DevicePairRequestResult:
+    pairing = _pairing(ctx)
+    try:
+        key = unb64(params.key)
+        code = unb64(params.code)
+    except ValueError as exc:
+        raise RpcCallError(INVALID_PARAMS, "not base64url") from exc
+    try:
+        pair = await pairing.request(code, key, params.name, params.model, params.words)
+    except PairingError as exc:
+        raise _refused(exc) from exc
+    return DevicePairRequestResult(pair=pair)
+
+
+async def device_pair_confirm(
+    ctx: RequestContext, params: DevicePairConfirmParams
+) -> DevicePairConfirmResult:
+    pairing = _pairing(ctx)
+    try:
+        device = await pairing.confirm(params.pair, params.accept)
+    except PairingError as exc:
+        raise _refused(exc) from exc
+    if device is None:
+        return DevicePairConfirmResult()
+    return DevicePairConfirmResult(device=_info(device, 0))
+
+
+async def device_rename(ctx: RequestContext, params: DeviceRenameParams) -> DeviceRenameResult:
+    devices = _devices(ctx)
+    name = "".join(ch for ch in params.name if ch.isprintable()).strip()
+    if not name:
+        raise RpcCallError(INVALID_PARAMS, "a device needs a name")
+    found = await _known(devices, params.device)
+    if found.revoked:
+        raise RpcCallError(INVALID_PARAMS, "this device was revoked")
+    await devices.rename(found.id, name[:64])
+    renamed = await _known(devices, found.id)
+    return DeviceRenameResult(device=_info(renamed, (await devices.rule_counts()).get(found.id, 0)))
+
+
+async def device_revoke(ctx: RequestContext, params: DeviceRevokeParams) -> DeviceRevokeResult:
+    devices = _devices(ctx)
+    await _known(devices, params.device)
+    revoked = await devices.revoke(params.device, ctx.state.clock().isoformat())
+    after = await _known(devices, params.device)
+    rules = await devices.rules_of(params.device)
+    seen: dict[str, str] = {}
+    for origin in rules:
+        seen.setdefault(origin.rule, origin.at)
+    return DeviceRevokeResult(
+        device=_info(after, len(seen)),
+        revoked=revoked,
+        rules=[DeviceRule(rule=rule, at=at) for rule, at in seen.items()],
+    )

@@ -1,0 +1,7 @@
+{
+  "additionalProperties": false,
+  "description": "``device.list``. No params.",
+  "properties": {},
+  "title": "DeviceListParams",
+  "type": "object"
+}

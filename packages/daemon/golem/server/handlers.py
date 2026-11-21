@@ -52,7 +52,18 @@ from golem.models.tiers import blended
 from golem.permissions.policy import PROJECT_POLICY
 from golem.secrets import SecretStore, SecretStoreError, check_name
 from golem.server.agents_edit import agent_infos, agents_set_wish
-from golem.server.device_rpc import connection_identify, device_sync, relay_dh, relay_sign
+from golem.server.device_rpc import (
+    connection_identify,
+    device_list,
+    device_pair_begin,
+    device_pair_confirm,
+    device_pair_request,
+    device_rename,
+    device_revoke,
+    device_sync,
+    relay_dh,
+    relay_sign,
+)
 from golem.server.dispatcher import (
     APPROVAL_NOT_FOUND,
     ARTIFACT_NOT_FOUND,
@@ -194,6 +205,12 @@ from golem_protocol.commands import (
     CostRoleRow,
     CostTotals,
     DaemonStatus,
+    DeviceListParams,
+    DevicePairBeginParams,
+    DevicePairConfirmParams,
+    DevicePairRequestParams,
+    DeviceRenameParams,
+    DeviceRevokeParams,
     DeviceSyncParams,
     EvalRoutingParams,
     EvalRoutingResult,
@@ -2096,6 +2113,18 @@ def standard_methods() -> dict[str, Method]:
         "relay.sign": Method("relay.sign", RelaySignParams, True, relay_sign),
         "relay.dh": Method("relay.dh", RelayDhParams, True, relay_dh),
         "device.sync": Method("device.sync", DeviceSyncParams, True, device_sync),
+        "device.pair.request": Method(
+            "device.pair.request", DevicePairRequestParams, True, device_pair_request
+        ),
+        "device.list": Method("device.list", DeviceListParams, True, device_list),
+        "device.pair.begin": Method(
+            "device.pair.begin", DevicePairBeginParams, True, device_pair_begin
+        ),
+        "device.pair.confirm": Method(
+            "device.pair.confirm", DevicePairConfirmParams, True, device_pair_confirm
+        ),
+        "device.rename": Method("device.rename", DeviceRenameParams, True, device_rename),
+        "device.revoke": Method("device.revoke", DeviceRevokeParams, True, device_revoke),
         # Before hello: the gateway names the device before anything the phone sent arrives.
         "connection.identify": Method(
             "connection.identify", ConnectionIdentifyParams, False, connection_identify

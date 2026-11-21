@@ -1,0 +1,16 @@
+{
+  "additionalProperties": false,
+  "description": "``device.revoke``.",
+  "properties": {
+    "device": {
+      "pattern": "^[0-9a-f]{32}$",
+      "title": "Device",
+      "type": "string"
+    }
+  },
+  "required": [
+    "device"
+  ],
+  "title": "DeviceRevokeParams",
+  "type": "object"
+}

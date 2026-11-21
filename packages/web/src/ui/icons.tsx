@@ -248,6 +248,12 @@ export const SettingsMcpIcon = (props: IconProps) => (
     <rect x="2.5" y="2.5" width="4.5" height="4.5" rx="1" /><rect x="9" y="2.5" width="4.5" height="4.5" rx="1" /><rect x="2.5" y="9" width="4.5" height="4.5" rx="1" /><path d="M11.25 9v4.5M9 11.25h4.5" />
   </Icon>
 );
+/** A phone. */
+export const SettingsDevicesIcon = (props: IconProps) => (
+  <Icon strokeWidth="1.4" {...props}>
+    <rect x="4.5" y="1.5" width="7" height="13" rx="1.5" /><path d="M7 12.5h2" />
+  </Icon>
+);
 /** A star. */
 export const SettingsSkillsIcon = (props: IconProps) => (
   <Icon strokeWidth="1.4" {...props}>

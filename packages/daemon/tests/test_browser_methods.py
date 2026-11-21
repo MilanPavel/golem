@@ -21,7 +21,13 @@ def test_key_management_stays_out_of_the_browser() -> None:
 
 
 def test_a_browser_cannot_call_the_gateways_methods() -> None:
-    for name in ("relay.sign", "relay.dh", "device.sync", "connection.identify"):
+    for name in (
+        "relay.sign",
+        "relay.dh",
+        "device.sync",
+        "device.pair.request",
+        "connection.identify",
+    ):
         assert METHOD_ACCESS[name] == "local"
         assert name not in BROWSER_METHODS
         assert name not in DEVICE_METHODS

@@ -24,6 +24,7 @@ from golem.models.ollama import LocalServers
 from golem.models.pulls import PullManager
 from golem.models.scores import Scores
 from golem.notify import Notifier
+from golem.pairing import PairingManager
 from golem.paths import GolemPaths
 from golem.permissions.policy import Policy
 from golem.routine_scheduler import RoutineScheduler
@@ -56,6 +57,8 @@ class DaemonState:
     routine_runs: RoutineRuns | None = None
     devices: DeviceStore | None = None
     """The device registry, once the database is open."""
+    pairing: PairingManager | None = None
+    """The open phone pairing, if any. Made with the registry."""
     models: ModelDiscovery | None = None
     facts: FactsSource | None = None
     pulls: PullManager | None = None
@@ -83,5 +86,7 @@ class DaemonState:
     mcp_imports: ScanStore = field(default_factory=ScanStore)
     broadcast: Callable[[BaseModel], None] = field(default=lambda _notification: None)
     """Queues a notification on every connection that said hello."""
+    broadcast_owner: Callable[[BaseModel], None] = field(default=lambda _notification: None)
+    """Like ``broadcast``, but skips a paired phone's connection."""
     clock: Callable[[], datetime] = field(default=lambda: datetime.now(local_zone()))
     """The time, with the Mac's zone. A test sets its own."""

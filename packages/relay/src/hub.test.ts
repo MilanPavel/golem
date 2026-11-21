@@ -44,6 +44,23 @@ async function deviceOnline(hub: ReturnType<typeof setup>["hub"], id: Identity, 
   return sock;
 }
 
+const sha = async (bytes: Uint8Array) => toBase64Url(new Uint8Array(await crypto.subtle.digest("SHA-256", bytes as BufferSource)));
+
+/** The Mac lists a pairing for `code`, ending `seconds` from now (the test clock reads 1000 s). */
+async function openPair(sock: TestSocket, code: Uint8Array, seq: number, seconds = 300, devices: Identity[] = []) {
+  const slot = await sha(code);
+  sock.send(JSON.stringify({ type: "allow", seq, devices: devices.map((d) => ({ key: d.publicKey })), pairs: [{ slot, exp: 1000 + seconds }] }));
+  await new Promise((r) => setTimeout(r, 5));
+  return slot;
+}
+
+async function pairingDevice(hub: ReturnType<typeof setup>["hub"], id: Identity, room: string, slot: string, ip = "10.0.0.1") {
+  const sock = connect(hub, "device", HOST, ip);
+  await sock.auth(id, { mac: room, pair: slot });
+  await until(() => sock.closed !== null || sock.json().some((m) => m["type"] === "peer"), "device admitted");
+  return sock;
+}
+
 const text = (s: string) => new TextEncoder().encode(s);
 
 describe("authentication", () => {
@@ -397,5 +414,103 @@ describe("what the relay sees", () => {
     expect(log).not.toContain("10.0.0.1");
     expect(log).not.toContain(room);
     expect(log).toContain("connect");
+  });
+});
+
+describe("pair slots", () => {
+  const code = new Uint8Array(16).fill(7);
+
+  test("an unknown phone with a valid slot is admitted and exchanges frames", async () => {
+    const { hub } = setup();
+    const { sock: mac, room } = await macOnline(hub, []);
+    const slot = await openPair(mac, code, 2);
+    const phone = await newIdentity();
+    const dev = await pairingDevice(hub, phone, room, slot);
+    expect(dev.closed).toBeNull();
+    const id = await phone.deviceId();
+    dev.send(deviceFrame([1, 2, 3, 4], text("e")));
+    await until(() => mac.binary().length === 1, "frame at the Mac");
+    mac.send(macFrame(id, [1, 2, 3, 4], text("e2")));
+    await until(() => dev.binary().length === 1, "frame at the device");
+  });
+
+  test("a slot works once: the second phone with it gets 4401", async () => {
+    const { hub } = setup();
+    const { sock: mac, room } = await macOnline(hub, []);
+    const slot = await openPair(mac, code, 2);
+    await pairingDevice(hub, await newIdentity(), room, slot);
+    const second = await pairingDevice(hub, await newIdentity(), room, slot, "10.0.0.2");
+    expect(second.closed).toBe(4401);
+  });
+
+  test("a later allow that still lists a spent slot does not bring it back", async () => {
+    const { hub } = setup();
+    const { sock: mac, room } = await macOnline(hub, []);
+    const slot = await openPair(mac, code, 2);
+    await pairingDevice(hub, await newIdentity(), room, slot);
+    await openPair(mac, code, 3);
+    const again = await pairingDevice(hub, await newIdentity(), room, slot, "10.0.0.2");
+    expect(again.closed).toBe(4401);
+  });
+
+  test("an expired slot gets 4401", async () => {
+    const { hub, clock } = setup();
+    const { sock: mac, room } = await macOnline(hub, []);
+    const slot = await openPair(mac, code, 2, 300);
+    clock.now += 301_000;
+    const dev = await pairingDevice(hub, await newIdentity(), room, slot);
+    expect(dev.closed).toBe(4401);
+  });
+
+  test("the code itself is not a slot, and a made-up slot gets 4401", async () => {
+    const { hub } = setup();
+    const { sock: mac, room } = await macOnline(hub, []);
+    await openPair(mac, code, 2);
+    const raw = await pairingDevice(hub, await newIdentity(), room, toBase64Url(code));
+    expect(raw.closed).toBe(4401);
+    const none = await pairingDevice(hub, await newIdentity(), room, "AAAA", "10.0.0.2");
+    expect(none.closed).toBe(4401);
+  });
+
+  test("a phone without a slot is still refused", async () => {
+    const { hub } = setup();
+    const { sock: mac, room } = await macOnline(hub, []);
+    await openPair(mac, code, 2);
+    const dev = connect(hub, "device", HOST);
+    await dev.auth(await newIdentity(), { mac: room });
+    await until(() => dev.closed !== null, "closed");
+    expect(dev.closed).toBe(4401);
+  });
+
+  test("a new allow does not cut the phone that is pairing, and the phone cannot return after its socket closes", async () => {
+    const { hub } = setup();
+    const { sock: mac, room } = await macOnline(hub, []);
+    const slot = await openPair(mac, code, 2);
+    const phone = await newIdentity();
+    const dev = await pairingDevice(hub, phone, room, slot);
+    mac.send(JSON.stringify({ type: "allow", seq: 3, devices: [], pairs: [] }));
+    await new Promise((r) => setTimeout(r, 10));
+    expect(dev.closed).toBeNull();
+    dev.handler.close();
+    const back = connect(hub, "device", HOST, "10.0.0.2");
+    await back.auth(phone, { mac: room });
+    await until(() => back.closed !== null, "closed");
+    expect(back.closed).toBe(4401);
+    // Frames for it are dropped now, not queued.
+    mac.send(macFrame(await phone.deviceId(), [1, 2, 3, 4], text("late")));
+    await new Promise((r) => setTimeout(r, 5));
+    expect(hub.heldFrames().length).toBe(0);
+  });
+
+  test("the relay sees the slot, never the code, and logs neither", async () => {
+    const { hub, lines } = setup();
+    const { sock: mac, room } = await macOnline(hub, []);
+    const slot = await openPair(mac, code, 2);
+    await pairingDevice(hub, await newIdentity(), room, slot);
+    const log = lines.join("\n");
+    expect(log).not.toContain(slot);
+    expect(log).not.toContain(toBase64Url(code));
+    // Hashing the slot is not a way back: the relay holds no code to compare against.
+    expect(slot).not.toBe(toBase64Url(code));
   });
 });

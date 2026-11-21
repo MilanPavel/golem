@@ -944,3 +944,4 @@ export {
   type WaitScope,
   type WaitState,
 } from "./wait.ts";
+export { encodeQr, qrSpan, qrToPath, qrToTerminal, type QrCode, type TerminalOptions } from "./qr.ts";

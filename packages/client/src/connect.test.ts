@@ -1633,6 +1633,63 @@ test("memory.list reads a page, and memory.changed reaches onMemoryChanged unles
   }
 });
 
+test("device.* calls send their params, and device.pair.changed and device.changed reach their listeners", async () => {
+  const phone = { id: "a".repeat(32), name: "iPhone 16", paired_at: "2026-11-21T10:00:00+01:00", last_seen: null, revoked_at: null, rules: 1 };
+  const sent: Record<string, unknown>[] = [];
+  const server = await listen((socket) => {
+    attach(socket, {
+      answerPing: true,
+      results: {
+        "device.list": { devices: [phone] },
+        "device.pair.begin": { pair: "p1", uri: "golem://pair?v=1", expires_at: 1763720300 },
+        "device.pair.confirm": { device: phone },
+        "device.rename": { device: { ...phone, name: "Pocket" } },
+        "device.revoke": { device: { ...phone, revoked_at: "2026-11-21T11:00:00+01:00" }, revoked: true, rules: [{ rule: "shell(ls)", at: "2026-11-21T10:30:00+01:00" }] },
+      },
+      onRequest: (_socket, method, params) => {
+        if (method.startsWith("device.")) sent.push({ method, ...params });
+      },
+      onHello: (current) => {
+        write(current, { jsonrpc: "2.0", method: "device.pair.changed", params: { pair: "p1", state: "words", words: ["kiln", "otter", "maple"], device: { id: phone.id, name: "iPhone 16", model: "iPhone17,3" } } });
+        write(current, { jsonrpc: "2.0", method: "device.pair.changed", params: { pair: "p1", state: "nonsense" } });
+        write(current, { jsonrpc: "2.0", method: "device.changed", params: {} });
+      },
+    });
+  });
+  const client = connectGolem({ socketPath: server.socketPath, clientName: "web", reconnect: false, heartbeatMs: 60_000 });
+  const pairs: string[] = [];
+  let changed = 0;
+  const stopPairs = client.onDevicePairChanged((change) => pairs.push(`${change.state} ${(change.words ?? []).join(" ")}`));
+  const stopChanged = client.onDevicesChanged(() => (changed += 1));
+  try {
+    assert.deepEqual((await client.deviceList()).devices, [phone]);
+    assert.equal((await client.devicePairBegin()).pair, "p1");
+    assert.equal((await client.devicePairConfirm("p1")).device?.id, phone.id);
+    await client.devicePairConfirm("p1", false);
+    assert.equal((await client.deviceRename(phone.id, "Pocket")).device.name, "Pocket");
+    assert.deepEqual((await client.deviceRevoke(phone.id)).rules, [{ rule: "shell(ls)", at: "2026-11-21T10:30:00+01:00" }]);
+    assert.deepEqual(sent, [
+      { method: "device.list" },
+      { method: "device.pair.begin" },
+      { method: "device.pair.confirm", pair: "p1", accept: true },
+      { method: "device.pair.confirm", pair: "p1", accept: false },
+      { method: "device.rename", device: phone.id, name: "Pocket" },
+      { method: "device.revoke", device: phone.id },
+    ]);
+    for (let tries = 0; tries < 50 && (pairs.length < 1 || changed < 1); tries += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+    // The malformed notification is dropped.
+    assert.deepEqual(pairs, ["words kiln otter maple"]);
+    assert.equal(changed, 1);
+  } finally {
+    stopPairs();
+    stopChanged();
+    client.close();
+    await server.close();
+  }
+});
+
 test("forkSession sends the message id and reads the new session", async () => {
   const sent: Record<string, unknown>[] = [];
   const server = await listen((socket) => {

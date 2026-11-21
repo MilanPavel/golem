@@ -1,0 +1,23 @@
+{
+  "additionalProperties": false,
+  "description": "``device.rename``.",
+  "properties": {
+    "device": {
+      "pattern": "^[0-9a-f]{32}$",
+      "title": "Device",
+      "type": "string"
+    },
+    "name": {
+      "maxLength": 64,
+      "minLength": 1,
+      "title": "Name",
+      "type": "string"
+    }
+  },
+  "required": [
+    "device",
+    "name"
+  ],
+  "title": "DeviceRenameParams",
+  "type": "object"
+}

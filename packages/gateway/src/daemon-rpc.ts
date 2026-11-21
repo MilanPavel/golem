@@ -42,8 +42,8 @@ export interface Rpc {
 }
 
 export interface RpcHooks {
-  /** A notification arrived, by method name. */
-  notify(method: string): void;
+  /** A notification arrived, by method name, with its params when it has an object. */
+  notify(method: string, params: Record<string, unknown>): void;
   /** The connection ended. Every call still waiting has failed. */
   down(): void;
 }
@@ -117,7 +117,8 @@ export function connectRpc(open: OpenDaemon, hooks: RpcHooks): Opening {
           p.reject(new RpcError(typeof e["code"] === "number" ? e["code"] : -1, typeof e["message"] === "string" ? e["message"] : "error", e["data"]));
         } else p.resolve(message["result"]);
       } else if (id === undefined && typeof message["method"] === "string") {
-        hooks.notify(message["method"]);
+        const params = message["params"];
+        hooks.notify(message["method"], typeof params === "object" && params !== null && !Array.isArray(params) ? (params as Record<string, unknown>) : {});
       }
     }
 

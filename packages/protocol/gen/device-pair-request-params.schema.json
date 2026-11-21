@@ -1,0 +1,44 @@
+{
+  "additionalProperties": false,
+  "description": "``device.pair.request``. The gateway has verified the phone's signature over the\nhandshake and computed ``words`` from the handshake hash. The daemon checks ``code``.",
+  "properties": {
+    "code": {
+      "pattern": "^[A-Za-z0-9_-]{22}$",
+      "title": "Code",
+      "type": "string"
+    },
+    "key": {
+      "pattern": "^[A-Za-z0-9_-]{87}$",
+      "title": "Key",
+      "type": "string"
+    },
+    "model": {
+      "default": "",
+      "maxLength": 64,
+      "title": "Model",
+      "type": "string"
+    },
+    "name": {
+      "maxLength": 64,
+      "title": "Name",
+      "type": "string"
+    },
+    "words": {
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 3,
+      "minItems": 3,
+      "title": "Words",
+      "type": "array"
+    }
+  },
+  "required": [
+    "code",
+    "key",
+    "name",
+    "words"
+  ],
+  "title": "DevicePairRequestParams",
+  "type": "object"
+}
