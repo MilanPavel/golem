@@ -2,6 +2,29 @@
 
 What changed in each release of golem, newest first. `just release` writes each section from the commit messages on `main` ([CONTRIBUTING.md](CONTRIBUTING.md)), and the release pull request is the place to edit it. The GitHub release shows the same section. How a release is made is in [docs/sre.md](docs/sre.md), section 5.
 
+## [0.18.0] - 2026-11-21
+
+### Features
+
+- **daemon:** the lead's log names the model a helper ran on after a no ([#1520](https://github.com/MilanPavel/golem/pull/1520)) ([#1528](https://github.com/MilanPavel/golem/pull/1528))
+- **daemon:** a bundled type's wish is a config key, not a copy of its file ([#1524](https://github.com/MilanPavel/golem/pull/1524)) ([#1530](https://github.com/MilanPavel/golem/pull/1530))
+- **protocol:** model.routed has the reasons of a helper's pick ([#1521](https://github.com/MilanPavel/golem/pull/1521)) ([#1529](https://github.com/MilanPavel/golem/pull/1529))
+- **daemon:** cost.get splits the helpers' cost by agent type ([#1522](https://github.com/MilanPavel/golem/pull/1522)) ([#1531](https://github.com/MilanPavel/golem/pull/1531))
+- **daemon:** a helper's paid question says what is sent and what is not ([#1328](https://github.com/MilanPavel/golem/pull/1328)) ([#1534](https://github.com/MilanPavel/golem/pull/1534))
+- **protocol:** a summary lists its pending items, and approval.respond has a batch scope ([#1325](https://github.com/MilanPavel/golem/pull/1325)) ([#1535](https://github.com/MilanPavel/golem/pull/1535))
+- **client:** the Inbox model groups a lead's helper questions, with scopes and a count ([#1329](https://github.com/MilanPavel/golem/pull/1329)) ([#1537](https://github.com/MilanPavel/golem/pull/1537))
+- **daemon:** a lead lists its helpers' pending questions, the same one once with a count ([#1326](https://github.com/MilanPavel/golem/pull/1326)) ([#1536](https://github.com/MilanPavel/golem/pull/1536))
+- **web:** a helper's question is answered from the lead's dock and the Inbox, with scopes ([#1330](https://github.com/MilanPavel/golem/pull/1330)) ([#1538](https://github.com/MilanPavel/golem/pull/1538))
+- **relay:** a container and a page to run your own relay ([#751](https://github.com/MilanPavel/golem/pull/751)) ([#1540](https://github.com/MilanPavel/golem/pull/1540))
+- **daemon:** the device registry, the Mac's relay keys, and the gateway's relay methods ([#1008](https://github.com/MilanPavel/golem/pull/1008)) ([#1539](https://github.com/MilanPavel/golem/pull/1539))
+- **tui:** the approval band shows a helper's question, with keys for the scopes ([#1331](https://github.com/MilanPavel/golem/pull/1331)) ([#1542](https://github.com/MilanPavel/golem/pull/1542))
+- **daemon:** approval.respond with scope batch answers all helpers of a call ([#1327](https://github.com/MilanPavel/golem/pull/1327)) ([#1541](https://github.com/MilanPavel/golem/pull/1541))
+- **daemon:** a helper's question notifies once, as its lead ([#1332](https://github.com/MilanPavel/golem/pull/1332)) ([#1549](https://github.com/MilanPavel/golem/pull/1549))
+
+### Fixes
+
+- **daemon:** a helper's step that lands after its run ended is dropped ([#1532](https://github.com/MilanPavel/golem/pull/1532)) ([#1533](https://github.com/MilanPavel/golem/pull/1533))
+
 ## [0.17.0] - 2026-11-20
 
 ### Features
