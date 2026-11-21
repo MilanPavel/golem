@@ -20,7 +20,7 @@ _ACTIVITY = (
     " s.route,"
     " s.plan_first, s.paid_ok,"
     " s.forked_from_session_id, s.origin,"
-    " s.parent_session_id, s.parent_call_id, s.helper_index, s.agent,"
+    " s.parent_session_id, s.parent_call_id, s.helper_index, s.agent, s.trimmed_at,"
     " EXISTS (SELECT 1 FROM runs r"
     "  WHERE r.session_id = s.session_id"
     "  AND (r.status = 'running' OR (r.status = 'waiting' AND r.wait_reason = 'team')))"
@@ -43,6 +43,17 @@ class WaitingHelper:
     title: str | None
     index: int
     run_id: str
+
+
+@dataclass(frozen=True, slots=True)
+class FinishedHelper:
+    """A helper whose last run ended, with the time it ended and how it ended."""
+
+    session_id: str
+    status: RunStatus
+    ended_at: str
+    asked: bool
+    """Its log holds an approval or the paid question."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -82,6 +93,8 @@ class SessionRecord:
     """A helper's place in that call."""
     agent: str | None = None
     """The agent type of a helper session."""
+    trimmed_at: str | None = None
+    """When a helper's steps were removed (``session.trimmed``), None until then."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -125,7 +138,7 @@ class SessionRecords:
             " allowed_tools, mcp_servers, skills, options, permission_mode, checks, route,"
             " plan_first, paid_ok,"
             " forked_from_session_id, origin,"
-            " parent_session_id, parent_call_id, helper_index, agent"
+            " parent_session_id, parent_call_id, helper_index, agent, trimmed_at"
             " FROM sessions WHERE session_id = ?",
             (session_id,),
         )
@@ -140,7 +153,7 @@ class SessionRecords:
             " allowed_tools, mcp_servers, skills, options, permission_mode, checks, route,"
             " plan_first, paid_ok,"
             " forked_from_session_id, origin,"
-            " parent_session_id, parent_call_id, helper_index, agent"
+            " parent_session_id, parent_call_id, helper_index, agent, trimmed_at"
             " FROM sessions WHERE parent_session_id = ? AND parent_call_id = ?"
             " AND helper_index = ?",
             (parent_session_id, call_id, index),
@@ -157,7 +170,7 @@ class SessionRecords:
             " allowed_tools, mcp_servers, skills, options, permission_mode, checks, route,"
             " plan_first, paid_ok,"
             " forked_from_session_id, origin,"
-            " parent_session_id, parent_call_id, helper_index, agent"
+            " parent_session_id, parent_call_id, helper_index, agent, trimmed_at"
             " FROM sessions WHERE parent_session_id = ? AND parent_call_id = ?"
             " ORDER BY helper_index",
             (parent_session_id, call_id),
@@ -216,6 +229,39 @@ class SessionRecords:
             )
         found.reverse()
         return found
+
+    async def finished_helpers(self) -> list[FinishedHelper]:
+        """The helper sessions not yet trimmed whose newest run has ended, oldest end first.
+
+        A helper with a run open is left out, and so is one whose lead has a run open: a lead
+        that goes on may read its helpers' logs again.
+        ``asked`` says whether its log holds an approval or the paid question.
+        """
+        rows = await self._database.fetch_all(
+            "SELECT s.session_id, r.status, r.ended_at,"
+            " EXISTS (SELECT 1 FROM events e WHERE e.session_id = s.session_id"
+            "  AND e.type IN ('approval.needed', 'route.consent.needed')) AS asked"
+            " FROM sessions s JOIN runs r ON r.run_id ="
+            "  (SELECT run_id FROM runs WHERE session_id = s.session_id"
+            "   ORDER BY started_at DESC, rowid DESC LIMIT 1)"
+            " WHERE s.parent_session_id IS NOT NULL AND s.trimmed_at IS NULL"
+            " AND r.ended_at IS NOT NULL AND r.status IN ('completed', 'failed', 'cancelled')"
+            " AND NOT EXISTS (SELECT 1 FROM runs o WHERE o.session_id = s.session_id"
+            "  AND o.status IN ('running', 'waiting'))"
+            " AND NOT EXISTS (SELECT 1 FROM runs l WHERE l.session_id = s.parent_session_id"
+            "  AND l.status IN ('running', 'waiting'))"
+            " ORDER BY r.ended_at, s.session_id",
+            (),
+        )
+        return [
+            FinishedHelper(
+                session_id=str(row["session_id"]),
+                status=cast(RunStatus, row["status"]),
+                ended_at=str(row["ended_at"]),
+                asked=bool(row["asked"]),
+            )
+            for row in rows
+        ]
 
     async def activity(self, session_id: str) -> SessionActivity | None:
         """One session's row, whether a run is open, and its newest ``seq``."""
@@ -404,6 +450,7 @@ def _session(row: sqlite3.Row) -> SessionRecord:
         parent_call_id=row["parent_call_id"],
         helper_index=row["helper_index"],
         agent=row["agent"],
+        trimmed_at=row["trimmed_at"],
     )
 
 

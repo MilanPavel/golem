@@ -123,6 +123,7 @@ from golem.sessions.trace import (
     read_span,
     with_windows,
 )
+from golem.sessions.trim import HelperTrimmer
 from golem.skills.invoke import Invocation, SkillInvokeError, invoke
 from golem.skills.pinned import PinMemory, SkillPinError, pinnable, pinned_folders
 from golem.skills.registry import SkillRegistry
@@ -3334,6 +3335,15 @@ class SessionManager:
             await self._after_run(resume.session_id, resume.run_id)
         if prompt is not None:
             self._title_after(session, prompt, reply, local_only=resume.local_only)
+
+    def helper_trimmer(
+        self,
+        settings: Callable[[], AgentSettings],
+        now: Callable[[], datetime],
+        drop_thread: Callable[[str], Awaitable[object]] | None = None,
+    ) -> HelperTrimmer:
+        """The job that cuts a finished helper's log to a receipt (ADR-059, section 9)."""
+        return HelperTrimmer(self._records, self._events, settings, now, drop_thread)
 
     def label_of(self, session_id: str | None, role: str) -> str:
         """How a call of ``session_id`` is named to the calls waiting behind it (ADR-060).

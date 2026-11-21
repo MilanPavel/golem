@@ -49,7 +49,8 @@ export type Params =
   | HelperStepEvent
   | HelperStateEvent
   | HelperWaitEvent
-  | HelperEndedEvent;
+  | HelperEndedEvent
+  | SessionTrimmedEvent;
 export type Asks = boolean;
 export type AnswerChars = number | null;
 export type MaxCalls = number | null;
@@ -926,6 +927,12 @@ export type Seq46 = number;
 export type SessionId48 = string;
 export type Ts46 = string;
 export type Type46 = 'helper.ended';
+export type Removed1 = number;
+export type RunId48 = null;
+export type Seq47 = number;
+export type SessionId49 = string;
+export type Ts47 = string;
+export type Type47 = 'session.trimmed';
 
 /**
  * Server → client event. No ``id``; this is not a response to a request.
@@ -2689,4 +2696,30 @@ export interface HelperEndedData {
   stopped: Stopped;
   tokens: Tokens;
   working_ms: WorkingMs;
+}
+/**
+ * A helper's log was cut to its receipt. ``run_id`` is null: no run owns the change.
+ *
+ * This interface was referenced by `RpcNotification`'s JSON-Schema
+ * via the `definition` "SessionTrimmedEvent".
+ */
+export interface SessionTrimmedEvent {
+  data: SessionTrimmedData;
+  run_id?: RunId48;
+  seq: Seq47;
+  session_id: SessionId49;
+  ts: Ts47;
+  type: Type47;
+}
+/**
+ * A finished helper's steps were removed and a receipt kept (ADR-059, section 9).
+ *
+ * ``removed`` is how many events were removed from the helper's log. The brief, the final
+ * answer and ``session.completed`` stay.
+ *
+ * This interface was referenced by `RpcNotification`'s JSON-Schema
+ * via the `definition` "SessionTrimmedData".
+ */
+export interface SessionTrimmedData {
+  removed: Removed1;
 }

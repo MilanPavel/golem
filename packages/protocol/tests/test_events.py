@@ -44,6 +44,8 @@ from golem_protocol.events import (
     SessionCreatedData,
     SessionCreatedEvent,
     SessionParent,
+    SessionTrimmedData,
+    SessionTrimmedEvent,
     SessionUpdatedData,
     ToolCompletedData,
     ToolCompletedEvent,
@@ -434,6 +436,21 @@ def test_the_six_helper_events_round_trip() -> None:
         assert _ADAPTER.validate_python(event.model_dump()) == event  # type: ignore[attr-defined]
         assert _ADAPTER.validate_json(event.model_dump_json()) == event  # type: ignore[attr-defined]
     assert {e.type for e in events} <= set(get_args(EventType))  # type: ignore[attr-defined]
+
+
+def test_session_trimmed_round_trips_and_has_no_run() -> None:
+    event = SessionTrimmedEvent(
+        seq=9,
+        session_id="s_helper",
+        ts="2026-11-28T10:00:00+00:00",
+        type="session.trimmed",
+        data=SessionTrimmedData(removed=41),
+    )
+    assert event.run_id is None
+    assert _ADAPTER.validate_json(event.model_dump_json()) == event  # type: ignore[attr-defined]
+    assert "session.trimmed" in get_args(EventType)
+    with pytest.raises(ValidationError):
+        SessionTrimmedData(removed=-1)
 
 
 def test_model_routed_has_the_reasons_of_a_helpers_pick_and_still_reads_pinned() -> None:

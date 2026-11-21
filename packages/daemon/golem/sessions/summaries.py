@@ -82,6 +82,7 @@ def summarize(
         helpers_running=None if helpers is None else helpers[0],
         helpers_waiting=None if helpers is None else helpers[1],
         step=shown,
+        trimmed_at=session.trimmed_at,
     )
 
 

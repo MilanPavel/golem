@@ -13,7 +13,7 @@ import json
 import sqlite3
 from collections.abc import Sequence
 
-from golem.store.database import Database
+from golem.store.database import Database, Transaction
 from golem.store.projection import project
 from golem_protocol.events import (
     CHAT_EVENT,
@@ -23,11 +23,18 @@ from golem_protocol.events import (
     MessageStartedEvent,
     MessageThinkingDeltaEvent,
     ModelWaitingEvent,
+    SessionTrimmedData,
+    SessionTrimmedEvent,
     ToolCompletedEvent,
     ToolFailedEvent,
     ToolOutputEvent,
     ToolWritingEvent,
 )
+
+_RECEIPT_TYPES = ("session.created", "session.completed")
+"""Event types a trimmed helper keeps, besides its brief and its final answer."""
+
+_DELETE_CHUNK = 500
 
 _COLUMNS = "session_id, seq, ts, type, run_id, data"
 
@@ -43,19 +50,7 @@ class EventLog:
         message_id = _message_id(event)
         async with self._database.transaction() as tx:
             await project(tx, event)
-            await tx.execute(
-                "INSERT INTO events (session_id, seq, ts, type, run_id, message_id, data)"
-                " VALUES (?, ?, ?, ?, ?, ?, ?)",
-                (
-                    event.session_id,
-                    event.seq,
-                    event.ts,
-                    event.type,
-                    event.run_id,
-                    message_id,
-                    event.data.model_dump_json(),
-                ),
-            )
+            await _insert(tx, event, message_id)
             if isinstance(event, MessageCompletedEvent):
                 await tx.execute(
                     "DELETE FROM events"
@@ -70,6 +65,41 @@ class EventLog:
                     " WHERE session_id = ? AND message_id = ? AND type = 'tool.output'",
                     (event.session_id, event.data.call_id),
                 )
+
+    async def trim(self, session_id: str, ts: str) -> SessionTrimmedEvent | None:
+        """Cut a session's log to its receipt and append ``session.trimmed``, in one transaction.
+
+        The receipt is ``session.created``, the brief (the first user message), the final answer
+        (the last assistant message) and ``session.completed``. Everything else is removed. A
+        crash or an error leaves the log as it was. Returns the new event, or None when the
+        session has none to trim or is trimmed already.
+        """
+        async with self._database.transaction() as tx:
+            rows = await tx.fetch_all(
+                "SELECT seq, type, data FROM events WHERE session_id = ? ORDER BY seq",
+                (session_id,),
+            )
+            if not rows or any(row["type"] == "session.trimmed" for row in rows):
+                return None
+            keep = _receipt(rows)
+            gone = [int(row["seq"]) for row in rows if int(row["seq"]) not in keep]
+            event = SessionTrimmedEvent(
+                seq=int(rows[-1]["seq"]) + 1,
+                session_id=session_id,
+                ts=ts,
+                type="session.trimmed",
+                data=SessionTrimmedData(removed=len(gone)),
+            )
+            await project(tx, event)
+            for start in range(0, len(gone), _DELETE_CHUNK):
+                chunk = gone[start : start + _DELETE_CHUNK]
+                marks = ", ".join("?" for _ in chunk)
+                await tx.execute(
+                    f"DELETE FROM events WHERE session_id = ? AND seq IN ({marks})",
+                    (session_id, *chunk),
+                )
+            await _insert(tx, event, None)
+            return event
 
     async def after(self, session_id: str, after_seq: int = 0) -> list[ChatEvent]:
         """Events for ``session_id`` with ``seq > after_seq``, in order."""
@@ -127,6 +157,41 @@ class EventLog:
             (session_id,),
         )
         return 0 if row is None else int(row[0])
+
+
+async def _insert(tx: Transaction, event: ChatEvent, message_id: str | None) -> None:
+    await tx.execute(
+        "INSERT INTO events (session_id, seq, ts, type, run_id, message_id, data)"
+        " VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (
+            event.session_id,
+            event.seq,
+            event.ts,
+            event.type,
+            event.run_id,
+            message_id,
+            event.data.model_dump_json(),
+        ),
+    )
+
+
+def _receipt(rows: Sequence[sqlite3.Row]) -> set[int]:
+    """The ``seq`` of each event a trimmed helper keeps."""
+    keep: set[int] = set()
+    brief: int | None = None
+    answer: int | None = None
+    for row in rows:
+        seq = int(row["seq"])
+        if row["type"] in _RECEIPT_TYPES:
+            keep.add(seq)
+        elif row["type"] == "message.completed":
+            role = json.loads(row["data"]).get("role")
+            if role == "user" and brief is None:
+                brief = seq
+            elif role == "assistant":
+                answer = seq
+    keep.update(seq for seq in (brief, answer) if seq is not None)
+    return keep
 
 
 def _message_id(event: ChatEvent) -> str | None:

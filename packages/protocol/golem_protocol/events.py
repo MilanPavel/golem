@@ -1421,6 +1421,31 @@ class HelperWaitEvent(BaseModel):
     data: HelperWaitData
 
 
+class SessionTrimmedData(BaseModel):
+    """A finished helper's steps were removed and a receipt kept (ADR-059, section 9).
+
+    ``removed`` is how many events were removed from the helper's log. The brief, the final
+    answer and ``session.completed`` stay.
+    """
+
+    model_config = _CONFIG
+
+    removed: int = Field(ge=0)
+
+
+class SessionTrimmedEvent(BaseModel):
+    """A helper's log was cut to its receipt. ``run_id`` is null: no run owns the change."""
+
+    model_config = _CONFIG
+
+    seq: int = Field(ge=1)
+    session_id: str = Field(min_length=1)
+    run_id: None = None
+    ts: str = Field(min_length=1)
+    type: Literal["session.trimmed"]
+    data: SessionTrimmedData
+
+
 class HelperEndedEvent(BaseModel):
     """A helper's run ended."""
 
@@ -1846,6 +1871,7 @@ EventType = Literal[
     "helper.state",
     "helper.wait",
     "helper.ended",
+    "session.trimmed",
 ]
 """The ``type`` of each :data:`ChatEvent` member."""
 
@@ -1897,7 +1923,8 @@ ChatEvent = Annotated[
     | HelperStepEvent
     | HelperStateEvent
     | HelperWaitEvent
-    | HelperEndedEvent,
+    | HelperEndedEvent
+    | SessionTrimmedEvent,
     Field(discriminator="type"),
 ]
 
@@ -2000,6 +2027,8 @@ __all__ = [
     "SessionParent",
     "SessionPlanChangedData",
     "SessionPlanChangedEvent",
+    "SessionTrimmedData",
+    "SessionTrimmedEvent",
     "SessionUpdatedData",
     "SessionUpdatedEvent",
     "SkillActivatedData",

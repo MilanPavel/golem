@@ -64,6 +64,7 @@ export type SessionId1 = string;
 export type Status = 'idle' | 'running' | 'waiting' | 'closed';
 export type Step = string | null;
 export type Title = string | null;
+export type TrimmedAt = string | null;
 export type UpdatedAt = string;
 export type WaitLine = string | null;
 export type WaitReason = ('slot' | 'load' | 'provider' | 'team' | 'budget' | 'you' | 'stalled') | null;
@@ -108,6 +109,9 @@ export interface SessionListResult {
  * ``step`` is set on a helper: its newest step as one line (the ``summary`` of its last
  * ``helper.step``), at most 200 characters. Null before the first step. An older daemon
  * leaves all three out.
+ * ``trimmed_at`` is set on a helper whose steps were removed after its keep days
+ * (``session.trimmed``): the time of the trim. Null for any other session. An older daemon
+ * leaves it out.
  *
  * This interface was referenced by `SessionListResult`'s JSON-Schema
  * via the `definition` "SessionSummary".
@@ -132,6 +136,7 @@ export interface SessionSummary {
   status: Status;
   step?: Step;
   title?: Title;
+  trimmed_at?: TrimmedAt;
   updated_at: UpdatedAt;
   wait_line?: WaitLine;
   wait_reason?: WaitReason;

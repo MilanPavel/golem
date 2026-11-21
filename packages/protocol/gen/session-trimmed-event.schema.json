@@ -1,0 +1,61 @@
+{
+  "$defs": {
+    "SessionTrimmedData": {
+      "additionalProperties": false,
+      "description": "A finished helper's steps were removed and a receipt kept (ADR-059, section 9).\n\n``removed`` is how many events were removed from the helper's log. The brief, the final\nanswer and ``session.completed`` stay.",
+      "properties": {
+        "removed": {
+          "minimum": 0,
+          "title": "Removed",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "removed"
+      ],
+      "title": "SessionTrimmedData",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "A helper's log was cut to its receipt. ``run_id`` is null: no run owns the change.",
+  "properties": {
+    "data": {
+      "$ref": "#/$defs/SessionTrimmedData"
+    },
+    "run_id": {
+      "default": null,
+      "title": "Run Id",
+      "type": "null"
+    },
+    "seq": {
+      "minimum": 1,
+      "title": "Seq",
+      "type": "integer"
+    },
+    "session_id": {
+      "minLength": 1,
+      "title": "Session Id",
+      "type": "string"
+    },
+    "ts": {
+      "minLength": 1,
+      "title": "Ts",
+      "type": "string"
+    },
+    "type": {
+      "const": "session.trimmed",
+      "title": "Type",
+      "type": "string"
+    }
+  },
+  "required": [
+    "seq",
+    "session_id",
+    "ts",
+    "type",
+    "data"
+  ],
+  "title": "SessionTrimmedEvent",
+  "type": "object"
+}

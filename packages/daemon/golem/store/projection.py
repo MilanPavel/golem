@@ -36,6 +36,7 @@ from golem_protocol.events import (
     SessionCreatedEvent,
     SessionModeChangedEvent,
     SessionPlanChangedEvent,
+    SessionTrimmedEvent,
     SessionUpdatedEvent,
     SkillActivatedEvent,
     SkillDeactivatedEvent,
@@ -140,6 +141,11 @@ async def project(tx: Transaction, event: ChatEvent) -> None:
             "UPDATE sessions SET closed_at = ? WHERE session_id = ? AND closed_at IS NULL",
             (event.ts, event.session_id),
         )
+    elif isinstance(event, SessionTrimmedEvent):
+        await tx.execute(
+            "UPDATE sessions SET trimmed_at = ? WHERE session_id = ?",
+            (event.ts, event.session_id),
+        )
     elif isinstance(event, RunStartedEvent):
         await tx.execute(
             "INSERT INTO runs (run_id, session_id, status, started_at) VALUES (?, ?, 'running', ?)",
@@ -176,7 +182,9 @@ async def project(tx: Transaction, event: ChatEvent) -> None:
         await _finish_run(tx, event.run_id, "failed", event.ts, event.data.message)
     elif isinstance(event, RunCancelledEvent):
         await _finish_run(tx, event.run_id, "cancelled", event.ts, None)
-    if not isinstance(event, MessageDeltaEvent | MessageThinkingDeltaEvent | ToolOutputEvent):
+    if not isinstance(
+        event, MessageDeltaEvent | MessageThinkingDeltaEvent | ToolOutputEvent | SessionTrimmedEvent
+    ):
         await tx.execute(
             "UPDATE sessions SET updated_at = ? WHERE session_id = ?",
             (event.ts, event.session_id),

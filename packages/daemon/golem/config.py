@@ -510,11 +510,17 @@ class AgentSettings(BaseModel):
 
     ``extra_dirs`` adds folders of ``<name>.md`` agent files, with ``~`` for
     the home folder, after ``~/.golem/agents``.
+
+    A finished helper keeps its steps for ``keep_days`` days from its end, then only a receipt
+    stays. One that failed, was cancelled or asked you something keeps them for
+    ``keep_problem_days``. 0 keeps them for ever.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     extra_dirs: list[str] = Field(default_factory=list[str])
+    keep_days: int = Field(default=7, ge=0)
+    keep_problem_days: int = Field(default=30, ge=0)
     explorer: ExplorerSettings = Field(default_factory=ExplorerSettings)
     worker: AgentModelSettings = Field(default_factory=AgentModelSettings)
     reviewer: AgentModelSettings = Field(default_factory=AgentModelSettings)
