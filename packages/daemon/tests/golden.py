@@ -143,7 +143,7 @@ def scenarios() -> dict[str, Scenario]:
         "delegate": Scenario(
             _HelperAfterPark(
                 replies=[
-                    [("delegate", {"brief": "find the answer in notes.txt"})],
+                    [("delegate", {"agent": "explorer", "brief": "find the answer in notes.txt"})],
                     read,
                     "notes.txt says the answer is 42.",
                     "It is 42.",

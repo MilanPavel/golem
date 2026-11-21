@@ -47,6 +47,7 @@ from golem.store.database import Database
 from golem.store.events import EventLog
 from golem.store.records import RunRecords, SessionRecords
 from golem.tools import default_registry
+from golem.tools.delegate import DelegateArgs
 from golem.tools.registry import ToolScope
 from golem_protocol.events import ChatEvent
 
@@ -232,7 +233,12 @@ async def test_the_parent_delegates_and_keeps_only_the_answer(
 ) -> None:
     model = _Recording(
         replies=[
-            [("delegate", {"brief": "what is this repo, and which files matter"})],
+            [
+                (
+                    "delegate",
+                    {"agent": "explorer", "brief": "what is this repo, and which files matter"},
+                )
+            ],
             [("list_dir", {"path": "."})],
             [("read_file", {"path": "a.py"})],
             "A tiny Python repo. a.py matters.",
@@ -273,7 +279,7 @@ async def test_the_helpers_events_are_in_its_own_log_and_the_parent_log_has_a_su
 ) -> None:
     model = ToolCallingChatModel(
         replies=[
-            [("delegate", {"brief": "look"})],
+            [("delegate", {"agent": "explorer", "brief": "look"})],
             [("grep", {"pattern": "def"}), ("list_dir", {"path": "."})],
             "found it",
             "ok",
@@ -330,7 +336,7 @@ async def test_a_long_or_multi_line_step_summary_is_cut_to_one_line_of_200_chara
 ) -> None:
     model = ToolCallingChatModel(
         replies=[
-            [("delegate", {"brief": "look"})],
+            [("delegate", {"agent": "explorer", "brief": "look"})],
             [("list_dir", {"path": "."})],
             "found it",
             "ok",
@@ -364,7 +370,8 @@ async def test_helper_calls_carry_cost_and_are_usage_rows_of_the_helper_role(
     database: Database, project: Path
 ) -> None:
     model = ToolCallingChatModel(
-        replies=[[("delegate", {"brief": "look"})], "found it", "ok"], usage=USAGE
+        replies=[[("delegate", {"agent": "explorer", "brief": "look"})], "found it", "ok"],
+        usage=USAGE,
     )
     chat = _Chat(database, model)
     _, _, events = await chat.run(project)
@@ -382,9 +389,9 @@ async def test_the_helper_cannot_call_delegate_shell_or_write(
 ) -> None:
     model = _Recording(
         replies=[
-            [("delegate", {"brief": "look"})],
+            [("delegate", {"agent": "explorer", "brief": "look"})],
             [
-                ("delegate", {"brief": "again"}),
+                ("delegate", {"agent": "explorer", "brief": "again"}),
                 ("shell", {"command": "ls"}),
                 ("write_file", {"path": "x.py", "content": "x = 1\n"}),
                 ("read_file", {"path": "b.py"}),
@@ -422,7 +429,7 @@ async def test_past_the_call_limit_the_last_call_has_no_tools(
 ) -> None:
     model = _Recording(
         replies=[
-            [("delegate", {"brief": "look"})],
+            [("delegate", {"agent": "explorer", "brief": "look"})],
             [("list_dir", {"path": "."})],
             [("read_file", {"path": "a.py"})],
             # The last call has no tools. A tool call in its reply is dropped, not run.
@@ -454,7 +461,7 @@ async def test_a_reply_with_tool_calls_at_the_last_call_is_cut_to_its_text(
 ) -> None:
     model = ToolCallingChatModel(
         replies=[
-            [("delegate", {"brief": "look"})],
+            [("delegate", {"agent": "explorer", "brief": "look"})],
             [("list_dir", {"path": "."})],
             [("read_file", {"path": "a.py"})],
             "ok",
@@ -473,7 +480,7 @@ async def test_a_reply_with_tool_calls_at_the_last_call_is_cut_to_its_text(
 
 async def test_the_answer_is_cut_to_answer_chars(database: Database, project: Path) -> None:
     model = ToolCallingChatModel(
-        replies=[[("delegate", {"brief": "look"})], "x" * 50, "ok"],
+        replies=[[("delegate", {"agent": "explorer", "brief": "look"})], "x" * 50, "ok"],
     )
     chat = _Chat(database, model, limits=ChildLimits(answer_chars=10))
     session_id, _, events = await chat.run(project)
@@ -484,7 +491,7 @@ async def test_the_answer_is_cut_to_answer_chars(database: Database, project: Pa
 
 
 async def test_cancelling_the_parent_cancels_the_helper(database: Database, project: Path) -> None:
-    model = _Hanging(replies=[[("delegate", {"brief": "hang"})]])
+    model = _Hanging(replies=[[("delegate", {"agent": "explorer", "brief": "hang"})]])
     chat = _Chat(database, model)
     session_id = await chat.manager.create(None, cwd=str(project))
     run_id = await chat.manager.send(session_id, "go")
@@ -525,7 +532,9 @@ async def test_the_default_registry_has_delegate_and_a_scope_can_leave_it_out() 
 async def test_without_a_helper_host_delegate_is_refused_with_a_message(
     database: Database, project: Path
 ) -> None:
-    model = ToolCallingChatModel(replies=[[("delegate", {"brief": "look"})], "ok"])
+    model = ToolCallingChatModel(
+        replies=[[("delegate", {"agent": "explorer", "brief": "look"})], "ok"]
+    )
     chat = _Chat(database, model)
     chat.runtime.helpers = None
     _, _, events = await chat.run(project)
@@ -585,7 +594,9 @@ async def test_the_settings_bound_the_helper(database: Database, project: Path) 
         default_model="ollama/qwen3:8b",
         agents=AgentSettings(explorer=ExplorerSettings(max_calls=2, answer_chars=7)),
     )
-    model = ToolCallingChatModel(replies=[[("delegate", {"brief": "look"})], "x" * 50, "ok"])
+    model = ToolCallingChatModel(
+        replies=[[("delegate", {"agent": "explorer", "brief": "look"})], "x" * 50, "ok"]
+    )
     chat = _Chat(database, model, settings=settings)
     assert chat.runtime.child_limits.max_calls == 2
     _, _, events = await chat.run(project)
@@ -595,7 +606,7 @@ async def test_the_settings_bound_the_helper(database: Database, project: Path) 
 async def test_the_fourth_delegate_of_a_run_gets_an_error_result(
     database: Database, project: Path
 ) -> None:
-    calls = [("delegate", {"brief": f"look {n}"}) for n in range(4)]
+    calls = [("delegate", {"agent": "explorer", "brief": f"look {n}"}) for n in range(4)]
     model = ToolCallingChatModel(replies=[calls, "one", "two", "three", "ok"])
     chat = _Chat(database, model)
     session_id, run_id, events = await chat.run(project)
@@ -616,11 +627,14 @@ async def test_the_fourth_delegate_of_a_run_gets_an_error_result(
 
 async def test_a_new_turn_has_its_own_helpers(database: Database, project: Path) -> None:
     replies: list[str | list[tuple[str, dict[str, str]]]] = [
-        [("delegate", {"brief": "a"}), ("delegate", {"brief": "b"})],
+        [
+            ("delegate", {"agent": "explorer", "brief": "a"}),
+            ("delegate", {"agent": "explorer", "brief": "b"}),
+        ],
         "one",
         "two",
         "first turn",
-        [("delegate", {"brief": "c"})],
+        [("delegate", {"agent": "explorer", "brief": "c"})],
         "three",
         "second turn",
     ]
@@ -641,7 +655,10 @@ async def test_a_new_turn_has_its_own_helpers(database: Database, project: Path)
 async def test_two_delegates_in_one_reply_start_two_helpers_that_run_beside_each_other(
     database: Database, project: Path
 ) -> None:
-    calls = [("delegate", {"brief": "first"}), ("delegate", {"brief": "second"})]
+    calls = [
+        ("delegate", {"agent": "explorer", "brief": "first"}),
+        ("delegate", {"agent": "explorer", "brief": "second"}),
+    ]
     model = ToolCallingChatModel(replies=[calls, "one", "two", "ok"])
     chat = _Chat(database, model)
     session_id, _, events = await chat.run(project)
@@ -664,7 +681,9 @@ async def test_usage_rows_of_a_helper_are_grouped_as_helper_by_cost_get(
 ) -> None:
     from golem.sessions.usage import EVER, Usage
 
-    model = ToolCallingChatModel(replies=[[("delegate", {"brief": "look"})], "found", "ok"])
+    model = ToolCallingChatModel(
+        replies=[[("delegate", {"agent": "explorer", "brief": "look"})], "found", "ok"]
+    )
     chat = _Chat(database, model)
     await chat.run(project)
 
@@ -676,7 +695,9 @@ async def test_usage_rows_of_a_helper_are_grouped_as_helper_by_cost_get(
 async def test_a_local_helper_is_not_stopped_by_a_spent_cap(
     database: Database, project: Path
 ) -> None:
-    model = ToolCallingChatModel(replies=[[("delegate", {"brief": "look"})], "found it", "ok"])
+    model = ToolCallingChatModel(
+        replies=[[("delegate", {"agent": "explorer", "brief": "look"})], "found it", "ok"]
+    )
 
     async def spent(session_id: str | None) -> bool:
         del session_id
@@ -704,7 +725,7 @@ async def test_the_trace_nests_the_helper_and_trace_span_reads_its_thread(
 ) -> None:
     model = ToolCallingChatModel(
         replies=[
-            [("delegate", {"brief": "look at a.py"})],
+            [("delegate", {"agent": "explorer", "brief": "look at a.py"})],
             [("read_file", {"path": "a.py"})],
             "a.py has a().",
             "ok",
@@ -753,7 +774,9 @@ async def test_a_helper_that_never_answers_stops_at_the_time_limit(
         await gate.wait()
 
     monkeypatch.setattr(manager_module, "_pause", pause)
-    model = _Hanging(replies=[[("delegate", {"brief": "hang"})], "after the limit"])
+    model = _Hanging(
+        replies=[[("delegate", {"agent": "explorer", "brief": "hang"})], "after the limit"]
+    )
     chat = _Chat(database, model)
     session_id = await chat.manager.create(None, cwd=str(project))
     run_id = await chat.manager.send(session_id, "go")
@@ -776,7 +799,7 @@ async def test_a_helper_that_reads_past_eight_windows_stops_with_tokens(
 ) -> None:
     model = ToolCallingChatModel(
         replies=[
-            [("delegate", {"brief": "look"})],
+            [("delegate", {"agent": "explorer", "brief": "look"})],
             [("read_file", {"path": "a.py"})],
             [("read_file", {"path": "b.py"})],
             "never reached",
@@ -812,7 +835,7 @@ async def test_a_spent_cap_stops_a_paid_helper_with_budget_cloud_only(
 ) -> None:
     model = ToolCallingChatModel(
         replies=[
-            [("delegate", {"brief": "look"})],
+            [("delegate", {"agent": "explorer", "brief": "look"})],
             [("list_dir", {"path": "."})],
             "after the helper",
         ],
@@ -837,7 +860,9 @@ async def test_a_spent_cap_stops_a_paid_helper_with_budget_cloud_only(
 async def test_the_calls_of_a_lead_go_on_counting_after_it_was_woken(
     database: Database, project: Path
 ) -> None:
-    model = ToolCallingChatModel(replies=[[("delegate", {"brief": "look"})], "found", "ok"])
+    model = ToolCallingChatModel(
+        replies=[[("delegate", {"agent": "explorer", "brief": "look"})], "found", "ok"]
+    )
     chat = _Chat(database, model)
     _, _, events = await chat.run(project)
 
@@ -870,7 +895,9 @@ def _scout(project: Path) -> None:
 async def test_the_explorer_runs_from_its_file_with_the_limits_of_the_settings(
     database: Database, project: Path, tmp_path: Path
 ) -> None:
-    model = _Recording(replies=[[("delegate", {"brief": "look"})], "found it", "ok"])
+    model = _Recording(
+        replies=[[("delegate", {"agent": "explorer", "brief": "look"})], "found it", "ok"]
+    )
     settings = GolemSettings(
         default_model="ollama/qwen3:8b",
         agents=AgentSettings(explorer=ExplorerSettings(max_calls=9)),
@@ -897,7 +924,11 @@ async def test_a_project_agent_runs_in_a_trusted_project(
 ) -> None:
     _scout(project)
     model = _Recording(
-        replies=[[("delegate", {"brief": "count", "agent": "scout"})], "three files", "ok"]
+        replies=[
+            [("delegate", {"brief": "count", "agent": "scout"})],
+            "three files",
+            "ok",
+        ]
     )
     chat = _Chat(database, model, agents=_registry(tmp_path, project))
     _, _, events = await chat.run(project)
@@ -945,10 +976,37 @@ async def test_an_unknown_agent_gives_a_readable_result_that_names_the_agents(
     assert run.status == "completed"
 
 
+async def test_a_delegate_without_an_agent_starts_no_helper_and_names_the_agents(
+    database: Database, project: Path, tmp_path: Path
+) -> None:
+    model = _Recording(replies=[[("delegate", {"brief": "go"})], "ok"])
+    chat = _Chat(database, model, agents=_registry(tmp_path))
+    _, run_id, events = await chat.run(project)
+
+    result = _result_of(events, "call_1")
+    assert result.startswith("delegate needs an agent: one of ")
+    assert "explorer" in result
+    assert await chat.helper_ids(events) == []
+    run = await chat.runs.get(run_id)
+    assert run is not None
+    assert run.status == "completed"
+
+
+def test_the_schema_requires_agent_and_lists_it_first() -> None:
+    parameters = DelegateArgs.model_json_schema()
+    assert next(iter(parameters["properties"])) == "agent"
+    assert "agent" in parameters["required"]
+
+
 async def test_the_worker_is_listed_but_not_available_yet(
     database: Database, project: Path, tmp_path: Path
 ) -> None:
-    model = _Recording(replies=[[("delegate", {"brief": "change it", "agent": "worker"})], "ok"])
+    model = _Recording(
+        replies=[
+            [("delegate", {"brief": "change it", "agent": "worker"})],
+            "ok",
+        ]
+    )
     chat = _Chat(database, model, agents=_registry(tmp_path))
     _, _, events = await chat.run(project)
 
@@ -993,7 +1051,9 @@ async def test_a_local_only_folder_keeps_the_helper_local(
             roles=RoleSettings(explore="anthropic/big"), local_only=[str(project)]
         ),
     )
-    model = ToolCallingChatModel(replies=[[("delegate", {"brief": "look"})], "found", "ok"])
+    model = ToolCallingChatModel(
+        replies=[[("delegate", {"agent": "explorer", "brief": "look"})], "found", "ok"]
+    )
     chat = _Chat(database, model, settings=settings, tier_of=_tiers, agents=_registry(tmp_path))
     _, _, events = await chat.run(project)
 
@@ -1005,7 +1065,9 @@ async def test_a_local_only_folder_keeps_the_helper_local(
 async def test_a_cloud_only_setup_runs_the_helper_on_the_cheapest_budget_model(
     database: Database, project: Path, tmp_path: Path
 ) -> None:
-    model = ToolCallingChatModel(replies=[[("delegate", {"brief": "look"})], "found", "ok"])
+    model = ToolCallingChatModel(
+        replies=[[("delegate", {"agent": "explorer", "brief": "look"})], "found", "ok"]
+    )
     chat = _Chat(
         database,
         model,

@@ -653,8 +653,13 @@ def _delegated_this_turn(messages: Sequence[BaseMessage]) -> int:
 
 def _specs(call: ToolCall) -> list[HelperSpec]:
     """The helpers a ``delegate`` call asks for. Bad arguments raise :class:`InvalidArguments`."""
+    raw = dict(call["args"])
+    if raw.get("agent") in (None, ""):
+        # No type named: the host answers with the types the session may use.
+        brief = raw.get("brief")
+        return [HelperSpec(agent="", brief=brief if isinstance(brief, str) else "")]
     try:
-        args = DelegateArgs.model_validate(dict(call["args"]))
+        args = DelegateArgs.model_validate(raw)
     except ValidationError as exc:
         first = exc.errors()[0]
         field = ".".join(str(part) for part in first["loc"])

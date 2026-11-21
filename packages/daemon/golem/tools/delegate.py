@@ -14,7 +14,6 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from golem.tools.registry import Tool, ToolContext, ToolError, ToolResult
 
-AGENT = "explorer"
 MODEL_MAX = 100
 """The longest ``model`` a call may name."""
 MODELS_SHOWN = 8
@@ -24,12 +23,13 @@ MODELS_SHOWN = 8
 class DelegateArgs(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
+    agent: str = Field(
+        description=(
+            "Which helper to use: the name of one agent type listed in this tool. Required."
+        ),
+    )
     brief: str = Field(
         min_length=1, description="What to find out, and what to return. The helper sees only this."
-    )
-    agent: str = Field(
-        default=AGENT,
-        description="Which helper to use: the name of an agent type listed in this tool.",
     )
     model: str | None = Field(
         default=None,
@@ -130,7 +130,7 @@ def describe(types: Sequence[tuple[str, str]], models: Sequence[str] = ()) -> st
     text = DESCRIPTION
     if types:
         lines = "\n".join(f"- {name}: {about}" for name, about in types)
-        text = f"{text}\nThe agent argument is one of these types:\n{lines}"
+        text = f"{text}\nThe agent argument is required and is one of these types:\n{lines}"
     if models:
         shown = ", ".join(models[:MODELS_SHOWN])
         text = (
@@ -149,7 +149,6 @@ DELEGATE = Tool(
 )
 
 __all__ = [
-    "AGENT",
     "DELEGATE",
     "DESCRIPTION",
     "MODELS_SHOWN",

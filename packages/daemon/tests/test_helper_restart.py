@@ -215,7 +215,7 @@ def _kinds(events: list[ChatEvent]) -> list[str]:
 
 
 def _delegate(brief: str) -> list[tuple[str, dict[str, Any]]]:
-    return [("delegate", {"brief": brief})]
+    return [("delegate", {"agent": "explorer", "brief": brief})]
 
 
 def _tool_results(model: ToolCallingChatModel) -> list[str]:

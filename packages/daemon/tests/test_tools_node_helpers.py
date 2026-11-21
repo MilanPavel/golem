@@ -115,7 +115,12 @@ class _Lead:
 
 
 def _delegate(call_id: str, brief: str = "look") -> ToolCall:
-    return {"name": "delegate", "args": {"brief": brief}, "id": call_id, "type": "tool_call"}
+    return {
+        "name": "delegate",
+        "args": {"agent": "explorer", "brief": brief},
+        "id": call_id,
+        "type": "tool_call",
+    }
 
 
 def _risky_call(call_id: str) -> ToolCall:
@@ -241,7 +246,12 @@ async def test_a_refused_start_is_a_result_the_model_reads(tmp_path: Path) -> No
 
 async def test_bad_arguments_are_refused_before_a_helper_starts(tmp_path: Path) -> None:
     host = _Host()
-    bad: ToolCall = {"name": "delegate", "args": {"brief": ""}, "id": "d1", "type": "tool_call"}
+    bad: ToolCall = {
+        "name": "delegate",
+        "args": {"agent": "explorer", "brief": ""},
+        "id": "d1",
+        "type": "tool_call",
+    }
     lead = _Lead(tmp_path, host, [bad])
     result = await lead.start()
     [message] = _tool_messages(result)

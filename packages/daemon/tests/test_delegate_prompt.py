@@ -130,7 +130,9 @@ async def test_two_calls_of_a_run_send_the_same_prompt_and_name_the_section(
 async def test_a_helper_gets_its_own_prompt_not_the_section(
     database: Database, tmp_path: Path
 ) -> None:
-    model = ToolCallingChatModel(replies=[[("delegate", {"brief": "look around"})], "found", "ok"])
+    model = ToolCallingChatModel(
+        replies=[[("delegate", {"agent": "explorer", "brief": "look around"})], "found", "ok"]
+    )
     chat = _Chat(database, model, 32_768)
     session_id = await chat.manager.create(None, cwd=str(tmp_path))
     await chat.send(session_id, "what is this repo")
