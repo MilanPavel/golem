@@ -1,4 +1,5 @@
 import { MAX_MESSAGE_BYTES, filterMessage } from "./framing.ts";
+import type { FilterResult } from "./framing.ts";
 import { createLineSplitter } from "./lines.ts";
 
 /** Browser buffered amount above which reading from the daemon pauses. */
@@ -36,8 +37,14 @@ export interface Bridge {
 
 const encoder = new TextEncoder();
 
-/** The state of one browser-to-daemon connection. */
-export function createBridge(io: BridgeIO): Bridge {
+export interface BridgeOptions {
+  /** What may pass from the client to the daemon. Default: the browser's filter. */
+  filter?: (data: string | ArrayBuffer | Uint8Array) => FilterResult;
+}
+
+/** The state of one client-to-daemon connection. */
+export function createBridge(io: BridgeIO, options: BridgeOptions = {}): Bridge {
+  const filter = options.filter ?? filterMessage;
   const splitter = createLineSplitter();
   let queue: string[] = [];
   let queued = 0;
@@ -77,7 +84,7 @@ export function createBridge(io: BridgeIO): Bridge {
   return {
     browserMessage(data) {
       if (closed) return;
-      const result = filterMessage(data);
+      const result = filter(data);
       if (result.kind === "forward") send(result.line);
       else if (result.kind === "deny") {
         if (result.reply !== null) io.toBrowser(result.reply);

@@ -54,8 +54,8 @@ let token: string;
 let port: number;
 const opened: WebSocket[] = [];
 
-async function start(options: { maxSockets?: number; socketPath?: string; version?: string; kept?: boolean } = {}): Promise<void> {
-  gateway = startGateway({ port: 0, socketPath: options.socketPath ?? daemon.socketPath, token, ...options });
+async function start(options: { maxSockets?: number; socketPath?: string; version?: string; kept?: boolean; relay?: boolean } = {}): Promise<void> {
+  gateway = startGateway({ port: 0, socketPath: options.socketPath ?? daemon.socketPath, token, relay: false, ...options });
   port = gateway.port;
 }
 
@@ -143,14 +143,14 @@ test("/healthz answers with the pid, the version, and whether a job keeps it", a
   await start({ version: "1.2.3", kept: true });
   const res = await fetch(`${origin()}/healthz`);
   expect(res.status).toBe(200);
-  expect(await res.json()).toEqual({ golem: "web", pid: process.pid, version: "1.2.3", kept: true });
+  expect(await res.json()).toEqual({ golem: "web", pid: process.pid, version: "1.2.3", kept: true, relay: "off" });
   expect(res.headers.get("cache-control")).toBe("no-store");
 });
 
 test("/healthz says kept is false unless told", async () => {
   await start({ version: "1.2.3" });
   const res = await fetch(`${origin()}/healthz`);
-  expect(await res.json()).toEqual({ golem: "web", pid: process.pid, version: "1.2.3", kept: false });
+  expect(await res.json()).toEqual({ golem: "web", pid: process.pid, version: "1.2.3", kept: false, relay: "off" });
 });
 
 test("/healthz refuses a wrong Host and a wrong method", async () => {
