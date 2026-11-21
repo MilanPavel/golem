@@ -84,6 +84,11 @@ swift-check:
 # Record the event logs the view package tests fold: a real daemon, a fake model, six chats.
 golden:
     uv run python packages/daemon/tests/golden.py
+    just swift-fixtures
+
+# What packages/view makes of the golden logs, the Inbox and the Runs list, for GolemKit's tests to match.
+swift-fixtures:
+    cd packages/view && TZ=UTC node --experimental-strip-types scripts/swift-fixtures.ts
 
 # Refresh the bundled copy of LiteLLM's model prices.
 prices:

@@ -96,7 +96,7 @@ Here is a real run against a throwaway daemon with `qwen3.5:4b`. Two windows are
 
 Window B caught up in 13 ms. Its 15 replayed deltas and the first live one landed in one update, because the batcher holds 16 ms of text. Window A was gone for 25 ms, asked for what came after seq 44, and seq 45 was next: nothing lost and nothing repeated. Both folded to the same chat. The local model wrote slower than 60 updates a second, so the batcher saved little here (192 deltas, 158 updates). A fast hosted model, or a replay, gives it far more to merge.
 
-The same guarantee is a test. `just golden` records five chats from a real daemon with a scripted model: plain, a tool, an approval, a cancel, and a failure. `packages/view/src/golden.test.ts` folds each one live, replayed from 0, and reconnected with repeats and gaps, and expects the same chat every time.
+The same guarantee is a test. `just golden` records five chats from a real daemon with a scripted model: plain, a tool, an approval, a cancel, and a failure. `packages/view/src/golden.test.ts` folds each one live, replayed from 0, and reconnected with repeats and gaps, and expects the same chat every time. `just swift-fixtures` (which `just golden` runs last) writes what this package makes of the same logs, the Inbox and the Runs list to `apps/apple/GolemKit/Tests/GolemKitTests/Fixtures/view-state.json`, and GolemKit's tests fold the logs again in Swift and expect the same turns, step marks and groups.
 
 **Where it lives in the code:**
 
