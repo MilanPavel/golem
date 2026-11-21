@@ -1,0 +1,5 @@
+# Used with the repository root as the build context (BuildKit reads <Dockerfile>.dockerignore).
+# Send only what the relay build copies.
+*
+!packages/relay/src
+!packages/gateway/src/secret.ts

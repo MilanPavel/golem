@@ -78,7 +78,7 @@ jobs:
             exit 0
           fi
           git fetch --depth=1 origin "$BASE_SHA"
-          if git diff --name-only "$BASE_SHA" HEAD | grep -qE '^(packages/relay/|\.github/workflows/ci\.yml$)'; then
+          if git diff --name-only "$BASE_SHA" HEAD | grep -qE '^(packages/relay/|packages/gateway/src/secret\.ts$|\.github/workflows/ci\.yml$)'; then
             echo "run=true" >> "$GITHUB_OUTPUT"
           else
             echo "The relay is untouched, so the image is not built."
