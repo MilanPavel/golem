@@ -213,19 +213,86 @@ test("Next helper moves on in the batch and round again; esc closes the panel an
   expect(fake.raw.detachSession).toHaveBeenCalledWith("h1");
 });
 
-test("Open as chat shows the helper full width with a breadcrumb back to the lead and no composer", async () => {
+test("Open as chat shows the helper full width under a banner with Back to lead, Stop and no composer", async () => {
   const user = userEvent.setup();
-  await setup();
+  const { fake } = await setup();
   const inside = await openFirst(user);
   await user.click(inside.getByRole("button", { name: "Open as chat" }));
   await wait();
   expect(location.pathname).toBe("/s/h1");
   expect(location.search).toBe("?lead=a");
   expect(panel()).toBeNull();
-  const crumb = screen.getByRole("navigation", { name: "Breadcrumb" });
-  expect(within(crumb).getByRole("link", { name: "Fix the token refresh" })).toBeTruthy();
+  const banner = within(screen.getByRole("region", { name: "Helper banner" }));
+  expect(banner.getByText("Fix the token refresh")).toBeTruthy();
+  expect(banner.getByText("explorer")).toBeTruthy();
+  expect(banner.getByText("qwen3:27b")).toBeTruthy();
+  expect(screen.getByText("Read-only: the lead talks to this helper.")).toBeTruthy();
   expect(screen.getByText("I read the auth module. It is probably auth/session.py:88.")).toBeTruthy();
   expect(within(screen.getByRole("main")).queryByRole("textbox")).toBeNull();
-  await user.click(within(crumb).getByRole("link", { name: "Fix the token refresh" }));
+  await user.click(banner.getByRole("button", { name: "Stop" }));
+  expect(fake.raw.stopHelper).toHaveBeenCalledWith("h1");
+  await user.click(banner.getByRole("link", { name: "Back to lead" }));
   expect(location.pathname).toBe("/s/a");
+});
+
+test("a finished helper's banner has no Stop", async () => {
+  const user = userEvent.setup();
+  await setup();
+  await user.click(await screen.findByRole("button", { name: /^Open docs, / }));
+  await wait();
+  await user.click(within(panel() as HTMLElement).getByRole("button", { name: "Open as chat" }));
+  await wait();
+  const banner = within(screen.getByRole("region", { name: "Helper banner" }));
+  expect(banner.getByText("explorer")).toBeTruthy();
+  expect(banner.queryByRole("button", { name: "Stop" })).toBeNull();
+});
+
+/** The lead's log says h2 ended; the list says its steps were trimmed. */
+async function setupTrimmed() {
+  const made = await setup();
+  act(() => {
+    made.fake.emitEvent(
+      ev("a", "helper.ended", { call_id: "d1", index: 1, stopped: "done", model_calls: 3, tokens: 14_000, answer_tokens: 620, cost_usd: 0.01, duration_ms: 72_000, working_ms: 70_000 }),
+    );
+    made.fake.emitSummary({ ...summary("h2", "2026-11-19T03:00:00Z"), parent_session_id: "a", agent: "docs", trimmed_at: "2026-11-19T03:00:00Z" });
+  });
+  await wait();
+  return made;
+}
+
+test("a trimmed helper opens in the panel as a receipt, not as steps", async () => {
+  const user = userEvent.setup();
+  await setupTrimmed();
+  await user.click(await screen.findByRole("button", { name: /^Open docs, / }));
+  await wait();
+  const inside = within(panel() as HTMLElement);
+  const receipt = within(inside.getByRole("region", { name: "Helper receipt" }));
+  expect(receipt.getByText("List the docs.")).toBeTruthy();
+  expect(receipt.getByText("Answered · qwen3:27b · 14.0K tokens · $0.01 · 1m 10s")).toBeTruthy();
+  expect(receipt.getByText("Steps removed on 2026-11-19")).toBeTruthy();
+  expect(receipt.getByText("The answer is in the lead's chat.")).toBeTruthy();
+  expect(inside.queryByRole("radio", { name: "Everything" })).toBeNull();
+});
+
+test("a trimmed helper opened as a chat shows the receipt with a link to the lead and no transcript", async () => {
+  const user = userEvent.setup();
+  await setupTrimmed();
+  await user.click(await screen.findByRole("button", { name: /^Open docs, / }));
+  await wait();
+  await user.click(within(panel() as HTMLElement).getByRole("button", { name: "Open as chat" }));
+  await wait();
+  const receipt = within(screen.getByRole("region", { name: "Helper receipt" }));
+  expect(receipt.getByText("Steps removed on 2026-11-19")).toBeTruthy();
+  expect(screen.queryByText("Done. The docs are in docs/.")).toBeNull();
+  await user.click(receipt.getByRole("link", { name: "lead's chat" }));
+  expect(location.pathname).toBe("/s/a");
+});
+
+test("a daemon without trimmed_at shows the steps as before", async () => {
+  const user = userEvent.setup();
+  await setup();
+  await user.click(await screen.findByRole("button", { name: /^Open docs, / }));
+  await wait();
+  expect(screen.queryByRole("region", { name: "Helper receipt" })).toBeNull();
+  expect(within(panel() as HTMLElement).getByRole("radio", { name: "Summary" })).toBeTruthy();
 });

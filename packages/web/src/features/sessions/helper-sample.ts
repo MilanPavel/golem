@@ -64,6 +64,21 @@ export const ASKING_HELPER: { helper: HelperRef; chat: ChatState } = {
   },
 };
 
+/** The day the sample receipt says its steps were removed. */
+export const TRIMMED_AT = "2026-11-19T03:00:00.000Z";
+
+/** A helper whose steps the daemon removed: the brief and the answer are all its own log holds. */
+export const TRIMMED_HELPER: { helper: HelperRef; chat: ChatState } = {
+  helper: {
+    ...REF,
+    ended: { stopped: "done", modelCalls: 3, tokens: 14_000, answerTokens: 620, costUsd: 0.01, durationMs: 72_000, workingMs: 70_000 },
+  },
+  chat: {
+    ...emptyChat,
+    messages: [user, reply("a2", "The token is refreshed in auth/session.py:88. Nothing else calls it.")],
+  },
+};
+
 /** A helper that is done: its answer to the lead, and how it ended. */
 export const DONE_HELPER: { helper: HelperRef; chat: ChatState } = {
   helper: {

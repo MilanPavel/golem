@@ -1,7 +1,10 @@
 import {
   formatElapsed,
+  helperBanner,
   helperLimits,
   helperPanelState,
+  helperReceipt,
+  isTrimmedHelper,
   helperSummary,
   helperWorkingMs,
   type ApprovalChoice,
@@ -27,6 +30,7 @@ import { ApprovalBar, useApprovalAnswer } from "../approval/index.ts";
 import { closeHelper, openHelper, TranscriptColumn, type HelperOpen } from "../chat/index.ts";
 import { ConsentBar } from "../consent/consent-bar.tsx";
 import { WORKBENCH_DEFAULT, WORKBENCH_MAX, WORKBENCH_MIN, WORKBENCH_STEP, useWorkbenchWidth } from "../workbench/index.ts";
+import { HelperBannerBar, HelperReceiptCard } from "./helper-receipt.tsx";
 import { useNow } from "./use-now.ts";
 
 export type HelperView = "summary" | "everything";
@@ -106,13 +110,16 @@ export type HelperPanelViewProps = {
   onOpenChat: () => void;
   /** The answer controls of a helper that asks: the approval or consent card. */
   answer?: ReactNode;
+  /** When the daemon trimmed this helper to its receipt: the body shows the receipt, not the steps. */
+  trimmedAt?: string | null;
 };
 
 /**
  * One helper in the drawer, read-only: its head, the switch between Summary and Everything, its question
  * if it asks, the body, and the foot. There is no composer; the lead is the one who talks to it.
  */
-export function HelperPanelView({ lead, helper, chat, nowMs, view, onView, onClose, onNext, onStop, onOpenChat, answer }: HelperPanelViewProps) {
+export function HelperPanelView({ lead, helper, chat, nowMs, view, onView, onClose, onNext, onStop, onOpenChat, answer, trimmedAt = null }: HelperPanelViewProps) {
+  const trimmed = trimmedAt !== null;
   const summary = helperSummary(chat);
   const state = helperPanelState(helper, chat);
   const working = helperWorkingMs(helper, nowMs);
@@ -135,22 +142,28 @@ export function HelperPanelView({ lead, helper, chat, nowMs, view, onView, onClo
         </div>
         <p className="truncate text-xs text-muted">{sub.filter((part): part is string => part !== null).join(" · ")}</p>
       </header>
-      <div className="flex flex-col gap-1.5 border-b border-line px-3 py-2">
-        <ViewSwitch view={view} onView={onView} />
-        {limits === "" ? null : (
-          <p aria-label="Limits" className="text-meta text-faint">
-            {limits}
-          </p>
-        )}
-      </div>
-      {summary.question === null ? null : (
+      {trimmed ? null : (
+        <div className="flex flex-col gap-1.5 border-b border-line px-3 py-2">
+          <ViewSwitch view={view} onView={onView} />
+          {limits === "" ? null : (
+            <p aria-label="Limits" className="text-meta text-faint">
+              {limits}
+            </p>
+          )}
+        </div>
+      )}
+      {summary.question === null || trimmed ? null : (
         <div className="flex flex-col gap-2 border-b border-line px-3 py-2">
           <p className={LABEL}>asks you</p>
           <p className="text-sm text-pretty">{summary.question}</p>
           {answer}
         </div>
       )}
-      {view === "everything" ? (
+      {trimmed ? (
+        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto p-3">
+          <HelperReceiptCard receipt={helperReceipt({ ref: helper, chat, trimmedAt })} />
+        </div>
+      ) : view === "everything" ? (
         <TranscriptColumn chat={chat} detail="verbose" thinkingShown />
       ) : (
         <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-3">
@@ -265,6 +278,12 @@ function useLeadTitle(leadId: string): string | null {
   return own ?? listed ?? null;
 }
 
+/** When the daemon trimmed this helper, from the session list. Null for a helper that is whole, and for an older daemon. */
+function useTrimmedAt(helperId: string): string | null {
+  const listed = useSessionList().find((item) => item.session_id === helperId);
+  return listed !== undefined && isTrimmedHelper(listed) ? (listed.trimmed_at ?? null) : null;
+}
+
 const NO_HELPERS: readonly HelperRef[] = [];
 
 type Batch = { callId: string | null; helpers: readonly HelperRef[] };
@@ -297,6 +316,7 @@ export function HelperPanel({ leadId, open }: { leadId: string; open: HelperOpen
   const helper = batch.find((item) => item.id === open.helperId);
   const lead = useLeadTitle(leadId);
   const chat = useSession(open.helperId, (view) => view.chat);
+  const trimmedAt = useTrimmedAt(open.helperId);
   const { stopHelper } = usePageActions();
   const navigate = useNavigate();
   const now = useNow(5_000);
@@ -354,47 +374,56 @@ export function HelperPanel({ leadId, open }: { leadId: string; open: HelperOpen
           navigate(helperPath(helper.id, leadId));
         }}
         answer={<HelperAnswer sessionId={helper.id} chat={chat} />}
+        trimmedAt={trimmedAt}
       />
     </aside>
   );
 }
 
 /**
- * A helper as a chat of its own, full width, under a breadcrumb back to the lead. It has no composer:
- * the lead talks to it. A helper that asks can still be answered here.
+ * A helper as a chat of its own, full width, under a banner that names its lead. It has no composer:
+ * the lead talks to it. A helper that asks can still be answered here. A trimmed helper shows its
+ * receipt in place of the steps it no longer has.
  */
 export function HelperChat({ id, lead }: { id: string; lead: string }) {
   const chat = useSession(id, (view) => view.chat);
   const leadTitle = useLeadTitle(lead);
+  const trimmedAt = useTrimmedAt(id);
+  const listedAgent = useSessionList().find((item) => item.session_id === id)?.agent;
+  const ref = useBatch(lead, undefined, id).helpers.find((item) => item.id === id);
+  const { stopHelper } = usePageActions();
   const navigate = useNavigate();
   const summary = helperSummary(chat);
+  const banner = helperBanner({ lead: leadTitle, ref, chat, agent: listedAgent });
+  const back = () => {
+    navigate(sessionPath(lead));
+  };
   return (
     <div data-helper-chat className="flex min-h-0 flex-1 flex-col">
-      <nav aria-label="Breadcrumb" className={cn(HEADER_ROW, "gap-2 px-4 text-sm")}>
-        <a
-          href={sessionPath(lead)}
-          className="truncate text-clay-ink underline underline-offset-2"
-          onClick={(event) => {
-            event.preventDefault();
-            navigate(sessionPath(lead));
-          }}
-        >
-          {leadTitle ?? "Back to the chat"}
-        </a>
-        <span aria-hidden="true" className="text-faint">
-          /
-        </span>
-        <span aria-current="page" className="truncate text-muted">
-          helper · {firstWords(summary.brief)}
-        </span>
-      </nav>
-      {summary.question === null ? null : (
+      <HelperBannerBar
+        banner={banner}
+        leadId={lead}
+        onBack={back}
+        onStop={
+          banner.running
+            ? () => {
+                stopHelper(id).catch(() => undefined);
+              }
+            : null
+        }
+      />
+      {trimmedAt !== null ? (
+        <div className="mx-auto w-full max-w-column px-5 pt-4">
+          <HelperReceiptCard receipt={helperReceipt({ ref, chat, trimmedAt })} lead={{ id: lead, onOpen: back }} />
+        </div>
+      ) : null}
+      {summary.question === null || trimmedAt !== null ? null : (
         <div className="mx-auto flex w-full max-w-column flex-col gap-2 px-5 pt-4">
           <p className="text-sm text-pretty">{summary.question}</p>
           <HelperAnswer sessionId={id} chat={chat} />
         </div>
       )}
-      <TranscriptColumn chat={chat} detail="verbose" thinkingShown />
+      {trimmedAt === null ? <TranscriptColumn chat={chat} detail="verbose" thinkingShown /> : null}
     </div>
   );
 }

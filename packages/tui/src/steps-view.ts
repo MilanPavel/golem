@@ -1,14 +1,19 @@
 import type { ChatEvent } from "@golem/client";
 import {
   batchCard,
+  emptyChat,
+  helperBanner,
   helperLimits,
   helperPanelState,
+  helperReceipt,
   helperSteps,
   helperSummary,
+  isTrimmedHelper,
   withLocal,
   type BarKind,
   type CardTone,
   type ChatState,
+  type HelperBanner,
   type HelperBatch,
   type HelperRef,
   type IsLocal,
@@ -360,6 +365,8 @@ export type StepsLayoutInput = {
   refs: (callId: string) => readonly HelperRef[];
   /** The open helper's own log, or null before it arrives. */
   helper: HelperChatData | null;
+  /** When the daemon trimmed the open helper to its receipt, from the session list. Null or left out when it did not. */
+  trimmedAt?: string | null;
   /** The lead's title, for the breadcrumb. */
   lead: string;
   now: number;
@@ -378,10 +385,29 @@ export function stepsHelpers(callId: string, events: readonly ChatEvent[], nowMs
   return out;
 }
 
-/** The breadcrumb of a helper's chat: `<lead title> › <agent · label>`. */
-export function breadcrumb(lead: string, ref: Pick<HelperRef, "agent" | "label">): string {
-  const name = ref.label !== "" && ref.label !== ref.agent ? `${ref.agent} · ${ref.label}` : ref.agent;
-  return `${lead === "" ? "this chat" : lead} › ${name}`;
+/** When the daemon trimmed session `id` to its receipt, from the session list. Null for a helper that is whole, and for an older daemon. */
+export function trimmedAtOf(sessions: readonly { session_id: string; trimmed_at?: string | null }[], id: string | undefined): string | null {
+  const found = id === undefined ? undefined : sessions.find((item) => item.session_id === id);
+  return found !== undefined && isTrimmedHelper(found) ? (found.trimmed_at ?? null) : null;
+}
+
+/** The header line of a helper's chat: `Helper of <lead title> · <agent> · <model> · running`. */
+export function bannerLine(banner: HelperBanner): string {
+  return [`Helper of ${banner.lead === null || banner.lead === "" ? "this chat" : banner.lead}`, banner.agent, banner.model, banner.running ? "running" : null]
+    .filter((part): part is string => part !== null)
+    .join(" · ");
+}
+
+/** What a trimmed helper keeps, drawn in place of its steps: the brief, how it ended, when the steps went, where the answer is. */
+export function receiptLines(chat: ChatState, ref: HelperRef | undefined, trimmedAt: string, width: number): StepsLine[] {
+  const receipt = helperReceipt({ ref, chat, trimmedAt });
+  return [
+    { spans: [{ text: "Receipt", bold: true }] },
+    ...section("Asked", receipt.brief, width),
+    { spans: [{ text: [receipt.outcome, ...receipt.facts].join(" · ") }] },
+    ...(receipt.removed === null ? [] : [{ spans: [{ text: receipt.removed, dim: true }] } as StepsLine]),
+    { spans: [{ text: receipt.answerNote, dim: true }] },
+  ];
 }
 
 /** The scroll limit of the open helper's chat body, for the keys. */
@@ -389,9 +415,9 @@ export function chatBodyRoom(rows: number): number {
   return Math.max(1, rows - 5);
 }
 
-export function chatScrollMax(input: Pick<StepsLayoutInput, "state" | "helper" | "now" | "columns" | "rows">): number {
+export function chatScrollMax(input: Pick<StepsLayoutInput, "state" | "helper" | "now" | "columns" | "rows" | "trimmedAt">): number {
   const view = input.state.view;
-  if (view.kind !== "chat" || input.helper === null) return 0;
+  if (view.kind !== "chat" || input.helper === null || (input.trimmedAt ?? null) !== null) return 0;
   const body = helperChatBody(input.helper.chat, view.mode, input.columns, input.now);
   return Math.max(0, body.length - chatBodyRoom(input.rows));
 }
@@ -426,14 +452,15 @@ export function layoutStepsManager(input: StepsLayoutInput): StepsLine[] {
     hint = STEPS_HINT;
   } else {
     const ref = input.refs(view.callId).find((item) => item.index === view.index);
-    const named = ref === undefined ? "helper" : breadcrumb(input.lead, ref);
+    const trimmedAt = input.trimmedAt ?? null;
+    const named = helperBanner({ lead: input.lead, ref, chat: input.helper?.chat ?? emptyChat });
     const phase = ref !== undefined && input.helper !== null ? helperPanelState(ref, input.helper.chat) : null;
-    const limits = ref !== undefined && input.helper !== null ? helperLimits(ref, input.helper.chat, input.now) : "";
+    const limits = ref !== undefined && input.helper !== null && trimmedAt === null ? helperLimits(ref, input.helper.chat, input.now) : "";
     head = [
-      { spans: [{ text: named, bold: true }] },
+      { spans: [{ text: bannerLine(named), bold: true }] },
       {
         spans: [
-          { text: `read-only · ${view.mode === "summary" ? "Summary" : "Everything"}`, dim: true },
+          { text: trimmedAt !== null ? "read-only · receipt" : `read-only · ${view.mode === "summary" ? "Summary" : "Everything"}`, dim: true },
           { text: phase === null ? "" : ` · ${phase}`, dim: true },
           { text: limits === "" ? "" : ` · ${limits}`, dim: true },
         ],
@@ -444,6 +471,8 @@ export function layoutStepsManager(input: StepsLayoutInput): StepsLine[] {
       body = [{ spans: [{ text: "asking the daemon…", dim: true }] }];
     } else if (input.helper.error !== null) {
       body = [{ spans: [{ text: input.helper.error }] }];
+    } else if (trimmedAt !== null) {
+      body = receiptLines(input.helper.chat, ref, trimmedAt, width);
     } else {
       const all = helperChatBody(input.helper.chat, view.mode, width, input.now);
       const room = chatBodyRoom(rows);
