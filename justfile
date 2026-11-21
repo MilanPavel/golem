@@ -81,7 +81,7 @@ swift-check:
         swift test
     fi
 
-# Set IOS_DEVICE to pick another Simulator, and SKIP_KIT_TESTS=ConnectionTests to skip a suite of GolemKit.
+# Set IOS_DEVICE to pick another Simulator.
 # Build the iPhone app for the Simulator and run GolemKit's tests and the app's UI tests. Needs Xcode and xcodegen.
 ios:
     #!/usr/bin/env bash
@@ -94,7 +94,7 @@ ios:
     xcodegen
     xcodebuild build -project Golem.xcodeproj -scheme Golem \
         -destination 'generic/platform=iOS Simulator' -derivedDataPath build CODE_SIGNING_ALLOWED=NO
-    (cd GolemKit && swift test ${SKIP_KIT_TESTS:+--skip "$SKIP_KIT_TESTS"})
+    (cd GolemKit && swift test)
     xcodebuild test -project Golem.xcodeproj -scheme Golem \
         -destination "platform=iOS Simulator,name=${IOS_DEVICE:-iPhone 18 Pro}" -derivedDataPath build
 

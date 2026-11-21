@@ -58,7 +58,7 @@ private struct Rig {
     }
 }
 
-@Suite(.serialized, .enabled(if: RelayProcess.bunPath != nil, "bun is not installed, so the relay cannot run"))
+@Suite(.serialized, .timeLimit(.minutes(1)), .enabled(if: RelayProcess.bunPath != nil, "bun is not installed, so the relay cannot run"))
 struct ConnectionTests {
     @Test func aDeviceListsTheMacsSessionsThroughTheRelay() async throws {
         let rig = try await Rig.make()

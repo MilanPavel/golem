@@ -23,7 +23,7 @@ apps/apple/
 just ios
 ```
 
-It runs `xcodegen`, builds the app for the Simulator with signing off, runs GolemKit's tests, and runs the app's UI tests on the "iPhone 18 Pro" Simulator. Pick another with `IOS_DEVICE="iPhone 17"`. If a GolemKit suite hangs on your machine, skip it with `SKIP_KIT_TESTS=ConnectionTests just ios`. `just ios` says so when `xcodegen` is missing.
+It runs `xcodegen`, builds the app for the Simulator with signing off, runs GolemKit's tests, and runs the app's UI tests on the "iPhone 18 Pro" Simulator. Pick another with `IOS_DEVICE="iPhone 17"`. `just ios` says so when `xcodegen` is missing.
 
 ## Run on the Simulator
 
