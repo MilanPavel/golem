@@ -1,0 +1,32 @@
+{
+  "$defs": {
+    "DeviceChanged": {
+      "additionalProperties": false,
+      "description": "The registry, the open pairings, or ``[relay] url`` changed. Call ``device.sync`` again.",
+      "properties": {},
+      "title": "DeviceChanged",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Server → every connection: the device registry changed. Not stored.\n\nThe gateway calls ``device.sync`` again (ADR-051).",
+  "properties": {
+    "jsonrpc": {
+      "const": "2.0",
+      "default": "2.0",
+      "title": "Jsonrpc",
+      "type": "string"
+    },
+    "method": {
+      "const": "device.changed",
+      "default": "device.changed",
+      "title": "Method",
+      "type": "string"
+    },
+    "params": {
+      "$ref": "#/$defs/DeviceChanged"
+    }
+  },
+  "title": "DeviceChangedNotification",
+  "type": "object"
+}

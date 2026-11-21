@@ -1,0 +1,22 @@
+{
+  "additionalProperties": false,
+  "description": "An open pairing slot: ``SHA-256(code)`` and its expiry in unix seconds.",
+  "properties": {
+    "exp": {
+      "minimum": 0,
+      "title": "Exp",
+      "type": "integer"
+    },
+    "slot": {
+      "minLength": 1,
+      "title": "Slot",
+      "type": "string"
+    }
+  },
+  "required": [
+    "slot",
+    "exp"
+  ],
+  "title": "RelayPair",
+  "type": "object"
+}

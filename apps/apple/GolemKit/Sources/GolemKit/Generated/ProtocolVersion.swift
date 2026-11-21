@@ -2,5 +2,5 @@
 
 public enum ProtocolVersion {
     public static let major = 2
-    public static let minor = 129
+    public static let minor = 130
 }

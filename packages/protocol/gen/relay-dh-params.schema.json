@@ -1,0 +1,16 @@
+{
+  "additionalProperties": false,
+  "description": "``relay.dh``. A Diffie-Hellman of the Mac's Noise key with ``public_key``, an X25519 key.",
+  "properties": {
+    "public_key": {
+      "pattern": "^[A-Za-z0-9_-]{43}$",
+      "title": "Public Key",
+      "type": "string"
+    }
+  },
+  "required": [
+    "public_key"
+  ],
+  "title": "RelayDhParams",
+  "type": "object"
+}

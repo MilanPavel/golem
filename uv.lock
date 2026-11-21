@@ -370,6 +370,7 @@ version = "0.0.0"
 source = { editable = "packages/daemon" }
 dependencies = [
     { name = "aiosqlite" },
+    { name = "cryptography" },
     { name = "golem-protocol" },
     { name = "httpx" },
     { name = "keyring" },
@@ -389,6 +390,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "aiosqlite", specifier = ">=0.22" },
+    { name = "cryptography", specifier = ">=44" },
     { name = "golem-protocol", editable = "packages/protocol" },
     { name = "httpx", specifier = ">=0.28" },
     { name = "keyring", specifier = ">=25" },

@@ -23,8 +23,8 @@ public extension HelloResult {
 }
 
 public extension MethodAccess {
-    /// Whether the app may call `method` (the browser set).
+    /// Whether the app may call `method` (the device set, generated from the protocol).
     static func appMayCall(_ method: String) -> Bool {
-        browser.contains(method)
+        device.contains(method)
     }
 }

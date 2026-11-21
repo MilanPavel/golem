@@ -7,6 +7,8 @@ service ``golem``; elsewhere it is whatever ``keyring`` finds. A secret has a na
   the provider name alone, as before namespaces, so stored keys keep working.
 - ``mcp/<name>``: an MCP server's token, named as ``keychain:mcp/<name>`` in ``[mcp.*]``.
 - ``hook/<name>``: a hook endpoint's token, such as ``hook/token`` (plan step 4.5).
+- ``relay/<name>``: the Mac's keys for the phone relay, ``relay/identity`` and ``relay/noise``
+  (ADR-051). The daemon makes them and never returns them.
 
 A setting that needs a secret holds a :data:`SecretRef`, ``keychain:<name>``,
 and the daemon resolves it when it uses it. A config file never holds the
@@ -36,7 +38,7 @@ SERVICE = "golem"
 WAIT_NOTICE_SECONDS = 0.5
 KEYCHAIN_PREFIX = "keychain:"
 
-_NAME = re.compile(r"^(provider|mcp|hook)/[A-Za-z0-9][A-Za-z0-9._-]*$")
+_NAME = re.compile(r"^(provider|mcp|hook|relay)/[A-Za-z0-9][A-Za-z0-9._-]*$")
 """Provider accounts have no ``/``, so they never meet the other namespaces' accounts."""
 
 
@@ -49,10 +51,11 @@ class SecretMissingError(Exception):
 
 
 def check_name(name: str) -> str:
-    """``name`` when it is ``provider/<name>``, ``mcp/<server>``, or ``hook/<name>``."""
+    """``name`` when it is in the ``provider``, ``mcp``, ``hook``, or ``relay`` namespace."""
     if _NAME.fullmatch(name) is None:
         raise ValueError(
-            f"{name!r} is not a secret name: use provider/<name>, mcp/<server>, or hook/<name>"
+            f"{name!r} is not a secret name: "
+            "use provider/<name>, mcp/<server>, hook/<name>, or relay/<name>"
         )
     return name
 

@@ -1,0 +1,16 @@
+{
+  "additionalProperties": false,
+  "description": "``connection.identify``. The gateway names the device on this connection.",
+  "properties": {
+    "device": {
+      "pattern": "^[0-9a-f]{32}$",
+      "title": "Device",
+      "type": "string"
+    }
+  },
+  "required": [
+    "device"
+  ],
+  "title": "ConnectionIdentifyParams",
+  "type": "object"
+}

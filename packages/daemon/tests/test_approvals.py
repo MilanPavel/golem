@@ -8,6 +8,8 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import ec
 from fakes import ToolCallingChatModel
 from langchain_core.messages import ToolMessage
 from langgraph.checkpoint.memory import InMemorySaver
@@ -29,6 +31,7 @@ from golem.sessions.manager import (
 from golem.sessions.runner import RunControl
 from golem.sessions.summaries import summarize
 from golem.store.database import Database
+from golem.store.devices import DeviceStore
 from golem.store.events import EventLog
 from golem.store.records import RunRecords, SessionRecords
 from golem.tools.registry import Tool, ToolContext, ToolRegistry, ToolResult
@@ -495,3 +498,44 @@ async def test_a_cancel_that_meets_a_run_as_it_parks_still_ends_it(
     runs.pop(run_id, None)
     next_events = await daemon.settled(await daemon.manager.send(session_id, "again"))
     assert next_events[-1].type == "run.completed"
+
+
+async def test_always_allow_from_a_phone_records_its_device_with_the_rule(
+    database: Database, tmp_path: Path
+) -> None:
+    config = tmp_path / "config.toml"
+    commands = _Commands()
+    replies: list[Reply] = [_cmd("git status"), "one", _cmd("ls"), "two"]
+    daemon = _commands_daemon(database, replies, commands, config)
+    devices = DeviceStore(database)
+    daemon.manager.devices = devices
+    phone = await devices.add(_device_key(), "iPhone 16", "2026-11-21T10:00:00+01:00")
+
+    session_id = await daemon.manager.create(None)
+    run_id = await daemon.manager.send(session_id, "go")
+    asked = _needed(await daemon.settled(run_id))[0].data
+    await daemon.manager.respond(session_id, asked.call_id, "allow_always", device=phone.id)
+    events = await daemon.settled(run_id)
+    resolved = next(event for event in events if isinstance(event, ApprovalResolvedEvent))
+    assert resolved.data.device == phone.id
+    assert resolved.data.rule == "~/config.toml rule 1"
+    [origin] = await devices.rule_origins("~/config.toml rule 1")
+    assert (origin.device_id, origin.device_name) == (phone.id, "iPhone 16")
+    assert "iphone" not in config.read_text(encoding="utf-8").lower()
+    assert phone.id not in config.read_text(encoding="utf-8")
+
+    # An answer from a browser or a terminal has no device, and writes no origin.
+    run_two = await daemon.manager.send(session_id, "again")
+    asked_again = _needed(await daemon.settled(run_two))[0].data
+    await daemon.manager.respond(session_id, asked_again.call_id, "allow_always")
+    later = await daemon.settled(run_two)
+    last = next(event for event in later if isinstance(event, ApprovalResolvedEvent))
+    assert last.data.device is None
+    assert await devices.rule_origins("~/config.toml rule 2") == []
+
+
+def _device_key() -> bytes:
+    private = ec.generate_private_key(ec.SECP256R1())
+    return private.public_key().public_bytes(
+        serialization.Encoding.X962, serialization.PublicFormat.UncompressedPoint
+    )

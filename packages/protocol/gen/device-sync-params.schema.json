@@ -1,0 +1,7 @@
+{
+  "additionalProperties": false,
+  "description": "``device.sync``. What the gateway needs to serve phones. No params.",
+  "properties": {},
+  "title": "DeviceSyncParams",
+  "type": "object"
+}

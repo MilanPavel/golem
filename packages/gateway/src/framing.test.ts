@@ -25,6 +25,15 @@ test("an allowed method is forwarded as the exact original text plus one newline
   assert.deepEqual(filterMessage(text), { kind: "forward", line: `${text}\n` });
 });
 
+test("a browser gets -32020 for each of the gateway's relay methods", () => {
+  for (const method of ["relay.sign", "relay.dh", "device.sync", "connection.identify"]) {
+    assert.deepEqual(filterMessage(JSON.stringify({ jsonrpc: "2.0", id: 3, method, params: {} })), {
+      kind: "deny",
+      reply: deny(3),
+    });
+  }
+});
+
 test("two objects joined by \\n are refused", () => {
   assert.deepEqual(filterMessage('{"method":"ping"}\n{"method":"auth.set"}'), refused("line-break"));
 });

@@ -49,7 +49,7 @@ gen:
         --style.singleQuote \
         --unreachableDefinitions \
         --bannerComment "$BANNER"' _
-    uv run python -c 'from golem_protocol.codegen import default_gen_dir, export_browser_methods, export_version; export_version(default_gen_dir()); export_browser_methods(default_gen_dir())'
+    uv run python -c 'from golem_protocol.codegen import default_gen_dir, export_browser_methods, export_device_methods, export_version; export_version(default_gen_dir()); export_browser_methods(default_gen_dir()); export_device_methods(default_gen_dir())'
     # Swift for GolemKit: one quicktype run over all the schemas (Node only, so Linux CI runs it too).
     swift_dir=apps/apple/GolemKit/Sources/GolemKit/Generated
     mkdir -p "$swift_dir"

@@ -43,6 +43,8 @@ class ClientConnection:
 
     def __init__(self, writer: StreamOut, *, max_pending: int = MAX_PENDING_FRAMES) -> None:
         self.welcomed = False
+        self.device: str | None = None
+        """The paired phone this connection speaks for, set by ``connection.identify``."""
         self._writer = writer
         self._max_pending = max_pending
         self._queue: asyncio.Queue[bytes] = asyncio.Queue()

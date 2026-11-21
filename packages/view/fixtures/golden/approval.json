@@ -232,6 +232,7 @@
         "args": null,
         "call_id": "call_1",
         "decision": "allow",
+        "device": null,
         "name": "read_file",
         "rule": null,
         "subject": null
@@ -614,6 +615,7 @@
         "args": null,
         "call_id": "call_1",
         "decision": "allow",
+        "device": null,
         "name": "read_file",
         "rule": null,
         "subject": null

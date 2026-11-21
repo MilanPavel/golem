@@ -196,6 +196,8 @@ class Resume:
     asked: tuple[str, ...] = ()
     subject: str | None = None
     rule: str | None = None
+    device: str | None = None
+    """The paired phone that answered, for ``approval.resolved``. None for any other client."""
     diff: str | None = None
     args: dict[str, object] | None = None
     mcp_servers: tuple[str, ...] = ()
@@ -551,6 +553,7 @@ async def resume_turn(
                     subject=resume.subject,
                     rule=resume.rule,
                     args=resume.args,
+                    device=resume.device,
                 ),
             )
             answer = Answer(decision=resume.decision, diff=resume.diff, args=resume.args)

@@ -1,0 +1,7 @@
+{
+  "additionalProperties": false,
+  "description": "Empty. An unknown or revoked device gets an error instead.",
+  "properties": {},
+  "title": "ConnectionIdentifyResult",
+  "type": "object"
+}

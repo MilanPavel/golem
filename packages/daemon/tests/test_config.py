@@ -231,3 +231,45 @@ def test_a_blank_or_unknown_role_is_refused(tmp_path: Path) -> None:
     _write(home / "config.toml", '[routing.roles]\nsearch = "x"\n')
     with pytest.raises(ValidationError):
         load_settings(home=home, project_dir=tmp_path / "project")
+
+
+def test_relay_url_is_off_by_default_and_read_from_the_user_file(tmp_path: Path) -> None:
+    home = tmp_path / "home"
+    assert load_settings(home=home, project_dir=tmp_path / "p").relay.url is None
+    _write(home / "config.toml", '[relay]\nurl = "wss://relay.example.com/base"\n')
+    assert load_settings(home=home, project_dir=tmp_path / "p").relay.url == (
+        "wss://relay.example.com/base"
+    )
+
+
+@pytest.mark.parametrize("url", ["ws://127.0.0.1:8787", "ws://localhost:9", "ws://[::1]:9"])
+def test_relay_url_allows_a_loopback_ws_for_tests(tmp_path: Path, url: str) -> None:
+    home = tmp_path / "home"
+    _write(home / "config.toml", f'[relay]\nurl = "{url}"\n')
+    assert load_settings(home=home, project_dir=tmp_path / "p").relay.url == url
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "ws://relay.example.com",
+        "http://relay.example.com",
+        "https://relay.example.com",
+        "relay.example.com",
+        "wss://",
+        "wss://user:pw@relay.example.com",
+        "wss://relay.example.com/?x=1",
+    ],
+)
+def test_relay_url_refuses_anything_but_wss(tmp_path: Path, url: str) -> None:
+    home = tmp_path / "home"
+    _write(home / "config.toml", f'[relay]\nurl = "{url}"\n')
+    with pytest.raises(ValidationError):
+        load_settings(home=home, project_dir=tmp_path / "p")
+
+
+def test_a_project_cannot_set_the_relay(tmp_path: Path) -> None:
+    home = tmp_path / "home"
+    project = tmp_path / "project"
+    _write(project / ".golem" / "config.toml", '[relay]\nurl = "wss://evil.example.com"\n')
+    assert load_settings(home=home, project_dir=project).relay.url is None

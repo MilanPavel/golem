@@ -1,0 +1,18 @@
+{
+  "additionalProperties": false,
+  "description": "``relay.sign``. The gateway asks the daemon to sign with the Mac's relay key.\n\n``message`` is bytes. The daemon signs only a message that starts with\n``golem-relay-v1\\0``, so the gateway cannot use the key for anything else. ``local``: only\nthe gateway, on the Unix socket.",
+  "properties": {
+    "message": {
+      "maxLength": 65536,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9_-]+$",
+      "title": "Message",
+      "type": "string"
+    }
+  },
+  "required": [
+    "message"
+  ],
+  "title": "RelaySignParams",
+  "type": "object"
+}

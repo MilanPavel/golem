@@ -1,0 +1,108 @@
+{
+  "$defs": {
+    "RelayDevice": {
+      "additionalProperties": false,
+      "description": "A paired device that is not revoked: its id and its 65-byte public key.",
+      "properties": {
+        "id": {
+          "pattern": "^[0-9a-f]{32}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "key": {
+          "pattern": "^[A-Za-z0-9_-]{87}$",
+          "title": "Key",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "key"
+      ],
+      "title": "RelayDevice",
+      "type": "object"
+    },
+    "RelayPair": {
+      "additionalProperties": false,
+      "description": "An open pairing slot: ``SHA-256(code)`` and its expiry in unix seconds.",
+      "properties": {
+        "exp": {
+          "minimum": 0,
+          "title": "Exp",
+          "type": "integer"
+        },
+        "slot": {
+          "minLength": 1,
+          "title": "Slot",
+          "type": "string"
+        }
+      },
+      "required": [
+        "slot",
+        "exp"
+      ],
+      "title": "RelayPair",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "The relay settings and the allow list.\n\n``url`` is ``[relay] url``, or null when it is not set. ``room`` is the Mac's room id,\nthe SHA-256 of ``mac_key``. ``noise_key`` is the public half of the Mac's Noise key.\n``seq`` grows by one with each change and is the ``seq`` of the relay's ``allow``\nmessage. ``devices`` leaves out a revoked device.",
+  "properties": {
+    "devices": {
+      "items": {
+        "$ref": "#/$defs/RelayDevice"
+      },
+      "title": "Devices",
+      "type": "array"
+    },
+    "mac_key": {
+      "pattern": "^[A-Za-z0-9_-]{87}$",
+      "title": "Mac Key",
+      "type": "string"
+    },
+    "noise_key": {
+      "pattern": "^[A-Za-z0-9_-]{43}$",
+      "title": "Noise Key",
+      "type": "string"
+    },
+    "pairs": {
+      "items": {
+        "$ref": "#/$defs/RelayPair"
+      },
+      "title": "Pairs",
+      "type": "array"
+    },
+    "room": {
+      "pattern": "^[A-Za-z0-9_-]{43}$",
+      "title": "Room",
+      "type": "string"
+    },
+    "seq": {
+      "minimum": 0,
+      "title": "Seq",
+      "type": "integer"
+    },
+    "url": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Url"
+    }
+  },
+  "required": [
+    "room",
+    "mac_key",
+    "noise_key",
+    "seq",
+    "devices",
+    "pairs"
+  ],
+  "title": "DeviceSyncResult",
+  "type": "object"
+}

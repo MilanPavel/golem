@@ -44,7 +44,7 @@ private struct Fixture: Decodable {
 }
 
 @Test func approvalRespondEncodesAllowAlways() throws {
-    let params = ApprovalRespondParams(args: nil, callID: "c1", decision: .allowAlways, sessionID: "s1")
+    let params = ApprovalRespondParams(args: nil, callID: "c1", decision: .allowAlways, scope: nil, sessionID: "s1")
     let json = String(decoding: try JSONEncoder().encode(params), as: UTF8.self)
     #expect(json.contains(#""decision":"allow_always""#), "\(json)")
     #expect(json.contains(#""call_id":"c1""#), "\(json)")
@@ -61,8 +61,14 @@ private struct Fixture: Decodable {
     }
 }
 
-@Test func theAppMayCallBrowserMethodsOnly() {
+@Test func theAppMayCallTheDeviceMethodsOnly() {
     #expect(MethodAccess.appMayCall("approval.respond"))
+    #expect(MethodAccess.appMayCall("hello"))
     #expect(!MethodAccess.appMayCall("auth.set"))
+    #expect(!MethodAccess.appMayCall("policy.update"))
+    #expect(!MethodAccess.appMayCall("mcp.call"))
+    #expect(!MethodAccess.appMayCall("config.raw.set"))
+    #expect(!MethodAccess.appMayCall("device.sync"))
+    #expect(!MethodAccess.appMayCall("relay.sign"))
     #expect(!MethodAccess.appMayCall("nope"))
 }

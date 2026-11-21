@@ -1025,7 +1025,8 @@ class ApprovalResolvedData(BaseModel):
     ``allow_session`` also allows ``name`` with this ``subject`` for the rest of
     the session, or every call of ``name`` when ``subject`` is null.
     ``allow_always`` wrote an allow rule, and ``rule`` names it. ``args`` are
-    the arguments the user edited the call to, when they did.
+    the arguments the user edited the call to, when they did. ``device`` is the id of the
+    paired phone that answered, and null for an answer from a browser or a terminal.
     """
 
     model_config = _CONFIG
@@ -1036,6 +1037,7 @@ class ApprovalResolvedData(BaseModel):
     subject: str | None = None
     rule: str | None = None
     args: dict[str, Any] | None = None
+    device: str | None = Field(default=None, pattern=r"^[0-9a-f]{32}$")
 
 
 class SessionCreatedEvent(BaseModel):
