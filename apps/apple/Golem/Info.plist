@@ -38,6 +38,8 @@
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
+	<key>NSFaceIDUsageDescription</key>
+	<string>golem asks for Face ID before it saves an Always allow rule or allows a risky tool on your Mac.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>golem uses the camera to read the pairing code that your Mac shows. Nothing is recorded or kept.</string>
 	<key>UIApplicationSceneManifest</key>

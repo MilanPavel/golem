@@ -23,7 +23,8 @@ enum DebugEnvironment {
             pairing: { FakePairing() },
             link: { _ in FakeLink(scenario: scenario) },
             authenticator: FakeAuthenticator(),
-            deviceName: "iPhone 16")
+            deviceName: "iPhone 16",
+            network: { AsyncStream { $0.yield(scenario != .offline) } })
     }
 }
 
@@ -61,6 +62,10 @@ enum FakeScenario: String {
     case disconnected
     /// Starts empty; an approval arrives a moment after launch, as a summary from the Mac.
     case live
+    /// Two sessions wait; a moment after launch the Mac goes to sleep, and answers queue.
+    case asleep
+    /// Like `asleep`, with the phone's network off and the relay out of reach.
+    case offline
 }
 
 /// A Mac that is connected and has two sessions, or whatever the scenario says.
@@ -68,8 +73,13 @@ enum FakeScenario: String {
 final class FakeLink: MacLink {
     private let scenario: FakeScenario
     private let sessionChannelFake = FakeSessionChannel()
+    let pendingAnswers: PendingAnswers
 
-    nonisolated init(scenario: FakeScenario = .empty) { self.scenario = scenario }
+    // Called from the app model, on the main actor.
+    nonisolated init(scenario: FakeScenario = .empty) {
+        self.scenario = scenario
+        pendingAnswers = MainActor.assumeIsolated { PendingAnswers() }
+    }
 
     var sessionChannel: any SessionChannel { sessionChannelFake }
 
@@ -91,7 +101,16 @@ final class FakeLink: MacLink {
         return AsyncStream { continuation in
             continuation.yield(.connecting)
             continuation.yield(scenario == .disconnected ? .macUnreachable : .connected)
-            continuation.finish()
+            guard scenario == .asleep || scenario == .offline else {
+                continuation.finish()
+                return
+            }
+            // The Mac goes away after the Inbox has been read, so what was read stays on screen.
+            Task {
+                try? await Task.sleep(nanoseconds: 1_500_000_000)
+                continuation.yield(scenario == .offline ? .relayUnreachable : .macUnreachable)
+                continuation.finish()
+            }
         }
     }
 
@@ -102,7 +121,7 @@ final class FakeLink: MacLink {
                 InboxSession(sessionId: "s1", title: "Fix the flaky test", status: "running", updatedAt: "2026-11-21T10:00:00Z"),
                 InboxSession(sessionId: "s2", title: "Upgrade httpx", status: "idle", updatedAt: "2026-11-21T09:00:00Z"),
             ])
-        case .needs:
+        case .needs, .asleep, .offline:
             list.replace(with: [
                 Self.approval("s1", title: "Fix the flaky test", subject: "rm -rf build", minutesAgo: 4),
                 Self.approval("s2", title: "Upgrade httpx", subject: "uv lock --upgrade", minutesAgo: 1),
@@ -142,7 +161,9 @@ final class FakeLink: MacLink {
 
     func stop() async {}
 
-    var approvals: any ApprovalChannel { FakeApprovalChannel() }
+    var approvals: any ApprovalChannel {
+        scenario == .asleep || scenario == .offline ? FakeOfflineChannel(pending: pendingAnswers) : FakeApprovalChannel()
+    }
 
     /// A shell call whose command is the subject the fake session says.
     func approvalRequest(for item: InboxItem, folder: String?) async -> ApprovalRequest {
@@ -180,6 +201,18 @@ struct FakeApprovalChannel: ApprovalChannel {
             continuation.onTermination = { _ in task.cancel() }
         }
     }
+}
+
+/// A Mac that is away: every answer waits, as the real channel does when the outbox takes it.
+struct FakeOfflineChannel: ApprovalChannel {
+    let pending: PendingAnswers
+
+    func respond(sessionId: String, callId: String, decision: Decision) async throws {
+        await pending.record(sessionId: sessionId, callId: callId, decision: decision)
+        throw ApprovalFailure.queued
+    }
+
+    func resolutions() -> AsyncStream<ApprovalResolution> { AsyncStream { _ in } }
 }
 
 /// The approvals the debug menu opens.

@@ -3,7 +3,7 @@ import { test } from "node:test";
 
 import type { AgentInfo } from "@golem/client";
 
-import { agentFinished, agentRow, agentRows, agentsTable, agentUsed, agentWish, toolGroups, usageLine, wishLine, wishNow, wishOptions, wishSetup } from "./agents-view.ts";
+import { agentFinished, agentListLine, agentRow, agentRows, agentsTable, agentUsed, agentWish, asksLine, definitionLines, definitionPath, formatSeconds, limitFacts, toolGroups, usageLine, wishLine, wishNow, wishOptions, wishSetup } from "./agents-view.ts";
 
 const bundled = (over: Partial<AgentInfo>): AgentInfo => ({
   name: "explorer",
@@ -117,10 +117,13 @@ test("a model name as the wish comes first, so the dropdown shows what is set", 
 test("now says the model, the reason and a fresh window in words, and is null without a model", () => {
   assert.deepEqual(wishNow({ model: "qwen3:14b", tier: "local", reason: "the cheapest that fits", fresh_window: true }), {
     text: "now: qwen3:14b",
+    model: "qwen3:14b",
+    tier: "local",
     reason: "the cheapest that fits",
     freshWindow: "fresh window",
   });
-  assert.deepEqual(wishNow({ model: "claude-haiku" }), { text: "now: claude-haiku", reason: "", freshWindow: "" });
+  assert.deepEqual(wishNow({ model: "claude-haiku", tier: "budget" }), { text: "now: claude-haiku", model: "claude-haiku", tier: "hosted", reason: "", freshWindow: "" });
+  assert.deepEqual(wishNow({ model: "claude-haiku" }), { text: "now: claude-haiku", model: "claude-haiku", tier: null, reason: "", freshWindow: "" });
   assert.equal(wishNow(undefined), null);
   assert.equal(wishNow(null), null);
   assert.equal(wishNow({ reason: "no model" }), null);
@@ -184,4 +187,56 @@ test("the tools split into reading and changing ones, and the row carries the fi
   assert.equal(row.usage, "Cannot run yet");
   const old = agentRow(bundled({}));
   assert.deepEqual([old.path, old.text, old.unavailable, old.readingTools], [null, null, null, []]);
+});
+
+test("seconds are said in whole minutes only when they are whole", () => {
+  assert.equal(formatSeconds(300), "5 min");
+  assert.equal(formatSeconds(45), "45 s");
+  assert.equal(formatSeconds(90), "90 s");
+  assert.equal(formatSeconds(60), "1 min");
+});
+
+test("limits: three always, tokens and cost when set, no limit when the file sets none", () => {
+  assert.deepEqual(limitFacts({ max_calls: 15, max_seconds: 300, answer_chars: 6000 }), [
+    { value: "15", label: "tool calls" },
+    { value: "5 min", label: "time" },
+    { value: "6000", label: "answer chars" },
+  ]);
+  assert.deepEqual(limitFacts(undefined).map((fact) => fact.value), ["no limit", "no limit", "no limit"]);
+  const more = limitFacts({ max_calls: 1, max_tokens: 5000, max_cost_usd: 0.5 });
+  assert.deepEqual(more.slice(3), [{ value: "5000", label: "tokens" }, { value: "$0.50", label: "cost" }]);
+  assert.equal(asksLine(true), "May ask you one short question.");
+  assert.equal(asksLine(false), "Never asks you; it works from the brief.");
+});
+
+test("the list line says the wish and the model it becomes", () => {
+  assert.equal(agentListLine("cheapest", { model: "qwen3:14b" }), "cheapest → qwen3:14b");
+  assert.equal(agentListLine("stronger", { model: "gpt" }), "stronger than the lead → gpt");
+  assert.equal(agentListLine("ollama/x", { model: "ollama/x" }), "ollama/x");
+  assert.equal(agentListLine("cheapest", null), "cheapest");
+});
+
+test("the file text is split so front matter keys can be tinted, and the prompt never is", () => {
+  const lines = definitionLines("---\nname: worker\ntools: a, b\n---\nnote: this is the prompt\n---\n");
+  assert.deepEqual(
+    lines.map((line) => line.kind),
+    ["fence", "key", "key", "fence", "plain", "plain"],
+  );
+  assert.deepEqual(lines[1], { kind: "key", key: "name", text: " worker" });
+  assert.deepEqual(definitionLines("no front matter\nkey: x").map((line) => line.kind), ["plain", "plain"]);
+});
+
+test("a bundled file's path says read-only", () => {
+  assert.equal(definitionPath("golem/agents/bundled/explorer.md", "bundled"), "golem/agents/bundled/explorer.md · read-only");
+  assert.equal(definitionPath("~/.golem/agents/x.md", "user"), "~/.golem/agents/x.md");
+  assert.equal(definitionPath(null, "bundled"), null);
+});
+
+test("a row has its mark, list line, limits and tools note", () => {
+  const row = agentRow(
+    bundled({ origin: "user", wish: "cheapest", resolves_to: { model: "qwen3:14b", tier: "local" }, tools: ["read_file", "edit_file"], changing_tools: ["edit_file"], limits: { max_calls: 3 } }),
+  );
+  assert.deepEqual([row.mark, row.listLine, row.tier, row.toolsNote], ["yours", "cheapest → qwen3:14b", "local", "Marked tools change things."]);
+  assert.equal(row.limits[0]?.value, "3");
+  assert.equal(agentRow(bundled({ tools: [] })).toolsNote, "");
 });

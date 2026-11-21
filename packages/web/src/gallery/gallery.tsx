@@ -60,7 +60,7 @@ import { MemoryView } from "../features/settings/memory/memory-view.tsx";
 import { SAMPLE_MEMORIES, SAMPLE_MEMORY_COUNTS, SAMPLE_MEMORY_SETTINGS } from "../features/settings/memory/sample.ts";
 import { MEMORY_OFF_TEXT } from "../store/memory.ts";
 import { FinishedHelpers } from "../features/settings/agents-keep.tsx";
-import { AgentsTable } from "../features/settings/agents-section.tsx";
+import { AgentsPage } from "../features/settings/agents-section.tsx";
 import { SAMPLE_AGENTS, WISH_AGENTS_CLOUD, WISH_AGENTS_LOCAL, WISH_AGENTS_MIXED } from "../features/settings/agents-sample.ts";
 import { SkillList } from "../features/settings/skills-section.tsx";
 import { SkillOverview } from "../features/settings/skills/skill-detail.tsx";
@@ -1441,9 +1441,17 @@ function SkillsDemo() {
 function AgentsDemo() {
   return (
     <div className="flex flex-col gap-4">
-      <section aria-label="Agents, table" className="flex flex-col gap-3 rounded-lg border border-line bg-bg p-4">
-        <span className="font-mono text-xs text-faint">Table, with a broken file and a project agent that is not trusted</span>
-        <AgentsTable agents={SAMPLE_AGENTS} />
+      <section aria-label="Agents, wide" className="flex flex-col gap-3 rounded-lg border border-line bg-bg p-4">
+        <span className="font-mono text-xs text-faint">Wide: list and detail, with a broken file and a project agent that is not trusted</span>
+        <AgentsPage agents={SAMPLE_AGENTS} start="bundled/explorer" onSetWish={async () => {}} />
+      </section>
+      <section aria-label="Agents, narrow" className="flex max-w-md flex-col gap-3 rounded-lg border border-line bg-bg p-4">
+        <span className="font-mono text-xs text-faint">Narrow: one column, a row opened in place</span>
+        <AgentsPage agents={SAMPLE_AGENTS} narrow start="bundled/reviewer" onSetWish={async () => {}} />
+      </section>
+      <section aria-label="Agents, cannot run" className="flex flex-col gap-3 rounded-lg border border-line bg-bg p-4">
+        <span className="font-mono text-xs text-faint">An agent that cannot run yet, and one with no tools</span>
+        <AgentsPage agents={SAMPLE_AGENTS.filter((agent) => agent.name === "worker" || agent.name === "advisor")} start="bundled/worker" />
       </section>
       {(
         [
@@ -1454,7 +1462,7 @@ function AgentsDemo() {
       ).map(([title, setup, agents]) => (
         <section key={setup} aria-label={title} className="flex flex-col gap-3 rounded-lg border border-line bg-bg p-4">
           <span className="font-mono text-xs text-faint">{title}</span>
-          <AgentsTable agents={agents} setup={setup} onSetWish={async () => {}} />
+          <AgentsPage agents={agents} setup={setup} onSetWish={async () => {}} />
         </section>
       ))}
       {(
@@ -1471,7 +1479,7 @@ function AgentsDemo() {
       ))}
       <section aria-label="Agents, empty" className="flex flex-col gap-3 rounded-lg border border-line bg-bg p-4">
         <span className="font-mono text-xs text-faint">Empty</span>
-        <AgentsTable agents={[]} />
+        <AgentsPage agents={[]} />
       </section>
     </div>
   );

@@ -39,6 +39,8 @@ actor ScriptedMac {
     var replayOverlap = 0
     var answerPings = true
     private(set) var approvals: [[String: Any]] = []
+    /// Calls the Mac took an answer for. Like the daemon, it refuses a second answer for the same call.
+    private(set) var answeredCalls: [String] = []
     private(set) var attachCalls: [(session: String, afterSeq: Int)] = []
     /// `session.create`, `message.send` and `run.cancel` params, as they arrived.
     private(set) var createCalls: [[String: Any]] = []
@@ -80,6 +82,8 @@ actor ScriptedMac {
     }
 
     func setReplayOverlap(_ value: Int) { replayOverlap = value }
+    /// Marks a call as answered somewhere else already.
+    func answerElsewhere(_ callID: String) { answeredCalls.append(callID) }
     func setAnswerPings(_ value: Bool) { answerPings = value }
     func setRunList(_ value: [[String: Any]]) { runList = value }
     func setSessionList(_ value: [[String: Any]]) { sessionList = value }
@@ -285,7 +289,13 @@ actor ScriptedMac {
             answer([String: Any]())
         case "approval.respond":
             approvals.append(params)
-            answer(["run_id": "r1"])
+            let callID = params["call_id"] as? String ?? ""
+            if answeredCalls.contains(callID) {
+                sendLine(["jsonrpc": "2.0", "id": id, "error": ["code": -32010, "message": "no run waits on this tool call"]], to: channel)
+            } else {
+                answeredCalls.append(callID)
+                answer(["run_id": "r1"])
+            }
         default:
             sendLine(["jsonrpc": "2.0", "id": id, "error": ["code": -32601, "message": "unknown method"]], to: channel)
         }

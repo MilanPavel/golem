@@ -1,7 +1,7 @@
 import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import axe from "axe-core";
-import { afterEach, beforeEach, expect, test } from "vitest";
+import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { App } from "../../app.tsx";
 import { createPage } from "../../store/page.ts";
 import { PageProvider } from "../../store/page-context.tsx";
@@ -53,20 +53,26 @@ function mount(agents = SAMPLE_AGENTS, models?: ModelListResult) {
   return { fake, page, user: userEvent.setup(), ...view };
 }
 
-/** The cells of the row of an agent, by column. */
-function cells(name: string): string[] {
-  const row = screen.getAllByRole("row").find((candidate) => within(candidate).queryByRole("rowheader", { name: new RegExp(`^${name}\\b`) }) !== null);
-  if (row === undefined) throw new Error(`no row for ${name}`);
-  return within(row)
-    .getAllByRole("cell")
-    .map((cell) => cell.textContent ?? "");
+/** The list row of an agent: a button whose name starts with the agent's name. */
+function rowOf(name: string): HTMLElement {
+  return screen.getByRole("button", { name: new RegExp(`^${name}\\b`) });
 }
+
+/** Chooses an agent in the list, and waits for its detail. */
+async function choose(user: ReturnType<typeof userEvent.setup>, name: string): Promise<HTMLElement> {
+  await user.click(rowOf(name));
+  return screen.getByRole("heading", { name, level: 3 });
+}
+
+/** The file text on the page. */
+const fileOf = (name: string): HTMLElement => screen.getByLabelText(`File of ${name}`);
 
 beforeEach(() => {
   localStorage.clear();
   settingsContextStore.set(null);
 });
 afterEach(() => {
+  vi.unstubAllGlobals();
   closePalette();
   settingsContextStore.set(null);
   history.replaceState(null, "", "/");
@@ -90,41 +96,157 @@ test("while the daemon has not answered the page says it is asking", async () =>
   expect(await screen.findByText("asking the daemon…")).toBeTruthy();
 });
 
-test("the table shows bundled, user and project agents with wish, used and finished", async () => {
+test("the list shows each agent with its mark, its wish and the model it becomes, and the first is open", async () => {
   mount();
   await screen.findByText("7 agents");
-  expect(cells("explorer")).toEqual(["Cheapest that fits", "41", "39"]);
-  expect(cells("reviewer")).toEqual(["Stronger than the lead", "20", "19"]);
-  expect(cells("advisor")).toEqual(["Stronger than the lead", "4", "—"]);
-  expect(cells("worker")).toEqual(["Cheapest that fits", "—", "—"]);
-  expect(cells("triage")).toEqual(["Cheapest that fits", "12", "10"]);
-  expect(cells("docs")).toEqual(["Same as the lead", "3", "3"]);
-  const sources = screen.getAllByRole("rowheader").map((header) => header.textContent);
-  expect(sources.find((text) => text?.startsWith("docs"))).toContain("This project");
-  expect(sources.find((text) => text?.startsWith("triage"))).toContain("Yours");
-  expect(sources.find((text) => text?.startsWith("explorer"))).toContain("Bundled with golem");
-  expect(screen.getByRole("columnheader", { name: "Finished" })).toBeTruthy();
+  expect(rowOf("explorer").textContent).toBe("explorer bundled cheapest → qwen3:14b");
+  expect(rowOf("reviewer").textContent).toBe("reviewer bundled stronger than the lead → claude-sonnet");
+  expect(rowOf("triage").textContent).toBe("triage yours cheapest");
+  expect(rowOf("docs").textContent).toBe("docs project same as the lead");
+  expect(rowOf("worker").textContent).toContain("not yet");
+  expect(rowOf("explorer").textContent).not.toContain("not yet");
+  expect(rowOf("docs").getAttribute("aria-current")).toBe("true");
+  expect(rowOf("explorer").getAttribute("aria-current")).toBeNull();
+  expect(screen.getByRole("heading", { name: "docs", level: 3 })).toBeTruthy();
 });
 
 test("a project agent of a folder that is not trusted is not a row, and a line says to trust the folder", async () => {
   mount();
   await screen.findByText("7 agents");
-  expect(screen.queryByRole("rowheader", { name: /^release/ })).toBeNull();
+  expect(screen.queryByRole("button", { name: /^release/ })).toBeNull();
   expect(screen.getByText("Trust this folder to use its agent release.")).toBeTruthy();
 });
 
-test("a broken agent file shows its error", async () => {
-  mount();
+test("a broken agent file shows its error under the head", async () => {
+  const { user } = mount();
   await screen.findByText("7 agents");
-  const header = screen.getByRole("rowheader", { name: /^broken-one/ });
-  expect(within(header).getByRole("note").textContent).toContain("the frontmatter is not valid YAML");
+  await choose(user, "broken-one");
+  expect(screen.getByRole("note").textContent).toContain("the frontmatter is not valid YAML");
+  expect(screen.queryByRole("button", { name: /^Model wish of broken-one/ })).toBeNull();
 });
 
 test("with no agents the page says how to add one", async () => {
   mount([]);
   expect(await screen.findByText("0 agents")).toBeTruthy();
   expect(screen.getByText(/Add one as ~\/\.golem\/agents/)).toBeTruthy();
-  expect(screen.queryByRole("table")).toBeNull();
+  expect(screen.queryByRole("tablist")).toBeNull();
+});
+
+test("the Overview of a bundled agent says its model, tools, limits, prompt and use", async () => {
+  const { user } = mount();
+  await screen.findByText("7 agents");
+  await choose(user, "explorer");
+  const model = screen.getByRole("region", { name: "Model" });
+  expect(model.textContent).toContain("now qwen3:14b");
+  expect(model.textContent).toContain("the cheapest model that fits, a local one first");
+  expect(within(model).getByRole("button", { name: /^Model wish of explorer: Cheapest that fits/ })).toBeTruthy();
+  const tools = within(screen.getByRole("region", { name: "Can use" })).getAllByRole("listitem");
+  expect(tools.map((item) => item.textContent)).toEqual(["read_file", "list_dir", "glob", "grep", "git_log", "git_diff", "git_status"]);
+  expect(screen.getByText("All of these only read.")).toBeTruthy();
+  const limits = screen.getByRole("region", { name: "Limits" });
+  expect(limits.textContent).toContain("15tool calls");
+  expect(limits.textContent).toContain("5 mintime");
+  expect(limits.textContent).toContain("6000answer chars");
+  expect(limits.textContent).toContain("Never asks you; it works from the brief.");
+  expect(screen.getByRole("region", { name: "Prompt" }).textContent).toContain("You are a helper. Answer the brief.");
+  expect(screen.getByText("41 runs in 30 days")).toBeTruthy();
+});
+
+test("an agent that cannot run says not yet and why, marks its changing tools, and may ask", async () => {
+  const { user } = mount();
+  await screen.findByText("7 agents");
+  await choose(user, "worker");
+  const note = screen.getByRole("note");
+  expect(note.textContent).toBe("worker has tools that change things. Helpers that write come with a later step.");
+  expect(screen.getAllByText("not yet").length).toBe(2);
+  const chips = within(screen.getByRole("region", { name: "Can use" })).getAllByRole("listitem");
+  expect(chips.map((chip) => chip.textContent)).toEqual(["read_file", "! edit_file (changes things)", "! shell (changes things)"]);
+  expect(screen.getByText("Marked tools change things.")).toBeTruthy();
+  expect(screen.getByText("May ask you one short question.")).toBeTruthy();
+  expect(screen.getByText("Cannot run yet")).toBeTruthy();
+});
+
+test("an agent with no tools says it works from the brief alone", async () => {
+  const { user } = mount();
+  await screen.findByText("7 agents");
+  await choose(user, "advisor");
+  expect(screen.getByText("None. It works from the brief alone.")).toBeTruthy();
+  expect(screen.getByRole("region", { name: "Limits" }).textContent).toContain("1tool calls");
+});
+
+test("Definition shows the path, read-only for a bundled file, and the file with its keys tinted", async () => {
+  const { user } = mount();
+  await screen.findByText("7 agents");
+  await choose(user, "reviewer");
+  await user.click(screen.getByRole("tab", { name: "Definition" }));
+  expect(screen.getByText("golem/agents/bundled/reviewer.md · read-only")).toBeTruthy();
+  const file = fileOf("reviewer");
+  expect(file.textContent).toContain("name: reviewer");
+  expect(file.textContent).toContain("You are a reviewer. Say what is wrong, most serious first.");
+  expect(within(file).getByText("name:").className).toContain("text-clay-ink");
+  // The prompt is never tinted, even when a line looks like a key.
+  expect(within(file).queryByText("You are a reviewer.", { exact: false })?.className ?? "").not.toContain("text-clay-ink");
+  await choose(user, "triage");
+  await user.click(screen.getByRole("tab", { name: "Definition" }));
+  expect(screen.getByText("~/.golem/agents/triage.md")).toBeTruthy();
+  expect(screen.queryByText(/read-only/)).toBeNull();
+});
+
+test("Copy text puts the whole file on the clipboard", async () => {
+  const { user } = mount();
+  await screen.findByText("7 agents");
+  const writeText = vi.fn().mockResolvedValue(undefined);
+  Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
+  await choose(user, "explorer");
+  await user.click(screen.getByRole("tab", { name: "Definition" }));
+  await user.click(screen.getByRole("button", { name: "Copy text" }));
+  expect(writeText).toHaveBeenCalledWith(SAMPLE_AGENTS.find((agent) => agent.name === "explorer")?.text);
+  expect(await screen.findByRole("button", { name: "Copied" })).toBeTruthy();
+});
+
+test("the tabs are real tabs: the arrow keys move between them", async () => {
+  const { user } = mount();
+  await screen.findByText("7 agents");
+  const overview = screen.getByRole("tab", { name: "Overview" });
+  expect(overview.getAttribute("aria-selected")).toBe("true");
+  expect(screen.getByRole("tabpanel").getAttribute("aria-labelledby")).toBe(overview.id);
+  overview.focus();
+  await user.keyboard("{ArrowRight}");
+  expect(screen.getByRole("tab", { name: "Definition" }).getAttribute("aria-selected")).toBe("true");
+  expect(fileOf("docs")).toBeTruthy();
+});
+
+test("an older daemon that sends no file says so in the Definition", async () => {
+  const { user } = mount(WISH_AGENTS_MIXED);
+  await screen.findByText("5 agents");
+  await user.click(screen.getByRole("tab", { name: "Definition" }));
+  expect(screen.getByText(/The daemon did not send this file/)).toBeTruthy();
+});
+
+test("a narrow window is one column whose rows open in place, one at a time", async () => {
+  vi.stubGlobal("matchMedia", (query: string) => ({ matches: true, media: query, addEventListener() {}, removeEventListener() {} }));
+  const { user } = mount();
+  await screen.findByText("7 agents");
+  expect(screen.queryByRole("heading", { level: 3 })).toBeNull();
+  const explorer = rowOf("explorer");
+  expect(explorer.getAttribute("aria-expanded")).toBe("false");
+  await user.click(explorer);
+  expect(rowOf("explorer").getAttribute("aria-expanded")).toBe("true");
+  expect(screen.getByRole("group", { name: "explorer details" }).textContent).toContain("You are a helper.");
+  expect(screen.getByRole("tab", { name: "Definition" })).toBeTruthy();
+  await user.click(rowOf("reviewer"));
+  expect(rowOf("explorer").getAttribute("aria-expanded")).toBe("false");
+  expect(screen.getAllByRole("group")).toHaveLength(1);
+  await user.click(rowOf("reviewer"));
+  expect(screen.queryByRole("group")).toBeNull();
+});
+
+test("the settings search finds the page's fields", async () => {
+  mount();
+  await screen.findByText("7 agents");
+  for (const field of ["helpers", "model", "can use", "limits", "prompt"]) {
+    expect(document.querySelector(`[data-setting="${field}"]`), field).not.toBeNull();
+  }
 });
 
 test("only blocked project agents leave an empty table and the trust line", async () => {
@@ -147,7 +269,8 @@ test("an agent.registry.changed event reads the list again", async () => {
     fake.emitAgents(null);
   });
   expect(await screen.findByText("1 agent")).toBeTruthy();
-  expect(cells("explorer")).toEqual(["Cheapest that fits", "41", "39"]);
+  expect(rowOf("explorer").textContent).toContain("cheapest → qwen3:14b");
+  expect(screen.getByRole("heading", { name: "explorer", level: 3 })).toBeTruthy();
 });
 
 test("a daemon that does not know agents.list gets a plain not available state, and no retry button", async () => {
@@ -217,7 +340,8 @@ async function openFirst(user: ReturnType<typeof userEvent.setup>): Promise<void
 test("cloud models only: now says the hosted model, and no word of local models shows, even in the menu", async () => {
   const { user } = mount(WISH_AGENTS_CLOUD, listing(["budget", "frontier"]));
   await screen.findByText("5 agents");
-  await screen.findAllByText("now: claude-haiku", {}, { timeout: 4000 });
+  await waitFor(() => expect(screen.getByRole("region", { name: "Model" }).textContent).toContain("now claude-haiku"), { timeout: 4000 });
+  expect(rowOf("reviewer").textContent).toContain("→ claude-opus");
   await openFirst(user);
   expect(screen.queryByRole("menuitemradio", { name: /Always local/ })).toBeNull();
   expect(screen.getByRole("menuitemradio", { name: /Always frontier/ })).toBeTruthy();
@@ -227,8 +351,10 @@ test("cloud models only: now says the hosted model, and no word of local models 
 test("local models only: now says the local model, and no hosted word shows, even in the menu", async () => {
   const { user } = mount(WISH_AGENTS_LOCAL, listing(["local", "local"]));
   await screen.findByText("5 agents");
-  await screen.findAllByText("now: qwen3:8b");
-  expect(screen.getByText(/now: qwen3:14b, fresh window/)).toBeTruthy();
+  await waitFor(() => expect(screen.getByRole("region", { name: "Model" }).textContent).toContain("now qwen3:8b"));
+  await choose(user, "reviewer");
+  expect(screen.getByRole("region", { name: "Model" }).textContent).toContain("now qwen3:14b, fresh window");
+  await choose(user, "explorer");
   await openFirst(user);
   expect(screen.queryByRole("menuitemradio", { name: /Always budget/ })).toBeNull();
   expect(screen.queryByRole("menuitemradio", { name: /Always frontier/ })).toBeNull();
@@ -239,8 +365,10 @@ test("local models only: now says the local model, and no hosted word shows, eve
 test("mixed: every wish is offered, and now says local or hosted per type", async () => {
   const { user } = mount(WISH_AGENTS_MIXED, listing(["local", "budget"]));
   await screen.findByText("5 agents");
-  expect(await screen.findAllByText("now: qwen3:14b")).toHaveLength(2);
-  expect(screen.getAllByText("now: claude-sonnet")).toHaveLength(2);
+  await waitFor(() => expect(screen.getByRole("region", { name: "Model" }).textContent).toContain("now qwen3:14b"));
+  expect(rowOf("triage").textContent).toContain("always local → qwen3:14b");
+  expect(rowOf("reviewer").textContent).toContain("stronger than the lead → claude-sonnet");
+  expect(rowOf("worker").textContent).toContain("same as the lead → claude-sonnet");
   await openFirst(user);
   // The six wishes, then the two ready models of the listing, each a choice by name.
   expect(screen.getAllByRole("menuitemradio")).toHaveLength(8);
@@ -254,7 +382,7 @@ test("changing a wish calls agents.set_wish with the folder and shows what the r
   await openFirst(user);
   await user.click(screen.getByRole("menuitemradio", { name: /Stronger than the lead/ }));
   await waitFor(() => expect(fake.raw.setAgentWish).toHaveBeenCalledWith("explorer", "stronger", FOLDER));
-  expect(await screen.findByText("now: claude-opus")).toBeTruthy();
+  await waitFor(() => expect(screen.getByRole("region", { name: "Model" }).textContent).toContain("now claude-opus"));
   expect(screen.getByRole("button", { name: /^Model wish of explorer: Stronger than the lead/ })).toBeTruthy();
 });
 
@@ -279,11 +407,14 @@ test("a daemon that does not answer agents.set_wish gets a plain line, and the o
 });
 
 test("a broken agent has no dropdown, and an older daemon's type shows the wish without now", async () => {
-  mount(WISH_AGENTS_MIXED.map((agent) => (agent.name === "worker" ? { ...agent, resolves_to: undefined } : agent)), listing(["local", "budget"]));
+  const { user } = mount(WISH_AGENTS_MIXED.map((agent) => (agent.name === "worker" ? { ...agent, resolves_to: undefined } : agent)), listing(["local", "budget"]));
   await screen.findByText("5 agents");
+  await choose(user, "broken-one");
   expect(screen.queryByRole("button", { name: /^Model wish of broken-one/ })).toBeNull();
+  await choose(user, "worker");
   expect(screen.getByRole("button", { name: /^Model wish of worker/ })).toBeTruthy();
-  expect(screen.getAllByText(/^now: /)).toHaveLength(3);
+  expect(screen.getByRole("region", { name: "Model" }).textContent).not.toContain("now ");
+  expect(rowOf("worker").textContent).toBe("worker bundled same as the lead");
 });
 
 test("axe is clean for the three setups with the menu open", async () => {
