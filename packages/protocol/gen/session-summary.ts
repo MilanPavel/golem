@@ -15,9 +15,14 @@ export type Added = number | null;
 export type Agent1 = string | null;
 export type Alternatives = number | null;
 export type CallId = string | null;
+export type Count = number | null;
+export type Agent2 = string;
+export type Index = number;
+export type Label = string | null;
+export type SessionId = string;
 export type HelperId = string | null;
 export type Kind = 'approval' | 'consent';
-export type Label = string | null;
+export type Label1 = string | null;
 export type Name = string | null;
 export type NotSent =
   | []
@@ -49,9 +54,13 @@ export type Sent =
 export type Since = string;
 export type Source = string | null;
 export type Subject = string | null;
+/**
+ * @maxItems 200
+ */
+export type PendingItems = PendingItem[];
 export type PlanFirst = boolean;
 export type Route = 'pinned' | 'local' | 'auto';
-export type SessionId = string;
+export type SessionId1 = string;
 export type Status = 'idle' | 'running' | 'waiting' | 'closed';
 export type Step = string | null;
 export type Title = string | null;
@@ -77,6 +86,10 @@ export type WaitReason = ('slot' | 'load' | 'provider' | 'team' | 'budget' | 'yo
  * An older daemon leaves it out.
  * ``pending`` says what a ``waiting`` session waits for, null otherwise. An older daemon
  * leaves it out.
+ * ``pending_items`` is the list of everything the session waits for, oldest first: for a lead
+ * its own items and those of its helpers (a question several helpers ask is one item with a
+ * ``count``). ``pending`` is its first item. An older daemon leaves ``pending_items`` out, and
+ * a client then reads ``[pending]``.
  * ``parent_session_id`` and ``agent`` are set on a helper session: the id of the
  * session. An older daemon leaves them out.
  * ``wait_reason`` and ``wait_line`` say that the running run's model call waits in line:
@@ -102,9 +115,10 @@ export interface SessionSummary {
   origin?: Origin;
   parent_session_id?: ParentSessionId;
   pending?: PendingItem | null;
+  pending_items?: PendingItems;
   plan_first?: PlanFirst;
   route?: Route;
-  session_id: SessionId;
+  session_id: SessionId1;
   status: Status;
   step?: Step;
   title?: Title;
@@ -126,6 +140,11 @@ export interface SessionSummary {
  * stays in the session's events: a summary goes to every watcher on every event, so it
  * carries counts only. An older daemon leaves ``pending`` out of the summary.
  *
+ * In ``SessionSummary.pending_items`` an item of a lead's helper also carries ``helper``
+ * (the helper's ``session_id``, ``agent``, ``label`` and ``index``). ``count`` is the number
+ * of helpers that ask this same question (the same ``kind``, ``name`` and ``subject``), which
+ * the lead lists once; null for a single item. An older daemon leaves both out.
+ *
  * This interface was referenced by `SessionSummary`'s JSON-Schema
  * via the `definition` "PendingItem".
  */
@@ -134,9 +153,11 @@ export interface PendingItem {
   agent?: Agent1;
   alternatives?: Alternatives;
   call_id?: CallId;
+  count?: Count;
+  helper?: PendingHelper | null;
   helper_id?: HelperId;
   kind: Kind;
-  label?: Label;
+  label?: Label1;
   name?: Name;
   not_sent?: NotSent;
   removed?: Removed;
@@ -144,4 +165,18 @@ export interface PendingItem {
   since: Since;
   source?: Source;
   subject?: Subject;
+}
+/**
+ * The helper a pending item belongs to: its session, its agent type, its label and its
+ * place (``index``) in the ``delegate`` call. For a grouped item (``count`` above 1) it is the
+ * first of the helpers that ask.
+ *
+ * This interface was referenced by `SessionSummary`'s JSON-Schema
+ * via the `definition` "PendingHelper".
+ */
+export interface PendingHelper {
+  agent: Agent2;
+  index: Index;
+  label?: Label;
+  session_id: SessionId;
 }

@@ -13,6 +13,7 @@ from golem_protocol.commands import (
     AgentsListResult,
     AgentsSetWishParams,
     AgentsSetWishResult,
+    ApprovalRespondParams,
     DaemonStatus,
     HelloParams,
     HelloResult,
@@ -47,6 +48,7 @@ from golem_protocol.commands import (
     ModelBenchRow,
     ModelOptionsSaved,
     ModelServerStatus,
+    PendingHelper,
     PendingItem,
     PingParams,
     SessionInspectResult,
@@ -581,3 +583,63 @@ def test_pending_consent_helper_fields_round_trip_and_are_bounded() -> None:
         PendingItem(kind="consent", since="t", sent=["x"] * 11)
     with pytest.raises(ValidationError):
         PendingItem(kind="consent", since="t", not_sent=["x" * 121])
+
+
+def test_pending_items_plain_helper_and_grouped_round_trip() -> None:
+    plain = PendingItem(kind="approval", since="t1", call_id="c1", name="shell", subject="ls")
+    helper = PendingItem(
+        kind="approval",
+        since="t2",
+        call_id="c2",
+        name="shell",
+        subject="uv lock",
+        helper=PendingHelper(session_id="h1", agent="worker", label="lock", index=0),
+    )
+    grouped = helper.model_copy(update={"count": 5})
+    summary = _summary(
+        pending=plain.model_dump(), pending_items=[i.model_dump() for i in (plain, helper, grouped)]
+    )
+    again = SessionSummary.model_validate_json(summary.model_dump_json())
+    assert again == summary
+    assert again.pending_items == [plain, helper, grouped]
+    assert again.pending_items[2].count == 5
+    assert again.pending_items[1].helper is not None
+    assert again.pending_items[1].helper.agent == "worker"
+
+
+def test_summary_without_pending_items_validates() -> None:
+    summary = _summary(pending=PendingItem(kind="consent", since="t").model_dump())
+    assert summary.pending_items == []
+    assert SessionSummary.model_validate_json(summary.model_dump_json()) == summary
+
+
+def test_pending_item_new_field_limits() -> None:
+    with pytest.raises(ValidationError):
+        PendingItem.model_validate({"kind": "approval", "since": "t", "count": 1})
+    with pytest.raises(ValidationError):
+        PendingHelper.model_validate({"session_id": "h", "agent": "a", "index": -1})
+    with pytest.raises(ValidationError):
+        PendingHelper.model_validate(
+            {"session_id": "h", "agent": "a", "index": 0, "label": "x" * 121}
+        )
+    with pytest.raises(ValidationError):
+        PendingHelper.model_validate({"session_id": "h", "agent": "a", "index": 0, "extra": 1})
+    with pytest.raises(ValidationError):
+        _summary(pending_items=[{"kind": "other", "since": "t"}])
+
+
+def test_approval_respond_scope() -> None:
+    base = {"session_id": "s", "call_id": "c"}
+    assert ApprovalRespondParams.model_validate({**base, "decision": "allow"}).scope is None
+    for decision in ("allow", "allow_session", "deny"):
+        params = ApprovalRespondParams.model_validate(
+            {**base, "decision": decision, "scope": "batch"}
+        )
+        assert params.scope == "batch"
+        assert ApprovalRespondParams.model_validate_json(params.model_dump_json()) == params
+    with pytest.raises(ValidationError):
+        ApprovalRespondParams.model_validate({**base, "decision": "allow", "scope": "all"})
+    with pytest.raises(ValidationError):
+        ApprovalRespondParams.model_validate(
+            {**base, "decision": "allow", "scope": "batch", "args": {}}
+        )

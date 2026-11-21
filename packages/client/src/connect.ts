@@ -423,12 +423,13 @@ export interface GolemClient {
   changesCommitInfo(sessionId: string): Promise<ChangesCommitInfoResult>;
   /** A commit message the session's model suggests for `paths`. */
   changesSuggestMessage(sessionId: string, paths: string[]): Promise<ChangesSuggestMessageResult>;
-  /** `args` are the call's arguments as the user edited them. They go only with `allow`. */
+  /** `args` are the call's arguments as the user edited them. They go only with `allow`. `scope: "batch"` answers for all the helpers of one delegate call, and not with `args`. */
   respondApproval(
     sessionId: string,
     callId: string,
     decision: ApprovalChoice,
     args?: Readonly<Record<string, unknown>>,
+    scope?: "batch",
   ): Promise<ApprovalRespondResult>;
   /** Answer the paid step-up question a run waits on. The run goes on in the session's events. */
   answerConsent(sessionId: string, runId: string, answer: ConsentChoice): Promise<RouteConsentAnswerResult>;
@@ -1733,9 +1734,16 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       callId: string,
       decision: ApprovalChoice,
       args?: Readonly<Record<string, unknown>>,
+      scope?: "batch",
     ): Promise<ApprovalRespondResult> {
       await ready;
-      const params = { session_id: sessionId, call_id: callId, decision, ...(args === undefined ? {} : { args }) };
+      const params = {
+        session_id: sessionId,
+        call_id: callId,
+        decision,
+        ...(args === undefined ? {} : { args }),
+        ...(scope === undefined ? {} : { scope }),
+      };
       const result = await call("approval.respond", params);
       if (!isRecord(result) || typeof result["run_id"] !== "string") {
         throw new Error("invalid approval.respond result");

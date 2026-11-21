@@ -5,6 +5,7 @@ export type Args = {
 } | null;
 export type CallId = string;
 export type Decision = 'allow' | 'allow_session' | 'allow_always' | 'deny';
+export type Scope = 'batch' | null;
 export type SessionId = string;
 
 /**
@@ -17,10 +18,16 @@ export type SessionId = string;
  *
  * ``args`` replaces the call's arguments, edited by the user, and goes only
  * with ``allow``: an edited call runs once.
+ *
+ * ``scope`` is ``batch`` to answer for all the helpers of one ``delegate`` call: the
+ * decision applies to the same call in each unfinished helper of that call and answers those
+ * waiting on it. Without it the answer is for ``session_id`` alone (once, or for that session
+ * with ``allow_session``, which for a helper ends with it). ``batch`` is not for an edited call.
  */
 export interface ApprovalRespondParams {
   args?: Args;
   call_id: CallId;
   decision: Decision;
+  scope?: Scope;
   session_id: SessionId;
 }

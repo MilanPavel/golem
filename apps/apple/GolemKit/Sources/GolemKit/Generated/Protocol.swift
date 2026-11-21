@@ -910,26 +910,41 @@ public enum ApprovalResolvedEventType: String, Codable {
 ///
 /// ``args`` replaces the call's arguments, edited by the user, and goes only
 /// with ``allow``: an edited call runs once.
+///
+/// ``scope`` is ``batch`` to answer for all the helpers of one ``delegate`` call: the
+/// decision applies to the same call in each unfinished helper of that call and answers
+/// those
+/// waiting on it. Without it the answer is for ``session_id`` alone (once, or for that
+/// session
+/// with ``allow_session``, which for a helper ends with it). ``batch`` is not for an edited
+/// call.
 // MARK: - ApprovalRespondParams
 public struct ApprovalRespondParams: Codable {
     public let args: [String: JSONAny]?
     public let callID: String
     public let decision: Decision
+    public let scope: ScopeEnum?
     public let sessionID: String
 
     public enum CodingKeys: String, CodingKey {
         case args = "args"
         case callID = "call_id"
         case decision = "decision"
+        case scope = "scope"
         case sessionID = "session_id"
     }
 
-    public init(args: [String: JSONAny]?, callID: String, decision: Decision, sessionID: String) {
+    public init(args: [String: JSONAny]?, callID: String, decision: Decision, scope: ScopeEnum?, sessionID: String) {
         self.args = args
         self.callID = callID
         self.decision = decision
+        self.scope = scope
         self.sessionID = sessionID
     }
+}
+
+public enum ScopeEnum: String, Codable {
+    case batch = "batch"
 }
 
 /// The run that goes on. Its events go to the attached connections.
@@ -18187,6 +18202,12 @@ public struct SessionListResult: Codable {
 /// An older daemon leaves it out.
 /// ``pending`` says what a ``waiting`` session waits for, null otherwise. An older daemon
 /// leaves it out.
+/// ``pending_items`` is the list of everything the session waits for, oldest first: for a
+/// lead
+/// its own items and those of its helpers (a question several helpers ask is one item with a
+/// ``count``). ``pending`` is its first item. An older daemon leaves ``pending_items`` out,
+/// and
+/// a client then reads ``[pending]``.
 /// ``parent_session_id`` and ``agent`` are set on a helper session: the id of the
 /// session. An older daemon leaves them out.
 /// ``wait_reason`` and ``wait_line`` say that the running run's model call waits in line:
@@ -18214,6 +18235,7 @@ public struct SessionElement: Codable {
     public let origin: String?
     public let parentSessionID: String?
     public let pending: SessionPendingItem?
+    public let pendingItems: [SessionPendingItem]?
     public let planFirst: Bool?
     public let route: RouteEnum?
     public let sessionID: String
@@ -18237,6 +18259,7 @@ public struct SessionElement: Codable {
         case origin = "origin"
         case parentSessionID = "parent_session_id"
         case pending = "pending"
+        case pendingItems = "pending_items"
         case planFirst = "plan_first"
         case route = "route"
         case sessionID = "session_id"
@@ -18248,7 +18271,7 @@ public struct SessionElement: Codable {
         case waitReason = "wait_reason"
     }
 
-    public init(agent: String?, createdAt: String, cwd: String?, forkedFrom: String?, helpersRunning: Int?, helpersWaiting: Int?, lastSeq: Int, localOnly: Bool?, modelProfile: String, origin: String?, parentSessionID: String?, pending: SessionPendingItem?, planFirst: Bool?, route: RouteEnum?, sessionID: String, status: SessionStatus, step: String?, title: String?, updatedAt: String, waitLine: String?, waitReason: Reason?) {
+    public init(agent: String?, createdAt: String, cwd: String?, forkedFrom: String?, helpersRunning: Int?, helpersWaiting: Int?, lastSeq: Int, localOnly: Bool?, modelProfile: String, origin: String?, parentSessionID: String?, pending: SessionPendingItem?, pendingItems: [SessionPendingItem]?, planFirst: Bool?, route: RouteEnum?, sessionID: String, status: SessionStatus, step: String?, title: String?, updatedAt: String, waitLine: String?, waitReason: Reason?) {
         self.agent = agent
         self.createdAt = createdAt
         self.cwd = cwd
@@ -18261,6 +18284,7 @@ public struct SessionElement: Codable {
         self.origin = origin
         self.parentSessionID = parentSessionID
         self.pending = pending
+        self.pendingItems = pendingItems
         self.planFirst = planFirst
         self.route = route
         self.sessionID = sessionID
@@ -18287,12 +18311,21 @@ public struct SessionElement: Codable {
 /// ``route.consent.needed`` event. The full diff
 /// stays in the session's events: a summary goes to every watcher on every event, so it
 /// carries counts only. An older daemon leaves ``pending`` out of the summary.
+///
+/// In ``SessionSummary.pending_items`` an item of a lead's helper also carries ``helper``
+/// (the helper's ``session_id``, ``agent``, ``label`` and ``index``). ``count`` is the
+/// number
+/// of helpers that ask this same question (the same ``kind``, ``name`` and ``subject``),
+/// which
+/// the lead lists once; null for a single item. An older daemon leaves both out.
 // MARK: - SessionPendingItem
 public struct SessionPendingItem: Codable {
     public let added: Int?
     public let agent: String?
     public let alternatives: Int?
     public let callID: String?
+    public let count: Int?
+    public let helper: PurplePendingHelper?
     public let helperID: String?
     public let kind: PendingItemKind
     public let label: String?
@@ -18309,6 +18342,8 @@ public struct SessionPendingItem: Codable {
         case agent = "agent"
         case alternatives = "alternatives"
         case callID = "call_id"
+        case count = "count"
+        case helper = "helper"
         case helperID = "helper_id"
         case kind = "kind"
         case label = "label"
@@ -18321,11 +18356,13 @@ public struct SessionPendingItem: Codable {
         case subject = "subject"
     }
 
-    public init(added: Int?, agent: String?, alternatives: Int?, callID: String?, helperID: String?, kind: PendingItemKind, label: String?, name: String?, notSent: [String]?, removed: Int?, sent: [String]?, since: String, source: String?, subject: String?) {
+    public init(added: Int?, agent: String?, alternatives: Int?, callID: String?, count: Int?, helper: PurplePendingHelper?, helperID: String?, kind: PendingItemKind, label: String?, name: String?, notSent: [String]?, removed: Int?, sent: [String]?, since: String, source: String?, subject: String?) {
         self.added = added
         self.agent = agent
         self.alternatives = alternatives
         self.callID = callID
+        self.count = count
+        self.helper = helper
         self.helperID = helperID
         self.kind = kind
         self.label = label
@@ -18336,6 +18373,32 @@ public struct SessionPendingItem: Codable {
         self.since = since
         self.source = source
         self.subject = subject
+    }
+}
+
+/// The helper a pending item belongs to: its session, its agent type, its label and its
+/// place (``index``) in the ``delegate`` call. For a grouped item (``count`` above 1) it is
+/// the
+/// first of the helpers that ask.
+// MARK: - PurplePendingHelper
+public struct PurplePendingHelper: Codable {
+    public let agent: String
+    public let index: Int
+    public let label: String?
+    public let sessionID: String
+
+    public enum CodingKeys: String, CodingKey {
+        case agent = "agent"
+        case index = "index"
+        case label = "label"
+        case sessionID = "session_id"
+    }
+
+    public init(agent: String, index: Int, label: String?, sessionID: String) {
+        self.agent = agent
+        self.index = index
+        self.label = label
+        self.sessionID = sessionID
     }
 }
 
@@ -18903,6 +18966,12 @@ public enum SessionSummaryNotificationMethod: String, Codable {
 /// An older daemon leaves it out.
 /// ``pending`` says what a ``waiting`` session waits for, null otherwise. An older daemon
 /// leaves it out.
+/// ``pending_items`` is the list of everything the session waits for, oldest first: for a
+/// lead
+/// its own items and those of its helpers (a question several helpers ask is one item with a
+/// ``count``). ``pending`` is its first item. An older daemon leaves ``pending_items`` out,
+/// and
+/// a client then reads ``[pending]``.
 /// ``parent_session_id`` and ``agent`` are set on a helper session: the id of the
 /// session. An older daemon leaves them out.
 /// ``wait_reason`` and ``wait_line`` say that the running run's model call waits in line:
@@ -18930,6 +18999,7 @@ public struct SessionSummaryNotificationParams: Codable {
     public let origin: String?
     public let parentSessionID: String?
     public let pending: ParamsPendingItem?
+    public let pendingItems: [ParamsPendingItem]?
     public let planFirst: Bool?
     public let route: RouteEnum?
     public let sessionID: String
@@ -18953,6 +19023,7 @@ public struct SessionSummaryNotificationParams: Codable {
         case origin = "origin"
         case parentSessionID = "parent_session_id"
         case pending = "pending"
+        case pendingItems = "pending_items"
         case planFirst = "plan_first"
         case route = "route"
         case sessionID = "session_id"
@@ -18964,7 +19035,7 @@ public struct SessionSummaryNotificationParams: Codable {
         case waitReason = "wait_reason"
     }
 
-    public init(agent: String?, createdAt: String, cwd: String?, forkedFrom: String?, helpersRunning: Int?, helpersWaiting: Int?, lastSeq: Int, localOnly: Bool?, modelProfile: String, origin: String?, parentSessionID: String?, pending: ParamsPendingItem?, planFirst: Bool?, route: RouteEnum?, sessionID: String, status: SessionStatus, step: String?, title: String?, updatedAt: String, waitLine: String?, waitReason: Reason?) {
+    public init(agent: String?, createdAt: String, cwd: String?, forkedFrom: String?, helpersRunning: Int?, helpersWaiting: Int?, lastSeq: Int, localOnly: Bool?, modelProfile: String, origin: String?, parentSessionID: String?, pending: ParamsPendingItem?, pendingItems: [ParamsPendingItem]?, planFirst: Bool?, route: RouteEnum?, sessionID: String, status: SessionStatus, step: String?, title: String?, updatedAt: String, waitLine: String?, waitReason: Reason?) {
         self.agent = agent
         self.createdAt = createdAt
         self.cwd = cwd
@@ -18977,6 +19048,7 @@ public struct SessionSummaryNotificationParams: Codable {
         self.origin = origin
         self.parentSessionID = parentSessionID
         self.pending = pending
+        self.pendingItems = pendingItems
         self.planFirst = planFirst
         self.route = route
         self.sessionID = sessionID
@@ -19003,12 +19075,21 @@ public struct SessionSummaryNotificationParams: Codable {
 /// ``route.consent.needed`` event. The full diff
 /// stays in the session's events: a summary goes to every watcher on every event, so it
 /// carries counts only. An older daemon leaves ``pending`` out of the summary.
+///
+/// In ``SessionSummary.pending_items`` an item of a lead's helper also carries ``helper``
+/// (the helper's ``session_id``, ``agent``, ``label`` and ``index``). ``count`` is the
+/// number
+/// of helpers that ask this same question (the same ``kind``, ``name`` and ``subject``),
+/// which
+/// the lead lists once; null for a single item. An older daemon leaves both out.
 // MARK: - ParamsPendingItem
 public struct ParamsPendingItem: Codable {
     public let added: Int?
     public let agent: String?
     public let alternatives: Int?
     public let callID: String?
+    public let count: Int?
+    public let helper: FluffyPendingHelper?
     public let helperID: String?
     public let kind: PendingItemKind
     public let label: String?
@@ -19025,6 +19106,8 @@ public struct ParamsPendingItem: Codable {
         case agent = "agent"
         case alternatives = "alternatives"
         case callID = "call_id"
+        case count = "count"
+        case helper = "helper"
         case helperID = "helper_id"
         case kind = "kind"
         case label = "label"
@@ -19037,11 +19120,13 @@ public struct ParamsPendingItem: Codable {
         case subject = "subject"
     }
 
-    public init(added: Int?, agent: String?, alternatives: Int?, callID: String?, helperID: String?, kind: PendingItemKind, label: String?, name: String?, notSent: [String]?, removed: Int?, sent: [String]?, since: String, source: String?, subject: String?) {
+    public init(added: Int?, agent: String?, alternatives: Int?, callID: String?, count: Int?, helper: FluffyPendingHelper?, helperID: String?, kind: PendingItemKind, label: String?, name: String?, notSent: [String]?, removed: Int?, sent: [String]?, since: String, source: String?, subject: String?) {
         self.added = added
         self.agent = agent
         self.alternatives = alternatives
         self.callID = callID
+        self.count = count
+        self.helper = helper
         self.helperID = helperID
         self.kind = kind
         self.label = label
@@ -19052,6 +19137,32 @@ public struct ParamsPendingItem: Codable {
         self.since = since
         self.source = source
         self.subject = subject
+    }
+}
+
+/// The helper a pending item belongs to: its session, its agent type, its label and its
+/// place (``index``) in the ``delegate`` call. For a grouped item (``count`` above 1) it is
+/// the
+/// first of the helpers that ask.
+// MARK: - FluffyPendingHelper
+public struct FluffyPendingHelper: Codable {
+    public let agent: String
+    public let index: Int
+    public let label: String?
+    public let sessionID: String
+
+    public enum CodingKeys: String, CodingKey {
+        case agent = "agent"
+        case index = "index"
+        case label = "label"
+        case sessionID = "session_id"
+    }
+
+    public init(agent: String, index: Int, label: String?, sessionID: String) {
+        self.agent = agent
+        self.index = index
+        self.label = label
+        self.sessionID = sessionID
     }
 }
 
@@ -19073,6 +19184,12 @@ public struct ParamsPendingItem: Codable {
 /// An older daemon leaves it out.
 /// ``pending`` says what a ``waiting`` session waits for, null otherwise. An older daemon
 /// leaves it out.
+/// ``pending_items`` is the list of everything the session waits for, oldest first: for a
+/// lead
+/// its own items and those of its helpers (a question several helpers ask is one item with a
+/// ``count``). ``pending`` is its first item. An older daemon leaves ``pending_items`` out,
+/// and
+/// a client then reads ``[pending]``.
 /// ``parent_session_id`` and ``agent`` are set on a helper session: the id of the
 /// session. An older daemon leaves them out.
 /// ``wait_reason`` and ``wait_line`` say that the running run's model call waits in line:
@@ -19100,6 +19217,7 @@ public struct SessionSummary: Codable {
     public let origin: String?
     public let parentSessionID: String?
     public let pending: SessionSummaryPendingItem?
+    public let pendingItems: [SessionSummaryPendingItem]?
     public let planFirst: Bool?
     public let route: RouteEnum?
     public let sessionID: String
@@ -19123,6 +19241,7 @@ public struct SessionSummary: Codable {
         case origin = "origin"
         case parentSessionID = "parent_session_id"
         case pending = "pending"
+        case pendingItems = "pending_items"
         case planFirst = "plan_first"
         case route = "route"
         case sessionID = "session_id"
@@ -19134,7 +19253,7 @@ public struct SessionSummary: Codable {
         case waitReason = "wait_reason"
     }
 
-    public init(agent: String?, createdAt: String, cwd: String?, forkedFrom: String?, helpersRunning: Int?, helpersWaiting: Int?, lastSeq: Int, localOnly: Bool?, modelProfile: String, origin: String?, parentSessionID: String?, pending: SessionSummaryPendingItem?, planFirst: Bool?, route: RouteEnum?, sessionID: String, status: SessionStatus, step: String?, title: String?, updatedAt: String, waitLine: String?, waitReason: Reason?) {
+    public init(agent: String?, createdAt: String, cwd: String?, forkedFrom: String?, helpersRunning: Int?, helpersWaiting: Int?, lastSeq: Int, localOnly: Bool?, modelProfile: String, origin: String?, parentSessionID: String?, pending: SessionSummaryPendingItem?, pendingItems: [SessionSummaryPendingItem]?, planFirst: Bool?, route: RouteEnum?, sessionID: String, status: SessionStatus, step: String?, title: String?, updatedAt: String, waitLine: String?, waitReason: Reason?) {
         self.agent = agent
         self.createdAt = createdAt
         self.cwd = cwd
@@ -19147,6 +19266,7 @@ public struct SessionSummary: Codable {
         self.origin = origin
         self.parentSessionID = parentSessionID
         self.pending = pending
+        self.pendingItems = pendingItems
         self.planFirst = planFirst
         self.route = route
         self.sessionID = sessionID
@@ -19173,12 +19293,21 @@ public struct SessionSummary: Codable {
 /// ``route.consent.needed`` event. The full diff
 /// stays in the session's events: a summary goes to every watcher on every event, so it
 /// carries counts only. An older daemon leaves ``pending`` out of the summary.
+///
+/// In ``SessionSummary.pending_items`` an item of a lead's helper also carries ``helper``
+/// (the helper's ``session_id``, ``agent``, ``label`` and ``index``). ``count`` is the
+/// number
+/// of helpers that ask this same question (the same ``kind``, ``name`` and ``subject``),
+/// which
+/// the lead lists once; null for a single item. An older daemon leaves both out.
 // MARK: - SessionSummaryPendingItem
 public struct SessionSummaryPendingItem: Codable {
     public let added: Int?
     public let agent: String?
     public let alternatives: Int?
     public let callID: String?
+    public let count: Int?
+    public let helper: TentacledPendingHelper?
     public let helperID: String?
     public let kind: PendingItemKind
     public let label: String?
@@ -19195,6 +19324,8 @@ public struct SessionSummaryPendingItem: Codable {
         case agent = "agent"
         case alternatives = "alternatives"
         case callID = "call_id"
+        case count = "count"
+        case helper = "helper"
         case helperID = "helper_id"
         case kind = "kind"
         case label = "label"
@@ -19207,11 +19338,13 @@ public struct SessionSummaryPendingItem: Codable {
         case subject = "subject"
     }
 
-    public init(added: Int?, agent: String?, alternatives: Int?, callID: String?, helperID: String?, kind: PendingItemKind, label: String?, name: String?, notSent: [String]?, removed: Int?, sent: [String]?, since: String, source: String?, subject: String?) {
+    public init(added: Int?, agent: String?, alternatives: Int?, callID: String?, count: Int?, helper: TentacledPendingHelper?, helperID: String?, kind: PendingItemKind, label: String?, name: String?, notSent: [String]?, removed: Int?, sent: [String]?, since: String, source: String?, subject: String?) {
         self.added = added
         self.agent = agent
         self.alternatives = alternatives
         self.callID = callID
+        self.count = count
+        self.helper = helper
         self.helperID = helperID
         self.kind = kind
         self.label = label
@@ -19222,6 +19355,32 @@ public struct SessionSummaryPendingItem: Codable {
         self.since = since
         self.source = source
         self.subject = subject
+    }
+}
+
+/// The helper a pending item belongs to: its session, its agent type, its label and its
+/// place (``index``) in the ``delegate`` call. For a grouped item (``count`` above 1) it is
+/// the
+/// first of the helpers that ask.
+// MARK: - TentacledPendingHelper
+public struct TentacledPendingHelper: Codable {
+    public let agent: String
+    public let index: Int
+    public let label: String?
+    public let sessionID: String
+
+    public enum CodingKeys: String, CodingKey {
+        case agent = "agent"
+        case index = "index"
+        case label = "label"
+        case sessionID = "session_id"
+    }
+
+    public init(agent: String, index: Int, label: String?, sessionID: String) {
+        self.agent = agent
+        self.index = index
+        self.label = label
+        self.sessionID = sessionID
     }
 }
 

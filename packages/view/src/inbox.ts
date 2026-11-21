@@ -15,6 +15,10 @@ export interface InboxPending {
   added?: number | null;
   removed?: number | null;
   alternatives?: number | null;
+  /** The helper that asks, for an item in a lead's `pending_items`. */
+  helper?: { session_id: string; agent: string; label?: string | null; index: number } | null;
+  /** How many helpers ask this same question; the item is listed once. */
+  count?: number | null;
 }
 
 /** The part of a session summary the Inbox reads. */
@@ -23,6 +27,16 @@ export interface InboxSession {
   title?: string | null;
   status: string;
   pending?: InboxPending | null;
+  /** Everything the session waits for, a lead's helpers included. An older daemon leaves it out. */
+  pending_items?: InboxPending[] | null;
+}
+
+/** The items of a summary: `pending_items` when the daemon sends it, else `[pending]`, else none. */
+export function pendingItemsOf(session: Pick<InboxSession, "pending" | "pending_items">): InboxPending[] {
+  if (session.pending_items !== undefined && session.pending_items !== null && session.pending_items.length > 0) {
+    return session.pending_items;
+  }
+  return session.pending === undefined || session.pending === null ? [] : [session.pending];
 }
 
 /** One question that waits for the user. `age` is text only; ticking it live is the panel's job. */

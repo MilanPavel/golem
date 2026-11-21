@@ -1,6 +1,6 @@
 {
   "additionalProperties": false,
-  "description": "``approval.respond``. Answer the tool call a session's run waits on.\n\n``allow`` runs it once, ``allow_session`` runs it and allows the same call\nfor the rest of the session, ``allow_always`` runs it and writes an allow\nrule for it first in the user's ``config.toml``, and ``deny`` tells the\nmodel it may not.\n\n``args`` replaces the call's arguments, edited by the user, and goes only\nwith ``allow``: an edited call runs once.",
+  "description": "``approval.respond``. Answer the tool call a session's run waits on.\n\n``allow`` runs it once, ``allow_session`` runs it and allows the same call\nfor the rest of the session, ``allow_always`` runs it and writes an allow\nrule for it first in the user's ``config.toml``, and ``deny`` tells the\nmodel it may not.\n\n``args`` replaces the call's arguments, edited by the user, and goes only\nwith ``allow``: an edited call runs once.\n\n``scope`` is ``batch`` to answer for all the helpers of one ``delegate`` call: the\ndecision applies to the same call in each unfinished helper of that call and answers those\nwaiting on it. Without it the answer is for ``session_id`` alone (once, or for that session\nwith ``allow_session``, which for a helper ends with it). ``batch`` is not for an edited call.",
   "properties": {
     "args": {
       "anyOf": [
@@ -29,6 +29,19 @@
       ],
       "title": "Decision",
       "type": "string"
+    },
+    "scope": {
+      "anyOf": [
+        {
+          "const": "batch",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Scope"
     },
     "session_id": {
       "minLength": 1,
