@@ -2911,6 +2911,505 @@ public struct DeviceChanged: Codable {
     }
 }
 
+/// One phone in the registry. A revoked one stays, with ``revoked_at`` set.
+///
+/// ``rules`` counts the "Always allow" rules the phone made, which stay after a revoke.
+// MARK: - DeviceInfo
+public struct DeviceInfo: Codable {
+    public let id: String
+    public let lastSeen: String?
+    public let name: String
+    public let pairedAt: String
+    public let revokedAt: String?
+    public let rules: Int?
+
+    public enum CodingKeys: String, CodingKey {
+        case id = "id"
+        case lastSeen = "last_seen"
+        case name = "name"
+        case pairedAt = "paired_at"
+        case revokedAt = "revoked_at"
+        case rules = "rules"
+    }
+
+    public init(id: String, lastSeen: String?, name: String, pairedAt: String, revokedAt: String?, rules: Int?) {
+        self.id = id
+        self.lastSeen = lastSeen
+        self.name = name
+        self.pairedAt = pairedAt
+        self.revokedAt = revokedAt
+        self.rules = rules
+    }
+}
+
+/// ``device.list``. No params.
+// MARK: - DeviceListParams
+public struct DeviceListParams: Codable {
+
+    public init() {
+    }
+}
+
+/// Every device, revoked ones last.
+// MARK: - DeviceListResult
+public struct DeviceListResult: Codable {
+    public let devices: [DeviceElement]
+
+    public enum CodingKeys: String, CodingKey {
+        case devices = "devices"
+    }
+
+    public init(devices: [DeviceElement]) {
+        self.devices = devices
+    }
+}
+
+/// One phone in the registry. A revoked one stays, with ``revoked_at`` set.
+///
+/// ``rules`` counts the "Always allow" rules the phone made, which stay after a revoke.
+// MARK: - DeviceElement
+public struct DeviceElement: Codable {
+    public let id: String
+    public let lastSeen: String?
+    public let name: String
+    public let pairedAt: String
+    public let revokedAt: String?
+    public let rules: Int?
+
+    public enum CodingKeys: String, CodingKey {
+        case id = "id"
+        case lastSeen = "last_seen"
+        case name = "name"
+        case pairedAt = "paired_at"
+        case revokedAt = "revoked_at"
+        case rules = "rules"
+    }
+
+    public init(id: String, lastSeen: String?, name: String, pairedAt: String, revokedAt: String?, rules: Int?) {
+        self.id = id
+        self.lastSeen = lastSeen
+        self.name = name
+        self.pairedAt = pairedAt
+        self.revokedAt = revokedAt
+        self.rules = rules
+    }
+}
+
+/// ``device.pair.begin``. Opens a pairing. Only one is open at a time: it replaces the old.
+// MARK: - DevicePairBeginParams
+public struct DevicePairBeginParams: Codable {
+
+    public init() {
+    }
+}
+
+/// ``uri`` is the ``golem://pair`` link for the QR code. It holds the one-time code, so
+/// show it and do not log it. ``expires_at`` is in unix seconds. ``pair`` names this pairing
+/// in ``device.pair.changed`` and ``device.pair.confirm``.
+// MARK: - DevicePairBeginResult
+public struct DevicePairBeginResult: Codable {
+    public let expiresAt: Int
+    public let pair: String
+    public let uri: String
+
+    public enum CodingKeys: String, CodingKey {
+        case expiresAt = "expires_at"
+        case pair = "pair"
+        case uri = "uri"
+    }
+
+    public init(expiresAt: Int, pair: String, uri: String) {
+        self.expiresAt = expiresAt
+        self.pair = pair
+        self.uri = uri
+    }
+}
+
+/// Server → the browser and local connections, never a phone: a pairing moved on. Not
+/// stored.
+///
+/// ``words`` is what the owner compares with the phone (ADR-051).
+// MARK: - DevicePairChangedNotification
+public struct DevicePairChangedNotification: Codable {
+    public let jsonrpc: Jsonrpc?
+    public let method: DevicePairChangedNotificationMethod?
+    public let params: DevicePairChangedNotificationParams
+
+    public enum CodingKeys: String, CodingKey {
+        case jsonrpc = "jsonrpc"
+        case method = "method"
+        case params = "params"
+    }
+
+    public init(jsonrpc: Jsonrpc?, method: DevicePairChangedNotificationMethod?, params: DevicePairChangedNotificationParams) {
+        self.jsonrpc = jsonrpc
+        self.method = method
+        self.params = params
+    }
+}
+
+public enum DevicePairChangedNotificationMethod: String, Codable {
+    case devicePairChanged = "device.pair.changed"
+}
+
+/// A pairing moved on. ``words`` and ``device`` come with ``words`` and ``paired``.
+// MARK: - DevicePairChangedNotificationParams
+public struct DevicePairChangedNotificationParams: Codable {
+    public let device: ParamsPairingDevice?
+    public let pair: String
+    public let state: DevicePairChangedState
+    public let words: [String]?
+
+    public enum CodingKeys: String, CodingKey {
+        case device = "device"
+        case pair = "pair"
+        case state = "state"
+        case words = "words"
+    }
+
+    public init(device: ParamsPairingDevice?, pair: String, state: DevicePairChangedState, words: [String]?) {
+        self.device = device
+        self.pair = pair
+        self.state = state
+        self.words = words
+    }
+}
+
+/// What the phone says about itself. Untrusted text, shown as plain text.
+// MARK: - ParamsPairingDevice
+public struct ParamsPairingDevice: Codable {
+    public let id: String
+    public let model: String?
+    public let name: String
+
+    public enum CodingKeys: String, CodingKey {
+        case id = "id"
+        case model = "model"
+        case name = "name"
+    }
+
+    public init(id: String, model: String?, name: String) {
+        self.id = id
+        self.model = model
+        self.name = name
+    }
+}
+
+public enum DevicePairChangedState: String, Codable {
+    case expired = "expired"
+    case paired = "paired"
+    case refused = "refused"
+    case waiting = "waiting"
+    case words = "words"
+}
+
+/// A pairing moved on. ``words`` and ``device`` come with ``words`` and ``paired``.
+// MARK: - DevicePairChanged
+public struct DevicePairChanged: Codable {
+    public let device: DevicePairChangedPairingDevice?
+    public let pair: String
+    public let state: DevicePairChangedState
+    public let words: [String]?
+
+    public enum CodingKeys: String, CodingKey {
+        case device = "device"
+        case pair = "pair"
+        case state = "state"
+        case words = "words"
+    }
+
+    public init(device: DevicePairChangedPairingDevice?, pair: String, state: DevicePairChangedState, words: [String]?) {
+        self.device = device
+        self.pair = pair
+        self.state = state
+        self.words = words
+    }
+}
+
+/// What the phone says about itself. Untrusted text, shown as plain text.
+// MARK: - DevicePairChangedPairingDevice
+public struct DevicePairChangedPairingDevice: Codable {
+    public let id: String
+    public let model: String?
+    public let name: String
+
+    public enum CodingKeys: String, CodingKey {
+        case id = "id"
+        case model = "model"
+        case name = "name"
+    }
+
+    public init(id: String, model: String?, name: String) {
+        self.id = id
+        self.model = model
+        self.name = name
+    }
+}
+
+/// ``device.pair.confirm``. ``accept`` false refuses the phone, or cancels a pairing
+/// that no phone has joined.
+// MARK: - DevicePairConfirmParams
+public struct DevicePairConfirmParams: Codable {
+    public let accept: Bool?
+    public let pair: String
+
+    public enum CodingKeys: String, CodingKey {
+        case accept = "accept"
+        case pair = "pair"
+    }
+
+    public init(accept: Bool?, pair: String) {
+        self.accept = accept
+        self.pair = pair
+    }
+}
+
+/// ``device`` is the stored phone when accepted, else null.
+// MARK: - DevicePairConfirmResult
+public struct DevicePairConfirmResult: Codable {
+    public let device: DeviceInfoClass?
+
+    public enum CodingKeys: String, CodingKey {
+        case device = "device"
+    }
+
+    public init(device: DeviceInfoClass?) {
+        self.device = device
+    }
+}
+
+/// One phone in the registry. A revoked one stays, with ``revoked_at`` set.
+///
+/// ``rules`` counts the "Always allow" rules the phone made, which stay after a revoke.
+// MARK: - DeviceInfoClass
+public struct DeviceInfoClass: Codable {
+    public let id: String
+    public let lastSeen: String?
+    public let name: String
+    public let pairedAt: String
+    public let revokedAt: String?
+    public let rules: Int?
+
+    public enum CodingKeys: String, CodingKey {
+        case id = "id"
+        case lastSeen = "last_seen"
+        case name = "name"
+        case pairedAt = "paired_at"
+        case revokedAt = "revoked_at"
+        case rules = "rules"
+    }
+
+    public init(id: String, lastSeen: String?, name: String, pairedAt: String, revokedAt: String?, rules: Int?) {
+        self.id = id
+        self.lastSeen = lastSeen
+        self.name = name
+        self.pairedAt = pairedAt
+        self.revokedAt = revokedAt
+        self.rules = rules
+    }
+}
+
+/// ``device.pair.request``. The gateway has verified the phone's signature over the
+/// handshake and computed ``words`` from the handshake hash. The daemon checks ``code``.
+// MARK: - DevicePairRequestParams
+public struct DevicePairRequestParams: Codable {
+    public let code: String
+    public let key: String
+    public let model: String?
+    public let name: String
+    public let words: [String]
+
+    public enum CodingKeys: String, CodingKey {
+        case code = "code"
+        case key = "key"
+        case model = "model"
+        case name = "name"
+        case words = "words"
+    }
+
+    public init(code: String, key: String, model: String?, name: String, words: [String]) {
+        self.code = code
+        self.key = key
+        self.model = model
+        self.name = name
+        self.words = words
+    }
+}
+
+/// The code was right and is spent. The owner now compares ``words``.
+// MARK: - DevicePairRequestResult
+public struct DevicePairRequestResult: Codable {
+    public let pair: String
+
+    public enum CodingKeys: String, CodingKey {
+        case pair = "pair"
+    }
+
+    public init(pair: String) {
+        self.pair = pair
+    }
+}
+
+/// ``device.rename``.
+// MARK: - DeviceRenameParams
+public struct DeviceRenameParams: Codable {
+    public let device: String
+    public let name: String
+
+    public enum CodingKeys: String, CodingKey {
+        case device = "device"
+        case name = "name"
+    }
+
+    public init(device: String, name: String) {
+        self.device = device
+        self.name = name
+    }
+}
+
+// MARK: - DeviceRenameResult
+public struct DeviceRenameResult: Codable {
+    public let device: DeviceRenameResultDevice
+
+    public enum CodingKeys: String, CodingKey {
+        case device = "device"
+    }
+
+    public init(device: DeviceRenameResultDevice) {
+        self.device = device
+    }
+}
+
+/// One phone in the registry. A revoked one stays, with ``revoked_at`` set.
+///
+/// ``rules`` counts the "Always allow" rules the phone made, which stay after a revoke.
+// MARK: - DeviceRenameResultDevice
+public struct DeviceRenameResultDevice: Codable {
+    public let id: String
+    public let lastSeen: String?
+    public let name: String
+    public let pairedAt: String
+    public let revokedAt: String?
+    public let rules: Int?
+
+    public enum CodingKeys: String, CodingKey {
+        case id = "id"
+        case lastSeen = "last_seen"
+        case name = "name"
+        case pairedAt = "paired_at"
+        case revokedAt = "revoked_at"
+        case rules = "rules"
+    }
+
+    public init(id: String, lastSeen: String?, name: String, pairedAt: String, revokedAt: String?, rules: Int?) {
+        self.id = id
+        self.lastSeen = lastSeen
+        self.name = name
+        self.pairedAt = pairedAt
+        self.revokedAt = revokedAt
+        self.rules = rules
+    }
+}
+
+/// ``device.revoke``.
+// MARK: - DeviceRevokeParams
+public struct DeviceRevokeParams: Codable {
+    public let device: String
+
+    public enum CodingKeys: String, CodingKey {
+        case device = "device"
+    }
+
+    public init(device: String) {
+        self.device = device
+    }
+}
+
+/// ``revoked`` is false when the device was already revoked. ``rules`` stay in Tool rules.
+// MARK: - DeviceRevokeResult
+public struct DeviceRevokeResult: Codable {
+    public let device: DeviceRevokeResultDevice
+    public let revoked: Bool
+    public let rules: [RuleClass]
+
+    public enum CodingKeys: String, CodingKey {
+        case device = "device"
+        case revoked = "revoked"
+        case rules = "rules"
+    }
+
+    public init(device: DeviceRevokeResultDevice, revoked: Bool, rules: [RuleClass]) {
+        self.device = device
+        self.revoked = revoked
+        self.rules = rules
+    }
+}
+
+/// One phone in the registry. A revoked one stays, with ``revoked_at`` set.
+///
+/// ``rules`` counts the "Always allow" rules the phone made, which stay after a revoke.
+// MARK: - DeviceRevokeResultDevice
+public struct DeviceRevokeResultDevice: Codable {
+    public let id: String
+    public let lastSeen: String?
+    public let name: String
+    public let pairedAt: String
+    public let revokedAt: String?
+    public let rules: Int?
+
+    public enum CodingKeys: String, CodingKey {
+        case id = "id"
+        case lastSeen = "last_seen"
+        case name = "name"
+        case pairedAt = "paired_at"
+        case revokedAt = "revoked_at"
+        case rules = "rules"
+    }
+
+    public init(id: String, lastSeen: String?, name: String, pairedAt: String, revokedAt: String?, rules: Int?) {
+        self.id = id
+        self.lastSeen = lastSeen
+        self.name = name
+        self.pairedAt = pairedAt
+        self.revokedAt = revokedAt
+        self.rules = rules
+    }
+}
+
+/// A rule a phone wrote with "Always allow", and when.
+// MARK: - RuleClass
+public struct RuleClass: Codable {
+    public let at: String
+    public let rule: String
+
+    public enum CodingKeys: String, CodingKey {
+        case at = "at"
+        case rule = "rule"
+    }
+
+    public init(at: String, rule: String) {
+        self.at = at
+        self.rule = rule
+    }
+}
+
+/// A rule a phone wrote with "Always allow", and when.
+// MARK: - DeviceRule
+public struct DeviceRule: Codable {
+    public let at: String
+    public let rule: String
+
+    public enum CodingKeys: String, CodingKey {
+        case at = "at"
+        case rule = "rule"
+    }
+
+    public init(at: String, rule: String) {
+        self.at = at
+        self.rule = rule
+    }
+}
+
 /// ``device.sync``. What the gateway needs to serve phones. No params.
 // MARK: - DeviceSyncParams
 public struct DeviceSyncParams: Codable {
@@ -2927,7 +3426,7 @@ public struct DeviceSyncParams: Codable {
 /// message. ``devices`` leaves out a revoked device.
 // MARK: - DeviceSyncResult
 public struct DeviceSyncResult: Codable {
-    public let devices: [DeviceElement]
+    public let devices: [DeviceClass]
     public let macKey: String
     public let noiseKey: String
     public let pairs: [PairElement]
@@ -2945,7 +3444,7 @@ public struct DeviceSyncResult: Codable {
         case url = "url"
     }
 
-    public init(devices: [DeviceElement], macKey: String, noiseKey: String, pairs: [PairElement], room: String, seq: Int, url: String?) {
+    public init(devices: [DeviceClass], macKey: String, noiseKey: String, pairs: [PairElement], room: String, seq: Int, url: String?) {
         self.devices = devices
         self.macKey = macKey
         self.noiseKey = noiseKey
@@ -2957,8 +3456,8 @@ public struct DeviceSyncResult: Codable {
 }
 
 /// A paired device that is not revoked: its id and its 65-byte public key.
-// MARK: - DeviceElement
-public struct DeviceElement: Codable {
+// MARK: - DeviceClass
+public struct DeviceClass: Codable {
     public let id: String
     public let key: String
 
@@ -12345,6 +12844,26 @@ public struct OllamaStartResult: Codable {
 
     public init(running: Bool) {
         self.running = running
+    }
+}
+
+/// What the phone says about itself. Untrusted text, shown as plain text.
+// MARK: - PairingDevice
+public struct PairingDevice: Codable {
+    public let id: String
+    public let model: String?
+    public let name: String
+
+    public enum CodingKeys: String, CodingKey {
+        case id = "id"
+        case model = "model"
+        case name = "name"
+    }
+
+    public init(id: String, model: String?, name: String) {
+        self.id = id
+        self.model = model
+        self.name = name
     }
 }
 

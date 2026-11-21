@@ -113,6 +113,12 @@ interface Room {
   /** Device ids (base64url) the Mac listed. Null until the first `allow` of this relay's life. */
   allow: Set<string> | null;
   devices: Map<string, Session[]>;
+  /** Open pair slots (base64url SHA-256 of a pairing code) and when each ends, in unix seconds. */
+  pairs: Map<string, number>;
+  /** Slots already used. A late `allow` that still lists one does not bring it back. */
+  spent: Set<string>;
+  /** Device ids (base64url) that came in with a pair slot. They live only as long as that socket. */
+  pairing: Set<string>;
   toMac: FrameQueue;
   toDevice: Map<string, FrameQueue>;
   lastActive: number;
@@ -128,6 +134,9 @@ export interface Hub {
   /** Close every socket, as on shutdown. */
   shutdown(): void;
 }
+
+/** Most open pair slots one Mac may list. Only one pairing is open at a time; this is slack. */
+const MAX_PAIRS = 4;
 
 const P256 = { name: "ECDSA", namedCurve: "P-256" } as const;
 const SIGN = { name: "ECDSA", hash: "SHA-256" } as const;
@@ -210,6 +219,7 @@ export function createHub(options: HubOptions): Hub {
         room.devices.set(s.deviceId, list);
       } else {
         room.devices.delete(s.deviceId);
+        room.pairing.delete(s.deviceId);
         if (room.mac) sendJson(room.mac, { type: "peer", device: s.deviceId, state: "offline" });
       }
     }
@@ -231,7 +241,7 @@ export function createHub(options: HubOptions): Hub {
   function roomFor(id: string): Room {
     let room = rooms.get(id);
     if (!room) {
-      room = { id, allow: null, devices: new Map(), toMac: newQueue(), toDevice: new Map(), lastActive: now() };
+      room = { id, allow: null, devices: new Map(), pairs: new Map(), spent: new Set(), pairing: new Set(), toMac: newQueue(), toDevice: new Map(), lastActive: now() };
       rooms.set(id, room);
     }
     return room;
@@ -252,7 +262,7 @@ export function createHub(options: HubOptions): Hub {
     if (s.role === "mac") {
       await admitMac(s, key);
     } else {
-      await admitDevice(s, key, msg["mac"]);
+      await admitDevice(s, key, msg["mac"], msg["pair"]);
     }
   }
 
@@ -278,7 +288,7 @@ export function createHub(options: HubOptions): Hub {
     for (const frame of room.toMac.drain(now())) send(s, frame);
   }
 
-  async function admitDevice(s: Session, key: Uint8Array, roomId: unknown): Promise<void> {
+  async function admitDevice(s: Session, key: Uint8Array, roomId: unknown, pair: unknown): Promise<void> {
     const room = typeof roomId === "string" ? rooms.get(roomId) : undefined;
     if (!room || room.allow === null) {
       // No list yet: the relay may have just restarted. Try again, do not "pair again".
@@ -288,10 +298,16 @@ export function createHub(options: HubOptions): Hub {
     const idBytes = await deviceIdOf(key);
     const id = toBase64Url(idBytes);
     if (s.closed) return;
+    let bySlot = false;
     if (!room.allow.has(id)) {
-      end(s, CLOSE_NOT_AUTHENTICATED);
-      return;
+      // An unknown key gets in only with a valid pair slot, once. The slot is spent by the first socket that shows it.
+      if (typeof pair !== "string" || !takeSlot(room, pair)) {
+        end(s, CLOSE_NOT_AUTHENTICATED);
+        return;
+      }
+      bySlot = true;
     }
+    if (bySlot) room.pairing.add(id);
     const list = room.devices.get(id) ?? [];
     while (list.length >= cfg.maxSocketsPerDevice) end(list.shift()!, CLOSE_REPLACED);
     s.deviceId = id;
@@ -306,6 +322,17 @@ export function createHub(options: HubOptions): Hub {
     if (queued) for (const frame of queued.drain(now())) send(s, frame);
   }
 
+  /** Spend `slot` when it is open and not past its end. */
+  function takeSlot(room: Room, slot: string): boolean {
+    if (room.spent.has(slot)) return false;
+    const exp = room.pairs.get(slot);
+    if (exp === undefined || exp <= now() / 1000) return false;
+    room.pairs.delete(slot);
+    room.spent.add(slot);
+    if (room.spent.size > 256) room.spent.delete(room.spent.values().next().value as string);
+    return true;
+  }
+
   async function onAllow(s: Session, room: Room, msg: Record<string, unknown>): Promise<void> {
     const seq = msg["seq"];
     const devices = msg["devices"];
@@ -314,6 +341,22 @@ export function createHub(options: HubOptions): Hub {
       return;
     }
     if (seq < s.seq) return;
+    const pairs = msg["pairs"] ?? [];
+    if (!Array.isArray(pairs) || pairs.length > MAX_PAIRS) {
+      end(s, CLOSE_BAD_MESSAGE);
+      return;
+    }
+    const slots = new Map<string, number>();
+    for (const entry of pairs) {
+      const e = typeof entry === "object" && entry !== null ? (entry as Record<string, unknown>) : {};
+      const slot = e["slot"];
+      const exp = e["exp"];
+      if (typeof slot !== "string" || typeof exp !== "number" || !Number.isFinite(exp) || slot.length > 64) {
+        sendJson(s, { type: "error", code: "bad_pair" });
+        return;
+      }
+      slots.set(slot, exp);
+    }
     if (devices.length > cfg.maxDevices) {
       sendJson(s, { type: "error", code: "too_many_devices" });
       return;
@@ -331,13 +374,14 @@ export function createHub(options: HubOptions): Hub {
     if (s.closed || room.mac !== s || seq < s.seq) return;
     s.seq = seq;
     room.allow = ids;
+    room.pairs = new Map([...slots].filter(([slot]) => !room.spent.has(slot)));
     let revoked = 0;
     for (const [id, list] of [...room.devices]) {
-      if (ids.has(id)) continue;
+      if (ids.has(id) || room.pairing.has(id)) continue;
       for (const d of list) end(d, CLOSE_REVOKED);
       revoked += list.length;
     }
-    for (const id of [...room.toDevice.keys()]) if (!ids.has(id)) room.toDevice.delete(id);
+    for (const id of [...room.toDevice.keys()]) if (!ids.has(id) && !room.pairing.has(id)) room.toDevice.delete(id);
     log.event("allow", { room: prefixOf(room.id), count: ids.size });
     if (revoked > 0) log.event("revoke", { room: prefixOf(room.id), count: revoked });
   }
@@ -362,7 +406,7 @@ export function createHub(options: HubOptions): Hub {
       return;
     }
     const id = toBase64Url(frame.deviceId);
-    if (!room.allow?.has(id)) return;
+    if (!room.allow?.has(id) && !room.pairing.has(id)) return;
     const out = toDeviceFrame(frame);
     const sockets = room.devices.get(id) ?? [];
     const sid = toBase64Url(frame.sid);

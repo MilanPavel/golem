@@ -11,6 +11,7 @@ import { newIdentity } from "../../../relay/src/test-client.ts";
 import type { Identity } from "../../../relay/src/test-client.ts";
 import { createInitiator, generateKeyPair, x25519 } from "../noise.ts";
 import type { KeyPair, Transport } from "../noise.ts";
+import { pairWords } from "../pair-words.ts";
 import { backoffDelay } from "../relay.ts";
 import { startGateway } from "./server.ts";
 import type { Gateway } from "./server.ts";
@@ -49,6 +50,16 @@ interface FakeDaemon {
   lines: string[];
   identified: string[];
   syncs: number;
+  /** The pair slots `device.sync` lists. */
+  pairs: { slot: string; exp: number }[];
+  /** The code of the open pairing, or null. A right code is spent by `device.pair.request`. */
+  pairCode: Uint8Array | null;
+  /** The params of every `device.pair.request` the gateway made. */
+  requests: Record<string, unknown>[];
+  /** Tell every connection how the pairing went, as `device.pair.changed`. */
+  pairChanged(params: Record<string, unknown>): void;
+  /** Called with the id of the pairing a request opened, before the reply. */
+  onRequest: ((pair: string) => void) | null;
   changed(): void;
   close(): Promise<void>;
 }
@@ -69,6 +80,13 @@ async function fakeDaemon(dir: string): Promise<FakeDaemon> {
     lines: [],
     identified: [],
     syncs: 0,
+    pairs: [],
+    pairCode: null,
+    requests: [],
+    onRequest: null,
+    pairChanged(params) {
+      for (const s of controls) s.write(`${JSON.stringify({ jsonrpc: "2.0", method: "device.pair.changed", params })}\n`);
+    },
     changed() {
       daemon.seq += 1;
       for (const s of controls) s.write(`${JSON.stringify({ jsonrpc: "2.0", method: "device.changed", params: {} })}\n`);
@@ -104,9 +122,21 @@ async function fakeDaemon(dir: string): Promise<FakeDaemon> {
             noise_key: toBase64Url(noise.publicKey),
             seq: daemon.seq,
             devices,
-            pairs: [],
+            pairs: daemon.pairs,
           },
         };
+      }
+      case "device.pair.request": {
+        daemon.requests.push(p);
+        const code = fromBase64Url(String(p["code"])) ?? none;
+        if (daemon.pairCode === null || toBase64Url(code) !== toBase64Url(daemon.pairCode)) {
+          return { error: { code: -32021, message: "wrong", data: { reason: daemon.pairCode === null ? "pair_expired" : "pair_wrong_code" } } };
+        }
+        daemon.pairCode = null; // spent by the first handshake that presents it
+        daemon.pairs = [];
+        daemon.changed();
+        daemon.onRequest?.("pair-1");
+        return { result: { pair: "pair-1" } };
       }
       case "connection.identify": {
         const id = String(p["device"]);
@@ -229,7 +259,7 @@ class Phone {
     readonly id: Identity,
   ) {}
 
-  static async open(port: number, id: Identity, mac: Identity): Promise<Phone> {
+  static async open(port: number, id: Identity, mac: Identity, pairSlot?: string): Promise<Phone> {
     const ws = new WebSocket(`ws://127.0.0.1:${port}/v1/device`);
     ws.binaryType = "arraybuffer";
     const phone = new Phone(ws, id);
@@ -256,7 +286,7 @@ class Phone {
     });
     const nonce = await challenge;
     const sig = await id.sign(authMessage("device", "127.0.0.1", nonce));
-    ws.send(JSON.stringify({ type: "auth", v: 1, key: id.publicKey, sig: toBase64Url(sig), mac: await mac.roomId() }));
+    ws.send(JSON.stringify({ type: "auth", v: 1, key: id.publicKey, sig: toBase64Url(sig), mac: await mac.roomId(), ...(pairSlot === undefined ? {} : { pair: pairSlot }) }));
     return phone;
   }
 
@@ -294,6 +324,13 @@ class Phone {
     const message = new Uint8Array([...enc.encode("golem-auth-v1"), ...this.h]);
     const sig = sign ?? (await this.id.sign(message));
     await this.send(1, JSON.stringify({ type: "auth", v: 1, key: toBase64Url(this.id.raw), sig: toBase64Url(sig) }));
+  }
+
+  /** The `pair` control message: the code, this phone's key, its name, and its signature over the handshake. */
+  async pair(code: Uint8Array, options: { name?: string; sign?: Uint8Array } = {}): Promise<void> {
+    const message = new Uint8Array([...enc.encode("golem-pair-v1"), ...this.h]);
+    const sig = options.sign ?? (await this.id.sign(message));
+    await this.send(1, JSON.stringify({ type: "pair", v: 1, code: toBase64Url(code), key: toBase64Url(this.id.raw), name: options.name ?? "iPhone 16", model: "iPhone17,3", sig: toBase64Url(sig) }));
   }
 
   async receive(): Promise<{ type: number; flags: number; body: string }> {
@@ -555,4 +592,174 @@ test("the backoff doubles from 1 s to 60 s with jitter below the cap", () => {
   expect([0, 1, 2, 3, 6, 7, 20].map((n) => backoffDelay(n, backoff, () => 0))).toEqual([1000, 2000, 4000, 8000, 60_000, 60_000, 60_000]);
   expect(backoffDelay(0, backoff, () => 1)).toBe(500);
   expect(backoffDelay(10, backoff, () => 1)).toBe(30_000);
+});
+
+// ---- pairing ---------------------------------------------------------------------------------------
+
+const CODE = new Uint8Array(16).fill(9);
+const slotOf = async (code: Uint8Array) => toBase64Url(new Uint8Array(await globalThis.crypto.subtle.digest("SHA-256", code as BufferSource)));
+const inSeconds = (s: number) => Math.floor(Date.now() / 1000) + s;
+
+/** A pairing is open: the daemon lists the slot, and the phone that pairs is not in the registry. */
+async function openPairing(exp = inSeconds(300)): Promise<{ newcomer: Identity; slot: string }> {
+  daemon.registry.clear();
+  daemon.pairCode = CODE;
+  const slot = await slotOf(CODE);
+  daemon.pairs = [{ slot, exp }];
+  return { newcomer: await newIdentity(), slot };
+}
+
+async function pairingPhone(newcomer: Identity, slot: string): Promise<Phone> {
+  const p = await Phone.open(relay.port, newcomer, daemon.mac, slot);
+  phones.push(p);
+  await p.handshake(daemon.mac, daemon.noise.publicKey);
+  return p;
+}
+
+test("pairing: the phone shows the right code, gets the words, and is paired when the owner confirms", async () => {
+  const { newcomer, slot } = await openPairing();
+  start();
+  await connected(); // a pairing alone brings the link up
+  const p = await pairingPhone(newcomer, slot);
+  await p.pair(CODE);
+  const words = await pairWords(p.h);
+  expect(await p.control()).toEqual({ type: "pair.words", words });
+  // The daemon got the code, the key, the name, and the same words; the relay saw none of them.
+  expect(daemon.requests).toHaveLength(1);
+  expect(daemon.requests[0]).toMatchObject({ key: newcomer.publicKey, name: "iPhone 16", model: "iPhone17,3", words });
+  expect(daemon.requests[0]?.["code"]).toBe(toBase64Url(CODE));
+  const wire = relay.seen.map((m) => (typeof m === "string" ? m : Buffer.from(m).toString("latin1"))).join("\n");
+  expect(wire).not.toContain(toBase64Url(CODE));
+  expect(wire).toContain(slot);
+  // The owner confirms: the daemon stores the phone and says so.
+  const id = hex(await newcomer.deviceId());
+  daemon.registry.set(id, { key: newcomer.publicKey, revoked: false });
+  daemon.changed();
+  daemon.pairChanged({ pair: "pair-1", state: "paired", words, device: { id, name: "iPhone 16", model: "iPhone17,3" } });
+  expect(await p.control()).toEqual({ type: "paired", device: id });
+  // The phone then connects as a paired device, with no slot.
+  await sleep(50);
+  const again = await Phone.open(relay.port, newcomer, daemon.mac);
+  phones.push(again);
+  await again.handshake(daemon.mac, daemon.noise.publicKey);
+  await again.auth();
+  expect(await again.control()).toEqual({ type: "ok", device: id });
+});
+
+test("pairing: the answer that comes before the gateway listens is not lost", async () => {
+  const { newcomer, slot } = await openPairing();
+  const id = hex(await newcomer.deviceId());
+  daemon.onRequest = (pair) => queueMicrotask(() => daemon.pairChanged({ pair, state: "paired", device: { id, name: "x", model: "" } }));
+  start();
+  await connected();
+  const p = await pairingPhone(newcomer, slot);
+  await p.pair(CODE);
+  expect((await p.control())["type"]).toBe("pair.words");
+  expect(await p.control()).toEqual({ type: "paired", device: id });
+});
+
+test("pairing: the owner refuses, and the phone hears pair_refused", async () => {
+  const { newcomer, slot } = await openPairing();
+  start();
+  await connected();
+  const p = await pairingPhone(newcomer, slot);
+  await p.pair(CODE);
+  expect((await p.control())["type"]).toBe("pair.words");
+  daemon.pairChanged({ pair: "pair-1", state: "refused" });
+  expect((await p.control())["code"]).toBe("pair_refused");
+});
+
+test("pairing: a wrong code is refused with pair_wrong_code", async () => {
+  const { newcomer, slot } = await openPairing();
+  start();
+  await connected();
+  const p = await pairingPhone(newcomer, slot);
+  await p.pair(new Uint8Array(16).fill(1));
+  expect((await p.control())["code"]).toBe("pair_wrong_code");
+});
+
+test("pairing: a code that was used cannot be used again, at the relay and at the daemon", async () => {
+  const { newcomer, slot } = await openPairing();
+  start();
+  await connected();
+  const first = await pairingPhone(newcomer, slot);
+  await first.pair(CODE);
+  expect((await first.control())["type"]).toBe("pair.words");
+  // The slot is spent at the relay by the first socket, even before the owner confirms.
+  const second = await Phone.open(relay.port, await newIdentity(), daemon.mac, slot);
+  phones.push(second);
+  await until(() => second.closed !== null, "the relay to close it");
+  expect(second.closed).toBe(4401);
+  // And the daemon forgot the code once it was shown.
+  expect(daemon.pairCode).toBeNull();
+});
+
+test("pairing: a code that has ended is refused by the relay", async () => {
+  const { newcomer, slot } = await openPairing(inSeconds(-1));
+  start();
+  // The slot has ended, so the link is not even wanted: connect it by a paired device.
+  daemon.registry.set(phoneId, { key: phone.publicKey, revoked: false });
+  await connected();
+  const p = await Phone.open(relay.port, newcomer, daemon.mac, slot);
+  phones.push(p);
+  await until(() => p.closed !== null, "the relay to close it");
+  expect(p.closed).toBe(4401);
+});
+
+test("pairing: the owner's time runs out and the phone hears pair_expired", async () => {
+  const { newcomer, slot } = await openPairing();
+  gateway = startGateway({
+    port: 0,
+    socketPath: daemon.socketPath,
+    token: "x".repeat(43),
+    relayOptions: { backoff: { initialMs: 20, maxMs: 80 }, limits: { pairMs: 150 } },
+  });
+  await connected();
+  const p = await pairingPhone(newcomer, slot);
+  await p.pair(CODE);
+  expect((await p.control())["type"]).toBe("pair.words");
+  expect((await p.control())["code"]).toBe("pair_expired");
+});
+
+test("pairing: the daemon says the pairing expired", async () => {
+  const { newcomer, slot } = await openPairing();
+  start();
+  await connected();
+  const p = await pairingPhone(newcomer, slot);
+  await p.pair(CODE);
+  expect((await p.control())["type"]).toBe("pair.words");
+  daemon.pairChanged({ pair: "pair-1", state: "expired" });
+  expect((await p.control())["code"]).toBe("pair_expired");
+});
+
+test("pairing: a signature that does not fit the handshake is refused before the daemon hears of it", async () => {
+  const { newcomer, slot } = await openPairing();
+  start();
+  await connected();
+  const p = await pairingPhone(newcomer, slot);
+  await p.pair(CODE, { sign: new Uint8Array(64) });
+  expect((await p.control())["code"]).toBe("bad_signature");
+  expect(daemon.requests).toEqual([]);
+});
+
+test("pairing: the words are three BIP-39 words that depend on the handshake hash", async () => {
+  const { newcomer, slot } = await openPairing();
+  start();
+  await connected();
+  const p = await pairingPhone(newcomer, slot);
+  await p.pair(CODE);
+  const words = (await p.control())["words"] as string[];
+  expect(words).toHaveLength(3);
+  expect(words).toEqual(await pairWords(p.h));
+  const other = new Uint8Array(p.h);
+  other[0] = (other[0] ?? 0) ^ 1;
+  expect(await pairWords(other)).not.toEqual(words);
+});
+
+test("a device may not use the pair message once paired, and unpair is still not understood", async () => {
+  start();
+  await connected();
+  const p = await ready();
+  await p.send(1, JSON.stringify({ type: "pair", v: 1 }));
+  expect((await p.control())["code"]).toBe("bad_message");
 });

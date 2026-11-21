@@ -1,0 +1,15 @@
+{
+  "additionalProperties": false,
+  "description": "The code was right and is spent. The owner now compares ``words``.",
+  "properties": {
+    "pair": {
+      "title": "Pair",
+      "type": "string"
+    }
+  },
+  "required": [
+    "pair"
+  ],
+  "title": "DevicePairRequestResult",
+  "type": "object"
+}

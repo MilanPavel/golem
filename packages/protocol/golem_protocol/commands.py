@@ -2123,6 +2123,9 @@ B64Key32 = Annotated[str, Field(pattern=r"^[A-Za-z0-9_-]{43}$")]
 B64Key65 = Annotated[str, Field(pattern=r"^[A-Za-z0-9_-]{87}$")]
 """65 bytes (an uncompressed P-256 public key), base64url without padding."""
 
+B64Key16 = Annotated[str, Field(pattern=r"^[A-Za-z0-9_-]{22}$")]
+"""16 bytes (a pairing code), base64url without padding."""
+
 B64Sig64 = Annotated[str, Field(pattern=r"^[A-Za-z0-9_-]{86}$")]
 """64 bytes (a raw ``r || s`` ECDSA signature), base64url without padding."""
 
@@ -2226,6 +2229,164 @@ class DeviceChanged(BaseModel):
     """The registry, the open pairings, or ``[relay] url`` changed. Call ``device.sync`` again."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
+
+
+PairState = Literal["waiting", "words", "paired", "expired", "refused"]
+"""Where a pairing stands: the QR is up (``waiting``), a phone showed the right code and the
+owner compares ``words`` (``words``), the phone is stored (``paired``), or it ended."""
+
+
+class DeviceInfo(BaseModel):
+    """One phone in the registry. A revoked one stays, with ``revoked_at`` set.
+
+    ``rules`` counts the "Always allow" rules the phone made, which stay after a revoke.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    id: DeviceId
+    name: str
+    paired_at: str
+    last_seen: str | None = None
+    revoked_at: str | None = None
+    rules: int = Field(default=0, ge=0)
+
+
+class DeviceListParams(BaseModel):
+    """``device.list``. No params."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+
+class DeviceListResult(BaseModel):
+    """Every device, revoked ones last."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    devices: list[DeviceInfo]
+
+
+class DevicePairBeginParams(BaseModel):
+    """``device.pair.begin``. Opens a pairing. Only one is open at a time: it replaces the old."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+
+class DevicePairBeginResult(BaseModel):
+    """``uri`` is the ``golem://pair`` link for the QR code. It holds the one-time code, so
+    show it and do not log it. ``expires_at`` is in unix seconds. ``pair`` names this pairing
+    in ``device.pair.changed`` and ``device.pair.confirm``.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    pair: Annotated[str, Field(min_length=1, max_length=64)]
+    uri: str
+    expires_at: int = Field(ge=0)
+
+
+class DevicePairRequestParams(BaseModel):
+    """``device.pair.request``. The gateway has verified the phone's signature over the
+    handshake and computed ``words`` from the handshake hash. The daemon checks ``code``.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    code: B64Key16
+    key: B64Key65
+    name: Annotated[str, Field(max_length=64)]
+    model: Annotated[str, Field(max_length=64)] = ""
+    words: Annotated[list[str], Field(min_length=3, max_length=3)]
+
+
+class DevicePairRequestResult(BaseModel):
+    """The code was right and is spent. The owner now compares ``words``."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    pair: str
+
+
+class DevicePairConfirmParams(BaseModel):
+    """``device.pair.confirm``. ``accept`` false refuses the phone, or cancels a pairing
+    that no phone has joined.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    pair: str
+    accept: bool = True
+
+
+class DevicePairConfirmResult(BaseModel):
+    """``device`` is the stored phone when accepted, else null."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    device: DeviceInfo | None = None
+
+
+class DeviceRenameParams(BaseModel):
+    """``device.rename``."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    device: DeviceId
+    name: Annotated[str, Field(min_length=1, max_length=64)]
+
+
+class DeviceRenameResult(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    device: DeviceInfo
+
+
+class DeviceRule(BaseModel):
+    """A rule a phone wrote with "Always allow", and when."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    rule: str
+    at: str
+
+
+class DeviceRevokeParams(BaseModel):
+    """``device.revoke``."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    device: DeviceId
+
+
+class DeviceRevokeResult(BaseModel):
+    """``revoked`` is false when the device was already revoked. ``rules`` stay in Tool rules."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    device: DeviceInfo
+    revoked: bool
+    rules: list[DeviceRule]
+
+
+class PairingDevice(BaseModel):
+    """What the phone says about itself. Untrusted text, shown as plain text."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    id: DeviceId
+    name: str
+    model: str = ""
+
+
+class DevicePairChanged(BaseModel):
+    """A pairing moved on. ``words`` and ``device`` come with ``words`` and ``paired``."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    pair: str
+    state: PairState
+    words: list[str] | None = None
+    device: PairingDevice | None = None
 
 
 RoutineSource = Literal["user", "project"]
@@ -4548,6 +4709,21 @@ __all__ = [
     "DaemonStatus",
     "DeviceChanged",
     "DeviceId",
+    "DeviceInfo",
+    "DeviceListParams",
+    "DeviceListResult",
+    "DevicePairBeginParams",
+    "DevicePairBeginResult",
+    "DevicePairChanged",
+    "DevicePairConfirmParams",
+    "DevicePairConfirmResult",
+    "DevicePairRequestParams",
+    "DevicePairRequestResult",
+    "DeviceRenameParams",
+    "DeviceRenameResult",
+    "DeviceRevokeParams",
+    "DeviceRevokeResult",
+    "DeviceRule",
     "DeviceSyncParams",
     "DeviceSyncResult",
     "DirEntry",
@@ -4694,6 +4870,8 @@ __all__ = [
     "OllamaInstallResult",
     "OllamaStartParams",
     "OllamaStartResult",
+    "PairState",
+    "PairingDevice",
     "PendingItem",
     "PermissionsSetModeParams",
     "PermissionsSetModeResult",

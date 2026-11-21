@@ -1,0 +1,26 @@
+{
+  "additionalProperties": false,
+  "description": "What the phone says about itself. Untrusted text, shown as plain text.",
+  "properties": {
+    "id": {
+      "pattern": "^[0-9a-f]{32}$",
+      "title": "Id",
+      "type": "string"
+    },
+    "model": {
+      "default": "",
+      "title": "Model",
+      "type": "string"
+    },
+    "name": {
+      "title": "Name",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "name"
+  ],
+  "title": "PairingDevice",
+  "type": "object"
+}

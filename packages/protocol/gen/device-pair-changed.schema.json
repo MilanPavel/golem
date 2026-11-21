@@ -1,0 +1,81 @@
+{
+  "$defs": {
+    "PairingDevice": {
+      "additionalProperties": false,
+      "description": "What the phone says about itself. Untrusted text, shown as plain text.",
+      "properties": {
+        "id": {
+          "pattern": "^[0-9a-f]{32}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "model": {
+          "default": "",
+          "title": "Model",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name"
+      ],
+      "title": "PairingDevice",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "A pairing moved on. ``words`` and ``device`` come with ``words`` and ``paired``.",
+  "properties": {
+    "device": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/PairingDevice"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "pair": {
+      "title": "Pair",
+      "type": "string"
+    },
+    "state": {
+      "enum": [
+        "waiting",
+        "words",
+        "paired",
+        "expired",
+        "refused"
+      ],
+      "title": "State",
+      "type": "string"
+    },
+    "words": {
+      "anyOf": [
+        {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Words"
+    }
+  },
+  "required": [
+    "pair",
+    "state"
+  ],
+  "title": "DevicePairChanged",
+  "type": "object"
+}

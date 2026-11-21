@@ -127,6 +127,22 @@ export function startRelayLink(options: RelayLinkOptions): RelayLink {
   let replaced = false;
   let linkUrl = "";
 
+  /** Who waits for the owner of a pairing, by pair id. */
+  const pairWatchers = new Map<string, (params: Record<string, unknown>) => void>();
+  /** How the last pairings ended, so an answer that comes before its watcher is not lost. */
+  const pairEnded = new Map<string, Record<string, unknown>>();
+
+  function pairChanged(params: Record<string, unknown>): void {
+    const pair = str(params["pair"]);
+    if (pair === null) return;
+    const state = params["state"];
+    if (state === "paired" || state === "expired" || state === "refused") {
+      pairEnded.set(pair, params);
+      if (pairEnded.size > 8) pairEnded.delete(pairEnded.keys().next().value as string);
+    }
+    pairWatchers.get(pair)?.(params);
+  }
+
   const sessions: Sessions = createSessions(
     {
       config() {
@@ -150,6 +166,22 @@ export function startRelayLink(options: RelayLinkOptions): RelayLink {
         ws.send(frame);
       },
       buffered: () => ws?.bufferedAmount ?? 0,
+      sessionEnded() {
+        // A pairing keeps the link up after its code is spent. When it is the last thing, let go.
+        if (ws !== null && sessions.count() === 0 && !wanted()) void apply();
+      },
+      call(method, params) {
+        if (rpc === null) return Promise.reject(new Error("the daemon is not connected"));
+        return rpc.call(method, params);
+      },
+      watchPair(pair, listener) {
+        const last = pairEnded.get(pair);
+        if (last !== undefined) queueMicrotask(() => listener(last));
+        pairWatchers.set(pair, listener);
+        return () => {
+          if (pairWatchers.get(pair) === listener) pairWatchers.delete(pair);
+        };
+      },
       openDaemon: options.openDaemon,
       log,
     },
@@ -167,7 +199,7 @@ export function startRelayLink(options: RelayLinkOptions): RelayLink {
     if (sync === null || sync.url === "") return false;
     if (endpoint(sync.url) === null) return false;
     const t = nowSeconds();
-    return sync.devices.length > 0 || sync.pairs.some((p) => p.exp > t);
+    return sync.devices.length > 0 || sync.pairs.some((p) => p.exp > t) || sessions.count() > 0;
   }
 
   function setState(next: RelayState): void {
@@ -375,8 +407,9 @@ export function startRelayLink(options: RelayLinkOptions): RelayLink {
     connectingDaemon = true;
     try {
       opening = connectRpc(options.openDaemon, {
-        notify(method) {
+        notify(method, params) {
           if (method === "device.changed") void refresh();
+          else if (method === "device.pair.changed") pairChanged(params);
         },
         down() {
           rpc = null;

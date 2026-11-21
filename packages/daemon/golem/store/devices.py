@@ -102,7 +102,7 @@ class DeviceStore:
     async def list(self, *, include_revoked: bool = False) -> list[Device]:
         where = "" if include_revoked else " WHERE revoked_at IS NULL"
         rows = await self._database.fetch_all(
-            f"SELECT {_COLUMNS} FROM devices{where} ORDER BY paired_at, id"
+            f"SELECT {_COLUMNS} FROM devices{where} ORDER BY revoked_at IS NOT NULL, paired_at, id"
         )
         return [_device(row) for row in rows]
 
@@ -193,3 +193,19 @@ class DeviceStore:
             (rule,),
         )
         return [RuleOrigin(r["rule"], r["device_id"], r["device_name"], r["at"]) for r in rows]
+
+    async def rules_of(self, device: str) -> list[RuleOrigin]:
+        """The rules ``device`` wrote, oldest first. They stay after a revoke."""
+        rows = await self._database.fetch_all(
+            "SELECT rule, device_id, device_name, at FROM rule_origins WHERE device_id = ?"
+            " ORDER BY origin_id",
+            (device,),
+        )
+        return [RuleOrigin(r["rule"], r["device_id"], r["device_name"], r["at"]) for r in rows]
+
+    async def rule_counts(self) -> dict[str, int]:
+        """How many rules each device wrote, by device id."""
+        rows = await self._database.fetch_all(
+            "SELECT device_id, COUNT(DISTINCT rule) AS n FROM rule_origins GROUP BY device_id"
+        )
+        return {r["device_id"]: int(r["n"]) for r in rows}

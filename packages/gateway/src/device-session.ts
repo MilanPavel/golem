@@ -5,10 +5,12 @@
 import { DEVICE_METHODS } from "../../protocol/gen/device-methods.ts";
 import { createBridge } from "./bridge.ts";
 import type { Bridge } from "./bridge.ts";
+import { RpcError } from "./daemon-rpc.ts";
 import type { DaemonSocket, OpenDaemon } from "./daemon-rpc.ts";
 import { MAX_MESSAGE_BYTES, filterMessage } from "./framing.ts";
 import { createLineSplitter } from "./lines.ts";
 import { createResponder } from "./noise.ts";
+import { pairWords } from "./pair-words.ts";
 import type { Responder, Transport } from "./noise.ts";
 
 export type Log = (event: string, fields?: Record<string, string | number>) => void;
@@ -23,6 +25,12 @@ export interface SessionHost {
   send(deviceId: Uint8Array, sid: Uint8Array, noiseMessage: Uint8Array): void;
   /** Bytes queued on the relay socket and not yet written. */
   buffered(): number;
+  /** A call to the daemon on the relay link's own connection (`device.pair.request`). Rejects with `RpcError`. */
+  call(method: string, params: Record<string, unknown>): Promise<unknown>;
+  /** Hear how the pairing `pair` goes: the params of `device.pair.changed`. Returns a function that stops listening. */
+  watchPair(pair: string, listener: (params: Record<string, unknown>) => void): () => void;
+  /** A session ended. The link may now have no reason to stay up. */
+  sessionEnded?(): void;
   openDaemon: OpenDaemon;
   log: Log;
 }
@@ -30,6 +38,8 @@ export interface SessionHost {
 export interface SessionLimits {
   /** Time from the first handshake message to `ok`. */
   authMs: number;
+  /** A pairing waits this long for the owner (ADR-051: 2 minutes, and a little slack for the round trips). */
+  pairMs: number;
   /** A connection lives at most this long (ADR-051: 24 hours). */
   lifetimeMs: number;
   maxSessions: number;
@@ -38,6 +48,7 @@ export interface SessionLimits {
 
 export const DEFAULT_LIMITS: SessionLimits = {
   authMs: 10_000,
+  pairMs: 125_000,
   lifetimeMs: 24 * 60 * 60 * 1000,
   maxSessions: 64,
   maxPerDevice: 4,
@@ -59,11 +70,14 @@ const FLAG_MORE = 1;
 /** Body of one Noise message: a relay frame holds 32 KiB, less the frame head, the type and flags, and the tag. */
 const MAX_BODY = 30_000;
 const AUTH_CONTEXT = new TextEncoder().encode("golem-auth-v1");
+const PAIR_CONTEXT = new TextEncoder().encode("golem-pair-v1");
 const MAX_ENDED = 256;
 const MAX_HANDSHAKE_BYTES = 4096;
 
 const encoder = new TextEncoder();
 const none = new Uint8Array(0);
+
+const toBase64Url = (b: Uint8Array): string => btoa(String.fromCharCode(...b)).replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", "");
 
 const hex = (b: Uint8Array): string => Array.from(b, (x) => x.toString(16).padStart(2, "0")).join("");
 
@@ -88,7 +102,7 @@ async function deviceIdOf(key: Uint8Array): Promise<Uint8Array> {
   return new Uint8Array(await globalThis.crypto.subtle.digest("SHA-256", key as BufferSource)).slice(0, 16);
 }
 
-async function verifiesAuth(key: Uint8Array, sig: Uint8Array, h: Uint8Array): Promise<boolean> {
+async function verifiesAuth(key: Uint8Array, sig: Uint8Array, h: Uint8Array, context: Uint8Array = AUTH_CONTEXT): Promise<boolean> {
   try {
     if (key.length !== 65 || key[0] !== 0x04 || sig.length !== 64) return false;
     const imported = await globalThis.crypto.subtle.importKey(
@@ -98,9 +112,9 @@ async function verifiesAuth(key: Uint8Array, sig: Uint8Array, h: Uint8Array): Pr
       false,
       ["verify"],
     );
-    const message = new Uint8Array(AUTH_CONTEXT.length + h.length);
-    message.set(AUTH_CONTEXT);
-    message.set(h, AUTH_CONTEXT.length);
+    const message = new Uint8Array(context.length + h.length);
+    message.set(context);
+    message.set(h, context.length);
     return await globalThis.crypto.subtle.verify({ name: "ECDSA", hash: "SHA-256" }, imported, sig as BufferSource, message as BufferSource);
   } catch {
     return false;
@@ -111,7 +125,7 @@ function deviceFilter(data: string | ArrayBuffer | Uint8Array) {
   return filterMessage(data, { methods: DEVICE_METHODS, reservedIdPrefix: "gw:" });
 }
 
-type Phase = "handshake" | "auth" | "identify" | "ready" | "ended";
+type Phase = "handshake" | "auth" | "pairing" | "identify" | "ready" | "ended";
 
 class Session {
   private phase: Phase = "handshake";
@@ -125,6 +139,7 @@ class Session {
   private daemon: DaemonSocket | null = null;
   private bridge: Bridge | null = null;
   private poll: ReturnType<typeof setInterval> | null = null;
+  private unwatch: (() => void) | null = null;
   private readonly timers: ReturnType<typeof setTimeout>[] = [];
 
   constructor(
@@ -152,7 +167,8 @@ class Session {
   }
 
   private timeout(): void {
-    if (this.phase !== "ready") this.end();
+    // A pairing has its own, longer wait for the owner.
+    if (this.phase !== "ready" && this.phase !== "pairing") this.end();
   }
 
   private async receive(message: Uint8Array): Promise<void> {
@@ -165,6 +181,8 @@ class Session {
         return this.readyMessage(await this.open(message));
       case "identify":
         return this.fail("bad_message", "wait for ok");
+      case "pairing":
+        return this.fail("bad_message", "wait for your Mac");
       case "ended":
         return;
     }
@@ -209,6 +227,10 @@ class Session {
 
   private async authMessage(m: { type: number; flags: number; body: Uint8Array }): Promise<void> {
     const msg = m.type === TYPE_CONTROL && m.flags === 0 ? this.control(m.body) : null;
+    if (msg !== null && msg["type"] === "pair" && msg["v"] === 1) {
+      await this.pair(msg);
+      return;
+    }
     if (msg === null || msg["type"] !== "auth" || msg["v"] !== 1) {
       await this.fail("bad_message", "expected auth");
       return;
@@ -227,6 +249,65 @@ class Session {
     this.deviceHex = hex(this.deviceId);
     this.phase = "identify";
     this.identify(this.deviceHex);
+  }
+
+  /**
+   * `pair` (ADR-051): check the phone's signature over the handshake, give the daemon the code and the words, and
+   * wait for the owner. The daemon checks the code and tells every owner screen. The phone gets the same words.
+   */
+  private async pair(msg: Record<string, unknown>): Promise<void> {
+    const code = fromBase64Url(msg["code"]);
+    const key = fromBase64Url(msg["key"]);
+    const sig = fromBase64Url(msg["sig"]);
+    const name = msg["name"];
+    const model = msg["model"] ?? "";
+    const h = this.transport?.handshakeHash;
+    if (code === null || code.length !== 16 || key === null || sig === null || typeof name !== "string" || typeof model !== "string" || h === undefined) {
+      await this.fail("bad_message", "the pair message is not well formed");
+      return;
+    }
+    if (!(await verifiesAuth(key, sig, h, PAIR_CONTEXT))) {
+      await this.fail("bad_signature", "the signature does not fit");
+      return;
+    }
+    if (!sameBytes(await deviceIdOf(key), this.deviceId)) {
+      await this.fail("unknown_device", "the key is not the device the relay named");
+      return;
+    }
+    const words = await pairWords(h);
+    this.phase = "pairing";
+    this.timers.push(setTimeout(() => void this.fail("pair_expired", "the owner did not confirm in time"), this.limits.pairMs));
+    let pair: string;
+    try {
+      const reply = (await this.host.call("device.pair.request", {
+        code: toBase64Url(code),
+        key: toBase64Url(key),
+        name: name.slice(0, 64),
+        model: model.slice(0, 64),
+        words,
+      })) as { pair?: unknown };
+      if (typeof reply.pair !== "string") throw new Error("no pair id");
+      pair = reply.pair;
+    } catch (error) {
+      const reason = error instanceof RpcError ? (error.data as { reason?: unknown } | undefined)?.reason : undefined;
+      const known = ["pair_expired", "pair_wrong_code", "pair_refused"];
+      await this.fail(typeof reason === "string" && known.includes(reason) ? reason : "daemon_unavailable", "the pairing was not accepted");
+      return;
+    }
+    if (this.phase !== "pairing") return;
+    this.unwatch = this.host.watchPair(pair, (params) => void this.pairChanged(params));
+    await this.sendControl({ type: "pair.words", words });
+  }
+
+  private async pairChanged(params: Record<string, unknown>): Promise<void> {
+    if (this.phase !== "pairing") return;
+    const state = params["state"];
+    if (state === "paired") {
+      await this.sendControl({ type: "paired", device: this.device });
+      this.host.log("session.paired", { device: this.device.slice(0, 8) });
+      this.end();
+    } else if (state === "refused") await this.fail("pair_refused", "the owner refused the pairing");
+    else if (state === "expired") await this.fail("pair_expired", "the pairing ran out");
   }
 
   /** Open a daemon connection and name the device on it. Its reply is not passed on. */
@@ -399,6 +480,8 @@ class Session {
     this.phase = "ended";
     for (const t of this.timers) clearTimeout(t);
     if (this.poll !== null) clearInterval(this.poll);
+    this.unwatch?.();
+    this.unwatch = null;
     this.bridge?.browserClosed();
     this.daemon?.destroy();
     this.responder = null;
@@ -430,6 +513,7 @@ export function createSessions(host: SessionHost, limits: SessionLimits = DEFAUL
         session = new Session(host, deviceId, sid, limits, () => {
           live.delete(key);
           remember(key);
+          host.sessionEnded?.();
         });
         live.set(key, session);
       }

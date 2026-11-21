@@ -2,6 +2,7 @@ import { spawn, spawnSync } from "node:child_process";
 import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
+import { createInterface } from "node:readline/promises";
 
 import {
   connectGolem,
@@ -31,6 +32,7 @@ import { runModelsCheck } from "./models-check.ts";
 import { formatSkills } from "./format-skills.ts";
 import { formatStatus } from "./format-status.ts";
 import { formatCliVersion } from "./format-version.ts";
+import { DEVICES_USAGE, parseDevicesArgs, runDevicesList, runDevicesPair, runDevicesRename, runDevicesRevoke, type DevicesDeps } from "./devices.ts";
 import { parseMcpArgs, type McpArgs } from "./mcp-command.ts";
 import { planAdd } from "./add-plan.ts";
 import { exportServers } from "./mcp-export.ts";
@@ -94,6 +96,7 @@ const USAGE =
   "       golem eval routing [--days N] [--session ID]\n" +
   "       golem mcp add <name> -- <command…> [--token-env VAR] | golem mcp add <name> --url <url> [--token] [--env K=V] [--header K=V] [--cwd D] [--on-demand] [--project] [--timeout S] [--approval allow] | golem mcp add --catalog <id> [--input <id>=<value>] | golem mcp remove <name> | golem mcp export [--format claude|vscode] [--scope user|project]\n" +
   "       golem mcp list [--json] | show <name> [--json] | test <name> | test --catalog <id> | edit <name> [--project] | import [--from <app>|<file>] [--all] | logs <name> [-f] | enable <name> [--on-demand] | disable <name> | restart <name> | login <name> | logout <name> | tools <name> [--hide <glob>] [--show <glob>]\n" +
+  "       golem devices [list] | golem devices pair [--link] | golem devices rename <phone> <name> | golem devices revoke <phone> [--yes]\n" +
   "       golem ask \"<prompt>\" [--folder <dir>] [--model <profile>] [--skill <name>] [--detach] | golem open <id> [--web | --notified]\n" +
   "       golem config show [--resolved] | golem config edit [--project] | golem skills [list] | golem skills check <path>\n" +
   "       golem skills new <name> [--project] [--description \"…\"] | golem skills edit <name>\n" +
@@ -142,6 +145,9 @@ async function run(args: string[]): Promise<number> {
   }
   if (command === "mcp") {
     return runMcp(rest);
+  }
+  if (command === "devices") {
+    return runDevices(rest);
   }
   if (command === "models" && (rest.length === 0 || (rest.length === 1 && rest[0] === "--refresh"))) {
     return runModels(rest[0] === "--refresh");
@@ -284,6 +290,47 @@ function routinesDeps(): RoutinesDeps {
       process.stderr.write(`${line}\n`);
     },
   };
+}
+
+/** `golem devices list|pair|rename|revoke`: the phones paired with this Mac. */
+async function runDevices(given: string[]): Promise<number> {
+  const parsed = parseDevicesArgs(given);
+  if (parsed.kind === "error") {
+    process.stderr.write(`${parsed.message === DEVICES_USAGE ? USAGE : parsed.message}\n`);
+    return 1;
+  }
+  const deps: DevicesDeps = {
+    write: (line) => process.stdout.write(`${line}\n`),
+    error: (line) => process.stderr.write(`${line}\n`),
+    tty: process.stdout.isTTY === true,
+    async ask(question, signal) {
+      const rl = createInterface({ input: process.stdin, output: process.stdout });
+      try {
+        return await rl.question(question, signal === undefined ? {} : { signal });
+      } catch {
+        return null;
+      } finally {
+        rl.close();
+      }
+    },
+    onInterrupt(handler) {
+      process.on("SIGINT", handler);
+      return () => void process.off("SIGINT", handler);
+    },
+    now: () => new Date(),
+  };
+  return runWithClient((client) => {
+    switch (parsed.kind) {
+      case "list":
+        return runDevicesList(client, deps);
+      case "pair":
+        return runDevicesPair(client, parsed, deps);
+      case "rename":
+        return runDevicesRename(client, parsed, deps);
+      case "revoke":
+        return runDevicesRevoke(client, parsed, deps);
+    }
+  });
 }
 
 /** `golem routines [list]|run|pause|resume|edit`: the routines in `config.toml`, from a shell. */

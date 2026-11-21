@@ -8,6 +8,7 @@ import { createAppInstall, type AppInstallStore } from "./app-install.ts";
 import { createPageHost, type PageHostStore } from "./page-host.ts";
 import { createNewSession, type NewSessionStore } from "./new-session.ts";
 import { CONFIG_KEY } from "./config.ts";
+import { DEVICE_LIST_KEY, createPairing, type DeviceListResult, type DeviceRevokeResult, type Pairing } from "./devices.ts";
 import { MCP_CATALOG_KEY, MCP_LIST_KEY, MCP_TOOLS_KEY, type McpToolsResult } from "./mcp.ts";
 import { NOTIFICATIONS_KEY } from "./notifications.ts";
 import { ROUTING_KEY } from "./routing.ts";
@@ -38,6 +39,13 @@ export type PageClient = Pick<
   | "listAgents"
   | "setAgentWish"
   | "onMemoryChanged"
+  | "onDevicesChanged"
+  | "onDevicePairChanged"
+  | "deviceList"
+  | "devicePairBegin"
+  | "devicePairConfirm"
+  | "deviceRename"
+  | "deviceRevoke"
   | "listMemories"
   | "updateMemory"
   | "deleteMemories"
@@ -152,6 +160,10 @@ export type PageActions = {
   createSession(cwd: string | null, model: string | null): Promise<string>;
   /** Edits a memory's text, or sets whether it is in every chat or may go to a paid model. The list is read again. */
   updateMemory(id: string, change: { text?: string; always?: boolean; privacy?: MemoryPrivacy }): Promise<void>;
+  /** Renames a paired phone. The list is read again. */
+  renameDevice(id: string, name: string): Promise<void>;
+  /** Cuts a phone off. It resolves with the "Always allow" rules the phone made, which stay. The list is read again. */
+  revokeDevice(id: string): Promise<DeviceRevokeResult>;
   /** Deletes a memory. There is no trash. The list is read again. */
   deleteMemory(id: string): Promise<void>;
   /** The memories of a scope as Markdown or JSON text. */
@@ -357,6 +369,8 @@ export type PageQueries = {
   agentList(cwd: string | null): Promise<AgentsListResult>;
   /** One page of a scope's memories, with the counts of every scope and the `[memory]` settings. */
   memoryList(request: MemoryListRequest): Promise<MemoryListResult>;
+  /** Every paired phone, revoked ones last. */
+  deviceList(): Promise<DeviceListResult>;
   /** The routines, with each one's next and last run. */
   routineList(): Promise<RoutineListResult>;
   /** The runs, one per headless session, newest first. With `sessionId`, that session's row alone. */
@@ -411,6 +425,8 @@ export type Page = {
   drafts: Drafts;
   notes: Notes;
   pulls: Pulls;
+  /** The pairing of a phone this page opened, if any. */
+  pairing: Pairing;
   setupStart: SetupStart;
   queryClient: QueryClient;
   queries: PageQueries;
@@ -443,6 +459,7 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
     void queryClient.invalidateQueries({ queryKey: MODEL_LIST_KEY });
     void queryClient.invalidateQueries({ queryKey: SETUP_STATUS_KEY });
   });
+  const pairing = createPairing(client, queryClient);
   const setupStart = createSetupStart();
   const router = createRouter();
   const doc = options.doc ?? document;
@@ -467,6 +484,7 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
     drafts,
     notes,
     pulls,
+    pairing,
     setupStart,
     queryClient,
     queries: {
@@ -480,6 +498,7 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
       agentList: (cwd) => (cwd === null ? client.listAgents() : client.listAgents(cwd)),
       memoryList: ({ scope, query, after }) =>
         client.listMemories({ scope, limit: MEMORY_PAGE, ...(query === "" ? {} : { query }), ...(after === null ? {} : { after }) }),
+      deviceList: () => client.deviceList(),
       routineList: () => client.listRoutines(),
       runList: (sessionId) => (sessionId === null ? client.listRuns() : client.listRuns({ sessionId })),
       routineGet: (name, folder) => (folder === null ? client.getRoutine(name) : client.getRoutine(name, folder)),
@@ -516,6 +535,20 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
       },
       async sendStronger(sessionId, text) {
         await client.sendMessage(sessionId, text, { stronger: true });
+      },
+      async renameDevice(id, name) {
+        try {
+          await client.deviceRename(id, name);
+        } finally {
+          void queryClient.invalidateQueries({ queryKey: DEVICE_LIST_KEY });
+        }
+      },
+      async revokeDevice(id) {
+        try {
+          return await client.deviceRevoke(id);
+        } finally {
+          void queryClient.invalidateQueries({ queryKey: DEVICE_LIST_KEY });
+        }
       },
       async updateMemory(id, change) {
         try {
@@ -966,6 +999,7 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
       });
       sessionList.start();
       pulls.start();
+      pairing.start();
       stopQueries = keepQueriesHonest(client, queryClient);
       doc.addEventListener("visibilitychange", onVisibility);
     },
@@ -978,6 +1012,7 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
       stopHost = undefined;
       sessionList.stop();
       pulls.stop();
+      pairing.stop();
       sessions.stop();
       router.stop();
       queryClient.clear();

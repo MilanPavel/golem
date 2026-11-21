@@ -1,0 +1,71 @@
+{
+  "$defs": {
+    "DeviceInfo": {
+      "additionalProperties": false,
+      "description": "One phone in the registry. A revoked one stays, with ``revoked_at`` set.\n\n``rules`` counts the \"Always allow\" rules the phone made, which stay after a revoke.",
+      "properties": {
+        "id": {
+          "pattern": "^[0-9a-f]{32}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "last_seen": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Last Seen"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "paired_at": {
+          "title": "Paired At",
+          "type": "string"
+        },
+        "revoked_at": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Revoked At"
+        },
+        "rules": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Rules",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "paired_at"
+      ],
+      "title": "DeviceInfo",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "device": {
+      "$ref": "#/$defs/DeviceInfo"
+    }
+  },
+  "required": [
+    "device"
+  ],
+  "title": "DeviceRenameResult",
+  "type": "object"
+}

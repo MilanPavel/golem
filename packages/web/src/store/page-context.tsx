@@ -6,6 +6,7 @@ import { changeDiffKey, changesDiffKey, changesListKey, commitInfoKey, type Chan
 import { fileListKey, fileReadKey, type FileRead } from "./files.ts";
 import { configKey, type ConfigGetResult } from "./config.ts";
 import { NOTIFICATIONS_KEY } from "./notifications.ts";
+import { DEVICE_LIST_KEY, type DeviceListResult, type PairingSnapshot } from "./devices.ts";
 import { memoryListKey, type MemoryListResult, type MemoryScope } from "./memory.ts";
 import { ROUTING_KEY } from "./routing.ts";
 import { KEYS_KEY } from "./keys.ts";
@@ -467,6 +468,19 @@ export function usePulls(): PullsSnapshot {
 /** Whether the page has decided what setup does at its start, kept across the shell's remounts. */
 export function useSetupStart(): SetupStart {
   return usePage().setupStart;
+}
+
+/** Every paired phone, revoked ones last. Marked stale by the pushed `device.changed` and by the actions. */
+export function useDeviceList(): UseQueryResult<DeviceListResult> {
+  const { queries } = usePage();
+  return useQuery({ queryKey: [...DEVICE_LIST_KEY], queryFn: queries.deviceList, retry: false });
+}
+
+/** The pairing of a phone this page opened, and what to do with it. */
+export function usePairing(): { snapshot: PairingSnapshot; begin(): Promise<void>; confirm(accept: boolean): Promise<void>; cancel(): void; dismiss(): void } {
+  const { pairing } = usePage();
+  const snapshot = useSyncExternalStore(pairing.subscribe, pairing.getSnapshot);
+  return { snapshot, begin: pairing.begin, confirm: pairing.confirm, cancel: pairing.cancel, dismiss: pairing.dismiss };
 }
 
 /** The routines, with each one's next and last run. Marked stale by the pushed `routine.*` notifications. */

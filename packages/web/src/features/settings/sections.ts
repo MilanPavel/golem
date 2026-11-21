@@ -3,6 +3,7 @@ import {
   SettingsAgentsIcon,
   SettingsAppearanceIcon,
   SettingsConfigIcon,
+  SettingsDevicesIcon,
   SettingsContextIcon,
   SettingsInfoIcon,
   SettingsKeysIcon,
@@ -50,6 +51,7 @@ export const SECTIONS: readonly SettingsSection[] = [
   { id: "skills", title: "Skills", group: "abilities", icon: SettingsSkillsIcon, description: "Instructions golem loads when a task matches.", keywords: ["project", "user", "bundled", "instructions"] },
   { id: "agents", title: "Agents", group: "abilities", icon: SettingsAgentsIcon, description: "Helpers the lead can start, and the models they use.", keywords: ["helpers", "explorer", "sub-agent"] },
   { id: "memory", title: "Memory", group: "abilities", icon: SettingsMemoryIcon, description: "What golem remembers between chats.", keywords: ["paid model", "scopes", "remember", "forget"] },
+  { id: "devices", title: "Devices", group: "permissions", icon: SettingsDevicesIcon, description: "Phones paired with this Mac: pair one, rename it, or cut it off.", keywords: ["phone", "iphone", "pair", "qr code", "revoke", "relay"] },
   { id: "rules", title: "Tool rules", group: "permissions", icon: SettingsRulesIcon, description: "Allow, ask or deny, per tool and per path.", keywords: ["default mode", "rules", "allow", "deny", "permission"] },
   { id: "config", title: "Config file", group: "advanced", icon: SettingsConfigIcon, description: "Edit config.toml directly. The other sections write to it too.", keywords: ["which file", "problems", "toml", "raw"] },
 ];

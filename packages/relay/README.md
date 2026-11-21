@@ -3,7 +3,7 @@
 A small public service that passes encrypted frames between a Mac and its paired phones. It sees who talks to whom, when, and how much, never what. The design is [ADR-051](../../docs/adr/051-relay-and-pairing.md).
 
 - `/v1/mac` and `/v1/device`: one WebSocket per side. Each proves its P-256 key by signing the relay's challenge.
-- One room per Mac key. The Mac sends the whole allow list of device keys; a device not on it gets 4401, and a device removed from it gets 4403 at once.
+- One room per Mac key. The Mac sends the whole allow list of device keys; a device not on it gets 4401, and a device removed from it gets 4403 at once. The `allow` message may also list pair slots, `SHA-256` of a pairing code with an end time. A device that is not on the list gets in once with `"pair":"<slot>"` in its `auth`, for as long as that socket lives. The slot is spent by the first socket that shows it, and the relay never sees the code.
 - Data frames are binary, at most 32 KiB, and pass unread. A frame for a side that is away waits in memory for 60 seconds (at most 64 frames and 512 KiB), then is dropped.
 - `/healthz` returns `{"ok":true,"rooms":n,"sockets":n}`.
 - Nothing is written to disk. Logs hold an event name, a time, a request number, short id prefixes, a close code, and a count. Never a frame, a key, a token, or an IP address.

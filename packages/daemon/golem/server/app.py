@@ -50,6 +50,7 @@ from golem.models.tiers import Tier
 from golem.models.window import resolve_window
 from golem.models.window_plans import WindowPlans
 from golem.notify import Notifier, NotifierKinds, Poster, SessionFacts, default_poster
+from golem.pairing import PairingManager
 from golem.paths import GolemPaths, resolve_paths
 from golem.permissions.policy import Policy
 from golem.routine_scheduler import RoutineScheduler
@@ -174,6 +175,7 @@ class DaemonApp:
             paths=paths, started_at=time.monotonic(), secrets=secrets, user_home=user_home
         )
         self.state.broadcast = self._broadcast
+        self.state.broadcast_owner = self._broadcast_owner
         methods = standard_methods()
         if extra_methods:
             methods.update(extra_methods)
@@ -408,6 +410,12 @@ class DaemonApp:
                 devices = DeviceStore(database)
                 devices.on_change = self._devices_changed
                 self.state.devices = devices
+                self.state.pairing = PairingManager(
+                    devices,
+                    lambda: self.state.clock(),
+                    self._broadcast_owner,
+                    self._devices_changed,
+                )
                 sessions.devices = devices
                 routines = RoutineScheduler(
                     runs=self.state.routine_runs,
@@ -536,6 +544,9 @@ class DaemonApp:
             self.state.routines = None
             self.state.watcher = None
             self.state.routine_runs = None
+            if self.state.pairing is not None:
+                self.state.pairing.close()
+            self.state.pairing = None
             self.state.devices = None
             self.state.sessions = None
             self.state.memory = None
@@ -586,6 +597,14 @@ class DaemonApp:
             device = connection.device
             if device is not None and not await devices.active(device):
                 connection.abort()
+
+    def _broadcast_owner(self, notification: BaseModel) -> None:
+        """Like :meth:`_broadcast`, but a paired phone's connection does not get it."""
+        for connection in list(self._connections):
+            if not connection.welcomed or connection.closed or connection.device is not None:
+                continue
+            with contextlib.suppress(ConnectionResetError):
+                connection.enqueue(notification)
 
     def _broadcast(self, notification: BaseModel) -> None:
         """Queue ``notification`` on every connection that said hello."""

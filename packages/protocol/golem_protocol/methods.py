@@ -140,6 +140,12 @@ METHOD_ACCESS: Final[Mapping[str, Access]] = {
     "relay.sign": "local",
     "relay.dh": "local",
     "device.sync": "local",
+    "device.pair.request": "local",
+    "device.list": "browser",
+    "device.pair.begin": "browser",
+    "device.pair.confirm": "browser",
+    "device.rename": "browser",
+    "device.revoke": "browser",
     "connection.identify": "local",
 }
 

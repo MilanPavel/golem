@@ -1,0 +1,20 @@
+{
+  "additionalProperties": false,
+  "description": "A rule a phone wrote with \"Always allow\", and when.",
+  "properties": {
+    "at": {
+      "title": "At",
+      "type": "string"
+    },
+    "rule": {
+      "title": "Rule",
+      "type": "string"
+    }
+  },
+  "required": [
+    "rule",
+    "at"
+  ],
+  "title": "DeviceRule",
+  "type": "object"
+}

@@ -45,6 +45,13 @@ import type { MemoryListResult } from "../../protocol/gen/memory-list-result.ts"
 import type { MemorySettingsResult } from "../../protocol/gen/memory-settings-result.ts";
 import type { MemoryUpdateResult } from "../../protocol/gen/memory-update-result.ts";
 import type { MemoryWriteResult } from "../../protocol/gen/memory-write-result.ts";
+import type { DeviceInfo } from "../../protocol/gen/device-info.ts";
+import type { DeviceListResult } from "../../protocol/gen/device-list-result.ts";
+import type { DevicePairBeginResult } from "../../protocol/gen/device-pair-begin-result.ts";
+import type { DevicePairChanged } from "../../protocol/gen/device-pair-changed.ts";
+import type { DevicePairConfirmResult } from "../../protocol/gen/device-pair-confirm-result.ts";
+import type { DeviceRenameResult } from "../../protocol/gen/device-rename-result.ts";
+import type { DeviceRevokeResult } from "../../protocol/gen/device-revoke-result.ts";
 import type { MemoryChanged } from "../../protocol/gen/memory-changed.ts";
 import type { RoutineGetResult } from "../../protocol/gen/routine-get-result.ts";
 import type { RoutineInfo, RoutineListResult } from "../../protocol/gen/routine-list-result.ts";
@@ -1132,4 +1139,55 @@ export function isMcpCatalogResult(value: unknown): value is McpCatalogResult {
 
 export function isRoutineUpdateResult(value: unknown): value is RoutineUpdateResult {
   return isRecord(value) && isRoutineInfo(value["routine"]);
+}
+
+const PAIR_STATES = new Set(["waiting", "words", "paired", "expired", "refused"]);
+
+export function isDeviceInfo(value: unknown): value is DeviceInfo {
+  return (
+    isRecord(value) &&
+    typeof value["id"] === "string" &&
+    typeof value["name"] === "string" &&
+    typeof value["paired_at"] === "string" &&
+    (value["last_seen"] === undefined || value["last_seen"] === null || typeof value["last_seen"] === "string") &&
+    (value["revoked_at"] === undefined || value["revoked_at"] === null || typeof value["revoked_at"] === "string") &&
+    (value["rules"] === undefined || typeof value["rules"] === "number")
+  );
+}
+
+export function isDeviceListResult(value: unknown): value is DeviceListResult {
+  return isRecord(value) && Array.isArray(value["devices"]) && value["devices"].every(isDeviceInfo);
+}
+
+export function isDevicePairBeginResult(value: unknown): value is DevicePairBeginResult {
+  return isRecord(value) && typeof value["pair"] === "string" && typeof value["uri"] === "string" && typeof value["expires_at"] === "number";
+}
+
+export function isDevicePairConfirmResult(value: unknown): value is DevicePairConfirmResult {
+  return isRecord(value) && (value["device"] === undefined || value["device"] === null || isDeviceInfo(value["device"]));
+}
+
+export function isDeviceRenameResult(value: unknown): value is DeviceRenameResult {
+  return isRecord(value) && isDeviceInfo(value["device"]);
+}
+
+export function isDeviceRevokeResult(value: unknown): value is DeviceRevokeResult {
+  return (
+    isRecord(value) &&
+    isDeviceInfo(value["device"]) &&
+    typeof value["revoked"] === "boolean" &&
+    Array.isArray(value["rules"]) &&
+    value["rules"].every((r) => isRecord(r) && typeof r["rule"] === "string" && typeof r["at"] === "string")
+  );
+}
+
+export function isDevicePairChanged(value: unknown): value is DevicePairChanged {
+  return (
+    isRecord(value) &&
+    typeof value["pair"] === "string" &&
+    typeof value["state"] === "string" &&
+    PAIR_STATES.has(value["state"]) &&
+    (value["words"] === undefined || value["words"] === null || (Array.isArray(value["words"]) && value["words"].every((w) => typeof w === "string"))) &&
+    (value["device"] === undefined || value["device"] === null || (isRecord(value["device"]) && typeof value["device"]["id"] === "string" && typeof value["device"]["name"] === "string"))
+  );
 }

@@ -1,0 +1,20 @@
+{
+  "additionalProperties": false,
+  "description": "``device.pair.confirm``. ``accept`` false refuses the phone, or cancels a pairing\nthat no phone has joined.",
+  "properties": {
+    "accept": {
+      "default": true,
+      "title": "Accept",
+      "type": "boolean"
+    },
+    "pair": {
+      "title": "Pair",
+      "type": "string"
+    }
+  },
+  "required": [
+    "pair"
+  ],
+  "title": "DevicePairConfirmParams",
+  "type": "object"
+}

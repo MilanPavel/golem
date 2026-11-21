@@ -10,6 +10,7 @@ import { Link } from "../../ui/link.tsx";
 import { ConfigSection } from "./config-section.tsx";
 import { ContextSection } from "./context-section.tsx";
 import { useSettingsContext } from "./context.ts";
+import { DevicesSection } from "./devices-section.tsx";
 import { KeysSection } from "./keys-section.tsx";
 import { McpSection } from "./mcp-section.tsx";
 import { MemorySection } from "./memory/memory-section.tsx";
@@ -46,6 +47,8 @@ function Body({ section }: { section: string }) {
       return <SetupSection />;
     case "mcp":
       return <McpSection />;
+    case "devices":
+      return <DevicesSection />;
     case "skills":
       return <SkillsSection />;
     case "agents":

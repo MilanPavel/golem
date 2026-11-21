@@ -56,6 +56,12 @@ import type { DaemonStatus } from "../../protocol/gen/daemon-status.ts";
 import type { McpListResult } from "../../protocol/gen/mcp-list-result.ts";
 import type { McpServer } from "../../protocol/gen/mcp-server.ts";
 import type { ModelServerStatus } from "../../protocol/gen/model-server-status.ts";
+import type { DeviceListResult } from "../../protocol/gen/device-list-result.ts";
+import type { DevicePairBeginResult } from "../../protocol/gen/device-pair-begin-result.ts";
+import type { DevicePairChanged } from "../../protocol/gen/device-pair-changed.ts";
+import type { DevicePairConfirmResult } from "../../protocol/gen/device-pair-confirm-result.ts";
+import type { DeviceRenameResult } from "../../protocol/gen/device-rename-result.ts";
+import type { DeviceRevokeResult } from "../../protocol/gen/device-revoke-result.ts";
 import type { MemoryChanged } from "../../protocol/gen/memory-changed.ts";
 import type { MemoryDeleteResult } from "../../protocol/gen/memory-delete-result.ts";
 import type { MemoryExportParams } from "../../protocol/gen/memory-export-params.ts";
@@ -212,6 +218,12 @@ import {
   isPullDone,
   isPullProgress,
   isRefResult,
+  isDeviceListResult,
+  isDevicePairBeginResult,
+  isDevicePairChanged,
+  isDevicePairConfirmResult,
+  isDeviceRenameResult,
+  isDeviceRevokeResult,
   isMemoryChanged,
   isMemoryDeleteResult,
   isMemoryExportResult,
@@ -656,6 +668,20 @@ export interface GolemClient {
   memorySettings(change?: { scope: "you" | "project" | "history"; privacy: "chat" | "local" }): Promise<MemorySettingsResult>;
   /** `memory.changed`: a memory was made, edited, deleted, went stale or was resolved, so a list read before is stale. */
   onMemoryChanged(listener: (change: MemoryChanged) => void): () => void;
+  /** `device.list`: every paired phone, revoked ones last. */
+  deviceList(): Promise<DeviceListResult>;
+  /** `device.pair.begin`: open a pairing. The result holds the `golem://pair` link for the QR code. It fails when no relay is set. */
+  devicePairBegin(): Promise<DevicePairBeginResult>;
+  /** `device.pair.confirm`: the owner compared the words. `accept` false refuses the phone, or cancels a pairing nobody joined. */
+  devicePairConfirm(pair: string, accept?: boolean): Promise<DevicePairConfirmResult>;
+  /** `device.rename`. */
+  deviceRename(device: string, name: string): Promise<DeviceRenameResult>;
+  /** `device.revoke`: cut a phone off. Its "Always allow" rules stay, and come back in `rules`. */
+  deviceRevoke(device: string): Promise<DeviceRevokeResult>;
+  /** `device.pair.changed`: a pairing moved on (the words to compare, paired, or ended). */
+  onDevicePairChanged(listener: (change: DevicePairChanged) => void): () => void;
+  /** `device.changed`: a phone was paired, renamed, or revoked, so a list read before is stale. */
+  onDevicesChanged(listener: () => void): () => void;
   /** Ping the daemon now, with the heartbeat's timeout. A dead link then closes and reconnects. Does nothing unless the link is open. */
   checkNow(): void;
   close(): void;
@@ -721,6 +747,8 @@ export function connectGolem(options: ConnectOptions): GolemClient {
   const agentListeners = new Set<(root: string | null) => void>();
   const routineListeners = new Set<(kind: "changed" | "fired" | "finished") => void>();
   const memoryListeners = new Set<(change: MemoryChanged) => void>();
+  const pairListeners = new Set<(change: DevicePairChanged) => void>();
+  const deviceListeners = new Set<() => void>();
   const serverListeners = new Set<(status: ModelServerStatus) => void>();
   const optionsSavedListeners = new Set<(saved: ModelOptionsSaved) => void>();
   const installListeners = new Set<(update: OllamaInstallUpdate) => void>();
@@ -1113,6 +1141,32 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       for (const listener of routineListeners) {
         try {
           listener(kind);
+        } catch {
+          // A listener must not tear the socket down.
+        }
+      }
+      return;
+    }
+    if (isRecord(message) && message["method"] === "device.pair.changed") {
+      const params = message["params"];
+      // The words are for the owner to read aloud, not for a log: record the state only.
+      record({ direction: "in", kind: "device.pair.changed", detail: isDevicePairChanged(params) ? params.state : "", json: line.replace(/"words":\[[^\]]*\]/, '"words":[…]') });
+      if (isDevicePairChanged(params)) {
+        for (const listener of pairListeners) {
+          try {
+            listener(params);
+          } catch {
+            // A listener must not tear the socket down.
+          }
+        }
+      }
+      return;
+    }
+    if (isRecord(message) && message["method"] === "device.changed") {
+      record({ direction: "in", kind: "device.changed", detail: "", json: line });
+      for (const listener of deviceListeners) {
+        try {
+          listener();
         } catch {
           // A listener must not tear the socket down.
         }
@@ -2429,6 +2483,48 @@ export function connectGolem(options: ConnectOptions): GolemClient {
         throw new Error("invalid memory.settings result");
       }
       return result;
+    },
+    async deviceList(): Promise<DeviceListResult> {
+      await ready;
+      const result = await call("device.list", {});
+      if (!isDeviceListResult(result)) throw new Error("invalid device.list result");
+      return result;
+    },
+    async devicePairBegin(): Promise<DevicePairBeginResult> {
+      await ready;
+      const result = await call("device.pair.begin", {});
+      if (!isDevicePairBeginResult(result)) throw new Error("invalid device.pair.begin result");
+      return result;
+    },
+    async devicePairConfirm(pair: string, accept = true): Promise<DevicePairConfirmResult> {
+      await ready;
+      const result = await call("device.pair.confirm", { pair, accept });
+      if (!isDevicePairConfirmResult(result)) throw new Error("invalid device.pair.confirm result");
+      return result;
+    },
+    async deviceRename(device: string, name: string): Promise<DeviceRenameResult> {
+      await ready;
+      const result = await call("device.rename", { device, name });
+      if (!isDeviceRenameResult(result)) throw new Error("invalid device.rename result");
+      return result;
+    },
+    async deviceRevoke(device: string): Promise<DeviceRevokeResult> {
+      await ready;
+      const result = await call("device.revoke", { device });
+      if (!isDeviceRevokeResult(result)) throw new Error("invalid device.revoke result");
+      return result;
+    },
+    onDevicePairChanged(listener: (change: DevicePairChanged) => void): () => void {
+      pairListeners.add(listener);
+      return () => {
+        pairListeners.delete(listener);
+      };
+    },
+    onDevicesChanged(listener: () => void): () => void {
+      deviceListeners.add(listener);
+      return () => {
+        deviceListeners.delete(listener);
+      };
     },
     onMemoryChanged(listener: (change: MemoryChanged) => void): () => void {
       memoryListeners.add(listener);

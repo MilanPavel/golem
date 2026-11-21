@@ -1,0 +1,7 @@
+{
+  "additionalProperties": false,
+  "description": "``device.pair.begin``. Opens a pairing. Only one is open at a time: it replaces the old.",
+  "properties": {},
+  "title": "DevicePairBeginParams",
+  "type": "object"
+}
