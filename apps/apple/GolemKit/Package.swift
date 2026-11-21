@@ -9,6 +9,6 @@ let package = Package(
     ],
     targets: [
         .target(name: "GolemKit"),
-        .testTarget(name: "GolemKitTests", dependencies: ["GolemKit"]),
+        .testTarget(name: "GolemKitTests", dependencies: ["GolemKit"], exclude: ["Fixtures"]),
     ]
 )
