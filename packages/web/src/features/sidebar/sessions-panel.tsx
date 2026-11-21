@@ -4,7 +4,9 @@ import {
   groupHelpers,
   helperWords,
   type HelperCardSession,
-  isHelperSession,
+  helperLabel,
+  helperRowState,
+  type HelperRowState,
   isRoutineSession,
   queuedWords,
   sessionState,
@@ -20,7 +22,7 @@ import { Input } from "../../ui/input.tsx";
 import { Menu, MenuCheckboxItem, MenuContent, MenuItem, MenuTrigger } from "../../ui/menu.tsx";
 import { useShowHelpers } from "./show-helpers.ts";
 import { HelperRowCard, SQUARE, type HelperCardActions } from "./helper-row-card.tsx";
-import { openHelper } from "../chat/index.ts";
+import { openHelper, useHelperOpen } from "../chat/index.ts";
 import { useNavigate, usePageActions, useRoute, useSessionList } from "../../store/page-context.tsx";
 import type { SessionSummary } from "../../store/session-list.ts";
 import { sessionPath } from "../../store/router.ts";
@@ -78,16 +80,67 @@ export type SidebarActions = {
 /** A row asks to close its session; `trigger` is its menu button, for focus afterwards. */
 type AskClose = (session: SessionSummary, trigger: HTMLButtonElement | null) => void;
 
+/** What a screen reader hears for a fork; the grey tag in the folder line is what you see. */
 function ForkMark({ row }: { row: ForkRow }) {
   return (
-    <>
-      <span aria-hidden="true" className="shrink-0 text-faint">
-        ⑂
-      </span>
-      <span className="sr-only">
-        {row.parentShown ? (row.parentTitle ? `fork of ${row.parentTitle}` : "fork of an untitled session") : "fork"}
-      </span>
-    </>
+    <span className="sr-only">
+      {row.parentShown ? (row.parentTitle ? `fork of ${row.parentTitle}` : "fork of an untitled session") : "fork"}
+    </span>
+  );
+}
+
+const HELPER_DOT: Record<HelperRowState, string> = {
+  working: "bg-clay animate-pulse",
+  queued: "border border-clay",
+  asking: "bg-wait",
+  done: "bg-allow",
+};
+
+const HELPER_STATE_WORDS: Record<HelperRowState, string> = { working: "working", queued: "queued", asking: "asks you", done: "done" };
+
+/**
+ * A helper under its lead: lighter than a chat row, a clay bar on the left, the agent type and then the
+ * brief. No folder and no time of its own. Its click opens the helper.
+ */
+function HelperTreeRow({
+  helper,
+  leadId,
+  leadTitle,
+  level,
+  selected,
+  onOpen,
+}: {
+  helper: SessionSummary;
+  leadId: string;
+  leadTitle: string;
+  level: number;
+  selected: boolean;
+  onOpen: (leadId: string, helperId: string) => void;
+}) {
+  const state = helperRowState(helper);
+  const { agent, brief } = helperLabel(helper);
+  const words = HELPER_STATE_WORDS[state];
+  return (
+    <li aria-level={level} data-helper-row={state} className="ml-4">
+      <Link
+        href={sessionPath(leadId)}
+        onNavigate={() => onOpen(leadId, helper.session_id)}
+        aria-current={selected ? "true" : undefined}
+        title={brief === "" ? undefined : brief}
+        className={cn(
+          "flex items-center gap-2 rounded-md border-l-2 border-clay py-1 pr-2 pl-2.5 text-xs text-muted outline-offset-2 outline-clay hover:bg-line hover:text-ink focus-visible:outline-2",
+          selected && "bg-surface text-ink ring-1 ring-line ring-inset",
+        )}
+      >
+        <span aria-hidden="true" data-square={state} className={cn("size-2 shrink-0 rounded-xs", HELPER_DOT[state])} />
+        <span className="min-w-0 flex-1 truncate">
+          <span className="font-medium text-ink">{agent}</span>
+          {brief === "" ? null : ` · ${brief}`}
+        </span>
+        <span className="shrink-0 text-faint">{words}</span>
+        <span className="sr-only">{`helper of ${leadTitle}`}</span>
+      </Link>
+    </li>
   );
 }
 
@@ -169,7 +222,11 @@ function SessionRow({
                   <span className="sr-only">started by a routine</span>
                 </>
               ) : null}
-              {isHelperSession(session) ? <span className="shrink-0 text-meta text-faint">helper</span> : null}
+              {row.forked ? (
+                <span aria-hidden="true" data-testid="fork-tag" className="shrink-0 rounded-xs border border-line-strong px-1 text-xs text-faint">
+                  fork
+                </span>
+              ) : null}
             </span>
             <span className="flex items-center gap-2">
               {session.cwd ? (
@@ -247,8 +304,10 @@ function TimeGroupSection({
   chunks,
   squares,
   helpers,
+  nested,
   cardActions,
   selectedId,
+  openHelperId,
   now,
   onNavigate,
   onRename,
@@ -258,6 +317,9 @@ function TimeGroupSection({
   chunks: Chunk[];
   squares: ReadonlyMap<string, readonly HelperSquare[]>;
   helpers: ReadonlyMap<string, readonly HelperCardSession[]>;
+  /** The helpers shown as rows under a lead. Such a lead shows no squares and no card. */
+  nested: ReadonlyMap<string, readonly SessionSummary[]>;
+  openHelperId: string | null;
   cardActions?: HelperCardActions;
   selectedId: string | null;
   now: number;
@@ -273,20 +335,36 @@ function TimeGroupSection({
       </div>
       <ul aria-labelledby={headingId} className="flex flex-col gap-px">
         {chunks.flatMap((chunk) =>
-          chunk.rows.map((row) => (
-            <SessionRow
-              key={row.session.session_id}
-              row={row}
-              squares={squares.get(row.session.session_id) ?? []}
-              helpers={helpers.get(row.session.session_id) ?? []}
-              cardActions={cardActions}
-              selected={row.session.session_id === selectedId}
-              now={now}
-              onNavigate={onNavigate}
-              onRename={onRename}
-              onAskClose={onAskClose}
-            />
-          )),
+          chunk.rows.flatMap((row) => {
+            const id = row.session.session_id;
+            const under = nested.get(id) ?? [];
+            const open = (leadId: string, helperId: string) => (cardActions ? cardActions.open(leadId, helperId) : onNavigate(sessionPath(leadId)));
+            return [
+              <SessionRow
+                key={id}
+                row={row}
+                squares={under.length > 0 ? [] : (squares.get(id) ?? [])}
+                helpers={under.length > 0 ? [] : (helpers.get(id) ?? [])}
+                cardActions={cardActions}
+                selected={id === selectedId && openHelperId === null}
+                now={now}
+                onNavigate={onNavigate}
+                onRename={onRename}
+                onAskClose={onAskClose}
+              />,
+              ...under.map((helper) => (
+                <HelperTreeRow
+                  key={helper.session_id}
+                  helper={helper}
+                  leadId={id}
+                  leadTitle={row.session.title ?? "Untitled"}
+                  level={row.depth + 2}
+                  selected={helper.session_id === openHelperId}
+                  onOpen={open}
+                />
+              )),
+            ];
+          }),
         )}
       </ul>
     </div>
@@ -317,6 +395,8 @@ export type SessionsPanelProps = {
   sessions: readonly SessionSummary[];
   /** The session in view, if any. */
   selectedId: string | null;
+  /** The helper the chat shows in its panel, if any. Its lead has its helpers as rows. */
+  openHelperId?: string | null;
   now: number;
   onNavigate: (path: string) => void;
   /** Rename and close from each row's menu. Without it the rows have no menu. */
@@ -326,7 +406,7 @@ export type SessionsPanelProps = {
 };
 
 /** The sessions panel's body: a filter, then sessions by time, closed ones left out. */
-export function SessionsPanel({ sessions, selectedId, now, onNavigate, actions, helperActions }: SessionsPanelProps) {
+export function SessionsPanel({ sessions, selectedId, openHelperId = null, now, onNavigate, actions, helperActions }: SessionsPanelProps) {
   const [closing, setClosing] = useState<SessionSummary | null>(null);
   const [filter, setFilter] = useState("");
   // Where focus goes when the dialog shuts: the row's menu button, or the list once the row is gone.
@@ -338,8 +418,9 @@ export function SessionsPanel({ sessions, selectedId, now, onNavigate, actions, 
   };
   const open = useMemo(() => sessions.filter((session) => session.status !== "closed"), [sessions]);
   const [showHelpers, setShowHelpers] = useShowHelpers();
-  // A helper is not a row (ADR-059): its lead shows a square for it. The filter reads the rows only.
-  const grouped = useMemo(() => groupHelpers(open, { showHelpers }), [open, showHelpers]);
+  // A helper is not a row of its own (ADR-059). The filter reads the lead rows, and the helpers only with "Show helpers".
+  // The lead in view, or the lead of the helper in view, shows its helpers as rows; with "Show helpers" every lead does.
+  const grouped = useMemo(() => groupHelpers(open, { showHelpers, openId: openHelperId ?? selectedId }), [open, showHelpers, openHelperId, selectedId]);
   const needle = filter.trim().toLowerCase();
   const shown = useMemo(
     () =>
@@ -348,9 +429,10 @@ export function SessionsPanel({ sessions, selectedId, now, onNavigate, actions, 
         : grouped.rows.filter(
             (session) =>
               (session.title ?? "").toLowerCase().includes(needle) ||
-              (session.cwd ? folderName(session.cwd) : "").toLowerCase().includes(needle),
+              (session.cwd ? folderName(session.cwd) : "").toLowerCase().includes(needle) ||
+              (showHelpers && (grouped.nested.get(session.session_id) ?? []).some((helper) => (helper.title ?? "").toLowerCase().includes(needle))),
           ),
-    [grouped, needle],
+    [grouped, needle, showHelpers],
   );
   const groups = useMemo(() => timeChunks(shown, now), [shown, now]);
   return (
@@ -396,6 +478,8 @@ export function SessionsPanel({ sessions, selectedId, now, onNavigate, actions, 
               chunks={group.chunks}
               squares={grouped.squares}
               helpers={grouped.helpers}
+              nested={grouped.nested}
+              openHelperId={openHelperId}
               cardActions={helperActions}
               selectedId={selectedId}
               now={now}
@@ -434,6 +518,7 @@ export function LiveSessionsPanel() {
   const { rename, close } = useSessionActions();
   const actions = useMemo(() => ({ rename, close }), [rename, close]);
   const page = usePageActions();
+  const openHelperId = useHelperOpen()?.helperId ?? null;
   const helperActions = useMemo<HelperCardActions>(
     () => ({
       open(leadId, helperId) {
@@ -450,6 +535,7 @@ export function LiveSessionsPanel() {
     <SessionsPanel
       sessions={sessions}
       selectedId={route.name === "session" ? route.id : null}
+      openHelperId={openHelperId}
       now={now}
       onNavigate={navigate}
       actions={actions}

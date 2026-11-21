@@ -318,7 +318,7 @@ test("a fork is listed under its parent with a mark that names the parent", asyn
   const items = within(list).getAllByRole("listitem");
   expect(items.map((item) => item.getAttribute("aria-level"))).toEqual(["1", "2", "1"]);
   expect(items[1]?.textContent).toContain("fork of UTF-8 split");
-  expect(items[1]?.textContent).toContain("⑂");
+  expect(within(items[1]!).getByTestId("fork-tag").textContent).toBe("fork");
 });
 
 for (const theme of ["slip", "kiln"]) {

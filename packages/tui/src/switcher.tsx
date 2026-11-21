@@ -2,7 +2,7 @@ import { Box, Text } from "ink";
 
 import { ROUTINE_MARK } from "@golem/view";
 
-import { type SwitcherRow } from "./switcher.ts";
+import { FORK_TAG, type SwitcherRow } from "./switcher.ts";
 import { CLAY } from "./theme.ts";
 
 /** The session list in place of the transcript. The first line is the key hint. */
@@ -27,7 +27,7 @@ export function SwitcherView({
       {rows.length === 0 ? <Text dimColor>{empty}</Text> : null}
       {rows.flatMap((row) => {
         const mark = row.routine ? `${ROUTINE_MARK} ` : "";
-        const squares = row.helpers.length > 0 ? row.helpers.length + 1 : 0;
+        const squares = (row.helpers.length > 0 ? row.helpers.length + 1 : 0) + (row.fork ? FORK_TAG.length + 1 : 0);
         const pad = " ".repeat(Math.max(1, columns - mark.length - row.title.length - squares - row.age.length - 5));
         const line = (
           <Text key={row.sessionId} wrap="truncate-end" inverse={row.selected}>
@@ -40,6 +40,7 @@ export function SwitcherView({
             </Text>
             {row.routine ? <Text dimColor>{mark}</Text> : null}
             <Text bold={row.current}>{row.title}</Text>
+            {row.fork ? <Text dimColor>{` ${FORK_TAG}`}</Text> : null}
             {row.helpers.length > 0 ? (
               <Text>
                 {" "}
@@ -53,13 +54,13 @@ export function SwitcherView({
             <Text dimColor>{`${pad}${row.age}`}</Text>
           </Text>
         );
-        // The selected lead's helpers, one line each: the mark, the agent and title, the newest step.
+        // The open lead's helpers, one line each: the mark, the agent and brief, the newest step while it works.
         const under = row.lines.map((item) => (
           <Text key={`${row.sessionId}:${item.sessionId}`} wrap="truncate-end">
-            <Text color={item.square === "asking" ? "yellow" : item.square === "working" ? "green" : undefined} dimColor={item.square === "queued"}>
-              {`    ${item.square === "queued" ? "□" : "■"} `}
+            <Text color={item.square === "asking" ? "yellow" : item.square === "working" ? "green" : undefined} dimColor={item.square === "queued" || item.square === "done"}>
+              {`    ${item.square === "queued" ? "□" : item.square === "done" ? "✓" : "■"} `}
             </Text>
-            <Text>{item.text}</Text>
+            <Text dimColor={item.square === "done"}>{item.text}</Text>
             {item.step === null ? null : <Text dimColor>{`  ${item.step}`}</Text>}
           </Text>
         ));

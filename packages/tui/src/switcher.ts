@@ -1,5 +1,5 @@
 import type { SessionSummary } from "@golem/client";
-import { groupHelpers, helperRowCard, helperWords, isRoutineSession, isWaiting, sessionState, type HelperSquare } from "@golem/view";
+import { groupHelpers, helperLabel, helperRowCard, helperRowState, helperWords, isRoutineSession, isWaiting, sessionState, type HelperRowState, type HelperSquare } from "@golem/view";
 
 /** The selection is a session id, so it stays put while live summaries reorder the list. */
 export type SwitcherState = {
@@ -31,10 +31,11 @@ export type SwitcherAction =
   | { kind: "close" }
   | { kind: "close-session"; sessionId: string };
 
-/** One helper of the selected lead, as a line under its row. */
+/** One helper of the open lead, as a line under its row. */
 export type SwitcherHelperLine = {
   sessionId: string;
-  square: HelperSquare;
+  /** The mark: working, queued, asks you, or done. */
+  square: HelperRowState;
   /** The agent type and the rest of its title. */
   text: string;
   /** Its newest step, or null before the first step. */
@@ -42,8 +43,10 @@ export type SwitcherHelperLine = {
 };
 
 export type SwitcherRow = {
-  /** The helpers of this session that are not done, under its row. Only the selected row has any. */
+  /** The helpers of this session, under its row, in the order of the call. Only the lead of the open chat has any. */
   lines: SwitcherHelperLine[];
+  /** The session is a fork of another: a small grey tag after its title. */
+  fork: boolean;
   sessionId: string;
   selected: boolean;
   current: boolean;
@@ -171,16 +174,18 @@ export function layoutSwitcher(input: {
     return [];
   }
   const index = selectedIndex(input.state, sessions);
-  const { squares, helpers: summaries } = groupHelpers(input.sessions);
-  // The selected lead shows its helpers as lines under its row; they take their share of the height.
-  const selectedLines = helperLines(summaries.get(sessions[index]?.session_id ?? "") ?? [], input.now, input.columns).slice(0, Math.max(0, rows - 1));
-  const budget = rows - selectedLines.length;
+  const { squares, nested } = groupHelpers(input.sessions, { openId: input.current });
+  // The lead of the open chat shows its helpers as lines under its row; they take their share of the height.
+  const openLead = openLeadId(input.sessions, input.current);
+  const openLines = helperLines(nested.get(openLead ?? "") ?? [], input.now, input.columns).slice(0, Math.max(0, rows - 1));
+  const budget = rows - openLines.length;
   const start = Math.min(Math.max(0, index - budget + 1), Math.max(0, sessions.length - budget));
   return sessions.slice(start, start + budget).map((summary, offset) => {
     const age = relativeAge(summary.updated_at, input.now);
     const helpers = squares.get(summary.session_id) ?? [];
     return {
-      lines: start + offset === index ? selectedLines : [],
+      lines: summary.session_id === openLead ? openLines : [],
+      fork: summary.forked_from !== undefined && summary.forked_from !== null,
       sessionId: summary.session_id,
       selected: start + offset === index,
       current: summary.session_id === input.current,
@@ -190,7 +195,7 @@ export function layoutSwitcher(input: {
       routine: isRoutineSession(summary),
       title: fit(
         summary.title ?? UNTITLED,
-        input.columns - ROW_CHROME - age.length - (isRoutineSession(summary) ? 2 : 0) - (helpers.length > 0 ? helpers.length + 1 : 0),
+        input.columns - ROW_CHROME - age.length - (isRoutineSession(summary) ? 2 : 0) - (summary.forked_from === undefined || summary.forked_from === null ? 0 : FORK_TAG.length + 1) - (helpers.length > 0 ? helpers.length + 1 : 0),
       ),
       age,
       helpers,
@@ -199,20 +204,30 @@ export function layoutSwitcher(input: {
   });
 }
 
-/** The card of a lead as lines: a mark, the agent type and title, the newest step. Nothing for a lead with no helper to show. */
-function helperLines(helpers: readonly SessionSummary[], now: number, columns: number): SwitcherHelperLine[] {
-  const card = helperRowCard(helpers, now);
-  if (card === null) {
-    return [];
+/** The lead of the open chat: the chat itself, or the lead when it is a helper. Null when no chat is open. */
+function openLeadId(sessions: readonly SessionSummary[], current: string | null): string | null {
+  if (current === null) {
+    return null;
   }
-  return card.blocks.map((block) => {
-    const text = fit([block.agent, block.title].filter((part) => part !== "").join(" "), Math.max(8, Math.floor((columns - LINE_CHROME) / 2)));
+  return sessions.find((summary) => summary.session_id === current)?.parent_session_id ?? current;
+}
+
+/** The grey word after a fork's title. */
+export const FORK_TAG = "fork";
+
+/** The helpers of a lead as lines: a mark, the agent type and brief, the newest step while it works. */
+function helperLines(helpers: readonly SessionSummary[], now: number, columns: number): SwitcherHelperLine[] {
+  return helpers.map((helper) => {
+    const { agent, brief } = helperLabel(helper);
+    const state = helperRowState(helper);
+    const text = fit([agent, brief].filter((part) => part !== "").join(" "), Math.max(8, Math.floor((columns - LINE_CHROME) / 2)));
     const room = columns - LINE_CHROME - text.length - 2;
+    const step = state === "done" ? "" : (helperRowCard([helper], now)?.blocks[0]?.step ?? "");
     return {
-      sessionId: block.sessionId,
-      square: block.square,
+      sessionId: helper.session_id,
+      square: state,
       text,
-      step: block.step === null || room < 4 ? null : fit(block.step, room),
+      step: step === "" || room < 4 ? null : fit(step, room),
     };
   });
 }

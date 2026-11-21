@@ -247,31 +247,63 @@ test("a helper whose lead is not listed is not a row, and the filter skips it", 
   assert.deepEqual(rowsOf(sessions, "explorer").map((row) => row.sessionId), []);
 });
 
-test("the selected lead shows its helpers as lines: mark, title, newest step; other rows show none", () => {
-  const sessions = [
-    summary("s_a", "Lead", true),
-    summary("s_b", "Other"),
-    { ...helper("h1", "s_a", "running"), step: "read daemon/app.py" },
-    helper("h2", "s_a", "waiting"),
-    helper("h3", "s_a", "idle"),
-  ];
-  const rows = rowsOf(sessions);
+function openRows(sessions: SessionSummary[], current: string | null) {
+  return layoutSwitcher({ state: openSwitcher("s_b"), sessions, current, now: NOW, columns: 60, rows: 10 });
+}
+
+const HELPERS = [
+  summary("s_a", "Lead", true),
+  summary("s_b", "Other"),
+  { ...helper("h2", "s_a", "idle"), created_at: "2026-10-15T11:10:00Z" },
+  { ...helper("h1", "s_a", "running"), step: "read daemon/app.py", created_at: "2026-10-15T11:05:00Z" },
+  { ...helper("h3", "s_a", "waiting"), created_at: "2026-10-15T11:20:00Z" },
+];
+
+test("the lead of the open chat shows all its helpers as lines in the order of the call, with the marks", () => {
+  const rows = openRows(HELPERS, "s_a");
   const lead = rows.find((row) => row.sessionId === "s_a");
   assert.deepEqual(
     lead?.lines.map((line) => [line.sessionId, line.square, line.step]),
     [
       ["h1", "working", "read daemon/app.py"],
-      ["h2", "asking", null],
+      ["h2", "done", null],
+      ["h3", "asking", null],
     ],
   );
   assert.equal(lead?.lines[0]?.text, "explorer h1");
   assert.deepEqual(rows.find((row) => row.sessionId === "s_b")?.lines, []);
 });
 
+test("a helper as the open chat keeps its lead's helpers shown", () => {
+  assert.equal(openRows(HELPERS, "h1").find((row) => row.sessionId === "s_a")?.lines.length, 3);
+});
+
+test("with another chat open, or none, the lead shows squares and no lines", () => {
+  for (const current of ["s_b", null]) {
+    const lead = openRows(HELPERS, current).find((row) => row.sessionId === "s_a");
+    assert.deepEqual(lead?.lines, []);
+    assert.deepEqual(lead?.helpers, ["working", "asking"]);
+  }
+});
+
+test("a trimmed helper is not a line, and a field that is empty is", () => {
+  const sessions = [
+    summary("s_a", "Lead"),
+    { ...helper("h1", "s_a", "idle"), trimmed_at: "2026-10-15T11:30:00Z" },
+    { ...helper("h2", "s_a", "idle"), trimmed_at: null },
+  ] as SessionSummary[];
+  assert.deepEqual(openRows(sessions, "s_a")[0]?.lines.map((line) => line.sessionId), ["h2"]);
+});
+
+test("a fork has the tag and a helper is never a row", () => {
+  const sessions = [summary("s_a", "Lead"), { ...summary("s_f", "Fork"), forked_from: "s_a" }, helper("h1", "s_a", "running")];
+  assert.deepEqual(openRows(sessions, "s_a").map((row) => [row.sessionId, row.fork]), [["s_a", false], ["s_f", true]]);
+});
+
 test("the helper lines take their share of the height, and the selected row stays in view", () => {
   const sessions = [summary("s_a", "Lead", true), summary("s_b", "Other"), summary("s_c", "Third"), helper("h1", "s_a", "running"), helper("h2", "s_a", "running")];
-  const rows = layoutSwitcher({ state: openSwitcher("s_a"), sessions, current: null, now: NOW, columns: 60, rows: 4 });
-  assert.equal(rows.length + (rows[0]?.lines.length ?? 0), 4);
+  const rows = layoutSwitcher({ state: openSwitcher("s_a"), sessions, current: "s_a", now: NOW, columns: 60, rows: 4 });
+  assert.equal(rows.length + (rows.find((row) => row.sessionId === "s_a")?.lines.length ?? 0), 4);
   assert.ok(rows.some((row) => row.selected));
 });
 

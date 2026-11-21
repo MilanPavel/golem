@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { groupHelpers, helperCountWords, helperSquare, helperWords, isHelperSession, type HelperSession } from "./helper-rows.ts";
+import { groupHelpers, helperCountWords, helperLabel, helperRowState, helperSquare, helperWords, isHelperSession, isTrimmedHelper, type HelperSession } from "./helper-rows.ts";
 
 function s(id: string, status: string, extra: Partial<HelperSession> = {}): HelperSession {
   return { session_id: id, status, ...extra };
@@ -47,11 +47,63 @@ test("an older daemon, with no parent_session_id, keeps every row", () => {
   assert.equal(squares.size, 0);
 });
 
-test("show helpers brings the helper rows back and keeps the squares", () => {
-  const list = [LEAD, s("h1", "running", { parent_session_id: "lead" })];
-  const { rows, squares } = groupHelpers(list, { showHelpers: true });
-  assert.deepEqual(rows.map((r) => r.session_id), ["lead", "h1"]);
+test("show helpers nests the helpers of every lead and keeps the squares", () => {
+  const other = s("other", "idle");
+  const list = [LEAD, s("h1", "running", { parent_session_id: "lead" }), other, s("o1", "idle", { parent_session_id: "other" })];
+  const { rows, squares, nested } = groupHelpers(list, { showHelpers: true });
+  assert.deepEqual(rows.map((r) => r.session_id), ["lead", "other"]);
   assert.deepEqual(squares.get("lead"), ["working"]);
+  assert.deepEqual(nested.get("lead")?.map((r) => r.session_id), ["h1"]);
+  assert.deepEqual(nested.get("other")?.map((r) => r.session_id), ["o1"]);
+});
+
+const TWO = [
+  LEAD,
+  s("h2", "idle", { parent_session_id: "lead", created_at: "2026-11-21T10:05:00Z" }),
+  s("h1", "running", { parent_session_id: "lead", created_at: "2026-11-21T10:00:00Z" }),
+  s("other", "idle"),
+  s("o1", "running", { parent_session_id: "other" }),
+];
+
+test("the open lead has its helpers as rows, in the order of the call", () => {
+  const { rows, nested } = groupHelpers(TWO, { openId: "lead" });
+  assert.deepEqual(rows.map((r) => r.session_id), ["lead", "other"]);
+  assert.deepEqual(nested.get("lead")?.map((r) => r.session_id), ["h1", "h2"]);
+  assert.equal(nested.has("other"), false);
+});
+
+test("a lead stays open while one of its helpers is the open chat", () => {
+  assert.deepEqual(groupHelpers(TWO, { openId: "h2" }).nested.get("lead")?.map((r) => r.session_id), ["h1", "h2"]);
+});
+
+test("another chat open, and no show helpers, leaves no helper rows", () => {
+  assert.equal(groupHelpers(TWO, { openId: "other" }).nested.has("lead"), false);
+  assert.equal(groupHelpers(TWO).nested.size, 0);
+});
+
+test("a trimmed helper is not a row, and one with the field empty is", () => {
+  const list = [
+    LEAD,
+    s("h1", "idle", { parent_session_id: "lead", trimmed_at: "2026-11-21T10:00:00Z" }),
+    s("h2", "idle", { parent_session_id: "lead", trimmed_at: null }),
+    s("h3", "idle", { parent_session_id: "lead" }),
+  ];
+  assert.deepEqual(groupHelpers(list, { openId: "lead" }).nested.get("lead")?.map((r) => r.session_id), ["h2", "h3"]);
+  assert.equal(isTrimmedHelper(list[1]!), true);
+  assert.equal(isTrimmedHelper(list[2]!), false);
+});
+
+test("a helper label is the agent type and the brief after it", () => {
+  assert.deepEqual(helperLabel(s("x", "idle", { agent: "explorer", title: "explorer · Map approvals" })), { agent: "explorer", brief: "Map approvals" });
+  assert.deepEqual(helperLabel(s("x", "idle", { title: "Read it" })), { agent: "helper", brief: "Read it" });
+  assert.deepEqual(helperLabel(s("x", "idle")), { agent: "helper", brief: "" });
+});
+
+test("a helper row says working, queued, asking or done", () => {
+  assert.equal(helperRowState(s("x", "running")), "working");
+  assert.equal(helperRowState(s("x", "running", { wait_reason: "slot" })), "queued");
+  assert.equal(helperRowState(s("x", "waiting")), "asking");
+  assert.equal(helperRowState(s("x", "idle")), "done");
 });
 
 test("square and helper test", () => {
