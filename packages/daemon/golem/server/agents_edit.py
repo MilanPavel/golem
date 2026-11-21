@@ -24,6 +24,7 @@ from pathlib import Path
 
 from pydantic import ValidationError
 
+from golem.agents.bundled import bundled_agents_dir
 from golem.agents.edit import AgentEditError, check_wish, with_wish
 from golem.agents.model import Agent
 from golem.agents.registry import AgentRegistry, Listed
@@ -76,6 +77,8 @@ async def agent_infos(ctx: RequestContext, cwd: str | None) -> list[tuple[AgentI
     root = None if cwd is None else Path(cwd)
     view = registry.view(root)
     counts = await ctx.state.agent_usage.counts() if ctx.state.agent_usage is not None else None
+    sessions = ctx.state.sessions
+    home = ctx.state.user_home or Path.home()
 
     async def info(entry: Listed, *, trusted: bool) -> tuple[AgentInfo, Agent]:
         agent = entry.agent
@@ -85,6 +88,8 @@ async def agent_infos(ctx: RequestContext, cwd: str | None) -> list[tuple[AgentI
             if other.shadowed_by == agent.path and other.agent.valid
         ]
         count = None if counts is None else counts.get(agent.name)
+        text = await _file_text(agent.path) if trusted else None
+        usable = trusted and agent.valid and sessions is not None
         return AgentInfo(
             name=agent.name,
             description=agent.description,
@@ -104,6 +109,13 @@ async def agent_infos(ctx: RequestContext, cwd: str | None) -> list[tuple[AgentI
             used=0 if count is None else count.used,
             finished=None if counts is None else (0 if count is None else count.finished),
             resolves_to=await _resolves_to(ctx, entry, cwd) if trusted else None,
+            path=shown_path(agent.path, entry.origin, root, home),
+            text=text,
+            prompt=agent.body if trusted else None,
+            changing_tools=sessions.changing_tools(agent) if sessions is not None else [],
+            unavailable=sessions.unavailable_reason(agent) if usable and sessions else None,
+            stopped=None if counts is None else (0 if count is None else count.stopped),
+            cost_usd=None if count is None else count.cost_usd,
         ), agent
 
     held_back = [
@@ -115,6 +127,29 @@ async def agent_infos(ctx: RequestContext, cwd: str | None) -> list[tuple[AgentI
         if entry.usable or not entry.agent.valid
     ]
     return held_back + shown
+
+
+def shown_path(path: Path, origin: AgentOrigin, root: Path | None, home: Path) -> str:
+    """The file as a person reads it: ``~`` for the home folder, the package path for a bundled
+    file, the path inside the project for a project file."""
+    if origin == "bundled":
+        package = bundled_agents_dir().parent.parent
+        with contextlib.suppress(ValueError):
+            return f"{package.name}/{path.relative_to(package).as_posix()}"
+    if origin == "project" and root is not None:
+        with contextlib.suppress(ValueError):
+            return path.relative_to(root).as_posix()
+    with contextlib.suppress(ValueError):
+        return f"~/{path.relative_to(home).as_posix()}"
+    return str(path)
+
+
+async def _file_text(path: Path) -> str | None:
+    """The file as written, or None when it cannot be read."""
+    try:
+        return await asyncio.to_thread(_read, path)
+    except (OSError, UnicodeDecodeError):
+        return None
 
 
 async def _resolves_to(

@@ -86,6 +86,7 @@ from golem.sessions.helpers import (
     stop_reason,
     summarize_run,
     tokens_over,
+    unavailable_reason,
     what_is_sent,
     wish_of,
     writing_tools,
@@ -1703,12 +1704,9 @@ class SessionManager:
                     )
                 names = ", ".join(a.name for a in view.usable())
                 raise ToolError(f"unknown agent {spec.agent}; the agents are {names}")
-            writes = writing_tools(agent, self._is_read_only)
-            if writes:
-                raise ToolError(
-                    f"agent {agent.name} is not available yet: it has tools that change things "
-                    f"({', '.join(writes)}), and only agents that read can run now"
-                )
+            reason = unavailable_reason(agent, self._is_read_only)
+            if reason is not None:
+                raise ToolError(reason)
             source: AgentOrigin = next(e.origin for e in view.listed if e.agent is agent)
             tools = [name for name in agent.tools if name in offered or name == "delegate"]
             snapshot = snapshot_of(agent, source, tools, self._runtime.child_limits)
@@ -1726,6 +1724,14 @@ class SessionManager:
                 prompt=prompt,
                 asked_model=spec.model,
             )
+
+    def unavailable_reason(self, agent: Agent) -> str | None:
+        """Why ``agent`` cannot be started now (the text ``delegate`` refuses with), or None."""
+        return unavailable_reason(agent, self._is_read_only)
+
+    def changing_tools(self, agent: Agent) -> list[str]:
+        """The tools of ``agent`` that are not read-only."""
+        return writing_tools(agent, self._is_read_only)
 
     def _is_read_only(self, name: str) -> bool:
         tool = self._runtime.tools.get(name)

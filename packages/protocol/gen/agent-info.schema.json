@@ -140,12 +140,32 @@
     }
   },
   "additionalProperties": false,
-  "description": "One agent type: an ``agents/<name>.md`` file, valid or not.\n\n``wish`` is the model wish as written: ``cheapest``, ``same``, ``stronger``, a tier\nor a model. ``tools`` are the tool names the helper may use, empty for none. ``asks``\nis true when the helper may ask you a question. ``errors`` are what is wrong with\nthe file: a type with errors is never the one a name resolves to. ``shadowed`` lists\nthe origins of lower files of the same name that this one hides. ``trusted`` is\nfalse for a project agent in a folder that is not trusted, which is listed and\nnever started. ``used`` and ``finished`` count helpers of this type started and\nended in the last 30 days (``helper.ended``). ``finished`` is ``None`` when the\ndaemon cannot count them. ``resolves_to`` is what ``wish`` becomes in this setup;\n``None`` when the daemon does not say. An older daemon leaves it out.",
+  "description": "One agent type: an ``agents/<name>.md`` file, valid or not.\n\n``wish`` is the model wish as written: ``cheapest``, ``same``, ``stronger``, a tier\nor a model. ``tools`` are the tool names the helper may use, empty for none. ``asks``\nis true when the helper may ask you a question. ``errors`` are what is wrong with\nthe file: a type with errors is never the one a name resolves to. ``shadowed`` lists\nthe origins of lower files of the same name that this one hides. ``trusted`` is\nfalse for a project agent in a folder that is not trusted, which is listed and\nnever started. ``used`` and ``finished`` count helpers of this type started and\nended in the last 30 days (``helper.ended``). ``finished`` is ``None`` when the\ndaemon cannot count them. ``stopped`` counts the ones of the last 30 days that ended\nearly, for any reason other than done; ``None`` when the daemon cannot count them.\n``cost_usd`` is what those helpers cost in the same days; ``None`` when the daemon\ncannot say. ``resolves_to`` is what ``wish`` becomes in this setup; ``None`` when the\ndaemon does not say.\n\n``path`` is the agent's file: ``~`` stands for the home folder, a bundled file is its\npackage path (``golem/agents/bundled/explorer.md``) and a project file is relative to the\nproject. ``text`` is the whole file as written and ``prompt`` is its body. Both are\n``None`` for a project agent in a folder that is not trusted. ``changing_tools`` are the\n``tools`` that change things; the rest only read. ``unavailable`` says in plain words why\nthe agent cannot be started now, the same text ``delegate`` refuses with, and is ``None``\nwhen it can. An older daemon leaves out every field from ``resolves_to`` on.",
   "properties": {
     "asks": {
       "default": false,
       "title": "Asks",
       "type": "boolean"
+    },
+    "changing_tools": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Changing Tools",
+      "type": "array"
+    },
+    "cost_usd": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Cost Usd"
     },
     "description": {
       "title": "Description",
@@ -188,6 +208,30 @@
       "title": "Origin",
       "type": "string"
     },
+    "path": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Path"
+    },
+    "prompt": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Prompt"
+    },
     "resolves_to": {
       "anyOf": [
         {
@@ -211,6 +255,31 @@
       "title": "Shadowed",
       "type": "array"
     },
+    "stopped": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Stopped"
+    },
+    "text": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Text"
+    },
     "tools": {
       "items": {
         "type": "string"
@@ -222,6 +291,18 @@
       "default": true,
       "title": "Trusted",
       "type": "boolean"
+    },
+    "unavailable": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Unavailable"
     },
     "used": {
       "default": 0,

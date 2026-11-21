@@ -3,7 +3,7 @@ import { test } from "node:test";
 
 import type { AgentInfo } from "@golem/client";
 
-import { agentFinished, agentRow, agentRows, agentsTable, agentUsed, agentWish, wishLine, wishNow, wishOptions, wishSetup } from "./agents-view.ts";
+import { agentFinished, agentRow, agentRows, agentsTable, agentUsed, agentWish, toolGroups, usageLine, wishLine, wishNow, wishOptions, wishSetup } from "./agents-view.ts";
 
 const bundled = (over: Partial<AgentInfo>): AgentInfo => ({
   name: "explorer",
@@ -155,4 +155,33 @@ test("wishLine: the wish, what it becomes, and the setup decides the words", () 
   assert.equal(wishLine("frontier", "local", undefined), "wish: not available here");
   assert.equal(wishLine("local", "cloud", { model: "m" }), "wish: not available here, now m");
   assert.equal(wishLine("qwen3:14b", "local", null), "wish: qwen3:14b");
+});
+
+test("the usage line says runs, early stops and cost, and leaves out what is missing", () => {
+  assert.equal(usageLine(bundled({ used: 9, stopped: 1, cost_usd: 0 })), "9 runs in 30 days · 1 stopped early · $0.00");
+  assert.equal(usageLine(bundled({ used: 9, stopped: 0, cost_usd: 1.234 })), "9 runs in 30 days · $1.23");
+  assert.equal(usageLine(bundled({ used: 1, stopped: null, cost_usd: null })), "1 run in 30 days");
+  assert.equal(usageLine(bundled({ used: 0 })), "Not used yet");
+  assert.equal(usageLine(bundled({ used: 5, unavailable: "agent worker is not available yet" })), "Cannot run yet");
+});
+
+test("the tools split into reading and changing ones, and the row carries the file", () => {
+  const worker = bundled({
+    name: "worker",
+    tools: ["read_file", "edit_file", "grep"],
+    changing_tools: ["edit_file"],
+    path: "golem/agents/bundled/worker.md",
+    text: "---\nname: worker\n---\nDo it.",
+    prompt: "Do it.",
+    unavailable: "agent worker is not available yet",
+  });
+  assert.deepEqual(toolGroups(worker), { reading: ["read_file", "grep"], changing: ["edit_file"] });
+  const row = agentRow(worker);
+  assert.equal(row.path, "golem/agents/bundled/worker.md");
+  assert.equal(row.prompt, "Do it.");
+  assert.equal(row.unavailable, "agent worker is not available yet");
+  assert.deepEqual([row.readingTools, row.changingTools], [["read_file", "grep"], ["edit_file"]]);
+  assert.equal(row.usage, "Cannot run yet");
+  const old = agentRow(bundled({}));
+  assert.deepEqual([old.path, old.text, old.unavailable, old.readingTools], [null, null, null, []]);
 });

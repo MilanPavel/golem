@@ -175,6 +175,20 @@ def writing_tools(agent: Agent, is_read_only: Callable[[str], bool]) -> list[str
     return [name for name in agent.tools if not is_read_only(name)]
 
 
+def unavailable_reason(agent: Agent, is_read_only: Callable[[str], bool]) -> str | None:
+    """Why ``agent`` cannot be started now, or ``None`` when it can.
+
+    ``delegate`` refuses with this text, and the agents list shows it.
+    """
+    writes = writing_tools(agent, is_read_only)
+    if not writes:
+        return None
+    return (
+        f"agent {agent.name} is not available yet: it has tools that change things "
+        f"({', '.join(writes)}), and only agents that read can run now"
+    )
+
+
 @dataclass(frozen=True, slots=True)
 class RunSummary:
     """What the events of one helper run say about how it went."""
@@ -328,6 +342,7 @@ __all__ = [
     "stopped_of",
     "summarize_run",
     "tokens_over",
+    "unavailable_reason",
     "wish_of",
     "writing_tools",
 ]
