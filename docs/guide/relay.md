@@ -11,10 +11,10 @@ It is one container, and it keeps nothing on disk.
 
 ## Build and run it
 
-The image is built from the relay package, so the build context is `packages/relay`. From the repository root:
+The relay imports one file of the gateway, so the build context is the repository root:
 
 ```sh
-docker build -t golem-relay packages/relay
+docker build -f packages/relay/Dockerfile -t golem-relay .
 docker run --rm -p 8080:8080 -e RELAY_HOST=relay.example.com golem-relay
 ```
 
