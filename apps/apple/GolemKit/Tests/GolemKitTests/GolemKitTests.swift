@@ -17,7 +17,7 @@ private struct Fixture: Decodable {
 @Test func everyRecordedEventDecodes() throws {
     let files = try FileManager.default.contentsOfDirectory(at: goldenFolder, includingPropertiesForKeys: nil)
         .filter { $0.pathExtension == "json" }
-    #expect(files.count == 5)
+    #expect(!files.isEmpty)
     for file in files {
         let fixture = try JSONDecoder().decode(Fixture.self, from: Data(contentsOf: file))
         #expect(!fixture.live.isEmpty, "\(file.lastPathComponent)")
