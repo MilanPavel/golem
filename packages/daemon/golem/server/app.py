@@ -449,6 +449,7 @@ class DaemonApp:
                 )
                 sessions.facts = self.state.facts
                 sessions.listed_refs = lambda: [listed.ref for listed in models.cached()]
+                sessions.listed_models = models.cached
                 self.state.pulls = pulls
                 checks = CheckManager(
                     router,

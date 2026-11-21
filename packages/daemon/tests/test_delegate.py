@@ -33,6 +33,7 @@ from golem.config import (
 from golem.graphs.adapter import plain_messages
 from golem.graphs.chat import ChatRuntime, open_chat
 from golem.graphs.child import FINAL_REQUEST, ChildLimits
+from golem.models.discovery import ListedModel
 from golem.models.dispatcher import Dispatcher
 from golem.models.router import ModelRouter
 from golem.models.tiers import Tier
@@ -1023,3 +1024,47 @@ async def test_a_cloud_only_setup_runs_the_helper_on_the_cheapest_budget_model(
     started = next(e for e in events if e.type == "helper.started")
     assert started.data.model == "deepseek/chat"
     assert started.data.pick_reason == "the cheapest hosted model at or below the lead's tier"
+
+
+def _listed(ref: str, status: str = "ready", price: ModelPrice | None = None) -> ListedModel:
+    return ListedModel(
+        ref=ref,
+        label=ref,
+        provider=ref.partition("/")[0],
+        source="catalog",
+        status=status,  # type: ignore[arg-type]
+        price=price,
+    )
+
+
+async def test_the_delegate_models_include_listed_hosted_models_when_there_are_no_profiles(
+    database: Database,
+) -> None:
+    settings = GolemSettings(default_model="ollama/qwen3.8:27b")
+    chat = _Chat(database, ToolCallingChatModel(replies=[]), settings=settings)
+    chat.manager.listed_models = lambda: [
+        _listed("ollama/qwen3.8:27b"),
+        _listed("openai/gpt-6-luna", price=ModelPrice(input=5, output=10)),
+        _listed("openai/gpt-6-mini", price=ModelPrice(input=0.1, output=0.2)),
+        _listed("openai/not-ready", status="needs_key"),
+    ]
+    assert chat.manager._named_models() == [  # pyright: ignore[reportPrivateUsage]
+        "local",
+        "budget",
+        "frontier",
+        "ollama/qwen3.8:27b",
+        "openai/gpt-6-mini",
+        "openai/gpt-6-luna",
+    ]
+
+
+async def test_many_local_models_leave_room_for_hosted_ones(database: Database) -> None:
+    chat = _Chat(database, ToolCallingChatModel(replies=[]))
+    chat.manager.listed_models = lambda: [
+        *(_listed(f"ollama/m{n}") for n in range(12)),
+        *(_listed(f"openai/h{n}", price=ModelPrice(input=n + 1, output=1)) for n in range(4)),
+    ]
+    names = chat.manager._named_models()  # pyright: ignore[reportPrivateUsage]
+    assert names[:3] == ["local", "budget", "frontier"]
+    assert names[3:5] == ["ollama/m0", "ollama/m1"]
+    assert names[5:9] == [f"openai/h{n}" for n in range(4)]
