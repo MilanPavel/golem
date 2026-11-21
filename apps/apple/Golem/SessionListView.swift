@@ -41,6 +41,22 @@ struct SessionListView: View {
                     }
                 }
                 #if DEBUG
+                ToolbarItem(placement: .topBarLeading) {
+                    // Opens the approval sheet and the review card on fixtures, until the Inbox does it.
+                    Menu("Debug") {
+                        ForEach(DebugApprovals.all, id: \.id) { entry in
+                            Button(entry.label) { model.present(approval: entry.request) }
+                                .accessibilityIdentifier("debug.approval.\(entry.id)")
+                        }
+                        if ReviewFeature.isEnabled() {
+                            Button("Review") {
+                                model.present(review: .fixture, responder: FakeReviewResponder())
+                            }
+                            .accessibilityIdentifier("debug.review")
+                        }
+                    }
+                    .accessibilityIdentifier("debug.menu")
+                }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Forget") { model.forgetMac() }
                         .accessibilityIdentifier("sessions.forget")
@@ -48,6 +64,8 @@ struct SessionListView: View {
                 #endif
             }
             .refreshable { await model.refresh() }
+            .approvalSheet(model)
+            .reviewSheet(model)
         }
     }
 
