@@ -41,6 +41,13 @@ public enum GolemEvent {
     case toolOutput(ToolOutputEvent)
     case toolRequested(ToolRequestedEvent)
     case toolStarted(ToolStartedEvent)
+    case helperEnded(HelperEndedEvent)
+    case helperModel(HelperModelEvent)
+    case helperStarted(HelperStartedEvent)
+    case helperState(HelperStateEvent)
+    case helperStep(HelperStepEvent)
+    case helperWait(HelperWaitEvent)
+    case modelWaiting(ModelWaitingEvent)
     case unknown(UnknownEvent)
 }
 
@@ -137,6 +144,20 @@ extension GolemEvent: Decodable {
             self = .toolRequested(try ToolRequestedEvent(from: decoder))
         case "tool.started":
             self = .toolStarted(try ToolStartedEvent(from: decoder))
+        case "helper.ended":
+            self = .helperEnded(try HelperEndedEvent(from: decoder))
+        case "helper.model":
+            self = .helperModel(try HelperModelEvent(from: decoder))
+        case "helper.started":
+            self = .helperStarted(try HelperStartedEvent(from: decoder))
+        case "helper.state":
+            self = .helperState(try HelperStateEvent(from: decoder))
+        case "helper.step":
+            self = .helperStep(try HelperStepEvent(from: decoder))
+        case "helper.wait":
+            self = .helperWait(try HelperWaitEvent(from: decoder))
+        case "model.waiting":
+            self = .modelWaiting(try ModelWaitingEvent(from: decoder))
         default:
             self = .unknown(try UnknownEvent(from: decoder))
         }
@@ -181,6 +202,13 @@ extension GolemEvent: Decodable {
         case .toolOutput(let event): return event.seq
         case .toolRequested(let event): return event.seq
         case .toolStarted(let event): return event.seq
+        case .helperEnded(let event): return event.seq
+        case .helperModel(let event): return event.seq
+        case .helperStarted(let event): return event.seq
+        case .helperState(let event): return event.seq
+        case .helperStep(let event): return event.seq
+        case .helperWait(let event): return event.seq
+        case .modelWaiting(let event): return event.seq
         case .unknown(let event): return event.seq
         }
     }
