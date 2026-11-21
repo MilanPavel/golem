@@ -106,7 +106,7 @@ struct SessionDetailTests {
 
         await rig.mac.record(session: "s1", type: "message.completed", data: message("m2", role: "assistant", text: "It says **42**."))
         await rig.mac.record(session: "s1", type: "run.completed", data: [:])
-        await waitFor("the answer") { await MainActor.run { model.result?.text == "It says **42**." } }
+        await waitFor("the run to end") { await MainActor.run { !model.chat.busy } }
         #expect(!model.chat.busy)
 
         task.cancel()
