@@ -4,6 +4,8 @@ import Foundation
 final class RelayProcess {
     let port: Int
     private let process = Process()
+    private let errorPipe = Pipe()
+    private let exited = ExitFlag()
 
     /// Where `bun` is, or nil when it is not installed. Tests that need the relay are skipped then.
     static let bunPath: String? = {
@@ -28,25 +30,55 @@ final class RelayProcess {
         environment["IP_OPEN"] = "1000"
         process.environment = environment
         process.standardOutput = FileHandle.nullDevice
-        process.standardError = FileHandle.nullDevice
+        process.standardError = errorPipe
+        let flag = exited
+        process.terminationHandler = { _ in flag.set() }
         try process.run()
     }
 
-    func waitUntilHealthy() async throws {
-        let health = URL(string: "http://127.0.0.1:\(port)/healthz")!
-        for _ in 0..<200 {
-            if let (_, response) = try? await URLSession.shared.data(from: health),
+    /// What the relay printed to stderr so far (only what is already buffered).
+    private func stderrText() -> String {
+        let fd = errorPipe.fileHandleForReading.fileDescriptor
+        let flags = fcntl(fd, F_GETFL)
+        _ = fcntl(fd, F_SETFL, flags | O_NONBLOCK)
+        var data = Data()
+        var buffer = [UInt8](repeating: 0, count: 4096)
+        while true {
+            let count = read(fd, &buffer, buffer.count)
+            if count <= 0 { break }
+            data.append(buffer, count: count)
+        }
+        return String(decoding: data, as: UTF8.self)
+    }
+
+    /// Waits for the relay to answer `/healthz`, for at most `seconds`. Fails with the relay's stderr.
+    func waitUntilHealthy(seconds: Double = 10) async throws {
+        var request = URLRequest(url: URL(string: "http://127.0.0.1:\(port)/healthz")!)
+        request.timeoutInterval = 2
+        let deadline = Date().addingTimeInterval(seconds)
+        while Date() < deadline {
+            if exited.isSet { break }
+            if let (_, response) = try? await URLSession.shared.data(for: request),
                (response as? HTTPURLResponse)?.statusCode == 200 {
                 return
             }
             try await Task.sleep(nanoseconds: 50_000_000)
         }
-        throw RelayProcessError.notHealthy
+        let output = stderrText()
+        let died = exited.isSet
+        stop()
+        throw RelayProcessError.notHealthy(died ? "the relay exited: \(output)" : "no answer in \(seconds) s: \(output)")
     }
 
+    /// Ends the relay and never blocks for long: `Process.waitUntilExit` can wait forever on a
+    /// cooperative thread (#1556), so this watches the termination handler and falls back to SIGKILL.
     func stop() {
-        if process.isRunning { process.terminate() }
-        process.waitUntilExit()
+        guard process.processIdentifier > 0, !exited.isSet else { return }
+        process.terminate()
+        if !exited.wait(seconds: 2) {
+            kill(process.processIdentifier, SIGKILL)
+            _ = exited.wait(seconds: 2)
+        }
     }
 
     private static func freePort() throws -> Int {
@@ -71,5 +103,23 @@ final class RelayProcess {
 }
 
 enum RelayProcessError: Error {
-    case bunMissing, noPort, notHealthy
+    case bunMissing, noPort, notHealthy(String)
+}
+
+/// Set once the relay process has exited.
+final class ExitFlag: @unchecked Sendable {
+    private let lock = NSLock()
+    private var value = false
+
+    var isSet: Bool { lock.lock(); defer { lock.unlock() }; return value }
+    func set() { lock.lock(); value = true; lock.unlock() }
+
+    func wait(seconds: Double) -> Bool {
+        let deadline = Date().addingTimeInterval(seconds)
+        while Date() < deadline {
+            if isSet { return true }
+            Thread.sleep(forTimeInterval: 0.01)
+        }
+        return isSet
+    }
 }

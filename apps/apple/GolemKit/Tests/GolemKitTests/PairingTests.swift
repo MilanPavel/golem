@@ -138,7 +138,7 @@ private func pairLink(relay: RelayProcess, mac: ScriptedMac, code: Data) async t
     return try PairLink(parsing: text)
 }
 
-@Test(.enabled(if: RelayProcess.bunPath != nil)) func pairingThroughTheRelayKeepsTheMac() async throws {
+@Test(.timeLimit(.minutes(1)), .enabled(if: RelayProcess.bunPath != nil)) func pairingThroughTheRelayKeepsTheMac() async throws {
     let relay = try RelayProcess()
     defer { relay.stop() }
     try await relay.waitUntilHealthy()
@@ -167,7 +167,7 @@ private func pairLink(relay: RelayProcess, mac: ScriptedMac, code: Data) async t
     #expect(saved.relayURL == relay.url)
 }
 
-@Test(.enabled(if: RelayProcess.bunPath != nil)) func aCodeTheRelayDoesNotKnowIsExpired() async throws {
+@Test(.timeLimit(.minutes(1)), .enabled(if: RelayProcess.bunPath != nil)) func aCodeTheRelayDoesNotKnowIsExpired() async throws {
     let relay = try RelayProcess()
     defer { relay.stop() }
     try await relay.waitUntilHealthy()
@@ -183,7 +183,7 @@ private func pairLink(relay: RelayProcess, mac: ScriptedMac, code: Data) async t
     #expect(try store.load() == nil)
 }
 
-@Test(.enabled(if: RelayProcess.bunPath != nil)) func anOwnerWhoRefusesStopsThePairing() async throws {
+@Test(.timeLimit(.minutes(1)), .enabled(if: RelayProcess.bunPath != nil)) func anOwnerWhoRefusesStopsThePairing() async throws {
     let relay = try RelayProcess()
     defer { relay.stop() }
     try await relay.waitUntilHealthy()

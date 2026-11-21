@@ -162,6 +162,7 @@ jobs:
 
       - name: Test GolemKit
         if: steps.filter.outputs.run == 'true'
+        timeout-minutes: 10
         working-directory: apps/apple/GolemKit
         run: swift test
 
