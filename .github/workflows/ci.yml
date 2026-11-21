@@ -59,10 +59,69 @@ jobs:
       - name: Web tests
         run: just test-web ${{ matrix.shard }}/4
 
+  # Builds the relay's image and checks that it answers. It is a part of the required check, so it
+  # always runs; the filter step skips the build on a pull request that leaves the relay alone.
+  relay-image:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Does this change touch the relay?
+        id: filter
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if [ "$EVENT" != "pull_request" ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          git fetch --depth=1 origin "$BASE_SHA"
+          if git diff --name-only "$BASE_SHA" HEAD | grep -qE '^(packages/relay/|\.github/workflows/ci\.yml$)'; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "The relay is untouched, so the image is not built."
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build the image
+        if: steps.filter.outputs.run == 'true'
+        run: docker build -t golem-relay packages/relay
+
+      - name: Run it and check /healthz
+        if: steps.filter.outputs.run == 'true'
+        run: |
+          docker run -d -p 8080:8080 -e RELAY_HOST=localhost --name relay golem-relay
+          for _ in $(seq 1 20); do
+            if curl -fsS http://127.0.0.1:8080/healthz; then
+              echo
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "healthz did not answer in 20 s"
+          exit 1
+
+      - name: Wait for the container's own health check
+        if: steps.filter.outputs.run == 'true'
+        run: |
+          for _ in $(seq 1 45); do
+            status=$(docker inspect --format '{{.State.Health.Status}}' relay)
+            echo "health: $status"
+            [ "$status" = "healthy" ] && exit 0
+            sleep 1
+          done
+          exit 1
+
+      - name: Show the relay's log
+        if: failure() && steps.filter.outputs.run == 'true'
+        run: docker logs relay
+
   # The one check the ruleset of main requires: green only when every part above is.
   check:
     if: always()
-    needs: [static, test-py, test-js, test-web]
+    needs: [static, test-py, test-js, test-web, relay-image]
     runs-on: ubuntu-24.04
     steps:
       - name: Every part passed
