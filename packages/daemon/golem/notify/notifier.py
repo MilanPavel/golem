@@ -15,7 +15,10 @@ from typing import Literal, Protocol
 
 from golem_protocol.events import (
     ApprovalNeededEvent,
+    ApprovalResolvedEvent,
     ChatEvent,
+    RouteConsentAnsweredEvent,
+    RouteConsentNeededEvent,
     RunFailedEvent,
     SessionCompletedEvent,
 )
@@ -66,6 +69,10 @@ class NotifierKinds:
 class SessionFacts:
     title: str | None
     origin: str
+    lead: str | None = None
+    """The lead's session id, for a helper session."""
+    agent: str | None = None
+    """The agent type, for a helper session."""
 
 
 Lookup = Callable[[str], Awaitable[SessionFacts | None]]
@@ -98,6 +105,10 @@ class Notifier:
             (lambda _routine: kinds) if isinstance(kinds, NotifierKinds) else kinds
         )
         self._said: dict[tuple[str, Kind], str] = {}
+        self._asking: dict[str, dict[str, str]] = {}
+        """For each lead, the helpers that ask now: helper session id to agent name."""
+        self._leads: dict[str, str] = {}
+        """For each helper that asks, its lead."""
         self._tasks: set[asyncio.Task[None]] = set()
 
     @property
@@ -106,11 +117,28 @@ class Notifier:
 
     def on_event(self, event: ChatEvent) -> None:
         """The bus calls this for every event. Cheap and non-blocking."""
+        if isinstance(
+            event,
+            ApprovalResolvedEvent
+            | RouteConsentAnsweredEvent
+            | RunFailedEvent
+            | SessionCompletedEvent,
+        ):
+            self._resolved(event.session_id)
         match event:
             case ApprovalNeededEvent():
                 data = event.data
                 what = data.name if not data.subject else f"{data.name} {data.subject}"
                 self._consider(event, "needs_you", data.call_id, f"Allow {what}")
+            case RouteConsentNeededEvent():
+                data = event.data
+                self._consider(
+                    event,
+                    "needs_you",
+                    str(event.seq),
+                    f"Use {data.model or data.model_profile}",
+                    helper_only=True,
+                )
             case RunFailedEvent():
                 self._consider(event, "failed", event.data.message, event.data.message)
             case SessionCompletedEvent() if event.data.status == "completed":
@@ -132,21 +160,69 @@ class Notifier:
         body: str,
         *,
         clears: Kind | None = None,
+        helper_only: bool = False,
     ) -> None:
-        if self._attached(event.session_id):
+        if kind != "needs_you" and self._attached(event.session_id):
             return
         task = asyncio.create_task(
-            self._say(event.session_id, kind, fingerprint, _cut(body), clears),
+            self._say(event.session_id, kind, fingerprint, _cut(body), clears, helper_only),
             name=f"golem-notify-{kind}",
         )
         self._tasks.add(task)
         task.add_done_callback(self._tasks.discard)
 
+    def _resolved(self, session_id: str) -> None:
+        """A helper answered or ended: it no longer asks. Nothing is posted."""
+        lead = self._leads.pop(session_id, None)
+        if lead is not None:
+            asking = self._asking.get(lead, {})
+            asking.pop(session_id, None)
+            if not asking:
+                self._asking.pop(lead, None)
+                self._said.pop((lead, "needs_you"), None)
+
+    async def _say_helper(
+        self, helper: str, facts: SessionFacts, lead: str, fingerprint: str, body: str
+    ) -> None:
+        """One banner per lead. A new asker replaces the last banner, since the lead keys it."""
+        asking = self._asking.setdefault(lead, {})
+        asking[helper] = facts.agent or ""
+        self._leads[helper] = lead
+        if len(asking) == 1:
+            who = f"{facts.agent} asks" if facts.agent else "A helper asks"
+            text, said = f"{who}: {body}", f"{helper}:{fingerprint}"
+        else:
+            text, said = f"{len(asking)} helpers ask", ",".join(sorted(asking))
+        lead_facts = await self._lookup(lead)
+        origin = "user" if lead_facts is None else lead_facts.origin
+        if origin == "user":
+            # ADR-050 holds for the lead: a chat you typed into is yours.
+            return
+        routine = origin.removeprefix("routine:") if origin.startswith("routine:") else None
+        if not self._kinds(routine).on("needs_you"):
+            return
+        if self._attached(lead) or self._said.get((lead, "needs_you")) == said:
+            return
+        self._said[lead, "needs_you"] = said
+        title = (lead_facts.title if lead_facts is not None else None) or routine or "golem"
+        await self._poster.post(Notice("needs_you", lead, title, _cut(text)))
+
     async def _say(
-        self, session_id: str, kind: Kind, fingerprint: str, body: str, clears: Kind | None
+        self,
+        session_id: str,
+        kind: Kind,
+        fingerprint: str,
+        body: str,
+        clears: Kind | None,
+        helper_only: bool = False,
     ) -> None:
         try:
             facts = await self._lookup(session_id)
+            if kind == "needs_you" and facts is not None and facts.lead is not None:
+                await self._say_helper(session_id, facts, facts.lead, fingerprint, body)
+                return
+            if helper_only or self._attached(session_id):
+                return
             origin = "user" if facts is None else facts.origin
             if kind == "needs_you" and origin == "user":
                 # ADR-050: a chat you typed into is yours; only headless sessions ping you.
