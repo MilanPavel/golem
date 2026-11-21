@@ -1690,6 +1690,9 @@ class SessionManager:
         )
         chosen: list[tuple[AgentSnapshot, str]] = []
         for spec in helpers:
+            if spec.agent == "":
+                names = ", ".join(a.name for a in view.usable())
+                raise ToolError(f"delegate needs an agent: one of {names}")
             agent = view.get(spec.agent)
             if agent is None:
                 held = {a.name for a in self._agents.blocked(root) if a.valid}

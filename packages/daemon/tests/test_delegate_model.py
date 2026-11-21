@@ -275,17 +275,20 @@ async def test_an_unknown_name_does_not_fail_the_call(
 
 
 def test_the_argument_is_optional_and_a_name() -> None:
-    assert DelegateArgs(brief="x").model is None
-    assert DelegateArgs(brief="x", model="ollama/qwen3:8b").model == "ollama/qwen3:8b"
+    assert DelegateArgs(agent="explorer", brief="x").model is None
+    assert (
+        DelegateArgs(agent="explorer", brief="x", model="ollama/qwen3:8b").model
+        == "ollama/qwen3:8b"
+    )
 
 
 @pytest.mark.parametrize("bad", ["", "  ", "two words", " lead", "x" * 101])
 def test_a_bad_model_is_a_readable_tool_error(bad: str) -> None:
     with pytest.raises(ValidationError):
-        DelegateArgs(brief="x", model=bad)
+        DelegateArgs(agent="explorer", brief="x", model=bad)
     call = {
         "name": "delegate",
-        "args": {"brief": "x", "model": bad},
+        "args": {"agent": "explorer", "brief": "x", "model": bad},
         "id": "d",
         "type": "tool_call",
     }
@@ -294,7 +297,11 @@ def test_a_bad_model_is_a_readable_tool_error(bad: str) -> None:
 
 
 def test_specs_carry_the_model() -> None:
-    call = {"name": "delegate", "args": {"brief": "x", "model": "local"}, "id": "d"}
+    call = {
+        "name": "delegate",
+        "args": {"agent": "explorer", "brief": "x", "model": "local"},
+        "id": "d",
+    }
     (spec,) = _specs({**call, "type": "tool_call"})  # pyright: ignore[reportArgumentType]
     assert spec.model == "local"
 

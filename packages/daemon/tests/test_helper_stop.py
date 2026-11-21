@@ -211,7 +211,10 @@ def _helper_ids(events: list[ChatEvent]) -> list[str]:
 async def test_stopping_one_of_two_helpers_ends_it_cancelled_and_the_lead_goes_on(
     database: Database, project: Path, tmp_path: Path
 ) -> None:
-    calls = [("delegate", {"brief": "hang"}), ("delegate", {"brief": "quick"})]
+    calls = [
+        ("delegate", {"agent": "explorer", "brief": "hang"}),
+        ("delegate", {"agent": "explorer", "brief": "quick"}),
+    ]
     model = _Model(replies=[calls, "quick answer", "lead done"])
     chat = _Chat(database, model, tmp_path)
     lead = await chat.manager.create(None, cwd=str(project))
