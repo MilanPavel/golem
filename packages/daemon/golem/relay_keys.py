@@ -13,16 +13,15 @@ import base64
 import binascii
 import hashlib
 import threading
-
-from cryptography.exceptions import InvalidSignature
-from cryptography.hazmat.primitives import hashes, serialization
-from cryptography.hazmat.primitives.asymmetric import ec, x25519
-from cryptography.hazmat.primitives.asymmetric.utils import (
-    decode_dss_signature,
-    encode_dss_signature,
-)
+from typing import TYPE_CHECKING
 
 from golem.secrets import SecretStore
+
+if TYPE_CHECKING:
+    from cryptography.hazmat.primitives.asymmetric import ec, x25519
+
+# ``cryptography`` is imported inside the functions: it costs startup time, and the daemon
+# needs it only once a relay key is used.
 
 IDENTITY = "relay/identity"
 NOISE = "relay/noise"
@@ -57,6 +56,8 @@ def check_public_key(public_key: bytes) -> bytes:
     """``public_key`` when it is a valid uncompressed P-256 point (65 bytes)."""
     if len(public_key) != 65 or public_key[0] != 4:
         raise ValueError("a device key is 65 bytes, uncompressed")
+    from cryptography.hazmat.primitives.asymmetric import ec
+
     ec.EllipticCurvePublicKey.from_encoded_point(ec.SECP256R1(), public_key)
     return public_key
 
@@ -65,6 +66,11 @@ def verify(public_key: bytes, message: bytes, signature: bytes) -> bool:
     """Whether ``signature`` (64 bytes, ``r || s``) is ``public_key``'s over ``message``."""
     if len(signature) != 64:
         return False
+    from cryptography.exceptions import InvalidSignature
+    from cryptography.hazmat.primitives import hashes
+    from cryptography.hazmat.primitives.asymmetric import ec
+    from cryptography.hazmat.primitives.asymmetric.utils import encode_dss_signature
+
     try:
         key = ec.EllipticCurvePublicKey.from_encoded_point(ec.SECP256R1(), public_key)
         der = encode_dss_signature(
@@ -84,6 +90,9 @@ class RelayKeys:
         self._lock = threading.Lock()
 
     def _identity(self) -> ec.EllipticCurvePrivateKey:
+        from cryptography.hazmat.primitives import serialization
+        from cryptography.hazmat.primitives.asymmetric import ec
+
         with self._lock:
             stored = self._store.get(IDENTITY)
             if stored is None:
@@ -106,6 +115,9 @@ class RelayKeys:
         return loaded
 
     def _noise(self) -> x25519.X25519PrivateKey:
+        from cryptography.hazmat.primitives import serialization
+        from cryptography.hazmat.primitives.asymmetric import x25519
+
         with self._lock:
             stored = self._store.get(NOISE)
             if stored is None:
@@ -124,6 +136,8 @@ class RelayKeys:
 
     def mac_key(self) -> bytes:
         """The public signing key, 65 bytes uncompressed."""
+        from cryptography.hazmat.primitives import serialization
+
         return (
             self._identity()
             .public_key()
@@ -136,6 +150,8 @@ class RelayKeys:
 
     def noise_key(self) -> bytes:
         """The public Noise key, 32 bytes."""
+        from cryptography.hazmat.primitives import serialization
+
         return (
             self._noise()
             .public_key()
@@ -144,6 +160,10 @@ class RelayKeys:
 
     def sign(self, message: bytes) -> bytes:
         """The 64-byte signature of ``message``, which must start with :data:`SIGN_PREFIX`."""
+        from cryptography.hazmat.primitives import hashes
+        from cryptography.hazmat.primitives.asymmetric import ec
+        from cryptography.hazmat.primitives.asymmetric.utils import decode_dss_signature
+
         if not message.startswith(SIGN_PREFIX):
             raise RelayKeyError("the relay key signs only a golem-relay-v1 message")
         der = self._identity().sign(message, ec.ECDSA(hashes.SHA256()))
@@ -152,6 +172,8 @@ class RelayKeys:
 
     def dh(self, public_key: bytes) -> bytes:
         """The X25519 shared secret with ``public_key``. Refused when it is all zeros."""
+        from cryptography.hazmat.primitives.asymmetric import x25519
+
         try:
             shared = self._noise().exchange(x25519.X25519PublicKey.from_public_bytes(public_key))
         except ValueError as exc:
