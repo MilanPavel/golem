@@ -87,7 +87,7 @@ jobs:
 
       - name: Build the image
         if: steps.filter.outputs.run == 'true'
-        run: docker build -t golem-relay packages/relay
+        run: docker build -f packages/relay/Dockerfile -t golem-relay .
 
       - name: Run it and check /healthz
         if: steps.filter.outputs.run == 'true'
