@@ -1,0 +1,29 @@
+{
+  "additionalProperties": false,
+  "description": "``agents.copy``. Copy the bundled agent ``name``, unchanged, to\n``~/.golem/agents/<name>.md``. Refused when the user already has a file of that name.",
+  "properties": {
+    "cwd": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Cwd"
+    },
+    "name": {
+      "minLength": 1,
+      "title": "Name",
+      "type": "string"
+    }
+  },
+  "required": [
+    "name"
+  ],
+  "title": "AgentsCopyParams",
+  "type": "object"
+}

@@ -338,3 +338,169 @@ async def test_the_daemon_answers_and_announces_a_change(short_home: Path) -> No
     finally:
         await client.close()
         await stop_daemon(app, task)
+
+
+# --- agents.save, agents.copy, agents.delete --------------------------------------------------
+
+
+def _text(name: str = "mine", body: str = "Be brief.", extra: str = "") -> str:
+    return f"---\nname: {name}\ndescription: Does a thing.\nmodel: cheapest\n{extra}---\n{body}\n"
+
+
+def _folder(world: _World) -> Path:
+    return world.state.paths.agents_dir
+
+
+def _files(world: _World) -> list[str]:
+    folder = _folder(world)
+    return sorted(p.name for p in folder.iterdir()) if folder.exists() else []
+
+
+async def test_copy_changes_the_prompt_and_delete_brings_the_bundled_one_back(
+    world: _World,
+) -> None:
+    bundled = await world.call("agents.get", {"name": "reviewer"})
+    assert bundled.origin == "bundled"
+
+    copied = await world.call("agents.copy", {"name": "reviewer"})
+    assert (copied.origin, copied.shadowed) == ("user", ["bundled"])
+    assert (_folder(world) / "reviewer.md").read_bytes() == (
+        bundled_agents_dir() / "reviewer.md"
+    ).read_bytes()
+
+    text = copied.text or ""
+    changed = text.replace(bundled.prompt.strip(), "My own review prompt.")
+    assert changed != text
+    saved = await world.call("agents.save", {"text": changed, "name": "reviewer"})
+    assert saved.ok and saved.agent is not None and saved.problems == []
+    got = await world.call("agents.get", {"name": "reviewer"})
+    assert (got.origin, got.prompt.strip()) == ("user", "My own review prompt.")
+
+    deleted = await world.call("agents.delete", {"name": "reviewer"})
+    assert deleted.agent is not None and deleted.agent.origin == "bundled"
+    back = await world.call("agents.get", {"name": "reviewer"})
+    assert (back.origin, back.prompt) == ("bundled", bundled.prompt)
+    assert _files(world) == []
+
+
+async def test_copy_is_refused_for_a_name_that_is_not_bundled_or_already_yours(
+    world: _World,
+) -> None:
+    _agent(_folder(world), "mine")
+    for name in ("mine", "nope"):
+        with pytest.raises(RpcCallError) as raised:
+            await world.call("agents.copy", {"name": name})
+        assert raised.value.code == INVALID_PARAMS and "not a built-in" in str(raised.value)
+    await world.call("agents.copy", {"name": "worker"})
+    with pytest.raises(RpcCallError) as again:
+        await world.call("agents.copy", {"name": "worker"})
+    assert "already have" in str(again.value)
+
+
+async def test_save_makes_a_new_agent_and_rename_removes_the_old_file(world: _World) -> None:
+    created = await world.call("agents.save", {"text": _text("first")})
+    assert created.ok and created.agent is not None
+    assert (created.agent.name, created.agent.origin) == ("first", "user")
+    assert _files(world) == ["first.md"]
+
+    renamed = await world.call("agents.save", {"text": _text("second"), "name": "first"})
+    assert renamed.ok
+    assert _files(world) == ["second.md"]
+    with pytest.raises(RpcCallError):
+        await world.call("agents.get", {"name": "first"})
+
+    same = await world.call("agents.save", {"text": _text("second", "New."), "name": "second"})
+    assert same.ok
+    assert (await world.call("agents.get", {"name": "second"})).prompt.strip() == "New."
+    assert _files(world) == ["second.md"]
+
+
+async def test_save_refuses_a_name_that_is_taken_or_a_file_that_is_not_there(
+    world: _World,
+) -> None:
+    await world.call("agents.save", {"text": _text("a")})
+    await world.call("agents.save", {"text": _text("b")})
+    before = (_folder(world) / "a.md").read_bytes()
+
+    taken = await world.call("agents.save", {"text": _text("a", "Other."), "name": "b"})
+    assert not taken.ok and "already have" in taken.problems[0].message
+    fresh = await world.call("agents.save", {"text": _text("a", "Other.")})
+    assert not fresh.ok
+    gone = await world.call("agents.save", {"text": _text("c"), "name": "zzz"})
+    assert not gone.ok and "no agent file" in gone.problems[0].message
+    assert (_folder(world) / "a.md").read_bytes() == before
+    assert _files(world) == ["a.md", "b.md"]
+
+
+async def test_save_with_problems_writes_nothing_and_gives_the_lines(world: _World) -> None:
+    text = (
+        "---\nname: mine\ndescription: Does a thing.\nmodel: cheapest\ntools: read_file, nope\n"
+        "max-calls: lots\n---\nPrompt.\n"
+    )
+    result = await world.call("agents.save", {"text": text})
+    assert not result.ok and result.agent is None
+    lines = {(p.line, p.message.split("`")[1]) for p in result.problems}
+    assert lines == {(5, "tools"), (6, "max-calls")}
+    assert _files(world) == []
+
+    no_name = await world.call("agents.save", {"text": "---\ndescription: x\n---\nPrompt.\n"})
+    assert not no_name.ok and "`name` is missing" in no_name.problems[0].message
+    assert no_name.problems[0].line is None
+    bad_name = await world.call("agents.save", {"text": _text("Bad Name")})
+    assert not bad_name.ok and bad_name.problems[0].line == 2
+    no_front = await world.call("agents.save", {"text": "just text\n"})
+    assert not no_front.ok
+    assert _files(world) == []
+
+
+async def test_a_name_with_a_path_cannot_write_or_delete_outside_the_folder(
+    world: _World, tmp_path: Path
+) -> None:
+    outside = tmp_path / "outside.md"
+    outside.write_text("keep me\n")
+    victim = _folder(world).parent / "victim.md"
+    victim.write_text("keep me too\n")
+    names = ("../victim", "../outside", "a/b", "/etc/passwd", ".hidden", "..", "A", "x.md", "a_b")
+    for name in names:
+        saved = await world.call("agents.save", {"text": _text(name)})
+        assert not saved.ok, name
+        replaced = await world.call("agents.save", {"text": _text("ok"), "name": name})
+        assert not replaced.ok, name
+        for method in ("agents.copy", "agents.delete"):
+            with pytest.raises(RpcCallError) as raised:
+                await world.call(method, {"name": name})
+            assert raised.value.code == INVALID_PARAMS, (method, name)
+    assert victim.read_text() == "keep me too\n" and outside.read_text() == "keep me\n"
+    assert _files(world) == []
+
+
+async def test_a_symlinked_file_is_not_written_through(world: _World, tmp_path: Path) -> None:
+    target = tmp_path / "elsewhere.md"
+    target.write_text("keep me\n")
+    _folder(world).mkdir(parents=True)
+    (_folder(world) / "link.md").symlink_to(target)
+
+    result = await world.call("agents.save", {"text": _text("link"), "name": "link"})
+    assert not result.ok
+    with pytest.raises(RpcCallError):
+        await world.call("agents.delete", {"name": "link"})
+    assert target.read_text() == "keep me\n"
+
+
+async def test_delete_refuses_bundled_project_and_unknown_agents(world: _World) -> None:
+    _agent(world.project / ".golem/agents", "local")
+    _trust(world)
+    cwd = str(world.project)
+    for name, words in (
+        ("explorer", "built-in"),
+        ("local", "project agent"),
+        ("nothing", "no agent file"),
+    ):
+        with pytest.raises(RpcCallError) as raised:
+            await world.call("agents.delete", {"name": name, "cwd": cwd})
+        assert raised.value.code == INVALID_PARAMS and words in str(raised.value)
+    assert (world.project / ".golem/agents/local.md").exists()
+
+    await world.call("agents.save", {"text": _text("gone")})
+    result = await world.call("agents.delete", {"name": "gone"})
+    assert result.agent is None

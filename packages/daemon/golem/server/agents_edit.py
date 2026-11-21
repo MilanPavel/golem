@@ -11,6 +11,10 @@ setup, from the same code a helper uses to pick its model
   tools and limits stay the bundled ones of the running release;
 - a project file of a folder that is not in ``trusted_projects`` is never edited: the registry
   does not even show it as a winner.
+
+``agents.save``, ``agents.copy`` and ``agents.delete`` write, copy and remove the user's own files
+in ``~/.golem/agents``, and nothing outside that folder. A name is checked against the agent name
+rules before any path is built, and the final path is checked to be a direct child of the folder.
 """
 
 from __future__ import annotations
@@ -19,6 +23,7 @@ import asyncio
 import contextlib
 import logging
 import os
+import re
 import tempfile
 from pathlib import Path
 
@@ -26,7 +31,8 @@ from pydantic import ValidationError
 
 from golem.agents.bundled import bundled_agents_dir
 from golem.agents.edit import AgentEditError, check_wish, with_wish
-from golem.agents.model import Agent
+from golem.agents.model import AGENT_SUFFIX, Agent
+from golem.agents.parse import parse_agent
 from golem.agents.registry import AgentRegistry, Listed
 from golem.config import BUNDLED_TYPES, AgentSettings, load_settings
 from golem.config_edit import RawConflictError, set_keys
@@ -36,11 +42,19 @@ from golem.server.dispatcher import (
     RequestContext,
     RpcCallError,
 )
+from golem.skills.parse import MAX_NAME, NAME, frontmatter_fields, split_frontmatter
 from golem_protocol.commands import (
     AgentInfo,
+    AgentsCopyParams,
+    AgentsCopyResult,
+    AgentsDeleteParams,
+    AgentsDeleteResult,
     AgentsKeepParams,
     AgentsKeepResult,
     AgentsKeepValues,
+    AgentsSaveParams,
+    AgentsSaveProblem,
+    AgentsSaveResult,
     AgentsSetWishParams,
     AgentsSetWishResult,
     ConfigError,
@@ -298,4 +312,208 @@ async def agents_keep(ctx: RequestContext, params: AgentsKeepParams) -> AgentsKe
     return AgentsKeepResult(ok=True, values=await _keep_values(ctx))
 
 
-__all__ = ["agent_infos", "agents_keep", "agents_set_wish", "check_cwd"]
+# --- agents.save, agents.copy, agents.delete --------------------------------------------------
+
+_KEY_IN_ERROR = re.compile(r"`([a-z-]+)`")
+_KEY_LINE = re.compile(r"([A-Za-z0-9_-]+)[ \t]*:")
+_DRAFT = "draft"
+_NO_NAME = "`name` is missing: the name inside the file decides the file name"
+
+
+def _agents_folder(ctx: RequestContext) -> Path:
+    """The folder of the user's own agent files, the only one these methods write in."""
+    return ctx.state.paths.agents_dir
+
+
+def _user_file(folder: Path, name: str) -> Path:
+    """The path of the user's file for ``name``. Checks the name before it builds the path.
+
+    Raises :class:`AgentEditError` for a name that is not 1-64 lowercase letters, digits and
+    single hyphens, so a ``/``, a ``..`` or a leading dot never reaches the file system.
+    """
+    if len(name) > MAX_NAME or not NAME.fullmatch(name):
+        raise AgentEditError(
+            f"{name!r} is not a name an agent can have: use 1-{MAX_NAME} lowercase letters, "
+            "digits and single hyphens, such as `code-reviewer`"
+        )
+    path = folder / f"{name}{AGENT_SUFFIX}"
+    if path.resolve().parent != folder.resolve() or path.is_symlink():
+        raise AgentEditError(f"{name!r} would be written outside {folder}, so it is refused")
+    return path
+
+
+def _key_lines(text: str) -> dict[str, int]:
+    """The line (from 1) of each top-level frontmatter key in ``text``."""
+    lines = text.lstrip("\ufeff").splitlines()
+    found: dict[str, int] = {}
+    if not lines or lines[0].strip() != "---":
+        return found
+    for number, line in enumerate(lines[1:], start=2):
+        if line.strip() == "---":
+            break
+        match = _KEY_LINE.match(line)
+        if match:
+            found.setdefault(match.group(1), number)
+    return found
+
+
+def _problem(message: str, keys: dict[str, int]) -> AgentsSaveProblem:
+    """A parser message with a line: the line of the first `key` the message names."""
+    for key in _KEY_IN_ERROR.findall(message):
+        if key in keys:
+            return AgentsSaveProblem(message=message, line=keys[key])
+    return AgentsSaveProblem(message=message)
+
+
+def _name_in(text: str) -> str | None:
+    """The ``name`` key of the frontmatter, or None when there is none or it is not text."""
+    split = split_frontmatter(text.encode("utf-8"), complete=True)
+    if isinstance(split, str):
+        return None
+    value = frontmatter_fields(split[0], []).get("name")
+    return value.strip() if isinstance(value, str) and value.strip() else None
+
+
+def _check_text(text: str) -> tuple[str | None, list[AgentsSaveProblem]]:
+    """Read ``text`` with the registry's parser. Returns the agent's name and its problems.
+
+    The parser reads files, so the text goes into a scratch folder first, never into the
+    agents folder. The file there is named after the agent, so the parser's own name checks run.
+    """
+    keys = _key_lines(text)
+    name = _name_in(text)
+    valid = name is not None and len(name) <= MAX_NAME and NAME.fullmatch(name) is not None
+    with tempfile.TemporaryDirectory(prefix="golem-agent-") as scratch:
+        draft = Path(scratch) / f"{name if valid else _DRAFT}{AGENT_SUFFIX}"
+        draft.write_bytes(text.encode("utf-8"))
+        agent = parse_agent(draft)
+    problems = [_problem(message, keys) for message in agent.errors]
+    if name is None:
+        problems.insert(0, AgentsSaveProblem(message=_NO_NAME, line=keys.get("name")))
+    return name, problems
+
+
+async def _user_info(ctx: RequestContext, cwd: str | None, name: str) -> AgentInfo:
+    """The user's agent ``name`` as the list shows it, after the registry looked again."""
+    if ctx.state.agents is not None:
+        ctx.state.agents.check()
+    found = await agent_infos(ctx, cwd)
+    return next(
+        pair[0]
+        for pair in found
+        if pair[0].name == name and pair[0].origin == "user" and pair[0].trusted
+    )
+
+
+def _registry(ctx: RequestContext, cwd: str | None) -> AgentRegistry:
+    registry = ctx.state.agents
+    if registry is None:
+        raise RpcCallError(INTERNAL_ERROR, "agents are not available")
+    check_cwd(cwd)
+    return registry
+
+
+async def agents_save(ctx: RequestContext, params: AgentsSaveParams) -> AgentsSaveResult:
+    """Save ``params.text`` as a user agent file, only when the parser finds nothing wrong.
+
+    Problems come back as ``ok = False``, each with the line of the frontmatter key it names
+    when there is one, and nothing is written. A refused name (taken, or the file to replace
+    is not there) is one more problem.
+    """
+    _registry(ctx, params.cwd)
+    folder = _agents_folder(ctx)
+    name, problems = await asyncio.to_thread(_check_text, params.text)
+    if problems or name is None:
+        return AgentsSaveResult(ok=False, problems=problems)
+    try:
+        target = _user_file(folder, name)
+        old = None if params.name is None else _user_file(folder, params.name)
+        if old is not None and not old.is_file():
+            raise AgentEditError(f"You have no agent file named {params.name} to replace.")
+        if target.exists() and target != old:
+            raise AgentEditError(
+                f"You already have an agent named {name}: pick another name, or edit that one."
+            )
+    except AgentEditError as exc:
+        return AgentsSaveResult(ok=False, problems=[AgentsSaveProblem(message=str(exc))])
+    try:
+        await asyncio.to_thread(_write, target, params.text, old != target)
+        if old is not None and old != target:
+            await asyncio.to_thread(old.unlink)
+    except OSError as exc:
+        raise RpcCallError(INTERNAL_ERROR, f"could not write {target}: {exc}") from exc
+    log.info("saved agent %s to %s", name, target)
+    return AgentsSaveResult(ok=True, agent=await _user_info(ctx, params.cwd, name))
+
+
+async def agents_copy(ctx: RequestContext, params: AgentsCopyParams) -> AgentsCopyResult:
+    """Copy the bundled file of ``params.name`` to the user's folder, unchanged."""
+    _registry(ctx, params.cwd)
+    try:
+        target = _user_file(_agents_folder(ctx), params.name)
+        source = bundled_agents_dir() / f"{params.name}{AGENT_SUFFIX}"
+        if not source.is_file():
+            raise AgentEditError(
+                f"{params.name} is not a built-in agent, so there is nothing to copy."
+            )
+        if target.exists():
+            raise AgentEditError(
+                f"You already have an agent named {params.name}: edit that one instead."
+            )
+        text = await asyncio.to_thread(_read, source)
+        await asyncio.to_thread(_write, target, text, True)
+    except AgentEditError as exc:
+        raise RpcCallError(INVALID_PARAMS, str(exc)) from exc
+    except (OSError, UnicodeDecodeError) as exc:
+        raise RpcCallError(INTERNAL_ERROR, f"could not copy {params.name}: {exc}") from exc
+    log.info("copied the built-in agent %s to %s", params.name, target)
+    info = await _user_info(ctx, params.cwd, params.name)
+    return AgentsCopyResult(**info.model_dump())
+
+
+async def agents_delete(ctx: RequestContext, params: AgentsDeleteParams) -> AgentsDeleteResult:
+    """Remove the user's file of ``params.name``. Answers with what the name means now."""
+    registry = _registry(ctx, params.cwd)
+    try:
+        target = _user_file(_agents_folder(ctx), params.name)
+        if not target.is_file():
+            raise AgentEditError(_cannot_delete(registry, params))
+        await asyncio.to_thread(target.unlink)
+    except AgentEditError as exc:
+        raise RpcCallError(INVALID_PARAMS, str(exc)) from exc
+    except OSError as exc:
+        raise RpcCallError(INTERNAL_ERROR, f"could not delete {params.name}: {exc}") from exc
+    registry.check()
+    log.info("deleted the agent file %s", target)
+    found = await agent_infos(ctx, params.cwd)
+    now = next(
+        (p[0] for p in found if p[0].name == params.name and p[0].trusted and not p[0].errors),
+        None,
+    )
+    return AgentsDeleteResult(agent=now)
+
+
+def _cannot_delete(registry: AgentRegistry, params: AgentsDeleteParams) -> str:
+    root = None if params.cwd is None else Path(params.cwd)
+    winner = next(
+        (e for e in registry.view(root).listed if e.agent.name == params.name and e.usable), None
+    )
+    if winner is not None and winner.origin == "bundled":
+        return f"{params.name} is a built-in agent: it cannot be deleted."
+    if winner is not None and winner.origin == "project":
+        return (
+            f"{params.name} is a project agent: delete its file in the project's "
+            ".golem/agents yourself."
+        )
+    return f"You have no agent file named {params.name}."
+
+
+__all__ = [
+    "agent_infos",
+    "agents_copy",
+    "agents_delete",
+    "agents_keep",
+    "agents_save",
+    "agents_set_wish",
+    "check_cwd",
+]

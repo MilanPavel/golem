@@ -84,7 +84,10 @@ import type { SkillCall } from "../../protocol/gen/skill-call.ts";
 import type { SkillCreateResult } from "../../protocol/gen/skill-create-result.ts";
 import type { SkillListResult } from "../../protocol/gen/skill-list-result.ts";
 import type { AgentsListResult } from "../../protocol/gen/agents-list-result.ts";
+import type { AgentsCopyResult } from "../../protocol/gen/agents-copy-result.ts";
+import type { AgentsDeleteResult } from "../../protocol/gen/agents-delete-result.ts";
 import type { AgentsKeepResult } from "../../protocol/gen/agents-keep-result.ts";
+import type { AgentsSaveResult } from "../../protocol/gen/agents-save-result.ts";
 import type { AgentsSetWishResult } from "../../protocol/gen/agents-set-wish-result.ts";
 import type { SkillReadResult } from "../../protocol/gen/skill-read-result.ts";
 import type { RoutineUpdateResult } from "../../protocol/gen/routine-update-result.ts";
@@ -241,7 +244,10 @@ import {
   isRunListResult,
   isSkillCreateResult,
   isAgentsListResult,
+  isAgentsCopyResult,
+  isAgentsDeleteResult,
   isAgentsKeepResult,
+  isAgentsSaveResult,
   isAgentsSetWishResult,
   isSkillListResult,
   isSkillReadResult,
@@ -648,6 +654,12 @@ export interface GolemClient {
   setAgentWish(name: string, wish: string, cwd?: string): Promise<AgentsSetWishResult>;
   /** `agents.keep`: read how long a finished helper's steps are kept, or change `keep_days` and `keep_problem_days` (0 is for ever). */
   agentsKeep(change?: { keep_days?: number; keep_problem_days?: number }): Promise<AgentsKeepResult>;
+  /** `agents.save`: save the whole text of a user agent file. `name` is the file it replaces; leave it out for a new agent. When `ok` is false nothing was saved and `problems` each carry a message and, for a frontmatter key, its line. */
+  saveAgent(text: string, name?: string, cwd?: string): Promise<AgentsSaveResult>;
+  /** `agents.copy`: copy the bundled agent `name` to the user's own agents, unchanged. Resolves to the new user agent. */
+  copyAgent(name: string, cwd?: string): Promise<AgentsCopyResult>;
+  /** `agents.delete`: remove the user's file of the agent `name`. `agent` is what the name means now (such as the bundled one), or null. */
+  deleteAgent(name: string, cwd?: string): Promise<AgentsDeleteResult>;
   /** `agent.registry.changed`: agent files changed. `root` is the folder whose project agents changed, or `null` for every folder. */
   onAgentsChanged(listener: (root: string | null) => void): () => void;
   /** `routine.remove`: delete a user routine from `config.toml`. */
@@ -2421,6 +2433,34 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       const result = await call("agents.keep", { ...change });
       if (!isAgentsKeepResult(result)) {
         throw new Error("invalid agents.keep result");
+      }
+      return result;
+    },
+    async saveAgent(text: string, name?: string, cwd?: string): Promise<AgentsSaveResult> {
+      await ready;
+      const result = await call("agents.save", {
+        text,
+        ...(name === undefined ? {} : { name }),
+        ...(cwd === undefined ? {} : { cwd }),
+      });
+      if (!isAgentsSaveResult(result)) {
+        throw new Error("invalid agents.save result");
+      }
+      return result;
+    },
+    async copyAgent(name: string, cwd?: string): Promise<AgentsCopyResult> {
+      await ready;
+      const result = await call("agents.copy", cwd === undefined ? { name } : { name, cwd });
+      if (!isAgentsCopyResult(result)) {
+        throw new Error("invalid agents.copy result");
+      }
+      return result;
+    },
+    async deleteAgent(name: string, cwd?: string): Promise<AgentsDeleteResult> {
+      await ready;
+      const result = await call("agents.delete", cwd === undefined ? { name } : { name, cwd });
+      if (!isAgentsDeleteResult(result)) {
+        throw new Error("invalid agents.delete result");
       }
       return result;
     },
