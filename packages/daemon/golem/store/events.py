@@ -96,6 +96,20 @@ class EventLog:
         )
         return [_decode(row) for row in rows]
 
+    async def for_runs(self, run_ids: Sequence[str]) -> dict[str, list[ChatEvent]]:
+        """Every stored event of each of ``run_ids``, in order, in one query."""
+        if not run_ids:
+            return {}
+        marks = ", ".join("?" for _ in run_ids)
+        rows = await self._database.fetch_all(
+            f"SELECT {_COLUMNS} FROM events WHERE run_id IN ({marks}) ORDER BY run_id, seq",
+            tuple(run_ids),
+        )
+        found: dict[str, list[ChatEvent]] = {run_id: [] for run_id in run_ids}
+        for row in rows:
+            found[str(row["run_id"])].append(_decode(row))
+        return found
+
     async def last_wait(self, run_id: str) -> ModelWaitingEvent | None:
         """The newest stored ``model.waiting`` of one run. A completed message deletes its own."""
         rows = await self._database.fetch_all(

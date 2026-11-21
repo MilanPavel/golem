@@ -35,6 +35,17 @@ _ACTIVITY = (
 
 
 @dataclass(frozen=True, slots=True)
+class WaitingHelper:
+    """An open helper whose run waits for you, and the run."""
+
+    session_id: str
+    agent: str
+    title: str | None
+    index: int
+    run_id: str
+
+
+@dataclass(frozen=True, slots=True)
 class SessionRecord:
     session_id: str
     model_profile: str
@@ -174,6 +185,37 @@ class SessionRecords:
             (parent_session_id,),
         )
         return (0, 0) if row is None else (int(row[0]), int(row[1]))
+
+    async def waiting_helpers(self, parent_session_id: str) -> list[WaitingHelper]:
+        """The open helpers of ``parent_session_id`` whose newest run waits for you, oldest
+        first. One query."""
+        rows = await self._database.fetch_all(
+            "SELECT s.session_id, s.agent, s.title, s.helper_index, r.run_id"
+            " FROM sessions s JOIN runs r ON r.session_id = s.session_id"
+            " WHERE s.parent_session_id = ? AND s.closed_at IS NULL"
+            " AND r.status = 'waiting' AND r.wait_reason IS NOT 'team'"
+            " ORDER BY r.started_at DESC, r.run_id DESC",
+            (parent_session_id,),
+        )
+        seen: set[str] = set()
+        found: list[WaitingHelper] = []
+        for row in rows:
+            session_id = str(row["session_id"])
+            if session_id in seen:
+                continue
+            seen.add(session_id)
+            title = None if row["title"] is None else str(row["title"])
+            found.append(
+                WaitingHelper(
+                    session_id=session_id,
+                    agent=str(row["agent"]) if row["agent"] is not None else "",
+                    title=title,
+                    index=int(row["helper_index"] or 0),
+                    run_id=str(row["run_id"]),
+                )
+            )
+        found.reverse()
+        return found
 
     async def activity(self, session_id: str) -> SessionActivity | None:
         """One session's row, whether a run is open, and its newest ``seq``."""
@@ -393,4 +435,5 @@ __all__ = [
     "SessionActivity",
     "SessionRecord",
     "SessionRecords",
+    "WaitingHelper",
 ]
