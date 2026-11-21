@@ -233,7 +233,9 @@ How long a finished helper keeps its steps. After that only a receipt stays: its
 | `keep_days` | `7` | Days a finished helper keeps its steps, counted from the end of its last run, not from when you opened it. 0 keeps them for ever. A helper whose steps were removed cannot be continued as a chat |
 | `keep_problem_days` | `30` | The same for a helper that failed, was cancelled or asked you something (an approval or the paid question). 0 keeps them for ever |
 
-Settings › Agents has a "Finished helpers" block for both keys, each with a "for ever" choice that writes 0, and `/agents` shows the two values on one line. A change there is written to `config.toml` with its comments kept. The terminal does not edit them.
+Settings › Agents is a list of the agents on the left and the chosen one on the right. On a narrow window it is one column, and a row opens in place. Each agent is a Markdown file. The **Overview** tab shows the model it uses now and why (the wish is a dropdown that saves at once), the tools it can use with the ones that change things marked, its limits (tool calls, time, answer length, and whether it may ask you a question), its prompt, and how often it ran in the last 30 days. The **Definition** tab shows the file itself with its path, the settings at the top tinted, and **Copy text**. A file that comes with golem says it is read-only. An agent that cannot be started yet shows "not yet" and the reason, and an agent whose file has a problem shows the problem. A project agent in a folder that is not trusted is not listed, and a line says to trust the folder.
+
+The bottom of the page has a "Finished helpers" line for both keys, each with a "for ever" choice that writes 0, and `/agents` shows the two values on one line. A change there is written to `config.toml` with its comments kept. The terminal does not edit them.
 
 A value below 0 is a config error that names the line. A helper that is running or waiting is never trimmed, and neither is one whose lead is waiting for its helpers. golem checks when it starts and then once an hour, and a change in `config.toml` applies to the next check without a restart.
 
