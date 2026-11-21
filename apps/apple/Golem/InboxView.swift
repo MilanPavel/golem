@@ -20,6 +20,12 @@ struct InboxView: View {
     private func content(_ inbox: Inbox, now: Date) -> some View {
         let ms = nowMilliseconds(now)
         return List {
+            if let stale = model.staleText {
+                Text("Last known \u{b7} \(stale)")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .accessibilityIdentifier("inbox.stale")
+            }
             Section {
                 if inbox.needsYou.isEmpty {
                     Text("Nothing needs you.")
@@ -27,7 +33,7 @@ struct InboxView: View {
                         .accessibilityIdentifier("inbox.empty")
                 }
                 ForEach(inbox.needsYou) { item in
-                    NeedsYouRow(item: item) {
+                    NeedsYouRow(item: item, answer: model.pendingAnswer(for: item)) {
                         model.present(item: item)
                     }
                 }
@@ -57,6 +63,7 @@ struct InboxView: View {
 
 private struct NeedsYouRow: View {
     let item: InboxItem
+    let answer: PendingAnswer?
     let action: () -> Void
 
     var body: some View {
@@ -65,6 +72,12 @@ private struct NeedsYouRow: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(item.headline).foregroundStyle(.primary)
                     Text(detail).font(.caption).foregroundStyle(.secondary)
+                    if let answer {
+                        Text(answer.rowText)
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(answer.status == .waiting ? .orange : .secondary)
+                            .accessibilityIdentifier("inbox.answer.\(item.callId ?? "")")
+                    }
                 }
             }
         }

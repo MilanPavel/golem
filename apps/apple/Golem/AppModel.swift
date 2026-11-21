@@ -19,14 +19,17 @@ protocol MacLink: AnyObject {
     func approvalRequest(for item: InboxItem, folder: String?) async -> ApprovalRequest
     /// Answers approvals and hears when one is answered elsewhere.
     var approvals: any ApprovalChannel { get }
+    /// Answers given while the Mac could not be reached, and what became of them.
+    var pendingAnswers: PendingAnswers { get }
 }
 
 /// The real link: one `Connection` to the Mac, through the relay.
 @MainActor
 final class ConnectionLink: MacLink {
     private let connection: Connection
+    let pendingAnswers = PendingAnswers()
 
-    var approvals: any ApprovalChannel { ConnectionApprovalChannel(connection: connection) }
+    var approvals: any ApprovalChannel { ConnectionApprovalChannel(connection: connection, pending: pendingAnswers) }
 
     func approvalRequest(for item: InboxItem, folder: String?) async -> ApprovalRequest {
         await ApprovalRequestLoader.load(item: item, folder: folder, connection: connection)
@@ -35,6 +38,9 @@ final class ConnectionLink: MacLink {
 
     init(mac: PairedMac, key: any DeviceKey) {
         connection = Connection(config: mac.connectionConfig(), key: key)
+        let connection = connection
+        let pending = pendingAnswers
+        Task { pending.follow(await connection.outboxOutcomes()) }
     }
 
     func start() -> AsyncStream<ConnectionState> {
@@ -69,6 +75,7 @@ final class ConnectionLink: MacLink {
     }
 
     func stop() async {
+        pendingAnswers.stopFollowing()
         await connection.stop()
     }
 }
@@ -86,6 +93,8 @@ struct AppEnvironment {
     var authenticator: any ApprovalAuthenticator = LocalAuthenticator()
     /// This phone's name, as the rule note shows it.
     var deviceName = "this iPhone"
+    /// Whether the phone has a network, now and after each change.
+    var network: () -> AsyncStream<Bool> = { NetworkMonitor.updates() }
 
     @MainActor
     static func live() -> AppEnvironment {
@@ -139,6 +148,10 @@ final class AppModel {
     private(set) var macName = ""
     private(set) var connection: ConnectionState = .stopped(.stopped)
     private(set) var listError: String?
+    /// Whether the phone itself has a network. It tells "no network" from "can't reach the relay".
+    private(set) var networkAvailable = true
+    /// When the Inbox was last read from, or pushed to by, the Mac.
+    private(set) var lastUpdated: Date?
     let sessions = SessionListModel()
     let runs = RunsModel()
     /// The approval sheet that is open, if any. Whoever lists approvals sets it with `present(approval:)`.
@@ -154,6 +167,7 @@ final class AppModel {
     private var summaryTask: Task<Void, Never>?
     private var runsTask: Task<Void, Never>?
     private var openingApproval = false
+    private var networkTask: Task<Void, Never>?
     @ObservationIgnored private let inboxModel: InboxModel
 
     init(environment: AppEnvironment) {
@@ -165,6 +179,10 @@ final class AppModel {
             startLink(to: mac)
         } else {
             screen = .scan(message: nil)
+        }
+        let updates = environment.network()
+        networkTask = Task { [weak self] in
+            for await available in updates { self?.networkAvailable = available }
         }
     }
 
@@ -262,11 +280,13 @@ final class AppModel {
         guard let link else { return }
         do {
             try await link.refresh(into: sessions)
+            lastUpdated = environment.now()
             listError = nil
         } catch {
             listError = "The Mac's sessions could not be read."
         }
         updateBadge()
+        link.pendingAnswers.prune(keeping: Set(inbox(now: environment.now()).needsYou.compactMap(\.callId)))
         // A Mac that does not answer `run.list` leaves Running and Today empty; the rest still works.
         try? await link.refresh(into: runs)
     }
@@ -284,6 +304,7 @@ final class AppModel {
         } else {
             sessions.update(summary)
         }
+        lastUpdated = environment.now()
         updateBadge()
         guard runsTask == nil, let link else { return }
         runsTask = Task { [weak self] in
@@ -315,11 +336,13 @@ final class AppModel {
         runsTask?.cancel()
         runsTask = nil
         let old = link
+        old?.pendingAnswers.clear()
         link = nil
         Task { await old?.stop() }
         try? environment.store.forget()
         sessions.replace(with: [])
         runs.replace(with: [])
+        lastUpdated = nil
         dismissApproval()
         environment.setBadge(0)
         connection = .stopped(.stopped)
@@ -340,6 +363,8 @@ final class AppModel {
     /// reads them from the session's events first; a tap while one is loading is ignored.
     func present(item: InboxItem) {
         guard let link, item.kind == .approval, item.callId != nil, !openingApproval else { return }
+        // Its answer is queued; there is nothing to decide until the Mac has dealt with it.
+        if let callId = item.callId, link.pendingAnswers.isWaiting(callId: callId) { return }
         openingApproval = true
         let folder = sessions.sessions.first { $0.sessionId == item.sessionId }?.cwd
         Task { [weak self] in
@@ -364,6 +389,26 @@ final class AppModel {
 
     func dismissReview() {
         presentedReview = nil
+    }
+
+    // MARK: - Offline
+
+    /// The banner for the connection now, or nil when all is well.
+    var banner: OfflineBanner? {
+        OfflineBanner.make(
+            state: connection, networkAvailable: networkAvailable, waiting: link?.pendingAnswers.waitingCount ?? 0)
+    }
+
+    /// What became of an answer given for this Inbox item while the Mac could not be reached.
+    func pendingAnswer(for item: InboxItem) -> PendingAnswer? {
+        guard let callId = item.callId else { return nil }
+        return link?.pendingAnswers.answer(for: callId)
+    }
+
+    /// "Updated 08:47" while the Inbox is not live, so it reads as what was last known.
+    var staleText: String? {
+        guard connection != .connected, case .tabs = screen else { return nil }
+        return OfflineBanner.updatedText(lastUpdated)
     }
 
     // MARK: - Words for people
