@@ -1,7 +1,7 @@
 # ADR-051: A phone reaches the Mac through a relay that sees only ciphertext
 
 **Date**: 2026-11-13
-**Status**: accepted, amended 2026-11-15 (the cipher, the libraries, and [The wire in detail](#the-wire-in-detail))
+**Status**: accepted, amended 2026-11-15 (the cipher, the libraries, and [The wire in detail](#the-wire-in-detail)), amended 2026-11-21 (the pairing wire)
 
 ## The idea
 
@@ -76,7 +76,7 @@ What it does **not** hide, on purpose: who talks to whom and when, and message s
 
 ### The encryption: Noise NK, with the device's signature over the handshake
 
-**`Noise_NK_25519_AESGCM_SHA256`**, the prologue `golem-noise-v1 ‖ room id`.
+**`Noise_NK_25519_AESGCM_SHA256`**, the prologue is the ASCII `golem-noise-v1` followed by the raw 32 bytes of the room id (the SHA-256 of the Mac's 65-byte key, see [The wire in detail](#the-wire-in-detail)).
 
 ```mermaid
 sequenceDiagram
@@ -145,7 +145,9 @@ The link is about 200 characters, so the QR code stays scannable on a terminal.
 
 **The code** ends after 5 minutes and works once. It is spent by the first handshake that presents it, **whether or not the owner then confirms**, so a leaked code gives an attacker one try, and a failed or refused pairing needs a new QR. A wrong code counts, and the Mac cancels the pairing after 3 wrong ones. Only one pairing is open at a time. The compare is constant-time.
 
-**The confirmation** is three words from the 2048-word BIP-39 English list, taken from the first 33 bits of `HKDF-SHA256(ikm = h, info = "golem-pair-sas-v1")`. Both screens show them: the phone as soon as the handshake is done, the Mac as soon as the code checked out. **The Mac accepts the device only when the owner confirms there**: `golem devices pair` asks `Confirm only if your phone shows the same words`, and the web page has a button. The words come from `h`, so they depend on both ephemeral keys, and no one can choose them. Words, not six digits, because three words are easier to compare across a desk or aloud, and 33 bits is plenty against the single try an attacker gets. The confirmation window is 2 minutes.
+**The confirmation** is three words from the 2048-word BIP-39 English list, taken from the first 33 bits of `HKDF-SHA256(ikm = h, salt = empty, info = "golem-pair-sas-v1")`, as three 11-bit indexes, most significant bit first. The list is in `packages/protocol/vectors/bip39/`. Both screens show them: the phone as soon as the handshake is done, the Mac as soon as the code checked out. **The Mac accepts the device only when the owner confirms there**: `golem devices pair` asks `Confirm only if your phone shows the same words`, and the web page has a button. The words come from `h`, so they depend on both ephemeral keys, and no one can choose them. Words, not six digits, because three words are easier to compare across a desk or aloud, and 33 bits is plenty against the single try an attacker gets. The confirmation window is 2 minutes.
+
+**`device.pair.confirm {pair, accept}`** takes the owner's answer. `accept: false` refuses the phone, or cancels a pairing that nobody joined (Ctrl-C, Cancel). The daemon sends `device.pair.changed {pair, state: waiting|words|paired|expired|refused, words?, device?}` to browser and local connections, never to a device. `device.changed` still fires after a pair.
 
 **What pairing does not protect:** an owner who confirms without looking. The prompt says what to compare, and shows the device's name and its model, which is the phone's own claim.
 
@@ -158,11 +160,13 @@ One WebSocket per side, both over TLS: `wss://<relay>/v1/mac` and `wss://<relay>
 **Authentication** has no cookie or header, because the sides prove a key, not a login:
 
 1. The relay sends `{"type":"challenge","v":1,"nonce":"<32 random bytes>"}`.
-2. The client has 5 seconds to answer `{"type":"auth","key":"<P-256 public key>","sig":"<signature>", ...}`. The signature is ECDSA over `"golem-relay-v1\0" ‖ role ‖ relay host ‖ nonce`. **The relay's host name is in it**, so a malicious relay cannot pass a challenge it got from another relay to a client and use the answer there.
-3. A Mac's `auth` is accepted for any key: its room id is the hash of the key, so whoever signs owns that room. A device's `auth` names the room (`"mac":"<room id>"`) and is accepted only when its key is on that Mac's **allow list**, or when it brings a valid pair slot.
+2. The client has 5 seconds to answer `{"type":"auth","key":"<P-256 public key>","sig":"<signature>", ...}`. The signature is ECDSA over `"golem-relay-v1\0" ‖ role ‖ relay host ‖ nonce`. **The relay's host name is in it**, without the port, so a malicious relay cannot pass a challenge it got from another relay to a client and use the answer there.
+3. A Mac's `auth` is accepted for any key: its room id is the hash of the key, so whoever signs owns that room. A device's `auth` names the room (`"mac":"<room id>"`) and is accepted only when its key is on that Mac's **allow list**, or when it carries `"pair":"<base64url SHA-256(code)>"` for an open pair slot.
 4. Otherwise: close **4401**.
 
 **The allow list.** After it authenticates, the Mac sends `{"type":"allow","seq":n,"devices":[{"key":"<public key>"}, ...],"pairs":[{"slot":"<SHA-256(code)>","exp":<unix seconds>}]}`. It is always the whole list, and a lower `seq` than the last is ignored. The list is not separately signed: the authenticated socket already carries the Mac's authority, and a signature would add nothing a replayed message could not already do. The relay keeps the list **in memory only**. A relay that restarts has no list until the Mac, which reconnects at once, sends it again.
+
+**Pair slots.** An unknown device key is admitted once, with an open and unexpired slot from `pairs`. The slot is spent on that admit, and a later `allow` never revives a spent slot. The pairing device lives only as long as its socket: a later `allow` does not cut it, and its key is not admitted again unless the Mac lists it in `devices`.
 
 The relay uses the list for **hygiene, not for trust**: it keeps strangers off the room and lets it close a revoked device's sockets at once. The Mac's registry is the real check, so a relay that ignores a revocation still cannot get a revoked device through.
 
@@ -269,7 +273,7 @@ The daemon cannot tell a phone from a browser: both come through the gateway. So
 
 1. The Noise session passes the auth check ([above](#the-encryption-noise-nk-with-the-devices-signature-over-the-handshake)).
 2. The gateway opens a daemon connection and sends `{"jsonrpc":"2.0","id":"gw:identify","method":"connection.identify","params":{"device":"<id>"}}`. This is the one place the gateway speaks the protocol itself, which ADR-028 said it never does, and the reply is not passed on.
-3. The daemon sets `connection.device` if the device exists and is not revoked, and refuses otherwise.
+3. The daemon sets `connection.device` if the device exists and is not revoked, and refuses otherwise with `DEVICE_REFUSED` (-32021, `data.reason`: `unknown_device` or `revoked`).
 4. A phone's request ids starting with `gw:` are refused by the filter, and `connection.identify` is `local`, so a phone cannot send it.
 
 `approval.respond` then passes `ctx.connection.device` to the session manager, which writes it with the rule (`manager.py` `_remember`) and into the resolved event, so the Mac's web page and TUI can say "allowed from iPhone 16". An answer from a browser or a terminal has no device. The same field marks the audit trail for every call, not just "Always allow".
@@ -310,7 +314,7 @@ Error codes: `bad_message` (not JSON, unknown type, wrong `v`, or out of order),
 | `relay.sign` | `message` (bytes) | `sig` (64 bytes). The daemon signs only messages that start with `golem-relay-v1\0`, so the gateway cannot use the Mac's key for anything else |
 | `relay.dh` | `public_key` (32 bytes) | `shared` (32 bytes). Refused for an all-zero result |
 | `device.sync` | none | `url`, `room`, `mac_key` (65 bytes), `noise_key` (32 bytes, public), `seq`, `devices` (`id`, `key`), `pairs` (`slot`, `exp`) |
-| `connection.identify` | `device` (hex id) | `{}`, or an error for an unknown or revoked device |
+| `connection.identify` | `device` (hex id) | `{}`, or `DEVICE_REFUSED` (see [How the daemon learns](#how-the-daemon-learns-which-device-answered)) for an unknown or revoked device |
 
 `device.changed` is a notification with no params; the gateway calls `device.sync` again. `seq` grows by one with each change and becomes the `seq` of the relay's `allow` message.
 
