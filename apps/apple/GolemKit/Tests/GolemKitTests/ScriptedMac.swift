@@ -40,6 +40,11 @@ actor ScriptedMac {
     var answerPings = true
     private(set) var approvals: [[String: Any]] = []
     private(set) var attachCalls: [(session: String, afterSeq: Int)] = []
+    /// `session.create`, `message.send` and `run.cancel` params, as they arrived.
+    private(set) var createCalls: [[String: Any]] = []
+    private(set) var sendCalls: [[String: Any]] = []
+    private(set) var cancelCalls: [[String: Any]] = []
+    private(set) var detachCalls: [String] = []
     private(set) var handshakes = 0
 
     var sessionList: [[String: Any]] = []
@@ -264,6 +269,20 @@ actor ScriptedMac {
                 sendLine(["jsonrpc": "2.0", "method": "event", "params": event], to: channel)
             }
             answer(["session_id": sessionID, "last_seq": events.count])
+        case "session.create":
+            createCalls.append(params)
+            answer(["session_id": "new-\(createCalls.count)"])
+        case "message.send":
+            sendCalls.append(params)
+            answer(["run_id": "run-\(sendCalls.count)"])
+        case "run.cancel":
+            cancelCalls.append(params)
+            answer(["cancelled": true])
+        case "session.detach":
+            let id = params["session_id"] as? String ?? ""
+            detachCalls.append(id)
+            channel.attached.remove(id)
+            answer([String: Any]())
         case "approval.respond":
             approvals.append(params)
             answer(["run_id": "r1"])
@@ -281,6 +300,20 @@ actor ScriptedMac {
             "type": "approval.needed", "seq": seq, "session_id": session, "run_id": "r1", "ts": "2026-11-21T10:00:00Z",
             "data": ["call_id": callId, "name": name, "args": args, "source": source],
         ])
+    }
+
+    /// Appends an event (`type`, `run_id`, `data`) to the session's log, and pushes it to every channel
+    /// that attached the session.
+    func record(session: String, type: String, runId: String? = "r1", data: [String: Any]) {
+        let seq = (log[session]?.count ?? 0) + 1
+        let event: [String: Any] = [
+            "type": type, "seq": seq, "session_id": session, "run_id": runId.map { $0 as Any } ?? NSNull(),
+            "ts": "2026-11-21T10:00:\(String(format: "%02d", seq % 60))Z", "data": data,
+        ]
+        log[session, default: []].append(event)
+        for channel in channels.values where channel.attached.contains(session) {
+            sendLine(["jsonrpc": "2.0", "method": "event", "params": event], to: channel)
+        }
     }
 
     /// Pushes a `session.summary` to every channel that asked to watch.

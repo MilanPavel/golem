@@ -67,8 +67,11 @@ enum FakeScenario: String {
 @MainActor
 final class FakeLink: MacLink {
     private let scenario: FakeScenario
+    private let sessionChannelFake = FakeSessionChannel()
 
     nonisolated init(scenario: FakeScenario = .empty) { self.scenario = scenario }
+
+    var sessionChannel: any SessionChannel { sessionChannelFake }
 
     private nonisolated static func iso(_ secondsAgo: TimeInterval) -> String {
         ISO8601DateFormatter().string(from: Date().addingTimeInterval(-secondsAgo))

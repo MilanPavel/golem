@@ -11,6 +11,7 @@ struct InboxView: View {
             TimelineView(.periodic(from: .now, by: 1)) { context in
                 content(model.inbox(now: context.date), now: context.date)
             }
+            .sessionDestination(model)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .principal) { ConnectionHeader(model: model) } }
             .refreshable { await model.refresh() }
@@ -37,16 +38,20 @@ struct InboxView: View {
             if !inbox.running.isEmpty {
                 Section("Running") {
                     ForEach(inbox.running) { run in
-                        RunRow(run: run, detail: runRowLine(run, now: ms), trailing: runDuration(run, now: ms))
-                            .accessibilityIdentifier("inbox.running.\(run.sessionId)")
+                        NavigationLink(value: SessionRoute(sessionID: run.sessionId, title: runName(run))) {
+                            RunRow(run: run, detail: runRowLine(run, now: ms), trailing: runDuration(run, now: ms))
+                        }
+                        .accessibilityIdentifier("inbox.running.\(run.sessionId)")
                     }
                 }
             }
             if !inbox.today.isEmpty {
                 Section("Today") {
                     ForEach(inbox.today) { run in
-                        RunRow(run: run, detail: runResultLine(run), trailing: runDuration(run, now: ms))
-                            .accessibilityIdentifier("inbox.today.\(run.sessionId)")
+                        NavigationLink(value: SessionRoute(sessionID: run.sessionId, title: runName(run))) {
+                            RunRow(run: run, detail: runResultLine(run), trailing: runDuration(run, now: ms))
+                        }
+                        .accessibilityIdentifier("inbox.today.\(run.sessionId)")
                     }
                 }
             }

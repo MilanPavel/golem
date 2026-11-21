@@ -22,7 +22,7 @@ final class InboxUITests: XCTestCase {
         XCTAssertTrue(app.otherElements["automations.empty"].waitForExistence(timeout: 5)
             || app.staticTexts["No automations yet"].waitForExistence(timeout: 5))
         app.tabBars.buttons["Chats"].tap()
-        XCTAssertTrue(app.staticTexts["Fix the flaky test"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["chats.row.s1"].waitForExistence(timeout: 5))
     }
 
     func testNothingNeedsYouWhenNothingWaits() {
