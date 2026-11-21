@@ -22,6 +22,15 @@ struct GolemApp: App {
                     guard url.scheme == "golem", url.host == "pair" else { return }
                     model.handle(linkText: url.absoluteString)
                 }
+                #if DEBUG
+                // `-pairLink <golem://pair link>` starts pairing at launch, for an end-to-end run from the shell.
+                .task {
+                    let arguments = ProcessInfo.processInfo.arguments
+                    if let at = arguments.firstIndex(of: "-pairLink"), at + 1 < arguments.count {
+                        model.handle(linkText: arguments[at + 1])
+                    }
+                }
+                #endif
         }
     }
 }
