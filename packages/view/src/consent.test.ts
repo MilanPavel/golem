@@ -4,7 +4,7 @@ import { test } from "node:test";
 import type { ChatEvent } from "@golem/client";
 
 import { emptyChat, reduceChat, type PendingConsent } from "./chat-state.ts";
-import { CONSENT_LABELS, CONSENT_TITLE, consentAnswers, consentCapsLine, consentLine, consentReason } from "./consent.ts";
+import { CONSENT_LABELS, CONSENT_TITLE, consentAnswers, consentCapsLine, consentLine, consentNotSentLine, consentReason, consentSentLine } from "./consent.ts";
 
 function ev(type: string, data: Record<string, unknown>, run = "r1"): ChatEvent {
   return { seq: 1, session_id: "s", run_id: run, ts: "t", type, data } as ChatEvent;
@@ -41,6 +41,9 @@ test("route.consent.needed opens the question on the run, and the answer closes 
     estimatedUsd: 0.0213,
     alternatives: ["session", "once", "local"],
     signal: null,
+    helper: null,
+    sent: [],
+    notSent: [],
     caps: { sessionUsd: 0.5, dailyUsd: 2.0, spentSession: 0.1, spentToday: 0.42 },
   });
   state = reduceChat(state, ev("route.consent.answered", { answer: "once" }));
@@ -109,4 +112,22 @@ test("a question from a struggling model says so, and one before a turn keeps it
     consentReason(state.consent),
     "The model is struggling: a tool call written as text could not be read on small.",
   );
+});
+
+test("a helper's question names the helper and what is sent and not sent", () => {
+  const data = { ...ASKED, helper_id: "h1", agent: "worker", label: "upgrade httpx", sent: ["the brief", "the diff, 212 lines"], not_sent: ["this chat"] };
+  const state = reduceChat(emptyChat, ev("route.consent.needed", data));
+  assert.ok(state.consent);
+  assert.equal(state.consent.helper, "worker \u00b7 upgrade httpx");
+  assert.equal(consentSentLine(state.consent), "Sent: the brief, the diff, 212 lines");
+  assert.equal(consentNotSentLine(state.consent), "Not sent: this chat");
+  const bare = reduceChat(emptyChat, ev("route.consent.needed", { ...data, label: null }));
+  assert.equal(bare.consent?.helper, "worker");
+});
+
+test("a lead's own question has no helper and no sent lines", () => {
+  const consent = asked();
+  assert.equal(consent.helper, null);
+  assert.equal(consentSentLine(consent), "");
+  assert.equal(consentNotSentLine(consent), "");
 });

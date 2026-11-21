@@ -10,6 +10,14 @@ function inside(target: EventTarget | null, selector: string): boolean {
   return target instanceof Element && target.closest(selector) !== null;
 }
 
+/** Whether a key press is for something else: a field, an open overlay, a focused button's own Enter, a modifier. */
+export function keyBelongsElsewhere(event: KeyboardEvent): boolean {
+  if (event.defaultPrevented || event.isComposing || event.repeat) return true;
+  if (event.metaKey || event.ctrlKey || event.altKey) return true;
+  if (inside(event.target, EDITABLE) || inside(event.target, OVERLAY)) return true;
+  return event.key === "Enter" && inside(event.target, INTERACTIVE);
+}
+
 /**
  * Answers the pending approval from the keyboard: Enter, S, W, D, and opens the editor on E. Keys that belong to
  * something else are left alone: a field, an open overlay, a focused button's own Enter.
@@ -33,14 +41,11 @@ export function useApprovalKeys({
   useEffect(() => {
     if (callId === null) return;
     function onKeyDown(event: KeyboardEvent): void {
-      if (event.defaultPrevented || event.isComposing || event.repeat) return;
-      if (event.metaKey || event.ctrlKey || event.altKey) return;
+      if (keyBelongsElsewhere(event)) return;
       const found = approvalKey(event.key);
       if (found === null) return;
       const edit = found === "edit";
       const decision = edit ? null : found;
-      if (inside(event.target, EDITABLE) || inside(event.target, OVERLAY)) return;
-      if (event.key === "Enter" && inside(event.target, INTERACTIVE)) return;
       if (!latest.current.canAnswer()) return;
       if (decision === null) {
         if (latest.current.onEdit === undefined) return;

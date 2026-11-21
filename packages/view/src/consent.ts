@@ -43,3 +43,13 @@ export function consentCapsLine(consent: PendingConsent): string {
   if (caps.dailyUsd !== null) parts.push(`today ${formatCost(caps.spentToday)} of ${formatCost(caps.dailyUsd)}`);
   return parts.join(" · ");
 }
+
+/** `Sent: the brief, the diff` for a helper's paid question; empty when the daemon names nothing. */
+export function consentSentLine(consent: Pick<PendingConsent, "sent">): string {
+  return consent.sent.length === 0 ? "" : `Sent: ${consent.sent.join(", ")}`;
+}
+
+/** `Not sent: this chat`; empty when the daemon names nothing. */
+export function consentNotSentLine(consent: Pick<PendingConsent, "notSent">): string {
+  return consent.notSent.length === 0 ? "" : `Not sent: ${consent.notSent.join(", ")}`;
+}

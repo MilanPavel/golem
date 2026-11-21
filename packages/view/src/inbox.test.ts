@@ -143,6 +143,14 @@ describe("helpers in the Inbox", () => {
     assert.equal(second!.sessionId, "lead");
   });
 
+  it("a helper's paid question carries what is sent and not sent", () => {
+    const ask: InboxPending = { kind: "consent", since: "2026-11-16T11:55:00Z", sent: ["the brief"], not_sent: ["this chat"], helper: { session_id: "h1", agent: "worker", index: 0 } };
+    const [item] = inboxItems([session("lead", ask, { pending_items: [ask] })], NOW);
+    assert.deepEqual(item!.sent, ["the brief"]);
+    assert.deepEqual(item!.notSent, ["this chat"]);
+    assert.deepEqual(inboxItems([session("a", approval("shell", "ls"))], NOW)[0]!.sent, []);
+  });
+
   it("an older daemon: no pending_items falls back to pending", () => {
     const items = inboxItems([session("a", approval("shell", "ls"))], NOW);
     assert.equal(items.length, 1);
