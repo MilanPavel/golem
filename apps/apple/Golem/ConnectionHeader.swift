@@ -8,7 +8,7 @@ struct ConnectionHeader: View {
     var body: some View {
         VStack(spacing: 0) {
             Text(model.macName).font(.headline)
-            Text(Self.describe(model.connection, mac: model.macName))
+            Text(model.banner?.cause == .noNetwork ? "No network" : Self.describe(model.connection, mac: model.macName))
                 .font(.caption2)
                 .foregroundStyle(.secondary)
                 .accessibilityIdentifier("connection.state")

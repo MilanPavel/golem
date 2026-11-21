@@ -38,6 +38,8 @@ public protocol ApprovalChannel: Sendable {
 
 public enum ApprovalFailure: Error, Equatable {
     case alreadyAnswered
+    /// The Mac cannot be reached; the answer waits in the outbox and goes out when it is back.
+    case queued
     case failed(String)
 }
 
@@ -48,19 +50,33 @@ public struct ConnectionApprovalChannel: ApprovalChannel {
     /// The daemon's code for "no run waits on this tool call".
     static let approvalNotFound = -32010
     private let connection: Connection
+    private let pending: PendingAnswers?
 
-    public init(connection: Connection) {
+    /// With `pending`, an answer given while the Mac cannot be reached waits in the outbox (`ApprovalFailure.queued`).
+    public init(connection: Connection, pending: PendingAnswers? = nil) {
         self.connection = connection
+        self.pending = pending
     }
 
     public func respond(sessionId: String, callId: String, decision: Decision) async throws {
         let params = ApprovalRespondParams(args: nil, callID: callId, decision: decision, scope: nil, sessionID: sessionId)
+        if let pending, await pending.isWaiting(callId: callId) { throw ApprovalFailure.queued }
         do {
             let _: ApprovalRespondResult = try await connection.call("approval.respond", params)
         } catch ConnectionError.rpc(let code, let message) {
             if code == Self.approvalNotFound { throw ApprovalFailure.alreadyAnswered }
             throw ApprovalFailure.failed(message)
-        } catch ConnectionError.notConnected, ConnectionError.timedOut {
+        } catch ConnectionError.notConnected {
+            // Not connected, or the link dropped with the answer in flight. If the Mac did get it, it refuses
+            // the second one (`approval not found`), which the app shows as answered on the Mac.
+            guard let pending else { throw ApprovalFailure.failed("Your Mac is not reachable.") }
+            do {
+                try await pending.queue(sessionId: sessionId, callId: callId, decision: decision, on: connection)
+            } catch {
+                throw ApprovalFailure.failed("The answer could not be saved to send later.")
+            }
+            throw ApprovalFailure.queued
+        } catch ConnectionError.timedOut {
             throw ApprovalFailure.failed("Your Mac is not reachable.")
         } catch {
             throw ApprovalFailure.failed("The answer did not reach your Mac.")
@@ -96,13 +112,15 @@ public enum ApprovalPhase: Equatable, Sendable {
     case answered(Decision)
     /// Answered somewhere else first.
     case answeredElsewhere
+    /// The Mac cannot be reached; the answer waits to be sent.
+    case queued(Decision)
     /// The answer did not go; the sheet stays so the owner can try again.
     case failed(String)
 }
 
 @MainActor @Observable
 public final class ApprovalSheetModel {
-    public static let answeredElsewhereText = "Answered on the Mac"
+    public nonisolated static let answeredElsewhereText = "Answered on the Mac"
 
     public let request: ApprovalRequest
     public let deviceName: String
@@ -145,7 +163,7 @@ public final class ApprovalSheetModel {
     /// Whether the sheet is finished and should close.
     public var isClosing: Bool {
         switch phase {
-        case .answered, .answeredElsewhere: true
+        case .answered, .answeredElsewhere, .queued: true
         default: false
         }
     }
@@ -154,6 +172,7 @@ public final class ApprovalSheetModel {
     public var closingText: String? {
         switch phase {
         case .answeredElsewhere: Self.answeredElsewhereText
+        case .queued: "Waiting to send"
         case .answered(.deny): "Denied"
         case .answered(.allowAlways): "Always allowed"
         case .answered: "Allowed"
@@ -200,6 +219,8 @@ public final class ApprovalSheetModel {
             if phase != .answeredElsewhere { phase = .answered(decision) }
         } catch ApprovalFailure.alreadyAnswered {
             phase = .answeredElsewhere
+        } catch ApprovalFailure.queued {
+            if phase != .answeredElsewhere { phase = .queued(decision) }
         } catch ApprovalFailure.failed(let message) {
             phase = .failed(message)
         } catch {
@@ -231,7 +252,7 @@ public final class ApprovalSheetModel {
     public func apply(_ resolution: ApprovalResolution) {
         guard resolution.sessionId == request.sessionId, resolution.callId == request.callId else { return }
         switch phase {
-        case .answered, .answeredElsewhere, .sending: return
+        case .answered, .answeredElsewhere, .queued, .sending: return
         default: phase = .answeredElsewhere
         }
     }
