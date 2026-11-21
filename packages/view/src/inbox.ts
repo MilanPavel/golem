@@ -29,6 +29,8 @@ export interface InboxSession {
   pending?: InboxPending | null;
   /** Everything the session waits for, a lead's helpers included. An older daemon leaves it out. */
   pending_items?: InboxPending[] | null;
+  /** Set for a helper session: its lead's id. An older daemon leaves it out. */
+  parent_session_id?: string | null;
 }
 
 /** The items of a summary: `pending_items` when the daemon sends it, else `[pending]`, else none. */
@@ -54,6 +56,32 @@ export interface InboxItem {
   age: string;
   added: number | null;
   removed: number | null;
+  /** The helper that asks, for an item in a lead's list; null for the session's own item. */
+  helper: InboxHelper | null;
+  /** How many helpers ask this same question (1 for an item of one asker). */
+  count: number;
+  /** Where the answer goes: the helper's session for a helper's item, else `sessionId`. */
+  answerSessionId: string;
+}
+
+/** The helper behind an item, with the words that name it. */
+export interface InboxHelper {
+  sessionId: string;
+  agent: string;
+  label: string | null;
+  index: number;
+  /** `worker · upgrade httpx`, or just the agent when there is no label. */
+  name: string;
+}
+
+/** One lead and what it and its helpers wait for. */
+export interface InboxGroup {
+  sessionId: string;
+  sessionTitle: string;
+  /** The items, oldest first. */
+  items: InboxItem[];
+  /** How many askers wait: an item counts once per helper that asks it. */
+  waiting: number;
 }
 
 const MINUTE = 60_000;
@@ -113,33 +141,91 @@ function headline(pending: InboxPending): string {
   return subject === "" ? `Use ${tool}` : `Use ${tool} on \`${subject}\``;
 }
 
-/** The items that wait, oldest first by `since` (ties by session id). Closed sessions and sessions with nothing pending are left out. */
+function helperOf(pending: InboxPending): InboxHelper | null {
+  const helper = pending.helper;
+  if (helper === null || helper === undefined) return null;
+  const label = helper.label?.trim() ? helper.label.trim() : null;
+  return {
+    sessionId: helper.session_id,
+    agent: helper.agent,
+    label,
+    index: helper.index,
+    name: label === null ? helper.agent : `${helper.agent} \u00b7 ${label}`,
+  };
+}
+
+/** `2 helpers` for a count of 2 or more, else null. */
+export function inboxHelperCountWords(count: number): string | null {
+  return count >= 2 ? `${count} helpers` : null;
+}
+
+/** `5 helpers ask this` for a count of 2 or more, else null. */
+export function inboxHelperAskWords(count: number): string | null {
+  return count >= 2 ? `${count} helpers ask this` : null;
+}
+
+function compareItems(a: InboxItem, b: InboxItem): number {
+  const ta = Date.parse(a.since);
+  const tb = Date.parse(b.since);
+  if (ta !== tb && !Number.isNaN(ta) && !Number.isNaN(tb)) return ta - tb;
+  if (a.since !== b.since) return a.since < b.since ? -1 : 1;
+  return a.sessionId < b.sessionId ? -1 : a.sessionId > b.sessionId ? 1 : 0;
+}
+
+/**
+ * The items that wait, oldest first by `since` (ties by session id), one for each pending item: a lead's own
+ * and its helpers'. Closed sessions are left out, and so is a helper session whose lead is listed, because
+ * the lead's `pending_items` already has its item.
+ */
 export function inboxItems(sessions: readonly InboxSession[], now: number): InboxItem[] {
+  const ids = new Set(sessions.map((session) => session.session_id));
   const items: InboxItem[] = [];
   for (const session of sessions) {
-    const pending = session.pending;
-    if (pending === null || pending === undefined || session.status === "closed") {
-      continue;
+    if (session.status === "closed") continue;
+    const lead = session.parent_session_id;
+    if (lead !== undefined && lead !== null && ids.has(lead)) continue;
+    for (const pending of pendingItemsOf(session)) {
+      const approval = pending.kind === "approval";
+      const helper = helperOf(pending);
+      items.push({
+        sessionId: session.session_id,
+        sessionTitle: session.title?.trim() ? session.title : UNTITLED,
+        kind: pending.kind,
+        callId: approval ? (pending.call_id ?? null) : null,
+        headline: headline(pending),
+        source: approval ? (pending.source ?? null) : null,
+        since: pending.since,
+        age: ageText(pending.since, now),
+        added: approval ? (pending.added ?? null) : null,
+        removed: approval ? (pending.removed ?? null) : null,
+        helper,
+        count: Math.max(1, pending.count ?? 1),
+        answerSessionId: helper === null ? session.session_id : helper.sessionId,
+      });
     }
-    const approval = pending.kind === "approval";
-    items.push({
-      sessionId: session.session_id,
-      sessionTitle: session.title?.trim() ? session.title : UNTITLED,
-      kind: pending.kind,
-      callId: approval ? (pending.call_id ?? null) : null,
-      headline: headline(pending),
-      source: approval ? (pending.source ?? null) : null,
-      since: pending.since,
-      age: ageText(pending.since, now),
-      added: approval ? (pending.added ?? null) : null,
-      removed: approval ? (pending.removed ?? null) : null,
-    });
   }
-  return items.sort((a, b) => {
-    const ta = Date.parse(a.since);
-    const tb = Date.parse(b.since);
-    if (ta !== tb && !Number.isNaN(ta) && !Number.isNaN(tb)) return ta - tb;
-    if (a.since !== b.since) return a.since < b.since ? -1 : 1;
-    return a.sessionId < b.sessionId ? -1 : a.sessionId > b.sessionId ? 1 : 0;
-  });
+  return items.sort(compareItems);
+}
+
+/** The items of `inboxItems` by lead, the lead with the oldest item first. */
+export function inboxGroups(sessions: readonly InboxSession[], now: number): InboxGroup[] {
+  const groups = new Map<string, InboxGroup>();
+  for (const item of inboxItems(sessions, now)) {
+    const group = groups.get(item.sessionId);
+    if (group === undefined) {
+      groups.set(item.sessionId, { sessionId: item.sessionId, sessionTitle: item.sessionTitle, items: [item], waiting: item.count });
+    } else {
+      group.items.push(item);
+      group.waiting += item.count;
+    }
+  }
+  return [...groups.values()];
+}
+
+/**
+ * How many askers need you, for the rail badge and "N need you": one for each item, and for a question
+ * several helpers ask, one for each helper (the count). Each helper is a session that waits.
+ */
+export function inboxCount(items: readonly Pick<InboxItem, "count">[]): number {
+  return items.reduce((sum, item) => sum + item.count, 0);
 }
