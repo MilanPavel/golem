@@ -46,7 +46,16 @@ Pick the Golem scheme and a Simulator, then Run. The Simulator has no camera, so
 4. In the Simulator, tap **Paste pair link**, paste the link (copy it on the Mac, then paste in the field), tap **Pair**.
 5. The app shows three words. Compare them with the Mac and confirm there. The app says "Paired with <your Mac>", and **Continue** shows the Mac's sessions.
 
-In a debug build, `xcrun simctl openurl booted '<link>'` pairs too.
+A `golem://pair` link opens the app and starts pairing in every build, so the Camera app or a tapped link works too: `xcrun simctl openurl booted '<link>'` (iOS asks to open Golem first). The words and the confirmation on the Mac still guard it. Other `golem://` links are ignored.
+
+For a run from the shell with no taps, build with ad-hoc signing (the `just ios` build has signing off, so the Simulator's Keychain refuses the device key with -34018) and start the app with the link as a launch argument (debug builds only):
+
+```sh
+xcodebuild build -project Golem.xcodeproj -scheme Golem -destination 'platform=iOS Simulator,name=iPhone 18 Pro' \
+  -derivedDataPath build CODE_SIGN_IDENTITY=- CODE_SIGNING_ALLOWED=YES CODE_SIGNING_REQUIRED=NO
+xcrun simctl install booted build/Build/Products/Debug-iphonesimulator/Golem.app
+xcrun simctl launch booted dev.golem.app -pairLink 'golem://pair?...'
+```
 
 ## Run on a real iPhone, with a free Personal Team
 
