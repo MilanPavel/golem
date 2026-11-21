@@ -3875,6 +3875,40 @@ class ConfigGetResult(BaseModel):
     notifications_open_in: Literal["web", "terminal"] | None = None
 
 
+class AgentsKeepParams(BaseModel):
+    """``agents.keep``. Read how long a finished helper's steps are kept, or change it.
+
+    Without keys it only reads. Only the keys sent change, in ``[agents]`` of the user's
+    ``config.toml``, and the file keeps its comments. 0 keeps for ever. Both values are
+    checked first, and when one is wrong nothing is written. The next trim pass uses them.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    keep_days: int | None = None
+    keep_problem_days: int | None = None
+
+
+class AgentsKeepValues(BaseModel):
+    """``[agents] keep_days`` and ``keep_problem_days`` as golem uses them. 0 is for ever."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    keep_days: int = Field(ge=0)
+    keep_problem_days: int = Field(ge=0)
+
+
+class AgentsKeepResult(BaseModel):
+    """``ok`` is false when a value was wrong, and the file is then untouched. ``values`` is
+    what is in force now, set when ``ok``."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    ok: bool
+    errors: list[ConfigError] = Field(default_factory=list[ConfigError])
+    values: AgentsKeepValues | None = None
+
+
 class NotificationsGetParams(BaseModel):
     """``notifications.get``. The ``[notifications]`` settings as golem uses them."""
 
@@ -4661,6 +4695,9 @@ __all__ = [
     "AgentRegistryChanged",
     "AgentsGetParams",
     "AgentsGetResult",
+    "AgentsKeepParams",
+    "AgentsKeepResult",
+    "AgentsKeepValues",
     "AgentsListParams",
     "AgentsListResult",
     "AgentsSetWishParams",

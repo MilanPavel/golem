@@ -233,6 +233,8 @@ How long a finished helper keeps its steps. After that only a receipt stays: its
 | `keep_days` | `7` | Days a finished helper keeps its steps, counted from the end of its last run, not from when you opened it. 0 keeps them for ever |
 | `keep_problem_days` | `30` | The same for a helper that failed, was cancelled or asked you something (an approval or the paid question). 0 keeps them for ever |
 
+Settings › Agents has a "Finished helpers" block for both keys, each with a "for ever" choice that writes 0, and `/agents` shows the two values on one line. A change there is written to `config.toml` with its comments kept. The terminal does not edit them.
+
 A value below 0 is a config error that names the line. A helper that is running or waiting is never trimmed, and neither is one whose lead is waiting for its helpers. golem checks when it starts and then once an hour, and a change in `config.toml` applies to the next check without a restart.
 
 ### `[routing.roles]`

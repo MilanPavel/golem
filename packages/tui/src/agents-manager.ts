@@ -1,4 +1,4 @@
-import { RpcError, type AgentInfo } from "@golem/client";
+import { RpcError, type AgentInfo, type AgentsKeepValues } from "@golem/client";
 import { AGENT_GROUPS, agentWarnings, agentWish, wishLine, wishNow, wishOptions, type WishModel, type WishOption, type WishSetup } from "@golem/view";
 
 import type { Press } from "./keys.ts";
@@ -176,6 +176,8 @@ export function layoutAgentsManager(input: {
   setup?: WishSetup;
   /** The models the wish choices may name. */
   models?: readonly WishModel[];
+  /** How long a finished helper's steps are kept, or null while unknown. Read only here. */
+  keep?: AgentsKeepValues | null;
 }): AgentsManagerLine[] {
   const width = Math.max(1, input.columns);
   const room = Math.max(0, input.rows - 2);
@@ -188,11 +190,11 @@ export function layoutAgentsManager(input: {
   } else if (input.agents === null) {
     body = [{ text: "Agents", bold: true }, { text: "" }, { text: "asking the daemon…", dim: true }];
   } else if (view.kind === "list") {
-    body = scrollToSelected(listLines(input.agents, view.selected, input.cwd, input.home, setup), room);
+    body = scrollToSelected(listLines(input.agents, view.selected, input.cwd, input.home, setup, input.keep ?? null), room);
   } else {
     const agent = input.agents.find((item) => item.name === view.name && item.origin === view.origin);
     if (agent === undefined) {
-      body = scrollToSelected(listLines(input.agents, 0, input.cwd, input.home, setup), room);
+      body = scrollToSelected(listLines(input.agents, 0, input.cwd, input.home, setup, input.keep ?? null), room);
     } else {
       if (view.pick !== undefined) {
         body = pickLines(agent, view.pick.selected, setup, input.models ?? [], width);
@@ -213,6 +215,12 @@ export function layoutAgentsManager(input: {
   });
 }
 
+/** `finished helpers: steps kept 7 days · failed, stopped or asking 30 days`; 0 is `for ever`. */
+export function keepLine(keep: AgentsKeepValues): string {
+  const days = (count: number) => (count === 0 ? "for ever" : `${count} ${count === 1 ? "day" : "days"}`);
+  return `finished helpers: steps kept ${days(keep.keep_days)} · failed, stopped or asking ${days(keep.keep_problem_days)}`;
+}
+
 /** `used 41 · finished 39`, or `not used yet`. `finished` is a number of helpers. */
 export function agentCounts(agent: AgentInfo): string {
   const used = agent.used ?? 0;
@@ -223,9 +231,10 @@ export function agentCounts(agent: AgentInfo): string {
   return finished === null || finished === undefined ? `used ${used}` : `used ${used} · finished ${finished}`;
 }
 
-function listLines(agents: readonly AgentInfo[], selected: number, cwd: string, home: string, setup: WishSetup): AgentsManagerLine[] {
+function listLines(agents: readonly AgentInfo[], selected: number, cwd: string, home: string, setup: WishSetup, keep: AgentsKeepValues | null): AgentsManagerLine[] {
   const count = `${agents.length} ${agents.length === 1 ? "agent" : "agents"}`;
   const lines: AgentsManagerLine[] = [{ text: "Agents", bold: true }, { text: `${count} · helpers, last 30 days`, dim: true }];
+  if (keep !== null) lines.push({ text: keepLine(keep), dim: true });
   if (agents.length === 0) {
     return [...lines, { text: "" }, { text: AGENTS_HINT }];
   }

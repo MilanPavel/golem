@@ -11,6 +11,7 @@ import {
   OLLAMA_FAILED,
   RpcError,
   SESSION_NOT_FOUND,
+  type AgentsKeepValues,
   type ApprovalChoice,
   type ChatEvent,
   type ChangesRevertTarget,
@@ -714,6 +715,7 @@ export function App({
   const agentsManagerRef = useRef(agentsManager);
   agentsManagerRef.current = agentsManager;
   const [agentList, setAgentList] = useState<AgentList>({ agents: null, error: null });
+  const [agentsKeep, setAgentsKeep] = useState<AgentsKeepValues | null>(null);
   const agentListRef = useRef(agentList);
   agentListRef.current = agentList;
   const [routinesManager, setRoutinesManager] = useState<RoutinesManagerState>(closedRoutinesManager);
@@ -2170,6 +2172,10 @@ export function App({
       (error: unknown) => {
         setAgentList(agentListFailed(error));
       },
+    );
+    client.agentsKeep().then(
+      (result) => setAgentsKeep(result.values ?? null),
+      () => setAgentsKeep(null),
     );
   }
 
@@ -5943,6 +5949,7 @@ export function App({
             rows: budget.body,
             setup: wishSetup(listing?.models),
             models: listing?.models,
+            keep: agentsKeep,
           }).map((line, index) => (
             <McpManagerRow key={index} line={line} />
           ))}

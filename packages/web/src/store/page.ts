@@ -10,7 +10,7 @@ import { createNewSession, type NewSessionStore } from "./new-session.ts";
 import { CONFIG_KEY } from "./config.ts";
 import { DEVICE_LIST_KEY, createPairing, type DeviceListResult, type DeviceRevokeResult, type Pairing } from "./devices.ts";
 import { MCP_CATALOG_KEY, MCP_LIST_KEY, MCP_TOOLS_KEY, type McpToolsResult } from "./mcp.ts";
-import { NOTIFICATIONS_KEY } from "./notifications.ts";
+import { AGENTS_KEEP_KEY, NOTIFICATIONS_KEY, type AgentsKeepResult, type AgentsKeepValues } from "./notifications.ts";
 import { ROUTING_KEY } from "./routing.ts";
 import type { AgentInfo, AgentsListResult as AgentsListed } from "./agents.ts";
 import { MODEL_LIST_ALL_KEY, MODEL_LIST_KEY, SETUP_STATUS_KEY, type ModelListResult } from "./models.ts";
@@ -38,6 +38,7 @@ export type PageClient = Pick<
   | "onAgentsChanged"
   | "listAgents"
   | "setAgentWish"
+  | "agentsKeep"
   | "onMemoryChanged"
   | "onDevicesChanged"
   | "onDevicePairChanged"
@@ -244,6 +245,11 @@ export type PageActions = {
    * error for each wrong setting), not a rejection, and nothing is written then.
    */
   setNotifications(params: NotificationsSetParams): Promise<NotificationsSetResult>;
+  /**
+   * Changes how many days a finished helper's steps are kept (`[agents] keep_days`, `keep_problem_days`; 0 is
+   * for ever). A refusal is in the result (`ok: false`), not a rejection, and nothing is written then.
+   */
+  setAgentsKeep(change: { keep_days?: number; keep_problem_days?: number }): Promise<AgentsKeepResult>;
   /** Posts a sample notification (`notify.test`). `posted` is false when nothing could be shown. */
   notifyTest(): Promise<NotifyTestResult>;
   /** A local model's tunable options with its defaults, what is saved for it, and the session's overrides. */
@@ -389,6 +395,8 @@ export type PageQueries = {
   routing(): Promise<RoutingGetResult>;
   /** The `[notifications]` settings, from `notifications.get`. */
   notifications(): Promise<NotificationsValues>;
+  /** How long a finished helper's steps are kept, from `agents.keep`. */
+  agentsKeep(): Promise<AgentsKeepValues>;
   /** A session's runs as a tree of spans. */
   trace(sessionId: string): Promise<TraceGetResult>;
   /** The servers golem offers to add, with what each needs here. */
@@ -508,6 +516,11 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
       cost: (sessionId) => (sessionId === undefined ? client.getCost() : client.getCost(sessionId)),
       routing: () => client.getRouting(),
       notifications: () => client.getNotifications(),
+      agentsKeep: async () => {
+        const result = await client.agentsKeep();
+        if (result.values == null) throw new Error("agents.keep gave no values");
+        return result.values;
+      },
       trace: (sessionId) => client.getTrace(sessionId),
       traceSpan: (sessionId, spanId) => client.getTraceSpan(sessionId, spanId),
       artifact: (sessionId, artifactId, offset, limit) => client.readArtifact(sessionId, artifactId, offset, limit),
@@ -875,6 +888,11 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
       async setNotifications(params) {
         const result = await client.setNotifications(params);
         if (result.ok) await queryClient.invalidateQueries({ queryKey: NOTIFICATIONS_KEY });
+        return result;
+      },
+      async setAgentsKeep(change) {
+        const result = await client.agentsKeep(change);
+        if (result.ok) await queryClient.invalidateQueries({ queryKey: AGENTS_KEEP_KEY });
         return result;
       },
       notifyTest: () => client.notifyTest(),

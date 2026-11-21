@@ -1,0 +1,110 @@
+{
+  "$defs": {
+    "AgentsKeepValues": {
+      "additionalProperties": false,
+      "description": "``[agents] keep_days`` and ``keep_problem_days`` as golem uses them. 0 is for ever.",
+      "properties": {
+        "keep_days": {
+          "minimum": 0,
+          "title": "Keep Days",
+          "type": "integer"
+        },
+        "keep_problem_days": {
+          "minimum": 0,
+          "title": "Keep Problem Days",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "keep_days",
+        "keep_problem_days"
+      ],
+      "title": "AgentsKeepValues",
+      "type": "object"
+    },
+    "ConfigError": {
+      "additionalProperties": false,
+      "description": "One problem in a config text. ``line`` and ``column`` count from 1, when known.\n\n``path`` is the setting, as ``mcp.github.headers.Authorization``.",
+      "properties": {
+        "column": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Column"
+        },
+        "line": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Line"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        },
+        "path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Path"
+        }
+      },
+      "required": [
+        "message"
+      ],
+      "title": "ConfigError",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "``ok`` is false when a value was wrong, and the file is then untouched. ``values`` is\nwhat is in force now, set when ``ok``.",
+  "properties": {
+    "errors": {
+      "items": {
+        "$ref": "#/$defs/ConfigError"
+      },
+      "title": "Errors",
+      "type": "array"
+    },
+    "ok": {
+      "title": "Ok",
+      "type": "boolean"
+    },
+    "values": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/AgentsKeepValues"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    }
+  },
+  "required": [
+    "ok"
+  ],
+  "title": "AgentsKeepResult",
+  "type": "object"
+}

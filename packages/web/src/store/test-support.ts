@@ -194,6 +194,7 @@ export function fakeClient() {
       terminal_apps: ["Terminal", "iTerm", "Ghostty"],
     })),
     setNotifications: vi.fn<PageClient["setNotifications"]>(async () => ({ ok: true, errors: [] })),
+    agentsKeep: vi.fn<PageClient["agentsKeep"]>(async () => ({ ok: true, errors: [], values: { keep_days: 7, keep_problem_days: 30 } })),
     notifyTest: vi.fn<PageClient["notifyTest"]>(async () => ({ posted: true, mechanism: "osascript" })),
     getTrace: vi.fn<PageClient["getTrace"]>(async (sessionId) => ({ session_id: sessionId, title: null, runs: [] })),
     listMcp: vi.fn<PageClient["listMcp"]>(async () => ({ servers: [] })),

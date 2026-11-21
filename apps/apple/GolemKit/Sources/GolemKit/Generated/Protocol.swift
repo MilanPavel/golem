@@ -413,6 +413,107 @@ public struct AgentsGetResultWishResolution: Codable {
     }
 }
 
+/// ``agents.keep``. Read how long a finished helper's steps are kept, or change it.
+///
+/// Without keys it only reads. Only the keys sent change, in ``[agents]`` of the user's
+/// ``config.toml``, and the file keeps its comments. 0 keeps for ever. Both values are
+/// checked first, and when one is wrong nothing is written. The next trim pass uses them.
+// MARK: - AgentsKeepParams
+public struct AgentsKeepParams: Codable {
+    public let keepDays: Int?
+    public let keepProblemDays: Int?
+
+    public enum CodingKeys: String, CodingKey {
+        case keepDays = "keep_days"
+        case keepProblemDays = "keep_problem_days"
+    }
+
+    public init(keepDays: Int?, keepProblemDays: Int?) {
+        self.keepDays = keepDays
+        self.keepProblemDays = keepProblemDays
+    }
+}
+
+/// ``ok`` is false when a value was wrong, and the file is then untouched. ``values`` is
+/// what is in force now, set when ``ok``.
+// MARK: - AgentsKeepResult
+public struct AgentsKeepResult: Codable {
+    public let errors: [AgentsKeepResultError]?
+    public let ok: Bool
+    public let values: AgentsKeepValuesClass?
+
+    public enum CodingKeys: String, CodingKey {
+        case errors = "errors"
+        case ok = "ok"
+        case values = "values"
+    }
+
+    public init(errors: [AgentsKeepResultError]?, ok: Bool, values: AgentsKeepValuesClass?) {
+        self.errors = errors
+        self.ok = ok
+        self.values = values
+    }
+}
+
+/// One problem in a config text. ``line`` and ``column`` count from 1, when known.
+///
+/// ``path`` is the setting, as ``mcp.github.headers.Authorization``.
+// MARK: - AgentsKeepResultError
+public struct AgentsKeepResultError: Codable {
+    public let column: Int?
+    public let line: Int?
+    public let message: String
+    public let path: String?
+
+    public enum CodingKeys: String, CodingKey {
+        case column = "column"
+        case line = "line"
+        case message = "message"
+        case path = "path"
+    }
+
+    public init(column: Int?, line: Int?, message: String, path: String?) {
+        self.column = column
+        self.line = line
+        self.message = message
+        self.path = path
+    }
+}
+
+/// ``[agents] keep_days`` and ``keep_problem_days`` as golem uses them. 0 is for ever.
+// MARK: - AgentsKeepValuesClass
+public struct AgentsKeepValuesClass: Codable {
+    public let keepDays: Int
+    public let keepProblemDays: Int
+
+    public enum CodingKeys: String, CodingKey {
+        case keepDays = "keep_days"
+        case keepProblemDays = "keep_problem_days"
+    }
+
+    public init(keepDays: Int, keepProblemDays: Int) {
+        self.keepDays = keepDays
+        self.keepProblemDays = keepProblemDays
+    }
+}
+
+/// ``[agents] keep_days`` and ``keep_problem_days`` as golem uses them. 0 is for ever.
+// MARK: - AgentsKeepValues
+public struct AgentsKeepValues: Codable {
+    public let keepDays: Int
+    public let keepProblemDays: Int
+
+    public enum CodingKeys: String, CodingKey {
+        case keepDays = "keep_days"
+        case keepProblemDays = "keep_problem_days"
+    }
+
+    public init(keepDays: Int, keepProblemDays: Int) {
+        self.keepDays = keepDays
+        self.keepProblemDays = keepProblemDays
+    }
+}
+
 /// ``agents.list``. The agent types a session in ``cwd`` sees, or the user's without it.
 // MARK: - AgentsListParams
 public struct AgentsListParams: Codable {

@@ -6,6 +6,7 @@ import { useAgentList, useModelList, usePageActions } from "../../store/page-con
 import { Button } from "../../ui/button.tsx";
 import { cn } from "../../ui/cn.ts";
 import { Menu, MenuContent, MenuRadioGroup, MenuRadioItem, MenuTrigger } from "../../ui/menu.tsx";
+import { FinishedHelpersSection } from "./agents-keep.tsx";
 import { useSettingsFolder } from "./context.ts";
 
 /** Where an agent type is written, said once under the table. */
@@ -200,13 +201,16 @@ export function AgentsSection() {
   }
   if (list.data === undefined) return <p className="text-body text-muted">asking the daemon…</p>;
   return (
-    <AgentsTable
-      agents={list.data.agents}
-      setup={wishSetup(models)}
-      models={models ?? []}
-      onSetWish={async (name, wish) => {
-        await actions.setAgentWish(name, wish, folder);
-      }}
-    />
+    <div className="flex max-w-column flex-col gap-8">
+      <AgentsTable
+        agents={list.data.agents}
+        setup={wishSetup(models)}
+        models={models ?? []}
+        onSetWish={async (name, wish) => {
+          await actions.setAgentWish(name, wish, folder);
+        }}
+      />
+      <FinishedHelpersSection />
+    </div>
   );
 }

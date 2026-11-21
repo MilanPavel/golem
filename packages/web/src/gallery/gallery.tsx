@@ -59,6 +59,7 @@ import { KEYS_CASES } from "../features/settings/keys-sample.ts";
 import { MemoryView } from "../features/settings/memory/memory-view.tsx";
 import { SAMPLE_MEMORIES, SAMPLE_MEMORY_COUNTS, SAMPLE_MEMORY_SETTINGS } from "../features/settings/memory/sample.ts";
 import { MEMORY_OFF_TEXT } from "../store/memory.ts";
+import { FinishedHelpers } from "../features/settings/agents-keep.tsx";
 import { AgentsTable } from "../features/settings/agents-section.tsx";
 import { SAMPLE_AGENTS, WISH_AGENTS_CLOUD, WISH_AGENTS_LOCAL, WISH_AGENTS_MIXED } from "../features/settings/agents-sample.ts";
 import { SkillList } from "../features/settings/skills-section.tsx";
@@ -1423,6 +1424,18 @@ function AgentsDemo() {
         <section key={setup} aria-label={title} className="flex flex-col gap-3 rounded-lg border border-line bg-bg p-4">
           <span className="font-mono text-xs text-faint">{title}</span>
           <AgentsTable agents={agents} setup={setup} onSetWish={async () => {}} />
+        </section>
+      ))}
+      {(
+        [
+          ["Finished helpers, the defaults", { keep_days: 7, keep_problem_days: 30 }, {}],
+          ["Finished helpers, for ever", { keep_days: 0, keep_problem_days: 0 }, {}],
+          ["Finished helpers, a value the config refused", { keep_days: 7, keep_problem_days: 30 }, { "agents.keep_days": "Input should be greater than or equal to 0" }],
+        ] as const
+      ).map(([title, values, errors]) => (
+        <section key={title} aria-label={title} className="flex flex-col gap-3 rounded-lg border border-line bg-bg p-4">
+          <span className="font-mono text-xs text-faint">{title}</span>
+          <FinishedHelpers values={values} errors={errors} failure={null} onSave={() => {}} />
         </section>
       ))}
       <section aria-label="Agents, empty" className="flex flex-col gap-3 rounded-lg border border-line bg-bg p-4">
