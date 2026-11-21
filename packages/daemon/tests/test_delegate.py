@@ -771,6 +771,36 @@ async def test_a_helper_that_never_answers_stops_at_the_time_limit(
     assert plain_messages(await chat.runtime.values(session_id))[-1].text == "after the limit"
 
 
+async def test_a_helper_waits_its_max_seconds_on_the_default_clocks(
+    database: Database, project: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    asked: list[float] = []
+    gate = asyncio.Event()
+
+    async def pause(seconds: float) -> None:
+        asked.append(seconds)
+        await gate.wait()
+
+    monkeypatch.setattr(manager_module, "_pause", pause)
+    model = _Hanging(
+        replies=[[("delegate", {"agent": "explorer", "brief": "hang"})], "after the limit"]
+    )
+    chat = _Chat(database, model)
+    session_id = await chat.manager.create(None, cwd=str(project))
+    run_id = await chat.manager.send(session_id, "go")
+    async with asyncio.timeout(5):
+        await model.waiting.wait()
+    async with asyncio.timeout(5):
+        while not asked:
+            await asyncio.sleep(0.01)
+    # Epoch seconds against the helper's epoch start, not against a monotonic clock.
+    assert 250 < asked[0] <= 300
+    gate.set()
+    events = await chat.finished(run_id)
+
+    assert _ended(events).data.stopped == "time"
+
+
 async def test_a_helper_that_reads_past_eight_windows_stops_with_tokens(
     database: Database, project: Path
 ) -> None:

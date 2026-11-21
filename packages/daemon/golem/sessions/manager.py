@@ -500,7 +500,7 @@ class SessionManager:
         self._steps: dict[str, dict[str, tuple[str, dict[str, object]]]] = {}
         """The name and the shown arguments of each tool call a helper asked for, by its session."""
         self._step_counts: dict[str, int] = {}
-        self.clock: Callable[[], float] = _now
+        self.wall_clock: Callable[[], float] = _now
         """Seconds since the epoch. A helper's time limit counts from its ``session.created``."""
         self.pause: Callable[[float], Awaitable[None]] = _pause
         """Waits that many seconds, for the time limit of a helper."""
@@ -1961,7 +1961,7 @@ class SessionManager:
     async def _time_limit(self, helper_id: str, run_id: str, seconds: int) -> None:
         # Plain elapsed time since the helper was made; its working clock is 15.6.2.
         began = started_at(await self._events.stored(helper_id))
-        left = 0.0 if began is None else began + seconds - self.clock()
+        left = 0.0 if began is None else began + seconds - self.wall_clock()
         await self.pause(max(0.0, left))
         await self._limit_stop(helper_id, run_id, True)
 
