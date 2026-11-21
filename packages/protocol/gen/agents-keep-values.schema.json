@@ -1,0 +1,22 @@
+{
+  "additionalProperties": false,
+  "description": "``[agents] keep_days`` and ``keep_problem_days`` as golem uses them. 0 is for ever.",
+  "properties": {
+    "keep_days": {
+      "minimum": 0,
+      "title": "Keep Days",
+      "type": "integer"
+    },
+    "keep_problem_days": {
+      "minimum": 0,
+      "title": "Keep Problem Days",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "keep_days",
+    "keep_problem_days"
+  ],
+  "title": "AgentsKeepValues",
+  "type": "object"
+}

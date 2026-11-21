@@ -84,6 +84,7 @@ import type { SkillCall } from "../../protocol/gen/skill-call.ts";
 import type { SkillCreateResult } from "../../protocol/gen/skill-create-result.ts";
 import type { SkillListResult } from "../../protocol/gen/skill-list-result.ts";
 import type { AgentsListResult } from "../../protocol/gen/agents-list-result.ts";
+import type { AgentsKeepResult } from "../../protocol/gen/agents-keep-result.ts";
 import type { AgentsSetWishResult } from "../../protocol/gen/agents-set-wish-result.ts";
 import type { SkillReadResult } from "../../protocol/gen/skill-read-result.ts";
 import type { RoutineUpdateResult } from "../../protocol/gen/routine-update-result.ts";
@@ -240,6 +241,7 @@ import {
   isRunListResult,
   isSkillCreateResult,
   isAgentsListResult,
+  isAgentsKeepResult,
   isAgentsSetWishResult,
   isSkillListResult,
   isSkillReadResult,
@@ -643,6 +645,8 @@ export interface GolemClient {
   listAgents(cwd?: string): Promise<AgentsListResult>;
   /** `agents.set_wish`: set the model wish of an agent type. Resolves to the type as it is now. */
   setAgentWish(name: string, wish: string, cwd?: string): Promise<AgentsSetWishResult>;
+  /** `agents.keep`: read how long a finished helper's steps are kept, or change `keep_days` and `keep_problem_days` (0 is for ever). */
+  agentsKeep(change?: { keep_days?: number; keep_problem_days?: number }): Promise<AgentsKeepResult>;
   /** `agent.registry.changed`: agent files changed. `root` is the folder whose project agents changed, or `null` for every folder. */
   onAgentsChanged(listener: (root: string | null) => void): () => void;
   /** `routine.remove`: delete a user routine from `config.toml`. */
@@ -2405,6 +2409,14 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       const result = await call("agents.set_wish", cwd === undefined ? { name, wish } : { name, wish, cwd });
       if (!isAgentsSetWishResult(result)) {
         throw new Error("invalid agents.set_wish result");
+      }
+      return result;
+    },
+    async agentsKeep(change?: { keep_days?: number; keep_problem_days?: number }): Promise<AgentsKeepResult> {
+      await ready;
+      const result = await call("agents.keep", { ...change });
+      if (!isAgentsKeepResult(result)) {
+        throw new Error("invalid agents.keep result");
       }
       return result;
     },

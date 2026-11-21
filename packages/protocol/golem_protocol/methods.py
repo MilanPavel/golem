@@ -136,6 +136,7 @@ METHOD_ACCESS: Final[Mapping[str, Access]] = {
     "agents.list": "browser",
     "agents.get": "browser",
     "agents.set_wish": "browser",
+    "agents.keep": "browser",
     "helper.stop": "browser",
     "relay.sign": "local",
     "relay.dh": "local",

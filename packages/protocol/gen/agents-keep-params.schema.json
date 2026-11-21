@@ -1,0 +1,32 @@
+{
+  "additionalProperties": false,
+  "description": "``agents.keep``. Read how long a finished helper's steps are kept, or change it.\n\nWithout keys it only reads. Only the keys sent change, in ``[agents]`` of the user's\n``config.toml``, and the file keeps its comments. 0 keeps for ever. Both values are\nchecked first, and when one is wrong nothing is written. The next trim pass uses them.",
+  "properties": {
+    "keep_days": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Keep Days"
+    },
+    "keep_problem_days": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Keep Problem Days"
+    }
+  },
+  "title": "AgentsKeepParams",
+  "type": "object"
+}

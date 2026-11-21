@@ -1826,6 +1826,42 @@ test("getRouting and setRouting send their params and check what comes back", as
   }
 });
 
+test("agentsKeep sends only the keys it was given and checks what comes back", async () => {
+  const sent: [string, Record<string, unknown>][] = [];
+  const result = { ok: true, errors: [], values: { keep_days: 14, keep_problem_days: 30 } };
+  const server = await listen((socket) => {
+    attach(socket, {
+      answerPing: true,
+      results: { "agents.keep": result },
+      onRequest: (_socket, method, params) => {
+        if (method === "agents.keep") sent.push([method, params]);
+      },
+    });
+  });
+  const client = connectGolem({ socketPath: server.socketPath, clientName: "web", reconnect: false, heartbeatMs: 60_000 });
+  try {
+    assert.deepEqual(await client.agentsKeep(), result);
+    assert.deepEqual(await client.agentsKeep({ keep_days: 14 }), result);
+    assert.deepEqual(sent, [
+      ["agents.keep", {}],
+      ["agents.keep", { keep_days: 14 }],
+    ]);
+  } finally {
+    client.close();
+    await server.close();
+  }
+  const bad = await listen((socket) => {
+    attach(socket, { answerPing: true, results: { "agents.keep": { ok: true, values: { keep_days: "7" } } } });
+  });
+  const refused = connectGolem({ socketPath: bad.socketPath, clientName: "web", reconnect: false, heartbeatMs: 60_000 });
+  try {
+    await assert.rejects(() => refused.agentsKeep(), /invalid agents.keep result/);
+  } finally {
+    refused.close();
+    await bad.close();
+  }
+});
+
 test("the notification calls send their params and check what comes back", async () => {
   const sent: [string, Record<string, unknown>][] = [];
   const values = {

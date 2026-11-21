@@ -37,6 +37,7 @@ import type { SessionSetModeResult } from "../../protocol/gen/session-set-mode-r
 import type { SessionSetOptionsResult } from "../../protocol/gen/session-set-options-result.ts";
 import type { ListedSkill, SkillListResult } from "../../protocol/gen/skill-list-result.ts";
 import type { AgentsListResult } from "../../protocol/gen/agents-list-result.ts";
+import type { AgentsKeepResult } from "../../protocol/gen/agents-keep-result.ts";
 import type { AgentsSetWishResult } from "../../protocol/gen/agents-set-wish-result.ts";
 import type { MemoryDeleteResult } from "../../protocol/gen/memory-delete-result.ts";
 import type { MemoryExportResult } from "../../protocol/gen/memory-export-result.ts";
@@ -907,6 +908,14 @@ export function isEvalRoutingResult(value: unknown): value is EvalRoutingResult 
       (Array.isArray(value["scenarios"]) && value["scenarios"].every(isEvalRow))) &&
     (value["top"] === undefined || Array.isArray(value["top"]))
   );
+}
+
+export function isAgentsKeepResult(value: unknown): value is AgentsKeepResult {
+  if (!isRecord(value) || typeof value["ok"] !== "boolean") return false;
+  if (value["errors"] !== undefined && !Array.isArray(value["errors"])) return false;
+  const values = value["values"];
+  if (values == null) return true;
+  return isRecord(values) && typeof values["keep_days"] === "number" && typeof values["keep_problem_days"] === "number";
 }
 
 export function isNotificationsValues(value: unknown): value is NotificationsValues {

@@ -22,10 +22,12 @@ import os
 import tempfile
 from pathlib import Path
 
+from pydantic import ValidationError
+
 from golem.agents.edit import AgentEditError, check_wish, with_wish
 from golem.agents.model import Agent
 from golem.agents.registry import AgentRegistry, Listed
-from golem.config import BUNDLED_TYPES
+from golem.config import BUNDLED_TYPES, AgentSettings, load_settings
 from golem.config_edit import RawConflictError, set_keys
 from golem.server.dispatcher import (
     INTERNAL_ERROR,
@@ -35,8 +37,12 @@ from golem.server.dispatcher import (
 )
 from golem_protocol.commands import (
     AgentInfo,
+    AgentsKeepParams,
+    AgentsKeepResult,
+    AgentsKeepValues,
     AgentsSetWishParams,
     AgentsSetWishResult,
+    ConfigError,
     WishResolution,
 )
 from golem_protocol.events import AgentLimits, AgentOrigin
@@ -216,4 +222,45 @@ def _write(path: Path, text: str, create: bool) -> None:
         raise
 
 
-__all__ = ["agent_infos", "agents_set_wish", "check_cwd"]
+async def _keep_values(ctx: RequestContext) -> AgentsKeepValues:
+    paths = ctx.state.paths
+    settings = await asyncio.to_thread(load_settings, home=paths.home, project_dir=paths.home)
+    agents = settings.agents
+    return AgentsKeepValues(keep_days=agents.keep_days, keep_problem_days=agents.keep_problem_days)
+
+
+async def agents_keep(ctx: RequestContext, params: AgentsKeepParams) -> AgentsKeepResult:
+    """Read how long a finished helper's steps are kept, or write the keys that were sent.
+
+    A wrong value comes back as a field error and nothing is written. The trim reads the file
+    again on its next pass, so no restart is needed.
+    """
+    patch = params.model_dump(exclude_none=True)
+    current = (await _keep_values(ctx)).model_dump()
+    try:
+        AgentSettings.model_validate({**current, **patch})
+    except ValidationError as exc:
+        return AgentsKeepResult(
+            ok=False,
+            errors=[
+                ConfigError(
+                    path=f"agents.{'.'.join(str(part) for part in error['loc'])}",
+                    message=error["msg"],
+                )
+                for error in exc.errors()
+            ],
+        )
+    config_file = ctx.state.paths.config_file
+    try:
+        if patch:
+            await asyncio.to_thread(set_keys, config_file, {"agents": patch})
+    except (RawConflictError, ValueError) as exc:
+        return AgentsKeepResult(ok=False, errors=[ConfigError(message=str(exc))])
+    except OSError as exc:
+        raise RpcCallError(INTERNAL_ERROR, f"could not write {config_file}: {exc}") from exc
+    if patch:
+        log.info("helper keep settings saved keys=%s", sorted(patch))
+    return AgentsKeepResult(ok=True, values=await _keep_values(ctx))
+
+
+__all__ = ["agent_infos", "agents_keep", "agents_set_wish", "check_cwd"]

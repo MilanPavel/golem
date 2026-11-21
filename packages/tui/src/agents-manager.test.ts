@@ -306,3 +306,11 @@ test("a broken type and an untrusted project type have no w key and no hint", ()
     assert.ok(texts(layout(state, [agent])).includes("Esc to go back"));
   }
 });
+
+test("the list says how long a finished helper's steps are kept, and 0 is for ever", () => {
+  const show = (keep: { keep_days: number; keep_problem_days: number } | null) =>
+    texts(layoutAgentsManager({ state: openAgentsManager(), agents: ALL, error: null, cwd: CWD, home: HOME, columns: 140, rows: 40, keep })).filter((line) => line.startsWith("finished helpers"));
+  assert.deepEqual(show({ keep_days: 7, keep_problem_days: 30 }), ["finished helpers: steps kept 7 days · failed, stopped or asking 30 days"]);
+  assert.deepEqual(show({ keep_days: 1, keep_problem_days: 0 }), ["finished helpers: steps kept 1 day · failed, stopped or asking for ever"]);
+  assert.deepEqual(show(null), []);
+});

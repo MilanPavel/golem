@@ -162,6 +162,8 @@ export type { SkillReadResult } from "../../protocol/gen/skill-read-result.ts";
 export type { ListedSkill, SkillListResult } from "../../protocol/gen/skill-list-result.ts";
 export type { AgentInfo, AgentLimits } from "../../protocol/gen/agent-info.ts";
 export type { AgentsListResult } from "../../protocol/gen/agents-list-result.ts";
+export type { AgentsKeepResult } from "../../protocol/gen/agents-keep-result.ts";
+export type { AgentsKeepValues } from "../../protocol/gen/agents-keep-values.ts";
 export type { AgentsSetWishResult } from "../../protocol/gen/agents-set-wish-result.ts";
 export type { WishResolution } from "../../protocol/gen/wish-resolution.ts";
 export type { SkillSetDisabledResult } from "../../protocol/gen/skill-set-disabled-result.ts";

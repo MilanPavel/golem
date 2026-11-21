@@ -5,7 +5,7 @@ import { ConnectionProvider } from "./connection-context.tsx";
 import { changeDiffKey, changesDiffKey, changesListKey, commitInfoKey, type ChangedFiles, type ChangesCommitInfoResult, type FileDiff } from "./changes.ts";
 import { fileListKey, fileReadKey, type FileRead } from "./files.ts";
 import { configKey, type ConfigGetResult } from "./config.ts";
-import { NOTIFICATIONS_KEY } from "./notifications.ts";
+import { AGENTS_KEEP_KEY, NOTIFICATIONS_KEY, type AgentsKeepValues } from "./notifications.ts";
 import { DEVICE_LIST_KEY, type DeviceListResult, type PairingSnapshot } from "./devices.ts";
 import { memoryListKey, type MemoryListResult, type MemoryScope } from "./memory.ts";
 import { ROUTING_KEY } from "./routing.ts";
@@ -265,6 +265,12 @@ export function useCost(enabled = true, sessionId?: string): UseQueryResult<Cost
 export function useRouting(enabled = true): UseQueryResult<RoutingGetResult> {
   const { queries } = usePage();
   return useQuery({ queryKey: [...ROUTING_KEY], queryFn: queries.routing, enabled, staleTime: 0, retry: false, refetchOnWindowFocus: true });
+}
+
+/** How long a finished helper's steps are kept. Read again whenever the tab is seen: a terminal edit pushes nothing. */
+export function useAgentsKeep(enabled = true): UseQueryResult<AgentsKeepValues> {
+  const { queries } = usePage();
+  return useQuery({ queryKey: [...AGENTS_KEEP_KEY], queryFn: queries.agentsKeep, enabled, staleTime: 0, retry: false, refetchOnWindowFocus: true });
 }
 
 /** The `[notifications]` settings. Read again whenever the tab is seen: a terminal edit pushes nothing. */

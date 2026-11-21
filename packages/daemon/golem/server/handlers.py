@@ -51,7 +51,7 @@ from golem.models.router import OLLAMA_BASE_URL, ModelConfigError, ModelRouter
 from golem.models.tiers import blended
 from golem.permissions.policy import PROJECT_POLICY
 from golem.secrets import SecretStore, SecretStoreError, check_name
-from golem.server.agents_edit import agent_infos, agents_set_wish
+from golem.server.agents_edit import agent_infos, agents_keep, agents_set_wish
 from golem.server.device_rpc import (
     connection_identify,
     device_list,
@@ -161,6 +161,7 @@ from golem.tools.write import DIFF_CHARS, Change, apply, diff_counts, diff_text
 from golem_protocol.commands import (
     AgentsGetParams,
     AgentsGetResult,
+    AgentsKeepParams,
     AgentsListParams,
     AgentsListResult,
     AgentsSetWishParams,
@@ -2030,6 +2031,7 @@ def standard_methods() -> dict[str, Method]:
         "agents.list": Method("agents.list", AgentsListParams, True, _agents_list),
         "agents.get": Method("agents.get", AgentsGetParams, True, _agents_get),
         "agents.set_wish": Method("agents.set_wish", AgentsSetWishParams, True, agents_set_wish),
+        "agents.keep": Method("agents.keep", AgentsKeepParams, True, agents_keep),
         "skill.list": Method("skill.list", SkillListParams, True, _skill_list),
         "skill.read": Method("skill.read", SkillReadParams, True, skill_read),
         "skill.write": Method("skill.write", SkillWriteParams, True, skill_write),
