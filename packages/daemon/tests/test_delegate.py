@@ -47,6 +47,7 @@ from golem.store.database import Database
 from golem.store.events import EventLog
 from golem.store.records import RunRecords, SessionRecords
 from golem.tools import default_registry
+from golem.tools.delegate import DelegateArgs
 from golem.tools.registry import ToolScope
 from golem_protocol.events import ChatEvent
 
@@ -992,9 +993,7 @@ async def test_a_delegate_without_an_agent_starts_no_helper_and_names_the_agents
 
 
 def test_the_schema_requires_agent_and_lists_it_first() -> None:
-    schema = default_registry().scoped(ToolScope(root=None)).schemas()
-    (delegate,) = [s for s in schema if s["function"]["name"] == "delegate"]  # type: ignore[index]
-    parameters = delegate["function"]["parameters"]  # type: ignore[index]
+    parameters = DelegateArgs.model_json_schema()
     assert next(iter(parameters["properties"])) == "agent"
     assert "agent" in parameters["required"]
 
