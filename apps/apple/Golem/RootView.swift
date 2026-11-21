@@ -32,6 +32,9 @@ struct MainTabs: View {
             SessionListView(model: model)
                 .tabItem { Label("Chats", systemImage: "bubble.left") }
         }
+        // One sheet for every tab, so an approval opens from the Inbox and from Chats alike.
+        .approvalSheet(model)
+        .reviewSheet(model)
     }
 }
 

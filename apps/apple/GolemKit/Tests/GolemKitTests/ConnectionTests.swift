@@ -110,6 +110,31 @@ struct ConnectionTests {
         await rig.shutdown()
     }
 
+    @Test func anInboxItemFindsItsFullApprovalInTheSessionsEvents() async throws {
+        let rig = try await Rig.make()
+        await rig.mac.recordApproval(session: "s1", callId: "c0", name: "shell", args: ["command": "ls"])
+        await rig.mac.recordApproval(session: "s1", callId: "c1", name: "edit_file", args: ["path": "src/a.ts"])
+        await rig.connection.start()
+        await eventually("connected") { await rig.connection.state == .connected }
+        let item = InboxItem(
+            sessionId: "s1", sessionTitle: "Fix it", kind: .approval, callId: "c1", headline: "Edit `a.ts`", source: nil,
+            since: "2026-11-21T10:00:00Z", age: "1m", added: nil, removed: nil, helper: nil, count: 1,
+            answerSessionId: "s1", sent: [], notSent: [])
+        let request = try #require(await ApprovalRequestLoader.load(item: item, folder: "~/code/shop", connection: rig.connection))
+        #expect(request.callId == "c1")
+        #expect(request.name == "edit_file")
+        #expect(request.path == "src/a.ts")
+        #expect(request.folder == "~/code/shop")
+        #expect(request.origin == "Fix it")
+        // The session is not left followed.
+        #expect(await rig.connection.lastSeq(sessionID: "s1") == nil)
+
+        var gone = item
+        gone.callId = "nope"
+        #expect(await ApprovalRequestLoader.load(item: gone, folder: nil, connection: rig.connection, timeout: 0.5) == nil)
+        await rig.shutdown()
+    }
+
     @Test func aMethodOutsideTheDeviceListIsRefusedBeforeItIsSent() async throws {
         let rig = try await Rig.make()
         await rig.connection.start()

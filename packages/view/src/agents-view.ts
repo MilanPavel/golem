@@ -168,6 +168,28 @@ export function agentFinished(agent: AgentInfo): string {
   return String(agent.finished);
 }
 
+/**
+ * The one usage line: `9 runs in 30 days · 1 stopped early · $0.00`. The stopped part is left out when none
+ * stopped (or the daemon cannot count them), the cost part when the daemon cannot say. An agent that cannot be
+ * started says `Cannot run yet`, and one never used `Not used yet`.
+ */
+export function usageLine(agent: AgentInfo): string {
+  if (agent.unavailable !== null && agent.unavailable !== undefined) return "Cannot run yet";
+  const used = agent.used ?? 0;
+  if (used <= 0) return "Not used yet";
+  const parts = [`${used} ${used === 1 ? "run" : "runs"} in 30 days`];
+  if ((agent.stopped ?? 0) > 0) parts.push(`${agent.stopped} stopped early`);
+  if (agent.cost_usd !== null && agent.cost_usd !== undefined) parts.push(`$${agent.cost_usd.toFixed(2)}`);
+  return parts.join(" · ");
+}
+
+/** The tools of an agent split in two: the ones that only read, and the ones that change things (`changing_tools`). */
+export function toolGroups(agent: AgentInfo): { reading: string[]; changing: string[] } {
+  const changing = new Set(agent.changing_tools ?? []);
+  const tools = agent.tools ?? [];
+  return { reading: tools.filter((tool) => !changing.has(tool)), changing: tools.filter((tool) => changing.has(tool)) };
+}
+
 /** The warnings: the file's errors, then a note for a project agent that is not trusted. */
 export function agentWarnings(agent: AgentInfo): string[] {
   const warnings = [...(agent.errors ?? [])];
@@ -194,6 +216,19 @@ export interface AgentRow {
   editable: boolean;
   used: string;
   finished: string;
+  /** The one usage line, see {@link usageLine}. */
+  usage: string;
+  /** The file's path, `~` for the home folder; null when the daemon does not say. */
+  path: string | null;
+  /** The whole file as written; null when the daemon does not say or the folder is not trusted. */
+  text: string | null;
+  /** The body of the file; null as for `text`. */
+  prompt: string | null;
+  /** The tools that only read, and the ones that change things. */
+  readingTools: string[];
+  changingTools: string[];
+  /** Why the agent cannot be started now, or null when it can. */
+  unavailable: string | null;
   warnings: string[];
   tone: McpTone;
 }
@@ -214,6 +249,13 @@ export function agentRow(agent: AgentInfo, setup: WishSetup = "mixed", models: r
     editable: !broken,
     used: agentUsed(agent),
     finished: agentFinished(agent),
+    usage: usageLine(agent),
+    path: agent.path ?? null,
+    text: agent.text ?? null,
+    prompt: agent.prompt ?? null,
+    readingTools: toolGroups(agent).reading,
+    changingTools: toolGroups(agent).changing,
+    unavailable: agent.unavailable ?? null,
     warnings,
     tone: broken ? "bad" : warnings.length > 0 ? "wait" : "ok",
   };

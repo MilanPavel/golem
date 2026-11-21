@@ -274,6 +274,15 @@ actor ScriptedMac {
 
     // MARK: - Making events
 
+    /// Stores an `approval.needed` event in the session's log, for an attach to replay.
+    func recordApproval(session: String, callId: String, name: String, args: [String: Any], source: String = "built-in default") {
+        let seq = (log[session]?.count ?? 0) + 1
+        log[session, default: []].append([
+            "type": "approval.needed", "seq": seq, "session_id": session, "run_id": "r1", "ts": "2026-11-21T10:00:00Z",
+            "data": ["call_id": callId, "name": name, "args": args, "source": source],
+        ])
+    }
+
     /// Pushes a `session.summary` to every channel that asked to watch.
     func pushSummary(_ row: [String: Any]) {
         for channel in channels.values where channel.watching {

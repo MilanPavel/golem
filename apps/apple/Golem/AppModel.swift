@@ -15,12 +15,23 @@ protocol MacLink: AnyObject {
     /// A session's new summary, each time one changes.
     func summaries() -> AsyncStream<InboxSession>
     func stop() async
+    /// The full request for an Inbox item: the arguments, diff and folder come from the session's events.
+    func approvalRequest(for item: InboxItem, folder: String?) async -> ApprovalRequest
+    /// Answers approvals and hears when one is answered elsewhere.
+    var approvals: any ApprovalChannel { get }
 }
 
 /// The real link: one `Connection` to the Mac, through the relay.
 @MainActor
 final class ConnectionLink: MacLink {
     private let connection: Connection
+
+    var approvals: any ApprovalChannel { ConnectionApprovalChannel(connection: connection) }
+
+    func approvalRequest(for item: InboxItem, folder: String?) async -> ApprovalRequest {
+        await ApprovalRequestLoader.load(item: item, folder: folder, connection: connection)
+            ?? ApprovalRequest(item: item, folder: folder)
+    }
 
     init(mac: PairedMac, key: any DeviceKey) {
         connection = Connection(config: mac.connectionConfig(), key: key)
@@ -71,6 +82,10 @@ struct AppEnvironment {
     var now: () -> Date = Date.init
     /// Puts the count on the app icon. Does nothing without the badge permission.
     var setBadge: @MainActor (Int) -> Void = { _ in }
+    /// Face ID or the passcode, for an Always allow and a risky Allow once.
+    var authenticator: any ApprovalAuthenticator = LocalAuthenticator()
+    /// This phone's name, as the rule note shows it.
+    var deviceName = "this iPhone"
 
     @MainActor
     static func live() -> AppEnvironment {
@@ -83,7 +98,8 @@ struct AppEnvironment {
                     deviceModel: UIDevice.current.model, store: store)
             },
             link: { ConnectionLink(mac: $0, key: try DeviceKeys.load()) },
-            setBadge: { Badge.set($0) })
+            setBadge: { Badge.set($0) },
+            deviceName: UIDevice.current.name)
     }
 }
 
@@ -125,8 +141,10 @@ final class AppModel {
     private(set) var listError: String?
     let sessions = SessionListModel()
     let runs = RunsModel()
-    /// The approval the person tapped in the Inbox. The approval sheet (#764) presents it.
-    var selectedApproval: InboxItem?
+    /// The approval sheet that is open, if any. Whoever lists approvals sets it with `present(approval:)`.
+    private(set) var presentedApproval: ApprovalSheetModel?
+    /// The review card that is open, if any. Only set while `ReviewFeature` is on.
+    private(set) var presentedReview: ReviewModel?
 
     private let environment: AppEnvironment
     private var pairingTask: Task<Void, Never>?
@@ -135,6 +153,7 @@ final class AppModel {
     private var linkTask: Task<Void, Never>?
     private var summaryTask: Task<Void, Never>?
     private var runsTask: Task<Void, Never>?
+    private var openingApproval = false
     @ObservationIgnored private let inboxModel: InboxModel
 
     init(environment: AppEnvironment) {
@@ -301,10 +320,50 @@ final class AppModel {
         try? environment.store.forget()
         sessions.replace(with: [])
         runs.replace(with: [])
-        selectedApproval = nil
+        dismissApproval()
         environment.setBadge(0)
         connection = .stopped(.stopped)
         screen = .scan(message: nil)
+    }
+
+    // MARK: - Approvals
+
+    /// Opens the approval sheet for a request. Nothing happens without a link to the Mac.
+    func present(approval request: ApprovalRequest) {
+        guard let link else { return }
+        presentedApproval = ApprovalSheetModel(
+            request: request, deviceName: environment.deviceName, authenticator: environment.authenticator,
+            channel: link.approvals)
+    }
+
+    /// Opens the sheet for an approval in the Inbox. The Inbox item has no arguments or diff, so the link
+    /// reads them from the session's events first; a tap while one is loading is ignored.
+    func present(item: InboxItem) {
+        guard let link, item.kind == .approval, item.callId != nil, !openingApproval else { return }
+        openingApproval = true
+        let folder = sessions.sessions.first { $0.sessionId == item.sessionId }?.cwd
+        Task { [weak self] in
+            let request = await link.approvalRequest(for: item, folder: folder)
+            guard let self else { return }
+            self.openingApproval = false
+            self.present(approval: request)
+        }
+    }
+
+    func dismissApproval() {
+        presentedApproval?.stopFollowing()
+        presentedApproval = nil
+    }
+
+    /// Opens the review card for a draft. The protocol has no review events yet, so this is off in a
+    /// release build and a debug build opens a fixture.
+    func present(review request: ReviewRequest, responder: any ReviewResponder) {
+        guard ReviewFeature.isEnabled() else { return }
+        presentedReview = ReviewModel(request: request, responder: responder)
+    }
+
+    func dismissReview() {
+        presentedReview = nil
     }
 
     // MARK: - Words for people

@@ -3,7 +3,7 @@ import SwiftUI
 
 /// The home screen: what waits on you, what runs, and what finished today.
 struct InboxView: View {
-    @Bindable var model: AppModel
+    let model: AppModel
 
     var body: some View {
         NavigationStack {
@@ -14,10 +14,6 @@ struct InboxView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .principal) { ConnectionHeader(model: model) } }
             .refreshable { await model.refresh() }
-            .sheet(item: $model.selectedApproval) { item in
-                // The one place the approval sheet (#764) replaces.
-                ApprovalSheetPlaceholder(item: item)
-            }
         }
     }
 
@@ -32,7 +28,7 @@ struct InboxView: View {
                 }
                 ForEach(inbox.needsYou) { item in
                     NeedsYouRow(item: item) {
-                        if item.kind == .approval { model.selectedApproval = item }
+                        model.present(item: item)
                     }
                 }
             } header: {
@@ -103,20 +99,5 @@ private struct RunRow: View {
             }
         }
         .accessibilityElement(children: .combine)
-    }
-}
-
-/// Stands in for the real approval sheet until #764 lands. It only names the question.
-struct ApprovalSheetPlaceholder: View {
-    let item: InboxItem
-
-    var body: some View {
-        VStack(spacing: 12) {
-            Text(item.headline).font(.headline)
-            Text(item.sessionTitle).foregroundStyle(.secondary)
-        }
-        .padding()
-        .presentationDetents([.medium])
-        .accessibilityIdentifier("approval.placeholder")
     }
 }

@@ -21,7 +21,9 @@ enum DebugEnvironment {
         return AppEnvironment(
             store: InMemoryMacStore(paired),
             pairing: { FakePairing() },
-            link: { _ in FakeLink(scenario: scenario) })
+            link: { _ in FakeLink(scenario: scenario) },
+            authenticator: FakeAuthenticator(),
+            deviceName: "iPhone 16")
     }
 }
 
@@ -136,5 +138,70 @@ final class FakeLink: MacLink {
     }
 
     func stop() async {}
+
+    var approvals: any ApprovalChannel { FakeApprovalChannel() }
+
+    /// A shell call whose command is the subject the fake session says.
+    func approvalRequest(for item: InboxItem, folder: String?) async -> ApprovalRequest {
+        let command = Self.commands[item.callId ?? ""] ?? "true"
+        return ApprovalRequest(
+            sessionId: item.answerSessionId, callId: item.callId ?? "", name: "shell", command: command, subject: command,
+            folder: "~/code/shop", origin: item.sessionTitle, source: item.source ?? "built-in default")
+    }
+
+    private nonisolated static let commands = [
+        "call-s1": "rm -rf build", "call-s2": "uv lock --upgrade", "call-s3": "git push",
+    ]
+}
+
+/// Face ID that always passes.
+struct FakeAuthenticator: ApprovalAuthenticator {
+    func isAvailable() -> Bool { true }
+    func confirm(reason: String) async -> Bool { true }
+}
+
+/// A Mac that takes every answer, and answers the call `call-elsewhere` itself a second after the sheet opens.
+struct FakeApprovalChannel: ApprovalChannel {
+    func respond(sessionId: String, callId: String, decision: Decision) async throws {
+        try? await Task.sleep(nanoseconds: 100_000_000)
+    }
+
+    func resolutions() -> AsyncStream<ApprovalResolution> {
+        AsyncStream { continuation in
+            let task = Task {
+                try? await Task.sleep(nanoseconds: 1_000_000_000)
+                guard !Task.isCancelled else { return }
+                continuation.yield(ApprovalResolution(
+                    sessionId: "s1", callId: "call-elsewhere", decision: .deny, device: nil))
+            }
+            continuation.onTermination = { _ in task.cancel() }
+        }
+    }
+}
+
+/// The approvals the debug menu opens.
+enum DebugApprovals {
+    static let all: [(id: String, label: String, request: ApprovalRequest)] = [
+        ("shell", "Shell command", ApprovalRequest(
+            sessionId: "s1", callId: "call-shell", name: "shell", command: "git push origin main --force-with-lease",
+            subject: "git push origin main --force-with-lease", folder: "~/code/shop", origin: "Fix the flaky test",
+            source: "built-in default")),
+        ("edit", "Edit a file in the folder", ApprovalRequest(
+            sessionId: "s1", callId: "call-edit", name: "edit_file", subject: "src/cart.ts",
+            diff: "--- a/src/cart.ts\n+++ b/src/cart.ts\n@@ -10,3 +10,3 @@\n-  retry(2)\n+  retry(3)\n",
+            path: "src/cart.ts", folder: "~/code/shop", origin: "Fix the flaky test", source: "built-in default")),
+        ("mcp", "MCP tool", ApprovalRequest(
+            sessionId: "s1", callId: "call-mcp", name: "mcp__linear__create_issue",
+            argsText: "{\n  \"team\": \"Web\",\n  \"title\": \"NPE in checkout\"\n}", folder: "~/code/shop",
+            origin: "NPE in checkout", source: "built-in default")),
+        ("elsewhere", "Answered on the Mac", ApprovalRequest(
+            sessionId: "s1", callId: "call-elsewhere", name: "read_file", subject: "README.md", path: "README.md",
+            folder: "~/code/shop", origin: "Upgrade httpx", source: "built-in default")),
+    ]
+}
+
+/// A review step that takes every answer.
+struct FakeReviewResponder: ReviewResponder {
+    func answer(_ answer: ReviewAnswer, for review: ReviewRequest) async throws {}
 }
 #endif

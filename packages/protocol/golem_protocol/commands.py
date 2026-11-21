@@ -2016,20 +2016,8 @@ class WishResolution(BaseModel):
     fresh_window: bool | None = None
 
 
-class AgentInfo(BaseModel):
-    """One agent type: an ``agents/<name>.md`` file, valid or not.
-
-    ``wish`` is the model wish as written: ``cheapest``, ``same``, ``stronger``, a tier
-    or a model. ``tools`` are the tool names the helper may use, empty for none. ``asks``
-    is true when the helper may ask you a question. ``errors`` are what is wrong with
-    the file: a type with errors is never the one a name resolves to. ``shadowed`` lists
-    the origins of lower files of the same name that this one hides. ``trusted`` is
-    false for a project agent in a folder that is not trusted, which is listed and
-    never started. ``used`` and ``finished`` count helpers of this type started and
-    ended in the last 30 days (``helper.ended``). ``finished`` is ``None`` when the
-    daemon cannot count them. ``resolves_to`` is what ``wish`` becomes in this setup;
-    ``None`` when the daemon does not say. An older daemon leaves it out.
-    """
+class _AgentFields(BaseModel):
+    """The fields of an agent type that every agent result has. See :class:`AgentInfo`."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -2046,6 +2034,43 @@ class AgentInfo(BaseModel):
     used: int = Field(default=0, ge=0)
     finished: int | None = Field(default=None, ge=0)
     resolves_to: WishResolution | None = None
+    path: str | None = None
+    text: str | None = None
+    changing_tools: list[str] = Field(default_factory=list[str])
+    unavailable: str | None = None
+    stopped: int | None = Field(default=None, ge=0)
+    cost_usd: float | None = Field(default=None, ge=0)
+
+
+class AgentInfo(_AgentFields):
+    """One agent type: an ``agents/<name>.md`` file, valid or not.
+
+    ``wish`` is the model wish as written: ``cheapest``, ``same``, ``stronger``, a tier
+    or a model. ``tools`` are the tool names the helper may use, empty for none. ``asks``
+    is true when the helper may ask you a question. ``errors`` are what is wrong with
+    the file: a type with errors is never the one a name resolves to. ``shadowed`` lists
+    the origins of lower files of the same name that this one hides. ``trusted`` is
+    false for a project agent in a folder that is not trusted, which is listed and
+    never started. ``used`` and ``finished`` count helpers of this type started and
+    ended in the last 30 days (``helper.ended``). ``finished`` is ``None`` when the
+    daemon cannot count them. ``stopped`` counts the ones of the last 30 days that ended
+    early, for any reason other than done; ``None`` when the daemon cannot count them.
+    ``cost_usd`` is what those helpers cost in the same days; ``None`` when the daemon
+    cannot say. ``resolves_to`` is what ``wish`` becomes in this setup; ``None`` when the
+    daemon does not say.
+
+    ``path`` is the agent's file: ``~`` stands for the home folder, a bundled file is its
+    package path (``golem/agents/bundled/explorer.md``) and a project file is relative to the
+    project. ``text`` is the whole file as written and ``prompt`` is its body. Both are
+    ``None`` for a project agent in a folder that is not trusted. ``changing_tools`` are the
+    ``tools`` that change things; the rest only read. ``unavailable`` says in plain words why
+    the agent cannot be started now, the same text ``delegate`` refuses with, and is ``None``
+    when it can. An older daemon leaves out every field from ``resolves_to`` on.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    prompt: str | None = None
 
 
 class AgentsListParams(BaseModel):
@@ -2073,8 +2098,8 @@ class AgentsGetParams(BaseModel):
     cwd: str | None = Field(default=None, min_length=1)
 
 
-class AgentsGetResult(AgentInfo):
-    """The agent type and its prompt, the body of its file."""
+class AgentsGetResult(_AgentFields):
+    """The agent type and its prompt, the body of its file. ``prompt`` is empty when held back."""
 
     prompt: str
 

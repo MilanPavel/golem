@@ -140,12 +140,32 @@
     }
   },
   "additionalProperties": false,
-  "description": "The agent type and its prompt, the body of its file.",
+  "description": "The agent type and its prompt, the body of its file. ``prompt`` is empty when held back.",
   "properties": {
     "asks": {
       "default": false,
       "title": "Asks",
       "type": "boolean"
+    },
+    "changing_tools": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Changing Tools",
+      "type": "array"
+    },
+    "cost_usd": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Cost Usd"
     },
     "description": {
       "title": "Description",
@@ -188,6 +208,18 @@
       "title": "Origin",
       "type": "string"
     },
+    "path": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Path"
+    },
     "prompt": {
       "title": "Prompt",
       "type": "string"
@@ -215,6 +247,31 @@
       "title": "Shadowed",
       "type": "array"
     },
+    "stopped": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Stopped"
+    },
+    "text": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Text"
+    },
     "tools": {
       "items": {
         "type": "string"
@@ -226,6 +283,18 @@
       "default": true,
       "title": "Trusted",
       "type": "boolean"
+    },
+    "unavailable": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Unavailable"
     },
     "used": {
       "default": 0,

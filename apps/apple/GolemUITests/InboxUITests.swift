@@ -39,8 +39,10 @@ final class InboxUITests: XCTestCase {
         let second = app.buttons.matching(NSPredicate(format: "label CONTAINS 'uv lock --upgrade'")).firstMatch
         XCTAssertTrue(second.exists)
         second.tap()
-        XCTAssertTrue(app.staticTexts["Upgrade httpx"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.otherElements["approval.placeholder"].exists || app.staticTexts["Run `uv lock --upgrade`"].exists)
+        XCTAssertTrue(app.staticTexts["approval.title"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["approval.origin"].label.contains("Upgrade httpx"))
+        XCTAssertTrue(app.buttons["approval.allow"].exists)
+        XCTAssertTrue(app.buttons["approval.deny"].exists)
     }
 
     func testRunningAndTodayShowTheRuns() {
