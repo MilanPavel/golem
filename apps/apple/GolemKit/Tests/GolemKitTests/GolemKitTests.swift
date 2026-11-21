@@ -64,6 +64,7 @@ private struct Fixture: Decodable {
 @Test func theAppMayCallTheDeviceMethodsOnly() {
     #expect(MethodAccess.appMayCall("approval.respond"))
     #expect(MethodAccess.appMayCall("hello"))
+    #expect(MethodAccess.appMayCall("run.list"))
     #expect(!MethodAccess.appMayCall("auth.set"))
     #expect(!MethodAccess.appMayCall("policy.update"))
     #expect(!MethodAccess.appMayCall("mcp.call"))

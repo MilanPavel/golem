@@ -9,6 +9,7 @@ export const DEVICE_METHODS: ReadonlySet<string> = new Set([
   "model.list",
   "ping",
   "run.cancel",
+  "run.list",
   "session.attach",
   "session.close",
   "session.create",

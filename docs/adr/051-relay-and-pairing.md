@@ -262,6 +262,7 @@ A new method access level, **`device`**, beside `browser` and `local` in `METHOD
 | `local` | Nobody over a network. Only a client on the daemon's Unix socket |
 
 - **A device gets the methods a person needs to watch, answer, and start work:** `hello`, `ping`, `daemon.status`, listing, attaching, creating, forking, renaming, and closing sessions, `message.send`, `approval.respond`, `run.cancel`, `artifact.read`, `session.inspect`, the trace reads, `model.list`, and later the routine and workflow methods of Phase 4 (read and "run now"). The exact table is written in 14.3.1, and the rest are `browser` until someone decides.
+- **Amendment, 2026-11-21:** a device may also read `run.list` (read only), so the phone's Inbox can show the running and finished runs of routines and detached asks. No other routine or workflow method is added.
 - **A device never gets:** `auth.*`, anything that edits `config.toml`, rules (`policy.update` and `policy.remove`), MCP servers, trust, or runtimes, `mcp.call`, `daemon.shutdown`, and **all `device.*`**. A phone saves "Always allow" only through `approval.respond`, where the daemon records the device.
 - **It stays a generated allowlist,** as in ADR-028: `just gen` writes `gen/device-methods.ts` (and the Swift list for GolemKit), and a test fails for a method with no declaration. Existing `browser` methods do not become `device` by themselves.
 - **The same framing checks apply to a device as to a browser:** one JSON object per message, no `\n`, at most 1 MiB, a method in the list, and the same `-32020` refusal.

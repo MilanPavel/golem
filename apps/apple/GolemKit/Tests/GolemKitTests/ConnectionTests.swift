@@ -73,6 +73,43 @@ struct ConnectionTests {
         await rig.shutdown()
     }
 
+    @Test func aWatchedListPushesSummariesAsTheyChange() async throws {
+        let rig = try await Rig.make()
+        await rig.mac.setSessionList([sessionRow("s1", title: "first")])
+        let collector = Collector.collect(await rig.connection.summaries())
+        await rig.connection.start()
+        await eventually("connected") { await rig.connection.state == .connected }
+
+        // Before the list asks to watch, the Mac pushes nothing.
+        await rig.mac.pushSummary(sessionRow("s1", title: "ignored"))
+        _ = try await rig.connection.listSessions()
+        var waiting = sessionRow("s1", title: "first")
+        waiting["status"] = "waiting"
+        waiting["pending"] = ["kind": "approval", "since": "2026-11-21T10:05:00Z", "call_id": "c1", "name": "shell", "subject": "ls"]
+        await rig.mac.pushSummary(waiting)
+        await eventually("the summary") { await collector.items.count == 1 }
+        let summary = try #require(await collector.items.first)
+        #expect(summary.sessionId == "s1")
+        #expect(summary.status == "waiting")
+        #expect(summary.pending?.callId == "c1")
+        await rig.shutdown()
+    }
+
+    @Test @MainActor func theRunsModelReadsRunList() async throws {
+        let rig = try await Rig.make()
+        await rig.mac.setRunList([[
+            "session_id": "r1", "kind": "routine", "origin": "routine:pr-digest", "routine": "pr-digest",
+            "trigger": "schedule", "status": "running", "started_at": "2026-11-21T10:00:00Z", "approvals": 0,
+        ]])
+        await rig.connection.start()
+        await eventually("connected") { await rig.connection.state == .connected }
+        let runs = RunsModel()
+        try await runs.refresh(from: rig.connection)
+        #expect(runs.runs.map(\.sessionId) == ["r1"])
+        #expect(runs.runs.first?.status == .running)
+        await rig.shutdown()
+    }
+
     @Test func aMethodOutsideTheDeviceListIsRefusedBeforeItIsSent() async throws {
         let rig = try await Rig.make()
         await rig.connection.start()

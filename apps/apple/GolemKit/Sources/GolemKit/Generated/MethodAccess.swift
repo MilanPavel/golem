@@ -10,6 +10,7 @@ public enum MethodAccess {
         "model.list",
         "ping",
         "run.cancel",
+        "run.list",
         "session.attach",
         "session.close",
         "session.create",

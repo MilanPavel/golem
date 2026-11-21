@@ -66,6 +66,11 @@ def test_export_browser_methods_is_sorted_and_deterministic(tmp_path: Path) -> N
     assert names == sorted(BROWSER_METHODS)
 
 
+def test_a_device_may_read_the_runs_for_the_inbox_and_nothing_that_edits_a_routine() -> None:
+    assert METHOD_ACCESS["run.list"] == "device"
+    assert not {"routine.fire", "routine.set", "routine.remove"} & DEVICE_METHODS
+
+
 def test_a_browser_may_read_traces() -> None:
     assert {"trace.get", "trace.span"} <= BROWSER_METHODS
 
