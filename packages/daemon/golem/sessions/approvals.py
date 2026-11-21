@@ -10,7 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from golem.sessions.recovery import open_turn
-from golem_protocol.commands import PendingItem
+from golem_protocol.commands import PendingHelper, PendingItem
 from golem_protocol.events import (
     ApprovalNeededEvent,
     ApprovalResolvedEvent,
@@ -91,6 +91,8 @@ class PendingConsent:
     label: str | None = None
     sent: tuple[str, ...] | None = None
     not_sent: tuple[str, ...] | None = None
+    model_profile: str | None = None
+    """The paid model that would run, which is what two questions have in common."""
 
 
 def pending_consent(events: list[ChatEvent]) -> PendingConsent | None:
@@ -119,6 +121,7 @@ def pending_consent(events: list[ChatEvent]) -> PendingConsent | None:
         label=asked.data.label,
         sent=None if asked.data.sent is None else tuple(asked.data.sent),
         not_sent=None if asked.data.not_sent is None else tuple(asked.data.not_sent),
+        model_profile=asked.data.model_profile,
     )
 
 
@@ -133,15 +136,20 @@ def diff_counts(diff: str) -> tuple[int, int]:
     return added, removed
 
 
-def pending_item(events: list[ChatEvent]) -> PendingItem | None:
-    """What the run of ``events`` waits for, as the session summary carries it.
+PendingKey = tuple[str, str | None, str | None]
+"""What makes two pending questions the same: the kind, then the tool and its subject for an
+approval (the pair an allowance holds) or the paid model for a consent."""
+
+
+def pending_entry(events: list[ChatEvent]) -> tuple[PendingItem, PendingKey] | None:
+    """What the run of ``events`` waits for, with the key that groups the same question.
 
     An approval wins when both are open. The diff is counted, never copied.
     """
     approval = pending_approval(events)
     if approval is not None:
         added, removed = (None, None) if approval.diff is None else diff_counts(approval.diff)
-        return PendingItem(
+        item = PendingItem(
             kind="approval",
             since=approval.since,
             call_id=approval.call_id,
@@ -151,9 +159,10 @@ def pending_item(events: list[ChatEvent]) -> PendingItem | None:
             added=added,
             removed=removed,
         )
+        return item, ("approval", approval.name, approval.subject)
     consent = pending_consent(events)
     if consent is not None:
-        return PendingItem(
+        item = PendingItem(
             kind="consent",
             since=consent.since,
             alternatives=len(consent.alternatives),
@@ -163,14 +172,46 @@ def pending_item(events: list[ChatEvent]) -> PendingItem | None:
             sent=None if consent.sent is None else list(consent.sent),
             not_sent=None if consent.not_sent is None else list(consent.not_sent),
         )
+        return item, ("consent", consent.model_profile, None)
     return None
+
+
+def pending_item(events: list[ChatEvent]) -> PendingItem | None:
+    """What the run of ``events`` waits for, as the session summary carries it."""
+    found = pending_entry(events)
+    return None if found is None else found[0]
+
+
+def group_helper_items(
+    asked: list[tuple[PendingItem, PendingKey, PendingHelper]],
+) -> list[PendingItem]:
+    """The items of a lead's helpers, oldest first, the same question once with a ``count``.
+
+    ``helper`` of a grouped item is the first helper that asked.
+    """
+    ordered = sorted(asked, key=lambda found: (found[0].since, found[2].index))
+    first: dict[PendingKey, int] = {}
+    counts: dict[PendingKey, int] = {}
+    items: list[PendingItem] = []
+    for item, key, helper in ordered:
+        counts[key] = counts.get(key, 0) + 1
+        if key not in first:
+            first[key] = len(items)
+            items.append(item.model_copy(update={"helper": helper}))
+    for key, at in first.items():
+        if counts[key] > 1:
+            items[at] = items[at].model_copy(update={"count": counts[key]})
+    return items
 
 
 __all__ = [
     "Pending",
     "PendingConsent",
+    "PendingKey",
     "diff_counts",
+    "group_helper_items",
     "pending_approval",
     "pending_consent",
+    "pending_entry",
     "pending_item",
 ]

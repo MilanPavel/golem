@@ -331,6 +331,7 @@ from golem_protocol.commands import (
     SessionSetRouteResult,
     SessionSetSkillsParams,
     SessionSetSkillsResult,
+    SessionSummary,
     SetupInstall,
     SetupJob,
     SetupPaths,
@@ -473,19 +474,22 @@ async def _session_list(ctx: RequestContext, params: SessionListParams) -> Sessi
         found = await sessions.watch(params.limit, ctx.connection)
     else:
         found = await sessions.recent(params.limit, params.cwd)
-    return SessionListResult(
-        sessions=[
+    summaries: list[SessionSummary] = []
+    for item in found:
+        own = await sessions.pending(item)
+        helpers = await sessions.helpers(item)
+        summaries.append(
             summarize(
                 item,
                 sessions.local_only(item.session.cwd),
-                await sessions.pending(item),
+                own,
                 await sessions.wait(item),
-                await sessions.helpers(item),
+                helpers,
                 sessions.step(item.session.session_id),
+                await sessions.pending_items(item, own, helpers),
             )
-            for item in found
-        ]
-    )
+        )
+    return SessionListResult(sessions=summaries)
 
 
 async def _session_fork(ctx: RequestContext, params: SessionForkParams) -> SessionForkResult:
