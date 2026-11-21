@@ -132,6 +132,10 @@ test-js:
 test-web shard="1/1":
     pnpm --filter @golem/web test --shard={{shard}}
 
+# Run the relay for development on 127.0.0.1:8080. Set RELAY_HOST (the name clients sign for) or BIND to change them.
+relay:
+    RELAY_HOST="${RELAY_HOST:-localhost}" BIND="${BIND:-127.0.0.1:8080}" bun packages/relay/src/bun/main.ts
+
 # Serve the docs site at http://localhost:5173/golem/, reloading on every edit (ADR-034).
 docs:
     pnpm --filter @golem/docs dev

@@ -681,6 +681,15 @@ class SessionManager:
         """``(running, waiting)`` of a lead's helpers, None when none has a run open."""
         return await self._events.helpers(activity)
 
+    async def pending_items(
+        self,
+        activity: SessionActivity,
+        own: PendingItem | None,
+        helpers: tuple[int, int] | None,
+    ) -> list[PendingItem]:
+        """Everything the session waits for, oldest first: its own and its helpers' (ADR-059)."""
+        return await self._events.pending_items(activity, own, helpers)
+
     def step(self, session_id: str) -> str | None:
         """A helper's newest step, as one line."""
         return self._events.step(session_id)

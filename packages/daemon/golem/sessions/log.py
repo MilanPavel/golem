@@ -19,6 +19,7 @@ import logging
 import time
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
+from typing import TYPE_CHECKING
 
 from pydantic import BaseModel
 
@@ -26,8 +27,11 @@ from golem.sessions.bus import EventBus, EventTarget, SummaryTarget
 from golem.sessions.summaries import QUEUED_REASONS, summarize
 from golem.store.events import EventLog
 from golem.store.records import SessionActivity, SessionRecords
-from golem_protocol.commands import PendingItem, SessionSummary
+from golem_protocol.commands import PendingHelper, PendingItem, SessionSummary
 from golem_protocol.events import CHAT_EVENT, ChatEvent, EventType, WaitReason
+
+if TYPE_CHECKING:
+    from golem.sessions.approvals import PendingKey
 
 log = logging.getLogger("golem.sessions")
 
@@ -63,6 +67,8 @@ class SessionLog:
         """The wait each session's last summary carried, so a repeat is not sent again."""
         self._helper_counts: dict[str, tuple[int, int]] = {}
         """The helper counts each lead's last summary carried, so a repeat is not sent again."""
+        self._lead_items: dict[str, list[PendingItem]] = {}
+        """The pending list each lead's last summary carried, so a repeat is not sent again."""
         self._steps: dict[str, str] = {}
         """A helper's newest step, as one line."""
         self._step_pushed: dict[str, float] = {}
@@ -76,6 +82,51 @@ class SessionLog:
             return None
         counts = await self._records.helper_counts(activity.session.session_id)
         return counts if counts != (0, 0) else None
+
+    async def pending_items(
+        self,
+        activity: SessionActivity,
+        own: PendingItem | None,
+        helpers: tuple[int, int] | None,
+    ) -> list[PendingItem]:
+        """Everything ``activity`` waits for, oldest first: its own item, and for a lead those
+        of its helpers that wait for you, the same question once with a ``count``.
+
+        ``own`` and ``helpers`` are what :meth:`pending` and :meth:`helpers` said. A session
+        with no helper waiting reads nothing more; a lead with some reads two queries, whatever
+        their number.
+        """
+        items = [] if own is None else [own]
+        if helpers is None or helpers[1] == 0:
+            return items
+        # approvals reaches this module through recovery, so it is imported here.
+        from golem.sessions.approvals import group_helper_items, pending_entry
+
+        waiting = await self._records.waiting_helpers(activity.session.session_id)
+        events = await self._events.for_runs([helper.run_id for helper in waiting])
+        asked: list[tuple[PendingItem, PendingKey, PendingHelper]] = []
+        for helper in waiting:
+            found = pending_entry(events.get(helper.run_id, []))
+            if found is None:
+                continue
+            item, key = found
+            head = f"{helper.agent} · "
+            label = item.label
+            if label is None and helper.title is not None and helper.title.startswith(head):
+                label = helper.title[len(head) :][:120] or None
+            asked.append(
+                (
+                    item,
+                    key,
+                    PendingHelper(
+                        session_id=helper.session_id,
+                        agent=helper.agent or "helper",
+                        label=label,
+                        index=helper.index,
+                    ),
+                )
+            )
+        return sorted([*items, *group_helper_items(asked)], key=lambda item: item.since)
 
     def step(self, session_id: str) -> str | None:
         """A helper's newest step, None before its first or once its run ended."""
@@ -114,25 +165,38 @@ class SessionLog:
             self._helper_counts.pop(session_id, None)
         else:
             self._helper_counts[session_id] = helpers
+        own = await self.pending(activity)
+        items = await self.pending_items(activity, own, helpers)
+        if items:
+            self._lead_items[session_id] = items
+        else:
+            self._lead_items.pop(session_id, None)
         return summarize(
             activity,
             self.local_only(activity.session.cwd),
-            await self.pending(activity),
+            own,
             wait,
             helpers,
             self.step(session_id),
+            items,
         )
 
     async def _push_lead(self, lead_id: str) -> None:
         """Send a lead's summary when what its helpers do changed: a helper's state is the
         lead's too (ADR-059)."""
-        activity = await self._records.activity(lead_id)
-        if activity is None:
-            return
-        counts = await self.helpers(activity)
-        if counts == self._helper_counts.get(lead_id):
-            return
-        self._bus.publish_summary(await self._summary(activity, await self.wait(activity)))
+        # One push at a time per lead, in its lock: two helpers' events must not publish a
+        # newer summary before an older one.
+        async with self._lock(lead_id):
+            activity = await self._records.activity(lead_id)
+            if activity is None:
+                return
+            counts = await self.helpers(activity)
+            items = await self.pending_items(activity, await self.pending(activity), counts)
+            if counts == self._helper_counts.get(lead_id) and items == self._lead_items.get(
+                lead_id, []
+            ):
+                return
+            self._bus.publish_summary(await self._summary(activity, await self.wait(activity)))
 
     async def emit(
         self,

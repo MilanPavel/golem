@@ -124,6 +124,7 @@ const sidebar: DefaultTheme.Sidebar = [
       { text: "Routines", link: "/guide/routines" },
       { text: "The web UI", link: "/guide/web" },
       { text: "Settings", link: "/guide/settings" },
+      { text: "Run your own relay", link: "/guide/relay" },
     ],
   },
   // golem's architecture, one idea per chapter: the idea in agents generally, then golem's

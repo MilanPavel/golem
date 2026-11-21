@@ -14,6 +14,8 @@ A small public service that passes encrypted frames between a Mac and its paired
 RELAY_HOST=relay.example.com BIND=0.0.0.0:8080 bun packages/relay/src/bun/main.ts
 ```
 
+In a container: `docker build -t golem-relay packages/relay` (the build context is this package), then `docker run -p 8080:8080 -e RELAY_HOST=relay.example.com golem-relay`. For development, `just relay`. The full guide is `docs/guide/relay.md`.
+
 It speaks plain WebSocket. Put TLS in front (Caddy, Fly, a Cloudflare Tunnel).
 
 | Variable | Meaning | Default |
