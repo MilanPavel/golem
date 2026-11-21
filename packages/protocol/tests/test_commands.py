@@ -317,7 +317,7 @@ def test_agents_list_and_get_round_trip() -> None:
     )
     listed = AgentsListResult(agents=[info])
     assert AgentsListResult.model_validate_json(listed.model_dump_json()) == listed
-    got = AgentsGetResult(**info.model_dump(), prompt="Find it.")
+    got = AgentsGetResult.model_validate({**info.model_dump(), "prompt": "Find it."})
     assert AgentsGetResult.model_validate_json(got.model_dump_json()) == got
     list_params = AgentsListParams(cwd="/work")
     assert AgentsListParams.model_validate_json(list_params.model_dump_json()) == list_params

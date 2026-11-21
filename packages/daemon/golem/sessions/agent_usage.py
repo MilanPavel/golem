@@ -1,7 +1,9 @@
 """How often each agent type was used and finished, counted from stored events (ADR-059).
 
 ``used`` counts the helpers of an agent type started in the last 30 days. ``finished`` counts
-the ones that ended with ``stopped = "done"``. Both are read from the lead's log:
+the ones that ended with ``stopped = "done"``. ``stopped`` counts the ones that ended for any
+other reason. ``cost_usd`` adds up the ``cost_usd`` of their ``helper.ended`` events. All are
+read from the lead's log:
 
 * A helper is one ``helper.started`` event (its ``agent`` names the type). Its end is the
   ``helper.ended`` with the same ``call_id`` and ``index``, in the same log. A helper with no
@@ -12,7 +14,9 @@ the ones that ended with ``stopped = "done"``. Both are read from the lead's log
   when left out). It counts as used, and as finished when its ``tool.completed`` preview does
   not start ``<agent> finished:`` (the old result text for a helper stopped by a limit). A
   ``tool.failed``, or no outcome yet, is not finished. A call that has a ``helper.started``
-  in the same log is a new-shape call and is not counted twice.
+  in the same log is a new-shape call and is not counted twice. A ``tool.failed`` or a
+  ``<agent> finished:`` preview counts as stopped. An old call has no cost in its log, so a
+  type with any old-shape call in the window has ``cost_usd = None``: the daemon cannot say.
 
 Cost: the ``events`` table has no index on ``type`` or ``ts``, so each of the two queries
 scans the whole table once and decodes the JSON of only the rows it keeps (helper events
@@ -24,7 +28,7 @@ opens a page; it should not run on every event.
 
 from __future__ import annotations
 
-from collections import Counter
+from collections import Counter, defaultdict
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
@@ -46,7 +50,8 @@ SELECT type, ts, session_id,
        json_extract(data, '$.call_id') AS call_id,
        json_extract(data, '$.index') AS idx,
        json_extract(data, '$.agent') AS agent,
-       json_extract(data, '$.stopped') AS stopped
+       json_extract(data, '$.stopped') AS stopped,
+       json_extract(data, '$.cost_usd') AS cost
 FROM events
 WHERE type IN ('helper.started', 'helper.ended') AND ts >= ?
 """
@@ -71,6 +76,9 @@ WHERE r.type = 'tool.requested' AND r.ts >= ?
 class AgentCount:
     used: int = 0
     finished: int = 0
+    stopped: int = 0
+    cost_usd: float | None = 0.0
+    """``None`` when some of the type's helpers are from before helpers were sessions."""
 
 
 class AgentUsage:
@@ -99,35 +107,55 @@ class AgentUsage:
         prefix = cutoff.astimezone(UTC).isoformat()[:19]
         used: Counter[str] = Counter()
         finished: Counter[str] = Counter()
+        stopped_early: Counter[str] = Counter()
+        cost: defaultdict[str, float] = defaultdict(float)
+        old: set[str] = set()
 
         started: dict[tuple[str, str, int], tuple[str, datetime]] = {}
         stopped: dict[tuple[str, str, int], str] = {}
+        costs: dict[tuple[str, str, int], float] = {}
         for row in await self._database.fetch_all(_NEW_SHAPE, (prefix,)):
             key = (row["session_id"], row["call_id"], row["idx"])
             if row["type"] == "helper.started":
                 started[key] = (row["agent"], _when(row["ts"]))
             else:
                 stopped[key] = row["stopped"]
+                costs[key] = float(row["cost"] or 0.0)
         new_calls = {(session, call) for session, call, _ in started}
         for key, (agent, ts) in started.items():
             if ts < cutoff:
                 continue
             used[agent] += 1
             # No helper.ended yet means it is still running: used, not finished.
-            if stopped.get(key) == "done":
+            ended = stopped.get(key)
+            if ended == "done":
                 finished[agent] += 1
+            elif ended is not None:
+                stopped_early[agent] += 1
+            cost[agent] += costs.get(key, 0.0)
 
         for row in await self._database.fetch_all(_OLD_SHAPE, (prefix,)):
             if (row["session_id"], row["call_id"]) in new_calls or _when(row["ts"]) < cutoff:
                 continue
             agent = row["agent"] or DEFAULT_OLD_AGENT
             used[agent] += 1
+            old.add(agent)
             if row["outcome"] == "tool.completed" and not row["head"].startswith(
                 f"{agent} finished:"
             ):
                 finished[agent] += 1
+            elif row["outcome"] is not None:
+                stopped_early[agent] += 1
 
-        return {name: AgentCount(used[name], finished[name]) for name in used}
+        return {
+            name: AgentCount(
+                used[name],
+                finished[name],
+                stopped_early[name],
+                None if name in old else cost[name],
+            )
+            for name in used
+        }
 
 
 def _when(ts: str) -> datetime:

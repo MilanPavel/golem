@@ -1665,7 +1665,7 @@ async def _agents_get(ctx: RequestContext, params: AgentsGetParams) -> AgentsGet
     info, agent = pick
     # A blocked agent's prompt is not sent: its folder is not trusted.
     prompt = agent.body if info.trusted else ""
-    return AgentsGetResult(**info.model_dump(), prompt=prompt)
+    return AgentsGetResult.model_validate({**info.model_dump(), "prompt": prompt})
 
 
 async def _session_set_skills(

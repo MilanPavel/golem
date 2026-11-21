@@ -38,7 +38,11 @@ from golem.models.dispatcher import Dispatcher
 from golem.models.router import ModelRouter
 from golem.models.tiers import Tier
 from golem.models.window import ContextWindow
+from golem.paths import resolve_paths
 from golem.permissions.policy import Policy
+from golem.server.agents_edit import agent_infos
+from golem.server.dispatcher import RequestContext
+from golem.server.state import DaemonState
 from golem.sessions import manager as manager_module
 from golem.sessions.bus import EventBus
 from golem.sessions.log import SessionLog
@@ -1047,6 +1051,33 @@ async def test_the_worker_is_listed_but_not_available_yet(
     tool = chat.runtime.tools.scoped(ToolScope(root=project)).get("delegate")
     assert tool is not None
     assert "- worker: " in tool.description
+
+
+async def test_the_agents_list_says_why_the_worker_cannot_run_in_the_words_delegate_uses(
+    database: Database, project: Path, tmp_path: Path
+) -> None:
+    model = _Recording(replies=[[("delegate", {"brief": "change it", "agent": "worker"})], "ok"])
+    registry = _registry(tmp_path)
+    chat = _Chat(database, model, agents=registry)
+    _, _, events = await chat.run(project)
+    refused = _result_of(events, "call_1")
+
+    state = DaemonState(paths=resolve_paths(tmp_path / "golem"), started_at=0.0)
+    state.agents = registry
+    state.sessions = chat.manager
+    infos = {
+        info.name: info
+        for info, _ in await agent_infos(RequestContext(state, cast(Any, None)), None)
+    }
+
+    assert infos["worker"].unavailable == refused
+    assert "write_file" in infos["worker"].changing_tools
+    assert infos["explorer"].unavailable is None
+    assert infos["explorer"].changing_tools == []
+    assert infos["explorer"].path == "golem/agents/bundled/explorer.md"
+    written = (bundled_agents_dir() / "explorer.md").read_text()
+    assert infos["explorer"].text == written
+    assert infos["explorer"].prompt == written.split("---\n", 2)[2].strip("\n")
 
 
 async def test_the_delegate_description_lists_the_types_a_folder_sees(

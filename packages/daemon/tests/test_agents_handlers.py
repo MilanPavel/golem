@@ -165,8 +165,10 @@ async def test_counts_new_shape_old_shape_and_the_30_day_edge(database: Database
     # explorer, new shape: c1 c2 c3 c4 c6 edge_in used; c1 and edge_in finished.
     # explorer, old shape: o1 o2 o3 o4 used (c1 has a tool.requested too and is not counted
     # twice); only o1 finished, since o2's result starts "explorer finished:".
-    assert counts["explorer"] == AgentCount(used=10, finished=3)
-    assert counts["reviewer"] == AgentCount(used=2, finished=2)
+    # stopped: c2 c3 (new shape) and o2 o3 (old shape). The old calls have no cost, so the
+    # explorer's cost cannot be said; the reviewer's is the sum of its two helper.ended events.
+    assert counts["explorer"] == AgentCount(used=10, finished=3, stopped=4, cost_usd=None)
+    assert counts["reviewer"] == AgentCount(used=2, finished=2, stopped=0, cost_usd=0.0)
     assert set(counts) == {"explorer", "reviewer"}
 
 
@@ -206,6 +208,7 @@ async def world(tmp_path: Path, database: Database) -> _World:
     )
     state = DaemonState(paths=resolve_paths(home), started_at=0.0)
     state.agents = registry
+    state.user_home = home
     state.agent_usage = AgentUsage(database, clock=lambda: NOW)
     return _World(home, project, state, trusted)
 
@@ -230,7 +233,17 @@ async def test_list_shows_bundled_user_and_trusted_project_agents(
     mine = next(a for a in result.agents if a.name == "mine")
     assert (mine.wish, mine.tools, mine.limits.max_calls) == ("cheapest", ["read_file"], 7)
     explorer = next(a for a in result.agents if a.name == "explorer")
-    assert (explorer.used, explorer.finished) == (10, 3)
+    assert (explorer.used, explorer.finished, explorer.stopped) == (10, 3, 4)
+    assert explorer.cost_usd is None
+    reviewer = next(a for a in result.agents if a.name == "reviewer")
+    assert (reviewer.stopped, reviewer.cost_usd) == (0, 0.0)
+    assert (mine.path, mine.text) == (
+        "~/agents/mine.md",
+        (world.home / "agents/mine.md").read_text(),
+    )
+    local = next(a for a in result.agents if a.name == "local")
+    assert local.path == ".golem/agents/local.md"
+    assert local.prompt == "Prompt."
     assert (mine.used, mine.finished) == (0, 0)
 
     without = await world.call("agents.list", {})
@@ -253,6 +266,7 @@ async def test_a_project_agent_of_an_untrusted_folder_is_blocked_not_offered(
 
     only = await world.call("agents.get", {"name": "local", "cwd": str(world.project)})
     assert (only.trusted, only.prompt) == (False, "")
+    assert (only.text, only.path) == (None, ".golem/agents/local.md")
     # The look-alike does not take the bundled explorer's name.
     resolved = await world.call("agents.get", {"name": "explorer", "cwd": str(world.project)})
     assert (resolved.origin, resolved.trusted) == ("bundled", True)
@@ -294,6 +308,7 @@ async def test_without_a_store_the_counts_are_unknown(world: _World) -> None:
     listed = await world.call("agents.list", {})
 
     assert {a.finished for a in listed.agents} == {None}
+    assert {(a.stopped, a.cost_usd) for a in listed.agents} == {(None, None)}
     assert AgentsListParams(cwd=None).cwd is None and AgentsGetParams(name="x").name == "x"
 
 

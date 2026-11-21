@@ -12,52 +12,84 @@ import Foundation
 /// false for a project agent in a folder that is not trusted, which is listed and
 /// never started. ``used`` and ``finished`` count helpers of this type started and
 /// ended in the last 30 days (``helper.ended``). ``finished`` is ``None`` when the
-/// daemon cannot count them. ``resolves_to`` is what ``wish`` becomes in this setup;
-/// ``None`` when the daemon does not say. An older daemon leaves it out.
+/// daemon cannot count them. ``stopped`` counts the ones of the last 30 days that ended
+/// early, for any reason other than done; ``None`` when the daemon cannot count them.
+/// ``cost_usd`` is what those helpers cost in the same days; ``None`` when the daemon
+/// cannot say. ``resolves_to`` is what ``wish`` becomes in this setup; ``None`` when the
+/// daemon does not say.
+///
+/// ``path`` is the agent's file: ``~`` stands for the home folder, a bundled file is its
+/// package path (``golem/agents/bundled/explorer.md``) and a project file is relative to the
+/// project. ``text`` is the whole file as written and ``prompt`` is its body. Both are
+/// ``None`` for a project agent in a folder that is not trusted. ``changing_tools`` are the
+/// ``tools`` that change things; the rest only read. ``unavailable`` says in plain words why
+/// the agent cannot be started now, the same text ``delegate`` refuses with, and is ``None``
+/// when it can. An older daemon leaves out every field from ``resolves_to`` on.
 // MARK: - AgentInfo
 public struct AgentInfo: Codable {
     public let asks: Bool?
+    public let changingTools: [String]?
+    public let costUsd: Double?
     public let description: String
     public let errors: [String]?
     public let finished: Int?
     public let limits: AgentInfoLimits?
     public let name: String
     public let origin: Origin
+    public let path: String?
+    public let prompt: String?
     public let resolvesTo: AgentInfoWishResolution?
     public let shadowed: [Origin]?
+    public let stopped: Int?
+    public let text: String?
     public let tools: [String]?
     public let trusted: Bool?
+    public let unavailable: String?
     public let used: Int?
     public let wish: String
 
     public enum CodingKeys: String, CodingKey {
         case asks = "asks"
+        case changingTools = "changing_tools"
+        case costUsd = "cost_usd"
         case description = "description"
         case errors = "errors"
         case finished = "finished"
         case limits = "limits"
         case name = "name"
         case origin = "origin"
+        case path = "path"
+        case prompt = "prompt"
         case resolvesTo = "resolves_to"
         case shadowed = "shadowed"
+        case stopped = "stopped"
+        case text = "text"
         case tools = "tools"
         case trusted = "trusted"
+        case unavailable = "unavailable"
         case used = "used"
         case wish = "wish"
     }
 
-    public init(asks: Bool?, description: String, errors: [String]?, finished: Int?, limits: AgentInfoLimits?, name: String, origin: Origin, resolvesTo: AgentInfoWishResolution?, shadowed: [Origin]?, tools: [String]?, trusted: Bool?, used: Int?, wish: String) {
+    public init(asks: Bool?, changingTools: [String]?, costUsd: Double?, description: String, errors: [String]?, finished: Int?, limits: AgentInfoLimits?, name: String, origin: Origin, path: String?, prompt: String?, resolvesTo: AgentInfoWishResolution?, shadowed: [Origin]?, stopped: Int?, text: String?, tools: [String]?, trusted: Bool?, unavailable: String?, used: Int?, wish: String) {
         self.asks = asks
+        self.changingTools = changingTools
+        self.costUsd = costUsd
         self.description = description
         self.errors = errors
         self.finished = finished
         self.limits = limits
         self.name = name
         self.origin = origin
+        self.path = path
+        self.prompt = prompt
         self.resolvesTo = resolvesTo
         self.shadowed = shadowed
+        self.stopped = stopped
+        self.text = text
         self.tools = tools
         self.trusted = trusted
+        self.unavailable = unavailable
         self.used = used
         self.wish = wish
     }
@@ -304,54 +336,72 @@ public struct AgentsGetParams: Codable {
     }
 }
 
-/// The agent type and its prompt, the body of its file.
+/// The agent type and its prompt, the body of its file. ``prompt`` is empty when held back.
 // MARK: - AgentsGetResult
 public struct AgentsGetResult: Codable {
     public let asks: Bool?
+    public let changingTools: [String]?
+    public let costUsd: Double?
     public let description: String
     public let errors: [String]?
     public let finished: Int?
     public let limits: AgentsGetResultLimits?
     public let name: String
     public let origin: Origin
+    public let path: String?
     public let prompt: String
     public let resolvesTo: AgentsGetResultWishResolution?
     public let shadowed: [Origin]?
+    public let stopped: Int?
+    public let text: String?
     public let tools: [String]?
     public let trusted: Bool?
+    public let unavailable: String?
     public let used: Int?
     public let wish: String
 
     public enum CodingKeys: String, CodingKey {
         case asks = "asks"
+        case changingTools = "changing_tools"
+        case costUsd = "cost_usd"
         case description = "description"
         case errors = "errors"
         case finished = "finished"
         case limits = "limits"
         case name = "name"
         case origin = "origin"
+        case path = "path"
         case prompt = "prompt"
         case resolvesTo = "resolves_to"
         case shadowed = "shadowed"
+        case stopped = "stopped"
+        case text = "text"
         case tools = "tools"
         case trusted = "trusted"
+        case unavailable = "unavailable"
         case used = "used"
         case wish = "wish"
     }
 
-    public init(asks: Bool?, description: String, errors: [String]?, finished: Int?, limits: AgentsGetResultLimits?, name: String, origin: Origin, prompt: String, resolvesTo: AgentsGetResultWishResolution?, shadowed: [Origin]?, tools: [String]?, trusted: Bool?, used: Int?, wish: String) {
+    public init(asks: Bool?, changingTools: [String]?, costUsd: Double?, description: String, errors: [String]?, finished: Int?, limits: AgentsGetResultLimits?, name: String, origin: Origin, path: String?, prompt: String, resolvesTo: AgentsGetResultWishResolution?, shadowed: [Origin]?, stopped: Int?, text: String?, tools: [String]?, trusted: Bool?, unavailable: String?, used: Int?, wish: String) {
         self.asks = asks
+        self.changingTools = changingTools
+        self.costUsd = costUsd
         self.description = description
         self.errors = errors
         self.finished = finished
         self.limits = limits
         self.name = name
         self.origin = origin
+        self.path = path
         self.prompt = prompt
         self.resolvesTo = resolvesTo
         self.shadowed = shadowed
+        self.stopped = stopped
+        self.text = text
         self.tools = tools
         self.trusted = trusted
+        self.unavailable = unavailable
         self.used = used
         self.wish = wish
     }
@@ -552,52 +602,84 @@ public struct AgentsListResult: Codable {
 /// false for a project agent in a folder that is not trusted, which is listed and
 /// never started. ``used`` and ``finished`` count helpers of this type started and
 /// ended in the last 30 days (``helper.ended``). ``finished`` is ``None`` when the
-/// daemon cannot count them. ``resolves_to`` is what ``wish`` becomes in this setup;
-/// ``None`` when the daemon does not say. An older daemon leaves it out.
+/// daemon cannot count them. ``stopped`` counts the ones of the last 30 days that ended
+/// early, for any reason other than done; ``None`` when the daemon cannot count them.
+/// ``cost_usd`` is what those helpers cost in the same days; ``None`` when the daemon
+/// cannot say. ``resolves_to`` is what ``wish`` becomes in this setup; ``None`` when the
+/// daemon does not say.
+///
+/// ``path`` is the agent's file: ``~`` stands for the home folder, a bundled file is its
+/// package path (``golem/agents/bundled/explorer.md``) and a project file is relative to the
+/// project. ``text`` is the whole file as written and ``prompt`` is its body. Both are
+/// ``None`` for a project agent in a folder that is not trusted. ``changing_tools`` are the
+/// ``tools`` that change things; the rest only read. ``unavailable`` says in plain words why
+/// the agent cannot be started now, the same text ``delegate`` refuses with, and is ``None``
+/// when it can. An older daemon leaves out every field from ``resolves_to`` on.
 // MARK: - AgentElement
 public struct AgentElement: Codable {
     public let asks: Bool?
+    public let changingTools: [String]?
+    public let costUsd: Double?
     public let description: String
     public let errors: [String]?
     public let finished: Int?
     public let limits: AgentLimitsClass?
     public let name: String
     public let origin: Origin
+    public let path: String?
+    public let prompt: String?
     public let resolvesTo: AgentWishResolution?
     public let shadowed: [Origin]?
+    public let stopped: Int?
+    public let text: String?
     public let tools: [String]?
     public let trusted: Bool?
+    public let unavailable: String?
     public let used: Int?
     public let wish: String
 
     public enum CodingKeys: String, CodingKey {
         case asks = "asks"
+        case changingTools = "changing_tools"
+        case costUsd = "cost_usd"
         case description = "description"
         case errors = "errors"
         case finished = "finished"
         case limits = "limits"
         case name = "name"
         case origin = "origin"
+        case path = "path"
+        case prompt = "prompt"
         case resolvesTo = "resolves_to"
         case shadowed = "shadowed"
+        case stopped = "stopped"
+        case text = "text"
         case tools = "tools"
         case trusted = "trusted"
+        case unavailable = "unavailable"
         case used = "used"
         case wish = "wish"
     }
 
-    public init(asks: Bool?, description: String, errors: [String]?, finished: Int?, limits: AgentLimitsClass?, name: String, origin: Origin, resolvesTo: AgentWishResolution?, shadowed: [Origin]?, tools: [String]?, trusted: Bool?, used: Int?, wish: String) {
+    public init(asks: Bool?, changingTools: [String]?, costUsd: Double?, description: String, errors: [String]?, finished: Int?, limits: AgentLimitsClass?, name: String, origin: Origin, path: String?, prompt: String?, resolvesTo: AgentWishResolution?, shadowed: [Origin]?, stopped: Int?, text: String?, tools: [String]?, trusted: Bool?, unavailable: String?, used: Int?, wish: String) {
         self.asks = asks
+        self.changingTools = changingTools
+        self.costUsd = costUsd
         self.description = description
         self.errors = errors
         self.finished = finished
         self.limits = limits
         self.name = name
         self.origin = origin
+        self.path = path
+        self.prompt = prompt
         self.resolvesTo = resolvesTo
         self.shadowed = shadowed
+        self.stopped = stopped
+        self.text = text
         self.tools = tools
         self.trusted = trusted
+        self.unavailable = unavailable
         self.used = used
         self.wish = wish
     }
@@ -685,47 +767,68 @@ public struct AgentsSetWishParams: Codable {
 // MARK: - AgentsSetWishResult
 public struct AgentsSetWishResult: Codable {
     public let asks: Bool?
+    public let changingTools: [String]?
+    public let costUsd: Double?
     public let description: String
     public let errors: [String]?
     public let finished: Int?
     public let limits: AgentsSetWishResultLimits?
     public let name: String
     public let origin: Origin
+    public let path: String?
+    public let prompt: String?
     public let resolvesTo: AgentsSetWishResultWishResolution?
     public let shadowed: [Origin]?
+    public let stopped: Int?
+    public let text: String?
     public let tools: [String]?
     public let trusted: Bool?
+    public let unavailable: String?
     public let used: Int?
     public let wish: String
 
     public enum CodingKeys: String, CodingKey {
         case asks = "asks"
+        case changingTools = "changing_tools"
+        case costUsd = "cost_usd"
         case description = "description"
         case errors = "errors"
         case finished = "finished"
         case limits = "limits"
         case name = "name"
         case origin = "origin"
+        case path = "path"
+        case prompt = "prompt"
         case resolvesTo = "resolves_to"
         case shadowed = "shadowed"
+        case stopped = "stopped"
+        case text = "text"
         case tools = "tools"
         case trusted = "trusted"
+        case unavailable = "unavailable"
         case used = "used"
         case wish = "wish"
     }
 
-    public init(asks: Bool?, description: String, errors: [String]?, finished: Int?, limits: AgentsSetWishResultLimits?, name: String, origin: Origin, resolvesTo: AgentsSetWishResultWishResolution?, shadowed: [Origin]?, tools: [String]?, trusted: Bool?, used: Int?, wish: String) {
+    public init(asks: Bool?, changingTools: [String]?, costUsd: Double?, description: String, errors: [String]?, finished: Int?, limits: AgentsSetWishResultLimits?, name: String, origin: Origin, path: String?, prompt: String?, resolvesTo: AgentsSetWishResultWishResolution?, shadowed: [Origin]?, stopped: Int?, text: String?, tools: [String]?, trusted: Bool?, unavailable: String?, used: Int?, wish: String) {
         self.asks = asks
+        self.changingTools = changingTools
+        self.costUsd = costUsd
         self.description = description
         self.errors = errors
         self.finished = finished
         self.limits = limits
         self.name = name
         self.origin = origin
+        self.path = path
+        self.prompt = prompt
         self.resolvesTo = resolvesTo
         self.shadowed = shadowed
+        self.stopped = stopped
+        self.text = text
         self.tools = tools
         self.trusted = trusted
+        self.unavailable = unavailable
         self.used = used
         self.wish = wish
     }
