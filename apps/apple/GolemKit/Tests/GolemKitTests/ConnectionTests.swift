@@ -4,7 +4,7 @@ import Testing
 @testable import GolemKit
 
 /// Collects what an `AsyncStream` yields, so a test can look at it.
-actor Collector<Element: Sendable> {
+private actor Collector<Element: Sendable> {
     private(set) var items: [Element] = []
     private var task: Task<Void, Never>?
 
@@ -21,7 +21,7 @@ actor Collector<Element: Sendable> {
 }
 
 /// Polls until `check` holds, or fails the test after `seconds`.
-func eventually(
+private func eventually(
     _ what: String, seconds: Double = 10, sourceLocation: SourceLocation = #_sourceLocation,
     _ check: () async -> Bool
 ) async {
@@ -34,7 +34,7 @@ func eventually(
 }
 
 /// A relay, a scripted Mac that has joined it, and a device key the Mac allows.
-struct Rig {
+private struct Rig {
     let relay: RelayProcess
     let mac: ScriptedMac
     let key: InMemoryDeviceKey
