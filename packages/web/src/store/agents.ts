@@ -1,6 +1,6 @@
-import { RpcError, type AgentInfo, type AgentsListResult } from "@golem/client";
+import { RpcError, type AgentInfo, type AgentsListResult, type AgentsSaveResult } from "@golem/client";
 
-export type { AgentInfo, AgentsListResult };
+export type { AgentInfo, AgentsListResult, AgentsSaveResult };
 
 /** The query key of `agents.list`. The pushed `agent.registry.changed` marks it stale. */
 export const AGENT_LIST_KEY = ["agents.list"] as const;

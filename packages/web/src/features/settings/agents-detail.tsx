@@ -1,13 +1,13 @@
-import { definitionLines, type AgentRow } from "@golem/view";
+import { definitionLines, definitionNote, deleteQuestion, replacesLine, type AgentRow } from "@golem/view";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { writeClipboard } from "../../ui/clipboard.ts";
 import { Button } from "../../ui/button.tsx";
 import { cn } from "../../ui/cn.ts";
 import { Code } from "../../ui/code.tsx";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../ui/tabs.tsx";
+import { AgentEditor } from "./agents-editor.tsx";
+import type { AgentControls, AgentTab } from "./agents-editing.ts";
 import { ModelControl } from "./agents-model.tsx";
-
-export type AgentTab = "overview" | "definition";
 
 const NO_FILE = "The daemon did not send this file. Update golem to read it here.";
 const COPIED_MS = 2000;
@@ -62,6 +62,7 @@ export function AgentOverview({ row, onSetWish }: { row: AgentRow; onSetWish: ((
       <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
         <Fact title="Model" setting="model" className="xl:col-span-2">
           <ModelControl row={row} onSetWish={onSetWish} />
+          {row.source === "user" && row.editable && onSetWish !== undefined ? <p className="text-meta text-muted">Saved in the agent's file, on its model line.</p> : null}
         </Fact>
         <Fact title="Can use" setting="can use">
           <CanUse row={row} />
@@ -126,15 +127,80 @@ function CopyText({ text }: { text: string }) {
   );
 }
 
-/** The Definition: the path, "Copy text", and the file with the keys at its top tinted. */
-export function AgentDefinition({ row }: { row: AgentRow }) {
+/** The buttons of a user agent's file: Delete (asks once, in place), Open and Edit. */
+function UserActions({ row, controls }: { row: AgentRow; controls: AgentControls }) {
+  const edit = useRef<HTMLButtonElement>(null);
+  const del = useRef<HTMLButtonElement>(null);
+  const confirm = useRef<HTMLButtonElement>(null);
+  const was = useRef(controls.asking);
+  useEffect(() => {
+    if (controls.asking) confirm.current?.focus();
+    else if (was.current) del.current?.focus();
+    was.current = controls.asking;
+  }, [controls.asking]);
+  useEffect(() => {
+    if (!controls.focusEdit || edit.current === null) return;
+    edit.current.focus();
+    controls.editFocused();
+  }, [controls]);
+  if (controls.asking) {
+    return (
+      <>
+        <span className="self-center text-meta text-muted">{deleteQuestion(row.shadowed)}</span>
+        <Button ref={confirm} size="sm" kind="danger" disabled={controls.busy} onClick={controls.onRemove}>
+          Delete
+        </Button>
+        <Button size="sm" onClick={controls.onKeepIt}>
+          Keep
+        </Button>
+      </>
+    );
+  }
+  return (
+    <>
+      {controls.can.remove ? (
+        <Button ref={del} size="sm" kind="danger" onClick={controls.onAsk}>
+          Delete
+        </Button>
+      ) : null}
+      {controls.can.edit ? (
+        <Button ref={edit} size="sm" kind="primary" onClick={controls.onEdit}>
+          Edit
+        </Button>
+      ) : null}
+    </>
+  );
+}
+
+/** "Make my own copy" of a bundled agent. */
+function CopyButton({ controls }: { controls: AgentControls }) {
+  return (
+    <Button size="sm" kind="primary" disabled={controls.busy} onClick={controls.onCopy}>
+      Make my own copy
+    </Button>
+  );
+}
+
+/** The Definition: the path, "Copy text" with the actions of the agent, and the file with the keys at its top tinted; or the editor. */
+export function AgentDefinition({ row, controls }: { row: AgentRow; controls: AgentControls }) {
+  if (controls.draft !== null) return <AgentEditor path={row.path} name={row.name} draft={controls.draft} controls={controls} />;
   if (row.text === null) return <p className="text-sm text-muted">{NO_FILE}</p>;
+  const note = definitionNote(row.source, row.shadowed);
   return (
     <div className="flex flex-col gap-2">
       <div className="flex flex-wrap items-center justify-between gap-2">
         {row.definitionPath === null ? <span /> : <Code tone="muted" className="min-w-0 wrap-anywhere">{row.definitionPath}</Code>}
-        <CopyText text={row.text} />
+        <div className="flex flex-wrap items-center gap-2">
+          <CopyText text={row.text} />
+          {controls.can.copy ? <CopyButton controls={controls} /> : null}
+          <UserActions row={row} controls={controls} />
+        </div>
       </div>
+      {controls.error === null ? null : (
+        <p role="alert" className="text-meta text-deny wrap-anywhere">
+          {controls.error}
+        </p>
+      )}
       <pre
         // The file may be wider than the pane: it scrolls, so the keyboard must be able to reach it.
         tabIndex={0}
@@ -155,7 +221,7 @@ export function AgentDefinition({ row }: { row: AgentRow }) {
           </span>
         ))}
       </pre>
-      {row.source === "bundled" ? <p className="text-meta text-muted">This file ships with golem and updates with it.</p> : null}
+      {note === null ? null : <p className="text-meta text-muted">{note}</p>}
     </div>
   );
 }
@@ -167,14 +233,16 @@ export function AgentDefinition({ row }: { row: AgentRow }) {
 export function AgentDetail({
   row,
   onSetWish,
+  controls,
   showName = true,
 }: {
   row: AgentRow;
   onSetWish: ((name: string, wish: string) => Promise<void>) | undefined;
+  controls: AgentControls;
   /** False in a narrow row, where the row above already says the name. */
   showName?: boolean;
 }) {
-  const [tab, setTab] = useState<AgentTab>("overview");
+  const replaces = replacesLine(row.name, row.shadowed);
   const broken = row.tone === "bad";
   return (
     <div className="flex min-w-0 flex-col gap-3">
@@ -183,9 +251,12 @@ export function AgentDetail({
           <div className="flex flex-wrap items-center gap-2">
             <h3 className="font-ui text-lg font-semibold wrap-anywhere">{row.name}</h3>
             <OriginMark row={row} />
+            {replaces === null ? null : <span className="text-meta text-muted">{replaces}</span>}
             {row.unavailable === null ? null : <NotYetMark />}
           </div>
-        ) : null}
+        ) : replaces === null ? null : (
+          <p className="text-meta text-muted">{replaces}</p>
+        )}
         {row.description === "" ? null : <p className="max-w-prose text-sm text-muted wrap-anywhere">{row.description}</p>}
         {row.unavailable === null ? null : (
           <p role="note" className="w-fit max-w-prose rounded-md bg-wait-soft px-2.5 py-1 text-meta text-wait">
@@ -198,7 +269,7 @@ export function AgentDetail({
           </p>
         ))}
       </header>
-      <Tabs value={tab} onValueChange={(next) => setTab(next as AgentTab)} className="flex flex-col gap-3">
+      <Tabs value={controls.tab} onValueChange={(next) => controls.onTab(next as AgentTab)} className="flex flex-col gap-3">
         <TabsList aria-label={`${row.name} details`}>
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="definition">Definition</TabsTrigger>
@@ -207,7 +278,7 @@ export function AgentDetail({
           <AgentOverview row={row} onSetWish={onSetWish} />
         </TabsContent>
         <TabsContent value="definition">
-          <AgentDefinition row={row} />
+          <AgentDefinition row={row} controls={controls} />
         </TabsContent>
       </Tabs>
     </div>

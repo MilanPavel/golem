@@ -61,7 +61,7 @@ import { SAMPLE_MEMORIES, SAMPLE_MEMORY_COUNTS, SAMPLE_MEMORY_SETTINGS } from ".
 import { MEMORY_OFF_TEXT } from "../store/memory.ts";
 import { FinishedHelpers } from "../features/settings/agents-keep.tsx";
 import { AgentsPage } from "../features/settings/agents-section.tsx";
-import { SAMPLE_AGENTS, WISH_AGENTS_CLOUD, WISH_AGENTS_LOCAL, WISH_AGENTS_MIXED } from "../features/settings/agents-sample.ts";
+import { SAMPLE_AGENTS, SAMPLE_COPY, WISH_AGENTS_CLOUD, WISH_AGENTS_LOCAL, WISH_AGENTS_MIXED } from "../features/settings/agents-sample.ts";
 import { SkillList } from "../features/settings/skills-section.tsx";
 import { SkillOverview } from "../features/settings/skills/skill-detail.tsx";
 import { SAMPLE_BROKEN_SKILL_MD, SAMPLE_SKILLS } from "../features/settings/skills/sample.ts";
@@ -1437,6 +1437,13 @@ function SkillsDemo() {
   );
 }
 
+/** The file actions of the agents gallery entries: they do nothing. */
+const AGENT_FILES = {
+  onSave: async () => ({ ok: true, problems: [] }),
+  onCopy: async (name: string) => ({ name, description: "", origin: "user" as const, wish: "cheapest" }),
+  onDelete: async () => ({ agent: null }),
+};
+
 /** Settings → Agents: the table with a bundled, a user and a project agent, a broken file and a blocked one; and an empty list. */
 function AgentsDemo() {
   return (
@@ -1448,6 +1455,27 @@ function AgentsDemo() {
       <section aria-label="Agents, narrow" className="flex max-w-md flex-col gap-3 rounded-lg border border-line bg-bg p-4">
         <span className="font-mono text-xs text-faint">Narrow: one column, a row opened in place</span>
         <AgentsPage agents={SAMPLE_AGENTS} narrow start="bundled/reviewer" onSetWish={async () => {}} />
+      </section>
+      {(
+        [
+          ["Agents, editor", "Edit: the file of your own agent in a text box, with Save and Cancel", "user/triage", "edit"],
+          ["Agents, refused save", "A refused save keeps the text and says Not saved, with the line and the problem", "user/triage", "refused"],
+          ["Agents, delete question", "Delete asks once, in place", "user/triage", "delete"],
+          ["Agents, new agent", "+ New agent: the template in the editor, and a row that is not saved yet", "bundled/explorer", "new"],
+        ] as const
+      ).map(([title, caption, start, demo]) => (
+        <section key={title} aria-label={title} className="flex flex-col gap-3 rounded-lg border border-line bg-bg p-4">
+          <span className="font-mono text-xs text-faint">{caption}</span>
+          <AgentsPage agents={SAMPLE_AGENTS} start={start} demo={demo} onSetWish={async () => {}} {...AGENT_FILES} />
+        </section>
+      ))}
+      <section aria-label="Agents, a copy" className="flex flex-col gap-3 rounded-lg border border-line bg-bg p-4">
+        <span className="font-mono text-xs text-faint">A copy of a bundled agent: yours, it replaces the bundled one, and delete says the bundled one comes back</span>
+        <AgentsPage agents={[...SAMPLE_AGENTS.filter((agent) => agent.name !== "reviewer"), SAMPLE_COPY]} start="user/reviewer" demo="delete" onSetWish={async () => {}} {...AGENT_FILES} />
+      </section>
+      <section aria-label="Agents, narrow editor" className="flex max-w-md flex-col gap-3 rounded-lg border border-line bg-bg p-4">
+        <span className="font-mono text-xs text-faint">Narrow: the editor and a refused save inside the opened row</span>
+        <AgentsPage agents={SAMPLE_AGENTS} narrow start="user/triage" demo="refused" onSetWish={async () => {}} {...AGENT_FILES} />
       </section>
       <section aria-label="Agents, cannot run" className="flex flex-col gap-3 rounded-lg border border-line bg-bg p-4">
         <span className="font-mono text-xs text-faint">An agent that cannot run yet, and one with no tools</span>
