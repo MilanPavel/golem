@@ -1,0 +1,80 @@
+# XcodeGen input (ADR-052). `xcodegen` writes Golem.xcodeproj from this file; the project is not checked in.
+#
+# The bundle id, the team and the Keychain group are build settings, set in Config/Golem.xcconfig.
+# To change them on your machine, put overrides in Config/Local.xcconfig (not checked in).
+name: Golem
+
+options:
+  deploymentTarget:
+    iOS: "17.0"
+  createIntermediateGroups: true
+  developmentLanguage: en
+  generateEmptyDirectories: true
+
+configFiles:
+  Debug: Config/Golem.xcconfig
+  Release: Config/Golem.xcconfig
+
+settings:
+  base:
+    SWIFT_VERSION: "5.9"
+    SWIFT_STRICT_CONCURRENCY: complete
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    TARGETED_DEVICE_FAMILY: "1"
+    # The Simulator runs the app ad hoc, with no team. A device needs a team (Config/Local.xcconfig).
+    "CODE_SIGN_IDENTITY[sdk=iphonesimulator*]": "-"
+
+packages:
+  GolemKit:
+    path: GolemKit
+
+targets:
+  Golem:
+    type: application
+    platform: iOS
+    sources:
+      - path: Golem
+        excludes:
+          - Info.plist
+          - Golem.entitlements
+    dependencies:
+      - package: GolemKit
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: $(GOLEM_BUNDLE_ID)
+        PRODUCT_NAME: Golem
+        INFOPLIST_FILE: Golem/Info.plist
+        CODE_SIGN_ENTITLEMENTS: Golem/Golem.entitlements
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        ENABLE_PREVIEWS: YES
+        CODE_SIGN_STYLE: Automatic
+
+  GolemUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: GolemUITests
+    dependencies:
+      - target: Golem
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: $(GOLEM_BUNDLE_ID).uitests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_TARGET_NAME: Golem
+
+schemes:
+  Golem:
+    build:
+      targets:
+        Golem: all
+        GolemUITests: [test]
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets:
+        - GolemUITests
+    archive:
+      config: Release

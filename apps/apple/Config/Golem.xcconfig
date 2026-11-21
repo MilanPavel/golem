@@ -1,0 +1,15 @@
+// Build settings that differ between people and machines. Nothing secret goes here.
+//
+// To run on your own iPhone with a free Personal Team, copy these three lines into
+// Config/Local.xcconfig (not checked in) and change them. See apps/apple/README.md.
+
+// The bundle id. A Personal Team needs one that no one else has used, so change it.
+GOLEM_BUNDLE_ID = dev.golem.app
+
+// The Keychain group the app and its later extensions share. The team id is put in front of it.
+GOLEM_KEYCHAIN_GROUP = dev.golem.app.shared
+
+// Your Apple team id (ten characters). Empty builds for the Simulator only.
+DEVELOPMENT_TEAM =
+
+#include? "Local.xcconfig"

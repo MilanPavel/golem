@@ -30,3 +30,12 @@ packages/daemon/golem/_build.py
 
 # Demo recordings in progress (just demo-tui, just demo-web).
 scripts/demo/out/
+
+# The Xcode project is generated from apps/apple/project.yml by `xcodegen` (ADR-052).
+apps/apple/*.xcodeproj/
+# Per-machine signing settings (see apps/apple/README.md).
+apps/apple/Config/Local.xcconfig
+# Xcode build output and per-user state.
+apps/apple/build/
+*.xcuserstate
+xcuserdata/
