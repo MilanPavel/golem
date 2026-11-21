@@ -222,6 +222,8 @@ What bounds the helper that the `delegate` tool starts. A helper only reads: it 
 
 `[agents.<name>]` takes one more key for each bundled type (`explorer`, `worker`, `reviewer`, `advisor`): `model`, a wish (`cheapest`, `same`, `stronger`, `local`, `budget`, `frontier`) or a model name. It replaces the wish in the bundled file and nothing else. Changing a wish in Settings or `/agents` writes it. A file of the same name in `~/.golem/agents` wins over both.
 
+The daemon also writes your own agent files, and only in `~/.golem/agents`. `agents.save` saves the whole text of a file, and only when the agent parser finds nothing wrong: otherwise nothing is written and the problems come back, each with its line when it is about a frontmatter key. The `name` inside the file decides the file name, a changed name renames the file, and a name another file of yours has is refused. `agents.copy` copies a bundled agent there unchanged, and `agents.delete` removes your file, which brings the bundled agent of that name back. Bundled and project agents cannot be deleted. A name with a `/`, a `..`, a leading dot or anything but lowercase letters, digits and single hyphens is refused. No restart is needed: the next helper reads the new file.
+
 A helper also stops when its calls have taken in more than 8 times its model's window in all (`tokens`), or when a cap in `[budget]` is spent before one of its paid calls (`budget`). It then returns what it has, and the result starts with `explorer finished: <reason>`. Its calls count against the same caps as the chat's, and `golem cost` and Settings → Usage list them as `helper` under "by job".
 
 ### `[agents]`

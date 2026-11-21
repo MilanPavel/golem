@@ -37,7 +37,10 @@ import type { SessionSetModeResult } from "../../protocol/gen/session-set-mode-r
 import type { SessionSetOptionsResult } from "../../protocol/gen/session-set-options-result.ts";
 import type { ListedSkill, SkillListResult } from "../../protocol/gen/skill-list-result.ts";
 import type { AgentsListResult } from "../../protocol/gen/agents-list-result.ts";
+import type { AgentsCopyResult } from "../../protocol/gen/agents-copy-result.ts";
+import type { AgentsDeleteResult } from "../../protocol/gen/agents-delete-result.ts";
 import type { AgentsKeepResult } from "../../protocol/gen/agents-keep-result.ts";
+import type { AgentsSaveResult } from "../../protocol/gen/agents-save-result.ts";
 import type { AgentsSetWishResult } from "../../protocol/gen/agents-set-wish-result.ts";
 import type { MemoryDeleteResult } from "../../protocol/gen/memory-delete-result.ts";
 import type { MemoryExportResult } from "../../protocol/gen/memory-export-result.ts";
@@ -916,6 +919,41 @@ export function isAgentsKeepResult(value: unknown): value is AgentsKeepResult {
   const values = value["values"];
   if (values == null) return true;
   return isRecord(values) && typeof values["keep_days"] === "number" && typeof values["keep_problem_days"] === "number";
+}
+
+function isAgentInfoLike(value: unknown): boolean {
+  return (
+    isRecord(value) &&
+    typeof value["name"] === "string" &&
+    typeof value["description"] === "string" &&
+    typeof value["origin"] === "string" &&
+    typeof value["wish"] === "string"
+  );
+}
+
+export function isAgentsCopyResult(value: unknown): value is AgentsCopyResult {
+  return isAgentInfoLike(value);
+}
+
+export function isAgentsSaveResult(value: unknown): value is AgentsSaveResult {
+  if (!isRecord(value) || typeof value["ok"] !== "boolean") return false;
+  const problems = value["problems"];
+  if (
+    problems !== undefined &&
+    !(
+      Array.isArray(problems) &&
+      problems.every(
+        (p) => isRecord(p) && typeof p["message"] === "string" && (p["line"] == null || typeof p["line"] === "number"),
+      )
+    )
+  ) {
+    return false;
+  }
+  return value["agent"] == null || isAgentInfoLike(value["agent"]);
+}
+
+export function isAgentsDeleteResult(value: unknown): value is AgentsDeleteResult {
+  return isRecord(value) && (value["agent"] == null || isAgentInfoLike(value["agent"]));
 }
 
 export function isNotificationsValues(value: unknown): value is NotificationsValues {

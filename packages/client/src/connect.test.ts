@@ -1862,6 +1862,48 @@ test("agentsKeep sends only the keys it was given and checks what comes back", a
   }
 });
 
+test("saveAgent, copyAgent and deleteAgent send their params and check what comes back", async () => {
+  const sent: [string, Record<string, unknown>][] = [];
+  const agent = { name: "mine", description: "d", origin: "user", wish: "cheapest" };
+  const server = await listen((socket) => {
+    attach(socket, {
+      answerPing: true,
+      results: {
+        "agents.save": { ok: false, problems: [{ message: "`model` is wrong", line: 3 }] },
+        "agents.copy": agent,
+        "agents.delete": { agent: null },
+      },
+      onRequest: (_socket, method, params) => {
+        if (method.startsWith("agents.")) sent.push([method, params]);
+      },
+    });
+  });
+  const client = connectGolem({ socketPath: server.socketPath, clientName: "web", reconnect: false, heartbeatMs: 60_000 });
+  try {
+    assert.deepEqual((await client.saveAgent("text", "mine")).problems, [{ message: "`model` is wrong", line: 3 }]);
+    assert.deepEqual(await client.copyAgent("reviewer"), agent);
+    assert.deepEqual(await client.deleteAgent("mine"), { agent: null });
+    assert.deepEqual(sent, [
+      ["agents.save", { text: "text", name: "mine" }],
+      ["agents.copy", { name: "reviewer" }],
+      ["agents.delete", { name: "mine" }],
+    ]);
+  } finally {
+    client.close();
+    await server.close();
+  }
+  const bad = await listen((socket) => {
+    attach(socket, { answerPing: true, results: { "agents.save": { ok: "yes" } } });
+  });
+  const refused = connectGolem({ socketPath: bad.socketPath, clientName: "web", reconnect: false, heartbeatMs: 60_000 });
+  try {
+    await assert.rejects(() => refused.saveAgent("t"), /invalid agents.save result/);
+  } finally {
+    refused.close();
+    await bad.close();
+  }
+});
+
 test("the notification calls send their params and check what comes back", async () => {
   const sent: [string, Record<string, unknown>][] = [];
   const values = {

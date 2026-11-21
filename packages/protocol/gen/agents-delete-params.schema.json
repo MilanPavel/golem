@@ -1,0 +1,29 @@
+{
+  "additionalProperties": false,
+  "description": "``agents.delete``. Remove the user's file ``~/.golem/agents/<name>.md``. A bundled or\nproject agent is refused.",
+  "properties": {
+    "cwd": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Cwd"
+    },
+    "name": {
+      "minLength": 1,
+      "title": "Name",
+      "type": "string"
+    }
+  },
+  "required": [
+    "name"
+  ],
+  "title": "AgentsDeleteParams",
+  "type": "object"
+}

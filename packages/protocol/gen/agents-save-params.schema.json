@@ -1,0 +1,41 @@
+{
+  "additionalProperties": false,
+  "description": "``agents.save``. Save the text of a user agent file, and only when it is a good one.\n\n``text`` is the whole file. ``name`` is the user agent it replaces; leave it out for a\nnew agent. The name written inside ``text`` decides the file, ``~/.golem/agents/<name>.md``:\nwhen it differs from ``name``, the old file is removed, which is a rename. A name that\nanother file of the user's already has is refused. The text is read by the parser the\nregistry uses, and when it has problems nothing is written.",
+  "properties": {
+    "cwd": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Cwd"
+    },
+    "name": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Name"
+    },
+    "text": {
+      "title": "Text",
+      "type": "string"
+    }
+  },
+  "required": [
+    "text"
+  ],
+  "title": "AgentsSaveParams",
+  "type": "object"
+}

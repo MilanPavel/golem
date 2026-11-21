@@ -1,0 +1,28 @@
+{
+  "additionalProperties": false,
+  "description": "One thing wrong with a text. ``line`` is its line in the text, counted from 1, when\nthe problem is in a frontmatter key; ``None`` when it is not about one line.",
+  "properties": {
+    "line": {
+      "anyOf": [
+        {
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Line"
+    },
+    "message": {
+      "title": "Message",
+      "type": "string"
+    }
+  },
+  "required": [
+    "message"
+  ],
+  "title": "AgentsSaveProblem",
+  "type": "object"
+}

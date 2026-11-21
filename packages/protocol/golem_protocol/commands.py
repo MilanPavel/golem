@@ -2121,6 +2121,77 @@ class AgentsSetWishResult(AgentInfo):
     """The agent type after the change."""
 
 
+class AgentsSaveParams(BaseModel):
+    """``agents.save``. Save the text of a user agent file, and only when it is a good one.
+
+    ``text`` is the whole file. ``name`` is the user agent it replaces; leave it out for a
+    new agent. The name written inside ``text`` decides the file, ``~/.golem/agents/<name>.md``:
+    when it differs from ``name``, the old file is removed, which is a rename. A name that
+    another file of the user's already has is refused. The text is read by the parser the
+    registry uses, and when it has problems nothing is written.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    text: str
+    name: str | None = Field(default=None, min_length=1)
+    cwd: str | None = Field(default=None, min_length=1)
+
+
+class AgentsSaveProblem(BaseModel):
+    """One thing wrong with a text. ``line`` is its line in the text, counted from 1, when
+    the problem is in a frontmatter key; ``None`` when it is not about one line."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    message: str
+    line: int | None = Field(default=None, ge=1)
+
+
+class AgentsSaveResult(BaseModel):
+    """``ok`` is false when the text was not saved: ``problems`` says why and no file changed.
+    ``agent`` is the saved agent, set when ``ok``."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    ok: bool
+    problems: list[AgentsSaveProblem] = Field(default_factory=list[AgentsSaveProblem])
+    agent: AgentInfo | None = None
+
+
+class AgentsCopyParams(BaseModel):
+    """``agents.copy``. Copy the bundled agent ``name``, unchanged, to
+    ``~/.golem/agents/<name>.md``. Refused when the user already has a file of that name."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    name: str = Field(min_length=1)
+    cwd: str | None = Field(default=None, min_length=1)
+
+
+class AgentsCopyResult(AgentInfo):
+    """The new user agent. ``shadowed`` shows ``bundled``."""
+
+
+class AgentsDeleteParams(BaseModel):
+    """``agents.delete``. Remove the user's file ``~/.golem/agents/<name>.md``. A bundled or
+    project agent is refused."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    name: str = Field(min_length=1)
+    cwd: str | None = Field(default=None, min_length=1)
+
+
+class AgentsDeleteResult(BaseModel):
+    """``agent`` is the type the name means now, such as the bundled one that the deleted file
+    hid, or ``None`` when no agent has the name any more."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    agent: AgentInfo | None = None
+
+
 class HelperStopParams(BaseModel):
     """``helper.stop``. Cancel the run of a helper session.
 
