@@ -261,6 +261,15 @@ class NotAHelperError(Exception):
         super().__init__("This session is not a helper: only a helper can be stopped here.")
 
 
+class NotAHelperBatchError(Exception):
+    """``approval.respond`` with ``scope: "batch"`` named a session that is not a helper."""
+
+    def __init__(self) -> None:
+        super().__init__(
+            "scope batch answers the helpers of one delegate call: this session is not a helper."
+        )
+
+
 class HelperSessionError(Exception):
     """A helper session answers its lead, so nobody sends it a message."""
 
@@ -2839,6 +2848,7 @@ class SessionManager:
         call_id: str,
         decision: ApprovalDecision,
         args: dict[str, object] | None = None,
+        scope: Literal["batch"] | None = None,
         *,
         device: str | None = None,
     ) -> str:
@@ -2853,71 +2863,148 @@ class SessionManager:
         that answered, from its connection. It goes with the rule and into
         ``approval.resolved``.
 
+        ``scope`` ``batch`` is for a helper's question (ADR-059, section 8). With an allow, the
+        same call (the tool and its subject) is allowed in each unfinished helper of the same
+        ``delegate`` call, for as long as that helper lives, and the helpers that wait on it now
+        are answered with ``allow``: one that has not asked yet will not. With ``deny``, the
+        helpers that wait on the same call now are denied; a deny is the answer to a question
+        asked, so a helper that has not asked is still asked. Nothing reaches the lead.
+
         Raises :class:`ApprovalNotFoundError`, :class:`SessionNotFoundError`,
         :class:`SessionBusyError`, :class:`RuleWriteError`,
-        :class:`InvalidToolArgsError`, or :class:`SchemaMismatchError`.
+        :class:`InvalidToolArgsError`, :class:`NotAHelperBatchError`, or
+        :class:`SchemaMismatchError`.
         """
         async with self._lock:
-            session = await self._resolve(session_id)
-            run = await self._run_records.waiting(session_id)
-            live = session.task is not None and not session.task.done()
-            if run is None:
-                if live:
-                    raise SessionBusyError(session_id)
-                raise ApprovalNotFoundError(call_id)
-            if live and session.task is not None:
-                # approval.needed is stored before the paused task has finished closing its stream.
-                await asyncio.wait({session.task})
-            pending = pending_approval(await self._events.for_run(run.run_id))
-            if pending is None or pending.call_id != call_id:
-                raise ApprovalNotFoundError(call_id)
-            if args is not None and args == pending.args:
-                args = None
-            if args is not None:
-                args = self._check_edited(session, pending.name, decision, args)
-            rule: str | None = None
-            if decision == "allow_always":
-                rule = await self._remember(session, pending.name, pending.args, device)
-            if decision == "allow_session":
-                session.allowed_tools.add((pending.name, pending.subject))
-            if pending.name == MCP_ENABLE and decision != "deny":
-                # Approving "turn on X" also approves X's tools for the rest of the session.
-                server = (args if args is not None else pending.args).get("name")
-                if isinstance(server, str) and server != "":
-                    session.allowed_tools.add(server_grant(server))
-            memory = self._memory_access(session, session.model_profile, pending.prompt or "")
-            resume = Resume(
-                session_id=session_id,
-                run_id=run.run_id,
-                call_id=call_id,
-                name=pending.name,
-                decision=decision,
-                user_message_id=pending.user_message_id,
-                open_calls=pending.open_calls,
-                cwd=session.cwd,
-                allowed_tools=_ordered(session.allowed_tools),
-                asked=pending.asked,
-                subject=pending.subject,
-                rule=rule,
-                device=device,
-                diff=pending.diff,
-                args=args,
-                mcp_servers=tuple(sorted(session.mcp_servers)),
-                pinned=tuple(session.skills),
-                pinned_folders=self._pinned_folders(session),
-                options=dict(session.options),
-                permission_mode=session.permission_mode,
-                checks=session.checks,
-                plan_first=session.plan_first,
-                local_only=self.local_only(session.cwd) or session.route == "local",
-                pins=session.pins,
-                child=self._child_of(session),
-                memory=memory,
-            )
-            control = RunControl()
-            work = self._resumed(session, resume, control, pending.prompt)
-            await self._start(session, run.run_id, control, work, memory)
-            return run.run_id
+            if scope == "batch":
+                return await self._respond_batch(session_id, call_id, decision, device)
+            return await self._respond_one(session_id, call_id, decision, args, device)
+
+    async def _respond_batch(
+        self, session_id: str, call_id: str, decision: ApprovalDecision, device: str | None
+    ) -> str:
+        """:meth:`respond` with ``scope`` ``batch``, with the manager's lock held."""
+        await self._resolve(session_id)
+        record = await self._records.get(session_id)
+        if record is None or record.parent_session_id is None or record.parent_call_id is None:
+            raise NotAHelperBatchError
+        run = await self._run_records.waiting(session_id)
+        found = None if run is None else pending_approval(await self._events.for_run(run.run_id))
+        if found is None or found.call_id != call_id:
+            # The same errors as an answer to this session alone.
+            return await self._respond_one(session_id, call_id, decision, None, device)
+        key = (found.name, found.subject)
+        unfinished: list[str] = []
+        for helper in await self._records.helpers_of(
+            record.parent_session_id, record.parent_call_id
+        ):
+            last = await self._run_records.latest(helper.session_id)
+            open_run = last is not None and last.status in ("running", "waiting")
+            if helper.closed_at is None and open_run:
+                unfinished.append(helper.session_id)
+        if decision != "deny":
+            # Each helper holds it in its own session: it is gone with the helper and never
+            # reaches the lead's allowances.
+            for helper_id in unfinished:
+                held = await self._resolve(helper_id)
+                if key in held.allowed_tools:
+                    continue
+                held.allowed_tools.add(key)
+                await self._events.emit(
+                    helper_id,
+                    None,
+                    "session.updated",
+                    SessionUpdatedData(
+                        allowed_tools=[
+                            SessionAllowance(tool=name, subject=item)
+                            for name, item in _ordered(held.allowed_tools)
+                        ]
+                    ),
+                )
+        run_id = await self._respond_one(session_id, call_id, decision, None, device)
+        # allow_always wrote its rule with the first answer; the others take a plain allow.
+        others = "deny" if decision == "deny" else "allow"
+        for helper_id in unfinished:
+            if helper_id == session_id:
+                continue
+            waiting = await self._run_records.waiting(helper_id)
+            if waiting is None:
+                continue
+            asked = pending_approval(await self._events.for_run(waiting.run_id))
+            if asked is None or (asked.name, asked.subject) != key:
+                continue
+            await self._respond_one(helper_id, asked.call_id, others, None, device)
+        return run_id
+
+    async def _respond_one(
+        self,
+        session_id: str,
+        call_id: str,
+        decision: ApprovalDecision,
+        args: dict[str, object] | None,
+        device: str | None,
+    ) -> str:
+        """The answer to one session's run, with the manager's lock held."""
+        session = await self._resolve(session_id)
+        run = await self._run_records.waiting(session_id)
+        live = session.task is not None and not session.task.done()
+        if run is None:
+            if live:
+                raise SessionBusyError(session_id)
+            raise ApprovalNotFoundError(call_id)
+        if live and session.task is not None:
+            # approval.needed is stored before the paused task has finished closing its stream.
+            await asyncio.wait({session.task})
+        pending = pending_approval(await self._events.for_run(run.run_id))
+        if pending is None or pending.call_id != call_id:
+            raise ApprovalNotFoundError(call_id)
+        if args is not None and args == pending.args:
+            args = None
+        if args is not None:
+            args = self._check_edited(session, pending.name, decision, args)
+        rule: str | None = None
+        if decision == "allow_always":
+            rule = await self._remember(session, pending.name, pending.args, device)
+        if decision == "allow_session":
+            session.allowed_tools.add((pending.name, pending.subject))
+        if pending.name == MCP_ENABLE and decision != "deny":
+            # Approving "turn on X" also approves X's tools for the rest of the session.
+            server = (args if args is not None else pending.args).get("name")
+            if isinstance(server, str) and server != "":
+                session.allowed_tools.add(server_grant(server))
+        memory = self._memory_access(session, session.model_profile, pending.prompt or "")
+        resume = Resume(
+            session_id=session_id,
+            run_id=run.run_id,
+            call_id=call_id,
+            name=pending.name,
+            decision=decision,
+            user_message_id=pending.user_message_id,
+            open_calls=pending.open_calls,
+            cwd=session.cwd,
+            allowed_tools=_ordered(session.allowed_tools),
+            asked=pending.asked,
+            subject=pending.subject,
+            rule=rule,
+            device=device,
+            diff=pending.diff,
+            args=args,
+            mcp_servers=tuple(sorted(session.mcp_servers)),
+            pinned=tuple(session.skills),
+            pinned_folders=self._pinned_folders(session),
+            options=dict(session.options),
+            permission_mode=session.permission_mode,
+            checks=session.checks,
+            plan_first=session.plan_first,
+            local_only=self.local_only(session.cwd) or session.route == "local",
+            pins=session.pins,
+            child=self._child_of(session),
+            memory=memory,
+        )
+        control = RunControl()
+        work = self._resumed(session, resume, control, pending.prompt)
+        await self._start(session, run.run_id, control, work, memory)
+        return run.run_id
 
     async def allowances(self, session_id: str) -> list[Allowance]:
         """What ``session_id`` allows for the rest of the session."""
@@ -3403,9 +3490,11 @@ class SessionManager:
         """The scope of a helper session, from its record. None for any other session."""
         if session.agent is None:
             return None
-        return scope_of_agent(
+        scope = scope_of_agent(
             session.agent, session.prompt or self._prompt_of(session.agent, session)
         )
+        # The helper's allowances are read live: a batch answer reaches a helper still running.
+        return replace(scope, granted=lambda: tuple(session.allowed_tools))
 
     def _prompt_of(self, agent: AgentSnapshot, session: _LiveSession) -> str:
         """The prompt of a helper that lost it, such as after a restart: its agent file, read

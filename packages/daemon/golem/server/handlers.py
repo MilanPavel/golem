@@ -128,6 +128,7 @@ from golem.sessions.manager import (
     HelperSessionError,
     InvalidToolArgsError,
     MessageNotFoundError,
+    NotAHelperBatchError,
     NotAHelperError,
     RuleWriteError,
     RunNotFoundError,
@@ -596,8 +597,11 @@ async def _approval_respond(
             params.call_id,
             params.decision,
             params.args,
+            params.scope,
             device=ctx.connection.device,
         )
+    except NotAHelperBatchError as exc:
+        raise RpcCallError(INVALID_PARAMS, str(exc)) from exc
     except ApprovalNotFoundError as exc:
         raise RpcCallError(APPROVAL_NOT_FOUND, "no run waits on this tool call") from exc
     except InvalidToolArgsError as exc:

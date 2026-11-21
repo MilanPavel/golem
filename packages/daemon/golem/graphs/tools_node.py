@@ -30,8 +30,8 @@ from __future__ import annotations
 import json
 import logging
 import time
-from collections.abc import Awaitable, Callable, Mapping, Sequence
-from dataclasses import dataclass, replace
+from collections.abc import Awaitable, Callable, Iterable, Mapping, Sequence
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Literal, Protocol, cast
 
@@ -130,6 +130,10 @@ class ChildScope:
     """Whether the helper may ask you, as a helper session of an agent that has ``asks``."""
     prompt: str = ""
     """The helper's whole system prompt: the body of its agent file."""
+    granted: Callable[[], Iterable[Allowance]] | None = field(default=None, compare=False)
+    """What the helper's session allows now, read again at each tool step. A batch answer
+    (``approval.respond`` with ``scope: "batch"``) reaches a helper that is still running
+    through it, so the helper does not ask for what you allowed."""
 
 
 class HelperHost(Protocol):
@@ -289,6 +293,8 @@ def tools_node(
         mode = _mode(config)
         plan_first = _plan_first(config)
         child = child_of(config)
+        if child is not None and child.granted is not None:
+            allowed |= set(child.granted())
         helper = child is not None
         never_ask = child is not None and not child.asks
         host = children()
