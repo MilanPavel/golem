@@ -3,7 +3,7 @@ import type { AgentsKeepValues } from "../../store/notifications.ts";
 import { actionErrorText } from "../../store/errors.ts";
 import { useAgentsKeep, usePageActions } from "../../store/page-context.tsx";
 import { Input } from "../../ui/input.tsx";
-import { FieldError, Part, type RoutingErrors } from "./routing-parts.tsx";
+import { FieldError, type RoutingErrors } from "./routing-parts.tsx";
 
 /** What a day count is when "for ever" is turned off again: the daemon's defaults. */
 const DAYS_BACK = { keep_days: 7, keep_problem_days: 30 } as const;
@@ -90,17 +90,23 @@ export function FinishedHelpers({
   /** Saves one count. `null` is text that is not a whole number. */
   onSave: (field: KeepKey, days: number | null) => void;
 }) {
+  const heading = useId();
   return (
-    <Part setting="finished helpers" title="Finished helpers" line="How long a helper's steps stay once it is done.">
-      <KeepRow label="Keep the steps for" field="keep_days" value={values.keep_days} errors={errors} onSave={onSave} />
-      <KeepRow label="Keep failed, stopped and asking helpers for" field="keep_problem_days" value={values.keep_problem_days} errors={errors} onSave={onSave} />
+    <section data-setting="finished helpers" aria-labelledby={heading} className="flex shrink-0 flex-col gap-1 rounded-lg border border-line bg-surface px-4 py-3">
+      <div className="flex flex-wrap items-start gap-x-6 gap-y-2">
+        <h3 id={heading} className="text-sm font-medium text-ink">
+          Finished helpers
+        </h3>
+        <KeepRow label="Keep the steps for" field="keep_days" value={values.keep_days} errors={errors} onSave={onSave} />
+        <KeepRow label="Keep failed, stopped and asking helpers for" field="keep_problem_days" value={values.keep_problem_days} errors={errors} onSave={onSave} />
+      </div>
       {failure === null ? null : (
         <p role="alert" className="text-xs text-deny">
           {failure}
         </p>
       )}
-      <p className="text-xs text-faint">{KEEP_STAYS}</p>
-    </Part>
+      <p className="text-xs text-faint">{`How long a helper's steps stay once it is done. ${KEEP_STAYS}`}</p>
+    </section>
   );
 }
 

@@ -117,6 +117,10 @@ export function wishOptions(current: string, setup: WishSetup, models: readonly 
 /** What a wish becomes, as words: `now: qwen3:14b`, why, and whether the helper starts with an empty window. */
 export interface WishNow {
   text: string;
+  /** The model the wish picks now, without the `now` word. */
+  model: string;
+  /** Where that model runs: on this computer, or hosted. Null when the daemon does not say. */
+  tier: "local" | "hosted" | null;
   reason: string;
   freshWindow: string;
 }
@@ -127,6 +131,8 @@ export function wishNow(resolves: AgentInfo["resolves_to"]): WishNow | null {
   if (resolves === null || resolves === undefined || model === null || model === undefined || model === "") return null;
   return {
     text: `now: ${model}`,
+    model,
+    tier: resolves.tier === undefined || resolves.tier === null ? null : resolves.tier === "local" ? "local" : "hosted",
     reason: resolves.reason ?? "",
     freshWindow: resolves.fresh_window === true ? "fresh window" : "",
   };
@@ -190,6 +196,96 @@ export function toolGroups(agent: AgentInfo): { reading: string[]; changing: str
   return { reading: tools.filter((tool) => !changing.has(tool)), changing: tools.filter((tool) => changing.has(tool)) };
 }
 
+/** The small word beside a name for where the agent comes from. */
+export const AGENT_MARKS: Record<AgentOrigin, string> = {
+  bundled: "bundled",
+  user: "yours",
+  project: "project",
+};
+
+/** The wish as a short word for a list row: `cheapest`, `stronger than the lead`; a model name is shown as it is. */
+export function agentWishShort(wish: string): string {
+  return Object.hasOwn(WISH_WORDS, wish) ? (WISH_WORDS[wish] ?? wish) : wish;
+}
+
+/**
+ * The second line of a list row: `cheapest → qwen3:14b`. A wish that already is the model's name, or that the
+ * daemon does not resolve (an older daemon), is said alone.
+ */
+export function agentListLine(wish: string, resolves: AgentInfo["resolves_to"]): string {
+  const now = wishNow(resolves);
+  const short = agentWishShort(wish);
+  if (now === null) return short;
+  return short === now.model ? short : `${short} → ${now.model}`;
+}
+
+/** Seconds as a person reads them: `45 s`, `5 min`, `90 s` (only whole minutes are said in minutes). */
+export function formatSeconds(seconds: number): string {
+  return seconds >= 60 && seconds % 60 === 0 ? `${seconds / 60} min` : `${seconds} s`;
+}
+
+/** One fact of the Limits box. */
+export interface LimitFact {
+  value: string;
+  label: string;
+}
+
+/**
+ * What bounds one helper of this type: tool calls, time and answer length always (`no limit` when the file sets
+ * none), tokens and cost only when the file sets them.
+ */
+export function limitFacts(limits: AgentInfo["limits"]): LimitFact[] {
+  const none = "no limit";
+  const facts: LimitFact[] = [
+    { value: limits?.max_calls == null ? none : String(limits.max_calls), label: "tool calls" },
+    { value: limits?.max_seconds == null ? none : formatSeconds(limits.max_seconds), label: "time" },
+    { value: limits?.answer_chars == null ? none : String(limits.answer_chars), label: "answer chars" },
+  ];
+  if (limits?.max_tokens != null) facts.push({ value: String(limits.max_tokens), label: "tokens" });
+  if (limits?.max_cost_usd != null) facts.push({ value: `$${limits.max_cost_usd.toFixed(2)}`, label: "cost" });
+  return facts;
+}
+
+/** Whether the helper may ask you a question, as one line. */
+export function asksLine(asks: boolean | undefined): string {
+  return asks === true ? "May ask you one short question." : "Never asks you; it works from the brief.";
+}
+
+/** One line of the file text: the `---` fences and the keys of the front matter are told apart for tinting. */
+export type DefinitionLine = { kind: "fence" | "plain"; text: string } | { kind: "key"; key: string; text: string };
+
+/**
+ * The file text split into lines. Between the first two `---` lines, a `key:` at the start of a line is a key;
+ * everything else, the whole prompt included, is plain. A key line's `text` is what follows the colon.
+ */
+export function definitionLines(text: string): DefinitionLine[] {
+  let fences = 0;
+  return text
+    .split("\r").join("")
+    .trimEnd()
+    .split("\n")
+    .map((line): DefinitionLine => {
+      if (line === "---" && fences < 2) {
+        fences += 1;
+        return { kind: "fence", text: line };
+      }
+      const key = fences === 1 ? /^([A-Za-z][\w-]*):/.exec(line)?.[1] : undefined;
+      return key === undefined ? { kind: "plain", text: line } : { kind: "key", key, text: line.slice(key.length + 1) };
+    });
+}
+
+/** The path line of the Definition tab: a bundled file is read-only. */
+export function definitionPath(path: string | null, origin: AgentOrigin): string | null {
+  if (path === null) return null;
+  return origin === "bundled" ? `${path} · read-only` : path;
+}
+
+function toolsNote(agent: AgentInfo): string {
+  const { reading, changing } = toolGroups(agent);
+  if (reading.length + changing.length === 0) return "";
+  return changing.length > 0 ? "Marked tools change things." : "All of these only read.";
+}
+
 /** The warnings: the file's errors, then a note for a project agent that is not trusted. */
 export function agentWarnings(agent: AgentInfo): string[] {
   const warnings = [...(agent.errors ?? [])];
@@ -216,6 +312,19 @@ export interface AgentRow {
   editable: boolean;
   used: string;
   finished: string;
+  /** The word beside the name: bundled, yours or project. */
+  mark: string;
+  /** The second line of a list row, `cheapest → qwen3:14b`. */
+  listLine: string;
+  /** Where the model of now runs; null when the daemon does not say. */
+  tier: WishNow["tier"];
+  /** The Limits box. */
+  limits: LimitFact[];
+  asksLine: string;
+  /** A line under the tool chips: which are marked. Empty with no tools. */
+  toolsNote: string;
+  /** The path line of the Definition tab, `read-only` for a bundled file; null when the daemon does not say. */
+  definitionPath: string | null;
   /** The one usage line, see {@link usageLine}. */
   usage: string;
   /** The file's path, `~` for the home folder; null when the daemon does not say. */
@@ -250,6 +359,13 @@ export function agentRow(agent: AgentInfo, setup: WishSetup = "mixed", models: r
     used: agentUsed(agent),
     finished: agentFinished(agent),
     usage: usageLine(agent),
+    mark: AGENT_MARKS[agent.origin],
+    listLine: agentListLine(agent.wish, agent.resolves_to),
+    tier: wishNow(agent.resolves_to)?.tier ?? null,
+    limits: limitFacts(agent.limits),
+    asksLine: asksLine(agent.asks),
+    toolsNote: toolsNote(agent),
+    definitionPath: definitionPath(agent.path ?? null, agent.origin),
     path: agent.path ?? null,
     text: agent.text ?? null,
     prompt: agent.prompt ?? null,
