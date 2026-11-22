@@ -19484,20 +19484,33 @@ public enum SessionCompletedEventType: String, Codable {
 /// for ``golem ask --detach``. Only the daemon itself starts a ``routine:*``
 /// session, and any other value is refused.
 ///
+/// ``branch`` asks the daemon to switch ``cwd`` to that git branch before the
+/// session starts (``git switch``), or to create it first with
+/// ``create_branch`` (``git switch -c``). Uncommitted changes go along, as in
+/// git. A ``cwd`` that is not a repository is refused with ``not_a_repo``, and
+/// a failed switch with ``branch_switch_failed`` carrying git's own message;
+/// no session is made then. Both errors put that name in ``error.data.code``.
+///
 /// The caller is not attached. ``session.attach`` replays ``session.created``.
 // MARK: - SessionCreateParams
 public struct SessionCreateParams: Codable {
+    public let branch: String?
+    public let createBranch: Bool?
     public let cwd: String?
     public let modelProfile: String?
     public let origin: OriginEnum?
 
     public enum CodingKeys: String, CodingKey {
+        case branch = "branch"
+        case createBranch = "create_branch"
         case cwd = "cwd"
         case modelProfile = "model_profile"
         case origin = "origin"
     }
 
-    public init(cwd: String?, modelProfile: String?, origin: OriginEnum?) {
+    public init(branch: String?, createBranch: Bool?, cwd: String?, modelProfile: String?, origin: OriginEnum?) {
+        self.branch = branch
+        self.createBranch = createBranch
         self.cwd = cwd
         self.modelProfile = modelProfile
         self.origin = origin
