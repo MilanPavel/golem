@@ -67,6 +67,27 @@ Run `golem` again while one is running, and it opens the same server instead of 
 
 The web UI is new, and it grows step by step in [Phase 10](https://github.com/MilanPavel/golem/issues/150). **Approvals, diffs, and the todo drawer** come next. Until then, answer an approval in the terminal: run `golem tui` in the same folder, and the waiting question is there. After that come models and a command palette, then settings, a layout for phones, and installing the page as an app.
 
+## The composer row
+
+The row under the message box holds the chips for the session. From the left:
+
+- **Model:** the model for the next turn. On the empty screen it is the model the new session starts on.
+- **Folder:** where golem works. Press it to choose another.
+- **Branch:** the git branch of that folder. It shows only when the folder is in a repo.
+- **Context, mode and Send:** how full the model's window is, the permission mode, and the send button.
+
+The row stays on one line. On a narrow screen the chips shrink to their icons.
+
+**A session keeps its folder and its branch.** The folder chip of an open session is read only. Its menu offers a new session here, a new session in another folder, and a copy of the path. When golem runs on your Mac, `Open in Finder` shows the folder there.
+
+**Start a new session on another branch.** On the empty screen, press the branch chip and pick a branch, or type a new name to create one. When you send, golem switches the folder to that branch and starts the session there. Changes you have not committed go along to the new branch. If git cannot switch, the session does not start, and the page shows what git said.
+
+In an open session, the branch menu says `This session stays on main.` Each other branch says `New session ↗`. Pick one to start a new session on it, with the same rule.
+
+**Choose a folder.** The folder menu lists your earlier folders and the worktrees of the repo you are in. You can also type a path, such as `~/code/app`, and press `Use ~/code/app`. When golem runs on your Mac, `Choose folder…` opens the macOS dialog. Anywhere else, `Browse…` opens golem's own folder browser, which lists your home folder.
+
+**The branch changed.** If the branch changes under a session, for example when you switch in a terminal, golem adds a note to the chat: `The branch changed from main to feature. Files may differ from what golem read.` The chip follows the new branch.
+
 ## Trace a session
 
 A trace shows how an answer was made. One reply can be several model calls, with tools run between them. The trace lists each step, and what it took in and gave out, so you can see why an answer was slow, costly, or wrong.
