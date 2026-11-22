@@ -3,7 +3,16 @@ import { readFileSync } from "node:fs";
 import { inflateSync } from "node:zlib";
 import { expect, test } from "vitest";
 import { FAVICON_COLORS } from "../features/tab-status/favicon-colors.ts";
-import { BG, ICONS, renderIcon } from "../../scripts/gen-icons.ts";
+import {
+  FIGURE_SHARE,
+  ICONS,
+  layout,
+  renderIcon,
+  SANDSTONE_BOTTOM,
+  SANDSTONE_TOP,
+  STONE_DARK,
+  STONE_LIGHT,
+} from "../../scripts/gen-icons.ts";
 
 const committed = (file: string) => readFileSync(new URL(`../../public/${file}`, import.meta.url));
 
@@ -32,12 +41,46 @@ test("the sizes are 192, 512, 512 and 180", () => {
   expect(ICONS.map((icon) => decode(committed(icon.file)).size)).toEqual([192, 512, 512, 180]);
 });
 
-test("the body is the idle body colour and the corner is the page background", () => {
+test("the tile is a sandstone gradient from the top-left to the bottom-right corner", () => {
   for (const { file } of ICONS) {
     const icon = decode(committed(file));
-    const mid = Math.floor(icon.size / 2);
-    expect(icon.pixel(mid, mid), file).toBe(FAVICON_COLORS["golem-body"][0]);
-    expect(icon.pixel(0, 0), file).toBe(BG);
-    expect(icon.pixel(icon.size - 1, icon.size - 1), file).toBe(BG);
+    expect(icon.pixel(0, 0), file).toBe(SANDSTONE_TOP);
+    expect(icon.pixel(icon.size - 1, icon.size - 1), file).toBe(SANDSTONE_BOTTOM);
+  }
+});
+
+test("a body cell has a light top edge, a dark bottom edge and a body-coloured face", () => {
+  for (const { file, kind } of ICONS) {
+    const icon = decode(committed(file));
+    const { cell, left, top } = layout(icon.size, kind);
+    const midX = left + 4 * cell + Math.floor(cell / 2);
+    // The cell at column 4, row 2 is a body cell.
+    expect(icon.pixel(midX, top + 2 * cell), file).toBe(STONE_LIGHT);
+    expect(icon.pixel(midX, top + 3 * cell - 1), file).toBe(STONE_DARK);
+    expect(icon.pixel(midX, top + 2 * cell + Math.floor(cell / 2)), file).toBe(FAVICON_COLORS["golem-body"][0]);
+  }
+});
+
+test("an eye cell is flat golem-eye", () => {
+  for (const { file, kind } of ICONS) {
+    const icon = decode(committed(file));
+    const { cell, left, top } = layout(icon.size, kind);
+    for (const [dx, dy] of [[0, 0], [cell - 1, cell - 1], [Math.floor(cell / 2), Math.floor(cell / 2)]] as const) {
+      expect(icon.pixel(left + 3 * cell + dx, top + cell + dy), file).toBe(FAVICON_COLORS["golem-eye"][0]);
+    }
+  }
+});
+
+test("the figure fills about 68% of the width, 60% when maskable", () => {
+  for (const { file, size, kind } of ICONS) {
+    const { cell } = layout(size, kind);
+    const share = (9 * cell) / size;
+    // Whole-pixel cells: the small icons land within half a cell of the target.
+    expect(Math.abs(share - FIGURE_SHARE[kind]), file).toBeLessThanOrEqual(0.5 / size * 9 + 1e-9);
+    if (size === 512) {
+      const [lo, hi] = kind === "maskable" ? [0.58, 0.62] : [0.66, 0.7];
+      expect(share, file).toBeGreaterThanOrEqual(lo);
+      expect(share, file).toBeLessThanOrEqual(hi);
+    }
   }
 });
