@@ -2,7 +2,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ThemeSwitch } from "../../theme-switch.tsx";
 import { sessionPath, settingsPath } from "../../store/router.ts";
 import { installOffer } from "../../store/app-install.ts";
-import { useConnection } from "../../store/connection-context.tsx";
 import { useAppInstall, useNavigate } from "../../store/page-context.tsx";
 import { IconButton } from "../../ui/icon-button.tsx";
 import { CloseIcon } from "../../ui/icons.tsx";
@@ -90,7 +89,6 @@ function Body({ section }: { section: string }) {
 export function SettingsScreen({ section }: { section: string }) {
   const navigate = useNavigate();
   const context = useSettingsContext();
-  const version = useConnection().daemonVersion;
   const current = SECTIONS.find((item) => item.id === section);
   const back = context === null ? "/" : sessionPath(context.sessionId);
   // `/settings/setup` is the old name of Info: the router reads it as Info, and the address follows.
@@ -115,7 +113,6 @@ export function SettingsScreen({ section }: { section: string }) {
     <div data-screen="settings" className="flex min-h-0 flex-1 flex-col md:flex-row">
       <SettingsNav
         section={section}
-        version={version}
         onNavigate={navigate}
         search={
           <SettingsSearchBox

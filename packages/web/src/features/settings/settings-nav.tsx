@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from "react";
 import { settingsPath } from "../../store/router.ts";
 import { cn } from "../../ui/cn.ts";
-import { ChevronDownIcon, SettingsConfigIcon } from "../../ui/icons.tsx";
+import { ChevronDownIcon } from "../../ui/icons.tsx";
 import { Link } from "../../ui/link.tsx";
 import { GROUPS, SECTIONS, type SettingsSection } from "./sections.ts";
 import { useSectionBadges } from "./use-section-badges.ts";
@@ -56,17 +56,15 @@ function Groups({ section, onNavigate, onPick }: { section: string; onNavigate: 
 
 /**
  * The sidebar of the settings page: the title, a slot for the search box, the sections under their
- * groups, and a footer with the version and a link to the config file. Hidden under `md`.
+ * groups. Hidden under `md`.
  */
 export function SettingsNav({
   section,
-  version,
   search,
   results,
   onNavigate,
 }: {
   section: string;
-  version: string | null;
   search?: ReactNode;
   /** Shown in place of the grouped list while there is a query. */
   results?: ReactNode;
@@ -81,19 +79,6 @@ export function SettingsNav({
       <nav aria-label="Settings sections" className="min-h-0 flex-1 overflow-y-auto px-2.5 pb-3">
         {results ?? <Groups section={section} onNavigate={onNavigate} />}
       </nav>
-      <div className="flex items-center gap-2 border-t border-line px-4 pt-2.5 pb-3 text-meta text-faint">
-        <span aria-hidden="true" className="size-1.75 rounded-full bg-allow" />
-        {version === null ? "golem" : `golem v${version}`}
-        <Link
-          href={settingsPath("config")}
-          onNavigate={onNavigate}
-          title="Open config.toml"
-          className="ml-auto inline-flex items-center gap-1 outline-offset-2 outline-clay hover:text-clay-ink focus-visible:outline-2"
-        >
-          <SettingsConfigIcon className="size-3.5" />
-          config.toml
-        </Link>
-      </div>
     </div>
   );
 }
