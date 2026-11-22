@@ -1677,7 +1677,7 @@ class SessionManager:
 
         Each agent is the file of that name as the folder of the call sees it: a project agent
         only in a trusted folder. Its tools are the ones its lead may use too, and its limits are
-        the file's, except the explorer's, which ``[agents.explorer]`` sets. Only an agent whose
+        resolved from ``config.toml`` and the file. Only an agent whose
         tools all read can run now. Every spec is checked before any helper starts. Raises
         :class:`~golem.tools.registry.ToolError` for an agent that is unknown, held back or
         not available yet, and as :meth:`start_helper` does.
@@ -1713,7 +1713,7 @@ class SessionManager:
                 raise ToolError(reason)
             source: AgentOrigin = next(e.origin for e in view.listed if e.agent is agent)
             tools = [name for name in agent.tools if name in offered or name == "delegate"]
-            snapshot = snapshot_of(agent, source, tools, self._runtime.child_limits)
+            snapshot = snapshot_of(agent, source, tools, self._runtime.router.agent_settings())
             chosen.append((snapshot, agent.body))
         for index, (spec, (snapshot, prompt)) in enumerate(zip(helpers, chosen, strict=True)):
             await self.start_helper(

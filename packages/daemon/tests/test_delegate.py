@@ -441,7 +441,14 @@ async def test_past_the_call_limit_the_last_call_has_no_tools(
             "ok",
         ],
     )
-    chat = _Chat(database, model, limits=ChildLimits(max_calls=2))
+    chat = _Chat(
+        database,
+        model,
+        settings=GolemSettings(
+            default_model="ollama/qwen3:8b",
+            agents=AgentSettings(explorer=ExplorerSettings(max_calls=2)),
+        ),
+    )
     _, _, events = await chat.run(project)
 
     # parent, helper, helper, last helper call, parent: the last helper call offered no tools.
@@ -471,7 +478,14 @@ async def test_a_reply_with_tool_calls_at_the_last_call_is_cut_to_its_text(
             "ok",
         ],
     )
-    chat = _Chat(database, model, limits=ChildLimits(max_calls=1))
+    chat = _Chat(
+        database,
+        model,
+        settings=GolemSettings(
+            default_model="ollama/qwen3:8b",
+            agents=AgentSettings(explorer=ExplorerSettings(max_calls=1)),
+        ),
+    )
     _, _, events = await chat.run(project)
 
     assert _delegate_result(events) == "explorer finished: calls\n\n(the helper gave no answer)"

@@ -12,8 +12,9 @@ from dataclasses import dataclass, replace
 from datetime import datetime
 from pathlib import Path
 
+from golem.agents.limits import resolve_limits
 from golem.agents.model import Agent
-from golem.config import PermissionMode, RoleSettings
+from golem.config import AgentSettings, PermissionMode, RoleSettings
 from golem.graphs.child import ChildLimits
 from golem.graphs.tools_node import ChildScope
 from golem.models.facts import ModelFacts
@@ -133,38 +134,32 @@ def helper_mode(agent: AgentSnapshot, lead: PermissionMode) -> PermissionMode:
 
 
 EXPLORER = "explorer"
-"""The one agent type whose limits ``[agents.explorer]`` sets."""
+"""The agent type that the ``explore`` role (and its model) is for."""
 
 DEFAULT_PROMPT = "You are a helper. Answer the brief. Do not ask questions."
 """The prompt of a helper whose agent file cannot be found again, such as after a restart."""
 
 
 def snapshot_of(
-    agent: Agent, source: AgentOrigin, tools: Iterable[str], limits: ChildLimits
+    agent: Agent, source: AgentOrigin, tools: Iterable[str], settings: AgentSettings
 ) -> AgentSnapshot:
     """The agent as its file reads now, with the tools it keeps: what its lead may use.
 
-    ``[agents.explorer]`` overrides the limits of the explorer's file.
+    Its limits are resolved once, from ``config.toml`` and the file
+    (:func:`~golem.agents.limits.resolve_limits`), and stored with the helper.
     """
-    if agent.name == EXPLORER:
-        cut = AgentLimits(
-            max_calls=limits.max_calls,
-            max_seconds=int(limits.timeout_s),
-            max_cost_usd=agent.limits.max_cost_usd,
-            answer_chars=limits.answer_chars,
-        )
-    else:
-        cut = AgentLimits(
-            max_calls=agent.limits.max_calls,
-            max_seconds=agent.limits.max_seconds,
-            max_cost_usd=agent.limits.max_cost_usd,
-            answer_chars=agent.limits.answer_chars,
-        )
+    resolved = resolve_limits(agent, settings)
     return AgentSnapshot(
         name=agent.name,
         source=source,
         tools=list(tools),
-        limits=cut,
+        limits=AgentLimits(
+            max_calls=resolved.max_calls,
+            max_seconds=resolved.max_seconds,
+            max_cost_usd=resolved.max_cost_usd,
+            max_tokens=resolved.max_tokens,
+            answer_chars=resolved.answer_chars,
+        ),
         wish=agent.wish,
         asks=agent.asks,
     )

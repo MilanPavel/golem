@@ -11,7 +11,7 @@ Frontmatter fields:
 - ``model``: the wish, one of ``cheapest``, ``same``, ``stronger``, ``local``,
   ``budget``, ``frontier``, or a model name. Default ``cheapest``.
 - ``tools``: names of golem's tools, as text or a list. Left out means none.
-- ``max-calls``, ``max-seconds``, ``max-cost-usd``, ``max-answer-chars``: limits.
+- ``max-calls``, ``max-seconds``, ``max-cost-usd``, ``max-tokens``, ``max-answer-chars``: limits.
 - ``asks``: true when the helper may ask you a question. Default false.
 """
 
@@ -49,6 +49,7 @@ KNOWN = frozenset(
         "max-calls",
         "max-seconds",
         "max-cost-usd",
+        "max-tokens",
         "max-answer-chars",
         "asks",
     }
@@ -109,6 +110,7 @@ def parse_agent(path: Path, *, known_tools: frozenset[str] | None = None) -> Age
         max_calls=_count(fields, "max-calls", errors),
         max_seconds=_count(fields, "max-seconds", errors),
         max_cost_usd=_cost(fields, errors),
+        max_tokens=_count(fields, "max-tokens", errors),
         answer_chars=_count(fields, "max-answer-chars", errors),
     )
     asks = flag_field(fields, "asks", False, errors)

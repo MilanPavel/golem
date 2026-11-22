@@ -316,7 +316,7 @@ async def test_a_helper_gets_the_new_bundled_prompt_and_the_set_wish(
     assert agent is not None
     assert "New release line." in agent.body
     assert agent.wish == "stronger"
-    snapshot = snapshot_of(agent, "bundled", agent.tools, world.chat.runtime.child_limits)
+    snapshot = snapshot_of(agent, "bundled", agent.tools, AgentSettings())
     lead = await world.chat.manager.create(CHEAP, cwd=str(world.project))
     ref = await world.chat.manager.start_helper(
         lead, "call-1", 0, snapshot, "look", CHEAP, str(world.project)

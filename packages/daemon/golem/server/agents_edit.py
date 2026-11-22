@@ -114,6 +114,7 @@ async def agent_infos(ctx: RequestContext, cwd: str | None) -> list[tuple[AgentI
                 max_calls=agent.limits.max_calls,
                 max_seconds=agent.limits.max_seconds,
                 max_cost_usd=agent.limits.max_cost_usd,
+                max_tokens=agent.limits.max_tokens,
                 answer_chars=agent.limits.answer_chars,
             ),
             asks=agent.asks,
