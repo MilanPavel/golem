@@ -56,9 +56,9 @@ class CommitText(BaseModel):
     body: str = ""
 
 
-async def run_git(folder: str, *args: str) -> GitResult:
+async def run_git(folder: str, *args: str, seconds: float = GIT_SECONDS) -> GitResult:
     """Run git in ``folder``. It never reads stdin or asks for a password."""
-    env = {**os.environ, "GIT_TERMINAL_PROMPT": "0"}
+    env = {**os.environ, "GIT_TERMINAL_PROMPT": "0", "GIT_OPTIONAL_LOCKS": "0"}
     try:
         process = await asyncio.create_subprocess_exec(
             "git",
@@ -73,12 +73,12 @@ async def run_git(folder: str, *args: str) -> GitResult:
     except OSError as exc:
         return GitResult(-1, f"git could not start: {exc}")
     try:
-        async with asyncio.timeout(GIT_SECONDS):
+        async with asyncio.timeout(seconds):
             data, _ = await process.communicate()
     except TimeoutError:
         process.kill()
         await process.wait()
-        return GitResult(-1, f"git took longer than {int(GIT_SECONDS)} seconds and was stopped")
+        return GitResult(-1, f"git took longer than {seconds:g} seconds and was stopped")
     code = process.returncode if process.returncode is not None else -1
     return GitResult(code, data.decode("utf-8", errors="replace"))
 

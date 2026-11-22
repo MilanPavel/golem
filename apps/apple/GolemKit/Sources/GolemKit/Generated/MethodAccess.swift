@@ -53,6 +53,8 @@ public enum MethodAccess {
         "file.list",
         "file.read",
         "fs.list_dirs",
+        "git.branches",
+        "git.info",
         "hello",
         "helper.stop",
         "mcp.add",

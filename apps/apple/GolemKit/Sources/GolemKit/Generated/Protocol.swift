@@ -4803,6 +4803,167 @@ public struct EntryElement: Codable {
     }
 }
 
+/// A local branch. ``last_used`` is the time of its last commit, ISO 8601, or null.
+// MARK: - GitBranch
+public struct GitBranch: Codable {
+    public let lastUsed: String?
+    public let name: String
+
+    public enum CodingKeys: String, CodingKey {
+        case lastUsed = "last_used"
+        case name = "name"
+    }
+
+    public init(lastUsed: String?, name: String) {
+        self.lastUsed = lastUsed
+        self.name = name
+    }
+}
+
+/// ``git.branches``. The local branches of the repo a folder belongs to, read only.
+// MARK: - GitBranchesParams
+public struct GitBranchesParams: Codable {
+    public let path: String
+
+    public enum CodingKeys: String, CodingKey {
+        case path = "path"
+    }
+
+    public init(path: String) {
+        self.path = path
+    }
+}
+
+/// Local branches, newest commit first, at most 200. Not a repo: empty.
+// MARK: - GitBranchesResult
+public struct GitBranchesResult: Codable {
+    public let branches: [BranchElement]
+    public let current: String?
+
+    public enum CodingKeys: String, CodingKey {
+        case branches = "branches"
+        case current = "current"
+    }
+
+    public init(branches: [BranchElement], current: String?) {
+        self.branches = branches
+        self.current = current
+    }
+}
+
+/// A local branch. ``last_used`` is the time of its last commit, ISO 8601, or null.
+// MARK: - BranchElement
+public struct BranchElement: Codable {
+    public let lastUsed: String?
+    public let name: String
+
+    public enum CodingKeys: String, CodingKey {
+        case lastUsed = "last_used"
+        case name = "name"
+    }
+
+    public init(lastUsed: String?, name: String) {
+        self.lastUsed = lastUsed
+        self.name = name
+    }
+}
+
+/// ``git.info``. What git says about a folder, read only.
+///
+/// ``path`` is an absolute folder under the user's home folder, checked as
+/// ``fs.list_dirs`` checks it. A path that is not a folder is refused.
+// MARK: - GitInfoParams
+public struct GitInfoParams: Codable {
+    public let path: String
+
+    public enum CodingKeys: String, CodingKey {
+        case path = "path"
+    }
+
+    public init(path: String) {
+        self.path = path
+    }
+}
+
+/// The repo a folder belongs to. Not a repo: ``repository`` is false and the rest is empty.
+///
+/// ``changed`` counts the lines of ``git status --porcelain``, tracked and
+/// untracked. ``branch`` is null on a detached HEAD, and ``detached`` is true.
+/// ``worktrees`` lists the main checkout first, then the others by path.
+// MARK: - GitInfoResult
+public struct GitInfoResult: Codable {
+    public let branch: String?
+    public let changed: Int
+    public let detached: Bool
+    public let repository: Bool
+    public let root: String?
+    public let worktrees: [WorktreeElement]
+
+    public enum CodingKeys: String, CodingKey {
+        case branch = "branch"
+        case changed = "changed"
+        case detached = "detached"
+        case repository = "repository"
+        case root = "root"
+        case worktrees = "worktrees"
+    }
+
+    public init(branch: String?, changed: Int, detached: Bool, repository: Bool, root: String?, worktrees: [WorktreeElement]) {
+        self.branch = branch
+        self.changed = changed
+        self.detached = detached
+        self.repository = repository
+        self.root = root
+        self.worktrees = worktrees
+    }
+}
+
+/// A checkout of a repo. ``agent`` is true under ``<repo>/.claude/worktrees/``.
+// MARK: - WorktreeElement
+public struct WorktreeElement: Codable {
+    public let agent: Bool
+    public let branch: String?
+    public let main: Bool
+    public let path: String
+
+    public enum CodingKeys: String, CodingKey {
+        case agent = "agent"
+        case branch = "branch"
+        case main = "main"
+        case path = "path"
+    }
+
+    public init(agent: Bool, branch: String?, main: Bool, path: String) {
+        self.agent = agent
+        self.branch = branch
+        self.main = main
+        self.path = path
+    }
+}
+
+/// A checkout of a repo. ``agent`` is true under ``<repo>/.claude/worktrees/``.
+// MARK: - GitWorktree
+public struct GitWorktree: Codable {
+    public let agent: Bool
+    public let branch: String?
+    public let main: Bool
+    public let path: String
+
+    public enum CodingKeys: String, CodingKey {
+        case agent = "agent"
+        case branch = "branch"
+        case main = "main"
+        case path = "path"
+    }
+
+    public init(agent: Bool, branch: String?, main: Bool, path: String) {
+        self.agent = agent
+        self.branch = branch
+        self.main = main
+        self.path = path
+    }
+}
+
 /// First command on a connection. Negotiates the protocol version.
 // MARK: - HelloParams
 public struct HelloParams: Codable {

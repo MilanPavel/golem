@@ -1,0 +1,28 @@
+{
+  "additionalProperties": false,
+  "description": "A local branch. ``last_used`` is the time of its last commit, ISO 8601, or null.",
+  "properties": {
+    "last_used": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Last Used"
+    },
+    "name": {
+      "minLength": 1,
+      "title": "Name",
+      "type": "string"
+    }
+  },
+  "required": [
+    "name"
+  ],
+  "title": "GitBranch",
+  "type": "object"
+}

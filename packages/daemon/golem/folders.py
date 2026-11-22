@@ -23,20 +23,20 @@ class FolderError(Exception):
     """A folder that cannot be listed. The message is for the person."""
 
 
-def _hidden(home: Path) -> list[Path]:
+def hidden_folders(home: Path) -> list[Path]:
     """The folders under ``home`` that are never listed, nor entered."""
     return [(home / name).resolve() for name in ("Library", *SECRET_DIRS)]
 
 
-def _under(path: Path, root: Path) -> bool:
+def is_under(path: Path, root: Path) -> bool:
     return path == root or root in path.parents
 
 
 def _browsable(path: Path, home: Path, hidden: list[Path]) -> bool:
     """Whether ``path``, already resolved, is home or a folder below it that may be shown."""
-    if not _under(path, home):
+    if not is_under(path, home):
         return False
-    if any(_under(path, folder) for folder in hidden):
+    if any(is_under(path, folder) for folder in hidden):
         return False
     return not any(part.startswith(".") for part in path.relative_to(home).parts)
 
@@ -49,7 +49,7 @@ def list_dirs(path: Path | None, home: Path) -> FsListDirsResult:
     be read.
     """
     root = home.resolve()
-    hidden = _hidden(root)
+    hidden = hidden_folders(root)
     try:
         target = root if path is None else path.resolve()
     except (OSError, RuntimeError) as exc:

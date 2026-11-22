@@ -1,0 +1,60 @@
+{
+  "$defs": {
+    "GitBranch": {
+      "additionalProperties": false,
+      "description": "A local branch. ``last_used`` is the time of its last commit, ISO 8601, or null.",
+      "properties": {
+        "last_used": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Last Used"
+        },
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "GitBranch",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Local branches, newest commit first, at most 200. Not a repo: empty.",
+  "properties": {
+    "branches": {
+      "items": {
+        "$ref": "#/$defs/GitBranch"
+      },
+      "title": "Branches",
+      "type": "array"
+    },
+    "current": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Current"
+    }
+  },
+  "required": [
+    "branches"
+  ],
+  "title": "GitBranchesResult",
+  "type": "object"
+}

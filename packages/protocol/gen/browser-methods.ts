@@ -30,6 +30,8 @@ export const BROWSER_METHODS: ReadonlySet<string> = new Set([
   "file.list",
   "file.read",
   "fs.list_dirs",
+  "git.branches",
+  "git.info",
   "hello",
   "helper.stop",
   "mcp.add",

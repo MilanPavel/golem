@@ -1,0 +1,98 @@
+{
+  "$defs": {
+    "GitWorktree": {
+      "additionalProperties": false,
+      "description": "A checkout of a repo. ``agent`` is true under ``<repo>/.claude/worktrees/``.",
+      "properties": {
+        "agent": {
+          "title": "Agent",
+          "type": "boolean"
+        },
+        "branch": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Branch"
+        },
+        "main": {
+          "title": "Main",
+          "type": "boolean"
+        },
+        "path": {
+          "minLength": 1,
+          "title": "Path",
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "main",
+        "agent"
+      ],
+      "title": "GitWorktree",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "The repo a folder belongs to. Not a repo: ``repository`` is false and the rest is empty.\n\n``changed`` counts the lines of ``git status --porcelain``, tracked and\nuntracked. ``branch`` is null on a detached HEAD, and ``detached`` is true.\n``worktrees`` lists the main checkout first, then the others by path.",
+  "properties": {
+    "branch": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Branch"
+    },
+    "changed": {
+      "minimum": 0,
+      "title": "Changed",
+      "type": "integer"
+    },
+    "detached": {
+      "title": "Detached",
+      "type": "boolean"
+    },
+    "repository": {
+      "title": "Repository",
+      "type": "boolean"
+    },
+    "root": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Root"
+    },
+    "worktrees": {
+      "items": {
+        "$ref": "#/$defs/GitWorktree"
+      },
+      "title": "Worktrees",
+      "type": "array"
+    }
+  },
+  "required": [
+    "repository",
+    "detached",
+    "changed",
+    "worktrees"
+  ],
+  "title": "GitInfoResult",
+  "type": "object"
+}

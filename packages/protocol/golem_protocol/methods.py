@@ -125,6 +125,8 @@ METHOD_ACCESS: Final[Mapping[str, Access]] = {
     "ollama.install_cancel": "browser",
     "ollama.start": "browser",
     "fs.list_dirs": "browser",
+    "git.info": "browser",
+    "git.branches": "browser",
     "notify.test": "browser",
     "memory.list": "browser",
     "memory.get": "browser",
