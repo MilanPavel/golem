@@ -295,6 +295,9 @@ class ToolRegistry:
         self.delegate_text: Callable[[Path | None], str] | None = None
         """The description of ``delegate`` for a session folder, with the agent types it sees.
         The session manager sets it. None: ``delegate`` keeps its own description."""
+        self.delegate_hidden: Callable[[], bool] | None = None
+        """Whether ``delegate`` is left out of a session's tools now (``[agents] use_helpers =
+        "never"``). Read at each :meth:`scoped`, so a change applies to the next message."""
 
     def scoped(self, scope: ToolScope) -> ToolRegistry:
         """This registry with the outside tools ``scope`` sees."""
@@ -306,6 +309,7 @@ class ToolRegistry:
             view._plain_schemas = view._all_schemas = view._schemas
             view._extra = {}
             view.delegate_text = None
+            view.delegate_hidden = None
             return view
         view._source, view._plain_schemas = self._source, self._plain_schemas
         view._all_schemas = self._all_schemas
@@ -317,6 +321,10 @@ class ToolRegistry:
         found: Iterable[Tool[Any]] = () if self._source is None else self._source.tools(scope)
         view._extra = {tool.name: tool for tool in found if tool.name not in self._tools}
         view.delegate_text = self.delegate_text
+        view.delegate_hidden = self.delegate_hidden
+        if self.delegate_hidden is not None and self.delegate_hidden():
+            view._tools = {n: t for n, t in view._tools.items() if n != "delegate"}
+            view._schemas = [i for i in view._schemas if _function_name(i) != "delegate"]
         self._describe_delegate(view, scope.root)
         return view
 

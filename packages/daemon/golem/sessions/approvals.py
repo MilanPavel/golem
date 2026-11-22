@@ -8,7 +8,9 @@ restart.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import cast
 
+from golem.graphs.tools_node import HELPERS_ASK_SOURCE
 from golem.sessions.recovery import open_turn
 from golem_protocol.commands import PendingHelper, PendingItem
 from golem_protocol.events import (
@@ -136,6 +138,20 @@ def diff_counts(diff: str) -> tuple[int, int]:
     return added, removed
 
 
+def helper_agents(args: dict[str, object]) -> list[str]:
+    """The agent type of each helper a ``delegate`` call starts, in the order of the call."""
+    batch = args.get("batch")
+    rows = cast(list[object], batch) if isinstance(batch, list) else [args]
+    found = [
+        agent
+        for row in rows
+        if isinstance(row, dict)
+        and isinstance(agent := cast(dict[str, object], row).get("agent"), str)
+        and agent != ""
+    ]
+    return found or ["helper"]
+
+
 PendingKey = tuple[str, str | None, str | None]
 """What makes two pending questions the same: the kind, then the tool and its subject for an
 approval (the pair an allowance holds) or the paid model for a consent."""
@@ -147,6 +163,16 @@ def pending_entry(events: list[ChatEvent]) -> tuple[PendingItem, PendingKey] | N
     An approval wins when both are open. The diff is counted, never copied.
     """
     approval = pending_approval(events)
+    if approval is not None and approval.source == HELPERS_ASK_SOURCE:
+        agents = helper_agents(approval.args)
+        item = PendingItem(
+            kind="batch",
+            since=approval.since,
+            call_id=approval.call_id,
+            helper_count=len(agents),
+            agents=agents,
+        )
+        return item, ("batch", None, None)
     if approval is not None:
         added, removed = (None, None) if approval.diff is None else diff_counts(approval.diff)
         item = PendingItem(
@@ -210,6 +236,7 @@ __all__ = [
     "PendingKey",
     "diff_counts",
     "group_helper_items",
+    "helper_agents",
     "pending_approval",
     "pending_consent",
     "pending_entry",

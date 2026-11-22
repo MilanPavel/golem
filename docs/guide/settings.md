@@ -237,8 +237,8 @@ How long a finished helper keeps its steps. After that only a receipt stays: its
 | `keep_days` | `7` | Days a finished helper keeps its steps, counted from the end of its last run, not from when you opened it. 0 keeps them for ever. A helper whose steps were removed cannot be continued as a chat |
 | `keep_problem_days` | `30` | The same for a helper that failed, was cancelled or asked you something (an approval or the paid question). 0 keeps them for ever |
 | `max_calls`, `working_seconds`, `max_cost`, `max_tokens` | not set | The limits of one helper of every type, when neither its own `[agents.<name>]` table nor its agent file sets them. The order is `[agents.<name>]`, the agent file, `[agents]`, then the built-in default (15 calls; no other limit). `working_seconds` does not count the time a helper waits |
-| `use_helpers` | `when_needed` | "Use helpers": `when_needed`, `ask` or `never`. Stored for now; nothing applies it yet |
-| `at_once` | `3` | How many helpers run at once. 1 to 16. Stored for now; nothing enforces it yet |
+| `use_helpers` | `when_needed` | "Use helpers": `when_needed` (the model starts a helper only for a reason, with no question), `ask` (every `delegate` call waits for your yes or no first; a no tells the model to do the work in the chat) or `never` (the model is not offered `delegate`). A change applies to the next message, with no restart |
+| `at_once` | `3` | How many helpers run at once. 1 to 16. At 1 the helpers of a lead take turns: one that finds the turn taken waits `queued` with the reason `one at a time` and starts when the running one ends (a helper that waits for your answer holds no turn). Above 1 nothing limits them yet; that comes with the dispatcher |
 | `max_per_batch` | `3` | How many helpers one message of the lead may start. 1 to 20. `[agents.explorer] max_per_turn` is its old name. It sets the cap that `delegate` already has |
 | `per_message_cost` | `1.0` | Most US dollars all helpers of one message may cost. Stored for now |
 | `estimate_over` | `0.25` | A batch estimated above this many US dollars asks you first. Stored for now |

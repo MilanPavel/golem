@@ -5,6 +5,7 @@ export const DEVICE_METHODS: ReadonlySet<string> = new Set([
   "artifact.read",
   "daemon.status",
   "hello",
+  "helpers.respond",
   "message.send",
   "model.list",
   "ping",

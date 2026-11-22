@@ -119,6 +119,13 @@ HELPERS_DONE = "helpers_done"
 
 NO_ASK_REFUSAL = "a helper cannot ask for approval: this call needs it"
 
+HELPERS_ASK_SOURCE = "use_helpers"
+"""The ``source`` of the ``approval.needed`` that asks whether to start helpers (``[agents]
+use_helpers = "ask"``). The session reads such an approval as a ``batch`` pending item."""
+
+HELPERS_DECLINED = "The user chose to do this in the chat. Do the work here, without helpers."
+"""What the model reads when the user declines the helpers of a ``delegate`` call."""
+
 
 @dataclass(frozen=True, slots=True)
 class ChildScope:
@@ -259,6 +266,7 @@ def tools_node(
     budget_of: BudgetOf | None = None,
     children: Callable[[], ChildHost | None] = lambda: None,
     tier_of: Callable[[str], Tier | None] | None = None,
+    helpers_setting: Callable[[], str] = lambda: "when_needed",
 ) -> Callable[[AgentState, RunnableConfig], Awaitable[dict[str, object]]]:
     async def tools(state: AgentState, config: RunnableConfig) -> dict[str, object]:
         last = state["messages"][-1]
@@ -324,6 +332,19 @@ def tools_node(
                 message = f"{call['name']} is only for a plan first run"
                 verdicts.append(_Verdict(run=False, message=message, kind="denied"))
                 continue
+            helpers_ask = False
+            if (
+                parking
+                and call["name"] == "delegate"
+                and (ids[index] in asked or (index > last_asked and helpers_setting() == "ask"))
+            ):
+                # "Ask me first": the question comes only for a call that would start helpers.
+                assert host is not None
+                refusal = _delegate_refusal(call, delegated, host.child_limits.max_per_turn)
+                if refusal is not None:
+                    verdicts.append(refusal)
+                    continue
+                helpers_ask = True
             preview = await _preview(session_tools, call, replace(base, planned=dict(planned)))
             verdict = _decide(
                 session_tools,
@@ -337,6 +358,7 @@ def tools_node(
                 asked=ids[index] in asked,
                 before_last_asked=index < last_asked,
                 never_ask=never_ask,
+                helpers_ask=helpers_ask,
             )
             if verdict.run and verdict.args is not None:
                 edited = cast(ToolCall, {**call, "args": verdict.args})
@@ -483,12 +505,18 @@ def _decide(
     asked: bool,
     before_last_asked: bool,
     never_ask: bool = False,
+    helpers_ask: bool = False,
 ) -> _Verdict:
-    """``preview`` is what the call would change, or why it cannot, or None."""
+    """``preview`` is what the call would change, or why it cannot, or None.
+
+    ``helpers_ask`` puts the question "start these helpers?" to the user for a ``delegate`` call
+    that the rules let through.
+    """
     name = call["name"]
     subject = describe(registry, name, call["args"], ctx.root).subject
     decision = policy.check(registry, name, call["args"], ctx.root, mode)
-    if not asked:
+    helpers_ask = helpers_ask and decision.allowed
+    if not asked and not helpers_ask:
         if decision.allowed:
             return _Verdict(run=True)
         if decision.action == "deny":
@@ -510,12 +538,16 @@ def _decide(
                 "message_id": message_id,
                 "name": name,
                 "args": dict(call["args"]),
-                "source": decision.source,
+                "source": HELPERS_ASK_SOURCE if helpers_ask else decision.source,
                 "subject": subject,
                 "diff": preview.diff if isinstance(preview, Preview) else None,
             }
         )
     )
+    if helpers_ask:
+        if answer.decision == "deny":
+            return _Verdict(run=False, message=HELPERS_DECLINED, kind="denied")
+        return _Verdict(run=True)
     if decision.action == "deny" and answer.decision != "deny":
         log.info("tool %s denied by %s after it was approved", name, decision.source)
         return _Verdict(run=False, message=explain(decision, name), kind="denied")
@@ -652,6 +684,17 @@ def _delegated_this_turn(messages: Sequence[BaseMessage]) -> int:
         if isinstance(message, ToolMessage) and message.name == "delegate":
             found += 1
     return found
+
+
+def _delegate_refusal(call: ToolCall, delegated: int, limit: int) -> _Verdict | None:
+    """Why a ``delegate`` call starts no helper, before the user is asked about it, or None."""
+    try:
+        _specs(call)
+    except InvalidArguments as exc:
+        return _Verdict(run=False, message=str(exc), kind="invalid_args")
+    if delegated >= limit:
+        return _Verdict(run=False, message=NO_MORE_HELPERS, kind="denied")
+    return None
 
 
 def _specs(call: ToolCall) -> list[HelperSpec]:
@@ -808,6 +851,8 @@ __all__ = [
     "CWD_KEY",
     "DENIED_RESULT",
     "ERROR_KEY",
+    "HELPERS_ASK_SOURCE",
+    "HELPERS_DECLINED",
     "HELPERS_DONE",
     "LOCAL_ONLY_KEY",
     "MCP_KEY",

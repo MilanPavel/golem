@@ -23,6 +23,8 @@ from golem_protocol.commands import (
     DaemonStatus,
     HelloParams,
     HelloResult,
+    HelpersRespondParams,
+    HelpersRespondResult,
     HelperStopParams,
     HelperStopResult,
     InspectMessage,
@@ -285,6 +287,23 @@ def test_summary_helper_fields_are_optional_and_round_trip() -> None:
         _summary(step="")
     with pytest.raises(ValidationError):
         _summary(helpers_running=-1)
+
+
+def test_helpers_respond_round_trips_and_refuses_bad_input() -> None:
+    params = HelpersRespondParams(session_id="s1", call_id="call_1", run=False)
+    assert HelpersRespondParams.model_validate_json(params.model_dump_json()) == params
+    result = HelpersRespondResult(run_id="r1")
+    assert HelpersRespondResult.model_validate_json(result.model_dump_json()) == result
+    with pytest.raises(ValidationError):
+        HelpersRespondParams.model_validate({"session_id": "s1", "call_id": "call_1"})
+    with pytest.raises(ValidationError):
+        HelpersRespondParams.model_validate({"session_id": "s1", "call_id": "", "run": True})
+    with pytest.raises(ValidationError):
+        HelpersRespondParams.model_validate(
+            {"session_id": "s1", "call_id": "c", "run": True, "extra": 1}
+        )
+    with pytest.raises(ValidationError):
+        HelpersRespondResult.model_validate({})
 
 
 def test_helper_stop_round_trips_and_refuses_bad_input() -> None:

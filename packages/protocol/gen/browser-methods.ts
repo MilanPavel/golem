@@ -44,6 +44,7 @@ export const BROWSER_METHODS: ReadonlySet<string> = new Set([
   "git.info",
   "hello",
   "helper.stop",
+  "helpers.respond",
   "hf.files",
   "hf.search",
   "mcp.add",
