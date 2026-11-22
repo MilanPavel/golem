@@ -46,6 +46,8 @@ public enum MethodAccess {
         "chat.get",
         "chat.prompt",
         "chat.set",
+        "chat.suggestion_dismiss",
+        "chat.suggestions",
         "config.get",
         "config.raw.get",
         "config.raw.set",

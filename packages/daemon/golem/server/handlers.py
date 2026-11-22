@@ -72,7 +72,14 @@ from golem.server.agents_edit import (
     agents_set_limits,
     agents_set_wish,
 )
-from golem.server.chat_edit import chat_draft, chat_get, chat_prompt, chat_set
+from golem.server.chat_edit import (
+    chat_draft,
+    chat_get,
+    chat_prompt,
+    chat_set,
+    chat_suggestion_dismiss,
+    chat_suggestions,
+)
 from golem.server.device_rpc import (
     connection_identify,
     device_list,
@@ -226,6 +233,8 @@ from golem_protocol.commands import (
     ChatGetParams,
     ChatPromptParams,
     ChatSetParams,
+    ChatSuggestionDismissParams,
+    ChatSuggestionsParams,
     ConfigAllowance,
     ConfigGetParams,
     ConfigGetResult,
@@ -2196,6 +2205,15 @@ def standard_methods() -> dict[str, Method]:
         "chat.prompt": Method("chat.prompt", ChatPromptParams, True, chat_prompt),
         "chat.set": Method("chat.set", ChatSetParams, True, chat_set),
         "chat.draft": Method("chat.draft", ChatDraftParams, True, chat_draft),
+        "chat.suggestions": Method(
+            "chat.suggestions", ChatSuggestionsParams, True, chat_suggestions
+        ),
+        "chat.suggestion_dismiss": Method(
+            "chat.suggestion_dismiss",
+            ChatSuggestionDismissParams,
+            True,
+            chat_suggestion_dismiss,
+        ),
         "notifications.get": Method(
             "notifications.get", NotificationsGetParams, True, notifications_get
         ),

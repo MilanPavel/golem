@@ -1,0 +1,17 @@
+{
+  "additionalProperties": false,
+  "description": "``chat.suggestion_dismiss``. The line is never suggested again.",
+  "properties": {
+    "line": {
+      "maxLength": 2000,
+      "minLength": 1,
+      "title": "Line",
+      "type": "string"
+    }
+  },
+  "required": [
+    "line"
+  ],
+  "title": "ChatSuggestionDismissParams",
+  "type": "object"
+}

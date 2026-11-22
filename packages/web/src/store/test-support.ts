@@ -198,6 +198,8 @@ export function fakeClient() {
     getChat: vi.fn<PageClient["getChat"]>(async () => ({ instructions: [], plan_first: false, mode: "balanced" })),
     setChat: vi.fn<PageClient["setChat"]>(async (params) => ({ ok: true, errors: [], values: { instructions: params.instructions ?? [], plan_first: params.plan_first ?? false, mode: "balanced" } })),
     getChatPrompt: vi.fn<PageClient["getChatPrompt"]>(async () => ({ model: null, parts: [], tools_tokens: 0, total_tokens: 0 })),
+    getChatSuggestions: vi.fn<PageClient["getChatSuggestions"]>(async () => ({ suggestions: [], updated: null, needs_local_model: false })),
+    dismissChatSuggestion: vi.fn<PageClient["dismissChatSuggestion"]>(async () => ({ ok: true })),
     draftChat: vi.fn<PageClient["draftChat"]>(async () => ({ lines: [], model: "ollama/qwen3" })),
     getNotifications: vi.fn<PageClient["getNotifications"]>(async () => ({
       needs_you: true,

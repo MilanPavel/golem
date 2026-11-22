@@ -32,6 +32,10 @@ from golem_protocol.commands import (
     ChatPromptResult,
     ChatSetParams,
     ChatSetResult,
+    ChatSuggestionDismissParams,
+    ChatSuggestionDismissResult,
+    ChatSuggestionsParams,
+    ChatSuggestionsResult,
     ChatValues,
     ConfigError,
 )
@@ -121,3 +125,26 @@ async def chat_draft(ctx: RequestContext, params: ChatDraftParams) -> ChatDraftR
     except DraftUnusable as exc:
         raise RpcCallError(INVALID_PARAMS, str(exc)) from exc
     return ChatDraftResult(lines=lines, model=model)
+
+
+async def chat_suggestions(
+    ctx: RequestContext, _params: ChatSuggestionsParams
+) -> ChatSuggestionsResult:
+    """What is kept. A kept result older than a day starts the job; the answer never waits."""
+    suggestions = ctx.state.suggestions
+    if suggestions is None:
+        raise RpcCallError(INTERNAL_ERROR, "the daemon is not ready to suggest lines yet")
+    return await suggestions.get()
+
+
+async def chat_suggestion_dismiss(
+    ctx: RequestContext, params: ChatSuggestionDismissParams
+) -> ChatSuggestionDismissResult:
+    suggestions = ctx.state.suggestions
+    if suggestions is None:
+        raise RpcCallError(INTERNAL_ERROR, "the daemon is not ready to suggest lines yet")
+    line = params.line.strip()
+    if not line:
+        raise RpcCallError(INVALID_PARAMS, "there is no line to dismiss")
+    await suggestions.dismiss(line)
+    return ChatSuggestionDismissResult(ok=True)

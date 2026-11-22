@@ -2906,6 +2906,112 @@ public enum DefaultPermissionModeEnum: String, Codable {
     case careful = "careful"
 }
 
+/// ``chat.suggestion_dismiss``. The line is never suggested again.
+// MARK: - ChatSuggestionDismissParams
+public struct ChatSuggestionDismissParams: Codable {
+    public let line: String
+
+    public enum CodingKeys: String, CodingKey {
+        case line = "line"
+    }
+
+    public init(line: String) {
+        self.line = line
+    }
+}
+
+// MARK: - ChatSuggestionDismissResult
+public struct ChatSuggestionDismissResult: Codable {
+    public let ok: Bool
+
+    public enum CodingKeys: String, CodingKey {
+        case ok = "ok"
+    }
+
+    public init(ok: Bool) {
+        self.ok = ok
+    }
+}
+
+/// One instruction line golem suggests, and why. ``source`` is ``memory`` for a note and
+/// ``chats`` for what you keep asking.
+// MARK: - ChatSuggestion
+public struct ChatSuggestion: Codable {
+    public let line: String
+    public let reason: String
+    public let source: ChatSuggestionSource
+
+    public enum CodingKeys: String, CodingKey {
+        case line = "line"
+        case reason = "reason"
+        case source = "source"
+    }
+
+    public init(line: String, reason: String, source: ChatSuggestionSource) {
+        self.line = line
+        self.reason = reason
+        self.source = source
+    }
+}
+
+public enum ChatSuggestionSource: String, Codable {
+    case chats = "chats"
+    case memory = "memory"
+}
+
+/// ``chat.suggestions``. Reads the kept suggestions and starts the job when they are
+/// older than a day.
+// MARK: - ChatSuggestionsParams
+public struct ChatSuggestionsParams: Codable {
+
+    public init() {
+    }
+}
+
+/// At most 5 suggestions, without the lines already in ``[chat] instructions`` and the
+/// dismissed ones. ``updated`` is when the job last ran, null before the first run.
+/// ``needs_local_model`` is true when there is no local model: the job reads your messages,
+/// so it runs on a local model only.
+// MARK: - ChatSuggestionsResult
+public struct ChatSuggestionsResult: Codable {
+    public let needsLocalModel: Bool
+    public let suggestions: [SuggestionElement]
+    public let updated: String?
+
+    public enum CodingKeys: String, CodingKey {
+        case needsLocalModel = "needs_local_model"
+        case suggestions = "suggestions"
+        case updated = "updated"
+    }
+
+    public init(needsLocalModel: Bool, suggestions: [SuggestionElement], updated: String?) {
+        self.needsLocalModel = needsLocalModel
+        self.suggestions = suggestions
+        self.updated = updated
+    }
+}
+
+/// One instruction line golem suggests, and why. ``source`` is ``memory`` for a note and
+/// ``chats`` for what you keep asking.
+// MARK: - SuggestionElement
+public struct SuggestionElement: Codable {
+    public let line: String
+    public let reason: String
+    public let source: ChatSuggestionSource
+
+    public enum CodingKeys: String, CodingKey {
+        case line = "line"
+        case reason = "reason"
+        case source = "source"
+    }
+
+    public init(line: String, reason: String, source: ChatSuggestionSource) {
+        self.line = line
+        self.reason = reason
+        self.source = source
+    }
+}
+
 /// ``[chat]`` as golem uses it. ``mode`` is ``[permissions] mode``, read only here: the
 /// page changes it with ``permissions.set_mode``.
 // MARK: - ChatValues

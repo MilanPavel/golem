@@ -35,6 +35,7 @@ from golem.secrets import SecretStore
 from golem.sessions.agent_usage import AgentUsage
 from golem.sessions.drafts import ModelDrafts
 from golem.sessions.manager import SessionManager
+from golem.sessions.suggestions import ChatSuggestions
 from golem.sessions.usage import Usage
 from golem.skills.registry import SkillRegistry
 from golem.store.artifacts import ArtifactStore
@@ -74,6 +75,8 @@ class DaemonState:
     usage: Usage | None = None
     drafts: ModelDrafts | None = None
     """Drafts instruction lines for ``chat.draft``, once the database is open."""
+    suggestions: ChatSuggestions | None = None
+    """Suggests instruction lines for ``chat.suggestions``, once the database is open."""
     scores: Scores | None = None
     mcp: McpSupervisor | None = None
     secrets: SecretStore | None = None

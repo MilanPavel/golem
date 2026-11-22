@@ -83,6 +83,7 @@ from golem.sessions.drafts import ModelDrafts
 from golem.sessions.log import SessionLog
 from golem.sessions.manager import SessionManager
 from golem.sessions.recovery import recover_runs
+from golem.sessions.suggestions import ChatSuggestions
 from golem.sessions.titles import ModelTitles, TitleGenerator
 from golem.sessions.trim import HelperTrimmer
 from golem.sessions.usage import Usage, backfill
@@ -98,6 +99,7 @@ from golem.store.devices import DeviceStore
 from golem.store.events import EventLog
 from golem.store.records import RunRecords, SessionRecords
 from golem.store.routine_runs import RoutineRuns
+from golem.store.suggestions import SuggestionStore
 from golem.tools import default_registry
 from golem.tools.registry import ToolScope
 from golem_protocol.commands import (
@@ -354,6 +356,17 @@ class DaemonApp:
                     lambda profile: _tier_of(router, models, profile),
                 )
                 self.state.drafts = drafts
+                paths = self.state.paths
+
+                async def chat_lines() -> list[str]:
+                    loaded = await asyncio.to_thread(
+                        load_settings, home=paths.home, project_dir=paths.home
+                    )
+                    return list(loaded.chat.instructions)
+
+                self.state.suggestions = ChatSuggestions(
+                    drafts, SuggestionStore(database), chat_lines, lambda: state.memory
+                )
                 chat = open_chat(
                     router,
                     saver,
@@ -569,6 +582,9 @@ class DaemonApp:
             self.state.local_servers = None
             self.state.usage = None
             self.state.drafts = None
+            if self.state.suggestions is not None:
+                await self.state.suggestions.aclose()
+            self.state.suggestions = None
             self.state.agent_usage = None
             self.state.notifier = None
             self.state.routines = None

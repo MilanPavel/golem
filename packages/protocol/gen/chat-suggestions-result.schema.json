@@ -1,0 +1,66 @@
+{
+  "$defs": {
+    "ChatSuggestion": {
+      "additionalProperties": false,
+      "description": "One instruction line golem suggests, and why. ``source`` is ``memory`` for a note and\n``chats`` for what you keep asking.",
+      "properties": {
+        "line": {
+          "title": "Line",
+          "type": "string"
+        },
+        "reason": {
+          "title": "Reason",
+          "type": "string"
+        },
+        "source": {
+          "enum": [
+            "memory",
+            "chats"
+          ],
+          "title": "Source",
+          "type": "string"
+        }
+      },
+      "required": [
+        "line",
+        "reason",
+        "source"
+      ],
+      "title": "ChatSuggestion",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "At most 5 suggestions, without the lines already in ``[chat] instructions`` and the\ndismissed ones. ``updated`` is when the job last ran, null before the first run.\n``needs_local_model`` is true when there is no local model: the job reads your messages,\nso it runs on a local model only.",
+  "properties": {
+    "needs_local_model": {
+      "title": "Needs Local Model",
+      "type": "boolean"
+    },
+    "suggestions": {
+      "items": {
+        "$ref": "#/$defs/ChatSuggestion"
+      },
+      "title": "Suggestions",
+      "type": "array"
+    },
+    "updated": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Updated"
+    }
+  },
+  "required": [
+    "suggestions",
+    "updated",
+    "needs_local_model"
+  ],
+  "title": "ChatSuggestionsResult",
+  "type": "object"
+}

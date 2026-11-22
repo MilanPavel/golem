@@ -1,7 +1,7 @@
 import { useEffect, useId, useRef, useState, type DragEvent, type KeyboardEvent } from "react";
 import { actionErrorText } from "../../store/errors.ts";
-import type { ChatPromptResult } from "../../store/notifications.ts";
-import { useChatDefaults, useChatPrompt, useNavigate, usePageActions } from "../../store/page-context.tsx";
+import type { ChatPromptResult, ChatSuggestionsResult } from "../../store/notifications.ts";
+import { useChatDefaults, useChatPrompt, useChatSuggestions, useNavigate, usePageActions } from "../../store/page-context.tsx";
 import { Button } from "../../ui/button.tsx";
 import { Input } from "../../ui/input.tsx";
 import { instructionTokens, PromptPreview } from "./chat-prompt.tsx";
@@ -39,6 +39,10 @@ export type InstructionsProps = {
   onPreview: (lines: string[] | null) => void;
   prompt: ChatPromptResult | undefined;
   promptError: string | null;
+  /** The suggestions from the person's chats and memory, from `chat.suggestions`. Undefined while loading or when they could not be read. */
+  suggestions?: ChatSuggestionsResult | undefined;
+  /** Never suggests the line again, with `chat.suggestion_dismiss`. */
+  onDismiss?: (line: string) => Promise<void>;
   /** Opens a link to another page of the app, such as Memory. */
   onNavigate: (href: string) => void;
 };
@@ -125,11 +129,56 @@ function Suggestion({ text, onAdd }: { text: string; onAdd: () => void }) {
   );
 }
 
+/** A suggestion from the person's chats or memory: the line, why, and Add or Not for me. */
+function FromYourChats({ suggestions, have, onAdd, onDismiss }: { suggestions: ChatSuggestionsResult; have: ReadonlySet<string>; onAdd: (line: string) => void; onDismiss: (line: string) => void }) {
+  const shown = suggestions.suggestions.filter((item) => !have.has(item.line.trim()));
+  return (
+    <div className="flex flex-col gap-1.5 border-t border-dashed border-line pt-3">
+      <h4 className="text-sm font-medium text-ink">From your chats</h4>
+      {suggestions.needs_local_model ? (
+        <p className="text-xs text-muted">Needs a local model, because it reads your messages.</p>
+      ) : shown.length === 0 ? (
+        <p className="text-xs text-muted">Nothing yet. golem looks at your chats once a day.</p>
+      ) : (
+        <ul aria-label="From your chats" className="m-0 flex list-none flex-col p-0">
+          {shown.map((item) => (
+            <li key={item.line} className="flex items-start gap-2 border-t border-dashed border-line py-1.5 first:border-t-0">
+              <div className="min-w-0 flex-1">
+                <p className="text-sm text-ink wrap-anywhere">{item.line}</p>
+                <p className="text-xs text-muted wrap-anywhere">{item.reason}</p>
+              </div>
+              <Button
+                size="sm"
+                aria-label={`Add “${item.line}”`}
+                onClick={() => {
+                  onAdd(item.line);
+                }}
+              >
+                Add
+              </Button>
+              <Button
+                size="sm"
+                kind="ghost"
+                aria-label={`Not for me: “${item.line}”`}
+                onClick={() => {
+                  onDismiss(item.line);
+                }}
+              >
+                Not for me
+              </Button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 /**
  * Your instructions: the lines golem adds to the system prompt of every chat, written, drafted or picked, next to what the
  * model reads. A line is saved when its box loses focus, on Enter, after a move and after ✕: there is no Save button.
  */
-export function InstructionsView({ saved, onSave, onDraft, onPreview, prompt, promptError, onNavigate }: InstructionsProps) {
+export function InstructionsView({ saved, onSave, onDraft, onPreview, prompt, promptError, onNavigate, suggestions, onDismiss }: InstructionsProps) {
   const [rows, setRows] = useState<Row[]>(() => saved.map(make));
   const rowsRef = useRef(rows);
   const lastSaved = useRef<string[]>(filled(saved));
@@ -142,6 +191,7 @@ export function InstructionsView({ saved, onSave, onDraft, onPreview, prompt, pr
   const [drafts, setDrafts] = useState<string[] | null>(null);
   const [drafting, setDrafting] = useState(false);
   const [draftError, setDraftError] = useState<string | null>(null);
+  const [dismissed, setDismissed] = useState<ReadonlySet<string>>(new Set());
   const id = useId();
 
   function put(list: Row[]): void {
@@ -224,6 +274,7 @@ export function InstructionsView({ saved, onSave, onDraft, onPreview, prompt, pr
   }
 
   const have = new Set(filled(texts));
+  const hidden = new Set([...have, ...dismissed]);
   const offered = (drafts ?? []).filter((line) => !have.has(line.trim()));
   const common = COMMON_LINES.filter((line) => !have.has(line));
   const count = filled(texts).length;
@@ -371,6 +422,20 @@ export function InstructionsView({ saved, onSave, onDraft, onPreview, prompt, pr
             )}
           </div>
 
+          {suggestions === undefined ? null : (
+            <FromYourChats
+              suggestions={suggestions}
+              have={hidden}
+              onAdd={(line) => {
+                add([line]);
+              }}
+              onDismiss={(line) => {
+                setDismissed((before) => new Set([...before, line.trim()]));
+                void onDismiss?.(line);
+              }}
+            />
+          )}
+
           <details className="border-t border-dashed border-line pt-3">
             <summary className="cursor-pointer text-sm font-medium text-ink">
               Common ones <span className="font-normal text-muted">a few lines many people use</span>
@@ -401,6 +466,7 @@ export function YourInstructions() {
   const navigate = useNavigate();
   const [preview, setPreview] = useState<string[] | null>(null);
   const prompt = useChatPrompt(preview, chat.data !== undefined);
+  const suggestions = useChatSuggestions(chat.data !== undefined);
   if (chat.isError) {
     return (
       <div role="group" aria-label="Your instructions" className="flex flex-col items-start gap-2">
@@ -428,6 +494,10 @@ export function YourInstructions() {
       onDraft={async (description) => (await actions.draftChat(description)).lines}
       onPreview={setPreview}
       onNavigate={navigate}
+      suggestions={suggestions.data}
+      onDismiss={async (line) => {
+        await actions.dismissChatSuggestion(line).catch(() => undefined);
+      }}
       prompt={prompt.data}
       promptError={prompt.isError ? actionErrorText(prompt.error, "Could not read what the model reads.") : null}
     />

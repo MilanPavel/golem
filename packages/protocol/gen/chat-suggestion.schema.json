@@ -1,0 +1,29 @@
+{
+  "additionalProperties": false,
+  "description": "One instruction line golem suggests, and why. ``source`` is ``memory`` for a note and\n``chats`` for what you keep asking.",
+  "properties": {
+    "line": {
+      "title": "Line",
+      "type": "string"
+    },
+    "reason": {
+      "title": "Reason",
+      "type": "string"
+    },
+    "source": {
+      "enum": [
+        "memory",
+        "chats"
+      ],
+      "title": "Source",
+      "type": "string"
+    }
+  },
+  "required": [
+    "line",
+    "reason",
+    "source"
+  ],
+  "title": "ChatSuggestion",
+  "type": "object"
+}
