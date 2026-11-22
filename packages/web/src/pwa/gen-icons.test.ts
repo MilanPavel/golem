@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { inflateSync } from "node:zlib";
 import { expect, test } from "vitest";
 import { FAVICON_COLORS } from "../features/tab-status/favicon-colors.ts";
+import { ART, WIDTH } from "../ui/pixel-golem.tsx";
 import {
   FIGURE_SHARE,
   ICONS,
@@ -82,5 +83,15 @@ test("the figure fills about 68% of the width, 60% when maskable", () => {
       expect(share, file).toBeGreaterThanOrEqual(lo);
       expect(share, file).toBeLessThanOrEqual(hi);
     }
+  }
+});
+
+test("the figure is centred: equal margins left and right, top and bottom, within a pixel", () => {
+  for (const { file, size, kind } of ICONS) {
+    const { cell, left, top } = layout(size, kind);
+    const right = size - left - WIDTH * cell;
+    const bottom = size - top - ART.length * cell;
+    expect(Math.abs(left - right), file).toBeLessThanOrEqual(1);
+    expect(Math.abs(top - bottom), file).toBeLessThanOrEqual(1);
   }
 });

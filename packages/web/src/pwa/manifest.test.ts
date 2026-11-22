@@ -38,7 +38,7 @@ test("the manifest lists itself as a web app, so Chrome can say it is installed"
 
 test("every icon exists, with a 192 and a 512 any icon and a maskable one", () => {
   for (const icon of manifest.icons) {
-    expect(existsSync(new URL(`../../public${icon.src}`, import.meta.url)), icon.src).toBe(true);
+    expect(existsSync(new URL(`../../public${icon.src.split("?")[0]}`, import.meta.url)), icon.src).toBe(true);
     expect(icon.type).toBe("image/png");
   }
   const any = manifest.icons.filter((icon) => icon.purpose === "any").map((icon) => icon.sizes);
@@ -59,8 +59,14 @@ test("the two theme-color metas are the two page backgrounds", () => {
 
 test("index.html links the manifest and the touch icon, and has one icon link for the tab status", () => {
   expect(html).toContain('<link rel="manifest" href="/manifest.webmanifest" />');
-  expect(html).toContain('<link rel="apple-touch-icon" href="/apple-touch-icon.png" />');
+  expect(html).toContain('<link rel="apple-touch-icon" href="/apple-touch-icon.png?v=2" />');
   expect(html).toContain('<meta name="apple-mobile-web-app-title" content="golem" />');
   const icons = [...html.matchAll(/<link\s[^>]*rel="([^"]*)"/g)].filter((m) => (m[1] ?? "").split(/\s+/).includes("icon"));
   expect(icons).toHaveLength(1);
+});
+
+test("the icon URLs carry a version, so an installed app fetches redrawn icons", () => {
+  // Chrome keeps an installed app's icons until the manifest changes. Bump v when `just icons` redraws them.
+  for (const icon of manifest.icons) expect(icon.src, icon.src).toMatch(/\?v=\d+$/);
+  expect(html).toMatch(/<link rel="apple-touch-icon" href="\/apple-touch-icon\.png\?v=\d+" \/>/);
 });

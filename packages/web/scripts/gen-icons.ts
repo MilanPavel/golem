@@ -24,7 +24,6 @@ export const STONE_DARK = "#6B4322";
 /** Share of the width the figure fills; the maskable one stays inside the 80% safe circle. */
 export const FIGURE_SHARE = { any: 0.68, touch: 0.68, maskable: 0.6 } as const;
 const BEVEL_SHARE = 0.16;
-const NUDGE_DOWN = 0.015;
 
 type Rgb = [number, number, number];
 
@@ -60,7 +59,7 @@ export function layout(size: number, kind: Icon["kind"]): Layout {
   const cell = Math.max(1, Math.round((FIGURE_SHARE[kind] * size) / WIDTH));
   const bevel = Math.max(1, Math.round(BEVEL_SHARE * cell));
   const left = Math.floor((size - WIDTH * cell) / 2);
-  const top = Math.floor((size - ART.length * cell) / 2) + Math.round(NUDGE_DOWN * size);
+  const top = Math.floor((size - ART.length * cell) / 2);
   return { cell, bevel, left, top };
 }
 
