@@ -2394,6 +2394,94 @@ public struct ChatGetParams: Codable {
     }
 }
 
+/// ``chat.prompt``. What the model of a new chat reads now.
+///
+/// It is the default model, no folder, no pinned skills, no on-demand MCP servers, and plan
+/// first as ``[chat] plan_first`` says. ``instructions`` stand in for the saved lines for
+/// this
+/// answer only, and nothing is written. They are checked as ``chat.set`` checks them, and a
+/// bad line is an invalid params error.
+// MARK: - ChatPromptParams
+public struct ChatPromptParams: Codable {
+    public let instructions: [String]?
+
+    public enum CodingKeys: String, CodingKey {
+        case instructions = "instructions"
+    }
+
+    public init(instructions: [String]?) {
+        self.instructions = instructions
+    }
+}
+
+/// One named section of the system prompt. ``tokens`` is the characters over four, rounded
+/// up.
+// MARK: - ChatPromptPart
+public struct ChatPromptPart: Codable {
+    public let name: String
+    public let text: String
+    public let tokens: Int
+
+    public enum CodingKeys: String, CodingKey {
+        case name = "name"
+        case text = "text"
+        case tokens = "tokens"
+    }
+
+    public init(name: String, text: String, tokens: Int) {
+        self.name = name
+        self.text = text
+        self.tokens = tokens
+    }
+}
+
+/// ``model`` is the default model, null when there is none (the memory block is then left
+/// out). ``tools_tokens`` is the size of the tool schemas the model would be offered, 0 for
+/// a
+/// model that takes no tools. ``total_tokens`` is the parts plus ``tools_tokens``.
+// MARK: - ChatPromptResult
+public struct ChatPromptResult: Codable {
+    public let model: String?
+    public let parts: [PartElement]
+    public let toolsTokens: Int
+    public let totalTokens: Int
+
+    public enum CodingKeys: String, CodingKey {
+        case model = "model"
+        case parts = "parts"
+        case toolsTokens = "tools_tokens"
+        case totalTokens = "total_tokens"
+    }
+
+    public init(model: String?, parts: [PartElement], toolsTokens: Int, totalTokens: Int) {
+        self.model = model
+        self.parts = parts
+        self.toolsTokens = toolsTokens
+        self.totalTokens = totalTokens
+    }
+}
+
+/// One named section of the system prompt. ``tokens`` is the characters over four, rounded
+/// up.
+// MARK: - PartElement
+public struct PartElement: Codable {
+    public let name: String
+    public let text: String
+    public let tokens: Int
+
+    public enum CodingKeys: String, CodingKey {
+        case name = "name"
+        case text = "text"
+        case tokens = "tokens"
+    }
+
+    public init(name: String, text: String, tokens: Int) {
+        self.name = name
+        self.text = text
+        self.tokens = tokens
+    }
+}
+
 /// ``chat.set``. Change keys of ``[chat]`` in the user's ``config.toml``.
 ///
 /// Only the keys sent change. ``instructions`` has at most 30 lines of 1 to 300 characters

@@ -4074,6 +4074,44 @@ class ChatSetResult(BaseModel):
     values: ChatValues | None = None
 
 
+class ChatPromptParams(BaseModel):
+    """``chat.prompt``. What the model of a new chat reads now.
+
+    It is the default model, no folder, no pinned skills, no on-demand MCP servers, and plan
+    first as ``[chat] plan_first`` says. ``instructions`` stand in for the saved lines for this
+    answer only, and nothing is written. They are checked as ``chat.set`` checks them, and a
+    bad line is an invalid params error.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    instructions: list[str] | None = None
+
+
+class ChatPromptPart(BaseModel):
+    """One named section of the system prompt. ``tokens`` is the characters over four, rounded
+    up."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    name: str
+    text: str
+    tokens: int
+
+
+class ChatPromptResult(BaseModel):
+    """``model`` is the default model, null when there is none (the memory block is then left
+    out). ``tools_tokens`` is the size of the tool schemas the model would be offered, 0 for a
+    model that takes no tools. ``total_tokens`` is the parts plus ``tools_tokens``."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    model: str | None
+    parts: list[ChatPromptPart]
+    tools_tokens: int
+    total_tokens: int
+
+
 class NotificationsGetParams(BaseModel):
     """``notifications.get``. The ``[notifications]`` settings as golem uses them."""
 
@@ -5004,6 +5042,9 @@ __all__ = [
     "ChangesSuggestMessageParams",
     "ChangesSuggestMessageResult",
     "ChatGetParams",
+    "ChatPromptParams",
+    "ChatPromptPart",
+    "ChatPromptResult",
     "ChatSetParams",
     "ChatSetResult",
     "ChatValues",

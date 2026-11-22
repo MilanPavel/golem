@@ -1,0 +1,67 @@
+{
+  "$defs": {
+    "ChatPromptPart": {
+      "additionalProperties": false,
+      "description": "One named section of the system prompt. ``tokens`` is the characters over four, rounded\nup.",
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "text": {
+          "title": "Text",
+          "type": "string"
+        },
+        "tokens": {
+          "title": "Tokens",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "name",
+        "text",
+        "tokens"
+      ],
+      "title": "ChatPromptPart",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "``model`` is the default model, null when there is none (the memory block is then left\nout). ``tools_tokens`` is the size of the tool schemas the model would be offered, 0 for a\nmodel that takes no tools. ``total_tokens`` is the parts plus ``tools_tokens``.",
+  "properties": {
+    "model": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Model"
+    },
+    "parts": {
+      "items": {
+        "$ref": "#/$defs/ChatPromptPart"
+      },
+      "title": "Parts",
+      "type": "array"
+    },
+    "tools_tokens": {
+      "title": "Tools Tokens",
+      "type": "integer"
+    },
+    "total_tokens": {
+      "title": "Total Tokens",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "model",
+    "parts",
+    "tools_tokens",
+    "total_tokens"
+  ],
+  "title": "ChatPromptResult",
+  "type": "object"
+}

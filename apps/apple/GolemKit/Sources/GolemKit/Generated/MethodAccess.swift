@@ -41,6 +41,7 @@ public enum MethodAccess {
         "changes.revert",
         "changes.suggest_message",
         "chat.get",
+        "chat.prompt",
         "chat.set",
         "config.get",
         "config.raw.get",

@@ -35,12 +35,13 @@ from langchain_core.runnables import RunnableConfig
 from golem.agents.bundled import bundled_agents_dir
 from golem.agents.model import Agent
 from golem.agents.registry import AgentRegistry
-from golem.config import AgentSettings, ModelPrice, PermissionMode, RouteMode
+from golem.config import AgentSettings, ChatSettings, ModelPrice, PermissionMode, RouteMode
 from golem.evals.whatif import build_report, session_model
 from golem.graphs.adapter import PlainMessage, plain_messages, trace_messages
 from golem.graphs.chat import ChatRuntime, Growth
 from golem.graphs.child import child_thread
 from golem.graphs.context_view import ContextView, view
+from golem.graphs.instructions_prompt import INSTRUCTIONS_SECTION, instructions_text
 from golem.graphs.state import SCHEMA_VERSION, AgentState
 from golem.graphs.step_up import Consent, StepAsk, StepRequest, StepUp
 from golem.graphs.tools_node import CWD_KEY, ChildScope
@@ -242,6 +243,15 @@ class MessageNotFoundError(Exception):
 
 class RunNotFoundError(Exception):
     """No run with this id, in progress or finished."""
+
+
+@dataclass(frozen=True, slots=True)
+class NewChatPrompt:
+    """What the model of a new chat reads: its name, the named prompt parts, the tools' size."""
+
+    model: str | None
+    parts: list[tuple[str, str]]
+    tools_chars: int
 
 
 @dataclass(frozen=True, slots=True)
@@ -791,6 +801,52 @@ class SessionManager:
                 model_name=identity.name,
                 messages=[PlainMessage("system", system), *messages] if system else messages,
             )
+
+    async def new_chat_prompt(self, instructions: Sequence[str] | None = None) -> NewChatPrompt:
+        """What the model of a new chat would read now, as ``chat.prompt`` shows it.
+
+        It is the default model, no folder, no pinned skills, no on-demand MCP servers, and plan
+        first as ``[chat] plan_first`` says. ``instructions`` stand in for the saved lines of
+        this answer only. No session is stored and no model is called. With no default model,
+        ``model`` is None and the memory block is left out.
+        """
+        router = self._runtime.router
+        profile = router.default
+        session = _LiveSession(
+            session_id="",
+            model_profile=profile or router.profile_name,
+            schema_version=SCHEMA_VERSION,
+            plan_first=router.chat_settings().plan_first,
+        )
+        schemas: list[dict[str, object]] = []
+        if profile is not None and await self._takes_tools(profile):
+            schemas = self._runtime.tools.scoped(_scope(session)).schemas()
+        names = [str(cast(Mapping[str, object], item["function"])["name"]) for item in schemas]
+        parts = await self._runtime.prompt_parts(
+            {},
+            None,
+            profile=profile,
+            tools=names,
+            memory=None if profile is None else self._memory_access(session, profile, ""),
+            plan_first=session.plan_first,
+        )
+        if instructions is not None:
+            lines = instructions_text(ChatSettings(instructions=list(instructions)))
+            parts = [part for part in parts if part[0] != INSTRUCTIONS_SECTION]
+            if lines is not None:
+                parts.insert(0, (INSTRUCTIONS_SECTION, lines))
+        tools_chars = len(json.dumps(schemas, sort_keys=True, separators=(",", ":")))
+        return NewChatPrompt(model=profile, parts=parts, tools_chars=tools_chars if schemas else 0)
+
+    async def _takes_tools(self, profile: str) -> bool:
+        """False when the model is known to refuse tools."""
+        if self.facts is None:
+            return True
+        try:
+            found = await self.facts.facts([self._runtime.router.resolve(profile).ref])
+        except ModelConfigError:
+            return True
+        return not any(item.tools is False for item in found)
 
     async def compact(
         self, session_id: str, action: Literal["clear", "summarise", "grow"], focus: str | None
