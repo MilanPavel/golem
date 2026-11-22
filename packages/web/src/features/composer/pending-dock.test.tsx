@@ -212,3 +212,23 @@ test("an older daemon, with only pending, keeps the old dock and the old Inbox",
   expect(screen.queryByRole("group", { name: "Helper question" })).toBeNull();
   expect(inbox().getAllByRole("button").map((b) => b.textContent)).toEqual(["Allow once", "Allow for this session", "Deny", "Open"]);
 });
+
+const BATCH: Pending = { kind: "batch", since: SINCE, call_id: "c7", helper_count: 3, agents: ["explorer", "explorer", "worker"] };
+
+test("the Inbox lists a batch with the card's head, and Run answers helpers.respond", async () => {
+  const { fake, emit } = setup();
+  emit(lead([BATCH]));
+  expect(inbox().getByText("3 helpers · explorer ×2, worker")).toBeTruthy();
+  expect(inbox().getAllByRole("button").map((b) => b.textContent)).toEqual(["Run", "Do it in the chat", "Open"]);
+  fireEvent.click(inbox().getByRole("button", { name: /^Run/ }));
+  expect(fake.raw.respondHelpers).toHaveBeenLastCalledWith("lead", "c7", true);
+  await wait();
+  expect(fake.raw.respondApproval).not.toHaveBeenCalled();
+});
+
+test("Do it in the chat from the Inbox sends run false", () => {
+  const { fake, emit } = setup();
+  emit(lead([BATCH]));
+  fireEvent.click(inbox().getByRole("button", { name: /^Do it in the chat/ }));
+  expect(fake.raw.respondHelpers).toHaveBeenLastCalledWith("lead", "c7", false);
+});

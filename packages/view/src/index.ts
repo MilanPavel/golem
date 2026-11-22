@@ -245,6 +245,22 @@ export {
   type InboxPending,
   type InboxSession,
 } from "./inbox.ts";
+export {
+  helperCardOf,
+  helperBatchHead,
+  helperJobsOf,
+  HELPER_CARD_ACTIONS,
+  isUseHelpersQuestion,
+  USE_HELPERS_POSITIONS,
+  USE_HELPERS_SOURCE,
+  useHelpersExplain,
+  useHelpersPosition,
+  type HelperCardAction,
+  type HelperCardJob,
+  type HelperCardModel,
+  type UseHelpersPosition,
+  type UseHelpersValue,
+} from "./use-helpers.ts";
 export { isRoutineSession, isWaiting, originLabel, ROUTINE_MARK, routineName, type OriginSession } from "./origin.ts";
 export {
   appendDelta,

@@ -1,5 +1,5 @@
 import { OLLAMA_FAILED, RpcError, type ApprovalChoice, type ConfigGetResult, type ConfigRawGetResult, type ConfigRawResult, type FsListDirsResult, type GitBranchesResult, type GitInfoResult, type FsChooseFolderResult, type McpAddParams, type McpCallResult, type McpImportApplyParams, type McpImportApplyResult, type McpImportScanResult, type McpCatalogResult, type McpListResult, type McpLogsResult, type McpServerConfig, type McpServerDetail, type McpServerLog, type McpLoginDone, type McpTestProgress, type McpTestResult, type GolemClient, type RuntimeName, type SetupStatusResult, type SkillListResult, type AgentsListResult, type AgentsSaveResult, type AgentsDeleteResult, type TraceGetResult, type TraceSpanResult, type ArtifactReadResult, type ChangesDiffResult, type ChangesDiffTarget, type ChangesListResult, type ChangesRevertResult, type ChangesRevertTarget, type ChangesCommitResult, type ChangesCommitInfoResult, type ChangesSuggestMessageResult, type ModelOptionsGetResult, type ModelOptionsSetResult, type SessionSetOptionsResult, type SkillCreateResult, type SkillReadResult, type SkillWriteResult, type AuthListResult, type FileListResult, type FileReadResult, type CostGetResult, type SessionCompactResult, type ConsentChoice, type RoutingGetResult, type RoutingSetParams, type RoutingSetResult, type NotificationsValues, type NotificationsSetParams, type NotificationsSetResult, type NotifyTestResult, type ChatSetParams, type ChatSetResult, type ChatValues, type ChatPromptResult, type ChatDraftResult, type ChatSuggestionsResult, type ChatSuggestionDismissResult, type AgentLimitsChange } from "@golem/client";
-import { changeToolFilter, installEventOf, type InstallEvent, type PermissionMode, type CompactAction, type RouteMode } from "@golem/view";
+import { changeToolFilter, installEventOf, type InstallEvent, type PermissionMode, type CompactAction, type RouteMode, type UseHelpersValue } from "@golem/view";
 import type { QueryClient } from "@tanstack/react-query";
 import { createDrafts, type Drafts } from "./drafts.ts";
 import { createNotes, type Notes } from "./notes.ts";
@@ -171,6 +171,7 @@ export type PageClient = Pick<
   | "cancelOllamaInstall"
   | "onOllamaInstall"
   | "respondApproval"
+  | "respondHelpers"
   | "answerConsent"
   | "checkNow"
   | "close"
@@ -266,6 +267,8 @@ export type PageActions = {
   close(sessionId: string): Promise<void>;
   /** `scope: "batch"` answers for all the helpers of one delegate call; it does not go with `args`. */
   respond(sessionId: string, callId: string, decision: ApprovalChoice, args?: Readonly<Record<string, unknown>>, scope?: "batch"): Promise<void>;
+  /** Answers "start these helpers?" (`helpers.respond`) for the `delegate` call `callId`. `run` false tells the model to do the work in the chat. */
+  respondHelpers(sessionId: string, callId: string, run: boolean): Promise<void>;
   /** Answers the paid step-up question the session's run waits on. The run goes on in its events. */
   answerConsent(sessionId: string, runId: string, answer: ConsentChoice): Promise<void>;
   /** Switches the session's model. The chip changes from the daemon's `model.selected` event. */
@@ -296,9 +299,9 @@ export type PageActions = {
   setNotifications(params: NotificationsSetParams): Promise<NotificationsSetResult>;
   /**
    * Changes how many days a finished helper's steps are kept (`[agents] keep_days`, `keep_problem_days`; 0 is
-   * for ever). A refusal is in the result (`ok: false`), not a rejection, and nothing is written then.
+   * for ever) or the setting `use_helpers`. A refusal is in the result (`ok: false`), not a rejection, and nothing is written then.
    */
-  setAgentsKeep(change: { keep_days?: number; keep_problem_days?: number }): Promise<AgentsKeepResult>;
+  setAgentsKeep(change: { keep_days?: number; keep_problem_days?: number; use_helpers?: UseHelpersValue }): Promise<AgentsKeepResult>;
   /**
    * Sets and clears the limits of `[agents]` that bound every helper (`agents.set_default_limits`). A refusal is in
    * the result (`ok: false`). The agents are read again, since what a type runs with may change.
@@ -788,6 +791,9 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
         if (scope !== undefined) await client.respondApproval(sessionId, callId, decision, args, scope);
         else if (args === undefined) await client.respondApproval(sessionId, callId, decision);
         else await client.respondApproval(sessionId, callId, decision, args);
+      },
+      async respondHelpers(sessionId, callId, run) {
+        await client.respondHelpers(sessionId, callId, run);
       },
       async answerConsent(sessionId, runId, answer) {
         await client.answerConsent(sessionId, runId, answer);

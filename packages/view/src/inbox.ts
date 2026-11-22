@@ -4,9 +4,11 @@
  * summary has it, so this file does not depend on the generated types.
  */
 
+import { helperCardOf } from "./use-helpers.ts";
+
 /** What a session waits for, as its summary carries it. */
 export interface InboxPending {
-  /** `batch` is the card that confirms a batch of helpers; the Inbox does not list it yet, and a kind it does not know is skipped. */
+  /** `batch` is the card that confirms a batch of helpers ("Use helpers: Ask me first"); a kind the Inbox does not know is skipped. */
   kind: "approval" | "consent" | "batch";
   since: string;
   call_id?: string | null;
@@ -52,11 +54,11 @@ export function pendingItemsOf(session: Pick<InboxSession, "pending" | "pending_
 export interface InboxItem {
   sessionId: string;
   sessionTitle: string;
-  kind: "approval" | "consent";
-  /** The tool call to answer; null for a consent. */
+  kind: "approval" | "consent" | "batch";
+  /** The tool call to answer (the `delegate` call for a batch); null for a consent. */
   callId: string | null;
   headline: string;
-  /** The rule that asked; null for a consent. */
+  /** The rule that asked; null for a consent and a batch. */
   source: string | null;
   /** The time the question was asked, as the daemon wrote it. */
   since: string;
@@ -73,6 +75,8 @@ export interface InboxItem {
   sent: string[];
   /** For a paid question: what does not go ("this chat"). */
   notSent: string[];
+  /** For a batch: one agent type name per helper it starts; empty otherwise. */
+  agents: string[];
 }
 
 /** The helper behind an item, with the words that name it. */
@@ -133,6 +137,9 @@ function fileName(path: string): string {
 function headline(pending: InboxPending): string {
   if (pending.kind === "consent") {
     return "Use a paid model for this message?";
+  }
+  if (pending.kind === "batch") {
+    return helperCardOf({ helperCount: pending.helper_count, agents: pending.agents }).head;
   }
   const name = pending.name ?? "";
   const subject = oneLine(pending.subject);
@@ -196,14 +203,15 @@ export function inboxItems(sessions: readonly InboxSession[], now: number): Inbo
     const lead = session.parent_session_id;
     if (lead !== undefined && lead !== null && ids.has(lead)) continue;
     for (const pending of pendingItemsOf(session)) {
-      if (pending.kind !== "approval" && pending.kind !== "consent") continue;
+      if (pending.kind !== "approval" && pending.kind !== "consent" && pending.kind !== "batch") continue;
       const approval = pending.kind === "approval";
+      const batch = pending.kind === "batch";
       const helper = helperOf(pending);
       items.push({
         sessionId: session.session_id,
         sessionTitle: session.title?.trim() ? session.title : UNTITLED,
         kind: pending.kind,
-        callId: approval ? (pending.call_id ?? null) : null,
+        callId: approval || batch ? (pending.call_id ?? null) : null,
         headline: headline(pending),
         source: approval ? (pending.source ?? null) : null,
         since: pending.since,
@@ -213,8 +221,9 @@ export function inboxItems(sessions: readonly InboxSession[], now: number): Inbo
         helper,
         count: Math.max(1, pending.count ?? 1),
         answerSessionId: helper === null ? session.session_id : helper.sessionId,
-        sent: approval ? [] : [...(pending.sent ?? [])],
-        notSent: approval ? [] : [...(pending.not_sent ?? [])],
+        sent: approval || batch ? [] : [...(pending.sent ?? [])],
+        notSent: approval || batch ? [] : [...(pending.not_sent ?? [])],
+        agents: batch ? [...(pending.agents ?? [])] : [],
       });
     }
   }

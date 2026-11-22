@@ -1,4 +1,4 @@
-import { inboxAnswerOptions, inboxHelperAskWords, type ApprovalAnswerOption, type ApprovalChoice, type InboxGroup, type InboxItem } from "@golem/view";
+import { helperCardOf, inboxAnswerOptions, inboxHelperAskWords, type ApprovalAnswerOption, type ApprovalChoice, type InboxGroup, type InboxItem } from "@golem/view";
 import { Button } from "../../ui/button.tsx";
 import { inboxKey, type InboxChoice } from "../../store/inbox.ts";
 import { Headline } from "./headline.tsx";
@@ -60,6 +60,23 @@ function InboxCard({
             {option.label}
           </Button>
         ))}
+        {item.kind === "batch" && item.callId !== null
+          ? helperCardOf({ helperCount: item.agents.length, agents: item.agents }).actions.map((action) => (
+              <Button
+                key={action.id}
+                size="sm"
+                kind={action.primary ? "ink" : "secondary"}
+                disabled={busy}
+                data-helper-answer={action.id}
+                aria-label={`${action.label}, ${item.sessionTitle}`}
+                onClick={() => {
+                  onAnswer(item, action.run ? "allow" : "deny");
+                }}
+              >
+                {action.label}
+              </Button>
+            ))
+          : null}
         {helper === null && item.kind === "approval" && item.callId !== null
           ? ANSWERS.map(({ choice, label }) => (
               <Button

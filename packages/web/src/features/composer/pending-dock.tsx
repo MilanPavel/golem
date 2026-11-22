@@ -58,7 +58,7 @@ export function PendingDock({ sessionId }: { sessionId: string }) {
   const key = inboxKey(current);
   let card;
   if (current.helper === null) {
-    card = current.kind === "approval" ? <DockedApproval sessionId={sessionId} /> : <DockedConsent sessionId={sessionId} />;
+    card = current.kind !== "consent" ? <DockedApproval sessionId={sessionId} /> : <DockedConsent sessionId={sessionId} />;
   } else if (current.kind === "consent") {
     card = <HelperConsent key={key} item={current} onOpen={openHelper} />;
   } else {

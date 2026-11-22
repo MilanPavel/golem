@@ -1,4 +1,4 @@
-import { agentRow, signInLine, type SignInLine, checksSummary, COMMANDS, mcpStatusWord, noPastes, pickerGroups, withModelChoices, withSkillChoices, type CheckRun, type ChecksState, type ReviewNote, type TodoItem, type TurnChecks, type TurnCard, type ChatMessage, type ChatState, type RewindPlan, ladderRows, NO_LOCAL_WINDOW, routeRows, spendRows, contextActions, bestActions, windowSourceOf, helperBanner, helperReceipt, type ContextActionsInput, type PermissionMode } from "@golem/view";
+import { helperCardOf, agentRow, signInLine, type SignInLine, checksSummary, COMMANDS, mcpStatusWord, noPastes, pickerGroups, withModelChoices, withSkillChoices, type CheckRun, type ChecksState, type ReviewNote, type TodoItem, type TurnChecks, type TurnCard, type ChatMessage, type ChatState, type RewindPlan, ladderRows, NO_LOCAL_WINDOW, routeRows, spendRows, contextActions, bestActions, windowSourceOf, helperBanner, helperReceipt, type ContextActionsInput, type PermissionMode } from "@golem/view";
 import type { ListedModel } from "@golem/client";
 import { createContext, useContext, useEffect, useId, useState, type ReactNode } from "react";
 import { Badge } from "../ui/badge.tsx";
@@ -28,7 +28,9 @@ import { ChecksStrip, EditCards, ToolLine, TranscriptMessages, WritingRow, type 
 import { COST_CASES, CUT_REPLY, SAMPLE_CHAT, SAMPLE_TOOLS, THINKING_CASES, TURN_CHAT, NOTICE_CHAT, ROUTED_CASES, ROUTED_SESSION } from "../features/chat/sample.ts";
 import { ApprovalBar } from "../features/approval/index.ts";
 import { DockCounter } from "../features/approval/dock-counter.tsx";
+import { HelperBatchCard } from "../features/approval/helper-batch-card.tsx";
 import { HelperQuestion } from "../features/approval/helper-question.tsx";
+import { UseHelpers } from "../features/settings/use-helpers-setting.tsx";
 import { ConsentBar } from "../features/consent/consent-bar.tsx";
 import { ANSWERED, PENDING_EDIT, PENDING_SHELL } from "../features/approval/sample.ts";
 import { DiffModeSwitch, DiffView } from "../features/diff/index.ts";
@@ -1674,6 +1676,47 @@ function AgentsDemo() {
   );
 }
 
+/** Settings → Agents, Use helpers: the three positions, one error, and the card "Ask me first" shows. Small parts only. */
+function UseHelpersDemo() {
+  const batch = (label: string, args: Record<string, unknown>, extra: { sending?: boolean; error?: string } = {}) => (
+    <div key={label}>
+      <p className="mb-1 text-xs text-muted">{label}</p>
+      <div className="rounded-lg border border-line bg-bg p-4">
+        <DockView
+          busy
+          meter={<Meter state="waiting" runStartedAt={null} />}
+          approval={<HelperBatchCard model={helperCardOf({ args })} sending={extra.sending} error={extra.error ?? null} onAnswer={() => {}} />}
+          composer={<DemoComposer busy />}
+        />
+      </div>
+    </div>
+  );
+  return (
+    <div className="flex flex-col gap-4">
+      {(["when_needed", "ask", "never"] as const).map((value) => (
+        <section key={value} aria-label={`Use helpers, ${value}`} className="rounded-lg border border-line bg-bg p-4">
+          <UseHelpers value={value} onChoose={() => {}} />
+        </section>
+      ))}
+      <section aria-label="Use helpers, a wrong value" className="rounded-lg border border-line bg-bg p-4">
+        <UseHelpers value="ask" errors={{ "agents.use_helpers": "Not one of when_needed, ask, never." }} onChoose={() => {}} />
+      </section>
+      {batch("Ask me first, one helper", { agent: "explorer", brief: "List every call site of httpx and the file each is in." })}
+      {batch("Ask me first, three helpers", {
+        batch: [
+          { agent: "explorer", brief: "Call sites of httpx", label: "call sites" },
+          { agent: "explorer", brief: "What the 0.28 changelog changes for a client", label: "changelog" },
+          { agent: "worker", brief: "Upgrade httpx in pyproject.toml, fix what breaks, run just test.", label: "upgrade" },
+        ],
+      })}
+      {batch("Ask me first, the answer is on its way", { agent: "explorer", brief: "List every call site of httpx." }, { sending: true })}
+      <div className="max-w-sm">
+        {batch("Ask me first, phone width, the answer failed", { agent: "worker", brief: "Upgrade httpx." }, { error: "Could not send the answer. Try again." })}
+      </div>
+    </div>
+  );
+}
+
 /** Settings → Agents, the limits: the Limits block of one agent in its states, and the limits for every helper. */
 function AgentLimitsDemo() {
   return (
@@ -2266,6 +2309,11 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
       <section className="mt-6" id={anchor("Agent limits")}>
         <h3 className="mb-2 font-mono text-xs text-faint">Agent limits</h3>
         <AgentLimitsDemo />
+      </section>
+
+      <section className="mt-6" id={anchor("Use helpers")}>
+        <h3 className="mb-2 font-mono text-xs text-faint">Use helpers</h3>
+        <UseHelpersDemo />
       </section>
 
       <section className="mt-6" id={anchor("Memory")}>

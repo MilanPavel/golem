@@ -236,9 +236,9 @@ test("a narrow window is one column whose rows open in place, one at a time", as
   expect(screen.getByRole("tab", { name: "Definition" })).toBeTruthy();
   await user.click(rowOf("reviewer"));
   expect(rowOf("explorer").getAttribute("aria-expanded")).toBe("false");
-  expect(screen.getAllByRole("group")).toHaveLength(1);
+  expect(screen.getAllByRole("group").filter((group) => !group.matches("fieldset"))).toHaveLength(1);
   await user.click(rowOf("reviewer"));
-  expect(screen.queryByRole("group")).toBeNull();
+  expect(screen.queryByRole("group", { name: /^(?!Use helpers)/ })).toBeNull();
 });
 
 test("the settings search finds the page's fields", async () => {

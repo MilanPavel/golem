@@ -82,7 +82,7 @@ export type Inbox = {
   busy: Readonly<Record<string, boolean>>;
   /** The line a failed answer left on its card, by `inboxKey`. */
   errors: Readonly<Record<string, string>>;
-  /** Answers to the item's target: the helper's session for a helper's item. `scope: "batch"` is all helpers. */
+  /** Answers to the item's target: the helper's session for a helper's item. `scope: "batch"` is all helpers. For a batch item `allow` runs the helpers and `deny` does the work in the chat. */
   answer(item: InboxItem, choice: ApprovalChoice, scope?: "batch"): void;
   open(item: InboxItem): void;
 };
@@ -120,7 +120,12 @@ export function useInbox(): Inbox {
       const key = inboxKey(item);
       setSent((current) => new Set(current).add(key));
       setFailed((current) => Object.fromEntries(Object.entries(current).filter(([each]) => each !== key)));
-      answerInboxItem(actions, target.sessionId, target.callId, choice, scope).catch((err: unknown) => {
+      // A batch of helpers is answered with `helpers.respond`: Run is a yes, "Do it in the chat" a no.
+      const sending =
+        item.kind === "batch"
+          ? actions.respondHelpers(target.sessionId, target.callId, choice !== "deny")
+          : answerInboxItem(actions, target.sessionId, target.callId, choice, scope);
+      sending.catch((err: unknown) => {
         setSent((current) => {
           const next = new Set(current);
           next.delete(key);

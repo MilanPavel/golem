@@ -738,8 +738,8 @@ export interface GolemClient {
   listAgents(cwd?: string): Promise<AgentsListResult>;
   /** `agents.set_wish`: set the model wish of an agent type. Resolves to the type as it is now. */
   setAgentWish(name: string, wish: string, cwd?: string): Promise<AgentsSetWishResult>;
-  /** `agents.keep`: read how long a finished helper's steps are kept, or change `keep_days` and `keep_problem_days` (0 is for ever). */
-  agentsKeep(change?: { keep_days?: number; keep_problem_days?: number }): Promise<AgentsKeepResult>;
+  /** `agents.keep`: read how long a finished helper's steps are kept, or change `keep_days` and `keep_problem_days` (0 is for ever) and `use_helpers`. */
+  agentsKeep(change?: { keep_days?: number; keep_problem_days?: number; use_helpers?: "when_needed" | "ask" | "never" }): Promise<AgentsKeepResult>;
   /**
    * `agents.set_limits`: set the limits sent for an agent type and clear the ones named in `clear`; a key in neither stays as it is.
    * A built-in type gets them in `[agents.<name>]` of `config.toml`, your own file in its front matter; a project agent is refused.
@@ -2657,7 +2657,7 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       }
       return result;
     },
-    async agentsKeep(change?: { keep_days?: number; keep_problem_days?: number }): Promise<AgentsKeepResult> {
+    async agentsKeep(change?: { keep_days?: number; keep_problem_days?: number; use_helpers?: "when_needed" | "ask" | "never" }): Promise<AgentsKeepResult> {
       await ready;
       const result = await call("agents.keep", { ...change });
       if (!isAgentsKeepResult(result)) {
