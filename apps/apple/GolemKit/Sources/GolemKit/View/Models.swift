@@ -29,6 +29,11 @@ public final class TranscriptModel {
         chat.apply(event)
     }
 
+    /// Forgets the transcript, before an attach that replays it from the start.
+    public func reset() {
+        chat = ChatState()
+    }
+
     /// Reads events until the stream ends.
     public func follow(_ events: AsyncStream<GolemEvent>) async {
         for await event in events {

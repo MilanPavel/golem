@@ -19,6 +19,8 @@ protocol MacLink: AnyObject {
     func approvalRequest(for item: InboxItem, folder: String?) async -> ApprovalRequest
     /// Answers approvals and hears when one is answered elsewhere.
     var approvals: any ApprovalChannel { get }
+    /// Reads a session, replies, cancels, and makes new sessions.
+    var sessionChannel: any SessionChannel { get }
     /// Answers given while the Mac could not be reached, and what became of them.
     var pendingAnswers: PendingAnswers { get }
 }
@@ -30,6 +32,7 @@ final class ConnectionLink: MacLink {
     let pendingAnswers = PendingAnswers()
 
     var approvals: any ApprovalChannel { ConnectionApprovalChannel(connection: connection, pending: pendingAnswers) }
+    var sessionChannel: any SessionChannel { ConnectionSessionChannel(connection: connection) }
 
     func approvalRequest(for item: InboxItem, folder: String?) async -> ApprovalRequest {
         await ApprovalRequestLoader.load(item: item, folder: folder, connection: connection)
@@ -389,6 +392,18 @@ final class AppModel {
 
     func dismissReview() {
         presentedReview = nil
+    }
+
+    // MARK: - Sessions and new tasks
+
+    /// The model for a session or run screen. Nil without a link to the Mac.
+    func sessionDetail(sessionID: String, title: String) -> SessionDetailModel? {
+        link.map { SessionDetailModel(sessionID: sessionID, title: title, channel: $0.sessionChannel) }
+    }
+
+    /// The model for the new-task screen, with the folders sessions ran in. Nil without a link to the Mac.
+    func newTask() -> NewTaskModel? {
+        link.map { NewTaskModel(folders: recentFolders(sessions.sessions), channel: $0.sessionChannel) }
     }
 
     // MARK: - Offline

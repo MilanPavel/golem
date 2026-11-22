@@ -72,6 +72,7 @@ enum FakeScenario: String {
 @MainActor
 final class FakeLink: MacLink {
     private let scenario: FakeScenario
+    private let sessionChannelFake = FakeSessionChannel()
     let pendingAnswers: PendingAnswers
 
     // Called from the app model, on the main actor.
@@ -79,6 +80,8 @@ final class FakeLink: MacLink {
         self.scenario = scenario
         pendingAnswers = MainActor.assumeIsolated { PendingAnswers() }
     }
+
+    var sessionChannel: any SessionChannel { sessionChannelFake }
 
     private nonisolated static func iso(_ secondsAgo: TimeInterval) -> String {
         ISO8601DateFormatter().string(from: Date().addingTimeInterval(-secondsAgo))
