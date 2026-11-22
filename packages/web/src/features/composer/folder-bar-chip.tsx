@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { useFolderMenuRequest, useGitInfo, useNavigate, useNewSessionFolder, useSession, useSessionList } from "../../store/page-context.tsx";
+import { revealErrorText } from "../../store/errors.ts";
+import { useFolderDialog, useFolderMenuRequest, useGitInfo, useNavigate, useNewSessionFolder, useSession, useSessionList, usePageActions } from "../../store/page-context.tsx";
 import type { SessionView } from "../../store/session-store.ts";
 import { cn } from "../../ui/cn.ts";
 import { Code } from "../../ui/code.tsx";
@@ -37,6 +38,10 @@ export type SessionFolderMenuBodyProps = {
   /** The branch of the folder, when it is in a repo on one. */
   branch: string | null;
   onCopy: () => void;
+  /** `Open in Finder`. Without it the item is not offered. */
+  onReveal?: () => void;
+  /** Why the folder did not open in Finder. */
+  error?: string | null;
   onNewHere: () => void;
   onNewElsewhere: () => void;
 };
@@ -45,7 +50,7 @@ export type SessionFolderMenuBodyProps = {
  * The menu of an open session's folder. It is read only: a session keeps its folder, so the ways
  * out are a new session here or in another folder.
  */
-export function SessionFolderMenuBody({ folder, branch, onCopy, onNewHere, onNewElsewhere }: SessionFolderMenuBodyProps) {
+export function SessionFolderMenuBody({ folder, branch, onCopy, onReveal, error = null, onNewHere, onNewElsewhere }: SessionFolderMenuBodyProps) {
   const cut = folder.lastIndexOf("/");
   return (
     <div className="flex flex-col py-1">
@@ -60,11 +65,22 @@ export function SessionFolderMenuBody({ folder, branch, onCopy, onNewHere, onNew
         )}
       </div>
       <p className="px-3 pb-2 text-meta text-muted">{SESSION_KEEPS_FOLDER}</p>
+      {error === null ? null : (
+        <p role="alert" className="px-3 pb-2 text-xs text-deny">
+          {error}
+        </p>
+      )}
       <div className="flex flex-col border-t border-line px-1 pt-1">
         <button type="button" className={MENU_ROW} onClick={onCopy}>
           <CopyIcon className="size-4 shrink-0 text-muted" />
           Copy path
         </button>
+        {onReveal === undefined ? null : (
+          <button type="button" className={MENU_ROW} onClick={onReveal}>
+            <FolderIcon className="size-4 shrink-0 text-muted" />
+            Open in Finder
+          </button>
+        )}
         <button type="button" className={MENU_ROW} onClick={onNewHere}>
           <PlusIcon className="size-4 shrink-0 text-muted" />
           New session in this folder
@@ -79,10 +95,17 @@ export function SessionFolderMenuBody({ folder, branch, onCopy, onNewHere, onNew
 }
 
 /** The folder chip of an open session: its folder, with the read-only menu. */
-export function SessionFolderChip({ folder, branch, onNewHere, onNewElsewhere }: Omit<SessionFolderMenuBodyProps, "onCopy">) {
+export function SessionFolderChip({ folder, branch, onReveal, onNewHere, onNewElsewhere }: Omit<SessionFolderMenuBodyProps, "onCopy" | "error" | "onReveal"> & { onReveal?: (folder: string) => Promise<void> }) {
   const [open, setOpen] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next);
+        if (!next) setError(null);
+      }}
+    >
       <PopoverTrigger asChild>
         <button type="button" title={folder} aria-label={`Folder: ${folderName(folder)}`} aria-haspopup="dialog" className={FOLDER_CHIP}>
           <FolderIcon />
@@ -97,6 +120,18 @@ export function SessionFolderChip({ folder, branch, onNewHere, onNewElsewhere }:
             void writeClipboard(folder).catch(() => undefined);
             setOpen(false);
           }}
+          error={error}
+          onReveal={
+            onReveal === undefined
+              ? undefined
+              : () => {
+                  setError(null);
+                  onReveal(folder).then(
+                    () => setOpen(false),
+                    (failure: unknown) => setError(failure instanceof Error ? failure.message : "The folder did not open in Finder."),
+                  );
+                }
+          }
           onNewHere={() => {
             setOpen(false);
             onNewHere();
@@ -129,9 +164,22 @@ function OpenSessionFolder({ folder }: { folder: string }) {
   const [, setFolder] = useNewSessionFolder();
   const { ask } = useFolderMenuRequest();
   const navigate = useNavigate();
+  const local = useFolderDialog();
+  const actions = usePageActions();
   return (
     <SessionFolderChip
       folder={folder}
+      onReveal={
+        local
+          ? async (path) => {
+              try {
+                await actions.reveal(path);
+              } catch (error) {
+                throw new Error(revealErrorText(error));
+              }
+            }
+          : undefined
+      }
       branch={info.data?.branch ?? null}
       onNewHere={() => {
         setFolder(folder);

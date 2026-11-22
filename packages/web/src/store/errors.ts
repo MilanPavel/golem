@@ -19,6 +19,15 @@ export function folderDialogErrorText(error: unknown): string {
   return error instanceof Error && error.message !== "" ? error.message : "The folder dialog did not open.";
 }
 
+/** One short line for a folder that did not open in Finder. */
+export function revealErrorText(error: unknown): string {
+  if (error instanceof RpcError) {
+    if (error.code === NOT_LOCAL || error.code === UNSUPPORTED) return "Finder is not available here. It opens only on the Mac that runs golem.";
+    return error.message;
+  }
+  return error instanceof Error && error.message !== "" ? error.message : "The folder did not open in Finder.";
+}
+
 /** The daemon refused a call's parameters, such as a folder that is not absolute or does not exist. */
 export function isInvalidParams(error: unknown): error is RpcError {
   return error instanceof RpcError && error.code === INVALID_PARAMS;

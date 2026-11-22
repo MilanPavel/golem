@@ -18,8 +18,10 @@ from golem.folders import (
     DialogBusyError,
     DialogUnsupportedError,
     FolderError,
+    RevealFailedError,
     choose_folder,
     list_dirs,
+    reveal_folder,
 )
 from golem.secrets import MemorySecrets
 from golem.server.dispatcher import INVALID_PARAMS, NOT_LOCAL, UNSUPPORTED
@@ -348,6 +350,99 @@ async def test_the_method_serves_this_mac_and_refuses_a_phone(
         _as_platform(monkeypatch, "linux")
         unsupported = await local.call("fs.choose_folder", {})
         assert error_code(unsupported) == UNSUPPORTED
+    finally:
+        await local.close()
+        await phone.close()
+        await stop_daemon(app, task)
+
+
+# --- fs.reveal: Finder is never opened, `open` is always stubbed ---
+
+
+def _stub_open(monkeypatch: pytest.MonkeyPatch, code: int = 0) -> list[str]:
+    opened: list[str] = []
+
+    async def fake(path: str) -> int:
+        opened.append(path)
+        return code
+
+    monkeypatch.setattr("golem.folders._run_open", fake)
+    return opened
+
+
+async def test_a_folder_is_handed_to_open(home: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    _as_platform(monkeypatch, "darwin")
+    opened = _stub_open(monkeypatch)
+    (home / ".config").mkdir()
+    (home / "code").mkdir()
+    await reveal_folder(str(home / "code"), home)
+    await reveal_folder(str(home / ".config"), home)
+    assert opened == [str(home / "code"), str(home / ".config")]
+
+
+async def test_a_path_that_is_not_a_folder_under_home_is_refused(
+    home: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _as_platform(monkeypatch, "darwin")
+    opened = _stub_open(monkeypatch)
+    (home / "file.txt").write_text("x")
+    (home / "Library").mkdir()
+    (home / ".ssh").mkdir()
+    for path in ("relative", str(home / "nowhere"), str(home / "file.txt"), str(home.parent)):
+        with pytest.raises(FolderError):
+            await reveal_folder(path, home)
+    for hidden in ("Library", ".ssh"):
+        with pytest.raises(FolderError):
+            await reveal_folder(str(home / hidden), home)
+    assert opened == []
+
+
+async def test_a_failing_open_is_an_error(home: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    _as_platform(monkeypatch, "darwin")
+    _stub_open(monkeypatch, code=1)
+    with pytest.raises(RevealFailedError):
+        await reveal_folder(str(home), home)
+
+
+async def test_off_macos_reveal_is_unsupported(home: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    _as_platform(monkeypatch, "linux")
+    opened = _stub_open(monkeypatch)
+    with pytest.raises(DialogUnsupportedError):
+        await reveal_folder(str(home), home)
+    assert opened == []
+
+
+async def test_the_reveal_method_serves_this_mac_and_refuses_a_phone(
+    short_home: Path, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    fake_home = (tmp_path / "me").resolve()
+    (fake_home / "code").mkdir(parents=True)
+    (fake_home / "file.txt").write_text("x")
+    monkeypatch.setattr(Path, "home", lambda: fake_home)
+    _as_platform(monkeypatch, "darwin")
+    opened = _stub_open(monkeypatch)
+    app, task = await start_daemon(short_home, secrets=MemorySecrets())
+    local = await RpcClient.connect(app.paths.socket_path)
+    phone = await RpcClient.connect(app.paths.socket_path)
+    try:
+        await local.call("hello", HELLO)
+        assert rpc_result(await local.call("fs.reveal", {"path": str(fake_home / "code")})) == {}
+        assert opened == [str(fake_home / "code")]
+        for path in ("relative", str(fake_home / "nowhere"), str(fake_home / "file.txt")):
+            assert error_code(await local.call("fs.reveal", {"path": path})) == INVALID_PARAMS
+
+        devices = app.state.devices
+        assert devices is not None
+        device = await devices.add(new_key(), "iPhone", "2026-11-22T10:00:00+01:00")
+        rpc_result(await phone.call("connection.identify", {"device": device.id}))
+        refused = await phone.call("fs.reveal", {"path": str(fake_home / "code")})
+        assert error_code(refused) == NOT_LOCAL
+        assert refused["error"]["data"] == {"reason": "not_local"}  # type: ignore[index]
+
+        _as_platform(monkeypatch, "linux")
+        unsupported = await local.call("fs.reveal", {"path": str(fake_home / "code")})
+        assert error_code(unsupported) == UNSUPPORTED
+        assert opened == [str(fake_home / "code")]
     finally:
         await local.close()
         await phone.close()

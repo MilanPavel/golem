@@ -12,7 +12,7 @@ import asyncio
 from pathlib import Path
 
 from golem.coding.commit import run_git
-from golem.folders import OUTSIDE, FolderError, hidden_folders, is_under
+from golem.folders import FolderError, checked_folder, is_under
 from golem_protocol.commands import (
     GitBranch,
     GitBranchesResult,
@@ -23,24 +23,6 @@ from golem_protocol.commands import (
 GIT_INFO_SECONDS = 2.0
 MAX_BRANCHES = 200
 AGENT_WORKTREES = Path(".claude") / "worktrees"
-
-
-def _folder(path: str, home: Path) -> str:
-    """``path`` resolved, if it is an existing folder the page may ask about."""
-    if not Path(path).is_absolute():
-        raise FolderError("path must be an absolute path")
-    root = home.resolve()
-    try:
-        target = Path(path).resolve()
-    except (OSError, RuntimeError) as exc:
-        raise FolderError(OUTSIDE) from exc
-    if not is_under(target, root) or any(
-        is_under(target, hidden) for hidden in hidden_folders(root)
-    ):
-        raise FolderError(OUTSIDE)
-    if not target.is_dir():
-        raise FolderError(f"There is no folder at {path}.")
-    return str(target)
 
 
 async def _git(folder: str, *args: str) -> str | None:
@@ -83,7 +65,7 @@ def _worktrees(listing: str) -> list[GitWorktree]:
 
 async def git_info(path: str, home: Path) -> GitInfoResult:
     """Whether ``path`` is in a repo, its branch, changed files, and worktrees."""
-    folder = _folder(path, home)
+    folder = checked_folder(path, home)
     try:
         async with asyncio.timeout(GIT_INFO_SECONDS):
             top = await _git(folder, "rev-parse", "--show-toplevel")
@@ -107,7 +89,7 @@ async def git_info(path: str, home: Path) -> GitInfoResult:
 
 async def git_branches(path: str, home: Path) -> GitBranchesResult:
     """The local branches of the repo ``path`` is in, newest commit first."""
-    folder = _folder(path, home)
+    folder = checked_folder(path, home)
     try:
         async with asyncio.timeout(GIT_INFO_SECONDS):
             head = await _git(folder, "symbolic-ref", "--short", "-q", "HEAD")

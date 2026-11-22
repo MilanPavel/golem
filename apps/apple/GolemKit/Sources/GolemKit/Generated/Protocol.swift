@@ -4918,6 +4918,33 @@ public struct EntryElement: Codable {
     }
 }
 
+/// ``fs.reveal``. Opens a folder in Finder on the daemon's Mac.
+///
+/// ``path`` is an absolute, existing folder under the user's home folder, checked as
+/// ``git.info`` checks it. It is refused with ``not_local`` when the caller is not a page on
+/// this Mac and with ``unsupported`` when the platform is not macOS (see
+/// ``HelloResult.local_ui``).
+// MARK: - FSRevealParams
+public struct FSRevealParams: Codable {
+    public let path: String
+
+    public enum CodingKeys: String, CodingKey {
+        case path = "path"
+    }
+
+    public init(path: String) {
+        self.path = path
+    }
+}
+
+/// Empty. The call returns once ``open`` has exited.
+// MARK: - FSRevealResult
+public struct FSRevealResult: Codable {
+
+    public init() {
+    }
+}
+
 /// A local branch. ``last_used`` is the time of its last commit, ISO 8601, or null.
 // MARK: - GitBranch
 public struct GitBranch: Codable {

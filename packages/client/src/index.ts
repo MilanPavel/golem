@@ -185,6 +185,7 @@ export type { ListedModel, ModelListResult } from "../../protocol/gen/model-list
 export type { DirEntry, FsListDirsResult } from "../../protocol/gen/fs-list-dirs-result.ts";
 export type { FsChooseFolderResult } from "../../protocol/gen/fs-choose-folder-result.ts";
 export type { GitBranch, GitBranchesResult } from "../../protocol/gen/git-branches-result.ts";
+export type { FsRevealResult } from "../../protocol/gen/fs-reveal-result.ts";
 export type { GitInfoResult, GitWorktree } from "../../protocol/gen/git-info-result.ts";
 export type { SetupRow, SetupStatusResult } from "../../protocol/gen/setup-status-result.ts";
 export { mergeSummary } from "./session-index.ts";

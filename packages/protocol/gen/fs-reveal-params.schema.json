@@ -1,0 +1,16 @@
+{
+  "additionalProperties": false,
+  "description": "``fs.reveal``. Opens a folder in Finder on the daemon's Mac.\n\n``path`` is an absolute, existing folder under the user's home folder, checked as\n``git.info`` checks it. It is refused with ``not_local`` when the caller is not a page on\nthis Mac and with ``unsupported`` when the platform is not macOS (see\n``HelloResult.local_ui``).",
+  "properties": {
+    "path": {
+      "minLength": 1,
+      "title": "Path",
+      "type": "string"
+    }
+  },
+  "required": [
+    "path"
+  ],
+  "title": "FsRevealParams",
+  "type": "object"
+}

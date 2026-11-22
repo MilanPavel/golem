@@ -1,0 +1,7 @@
+{
+  "additionalProperties": false,
+  "description": "Empty. The call returns once ``open`` has exited.",
+  "properties": {},
+  "title": "FsRevealResult",
+  "type": "object"
+}

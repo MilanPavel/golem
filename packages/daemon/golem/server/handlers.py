@@ -40,9 +40,11 @@ from golem.folders import (
     DialogBusyError,
     DialogUnsupportedError,
     FolderError,
+    RevealFailedError,
     choose_folder,
     dialog_supported,
     list_dirs,
+    reveal_folder,
 )
 from golem.gitinfo import git_branches, git_info
 from golem.mcp import McpServerError, McpSupervisor
@@ -247,6 +249,8 @@ from golem_protocol.commands import (
     FsChooseFolderResult,
     FsListDirsParams,
     FsListDirsResult,
+    FsRevealParams,
+    FsRevealResult,
     GitBranchesParams,
     GitBranchesResult,
     GitInfoParams,
@@ -690,6 +694,24 @@ async def _fs_choose_folder(
     except FolderError as exc:
         raise RpcCallError(INTERNAL_ERROR, str(exc)) from exc
     return FsChooseFolderResult(path=path)
+
+
+async def _fs_reveal(ctx: RequestContext, params: FsRevealParams) -> FsRevealResult:
+    if ctx.connection.device is not None:
+        raise RpcCallError(
+            NOT_LOCAL,
+            "Open in Finder works only for a page on this Mac.",
+            {"reason": "not_local"},
+        )
+    try:
+        await reveal_folder(params.path, Path.home())
+    except DialogUnsupportedError as exc:
+        raise RpcCallError(UNSUPPORTED, str(exc), {"reason": "unsupported"}) from exc
+    except RevealFailedError as exc:
+        raise RpcCallError(INTERNAL_ERROR, str(exc)) from exc
+    except FolderError as exc:
+        raise RpcCallError(INVALID_PARAMS, str(exc)) from exc
+    return FsRevealResult()
 
 
 async def _route_consent_answer(
@@ -2208,6 +2230,7 @@ def standard_methods() -> dict[str, Method]:
         "fs.choose_folder": Method(
             "fs.choose_folder", FsChooseFolderParams, True, _fs_choose_folder
         ),
+        "fs.reveal": Method("fs.reveal", FsRevealParams, True, _fs_reveal),
         "setup.status": Method("setup.status", SetupStatusParams, True, _setup_status),
         "ollama.install": Method("ollama.install", OllamaInstallParams, True, _ollama_install),
         "ollama.install_cancel": Method(

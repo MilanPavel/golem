@@ -2249,9 +2249,9 @@ test("the repo info and the folder dialog send their arguments, localUi follows 
     attach(socket, {
       answerPing: true,
       localUi: true,
-      results: { "git.info": info, "fs.choose_folder": { path: "/home/me/x" } },
+      results: { "git.info": info, "fs.choose_folder": { path: "/home/me/x" }, "fs.reveal": {} },
       onRequest: (_socket, method, params) => {
-        if (method === "git.info" || method === "fs.choose_folder") seen.push([method, params]);
+        if (method === "git.info" || method === "fs.choose_folder" || method === "fs.reveal") seen.push([method, params]);
       },
     });
   });
@@ -2263,22 +2263,25 @@ test("the repo info and the folder dialog send their arguments, localUi follows 
     assert.deepEqual(await client.gitInfo("/r"), info);
     assert.deepEqual(await client.chooseFolder("/home/me"), { path: "/home/me/x" });
     await client.chooseFolder();
+    assert.deepEqual(await client.reveal("/home/me/x"), {});
     assert.deepEqual(seen, [
       ["git.info", { path: "/r" }],
       ["fs.choose_folder", { start: "/home/me" }],
       ["fs.choose_folder", {}],
+      ["fs.reveal", { path: "/home/me/x" }],
     ]);
   } finally {
     client.close();
     await daemon.close();
   }
   const bad = await listen((socket) => {
-    attach(socket, { answerPing: true, results: { "git.info": { repository: true }, "fs.choose_folder": { path: 3 } } });
+    attach(socket, { answerPing: true, results: { "git.info": { repository: true }, "fs.choose_folder": { path: 3 }, "fs.reveal": 3 } });
   });
   const refused = connectGolem({ socketPath: bad.socketPath, clientName: "tui", reconnect: false, heartbeatMs: 60_000 });
   try {
     await assert.rejects(() => refused.gitInfo("/r"), /invalid git.info result/);
     await assert.rejects(() => refused.chooseFolder(), /invalid fs.choose_folder result/);
+    await assert.rejects(() => refused.reveal("/r"), /invalid fs.reveal result/);
     assert.equal(refused.localUi, false);
   } finally {
     refused.close();

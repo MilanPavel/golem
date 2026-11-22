@@ -54,6 +54,7 @@ public enum MethodAccess {
         "file.read",
         "fs.choose_folder",
         "fs.list_dirs",
+        "fs.reveal",
         "git.branches",
         "git.info",
         "hello",

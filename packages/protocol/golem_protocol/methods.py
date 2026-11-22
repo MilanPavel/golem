@@ -128,6 +128,7 @@ METHOD_ACCESS: Final[Mapping[str, Access]] = {
     "git.info": "browser",
     "git.branches": "browser",
     "fs.choose_folder": "browser",
+    "fs.reveal": "browser",
     "notify.test": "browser",
     "memory.list": "browser",
     "memory.get": "browser",
