@@ -1,0 +1,17 @@
+{
+  "additionalProperties": false,
+  "description": "``chat.draft``. Golem drafts instruction lines from what the person says about how\nthey like answers. Nothing is saved.",
+  "properties": {
+    "description": {
+      "maxLength": 2000,
+      "minLength": 1,
+      "title": "Description",
+      "type": "string"
+    }
+  },
+  "required": [
+    "description"
+  ],
+  "title": "ChatDraftParams",
+  "type": "object"
+}

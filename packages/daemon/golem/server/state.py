@@ -32,6 +32,7 @@ from golem.routine_watcher import FileWatcher
 from golem.routines import local_zone
 from golem.secrets import SecretStore
 from golem.sessions.agent_usage import AgentUsage
+from golem.sessions.drafts import ModelDrafts
 from golem.sessions.manager import SessionManager
 from golem.sessions.usage import Usage
 from golem.skills.registry import SkillRegistry
@@ -69,6 +70,8 @@ class DaemonState:
     artifacts: ArtifactStore | None = None
     changes: ChangeStore | None = None
     usage: Usage | None = None
+    drafts: ModelDrafts | None = None
+    """Drafts instruction lines for ``chat.draft``, once the database is open."""
     scores: Scores | None = None
     mcp: McpSupervisor | None = None
     secrets: SecretStore | None = None

@@ -78,6 +78,7 @@ from golem.server.start_error import (
 from golem.server.state import DaemonState
 from golem.sessions.agent_usage import AgentUsage
 from golem.sessions.bus import EventBus
+from golem.sessions.drafts import ModelDrafts
 from golem.sessions.log import SessionLog
 from golem.sessions.manager import SessionManager
 from golem.sessions.recovery import recover_runs
@@ -343,6 +344,15 @@ class DaemonApp:
                 dispatch = ModelDispatcher(rank_of, local_slots=settings.ollama.fixed_parallel)
                 if isinstance(self._titles, ModelTitles):
                     self._titles.use(dispatch)
+                drafts = ModelDrafts(router, dispatch)
+                drafts.bind(models.tier_of_ref, models.budget_refs)
+                drafts.limit(budget.paid_ok)
+                drafts.record_to(
+                    usage,
+                    lambda profile: _price_of(router, models, profile),
+                    lambda profile: _tier_of(router, models, profile),
+                )
+                self.state.drafts = drafts
                 chat = open_chat(
                     router,
                     saver,
@@ -550,6 +560,7 @@ class DaemonApp:
                 await self.state.local_servers.aclose()
             self.state.local_servers = None
             self.state.usage = None
+            self.state.drafts = None
             self.state.agent_usage = None
             self.state.notifier = None
             self.state.routines = None

@@ -57,6 +57,7 @@ METHOD_ACCESS: Final[Mapping[str, Access]] = {
     "chat.get": "browser",
     "chat.prompt": "browser",
     "chat.set": "browser",
+    "chat.draft": "browser",
     "notifications.get": "browser",
     "notifications.set": "browser",
     "routing.get": "browser",

@@ -1,4 +1,4 @@
-"""``chat.get``, ``chat.set`` and ``chat.prompt``: the ``[chat]`` defaults for new chats.
+"""``chat.get``, ``chat.set``, ``chat.prompt`` and ``chat.draft``: the ``[chat]`` defaults.
 
 A write checks the values first, so a wrong line comes back as an error that names it and
 nothing is written. The file keeps its comments.
@@ -11,14 +11,21 @@ import logging
 
 from golem.config import check_instructions, load_settings
 from golem.config_edit import RawConflictError, set_keys
+from golem.models.errors import BudgetSpent, ModelUnreachable
+from golem.models.router import ModelConfigError
 from golem.server.dispatcher import (
+    BUDGET_SPENT,
     INTERNAL_ERROR,
     INVALID_PARAMS,
+    MODEL_NOT_CONFIGURED,
     RequestContext,
     RpcCallError,
 )
+from golem.sessions.drafts import UNUSABLE, DraftUnusable
 from golem.tokens import CHARS_PER_TOKEN
 from golem_protocol.commands import (
+    ChatDraftParams,
+    ChatDraftResult,
     ChatGetParams,
     ChatPromptParams,
     ChatPromptPart,
@@ -94,3 +101,23 @@ async def chat_prompt(ctx: RequestContext, params: ChatPromptParams) -> ChatProm
         tools_tokens=tools,
         total_tokens=sum(part.tokens for part in parts) + tools,
     )
+
+
+async def chat_draft(ctx: RequestContext, params: ChatDraftParams) -> ChatDraftResult:
+    drafts = ctx.state.drafts
+    if drafts is None:
+        raise RpcCallError(INTERNAL_ERROR, "the daemon is not ready to draft lines yet")
+    description = params.description.strip()
+    if not description:
+        raise RpcCallError(INVALID_PARAMS, UNUSABLE)
+    try:
+        lines, model = await drafts.draft(description)
+    except BudgetSpent as exc:
+        raise RpcCallError(BUDGET_SPENT, f"{exc}; {exc.hint}") from exc
+    except ModelConfigError as exc:
+        raise RpcCallError(MODEL_NOT_CONFIGURED, str(exc)) from exc
+    except ModelUnreachable as exc:
+        raise RpcCallError(INTERNAL_ERROR, f"{exc}; {exc.hint}") from exc
+    except DraftUnusable as exc:
+        raise RpcCallError(INVALID_PARAMS, str(exc)) from exc
+    return ChatDraftResult(lines=lines, model=model)

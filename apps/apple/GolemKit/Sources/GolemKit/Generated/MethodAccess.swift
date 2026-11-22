@@ -40,6 +40,7 @@ public enum MethodAccess {
         "changes.list",
         "changes.revert",
         "changes.suggest_message",
+        "chat.draft",
         "chat.get",
         "chat.prompt",
         "chat.set",

@@ -1,0 +1,23 @@
+{
+  "additionalProperties": false,
+  "description": "3 to 8 short lines, one rule each, and the model that wrote them. At most 8 lines of\n300 characters; never empty.",
+  "properties": {
+    "lines": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Lines",
+      "type": "array"
+    },
+    "model": {
+      "title": "Model",
+      "type": "string"
+    }
+  },
+  "required": [
+    "lines",
+    "model"
+  ],
+  "title": "ChatDraftResult",
+  "type": "object"
+}
