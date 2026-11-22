@@ -1770,6 +1770,7 @@ async def _gated(
 ) -> AsyncGenerator[Grant | None]:
     """Hold a slot of the line ``profile`` runs on: a local model's, or a hosted provider's.
 
+    Each wait, short ones too, writes ``model.waited`` with its length when the call has its turn.
     A wait of over a second writes ``model.waiting`` with its reason (``slot`` on a local line,
     ``provider`` on a hosted one), the line's plain name, the position and the holder, and it
     ends when the call has its turn. ``arrived`` is the first arrival of a call that is tried
@@ -1816,6 +1817,14 @@ async def _gated(
     if not label:
         label = "a chat" if role == "chat" else "a helper"
     async with dispatcher.hold(Call(line, sid, role, label, arrived), notice) as grant:
+        if grant.waited > 0:
+            write(
+                {
+                    STREAM_KEY: "model.waited",
+                    "message_id": message_id,
+                    "ms": round(grant.waited * 1000),
+                }
+            )
         yield grant
 
 

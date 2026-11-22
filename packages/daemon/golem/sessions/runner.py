@@ -42,6 +42,7 @@ from golem.graphs.adapter import (
     ModelResponded,
     ModelRouted,
     ModelStarted,
+    ModelWaited,
     ModelWaiting,
     PinRead,
     PinSkipped,
@@ -270,6 +271,10 @@ class _Progress:
     text_tool_calls: Literal["recovered", "unread"] | None = None
     timings: Mapping[str, int] = field(default_factory=dict[str, int])
     """The model server's own numbers for the call, from ``model.response``."""
+    waited_ms: int = 0
+    """What the call waited for its turn on a line, from ``model.waited``."""
+    wait_since: float | None = None
+    """When a wait that has not ended began (``time.monotonic()``), from ``model.waiting``."""
     note_speed: Callable[..., object] | None = None
     translate: Translator = field(default_factory=Translator)
     """Turns stream parts into facts. It holds text that may be half of a ``<think>`` tag."""
@@ -693,7 +698,15 @@ async def _apply(
                 rejected=[ModelRejection(ref=r, tier=t, why=w) for r, t, w in fact.rejected],
             ),
         )
+    elif isinstance(fact, ModelWaited):
+        if fact.message_id == progress.call:
+            progress.waited_ms += fact.ms
     elif isinstance(fact, ModelWaiting):
+        if fact.message_id == progress.call and fact.reason in ("slot", "load", "provider"):
+            if not fact.waiting:
+                progress.wait_since = None
+            elif progress.wait_since is None:
+                progress.wait_since = time.monotonic()
         await emit(
             "model.waiting",
             ModelWaitingData(
@@ -716,6 +729,8 @@ async def _apply(
         progress.ran_window = None
         progress.text_tool_calls = None
         progress.timings = {}
+        progress.waited_ms = 0
+        progress.wait_since = None
         model = progress.model
         if fact.profile is not None and progress.identify is not None:
             model = progress.identify(fact.profile)
@@ -1066,6 +1081,10 @@ async def _end_call(
                 input=found.input, output=found.output, cached_input=found.cached_input
             )
     timings: Mapping[str, int] = {} if failed else progress.timings
+    waited = progress.waited_ms + timings.get("load_ms", 0)
+    if progress.wait_since is not None:
+        waited += _ms(now - progress.wait_since)
+    progress.wait_since = None
     if timings and model is not None and progress.note_speed is not None:
         try:
             progress.note_speed(model.profile, timings)
@@ -1087,6 +1106,7 @@ async def _end_call(
             load_ms=timings.get("load_ms"),
             prompt_ms=timings.get("prompt_ms"),
             reply_ms=timings.get("reply_ms"),
+            waited_ms=waited or None,
         ),
     )
 

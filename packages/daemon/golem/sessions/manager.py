@@ -67,6 +67,7 @@ from golem.permissions.policy import explain
 from golem.sessions.approvals import pending_approval, pending_consent
 from golem.sessions.bus import EventTarget, SummaryTarget
 from golem.sessions.context import context_breakdown
+from golem.sessions.helper_clock import clock_paused, working_ms
 from golem.sessions.helpers import (
     DEFAULT_PROMPT,
     NO_NESTED,
@@ -82,7 +83,6 @@ from golem.sessions.helpers import (
     routed_of,
     scope_of_agent,
     snapshot_of,
-    started_at,
     stop_reason,
     summarize_run,
     tokens_over,
@@ -167,6 +167,7 @@ from golem_protocol.events import (
     RouteConsentAnsweredData,
     RunCancelledData,
     RunFailedData,
+    RunStartedEvent,
     SessionAllowance,
     SessionChecksChangedData,
     SessionCompletedData,
@@ -196,6 +197,9 @@ NO_STRONGER = "No stronger model is ready. Add a key in Settings."
 
 GROW_EVERY = 600.0
 """Seconds between two growths of the window in one session."""
+
+CLOCK_RECHECK = 2.0
+"""Seconds between two looks at a helper's working clock while it stands still."""
 
 log = logging.getLogger("golem.sessions")
 
@@ -1847,17 +1851,16 @@ class SessionManager:
         stored = await self._events.stored(helper_id)
         agent = next((e.data.agent for e in stored if isinstance(e, SessionCreatedEvent)), None)
         limit = None if agent is None else agent.limits.max_seconds
-        began = started_at(stored)
         ended = None if not run_events else run_events[-1].ts
         timed_out = helper_id in self._timed_out
-        if not timed_out and limit is not None and began is not None and ended is not None:
+        if not timed_out and limit is not None and ended is not None:
             # A stop at the limit that the daemon lost to a crash still reads as time.
             at = _epoch(ended)
             timed_out = (
                 at is not None
                 and run is not None
                 and run.status == "cancelled"
-                and (at - began >= limit)
+                and working_ms(stored, at) >= limit * 1000
             )
         return stop_reason(
             None if run is None else run.status, run_events, agent, timed_out=timed_out
@@ -1978,7 +1981,7 @@ class SessionManager:
         await self._stop([live], "user")
 
     def _arm_time_limit(self, session: _LiveSession, run_id: str) -> None:
-        """Stop the helper's run when its agent's time limit has passed since it was made."""
+        """Stop the helper's run when it has worked its agent's time limit."""
         seconds = None if session.agent is None else session.agent.limits.max_seconds
         if session.parent is None or seconds is None:
             return
@@ -1987,10 +1990,24 @@ class SessionManager:
         )
 
     async def _time_limit(self, helper_id: str, run_id: str, seconds: int) -> None:
-        # Plain elapsed time since the helper was made; its working clock is 15.6.2.
-        began = started_at(await self._events.stored(helper_id))
-        left = 0.0 if began is None else began + seconds - self.wall_clock()
-        await self.pause(max(0.0, left))
+        """Sleep for the working time left, and count again from the stored events.
+
+        The clock stands still while the helper waits for you, a slot, a model load or a
+        provider, so it is checked again every ``CLOCK_RECHECK`` seconds then.
+        """
+        live = self._runs.get(run_id)
+        if live is not None:
+            await live.control.started.wait()
+        while True:
+            stored = await self._events.stored(helper_id)
+            if not any(isinstance(e, RunStartedEvent) and e.run_id == run_id for e in stored):
+                await asyncio.sleep(0.01)  # the run is just starting: its first event is on the way
+                continue
+            now = self.wall_clock()
+            left = seconds - working_ms(stored, now) / 1000
+            if left <= 0:
+                break
+            await self.pause(CLOCK_RECHECK if clock_paused(stored, now) else left)
         await self._limit_stop(helper_id, run_id, True)
 
     def _spawn_wake(self, lead_id: str) -> None:

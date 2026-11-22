@@ -148,7 +148,8 @@
           "cache_write": null,
           "input": 100,
           "output": 20
-        }
+        },
+        "waited_ms": null
       },
       "run_id": "id-2",
       "seq": 8,
@@ -443,7 +444,8 @@
           "cache_write": null,
           "input": 100,
           "output": 20
-        }
+        },
+        "waited_ms": null
       },
       "run_id": "id-2",
       "seq": 23,
@@ -609,7 +611,8 @@
           "cache_write": null,
           "input": 100,
           "output": 20
-        }
+        },
+        "waited_ms": null
       },
       "run_id": "id-2",
       "seq": 8,
@@ -904,7 +907,8 @@
           "cache_write": null,
           "input": 100,
           "output": 20
-        }
+        },
+        "waited_ms": null
       },
       "run_id": "id-2",
       "seq": 23,

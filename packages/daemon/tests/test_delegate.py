@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import time
 from collections.abc import Awaitable, Callable, Mapping
 from pathlib import Path
 from typing import Any, cast
@@ -792,6 +793,8 @@ async def test_a_helper_that_never_answers_stops_at_the_time_limit(
         await gate.wait()
 
     monkeypatch.setattr(manager_module, "_pause", pause)
+    skew = [0.0]
+    monkeypatch.setattr(manager_module, "_now", lambda: time.time() + skew[0])
     model = _Hanging(
         replies=[[("delegate", {"agent": "explorer", "brief": "hang"})], "after the limit"]
     )
@@ -800,6 +803,7 @@ async def test_a_helper_that_never_answers_stops_at_the_time_limit(
     run_id = await chat.manager.send(session_id, "go")
     async with asyncio.timeout(5):
         await model.waiting.wait()
+    skew[0] = 400.0
     gate.set()
     events = await chat.finished(run_id)
 
@@ -823,6 +827,8 @@ async def test_a_helper_waits_its_max_seconds_on_the_default_clocks(
         await gate.wait()
 
     monkeypatch.setattr(manager_module, "_pause", pause)
+    skew = [0.0]
+    monkeypatch.setattr(manager_module, "_now", lambda: time.time() + skew[0])
     model = _Hanging(
         replies=[[("delegate", {"agent": "explorer", "brief": "hang"})], "after the limit"]
     )
@@ -836,6 +842,7 @@ async def test_a_helper_waits_its_max_seconds_on_the_default_clocks(
             await asyncio.sleep(0.01)
     # Epoch seconds against the helper's epoch start, not against a monotonic clock.
     assert 250 < asked[0] <= 300
+    skew[0] = 400.0
     gate.set()
     events = await chat.finished(run_id)
 
