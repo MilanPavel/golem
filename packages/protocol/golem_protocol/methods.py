@@ -145,6 +145,8 @@ METHOD_ACCESS: Final[Mapping[str, Access]] = {
     "agents.get": "browser",
     "agents.set_wish": "browser",
     "agents.keep": "browser",
+    "agents.set_limits": "browser",
+    "agents.set_default_limits": "browser",
     "agents.save": "browser",
     "agents.copy": "browser",
     "agents.delete": "browser",

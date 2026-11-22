@@ -23,6 +23,7 @@ export {
   NOT_A_REPO,
   BRANCH_SWITCH_FAILED,
   SESSION_NOT_FOUND,
+  type AgentLimitsChange,
   type ApprovalChoice,
   type ConsentChoice,
   type ChangesDiffTarget,
@@ -173,6 +174,9 @@ export type { AgentsSaveProblem } from "../../protocol/gen/agents-save-problem.t
 export type { AgentsSaveResult } from "../../protocol/gen/agents-save-result.ts";
 export type { AgentsKeepResult } from "../../protocol/gen/agents-keep-result.ts";
 export type { AgentsKeepValues } from "../../protocol/gen/agents-keep-values.ts";
+export type { AgentsSetDefaultLimitsParams } from "../../protocol/gen/agents-set-default-limits-params.ts";
+export type { AgentsSetLimitsParams } from "../../protocol/gen/agents-set-limits-params.ts";
+export type { AgentsSetLimitsResult } from "../../protocol/gen/agents-set-limits-result.ts";
 export type { AgentsSetWishResult } from "../../protocol/gen/agents-set-wish-result.ts";
 export type { WishResolution } from "../../protocol/gen/wish-resolution.ts";
 export type { SkillSetDisabledResult } from "../../protocol/gen/skill-set-disabled-result.ts";

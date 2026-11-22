@@ -2327,3 +2327,71 @@ test("readFile and listFiles send their arguments and reject a malformed result"
     await bad.close();
   }
 });
+
+test("agents.set_limits sends the keys to set and to clear, and a result that is not an agent is refused", async () => {
+  const sent: Record<string, unknown>[] = [];
+  const updated = { name: "worker", description: "Works.", origin: "bundled", wish: "cheapest", limits: { max_calls: 5 }, limits_from_config: ["max_calls"] };
+  const server = await listen((socket) => {
+    attach(socket, {
+      answerPing: true,
+      results: { "agents.set_limits": updated },
+      onRequest: (_socket, method, params) => {
+        if (method === "agents.set_limits") sent.push({ ...params });
+      },
+    });
+  });
+  const client = connectGolem({ socketPath: server.socketPath, clientName: "web", reconnect: false, heartbeatMs: 60_000 });
+  try {
+    assert.deepEqual(await client.setAgentLimits("worker", { max_calls: 5, clear: ["max_tokens"] }, "/repo"), updated);
+    await client.setAgentLimits("worker", { max_cost: 0.5 });
+    assert.deepEqual(sent, [
+      { name: "worker", max_calls: 5, clear: ["max_tokens"], cwd: "/repo" },
+      { name: "worker", max_cost: 0.5 },
+    ]);
+  } finally {
+    client.close();
+    await server.close();
+  }
+  const bad = await listen((socket) => {
+    attach(socket, { answerPing: true, results: { "agents.set_limits": { name: "worker", limits_from_config: [1] } } });
+  });
+  const refused = connectGolem({ socketPath: bad.socketPath, clientName: "web", reconnect: false, heartbeatMs: 60_000 });
+  try {
+    await assert.rejects(() => refused.setAgentLimits("worker", {}), /invalid agents.set_limits result/);
+  } finally {
+    refused.close();
+    await bad.close();
+  }
+});
+
+test("agents.set_default_limits sends the keys it was given and checks what comes back", async () => {
+  const sent: Record<string, unknown>[] = [];
+  const result = { ok: true, errors: [], values: { keep_days: 7, keep_problem_days: 30, max_calls: 8, max_tokens: null } };
+  const server = await listen((socket) => {
+    attach(socket, {
+      answerPing: true,
+      results: { "agents.set_default_limits": result },
+      onRequest: (_socket, method, params) => {
+        if (method === "agents.set_default_limits") sent.push({ ...params });
+      },
+    });
+  });
+  const client = connectGolem({ socketPath: server.socketPath, clientName: "web", reconnect: false, heartbeatMs: 60_000 });
+  try {
+    assert.deepEqual(await client.setDefaultAgentLimits({ max_calls: 8, clear: ["max_tokens"] }), result);
+    assert.deepEqual(sent, [{ max_calls: 8, clear: ["max_tokens"] }]);
+  } finally {
+    client.close();
+    await server.close();
+  }
+  const bad = await listen((socket) => {
+    attach(socket, { answerPing: true, results: { "agents.set_default_limits": { ok: "yes" } } });
+  });
+  const refused = connectGolem({ socketPath: bad.socketPath, clientName: "web", reconnect: false, heartbeatMs: 60_000 });
+  try {
+    await assert.rejects(() => refused.setDefaultAgentLimits({}), /invalid agents.set_default_limits result/);
+  } finally {
+    refused.close();
+    await bad.close();
+  }
+});

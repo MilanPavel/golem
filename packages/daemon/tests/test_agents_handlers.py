@@ -6,6 +6,7 @@ No model is involved: the registry reads files, and the counts read stored event
 from __future__ import annotations
 
 import json
+import tomllib
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -504,3 +505,227 @@ async def test_delete_refuses_bundled_project_and_unknown_agents(world: _World) 
     await world.call("agents.save", {"text": _text("gone")})
     result = await world.call("agents.delete", {"name": "gone"})
     assert result.agent is None
+
+
+# --- agents.set_limits, agents.set_default_limits ---------------------------------------------
+
+
+def _config(world: _World) -> dict[str, Any]:
+    path = world.state.paths.config_file
+    return tomllib.loads(path.read_text()) if path.exists() else {}
+
+
+def _write_config(world: _World, text: str) -> None:
+    world.state.paths.config_file.write_text(text)
+
+
+async def test_list_and_get_show_the_resolved_limits_and_which_come_from_config(
+    world: _World,
+) -> None:
+    _agent(_folder(world), "mine")
+    _write_config(
+        world,
+        "[agents]\nmax_tokens = 9000\nmax_cost = 2.0\n"
+        "[agents.worker]\nmax_calls = 4\n[agents.explorer]\ntimeout_seconds = 120\n",
+    )
+
+    listed = {a.name: a for a in (await world.call("agents.list", {})).agents}
+
+    worker = listed["worker"]
+    assert worker.limits.max_calls == 4
+    assert (worker.limits.max_tokens, worker.limits.max_cost_usd) == (9000, 2.0)
+    assert worker.limits_from_config == ["max_calls"]
+    explorer = listed["explorer"]
+    assert explorer.limits.max_seconds == 120
+    assert explorer.limits_from_config == ["max_seconds"]
+    assert listed["reviewer"].limits_from_config == []
+    mine = listed["mine"]
+    assert (mine.limits.max_calls, mine.limits.max_tokens) == (7, 9000)
+    assert mine.limits_from_config == []
+    assert (mine.text or "").count("max-calls: 7") == 1
+    got = await world.call("agents.get", {"name": "worker"})
+    assert got.limits.max_calls == 4 and got.limits_from_config == ["max_calls"]
+
+
+async def test_set_and_clear_each_limit_of_a_bundled_type(world: _World) -> None:
+    _write_config(world, "# mine\n[agents.worker]\nmodel = 'cheapest'\n")
+    info = await world.call(
+        "agents.set_limits",
+        {
+            "name": "worker",
+            "max_calls": 5,
+            "working_seconds": 90,
+            "max_cost": 0.5,
+            "max_tokens": 4000,
+        },
+    )
+    table = _config(world)["agents"]["worker"]
+    assert table == {
+        "model": "cheapest",
+        "max_calls": 5,
+        "working_seconds": 90,
+        "max_cost": 0.5,
+        "max_tokens": 4000,
+    }
+    assert world.state.paths.config_file.read_text().startswith("# mine")
+    assert (info.limits.max_calls, info.limits.max_seconds) == (5, 90)
+    assert (info.limits.max_cost_usd, info.limits.max_tokens) == (0.5, 4000)
+    assert info.limits_from_config == ["max_calls", "max_seconds", "max_cost_usd", "max_tokens"]
+
+    for key in ("max_calls", "working_seconds", "max_cost", "max_tokens"):
+        cleared = await world.call("agents.set_limits", {"name": "worker", "clear": [key]})
+        assert key not in _config(world)["agents"]["worker"]
+    assert _config(world)["agents"]["worker"] == {"model": "cheapest"}
+    assert cleared.limits_from_config == []
+    assert cleared.limits.max_calls == 30  # the bundled file
+
+    untouched = await world.call("agents.set_limits", {"name": "worker", "max_calls": 3})
+    again = await world.call("agents.set_limits", {"name": "worker", "max_tokens": 10})
+    assert untouched.limits.max_calls == 3 and again.limits.max_calls == 3
+    assert _config(world)["agents"]["worker"]["max_calls"] == 3
+
+
+async def test_the_explorers_old_timeout_key_is_replaced(world: _World) -> None:
+    _write_config(world, "[agents.explorer]\ntimeout_seconds = 120\nanswer_chars = 500\n")
+    info = await world.call("agents.set_limits", {"name": "explorer", "working_seconds": 60})
+    assert _config(world)["agents"]["explorer"] == {"answer_chars": 500, "working_seconds": 60}
+    assert info.limits.max_seconds == 60
+    assert info.limits_from_config == ["max_seconds", "answer_chars"]
+
+    _write_config(world, "[agents.explorer]\ntimeout_seconds = 120\n")
+    cleared = await world.call(
+        "agents.set_limits", {"name": "explorer", "clear": ["working_seconds"]}
+    )
+    assert "agents" not in _config(world)
+    assert cleared.limits_from_config == []
+    assert cleared.limits.max_seconds != 120
+
+
+async def test_set_and_clear_each_limit_of_your_own_agent(world: _World) -> None:
+    text = (
+        "---\n# mine\nname: mine\ndescription: Does a thing.   # keep\nmodel: cheapest\n"
+        "max-calls: 7   # seven\nmax-tokens: 100\n---\nBody.\n\n  indented\n"
+    )
+    path = _folder(world) / "mine.md"
+    _folder(world).mkdir(parents=True)
+    path.write_text(text)
+
+    info = await world.call(
+        "agents.set_limits",
+        {
+            "name": "mine",
+            "max_calls": 9,
+            "working_seconds": 30,
+            "max_cost": 1.5,
+            "clear": ["max_tokens"],
+        },
+    )
+
+    expected = (
+        "---\n# mine\nname: mine\ndescription: Does a thing.   # keep\nmodel: cheapest\n"
+        "max-calls: 9   # seven\nmax-seconds: 30\nmax-cost-usd: 1.5\n---\nBody.\n\n  indented\n"
+    )
+    assert path.read_text() == expected
+    assert (info.limits.max_calls, info.limits.max_seconds) == (9, 30)
+    assert (info.limits.max_cost_usd, info.limits.max_tokens) == (1.5, None)
+    assert info.limits_from_config == []
+    assert info.text == expected
+
+    for key in ("max_calls", "working_seconds", "max_cost"):
+        await world.call("agents.set_limits", {"name": "mine", "clear": [key]})
+    assert path.read_text() == text.replace("max-calls: 7   # seven\nmax-tokens: 100\n", "")
+    assert not world.state.paths.config_file.exists()
+
+
+async def test_set_limits_refuses_a_project_agent_and_wrong_values_and_writes_nothing(
+    world: _World,
+) -> None:
+    _agent(world.project / ".golem/agents", "local")
+    _trust(world)
+    cwd = str(world.project)
+    before = (world.project / ".golem/agents/local.md").read_text()
+    with pytest.raises(RpcCallError) as project:
+        await world.call("agents.set_limits", {"name": "local", "cwd": cwd, "max_calls": 2})
+    assert project.value.code == INVALID_PARAMS and "read-only" in str(project.value)
+    assert (world.project / ".golem/agents/local.md").read_text() == before
+
+    _agent(_folder(world), "mine")
+    mine = (_folder(world) / "mine.md").read_text()
+    bad: list[tuple[str, dict[str, Any], str]] = [
+        ("worker", {"max_calls": 0}, "max_calls must be a whole number"),
+        ("worker", {"working_seconds": 0}, "working_seconds must be"),
+        ("worker", {"max_tokens": -5}, "max_tokens must be"),
+        ("worker", {"max_cost": -0.1}, "max_cost must be 0 or more"),
+        ("worker", {"max_calls": 2, "clear": ["max_calls"]}, "both set and cleared"),
+        ("explorer", {"max_calls": 51}, "50 or less"),
+        ("mine", {"max_cost": 0}, "above 0"),
+        ("mine", {"max_calls": 0}, "max_calls"),
+        ("nope", {"max_calls": 2}, "no agent named"),
+    ]
+    for name, params, words in bad:
+        with pytest.raises(RpcCallError) as raised:
+            await world.call("agents.set_limits", {"name": name, **params})
+        assert raised.value.code == INVALID_PARAMS and words in str(raised.value), (name, params)
+    assert not world.state.paths.config_file.exists()
+    assert (_folder(world) / "mine.md").read_text() == mine
+    ok = await world.call("agents.set_limits", {"name": "explorer", "max_calls": 50})
+    assert ok.limits.max_calls == 50
+
+
+async def test_default_limits_are_set_cleared_and_read_with_keep(world: _World) -> None:
+    _write_config(world, "# mine\n[agents]\nkeep_days = 3\n")
+    got = await world.call("agents.keep", {})
+    assert (got.values.max_calls, got.values.max_cost) == (None, None)
+
+    saved = await world.call(
+        "agents.set_default_limits",
+        {"max_calls": 8, "working_seconds": 120, "max_cost": 0.25, "max_tokens": 5000},
+    )
+    assert saved.ok and saved.values is not None
+    assert (saved.values.max_calls, saved.values.working_seconds) == (8, 120)
+    assert (saved.values.max_cost, saved.values.max_tokens) == (0.25, 5000)
+    assert saved.values.keep_days == 3
+    assert _config(world)["agents"] == {
+        "keep_days": 3,
+        "max_calls": 8,
+        "working_seconds": 120,
+        "max_cost": 0.25,
+        "max_tokens": 5000,
+    }
+    assert world.state.paths.config_file.read_text().startswith("# mine")
+    worker = await world.call("agents.get", {"name": "worker"})
+    assert (worker.limits.max_cost_usd, worker.limits_from_config) == (0.25, [])
+
+    cleared = await world.call(
+        "agents.set_default_limits", {"clear": ["max_calls", "working_seconds", "max_cost"]}
+    )
+    assert cleared.values is not None
+    assert (cleared.values.max_calls, cleared.values.max_tokens) == (None, 5000)
+    assert _config(world)["agents"] == {"keep_days": 3, "max_tokens": 5000}
+
+    wrong = await world.call("agents.set_default_limits", {"max_calls": 0, "max_tokens": 1})
+    assert not wrong.ok and wrong.errors[0].path == "agents.max_calls"
+    assert _config(world)["agents"] == {"keep_days": 3, "max_tokens": 5000}
+
+
+async def test_set_limits_on_your_own_file_removes_the_config_keys_that_would_win(
+    world: _World,
+) -> None:
+    _folder(world).mkdir(parents=True)
+    (_folder(world) / "explorer.md").write_text(_text("explorer", extra="max-calls: 5\n"))
+    _write_config(
+        world, "[agents.explorer]\nmax_calls = 9\ntimeout_seconds = 120\nanswer_chars = 500\n"
+    )
+
+    info = await world.call("agents.set_limits", {"name": "explorer", "max_calls": 20})
+
+    assert "max-calls: 20\n" in (_folder(world) / "explorer.md").read_text()
+    assert _config(world)["agents"]["explorer"] == {"timeout_seconds": 120, "answer_chars": 500}
+    assert info.limits.max_calls == 20
+    assert "max_calls" not in info.limits_from_config
+
+    listed = {a.name: a for a in (await world.call("agents.list", {})).agents}
+    assert listed["explorer"].limits.max_calls == 20
+
+    await world.call("agents.set_limits", {"name": "explorer", "working_seconds": 45})
+    assert _config(world)["agents"]["explorer"] == {"answer_chars": 500}

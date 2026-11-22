@@ -11,6 +11,7 @@ export type MaxCalls = number | null;
 export type MaxCostUsd = number | null;
 export type MaxSeconds = number | null;
 export type MaxTokens = number | null;
+export type LimitsFromConfig = string[];
 export type Name = string;
 export type Origin = 'bundled' | 'user' | 'project';
 export type Path = string | null;
@@ -66,6 +67,12 @@ export interface AgentsSaveResult {
  * the agent cannot be started now, the same text ``delegate`` refuses with, and is ``None``
  * when it can. An older daemon leaves out every field from ``resolves_to`` on.
  *
+ * ``limits`` are the limits a helper of this type runs with now: ``[agents.<name>]`` of
+ * ``config.toml`` first, then the file, then ``[agents]``, then the built-in default. The file
+ * itself, in ``text``, is unchanged. ``limits_from_config`` names the limits that
+ * ``[agents.<name>]`` sets, among ``max_calls``, ``max_seconds``, ``max_cost_usd``,
+ * ``max_tokens`` and ``answer_chars``; it is empty for a type that has no such table.
+ *
  * This interface was referenced by `AgentsSaveResult`'s JSON-Schema
  * via the `definition` "AgentInfo".
  */
@@ -77,6 +84,7 @@ export interface AgentInfo {
   errors?: Errors;
   finished?: Finished;
   limits?: AgentLimits;
+  limits_from_config?: LimitsFromConfig;
   name: Name;
   origin: Origin;
   path?: Path;

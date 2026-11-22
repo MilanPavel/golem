@@ -231,8 +231,9 @@ export interface LimitFact {
 }
 
 /**
- * What bounds one helper of this type: tool calls, time and answer length always (`no limit` when the file sets
- * none), tokens and cost only when the file sets them.
+ * What bounds one helper of this type, from the resolved limits the daemon sends (config, file, `[agents]`, default):
+ * tool calls always have a value, time and answer length say `no limit` when nothing sets them, tokens and cost
+ * show only when something sets them.
  */
 export function limitFacts(limits: AgentInfo["limits"]): LimitFact[] {
   const none = "no limit";

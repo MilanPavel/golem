@@ -25,6 +25,13 @@ import Foundation
 /// ``tools`` that change things; the rest only read. ``unavailable`` says in plain words why
 /// the agent cannot be started now, the same text ``delegate`` refuses with, and is ``None``
 /// when it can. An older daemon leaves out every field from ``resolves_to`` on.
+///
+/// ``limits`` are the limits a helper of this type runs with now: ``[agents.<name>]`` of
+/// ``config.toml`` first, then the file, then ``[agents]``, then the built-in default. The
+/// file
+/// itself, in ``text``, is unchanged. ``limits_from_config`` names the limits that
+/// ``[agents.<name>]`` sets, among ``max_calls``, ``max_seconds``, ``max_cost_usd``,
+/// ``max_tokens`` and ``answer_chars``; it is empty for a type that has no such table.
 // MARK: - AgentInfo
 public struct AgentInfo: Codable {
     public let asks: Bool?
@@ -34,6 +41,7 @@ public struct AgentInfo: Codable {
     public let errors: [String]?
     public let finished: Int?
     public let limits: PurpleAgentLimits?
+    public let limitsFromConfig: [String]?
     public let name: String
     public let origin: Origin
     public let path: String?
@@ -56,6 +64,7 @@ public struct AgentInfo: Codable {
         case errors = "errors"
         case finished = "finished"
         case limits = "limits"
+        case limitsFromConfig = "limits_from_config"
         case name = "name"
         case origin = "origin"
         case path = "path"
@@ -71,7 +80,7 @@ public struct AgentInfo: Codable {
         case wish = "wish"
     }
 
-    public init(asks: Bool?, changingTools: [String]?, costUsd: Double?, description: String, errors: [String]?, finished: Int?, limits: PurpleAgentLimits?, name: String, origin: Origin, path: String?, prompt: String?, resolvesTo: PurpleWishResolution?, shadowed: [Origin]?, stopped: Int?, text: String?, tools: [String]?, trusted: Bool?, unavailable: String?, used: Int?, wish: String) {
+    public init(asks: Bool?, changingTools: [String]?, costUsd: Double?, description: String, errors: [String]?, finished: Int?, limits: PurpleAgentLimits?, limitsFromConfig: [String]?, name: String, origin: Origin, path: String?, prompt: String?, resolvesTo: PurpleWishResolution?, shadowed: [Origin]?, stopped: Int?, text: String?, tools: [String]?, trusted: Bool?, unavailable: String?, used: Int?, wish: String) {
         self.asks = asks
         self.changingTools = changingTools
         self.costUsd = costUsd
@@ -79,6 +88,7 @@ public struct AgentInfo: Codable {
         self.errors = errors
         self.finished = finished
         self.limits = limits
+        self.limitsFromConfig = limitsFromConfig
         self.name = name
         self.origin = origin
         self.path = path
@@ -347,6 +357,7 @@ public struct AgentsCopyResult: Codable {
     public let errors: [String]?
     public let finished: Int?
     public let limits: AgentsCopyResultLimits?
+    public let limitsFromConfig: [String]?
     public let name: String
     public let origin: Origin
     public let path: String?
@@ -369,6 +380,7 @@ public struct AgentsCopyResult: Codable {
         case errors = "errors"
         case finished = "finished"
         case limits = "limits"
+        case limitsFromConfig = "limits_from_config"
         case name = "name"
         case origin = "origin"
         case path = "path"
@@ -384,7 +396,7 @@ public struct AgentsCopyResult: Codable {
         case wish = "wish"
     }
 
-    public init(asks: Bool?, changingTools: [String]?, costUsd: Double?, description: String, errors: [String]?, finished: Int?, limits: AgentsCopyResultLimits?, name: String, origin: Origin, path: String?, prompt: String?, resolvesTo: AgentsCopyResultWishResolution?, shadowed: [Origin]?, stopped: Int?, text: String?, tools: [String]?, trusted: Bool?, unavailable: String?, used: Int?, wish: String) {
+    public init(asks: Bool?, changingTools: [String]?, costUsd: Double?, description: String, errors: [String]?, finished: Int?, limits: AgentsCopyResultLimits?, limitsFromConfig: [String]?, name: String, origin: Origin, path: String?, prompt: String?, resolvesTo: AgentsCopyResultWishResolution?, shadowed: [Origin]?, stopped: Int?, text: String?, tools: [String]?, trusted: Bool?, unavailable: String?, used: Int?, wish: String) {
         self.asks = asks
         self.changingTools = changingTools
         self.costUsd = costUsd
@@ -392,6 +404,7 @@ public struct AgentsCopyResult: Codable {
         self.errors = errors
         self.finished = finished
         self.limits = limits
+        self.limitsFromConfig = limitsFromConfig
         self.name = name
         self.origin = origin
         self.path = path
@@ -520,6 +533,13 @@ public struct AgentsDeleteResult: Codable {
 /// ``tools`` that change things; the rest only read. ``unavailable`` says in plain words why
 /// the agent cannot be started now, the same text ``delegate`` refuses with, and is ``None``
 /// when it can. An older daemon leaves out every field from ``resolves_to`` on.
+///
+/// ``limits`` are the limits a helper of this type runs with now: ``[agents.<name>]`` of
+/// ``config.toml`` first, then the file, then ``[agents]``, then the built-in default. The
+/// file
+/// itself, in ``text``, is unchanged. ``limits_from_config`` names the limits that
+/// ``[agents.<name>]`` sets, among ``max_calls``, ``max_seconds``, ``max_cost_usd``,
+/// ``max_tokens`` and ``answer_chars``; it is empty for a type that has no such table.
 // MARK: - AgentsDeleteResultAgentInfo
 public struct AgentsDeleteResultAgentInfo: Codable {
     public let asks: Bool?
@@ -529,6 +549,7 @@ public struct AgentsDeleteResultAgentInfo: Codable {
     public let errors: [String]?
     public let finished: Int?
     public let limits: TentacledAgentLimits?
+    public let limitsFromConfig: [String]?
     public let name: String
     public let origin: Origin
     public let path: String?
@@ -551,6 +572,7 @@ public struct AgentsDeleteResultAgentInfo: Codable {
         case errors = "errors"
         case finished = "finished"
         case limits = "limits"
+        case limitsFromConfig = "limits_from_config"
         case name = "name"
         case origin = "origin"
         case path = "path"
@@ -566,7 +588,7 @@ public struct AgentsDeleteResultAgentInfo: Codable {
         case wish = "wish"
     }
 
-    public init(asks: Bool?, changingTools: [String]?, costUsd: Double?, description: String, errors: [String]?, finished: Int?, limits: TentacledAgentLimits?, name: String, origin: Origin, path: String?, prompt: String?, resolvesTo: FluffyWishResolution?, shadowed: [Origin]?, stopped: Int?, text: String?, tools: [String]?, trusted: Bool?, unavailable: String?, used: Int?, wish: String) {
+    public init(asks: Bool?, changingTools: [String]?, costUsd: Double?, description: String, errors: [String]?, finished: Int?, limits: TentacledAgentLimits?, limitsFromConfig: [String]?, name: String, origin: Origin, path: String?, prompt: String?, resolvesTo: FluffyWishResolution?, shadowed: [Origin]?, stopped: Int?, text: String?, tools: [String]?, trusted: Bool?, unavailable: String?, used: Int?, wish: String) {
         self.asks = asks
         self.changingTools = changingTools
         self.costUsd = costUsd
@@ -574,6 +596,7 @@ public struct AgentsDeleteResultAgentInfo: Codable {
         self.errors = errors
         self.finished = finished
         self.limits = limits
+        self.limitsFromConfig = limitsFromConfig
         self.name = name
         self.origin = origin
         self.path = path
@@ -673,6 +696,7 @@ public struct AgentsGetResult: Codable {
     public let errors: [String]?
     public let finished: Int?
     public let limits: AgentsGetResultLimits?
+    public let limitsFromConfig: [String]?
     public let name: String
     public let origin: Origin
     public let path: String?
@@ -695,6 +719,7 @@ public struct AgentsGetResult: Codable {
         case errors = "errors"
         case finished = "finished"
         case limits = "limits"
+        case limitsFromConfig = "limits_from_config"
         case name = "name"
         case origin = "origin"
         case path = "path"
@@ -710,7 +735,7 @@ public struct AgentsGetResult: Codable {
         case wish = "wish"
     }
 
-    public init(asks: Bool?, changingTools: [String]?, costUsd: Double?, description: String, errors: [String]?, finished: Int?, limits: AgentsGetResultLimits?, name: String, origin: Origin, path: String?, prompt: String, resolvesTo: AgentsGetResultWishResolution?, shadowed: [Origin]?, stopped: Int?, text: String?, tools: [String]?, trusted: Bool?, unavailable: String?, used: Int?, wish: String) {
+    public init(asks: Bool?, changingTools: [String]?, costUsd: Double?, description: String, errors: [String]?, finished: Int?, limits: AgentsGetResultLimits?, limitsFromConfig: [String]?, name: String, origin: Origin, path: String?, prompt: String, resolvesTo: AgentsGetResultWishResolution?, shadowed: [Origin]?, stopped: Int?, text: String?, tools: [String]?, trusted: Bool?, unavailable: String?, used: Int?, wish: String) {
         self.asks = asks
         self.changingTools = changingTools
         self.costUsd = costUsd
@@ -718,6 +743,7 @@ public struct AgentsGetResult: Codable {
         self.errors = errors
         self.finished = finished
         self.limits = limits
+        self.limitsFromConfig = limitsFromConfig
         self.name = name
         self.origin = origin
         self.path = path
@@ -858,36 +884,70 @@ public struct AgentsKeepResultError: Codable {
 }
 
 /// ``[agents] keep_days`` and ``keep_problem_days`` as golem uses them. 0 is for ever.
+///
+/// ``max_calls``, ``working_seconds``, ``max_cost`` and ``max_tokens`` are the limits of
+/// ``[agents]`` that every helper gets when its own table and file leave them open; ``None``
+/// when
+/// ``config.toml`` does not set one. ``agents.set_default_limits`` changes them.
 // MARK: - AgentsKeepValuesClass
 public struct AgentsKeepValuesClass: Codable {
     public let keepDays: Int
     public let keepProblemDays: Int
+    public let maxCalls: Int?
+    public let maxCost: Double?
+    public let maxTokens: Int?
+    public let workingSeconds: Int?
 
     public enum CodingKeys: String, CodingKey {
         case keepDays = "keep_days"
         case keepProblemDays = "keep_problem_days"
+        case maxCalls = "max_calls"
+        case maxCost = "max_cost"
+        case maxTokens = "max_tokens"
+        case workingSeconds = "working_seconds"
     }
 
-    public init(keepDays: Int, keepProblemDays: Int) {
+    public init(keepDays: Int, keepProblemDays: Int, maxCalls: Int?, maxCost: Double?, maxTokens: Int?, workingSeconds: Int?) {
         self.keepDays = keepDays
         self.keepProblemDays = keepProblemDays
+        self.maxCalls = maxCalls
+        self.maxCost = maxCost
+        self.maxTokens = maxTokens
+        self.workingSeconds = workingSeconds
     }
 }
 
 /// ``[agents] keep_days`` and ``keep_problem_days`` as golem uses them. 0 is for ever.
+///
+/// ``max_calls``, ``working_seconds``, ``max_cost`` and ``max_tokens`` are the limits of
+/// ``[agents]`` that every helper gets when its own table and file leave them open; ``None``
+/// when
+/// ``config.toml`` does not set one. ``agents.set_default_limits`` changes them.
 // MARK: - AgentsKeepValues
 public struct AgentsKeepValues: Codable {
     public let keepDays: Int
     public let keepProblemDays: Int
+    public let maxCalls: Int?
+    public let maxCost: Double?
+    public let maxTokens: Int?
+    public let workingSeconds: Int?
 
     public enum CodingKeys: String, CodingKey {
         case keepDays = "keep_days"
         case keepProblemDays = "keep_problem_days"
+        case maxCalls = "max_calls"
+        case maxCost = "max_cost"
+        case maxTokens = "max_tokens"
+        case workingSeconds = "working_seconds"
     }
 
-    public init(keepDays: Int, keepProblemDays: Int) {
+    public init(keepDays: Int, keepProblemDays: Int, maxCalls: Int?, maxCost: Double?, maxTokens: Int?, workingSeconds: Int?) {
         self.keepDays = keepDays
         self.keepProblemDays = keepProblemDays
+        self.maxCalls = maxCalls
+        self.maxCost = maxCost
+        self.maxTokens = maxTokens
+        self.workingSeconds = workingSeconds
     }
 }
 
@@ -942,6 +1002,13 @@ public struct AgentsListResult: Codable {
 /// ``tools`` that change things; the rest only read. ``unavailable`` says in plain words why
 /// the agent cannot be started now, the same text ``delegate`` refuses with, and is ``None``
 /// when it can. An older daemon leaves out every field from ``resolves_to`` on.
+///
+/// ``limits`` are the limits a helper of this type runs with now: ``[agents.<name>]`` of
+/// ``config.toml`` first, then the file, then ``[agents]``, then the built-in default. The
+/// file
+/// itself, in ``text``, is unchanged. ``limits_from_config`` names the limits that
+/// ``[agents.<name>]`` sets, among ``max_calls``, ``max_seconds``, ``max_cost_usd``,
+/// ``max_tokens`` and ``answer_chars``; it is empty for a type that has no such table.
 // MARK: - AgentElement
 public struct AgentElement: Codable {
     public let asks: Bool?
@@ -951,6 +1018,7 @@ public struct AgentElement: Codable {
     public let errors: [String]?
     public let finished: Int?
     public let limits: AgentLimitsClass?
+    public let limitsFromConfig: [String]?
     public let name: String
     public let origin: Origin
     public let path: String?
@@ -973,6 +1041,7 @@ public struct AgentElement: Codable {
         case errors = "errors"
         case finished = "finished"
         case limits = "limits"
+        case limitsFromConfig = "limits_from_config"
         case name = "name"
         case origin = "origin"
         case path = "path"
@@ -988,7 +1057,7 @@ public struct AgentElement: Codable {
         case wish = "wish"
     }
 
-    public init(asks: Bool?, changingTools: [String]?, costUsd: Double?, description: String, errors: [String]?, finished: Int?, limits: AgentLimitsClass?, name: String, origin: Origin, path: String?, prompt: String?, resolvesTo: AgentWishResolution?, shadowed: [Origin]?, stopped: Int?, text: String?, tools: [String]?, trusted: Bool?, unavailable: String?, used: Int?, wish: String) {
+    public init(asks: Bool?, changingTools: [String]?, costUsd: Double?, description: String, errors: [String]?, finished: Int?, limits: AgentLimitsClass?, limitsFromConfig: [String]?, name: String, origin: Origin, path: String?, prompt: String?, resolvesTo: AgentWishResolution?, shadowed: [Origin]?, stopped: Int?, text: String?, tools: [String]?, trusted: Bool?, unavailable: String?, used: Int?, wish: String) {
         self.asks = asks
         self.changingTools = changingTools
         self.costUsd = costUsd
@@ -996,6 +1065,7 @@ public struct AgentElement: Codable {
         self.errors = errors
         self.finished = finished
         self.limits = limits
+        self.limitsFromConfig = limitsFromConfig
         self.name = name
         self.origin = origin
         self.path = path
@@ -1157,6 +1227,13 @@ public struct AgentsSaveResult: Codable {
 /// ``tools`` that change things; the rest only read. ``unavailable`` says in plain words why
 /// the agent cannot be started now, the same text ``delegate`` refuses with, and is ``None``
 /// when it can. An older daemon leaves out every field from ``resolves_to`` on.
+///
+/// ``limits`` are the limits a helper of this type runs with now: ``[agents.<name>]`` of
+/// ``config.toml`` first, then the file, then ``[agents]``, then the built-in default. The
+/// file
+/// itself, in ``text``, is unchanged. ``limits_from_config`` names the limits that
+/// ``[agents.<name>]`` sets, among ``max_calls``, ``max_seconds``, ``max_cost_usd``,
+/// ``max_tokens`` and ``answer_chars``; it is empty for a type that has no such table.
 // MARK: - AgentsSaveResultAgentInfo
 public struct AgentsSaveResultAgentInfo: Codable {
     public let asks: Bool?
@@ -1166,6 +1243,7 @@ public struct AgentsSaveResultAgentInfo: Codable {
     public let errors: [String]?
     public let finished: Int?
     public let limits: StickyAgentLimits?
+    public let limitsFromConfig: [String]?
     public let name: String
     public let origin: Origin
     public let path: String?
@@ -1188,6 +1266,7 @@ public struct AgentsSaveResultAgentInfo: Codable {
         case errors = "errors"
         case finished = "finished"
         case limits = "limits"
+        case limitsFromConfig = "limits_from_config"
         case name = "name"
         case origin = "origin"
         case path = "path"
@@ -1203,7 +1282,7 @@ public struct AgentsSaveResultAgentInfo: Codable {
         case wish = "wish"
     }
 
-    public init(asks: Bool?, changingTools: [String]?, costUsd: Double?, description: String, errors: [String]?, finished: Int?, limits: StickyAgentLimits?, name: String, origin: Origin, path: String?, prompt: String?, resolvesTo: TentacledWishResolution?, shadowed: [Origin]?, stopped: Int?, text: String?, tools: [String]?, trusted: Bool?, unavailable: String?, used: Int?, wish: String) {
+    public init(asks: Bool?, changingTools: [String]?, costUsd: Double?, description: String, errors: [String]?, finished: Int?, limits: StickyAgentLimits?, limitsFromConfig: [String]?, name: String, origin: Origin, path: String?, prompt: String?, resolvesTo: TentacledWishResolution?, shadowed: [Origin]?, stopped: Int?, text: String?, tools: [String]?, trusted: Bool?, unavailable: String?, used: Int?, wish: String) {
         self.asks = asks
         self.changingTools = changingTools
         self.costUsd = costUsd
@@ -1211,6 +1290,7 @@ public struct AgentsSaveResultAgentInfo: Codable {
         self.errors = errors
         self.finished = finished
         self.limits = limits
+        self.limitsFromConfig = limitsFromConfig
         self.name = name
         self.origin = origin
         self.path = path
@@ -1301,6 +1381,220 @@ public struct ProblemElement: Codable {
     }
 }
 
+/// ``agents.set_default_limits``. Set or clear the limits in ``[agents]`` that bound every
+/// helper its own table and its file leave open.
+///
+/// ``clear`` works as in :class:`AgentsSetLimitsParams`. Answers with ``ok`` false and the
+/// wrong field when a value is out of range, and nothing is written.
+// MARK: - AgentsSetDefaultLimitsParams
+public struct AgentsSetDefaultLimitsParams: Codable {
+    public let clear: [Clear]?
+    public let maxCalls: Int?
+    public let maxCost: Double?
+    public let maxTokens: Int?
+    public let workingSeconds: Int?
+
+    public enum CodingKeys: String, CodingKey {
+        case clear = "clear"
+        case maxCalls = "max_calls"
+        case maxCost = "max_cost"
+        case maxTokens = "max_tokens"
+        case workingSeconds = "working_seconds"
+    }
+
+    public init(clear: [Clear]?, maxCalls: Int?, maxCost: Double?, maxTokens: Int?, workingSeconds: Int?) {
+        self.clear = clear
+        self.maxCalls = maxCalls
+        self.maxCost = maxCost
+        self.maxTokens = maxTokens
+        self.workingSeconds = workingSeconds
+    }
+}
+
+public enum Clear: String, Codable {
+    case maxCalls = "max_calls"
+    case maxCost = "max_cost"
+    case maxTokens = "max_tokens"
+    case workingSeconds = "working_seconds"
+}
+
+/// ``agents.set_limits``. Set or clear limits of the helpers of the agent type ``name``.
+///
+/// A limit that is sent is set, and a key named in ``clear`` is removed so that the next
+/// place
+/// in the order applies again. A key that is in neither is left alone. A key in both is
+/// refused. For a built-in type the keys go in ``[agents.<name>]`` of ``config.toml``; for
+/// one
+/// of your own files they are the front matter lines ``max-calls``, ``max-seconds``,
+/// ``max-cost-usd`` and ``max-tokens``, and the same keys are then removed from
+/// ``[agents.<name>]`` of ``config.toml`` when your file has a built-in type's name, since
+/// that
+/// table would win over the file. A project agent is read-only here. ``max_calls`` and
+/// ``working_seconds`` are 1 or more, ``max_tokens`` is 1 or more, ``max_cost`` (US dollars)
+/// is
+/// 0 or more, and the explorer's ``max_calls`` is at most 50. Nothing is written when one is
+/// wrong.
+// MARK: - AgentsSetLimitsParams
+public struct AgentsSetLimitsParams: Codable {
+    public let clear: [Clear]?
+    public let cwd: String?
+    public let maxCalls: Int?
+    public let maxCost: Double?
+    public let maxTokens: Int?
+    public let name: String
+    public let workingSeconds: Int?
+
+    public enum CodingKeys: String, CodingKey {
+        case clear = "clear"
+        case cwd = "cwd"
+        case maxCalls = "max_calls"
+        case maxCost = "max_cost"
+        case maxTokens = "max_tokens"
+        case name = "name"
+        case workingSeconds = "working_seconds"
+    }
+
+    public init(clear: [Clear]?, cwd: String?, maxCalls: Int?, maxCost: Double?, maxTokens: Int?, name: String, workingSeconds: Int?) {
+        self.clear = clear
+        self.cwd = cwd
+        self.maxCalls = maxCalls
+        self.maxCost = maxCost
+        self.maxTokens = maxTokens
+        self.name = name
+        self.workingSeconds = workingSeconds
+    }
+}
+
+/// The agent type after the change.
+// MARK: - AgentsSetLimitsResult
+public struct AgentsSetLimitsResult: Codable {
+    public let asks: Bool?
+    public let changingTools: [String]?
+    public let costUsd: Double?
+    public let description: String
+    public let errors: [String]?
+    public let finished: Int?
+    public let limits: AgentsSetLimitsResultLimits?
+    public let limitsFromConfig: [String]?
+    public let name: String
+    public let origin: Origin
+    public let path: String?
+    public let prompt: String?
+    public let resolvesTo: AgentsSetLimitsResultWishResolution?
+    public let shadowed: [Origin]?
+    public let stopped: Int?
+    public let text: String?
+    public let tools: [String]?
+    public let trusted: Bool?
+    public let unavailable: String?
+    public let used: Int?
+    public let wish: String
+
+    public enum CodingKeys: String, CodingKey {
+        case asks = "asks"
+        case changingTools = "changing_tools"
+        case costUsd = "cost_usd"
+        case description = "description"
+        case errors = "errors"
+        case finished = "finished"
+        case limits = "limits"
+        case limitsFromConfig = "limits_from_config"
+        case name = "name"
+        case origin = "origin"
+        case path = "path"
+        case prompt = "prompt"
+        case resolvesTo = "resolves_to"
+        case shadowed = "shadowed"
+        case stopped = "stopped"
+        case text = "text"
+        case tools = "tools"
+        case trusted = "trusted"
+        case unavailable = "unavailable"
+        case used = "used"
+        case wish = "wish"
+    }
+
+    public init(asks: Bool?, changingTools: [String]?, costUsd: Double?, description: String, errors: [String]?, finished: Int?, limits: AgentsSetLimitsResultLimits?, limitsFromConfig: [String]?, name: String, origin: Origin, path: String?, prompt: String?, resolvesTo: AgentsSetLimitsResultWishResolution?, shadowed: [Origin]?, stopped: Int?, text: String?, tools: [String]?, trusted: Bool?, unavailable: String?, used: Int?, wish: String) {
+        self.asks = asks
+        self.changingTools = changingTools
+        self.costUsd = costUsd
+        self.description = description
+        self.errors = errors
+        self.finished = finished
+        self.limits = limits
+        self.limitsFromConfig = limitsFromConfig
+        self.name = name
+        self.origin = origin
+        self.path = path
+        self.prompt = prompt
+        self.resolvesTo = resolvesTo
+        self.shadowed = shadowed
+        self.stopped = stopped
+        self.text = text
+        self.tools = tools
+        self.trusted = trusted
+        self.unavailable = unavailable
+        self.used = used
+        self.wish = wish
+    }
+}
+
+/// What bounds one helper of this type. ``None`` means the file sets no limit of that kind.
+///
+/// ``max_seconds`` is working time: it does not count the time spent waiting for
+/// you, for a slot or for a provider. ``answer_chars`` cuts the helper's final answer.
+// MARK: - AgentsSetLimitsResultLimits
+public struct AgentsSetLimitsResultLimits: Codable {
+    public let answerChars: Int?
+    public let maxCalls: Int?
+    public let maxCostUsd: Double?
+    public let maxSeconds: Int?
+    public let maxTokens: Int?
+
+    public enum CodingKeys: String, CodingKey {
+        case answerChars = "answer_chars"
+        case maxCalls = "max_calls"
+        case maxCostUsd = "max_cost_usd"
+        case maxSeconds = "max_seconds"
+        case maxTokens = "max_tokens"
+    }
+
+    public init(answerChars: Int?, maxCalls: Int?, maxCostUsd: Double?, maxSeconds: Int?, maxTokens: Int?) {
+        self.answerChars = answerChars
+        self.maxCalls = maxCalls
+        self.maxCostUsd = maxCostUsd
+        self.maxSeconds = maxSeconds
+        self.maxTokens = maxTokens
+    }
+}
+
+/// What a type's wish becomes in this setup.
+///
+/// ``model`` is the model the wish picks now and ``tier`` its tier. ``reason`` is one plain
+/// line on why, at most 200 characters. ``fresh_window`` is true when the helper starts
+/// with an empty context window on that model. Every field may be left out.
+// MARK: - AgentsSetLimitsResultWishResolution
+public struct AgentsSetLimitsResultWishResolution: Codable {
+    public let freshWindow: Bool?
+    public let model: String?
+    public let reason: String?
+    public let tier: Tier?
+
+    public enum CodingKeys: String, CodingKey {
+        case freshWindow = "fresh_window"
+        case model = "model"
+        case reason = "reason"
+        case tier = "tier"
+    }
+
+    public init(freshWindow: Bool?, model: String?, reason: String?, tier: Tier?) {
+        self.freshWindow = freshWindow
+        self.model = model
+        self.reason = reason
+        self.tier = tier
+    }
+}
+
 /// ``agents.set_wish``. Set the model wish of the agent type ``name``.
 ///
 /// ``wish`` is ``cheapest``, ``same``, ``stronger``, a tier or a model name.
@@ -1333,6 +1627,7 @@ public struct AgentsSetWishResult: Codable {
     public let errors: [String]?
     public let finished: Int?
     public let limits: AgentsSetWishResultLimits?
+    public let limitsFromConfig: [String]?
     public let name: String
     public let origin: Origin
     public let path: String?
@@ -1355,6 +1650,7 @@ public struct AgentsSetWishResult: Codable {
         case errors = "errors"
         case finished = "finished"
         case limits = "limits"
+        case limitsFromConfig = "limits_from_config"
         case name = "name"
         case origin = "origin"
         case path = "path"
@@ -1370,7 +1666,7 @@ public struct AgentsSetWishResult: Codable {
         case wish = "wish"
     }
 
-    public init(asks: Bool?, changingTools: [String]?, costUsd: Double?, description: String, errors: [String]?, finished: Int?, limits: AgentsSetWishResultLimits?, name: String, origin: Origin, path: String?, prompt: String?, resolvesTo: AgentsSetWishResultWishResolution?, shadowed: [Origin]?, stopped: Int?, text: String?, tools: [String]?, trusted: Bool?, unavailable: String?, used: Int?, wish: String) {
+    public init(asks: Bool?, changingTools: [String]?, costUsd: Double?, description: String, errors: [String]?, finished: Int?, limits: AgentsSetWishResultLimits?, limitsFromConfig: [String]?, name: String, origin: Origin, path: String?, prompt: String?, resolvesTo: AgentsSetWishResultWishResolution?, shadowed: [Origin]?, stopped: Int?, text: String?, tools: [String]?, trusted: Bool?, unavailable: String?, used: Int?, wish: String) {
         self.asks = asks
         self.changingTools = changingTools
         self.costUsd = costUsd
@@ -1378,6 +1674,7 @@ public struct AgentsSetWishResult: Codable {
         self.errors = errors
         self.finished = finished
         self.limits = limits
+        self.limitsFromConfig = limitsFromConfig
         self.name = name
         self.origin = origin
         self.path = path

@@ -92,6 +92,8 @@ import type { AgentsCopyResult } from "../../protocol/gen/agents-copy-result.ts"
 import type { AgentsDeleteResult } from "../../protocol/gen/agents-delete-result.ts";
 import type { AgentsKeepResult } from "../../protocol/gen/agents-keep-result.ts";
 import type { AgentsSaveResult } from "../../protocol/gen/agents-save-result.ts";
+import type { AgentsSetDefaultLimitsParams } from "../../protocol/gen/agents-set-default-limits-params.ts";
+import type { AgentsSetLimitsResult } from "../../protocol/gen/agents-set-limits-result.ts";
 import type { AgentsSetWishResult } from "../../protocol/gen/agents-set-wish-result.ts";
 import type { SkillReadResult } from "../../protocol/gen/skill-read-result.ts";
 import type { RoutineUpdateResult } from "../../protocol/gen/routine-update-result.ts";
@@ -259,6 +261,7 @@ import {
   isAgentsDeleteResult,
   isAgentsKeepResult,
   isAgentsSaveResult,
+  isAgentsSetLimitsResult,
   isAgentsSetWishResult,
   isSkillListResult,
   isSkillReadResult,
@@ -363,6 +366,9 @@ interface ConnectBase {
 
 /** `dial` opens the link to the daemon. `@golem/client/node` has one for a Unix socket. */
 export type ConnectOptions = ConnectBase & { dial: Dial };
+
+/** The limits to set (a number) and to clear (`clear`, by key) for `setAgentLimits` and `setDefaultAgentLimits`. */
+export type AgentLimitsChange = AgentsSetDefaultLimitsParams;
 
 export interface GolemClient {
   readonly state: ConnectionState;
@@ -692,6 +698,14 @@ export interface GolemClient {
   setAgentWish(name: string, wish: string, cwd?: string): Promise<AgentsSetWishResult>;
   /** `agents.keep`: read how long a finished helper's steps are kept, or change `keep_days` and `keep_problem_days` (0 is for ever). */
   agentsKeep(change?: { keep_days?: number; keep_problem_days?: number }): Promise<AgentsKeepResult>;
+  /**
+   * `agents.set_limits`: set the limits sent for an agent type and clear the ones named in `clear`; a key in neither stays as it is.
+   * A built-in type gets them in `[agents.<name>]` of `config.toml`, your own file in its front matter; a project agent is refused.
+   * Resolves to the type as it is now.
+   */
+  setAgentLimits(name: string, change: AgentLimitsChange, cwd?: string): Promise<AgentsSetLimitsResult>;
+  /** `agents.set_default_limits`: set or clear the limits in `[agents]` that bound every helper. Resolves to what `agents.keep` returns, with the limits in `values`. */
+  setDefaultAgentLimits(change: AgentLimitsChange): Promise<AgentsKeepResult>;
   /** `agents.save`: save the whole text of a user agent file. `name` is the file it replaces; leave it out for a new agent. When `ok` is false nothing was saved and `problems` each carry a message and, for a frontmatter key, its line. */
   saveAgent(text: string, name?: string, cwd?: string): Promise<AgentsSaveResult>;
   /** `agents.copy`: copy the bundled agent `name` to the user's own agents, unchanged. Resolves to the new user agent. */
@@ -2526,6 +2540,22 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       const result = await call("agents.keep", { ...change });
       if (!isAgentsKeepResult(result)) {
         throw new Error("invalid agents.keep result");
+      }
+      return result;
+    },
+    async setAgentLimits(name: string, change: AgentLimitsChange, cwd?: string): Promise<AgentsSetLimitsResult> {
+      await ready;
+      const result = await call("agents.set_limits", cwd === undefined ? { name, ...change } : { name, ...change, cwd });
+      if (!isAgentsSetLimitsResult(result)) {
+        throw new Error("invalid agents.set_limits result");
+      }
+      return result;
+    },
+    async setDefaultAgentLimits(change: AgentLimitsChange): Promise<AgentsKeepResult> {
+      await ready;
+      const result = await call("agents.set_default_limits", { ...change });
+      if (!isAgentsKeepResult(result)) {
+        throw new Error("invalid agents.set_default_limits result");
       }
       return result;
     },

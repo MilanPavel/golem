@@ -10,7 +10,7 @@ const DAYS_BACK = { keep_days: 7, keep_problem_days: 30 } as const;
 
 const WHOLE_NUMBER = "Enter a whole number of days. 0 or for ever keeps them for ever.";
 
-export type KeepKey = keyof AgentsKeepValues;
+export type KeepKey = "keep_days" | "keep_problem_days";
 
 /** The page's own words for what stays after the steps go. */
 export const KEEP_STAYS = "What stays after: the brief, the answer, the model and the cost of each helper.";

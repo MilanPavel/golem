@@ -2061,6 +2061,7 @@ class _AgentFields(BaseModel):
     unavailable: str | None = None
     stopped: int | None = Field(default=None, ge=0)
     cost_usd: float | None = Field(default=None, ge=0)
+    limits_from_config: list[str] = Field(default_factory=list[str])
 
 
 class AgentInfo(_AgentFields):
@@ -2087,6 +2088,12 @@ class AgentInfo(_AgentFields):
     ``tools`` that change things; the rest only read. ``unavailable`` says in plain words why
     the agent cannot be started now, the same text ``delegate`` refuses with, and is ``None``
     when it can. An older daemon leaves out every field from ``resolves_to`` on.
+
+    ``limits`` are the limits a helper of this type runs with now: ``[agents.<name>]`` of
+    ``config.toml`` first, then the file, then ``[agents]``, then the built-in default. The file
+    itself, in ``text``, is unchanged. ``limits_from_config`` names the limits that
+    ``[agents.<name>]`` sets, among ``max_calls``, ``max_seconds``, ``max_cost_usd``,
+    ``max_tokens`` and ``answer_chars``; it is empty for a type that has no such table.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -2140,6 +2147,58 @@ class AgentsSetWishParams(BaseModel):
 
 class AgentsSetWishResult(AgentInfo):
     """The agent type after the change."""
+
+
+AgentLimitKey = Literal["max_calls", "working_seconds", "max_cost", "max_tokens"]
+"""The limits of one helper that ``config.toml`` can set: the keys of ``[agents]`` and
+``[agents.<name>]``."""
+
+
+class AgentsSetLimitsParams(BaseModel):
+    """``agents.set_limits``. Set or clear limits of the helpers of the agent type ``name``.
+
+    A limit that is sent is set, and a key named in ``clear`` is removed so that the next place
+    in the order applies again. A key that is in neither is left alone. A key in both is
+    refused. For a built-in type the keys go in ``[agents.<name>]`` of ``config.toml``; for one
+    of your own files they are the front matter lines ``max-calls``, ``max-seconds``,
+    ``max-cost-usd`` and ``max-tokens``, and the same keys are then removed from
+    ``[agents.<name>]`` of ``config.toml`` when your file has a built-in type's name, since that
+    table would win over the file. A project agent is read-only here. ``max_calls`` and
+    ``working_seconds`` are 1 or more, ``max_tokens`` is 1 or more, ``max_cost`` (US dollars) is
+    0 or more, and the explorer's ``max_calls`` is at most 50. Nothing is written when one is
+    wrong.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    name: str = Field(min_length=1)
+    cwd: str | None = Field(default=None, min_length=1)
+    max_calls: int | None = None
+    working_seconds: int | None = None
+    max_cost: float | None = None
+    max_tokens: int | None = None
+    clear: list[AgentLimitKey] = Field(default_factory=list[AgentLimitKey])
+
+
+class AgentsSetLimitsResult(AgentInfo):
+    """The agent type after the change."""
+
+
+class AgentsSetDefaultLimitsParams(BaseModel):
+    """``agents.set_default_limits``. Set or clear the limits in ``[agents]`` that bound every
+    helper its own table and its file leave open.
+
+    ``clear`` works as in :class:`AgentsSetLimitsParams`. Answers with ``ok`` false and the
+    wrong field when a value is out of range, and nothing is written.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    max_calls: int | None = None
+    working_seconds: int | None = None
+    max_cost: float | None = None
+    max_tokens: int | None = None
+    clear: list[AgentLimitKey] = Field(default_factory=list[AgentLimitKey])
 
 
 class AgentsSaveParams(BaseModel):
@@ -4013,12 +4072,21 @@ class AgentsKeepParams(BaseModel):
 
 
 class AgentsKeepValues(BaseModel):
-    """``[agents] keep_days`` and ``keep_problem_days`` as golem uses them. 0 is for ever."""
+    """``[agents] keep_days`` and ``keep_problem_days`` as golem uses them. 0 is for ever.
+
+    ``max_calls``, ``working_seconds``, ``max_cost`` and ``max_tokens`` are the limits of
+    ``[agents]`` that every helper gets when its own table and file leave them open; ``None`` when
+    ``config.toml`` does not set one. ``agents.set_default_limits`` changes them.
+    """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     keep_days: int = Field(ge=0)
     keep_problem_days: int = Field(ge=0)
+    max_calls: int | None = None
+    working_seconds: int | None = None
+    max_cost: float | None = None
+    max_tokens: int | None = None
 
 
 class AgentsKeepResult(BaseModel):
@@ -5022,6 +5090,7 @@ class FsRevealResult(BaseModel):
 
 __all__ = [
     "AgentInfo",
+    "AgentLimitKey",
     "AgentLimits",
     "AgentOrigin",
     "AgentRegistryChanged",
@@ -5032,6 +5101,9 @@ __all__ = [
     "AgentsKeepValues",
     "AgentsListParams",
     "AgentsListResult",
+    "AgentsSetDefaultLimitsParams",
+    "AgentsSetLimitsParams",
+    "AgentsSetLimitsResult",
     "AgentsSetWishParams",
     "AgentsSetWishResult",
     "ApprovalRespondParams",

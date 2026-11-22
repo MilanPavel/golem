@@ -2,7 +2,7 @@
   "$defs": {
     "AgentInfo": {
       "additionalProperties": false,
-      "description": "One agent type: an ``agents/<name>.md`` file, valid or not.\n\n``wish`` is the model wish as written: ``cheapest``, ``same``, ``stronger``, a tier\nor a model. ``tools`` are the tool names the helper may use, empty for none. ``asks``\nis true when the helper may ask you a question. ``errors`` are what is wrong with\nthe file: a type with errors is never the one a name resolves to. ``shadowed`` lists\nthe origins of lower files of the same name that this one hides. ``trusted`` is\nfalse for a project agent in a folder that is not trusted, which is listed and\nnever started. ``used`` and ``finished`` count helpers of this type started and\nended in the last 30 days (``helper.ended``). ``finished`` is ``None`` when the\ndaemon cannot count them. ``stopped`` counts the ones of the last 30 days that ended\nearly, for any reason other than done; ``None`` when the daemon cannot count them.\n``cost_usd`` is what those helpers cost in the same days; ``None`` when the daemon\ncannot say. ``resolves_to`` is what ``wish`` becomes in this setup; ``None`` when the\ndaemon does not say.\n\n``path`` is the agent's file: ``~`` stands for the home folder, a bundled file is its\npackage path (``golem/agents/bundled/explorer.md``) and a project file is relative to the\nproject. ``text`` is the whole file as written and ``prompt`` is its body. Both are\n``None`` for a project agent in a folder that is not trusted. ``changing_tools`` are the\n``tools`` that change things; the rest only read. ``unavailable`` says in plain words why\nthe agent cannot be started now, the same text ``delegate`` refuses with, and is ``None``\nwhen it can. An older daemon leaves out every field from ``resolves_to`` on.",
+      "description": "One agent type: an ``agents/<name>.md`` file, valid or not.\n\n``wish`` is the model wish as written: ``cheapest``, ``same``, ``stronger``, a tier\nor a model. ``tools`` are the tool names the helper may use, empty for none. ``asks``\nis true when the helper may ask you a question. ``errors`` are what is wrong with\nthe file: a type with errors is never the one a name resolves to. ``shadowed`` lists\nthe origins of lower files of the same name that this one hides. ``trusted`` is\nfalse for a project agent in a folder that is not trusted, which is listed and\nnever started. ``used`` and ``finished`` count helpers of this type started and\nended in the last 30 days (``helper.ended``). ``finished`` is ``None`` when the\ndaemon cannot count them. ``stopped`` counts the ones of the last 30 days that ended\nearly, for any reason other than done; ``None`` when the daemon cannot count them.\n``cost_usd`` is what those helpers cost in the same days; ``None`` when the daemon\ncannot say. ``resolves_to`` is what ``wish`` becomes in this setup; ``None`` when the\ndaemon does not say.\n\n``path`` is the agent's file: ``~`` stands for the home folder, a bundled file is its\npackage path (``golem/agents/bundled/explorer.md``) and a project file is relative to the\nproject. ``text`` is the whole file as written and ``prompt`` is its body. Both are\n``None`` for a project agent in a folder that is not trusted. ``changing_tools`` are the\n``tools`` that change things; the rest only read. ``unavailable`` says in plain words why\nthe agent cannot be started now, the same text ``delegate`` refuses with, and is ``None``\nwhen it can. An older daemon leaves out every field from ``resolves_to`` on.\n\n``limits`` are the limits a helper of this type runs with now: ``[agents.<name>]`` of\n``config.toml`` first, then the file, then ``[agents]``, then the built-in default. The file\nitself, in ``text``, is unchanged. ``limits_from_config`` names the limits that\n``[agents.<name>]`` sets, among ``max_calls``, ``max_seconds``, ``max_cost_usd``,\n``max_tokens`` and ``answer_chars``; it is empty for a type that has no such table.",
       "properties": {
         "asks": {
           "default": false,
@@ -55,6 +55,13 @@
         },
         "limits": {
           "$ref": "#/$defs/AgentLimits"
+        },
+        "limits_from_config": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Limits From Config",
+          "type": "array"
         },
         "name": {
           "minLength": 1,

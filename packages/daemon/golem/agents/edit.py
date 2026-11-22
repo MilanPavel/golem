@@ -1,8 +1,8 @@
-"""Change the model wish of an agent file and nothing else.
+"""Change the model wish or the limits of an agent file and nothing else.
 
 The wish is the ``model:`` key of the frontmatter. :func:`with_wish` rewrites that one line, or
 adds it, and returns the rest of the file byte for byte: comments, key order, line endings and
-the prompt stay as they were.
+the prompt stay as they were. :func:`with_limits` does the same for the limit keys.
 """
 
 from __future__ import annotations
@@ -16,6 +16,7 @@ from golem.skills.parse import frontmatter_fields
 _BOM = "﻿"
 _LINES = re.compile(r"[^\n]*\n|[^\n]+")
 _KEY = re.compile(r"model[ \t]*:(?P<value>.*?)(?P<eol>\r?\n)?$", re.DOTALL)
+_LIMIT_KEYS = ("max-calls", "max-seconds", "max-cost-usd", "max-tokens")
 _COMMENT = re.compile(r"[ \t]+#.*$")
 _WISH = re.compile(r"\S+")
 
@@ -81,3 +82,54 @@ def _read_back(text: str, wish: str) -> None:
 
 
 __all__ = ["AgentEditError", "check_wish", "with_wish"]
+
+
+def _frontmatter(text: str) -> tuple[int, list[str]]:
+    start = len(_BOM) if text.startswith(_BOM) else 0
+    lines = _LINES.findall(text, start)
+    if not lines or lines[0].rstrip() != "---":
+        raise AgentEditError("the file has no frontmatter to put the limit in")
+    if not any(i > 0 and line.rstrip() == "---" for i, line in enumerate(lines)):
+        raise AgentEditError("the frontmatter is never closed with ---")
+    return start, lines
+
+
+def _set_line(lines: list[str], key: str, value: int | float | None) -> None:
+    close = next(i for i, line in enumerate(lines) if i > 0 and line.rstrip() == "---")
+    pattern = re.compile(rf"{re.escape(key)}[ \t]*:(?P<value>.*?)(?P<eol>\r?\n)?$", re.DOTALL)
+    found = next((i for i in range(1, close) if pattern.match(lines[i])), None)
+    if found is None:
+        if value is None:
+            return
+        eol = "\r\n" if lines[close - 1].endswith("\r\n") else "\n"
+        if not lines[close - 1].endswith("\n"):
+            lines[close - 1] += eol
+        lines.insert(close, f"{key}: {value}{eol}")
+        return
+    end = found + 1
+    while end < close and lines[end][:1] in (" ", "\t") and lines[end].strip():
+        end += 1
+    if value is None:
+        del lines[found:end]
+        return
+    match = pattern.match(lines[found])
+    assert match is not None
+    tail = _COMMENT.search(match["value"])
+    comment = "" if tail is None else tail.group(0)
+    lines[found:end] = [f"{key}: {value}{comment}{match['eol'] or ''}"]
+
+
+def with_limits(text: str, changes: dict[str, int | float | None]) -> str:
+    """``text`` with the limit lines of ``changes`` set, or removed for a value of None.
+
+    The keys are ``max-calls``, ``max-seconds``, ``max-cost-usd`` and ``max-tokens``. The rest of
+    the file stays as it was. Raises :class:`AgentEditError` for another key and for a file
+    without frontmatter.
+    """
+    unknown = [key for key in changes if key not in _LIMIT_KEYS]
+    if unknown:
+        raise AgentEditError(f"{unknown[0]} is not a limit of an agent file")
+    start, lines = _frontmatter(text)
+    for key, value in changes.items():
+        _set_line(lines, key, value)
+    return text[:start] + "".join(lines)
