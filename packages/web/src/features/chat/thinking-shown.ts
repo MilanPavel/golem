@@ -3,31 +3,39 @@ import { createStore } from "../../store/create-store.ts";
 
 export const THINKING_KEY = "golem.thinking";
 
-/** The stored choice; with none, the thinking line is shown (also when storage is missing or blocked). */
-export function readThinkingShown(): boolean {
+/** How the thinking line sits above an answer: not at all, folded, or with its text showing. */
+export type ThinkingMode = "hidden" | "collapsed" | "open";
+export const THINKING_MODES: readonly ThinkingMode[] = ["hidden", "collapsed", "open"];
+
+/** What is kept for each mode. Collapsed is `shown`, the word an older page wrote. */
+const STORED: Record<ThinkingMode, string> = { hidden: "hidden", collapsed: "shown", open: "open" };
+
+/** The stored choice; with none, or a word that is not one, Collapsed (also when storage is missing or blocked). `shown` reads as Collapsed. */
+export function readThinkingMode(): ThinkingMode {
   try {
-    return globalThis.localStorage.getItem(THINKING_KEY) !== "hidden";
+    const stored = globalThis.localStorage.getItem(THINKING_KEY);
+    return stored === "hidden" ? "hidden" : stored === "open" ? "open" : "collapsed";
   } catch {
-    return true;
+    return "collapsed";
   }
 }
 
-function writeThinkingShown(shown: boolean): void {
+function writeThinkingMode(mode: ThinkingMode): void {
   try {
-    globalThis.localStorage.setItem(THINKING_KEY, shown ? "shown" : "hidden");
+    globalThis.localStorage.setItem(THINKING_KEY, STORED[mode]);
   } catch {
     // The choice then lasts until the page closes.
   }
 }
 
-/** One choice for every answer in the page: whether the thinking line sits above it. */
-export const thinkingShownStore = createStore<boolean>(readThinkingShown());
+/** One choice for every answer in the page: how the thinking line sits above it. */
+export const thinkingModeStore = createStore<ThinkingMode>(readThinkingMode());
 
-export function setThinkingShown(shown: boolean): void {
-  thinkingShownStore.set(shown);
-  writeThinkingShown(shown);
+export function setThinkingMode(mode: ThinkingMode): void {
+  thinkingModeStore.set(mode);
+  writeThinkingMode(mode);
 }
 
-export function useThinkingShown(): boolean {
-  return useSyncExternalStore(thinkingShownStore.subscribe, thinkingShownStore.getSnapshot);
+export function useThinkingMode(): ThinkingMode {
+  return useSyncExternalStore(thinkingModeStore.subscribe, thinkingModeStore.getSnapshot);
 }

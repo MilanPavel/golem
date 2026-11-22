@@ -91,9 +91,10 @@ for (const theme of ["slip", "kiln"] as const) {
     const normal = screen.getByRole("group", { name: "A turn with four tool steps, normal" });
     expect(normal.querySelectorAll("svg[data-state]")).toHaveLength(1);
     expect(within(normal).getAllByText("8.8s · 4 steps")).toHaveLength(1);
+    // The turn has a failed step, so its line starts open, as Settings › Chat says by default.
     const line = within(normal).getByRole("button", { name: /github calls, 1 failed/ });
-    expect(line.getAttribute("aria-expanded")).toBe("false");
-    expect(within(normal).queryByRole("list", { name: "Tool calls" })).toBeNull();
+    expect(line.getAttribute("aria-expanded")).toBe("true");
+    expect(within(normal).getByRole("list", { name: "Tool calls" })).toBeTruthy();
     const verbose = screen.getByRole("group", { name: "A turn with four tool steps, verbose" });
     expect(within(verbose).getByRole("list", { name: "Tool calls" })).toBeTruthy();
     expect(within(verbose).getAllByText("github · get_me").length).toBeGreaterThan(0);

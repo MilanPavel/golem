@@ -1,6 +1,7 @@
 import type { ComponentType, SVGProps } from "react";
 import {
   SettingsAgentsIcon,
+  SettingsChatIcon,
   SettingsAppearanceIcon,
   SettingsConfigIcon,
   SettingsDevicesIcon,
@@ -41,7 +42,8 @@ export const GROUPS: readonly SettingsGroup[] = [
 /** The sections, grouped, in the order of the sidebar. A new section adds an entry here and a case in the screen. */
 export const SECTIONS: readonly SettingsSection[] = [
   { id: "info", title: "Info", group: "general", icon: SettingsInfoIcon, description: "What is installed, where it lives, and whether it is healthy.", keywords: ["golem", "version", "service", "ollama", "model", "disk", "socket", "logs", "data", "daemon", "jobs", "install"] },
-  { id: "appearance", title: "Appearance", group: "general", icon: SettingsAppearanceIcon, description: "Theme, how much detail a chat shows, and the desktop app.", keywords: ["theme", "chat detail", "app"] },
+  { id: "chat", title: "Chat", group: "general", icon: SettingsChatIcon, description: "How golem answers and what a chat shows. These are the defaults for every new chat.", keywords: ["steps", "open it when a step fails", "thinking", "footer", "send"] },
+  { id: "appearance", title: "Appearance", group: "general", icon: SettingsAppearanceIcon, description: "Theme and the desktop app.", keywords: ["theme", "app"] },
   { id: "notifications", title: "Notifications", group: "general", icon: SettingsNotificationsIcon, description: "When golem tells you something, and when it keeps quiet.", keywords: ["tell me", "clicking a notification", "quiet hours", "pause"] },
   { id: "keys", title: "API keys", group: "models", icon: SettingsKeysIcon, description: "Keys for hosted providers. Stored in the system keychain.", keywords: ["provider", "anthropic", "openai", "keychain"] },
   { id: "routing", title: "Routing", group: "models", icon: SettingsRoutingIcon, description: "Which model new chats start on, and when golem switches.", keywords: ["new chats", "path of a turn", "paid gate", "exceptions", "ollama"] },

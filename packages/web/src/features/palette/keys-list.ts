@@ -1,4 +1,6 @@
 import { APPROVAL_KEYS } from "../approval/index.ts";
+import { sendKeys } from "../composer/send-hint.ts";
+import { sendKeyStore } from "../chat/chat-choices.ts";
 import { modShortcut } from "../../ui/platform.ts";
 
 export type KeyRow = { keys: readonly string[]; label: string };
@@ -20,8 +22,8 @@ export function keySections(): KeySection[] {
     {
       title: "Composer",
       rows: [
-        { keys: ["↵"], label: "send" },
-        { keys: ["⇧↵"], label: "new line" },
+        { keys: [sendKeys(sendKeyStore.getSnapshot()).send], label: "send" },
+        { keys: [sendKeys(sendKeyStore.getSnapshot()).newLine], label: "new line" },
         { keys: ["↑↓"], label: "earlier messages" },
         { keys: ["/"], label: "commands" },
         { keys: ["Tab"], label: "complete a command" },

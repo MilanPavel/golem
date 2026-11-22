@@ -11,6 +11,7 @@ import {
 } from "@golem/view";
 import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ClipboardEvent, type KeyboardEvent, type ReactNode } from "react";
 import { cn } from "../../ui/cn.ts";
+import { useSendKey } from "../chat/chat-choices.ts";
 import { SendIcon, StopIcon } from "../../ui/icons.tsx";
 import { recall, type History, type Recall } from "./history.ts";
 import { registerComposer } from "./active-composer.ts";
@@ -110,6 +111,7 @@ export function Composer({
 }: ComposerProps) {
   const field = useRef<HTMLTextAreaElement>(null);
   const [hint, setHint] = useState<string | null>(null);
+  const sendKey = useSendKey();
   const recalled = useRef<Recall | null>(null);
   const [browsing, setBrowsing] = useState(false);
   const [dismissed, setDismissed] = useState<string | null>(null);
@@ -256,7 +258,9 @@ export function Composer({
       return;
     }
     const el = event.currentTarget;
-    if (event.key === "Enter" && !event.shiftKey) {
+    // ↵ sends and ⇧↵ adds a line, or ⌘↵ sends and ↵ adds a line, as Settings › Chat says.
+    const sends = sendKey === "mod" ? event.metaKey || event.ctrlKey : !event.shiftKey;
+    if (event.key === "Enter" && (sends || (open && !event.shiftKey))) {
       event.preventDefault();
       if (open) {
         complete(selected, "enter");

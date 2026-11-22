@@ -22,7 +22,7 @@ import { Dot, serverSummary, SignInPanel, type Login } from "../features/setting
 import type { McpServer } from "../store/mcp.ts";
 import { ConnectionScreen } from "../features/connection/connection-screen.tsx";
 import { connectionScreen, type ConnectionHost } from "../features/connection/connection-screen.ts";
-import { ChecksStrip, DetailSwitch, EditCards, ToolLine, TranscriptMessages, WritingRow, type TurnUndo } from "../features/chat/index.ts";
+import { ChecksStrip, EditCards, ToolLine, TranscriptMessages, WritingRow, type TurnUndo } from "../features/chat/index.ts";
 import { COST_CASES, CUT_REPLY, SAMPLE_CHAT, SAMPLE_TOOLS, THINKING_CASES, TURN_CHAT, NOTICE_CHAT, ROUTED_CASES, ROUTED_SESSION } from "../features/chat/sample.ts";
 import { ApprovalBar } from "../features/approval/index.ts";
 import { DockCounter } from "../features/approval/dock-counter.tsx";
@@ -56,6 +56,7 @@ import { APPROVAL_DETAIL, APPROVAL_TRACE, CLEARED_DETAIL, GROWING_EVENTS, CUT_LI
 import type { TraceContextEvent, TraceRunSpan, TraceSpanResult } from "../store/trace.ts";
 import { FORM_CASES } from "../features/setup/sample.ts";
 import { HeroCard, PathsGrid } from "../features/setup/info-parts.tsx";
+import { ChatSection } from "../features/settings/chat-section.tsx";
 import { KeysView } from "../features/settings/keys-section.tsx";
 import { KEYS_CASES } from "../features/settings/keys-sample.ts";
 import { MemoryView } from "../features/settings/memory/memory-view.tsx";
@@ -2119,6 +2120,13 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
         <MemoryDemo />
       </section>
 
+      <section className="mt-6" id={anchor("Settings chat")}>
+        <h3 className="mb-2 font-mono text-xs text-faint">Settings › Chat</h3>
+        <div className="rounded-lg border border-line bg-bg p-4">
+          <ChatSection />
+        </div>
+      </section>
+
       <section className="mt-6" id={anchor("API keys")}>
         <h3 className="mb-2 font-mono text-xs text-faint">API keys</h3>
         <ApiKeysDemo />
@@ -2476,9 +2484,6 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
 
       <section className="mt-6" id={anchor("Turn")}>
         <h3 className="mb-2 font-mono text-xs text-faint">Turn</h3>
-        <div className="mb-3">
-          <DetailSwitch />
-        </div>
         <div className="flex flex-col gap-3">
           {(["normal", "verbose", "quiet"] as const).map((detail) => (
             <div key={detail} aria-label={`A turn with four tool steps, ${detail}`} role="group" className="flex flex-col gap-6 rounded-lg border border-line bg-bg p-4">

@@ -1,12 +1,13 @@
 import { LIVE_OUTPUT_CHARS, type ChatMessage, type ToolBlock } from "@golem/view";
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import axe from "axe-core";
-import { afterEach, expect, test } from "vitest";
+import { afterEach, beforeEach, expect, test } from "vitest";
 import { ToolLine, TranscriptColumn, TranscriptMessages, waitingLine } from "./transcript.tsx";
 import type { PullsSnapshot } from "../../store/pulls.ts";
 import { NOTICE_CHAT, SAMPLE_CHAT } from "./sample.ts";
 import { detailStore } from "./detail.ts";
-import { setThinkingShown } from "./thinking-shown.ts";
+import { footerStore, openOnFailStore } from "./chat-choices.ts";
+import { readThinkingMode, setThinkingMode, thinkingModeStore } from "./thinking-shown.ts";
 
 const noContrast = { rules: { "color-contrast": { enabled: false } } };
 const chat = (messages: ChatMessage[], extra: { error?: string | null; notice?: string | null } = {}) => ({
@@ -351,10 +352,10 @@ test("an answer after thinking has one line that opens to the thinking text and 
 test("a hidden thinking line leaves no control, and showing it brings it back", () => {
   const messages = chat([answer({ text: "391", thinking: "hm", thinkingMs: 12_400 })]);
   const view = render(<TranscriptMessages chat={messages} />);
-  act(() => setThinkingShown(false));
+  act(() => setThinkingMode("hidden"));
   expect(view.container.querySelector("[data-thinking]")).toBeNull();
   expect(screen.getByText("391")).toBeTruthy();
-  act(() => setThinkingShown(true));
+  act(() => setThinkingMode("collapsed"));
   expect(screen.getByRole("button", { name: /thought for 12s/ })).toBeTruthy();
   localStorage.clear();
 });
@@ -386,8 +387,18 @@ const fourTools: ToolBlock[] = [
 ];
 const turn = (tools: ToolBlock[], over: Partial<ChatMessage> = {}) => render(<TranscriptMessages chat={chat([answer({ tools, durationMs: 42_100, ...over })])} />);
 
+// The older tests below read the whole footer and a folded line, so they start with both choices off. The newer ones set what they test.
+beforeEach(() => {
+  openOnFailStore.set(false);
+  footerStore.set({ off: [], leaveOutEmpty: false });
+});
+
 afterEach(() => {
   detailStore.set("normal");
+  thinkingModeStore.set("collapsed");
+  openOnFailStore.set(true);
+  footerStore.set({ off: [], leaveOutEmpty: true });
+  localStorage.clear();
 });
 
 test("the tools fold into one activity line that is closed, with dots and the summary", () => {
@@ -661,4 +672,58 @@ test("a turn without a web tool keeps its links plain", () => {
   const { container } = render(<TranscriptMessages chat={chat([answer({ text: "See [docs](https://example.com/docs)." })])} />);
   expect(container.querySelectorAll(".src-chip")).toHaveLength(0);
   expect(container.querySelector("a")?.textContent).toBe("docs");
+});
+
+const failedStep: ToolBlock = { callId: "f1", name: "run_shell", args: { command: "date +%A" }, status: "done", summary: "exit 1", unsuccessful: true };
+const goodStep: ToolBlock = { callId: "g1", name: "read_file", args: { path: "a.ts" }, status: "done", summary: "3 lines" };
+
+test("with a failed step the activity line starts open, even in Quiet", () => {
+  detailStore.set("quiet");
+  openOnFailStore.set(true);
+  turn([goodStep, failedStep]);
+  expect(screen.getByRole("button", { name: "2 steps" }).getAttribute("aria-expanded")).toBe("true");
+  expect(screen.getByRole("list", { name: "Tool calls" })).toBeTruthy();
+});
+
+test("a turn with no failed step starts folded in Quiet, and so does a failed one when the choice is off", () => {
+  detailStore.set("quiet");
+  openOnFailStore.set(true);
+  const { unmount } = turn([goodStep]);
+  expect(screen.getByRole("button", { name: "1 step" }).getAttribute("aria-expanded")).toBe("false");
+  unmount();
+  openOnFailStore.set(false);
+  turn([goodStep, failedStep]);
+  expect(screen.getByRole("button", { name: "2 steps" }).getAttribute("aria-expanded")).toBe("false");
+});
+
+test("Thinking Open shows the text under the line without a click, and a click folds it", () => {
+  thinkingModeStore.set("open");
+  render(<TranscriptMessages chat={chat([answer({ text: "391", thinking: "17 times 23 is 391.", thinkingMs: 3000 })])} />);
+  const control = screen.getByRole("button", { name: /thought for 3s/ });
+  expect(control.getAttribute("aria-expanded")).toBe("true");
+  expect(screen.getByRole("region", { name: "Thinking" }).textContent).toBe("17 times 23 is 391.");
+  fireEvent.click(control);
+  expect(screen.queryByRole("region", { name: "Thinking" })).toBeNull();
+});
+
+test("a stored thinking choice of shown reads as Collapsed", () => {
+  localStorage.setItem("golem.thinking", "shown");
+  expect(readThinkingMode()).toBe("collapsed");
+});
+
+test("a part turned off is gone from the footer", () => {
+  footerStore.set({ off: ["steps", "model"], leaveOutEmpty: true });
+  turn([goodStep], { call: { model: "qwen3:27b", tier: "local", tokens: 4100, costUsd: 0, done: true } });
+  expect(screen.getByText("42.1s · local · 4.1K tok")).toBeTruthy();
+});
+
+test("Leave out what says nothing drops $0.00 on a local turn, and showing everything brings it back", () => {
+  const call = { model: "qwen3:27b", tier: "local" as const, tokens: 4100, costUsd: 0, done: true };
+  footerStore.set({ off: [], leaveOutEmpty: true });
+  const { unmount } = turn([goodStep], { call });
+  expect(screen.queryByText(/\$0\.00/)).toBeNull();
+  unmount();
+  footerStore.set({ off: [], leaveOutEmpty: false });
+  turn([goodStep], { call });
+  expect(screen.getByText(/\$0\.00/)).toBeTruthy();
 });

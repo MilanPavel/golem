@@ -33,7 +33,7 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { actionErrorText, isNoModelChosen } from "../../store/errors.ts";
 import { useConfig, useModelList, useNavigate, useNewSessionModel, useNotes, usePageActions, useSessionReader, useSkillList } from "../../store/page-context.tsx";
-import { detailStore, setDetail, setThinkingShown, setTimesShown, thinkingShownStore, timesShownStore } from "../chat/index.ts";
+import { detailStore, setDetail, setThinkingMode, setTimesShown, thinkingModeStore, timesShownStore } from "../chat/index.ts";
 import { drawerOpenStore, useDrawerOpen } from "../drawer/index.ts";
 import { openWorkbench, requestCommit } from "../workbench/index.ts";
 import { openModelDialog } from "../models/index.ts";
@@ -263,8 +263,8 @@ export function useCommands({ session, cwd, typing, send }: UseCommandsOptions):
             return say(`Detail is ${found.level}.`);
           }
           case "thinking": {
-            const next = !thinkingShownStore.getSnapshot();
-            setThinkingShown(next);
+            const next = thinkingModeStore.getSnapshot() === "hidden";
+            setThinkingMode(next ? "collapsed" : "hidden");
             return say(next ? "Thinking shown." : "Thinking hidden.");
           }
           case "mode": {

@@ -1,4 +1,6 @@
 import type { ReactNode } from "react";
+import { useSendKey } from "../chat/chat-choices.ts";
+import { sendHint } from "./send-hint.ts";
 import { NoticeLine, type CommandNotice } from "./notice-line.tsx";
 
 /** The meter, the composer, a line for an error or a notice, and the key hints, in a column. */
@@ -26,6 +28,7 @@ export function DockView({
   /** Shows the Esc hint, which only works while a run is in progress. */
   busy: boolean;
 }) {
+  const sendKey = useSendKey();
   return (
     <div data-dock="" className="flex flex-col gap-2">
       {meter}
@@ -40,7 +43,7 @@ export function DockView({
       ) : null}
       {notice === null ? null : <NoticeLine notice={notice} />}
       <p className="px-1 text-meta text-faint max-sm:hidden">
-        {busy ? "↵ send · ⇧↵ new line · esc stop" : "↵ send · ⇧↵ new line"}
+        {sendHint(sendKey, busy)}
       </p>
     </div>
   );
