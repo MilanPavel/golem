@@ -28,6 +28,7 @@ from langchain_core.language_models import BaseChatModel
 from golem.config import (
     AgentSettings,
     BudgetSettings,
+    ChatSettings,
     ContextSettings,
     GolemSettings,
     ModelOptions,
@@ -168,6 +169,7 @@ class _Catalog:
     context: ContextSettings = field(default_factory=ContextSettings)
     budget: BudgetSettings = field(default_factory=BudgetSettings)
     agents: AgentSettings = field(default_factory=AgentSettings)
+    chat: ChatSettings = field(default_factory=ChatSettings)
     at_once: dict[str, int] = field(default_factory=lambda: dict[str, int]())
 
 
@@ -553,6 +555,11 @@ class ModelRouter:
         catalog = self._current()
         return RoutingSettings() if catalog is None else catalog.routing
 
+    def chat_settings(self) -> ChatSettings:
+        """``[chat]``, read from the current ``config.toml``."""
+        catalog = self._current()
+        return ChatSettings() if catalog is None else catalog.chat
+
     def roles(self) -> RoleSettings:
         """``[routing.roles]``, read from the current ``config.toml``."""
         catalog = self._current()
@@ -668,6 +675,7 @@ def _catalog(settings: GolemSettings) -> _Catalog:
         context=settings.context,
         budget=settings.budget,
         agents=settings.agents,
+        chat=settings.chat,
         at_once={name: configured.at_once for name, configured in settings.providers.items()},
     )
 

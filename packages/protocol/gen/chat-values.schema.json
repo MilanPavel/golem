@@ -1,0 +1,33 @@
+{
+  "additionalProperties": false,
+  "description": "``[chat]`` as golem uses it. ``mode`` is ``[permissions] mode``, read only here: the\npage changes it with ``permissions.set_mode``.",
+  "properties": {
+    "instructions": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Instructions",
+      "type": "array"
+    },
+    "mode": {
+      "enum": [
+        "careful",
+        "balanced",
+        "autopilot"
+      ],
+      "title": "Mode",
+      "type": "string"
+    },
+    "plan_first": {
+      "title": "Plan First",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "instructions",
+    "plan_first",
+    "mode"
+  ],
+  "title": "ChatValues",
+  "type": "object"
+}

@@ -22,6 +22,7 @@ from golem.graphs.chat import ChatRuntime, open_chat
 from golem.graphs.cite_prompt import CITE_PROMPT
 from golem.graphs.delegate_prompt import DELEGATE_PROMPT
 from golem.graphs.estimate import TokenRatios
+from golem.graphs.instructions_prompt import instructions_section
 from golem.graphs.prompt import PLAN, SystemPrompt
 from golem.graphs.summarise import Summariser
 from golem.lock import DaemonAlreadyRunning, DaemonLock
@@ -351,6 +352,7 @@ class DaemonApp:
                     local,
                     SystemPrompt(
                         sections=(
+                            instructions_section(router),
                             pinned_section(self.state.skills),
                             index_section(self.state.skills),
                             memory_section(),

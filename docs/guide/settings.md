@@ -273,6 +273,17 @@ One tool rule. The first rule that matches a call decides it ([Tools and permiss
 | `path` | none | A glob on the path the call touches. `*` stays in one folder, `**` crosses folders, `~` is your home, and a relative glob starts at the chat's folder |
 | `action` | required | `allow`, `ask`, or `deny` |
 
+### `[chat]`
+
+The defaults for every new chat. A chat that is already open keeps what it has.
+
+| Key | Default | Meaning |
+|---|---|---|
+| `instructions` | `[]` | Your lines on how golem should answer, such as "Keep answers short" or "Explain it plainly". At most 30 lines, each 1 to 300 characters after trimming. Blank lines are dropped. The model reads them on every call, so a change shows on the next call with no restart. A helper chat does not get them |
+| `plan_first` | `false` | Whether a new chat starts in plan first. A chat that sets plan first itself wins |
+
+`chat.get` and `chat.set` read and write these keys for the web page. `chat.get` also returns `mode`, which is `[permissions] mode` and is read only there.
+
 ### `[permissions]`
 
 Only your own file sets this. A chat can use another mode for itself.

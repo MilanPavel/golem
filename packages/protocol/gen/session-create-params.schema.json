@@ -1,6 +1,6 @@
 {
   "additionalProperties": false,
-  "description": "``session.create``. An empty profile uses the daemon's configured one.\n\n``cwd`` is the session's project folder, an absolute path. File tools work\nonly inside it, and a session without one has no file tools.\n\n``model_profile`` is a profile name or a ``provider/model`` ref, and null\nuses the default. The daemon checks it as ``session.set_model`` does, so a\nmodel that does not resolve, or whose provider has no key, fails here with\nthe same error code and message.\n\n``origin`` says who started the session: ``user`` (the default) or ``cli``\nfor ``golem ask --detach``. Only the daemon itself starts a ``routine:*``\nsession, and any other value is refused.\n\n``branch`` asks the daemon to switch ``cwd`` to that git branch before the\nsession starts (``git switch``), or to create it first with\n``create_branch`` (``git switch -c``). Uncommitted changes go along, as in\ngit. A ``cwd`` that is not a repository is refused with ``not_a_repo``, and\na failed switch with ``branch_switch_failed`` carrying git's own message;\nno session is made then. Both errors put that name in ``error.data.code``.\n\nThe caller is not attached. ``session.attach`` replays ``session.created``.",
+  "description": "``session.create``. An empty profile uses the daemon's configured one.\n\n``cwd`` is the session's project folder, an absolute path. File tools work\nonly inside it, and a session without one has no file tools.\n\n``model_profile`` is a profile name or a ``provider/model`` ref, and null\nuses the default. The daemon checks it as ``session.set_model`` does, so a\nmodel that does not resolve, or whose provider has no key, fails here with\nthe same error code and message.\n\n``plan_first`` starts the session in plan first (true) or not (false). Left out, the\nsession follows ``[chat] plan_first``.\n\n``origin`` says who started the session: ``user`` (the default) or ``cli``\nfor ``golem ask --detach``. Only the daemon itself starts a ``routine:*``\nsession, and any other value is refused.\n\n``branch`` asks the daemon to switch ``cwd`` to that git branch before the\nsession starts (``git switch``), or to create it first with\n``create_branch`` (``git switch -c``). Uncommitted changes go along, as in\ngit. A ``cwd`` that is not a repository is refused with ``not_a_repo``, and\na failed switch with ``branch_switch_failed`` carrying git's own message;\nno session is made then. Both errors put that name in ``error.data.code``.\n\nThe caller is not attached. ``session.attach`` replays ``session.created``.",
   "properties": {
     "branch": {
       "anyOf": [
@@ -61,6 +61,18 @@
       ],
       "default": null,
       "title": "Origin"
+    },
+    "plan_first": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Plan First"
     }
   },
   "title": "SessionCreateParams",

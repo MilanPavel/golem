@@ -74,7 +74,7 @@ public struct ConnectionSessionChannel: SessionChannel {
     }
 
     public func create(folder: String?) async throws -> String {
-        let params = SessionCreateParams(branch: nil, createBranch: false, cwd: folder, modelProfile: nil, origin: .user)
+        let params = SessionCreateParams(branch: nil, createBranch: false, cwd: folder, modelProfile: nil, origin: .user, planFirst: nil)
         do {
             return try await connection.call("session.create", params, as: SessionCreateResult.self).sessionID
         } catch {

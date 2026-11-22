@@ -5,6 +5,7 @@ export type CreateBranch = boolean;
 export type Cwd = string | null;
 export type ModelProfile = string | null;
 export type Origin = ('user' | 'cli') | null;
+export type PlanFirst = boolean | null;
 
 /**
  * ``session.create``. An empty profile uses the daemon's configured one.
@@ -16,6 +17,9 @@ export type Origin = ('user' | 'cli') | null;
  * uses the default. The daemon checks it as ``session.set_model`` does, so a
  * model that does not resolve, or whose provider has no key, fails here with
  * the same error code and message.
+ *
+ * ``plan_first`` starts the session in plan first (true) or not (false). Left out, the
+ * session follows ``[chat] plan_first``.
  *
  * ``origin`` says who started the session: ``user`` (the default) or ``cli``
  * for ``golem ask --detach``. Only the daemon itself starts a ``routine:*``
@@ -36,4 +40,5 @@ export interface SessionCreateParams {
   cwd?: Cwd;
   model_profile?: ModelProfile;
   origin?: Origin;
+  plan_first?: PlanFirst;
 }
