@@ -14,10 +14,17 @@ export const ICONS: readonly Icon[] = [
   { file: "apple-touch-icon.png", size: 180, kind: "touch" },
 ];
 
-/** The light value of `--color-bg`, which tokens.css holds and a test keeps equal. */
-export const BG = "#F3F2EF";
+/** The sandstone tile: a vertical gradient from the top colour to the bottom one. */
+export const SANDSTONE_TOP = "#EADBC4";
+export const SANDSTONE_BOTTOM = "#D4BE9E";
+/** The stone block shades: light top and left edges, dark bottom and right edges. */
+export const STONE_LIGHT = "#B98552";
+export const STONE_DARK = "#6B4322";
 
-const FIGURE_SHARE = { any: 0.64, touch: 0.64, maskable: 0.5 } as const;
+/** Share of the width the figure fills; the maskable one stays inside the 80% safe circle. */
+export const FIGURE_SHARE = { any: 0.68, touch: 0.68, maskable: 0.6 } as const;
+const BEVEL_SHARE = 0.16;
+const NUDGE_DOWN = 0.015;
 
 type Rgb = [number, number, number];
 
@@ -46,22 +53,50 @@ function chunk(type: string, data: Uint8Array): Buffer {
   return out;
 }
 
-/** An 8-bit RGB PNG of the idle pixel golem on `--color-bg`: whole cells, no blur. */
-export function renderIcon(size: number, kind: Icon["kind"]): Buffer {
-  const cell = Math.floor((FIGURE_SHARE[kind] * size) / WIDTH);
+export type Layout = { cell: number; bevel: number; left: number; top: number };
+
+/** Whole-pixel geometry of the figure: cell size, bevel width and the top-left corner. */
+export function layout(size: number, kind: Icon["kind"]): Layout {
+  const cell = Math.max(1, Math.round((FIGURE_SHARE[kind] * size) / WIDTH));
+  const bevel = Math.max(1, Math.round(BEVEL_SHARE * cell));
   const left = Math.floor((size - WIDTH * cell) / 2);
-  const top = Math.floor((size - ART.length * cell) / 2);
-  const bg = rgb(BG);
+  const top = Math.floor((size - ART.length * cell) / 2) + Math.round(NUDGE_DOWN * size);
+  return { cell, bevel, left, top };
+}
+
+function lerp(a: Rgb, b: Rgb, t: number): Rgb {
+  return a.map((v, i) => Math.round(v + ((b[i] as number) - v) * t)) as Rgb;
+}
+
+/** An 8-bit RGB PNG of the stone pixel golem on a sandstone gradient: whole pixels, no blur. */
+export function renderIcon(size: number, kind: Icon["kind"]): Buffer {
+  const { cell, bevel, left, top } = layout(size, kind);
+  const [skyTop, skyBottom] = [rgb(SANDSTONE_TOP), rgb(SANDSTONE_BOTTOM)];
   const body = rgb(FAVICON_COLORS["golem-body"][0]);
   const eye = rgb(FAVICON_COLORS["golem-eye"][0]);
+  const [light, dark] = [rgb(STONE_LIGHT), rgb(STONE_DARK)];
   const rowLen = 1 + size * 3;
   const raw = Buffer.alloc(rowLen * size);
   for (let y = 0; y < size; y++) {
+    const tile = lerp(skyTop, skyBottom, y / (size - 1));
     for (let x = 0; x < size; x++) {
       const cx = Math.floor((x - left) / cell);
       const cy = Math.floor((y - top) / cell);
       const hit = x >= left && y >= top ? CELLS.find((c) => c.x === cx && c.y === cy) : undefined;
-      raw.set(hit === undefined ? bg : hit.eye ? eye : body, y * rowLen + 1 + x * 3);
+      let color = tile;
+      if (hit !== undefined) {
+        if (hit.eye) color = eye;
+        else {
+          const u = x - left - cx * cell;
+          const v = y - top - cy * cell;
+          const [dl, dt, dr, db] = [u, v, cell - 1 - u, cell - 1 - v];
+          const edge = Math.min(dl, dt, dr, db);
+          // The nearest edge wins; on a corner diagonal the light edge does.
+          if (edge >= bevel) color = body;
+          else color = Math.min(dl, dt) <= Math.min(dr, db) ? light : dark;
+        }
+      }
+      raw.set(color, y * rowLen + 1 + x * 3);
     }
   }
   const ihdr = Buffer.alloc(13);
