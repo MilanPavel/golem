@@ -1,3 +1,4 @@
+import { useRoute } from "../../store/page-context.tsx";
 import { HEADER_ROW } from "../../ui/header-row.ts";
 import { IconButton } from "../../ui/icon-button.tsx";
 import { MenuIcon } from "../../ui/icons.tsx";
@@ -22,7 +23,9 @@ export function MenuButton() {
 /** A slim top bar that holds only the ☰, for pages with no top bar of their own. Nothing unless the layout is narrow. */
 export function MenuBar() {
   const mode = useLayoutMode();
-  if (mode !== "narrow") return null;
+  // Settings has Back in the place of the ☰.
+  const inSettings = useRoute().name === "settings";
+  if (mode !== "narrow" || inSettings) return null;
   return (
     <header className={`${HEADER_ROW} px-4`}>
       <MenuButton />

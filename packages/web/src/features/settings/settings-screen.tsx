@@ -1,14 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ThemeSwitch } from "../../theme-switch.tsx";
-import { sessionPath, settingsPath } from "../../store/router.ts";
+import { settingsPath } from "../../store/router.ts";
 import { installOffer } from "../../store/app-install.ts";
 import { useAppInstall, useNavigate } from "../../store/page-context.tsx";
-import { IconButton } from "../../ui/icon-button.tsx";
-import { CloseIcon } from "../../ui/icons.tsx";
 import { Link } from "../../ui/link.tsx";
 import { ConfigSection } from "./config-section.tsx";
 import { ContextSection } from "./context-section.tsx";
-import { useSettingsContext } from "./context.ts";
+import { useSettingsBack } from "./context.ts";
 import { DevicesSection } from "./devices-section.tsx";
 import { KeysSection } from "./keys-section.tsx";
 import { McpSection } from "./mcp-section.tsx";
@@ -83,14 +81,32 @@ function Body({ section }: { section: string }) {
 
 /**
  * The settings page: a sidebar of the sections under their groups (a picker under `md`), and the
- * section beside it with a head (title, description) and its body. Close goes back to the
- * session the person came from, else home.
+ * section beside it with a head (title, description) and its body. Back goes to the
+ * session the person came from, else home; so does Esc.
  */
 export function SettingsScreen({ section }: { section: string }) {
   const navigate = useNavigate();
-  const context = useSettingsContext();
+  const back = useSettingsBack();
   const current = SECTIONS.find((item) => item.id === section);
-  const back = context === null ? "/" : sessionPath(context.sessionId);
+  const goBack = useCallback(() => {
+    navigate(back.path);
+  }, [navigate, back.path]);
+  const backTarget = { where: back.where, onBack: goBack };
+  // Esc is Back, unless the key belongs to a field or a dialog. Focus on the rail counts too: it stays on the gear after a click.
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent): void {
+      if (event.key !== "Escape" || event.defaultPrevented || event.isComposing) return;
+      const target = event.target instanceof Element ? event.target : null;
+      if (target?.closest("input, textarea, select, [contenteditable]:not([contenteditable='false']), [role='dialog'], [role='alertdialog']") != null) return;
+      if (document.querySelector("[role='dialog'], [role='alertdialog']") !== null) return;
+      event.preventDefault();
+      goBack();
+    }
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [goBack]);
   // `/settings/setup` is the old name of Info: the router reads it as Info, and the address follows.
   useEffect(() => {
     if (section === "info" && location.pathname === "/settings/setup") navigate(settingsPath("info"), { replace: true });
@@ -113,6 +129,7 @@ export function SettingsScreen({ section }: { section: string }) {
     <div data-screen="settings" className="flex min-h-0 flex-1 flex-col md:flex-row">
       <SettingsNav
         section={section}
+        back={backTarget}
         onNavigate={navigate}
         search={
           <SettingsSearchBox
@@ -127,19 +144,9 @@ export function SettingsScreen({ section }: { section: string }) {
         }
         results={query.trim() === "" ? undefined : <SettingsSearchResults query={query} matches={matches} section={section} onPick={open} />}
       />
-      <SettingsPicker section={section} current={current} onNavigate={navigate} />
-      {/* `relative`: the close button sits in the corner of this pane, and a visually hidden input is positioned against it, so it scrolls with it and cannot make the window taller. */}
+      <SettingsPicker section={section} current={current} back={backTarget} onNavigate={navigate} />
+      {/* `relative`: a visually hidden input is positioned against it, so it scrolls with it and cannot make the window taller. */}
       <section className="relative flex min-h-0 min-w-0 flex-1 flex-col gap-3 overflow-y-auto px-7 py-5">
-        <div className="absolute top-4 right-4">
-          <IconButton
-            label="Close settings"
-            onClick={() => {
-              navigate(back);
-            }}
-          >
-            <CloseIcon />
-          </IconButton>
-        </div>
         {current === undefined ? (
           <>
             <p>There is no such section.</p>
@@ -149,7 +156,7 @@ export function SettingsScreen({ section }: { section: string }) {
           </>
         ) : (
           <>
-            <header className="flex max-w-column flex-col gap-1.5 pr-10">
+            <header className="flex max-w-column flex-col gap-1.5">
               <h2 className="text-title font-semibold tracking-tight">{current.title}</h2>
               <p className="text-body text-muted">{current.description}</p>
             </header>

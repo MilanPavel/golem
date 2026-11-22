@@ -1,7 +1,8 @@
 import { useState, type ReactNode } from "react";
 import { settingsPath } from "../../store/router.ts";
 import { cn } from "../../ui/cn.ts";
-import { ChevronDownIcon } from "../../ui/icons.tsx";
+import { IconButton } from "../../ui/icon-button.tsx";
+import { ChevronDownIcon, ChevronLeftIcon } from "../../ui/icons.tsx";
 import { Link } from "../../ui/link.tsx";
 import { GROUPS, SECTIONS, type SettingsSection } from "./sections.ts";
 import { useSectionBadges } from "./use-section-badges.ts";
@@ -54,6 +55,11 @@ function Groups({ section, onNavigate, onPick }: { section: string; onNavigate: 
   );
 }
 
+/** The accessible name of Back: "Back to <title>", or "Back to chats" with no session. */
+export function backLabel(where: string): string {
+  return where === "Chats" ? "Back to chats" : `Back to ${where}`;
+}
+
 /**
  * The sidebar of the settings page: the title, a slot for the search box, the sections under their
  * groups. Hidden under `md`.
@@ -62,9 +68,11 @@ export function SettingsNav({
   section,
   search,
   results,
+  back,
   onNavigate,
 }: {
   section: string;
+  back: { where: string; onBack: () => void };
   search?: ReactNode;
   /** Shown in place of the grouped list while there is a query. */
   results?: ReactNode;
@@ -72,7 +80,19 @@ export function SettingsNav({
 }) {
   return (
     <div data-testid="settings-nav" className="hidden min-h-0 w-62 shrink-0 flex-col border-r border-line bg-sunken/50 md:flex">
-      <div className="px-4 pt-5 pb-2.5">
+      <div className="px-4 pt-3 pb-2.5">
+        <button
+          type="button"
+          aria-label={backLabel(back.where)}
+          onClick={back.onBack}
+          className="mb-2.5 flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left outline-offset-2 outline-clay hover:bg-surface/70 focus-visible:outline-2"
+        >
+          <ChevronLeftIcon className="shrink-0 text-faint" />
+          <span className="flex min-w-0 flex-col">
+            <span className="text-sm font-medium text-ink">Back</span>
+            <span className="truncate text-meta text-muted">{back.where}</span>
+          </span>
+        </button>
         <h1 className="mb-3.5 ml-1 text-panel font-semibold tracking-tight">Settings</h1>
         {search}
       </div>
@@ -87,17 +107,23 @@ export function SettingsNav({
 export function SettingsPicker({
   section,
   current,
+  back,
   onNavigate,
 }: {
   section: string;
   current: SettingsSection | undefined;
+  back: { where: string; onBack: () => void };
   onNavigate: (href: string) => void;
 }) {
   const [open, setOpen] = useState(false);
   const group = GROUPS.find((item) => item.id === current?.group);
   const total = Object.values(useSectionBadges()).reduce((sum, count) => sum + count, 0);
   return (
-    <div className="border-b border-line px-4 py-3 md:hidden">
+    <div className="flex items-center gap-2 border-b border-line px-4 py-3 md:hidden">
+      <IconButton label={backLabel(back.where)} className="size-11 shrink-0" onClick={back.onBack}>
+        <ChevronLeftIcon />
+      </IconButton>
+      <div className="min-w-0 flex-1">
       <button
         type="button"
         aria-expanded={open}
@@ -105,7 +131,7 @@ export function SettingsPicker({
         onClick={() => {
           setOpen(!open);
         }}
-        className="flex w-full items-center gap-2.5 rounded-md border border-line-strong bg-surface px-3 py-2.5 text-left text-sm font-semibold outline-offset-2 outline-clay focus-visible:outline-2"
+        className="flex min-h-11 w-full items-center gap-2.5 rounded-md border border-line-strong bg-surface px-3 py-2.5 text-left text-sm font-semibold outline-offset-2 outline-clay focus-visible:outline-2"
       >
         {current === undefined ? null : <current.icon className="text-clay" />}
         <span>{current?.title ?? "Settings"}</span>
@@ -124,6 +150,7 @@ export function SettingsPicker({
           />
         </div>
       ) : null}
+      </div>
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import { setupProblem } from "@golem/view";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { useConnection } from "../../store/connection-context.tsx";
 import { useNavigate, useRoute, useSessionList, useSetupStatus } from "../../store/page-context.tsx";
 import { useInbox } from "../../store/inbox.ts";
@@ -14,6 +14,7 @@ import { openPalette } from "../palette/index.ts";
 import { overallState } from "../sessions/index.ts";
 import { useLayoutMode } from "./layout-mode.ts";
 import { MENU_BUTTON_ATTR } from "./menu-button.tsx";
+import { useSettingsBack } from "../settings/index.ts";
 import { PANELS } from "./panels.tsx";
 import { Rail, type RailItem } from "./rail.tsx";
 import { useSidebarItem } from "./sidebar-item.ts";
@@ -30,8 +31,8 @@ const EDITABLE_RICH = "[contenteditable]:not([contenteditable='false'])";
  * its open state is kept. From 760 px the rail stays and the panel floats over the page, closed until it
  * is asked for. Below that the rail is hidden too: the ☰ in the top bar opens rail and panel together
  * over the page. The page's own keys: ⌘B (Ctrl+B elsewhere) hides or shows the panel; Esc closes a
- * floating one. On the Settings page the wide layout hides the panel, as Settings lists its own sections;
- * the rail, ⌘B and the hide button then peek at it for that visit only, and the kept choice stays as it was.
+ * floating one. On the Settings page no layout draws the panel, as Settings lists its own sections;
+ * the kept state is not touched, and the rail icons and ⌘B leave Settings for the page it came from and open the panel.
  */
 export function SidebarShell() {
   const sessions = useSessionList();
@@ -49,16 +50,13 @@ export function SidebarShell() {
   const floating = useRef<HTMLDivElement>(null);
   const opener = useRef<HTMLElement | null>(null);
   // The wide layout opens the panel until the person chooses; a floating one opens only when asked.
-  // On Settings the wide panel is hidden until peeked at; the peek is not kept and ends with the visit.
+  // Settings draws no panel in any layout, and leaving it shows the panel as it was.
   const inSettings = route.name === "settings";
-  const [peek, setPeek] = useState(false);
-  const [wasInSettings, setWasInSettings] = useState(inSettings);
-  if (inSettings !== wasInSettings) {
-    setWasInSettings(inSettings);
-    setPeek(false);
-  }
-  const open = wide ? (inSettings ? peek : (stored ?? true)) : overlay;
-  const setOpen = wide ? (inSettings ? setPeek : setStored) : setOverlay;
+  const back = useSettingsBack();
+  const open = wide ? (stored ?? true) : overlay;
+  const setOpen = wide ? setStored : setOverlay;
+  // A floating panel asked for while leaving Settings opens once the page has changed.
+  const openAfterLeave = useRef(false);
   const routeKey = JSON.stringify(route);
 
   const waiting = useInbox().count;
@@ -70,7 +68,8 @@ export function SidebarShell() {
 
   // A floating panel closes when the page changes (a session was picked) and when the window grows wide.
   useEffect(() => {
-    setOverlay(false);
+    setOverlay(openAfterLeave.current);
+    openAfterLeave.current = false;
   }, [routeKey, wide, setOverlay]);
   // Focus moves into a floating panel when it opens.
   useEffect(() => {
@@ -99,16 +98,29 @@ export function SidebarShell() {
       // A rich text field keeps the key for bold.
       if (event.target instanceof Element && event.target.closest(EDITABLE_RICH) !== null) return;
       event.preventDefault();
-      setOpen(!open);
+      if (inSettings) leaveSettings();
+      else setOpen(!open);
     }
     document.addEventListener("keydown", onKeyDown);
     return () => {
       document.removeEventListener("keydown", onKeyDown);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- closeFloating reads refs and the same values as the deps.
-  }, [open, setOpen, wide, narrow, overlay, setOverlay]);
+  }, [open, setOpen, wide, narrow, overlay, setOverlay, inSettings]);
+
+  // The rail icons and ⌘B in Settings go back to the page it came from, with the panel open.
+  function leaveSettings(next?: RailItem): void {
+    if (next !== undefined) setItem(next);
+    if (wide) setStored(true);
+    else openAfterLeave.current = true;
+    navigate(back.path);
+  }
 
   function pick(next: RailItem): void {
+    if (inSettings) {
+      leaveSettings(next);
+      return;
+    }
     // With the ☰ the rail and the panel come together: a click picks, and never hides the panel.
     if (next === item && !narrow) {
       setOpen(!open);
@@ -125,7 +137,7 @@ export function SidebarShell() {
       state={overallState(connected, sessions.filter((session) => session.status !== "closed"))}
       version={connection.daemonVersion}
       connected={connected ? "connected" : "reconnecting"}
-      picked={open ? item : null}
+      picked={open && !inSettings ? item : null}
       inboxCount={waiting}
       settingsDot={problem !== null || !connected}
       onPick={pick}
@@ -136,8 +148,8 @@ export function SidebarShell() {
         openPalette(narrow ? (menuButton() ?? trigger) : trigger);
       }}
       onSettings={() => navigate(settingsPath())}
-      settingsOpen={route.name === "settings"}
-      wrap={{ sessions: (button) => <SessionsFlyout enabled={wide && !open} width={width}>{button}</SessionsFlyout> }}
+      settingsOpen={inSettings}
+      wrap={{ sessions: (button) => <SessionsFlyout enabled={wide && !open && !inSettings} width={width}>{button}</SessionsFlyout> }}
     />
   );
   const sidebarPanel = (
@@ -194,14 +206,14 @@ export function SidebarShell() {
     return (
       <>
         {rail}
-        {open ? panelBox : null}
+        {open && !inSettings ? panelBox : null}
         {modelDialog}
       </>
     );
   }
   const scrim = <div aria-hidden="true" data-testid="sidebar-scrim" onClick={closeFloating} className="fixed inset-0 z-40 bg-ink/40" />;
   if (narrow) {
-    if (!open) return modelDialog;
+    if (!open || inSettings) return modelDialog;
     return (
       <>
         {scrim}
@@ -223,7 +235,7 @@ export function SidebarShell() {
   return (
     <>
       {rail}
-      {open ? (
+      {open && !inSettings ? (
         <>
           {scrim}
           <div ref={floating} tabIndex={-1} className="fixed inset-y-0 left-rail z-50 flex max-w-full shadow-lg outline-none">

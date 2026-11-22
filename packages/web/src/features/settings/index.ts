@@ -4,6 +4,7 @@ export { SECTIONS, type SettingsSection } from "./sections.ts";
 export {
   settingsContextStore,
   useRememberSettingsContext,
+  useSettingsBack,
   useSettingsContext,
   useSettingsFolder,
   type SettingsContext,
