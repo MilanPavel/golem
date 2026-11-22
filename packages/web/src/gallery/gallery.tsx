@@ -68,7 +68,7 @@ import { SAMPLE_MEMORIES, SAMPLE_MEMORY_COUNTS, SAMPLE_MEMORY_SETTINGS } from ".
 import { MEMORY_OFF_TEXT } from "../store/memory.ts";
 import { FinishedHelpers } from "../features/settings/agents-keep.tsx";
 import { AgentsPage } from "../features/settings/agents-section.tsx";
-import { SAMPLE_AGENTS, SAMPLE_COPY, WISH_AGENTS_CLOUD, WISH_AGENTS_LOCAL, WISH_AGENTS_MIXED } from "../features/settings/agents-sample.ts";
+import { SAMPLE_AGENTS, SAMPLE_CONFIG_LIMITS, SAMPLE_COPY, WISH_AGENTS_CLOUD, WISH_AGENTS_LOCAL, WISH_AGENTS_MIXED } from "../features/settings/agents-sample.ts";
 import { SkillList } from "../features/settings/skills-section.tsx";
 import { SkillOverview } from "../features/settings/skills/skill-detail.tsx";
 import { SAMPLE_BROKEN_SKILL_MD, SAMPLE_SKILLS } from "../features/settings/skills/sample.ts";
@@ -1616,6 +1616,19 @@ function AgentsDemo() {
           <AgentsPage agents={SAMPLE_AGENTS} start={start} demo={demo} onSetWish={async () => {}} {...AGENT_FILES} />
         </section>
       ))}
+      {(
+        [
+          ["Limits, read", "The Limits block: five facts, and a quiet note under a value that config.toml sets", [SAMPLE_CONFIG_LIMITS], "bundled/explorer", undefined],
+          ["Limits, editing", "Edit: tool calls, working time, cost and tokens as boxes, with Save and Cancel", SAMPLE_AGENTS, "user/triage", "limits"],
+          ["Limits, an error", "A refusal from the daemon is a line in the form, and what was typed stays", SAMPLE_AGENTS, "user/triage", "limits-error"],
+          ["Limits, a project agent", "A project agent has no Edit, only a note", SAMPLE_AGENTS, "project/docs", undefined],
+        ] as const
+      ).map(([title, caption, agents, start, demo]) => (
+        <section key={title} aria-label={title} className="flex flex-col gap-3 rounded-lg border border-line bg-bg p-4">
+          <span className="font-mono text-xs text-faint">{caption}</span>
+          <AgentsPage agents={agents} start={start} demo={demo} onSetWish={async () => {}} onSetLimits={async () => {}} />
+        </section>
+      ))}
       <section aria-label="Agents, a copy" className="flex flex-col gap-3 rounded-lg border border-line bg-bg p-4">
         <span className="font-mono text-xs text-faint">A copy of a bundled agent: yours, it replaces the bundled one, and delete says the bundled one comes back</span>
         <AgentsPage agents={[...SAMPLE_AGENTS.filter((agent) => agent.name !== "reviewer"), SAMPLE_COPY]} start="user/reviewer" demo="delete" onSetWish={async () => {}} {...AGENT_FILES} />
@@ -1644,12 +1657,15 @@ function AgentsDemo() {
         [
           ["Finished helpers, the defaults", { keep_days: 7, keep_problem_days: 30 }, {}],
           ["Finished helpers, for ever", { keep_days: 0, keep_problem_days: 0 }, {}],
-          ["Finished helpers, a value the config refused", { keep_days: 7, keep_problem_days: 30 }, { "agents.keep_days": "Input should be greater than or equal to 0" }],
+          ["Finished helpers, a value the config refused", { keep_days: 7, keep_problem_days: 30 }, { "agents.keep_days": "Input should be greater than or equal to 0" }, "mixed"],
+          ["Limits for every helper, set", { keep_days: 7, keep_problem_days: 30, max_calls: 20, working_seconds: 600, max_cost: 1.5, max_tokens: null }, {}, "mixed"],
+          ["Limits for every helper, cloud only: cost first", { keep_days: 7, keep_problem_days: 30, max_cost: 1.5 }, {}, "cloud"],
+          ["Limits for every helper, a wrong value", { keep_days: 7, keep_problem_days: 30 }, { "agents.max_calls": "Enter a whole number, 1 or more." }, "mixed"],
         ] as const
-      ).map(([title, values, errors]) => (
+      ).map(([title, values, errors, setup]) => (
         <section key={title} aria-label={title} className="flex flex-col gap-3 rounded-lg border border-line bg-bg p-4">
           <span className="font-mono text-xs text-faint">{title}</span>
-          <FinishedHelpers values={values} errors={errors} failure={null} onSave={() => {}} />
+          <FinishedHelpers values={values} errors={errors} failure={null} onSave={() => {}} setup={setup} onSaveLimit={() => {}} />
         </section>
       ))}
       <section aria-label="Agents, empty" className="flex flex-col gap-3 rounded-lg border border-line bg-bg p-4">

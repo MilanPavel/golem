@@ -1,5 +1,6 @@
 import type { AgentInfo, ListedModel } from "@golem/client";
 
+import { configLimitLabels, limitTexts, type LimitTexts } from "./agents-edit.ts";
 import type { McpTone } from "./mcp-servers.ts";
 
 /** What the agents list says about an agent type, as words and data: the TUI lays it out, the page draws it. */
@@ -232,8 +233,7 @@ export interface LimitFact {
 
 /**
  * What bounds one helper of this type, from the resolved limits the daemon sends (config, file, `[agents]`, default):
- * tool calls always have a value, time and answer length say `no limit` when nothing sets them, tokens and cost
- * show only when something sets them.
+ * tool calls always have a value, the others say `no limit` when nothing sets them.
  */
 export function limitFacts(limits: AgentInfo["limits"]): LimitFact[] {
   const none = "no limit";
@@ -242,8 +242,8 @@ export function limitFacts(limits: AgentInfo["limits"]): LimitFact[] {
     { value: limits?.max_seconds == null ? none : formatSeconds(limits.max_seconds), label: "time" },
     { value: limits?.answer_chars == null ? none : String(limits.answer_chars), label: "answer chars" },
   ];
-  if (limits?.max_tokens != null) facts.push({ value: String(limits.max_tokens), label: "tokens" });
-  if (limits?.max_cost_usd != null) facts.push({ value: `$${limits.max_cost_usd.toFixed(2)}`, label: "cost" });
+  facts.push({ value: limits?.max_tokens == null ? none : String(limits.max_tokens), label: "tokens" });
+  facts.push({ value: limits?.max_cost_usd == null ? none : `$${limits.max_cost_usd.toFixed(2)}`, label: "cost" });
   return facts;
 }
 
@@ -321,6 +321,9 @@ export interface AgentRow {
   tier: WishNow["tier"];
   /** The Limits box. */
   limits: LimitFact[];
+  /** The limits as text for the edit form, and the fact labels that `config.toml` sets. */
+  limitTexts: LimitTexts;
+  configLimits: string[];
   asksLine: string;
   /** A line under the tool chips: which are marked. Empty with no tools. */
   toolsNote: string;
@@ -366,6 +369,8 @@ export function agentRow(agent: AgentInfo, setup: WishSetup = "mixed", models: r
     listLine: agentListLine(agent.wish, agent.resolves_to),
     tier: wishNow(agent.resolves_to)?.tier ?? null,
     limits: limitFacts(agent.limits),
+    limitTexts: limitTexts(agent.limits),
+    configLimits: configLimitLabels(agent.limits_from_config),
     asksLine: asksLine(agent.asks),
     toolsNote: toolsNote(agent),
     definitionPath: definitionPath(agent.path ?? null, agent.origin),

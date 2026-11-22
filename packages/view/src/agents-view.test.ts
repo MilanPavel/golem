@@ -196,13 +196,15 @@ test("seconds are said in whole minutes only when they are whole", () => {
   assert.equal(formatSeconds(60), "1 min");
 });
 
-test("limits: three always, tokens and cost when set, no limit when the file sets none", () => {
+test("limits: five facts, no limit when nothing sets one", () => {
   assert.deepEqual(limitFacts({ max_calls: 15, max_seconds: 300, answer_chars: 6000 }), [
     { value: "15", label: "tool calls" },
     { value: "5 min", label: "time" },
     { value: "6000", label: "answer chars" },
+    { value: "no limit", label: "tokens" },
+    { value: "no limit", label: "cost" },
   ]);
-  assert.deepEqual(limitFacts(undefined).map((fact) => fact.value), ["no limit", "no limit", "no limit"]);
+  assert.deepEqual(limitFacts(undefined).map((fact) => fact.value), ["no limit", "no limit", "no limit", "no limit", "no limit"]);
   const more = limitFacts({ max_calls: 1, max_tokens: 5000, max_cost_usd: 0.5 });
   assert.deepEqual(more.slice(3), [{ value: "5000", label: "tokens" }, { value: "$0.50", label: "cost" }]);
   assert.equal(asksLine(true), "May ask you one short question.");

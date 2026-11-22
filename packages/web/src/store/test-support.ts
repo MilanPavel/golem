@@ -104,6 +104,8 @@ export function fakeClient() {
     onAgentsChanged: agents.on,
     listAgents: vi.fn<PageClient["listAgents"]>(async () => ({ agents: [] })),
     setAgentWish: vi.fn<PageClient["setAgentWish"]>(async (name, wish) => ({ name, description: "", origin: "user", wish })),
+    setAgentLimits: vi.fn<PageClient["setAgentLimits"]>(async (name) => ({ name, description: "", origin: "user", wish: "cheapest" })),
+    setDefaultAgentLimits: vi.fn<PageClient["setDefaultAgentLimits"]>(async () => ({ ok: true, errors: [], values: { keep_days: 7, keep_problem_days: 30 } })),
     saveAgent: vi.fn<PageClient["saveAgent"]>(async () => ({ ok: true, problems: [] })),
     copyAgent: vi.fn<PageClient["copyAgent"]>(async (name) => ({ name, description: "", origin: "user", wish: "cheapest" })),
     deleteAgent: vi.fn<PageClient["deleteAgent"]>(async () => ({ agent: null })),
