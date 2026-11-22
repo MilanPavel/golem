@@ -395,8 +395,11 @@ import {
   type CommitBand,
 } from "./commit-band.ts";
 import {
+  agentEditProblems,
   agentListFailed,
+  agentsFocused,
   agentsManagerKeyOf,
+  agentsNoticed,
   agentsWithSaved,
   agentWishFailed,
   closedAgentsManager,
@@ -404,6 +407,7 @@ import {
   openAgentsManager,
   pressAgentsManager,
   type AgentList,
+  type AgentsManagerAction,
   type AgentsManagerState,
 } from "./agents-manager.ts";
 import {
@@ -4820,10 +4824,94 @@ export function App({
     const pressed = pressAgentsManager(agentsManagerRef.current, agentListRef.current.agents ?? [], key, {
       setup: wishSetup(listing?.models),
       models: listing?.models ?? [],
+      columns,
+      rows: budget.body,
     });
     showAgentsManager(pressed.state);
-    if (pressed.action.kind === "set_wish") {
-      saveAgentWish(pressed.action.name, pressed.action.wish);
+    onAgentsAction(pressed.action);
+  }
+
+  function onAgentsAction(action: AgentsManagerAction): void {
+    switch (action.kind) {
+      case "set_wish":
+        saveAgentWish(action.name, action.wish);
+        return;
+      case "copy":
+        void changeAgentFiles(async () => {
+          const copy = await client.copyAgent(action.name, skillsFolder());
+          return { focus: copy, notice: `copied · ${copy.name} is yours now and hides the bundled one` };
+        });
+        return;
+      case "delete":
+        void changeAgentFiles(async () => {
+          const deleted = await client.deleteAgent(action.name, skillsFolder());
+          const back = deleted.agent ?? null;
+          return { focus: back, notice: back === null ? `${action.name} deleted` : `${action.name} deleted · the ${back.origin} ${back.name} is back` };
+        });
+        return;
+      case "edit":
+        void editAgentText(action.text, action.name);
+        return;
+      default:
+        return;
+    }
+  }
+
+  /**
+   * Run one change of the agent files (copy, delete, save), read the list again and put the manager on what
+   * changed: the new agent chosen, with one plain line on what happened, or on why it failed.
+   */
+  async function changeAgentFiles(change: () => Promise<{ focus: { name: string; origin: string } | null; notice: string }>): Promise<void> {
+    try {
+      const done = await change();
+      const listed = await client.listAgents(skillsFolder());
+      setAgentList({ agents: listed.agents, error: null });
+      showAgentsManager(agentsFocused(agentsManagerRef.current, listed.agents, done.focus, done.notice));
+    } catch (error) {
+      showAgentsManager(agentsNoticed(agentsManagerRef.current, messageOf(error)));
+    }
+  }
+
+  /**
+   * Edit an agent's text in `$EDITOR` on a temporary file, never on the real one. When the editor closes,
+   * `agents.save` checks that the text parses and only then writes the file. With problems, the manager shows
+   * them with their lines and keeps the text so the editor can open on it again.
+   */
+  async function editAgentText(text: string, name?: string): Promise<void> {
+    if (editing.current) {
+      return;
+    }
+    editing.current = true;
+    const dir = await mkdtemp(join(tmpdir(), "golem-agent-"));
+    let notice = "";
+    let saved: Awaited<ReturnType<typeof client.saveAgent>> | null = null;
+    let edited = text;
+    try {
+      const file = join(dir, "agent.md");
+      await writeFile(file, text, "utf8");
+      if (!(await editFile(file, suspendTerminal))) {
+        notice = "the editor did not exit cleanly, nothing was saved";
+      } else {
+        edited = await readFile(file, "utf8");
+        if (edited === text) {
+          notice = "no change";
+        } else {
+          saved = await client.saveAgent(edited, name, skillsFolder());
+        }
+      }
+    } catch (error) {
+      notice = messageOf(error);
+    } finally {
+      editing.current = false;
+      await rm(dir, { recursive: true, force: true });
+    }
+    if (saved === null) {
+      showAgentsManager(agentsNoticed(agentsManagerRef.current, notice));
+    } else if (!saved.ok) {
+      showAgentsManager(agentEditProblems(agentsManagerRef.current, { text: edited, ...(name === undefined ? {} : { name }) }, saved.problems ?? []));
+    } else {
+      const agent = saved.agent ?? null;
+      await changeAgentFiles(async () => ({ focus: agent, notice: `${agent?.name ?? "agent"} saved` }));
     }
   }
 
