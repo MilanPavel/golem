@@ -626,6 +626,39 @@ test("stopHelper sends helper.stop with the session id and reads stopped; a bad 
   }
 });
 
+test("respondHelpers sends helpers.respond with the call and the choice; a bad result throws", async () => {
+  const sent: Record<string, unknown>[] = [];
+  const server = await listen((socket) => {
+    attach(socket, {
+      answerPing: true,
+      results: { "helpers.respond": { run_id: "r_1" } },
+      onRequest: (_socket, method, params) => {
+        if (method === "helpers.respond") {
+          sent.push({ ...params });
+        }
+      },
+    });
+  });
+  const client = connectGolem({ socketPath: server.socketPath, clientName: "web", reconnect: false, heartbeatMs: 60_000 });
+  try {
+    assert.deepEqual(await client.respondHelpers("s_1", "call_1", false), { run_id: "r_1" });
+    assert.deepEqual(sent, [{ session_id: "s_1", call_id: "call_1", run: false }]);
+  } finally {
+    client.close();
+    await server.close();
+  }
+  const bad = await listen((socket) => {
+    attach(socket, { answerPing: true, results: { "helpers.respond": { run_id: 1 } } });
+  });
+  const other = connectGolem({ socketPath: bad.socketPath, clientName: "web", reconnect: false, heartbeatMs: 60_000 });
+  try {
+    await assert.rejects(other.respondHelpers("s_1", "call_1", true), /invalid helpers.respond result/);
+  } finally {
+    other.close();
+    await bad.close();
+  }
+});
+
 function summary(lastSeq: number, title: string | null = null): SessionSummary {
   return {
     session_id: "s_test",

@@ -102,6 +102,7 @@ import type { Ping } from "../../protocol/gen/ping.ts";
 import type { Params as ChatEvent } from "../../protocol/gen/rpc-notification.ts";
 import type { RunCancelResult } from "../../protocol/gen/run-cancel-result.ts";
 import type { HelperStopResult } from "../../protocol/gen/helper-stop-result.ts";
+import type { HelpersRespondResult } from "../../protocol/gen/helpers-respond-result.ts";
 import type { SessionAttachResult } from "../../protocol/gen/session-attach-result.ts";
 import type { SessionCloseResult } from "../../protocol/gen/session-close-result.ts";
 import type { SessionCreateResult } from "../../protocol/gen/session-create-result.ts";
@@ -923,6 +924,10 @@ export function isRunCancelResult(value: unknown): value is RunCancelResult {
 
 export function isHelperStopResult(value: unknown): value is HelperStopResult {
   return isRecord(value) && typeof value["stopped"] === "boolean";
+}
+
+export function isHelpersRespondResult(value: unknown): value is HelpersRespondResult {
+  return isRecord(value) && typeof value["run_id"] === "string" && value["run_id"] !== "";
 }
 
 export function isMessageSendResult(value: unknown): value is MessageSendResult {

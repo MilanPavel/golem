@@ -278,6 +278,8 @@ from golem_protocol.commands import (
     GitInfoResult,
     HelloParams,
     HelloResult,
+    HelpersRespondParams,
+    HelpersRespondResult,
     HelperStopParams,
     HelperStopResult,
     HfFilesParams,
@@ -794,6 +796,24 @@ async def _approval_respond(
     except SchemaMismatchError as exc:
         raise RpcCallError(SESSION_NOT_FOUND, str(exc)) from exc
     return ApprovalRespondResult(run_id=run_id)
+
+
+async def _helpers_respond(
+    ctx: RequestContext, params: HelpersRespondParams
+) -> HelpersRespondResult:
+    try:
+        run_id = await _sessions(ctx).respond_helpers(
+            params.session_id, params.call_id, params.run, device=ctx.connection.device
+        )
+    except ApprovalNotFoundError as exc:
+        raise RpcCallError(APPROVAL_NOT_FOUND, "no run waits on this question") from exc
+    except SessionNotFoundError as exc:
+        raise RpcCallError(SESSION_NOT_FOUND, "session not found") from exc
+    except SessionBusyError as exc:
+        raise RpcCallError(SESSION_BUSY, "session is busy") from exc
+    except SchemaMismatchError as exc:
+        raise RpcCallError(SESSION_NOT_FOUND, str(exc)) from exc
+    return HelpersRespondResult(run_id=run_id)
 
 
 async def _artifact_read(ctx: RequestContext, params: ArtifactReadParams) -> ArtifactReadResult:
@@ -2176,6 +2196,7 @@ def standard_methods() -> dict[str, Method]:
         "approval.respond": Method(
             "approval.respond", ApprovalRespondParams, True, _approval_respond
         ),
+        "helpers.respond": Method("helpers.respond", HelpersRespondParams, True, _helpers_respond),
         "route.consent.answer": Method(
             "route.consent.answer", RouteConsentAnswerParams, True, _route_consent_answer
         ),

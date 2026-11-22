@@ -4937,6 +4937,33 @@ class ApprovalRespondResult(BaseModel):
     run_id: str = Field(min_length=1)
 
 
+class HelpersRespondParams(BaseModel):
+    """``helpers.respond``. Answer the question "start these helpers?" a lead waits on.
+
+    The lead asks it when ``[agents] use_helpers`` is ``ask``: its pending list holds a
+    ``batch`` item whose ``call_id`` is the ``delegate`` call. ``run`` true starts the helpers
+    as usual. ``run`` false starts none, and the model gets a result that tells it to do the
+    work in the chat. The question is also on the log as ``approval.needed`` with the source
+    ``use_helpers`` and the tool ``delegate``, and the answer as ``approval.resolved``
+    (``allow`` or ``deny``); an older client may answer it with ``approval.respond``, where a
+    yes of any kind runs the helpers and writes no rule.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    session_id: str = Field(min_length=1)
+    call_id: str = Field(min_length=1)
+    run: bool
+
+
+class HelpersRespondResult(BaseModel):
+    """The run that goes on. Its events go to the attached connections."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    run_id: str = Field(min_length=1)
+
+
 class RouteConsentAnswerParams(BaseModel):
     """``route.consent.answer``. Answer the paid step-up question a session's run waits on.
 

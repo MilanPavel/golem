@@ -44,7 +44,7 @@ from golem.graphs.context_view import ContextView, view
 from golem.graphs.instructions_prompt import INSTRUCTIONS_SECTION, instructions_text
 from golem.graphs.state import SCHEMA_VERSION, AgentState
 from golem.graphs.step_up import Consent, StepAsk, StepRequest, StepUp
-from golem.graphs.tools_node import CWD_KEY, ChildScope
+from golem.graphs.tools_node import CWD_KEY, HELPERS_ASK_SOURCE, ChildScope
 from golem.memory.privacy import ChatPrivacy
 from golem.memory.project import project_key
 from golem.memory.project_privacy import project_memory_private
@@ -161,6 +161,7 @@ from golem_protocol.events import (
     HelperModelData,
     HelperStartedData,
     HelperStartedEvent,
+    HelperStateData,
     HelperStepData,
     HelperStopped,
     HelperWaitData,
@@ -196,6 +197,8 @@ from golem_protocol.events import (
 )
 
 NOT_APPROVED = "cancelled before it was approved"
+ONE_AT_A_TIME = "one at a time"
+"""``helper.state`` reason of a helper that waits because nothing can run at once."""
 
 NO_STRONGER = "No stronger model is ready. Add a key in Settings."
 
@@ -507,6 +510,9 @@ class SessionManager:
         self._skills = skills
         self._agents = agents if agents is not None else _bundled_agents()
         runtime.tools.delegate_text = self._delegate_text
+        runtime.tools.delegate_hidden = lambda: (
+            self._runtime.router.agent_settings().use_helpers == "never"
+        )
         self._events = events
         self._records = records
         self._run_records = runs
@@ -546,6 +552,11 @@ class SessionManager:
         self._wakes: set[asyncio.Task[None]] = set()
         self._stopping: set[str] = set()
         """Leads being cancelled or closed: a helper that ends must not wake them."""
+        self._queued: dict[str, list[tuple[str, str]]] = {}
+        """For each lead, the helpers that wait for a turn, oldest first: ``(helper id, brief)``.
+        In memory only: a restart ends a helper that never started, like any helper with no run."""
+        self._ended_helpers: set[str] = set()
+        """Helpers whose ``helper.ended`` is stored, which no longer hold a turn."""
         self._lock = asyncio.Lock()
         self.clock: Callable[[], float] = time.monotonic
         """Seconds for the limit on growing, replaceable in tests."""
@@ -1569,6 +1580,21 @@ class SessionManager:
                 await self._events.emit(
                     parent, run_id, "tool.started", ToolStartedData(call_id=call_id)
                 )
+            if not self._turn_free(parent):
+                # Nothing can run at once: the helpers take turns (ADR-059, section 2).
+                self._queued.setdefault(parent, []).append((sid, brief))
+                await self._events.emit(
+                    parent,
+                    run_id,
+                    "helper.state",
+                    HelperStateData(
+                        call_id=call_id,
+                        index=index,
+                        state="queued",
+                        reason=ONE_AT_A_TIME,
+                    ),
+                )
+                return HelperRef(sid, picked.profile, True)
             try:
                 await self._send(helper, brief)
             except BaseException:
@@ -1577,6 +1603,76 @@ class SessionManager:
                 self._sessions.pop(sid, None)
                 raise
             return HelperRef(sid, picked.profile, True)
+
+    def _busy_helpers(self, lead_id: str) -> int:
+        """How many helpers of ``lead_id`` hold a turn now: a live run that is not parked."""
+        return sum(
+            1
+            for found in self._sessions.values()
+            if found.parent is not None
+            and found.parent.session_id == lead_id
+            and not found.closed
+            and found.session_id not in self._ended_helpers
+            and found.task is not None
+            and not found.task.done()
+        )
+
+    def _turn_free(self, lead_id: str) -> bool:
+        """Whether a helper of ``lead_id`` may start now.
+
+        Only ``[agents] at_once = 1`` is enforced here: then a helper starts when none runs.
+        More at once is the dispatcher's job (step 15.8), so helpers still all start together.
+        """
+        return self._runtime.router.agent_settings().at_once > 1 or self._busy_helpers(lead_id) == 0
+
+    async def _start_queued(self, lead_id: str) -> None:
+        """Start the helpers of ``lead_id`` that wait for a turn, while a turn is free.
+
+        With the manager's lock held. A helper that fails to start is closed and ends.
+        """
+        waiting = self._queued.get(lead_id, [])
+        while waiting and self._turn_free(lead_id):
+            helper_id, brief = waiting.pop(0)
+            helper = self._sessions.get(helper_id)
+            if helper is None or helper.closed or helper.parent is None:
+                continue
+            parent = helper.parent
+            lead = await self._run_records.latest(lead_id)
+            await self._events.emit(
+                lead_id,
+                None if lead is None else lead.run_id,
+                "helper.state",
+                HelperStateData(call_id=parent.call_id, index=parent.index, state="running"),
+            )
+            try:
+                await self._send(helper, brief)
+            except Exception:
+                log.exception("a queued helper could not start")
+                helper.closed = True
+                await self._events.emit(helper_id, None, "session.closed", EmptyEventData())
+                self._sessions.pop(helper_id, None)
+        if not waiting:
+            self._queued.pop(lead_id, None)
+
+    async def _drop_queued(self, lead_id: str, only: str | None = None) -> bool:
+        """End the helpers of ``lead_id`` that never got a turn (all, or just ``only``): their
+        session is closed and the lead's log says how they ended. True when one was dropped."""
+        waiting = self._queued.get(lead_id, [])
+        gone = [item for item in waiting if only is None or item[0] == only]
+        if not gone:
+            return False
+        left = [item for item in waiting if item not in gone]
+        if left:
+            self._queued[lead_id] = left
+        else:
+            self._queued.pop(lead_id, None)
+        for helper_id, _brief in gone:
+            helper = self._sessions.pop(helper_id, None)
+            if helper is not None:
+                helper.closed = True
+            await self._events.emit(helper_id, None, "session.closed", EmptyEventData())
+            await self._helper_ended(helper_id, None, "cancelled")
+        return True
 
     async def _helper_model(
         self,
@@ -1950,8 +2046,12 @@ class SessionManager:
             events=stored,
         )
 
-    async def _helper_ended(self, session_id: str, run_id: str | None) -> None:
-        """Store ``helper.ended`` in the lead's log, once, and see whether the lead can go on."""
+    async def _helper_ended(
+        self, session_id: str, run_id: str | None, stopped: HelperStopped | None = None
+    ) -> None:
+        """Store ``helper.ended`` in the lead's log, once, and see whether the lead can go on.
+
+        ``stopped`` says how it ended when its run cannot: a helper that never got a turn."""
         record = await self._records.get(session_id)
         if (
             record is None
@@ -1961,6 +2061,7 @@ class SessionManager:
         ):
             return
         lead, call_id, index = record.parent_session_id, record.parent_call_id, record.helper_index
+        self._ended_helpers.add(session_id)
         self._steps.pop(session_id, None)
         self._step_counts.pop(session_id, None)
         self._events.clear_step(session_id)
@@ -1987,7 +2088,7 @@ class SessionManager:
                 HelperEndedData(
                     call_id=call_id,
                     index=index,
-                    stopped=await self._stopped(session_id, run, run_events),
+                    stopped=stopped or await self._stopped(session_id, run, run_events),
                     model_calls=summary.model_calls,
                     tokens=summary.tokens,
                     answer_tokens=len(summary.answer) // 4,
@@ -2113,6 +2214,7 @@ class SessionManager:
         async with self._lock:
             if lead_id in self._stopping:
                 return
+            await self._start_queued(lead_id)
             run = await self._run_records.waiting(lead_id)
             if run is None or run.wait_reason != "team":
                 return
@@ -2219,8 +2321,10 @@ class SessionManager:
     async def _cancel_helpers(self, lead_id: str) -> None:
         """Cancel the runs of the helpers of ``lead_id`` that have not ended.
 
-        A stopped helper ends ``cancelled``. Their sessions stay open.
+        A stopped helper ends ``cancelled``. Their sessions stay open. A helper that never got a
+        turn is closed and ends too.
         """
+        await self._drop_queued(lead_id)
         for helper in await self._records.open_helpers(lead_id):
             run = await self._run_records.latest(helper)
             if run is None or run.status not in ("running", "waiting"):
@@ -2255,6 +2359,8 @@ class SessionManager:
             raise SessionNotFoundError(session_id)
         if record.parent_session_id is None:
             raise NotAHelperError
+        if await self._drop_queued(record.parent_session_id, session_id):
+            return True
         run = await self._run_records.latest(session_id)
         if run is None or run.status not in ("running", "waiting"):
             return False
@@ -3057,6 +3163,29 @@ class SessionManager:
                 return await self._respond_batch(session_id, call_id, decision, device)
             return await self._respond_one(session_id, call_id, decision, args, device)
 
+    async def respond_helpers(
+        self, session_id: str, call_id: str, run: bool, *, device: str | None = None
+    ) -> str:
+        """Answer "start these helpers?" (``[agents] use_helpers = "ask"``) and go on.
+
+        ``run`` starts the helpers of the ``delegate`` call. Without it the call gets a result
+        that tells the model to do the work in the chat. Returns the run's id once
+        ``approval.resolved`` is in the log.
+
+        Raises :class:`ApprovalNotFoundError` when the run waits on no such question,
+        :class:`SessionNotFoundError`, :class:`SessionBusyError` or :class:`SchemaMismatchError`.
+        """
+        async with self._lock:
+            await self._resolve(session_id)
+            waiting = await self._run_records.waiting(session_id)
+            if waiting is not None:
+                found = pending_approval(await self._events.for_run(waiting.run_id))
+                if found is None or found.call_id != call_id or found.source != HELPERS_ASK_SOURCE:
+                    raise ApprovalNotFoundError(call_id)
+            return await self._respond_one(
+                session_id, call_id, "allow" if run else "deny", None, device
+            )
+
     async def _respond_batch(
         self, session_id: str, call_id: str, decision: ApprovalDecision, device: str | None
     ) -> str:
@@ -3135,6 +3264,10 @@ class SessionManager:
         pending = pending_approval(await self._events.for_run(run.run_id))
         if pending is None or pending.call_id != call_id:
             raise ApprovalNotFoundError(call_id)
+        if pending.source == HELPERS_ASK_SOURCE:
+            # "Start these helpers?" is a yes or a no: no rule, no allowance, no edited call.
+            decision = "deny" if decision == "deny" else "allow"
+            args = None
         if args is not None and args == pending.args:
             args = None
         if args is not None:

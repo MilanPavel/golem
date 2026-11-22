@@ -40,6 +40,7 @@ METHOD_ACCESS: Final[Mapping[str, Access]] = {
     "session.rename": "device",
     "message.send": "device",
     "approval.respond": "device",
+    "helpers.respond": "device",
     "route.consent.answer": "browser",
     "run.cancel": "device",
     "artifact.read": "device",

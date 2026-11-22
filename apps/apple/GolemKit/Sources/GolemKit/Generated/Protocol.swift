@@ -6483,6 +6483,49 @@ public enum HelperWaitEventType: String, Codable {
     case helperWait = "helper.wait"
 }
 
+/// ``helpers.respond``. Answer the question "start these helpers?" a lead waits on.
+///
+/// The lead asks it when ``[agents] use_helpers`` is ``ask``: its pending list holds a
+/// ``batch`` item whose ``call_id`` is the ``delegate`` call. ``run`` true starts the
+/// helpers
+/// as usual. ``run`` false starts none, and the model gets a result that tells it to do the
+/// work in the chat. The question is also on the log as ``approval.needed`` with the source
+/// ``use_helpers`` and the tool ``delegate``, and the answer as ``approval.resolved``
+/// (``allow`` or ``deny``); an older client may answer it with ``approval.respond``, where a
+/// yes of any kind runs the helpers and writes no rule.
+// MARK: - HelpersRespondParams
+public struct HelpersRespondParams: Codable {
+    public let callID: String
+    public let run: Bool
+    public let sessionID: String
+
+    public enum CodingKeys: String, CodingKey {
+        case callID = "call_id"
+        case run = "run"
+        case sessionID = "session_id"
+    }
+
+    public init(callID: String, run: Bool, sessionID: String) {
+        self.callID = callID
+        self.run = run
+        self.sessionID = sessionID
+    }
+}
+
+/// The run that goes on. Its events go to the attached connections.
+// MARK: - HelpersRespondResult
+public struct HelpersRespondResult: Codable {
+    public let runID: String
+
+    public enum CodingKeys: String, CodingKey {
+        case runID = "run_id"
+    }
+
+    public init(runID: String) {
+        self.runID = runID
+    }
+}
+
 /// ``hf.files``. List the sizes (quantizations) of one repo, with a fit check for this Mac.
 // MARK: - HFFilesParams
 public struct HFFilesParams: Codable {

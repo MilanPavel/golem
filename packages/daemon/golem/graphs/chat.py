@@ -1288,6 +1288,7 @@ def open_chat(
             _budget_by_window(window_of),
             lambda: runtime[0] if runtime else None,
             tier_of,
+            lambda: router.agent_settings().use_helpers,
         ),
     )
     builder.add_edge(START, "call_model")

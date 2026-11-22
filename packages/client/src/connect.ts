@@ -150,6 +150,7 @@ import type { SessionSetModelResult } from "../../protocol/gen/session-set-model
 import type { Params as ChatEvent } from "../../protocol/gen/rpc-notification.ts";
 import type { RunCancelResult } from "../../protocol/gen/run-cancel-result.ts";
 import type { HelperStopResult } from "../../protocol/gen/helper-stop-result.ts";
+import type { HelpersRespondResult } from "../../protocol/gen/helpers-respond-result.ts";
 import type { SessionAttachResult } from "../../protocol/gen/session-attach-result.ts";
 import type { SessionCloseResult } from "../../protocol/gen/session-close-result.ts";
 import type { SessionCreateResult } from "../../protocol/gen/session-create-result.ts";
@@ -285,6 +286,7 @@ import {
   isRecord,
   isRunCancelResult,
   isHelperStopResult,
+  isHelpersRespondResult,
   isSessionAttachResult,
   isSessionCloseResult,
   isSessionCreateResult,
@@ -434,6 +436,8 @@ export interface GolemClient {
   cancelRun(runId: string): Promise<RunCancelResult>;
   /** `helper.stop`: cancel the run of a helper session. The lead goes on with `stopped: cancelled` as its result. */
   stopHelper(sessionId: string): Promise<HelperStopResult>;
+  /** `helpers.respond`: answer "start these helpers?" (a `batch` pending item) for the `delegate` call `callId`. `run` false tells the model to do the work in the chat. */
+  respondHelpers(sessionId: string, callId: string, run: boolean): Promise<HelpersRespondResult>;
   inspectSession(sessionId: string): Promise<SessionInspectResult>;
   /** A session's runs as a tree: run, then model call, then tool call. Oldest run first. */
   /** What model calls cost: today, the week, and with a session id that session. */
@@ -1675,6 +1679,14 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       const result = await call("helper.stop", { session_id: sessionId });
       if (!isHelperStopResult(result)) {
         throw new Error("invalid helper.stop result");
+      }
+      return result;
+    },
+    async respondHelpers(sessionId: string, callId: string, run: boolean): Promise<HelpersRespondResult> {
+      await ready;
+      const result = await call("helpers.respond", { session_id: sessionId, call_id: callId, run });
+      if (!isHelpersRespondResult(result)) {
+        throw new Error("invalid helpers.respond result");
       }
       return result;
     },
