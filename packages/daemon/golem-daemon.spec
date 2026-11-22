@@ -33,6 +33,7 @@ datas = (
     collect_data_files("golem.models")
     + collect_data_files("golem.mcp")
     + collect_data_files("golem.agents")
+    + collect_data_files("golem.evals")
 )
 for distribution in (
     "golem",

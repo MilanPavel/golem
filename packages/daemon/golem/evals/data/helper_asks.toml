@@ -1,0 +1,133 @@
+# The fixed asks of the helper eval (golem/evals/helpers.py, ticket 15.4.5, ADR-059 section 2).
+#
+# name         the ask's short name, unique
+# text         what the user types
+# facts        what a good answer must contain. Each entry is one fact; "a|b" means a or b.
+#              The score of an answer is the share of facts it holds, ignoring case.
+# size         "little" (the ask reads little) or "much" (it reads much)
+# reason       the reason of ADR-059 section 2 the ask is meant to exercise:
+#              "none" (a plain ask: no helper), "window" (the reading crowds the lead's
+#              window), "at_once" (independent jobs), "model" (a stronger or cheaper model fits)
+# read_tokens  a rough guess of all the reading of the job, in tokens. The eval divides it by
+#              a lead's window to get the "reading share" the thresholds are proposed from.
+# jobs         independent jobs that need no order (default 1; find-fix-check is 1)
+# hard         one hard question that a stronger model answers better (default false)
+# files        a table of path = text, written to a new folder for the ask
+# sweep_files, sweep_lines, sweep_hits
+#              instead of (or beside) files: write that many modules of that many lines of
+#              filler, and put "def handle_<word>" in the modules named by sweep_hits
+#              ("mod03:orbit" is module mod03.py, word orbit)
+# needs_project true: the ask is about the repository given with --project (default: the
+#              current folder), not about a folder the eval writes. Its facts fit the golem repo.
+
+[[ask]]
+name = "rename-six-files"
+text = "rename old_name to new_name everywhere"
+facts = ["new_name", "six|6"]
+size = "little"
+reason = "none"
+read_tokens = 3000
+
+[ask.files]
+"mod0.py" = "from lib import old_name\n\n\ndef use0():\n    return old_name(0)\n"
+"mod1.py" = "from lib import old_name\n\n\ndef use1():\n    return old_name(1)\n"
+"mod2.py" = "from lib import old_name\n\n\ndef use2():\n    return old_name(2)\n"
+"mod3.py" = "from lib import old_name\n\n\ndef use3():\n    return old_name(3)\n"
+"mod4.py" = "from lib import old_name\n\n\ndef use4():\n    return old_name(4)\n"
+"mod5.py" = "from lib import old_name\n\n\ndef use5():\n    return old_name(5)\n"
+
+[[ask]]
+name = "one-file-question"
+text = "what does double in util.py do?"
+facts = ["x * 2|times two|twice|doubles"]
+size = "little"
+reason = "none"
+read_tokens = 800
+
+[ask.files]
+"util.py" = "def double(x):\n    return x * 2\n"
+
+[[ask]]
+name = "find-fix-check"
+text = "check.py fails, find the bug, fix it, run it again"
+facts = ["add", "a + b|adds|passes"]
+size = "little"
+reason = "none"
+read_tokens = 1500
+
+[ask.files]
+"calc.py" = "def add(a, b):\n    return a - b\n"
+"check.py" = "from calc import add\n\nassert add(2, 3) == 5, 'add is wrong'\nprint('all good')\n"
+
+[[ask]]
+name = "sweep-handlers-24"
+text = "which modules define a function named handle_something, and what does each return?"
+facts = ["mod03", "orbit", "mod17", "ember"]
+size = "much"
+reason = "window"
+read_tokens = 14000
+sweep_files = 24
+sweep_lines = 60
+sweep_hits = ["mod03:orbit", "mod17:ember"]
+
+[[ask]]
+name = "sweep-handlers-60"
+text = "which modules define a function named handle_something, and what does each return?"
+facts = ["mod08", "lantern", "mod31", "quartz", "mod52", "harbor"]
+size = "much"
+reason = "window"
+read_tokens = 36000
+sweep_files = 60
+sweep_lines = 60
+sweep_hits = ["mod08:lantern", "mod31:quartz", "mod52:harbor"]
+
+[[ask]]
+name = "two-sweeps-at-once"
+text = "in the folder, list the modules that define handle_ functions, and also count the modules that define filler_0 functions, as two separate jobs"
+facts = ["mod05", "falcon", "filler_0"]
+size = "much"
+reason = "at_once"
+read_tokens = 16000
+jobs = 2
+sweep_files = 28
+sweep_lines = 60
+sweep_hits = ["mod05:falcon"]
+
+[[ask]]
+name = "one-hard-question"
+text = "why does check_sum in verify.py return a wrong total for an empty list, and what is the right fix?"
+facts = ["empty", "start|initial|default|zero|0"]
+size = "little"
+reason = "model"
+read_tokens = 1200
+hard = true
+
+[ask.files]
+"verify.py" = "def check_sum(values):\n    total = values[0]\n    for value in values[1:]:\n        total += value\n    return total\n"
+
+[[ask]]
+name = "repo-overview"
+text = "what can you tell me about this repo"
+facts = ["daemon", "protocol"]
+size = "much"
+reason = "window"
+read_tokens = 30000
+needs_project = true
+
+[[ask]]
+name = "repo-config-read"
+text = "where is the config file read and what does it change"
+facts = ["config"]
+size = "much"
+reason = "window"
+read_tokens = 20000
+needs_project = true
+
+[[ask]]
+name = "repo-fit-together"
+text = "how do the parts of this project fit together"
+facts = ["daemon", "protocol"]
+size = "much"
+reason = "window"
+read_tokens = 40000
+needs_project = true
