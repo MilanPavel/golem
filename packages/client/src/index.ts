@@ -136,6 +136,10 @@ export type { TraceContextPart } from "../../protocol/gen/trace-context-part.ts"
 export type { PromptSectionInfo } from "../../protocol/gen/prompt-section-info.ts";
 export type { ChatSetParams } from "../../protocol/gen/chat-set-params.ts";
 export type { ChatSetResult } from "../../protocol/gen/chat-set-result.ts";
+export type { ChatPromptParams } from "../../protocol/gen/chat-prompt-params.ts";
+export type { ChatPromptResult } from "../../protocol/gen/chat-prompt-result.ts";
+export type { ChatPromptPart } from "../../protocol/gen/chat-prompt-part.ts";
+export type { ChatDraftResult } from "../../protocol/gen/chat-draft-result.ts";
 export type { ChatValues } from "../../protocol/gen/chat-values.ts";
 export type { NotificationsSetParams } from "../../protocol/gen/notifications-set-params.ts";
 export type { NotificationsSetResult } from "../../protocol/gen/notifications-set-result.ts";

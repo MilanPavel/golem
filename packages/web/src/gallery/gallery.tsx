@@ -60,6 +60,7 @@ import { FORM_CASES } from "../features/setup/sample.ts";
 import { HeroCard, PathsGrid } from "../features/setup/info-parts.tsx";
 import { HowFarView } from "../features/settings/chat-alone.tsx";
 import { ChatSection } from "../features/settings/chat-section.tsx";
+import { InstructionsView } from "../features/settings/chat-instructions.tsx";
 import { KeysView } from "../features/settings/keys-section.tsx";
 import { KEYS_CASES } from "../features/settings/keys-sample.ts";
 import { MemoryView } from "../features/settings/memory/memory-view.tsx";
@@ -146,11 +147,41 @@ const CTX_MESSAGES: ContextActionsInput["messages"] = Array.from({ length: 6 }, 
 ]).flat();
 const CTX_BIG_MODEL: ListedModel = { ref: "ollama/qwen3:27b", label: "qwen3:27b", provider: "ollama", source: "installed", status: "ready", tier: "local", ctx: 131072, price: { input: 0, output: 0 } };
 const CTX_MEMORY = { ram_gb: 32, size_gb: 16, kv_gb_per_1k_tokens: 0.06, overhead_gb: 1, fits_share: 0.5, tight_share: 0.75 };
+/** Your instructions with its lines held in the page, and what the model reads made from them. */
+function GalleryInstructions() {
+  const [lines, setLines] = useState<string[]>(["Keep answers short: the answer first, then stop."]);
+  const [shown, setShown] = useState<string[] | null>(null);
+  const text = (shown ?? lines).map((line) => line.trim()).filter((line) => line !== "").join("\n");
+  const instructions = text === "" ? [] : [{ name: "instructions", text, tokens: Math.ceil(text.length / 4) }];
+  const parts = [
+    ...instructions,
+    { name: "memory", text: "Notes you and golem wrote: you like metric units.", tokens: 14 },
+    { name: "skill_index", text: "Skills you can use: summarise a page, plan a trip.", tokens: 16 },
+    { name: "plan_first", text: "Show a short plan first and wait for a yes.", tokens: 12 },
+  ];
+  const tools = 1100;
+  const prompt = { model: "ollama/qwen3", parts, tools_tokens: tools, total_tokens: parts.reduce((all, part) => all + part.tokens, tools) };
+  return (
+    <InstructionsView
+      saved={lines}
+      onSave={async (next) => {
+        setLines(next);
+        return null;
+      }}
+      onDraft={async () => ["Be direct. No pleasantries, no praise, no offers at the end.", "Use metric units.", "Explain a term the first time you use it."]}
+      onPreview={setShown}
+      prompt={prompt}
+      promptError={null}
+      onNavigate={() => undefined}
+    />
+  );
+}
+
 /** Settings › Chat with its defaults held in the page, as the daemon would hold them. */
 function GalleryChatSettings() {
   const [mode, setMode] = useState<PermissionMode>("balanced");
   const [plan, setPlan] = useState(false);
-  return <ChatSection alone={<HowFarView mode={mode} planFirst={plan} onMode={setMode} onPlan={setPlan} />} />;
+  return <ChatSection instructions={<GalleryInstructions />} alone={<HowFarView mode={mode} planFirst={plan} onMode={setMode} onPlan={setPlan} />} />;
 }
 
 function ctxCase(label: string, used: number, window: number | null, extra: Partial<ContextActionsInput> = {}) {

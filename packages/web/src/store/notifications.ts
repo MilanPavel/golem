@@ -1,4 +1,4 @@
-import type { ChatSetParams, ChatSetResult, ChatValues, NotificationsSetParams, NotificationsSetResult, NotificationsValues, NotifyTestResult } from "@golem/client";
+import type { ChatSetParams, ChatSetResult, ChatValues, ChatPromptResult, ChatDraftResult, NotificationsSetParams, NotificationsSetResult, NotificationsValues, NotifyTestResult } from "@golem/client";
 
 import type { AgentsKeepResult, AgentsKeepValues } from "@golem/client";
 
@@ -12,7 +12,9 @@ export type { NotificationsSetParams, NotificationsSetResult, NotificationsValue
 /** The query key of `notifications.get`. A successful `notifications.set` marks it stale. */
 export const NOTIFICATIONS_KEY = ["notifications.get"] as const;
 
-export type { ChatSetParams, ChatSetResult, ChatValues };
+export type { ChatSetParams, ChatSetResult, ChatValues, ChatPromptResult, ChatDraftResult };
 
 /** The query key of `chat.get`. A successful `chat.set` or a new default mode marks it stale. */
 export const CHAT_KEY = ["chat.get"] as const;
+/** The query key of `chat.prompt`, followed by the lines it was asked with. */
+export const PROMPT_KEY = ["chat.prompt"] as const;

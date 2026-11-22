@@ -19,7 +19,7 @@ afterEach(reset);
 const preview = () => screen.getByRole("group", { name: "Preview" });
 
 test("the page shows the Steps, thinking, line, and send choices with today's values", () => {
-  render(<ChatSection alone={null} />);
+  render(<ChatSection instructions={null} alone={null} />);
   expect(screen.getByRole("radio", { name: "Normal" }).getAttribute("aria-checked")).toBe("true");
   expect(screen.getByRole("switch", { name: "Open it when a step fails" }).getAttribute("aria-checked")).toBe("true");
   expect(screen.getByRole("radio", { name: "Collapsed" }).getAttribute("aria-checked")).toBe("true");
@@ -32,7 +32,7 @@ test("the page shows the Steps, thinking, line, and send choices with today's va
 
 test("Steps changes the preview and is kept as golem.detail", async () => {
   const user = userEvent.setup();
-  render(<ChatSection alone={null} />);
+  render(<ChatSection instructions={null} alone={null} />);
   expect(within(preview()).getByText(/searched the web/)).toBeTruthy();
   await user.click(screen.getByRole("radio", { name: "Quiet" }));
   expect(localStorage.getItem("golem.detail")).toBe("quiet");
@@ -43,7 +43,7 @@ test("Steps changes the preview and is kept as golem.detail", async () => {
 
 test("the arrow keys move between the Steps choices", async () => {
   const user = userEvent.setup();
-  render(<ChatSection alone={null} />);
+  render(<ChatSection instructions={null} alone={null} />);
   screen.getByRole("radio", { name: "Normal" }).focus();
   await user.keyboard("{ArrowRight}");
   expect(localStorage.getItem("golem.detail")).toBe("verbose");
@@ -51,7 +51,7 @@ test("the arrow keys move between the Steps choices", async () => {
 
 test("One step failed opens the steps in Quiet, and turning the choice off folds them", async () => {
   const user = userEvent.setup();
-  render(<ChatSection alone={null} />);
+  render(<ChatSection instructions={null} alone={null} />);
   await user.click(screen.getByRole("radio", { name: "Quiet" }));
   expect(within(preview()).queryByRole("list", { name: "Tool calls" })).toBeNull();
   await user.click(within(preview()).getByRole("switch", { name: "One step failed" }));
@@ -63,7 +63,7 @@ test("One step failed opens the steps in Quiet, and turning the choice off folds
 
 test("Thinking has three choices and the preview follows them", async () => {
   const user = userEvent.setup();
-  render(<ChatSection alone={null} />);
+  render(<ChatSection instructions={null} alone={null} />);
   const line = () => within(preview()).queryByRole("button", { name: /thought for 3s/ });
   expect(line()?.getAttribute("aria-expanded")).toBe("false");
   await user.click(screen.getByRole("radio", { name: "Open" }));
@@ -76,7 +76,7 @@ test("Thinking has three choices and the preview follows them", async () => {
 
 test("a part turned off leaves the line under the answer, and the checkbox drops what says nothing", async () => {
   const user = userEvent.setup();
-  render(<ChatSection alone={null} />);
+  render(<ChatSection instructions={null} alone={null} />);
   const line = () => preview().querySelector("article > p:last-child")?.textContent ?? "";
   expect(line()).toBe("1m 12s · 5 steps · qwen3.8:27b · local · 38.4K tok · 1 helper");
   await user.click(screen.getByRole("button", { name: "Tokens" }));
@@ -88,7 +88,7 @@ test("a part turned off leaves the line under the answer, and the checkbox drops
 
 test("Send with changes the hint in the preview", async () => {
   const user = userEvent.setup();
-  render(<ChatSection alone={null} />);
+  render(<ChatSection instructions={null} alone={null} />);
   expect(within(preview()).getByText("↵ send · ⇧↵ new line")).toBeTruthy();
   await user.click(screen.getByRole("radio", { name: /Enter$/, checked: false }));
   expect(localStorage.getItem("golem.sendKey")).toBe("mod");
