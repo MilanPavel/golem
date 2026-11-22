@@ -1,6 +1,7 @@
 ---
 name: reviewer
 description: Reads a diff it did not write, with fresh eyes, and reports what is wrong. Use it before you call a change done. It cannot change anything.
+line: reads a change with fresh eyes before you call it done
 model: stronger
 tools: read_file, list_dir, glob, grep, git_log, git_diff, git_status
 max-calls: 20

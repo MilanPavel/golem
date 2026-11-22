@@ -20,7 +20,8 @@ from golem.coding.changes import ChangeStore
 from golem.config import MemorySettings, ModelPrice, load_settings
 from golem.graphs.chat import ChatRuntime, open_chat
 from golem.graphs.cite_prompt import CITE_PROMPT
-from golem.graphs.delegate_prompt import DELEGATE_PROMPT
+from golem.graphs.delegate_policy import Prices
+from golem.graphs.delegate_prompt import delegate_prompt, prices_of
 from golem.graphs.estimate import TokenRatios
 from golem.graphs.instructions_prompt import instructions_section
 from golem.graphs.prompt import PLAN, SystemPrompt
@@ -48,7 +49,7 @@ from golem.models.pulls import PullManager
 from golem.models.router import ModelConfigError, ModelRouter
 from golem.models.scores import Scores
 from golem.models.speed import SpeedBook
-from golem.models.tiers import Tier
+from golem.models.tiers import Tier, blended
 from golem.models.window import resolve_window
 from golem.models.window_plans import WindowPlans
 from golem.notify import Notifier, NotifierKinds, Poster, SessionFacts, default_poster
@@ -101,7 +102,7 @@ from golem.store.records import RunRecords, SessionRecords
 from golem.store.routine_runs import RoutineRuns
 from golem.store.suggestions import SuggestionStore
 from golem.tools import default_registry
-from golem.tools.registry import ToolScope
+from golem.tools.registry import ToolRegistry, ToolScope
 from golem_protocol.commands import (
     AgentRegistryChanged,
     KeychainWait,
@@ -381,7 +382,13 @@ class DaemonApp:
                             index_section(self.state.skills),
                             memory_section(),
                             mcp_section(mcp),
-                            DELEGATE_PROMPT,
+                            delegate_prompt(
+                                lambda root: (
+                                    [] if state.agents is None else state.agents.view(root).usable()
+                                ),
+                                lambda name: not _is_read_only(self.state.tools, name),
+                                settings.agents.delegate,
+                            ),
                             CITE_PROMPT,
                             PLAN,
                         )
@@ -399,6 +406,7 @@ class DaemonApp:
                         "a chat" if state.sessions is None else state.sessions.label_of(sid, role)
                     ),
                     tier_of=lambda profile: _tier_of(router, models, profile),
+                    helper_prices=lambda profile: _helper_prices(router, models, profile),
                     ratios=TokenRatios(),
                     paid_ok=budget.paid_ok,
                     budget_refs=models.budget_refs,
@@ -788,6 +796,22 @@ def _price_of(router: ModelRouter, models: ModelDiscovery, profile: str) -> Mode
     except ModelConfigError:
         return None
     return models.price_of(ref)
+
+
+def _helper_prices(router: ModelRouter, models: ModelDiscovery, profile: str) -> Prices:
+    """What the lead of ``profile`` and the helpers it could start cost. No I/O."""
+    try:
+        ref = router.resolve(profile).ref
+    except ModelConfigError:
+        return Prices()
+    price = models.price_of(ref)
+    tier = models.tier_of_ref(ref) or "frontier"
+    return prices_of(ref, tier, None if price is None else blended(price), models.cached())
+
+
+def _is_read_only(tools: ToolRegistry | None, name: str) -> bool:
+    tool = None if tools is None else tools.get(name)
+    return tool is not None and tool.read_only
 
 
 def _tier_of(router: ModelRouter, models: ModelDiscovery, profile: str) -> Tier | None:

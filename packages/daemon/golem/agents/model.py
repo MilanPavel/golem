@@ -50,6 +50,8 @@ class Agent:
     limits: AgentLimits = field(default_factory=AgentLimits)
     asks: bool = False
     """Whether the helper may ask you a question."""
+    line: str = ""
+    """What the lead's prompt says this type is for, a few words. Empty: use ``description``."""
     body: str = ""
     """The prompt."""
     extras: Mapping[str, Any] = field(default_factory=dict[str, Any])

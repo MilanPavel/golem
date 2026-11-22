@@ -13,6 +13,9 @@ Frontmatter fields:
 - ``tools``: names of golem's tools, as text or a list. Left out means none.
 - ``max-calls``, ``max-seconds``, ``max-cost-usd``, ``max-tokens``, ``max-answer-chars``: limits.
 - ``asks``: true when the helper may ask you a question. Default false.
+- ``line``: optional; what the lead's system prompt says this type is for, a few words
+  (``reads many files and returns the paths that matter``). Left out, the first sentence of
+  ``description`` is used.
 """
 
 from __future__ import annotations
@@ -52,8 +55,12 @@ KNOWN = frozenset(
         "max-tokens",
         "max-answer-chars",
         "asks",
+        "line",
     }
 )
+
+MAX_LINE = 120
+"""The longest ``line``: the lead pays for it on every call."""
 
 _WISH = re.compile(r"\S+")
 
@@ -114,6 +121,9 @@ def parse_agent(path: Path, *, known_tools: frozenset[str] | None = None) -> Age
         answer_chars=_count(fields, "max-answer-chars", errors),
     )
     asks = flag_field(fields, "asks", False, errors)
+    line = text_field(fields, "line", errors) or ""
+    if len(line) > MAX_LINE:
+        errors.append(f"`line` is {len(line)} characters, over {MAX_LINE}")
     if not body:
         errors.append("the prompt is empty: write it after the frontmatter")
 
@@ -127,6 +137,7 @@ def parse_agent(path: Path, *, known_tools: frozenset[str] | None = None) -> Age
         tools=tools,
         limits=limits,
         asks=asks,
+        line=line,
         body=body,
         extras={key: value for key, value in fields.items() if key not in KNOWN},
         errors=tuple(errors),
