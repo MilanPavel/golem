@@ -1,4 +1,4 @@
-import { act, render, screen } from "@testing-library/react";
+import { act, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import axe from "axe-core";
 import { afterEach, expect, test, vi } from "vitest";
@@ -161,12 +161,13 @@ test("the strip turns into the connection screen once the link has been gone for
   }
 });
 
-test("the Settings page shows the daemon version at the foot of its sidebar", () => {
+test("the Settings sidebar has no version or config.toml footer", () => {
   history.replaceState(null, "", "/settings");
   try {
     renderApp({ state: { status: "connected" }, daemonVersion: "0.9.1" });
     const sidebar = screen.getByTestId("settings-nav");
-    expect(sidebar.textContent).toContain("golem v0.9.1");
+    expect(sidebar.textContent).not.toContain("golem v0.9.1");
+    expect(within(sidebar).queryByRole("link", { name: /Open config\.toml/ })).toBeNull();
   } finally {
     history.replaceState(null, "", "/");
   }
