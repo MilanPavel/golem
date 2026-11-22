@@ -381,6 +381,26 @@ test("the list says how long a finished helper's steps are kept, and 0 is for ev
   assert.deepEqual(show(null), []);
 });
 
+test("the list says the limits every helper gets, and nothing when none is set", () => {
+  const show = (keep: Record<string, number | null>, setup: WishSetup = "mixed") =>
+    texts(layoutAgentsManager({ state: openAgentsManager(), agents: ALL, error: null, cwd: CWD, home: HOME, columns: 140, rows: 40, keep: { keep_days: 7, keep_problem_days: 30, ...keep }, setup })).filter((line) => line.startsWith("every helper"));
+  assert.deepEqual(show({ max_calls: 20, working_seconds: 600 }), ["every helper: 20 tool calls · 10 min"]);
+  assert.deepEqual(show({ max_calls: 20, working_seconds: 90, max_cost: 1.5, max_tokens: 5000 }), ["every helper: 20 tool calls · 90 s · $1.50 cost · 5000 tokens"]);
+  assert.deepEqual(show({ max_cost: 1.5, max_calls: 20 }, "cloud"), ["every helper: $1.50 cost · 20 tool calls"]);
+  assert.deepEqual(show({ max_calls: null }), []);
+  assert.deepEqual(show({}), []);
+});
+
+test("the read view shows tokens and cost when set, and marks what config.toml sets", () => {
+  const view = (agent: AgentInfo) => texts(layout({ open: true, view: { kind: "detail", name: agent.name, origin: agent.origin } }, [agent]));
+  const plain = view(PROMPTED);
+  assert.ok(plain.some((line) => line.startsWith("limits") && line.endsWith("answer 6000 chars")));
+  assert.ok(!plain.some((line) => line.includes("config.toml")));
+  const set = view({ ...PROMPTED, limits: { max_calls: 15, max_seconds: 300, answer_chars: 6000, max_tokens: 8000, max_cost_usd: 1.5 }, limits_from_config: ["max_cost_usd", "max_calls"] });
+  assert.ok(set.some((line) => line.startsWith("limits") && line.includes("answer 6000 chars · 8000 tokens · $1.50 cost")));
+  assert.ok(set.some((line) => line.trim() === "tool calls, cost: set in config.toml"));
+});
+
 const FILES: AgentInfo[] = [
   { ...scout, text: "---\nname: scout\n---\nbody" },
   { ...reviewer, text: "---\nname: reviewer\n---\nbody", shadowed: ["bundled"] },

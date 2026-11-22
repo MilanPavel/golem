@@ -914,6 +914,7 @@ export {
   agentWarnings,
   agentWish,
   definitionLines,
+  formatSeconds as formatLimitSeconds,
   type DefinitionLine,
   type LimitFact,
   wishLine,

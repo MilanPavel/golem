@@ -1,5 +1,5 @@
 import type { AgentInfo } from "@golem/client";
-import { agentRow, agentWish, wishLine, type AgentRow, type LimitFact, type WishModel, type WishSetup } from "@golem/view";
+import { agentRow, SET_IN_CONFIG, agentWish, wishLine, type AgentRow, type LimitFact, type WishModel, type WishSetup } from "@golem/view";
 
 import type { McpManagerLine } from "./mcp-manager.ts";
 
@@ -19,9 +19,10 @@ export function runsText(agent: AgentInfo): string {
   return used > 0 ? `${used} ${used === 1 ? "run" : "runs"}` : "—";
 }
 
-/** `15 tool calls · 5 min · answer 6000 chars`; a limit the file does not set says `no … limit`. */
+/** `15 tool calls · 5 min · answer 6000 chars`; calls, time and answer say `no … limit` when unset, tokens and cost are left out. */
 export function limitsText(facts: readonly LimitFact[]): string {
   return facts
+    .filter((fact) => fact.value !== "no limit" || (fact.label !== "tokens" && fact.label !== "cost"))
     .map((fact) => {
       if (fact.value === "no limit") {
         return `no ${fact.label} limit`;
@@ -69,6 +70,9 @@ export function readLines(agent: AgentInfo, input: { width: number; setup: WishS
     fact("", "* changes things");
   }
   fact("limits", limitsText(row.limits));
+  if (row.configLimits.length > 0) {
+    fact("", `${row.configLimits.join(", ")}: ${SET_IN_CONFIG}`);
+  }
   fact("asks", row.asksLine);
   fact("runs", row.usage);
   if (row.unavailable !== null) {
