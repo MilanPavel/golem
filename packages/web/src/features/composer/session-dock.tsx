@@ -6,6 +6,7 @@ import { useDraft, useDraftPastes, useNotes, usePageActions, useSession } from "
 import type { SessionView } from "../../store/session-store.ts";
 import { PendingDock } from "./pending-dock.tsx";
 import { DockedChecksQuestion } from "./checks-question.tsx";
+import { SessionBranchChip } from "./branch-chip.tsx";
 import { Composer } from "./composer.tsx";
 import { ModeChip } from "./mode-chip.tsx";
 import { NotesChip } from "./notes-chip.tsx";
@@ -135,7 +136,7 @@ export function SessionDock({ sessionId }: { sessionId: string }) {
               <>
                 <ModelBarChip sessionId={sessionId} onRoute={(mode) => setRoute.mutate(mode)} />
                 <SessionFolder sessionId={sessionId} />
-                {/* The branch chip goes here (ticket 10.20.7). */}
+                <SessionBranchChip sessionId={sessionId} />
               </>
             }
             barRight={

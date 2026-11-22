@@ -13,6 +13,8 @@ export type NewSessionState = {
   model: string | null;
   /** A session sent the person home to pick another folder: the empty screen opens its folder menu once. */
   folderMenu: boolean;
+  /** The branch picked for the next session, which golem switches the folder to when it starts. `create` makes it. */
+  branch: { name: string; create: boolean } | null;
 };
 
 export type NewSessionStore = StoreSource<NewSessionState> & {
@@ -25,29 +27,37 @@ export type NewSessionStore = StoreSource<NewSessionState> & {
   /** Ask the empty screen to open its folder menu. It calls `folderMenuShown` once it has. */
   askFolderMenu(): void;
   folderMenuShown(): void;
+  /** The person marks a branch for the next session (null drops the mark). Changing the folder drops it too. */
+  chooseBranch(branch: { name: string; create: boolean } | null): void;
 };
 
 export function createNewSession(): NewSessionStore {
-  const store = createStore<NewSessionState>({ chosen: undefined, lastOpened: undefined, model: null, folderMenu: false });
+  const store = createStore<NewSessionState>({ chosen: undefined, lastOpened: undefined, model: null, folderMenu: false, branch: null });
   return {
     getSnapshot: store.getSnapshot,
     subscribe: store.subscribe,
     choose(folder) {
       const state = store.getSnapshot();
       if (state.chosen !== folder) {
-        store.set({ ...state, chosen: folder });
+        store.set({ ...state, chosen: folder, branch: null });
       }
     },
     opened(cwd) {
       const state = store.getSnapshot();
       if (state.chosen !== undefined || state.lastOpened !== cwd) {
-        store.set({ ...state, chosen: undefined, lastOpened: cwd });
+        store.set({ ...state, chosen: undefined, lastOpened: cwd, branch: null });
       }
     },
     chooseModel(model) {
       const state = store.getSnapshot();
       if (state.model !== model) {
         store.set({ ...state, model });
+      }
+    },
+    chooseBranch(branch) {
+      const state = store.getSnapshot();
+      if (state.branch?.name !== branch?.name || state.branch?.create !== branch?.create) {
+        store.set({ ...state, branch });
       }
     },
     askFolderMenu() {

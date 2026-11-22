@@ -296,3 +296,13 @@ export const PlanIcon = (props: IconProps) => (
     <path d="M5 4h8M5 8h8M5 12h8M2.5 4h.01M2.5 8h.01M2.5 12h.01" />
   </Icon>
 );
+
+/** A git branch: two nodes joined by a line, with a third that forks off it. */
+export const BranchIcon = (props: IconProps) => (
+  <Icon {...props}>
+    <circle cx="4.5" cy="3.5" r="1.5" />
+    <circle cx="4.5" cy="12.5" r="1.5" />
+    <circle cx="11.5" cy="5.5" r="1.5" />
+    <path d="M4.5 5v6M11.5 7c0 2.5-2.5 2.5-5.5 3.5" />
+  </Icon>
+);

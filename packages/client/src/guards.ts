@@ -20,6 +20,7 @@ import type { FileListResult } from "../../protocol/gen/file-list-result.ts";
 import type { FileReadResult } from "../../protocol/gen/file-read-result.ts";
 import type { DirEntry, FsListDirsResult } from "../../protocol/gen/fs-list-dirs-result.ts";
 import type { FsChooseFolderResult } from "../../protocol/gen/fs-choose-folder-result.ts";
+import type { GitBranchesResult } from "../../protocol/gen/git-branches-result.ts";
 import type { GitInfoResult, GitWorktree } from "../../protocol/gen/git-info-result.ts";
 import type { SetupRow, SetupStatusResult } from "../../protocol/gen/setup-status-result.ts";
 import type { McpListResult } from "../../protocol/gen/mcp-list-result.ts";
@@ -673,6 +674,15 @@ export function isFsListDirsResult(value: unknown): value is FsListDirsResult {
 
 export function isFsChooseFolderResult(value: unknown): value is FsChooseFolderResult {
   return isRecord(value) && (value["path"] === undefined || value["path"] === null || typeof value["path"] === "string");
+}
+
+export function isGitBranchesResult(value: unknown): value is GitBranchesResult {
+  return (
+    isRecord(value) &&
+    (value["current"] === undefined || value["current"] === null || typeof value["current"] === "string") &&
+    Array.isArray(value["branches"]) &&
+    value["branches"].every((item) => isRecord(item) && typeof item["name"] === "string")
+  );
 }
 
 function isGitWorktree(value: unknown): value is GitWorktree {

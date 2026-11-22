@@ -2165,11 +2165,43 @@ test("createSession sends the folder and the model only when they are given", as
     await client.createSession({ cwd: "/repo" });
     await client.createSession({ modelProfile: "local" });
     await client.createSession({ cwd: "/repo", modelProfile: "ollama/qwen3:8b" });
+    await client.createSession({ cwd: "/repo", branch: "fix-x" });
+    await client.createSession({ cwd: "/repo", branch: "fix-y", createBranch: true });
     assert.deepEqual(seen, [
       {},
       { cwd: "/repo" },
       { model_profile: "local" },
       { cwd: "/repo", model_profile: "ollama/qwen3:8b" },
+      { cwd: "/repo", branch: "fix-x" },
+      { cwd: "/repo", branch: "fix-y", create_branch: true },
+    ]);
+  } finally {
+    client.close();
+    await daemon.close();
+  }
+});
+
+test("gitInfo and gitBranches send the path and check the answer", async () => {
+  const seen: [string, Record<string, unknown>][] = [];
+  const daemon = await listen((socket) => {
+    attach(socket, {
+      answerPing: true,
+      results: {
+        "git.info": { repository: true, root: "/repo", branch: "main", detached: false, changed: 3, worktrees: [] },
+        "git.branches": { current: "main", branches: [{ name: "main", last_used: null }] },
+      },
+      onRequest: (_socket, method, params) => {
+        seen.push([method, params]);
+      },
+    });
+  });
+  const client = connectGolem({ socketPath: daemon.socketPath, clientName: "tui", reconnect: false, heartbeatMs: 60_000 });
+  try {
+    assert.equal((await client.gitInfo("/repo")).changed, 3);
+    assert.equal((await client.gitBranches("/repo")).current, "main");
+    assert.deepEqual(seen.filter(([method]) => method.startsWith("git.")), [
+      ["git.info", { path: "/repo" }],
+      ["git.branches", { path: "/repo" }],
     ]);
   } finally {
     client.close();

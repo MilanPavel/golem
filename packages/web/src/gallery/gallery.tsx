@@ -38,7 +38,7 @@ import { cloudFinishedChat, cloudRunningChat, localFinishedChat, localRunningCha
 import { StepsView, stepsBatches } from "../features/workbench/steps-tab.tsx";
 import { ChangesView, ChecksView, Workbench, type WorkbenchTab, CommitDialogView, ConflictDialogView, RewindDialogView, TurnsView, FilesView } from "../features/workbench/index.ts";
 import type { ChangedFile } from "../store/changes.ts";
-import { Composer, ContextBannerView, ContextChipView, DockView, Meter, FolderBarBadge, SessionFolderMenuBody, ModeChipView, ModelBarChipView, NotesChipView, ChecksQuestionView, RoutePanelView, WaitHintView } from "../features/composer/index.ts";
+import { BranchChipView, BranchSwitchLineView, Composer, ContextBannerView, ContextChipView, DockView, Meter, FolderBarBadge, SessionFolderMenuBody, ModeChipView, ModelBarChipView, NotesChipView, ChecksQuestionView, RoutePanelView, WaitHintView } from "../features/composer/index.ts";
 import { PlanCardView } from "../features/chat/plan-card.tsx";
 import { createHistory } from "../features/composer/history.ts";
 import { CommandsDialog } from "../features/composer/help-dialog.tsx";
@@ -368,6 +368,7 @@ function ComposerRowDemo({ width }: { width: number }) {
               onTune={() => setOpen(false)}
             />
             <FolderBarBadge folder="/Users/you/repos/golem" />
+            <BranchChipView mode="session" folder="/Users/you/repos/golem" shown="main" current="main" changed={0} branches={["main", "fix-x"]} onPick={() => {}} onCreate={() => {}} />
           </>
         }
         barRight={
@@ -2203,6 +2204,19 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
           <NewSessionModelChipView label={{ kind: "pick", text: "Qwen3 8B" }} onOpen={() => {}} />
           <NewSessionModelChipView label={{ kind: "auto", text: "auto · llama3.2:3b" }} onOpen={() => {}} />
           <NewSessionModelChipView label={{ kind: "none" }} onOpen={() => {}} />
+        </div>
+      </section>
+
+      <section className="mt-6" id={anchor("Branch chip and menu")}>
+        <h3 className="mb-2 font-mono text-xs text-faint">Branch chip and menu</h3>
+        <div className="flex flex-wrap items-start gap-2 rounded-lg border border-line bg-bg p-4">
+          <BranchChipView mode="home" folder="/Users/you/repos/golem" shown="main" current="main" changed={0} branches={["main", "fix-x", "release"]} onPick={() => {}} onCreate={() => {}} />
+          <BranchChipView mode="home" folder="/Users/you/repos/golem" shown="fix-x" current="main" changed={3} branches={["main", "fix-x", "release"]} sharedWith={["Review untracked files"]} onPick={() => {}} onCreate={() => {}} />
+          <BranchChipView mode="session" folder="/Users/you/repos/golem" shown="main" current="main" changed={3} amber branches={["main", "fix-x", "release"]} onPick={() => {}} onCreate={() => {}} />
+        </div>
+        <div className="mt-2 rounded-lg border border-line bg-bg p-4">
+          <BranchSwitchLineView folder="/Users/you/repos/golem" from="main" to="fix-x" create={false} />
+          <BranchSwitchLineView folder="/Users/you/repos/golem" from="main" to="fix-y" create />
         </div>
       </section>
 

@@ -11,6 +11,7 @@ import { memoryListKey, type MemoryListResult, type MemoryScope } from "./memory
 import { ROUTING_KEY } from "./routing.ts";
 import { KEYS_KEY } from "./keys.ts";
 import type { FsListDirsResult, GitInfoResult } from "./dirs.ts";
+import type { GitBranchesResult } from "@golem/client";
 import { MODEL_LIST_ALL_KEY, MODEL_LIST_KEY, SETUP_STATUS_KEY, type ModelListResult } from "./models.ts";
 import type { Page, PageActions } from "./page.ts";
 import type { AppInstallSnapshot } from "./app-install.ts";
@@ -143,6 +144,13 @@ export function useNewSessionFolder(): [string | null, (folder: string | null) =
   const state = useSyncExternalStore(newSession.subscribe, newSession.getSnapshot);
   const list = useSyncExternalStore(sessionList.subscribe, sessionList.getSnapshot);
   return [resolveFolder(state, list), newSession.choose];
+}
+
+/** The branch marked for the next new session (null: none), and a setter for it. */
+export function useNewSessionBranch(): [{ name: string; create: boolean } | null, (branch: { name: string; create: boolean } | null) => void] {
+  const { newSession } = usePage();
+  const state = useSyncExternalStore(newSession.subscribe, newSession.getSnapshot);
+  return [state.branch, newSession.chooseBranch];
 }
 
 /** The model picked for the next new session, or null for the default, and a setter for it. */
@@ -479,7 +487,22 @@ export function useGitInfo(path: string | null, enabled = true): UseQueryResult<
     queryKey: ["git.info", path],
     queryFn: () => queries.gitInfo(path as string),
     enabled: enabled && path !== null,
+    // A branch switched in a terminal shows when the page gets focus again.
+    refetchOnWindowFocus: "always",
     staleTime: 5_000,
+    retry: false,
+  });
+}
+
+/** The local branches of a folder's repo. Fetched only once `enabled`, fresh each time. */
+export function useGitBranches(path: string | null, enabled = true): UseQueryResult<GitBranchesResult> {
+  const { queries } = usePage();
+  return useQuery({
+    queryKey: ["git.branches", path],
+    queryFn: () => queries.gitBranches(path as string),
+    enabled: enabled && path !== null,
+    staleTime: 0,
+    refetchOnWindowFocus: "always",
     retry: false,
   });
 }

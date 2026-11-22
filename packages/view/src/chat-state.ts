@@ -228,6 +228,8 @@ export type ChatState = {
   notices: ChatNotice[];
   /** Tool results cleared since the last run began, for the composer chip. 0 when none. */
   clearedNow: number;
+  /** True from `branch.changed` until the turn it came in ends. The branch chip is amber meanwhile. */
+  branchChanged: boolean;
   busy: boolean;
   error: string | null;
   notice: string | null;
@@ -287,6 +289,7 @@ export const emptyChat: ChatState = {
   messages: [],
   notices: [],
   clearedNow: 0,
+  branchChanged: false,
   busy: false,
   error: null,
   notice: null,
@@ -677,7 +680,7 @@ function reduceChatEvent(state: ChatState, event: ChatEvent): ChatState {
         text: branchChangedNote(event.data),
         at: event.ts,
       };
-      return { ...state, notices: [...state.notices, notice] };
+      return { ...state, notices: [...state.notices, notice], branchChanged: true };
     }
     case "run.started":
       return {
@@ -715,11 +718,12 @@ function reduceChatEvent(state: ChatState, event: ChatEvent): ChatState {
       };
     }
     case "run.completed":
-      return { ...notWaiting(stopWriting(state)), busy: false, runStartedAt: null, runId: null, approval: null, consent: null, down: null, retry: null };
+      return { ...notWaiting(stopWriting(state)), busy: false, branchChanged: false, runStartedAt: null, runId: null, approval: null, consent: null, down: null, retry: null };
     case "run.failed":
       return {
         ...notWaiting(stopWriting(state)),
         busy: false,
+        branchChanged: false,
         error: failureText(event.data),
         down: event.data.code != null && event.data.code !== "budget_spent" && event.data.code !== "local_only" ? (event.data.provider ?? "model") : state.down,
         retry: retryFor(state.messages, event.data),
@@ -732,6 +736,7 @@ function reduceChatEvent(state: ChatState, event: ChatEvent): ChatState {
       return {
         ...notWaiting(stopWriting(state)),
         busy: false,
+        branchChanged: false,
         runStartedAt: null,
         runId: null,
         approval: null,

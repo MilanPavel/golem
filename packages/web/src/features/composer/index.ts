@@ -8,6 +8,7 @@ export { NotesChip, NotesChipView } from "./notes-chip.tsx";
 export { RoutePanelView } from "./route-panel.tsx";
 export { ModelBarChip, ModelBarChipView, ModelName } from "./model-bar-chip.tsx";
 export { FolderBarBadge, FolderChipName, FOLDER_CHIP, SessionFolder, SessionFolderMenuBody, SESSION_KEEPS_FOLDER } from "./folder-bar-chip.tsx";
+export { BranchChipView, BranchSwitchLine, BranchSwitchLineView, HomeBranchChip, SessionBranchChip } from "./branch-chip.tsx";
 export { BAR_CHIP, ICON_UNDER_400, ICON_UNDER_500 } from "./composer-bar.ts";
 export { WaitHint, WaitHintView } from "./wait-hint.tsx";
 export { DockView } from "./dock.tsx";

@@ -164,6 +164,7 @@ export function fakeClient() {
     getConfig: vi.fn<PageClient["getConfig"]>(async () => ({ rules: [] }) as never),
     localUi: false,
     gitInfo: vi.fn<PageClient["gitInfo"]>(async () => ({ repository: false, branch: null, root: null, detached: false, changed: 0, worktrees: [] })),
+    gitBranches: vi.fn<PageClient["gitBranches"]>(async () => ({ branches: [] })),
     chooseFolder: vi.fn<PageClient["chooseFolder"]>(async () => ({ path: null })),
     listDirs: vi.fn<PageClient["listDirs"]>(async () => ({ path: "/home/me", home: "/home/me", parent: null, entries: [], truncated: false })),
     getTraceSpan: vi.fn<PageClient["getTraceSpan"]>(async (_id, spanId) => ({ span: { id: spanId, kind: "tool", name: "t", start: "t", status: "ok" }, messages: [] }) as never),
