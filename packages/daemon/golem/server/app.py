@@ -511,6 +511,9 @@ class DaemonApp:
                     )
                     self._trimmer.start()
                     watcher.start()
+                    self.state.apply_ollama = lambda: _apply_ollama_settings(
+                        local, self.paths.home, dispatch
+                    )
                     idle = asyncio.create_task(
                         _stop_idle(local, self.paths.home, dispatch), name="golem-ollama-idle"
                     )

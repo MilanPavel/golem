@@ -4181,6 +4181,51 @@ class NotificationsSetResult(BaseModel):
     values: NotificationsValues | None = None
 
 
+class OllamaSettingsGetParams(BaseModel):
+    """``ollama.settings.get``. The ``[ollama]`` settings as golem uses them."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+
+class OllamaSettingsValues(BaseModel):
+    """``[ollama]`` without ``models``. ``parallel`` is 1 to 8 or ``"auto"``.
+    ``running`` is true when a local server answers and ``started_by_golem`` when golem
+    started it. A server you started keeps its own ``OLLAMA_NUM_PARALLEL``."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    start: bool
+    idle_stop_minutes: int
+    parallel: int | Literal["auto"]
+    started_by_golem: bool
+    running: bool
+
+
+class OllamaSettingsSetParams(BaseModel):
+    """``ollama.settings.set``. Change keys of ``[ollama]`` in the user's ``config.toml``.
+
+    Only the keys sent change, and the file keeps its comments. ``[ollama.models]`` is not
+    touched. Every value is checked first, and when any is wrong nothing is written.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    start: bool | None = None
+    idle_stop_minutes: int | None = None
+    parallel: int | Literal["auto"] | None = None
+
+
+class OllamaSettingsSetResult(BaseModel):
+    """``ok`` is false when a value was wrong, and the file is then untouched. ``values`` is
+    what ``ollama.settings.get`` would now answer, set when ``ok``."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    ok: bool
+    errors: list[ConfigError] = Field(default_factory=list[ConfigError])
+    values: OllamaSettingsValues | None = None
+
+
 class RoutingGetParams(BaseModel):
     """``routing.get``. The routing, budget and context settings as golem uses them."""
 
@@ -5260,6 +5305,10 @@ __all__ = [
     "OllamaInstallOutput",
     "OllamaInstallParams",
     "OllamaInstallResult",
+    "OllamaSettingsGetParams",
+    "OllamaSettingsSetParams",
+    "OllamaSettingsSetResult",
+    "OllamaSettingsValues",
     "OllamaStartParams",
     "OllamaStartResult",
     "PairState",

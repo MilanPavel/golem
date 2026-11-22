@@ -14153,6 +14153,206 @@ public struct OllamaInstallResult: Codable {
     }
 }
 
+/// ``ollama.settings.get``. The ``[ollama]`` settings as golem uses them.
+// MARK: - OllamaSettingsGetParams
+public struct OllamaSettingsGetParams: Codable {
+
+    public init() {
+    }
+}
+
+/// ``ollama.settings.set``. Change keys of ``[ollama]`` in the user's ``config.toml``.
+///
+/// Only the keys sent change, and the file keeps its comments. ``[ollama.models]`` is not
+/// touched. Every value is checked first, and when any is wrong nothing is written.
+// MARK: - OllamaSettingsSetParams
+public struct OllamaSettingsSetParams: Codable {
+    public let idleStopMinutes: Int?
+    public let parallel: Parallel?
+    public let start: Bool?
+
+    public enum CodingKeys: String, CodingKey {
+        case idleStopMinutes = "idle_stop_minutes"
+        case parallel = "parallel"
+        case start = "start"
+    }
+
+    public init(idleStopMinutes: Int?, parallel: Parallel?, start: Bool?) {
+        self.idleStopMinutes = idleStopMinutes
+        self.parallel = parallel
+        self.start = start
+    }
+}
+
+public enum Parallel: Codable {
+    case enumeration(ParallelEnum)
+    case integer(Int)
+    case null
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        if let x = try? container.decode(Int.self) {
+            self = .integer(x)
+            return
+        }
+        if let x = try? container.decode(ParallelEnum.self) {
+            self = .enumeration(x)
+            return
+        }
+        if container.decodeNil() {
+            self = .null
+            return
+        }
+        throw DecodingError.typeMismatch(Parallel.self, DecodingError.Context(codingPath: decoder.codingPath, debugDescription: "Wrong type for Parallel"))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        switch self {
+        case .enumeration(let x):
+            try container.encode(x)
+        case .integer(let x):
+            try container.encode(x)
+        case .null:
+            try container.encodeNil()
+        }
+    }
+}
+
+public enum ParallelEnum: String, Codable {
+    case auto = "auto"
+}
+
+/// ``ok`` is false when a value was wrong, and the file is then untouched. ``values`` is
+/// what ``ollama.settings.get`` would now answer, set when ``ok``.
+// MARK: - OllamaSettingsSetResult
+public struct OllamaSettingsSetResult: Codable {
+    public let errors: [OllamaSettingsSetResultError]?
+    public let ok: Bool
+    public let values: OllamaSettingsValuesClass?
+
+    public enum CodingKeys: String, CodingKey {
+        case errors = "errors"
+        case ok = "ok"
+        case values = "values"
+    }
+
+    public init(errors: [OllamaSettingsSetResultError]?, ok: Bool, values: OllamaSettingsValuesClass?) {
+        self.errors = errors
+        self.ok = ok
+        self.values = values
+    }
+}
+
+/// One problem in a config text. ``line`` and ``column`` count from 1, when known.
+///
+/// ``path`` is the setting, as ``mcp.github.headers.Authorization``.
+// MARK: - OllamaSettingsSetResultError
+public struct OllamaSettingsSetResultError: Codable {
+    public let column: Int?
+    public let line: Int?
+    public let message: String
+    public let path: String?
+
+    public enum CodingKeys: String, CodingKey {
+        case column = "column"
+        case line = "line"
+        case message = "message"
+        case path = "path"
+    }
+
+    public init(column: Int?, line: Int?, message: String, path: String?) {
+        self.column = column
+        self.line = line
+        self.message = message
+        self.path = path
+    }
+}
+
+/// ``[ollama]`` without ``models``. ``parallel`` is 1 to 8 or ``"auto"``.
+/// ``running`` is true when a local server answers and ``started_by_golem`` when golem
+/// started it. A server you started keeps its own ``OLLAMA_NUM_PARALLEL``.
+// MARK: - OllamaSettingsValuesClass
+public struct OllamaSettingsValuesClass: Codable {
+    public let idleStopMinutes: Int
+    public let parallel: ParallelUnion
+    public let running: Bool
+    public let start: Bool
+    public let startedByGolem: Bool
+
+    public enum CodingKeys: String, CodingKey {
+        case idleStopMinutes = "idle_stop_minutes"
+        case parallel = "parallel"
+        case running = "running"
+        case start = "start"
+        case startedByGolem = "started_by_golem"
+    }
+
+    public init(idleStopMinutes: Int, parallel: ParallelUnion, running: Bool, start: Bool, startedByGolem: Bool) {
+        self.idleStopMinutes = idleStopMinutes
+        self.parallel = parallel
+        self.running = running
+        self.start = start
+        self.startedByGolem = startedByGolem
+    }
+}
+
+public enum ParallelUnion: Codable {
+    case enumeration(ParallelEnum)
+    case integer(Int)
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        if let x = try? container.decode(Int.self) {
+            self = .integer(x)
+            return
+        }
+        if let x = try? container.decode(ParallelEnum.self) {
+            self = .enumeration(x)
+            return
+        }
+        throw DecodingError.typeMismatch(ParallelUnion.self, DecodingError.Context(codingPath: decoder.codingPath, debugDescription: "Wrong type for ParallelUnion"))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        switch self {
+        case .enumeration(let x):
+            try container.encode(x)
+        case .integer(let x):
+            try container.encode(x)
+        }
+    }
+}
+
+/// ``[ollama]`` without ``models``. ``parallel`` is 1 to 8 or ``"auto"``.
+/// ``running`` is true when a local server answers and ``started_by_golem`` when golem
+/// started it. A server you started keeps its own ``OLLAMA_NUM_PARALLEL``.
+// MARK: - OllamaSettingsValues
+public struct OllamaSettingsValues: Codable {
+    public let idleStopMinutes: Int
+    public let parallel: ParallelUnion
+    public let running: Bool
+    public let start: Bool
+    public let startedByGolem: Bool
+
+    public enum CodingKeys: String, CodingKey {
+        case idleStopMinutes = "idle_stop_minutes"
+        case parallel = "parallel"
+        case running = "running"
+        case start = "start"
+        case startedByGolem = "started_by_golem"
+    }
+
+    public init(idleStopMinutes: Int, parallel: ParallelUnion, running: Bool, start: Bool, startedByGolem: Bool) {
+        self.idleStopMinutes = idleStopMinutes
+        self.parallel = parallel
+        self.running = running
+        self.start = start
+        self.startedByGolem = startedByGolem
+    }
+}
+
 /// ``ollama.start``. Start the local Ollama now, as a model call would.
 // MARK: - OllamaStartParams
 public struct OllamaStartParams: Codable {
