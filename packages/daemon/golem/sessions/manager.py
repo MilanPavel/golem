@@ -734,6 +734,10 @@ class SessionManager:
         """A helper's newest step, as one line."""
         return self._events.step(session_id)
 
+    async def branch(self, cwd: str | None) -> str | None:
+        """The branch checked out in ``cwd``, cached for two seconds. None when there is none."""
+        return await self._events.branches.get(cwd)
+
     async def pending_of(self, session_id: str) -> PendingItem | None:
         """What the session waits for, None when it waits for nothing or does not exist."""
         activity = await self._records.activity(session_id)

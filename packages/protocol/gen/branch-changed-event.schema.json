@@ -1,0 +1,88 @@
+{
+  "$defs": {
+    "BranchChangedData": {
+      "additionalProperties": false,
+      "description": "The branch of a session's folder is not the one its model last heard of.\n\n``from_branch`` and ``to_branch`` are the two branch names. ``paths_count`` is how many\nfiles differ between them, null when git could not say. The model gets a note with the\npaths before the turn; this event is the quiet line in the transcript.",
+      "properties": {
+        "from_branch": {
+          "minLength": 1,
+          "title": "From Branch",
+          "type": "string"
+        },
+        "paths_count": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Paths Count"
+        },
+        "to_branch": {
+          "minLength": 1,
+          "title": "To Branch",
+          "type": "string"
+        }
+      },
+      "required": [
+        "from_branch",
+        "to_branch"
+      ],
+      "title": "BranchChangedData",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "The folder's branch changed under the session, before the run's first model call.",
+  "properties": {
+    "data": {
+      "$ref": "#/$defs/BranchChangedData"
+    },
+    "run_id": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Run Id"
+    },
+    "seq": {
+      "minimum": 1,
+      "title": "Seq",
+      "type": "integer"
+    },
+    "session_id": {
+      "minLength": 1,
+      "title": "Session Id",
+      "type": "string"
+    },
+    "ts": {
+      "minLength": 1,
+      "title": "Ts",
+      "type": "string"
+    },
+    "type": {
+      "const": "branch.changed",
+      "title": "Type",
+      "type": "string"
+    }
+  },
+  "required": [
+    "seq",
+    "session_id",
+    "ts",
+    "type",
+    "data"
+  ],
+  "title": "BranchChangedEvent",
+  "type": "object"
+}

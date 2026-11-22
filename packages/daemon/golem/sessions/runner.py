@@ -69,6 +69,7 @@ from golem.models.privacy import LOCAL_ONLY_HINT
 from golem.models.router import ModelConfigError, ModelIdentity
 from golem.models.tiers import Tier
 from golem.permissions.engine import Allowance
+from golem.sessions.branch import branch_change
 from golem.sessions.interrupted import close_reply
 from golem.sessions.log import SessionLog
 from golem.skills.invoke import Invocation
@@ -78,6 +79,7 @@ from golem_protocol.events import (
     ApprovalNeededData,
     ApprovalNeededEvent,
     ApprovalResolvedData,
+    BranchChangedData,
     CallPrice,
     CheckCompletedData,
     CheckInfo,
@@ -323,6 +325,15 @@ async def run_turn(
         if turn.routed is not None:
             routed = _routed(runtime, turn.model_profile, turn.routed, turn.replaces)
             await emit("model.routed", routed)
+        seen = await runtime.branch_seen(turn.session_id)
+        branch, change = await branch_change(events.branches, turn.cwd, seen)
+        if change is not None:
+            await emit(
+                "branch.changed",
+                BranchChangedData(
+                    from_branch=change.old, to_branch=change.new, paths_count=change.paths_count
+                ),
+            )
         progress.open = turn.assistant_message_id
         await emit(
             "message.started",
@@ -352,6 +363,8 @@ async def run_turn(
             read_folders=turn.read_folders,
             child=turn.child,
             memory=turn.memory,
+            notes=() if change is None else (change.note,),
+            branch=branch,
         )
         return await _finish(stream, progress, emit)
     except asyncio.CancelledError:

@@ -50,7 +50,8 @@ export type Params =
   | HelperStateEvent
   | HelperWaitEvent
   | HelperEndedEvent
-  | SessionTrimmedEvent;
+  | SessionTrimmedEvent
+  | BranchChangedEvent;
 export type Asks = boolean;
 export type AnswerChars = number | null;
 export type MaxCalls = number | null;
@@ -933,6 +934,14 @@ export type Seq47 = number;
 export type SessionId49 = string;
 export type Ts47 = string;
 export type Type47 = 'session.trimmed';
+export type FromBranch = string;
+export type PathsCount = number | null;
+export type ToBranch = string;
+export type RunId49 = string | null;
+export type Seq48 = number;
+export type SessionId50 = string;
+export type Ts48 = string;
+export type Type48 = 'branch.changed';
 
 /**
  * Server → client event. No ``id``; this is not a response to a request.
@@ -2722,4 +2731,33 @@ export interface SessionTrimmedEvent {
  */
 export interface SessionTrimmedData {
   removed: Removed1;
+}
+/**
+ * The folder's branch changed under the session, before the run's first model call.
+ *
+ * This interface was referenced by `RpcNotification`'s JSON-Schema
+ * via the `definition` "BranchChangedEvent".
+ */
+export interface BranchChangedEvent {
+  data: BranchChangedData;
+  run_id?: RunId49;
+  seq: Seq48;
+  session_id: SessionId50;
+  ts: Ts48;
+  type: Type48;
+}
+/**
+ * The branch of a session's folder is not the one its model last heard of.
+ *
+ * ``from_branch`` and ``to_branch`` are the two branch names. ``paths_count`` is how many
+ * files differ between them, null when git could not say. The model gets a note with the
+ * paths before the turn; this event is the quiet line in the transcript.
+ *
+ * This interface was referenced by `RpcNotification`'s JSON-Schema
+ * via the `definition` "BranchChangedData".
+ */
+export interface BranchChangedData {
+  from_branch: FromBranch;
+  paths_count?: PathsCount;
+  to_branch: ToBranch;
 }

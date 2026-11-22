@@ -161,6 +161,7 @@ const EVENT_TYPES = new Set([
   "helper.state",
   "helper.wait",
   "session.trimmed",
+  "branch.changed",
   "helper.ended",
 ]);
 

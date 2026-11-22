@@ -453,6 +453,23 @@ def test_session_trimmed_round_trips_and_has_no_run() -> None:
         SessionTrimmedData(removed=-1)
 
 
+def test_branch_changed_carries_both_branches_and_how_many_files_differ() -> None:
+    event = {
+        "seq": 3,
+        "session_id": "s1",
+        "run_id": "r1",
+        "ts": "2026-11-22T10:00:00.000Z",
+        "type": "branch.changed",
+        "data": {"from_branch": "main", "to_branch": "fix-x", "paths_count": 4},
+    }
+    parsed = _ADAPTER.validate_python(event)  # type: ignore[attr-defined]
+    assert parsed.data.to_branch == "fix-x"  # type: ignore[attr-defined]
+    assert _ADAPTER.validate_json(parsed.model_dump_json()) == parsed  # type: ignore[attr-defined]
+    assert "branch.changed" in get_args(EventType)
+    with pytest.raises(ValidationError):
+        _ADAPTER.validate_python({**event, "data": {**event["data"], "from_branch": ""}})  # type: ignore[attr-defined,index]
+
+
 def test_model_routed_has_the_reasons_of_a_helpers_pick_and_still_reads_pinned() -> None:
     for reason in ("pinned", "same", "stronger", "tier", "named", "nearest", "lead"):
         event = {

@@ -3,6 +3,7 @@
 export type Jsonrpc = '2.0';
 export type Method = 'session.summary';
 export type Agent = string | null;
+export type Branch = string | null;
 export type CreatedAt = string;
 export type Cwd = string | null;
 export type ForkedFrom = string | null;
@@ -118,12 +119,16 @@ export interface SessionSummaryNotification {
  * ``trimmed_at`` is set on a helper whose steps were removed after its keep days
  * (``session.trimmed``): the time of the trim. Null for any other session. An older daemon
  * leaves it out.
+ * ``branch`` is the branch checked out in the session's ``cwd``. Null outside a repo, when
+ * the head is detached, and for a session with no folder. It follows the folder, so it can
+ * change without an event. An older daemon leaves it out.
  *
  * This interface was referenced by `SessionSummaryNotification`'s JSON-Schema
  * via the `definition` "SessionSummary".
  */
 export interface SessionSummary {
   agent?: Agent;
+  branch?: Branch;
   created_at: CreatedAt;
   cwd?: Cwd;
   forked_from?: ForkedFrom;

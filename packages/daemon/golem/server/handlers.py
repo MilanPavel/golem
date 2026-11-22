@@ -527,6 +527,7 @@ async def _session_list(ctx: RequestContext, params: SessionListParams) -> Sessi
                 helpers,
                 sessions.step(item.session.session_id),
                 await sessions.pending_items(item, own, helpers),
+                await sessions.branch(item.session.cwd),
             )
         )
     return SessionListResult(sessions=summaries)
