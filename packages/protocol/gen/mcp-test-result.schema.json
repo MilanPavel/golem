@@ -131,7 +131,7 @@
     }
   },
   "additionalProperties": false,
-  "description": "What ``mcp.test`` found.\n\n``steps`` has every step, with the ones after a failure ``skipped``.\n``stderr_tail`` is the server's last 50 lines of stderr, with secrets\nreplaced by ``•••``. ``hint`` is one next step for the person, and\n``runtime`` says which runtime (``node`` or ``uv``) a UI can offer to\ninstall when that is the hint.",
+  "description": "What ``mcp.test`` found.\n\n``steps`` has every step, with the ones after a failure ``skipped``.\n``stderr_tail`` is the server's last 50 lines of stderr, with secrets\nreplaced by ``•••``. ``hint`` is one next step for the person, and\n``runtime`` says which runtime (``node`` or ``uv``) a UI can offer to\ninstall when that is the hint. ``http_status`` is the HTTP status a hosted\nserver refused with, 401 or 403 when it did not accept the token, and\nnull for any other failure.",
   "properties": {
     "hint": {
       "anyOf": [
@@ -144,6 +144,20 @@
       ],
       "default": null,
       "title": "Hint"
+    },
+    "http_status": {
+      "anyOf": [
+        {
+          "maximum": 599,
+          "minimum": 100,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Http Status"
     },
     "ok": {
       "title": "Ok",

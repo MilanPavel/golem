@@ -8749,10 +8749,13 @@ public struct MCPTestProgress: Codable {
 /// ``stderr_tail`` is the server's last 50 lines of stderr, with secrets
 /// replaced by ``•••``. ``hint`` is one next step for the person, and
 /// ``runtime`` says which runtime (``node`` or ``uv``) a UI can offer to
-/// install when that is the hint.
+/// install when that is the hint. ``http_status`` is the HTTP status a hosted
+/// server refused with, 401 or 403 when it did not accept the token, and
+/// null for any other failure.
 // MARK: - MCPTestResult
 public struct MCPTestResult: Codable {
     public let hint: String?
+    public let httpStatus: Int?
     public let ok: Bool
     public let protocolVersion: String?
     public let runtime: Name?
@@ -8764,6 +8767,7 @@ public struct MCPTestResult: Codable {
 
     public enum CodingKeys: String, CodingKey {
         case hint = "hint"
+        case httpStatus = "http_status"
         case ok = "ok"
         case protocolVersion = "protocol_version"
         case runtime = "runtime"
@@ -8774,8 +8778,9 @@ public struct MCPTestResult: Codable {
         case tools = "tools"
     }
 
-    public init(hint: String?, ok: Bool, protocolVersion: String?, runtime: Name?, serverInfo: MCPImplementationClass?, stderrTail: [String]?, steps: [StepElement], testID: String, tools: [MCPTestResultTool]?) {
+    public init(hint: String?, httpStatus: Int?, ok: Bool, protocolVersion: String?, runtime: Name?, serverInfo: MCPImplementationClass?, stderrTail: [String]?, steps: [StepElement], testID: String, tools: [MCPTestResultTool]?) {
         self.hint = hint
+        self.httpStatus = httpStatus
         self.ok = ok
         self.protocolVersion = protocolVersion
         self.runtime = runtime

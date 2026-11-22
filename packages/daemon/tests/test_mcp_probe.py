@@ -155,6 +155,7 @@ async def test_a_refused_token_gets_the_token_hint_and_oauth_gets_its_own(
         ("initialize", "failed"),
     ]
     assert refused.hint == Hint("The token was refused: paste a new one")
+    assert refused.http_status == 401
     mode["header"] = 'Bearer resource_metadata="https://x.test/.well-known"'
     oauth = await probe(settings, ENVIRON, lambda _ref: None, timeouts=QUICK)
     assert oauth.hint == Hint("This server signs in with OAuth")
@@ -166,6 +167,7 @@ async def test_an_unreachable_host_says_it_cannot_be_reached() -> None:
     )
     assert result.steps[2].state == "failed"
     assert result.hint == Hint("Can't reach 127.0.0.1")
+    assert result.http_status is None
 
 
 async def test_an_unknown_host_fails_at_resolve() -> None:

@@ -362,6 +362,7 @@ export {
   type ImportSource,
 } from "./mcp-import.ts";
 export { editForm, updateFromForm, type EditForm, type EditPair } from "./mcp-edit.ts";
+export { agoText, isRefused, signInLine, tokenTestFailure, tokenTestRows, type SecretState, type SignInLine, type TokenTestRow } from "./mcp-signin.ts";
 export {
   changeToolFilter,
   formatLogLine,

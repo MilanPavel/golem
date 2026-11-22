@@ -1,4 +1,4 @@
-import { checksSummary, COMMANDS, mcpStatusWord, noPastes, pickerGroups, withModelChoices, withSkillChoices, type CheckRun, type ChecksState, type ReviewNote, type TodoItem, type TurnChecks, type TurnCard, type ChatMessage, type ChatState, type RewindPlan, ladderRows, NO_LOCAL_WINDOW, routeRows, spendRows, contextActions, bestActions, windowSourceOf, helperBanner, helperReceipt, type ContextActionsInput } from "@golem/view";
+import { signInLine, type SignInLine, checksSummary, COMMANDS, mcpStatusWord, noPastes, pickerGroups, withModelChoices, withSkillChoices, type CheckRun, type ChecksState, type ReviewNote, type TodoItem, type TurnChecks, type TurnCard, type ChatMessage, type ChatState, type RewindPlan, ladderRows, NO_LOCAL_WINDOW, routeRows, spendRows, contextActions, bestActions, windowSourceOf, helperBanner, helperReceipt, type ContextActionsInput } from "@golem/view";
 import type { ListedModel } from "@golem/client";
 import { createContext, useContext, useEffect, useId, useState, type ReactNode } from "react";
 import { Badge } from "../ui/badge.tsx";
@@ -19,6 +19,8 @@ import { StatusDot } from "../ui/status-dot.tsx";
 import { Textarea } from "../ui/textarea.tsx";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip.tsx";
 import { Dot, serverSummary, SignInPanel, type Login } from "../features/settings/mcp/sign-in.tsx";
+import { StoredValue, TokenTestView, type TokenTest } from "../features/settings/mcp/edit-form.tsx";
+import { TokenLine } from "../features/settings/mcp/token-line.tsx";
 import type { McpServer } from "../store/mcp.ts";
 import { ConnectionScreen } from "../features/connection/connection-screen.tsx";
 import { connectionScreen, type ConnectionHost } from "../features/connection/connection-screen.ts";
@@ -1428,6 +1430,64 @@ function McpSignInDemo() {
   );
 }
 
+const TOKEN_BASE = { oauth: false, state: "running" as const, secrets: [{ ref: "mcp/github", stored: true }], refused: false, workedAt: 0, now: 120_000 };
+const TOKEN_LINES: { label: string; line: SignInLine | null }[] = [
+  { label: "Token works", line: signInLine(TOKEN_BASE) },
+  { label: "Token missing", line: signInLine({ ...TOKEN_BASE, secrets: [{ ref: "mcp/github", stored: false }] }) },
+  { label: "Token refused", line: signInLine({ ...TOKEN_BASE, refused: true }) },
+  { label: "Signed in", line: signInLine({ ...TOKEN_BASE, oauth: true }) },
+  { label: "Not signed in", line: signInLine({ ...TOKEN_BASE, oauth: true, state: "needs_auth" }) },
+];
+const TOKEN_STEPS = [
+  { step: "resolve", state: "ok" },
+  { step: "connect", state: "ok" },
+  { step: "initialize", state: "ok" },
+  { step: "tools", state: "ok", detail: "46 tools" },
+] as const;
+const TOKEN_TESTS: { label: string; test: TokenTest }[] = [
+  { label: "Testing", test: { phase: "running", steps: TOKEN_STEPS.slice(0, 2) } },
+  { label: "Passed", test: { phase: "passed", steps: TOKEN_STEPS, message: "The new token works. It replaced the old one." } },
+  {
+    label: "Refused",
+    test: {
+      phase: "failed",
+      steps: [TOKEN_STEPS[0], TOKEN_STEPS[1], { step: "initialize", state: "failed", detail: "HTTP 401: bad credentials" }],
+      message: "The server refused this token. Your old token is still in use.",
+      out: { config: {}, secrets: {} },
+    },
+  },
+];
+
+/** The sign-in line, the token in Edit as a pill and as a field, and the test before a token is kept. */
+function McpTokenDemo() {
+  const row = { key: "Authorization", value: "", secret: true, ref: "mcp/github", prefix: "Bearer " };
+  const noop = (): void => {};
+  return (
+    <div className="flex max-w-2xl flex-col gap-4">
+      {TOKEN_LINES.map(({ label, line }) =>
+        line === null ? null : (
+          <section key={label} aria-label={`MCP token, ${label}`} className="flex flex-col gap-2 rounded-lg border border-line bg-bg p-4">
+            <span className="font-mono text-xs text-faint">{label}</span>
+            <TokenLine line={line} onAction={noop} canEdit waiting={false} />
+          </section>
+        ),
+      )}
+      <section aria-label="MCP token, In Edit" className="flex flex-col gap-2 rounded-lg border border-line bg-bg p-4">
+        <span className="font-mono text-xs text-faint">In Edit</span>
+        <StoredValue noun="header 1" row={row} there open={false} round={0} onType={noop} onOpen={noop} onClose={noop} />
+        <StoredValue noun="header 2" row={row} there={false} open={false} round={0} onType={noop} onOpen={noop} onClose={noop} />
+        <StoredValue noun="header 3" row={row} there open round={0} onType={noop} onOpen={noop} onClose={noop} />
+      </section>
+      {TOKEN_TESTS.map(({ label, test }) => (
+        <section key={label} aria-label={`MCP token test, ${label}`} className="flex flex-col gap-2 rounded-lg border border-line bg-bg p-4">
+          <span className="font-mono text-xs text-faint">Test: {label}</span>
+          <TokenTestView test={test} host="api.githubcopilot.com" onTryAgain={noop} onKeep={noop} />
+        </section>
+      ))}
+    </div>
+  );
+}
+
 const SAMPLE_CHECKED_AT = Date.now();
 
 /** Settings → Info: the hero card, the health list and the paths, in each state. */
@@ -2155,6 +2215,11 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
       <section className="mt-6" id={anchor("MCP sign-in")}>
         <h3 className="mb-2 font-mono text-xs text-faint">MCP sign-in</h3>
         <McpSignInDemo />
+      </section>
+
+      <section className="mt-6" id={anchor("MCP token")}>
+        <h3 className="mb-2 font-mono text-xs text-faint">MCP token</h3>
+        <McpTokenDemo />
       </section>
 
       <section className="mt-6" id={anchor("Welcome page")}>

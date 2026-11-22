@@ -35,6 +35,7 @@ export const GALLERY_SECTIONS = [
   "usage",
   "tools-panel",
   "mcp-sign-in",
+  "mcp-token",
   "welcome-page",
   "download-row",
   "session-title-rename-and-close",

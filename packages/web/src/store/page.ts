@@ -9,7 +9,7 @@ import { createPageHost, type PageHostStore } from "./page-host.ts";
 import { createNewSession, type NewSessionStore } from "./new-session.ts";
 import { CONFIG_KEY } from "./config.ts";
 import { DEVICE_LIST_KEY, createPairing, type DeviceListResult, type DeviceRevokeResult, type Pairing } from "./devices.ts";
-import { MCP_CATALOG_KEY, MCP_LIST_KEY, MCP_TOOLS_KEY, type McpToolsResult } from "./mcp.ts";
+import { MCP_CATALOG_KEY, MCP_GET_KEY, MCP_LIST_KEY, MCP_TOOLS_KEY, type McpToolsResult } from "./mcp.ts";
 import { AGENTS_KEEP_KEY, NOTIFICATIONS_KEY, type AgentsKeepResult, type AgentsKeepValues } from "./notifications.ts";
 import { ROUTING_KEY } from "./routing.ts";
 import type { AgentInfo, AgentsListResult as AgentsListed } from "./agents.ts";
@@ -836,6 +836,7 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
         } finally {
           await queryClient.invalidateQueries({ queryKey: MCP_LIST_KEY });
           await queryClient.invalidateQueries({ queryKey: MCP_TOOLS_KEY });
+          await queryClient.invalidateQueries({ queryKey: MCP_GET_KEY });
         }
       },
       scanMcpImport: (sessionId, text) => client.scanMcpImport({ ...(sessionId === null ? {} : { sessionId }), ...(text === null ? {} : { text }) }),

@@ -13,8 +13,8 @@ test("a command server becomes one line, and a secret stays a reference", () => 
   assert.equal(form.target, "command");
   assert.equal(form.command, "npx -y @x/server '/my folder'");
   assert.deepEqual(form.env, [
-    { key: "TOKEN", value: "", secret: true, ref: "mcp/x-token" },
-    { key: "MODE", value: "fast", secret: false, ref: null },
+    { key: "TOKEN", value: "", secret: true, ref: "mcp/x-token", prefix: "" },
+    { key: "MODE", value: "fast", secret: false, ref: null, prefix: "" },
   ]);
   assert.equal(form.timeout, "30");
 });
@@ -48,7 +48,7 @@ test("typing in a stored secret's field replaces it", () => {
 
 test("a new secret row names its own reference and needs a value", () => {
   const form = editForm({ command: "x" });
-  form.env.push({ key: "API_KEY", value: "", secret: true, ref: null });
+  form.env.push({ key: "API_KEY", value: "", secret: true, ref: null, prefix: "" });
   assert.deepEqual(updateFromForm("x", { command: "x" }, form), { error: "Type the secret for API_KEY." });
   form.env[0] = { ...form.env[0]!, value: "s" };
   const out = updateFromForm("x", { command: "x" }, form);
@@ -71,9 +71,9 @@ test("bad input says what is wrong", () => {
   const base = editForm({ command: "x" });
   assert.deepEqual(updateFromForm("x", {}, { ...base, command: "" }), { error: "Type a command or an https:// URL." });
   assert.deepEqual(updateFromForm("x", {}, { ...base, timeout: "soon" }), { error: "The timeout is a number of seconds above 0." });
-  assert.deepEqual(updateFromForm("x", {}, { ...base, env: [{ key: "1A", value: "", secret: false, ref: null }] }), { error: '"1A" is not a valid variable name.' });
+  assert.deepEqual(updateFromForm("x", {}, { ...base, env: [{ key: "1A", value: "", secret: false, ref: null, prefix: "" }] }), { error: '"1A" is not a valid variable name.' });
   assert.deepEqual(
-    updateFromForm("x", {}, { ...base, env: [{ key: "A", value: "", secret: false, ref: null }, { key: "A", value: "", secret: false, ref: null }] }),
+    updateFromForm("x", {}, { ...base, env: [{ key: "A", value: "", secret: false, ref: null, prefix: "" }, { key: "A", value: "", secret: false, ref: null, prefix: "" }] }),
     { error: "A is there twice." },
   );
 });
@@ -82,4 +82,19 @@ test("tool patterns go one per line", () => {
   const out = updateFromForm("x", { command: "x" }, { ...editForm({ command: "x" }), include: "read_*\n", exclude: "  delete_*  \n\nwrite_*" });
   assert.ok(!("error" in out));
   assert.deepEqual(out.config.tools, { include: ["read_*"], exclude: ["delete_*", "write_*"] });
+});
+
+test("a value with a prefix before the reference keeps it, and replacing the secret keeps it too", () => {
+  const original = { url: "https://x.example/mcp", headers: { Authorization: "Bearer keychain:mcp/x" } };
+  const form = editForm(original);
+  assert.deepEqual(form.headers, [{ key: "Authorization", value: "", secret: true, ref: "mcp/x", prefix: "Bearer " }]);
+  const same = updateFromForm("x", original, form);
+  assert.ok(!("error" in same));
+  assert.deepEqual(same.config.headers, { Authorization: "Bearer keychain:mcp/x" });
+  assert.deepEqual(same.secrets, {});
+  form.headers[0] = { ...form.headers[0]!, value: "new" };
+  const out = updateFromForm("x", original, form);
+  assert.ok(!("error" in out));
+  assert.deepEqual(out.secrets, { "mcp/x": "new" });
+  assert.deepEqual(out.config.headers, { Authorization: "Bearer keychain:mcp/x" });
 });

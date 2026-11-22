@@ -77,6 +77,8 @@ class ProbeResult:
     tools: list[McpTool] = field(default_factory=list[McpTool])
     stderr_tail: list[str] = field(default_factory=list[str])
     hint: Hint | None = None
+    http_status: int | None = None
+    """The HTTP status a hosted server answered a failed step with."""
 
 
 Progress = Callable[[Step], None]
@@ -219,6 +221,7 @@ async def probe(
     if not result.ok:
         status = getattr(transport, "status", None)
         authenticate = getattr(transport, "authenticate", None)
+        result.http_status = status if isinstance(status, int) else None
         result.hint = test_hint(
             steps,
             result.stderr_tail,
