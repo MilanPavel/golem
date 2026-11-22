@@ -133,6 +133,9 @@ export type { TraceContextEvent } from "../../protocol/gen/trace-context-event.t
 export type { TraceContextItem } from "../../protocol/gen/trace-context-item.ts";
 export type { TraceContextPart } from "../../protocol/gen/trace-context-part.ts";
 export type { PromptSectionInfo } from "../../protocol/gen/prompt-section-info.ts";
+export type { ChatSetParams } from "../../protocol/gen/chat-set-params.ts";
+export type { ChatSetResult } from "../../protocol/gen/chat-set-result.ts";
+export type { ChatValues } from "../../protocol/gen/chat-values.ts";
 export type { NotificationsSetParams } from "../../protocol/gen/notifications-set-params.ts";
 export type { NotificationsSetResult } from "../../protocol/gen/notifications-set-result.ts";
 export type { NotificationsValues } from "../../protocol/gen/notifications-values.ts";

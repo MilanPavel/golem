@@ -104,6 +104,8 @@ import type { SessionCreateResult } from "../../protocol/gen/session-create-resu
 import type { SessionForkResult } from "../../protocol/gen/session-fork-result.ts";
 import type { CostGetResult } from "../../protocol/gen/cost-get-result.ts";
 import type { EvalRoutingResult } from "../../protocol/gen/eval-routing-result.ts";
+import type { ChatSetResult } from "../../protocol/gen/chat-set-result.ts";
+import type { ChatValues } from "../../protocol/gen/chat-values.ts";
 import type { NotificationsSetResult } from "../../protocol/gen/notifications-set-result.ts";
 import type { NotificationsValues } from "../../protocol/gen/notifications-values.ts";
 import type { NotifyTestResult } from "../../protocol/gen/notify-test-result.ts";
@@ -999,6 +1001,24 @@ export function isAgentsSaveResult(value: unknown): value is AgentsSaveResult {
 
 export function isAgentsDeleteResult(value: unknown): value is AgentsDeleteResult {
   return isRecord(value) && (value["agent"] == null || isAgentInfoLike(value["agent"]));
+}
+
+export function isChatValues(value: unknown): value is ChatValues {
+  return (
+    isRecord(value) &&
+    Array.isArray(value["instructions"]) &&
+    typeof value["plan_first"] === "boolean" &&
+    (value["mode"] === "careful" || value["mode"] === "balanced" || value["mode"] === "autopilot")
+  );
+}
+
+export function isChatSetResult(value: unknown): value is ChatSetResult {
+  return (
+    isRecord(value) &&
+    typeof value["ok"] === "boolean" &&
+    (value["errors"] === undefined || Array.isArray(value["errors"])) &&
+    (value["values"] == null || isChatValues(value["values"]))
+  );
 }
 
 export function isNotificationsValues(value: unknown): value is NotificationsValues {

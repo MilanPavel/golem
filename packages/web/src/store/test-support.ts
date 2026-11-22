@@ -193,6 +193,8 @@ export function fakeClient() {
       picked: {},
     })),
     setRouting: vi.fn<PageClient["setRouting"]>(async () => ({ ok: true, errors: [] })),
+    getChat: vi.fn<PageClient["getChat"]>(async () => ({ instructions: [], plan_first: false, mode: "balanced" })),
+    setChat: vi.fn<PageClient["setChat"]>(async (params) => ({ ok: true, errors: [], values: { instructions: params.instructions ?? [], plan_first: params.plan_first ?? false, mode: "balanced" } })),
     getNotifications: vi.fn<PageClient["getNotifications"]>(async () => ({
       needs_you: true,
       failed: true,
