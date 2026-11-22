@@ -42,7 +42,7 @@ export const GROUPS: readonly SettingsGroup[] = [
 /** The sections, grouped, in the order of the sidebar. A new section adds an entry here and a case in the screen. */
 export const SECTIONS: readonly SettingsSection[] = [
   { id: "info", title: "Info", group: "general", icon: SettingsInfoIcon, description: "What is installed, where it lives, and whether it is healthy.", keywords: ["golem", "version", "service", "ollama", "model", "disk", "socket", "logs", "data", "daemon", "jobs", "install"] },
-  { id: "chat", title: "Chat", group: "general", icon: SettingsChatIcon, description: "How golem answers and what a chat shows. These are the defaults for every new chat.", keywords: ["steps", "open it when a step fails", "thinking", "footer", "send"] },
+  { id: "chat", title: "Chat", group: "general", icon: SettingsChatIcon, description: "How golem answers and what a chat shows. These are the defaults for every new chat.", keywords: ["default mode", "autopilot", "start with a plan", "steps", "open it when a step fails", "thinking", "footer", "send"] },
   { id: "appearance", title: "Appearance", group: "general", icon: SettingsAppearanceIcon, description: "Theme and the desktop app.", keywords: ["theme", "app"] },
   { id: "notifications", title: "Notifications", group: "general", icon: SettingsNotificationsIcon, description: "When golem tells you something, and when it keeps quiet.", keywords: ["tell me", "clicking a notification", "quiet hours", "pause"] },
   { id: "keys", title: "API keys", group: "models", icon: SettingsKeysIcon, description: "Keys for hosted providers. Stored in the system keychain.", keywords: ["provider", "anthropic", "openai", "keychain"] },
@@ -54,6 +54,6 @@ export const SECTIONS: readonly SettingsSection[] = [
   { id: "agents", title: "Agents", group: "abilities", icon: SettingsAgentsIcon, description: "Helpers the lead can start. Each one is a Markdown file.", keywords: ["helpers", "explorer", "sub-agent", "model", "limits", "prompt", "definition"] },
   { id: "memory", title: "Memory", group: "abilities", icon: SettingsMemoryIcon, description: "What golem remembers between chats.", keywords: ["paid model", "scopes", "remember", "forget"] },
   { id: "devices", title: "Devices", group: "permissions", icon: SettingsDevicesIcon, description: "Phones paired with this Mac: pair one, rename it, or cut it off.", keywords: ["phone", "iphone", "pair", "qr code", "revoke", "relay"] },
-  { id: "rules", title: "Tool rules", group: "permissions", icon: SettingsRulesIcon, description: "Allow, ask or deny, per tool and per path.", keywords: ["default mode", "rules", "allow", "deny", "permission"] },
+  { id: "rules", title: "Tool rules", group: "permissions", icon: SettingsRulesIcon, description: "Allow, ask or deny, per tool and per path.", keywords: ["rules", "allow", "deny", "permission"] },
   { id: "config", title: "Config file", group: "advanced", icon: SettingsConfigIcon, description: "Edit config.toml directly. The other sections write to it too.", keywords: ["which file", "problems", "toml", "raw"] },
 ];

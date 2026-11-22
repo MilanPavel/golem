@@ -1,4 +1,4 @@
-import { OLLAMA_FAILED, RpcError, type ApprovalChoice, type ConfigGetResult, type ConfigRawGetResult, type ConfigRawResult, type FsListDirsResult, type GitBranchesResult, type GitInfoResult, type FsChooseFolderResult, type McpAddParams, type McpCallResult, type McpImportApplyParams, type McpImportApplyResult, type McpImportScanResult, type McpCatalogResult, type McpListResult, type McpLogsResult, type McpServerConfig, type McpServerDetail, type McpServerLog, type McpLoginDone, type McpTestProgress, type McpTestResult, type GolemClient, type RuntimeName, type SetupStatusResult, type SkillListResult, type AgentsListResult, type AgentsSaveResult, type AgentsDeleteResult, type TraceGetResult, type TraceSpanResult, type ArtifactReadResult, type ChangesDiffResult, type ChangesDiffTarget, type ChangesListResult, type ChangesRevertResult, type ChangesRevertTarget, type ChangesCommitResult, type ChangesCommitInfoResult, type ChangesSuggestMessageResult, type ModelOptionsGetResult, type ModelOptionsSetResult, type SessionSetOptionsResult, type SkillCreateResult, type SkillReadResult, type SkillWriteResult, type AuthListResult, type FileListResult, type FileReadResult, type CostGetResult, type SessionCompactResult, type ConsentChoice, type RoutingGetResult, type RoutingSetParams, type RoutingSetResult, type NotificationsValues, type NotificationsSetParams, type NotificationsSetResult, type NotifyTestResult } from "@golem/client";
+import { OLLAMA_FAILED, RpcError, type ApprovalChoice, type ConfigGetResult, type ConfigRawGetResult, type ConfigRawResult, type FsListDirsResult, type GitBranchesResult, type GitInfoResult, type FsChooseFolderResult, type McpAddParams, type McpCallResult, type McpImportApplyParams, type McpImportApplyResult, type McpImportScanResult, type McpCatalogResult, type McpListResult, type McpLogsResult, type McpServerConfig, type McpServerDetail, type McpServerLog, type McpLoginDone, type McpTestProgress, type McpTestResult, type GolemClient, type RuntimeName, type SetupStatusResult, type SkillListResult, type AgentsListResult, type AgentsSaveResult, type AgentsDeleteResult, type TraceGetResult, type TraceSpanResult, type ArtifactReadResult, type ChangesDiffResult, type ChangesDiffTarget, type ChangesListResult, type ChangesRevertResult, type ChangesRevertTarget, type ChangesCommitResult, type ChangesCommitInfoResult, type ChangesSuggestMessageResult, type ModelOptionsGetResult, type ModelOptionsSetResult, type SessionSetOptionsResult, type SkillCreateResult, type SkillReadResult, type SkillWriteResult, type AuthListResult, type FileListResult, type FileReadResult, type CostGetResult, type SessionCompactResult, type ConsentChoice, type RoutingGetResult, type RoutingSetParams, type RoutingSetResult, type NotificationsValues, type NotificationsSetParams, type NotificationsSetResult, type NotifyTestResult, type ChatSetParams, type ChatSetResult, type ChatValues } from "@golem/client";
 import { changeToolFilter, installEventOf, type InstallEvent, type PermissionMode, type CompactAction, type RouteMode } from "@golem/view";
 import type { QueryClient } from "@tanstack/react-query";
 import { createDrafts, type Drafts } from "./drafts.ts";
@@ -10,7 +10,7 @@ import { createNewSession, type NewSessionStore } from "./new-session.ts";
 import { CONFIG_KEY } from "./config.ts";
 import { DEVICE_LIST_KEY, createPairing, type DeviceListResult, type DeviceRevokeResult, type Pairing } from "./devices.ts";
 import { MCP_CATALOG_KEY, MCP_GET_KEY, MCP_LIST_KEY, MCP_TOOLS_KEY, type McpToolsResult } from "./mcp.ts";
-import { AGENTS_KEEP_KEY, NOTIFICATIONS_KEY, type AgentsKeepResult, type AgentsKeepValues } from "./notifications.ts";
+import { AGENTS_KEEP_KEY, CHAT_KEY, NOTIFICATIONS_KEY, type AgentsKeepResult, type AgentsKeepValues } from "./notifications.ts";
 import { ROUTING_KEY } from "./routing.ts";
 import type { AgentInfo, AgentsListResult as AgentsListed } from "./agents.ts";
 import { MODEL_LIST_ALL_KEY, MODEL_LIST_KEY, SETUP_STATUS_KEY, type ModelListResult } from "./models.ts";
@@ -97,6 +97,8 @@ export type PageClient = Pick<
   | "getCost"
   | "getRouting"
   | "getNotifications"
+  | "getChat"
+  | "setChat"
   | "setNotifications"
   | "notifyTest"
   | "setRouting"
@@ -259,6 +261,11 @@ export type PageActions = {
    */
   setRouting(params: RoutingSetParams): Promise<RoutingSetResult>;
   /**
+   * Changes keys of `[chat]` in `config.toml`. A refusal is in the result (`ok: false`, with an
+   * error for each wrong setting), not a rejection, and nothing is written then.
+   */
+  setChat(params: ChatSetParams): Promise<ChatSetResult>;
+  /**
    * Changes keys of `[notifications]` in `config.toml`. A refusal is in the result (`ok: false`, with an
    * error for each wrong setting), not a rejection, and nothing is written then.
    */
@@ -411,6 +418,8 @@ export type PageQueries = {
   cost(sessionId?: string): Promise<CostGetResult>;
   /** The routing, budget and context settings, from `routing.get`. */
   routing(): Promise<RoutingGetResult>;
+  /** The defaults for every new chat, from `chat.get`. */
+  chat(): Promise<ChatValues>;
   /** The `[notifications]` settings, from `notifications.get`. */
   notifications(): Promise<NotificationsValues>;
   /** How long a finished helper's steps are kept, from `agents.keep`. */
@@ -539,6 +548,7 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
       mcpTools: (name, sessionId) => client.mcpTools(name, sessionId ?? undefined),
       cost: (sessionId) => (sessionId === undefined ? client.getCost() : client.getCost(sessionId)),
       routing: () => client.getRouting(),
+      chat: () => client.getChat(),
       notifications: () => client.getNotifications(),
       agentsKeep: async () => {
         const result = await client.agentsKeep();
@@ -706,6 +716,7 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
           throw failure;
         } finally {
           await queryClient.invalidateQueries({ queryKey: CONFIG_KEY });
+          await queryClient.invalidateQueries({ queryKey: CHAT_KEY });
         }
       },
       async cancel(runId) {
@@ -937,6 +948,11 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
           await queryClient.invalidateQueries({ queryKey: ROUTING_KEY });
           await queryClient.invalidateQueries({ queryKey: MODEL_LIST_KEY });
         }
+        return result;
+      },
+      async setChat(params) {
+        const result = await client.setChat(params);
+        if (result.ok) await queryClient.invalidateQueries({ queryKey: CHAT_KEY });
         return result;
       },
       async setNotifications(params) {

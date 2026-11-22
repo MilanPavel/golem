@@ -1,4 +1,4 @@
-import { signInLine, type SignInLine, checksSummary, COMMANDS, mcpStatusWord, noPastes, pickerGroups, withModelChoices, withSkillChoices, type CheckRun, type ChecksState, type ReviewNote, type TodoItem, type TurnChecks, type TurnCard, type ChatMessage, type ChatState, type RewindPlan, ladderRows, NO_LOCAL_WINDOW, routeRows, spendRows, contextActions, bestActions, windowSourceOf, helperBanner, helperReceipt, type ContextActionsInput } from "@golem/view";
+import { signInLine, type SignInLine, checksSummary, COMMANDS, mcpStatusWord, noPastes, pickerGroups, withModelChoices, withSkillChoices, type CheckRun, type ChecksState, type ReviewNote, type TodoItem, type TurnChecks, type TurnCard, type ChatMessage, type ChatState, type RewindPlan, ladderRows, NO_LOCAL_WINDOW, routeRows, spendRows, contextActions, bestActions, windowSourceOf, helperBanner, helperReceipt, type ContextActionsInput, type PermissionMode } from "@golem/view";
 import type { ListedModel } from "@golem/client";
 import { createContext, useContext, useEffect, useId, useState, type ReactNode } from "react";
 import { Badge } from "../ui/badge.tsx";
@@ -58,6 +58,7 @@ import { APPROVAL_DETAIL, APPROVAL_TRACE, CLEARED_DETAIL, GROWING_EVENTS, CUT_LI
 import type { TraceContextEvent, TraceRunSpan, TraceSpanResult } from "../store/trace.ts";
 import { FORM_CASES } from "../features/setup/sample.ts";
 import { HeroCard, PathsGrid } from "../features/setup/info-parts.tsx";
+import { HowFarView } from "../features/settings/chat-alone.tsx";
 import { ChatSection } from "../features/settings/chat-section.tsx";
 import { KeysView } from "../features/settings/keys-section.tsx";
 import { KEYS_CASES } from "../features/settings/keys-sample.ts";
@@ -145,6 +146,13 @@ const CTX_MESSAGES: ContextActionsInput["messages"] = Array.from({ length: 6 }, 
 ]).flat();
 const CTX_BIG_MODEL: ListedModel = { ref: "ollama/qwen3:27b", label: "qwen3:27b", provider: "ollama", source: "installed", status: "ready", tier: "local", ctx: 131072, price: { input: 0, output: 0 } };
 const CTX_MEMORY = { ram_gb: 32, size_gb: 16, kv_gb_per_1k_tokens: 0.06, overhead_gb: 1, fits_share: 0.5, tight_share: 0.75 };
+/** Settings › Chat with its defaults held in the page, as the daemon would hold them. */
+function GalleryChatSettings() {
+  const [mode, setMode] = useState<PermissionMode>("balanced");
+  const [plan, setPlan] = useState(false);
+  return <ChatSection alone={<HowFarView mode={mode} planFirst={plan} onMode={setMode} onPlan={setPlan} />} />;
+}
+
 function ctxCase(label: string, used: number, window: number | null, extra: Partial<ContextActionsInput> = {}) {
   const planned = extra.session?.provider !== "deepseek" && window !== null;
   const source = extra.source ?? windowSourceOf({ window, planned, numCtx: null });
@@ -2183,7 +2191,7 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
       <section className="mt-6" id={anchor("Settings chat")}>
         <h3 className="mb-2 font-mono text-xs text-faint">Settings › Chat</h3>
         <div className="rounded-lg border border-line bg-bg p-4">
-          <ChatSection />
+          <GalleryChatSettings />
         </div>
       </section>
 

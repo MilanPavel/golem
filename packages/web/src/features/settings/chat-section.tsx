@@ -1,5 +1,5 @@
 import { DETAILS, FOOTER_PART_LABELS, FOOTER_PARTS, type Detail, type FooterPart } from "@golem/view";
-import { useId } from "react";
+import { useId, type ReactNode } from "react";
 import { modShortcut } from "../../ui/platform.ts";
 import { Kbd } from "../../ui/kbd.tsx";
 import {
@@ -17,6 +17,7 @@ import {
   type SendKey,
   type ThinkingMode,
 } from "../chat/index.ts";
+import { HowFarItGoesAlone } from "./chat-alone.tsx";
 import { ChatPreview } from "./chat-preview.tsx";
 import { ChatRow, Choice, PartChip, Switch } from "./chat-controls.tsx";
 
@@ -132,9 +133,10 @@ function WhatTheChatShows() {
 }
 
 /** Settings › Chat: how golem answers and what a chat shows. This page has the screen choices; they apply to every chat. */
-export function ChatSection() {
+export function ChatSection({ alone = <HowFarItGoesAlone /> }: { alone?: ReactNode }) {
   return (
     <div className="flex flex-col gap-8">
+      {alone}
       <WhatTheChatShows />
     </div>
   );

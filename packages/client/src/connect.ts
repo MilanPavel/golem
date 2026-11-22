@@ -151,6 +151,9 @@ import type { SessionForkResult } from "../../protocol/gen/session-fork-result.t
 import type { SessionInspectResult } from "../../protocol/gen/session-inspect-result.ts";
 import type { CostGetResult } from "../../protocol/gen/cost-get-result.ts";
 import type { EvalRoutingResult } from "../../protocol/gen/eval-routing-result.ts";
+import type { ChatSetParams } from "../../protocol/gen/chat-set-params.ts";
+import type { ChatSetResult } from "../../protocol/gen/chat-set-result.ts";
+import type { ChatValues } from "../../protocol/gen/chat-values.ts";
 import type { NotificationsSetParams } from "../../protocol/gen/notifications-set-params.ts";
 import type { NotificationsSetResult } from "../../protocol/gen/notifications-set-result.ts";
 import type { NotificationsValues } from "../../protocol/gen/notifications-values.ts";
@@ -274,6 +277,8 @@ import {
   isSessionInspectResult,
   isCostGetResult,
   isEvalRoutingResult,
+  isChatSetResult,
+  isChatValues,
   isNotificationsSetResult,
   isNotificationsValues,
   isNotifyTestResult,
@@ -414,6 +419,9 @@ export interface GolemClient {
   /** What the recorded sessions of the last `days` days would have cost on each route. A calculation, no model call. */
   evalRouting(days?: number, sessionId?: string): Promise<EvalRoutingResult>;
   /** The routing, budget and context settings as golem uses them, and what it picks for an empty tier. */
+  /** The defaults for every new chat, from `[chat]`. */
+  getChat(): Promise<ChatValues>;
+  setChat(params: ChatSetParams): Promise<ChatSetResult>;
   getNotifications(): Promise<NotificationsValues>;
   setNotifications(params: NotificationsSetParams): Promise<NotificationsSetResult>;
   notifyTest(): Promise<NotifyTestResult>;
@@ -1650,6 +1658,22 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       const result = await call("eval.routing", params);
       if (!isEvalRoutingResult(result)) {
         throw new Error("invalid eval.routing result");
+      }
+      return result;
+    },
+    async getChat(): Promise<ChatValues> {
+      await ready;
+      const result = await call("chat.get", {});
+      if (!isChatValues(result)) {
+        throw new Error("invalid chat.get result");
+      }
+      return result;
+    },
+    async setChat(params: ChatSetParams): Promise<ChatSetResult> {
+      await ready;
+      const result = await call("chat.set", { ...params });
+      if (!isChatSetResult(result)) {
+        throw new Error("invalid chat.set result");
       }
       return result;
     },

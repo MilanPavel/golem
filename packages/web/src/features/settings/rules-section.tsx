@@ -3,10 +3,7 @@ import {
   effectiveMode,
   isLoosening,
   itemText,
-  MODE_ALWAYS_ASKS,
-  MODE_HINT,
   MODE_LABEL,
-  PERMISSION_MODES,
   permissionItems,
   ruleChange,
   type PermissionItem,
@@ -15,10 +12,12 @@ import {
 } from "@golem/view";
 import { useMemo, useState } from "react";
 import { actionErrorText } from "../../store/errors.ts";
-import { usePageActions, useConfig } from "../../store/page-context.tsx";
+import { usePageActions, useConfig, useNavigate } from "../../store/page-context.tsx";
+import { settingsPath } from "../../store/router.ts";
 import { Button } from "../../ui/button.tsx";
 import { cn } from "../../ui/cn.ts";
 import { Code } from "../../ui/code.tsx";
+import { Link } from "../../ui/link.tsx";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "../../ui/dialog.tsx";
 import { useSettingsContext, useSettingsFolder } from "./context.ts";
 
@@ -119,7 +118,7 @@ export function RulesSection() {
         </p>
       )}
       {config.data === undefined ? null : (
-        <DefaultMode mode={effectiveMode(null, config.data.default_permission_mode)} />
+        <DefaultModeLine mode={effectiveMode(null, config.data.default_permission_mode)} />
       )}
       {config.isError ? (
         <div className="flex flex-col items-start gap-2">
@@ -157,85 +156,17 @@ export function RulesSection() {
   );
 }
 
-/**
- * The mode a new chat starts in, as `[permissions] mode` in config.toml. A click saves it through the
- * daemon (the page shows it at once and puts the old one back if the save fails). Autopilot asks first.
- */
-function DefaultMode({ mode }: { mode: PermissionMode }) {
-  const actions = usePageActions();
-  const [saved, setSaved] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [confirming, setConfirming] = useState(false);
-
-  async function save(next: PermissionMode): Promise<void> {
-    setError(null);
-    setSaved(null);
-    try {
-      setSaved(await actions.setDefaultMode(next));
-    } catch (failure) {
-      setError(actionErrorText(failure, "Could not save the default mode."));
-    }
-  }
-
-  function pick(next: PermissionMode): void {
-    if (next === mode) return;
-    if (next === "autopilot") {
-      setConfirming(true);
-      return;
-    }
-    void save(next);
-  }
-
+/** Where the mode a new chat starts in is chosen: in Chat. This line only says what it is now. */
+function DefaultModeLine({ mode }: { mode: PermissionMode }) {
+  const navigate = useNavigate();
   return (
-    <section aria-labelledby="default-mode" data-setting="default mode" className="flex flex-col gap-2 rounded-lg border border-line bg-surface px-3 py-3">
-      <h3 id="default-mode" className="text-meta text-faint">
-        Default mode
-      </h3>
-      <div role="radiogroup" aria-labelledby="default-mode" className="flex flex-wrap gap-1">
-        {PERMISSION_MODES.map((item) => (
-          <button
-            key={item}
-            type="button"
-            role="radio"
-            aria-checked={item === mode}
-            onClick={() => pick(item)}
-            className={cn("rounded-md border px-3 py-1 text-sm", item === mode ? "border-clay bg-clay-soft text-clay-ink" : "border-line text-muted hover:text-ink")}
-          >
-            {MODE_LABEL[item]}
-          </button>
-        ))}
-      </div>
-      <p className="text-sm">{MODE_HINT[mode]}</p>
-      <p className="text-xs text-muted">{MODE_ALWAYS_ASKS} A chat can use another mode: pick it in the composer or with /mode.</p>
-      <p role="status" aria-live="polite" className="min-h-4 text-xs text-muted wrap-anywhere">
-        {saved === null ? null : `Saved to ${saved}`}
-      </p>
-      {error === null ? null : (
-        <p role="alert" className="text-sm text-deny">
-          {error}
-        </p>
-      )}
-      <Dialog open={confirming} onOpenChange={setConfirming}>
-        <DialogContent>
-          <DialogTitle>Use Autopilot by default?</DialogTitle>
-          <DialogDescription>New chats will edit files inside the project and run the sandboxed shell without asking. {MODE_ALWAYS_ASKS}</DialogDescription>
-          <div className="mt-4 flex justify-end gap-2">
-            <Button autoFocus onClick={() => setConfirming(false)}>
-              Cancel
-            </Button>
-            <Button
-              kind="primary"
-              onClick={() => {
-                setConfirming(false);
-                void save("autopilot");
-              }}
-            >
-              Use Autopilot
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-    </section>
+    <p className="text-sm text-muted">
+      New chats start in <b className="font-medium text-ink">{MODE_LABEL[mode]}</b>.{" "}
+      <Link href={settingsPath("chat")} onNavigate={navigate} className="text-clay-ink underline underline-offset-2">
+        Change it in Chat
+      </Link>
+      .
+    </p>
   );
 }
 
