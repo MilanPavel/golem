@@ -1,5 +1,5 @@
 import { RpcError, type AgentInfo, type AgentsKeepValues } from "@golem/client";
-import { AGENT_GROUPS, AGENT_TEMPLATE, agentRow, agentWarnings, wishLine, wishOptions, type WishModel, type WishOption, type WishSetup } from "@golem/view";
+import { AGENT_GROUPS, AGENT_TEMPLATE, agentRow, agentWarnings, formatLimitSeconds, limitFields, limitTexts, wishLine, wishOptions, type WishModel, type WishOption, type WishSetup } from "@golem/view";
 
 import { readLines, rule, runsText, wrapText } from "./agents-read.ts";
 import type { Press } from "./keys.ts";
@@ -481,6 +481,18 @@ export function keepLine(keep: AgentsKeepValues): string {
   return `finished helpers: steps kept ${days(keep.keep_days)} · failed, stopped or asking ${days(keep.keep_problem_days)}`;
 }
 
+/** `every helper: 20 tool calls · 10 min`, from the limits of `[agents]`; empty when none is set. */
+export function everyHelperLine(keep: AgentsKeepValues, setup: WishSetup): string {
+  const texts = limitTexts(keep);
+  const parts = limitFields(setup).flatMap((field) => {
+    const text = texts[field.key];
+    if (text === "") return [];
+    if (field.key === "working_seconds") return [formatLimitSeconds(Number(text))];
+    return [field.key === "max_cost" ? `$${Number(text).toFixed(2)} cost` : `${text} ${field.fact}`];
+  });
+  return parts.length === 0 ? "" : `every helper: ${parts.join(" · ")}`;
+}
+
 /** The wish and what it becomes, as a list row says it: `cheapest → qwen3:14b`; a wish this setup cannot use is `not available here`. */
 function listWish(agent: AgentInfo, setup: WishSetup): string {
   if (wishLine(agent.wish, setup, agent.resolves_to).includes("not available here")) {
@@ -493,6 +505,8 @@ function listLines(agents: readonly AgentInfo[], selected: number, cwd: string, 
   const count = `${agents.length} ${agents.length === 1 ? "agent" : "agents"}`;
   const lines: AgentsManagerLine[] = [{ text: "Agents", bold: true }, { text: `${count} · helpers, last 30 days`, dim: true }];
   if (keep !== null) lines.push({ text: keepLine(keep), dim: true });
+  const every = keep === null ? "" : everyHelperLine(keep, setup);
+  if (every !== "") lines.push({ text: every, dim: true });
   if (agents.length === 0) {
     return [...lines, { text: "" }, { text: AGENTS_HINT }];
   }
