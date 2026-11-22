@@ -1,9 +1,9 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { NewSessionComposer, useStartSession } from "../composer/index.ts";
+import { BranchSwitchLine, HomeBranchChip, NewSessionComposer, useStartSession } from "../composer/index.ts";
 import { PixelGolem } from "../../ui/pixel-golem.tsx";
 import { FinishSetupStrip } from "../welcome/index.ts";
 import { folderDialogErrorText } from "../../store/errors.ts";
-import { useFolderBranches, useFolderDialog, useFolderMenuRequest, useGitInfo, useHomeFolder, useKnownFolders, useNewSessionFolder, useNewSessionModel, usePageActions } from "../../store/page-context.tsx";
+import { useFolderBranches, useFolderDialog, useFolderMenuRequest, useGitInfo, useHomeFolder, useKnownFolders, useNewSessionBranch, useNewSessionFolder, useNewSessionModel, usePageActions } from "../../store/page-context.tsx";
 import { FolderBrowser } from "./folder-browser.tsx";
 import { FolderChip } from "./folder-chip.tsx";
 import { NewSessionModelChip } from "./model-chip-new.tsx";
@@ -59,13 +59,15 @@ export function HomeScreen() {
     shown();
   }, [shown]);
   const [model] = useNewSessionModel();
-  const start = useStartSession(folder, model);
+  const [branch] = useNewSessionBranch();
+  const start = useStartSession(folder, model, branch);
   return (
     <HomeView
       notice={<FinishSetupStrip />}
       composer={
         <NewSessionComposer
           start={start}
+          note={<BranchSwitchLine folder={folder} />}
           barLeft={
             <>
               <NewSessionModelChip />
@@ -90,7 +92,7 @@ export function HomeScreen() {
                 }
                 browser={(props) => <FolderBrowser {...props} />}
               />
-              {/* The branch chip goes here (ticket 10.20.7). */}
+              <HomeBranchChip folder={folder} />
             </>
           }
         />

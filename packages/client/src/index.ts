@@ -20,6 +20,8 @@ export {
   UNAUTHORIZED_CLOSE_CODE,
   RUN_NOT_FOUND,
   SESSION_BUSY,
+  NOT_A_REPO,
+  BRANCH_SWITCH_FAILED,
   SESSION_NOT_FOUND,
   type ApprovalChoice,
   type ConsentChoice,
@@ -182,6 +184,7 @@ export type { TraceRoute } from "../../protocol/gen/trace-route.ts";
 export type { ListedModel, ModelListResult } from "../../protocol/gen/model-list-result.ts";
 export type { DirEntry, FsListDirsResult } from "../../protocol/gen/fs-list-dirs-result.ts";
 export type { FsChooseFolderResult } from "../../protocol/gen/fs-choose-folder-result.ts";
+export type { GitBranch, GitBranchesResult } from "../../protocol/gen/git-branches-result.ts";
 export type { GitInfoResult, GitWorktree } from "../../protocol/gen/git-info-result.ts";
 export type { SetupRow, SetupStatusResult } from "../../protocol/gen/setup-status-result.ts";
 export { mergeSummary } from "./session-index.ts";

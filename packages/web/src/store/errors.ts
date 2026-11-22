@@ -1,4 +1,4 @@
-import { MODEL_NOT_CONFIGURED, RpcError, SESSION_BUSY } from "@golem/client";
+import { BRANCH_SWITCH_FAILED, MODEL_NOT_CONFIGURED, NOT_A_REPO, RpcError, SESSION_BUSY } from "@golem/client";
 import { NO_MODEL_NOTICE, noModelChosen } from "@golem/view";
 
 const INVALID_PARAMS = -32602;
@@ -27,6 +27,11 @@ export function isInvalidParams(error: unknown): error is RpcError {
 /** The daemon refused a new session's model: it does not resolve, or its provider has no key. */
 export function isModelRefused(error: unknown): error is RpcError {
   return error instanceof RpcError && error.code === MODEL_NOT_CONFIGURED;
+}
+
+/** The daemon could not switch the folder to the branch a new session asked for. The message is git's own. */
+export function isBranchRefused(error: unknown): error is RpcError {
+  return error instanceof RpcError && (error.code === BRANCH_SWITCH_FAILED || error.code === NOT_A_REPO);
 }
 
 /** The daemon refused a message because no model was ever chosen: the welcome page picks one. */

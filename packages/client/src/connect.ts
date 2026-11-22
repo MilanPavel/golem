@@ -21,6 +21,7 @@ import type { OllamaInstallResult } from "../../protocol/gen/ollama-install-resu
 import type { OllamaStartResult } from "../../protocol/gen/ollama-start-result.ts";
 import type { FsListDirsResult } from "../../protocol/gen/fs-list-dirs-result.ts";
 import type { FsChooseFolderResult } from "../../protocol/gen/fs-choose-folder-result.ts";
+import type { GitBranchesResult } from "../../protocol/gen/git-branches-result.ts";
 import type { GitInfoResult } from "../../protocol/gen/git-info-result.ts";
 import type { SetupStatusResult } from "../../protocol/gen/setup-status-result.ts";
 import type { ApprovalRespondResult } from "../../protocol/gen/approval-respond-result.ts";
@@ -182,6 +183,7 @@ import {
   isFileReadResult,
   isFsListDirsResult,
   isFsChooseFolderResult,
+  isGitBranchesResult,
   isGitInfoResult,
   isSetupStatusResult,
   isDaemonStatus,
@@ -289,6 +291,10 @@ const PROTOCOL_MISMATCH = -32001;
 export const SESSION_NOT_FOUND = -32003;
 export const SESSION_BUSY = -32004;
 export const MODEL_NOT_CONFIGURED = -32005;
+/** `session.create` with a `branch` in a folder that is not a git repo. */
+export const NOT_A_REPO = -32025;
+/** `session.create` with a `branch` that git would not switch to. The message is git's own. */
+export const BRANCH_SWITCH_FAILED = -32026;
 export const RUN_NOT_FOUND = -32006;
 export const MESSAGE_NOT_FOUND = -32007;
 export const KEYCHAIN_UNAVAILABLE = -32008;
@@ -365,8 +371,9 @@ export interface GolemClient {
   /**
    * Create a session. Its events arrive only after {@link GolemClient.attachSession}.
    * `cwd` is its project folder, an absolute path. File tools work only inside it.
+   * `branch` switches the folder to that git branch first (`createBranch` makes it); a refused switch is an error.
    */
-  createSession(options?: { cwd?: string; modelProfile?: string; origin?: "user" | "cli" }): Promise<SessionCreateResult>;
+  createSession(options?: { cwd?: string; modelProfile?: string; origin?: "user" | "cli"; branch?: string; createBranch?: boolean }): Promise<SessionCreateResult>;
   /**
    * Replay the session's events after `afterSeq`, then stream new ones.
    * The client attaches again after a reconnect, from the last `seq` it saw.
@@ -601,6 +608,8 @@ export interface GolemClient {
   listDirs(path?: string): Promise<FsListDirsResult>;
   /** The repo `path` belongs to: its branch, how many files changed, and its worktrees. */
   gitInfo(path: string): Promise<GitInfoResult>;
+  /** The local branches of the repo a folder belongs to, newest commit first. Read only. */
+  gitBranches(path: string): Promise<GitBranchesResult>;
   /**
    * Opens the macOS folder dialog on the daemon's Mac, in `start` when given. Resolves with the
    * folder chosen, or a null path when the person cancelled. Refused when the dialog is not
@@ -1486,12 +1495,14 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       }
       return result;
     },
-    async createSession(options?: { cwd?: string; modelProfile?: string; origin?: "user" | "cli" }): Promise<SessionCreateResult> {
+    async createSession(options?: { cwd?: string; modelProfile?: string; origin?: "user" | "cli"; branch?: string; createBranch?: boolean }): Promise<SessionCreateResult> {
       await ready;
-      const params: { cwd?: string; model_profile?: string; origin?: string } = {};
+      const params: { cwd?: string; model_profile?: string; origin?: string; branch?: string; create_branch?: boolean } = {};
       if (options?.cwd !== undefined) params.cwd = options.cwd;
       if (options?.modelProfile !== undefined) params.model_profile = options.modelProfile;
       if (options?.origin !== undefined) params.origin = options.origin;
+      if (options?.branch !== undefined) params.branch = options.branch;
+      if (options?.createBranch === true) params.create_branch = true;
       const result = await call("session.create", params);
       if (!isSessionCreateResult(result)) {
         throw new Error("invalid session.create result");
@@ -2281,6 +2292,14 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       const result = await call("git.info", { path });
       if (!isGitInfoResult(result)) {
         throw new Error("invalid git.info result");
+      }
+      return result;
+    },
+    async gitBranches(path: string): Promise<GitBranchesResult> {
+      await ready;
+      const result = await call("git.branches", { path });
+      if (!isGitBranchesResult(result)) {
+        throw new Error("invalid git.branches result");
       }
       return result;
     },

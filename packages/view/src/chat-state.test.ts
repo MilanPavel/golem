@@ -1312,6 +1312,18 @@ test("branch.changed becomes a quiet line after the message it followed, and no 
   assert.equal(noticesAfter(state.notices, "u", true).length, 1);
 });
 
+test("branchChanged is true from branch.changed until the turn ends", () => {
+  let state = reduceChat(emptyChat, event({ seq: 1, session_id: "s", run_id: "r", ts: "t", type: "run.started", data: {} }));
+  assert.equal(state.branchChanged, false);
+  state = reduceChat(
+    state,
+    event({ seq: 2, session_id: "s", run_id: "r", ts: "t", type: "branch.changed", data: { from_branch: "main", to_branch: "fix-x", paths_count: 3 } }),
+  );
+  assert.equal(state.branchChanged, true);
+  state = reduceChat(state, event({ seq: 3, session_id: "s", run_id: "r", ts: "t", type: "run.completed", data: {} }));
+  assert.equal(state.branchChanged, false);
+});
+
 test("context.changed becomes a notice after the message it followed, and no message", () => {
   let state = reduceChat(
     emptyChat,

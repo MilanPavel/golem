@@ -7,8 +7,8 @@ import { NoticeLine } from "./notice-line.tsx";
 import { NEW_DRAFT_KEY, type useStartSession } from "./start-session.ts";
 import { useCommands } from "./use-commands.tsx";
 
-/** The large composer of the empty screen, with `barLeft` (the model and the folder) in its row. Its draft is kept under "new". */
-export function NewSessionComposer({ start, barLeft }: { start: ReturnType<typeof useStartSession>; barLeft?: ReactNode }) {
+/** The large composer of the empty screen, with `barLeft` (the model, the folder and the branch) in its row, and `note` under it. Its draft is kept under "new". */
+export function NewSessionComposer({ start, barLeft, note }: { start: ReturnType<typeof useStartSession>; barLeft?: ReactNode; note?: ReactNode }) {
   const connection = useConnection().state.status;
   const [text, setText] = useDraft(NEW_DRAFT_KEY);
   const [pastes, setPastes] = useDraftPastes(NEW_DRAFT_KEY);
@@ -41,6 +41,7 @@ export function NewSessionComposer({ start, barLeft }: { start: ReturnType<typeo
           {error}
         </p>
       ) : null}
+      {note}
       {commands.notice === null ? null : (
         <div className="text-left">
           <NoticeLine notice={commands.notice} />
