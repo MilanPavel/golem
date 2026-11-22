@@ -1,0 +1,23 @@
+{
+  "additionalProperties": false,
+  "description": "``hf.search``. Look for GGUF models on Hugging Face. Only the query leaves this Mac.",
+  "properties": {
+    "limit": {
+      "default": 20,
+      "maximum": 100,
+      "minimum": 1,
+      "title": "Limit",
+      "type": "integer"
+    },
+    "query": {
+      "minLength": 1,
+      "title": "Query",
+      "type": "string"
+    }
+  },
+  "required": [
+    "query"
+  ],
+  "title": "HfSearchParams",
+  "type": "object"
+}

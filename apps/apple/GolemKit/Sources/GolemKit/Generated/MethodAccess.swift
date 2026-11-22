@@ -65,6 +65,8 @@ public enum MethodAccess {
         "git.info",
         "hello",
         "helper.stop",
+        "hf.files",
+        "hf.search",
         "mcp.add",
         "mcp.call",
         "mcp.catalog",

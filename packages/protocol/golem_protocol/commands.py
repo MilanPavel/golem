@@ -1676,6 +1676,64 @@ class ModelPullCancelResult(BaseModel):
     cancelled: bool
 
 
+class HfSearchParams(BaseModel):
+    """``hf.search``. Look for GGUF models on Hugging Face. Only the query leaves this Mac."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    query: str = Field(min_length=1)
+    limit: int = Field(default=20, ge=1, le=100)
+
+
+class HfRepo(BaseModel):
+    """One repo in a search. ``gated`` repos need a Hugging Face token to download."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    id: str = Field(min_length=1)
+    downloads: int = Field(ge=0)
+    likes: int = Field(ge=0)
+    updated: str | None = None
+    gated: bool
+
+
+class HfSearchResult(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    repos: list[HfRepo]
+
+
+class HfFilesParams(BaseModel):
+    """``hf.files``. List the sizes (quantizations) of one repo, with a fit check for this Mac."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    repo: str = Field(min_length=3)
+
+
+class HfSize(BaseModel):
+    """One quantization. ``files`` is the number of parts summed into ``size_gb``.
+
+    ``fit`` is null when golem cannot tell how much memory this Mac has. ``recommended`` marks
+    the size to pick: ``Q4_K_M`` when it fits, else the largest that fits.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    quant: str = Field(min_length=1)
+    size_gb: float = Field(ge=0)
+    files: int = Field(ge=1)
+    fit: Literal["fits", "tight", "too_big"] | None = None
+    recommended: bool
+
+
+class HfFilesResult(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    repo: str = Field(min_length=3)
+    sizes: list[HfSize]
+
+
 class ModelDeleteParams(BaseModel):
     """``model.delete``. Remove an installed local model from Ollama."""
 

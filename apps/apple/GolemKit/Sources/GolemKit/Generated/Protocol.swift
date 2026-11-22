@@ -6356,6 +6356,184 @@ public enum HelperWaitEventType: String, Codable {
     case helperWait = "helper.wait"
 }
 
+/// ``hf.files``. List the sizes (quantizations) of one repo, with a fit check for this Mac.
+// MARK: - HFFilesParams
+public struct HFFilesParams: Codable {
+    public let repo: String
+
+    public enum CodingKeys: String, CodingKey {
+        case repo = "repo"
+    }
+
+    public init(repo: String) {
+        self.repo = repo
+    }
+}
+
+// MARK: - HFFilesResult
+public struct HFFilesResult: Codable {
+    public let repo: String
+    public let sizes: [SizeElement]
+
+    public enum CodingKeys: String, CodingKey {
+        case repo = "repo"
+        case sizes = "sizes"
+    }
+
+    public init(repo: String, sizes: [SizeElement]) {
+        self.repo = repo
+        self.sizes = sizes
+    }
+}
+
+/// One quantization. ``files`` is the number of parts summed into ``size_gb``.
+///
+/// ``fit`` is null when golem cannot tell how much memory this Mac has. ``recommended``
+/// marks
+/// the size to pick: ``Q4_K_M`` when it fits, else the largest that fits.
+// MARK: - SizeElement
+public struct SizeElement: Codable {
+    public let files: Int
+    public let fit: Fit?
+    public let quant: String
+    public let recommended: Bool
+    public let sizeGB: Double
+
+    public enum CodingKeys: String, CodingKey {
+        case files = "files"
+        case fit = "fit"
+        case quant = "quant"
+        case recommended = "recommended"
+        case sizeGB = "size_gb"
+    }
+
+    public init(files: Int, fit: Fit?, quant: String, recommended: Bool, sizeGB: Double) {
+        self.files = files
+        self.fit = fit
+        self.quant = quant
+        self.recommended = recommended
+        self.sizeGB = sizeGB
+    }
+}
+
+public enum Fit: String, Codable {
+    case fits = "fits"
+    case tight = "tight"
+    case tooBig = "too_big"
+}
+
+/// One repo in a search. ``gated`` repos need a Hugging Face token to download.
+// MARK: - HFRepo
+public struct HFRepo: Codable {
+    public let downloads: Int
+    public let gated: Bool
+    public let id: String
+    public let likes: Int
+    public let updated: String?
+
+    public enum CodingKeys: String, CodingKey {
+        case downloads = "downloads"
+        case gated = "gated"
+        case id = "id"
+        case likes = "likes"
+        case updated = "updated"
+    }
+
+    public init(downloads: Int, gated: Bool, id: String, likes: Int, updated: String?) {
+        self.downloads = downloads
+        self.gated = gated
+        self.id = id
+        self.likes = likes
+        self.updated = updated
+    }
+}
+
+/// ``hf.search``. Look for GGUF models on Hugging Face. Only the query leaves this Mac.
+// MARK: - HFSearchParams
+public struct HFSearchParams: Codable {
+    public let limit: Int?
+    public let query: String
+
+    public enum CodingKeys: String, CodingKey {
+        case limit = "limit"
+        case query = "query"
+    }
+
+    public init(limit: Int?, query: String) {
+        self.limit = limit
+        self.query = query
+    }
+}
+
+// MARK: - HFSearchResult
+public struct HFSearchResult: Codable {
+    public let repos: [RepoElement]
+
+    public enum CodingKeys: String, CodingKey {
+        case repos = "repos"
+    }
+
+    public init(repos: [RepoElement]) {
+        self.repos = repos
+    }
+}
+
+/// One repo in a search. ``gated`` repos need a Hugging Face token to download.
+// MARK: - RepoElement
+public struct RepoElement: Codable {
+    public let downloads: Int
+    public let gated: Bool
+    public let id: String
+    public let likes: Int
+    public let updated: String?
+
+    public enum CodingKeys: String, CodingKey {
+        case downloads = "downloads"
+        case gated = "gated"
+        case id = "id"
+        case likes = "likes"
+        case updated = "updated"
+    }
+
+    public init(downloads: Int, gated: Bool, id: String, likes: Int, updated: String?) {
+        self.downloads = downloads
+        self.gated = gated
+        self.id = id
+        self.likes = likes
+        self.updated = updated
+    }
+}
+
+/// One quantization. ``files`` is the number of parts summed into ``size_gb``.
+///
+/// ``fit`` is null when golem cannot tell how much memory this Mac has. ``recommended``
+/// marks
+/// the size to pick: ``Q4_K_M`` when it fits, else the largest that fits.
+// MARK: - HFSize
+public struct HFSize: Codable {
+    public let files: Int
+    public let fit: Fit?
+    public let quant: String
+    public let recommended: Bool
+    public let sizeGB: Double
+
+    public enum CodingKeys: String, CodingKey {
+        case files = "files"
+        case fit = "fit"
+        case quant = "quant"
+        case recommended = "recommended"
+        case sizeGB = "size_gb"
+    }
+
+    public init(files: Int, fit: Fit?, quant: String, recommended: Bool, sizeGB: Double) {
+        self.files = files
+        self.fit = fit
+        self.quant = quant
+        self.recommended = recommended
+        self.sizeGB = sizeGB
+    }
+}
+
 /// One checkpoint message as plain text.
 // MARK: - InspectMessage
 public struct InspectMessage: Codable {
@@ -6551,12 +6729,6 @@ public enum Category: String, Codable {
     case longContext = "long-context"
     case reasoning = "reasoning"
     case vision = "vision"
-}
-
-public enum Fit: String, Codable {
-    case fits = "fits"
-    case tight = "tight"
-    case tooBig = "too_big"
 }
 
 /// USD per million tokens. A local model is zero.

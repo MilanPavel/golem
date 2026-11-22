@@ -1,0 +1,64 @@
+{
+  "$defs": {
+    "HfRepo": {
+      "additionalProperties": false,
+      "description": "One repo in a search. ``gated`` repos need a Hugging Face token to download.",
+      "properties": {
+        "downloads": {
+          "minimum": 0,
+          "title": "Downloads",
+          "type": "integer"
+        },
+        "gated": {
+          "title": "Gated",
+          "type": "boolean"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "likes": {
+          "minimum": 0,
+          "title": "Likes",
+          "type": "integer"
+        },
+        "updated": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Updated"
+        }
+      },
+      "required": [
+        "id",
+        "downloads",
+        "likes",
+        "gated"
+      ],
+      "title": "HfRepo",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "repos": {
+      "items": {
+        "$ref": "#/$defs/HfRepo"
+      },
+      "title": "Repos",
+      "type": "array"
+    }
+  },
+  "required": [
+    "repos"
+  ],
+  "title": "HfSearchResult",
+  "type": "object"
+}

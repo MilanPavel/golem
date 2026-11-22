@@ -1,0 +1,75 @@
+{
+  "$defs": {
+    "HfSize": {
+      "additionalProperties": false,
+      "description": "One quantization. ``files`` is the number of parts summed into ``size_gb``.\n\n``fit`` is null when golem cannot tell how much memory this Mac has. ``recommended`` marks\nthe size to pick: ``Q4_K_M`` when it fits, else the largest that fits.",
+      "properties": {
+        "files": {
+          "minimum": 1,
+          "title": "Files",
+          "type": "integer"
+        },
+        "fit": {
+          "anyOf": [
+            {
+              "enum": [
+                "fits",
+                "tight",
+                "too_big"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Fit"
+        },
+        "quant": {
+          "minLength": 1,
+          "title": "Quant",
+          "type": "string"
+        },
+        "recommended": {
+          "title": "Recommended",
+          "type": "boolean"
+        },
+        "size_gb": {
+          "minimum": 0,
+          "title": "Size Gb",
+          "type": "number"
+        }
+      },
+      "required": [
+        "quant",
+        "size_gb",
+        "files",
+        "recommended"
+      ],
+      "title": "HfSize",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "repo": {
+      "minLength": 3,
+      "title": "Repo",
+      "type": "string"
+    },
+    "sizes": {
+      "items": {
+        "$ref": "#/$defs/HfSize"
+      },
+      "title": "Sizes",
+      "type": "array"
+    }
+  },
+  "required": [
+    "repo",
+    "sizes"
+  ],
+  "title": "HfFilesResult",
+  "type": "object"
+}

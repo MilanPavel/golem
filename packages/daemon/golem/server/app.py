@@ -40,6 +40,7 @@ from golem.models.discovery import Loaded, ModelDiscovery
 from golem.models.dispatcher import Call
 from golem.models.dispatcher import Dispatcher as ModelDispatcher
 from golem.models.facts import FactsSource, ListedFacts
+from golem.models.huggingface import HuggingFace
 from golem.models.install import RUNTIMES, OllamaInstaller, runtime_installer
 from golem.models.keys import ProviderKeys
 from golem.models.ollama import LocalServer, LocalServers, ServerState
@@ -473,6 +474,7 @@ class DaemonApp:
                 sessions.listed_refs = lambda: [listed.ref for listed in models.cached()]
                 sessions.listed_models = models.cached
                 self.state.pulls = pulls
+                self.state.hf = HuggingFace(transport=pulls.transport, ram_gb=models.ram_gb)
                 checks = CheckManager(
                     router,
                     scores,
@@ -554,6 +556,9 @@ class DaemonApp:
             if self.state.pulls is not None:
                 await self.state.pulls.aclose()
             self.state.pulls = None
+            if self.state.hf is not None:
+                await self.state.hf.aclose()
+            self.state.hf = None
             if self.state.models is not None:
                 await self.state.models.aclose()
             self.state.models = None

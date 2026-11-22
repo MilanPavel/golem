@@ -54,6 +54,7 @@ from golem.models.bench import NoLocalModel
 from golem.models.check import CheckError
 from golem.models.discovery import KeyRejected, KeyUnchecked
 from golem.models.errors import ModelUnreachable
+from golem.models.huggingface import HuggingFace, HuggingFaceError
 from golem.models.install import InstallError, OllamaInstaller
 from golem.models.keys import KeyStore, KeyStoreError, MemoryKeyStore
 from golem.models.pulls import PullError, PullManager
@@ -269,6 +270,12 @@ from golem_protocol.commands import (
     HelloResult,
     HelperStopParams,
     HelperStopResult,
+    HfFilesParams,
+    HfFilesResult,
+    HfRepo,
+    HfSearchParams,
+    HfSearchResult,
+    HfSize,
     InspectMessage,
     ListedModel,
     ListedProvider,
@@ -1958,6 +1965,29 @@ async def _model_bench(ctx: RequestContext, params: ModelBenchParams) -> ModelBe
     return ModelBenchResult(ref=ref, started=started)
 
 
+def _hf(ctx: RequestContext) -> HuggingFace:
+    hf = ctx.state.hf
+    if hf is None:
+        raise RpcCallError(INTERNAL_ERROR, "Hugging Face search is not ready")
+    return hf
+
+
+async def _hf_search(ctx: RequestContext, params: HfSearchParams) -> HfSearchResult:
+    try:
+        repos = await _hf(ctx).search(params.query, params.limit)
+    except HuggingFaceError as exc:
+        raise RpcCallError(MODEL_PULL_FAILED, str(exc)) from exc
+    return HfSearchResult(repos=[HfRepo(**repo) for repo in repos])
+
+
+async def _hf_files(ctx: RequestContext, params: HfFilesParams) -> HfFilesResult:
+    try:
+        sizes = await _hf(ctx).sizes(params.repo)
+    except HuggingFaceError as exc:
+        raise RpcCallError(MODEL_PULL_FAILED, str(exc)) from exc
+    return HfFilesResult(repo=params.repo, sizes=[HfSize(**size) for size in sizes])
+
+
 async def _model_pull(ctx: RequestContext, params: ModelPullParams) -> ModelPullResult:
     try:
         ref, started = await _pulls(ctx).start(params.name)
@@ -2222,6 +2252,8 @@ def standard_methods() -> dict[str, Method]:
         "model.probe": Method("model.probe", ModelProbeParams, True, _model_probe),
         "model.bench": Method("model.bench", ModelBenchParams, True, _model_bench),
         "model.check": Method("model.check", ModelCheckParams, True, _model_check),
+        "hf.search": Method("hf.search", HfSearchParams, True, _hf_search),
+        "hf.files": Method("hf.files", HfFilesParams, True, _hf_files),
         "model.pull": Method("model.pull", ModelPullParams, True, _model_pull),
         "model.pull_cancel": Method(
             "model.pull_cancel", ModelPullCancelParams, True, _model_pull_cancel

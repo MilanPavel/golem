@@ -19,6 +19,7 @@ from golem.models.bench_manager import BenchManager
 from golem.models.check import CheckManager
 from golem.models.discovery import ModelDiscovery
 from golem.models.facts import FactsSource
+from golem.models.huggingface import HuggingFace
 from golem.models.install import BrewInstaller, OllamaInstaller
 from golem.models.ollama import LocalServers
 from golem.models.pulls import PullManager
@@ -63,6 +64,7 @@ class DaemonState:
     models: ModelDiscovery | None = None
     facts: FactsSource | None = None
     pulls: PullManager | None = None
+    hf: HuggingFace | None = None
     checks: CheckManager | None = None
     benches: BenchManager | None = None
     policy: Policy | None = None
