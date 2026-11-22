@@ -608,6 +608,28 @@ DEFAULT_MAX_PER_BATCH = 3
 is set."""
 
 
+class DelegateSettings(BaseModel):
+    """``[agents.delegate]``. When a helper is worth starting (ADR-059, section 2).
+
+    Every threshold is a share of the lead's window or a price ratio, never a token count, so
+    one setting fits a 32K local model and a 1M cloud one. The defaults are a first guess: the
+    eval of step 15.4 (#1212) tunes them.
+
+    ``read_share``: a job that reads this share of the window crowds out the task. ``fill_share``:
+    the share of the window the chat would reach with the reading added; past it the reading does
+    not fit. ``job_share``: the least a job reads, as a share of the window, to be worth its own
+    helper (reasons 2 and 3). ``price_ratio``: how many times dearer the lead must be than the
+    helper's model before a large read moves there.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    read_share: float = Field(default=0.3, gt=0, le=1)
+    fill_share: float = Field(default=0.85, gt=0, le=1)
+    job_share: float = Field(default=0.1, gt=0, le=1)
+    price_ratio: float = Field(default=3.0, gt=1)
+
+
 class AgentSettings(BaseModel):
     """``[agents]``. Limits for every helper, one table for each bundled type, and where files are.
 
@@ -640,6 +662,7 @@ class AgentSettings(BaseModel):
     max_per_batch: int | None = Field(default=None, ge=1, le=20)
     per_message_cost: float = Field(default=1.0, ge=0)
     estimate_over: float = Field(default=0.25, ge=0)
+    delegate: DelegateSettings = Field(default_factory=DelegateSettings)
     explorer: ExplorerSettings = Field(default_factory=ExplorerSettings)
     worker: AgentModelSettings = Field(default_factory=AgentModelSettings)
     reviewer: AgentModelSettings = Field(default_factory=AgentModelSettings)
