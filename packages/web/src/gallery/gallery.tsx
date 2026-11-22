@@ -1,4 +1,4 @@
-import { signInLine, type SignInLine, checksSummary, COMMANDS, mcpStatusWord, noPastes, pickerGroups, withModelChoices, withSkillChoices, type CheckRun, type ChecksState, type ReviewNote, type TodoItem, type TurnChecks, type TurnCard, type ChatMessage, type ChatState, type RewindPlan, ladderRows, NO_LOCAL_WINDOW, routeRows, spendRows, contextActions, bestActions, windowSourceOf, helperBanner, helperReceipt, type ContextActionsInput, type PermissionMode } from "@golem/view";
+import { agentRow, signInLine, type SignInLine, checksSummary, COMMANDS, mcpStatusWord, noPastes, pickerGroups, withModelChoices, withSkillChoices, type CheckRun, type ChecksState, type ReviewNote, type TodoItem, type TurnChecks, type TurnCard, type ChatMessage, type ChatState, type RewindPlan, ladderRows, NO_LOCAL_WINDOW, routeRows, spendRows, contextActions, bestActions, windowSourceOf, helperBanner, helperReceipt, type ContextActionsInput, type PermissionMode } from "@golem/view";
 import type { ListedModel } from "@golem/client";
 import { createContext, useContext, useEffect, useId, useState, type ReactNode } from "react";
 import { Badge } from "../ui/badge.tsx";
@@ -67,8 +67,9 @@ import { MemoryView } from "../features/settings/memory/memory-view.tsx";
 import { SAMPLE_MEMORIES, SAMPLE_MEMORY_COUNTS, SAMPLE_MEMORY_SETTINGS } from "../features/settings/memory/sample.ts";
 import { MEMORY_OFF_TEXT } from "../store/memory.ts";
 import { FinishedHelpers } from "../features/settings/agents-keep.tsx";
+import { LimitsBlock } from "../features/settings/agents-limits.tsx";
 import { AgentsPage } from "../features/settings/agents-section.tsx";
-import { SAMPLE_AGENTS, SAMPLE_COPY, WISH_AGENTS_CLOUD, WISH_AGENTS_LOCAL, WISH_AGENTS_MIXED } from "../features/settings/agents-sample.ts";
+import { SAMPLE_AGENTS, SAMPLE_CONFIG_LIMITS, SAMPLE_COPY, WISH_AGENTS_CLOUD, WISH_AGENTS_LOCAL, WISH_AGENTS_MIXED } from "../features/settings/agents-sample.ts";
 import { SkillList } from "../features/settings/skills-section.tsx";
 import { SkillOverview } from "../features/settings/skills/skill-detail.tsx";
 import { SAMPLE_BROKEN_SKILL_MD, SAMPLE_SKILLS } from "../features/settings/skills/sample.ts";
@@ -1644,18 +1645,53 @@ function AgentsDemo() {
         [
           ["Finished helpers, the defaults", { keep_days: 7, keep_problem_days: 30 }, {}],
           ["Finished helpers, for ever", { keep_days: 0, keep_problem_days: 0 }, {}],
-          ["Finished helpers, a value the config refused", { keep_days: 7, keep_problem_days: 30 }, { "agents.keep_days": "Input should be greater than or equal to 0" }],
+          ["Finished helpers, a value the config refused", { keep_days: 7, keep_problem_days: 30 }, { "agents.keep_days": "Input should be greater than or equal to 0" }, "mixed"],
         ] as const
-      ).map(([title, values, errors]) => (
+      ).map(([title, values, errors, setup]) => (
         <section key={title} aria-label={title} className="flex flex-col gap-3 rounded-lg border border-line bg-bg p-4">
           <span className="font-mono text-xs text-faint">{title}</span>
-          <FinishedHelpers values={values} errors={errors} failure={null} onSave={() => {}} />
+          <FinishedHelpers values={values} errors={errors} failure={null} onSave={() => {}} setup={setup} onSaveLimit={() => {}} />
         </section>
       ))}
       <section aria-label="Agents, empty" className="flex flex-col gap-3 rounded-lg border border-line bg-bg p-4">
         <span className="font-mono text-xs text-faint">Empty</span>
         <AgentsPage agents={[]} />
       </section>
+    </div>
+  );
+}
+
+/** Settings → Agents, the limits: the Limits block of one agent in its states, and the limits for every helper. */
+function AgentLimitsDemo() {
+  return (
+    <div className="flex flex-col gap-4">
+      {(
+        [
+          ["Limits, read", "The Limits block: five facts, and a quiet note under a value that config.toml sets", SAMPLE_CONFIG_LIMITS, undefined],
+          ["Limits, editing", "Edit: tool calls, working time, cost and tokens as boxes, with Save and Cancel", SAMPLE_AGENTS.find((agent) => agent.name === "triage"), "limits"],
+          ["Limits, an error", "A refusal from the daemon is a line in the form, and what was typed stays", SAMPLE_AGENTS.find((agent) => agent.name === "triage"), "limits-error"],
+          ["Limits, a project agent", "A project agent has no Edit, only a note", SAMPLE_AGENTS.find((agent) => agent.origin === "project" && agent.trusted !== false), undefined],
+        ] as const
+      ).map(([title, caption, agent, demo]) =>
+        agent === undefined ? null : (
+          <section key={title} aria-label={title} className="flex flex-col gap-3 rounded-lg border border-line bg-bg p-4">
+            <span className="font-mono text-xs text-faint">{caption}</span>
+            <LimitsBlock row={agentRow(agent)} demo={demo} onSetLimits={async () => {}} />
+          </section>
+        ),
+      )}
+      {(
+        [
+          ["Limits for every helper, set", { keep_days: 7, keep_problem_days: 30, max_calls: 20, working_seconds: 600, max_cost: 1.5, max_tokens: null }, {}, "mixed"],
+          ["Limits for every helper, cloud only: cost first", { keep_days: 7, keep_problem_days: 30, max_cost: 1.5 }, {}, "cloud"],
+          ["Limits for every helper, a wrong value", { keep_days: 7, keep_problem_days: 30 }, { "agents.max_calls": "Enter a whole number, 1 or more." }, "mixed"],
+        ] as const
+      ).map(([title, values, errors, setup]) => (
+        <section key={title} aria-label={title} className="flex flex-col gap-3 rounded-lg border border-line bg-bg p-4">
+          <span className="font-mono text-xs text-faint">{title}</span>
+          <FinishedHelpers values={values} errors={errors} failure={null} onSave={() => {}} setup={setup} onSaveLimit={() => {}} />
+        </section>
+      ))}
     </div>
   );
 }
@@ -2212,6 +2248,11 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
       <section className="mt-6" id={anchor("Agents")}>
         <h3 className="mb-2 font-mono text-xs text-faint">Agents</h3>
         <AgentsDemo />
+      </section>
+
+      <section className="mt-6" id={anchor("Agent limits")}>
+        <h3 className="mb-2 font-mono text-xs text-faint">Agent limits</h3>
+        <AgentLimitsDemo />
       </section>
 
       <section className="mt-6" id={anchor("Memory")}>

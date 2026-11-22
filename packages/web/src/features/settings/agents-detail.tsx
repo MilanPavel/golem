@@ -1,4 +1,4 @@
-import { definitionLines, definitionNote, deleteQuestion, replacesLine, type AgentRow } from "@golem/view";
+import { definitionLines, definitionNote, deleteQuestion, replacesLine, type AgentRow, type WishSetup } from "@golem/view";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { writeClipboard } from "../../ui/clipboard.ts";
 import { Button } from "../../ui/button.tsx";
@@ -7,6 +7,7 @@ import { Code } from "../../ui/code.tsx";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../ui/tabs.tsx";
 import { AgentEditor } from "./agents-editor.tsx";
 import type { AgentControls, AgentTab } from "./agents-editing.ts";
+import { LimitsBlock, type LimitsDemo, type SetLimits } from "./agents-limits.tsx";
 import { ModelControl } from "./agents-model.tsx";
 
 const NO_FILE = "The daemon did not send this file. Update golem to read it here.";
@@ -56,7 +57,7 @@ function CanUse({ row }: { row: AgentRow }) {
 }
 
 /** The Overview: model, tools, limits, the prompt and how much the agent was used. */
-export function AgentOverview({ row, onSetWish }: { row: AgentRow; onSetWish: ((name: string, wish: string) => Promise<void>) | undefined }) {
+export function AgentOverview({ row, onSetWish, setup, onSetLimits, demo }: { row: AgentRow; onSetWish: ((name: string, wish: string) => Promise<void>) | undefined; setup?: WishSetup; onSetLimits?: SetLimits; demo?: LimitsDemo }) {
   return (
     <div className="flex flex-col gap-3">
       <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
@@ -68,17 +69,7 @@ export function AgentOverview({ row, onSetWish }: { row: AgentRow; onSetWish: ((
           <CanUse row={row} />
         </Fact>
         <Fact title="Limits" setting="limits">
-          <dl className="grid grid-cols-3 gap-2">
-            {row.limits.map((limit) => (
-              <div key={limit.label}>
-                <dd>
-                  <Code>{limit.value}</Code>
-                </dd>
-                <dt className="text-meta text-muted">{limit.label}</dt>
-              </div>
-            ))}
-          </dl>
-          <p className="text-meta text-muted">{row.asksLine}</p>
+          <LimitsBlock row={row} setup={setup} onSetLimits={onSetLimits} demo={demo} />
         </Fact>
         <Fact title="Prompt" setting="prompt" className="xl:col-span-2">
           {row.prompt === null ? <p className="text-sm text-muted">{NO_FILE}</p> : <p className="font-prose text-body leading-relaxed whitespace-pre-wrap text-ink-soft wrap-anywhere">{row.prompt}</p>}
@@ -235,10 +226,17 @@ export function AgentDetail({
   onSetWish,
   controls,
   showName = true,
+  setup,
+  onSetLimits,
+  demo,
 }: {
   row: AgentRow;
   onSetWish: ((name: string, wish: string) => Promise<void>) | undefined;
   controls: AgentControls;
+  setup?: WishSetup;
+  onSetLimits?: SetLimits;
+  /** The gallery's seeded Limits state. */
+  demo?: LimitsDemo;
   /** False in a narrow row, where the row above already says the name. */
   showName?: boolean;
 }) {
@@ -275,7 +273,7 @@ export function AgentDetail({
           <TabsTrigger value="definition">Definition</TabsTrigger>
         </TabsList>
         <TabsContent value="overview">
-          <AgentOverview row={row} onSetWish={onSetWish} />
+          <AgentOverview row={row} onSetWish={onSetWish} setup={setup} onSetLimits={onSetLimits} demo={demo} />
         </TabsContent>
         <TabsContent value="definition">
           <AgentDefinition row={row} controls={controls} />

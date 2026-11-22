@@ -161,3 +161,10 @@ export const WISH_AGENTS_MIXED: AgentInfo[] = types(
   },
   { triage: "local" },
 );
+
+/** The bundled explorer with two limits that `config.toml` sets: the Limits block says so under them. */
+export const SAMPLE_CONFIG_LIMITS: AgentInfo = {
+  ...SAMPLE_AGENTS.find((agent) => agent.name === "explorer")!,
+  limits: { max_calls: 25, max_seconds: 600, max_cost_usd: 0.5, answer_chars: 6000 },
+  limits_from_config: ["max_calls", "max_cost_usd"],
+};

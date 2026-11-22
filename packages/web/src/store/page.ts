@@ -1,4 +1,4 @@
-import { OLLAMA_FAILED, RpcError, type ApprovalChoice, type ConfigGetResult, type ConfigRawGetResult, type ConfigRawResult, type FsListDirsResult, type GitBranchesResult, type GitInfoResult, type FsChooseFolderResult, type McpAddParams, type McpCallResult, type McpImportApplyParams, type McpImportApplyResult, type McpImportScanResult, type McpCatalogResult, type McpListResult, type McpLogsResult, type McpServerConfig, type McpServerDetail, type McpServerLog, type McpLoginDone, type McpTestProgress, type McpTestResult, type GolemClient, type RuntimeName, type SetupStatusResult, type SkillListResult, type AgentsListResult, type AgentsSaveResult, type AgentsDeleteResult, type TraceGetResult, type TraceSpanResult, type ArtifactReadResult, type ChangesDiffResult, type ChangesDiffTarget, type ChangesListResult, type ChangesRevertResult, type ChangesRevertTarget, type ChangesCommitResult, type ChangesCommitInfoResult, type ChangesSuggestMessageResult, type ModelOptionsGetResult, type ModelOptionsSetResult, type SessionSetOptionsResult, type SkillCreateResult, type SkillReadResult, type SkillWriteResult, type AuthListResult, type FileListResult, type FileReadResult, type CostGetResult, type SessionCompactResult, type ConsentChoice, type RoutingGetResult, type RoutingSetParams, type RoutingSetResult, type NotificationsValues, type NotificationsSetParams, type NotificationsSetResult, type NotifyTestResult, type ChatSetParams, type ChatSetResult, type ChatValues, type ChatPromptResult, type ChatDraftResult } from "@golem/client";
+import { OLLAMA_FAILED, RpcError, type ApprovalChoice, type ConfigGetResult, type ConfigRawGetResult, type ConfigRawResult, type FsListDirsResult, type GitBranchesResult, type GitInfoResult, type FsChooseFolderResult, type McpAddParams, type McpCallResult, type McpImportApplyParams, type McpImportApplyResult, type McpImportScanResult, type McpCatalogResult, type McpListResult, type McpLogsResult, type McpServerConfig, type McpServerDetail, type McpServerLog, type McpLoginDone, type McpTestProgress, type McpTestResult, type GolemClient, type RuntimeName, type SetupStatusResult, type SkillListResult, type AgentsListResult, type AgentsSaveResult, type AgentsDeleteResult, type TraceGetResult, type TraceSpanResult, type ArtifactReadResult, type ChangesDiffResult, type ChangesDiffTarget, type ChangesListResult, type ChangesRevertResult, type ChangesRevertTarget, type ChangesCommitResult, type ChangesCommitInfoResult, type ChangesSuggestMessageResult, type ModelOptionsGetResult, type ModelOptionsSetResult, type SessionSetOptionsResult, type SkillCreateResult, type SkillReadResult, type SkillWriteResult, type AuthListResult, type FileListResult, type FileReadResult, type CostGetResult, type SessionCompactResult, type ConsentChoice, type RoutingGetResult, type RoutingSetParams, type RoutingSetResult, type NotificationsValues, type NotificationsSetParams, type NotificationsSetResult, type NotifyTestResult, type ChatSetParams, type ChatSetResult, type ChatValues, type ChatPromptResult, type ChatDraftResult, type AgentLimitsChange } from "@golem/client";
 import { changeToolFilter, installEventOf, type InstallEvent, type PermissionMode, type CompactAction, type RouteMode } from "@golem/view";
 import type { QueryClient } from "@tanstack/react-query";
 import { createDrafts, type Drafts } from "./drafts.ts";
@@ -38,6 +38,8 @@ export type PageClient = Pick<
   | "onAgentsChanged"
   | "listAgents"
   | "setAgentWish"
+  | "setAgentLimits"
+  | "setDefaultAgentLimits"
   | "saveAgent"
   | "copyAgent"
   | "deleteAgent"
@@ -204,6 +206,11 @@ export type PageActions = {
   createSkill(params: { name: string; description: string; scope: "user" | "project"; cwd: string | null; modelInvocable: boolean }): Promise<SkillCreateResult>;
   /** Sets the model wish of an agent type in the folder's list. Resolves to the type as it is now, and puts it in the list the page holds. */
   setAgentWish(name: string, wish: string, cwd: string | null): Promise<AgentInfo>;
+  /**
+   * Sets and clears limits of the helpers of an agent type (`agents.set_limits`). Resolves to the type as it is now
+   * and puts it in the list the page holds. A wrong value rejects with the daemon's words, and nothing is written.
+   */
+  setAgentLimits(name: string, change: AgentLimitsChange, cwd: string | null): Promise<AgentInfo>;
   /** Saves the text of an agent file: `name` is the agent being edited (it may be renamed), none for a new one. A refused text is in the result (`ok: false`). The list is read again. */
   saveAgent(text: string, name: string | null, cwd: string | null): Promise<AgentsSaveResult>;
   /** Copies a bundled agent to your own. Resolves to the copy; the list is read again. */
@@ -279,6 +286,11 @@ export type PageActions = {
    * for ever). A refusal is in the result (`ok: false`), not a rejection, and nothing is written then.
    */
   setAgentsKeep(change: { keep_days?: number; keep_problem_days?: number }): Promise<AgentsKeepResult>;
+  /**
+   * Sets and clears the limits of `[agents]` that bound every helper (`agents.set_default_limits`). A refusal is in
+   * the result (`ok: false`). The agents are read again, since what a type runs with may change.
+   */
+  setDefaultAgentLimits(change: AgentLimitsChange): Promise<AgentsKeepResult>;
   /** Posts a sample notification (`notify.test`). `posted` is false when nothing could be shown. */
   notifyTest(): Promise<NotifyTestResult>;
   /** A local model's tunable options with its defaults, what is saved for it, and the session's overrides. */
@@ -661,6 +673,13 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
         );
         return updated;
       },
+      async setAgentLimits(name, change, cwd) {
+        const updated = cwd === null ? await client.setAgentLimits(name, change) : await client.setAgentLimits(name, change, cwd);
+        queryClient.setQueryData<AgentsListed>(["agents.list", cwd], (list) =>
+          list === undefined ? list : { ...list, agents: list.agents.map((agent) => (agent.name === name && agent.origin === updated.origin ? updated : agent)) },
+        );
+        return updated;
+      },
       async saveAgent(text, name, cwd) {
         const result = await client.saveAgent(text, name ?? undefined, cwd ?? undefined);
         if (result.ok) await queryClient.invalidateQueries({ queryKey: ["agents.list"] });
@@ -974,6 +993,14 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
       async setAgentsKeep(change) {
         const result = await client.agentsKeep(change);
         if (result.ok) await queryClient.invalidateQueries({ queryKey: AGENTS_KEEP_KEY });
+        return result;
+      },
+      async setDefaultAgentLimits(change) {
+        const result = await client.setDefaultAgentLimits(change);
+        if (result.ok) {
+          await queryClient.invalidateQueries({ queryKey: AGENTS_KEEP_KEY });
+          await queryClient.invalidateQueries({ queryKey: ["agents.list"] });
+        }
         return result;
       },
       notifyTest: () => client.notifyTest(),

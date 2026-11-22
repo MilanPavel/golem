@@ -26,7 +26,7 @@ export interface AgentCallbacks {
 }
 
 /** A state to start in, for the gallery and the tests. */
-export type AgentsDemo = "new" | "edit" | "refused" | "delete";
+export type AgentsDemo = "new" | "edit" | "refused" | "delete" | "limits" | "limits-error";
 
 /** What the detail of one agent needs to show and run its actions. */
 export interface AgentControls {

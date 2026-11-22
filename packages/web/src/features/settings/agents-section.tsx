@@ -11,6 +11,7 @@ import { FinishedHelpersSection } from "./agents-keep.tsx";
 import { AgentDetail, NotYetMark, OriginMark } from "./agents-detail.tsx";
 import { NewAgentDetail } from "./agents-editor.tsx";
 import { useAgentEditing, type AgentCallbacks, type AgentControls, type AgentsDemo, type Draft } from "./agents-editing.ts";
+import type { SetLimits } from "./agents-limits.tsx";
 import { TierDot } from "./agents-model.tsx";
 import { useSettingsFolder } from "./context.ts";
 
@@ -117,6 +118,9 @@ function AgentRows({
   register,
   onToggle,
   onSetWish,
+  setup,
+  onSetLimits,
+  demo,
 }: {
   rows: readonly AgentRow[];
   open: string | null;
@@ -126,6 +130,9 @@ function AgentRows({
   register: Register;
   onToggle: (key: string) => void;
   onSetWish: SetWish;
+  setup: WishSetup;
+  onSetLimits: SetLimits | undefined;
+  demo: AgentsDemo | undefined;
 }) {
   const id = useId();
   return (
@@ -148,7 +155,7 @@ function AgentRows({
             </button>
             {expanded ? (
               <div id={panel} role="group" aria-label={`${row.name} details`} className="border-t border-line px-3 py-3">
-                <AgentDetail row={row} onSetWish={onSetWish} controls={controls} showName={false} />
+                <AgentDetail row={row} onSetWish={onSetWish} controls={controls} showName={false} setup={setup} onSetLimits={onSetLimits} demo={demo === "limits" || demo === "limits-error" ? demo : undefined} />
               </div>
             ) : null}
           </li>
@@ -178,6 +185,7 @@ export function AgentsPage({
   setup = "mixed",
   models = [],
   onSetWish,
+  onSetLimits,
   onSave,
   onCopy,
   onDelete,
@@ -194,6 +202,8 @@ export function AgentsPage({
   setup?: WishSetup;
   /** Saves a wish. Without it the wish is text. A rejection is shown under the dropdown. */
   onSetWish?: (name: string, wish: string) => Promise<void>;
+  /** Saves the limits of a type (see `setAgentLimits`). Without it the limits are text. A rejection is shown in the form. */
+  onSetLimits?: SetLimits;
   /** One column, rows that open in place. */
   narrow?: boolean;
   /** Start in an editing state, for the gallery and the tests: a new agent, the editor, a refused save, or the delete question. */
@@ -269,6 +279,9 @@ export function AgentsPage({
             });
           }}
           onSetWish={onSetWish}
+          setup={setup}
+          onSetLimits={onSetLimits}
+          demo={demo}
         />
         {notes}
       </div>
@@ -284,7 +297,7 @@ export function AgentsPage({
         </div>
         <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto px-6 py-5">
           {creating && draft !== null ? <NewAgentDetail draft={draft} controls={controls} /> : null}
-          {!creating && shown !== undefined ? <AgentDetail key={keyOf(shown)} row={shown} onSetWish={onSetWish} controls={controls} /> : null}
+          {!creating && shown !== undefined ? <AgentDetail key={keyOf(shown)} row={shown} onSetWish={onSetWish} controls={controls} setup={setup} onSetLimits={onSetLimits} demo={demo === "limits" || demo === "limits-error" ? demo : undefined} /> : null}
         </div>
       </div>
       {notes}
@@ -323,11 +336,14 @@ export function AgentsSection() {
         onSetWish={async (name, wish) => {
           await actions.setAgentWish(name, wish, folder);
         }}
+        onSetLimits={async (name, change) => {
+          await actions.setAgentLimits(name, change, folder);
+        }}
         onSave={(text, name) => actions.saveAgent(text, name, folder)}
         onCopy={(name) => actions.copyAgent(name, folder)}
         onDelete={(name) => actions.deleteAgent(name, folder)}
       />
-      <FinishedHelpersSection />
+      <FinishedHelpersSection setup={wishSetup(models)} />
     </div>
   );
 }

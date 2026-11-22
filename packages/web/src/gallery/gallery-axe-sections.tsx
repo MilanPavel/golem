@@ -27,6 +27,7 @@ export const GALLERY_SECTIONS = [
   "mcp-servers",
   "skills",
   "agents",
+  "agent-limits",
   "memory",
   "settings-chat",
   "api-keys",
@@ -97,7 +98,7 @@ export function sectionAxeTests(theme: "slip" | "kiln"): void {
       expect(section, id).toBeTruthy();
       // The trace demos repeat the same "Context window" landmark, and the welcome cases the same "Keep golem
       // one click away" one, and the two import demos the same app names, and the three Finished helpers demos the same block, so unique landmark names are not checked in those.
-      const rules = id === "trace" || id === "dock" || id === "routing" || id === "settings-context" || id === "workbench" || id === "helper-panel" || id === "helper-banner-receipt" || id === "welcome-page" || id === "mcp-servers" || id === "agents" ? { ...DIALOG_RULES, "landmark-unique": { enabled: false } } : DIALOG_RULES;
+      const rules = id === "trace" || id === "dock" || id === "routing" || id === "settings-context" || id === "workbench" || id === "helper-panel" || id === "helper-banner-receipt" || id === "welcome-page" || id === "mcp-servers" || id === "agents" || id === "agent-limits" ? { ...DIALOG_RULES, "landmark-unique": { enabled: false } } : DIALOG_RULES;
       await expectAxeClean(section as Element, rules);
     });
   }
