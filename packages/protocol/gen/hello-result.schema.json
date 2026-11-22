@@ -6,6 +6,11 @@
       "title": "Daemon Version",
       "type": "string"
     },
+    "local_ui": {
+      "default": false,
+      "title": "Local Ui",
+      "type": "boolean"
+    },
     "protocol_major": {
       "title": "Protocol Major",
       "type": "integer"

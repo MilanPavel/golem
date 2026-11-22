@@ -2,16 +2,27 @@
 
 from __future__ import annotations
 
+import asyncio
 import os
 import re
 from pathlib import Path
+from types import SimpleNamespace
 from typing import cast
 
 import pytest
+from test_devices import new_key
 from test_server import HELLO, RpcClient, error_code, rpc_result, start_daemon, stop_daemon
 
-from golem.folders import MAX_ENTRIES, FolderError, list_dirs
-from golem.server.dispatcher import INVALID_PARAMS
+from golem.folders import (
+    MAX_ENTRIES,
+    DialogBusyError,
+    DialogUnsupportedError,
+    FolderError,
+    choose_folder,
+    list_dirs,
+)
+from golem.secrets import MemorySecrets
+from golem.server.dispatcher import INVALID_PARAMS, NOT_LOCAL, UNSUPPORTED
 
 
 @pytest.fixture
@@ -224,4 +235,120 @@ async def test_a_session_folder_that_does_not_exist_is_refused(
             assert error_code(await client.call(method, {"cwd": missing})) == INVALID_PARAMS
     finally:
         await client.close()
+        await stop_daemon(app, task)
+
+
+# --- fs.choose_folder: the macOS dialog is always stubbed ---
+
+
+def _as_platform(monkeypatch: pytest.MonkeyPatch, platform: str) -> None:
+    monkeypatch.setattr("golem.folders.sys", SimpleNamespace(platform=platform))
+
+
+def _stub_dialog(monkeypatch: pytest.MonkeyPatch, reply: tuple[int, str, str]) -> list[str]:
+    starts: list[str] = []
+
+    async def fake(start: str) -> tuple[int, str, str]:
+        starts.append(start)
+        return reply
+
+    monkeypatch.setattr("golem.folders._run_osascript", fake)
+    return starts
+
+
+async def test_a_chosen_folder_comes_back_without_a_trailing_slash(
+    home: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _as_platform(monkeypatch, "darwin")
+    starts = _stub_dialog(monkeypatch, (0, "/Users/me/code/golem/\n", ""))
+    (home / "code").mkdir()
+    assert await choose_folder(home / "code", home) == "/Users/me/code/golem"
+    assert await choose_folder(home / "nowhere", home) == "/Users/me/code/golem"
+    assert await choose_folder(None, home) == "/Users/me/code/golem"
+    assert starts == [str(home / "code"), str(home), str(home)]
+
+
+async def test_cancel_is_null_and_other_failures_are_errors(
+    home: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _as_platform(monkeypatch, "darwin")
+    _stub_dialog(monkeypatch, (1, "", "execution error: User canceled. (-128)"))
+    assert await choose_folder(None, home) is None
+    _stub_dialog(monkeypatch, (1, "", "execution error: boom (-1)"))
+    with pytest.raises(FolderError):
+        await choose_folder(None, home)
+
+
+async def test_a_dialog_left_open_too_long_counts_as_cancelled(
+    home: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _as_platform(monkeypatch, "darwin")
+
+    async def slow(start: str) -> tuple[int, str, str]:
+        raise TimeoutError
+
+    monkeypatch.setattr("golem.folders._run_osascript", slow)
+    assert await choose_folder(None, home) is None
+
+
+async def test_off_macos_the_dialog_is_unsupported(
+    home: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _as_platform(monkeypatch, "linux")
+    starts = _stub_dialog(monkeypatch, (0, "/x\n", ""))
+    with pytest.raises(DialogUnsupportedError):
+        await choose_folder(None, home)
+    assert starts == []
+
+
+async def test_a_second_dialog_while_one_is_open_is_busy(
+    home: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _as_platform(monkeypatch, "darwin")
+    release = asyncio.Event()
+
+    async def held(start: str) -> tuple[int, str, str]:
+        await release.wait()
+        return 0, "/a/b\n", ""
+
+    monkeypatch.setattr("golem.folders._run_osascript", held)
+    first = asyncio.create_task(choose_folder(None, home))
+    await asyncio.sleep(0)
+    with pytest.raises(DialogBusyError):
+        await choose_folder(None, home)
+    release.set()
+    assert await first == "/a/b"
+    assert await choose_folder(None, home) == "/a/b"
+
+
+async def test_the_method_serves_this_mac_and_refuses_a_phone(
+    short_home: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _as_platform(monkeypatch, "darwin")
+    _stub_dialog(monkeypatch, (0, "/Users/me/code\n", ""))
+    app, task = await start_daemon(short_home, secrets=MemorySecrets())
+    local = await RpcClient.connect(app.paths.socket_path)
+    phone = await RpcClient.connect(app.paths.socket_path)
+    try:
+        assert rpc_result(await local.call("hello", HELLO))["local_ui"] is True
+        picked = rpc_result(await local.call("fs.choose_folder", {"start": None}))
+        assert picked == {"path": "/Users/me/code"}
+        relative = await local.call("fs.choose_folder", {"start": "relative"})
+        assert error_code(relative) == INVALID_PARAMS
+
+        devices = app.state.devices
+        assert devices is not None
+        device = await devices.add(new_key(), "iPhone", "2026-11-22T10:00:00+01:00")
+        rpc_result(await phone.call("connection.identify", {"device": device.id}))
+        assert rpc_result(await phone.call("hello", HELLO))["local_ui"] is False
+        refused = await phone.call("fs.choose_folder", {})
+        assert error_code(refused) == NOT_LOCAL
+        assert refused["error"]["data"] == {"reason": "not_local"}  # type: ignore[index]
+
+        _as_platform(monkeypatch, "linux")
+        unsupported = await local.call("fs.choose_folder", {})
+        assert error_code(unsupported) == UNSUPPORTED
+    finally:
+        await local.close()
+        await phone.close()
         await stop_daemon(app, task)

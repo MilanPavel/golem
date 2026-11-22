@@ -1,0 +1,21 @@
+{
+  "additionalProperties": false,
+  "description": "``fs.choose_folder``. Opens the macOS folder dialog on the daemon's Mac.\n\n``start`` is the folder the dialog opens in. Null opens it in the home folder, and so\ndoes a path that is not a folder. The call waits up to 5 minutes for an answer. It is\nrefused with ``not_local`` when the caller is not a page on this Mac, with\n``unsupported`` when the platform is not macOS, and with ``busy`` while another dialog\nis open (see ``HelloResult.local_ui``).",
+  "properties": {
+    "start": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Start"
+    }
+  },
+  "title": "FsChooseFolderParams",
+  "type": "object"
+}

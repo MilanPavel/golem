@@ -41,6 +41,12 @@ OLLAMA_FAILED = -32016
 BUDGET_SPENT = -32017
 LOCAL_ONLY = -32018
 DEVICE_REFUSED = -32021
+NOT_LOCAL = -32022
+"""``fs.choose_folder`` from a page that is not on the daemon's Mac."""
+UNSUPPORTED = -32023
+"""``fs.choose_folder`` on a platform with no folder dialog."""
+BUSY = -32024
+"""``fs.choose_folder`` while another folder dialog is open."""
 """An unknown or revoked device: ``connection.identify``, or any call on its connection."""
 
 DRAIN_TIMEOUT_SECONDS = 5.0

@@ -7,11 +7,16 @@ the sandbox. No file name, size, time, or content is ever returned.
 
 from __future__ import annotations
 
+import asyncio
+import logging
 import os
+import sys
 from pathlib import Path
 
 from golem.tools.sandbox import SECRET_DIRS
 from golem_protocol.commands import DirEntry, FsListDirsResult
+
+log = logging.getLogger("golem.folders")
 
 MAX_ENTRIES = 500
 """One call stays small: a longer list is cut, and ``truncated`` says so."""
@@ -84,3 +89,89 @@ def list_dirs(path: Path | None, home: Path) -> FsListDirsResult:
         entries=entries[:MAX_ENTRIES],
         truncated=len(entries) > MAX_ENTRIES,
     )
+
+
+DIALOG_SECONDS = 300.0
+"""How long the folder dialog may stay open before golem closes it."""
+
+_SCRIPT = (
+    "on run argv",
+    "set start to item 1 of argv",
+    "set picked to choose folder with prompt (item 2 of argv) default location (POSIX file start)",
+    "return POSIX path of picked",
+    "end run",
+)
+_PROMPT = "Choose a folder for golem"
+_CANCELLED = "-128"
+
+_dialog_open = False
+
+
+class DialogUnsupportedError(FolderError):
+    """The platform has no folder dialog."""
+
+
+class DialogBusyError(FolderError):
+    """Another folder dialog is already open."""
+
+
+def dialog_supported() -> bool:
+    """Whether this platform can show the folder dialog (macOS only)."""
+    return sys.platform == "darwin"
+
+
+async def _run_osascript(start: str) -> tuple[int, str, str]:
+    """Run the dialog and wait for it. The start folder and the prompt are script arguments."""
+    args = ["osascript"]
+    for line in _SCRIPT:
+        args += ["-e", line]
+    args += ["--", start, _PROMPT]
+    process = await asyncio.create_subprocess_exec(
+        *args,
+        stdin=asyncio.subprocess.DEVNULL,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+    try:
+        async with asyncio.timeout(DIALOG_SECONDS):
+            out, err = await process.communicate()
+    except BaseException:
+        process.kill()
+        await process.wait()
+        raise
+    return process.returncode or 0, out.decode(errors="replace"), err.decode(errors="replace")
+
+
+async def choose_folder(start: Path | None, home: Path) -> str | None:
+    """Open the macOS folder dialog and return the folder chosen, or None when it is cancelled.
+
+    The dialog opens in ``start`` when that is a folder, else in ``home``. The path has no
+    trailing slash. Raises :class:`DialogUnsupportedError` off macOS and
+    :class:`DialogBusyError` while another dialog is open. A dialog left open for
+    :data:`DIALOG_SECONDS` is closed and counts as cancelled.
+    """
+    global _dialog_open
+    if not dialog_supported():
+        raise DialogUnsupportedError("The folder dialog is only available on macOS.")
+    if _dialog_open:
+        raise DialogBusyError("A folder dialog is already open.")
+    _dialog_open = True
+    try:
+        folder = start if start is not None and start.is_dir() else home
+        try:
+            code, out, err = await _run_osascript(str(folder))
+        except TimeoutError:
+            return None
+        except OSError as exc:
+            raise FolderError("golem could not open the folder dialog.") from exc
+    finally:
+        _dialog_open = False
+    if code != 0:
+        if _CANCELLED in err:
+            return None
+        log.warning("the folder dialog failed: %s", err.strip())
+        raise FolderError("golem could not open the folder dialog.")
+    chosen = out.strip()
+    if not chosen:
+        return None
+    return chosen if chosen == "/" else chosen.rstrip("/")
