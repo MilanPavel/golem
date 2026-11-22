@@ -198,13 +198,25 @@ test("a window that grows wide closes the floating panel and shows the stored la
   expect(panel()).toBeNull();
 });
 
-test("medium on Settings: the rail floats the panel as it does elsewhere", async () => {
+test("medium on Settings: no panel, and the rail leaves Settings and floats the panel open", async () => {
   windowWidth(900);
   history.replaceState(null, "", "/settings");
   const user = userEvent.setup();
   mount();
   expect(panel()).toBeNull();
-  await user.click(within(rail()!).getByRole("button", { name: "Sessions" }));
-  expect(panel()).not.toBeNull();
+  await user.click(within(rail()!).getByRole("button", { name: "Inbox" }));
+  expect(location.pathname).toBe("/");
+  expect(panel()?.getAttribute("aria-label")).toBe("Inbox");
   expect(scrim()).not.toBeNull();
+});
+
+test("narrow on Settings: no panel and no ☰, and the stored choices stay as they were", () => {
+  windowWidth(600);
+  sidebarOpenStore.set(true);
+  history.replaceState(null, "", "/settings");
+  mount();
+  expect(panel()).toBeNull();
+  expect(rail()).toBeNull();
+  expect(menu()).toBeNull();
+  expect(sidebarOpenStore.getSnapshot()).toBe(true);
 });

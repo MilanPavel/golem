@@ -284,16 +284,53 @@ test("useSettingsFolder falls back to the new session's folder when the context 
   expect(screen.getByTestId("folder").textContent).toBe("/work/one");
 });
 
-test("Close settings goes back to the session the person came from, else home", async () => {
+test("Back names where it goes, and goes there; there is no Close settings", async () => {
   const first = mount("/settings", OK_ROWS);
-  await first.user.click(await screen.findByRole("button", { name: "Close settings" }));
+  expect(screen.queryByRole("button", { name: "Close settings" })).toBeNull();
+  // The list and the picker each have one; CSS shows one of them.
+  const [chats] = await screen.findAllByRole("button", { name: "Back to chats" });
+  expect(within(chats!).getByText("Chats")).toBeTruthy();
+  await first.user.click(chats!);
   expect(location.pathname).toBe("/");
   first.unmount();
 
   settingsContextStore.set({ sessionId: "a", cwd: null });
   const second = mount("/settings/appearance", OK_ROWS);
-  await second.user.click(await screen.findByRole("button", { name: "Close settings" }));
+  act(() => {
+    second.fake.emitSummary({ ...summary("a", "2026-11-01T11:59:00Z"), title: "Fix the build" });
+  });
+  const [back] = await screen.findAllByRole("button", { name: "Back to Fix the build" });
+  expect(within(back!).getByText("Fix the build")).toBeTruthy();
+  await second.user.click(screen.getByRole("link", { name: /Routing/ }));
+  expect(screen.getAllByRole("button", { name: "Back to Fix the build" })).toHaveLength(2);
+  await second.user.click(screen.getAllByRole("button", { name: "Back to Fix the build" })[0]!);
   expect(location.pathname).toBe("/s/a");
+});
+
+test("Esc on the page goes back, Esc in a field does not", async () => {
+  const { user } = mount("/settings/appearance", OK_ROWS);
+  const box = await screen.findByRole("textbox", { name: "Search settings" });
+  await user.click(box);
+  await user.keyboard("{Escape}");
+  expect(location.pathname).toBe("/settings/appearance");
+  box.blur();
+  await user.keyboard("{Escape}");
+  expect(location.pathname).toBe("/");
+});
+
+test("Esc goes back with focus outside the page, as on the rail's gear after a click", async () => {
+  const { user } = mount("/settings/appearance", OK_ROWS);
+  await screen.findByRole("textbox", { name: "Search settings" });
+  const gear = document.createElement("button");
+  gear.textContent = "Settings";
+  document.body.append(gear);
+  try {
+    gear.focus();
+    await user.keyboard("{Escape}");
+    expect(location.pathname).toBe("/");
+  } finally {
+    gear.remove();
+  }
 });
 
 // Accessibility

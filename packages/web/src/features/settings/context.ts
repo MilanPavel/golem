@@ -1,6 +1,7 @@
 import { useEffect, useSyncExternalStore } from "react";
 import { createStore } from "../../store/create-store.ts";
-import { useNewSessionFolder } from "../../store/page-context.tsx";
+import { useNewSessionFolder, useSessionList } from "../../store/page-context.tsx";
+import { sessionPath } from "../../store/router.ts";
 
 /**
  * The session the person came from, for the settings that depend on a folder or a session.
@@ -33,4 +34,13 @@ export function useSettingsFolder(): string | null {
   const context = useSettingsContext();
   const [fresh] = useNewSessionFolder();
   return context?.cwd ?? fresh ?? null;
+}
+
+/** Where Back from Settings goes: the remembered session, else home, with the words for it. */
+export function useSettingsBack(): { path: string; where: string } {
+  const context = useSettingsContext();
+  const sessions = useSessionList();
+  if (context === null) return { path: "/", where: "Chats" };
+  const title = sessions.find((session) => session.session_id === context.sessionId)?.title;
+  return { path: sessionPath(context.sessionId), where: title === null || title === undefined || title === "" ? "Untitled" : title };
 }

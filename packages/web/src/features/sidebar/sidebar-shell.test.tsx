@@ -261,40 +261,52 @@ test("with nothing waiting the Sessions header has no chip", () => {
   expect(within(panel()!).queryByText(/waiting/)).toBeNull();
 });
 
-test("Settings hides the wide panel and leaving Settings brings the stored choice back", async () => {
+test("Settings draws no wide panel, and leaving it shows the stored choice as it was", async () => {
   localStorage.setItem(SIDEBAR_OPEN_KEY, "1");
   sidebarOpenStore.set(true);
+  sidebarWidthStore.set(20);
+  sidebarItemStore.set("inbox");
   history.replaceState(null, "", "/settings");
   const user = userEvent.setup();
   mount();
   expect(panel()).toBeNull();
+  for (const name of ["Sessions", "Inbox"]) expect(railButton(name).getAttribute("aria-current")).not.toBe("true");
   await user.click(railButton("New session"));
-  expect(panel()).not.toBeNull();
-  expect(localStorage.getItem(SIDEBAR_OPEN_KEY)).toBe("1");
+  expect(panel()?.getAttribute("aria-label")).toBe("Inbox");
+  expect(sidebarOpenStore.getSnapshot()).toBe(true);
+  expect(sidebarItemStore.getSnapshot()).toBe("inbox");
+  expect(sidebarWidthStore.getSnapshot()).toBe(20);
 });
 
-test("on Settings the Sessions icon shows the panel and leaves the stored choice alone", async () => {
-  localStorage.setItem(SIDEBAR_OPEN_KEY, "1");
-  sidebarOpenStore.set(true);
+test("a panel hidden before Settings is still hidden after Back", async () => {
+  sidebarOpenStore.set(false);
   history.replaceState(null, "", "/settings");
   const user = userEvent.setup();
   mount();
-  await user.click(railButton("Sessions"));
-  expect(panel()).not.toBeNull();
-  await user.click(within(panel()!).getByRole("button", { name: "Hide sidebar" }));
+  await user.click(screen.getAllByRole("button", { name: "Back to chats" })[0]!);
+  expect(location.pathname).toBe("/");
   expect(panel()).toBeNull();
-  expect(localStorage.getItem(SIDEBAR_OPEN_KEY)).toBe("1");
+  expect(sidebarOpenStore.getSnapshot()).toBe(false);
+});
+
+test("on Settings the Inbox icon leaves for the session and opens Inbox", async () => {
+  sidebarOpenStore.set(false);
+  history.replaceState(null, "", "/settings");
+  const user = userEvent.setup();
+  mount();
+  await user.click(railButton("Inbox"));
+  expect(location.pathname).toBe("/");
+  expect(panel()?.getAttribute("aria-label")).toBe("Inbox");
   expect(sidebarOpenStore.getSnapshot()).toBe(true);
 });
 
-test("on Settings the mod key with B peeks at the panel without writing the stored choice", async () => {
+test("on Settings the mod key with B leaves Settings and opens the panel", async () => {
+  sidebarOpenStore.set(false);
   history.replaceState(null, "", "/settings");
   const user = userEvent.setup();
   mount();
   expect(panel()).toBeNull();
   await user.keyboard("{Control>}b{/Control}");
+  expect(location.pathname).toBe("/");
   expect(panel()).not.toBeNull();
-  await user.keyboard("{Control>}b{/Control}");
-  expect(panel()).toBeNull();
-  expect(localStorage.getItem(SIDEBAR_OPEN_KEY)).toBeNull();
 });
