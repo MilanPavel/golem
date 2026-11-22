@@ -19,6 +19,8 @@ import type { ChangesListResult } from "../../protocol/gen/changes-list-result.t
 import type { FileListResult } from "../../protocol/gen/file-list-result.ts";
 import type { FileReadResult } from "../../protocol/gen/file-read-result.ts";
 import type { DirEntry, FsListDirsResult } from "../../protocol/gen/fs-list-dirs-result.ts";
+import type { FsChooseFolderResult } from "../../protocol/gen/fs-choose-folder-result.ts";
+import type { GitInfoResult, GitWorktree } from "../../protocol/gen/git-info-result.ts";
 import type { SetupRow, SetupStatusResult } from "../../protocol/gen/setup-status-result.ts";
 import type { McpListResult } from "../../protocol/gen/mcp-list-result.ts";
 import type { McpLoginDone } from "../../protocol/gen/mcp-login-done.ts";
@@ -666,6 +668,33 @@ export function isFsListDirsResult(value: unknown): value is FsListDirsResult {
     Array.isArray(value["entries"]) &&
     value["entries"].every(isDirEntry) &&
     typeof value["truncated"] === "boolean"
+  );
+}
+
+export function isFsChooseFolderResult(value: unknown): value is FsChooseFolderResult {
+  return isRecord(value) && (value["path"] === undefined || value["path"] === null || typeof value["path"] === "string");
+}
+
+function isGitWorktree(value: unknown): value is GitWorktree {
+  return (
+    isRecord(value) &&
+    typeof value["path"] === "string" &&
+    typeof value["main"] === "boolean" &&
+    typeof value["agent"] === "boolean" &&
+    (value["branch"] === undefined || value["branch"] === null || typeof value["branch"] === "string")
+  );
+}
+
+export function isGitInfoResult(value: unknown): value is GitInfoResult {
+  return (
+    isRecord(value) &&
+    typeof value["repository"] === "boolean" &&
+    typeof value["detached"] === "boolean" &&
+    typeof value["changed"] === "number" &&
+    (value["branch"] === undefined || value["branch"] === null || typeof value["branch"] === "string") &&
+    (value["root"] === undefined || value["root"] === null || typeof value["root"] === "string") &&
+    Array.isArray(value["worktrees"]) &&
+    value["worktrees"].every(isGitWorktree)
   );
 }
 

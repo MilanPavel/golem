@@ -55,7 +55,7 @@ function setup(cwd: string | null = "/Users/you/repos/golem") {
 
 async function openBrowser(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getByRole("button", { name: /^Folder:/ }));
-  await user.click(screen.getByRole("menuitem", { name: "Choose a folder…" }));
+  await user.click(await screen.findByRole("option", { name: "Browse…" }));
   return screen.findByRole("dialog", { name: "Choose a folder" });
 }
 

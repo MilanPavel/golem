@@ -1,4 +1,4 @@
-import { keepPreviousData, QueryClientProvider, useInfiniteQuery, useQuery, type UseInfiniteQueryResult, type InfiniteData, type UseQueryResult } from "@tanstack/react-query";
+import { keepPreviousData, QueryClientProvider, useInfiniteQuery, useQueries, useQuery, type UseInfiniteQueryResult, type InfiniteData, type UseQueryResult } from "@tanstack/react-query";
 import { createContext, useCallback, useContext, useMemo, useSyncExternalStore, type ReactNode } from "react";
 import { useSyncExternalStoreWithSelector } from "use-sync-external-store/with-selector";
 import { ConnectionProvider } from "./connection-context.tsx";
@@ -10,7 +10,7 @@ import { DEVICE_LIST_KEY, type DeviceListResult, type PairingSnapshot } from "./
 import { memoryListKey, type MemoryListResult, type MemoryScope } from "./memory.ts";
 import { ROUTING_KEY } from "./routing.ts";
 import { KEYS_KEY } from "./keys.ts";
-import type { FsListDirsResult } from "./dirs.ts";
+import type { FsListDirsResult, GitInfoResult } from "./dirs.ts";
 import { MODEL_LIST_ALL_KEY, MODEL_LIST_KEY, SETUP_STATUS_KEY, type ModelListResult } from "./models.ts";
 import type { Page, PageActions } from "./page.ts";
 import type { AppInstallSnapshot } from "./app-install.ts";
@@ -150,6 +150,13 @@ export function useNewSessionModel(): [string | null, (model: string | null) => 
   const { newSession } = usePage();
   const state = useSyncExternalStore(newSession.subscribe, newSession.getSnapshot);
   return [state.model, newSession.chooseModel];
+}
+
+/** Ask the empty screen to open its folder menu, and the empty screen's side: whether it was asked, and a way to say it has. */
+export function useFolderMenuRequest(): { asked: boolean; ask: () => void; shown: () => void } {
+  const { newSession } = usePage();
+  const state = useSyncExternalStore(newSession.subscribe, newSession.getSnapshot);
+  return { asked: state.folderMenu, ask: newSession.askFolderMenu, shown: newSession.folderMenuShown };
 }
 
 /** The folders to offer for a new session, newest first. */
@@ -463,6 +470,50 @@ export function useMcpCatalog(sessionId: string | null, enabled = true): UseQuer
 export function useDirs(path: string | null, enabled = true): UseQueryResult<FsListDirsResult> {
   const { queries } = usePage();
   return useQuery({ queryKey: ["fs.list_dirs", path], queryFn: () => queries.dirs(path), enabled, staleTime: 0, retry: false });
+}
+
+/** The repo `path` belongs to (`null`: none asked). Fetched once `enabled`; a failed read leaves the folder without a branch. */
+export function useGitInfo(path: string | null, enabled = true): UseQueryResult<GitInfoResult> {
+  const { queries } = usePage();
+  return useQuery({
+    queryKey: ["git.info", path],
+    queryFn: () => queries.gitInfo(path as string),
+    enabled: enabled && path !== null,
+    staleTime: 5_000,
+    retry: false,
+  });
+}
+
+/** The branch of each folder in `paths` that is in a repo on a branch, read in the background. */
+export function useFolderBranches(paths: readonly string[]): Record<string, string | null> {
+  const { queries } = usePage();
+  const results = useQueries({
+    queries: paths.map((path) => ({
+      queryKey: ["git.info", path],
+      queryFn: () => queries.gitInfo(path),
+      staleTime: 5_000,
+      retry: false,
+    })),
+  });
+  const out: Record<string, string | null> = {};
+  paths.forEach((path, index) => {
+    out[path] = results[index]?.data?.branch ?? null;
+  });
+  return out;
+}
+
+/** The home folder of the daemon's user, for `~` in a typed path. Null until it is known. */
+export function useHomeFolder(): string | null {
+  const { queries } = usePage();
+  const query = useQuery({ queryKey: ["fs.home"], queryFn: async () => (await queries.dirs(null)).home, staleTime: Infinity, retry: false });
+  return query.data ?? null;
+}
+
+/** Whether the macOS folder dialog is offered to this page (the daemon's `hello` says so). False until known. */
+export function useFolderDialog(): boolean {
+  const { queries } = usePage();
+  const query = useQuery({ queryKey: ["hello.local_ui"], queryFn: () => queries.localUi(), staleTime: Infinity, retry: false });
+  return query.data === true;
 }
 
 /** The downloads in flight and the last failures, from every connection. */

@@ -20,6 +20,8 @@ import type { OllamaInstallDone } from "../../protocol/gen/ollama-install-done.t
 import type { OllamaInstallResult } from "../../protocol/gen/ollama-install-result.ts";
 import type { OllamaStartResult } from "../../protocol/gen/ollama-start-result.ts";
 import type { FsListDirsResult } from "../../protocol/gen/fs-list-dirs-result.ts";
+import type { FsChooseFolderResult } from "../../protocol/gen/fs-choose-folder-result.ts";
+import type { GitInfoResult } from "../../protocol/gen/git-info-result.ts";
 import type { SetupStatusResult } from "../../protocol/gen/setup-status-result.ts";
 import type { ApprovalRespondResult } from "../../protocol/gen/approval-respond-result.ts";
 import type { RouteConsentAnswerResult } from "../../protocol/gen/route-consent-answer-result.ts";
@@ -179,6 +181,8 @@ import {
   isFileListResult,
   isFileReadResult,
   isFsListDirsResult,
+  isFsChooseFolderResult,
+  isGitInfoResult,
   isSetupStatusResult,
   isDaemonStatus,
   isHelloResult,
@@ -349,6 +353,8 @@ export type ConnectOptions = ConnectBase & { dial: Dial };
 
 export interface GolemClient {
   readonly state: ConnectionState;
+  /** Whether the daemon said, in `hello`, that this page is on its own Mac and may open the folder dialog. False until connected. */
+  readonly localUi: boolean;
   readonly ready: Promise<void>;
   onState(listener: (state: ConnectionState) => void): () => void;
   onEvent(listener: (event: ChatEvent) => void): () => void;
@@ -593,6 +599,14 @@ export interface GolemClient {
    * home folder; without one the home folder is listed. A path outside home is refused.
    */
   listDirs(path?: string): Promise<FsListDirsResult>;
+  /** The repo `path` belongs to: its branch, how many files changed, and its worktrees. */
+  gitInfo(path: string): Promise<GitInfoResult>;
+  /**
+   * Opens the macOS folder dialog on the daemon's Mac, in `start` when given. Resolves with the
+   * folder chosen, or a null path when the person cancelled. Refused when the dialog is not
+   * offered here (see {@link GolemClient.localUi}).
+   */
+  chooseFolder(start?: string | null): Promise<FsChooseFolderResult>;
   /** Every part of golem's setup, as `golem doctor` checks it. */
   setupStatus(): Promise<SetupStatusResult>;
   /** Install Ollama with Homebrew, run by the daemon. Output reaches {@link GolemClient.onOllamaInstall}. */
@@ -749,6 +763,7 @@ export function connectGolem(options: ConnectOptions): GolemClient {
   const dial: Dial = options.dial;
 
   let state: ConnectionState = { status: "connecting" };
+  let localUi = false;
   const listeners = new Set<(next: ConnectionState) => void>();
   const eventListeners = new Set<(event: ChatEvent) => void>();
   const summaryListeners = new Set<(summary: SessionSummary) => void>();
@@ -1399,6 +1414,7 @@ export function connectGolem(options: ConnectOptions): GolemClient {
             current.close();
             return;
           }
+          localUi = result.local_ui === true;
           if (connectTimer !== undefined) {
             clearTimeout(connectTimer);
             connectTimer = undefined;
@@ -1427,6 +1443,9 @@ export function connectGolem(options: ConnectOptions): GolemClient {
   return {
     get state() {
       return state;
+    },
+    get localUi() {
+      return localUi;
     },
     ready,
     checkNow(): void {
@@ -2254,6 +2273,22 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       const result = await call("fs.list_dirs", path === undefined ? {} : { path });
       if (!isFsListDirsResult(result)) {
         throw new Error("invalid fs.list_dirs result");
+      }
+      return result;
+    },
+    async gitInfo(path: string): Promise<GitInfoResult> {
+      await ready;
+      const result = await call("git.info", { path });
+      if (!isGitInfoResult(result)) {
+        throw new Error("invalid git.info result");
+      }
+      return result;
+    },
+    async chooseFolder(start?: string | null): Promise<FsChooseFolderResult> {
+      await ready;
+      const result = await call("fs.choose_folder", start === undefined || start === null ? {} : { start });
+      if (!isFsChooseFolderResult(result)) {
+        throw new Error("invalid fs.choose_folder result");
       }
       return result;
     },
