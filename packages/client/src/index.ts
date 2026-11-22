@@ -42,6 +42,10 @@ export {
 } from "./connect.ts";
 export type { Dial, Link } from "./link.ts";
 export { wsDial } from "./ws-link.ts";
+export type { HfFilesResult } from "../../protocol/gen/hf-files-result.ts";
+export type { HfRepo } from "../../protocol/gen/hf-repo.ts";
+export type { HfSearchResult } from "../../protocol/gen/hf-search-result.ts";
+export type { HfSize } from "../../protocol/gen/hf-size.ts";
 export type { ModelProbeResult } from "../../protocol/gen/model-probe-result.ts";
 export type { McpListResult } from "../../protocol/gen/mcp-list-result.ts";
 export type { McpCatalogEntry } from "../../protocol/gen/mcp-catalog-entry.ts";

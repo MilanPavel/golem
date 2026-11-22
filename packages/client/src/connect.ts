@@ -115,6 +115,8 @@ import type { McpImportApplyResult } from "../../protocol/gen/mcp-import-apply-r
 import type { McpImportScanResult } from "../../protocol/gen/mcp-import-scan-result.ts";
 import type { MessageSendResult } from "../../protocol/gen/message-send-result.ts";
 import type { ModelListResult } from "../../protocol/gen/model-list-result.ts";
+import type { HfFilesResult } from "../../protocol/gen/hf-files-result.ts";
+import type { HfSearchResult } from "../../protocol/gen/hf-search-result.ts";
 import type { ModelDeleteResult } from "../../protocol/gen/model-delete-result.ts";
 import type { ModelProbeResult } from "../../protocol/gen/model-probe-result.ts";
 import type { ModelBenchDone } from "../../protocol/gen/model-bench-done.ts";
@@ -223,6 +225,8 @@ import {
   isMcpToolsResult,
   isMessageSendResult,
   isModelListResult,
+  isHfFilesResult,
+  isHfSearchResult,
   isModelProbeResult,
   isModelServerStatus,
   isModelOptionsGetResult,
@@ -562,6 +566,10 @@ export interface GolemClient {
   pullModel(name: string): Promise<ModelPullResult>;
   cancelPull(name: string): Promise<ModelPullCancelResult>;
   deleteModel(name: string): Promise<ModelDeleteResult>;
+  /** Looks for GGUF repos on Hugging Face. Only the query leaves this Mac. */
+  searchHf(query: string, limit?: number): Promise<HfSearchResult>;
+  /** The sizes of one repo, each with a fit check for this Mac. */
+  hfFiles(repo: string): Promise<HfFilesResult>;
   /** `model.pull.progress` and `model.pull.done`, from any client's download. */
   onPull(listener: (update: PullUpdate) => void): () => void;
   /** Start golem's tool-calling test on a model. Results reach {@link GolemClient.onCheck}. */
@@ -2151,6 +2159,22 @@ export function connectGolem(options: ConnectOptions): GolemClient {
         throw new Error("invalid model.pull_cancel result");
       }
       return result as ModelPullCancelResult;
+    },
+    async searchHf(query: string, limit?: number): Promise<HfSearchResult> {
+      await ready;
+      const result = await call("hf.search", limit === undefined ? { query } : { query, limit });
+      if (!isHfSearchResult(result)) {
+        throw new Error("invalid hf.search result");
+      }
+      return result;
+    },
+    async hfFiles(repo: string): Promise<HfFilesResult> {
+      await ready;
+      const result = await call("hf.files", { repo });
+      if (!isHfFilesResult(result)) {
+        throw new Error("invalid hf.files result");
+      }
+      return result;
     },
     async deleteModel(name: string): Promise<ModelDeleteResult> {
       await ready;

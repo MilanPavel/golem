@@ -11,6 +11,7 @@ import { Menu, MenuContent, MenuItem, MenuTrigger } from "../../../ui/menu.tsx";
 import { ProviderIcon } from "../../../ui/provider-icons.tsx";
 import { withActivePulls } from "../../models/model-text.ts";
 import type { SetupActions } from "../../setup/use-setup-actions.ts";
+import type { HfActions, HfTabProps } from "./hf-tab.tsx";
 import { GetModelsSheet } from "./get-models-sheet.tsx";
 import { groupProviders, isStarred, keyWhere, modelsOf, ollamaState, providerEntry, usableModels, type ProviderEntry } from "./derive.ts";
 import { ModelTable } from "./models-table.tsx";
@@ -29,6 +30,8 @@ export type ModelsActions = {
   stop(ref: string): Promise<void>;
   /** Starts a download. */
   pull(ref: string): Promise<void>;
+  /** Hugging Face: the search and a repo's sizes. */
+  hf: HfActions;
   /** Saves `[ollama]` settings. A refusal is in the result. */
   saveOllama(params: OllamaSettingsSetParams): Promise<OllamaSettingsSetResult>;
 };
@@ -42,7 +45,7 @@ export type ModelsViewProps = {
   setup: SetupActions;
   actions: ModelsActions;
   /** Where the page starts, for the gallery. */
-  initial?: { selected?: string; sheet?: "get" | "settings" | "key"; tab?: string; removing?: string };
+  initial?: { selected?: string; sheet?: "get" | "settings" | "key"; tab?: string; removing?: string; hf?: HfTabProps["initial"] };
 };
 
 type Sheet = "get" | "settings" | "key" | null;
@@ -236,6 +239,8 @@ export function ModelsView({ listing, keys, ollama, pulls, setup, actions, initi
         listing={shown}
         pulls={pulls}
         onPull={actions.pull}
+        hf={actions.hf}
+        {...(initial?.hf === undefined ? {} : { initialHf: initial.hf })}
         {...(initial?.tab === undefined ? {} : { initialTab: initial.tab })}
       />
       <OllamaSettingsSheet

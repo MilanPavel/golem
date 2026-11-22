@@ -5,7 +5,7 @@ import { Badge } from "../../../ui/badge.tsx";
 import { Button } from "../../../ui/button.tsx";
 import { cn } from "../../../ui/cn.ts";
 import { Code } from "../../../ui/code.tsx";
-import { pullShare, pullText, shortName } from "../../models/model-text.ts";
+import { hfPull, hfPullSource, pullShare, pullText, shortName } from "../../models/model-text.ts";
 import { PullBar } from "../../models/pull-bar.tsx";
 import { priceText, providerEntry, speedText, toolsText } from "./derive.ts";
 
@@ -54,12 +54,13 @@ function Star({ model, busy, onStar }: { model: ListedModel; busy: boolean; onSt
 }
 
 function Pulling({ model, entry, onStop, busy }: { model: ListedModel; entry: PullEntry | undefined; onStop?: (model: ListedModel) => void; busy: boolean }) {
+  const hf = hfPull(model.ref);
   return (
     <tr className="border-t border-line">
       <td className={TD} />
       <td className={TD}>
-        <Code>{shortName(model.ref)}</Code>
-        <small className="block text-sm text-faint">Downloading</small>
+        <Code>{hf === null ? shortName(model.ref) : hf.repo}</Code>
+        <small className="block text-sm text-faint">{hf === null ? "Downloading" : hfPullSource(hf.quant, entry)}</small>
       </td>
       <td className={TD} colSpan={3}>
         <PullBar label={`Downloading ${shortName(model.ref)}`} share={pullShare(entry, model.progress)} text={pullText(entry)} />

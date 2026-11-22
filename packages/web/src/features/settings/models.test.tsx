@@ -8,7 +8,7 @@ import { createPage } from "../../store/page.ts";
 import { PageProvider } from "../../store/page-context.tsx";
 import { fakeClient, fakeFrame } from "../../store/test-support.ts";
 import { closePalette } from "../palette/index.ts";
-import { OLLAMA_VALUES, SAMPLE_LISTING, TWO_KEYS } from "./models/models-sample.ts";
+import { HF_FILES, HF_RESULTS, OLLAMA_VALUES, SAMPLE_LISTING, TWO_KEYS } from "./models/models-sample.ts";
 import { settingsContextStore } from "./index.ts";
 
 const KEYS: AuthListResult = { providers: TWO_KEYS };
@@ -188,12 +188,12 @@ test("Ollama's state comes from the model list: stopped offers Start, not instal
   expect(screen.getByRole("button", { name: "Start Ollama" })).toBeTruthy();
 });
 
-test("Get models has the two tabs, lists golem's models for this Mac, and downloads one", async () => {
+test("Get models has the three tabs, lists golem's models for this Mac, and downloads one", async () => {
   const { fake, user } = mount();
   await user.click(await screen.findByRole("button", { name: /^Ollama/ }));
   await user.click(await screen.findByRole("button", { name: "Get models" }));
   const sheet = await screen.findByRole("dialog", { name: "Get models" });
-  expect(within(sheet).getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["For this Mac", "By name"]);
+  expect(within(sheet).getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["For this Mac", "Hugging Face", "By name"]);
   const list = within(sheet).getByRole("list", { name: "Models for this Mac" });
   expect(within(list).getAllByRole("listitem")[0]?.textContent).toContain("RECOMMENDED");
   expect(within(list).getByText("too big for this Mac", { exact: false })).toBeTruthy();
@@ -209,6 +209,56 @@ test("Get models › By name downloads the name that was typed", async () => {
   await user.type(screen.getByRole("textbox", { name: /An Ollama name/ }), "mistral-small3");
   await user.click(screen.getByRole("button", { name: "Download" }));
   await waitFor(() => expect(fake.raw.pullModel).toHaveBeenCalledWith("ollama/mistral-small3"));
+});
+
+async function openHf(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(await screen.findByRole("button", { name: /^Ollama/ }));
+  await user.click(await screen.findByRole("button", { name: "Get models" }));
+  await user.click(await screen.findByRole("tab", { name: "Hugging Face" }));
+  await user.type(screen.getByRole("textbox", { name: "Search Hugging Face" }), "qwen3.8 27b{Enter}");
+}
+
+test("Get models › Hugging Face lists the repos found, and a gated one cannot be opened", async () => {
+  const { fake, user } = mount();
+  fake.raw.searchHf.mockResolvedValue(HF_RESULTS);
+  await openHf(user);
+  await waitFor(() => expect(fake.raw.searchHf).toHaveBeenCalledWith("qwen3.8 27b"));
+  const list = await screen.findByRole("list", { name: "Hugging Face repos" });
+  expect(within(list).getAllByRole("listitem")).toHaveLength(3);
+  expect(within(list).getByText("↓ 412K", { exact: false })).toBeTruthy();
+  expect(within(list).getByText("Needs a Hugging Face token (later)")).toBeTruthy();
+  expect(within(list).queryByRole("button", { name: /Llama-4-Scout/ })).toBeNull();
+});
+
+test("a Hugging Face repo shows its sizes in words, and a too big size still downloads", async () => {
+  const { fake, user } = mount();
+  fake.raw.searchHf.mockResolvedValue(HF_RESULTS);
+  fake.raw.hfFiles.mockResolvedValue(HF_FILES);
+  await openHf(user);
+  await user.click(await screen.findByRole("button", { name: `Open ${HF_FILES.repo}` }));
+  expect(fake.raw.hfFiles).toHaveBeenCalledWith(HF_FILES.repo);
+  const sizes = await screen.findByRole("list", { name: `Sizes of ${HF_FILES.repo}` });
+  const rows = within(sizes).getAllByRole("listitem");
+  expect(rows[1]?.textContent).toContain("Recommended");
+  expect(rows[0]?.textContent).toContain("Fits");
+  expect(rows[3]?.textContent).toContain("Tight: it will spill to the CPU and run slower");
+  expect(rows[4]?.textContent).toContain("Too big for this Mac");
+  expect(screen.getByRole("link", { name: "Open on Hugging Face ↗" }).getAttribute("href")).toBe(`https://huggingface.co/${HF_FILES.repo}`);
+  await user.click(within(sizes).getByRole("button", { name: "Download F16" }));
+  await waitFor(() => expect(fake.raw.pullModel).toHaveBeenCalledWith(`ollama/hf.co/${HF_FILES.repo}:F16`));
+  await waitFor(() => expect(screen.queryByRole("dialog", { name: "Get models" })).toBeNull());
+});
+
+test("a Hugging Face download shows as a row in Ollama's table with where it comes from", async () => {
+  const { fake, user } = mount();
+  fake.raw.searchHf.mockResolvedValue(HF_RESULTS);
+  fake.raw.hfFiles.mockResolvedValue(HF_FILES);
+  await openHf(user);
+  await user.click(await screen.findByRole("button", { name: `Open ${HF_FILES.repo}` }));
+  await user.click(await screen.findByRole("button", { name: "Download Q4_K_M" }));
+  await waitFor(() => expect(screen.getByRole("progressbar", { name: `Downloading hf.co/${HF_FILES.repo}:Q4_K_M` })).toBeTruthy());
+  expect(screen.getByText("from Hugging Face · Q4_K_M")).toBeTruthy();
+  expect(screen.getByRole("button", { name: `Stop downloading hf.co/${HF_FILES.repo}:Q4_K_M` })).toBeTruthy();
 });
 
 test("Ollama Settings sends ollama.settings.set with the three values", async () => {

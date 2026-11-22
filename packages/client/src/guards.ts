@@ -84,6 +84,8 @@ import type { ConfigGetResult } from "../../protocol/gen/config-get-result.ts";
 import type { DaemonStatus } from "../../protocol/gen/daemon-status.ts";
 import type { HelloResult } from "../../protocol/gen/hello-result.ts";
 import type { MessageSendResult } from "../../protocol/gen/message-send-result.ts";
+import type { HfFilesResult } from "../../protocol/gen/hf-files-result.ts";
+import type { HfSearchResult } from "../../protocol/gen/hf-search-result.ts";
 import type { ModelListResult } from "../../protocol/gen/model-list-result.ts";
 import type { ModelProbeResult } from "../../protocol/gen/model-probe-result.ts";
 import type { ModelBenchDone } from "../../protocol/gen/model-bench-done.ts";
@@ -485,6 +487,39 @@ export function isMcpToolsResult(value: unknown): value is McpToolsResult {
     Array.isArray(value["tools"]) &&
     value["tools"].every(
       (tool) => isRecord(tool) && typeof tool["name"] === "string" && typeof tool["description"] === "string",
+    )
+  );
+}
+
+export function isHfSearchResult(value: unknown): value is HfSearchResult {
+  return (
+    isRecord(value) &&
+    Array.isArray(value["repos"]) &&
+    value["repos"].every(
+      (repo) =>
+        isRecord(repo) &&
+        typeof repo["id"] === "string" &&
+        typeof repo["downloads"] === "number" &&
+        typeof repo["likes"] === "number" &&
+        typeof repo["gated"] === "boolean" &&
+        (repo["updated"] === undefined || repo["updated"] === null || typeof repo["updated"] === "string"),
+    )
+  );
+}
+
+export function isHfFilesResult(value: unknown): value is HfFilesResult {
+  return (
+    isRecord(value) &&
+    typeof value["repo"] === "string" &&
+    Array.isArray(value["sizes"]) &&
+    value["sizes"].every(
+      (size) =>
+        isRecord(size) &&
+        typeof size["quant"] === "string" &&
+        typeof size["size_gb"] === "number" &&
+        typeof size["files"] === "number" &&
+        typeof size["recommended"] === "boolean" &&
+        (size["fit"] === undefined || size["fit"] === null || size["fit"] === "fits" || size["fit"] === "tight" || size["fit"] === "too_big"),
     )
   );
 }
