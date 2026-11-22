@@ -129,6 +129,7 @@ import type { ModelPullProgress } from "../../protocol/gen/model-pull-progress.t
 import type { ModelPullResult } from "../../protocol/gen/model-pull-result.ts";
 import type { ModelScoreResetResult } from "../../protocol/gen/model-score-reset-result.ts";
 import type { ModelSetDefaultResult } from "../../protocol/gen/model-set-default-result.ts";
+import type { ModelStarResult } from "../../protocol/gen/model-star-result.ts";
 import type { ModelOptionsGetResult } from "../../protocol/gen/model-options-get-result.ts";
 import type { ModelOptionsSaved } from "../../protocol/gen/model-options-saved.ts";
 import type { ModelOptionsSetResult } from "../../protocol/gen/model-options-set-result.ts";
@@ -226,6 +227,7 @@ import {
   isModelOptionsSetResult,
   isModelScoreResetResult,
   isModelSetDefaultResult,
+  isModelStarResult,
   isPermissionsSetModeResult,
   isSessionCompactResult,
   isSessionSetChecksResult,
@@ -520,6 +522,8 @@ export interface GolemClient {
   /** Starts a model's score from nothing. Usage rows stay. */
   resetModelScore(ref: string): Promise<ModelScoreResetResult>;
   setDefaultModel(model: string): Promise<ModelSetDefaultResult>;
+  /** Star `ref` for the model menu, or take its star away. The first change writes the whole list to `[model_menu] starred`. */
+  starModel(ref: string, starred: boolean): Promise<ModelStarResult>;
   /** Write `[permissions] mode` to the user's config.toml, keeping its comments. New chats start in it. */
   setDefaultPermissionMode(mode: PermissionsSetModeParams["mode"]): Promise<PermissionsSetModeResult>;
   /** The tunable options of a local model, its own defaults, what is saved for it, and `sessionId`'s overrides. */
@@ -2007,6 +2011,14 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       const result = await call("model.set_default", { model });
       if (!isModelSetDefaultResult(result)) {
         throw new Error("invalid model.set_default result");
+      }
+      return result;
+    },
+    async starModel(ref: string, starred: boolean): Promise<ModelStarResult> {
+      await ready;
+      const result = await call("model.star", { ref, starred });
+      if (!isModelStarResult(result)) {
+        throw new Error("invalid model.star result");
       }
       return result;
     },

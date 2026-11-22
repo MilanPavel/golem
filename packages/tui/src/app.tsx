@@ -5137,6 +5137,16 @@ export function App({
           setChat((current) => ({ ...current, error: messageOf(error) }));
         },
       );
+    } else if (action.kind === "star") {
+      void client.starModel(action.ref, action.starred).then(
+        () => {
+          setChat((current) => ({ ...current, error: null, notice: `${action.starred ? "starred" : "unstarred"} ${action.ref}` }));
+          loadModels(false);
+        },
+        (error: unknown) => {
+          setChat((current) => ({ ...current, error: messageOf(error) }));
+        },
+      );
     } else if (action.kind === "close") {
       setChat((current) => ({ ...current, notice: state.firstRun ? NO_MODEL_BAND : null }));
     }

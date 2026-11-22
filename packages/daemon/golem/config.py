@@ -522,6 +522,19 @@ class ChatSettings(BaseModel):
         return check_instructions(value)
 
 
+class ModelMenuSettings(BaseModel):
+    """``[model_menu]``. The models you starred, which the model menu lists.
+
+    ``starred`` is a list of ``provider/model`` refs. While the key is unset (None), the menu
+    shows the curated hosted models that can be called and the installed local ones. The first
+    star or unstar writes the whole list.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    starred: list[str] | None = None
+
+
 class AgentModelSettings(BaseModel):
     """``[agents.<name>]`` of a bundled type: the wish and the limits that win over its file.
 
@@ -934,6 +947,7 @@ BROWSER_SETTINGS = frozenset(
         "routing",
         "notifications",
         "chat",
+        "model_menu",
         "context",
         "budget",
         "memory",
@@ -1018,6 +1032,7 @@ class GolemSettings(BaseSettings):
     agents: AgentSettings = Field(default_factory=AgentSettings)
     notifications: NotificationSettings = Field(default_factory=NotificationSettings)
     chat: ChatSettings = Field(default_factory=ChatSettings)
+    model_menu: ModelMenuSettings = Field(default_factory=ModelMenuSettings)
     routine: list[RoutineSettings] = Field(default_factory=list[RoutineSettings])
 
     @field_validator("routine")

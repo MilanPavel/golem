@@ -1,0 +1,18 @@
+{
+  "additionalProperties": false,
+  "description": "``starred`` is the list as stored, in order.",
+  "properties": {
+    "starred": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Starred",
+      "type": "array"
+    }
+  },
+  "required": [
+    "starred"
+  ],
+  "title": "ModelStarResult",
+  "type": "object"
+}

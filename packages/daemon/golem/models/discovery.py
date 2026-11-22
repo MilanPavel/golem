@@ -126,6 +126,8 @@ class ListedModel:
     speed: Speed | None = None
     # How the model did on this Mac, filled from the scoreboard.
     score: Score | None = None
+    # In the model menu: in ``[model_menu] starred``, or by default while that key is unset.
+    starred: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -276,6 +278,8 @@ class ModelDiscovery:
         self._hosted = load_hosted_catalog() if hosted is None else hosted
         self._prices = prices.PriceBook.load(cache_dir) if price_book is None else price_book
         self._remote: dict[str, _Remote] = {}
+        # The refs the menu shows while ``[model_menu] starred`` is unset, as of the last listing.
+        self._default_starred: tuple[str, ...] = ()
         self._fetching: dict[str, asyncio.Task[_Remote]] = {}
         self._price_task: asyncio.Task[None] | None = None
         self._shown: dict[str, _Shown] = {}
@@ -395,6 +399,10 @@ class ModelDiscovery:
                     return found.price
         info = self._prices.lookup(provider, model_id)
         return None if info is None else info.price
+
+    def default_starred(self) -> tuple[str, ...]:
+        """The refs the model menu shows while ``[model_menu] starred`` is unset, as last listed."""
+        return self._default_starred
 
     def cached(self) -> Sequence[ListedModel]:
         """The models of the last listing. No network call. Empty before the first listing."""
@@ -521,6 +529,7 @@ class ModelDiscovery:
         show_all: bool = False,
     ) -> list[ListedModel]:
         by_ref: dict[str, ListedModel] = {}
+        curated_refs = {entry.ref for entry in self._hosted}
         labels = {entry.ref: entry.label for entry in [*self._catalog, *self._hosted]}
         for name, result in results.items():
             kind = providers[name].kind
@@ -606,6 +615,26 @@ class ModelDiscovery:
                 if price is not None:
                     listed = replace(listed, price=price)
                 by_ref[ref] = listed
+        self._default_starred = tuple(
+            ref
+            for ref, listed in by_ref.items()
+            if listed.source == "installed" or (listed.source == "remote" and ref in curated_refs)
+        )
+        configured_stars = self._router.menu_settings().starred
+        starred = set(self._default_starred if configured_stars is None else configured_stars)
+        for ref in sorted(starred - by_ref.keys()):
+            name, _, model_id = ref.partition("/")
+            if model_id == "":
+                continue
+            # No provider lists it, so it is never ready: the star stays and the row says so.
+            provider = providers.get(name)
+            star_status: Status = "server_down"
+            if provider is not None:
+                found_status = _unlisted_status(provider, keys.get(name), states.get(name))
+                star_status = star_status if found_status == "ready" else found_status
+            by_ref[ref] = self._listed(
+                ref, name, _Found(model_id=model_id), source="profile", status=star_status
+            )
         # A custom OpenAI-compatible provider on 127.0.0.1 or localhost is not ollama. It
         # gets no special case: its price decides, and an unknown price is frontier.
         overrides: dict[str, Tier | None] = {entry.ref: entry.tier for entry in self._hosted}
@@ -619,6 +648,7 @@ class ModelDiscovery:
                     override=overrides.get(ref),
                     budget_max_price=budget_max_price,
                 ),
+                starred=ref in starred,
             )
         return sorted(by_ref.values(), key=_order)
 

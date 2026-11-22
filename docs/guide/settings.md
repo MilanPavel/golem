@@ -284,6 +284,16 @@ The defaults for every new chat. A chat that is already open keeps what it has.
 
 `chat.get` and `chat.set` read and write these keys for the web page. `chat.get` also returns `mode`, which is `[permissions] mode` and is read only there.
 
+### `[model_menu]`
+
+The models you starred. The composer's model menu lists them, plus the default model and the chat's own model. **Show all** lists every model.
+
+| Key | Default | Meaning |
+|---|---|---|
+| `starred` | unset | A list of `provider/model` refs. While it is unset, the menu shows the hosted models golem curates that your keys can call, and the local models you have installed. The first star or unstar writes the whole list. A ref no provider lists can be starred too: it shows as not ready |
+
+`model.star` writes this key for the web page and the terminal.
+
 ### `[permissions]`
 
 Only your own file sets this. A chat can use another mode for itself.

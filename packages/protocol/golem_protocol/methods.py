@@ -120,6 +120,7 @@ METHOD_ACCESS: Final[Mapping[str, Access]] = {
     "model.check": "local",
     "model.bench": "local",
     "model.set_default": "browser",
+    "model.star": "browser",
     "permissions.set_mode": "browser",
     "session.set_model": "browser",
     "session.set_options": "browser",

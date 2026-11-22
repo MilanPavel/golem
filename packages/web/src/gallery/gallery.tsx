@@ -87,7 +87,7 @@ import { SetupFormView } from "../features/setup/setup-form.tsx";
 import { ToolsOfferView } from "../features/setup/tools-offer.tsx";
 import { TOOLS_CASES } from "../features/setup/tools-sample.ts";
 import { PullStatusView, pullSummary } from "../features/models/index.ts";
-import { NO_OLLAMA_LISTING, OLLAMA_DOWN_LISTING, SAMPLE_LISTING, SAMPLE_PULLS, THINKING_LISTING } from "../features/models/sample.ts";
+import { NO_OLLAMA_LISTING, OLLAMA_DOWN_LISTING, SAMPLE_LISTING, SAMPLE_PULLS, STARRED_LISTING, THINKING_LISTING, UNSTARRED_LISTING } from "../features/models/sample.ts";
 import { CloseSessionDialog, HelperBannerBar, HelperPanelView, HelperReceiptCard, RenameField, type HelperView } from "../features/sessions/index.ts";
 import { ALL_CLOUD, ALL_LOCAL, askingBatchChat, cloudBatchChat, localBatchChat } from "../features/chat/helper-card-sample.ts";
 import { ASKING_HELPER, DONE_HELPER, HELPER_NOW, RUNNING_HELPER, TRIMMED_AT, TRIMMED_HELPER } from "../features/sessions/helper-sample.ts";
@@ -1189,6 +1189,9 @@ function SessionActionsDemo({ theme }: { theme: string }) {
 
 const MODEL_CASES: { label: string; props: Partial<ModelDialogViewProps> }[] = [
   { label: "The list", props: {} },
+  { label: "Starred models", props: { listing: STARRED_LISTING, onShowAll: () => {} } },
+  { label: "Show all, with stars", props: { listing: STARRED_LISTING, showAll: true, onShowAll: () => {} } },
+  { label: "Nothing starred", props: { listing: UNSTARRED_LISTING, onShowAll: () => {} } },
   { label: "New session", props: { mode: "new", session: null } },
   { label: "New session, a pick", props: { mode: "new", session: { profile: "ollama/qwen3:8b", name: null }, initial: { activeId: "ollama/qwen3:8b" } } },
   { label: "New session, not ready", props: { mode: "new", session: null, initial: { activeId: "ollama/qwen3:14b" } } },
@@ -1287,7 +1290,7 @@ function ModelDialogDemo({ theme }: { theme: string }) {
             onRetry={() => {}}
             pulls={SAMPLE_PULLS}
             tune={sampleTuneBackend()}
-            actions={{ use: none, setDefault: none, pull: none, stop: none, remove: none, refresh: none }}
+            actions={{ use: none, setDefault: none, star: none, pull: none, stop: none, remove: none, refresh: none }}
             {...props}
           />
         </div>
@@ -1327,6 +1330,7 @@ function ModelListDemo() {
         onActiveChange={setActiveId}
         onActivate={() => {}}
         onStop={() => {}}
+        onStar={() => {}}
         empty={<p className="px-3 py-6 text-center text-sm text-muted">No matching models.</p>}
       />
     </div>

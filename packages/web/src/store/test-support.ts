@@ -245,6 +245,7 @@ export function fakeClient() {
     setSessionModel: vi.fn<PageClient["setSessionModel"]>(async () => ({}) as never),
     setDefaultPermissionMode: vi.fn<PageClient["setDefaultPermissionMode"]>(async (mode) => ({ mode, path: "/h/config.toml" })),
     setDefaultModel: vi.fn<PageClient["setDefaultModel"]>(async () => ({}) as never),
+    starModel: vi.fn<PageClient["starModel"]>(async () => ({ starred: [] })),
     getModelOptions: vi.fn<PageClient["getModelOptions"]>(async (model) => ({ model, options: [], defaults: {}, saved: {}, session: {} })),
     setModelOptions: vi.fn<PageClient["setModelOptions"]>(async (model) => ({ model, saved: {} })),
     setSessionOptions: vi.fn<PageClient["setSessionOptions"]>(async (id) => ({ session_id: id, options: {} })),

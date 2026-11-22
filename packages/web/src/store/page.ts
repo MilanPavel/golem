@@ -152,6 +152,7 @@ export type PageClient = Pick<
   | "revokeAllowance"
   | "setSessionModel"
   | "setDefaultModel"
+  | "starModel"
   | "setDefaultPermissionMode"
   | "getModelOptions"
   | "setModelOptions"
@@ -266,6 +267,8 @@ export type PageActions = {
   /** Switches the session's model. The chip changes from the daemon's `model.selected` event. */
   useModel(sessionId: string, name: string): Promise<void>;
   setDefault(name: string): Promise<void>;
+  /** Stars the model for the menu, or takes its star away, and reads the listing again. */
+  starModel(ref: string, starred: boolean): Promise<void>;
   /**
    * Changes keys of the routing, budget and context tables in `config.toml`. A refusal is in the result
    * (`ok: false`, with an error for each wrong setting), not a rejection, and nothing is written then.
@@ -1035,6 +1038,10 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
         await client.setDefaultModel(name);
         await queryClient.invalidateQueries({ queryKey: MODEL_LIST_KEY });
         await queryClient.invalidateQueries({ queryKey: SETUP_STATUS_KEY });
+      },
+      async starModel(ref, starred) {
+        await client.starModel(ref, starred);
+        await queryClient.invalidateQueries({ queryKey: MODEL_LIST_KEY });
       },
       async pull(ref, after) {
         pulls.begin(ref);

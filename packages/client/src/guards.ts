@@ -94,6 +94,7 @@ import type { ModelPullDone } from "../../protocol/gen/model-pull-done.ts";
 import type { ModelPullProgress } from "../../protocol/gen/model-pull-progress.ts";
 import type { ModelScoreResetResult } from "../../protocol/gen/model-score-reset-result.ts";
 import type { ModelSetDefaultResult } from "../../protocol/gen/model-set-default-result.ts";
+import type { ModelStarResult } from "../../protocol/gen/model-star-result.ts";
 import type { SessionSetModelResult } from "../../protocol/gen/session-set-model-result.ts";
 import type { Ping } from "../../protocol/gen/ping.ts";
 import type { Params as ChatEvent } from "../../protocol/gen/rpc-notification.ts";
@@ -635,6 +636,10 @@ export function isPermissionsSetModeResult(value: unknown): value is Permissions
 
 export function isModelSetDefaultResult(value: unknown): value is ModelSetDefaultResult {
   return isRecord(value) && typeof value["default"] === "string";
+}
+
+export function isModelStarResult(value: unknown): value is ModelStarResult {
+  return isRecord(value) && Array.isArray(value["starred"]) && value["starred"].every((ref) => typeof ref === "string");
 }
 
 export function isModelScoreResetResult(value: unknown): value is ModelScoreResetResult {

@@ -9,6 +9,7 @@ function model(ref: string, extra: Partial<ListedModel> = {}): ListedModel {
     source: "remote",
     status: "ready",
     tier: ref.startsWith("ollama/") ? "local" : "frontier",
+    starred: true,
     ...extra,
   };
 }
@@ -97,4 +98,19 @@ export const SAMPLE_PULLS: PullsSnapshot = {
     ],
   ]),
   failed: new Map([["ollama/qwen3:14b", "no space left on device"]]),
+};
+
+/** The sample listing as the menu shows it by default: only some models are starred, so the rest sit behind Show all. */
+export const STARRED_LISTING: ModelListResult = {
+  ...SAMPLE_LISTING,
+  models: SAMPLE_LISTING.models.map((item) => ({
+    ...item,
+    starred: ["ollama/qwen3:8b", "ollama/gemma4:e4b", "openrouter/qwen/qwen3-235b"].includes(item.ref),
+  })),
+};
+
+/** No model is starred: the menu lists only the default and says how to star. */
+export const UNSTARRED_LISTING: ModelListResult = {
+  ...SAMPLE_LISTING,
+  models: SAMPLE_LISTING.models.map((item) => ({ ...item, starred: false })),
 };

@@ -31,6 +31,7 @@ from golem.config_edit import (
     RuleIndexError,
     read_model_options,
     set_default_model,
+    set_keys,
     set_mcp_enabled,
     set_model_options,
     set_permission_mode,
@@ -346,6 +347,8 @@ from golem_protocol.commands import (
     ModelSetDefaultResult,
     ModelSetup,
     ModelSpeedInfo,
+    ModelStarParams,
+    ModelStarResult,
     NotificationsGetParams,
     NotificationsSetParams,
     NotifyTestParams,
@@ -1403,6 +1406,7 @@ async def _model_list(ctx: RequestContext, params: ModelListParams) -> ModelList
                     retried=model.score.retried,
                     tool_calls=model.score.tool_calls,
                 ),
+                starred=model.starred,
             )
             for model in listing.models
         ],
@@ -1467,6 +1471,33 @@ async def _model_set_default(
         raise RpcCallError(INTERNAL_ERROR, f"could not write {config_file}: {exc}") from exc
     log.info("default model=%s", params.model)
     return ModelSetDefaultResult(default=params.model)
+
+
+async def _model_star(ctx: RequestContext, params: ModelStarParams) -> ModelStarResult:
+    """Star or unstar ``params.ref``. The first change writes the menu's whole list."""
+    models = ctx.state.models
+    if models is None:
+        raise RpcCallError(INTERNAL_ERROR, "models are not ready")
+    router = _sessions(ctx).router
+    current = router.menu_settings().starred
+    if current is None:
+        # A fresh listing, so the first written list is today's menu, not an older snapshot.
+        await models.list()
+        current = list(models.default_starred())
+    ref = params.ref.strip()
+    if params.starred:
+        starred = list(current) if ref in current else [*current, ref]
+    else:
+        starred = [item for item in current if item != ref]
+    config_file = ctx.state.paths.config_file
+    try:
+        await asyncio.to_thread(set_keys, config_file, {"model_menu": {"starred": starred}})
+    except RawConflictError as exc:
+        raise RpcCallError(INTERNAL_ERROR, str(exc)) from exc
+    except (OSError, ValueError) as exc:
+        raise RpcCallError(INTERNAL_ERROR, f"could not write {config_file}: {exc}") from exc
+    log.info("model star ref=%s starred=%s", ref, params.starred)
+    return ModelStarResult(starred=starred)
 
 
 async def _permissions_set_mode(
@@ -2280,6 +2311,7 @@ def standard_methods() -> dict[str, Method]:
         "model.score_reset": Method(
             "model.score_reset", ModelScoreResetParams, True, _model_score_reset
         ),
+        "model.star": Method("model.star", ModelStarParams, True, _model_star),
         "model.set_default": Method(
             "model.set_default", ModelSetDefaultParams, True, _model_set_default
         ),

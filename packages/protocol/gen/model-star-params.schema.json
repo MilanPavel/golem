@@ -1,0 +1,21 @@
+{
+  "additionalProperties": false,
+  "description": "``model.star``. Star a model for the model menu, or take its star away.\n\nThe first change writes the whole list to ``[model_menu] starred``. A ref no provider lists\ncan be starred: it shows as not ready.",
+  "properties": {
+    "ref": {
+      "minLength": 3,
+      "title": "Ref",
+      "type": "string"
+    },
+    "starred": {
+      "title": "Starred",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "ref",
+    "starred"
+  ],
+  "title": "ModelStarParams",
+  "type": "object"
+}
