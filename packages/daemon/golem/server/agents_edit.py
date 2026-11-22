@@ -325,7 +325,7 @@ async def _keep_values(ctx: RequestContext) -> AgentsKeepValues:
         working_seconds=agents.working_seconds,
         max_cost=agents.max_cost,
         max_tokens=agents.max_tokens,
-        use_helpers="when_needed",
+        use_helpers=agents.use_helpers,
     )
 
 
