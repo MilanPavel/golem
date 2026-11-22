@@ -259,15 +259,17 @@ class ChatRuntime:
 
     @property
     def child_limits(self) -> ChildLimits:
-        """What stops a helper started by ``delegate``: ``[agents.explorer]`` unless set."""
+        """The caps of ``delegate`` that are not in a helper's snapshot: the answer length and how
+        many helpers one message starts, from ``[agents]`` and ``[agents.explorer]``."""
         if self._child_limits is not None:
             return self._child_limits
-        explorer = self.router.agent_settings().explorer
+        settings = self.router.agent_settings()
+        defaults = ChildLimits()
         return ChildLimits(
-            max_calls=explorer.max_calls,
-            timeout_s=float(explorer.timeout_seconds),
-            answer_chars=explorer.answer_chars,
-            max_per_turn=explorer.max_per_turn,
+            max_calls=settings.explorer.max_calls or defaults.max_calls,
+            timeout_s=float(settings.explorer.timeout_seconds),
+            answer_chars=settings.explorer.answer_chars or defaults.answer_chars,
+            max_per_turn=settings.batch_limit,
         )
 
     @child_limits.setter

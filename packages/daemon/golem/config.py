@@ -18,7 +18,7 @@ from contextvars import ContextVar
 from dataclasses import dataclass
 from fnmatch import fnmatchcase
 from pathlib import Path
-from typing import Annotated, Any, Literal, cast
+from typing import Annotated, Any, Literal, Self, cast
 from urllib.parse import urlsplit
 
 from pydantic import (
@@ -474,15 +474,21 @@ class NotificationSettings(BaseModel):
 
 
 class AgentModelSettings(BaseModel):
-    """``[agents.<name>]`` of a bundled type: the wish its file has, unless a file of yours wins.
+    """``[agents.<name>]`` of a bundled type: the wish and the limits that win over its file.
 
-    ``model`` is a wish word or a model name (ADR-059, section 4). Only the wish is a key: the
-    prompt, tools and limits stay the bundled ones of the running release.
+    ``model`` is a wish word or a model name (ADR-059, section 4). The prompt and the tools stay
+    the bundled ones of the running release. A limit that is not set leaves the agent file's
+    value (or ``[agents]``, or the built-in default: :func:`golem.agents.limits.resolve_limits`).
+    ``max_cost`` is in US dollars.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     model: str | None = None
+    max_calls: int | None = Field(default=None, ge=1)
+    working_seconds: int | None = Field(default=None, ge=1)
+    max_cost: float | None = Field(default=None, ge=0)
+    max_tokens: int | None = Field(default=None, ge=1)
 
     @field_validator("model")
     @classmethod
@@ -491,25 +497,68 @@ class AgentModelSettings(BaseModel):
             raise ValueError("model is a wish or a model name, with no spaces")
         return value
 
+    def given(self, key: str) -> Any:
+        """The value of ``key`` when the file sets it, else None. A default is not given."""
+        return cast(object, getattr(self, key)) if key in self.model_fields_set else None
+
 
 class ExplorerSettings(AgentModelSettings):
-    """``[agents.explorer]``. What bounds the explorer, over the limits in its agent file."""
+    """``[agents.explorer]``. The keys of every bundled type, and the explorer's older names.
 
-    max_calls: int = Field(default=15, ge=1, le=50)
+    ``timeout_seconds`` is the old name of ``working_seconds``. ``max_per_turn`` is the
+    explorer's old name of ``[agents] max_per_batch``: the most helpers one message may start.
+    ``max_calls`` keeps its name. Setting an old name and the new one to different values is an
+    error. ``answer_chars`` cuts the helper's answer and has no new name.
+
+    The old names keep their values from before (15 calls, 300 s, 6000 characters, 3 per
+    message), but a default is not a setting: only a key written in the file overrides the
+    explorer's agent file, so an existing ``config.toml`` runs the explorer as it did.
+    """
+
+    max_calls: int | None = Field(default=15, ge=1, le=50)
     timeout_seconds: int = Field(default=300, ge=1)
     answer_chars: int = Field(default=6_000, ge=1)
     max_per_turn: int = Field(default=3, ge=1)
 
+    @model_validator(mode="before")
+    @classmethod
+    def _old_names(cls, data: Any) -> Any:
+        if not isinstance(data, dict):
+            return data
+        table = cast(dict[str, Any], data)
+        old, new = table.get("timeout_seconds"), table.get("working_seconds")
+        if old is not None and new is not None and old != new:
+            raise ValueError(
+                "timeout_seconds is the old name of working_seconds: "
+                f"set one of them, or the same value in both (not {old} and {new})"
+            )
+        value = new if new is not None else old
+        if value is None:
+            return table
+        return {**table, "timeout_seconds": value, "working_seconds": value}
+
 
 BUNDLED_TYPES = ("explorer", "worker", "reviewer", "advisor")
-"""The agent types that ship with golem: the names ``[agents.<name>]`` may set a wish for."""
+"""The agent types that ship with golem: the names ``[agents.<name>]`` may set."""
+
+DEFAULT_MAX_PER_BATCH = 3
+"""How many helpers one message may start, when neither ``max_per_batch`` nor ``max_per_turn``
+is set."""
 
 
 class AgentSettings(BaseModel):
-    """``[agents]``. One table for each kind of helper, and where agent files are read.
+    """``[agents]``. Limits for every helper, one table for each bundled type, and where files are.
 
     ``extra_dirs`` adds folders of ``<name>.md`` agent files, with ``~`` for
     the home folder, after ``~/.golem/agents``.
+
+    ``max_calls``, ``working_seconds``, ``max_cost`` (US dollars) and ``max_tokens`` bound each
+    helper of every type that its file and its own table leave open. ``at_once`` is how many
+    helpers run at once, ``max_per_batch`` how many one message of the lead may start,
+    ``per_message_cost`` the most (US dollars) all helpers of one message may cost, and
+    ``estimate_over`` the estimate (US dollars) above which a batch asks you first. They are only
+    read and checked here: a later step enforces them. ``max_per_batch`` is the one key that
+    ``[agents.explorer] max_per_turn`` also sets, so the two must agree when both are given.
 
     A finished helper keeps its steps for ``keep_days`` days from its end, then only a receipt
     stays. One that failed, was cancelled or asked you something keeps them for
@@ -521,15 +570,47 @@ class AgentSettings(BaseModel):
     extra_dirs: list[str] = Field(default_factory=list[str])
     keep_days: int = Field(default=7, ge=0)
     keep_problem_days: int = Field(default=30, ge=0)
+    max_calls: int | None = Field(default=None, ge=1)
+    working_seconds: int | None = Field(default=None, ge=1)
+    max_cost: float | None = Field(default=None, ge=0)
+    max_tokens: int | None = Field(default=None, ge=1)
+    at_once: int = Field(default=3, ge=1, le=16)
+    max_per_batch: int | None = Field(default=None, ge=1, le=20)
+    per_message_cost: float = Field(default=1.0, ge=0)
+    estimate_over: float = Field(default=0.25, ge=0)
     explorer: ExplorerSettings = Field(default_factory=ExplorerSettings)
     worker: AgentModelSettings = Field(default_factory=AgentModelSettings)
     reviewer: AgentModelSettings = Field(default_factory=AgentModelSettings)
     advisor: AgentModelSettings = Field(default_factory=AgentModelSettings)
 
+    @model_validator(mode="after")
+    def _one_batch_limit(self) -> Self:
+        turn = self.explorer.given("max_per_turn")
+        if turn is not None and self.max_per_batch is not None and turn != self.max_per_batch:
+            raise ValueError(
+                "[agents.explorer] max_per_turn is the old name of [agents] max_per_batch: "
+                f"set one of them, or the same value in both (not {turn} and {self.max_per_batch})"
+            )
+        return self
+
+    @property
+    def batch_limit(self) -> int:
+        """How many helpers one message may start: ``max_per_batch``, else the explorer's
+        ``max_per_turn``, else :data:`DEFAULT_MAX_PER_BATCH`."""
+        if self.max_per_batch is not None:
+            return self.max_per_batch
+        turn = self.explorer.given("max_per_turn")
+        return DEFAULT_MAX_PER_BATCH if turn is None else turn
+
+    def table_for(self, name: str) -> AgentModelSettings | None:
+        """``[agents.<name>]`` of a bundled type, or None for any other name."""
+        table = cast(object, getattr(self, name, None)) if name in BUNDLED_TYPES else None
+        return table if isinstance(table, AgentModelSettings) else None
+
     def wish_for(self, name: str) -> str | None:
         """``model`` of ``[agents.<name>]``, or None when unset or not a bundled type."""
-        table = cast(object, getattr(self, name, None)) if name in BUNDLED_TYPES else None
-        return table.model if isinstance(table, AgentModelSettings) else None
+        table = self.table_for(name)
+        return None if table is None else table.model
 
 
 class WebSettings(BaseModel):

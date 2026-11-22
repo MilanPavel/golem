@@ -23,6 +23,7 @@ class AgentLimits:
     """Working time, not counting the time spent waiting for you or a provider."""
     max_cost_usd: float | None = None
     answer_chars: int | None = None
+    max_tokens: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
