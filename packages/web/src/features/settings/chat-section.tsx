@@ -17,6 +17,7 @@ import {
   type SendKey,
   type ThinkingMode,
 } from "../chat/index.ts";
+import { YourInstructions } from "./chat-instructions.tsx";
 import { HowFarItGoesAlone } from "./chat-alone.tsx";
 import { ChatPreview } from "./chat-preview.tsx";
 import { ChatRow, Choice, PartChip, Switch } from "./chat-controls.tsx";
@@ -133,9 +134,10 @@ function WhatTheChatShows() {
 }
 
 /** Settings › Chat: how golem answers and what a chat shows. This page has the screen choices; they apply to every chat. */
-export function ChatSection({ alone = <HowFarItGoesAlone /> }: { alone?: ReactNode }) {
+export function ChatSection({ instructions = <YourInstructions />, alone = <HowFarItGoesAlone /> }: { instructions?: ReactNode; alone?: ReactNode }) {
   return (
     <div className="flex flex-col gap-8">
+      {instructions}
       {alone}
       <WhatTheChatShows />
     </div>

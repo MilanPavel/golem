@@ -1956,6 +1956,46 @@ test("the notification calls send their params and check what comes back", async
   }
 });
 
+test("chat.prompt and chat.draft send their params and check what comes back", async () => {
+  const sent: [string, Record<string, unknown>][] = [];
+  const prompt = { model: "ollama/qwen3", parts: [{ name: "instructions", text: "Be direct.", tokens: 3 }], tools_tokens: 10, total_tokens: 13 };
+  const draft = { lines: ["Be direct."], model: "ollama/qwen3" };
+  const server = await listen((socket) => {
+    attach(socket, {
+      answerPing: true,
+      results: { "chat.prompt": prompt, "chat.draft": draft },
+      onRequest: (_socket, method, params) => {
+        if (method.startsWith("chat.")) sent.push([method, params]);
+      },
+    });
+  });
+  const client = connectGolem({ socketPath: server.socketPath, clientName: "web", reconnect: false, heartbeatMs: 60_000 });
+  try {
+    assert.deepEqual(await client.getChatPrompt({ instructions: ["Be direct."] }), prompt);
+    assert.deepEqual(await client.getChatPrompt(), prompt);
+    assert.deepEqual(await client.draftChat("short and friendly"), draft);
+    assert.deepEqual(sent, [
+      ["chat.prompt", { instructions: ["Be direct."] }],
+      ["chat.prompt", {}],
+      ["chat.draft", { description: "short and friendly" }],
+    ]);
+  } finally {
+    client.close();
+    await server.close();
+  }
+  const bad = await listen((socket) => {
+    attach(socket, { answerPing: true, results: { "chat.prompt": {}, "chat.draft": {} } });
+  });
+  const refused = connectGolem({ socketPath: bad.socketPath, clientName: "web", reconnect: false, heartbeatMs: 60_000 });
+  try {
+    await assert.rejects(() => refused.getChatPrompt(), /invalid chat.prompt result/);
+    await assert.rejects(() => refused.draftChat("x"), /invalid chat.draft result/);
+  } finally {
+    refused.close();
+    await bad.close();
+  }
+});
+
 test("getTrace and getTraceSpan send their ids and check what comes back", async () => {
   const sent: [string, Record<string, unknown>][] = [];
   const span = { id: "m_1", kind: "model", name: "model 1", start: "t", status: "ok" };

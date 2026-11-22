@@ -154,6 +154,9 @@ import type { EvalRoutingResult } from "../../protocol/gen/eval-routing-result.t
 import type { ChatSetParams } from "../../protocol/gen/chat-set-params.ts";
 import type { ChatSetResult } from "../../protocol/gen/chat-set-result.ts";
 import type { ChatValues } from "../../protocol/gen/chat-values.ts";
+import type { ChatPromptParams } from "../../protocol/gen/chat-prompt-params.ts";
+import type { ChatPromptResult } from "../../protocol/gen/chat-prompt-result.ts";
+import type { ChatDraftResult } from "../../protocol/gen/chat-draft-result.ts";
 import type { NotificationsSetParams } from "../../protocol/gen/notifications-set-params.ts";
 import type { NotificationsSetResult } from "../../protocol/gen/notifications-set-result.ts";
 import type { NotificationsValues } from "../../protocol/gen/notifications-values.ts";
@@ -278,6 +281,8 @@ import {
   isCostGetResult,
   isEvalRoutingResult,
   isChatSetResult,
+  isChatPromptResult,
+  isChatDraftResult,
   isChatValues,
   isNotificationsSetResult,
   isNotificationsValues,
@@ -422,6 +427,10 @@ export interface GolemClient {
   /** The defaults for every new chat, from `[chat]`. */
   getChat(): Promise<ChatValues>;
   setChat(params: ChatSetParams): Promise<ChatSetResult>;
+  /** What the model of a new chat reads. With `instructions`, those lines stand in for the saved ones for this answer only. */
+  getChatPrompt(params?: ChatPromptParams): Promise<ChatPromptResult>;
+  /** Golem drafts instruction lines from what the person says about how they like answers. Nothing is saved. */
+  draftChat(description: string): Promise<ChatDraftResult>;
   getNotifications(): Promise<NotificationsValues>;
   setNotifications(params: NotificationsSetParams): Promise<NotificationsSetResult>;
   notifyTest(): Promise<NotifyTestResult>;
@@ -1674,6 +1683,22 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       const result = await call("chat.set", { ...params });
       if (!isChatSetResult(result)) {
         throw new Error("invalid chat.set result");
+      }
+      return result;
+    },
+    async getChatPrompt(params: ChatPromptParams = {}): Promise<ChatPromptResult> {
+      await ready;
+      const result = await call("chat.prompt", { ...params });
+      if (!isChatPromptResult(result)) {
+        throw new Error("invalid chat.prompt result");
+      }
+      return result;
+    },
+    async draftChat(description: string): Promise<ChatDraftResult> {
+      await ready;
+      const result = await call("chat.draft", { description });
+      if (!isChatDraftResult(result)) {
+        throw new Error("invalid chat.draft result");
       }
       return result;
     },

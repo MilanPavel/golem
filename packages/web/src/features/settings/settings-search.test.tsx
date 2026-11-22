@@ -98,9 +98,9 @@ test("/ focuses the box, Esc clears it, and Enter opens the first result", async
   await user.keyboard("{Escape}");
   expect((box() as HTMLInputElement).value).toBe("");
   expect(within(nav()).getByRole("link", { name: "Appearance" })).toBeTruthy();
-  await user.keyboard("pro");
+  await user.keyboard("provi");
   await user.keyboard("{Enter}");
-  // "pro" matches the keyword "provider" of API keys first.
+  // "provi" matches the keyword "provider" of API keys first.
   expect(location.pathname).toBe("/settings/keys");
   expect((box() as HTMLInputElement).value).toBe("");
 });

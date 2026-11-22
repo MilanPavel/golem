@@ -105,6 +105,8 @@ import type { SessionForkResult } from "../../protocol/gen/session-fork-result.t
 import type { CostGetResult } from "../../protocol/gen/cost-get-result.ts";
 import type { EvalRoutingResult } from "../../protocol/gen/eval-routing-result.ts";
 import type { ChatSetResult } from "../../protocol/gen/chat-set-result.ts";
+import type { ChatPromptResult } from "../../protocol/gen/chat-prompt-result.ts";
+import type { ChatDraftResult } from "../../protocol/gen/chat-draft-result.ts";
 import type { ChatValues } from "../../protocol/gen/chat-values.ts";
 import type { NotificationsSetResult } from "../../protocol/gen/notifications-set-result.ts";
 import type { NotificationsValues } from "../../protocol/gen/notifications-values.ts";
@@ -1019,6 +1021,21 @@ export function isChatSetResult(value: unknown): value is ChatSetResult {
     (value["errors"] === undefined || Array.isArray(value["errors"])) &&
     (value["values"] == null || isChatValues(value["values"]))
   );
+}
+
+export function isChatPromptResult(value: unknown): value is ChatPromptResult {
+  return (
+    isRecord(value) &&
+    (typeof value["model"] === "string" || value["model"] === null) &&
+    typeof value["tools_tokens"] === "number" &&
+    typeof value["total_tokens"] === "number" &&
+    Array.isArray(value["parts"]) &&
+    value["parts"].every((part) => isRecord(part) && typeof part["name"] === "string" && typeof part["text"] === "string" && typeof part["tokens"] === "number")
+  );
+}
+
+export function isChatDraftResult(value: unknown): value is ChatDraftResult {
+  return isRecord(value) && typeof value["model"] === "string" && Array.isArray(value["lines"]) && value["lines"].every((line) => typeof line === "string");
 }
 
 export function isNotificationsValues(value: unknown): value is NotificationsValues {

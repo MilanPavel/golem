@@ -5,7 +5,7 @@ import { ConnectionProvider } from "./connection-context.tsx";
 import { changeDiffKey, changesDiffKey, changesListKey, commitInfoKey, type ChangedFiles, type ChangesCommitInfoResult, type FileDiff } from "./changes.ts";
 import { fileListKey, fileReadKey, type FileRead } from "./files.ts";
 import { configKey, type ConfigGetResult } from "./config.ts";
-import { AGENTS_KEEP_KEY, CHAT_KEY, NOTIFICATIONS_KEY, type ChatValues, type AgentsKeepValues } from "./notifications.ts";
+import { AGENTS_KEEP_KEY, CHAT_KEY, PROMPT_KEY, NOTIFICATIONS_KEY, type ChatValues, type ChatPromptResult, type AgentsKeepValues } from "./notifications.ts";
 import { DEVICE_LIST_KEY, type DeviceListResult, type PairingSnapshot } from "./devices.ts";
 import { memoryListKey, type MemoryListResult, type MemoryScope } from "./memory.ts";
 import { ROUTING_KEY } from "./routing.ts";
@@ -292,6 +292,12 @@ export function useAgentsKeep(enabled = true): UseQueryResult<AgentsKeepValues> 
 export function useChatDefaults(enabled = true): UseQueryResult<ChatValues> {
   const { queries } = usePage();
   return useQuery({ queryKey: [...CHAT_KEY], queryFn: queries.chat, enabled, staleTime: 0, retry: false, refetchOnWindowFocus: true });
+}
+
+/** What the model of a new chat reads. `instructions` stand in for the saved lines (null: the saved ones); a new set is asked for again. */
+export function useChatPrompt(instructions: readonly string[] | null, enabled = true): UseQueryResult<ChatPromptResult> {
+  const { queries } = usePage();
+  return useQuery({ queryKey: [...PROMPT_KEY, instructions], queryFn: () => queries.chatPrompt(instructions), enabled, staleTime: 0, retry: false, refetchOnWindowFocus: true, placeholderData: keepPreviousData });
 }
 
 /** The `[notifications]` settings. Read again whenever the tab is seen: a terminal edit pushes nothing. */
