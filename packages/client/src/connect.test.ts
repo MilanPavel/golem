@@ -2033,6 +2033,43 @@ test("chat.suggestions and chat.suggestion_dismiss send their params and check w
   }
 });
 
+test("ollama.settings.get and ollama.settings.set send their params and check what comes back", async () => {
+  const sent: [string, Record<string, unknown>][] = [];
+  const values = { start: true, idle_stop_minutes: 30, parallel: "auto", started_by_golem: false, running: true };
+  const server = await listen((socket) => {
+    attach(socket, {
+      answerPing: true,
+      results: { "ollama.settings.get": values, "ollama.settings.set": { ok: true, errors: [], values: { ...values, parallel: 2 } } },
+      onRequest: (_socket, method, params) => {
+        if (method.startsWith("ollama.settings.")) sent.push([method, params]);
+      },
+    });
+  });
+  const client = connectGolem({ socketPath: server.socketPath, clientName: "web", reconnect: false, heartbeatMs: 60_000 });
+  try {
+    assert.deepEqual(await client.getOllamaSettings(), values);
+    assert.deepEqual((await client.setOllamaSettings({ parallel: 2 })).values?.parallel, 2);
+    assert.deepEqual(sent, [
+      ["ollama.settings.get", {}],
+      ["ollama.settings.set", { parallel: 2 }],
+    ]);
+  } finally {
+    client.close();
+    await server.close();
+  }
+  const bad = await listen((socket) => {
+    attach(socket, { answerPing: true, results: { "ollama.settings.get": {}, "ollama.settings.set": {} } });
+  });
+  const refused = connectGolem({ socketPath: bad.socketPath, clientName: "web", reconnect: false, heartbeatMs: 60_000 });
+  try {
+    await assert.rejects(() => refused.getOllamaSettings(), /invalid ollama.settings.get result/);
+    await assert.rejects(() => refused.setOllamaSettings({}), /invalid ollama.settings.set result/);
+  } finally {
+    refused.close();
+    await bad.close();
+  }
+});
+
 test("getTrace and getTraceSpan send their ids and check what comes back", async () => {
   const sent: [string, Record<string, unknown>][] = [];
   const span = { id: "m_1", kind: "model", name: "model 1", start: "t", status: "ok" };

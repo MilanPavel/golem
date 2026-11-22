@@ -30,7 +30,7 @@ export const GALLERY_SECTIONS = [
   "agent-limits",
   "memory",
   "settings-chat",
-  "api-keys",
+  "settings-models",
   "routing",
   "settings-context",
   "usage",

@@ -33,7 +33,7 @@ export type RoutingViewProps = {
   spentToday?: number | null;
   /** Saves these keys. The daemon's answer comes back as `errors` and `values`. */
   onChange: (patch: RoutingSetParams) => void;
-  /** Opens Settings › API keys. */
+  /** Opens Settings › Models. */
   onOpenKeys?: () => void;
   /** Opens Settings › Context. */
   onOpenContext?: () => void;
@@ -173,7 +173,7 @@ export function RoutingSection() {
         window={window}
         spentToday={cost.data?.today.cost_usd ?? null}
         onChange={(patch) => void save(patch)}
-        onOpenKeys={() => navigate(settingsPath("keys"))}
+        onOpenKeys={() => navigate(settingsPath("models"))}
         onOpenContext={() => navigate(settingsPath("context"))}
         folderBrowser={({ onPick, onCancel }) => <FolderBrowser initialPath={null} autoFocus onPick={onPick} onCancel={onCancel} />}
       />

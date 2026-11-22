@@ -51,9 +51,10 @@ test("every section has keywords", () => {
 
 test("a title is matched first, then the keywords, ignoring case", () => {
   expect(searchSettings("ROUT").map((hit) => [hit.section.id, hit.keyword])).toEqual([["routing", null]]);
-  // "ollama" is a keyword of Info and Routing, and the title of neither.
+  // "ollama" is a keyword of Info, Models and Routing, and the title of none.
   expect(searchSettings("ollama").map((hit) => [hit.section.id, hit.keyword])).toEqual([
     ["info", "ollama"],
+    ["models", "ollama"],
     ["routing", "ollama"],
   ]);
   expect(searchSettings("   ")).toEqual([]);
@@ -94,14 +95,14 @@ test("/ focuses the box, Esc clears it, and Enter opens the first result", async
   // The slash is not typed into the box.
   expect((box() as HTMLInputElement).value).toBe("");
   await user.keyboard("ollama");
-  expect(within(nav()).getAllByRole("link")).toHaveLength(2);
+  expect(within(nav()).getAllByRole("link")).toHaveLength(3);
   await user.keyboard("{Escape}");
   expect((box() as HTMLInputElement).value).toBe("");
   expect(within(nav()).getByRole("link", { name: "Appearance" })).toBeTruthy();
   await user.keyboard("provi");
   await user.keyboard("{Enter}");
-  // "provi" matches the keyword "provider" of API keys first.
-  expect(location.pathname).toBe("/settings/keys");
+  // "provi" matches the keyword "provider" of Models first.
+  expect(location.pathname).toBe("/settings/models");
   expect((box() as HTMLInputElement).value).toBe("");
 });
 
@@ -125,8 +126,8 @@ test("a keyword with no tagged row just opens the section", async () => {
   const scroll = vi.spyOn(Element.prototype, "scrollIntoView").mockImplementation(() => {});
   const { user } = mount("/settings");
   await user.type(box(), "keychain");
-  await user.click(within(nav()).getByRole("link", { name: /API keys/ }));
-  expect(location.pathname).toBe("/settings/keys");
+  await user.click(within(nav()).getByRole("link", { name: /Models/ }));
+  expect(location.pathname).toBe("/settings/models");
   expect(scroll).not.toHaveBeenCalled();
 });
 
@@ -134,4 +135,17 @@ test("findSettingRow takes the exact tag before a tag that starts with the word"
   document.body.innerHTML = '<p data-setting="data folder"></p><p id="exact" data-setting="data"></p>';
   expect(findSettingRow(document, "Data")?.id).toBe("exact");
   document.body.innerHTML = "";
+});
+
+test("key, token and keychain find Models, and there is no API keys section", async () => {
+  expect(searchSettings("key").map((hit) => hit.section.id)).toContain("models");
+  expect(searchSettings("token").map((hit) => hit.section.id)).toEqual(expect.arrayContaining(["models", "mcp"]));
+  expect(searchSettings("keychain").map((hit) => hit.section.id)).toEqual(expect.arrayContaining(["models", "mcp"]));
+  expect(SECTIONS.some((section) => section.id === "keys" || section.title === "API keys")).toBe(false);
+  const { user } = mount("/settings");
+  expect(within(nav()).queryByRole("link", { name: /API keys/ })).toBeNull();
+  await user.type(box(), "api key");
+  const links = within(nav()).getAllByRole("link");
+  expect(links).toHaveLength(1);
+  expect(links[0]?.textContent.startsWith("Models")).toBe(true);
 });

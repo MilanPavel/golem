@@ -222,11 +222,11 @@ test("a pressed situation shows its sentence, and a settings change replays it",
   expect(screen.getByText("Nothing picked yet.")).toBeTruthy();
 });
 
-test("the empty Frontier step opens Settings › API keys", async () => {
+test("the empty Frontier step opens Settings › Models", async () => {
   const { user } = mount();
   await screen.findByRole("heading", { name: READY });
   await user.click(screen.getByRole("button", { name: "Add an API key" }));
-  expect(location.pathname).toBe("/settings/keys");
+  expect(location.pathname).toBe("/settings/models");
 });
 
 test("the Frontier step offers its ready models when none is chosen, not an API key", async () => {

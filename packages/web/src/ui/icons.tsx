@@ -224,12 +224,6 @@ export const SettingsNotificationsIcon = (props: IconProps) => (
     <path d="M4 11V7a4 4 0 0 1 8 0v4l1.2 1.5H2.8zM6.5 14h3" />
   </Icon>
 );
-/** A key. */
-export const SettingsKeysIcon = (props: IconProps) => (
-  <Icon strokeWidth="1.4" {...props}>
-    <circle cx="5.5" cy="10.5" r="3" /><path d="M7.6 8.4 13.5 2.5M11.5 4.5l1.6 1.6" />
-  </Icon>
-);
 /** A path that turns. */
 export const SettingsRoutingIcon = (props: IconProps) => (
   <Icon strokeWidth="1.4" {...props}>

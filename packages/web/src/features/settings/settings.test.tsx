@@ -108,7 +108,7 @@ test("every section appears once in the sidebar, under its group, in order", () 
   const links = within(nav).getAllByRole("link");
   const expected = GROUPS.flatMap((group) => SECTIONS.filter((item) => item.group === group.id).map((item) => item.title));
   expect(expected).toHaveLength(SECTIONS.length);
-  expect(links.map((link) => link.textContent.trim())).toEqual(["Info", "Chat", "Appearance", "Notifications", "API keys", "Routing", "Context", "Usage", "MCP servers", "Skills", "Agents", "Memory", "Devices", "Tool rules", "Config file"]);
+  expect(links.map((link) => link.textContent.trim())).toEqual(["Info", "Chat", "Appearance", "Notifications", "Models", "Routing", "Context", "Usage", "MCP servers", "Skills", "Agents", "Memory", "Devices", "Tool rules", "Config file"]);
   expect(links.map((link) => link.textContent.trim())).toEqual(expected);
   const headings = Array.from(nav.querySelectorAll("div > span")).map((node) => node.textContent);
   expect(headings).toEqual(GROUPS.map((group) => group.title));
@@ -140,7 +140,7 @@ test("the narrow picker shows the current section and lists every group", async 
   expect(picker.getAttribute("aria-expanded")).toBe("false");
   await user.click(picker);
   const list = screen.getByRole("group", { name: "All settings sections" });
-  for (const group of GROUPS) expect(within(list).getByText(group.title)).toBeTruthy();
+  for (const group of GROUPS) expect(within(list).getAllByText(group.title).length).toBeGreaterThan(0);
   expect(within(list).getAllByRole("link")).toHaveLength(SECTIONS.length);
   expect(within(list).getByRole("link", { name: "Usage" }).getAttribute("aria-current")).toBe("page");
   await user.click(within(list).getByRole("link", { name: "Skills" }));

@@ -95,6 +95,8 @@ import type { ModelPullProgress } from "../../protocol/gen/model-pull-progress.t
 import type { ModelScoreResetResult } from "../../protocol/gen/model-score-reset-result.ts";
 import type { ModelSetDefaultResult } from "../../protocol/gen/model-set-default-result.ts";
 import type { ModelStarResult } from "../../protocol/gen/model-star-result.ts";
+import type { OllamaSettingsSetResult } from "../../protocol/gen/ollama-settings-set-result.ts";
+import type { OllamaSettingsValues } from "../../protocol/gen/ollama-settings-values.ts";
 import type { SessionSetModelResult } from "../../protocol/gen/session-set-model-result.ts";
 import type { Ping } from "../../protocol/gen/ping.ts";
 import type { Params as ChatEvent } from "../../protocol/gen/rpc-notification.ts";
@@ -640,6 +642,26 @@ export function isModelSetDefaultResult(value: unknown): value is ModelSetDefaul
 
 export function isModelStarResult(value: unknown): value is ModelStarResult {
   return isRecord(value) && Array.isArray(value["starred"]) && value["starred"].every((ref) => typeof ref === "string");
+}
+
+export function isOllamaSettingsValues(value: unknown): value is OllamaSettingsValues {
+  return (
+    isRecord(value) &&
+    typeof value["start"] === "boolean" &&
+    typeof value["idle_stop_minutes"] === "number" &&
+    (typeof value["parallel"] === "number" || value["parallel"] === "auto") &&
+    typeof value["started_by_golem"] === "boolean" &&
+    typeof value["running"] === "boolean"
+  );
+}
+
+export function isOllamaSettingsSetResult(value: unknown): value is OllamaSettingsSetResult {
+  return (
+    isRecord(value) &&
+    typeof value["ok"] === "boolean" &&
+    (value["errors"] === undefined || Array.isArray(value["errors"])) &&
+    (value["values"] == null || isOllamaSettingsValues(value["values"]))
+  );
 }
 
 export function isModelScoreResetResult(value: unknown): value is ModelScoreResetResult {

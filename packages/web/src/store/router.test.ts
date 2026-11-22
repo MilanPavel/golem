@@ -90,6 +90,8 @@ test("parseRoute reads the settings page and its sections", () => {
   expect(parseRoute("/settings")).toEqual({ name: "settings", section: "info" });
   // The old name still lands on Info.
   expect(parseRoute("/settings/setup")).toEqual({ name: "settings", section: "info" });
+  // API keys became Models.
+  expect(parseRoute("/settings/keys")).toEqual({ name: "settings", section: "models" });
   expect(parseRoute("/settings/mcp")).toEqual({ name: "settings", section: "mcp" });
   expect(parseRoute("/settings/tool-rules")).toEqual({ name: "settings", section: "tool-rules" });
   for (const bad of ["/settings/", "/settings/a/b", "/settings/A", "/settings/a1", "/settingsx"]) {

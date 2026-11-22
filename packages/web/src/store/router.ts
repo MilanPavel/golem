@@ -75,7 +75,8 @@ export function parseRoute(pathname: string, search = ""): Route {
   const section = /^\/settings\/([a-z-]+)$/.exec(pathname)?.[1];
   if (section !== undefined) {
     // `setup` was renamed `info`: old links and bookmarks still land on it.
-    return { name: "settings", section: section === "setup" ? "info" : section };
+    // `keys` was renamed `models` when the keys moved onto the provider list.
+    return { name: "settings", section: section === "setup" ? "info" : section === "keys" ? "models" : section };
   }
   const match = /^\/s\/([^/]+)(\/trace)?$/.exec(pathname);
   if (match?.[1] !== undefined) {
