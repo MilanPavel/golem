@@ -52,6 +52,7 @@ public enum MethodAccess {
         "device.revoke",
         "file.list",
         "file.read",
+        "fs.choose_folder",
         "fs.list_dirs",
         "git.branches",
         "git.info",

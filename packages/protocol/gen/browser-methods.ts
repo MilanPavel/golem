@@ -29,6 +29,7 @@ export const BROWSER_METHODS: ReadonlySet<string> = new Set([
   "device.revoke",
   "file.list",
   "file.read",
+  "fs.choose_folder",
   "fs.list_dirs",
   "git.branches",
   "git.info",

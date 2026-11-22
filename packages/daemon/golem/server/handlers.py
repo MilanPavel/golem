@@ -36,7 +36,14 @@ from golem.config_edit import (
     set_permission_mode,
 )
 from golem.doctor import MacPlatform, run_checks
-from golem.folders import FolderError, list_dirs
+from golem.folders import (
+    DialogBusyError,
+    DialogUnsupportedError,
+    FolderError,
+    choose_folder,
+    dialog_supported,
+    list_dirs,
+)
 from golem.gitinfo import git_branches, git_info
 from golem.mcp import McpServerError, McpSupervisor
 from golem.models import hardware, ollama
@@ -76,6 +83,7 @@ from golem.server.dispatcher import (
     APPROVAL_NOT_FOUND,
     ARTIFACT_NOT_FOUND,
     BUDGET_SPENT,
+    BUSY,
     INTERNAL_ERROR,
     INVALID_PARAMS,
     INVALID_TOOL_ARGS,
@@ -86,12 +94,14 @@ from golem.server.dispatcher import (
     MESSAGE_NOT_FOUND,
     MODEL_NOT_CONFIGURED,
     MODEL_PULL_FAILED,
+    NOT_LOCAL,
     OLLAMA_FAILED,
     PROTOCOL_MISMATCH,
     RUN_NOT_FOUND,
     SESSION_BUSY,
     SESSION_NOT_FOUND,
     SKILL_NOT_FOUND,
+    UNSUPPORTED,
     Method,
     RequestContext,
     RpcCallError,
@@ -231,6 +241,8 @@ from golem_protocol.commands import (
     FileListResult,
     FileReadParams,
     FileReadResult,
+    FsChooseFolderParams,
+    FsChooseFolderResult,
     FsListDirsParams,
     FsListDirsResult,
     GitBranchesParams,
@@ -402,6 +414,16 @@ class _EmptyParams(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
 
+def _local_ui(ctx: RequestContext) -> bool:
+    """Whether this connection is a page on the daemon's Mac that may open the folder dialog.
+
+    The gateway serves pages on 127.0.0.1 only, and a phone or another machine reaches the
+    daemon through a gateway session that names its device with ``connection.identify``
+    before anything else. A connection with no device is therefore on this Mac.
+    """
+    return ctx.connection.device is None and dialog_supported()
+
+
 async def _hello(ctx: RequestContext, params: HelloParams) -> HelloResult:
     if params.protocol_major != PROTOCOL_MAJOR:
         raise RpcCallError(
@@ -415,6 +437,7 @@ async def _hello(ctx: RequestContext, params: HelloParams) -> HelloResult:
         protocol_major=PROTOCOL_MAJOR,
         protocol_minor=PROTOCOL_MINOR,
         daemon_version=__version__,
+        local_ui=_local_ui(ctx),
     )
 
 
@@ -619,6 +642,30 @@ async def _git_branches(ctx: RequestContext, params: GitBranchesParams) -> GitBr
         return await git_branches(params.path, Path.home())
     except FolderError as exc:
         raise RpcCallError(INVALID_PARAMS, str(exc)) from exc
+
+
+async def _fs_choose_folder(
+    ctx: RequestContext, params: FsChooseFolderParams
+) -> FsChooseFolderResult:
+    if ctx.connection.device is not None:
+        raise RpcCallError(
+            NOT_LOCAL,
+            "The folder dialog opens only for a page on this Mac.",
+            {"reason": "not_local"},
+        )
+    if params.start is not None and not Path(params.start).is_absolute():
+        raise RpcCallError(INVALID_PARAMS, "start must be an absolute path")
+    try:
+        path = await choose_folder(
+            None if params.start is None else Path(params.start), Path.home()
+        )
+    except DialogUnsupportedError as exc:
+        raise RpcCallError(UNSUPPORTED, str(exc), {"reason": "unsupported"}) from exc
+    except DialogBusyError as exc:
+        raise RpcCallError(BUSY, str(exc), {"reason": "busy"}) from exc
+    except FolderError as exc:
+        raise RpcCallError(INTERNAL_ERROR, str(exc)) from exc
+    return FsChooseFolderResult(path=path)
 
 
 async def _route_consent_answer(
@@ -2134,6 +2181,9 @@ def standard_methods() -> dict[str, Method]:
         "fs.list_dirs": Method("fs.list_dirs", FsListDirsParams, True, _fs_list_dirs),
         "git.info": Method("git.info", GitInfoParams, True, _git_info),
         "git.branches": Method("git.branches", GitBranchesParams, True, _git_branches),
+        "fs.choose_folder": Method(
+            "fs.choose_folder", FsChooseFolderParams, True, _fs_choose_folder
+        ),
         "setup.status": Method("setup.status", SetupStatusParams, True, _setup_status),
         "ollama.install": Method("ollama.install", OllamaInstallParams, True, _ollama_install),
         "ollama.install_cancel": Method(

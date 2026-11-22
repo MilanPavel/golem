@@ -53,9 +53,9 @@ private struct Fixture: Decodable {
 
 @Test func helloChecksTheProtocolMajor() throws {
     #expect(HelloParams.current(client: "ios").protocolMajor == ProtocolVersion.major)
-    let newer = HelloResult(daemonVersion: "x", protocolMajor: ProtocolVersion.major, protocolMinor: ProtocolVersion.minor + 5)
+    let newer = HelloResult(daemonVersion: "x", localUI: false, protocolMajor: ProtocolVersion.major, protocolMinor: ProtocolVersion.minor + 5)
     try newer.check()
-    let other = HelloResult(daemonVersion: "x", protocolMajor: ProtocolVersion.major + 1, protocolMinor: 0)
+    let other = HelloResult(daemonVersion: "x", localUI: false, protocolMajor: ProtocolVersion.major + 1, protocolMinor: 0)
     #expect(throws: HelloError.majorMismatch(app: ProtocolVersion.major, daemon: ProtocolVersion.major + 1)) {
         try other.check()
     }

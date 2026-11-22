@@ -39,6 +39,10 @@ class HelloResult(BaseModel):
     protocol_major: int
     protocol_minor: int
     daemon_version: str
+    local_ui: bool = False
+    """True when this connection is a page on the daemon's own Mac and the platform can show
+    the macOS folder dialog, so ``fs.choose_folder`` is offered. False for a paired phone
+    that comes through the relay, and for any platform but macOS."""
 
 
 class LocalServer(BaseModel):
@@ -4854,6 +4858,29 @@ class GitBranchesResult(BaseModel):
     branches: list[GitBranch]
 
 
+class FsChooseFolderParams(BaseModel):
+    """``fs.choose_folder``. Opens the macOS folder dialog on the daemon's Mac.
+
+    ``start`` is the folder the dialog opens in. Null opens it in the home folder, and so
+    does a path that is not a folder. The call waits up to 5 minutes for an answer. It is
+    refused with ``not_local`` when the caller is not a page on this Mac, with
+    ``unsupported`` when the platform is not macOS, and with ``busy`` while another dialog
+    is open (see ``HelloResult.local_ui``).
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    start: str | None = Field(default=None, min_length=1)
+
+
+class FsChooseFolderResult(BaseModel):
+    """The folder chosen, as an absolute path with no trailing slash. Null means cancelled."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    path: str | None = None
+
+
 __all__ = [
     "AgentInfo",
     "AgentLimits",
@@ -4943,6 +4970,8 @@ __all__ = [
     "FileListResult",
     "FileReadParams",
     "FileReadResult",
+    "FsChooseFolderParams",
+    "FsChooseFolderResult",
     "FsListDirsParams",
     "FsListDirsResult",
     "GitBranch",

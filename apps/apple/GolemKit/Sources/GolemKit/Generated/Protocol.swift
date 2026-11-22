@@ -4733,6 +4733,40 @@ public struct ForkedFrom: Codable {
     }
 }
 
+/// ``fs.choose_folder``. Opens the macOS folder dialog on the daemon's Mac.
+///
+/// ``start`` is the folder the dialog opens in. Null opens it in the home folder, and so
+/// does a path that is not a folder. The call waits up to 5 minutes for an answer. It is
+/// refused with ``not_local`` when the caller is not a page on this Mac, with
+/// ``unsupported`` when the platform is not macOS, and with ``busy`` while another dialog
+/// is open (see ``HelloResult.local_ui``).
+// MARK: - FSChooseFolderParams
+public struct FSChooseFolderParams: Codable {
+    public let start: String?
+
+    public enum CodingKeys: String, CodingKey {
+        case start = "start"
+    }
+
+    public init(start: String?) {
+        self.start = start
+    }
+}
+
+/// The folder chosen, as an absolute path with no trailing slash. Null means cancelled.
+// MARK: - FSChooseFolderResult
+public struct FSChooseFolderResult: Codable {
+    public let path: String?
+
+    public enum CodingKeys: String, CodingKey {
+        case path = "path"
+    }
+
+    public init(path: String?) {
+        self.path = path
+    }
+}
+
 /// ``fs.list_dirs``. The folders directly under ``path``, for a folder picker.
 ///
 /// ``path`` is an absolute path under the user's home folder. Null lists the
@@ -4988,17 +5022,20 @@ public struct HelloParams: Codable {
 // MARK: - HelloResult
 public struct HelloResult: Codable {
     public let daemonVersion: String
+    public let localUI: Bool?
     public let protocolMajor: Int
     public let protocolMinor: Int
 
     public enum CodingKeys: String, CodingKey {
         case daemonVersion = "daemon_version"
+        case localUI = "local_ui"
         case protocolMajor = "protocol_major"
         case protocolMinor = "protocol_minor"
     }
 
-    public init(daemonVersion: String, protocolMajor: Int, protocolMinor: Int) {
+    public init(daemonVersion: String, localUI: Bool?, protocolMajor: Int, protocolMinor: Int) {
         self.daemonVersion = daemonVersion
+        self.localUI = localUI
         self.protocolMajor = protocolMajor
         self.protocolMinor = protocolMinor
     }
