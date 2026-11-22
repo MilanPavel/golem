@@ -9,6 +9,8 @@ from golem_protocol.commands import (
     AgentRegistryChanged,
     AgentsGetParams,
     AgentsGetResult,
+    AgentsKeepParams,
+    AgentsKeepResult,
     AgentsKeepValues,
     AgentsListParams,
     AgentsListResult,
@@ -666,3 +668,47 @@ def test_approval_respond_scope() -> None:
         ApprovalRespondParams.model_validate(
             {**base, "decision": "allow", "scope": "batch", "args": {}}
         )
+
+
+def test_batch_pending_item_round_trips_in_pending_items() -> None:
+    batch = PendingItem(
+        kind="batch",
+        since="t3",
+        call_id="c9",
+        helper_count=3,
+        agents=["explorer", "explorer", "worker"],
+    )
+    own = PendingItem(kind="approval", since="t4", call_id="c1", name="shell", subject="ls")
+    summary = _summary(
+        pending=own.model_dump(), pending_items=[batch.model_dump(), own.model_dump()]
+    )
+    again = SessionSummary.model_validate_json(summary.model_dump_json())
+    assert again == summary
+    assert again.pending_items[0].helper_count == 3
+    assert again.pending_items[0].agents == ["explorer", "explorer", "worker"]
+    assert PendingItem(kind="approval", since="t").helper_count is None
+
+
+def test_old_pending_field_never_holds_a_batch() -> None:
+    batch = PendingItem(kind="batch", since="t", call_id="c9", helper_count=2, agents=["a", "b"])
+    with pytest.raises(ValidationError):
+        _summary(pending=batch.model_dump())
+    summary = _summary(pending_items=[batch.model_dump()])
+    assert summary.pending is None
+    # what an older client reads is `pending`, and it holds no batch
+    assert summary.model_dump(mode="json")["pending"] is None
+    with pytest.raises(ValidationError):
+        PendingItem.model_validate({"kind": "batch", "since": "t", "helper_count": 0})
+
+
+def test_use_helpers_setting_values() -> None:
+    assert AgentsKeepParams().use_helpers is None
+    assert AgentsKeepParams(use_helpers="ask").use_helpers == "ask"
+    with pytest.raises(ValidationError):
+        AgentsKeepParams.model_validate({"use_helpers": "always"})
+    values = AgentsKeepValues(keep_days=7, keep_problem_days=30)
+    assert values.use_helpers == "when_needed"
+    never = AgentsKeepValues(keep_days=7, keep_problem_days=30, use_helpers="never")
+    assert AgentsKeepValues.model_validate_json(never.model_dump_json()) == never
+    result = AgentsKeepResult(ok=True, values=never)
+    assert AgentsKeepResult.model_validate_json(result.model_dump_json()) == result

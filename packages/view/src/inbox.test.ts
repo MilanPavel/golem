@@ -27,6 +27,14 @@ describe("inboxItems", () => {
     assert.deepEqual(items.map((item) => item.sessionId), ["b", "a", "c"]);
   });
 
+  it("skips a batch item and any kind it does not know, without throwing", () => {
+    const batch: InboxPending = { kind: "batch", since: "2026-11-16T11:50:00Z", call_id: "c9", helper_count: 2, agents: ["explorer", "worker"] };
+    const unknown = { kind: "future", since: "2026-11-16T11:51:00Z" } as unknown as InboxPending;
+    const items = inboxItems([session("a", null, { pending_items: [batch, unknown, approval("shell", "ls")] }), session("b", null, { pending_items: [batch] })], NOW);
+    assert.deepEqual(items.map((item) => item.sessionId), ["a"]);
+    assert.equal(items[0]!.kind, "approval");
+  });
+
   it("skips sessions with nothing pending and closed sessions", () => {
     const items = inboxItems(
       [session("a", null), session("b", undefined), session("c", approval("shell", "ls"), { status: "closed" }), session("d", approval("shell", "ls"))],

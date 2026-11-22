@@ -43,7 +43,7 @@
     },
     "PendingItem": {
       "additionalProperties": false,
-      "description": "What a waiting session waits for, in a form a client can list without opening it.\n\n``kind`` is ``approval`` for a tool call that needs a yes, and ``consent`` for the paid\nstep-up question. ``since`` is the ``ts`` of the event that asked\n(``approval.needed`` or ``route.consent.needed``). For an approval, ``call_id``, ``name``,\n``subject`` and ``source`` are those of the ``approval.needed`` event, and ``added`` and\n``removed`` count the lines its diff adds and removes (null when the call has no diff).\nFor a consent, ``alternatives`` is the number of answers the user may give. A helper's\nconsent also carries ``helper_id``, ``agent``, ``label``, ``sent`` and ``not_sent`` of its\n``route.consent.needed`` event. The full diff\nstays in the session's events: a summary goes to every watcher on every event, so it\ncarries counts only. An older daemon leaves ``pending`` out of the summary.\n\nIn ``SessionSummary.pending_items`` an item of a lead's helper also carries ``helper``\n(the helper's ``session_id``, ``agent``, ``label`` and ``index``). ``count`` is the number\nof helpers that ask this same question (the same ``kind``, ``name`` and ``subject``), which\nthe lead lists once; null for a single item. An older daemon leaves both out.",
+      "description": "What a waiting session waits for, in a form a client can list without opening it.\n\n``kind`` is ``approval`` for a tool call that needs a yes, and ``consent`` for the paid\nstep-up question. ``since`` is the ``ts`` of the event that asked\n(``approval.needed`` or ``route.consent.needed``). For an approval, ``call_id``, ``name``,\n``subject`` and ``source`` are those of the ``approval.needed`` event, and ``added`` and\n``removed`` count the lines its diff adds and removes (null when the call has no diff).\nFor a consent, ``alternatives`` is the number of answers the user may give. A helper's\nconsent also carries ``helper_id``, ``agent``, ``label``, ``sent`` and ``not_sent`` of its\n``route.consent.needed`` event. The full diff\nstays in the session's events: a summary goes to every watcher on every event, so it\ncarries counts only. An older daemon leaves ``pending`` out of the summary.\n\nIn ``SessionSummary.pending_items`` an item of a lead's helper also carries ``helper``\n(the helper's ``session_id``, ``agent``, ``label`` and ``index``). ``count`` is the number\nof helpers that ask this same question (the same ``kind``, ``name`` and ``subject``), which\nthe lead lists once; null for a single item. An older daemon leaves both out.\n\nA ``batch`` item is the card that asks the user to confirm a ``delegate`` batch before its\nhelpers start (\"Use helpers: Ask me first\"). ``call_id`` is the ``delegate`` call, the id an\nanswer names. ``helper_count`` is how many helpers the batch starts and ``agents`` their agent\ntype names, one for each helper, in the order of the call. It is only ever in\n``SessionSummary.pending_items``: ``SessionSummary.pending`` never holds one, because an\nolder client reads that field and knows only ``approval`` and ``consent``.",
       "properties": {
         "added": {
           "anyOf": [
@@ -70,6 +70,22 @@
           ],
           "default": null,
           "title": "Agent"
+        },
+        "agents": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "maxItems": 100,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Agents"
         },
         "alternatives": {
           "anyOf": [
@@ -121,6 +137,20 @@
           ],
           "default": null
         },
+        "helper_count": {
+          "anyOf": [
+            {
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Helper Count"
+        },
         "helper_id": {
           "anyOf": [
             {
@@ -137,7 +167,8 @@
         "kind": {
           "enum": [
             "approval",
-            "consent"
+            "consent",
+            "batch"
           ],
           "title": "Kind",
           "type": "string"

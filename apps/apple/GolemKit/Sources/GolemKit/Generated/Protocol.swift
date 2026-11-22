@@ -825,16 +825,25 @@ public struct AgentsGetResultWishResolution: Codable {
 public struct AgentsKeepParams: Codable {
     public let keepDays: Int?
     public let keepProblemDays: Int?
+    public let useHelpers: UseHelpers?
 
     public enum CodingKeys: String, CodingKey {
         case keepDays = "keep_days"
         case keepProblemDays = "keep_problem_days"
+        case useHelpers = "use_helpers"
     }
 
-    public init(keepDays: Int?, keepProblemDays: Int?) {
+    public init(keepDays: Int?, keepProblemDays: Int?, useHelpers: UseHelpers?) {
         self.keepDays = keepDays
         self.keepProblemDays = keepProblemDays
+        self.useHelpers = useHelpers
     }
+}
+
+public enum UseHelpers: String, Codable {
+    case ask = "ask"
+    case never = "never"
+    case whenNeeded = "when_needed"
 }
 
 /// ``ok`` is false when a value was wrong, and the file is then untouched. ``values`` is
@@ -889,6 +898,9 @@ public struct AgentsKeepResultError: Codable {
 /// ``[agents]`` that every helper gets when its own table and file leave them open; ``None``
 /// when
 /// ``config.toml`` does not set one. ``agents.set_default_limits`` changes them.
+/// ``use_helpers`` is ``[agents] use_helpers``; ``when_needed`` when ``config.toml`` does
+/// not
+/// set it and for a daemon that does not know it.
 // MARK: - AgentsKeepValuesClass
 public struct AgentsKeepValuesClass: Codable {
     public let keepDays: Int
@@ -896,6 +908,7 @@ public struct AgentsKeepValuesClass: Codable {
     public let maxCalls: Int?
     public let maxCost: Double?
     public let maxTokens: Int?
+    public let useHelpers: UseHelpers?
     public let workingSeconds: Int?
 
     public enum CodingKeys: String, CodingKey {
@@ -904,15 +917,17 @@ public struct AgentsKeepValuesClass: Codable {
         case maxCalls = "max_calls"
         case maxCost = "max_cost"
         case maxTokens = "max_tokens"
+        case useHelpers = "use_helpers"
         case workingSeconds = "working_seconds"
     }
 
-    public init(keepDays: Int, keepProblemDays: Int, maxCalls: Int?, maxCost: Double?, maxTokens: Int?, workingSeconds: Int?) {
+    public init(keepDays: Int, keepProblemDays: Int, maxCalls: Int?, maxCost: Double?, maxTokens: Int?, useHelpers: UseHelpers?, workingSeconds: Int?) {
         self.keepDays = keepDays
         self.keepProblemDays = keepProblemDays
         self.maxCalls = maxCalls
         self.maxCost = maxCost
         self.maxTokens = maxTokens
+        self.useHelpers = useHelpers
         self.workingSeconds = workingSeconds
     }
 }
@@ -923,6 +938,9 @@ public struct AgentsKeepValuesClass: Codable {
 /// ``[agents]`` that every helper gets when its own table and file leave them open; ``None``
 /// when
 /// ``config.toml`` does not set one. ``agents.set_default_limits`` changes them.
+/// ``use_helpers`` is ``[agents] use_helpers``; ``when_needed`` when ``config.toml`` does
+/// not
+/// set it and for a daemon that does not know it.
 // MARK: - AgentsKeepValues
 public struct AgentsKeepValues: Codable {
     public let keepDays: Int
@@ -930,6 +948,7 @@ public struct AgentsKeepValues: Codable {
     public let maxCalls: Int?
     public let maxCost: Double?
     public let maxTokens: Int?
+    public let useHelpers: UseHelpers?
     public let workingSeconds: Int?
 
     public enum CodingKeys: String, CodingKey {
@@ -938,15 +957,17 @@ public struct AgentsKeepValues: Codable {
         case maxCalls = "max_calls"
         case maxCost = "max_cost"
         case maxTokens = "max_tokens"
+        case useHelpers = "use_helpers"
         case workingSeconds = "working_seconds"
     }
 
-    public init(keepDays: Int, keepProblemDays: Int, maxCalls: Int?, maxCost: Double?, maxTokens: Int?, workingSeconds: Int?) {
+    public init(keepDays: Int, keepProblemDays: Int, maxCalls: Int?, maxCost: Double?, maxTokens: Int?, useHelpers: UseHelpers?, workingSeconds: Int?) {
         self.keepDays = keepDays
         self.keepProblemDays = keepProblemDays
         self.maxCalls = maxCalls
         self.maxCost = maxCost
         self.maxTokens = maxTokens
+        self.useHelpers = useHelpers
         self.workingSeconds = workingSeconds
     }
 }
@@ -21304,14 +21325,26 @@ public struct SessionElement: Codable {
 /// of helpers that ask this same question (the same ``kind``, ``name`` and ``subject``),
 /// which
 /// the lead lists once; null for a single item. An older daemon leaves both out.
+///
+/// A ``batch`` item is the card that asks the user to confirm a ``delegate`` batch before
+/// its
+/// helpers start ("Use helpers: Ask me first"). ``call_id`` is the ``delegate`` call, the id
+/// an
+/// answer names. ``helper_count`` is how many helpers the batch starts and ``agents`` their
+/// agent
+/// type names, one for each helper, in the order of the call. It is only ever in
+/// ``SessionSummary.pending_items``: ``SessionSummary.pending`` never holds one, because an
+/// older client reads that field and knows only ``approval`` and ``consent``.
 // MARK: - SessionPendingItem
 public struct SessionPendingItem: Codable {
     public let added: Int?
     public let agent: String?
+    public let agents: [String]?
     public let alternatives: Int?
     public let callID: String?
     public let count: Int?
     public let helper: PurplePendingHelper?
+    public let helperCount: Int?
     public let helperID: String?
     public let kind: PendingItemKind
     public let label: String?
@@ -21326,10 +21359,12 @@ public struct SessionPendingItem: Codable {
     public enum CodingKeys: String, CodingKey {
         case added = "added"
         case agent = "agent"
+        case agents = "agents"
         case alternatives = "alternatives"
         case callID = "call_id"
         case count = "count"
         case helper = "helper"
+        case helperCount = "helper_count"
         case helperID = "helper_id"
         case kind = "kind"
         case label = "label"
@@ -21342,13 +21377,15 @@ public struct SessionPendingItem: Codable {
         case subject = "subject"
     }
 
-    public init(added: Int?, agent: String?, alternatives: Int?, callID: String?, count: Int?, helper: PurplePendingHelper?, helperID: String?, kind: PendingItemKind, label: String?, name: String?, notSent: [String]?, removed: Int?, sent: [String]?, since: String, source: String?, subject: String?) {
+    public init(added: Int?, agent: String?, agents: [String]?, alternatives: Int?, callID: String?, count: Int?, helper: PurplePendingHelper?, helperCount: Int?, helperID: String?, kind: PendingItemKind, label: String?, name: String?, notSent: [String]?, removed: Int?, sent: [String]?, since: String, source: String?, subject: String?) {
         self.added = added
         self.agent = agent
+        self.agents = agents
         self.alternatives = alternatives
         self.callID = callID
         self.count = count
         self.helper = helper
+        self.helperCount = helperCount
         self.helperID = helperID
         self.kind = kind
         self.label = label
@@ -21390,6 +21427,7 @@ public struct PurplePendingHelper: Codable {
 
 public enum PendingItemKind: String, Codable {
     case approval = "approval"
+    case batch = "batch"
     case consent = "consent"
 }
 
@@ -22080,14 +22118,26 @@ public struct SessionSummaryNotificationParams: Codable {
 /// of helpers that ask this same question (the same ``kind``, ``name`` and ``subject``),
 /// which
 /// the lead lists once; null for a single item. An older daemon leaves both out.
+///
+/// A ``batch`` item is the card that asks the user to confirm a ``delegate`` batch before
+/// its
+/// helpers start ("Use helpers: Ask me first"). ``call_id`` is the ``delegate`` call, the id
+/// an
+/// answer names. ``helper_count`` is how many helpers the batch starts and ``agents`` their
+/// agent
+/// type names, one for each helper, in the order of the call. It is only ever in
+/// ``SessionSummary.pending_items``: ``SessionSummary.pending`` never holds one, because an
+/// older client reads that field and knows only ``approval`` and ``consent``.
 // MARK: - ParamsPendingItem
 public struct ParamsPendingItem: Codable {
     public let added: Int?
     public let agent: String?
+    public let agents: [String]?
     public let alternatives: Int?
     public let callID: String?
     public let count: Int?
     public let helper: FluffyPendingHelper?
+    public let helperCount: Int?
     public let helperID: String?
     public let kind: PendingItemKind
     public let label: String?
@@ -22102,10 +22152,12 @@ public struct ParamsPendingItem: Codable {
     public enum CodingKeys: String, CodingKey {
         case added = "added"
         case agent = "agent"
+        case agents = "agents"
         case alternatives = "alternatives"
         case callID = "call_id"
         case count = "count"
         case helper = "helper"
+        case helperCount = "helper_count"
         case helperID = "helper_id"
         case kind = "kind"
         case label = "label"
@@ -22118,13 +22170,15 @@ public struct ParamsPendingItem: Codable {
         case subject = "subject"
     }
 
-    public init(added: Int?, agent: String?, alternatives: Int?, callID: String?, count: Int?, helper: FluffyPendingHelper?, helperID: String?, kind: PendingItemKind, label: String?, name: String?, notSent: [String]?, removed: Int?, sent: [String]?, since: String, source: String?, subject: String?) {
+    public init(added: Int?, agent: String?, agents: [String]?, alternatives: Int?, callID: String?, count: Int?, helper: FluffyPendingHelper?, helperCount: Int?, helperID: String?, kind: PendingItemKind, label: String?, name: String?, notSent: [String]?, removed: Int?, sent: [String]?, since: String, source: String?, subject: String?) {
         self.added = added
         self.agent = agent
+        self.agents = agents
         self.alternatives = alternatives
         self.callID = callID
         self.count = count
         self.helper = helper
+        self.helperCount = helperCount
         self.helperID = helperID
         self.kind = kind
         self.label = label
@@ -22310,14 +22364,26 @@ public struct SessionSummary: Codable {
 /// of helpers that ask this same question (the same ``kind``, ``name`` and ``subject``),
 /// which
 /// the lead lists once; null for a single item. An older daemon leaves both out.
+///
+/// A ``batch`` item is the card that asks the user to confirm a ``delegate`` batch before
+/// its
+/// helpers start ("Use helpers: Ask me first"). ``call_id`` is the ``delegate`` call, the id
+/// an
+/// answer names. ``helper_count`` is how many helpers the batch starts and ``agents`` their
+/// agent
+/// type names, one for each helper, in the order of the call. It is only ever in
+/// ``SessionSummary.pending_items``: ``SessionSummary.pending`` never holds one, because an
+/// older client reads that field and knows only ``approval`` and ``consent``.
 // MARK: - SessionSummaryPendingItem
 public struct SessionSummaryPendingItem: Codable {
     public let added: Int?
     public let agent: String?
+    public let agents: [String]?
     public let alternatives: Int?
     public let callID: String?
     public let count: Int?
     public let helper: TentacledPendingHelper?
+    public let helperCount: Int?
     public let helperID: String?
     public let kind: PendingItemKind
     public let label: String?
@@ -22332,10 +22398,12 @@ public struct SessionSummaryPendingItem: Codable {
     public enum CodingKeys: String, CodingKey {
         case added = "added"
         case agent = "agent"
+        case agents = "agents"
         case alternatives = "alternatives"
         case callID = "call_id"
         case count = "count"
         case helper = "helper"
+        case helperCount = "helper_count"
         case helperID = "helper_id"
         case kind = "kind"
         case label = "label"
@@ -22348,13 +22416,15 @@ public struct SessionSummaryPendingItem: Codable {
         case subject = "subject"
     }
 
-    public init(added: Int?, agent: String?, alternatives: Int?, callID: String?, count: Int?, helper: TentacledPendingHelper?, helperID: String?, kind: PendingItemKind, label: String?, name: String?, notSent: [String]?, removed: Int?, sent: [String]?, since: String, source: String?, subject: String?) {
+    public init(added: Int?, agent: String?, agents: [String]?, alternatives: Int?, callID: String?, count: Int?, helper: TentacledPendingHelper?, helperCount: Int?, helperID: String?, kind: PendingItemKind, label: String?, name: String?, notSent: [String]?, removed: Int?, sent: [String]?, since: String, source: String?, subject: String?) {
         self.added = added
         self.agent = agent
+        self.agents = agents
         self.alternatives = alternatives
         self.callID = callID
         self.count = count
         self.helper = helper
+        self.helperCount = helperCount
         self.helperID = helperID
         self.kind = kind
         self.label = label

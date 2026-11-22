@@ -14,6 +14,7 @@ export type Origin = string;
 export type ParentSessionId = string | null;
 export type Added = number | null;
 export type Agent1 = string | null;
+export type Agents = string[] | null;
 export type Alternatives = number | null;
 export type CallId = string | null;
 export type Count = number | null;
@@ -21,8 +22,9 @@ export type Agent2 = string;
 export type Index = number;
 export type Label = string | null;
 export type SessionId = string;
+export type HelperCount = number | null;
 export type HelperId = string | null;
-export type Kind = 'approval' | 'consent';
+export type Kind = 'approval' | 'consent' | 'batch';
 export type Label1 = string | null;
 export type Name = string | null;
 export type NotSent =
@@ -155,16 +157,25 @@ export interface SessionSummary {
  * of helpers that ask this same question (the same ``kind``, ``name`` and ``subject``), which
  * the lead lists once; null for a single item. An older daemon leaves both out.
  *
+ * A ``batch`` item is the card that asks the user to confirm a ``delegate`` batch before its
+ * helpers start ("Use helpers: Ask me first"). ``call_id`` is the ``delegate`` call, the id an
+ * answer names. ``helper_count`` is how many helpers the batch starts and ``agents`` their agent
+ * type names, one for each helper, in the order of the call. It is only ever in
+ * ``SessionSummary.pending_items``: ``SessionSummary.pending`` never holds one, because an
+ * older client reads that field and knows only ``approval`` and ``consent``.
+ *
  * This interface was referenced by `SessionSummary`'s JSON-Schema
  * via the `definition` "PendingItem".
  */
 export interface PendingItem {
   added?: Added;
   agent?: Agent1;
+  agents?: Agents;
   alternatives?: Alternatives;
   call_id?: CallId;
   count?: Count;
   helper?: PendingHelper | null;
+  helper_count?: HelperCount;
   helper_id?: HelperId;
   kind: Kind;
   label?: Label1;

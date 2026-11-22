@@ -2,6 +2,7 @@
 
 export type KeepDays = number | null;
 export type KeepProblemDays = number | null;
+export type UseHelpers = ('when_needed' | 'ask' | 'never') | null;
 
 /**
  * ``agents.keep``. Read how long a finished helper's steps are kept, or change it.
@@ -13,4 +14,5 @@ export type KeepProblemDays = number | null;
 export interface AgentsKeepParams {
   keep_days?: KeepDays;
   keep_problem_days?: KeepProblemDays;
+  use_helpers?: UseHelpers;
 }

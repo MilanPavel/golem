@@ -5,6 +5,7 @@ export type KeepProblemDays = number;
 export type MaxCalls = number | null;
 export type MaxCost = number | null;
 export type MaxTokens = number | null;
+export type UseHelpers = 'when_needed' | 'ask' | 'never';
 export type WorkingSeconds = number | null;
 
 /**
@@ -13,6 +14,8 @@ export type WorkingSeconds = number | null;
  * ``max_calls``, ``working_seconds``, ``max_cost`` and ``max_tokens`` are the limits of
  * ``[agents]`` that every helper gets when its own table and file leave them open; ``None`` when
  * ``config.toml`` does not set one. ``agents.set_default_limits`` changes them.
+ * ``use_helpers`` is ``[agents] use_helpers``; ``when_needed`` when ``config.toml`` does not
+ * set it and for a daemon that does not know it.
  */
 export interface AgentsKeepValues {
   keep_days: KeepDays;
@@ -20,5 +23,6 @@ export interface AgentsKeepValues {
   max_calls?: MaxCalls;
   max_cost?: MaxCost;
   max_tokens?: MaxTokens;
+  use_helpers?: UseHelpers;
   working_seconds?: WorkingSeconds;
 }
