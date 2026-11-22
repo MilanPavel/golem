@@ -140,6 +140,30 @@ test("a model the daemon refuses shows under the chips, the pick stays, and the 
   expect(fake.raw.sendMessage).not.toHaveBeenCalled();
 });
 
+test("the new-chat label on auto is the model auto starts on; a pick or another route keeps its label", () => {
+  const auto = { routing: { mode: "auto", paid: "ask", budget_max_price: 1.5, local_only: [] }, ladder: {} } as never;
+  const pinned = { routing: { mode: "pinned", paid: "ask", budget_max_price: 1.5, local_only: [] }, ladder: {} } as never;
+  expect(newSessionModelLabel(SAMPLE_LISTING, null, auto)).toMatchObject({ kind: "auto" });
+  expect(newSessionModelLabel(SAMPLE_LISTING, null, pinned)).toEqual({ kind: "default", text: "Gemma 4 E4B" });
+  expect(newSessionModelLabel(SAMPLE_LISTING, "local", auto)).toEqual({ kind: "pick", text: "Qwen3 8B" });
+});
+
+test("on the home screen the model and folder chips are in the composer's row, and nothing sits under the composer", async () => {
+  setup();
+  const model = await screen.findByRole("button", { name: "Model: Gemma 4 E4B, default" });
+  const folder = screen.getByRole("button", { name: /^Folder:/ });
+  const row = document.querySelector("[data-composer-bar]");
+  const composer = document.querySelector("[data-composer]");
+  expect(row?.contains(model)).toBe(true);
+  expect(row?.contains(folder)).toBe(true);
+  expect(composer?.contains(row)).toBe(true);
+  // Model, then folder; Send is the only control at the right.
+  expect(model.compareDocumentPosition(folder) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(row?.querySelector("button[aria-label='Send']")).toBeTruthy();
+  expect(row?.querySelector("[aria-label^='Permission mode']")).toBeNull();
+  expect(screen.getAllByRole("button", { name: /^(Model:|Folder:)/ })).toHaveLength(2);
+});
+
 test("the chip and the dialog have no accessibility violations", async () => {
   const { container, user } = setup();
   await user.click(await screen.findByRole("button", { name: /^Model:/ }));

@@ -5,14 +5,14 @@ import type { ModelDialogViewProps } from "./model-dialog.tsx";
 /**
  * The model dialog of one session, open or not. The chip and the `/model` command both open it
  * here, so one dialog serves both. `returnTo` says where focus goes back to when it closes: the
- * chip, or the element that had focus when the command ran, which is the composer.
+ * element that opened it, such as the model chip, or the composer that ran the command.
  */
 export type ModelDialogOpen = {
   /** The session it is for, or null for the model of the next new session (new-session mode). */
   sessionId: string | null;
   /** "default" is for the default model of new sessions: Settings opens it. It has no session, so `sessionId` is null. */
   mode?: "default";
-  returnTo: "chip" | HTMLElement | null;
+  returnTo: HTMLElement | null;
   initial?: ModelDialogViewProps["initial"];
 };
 

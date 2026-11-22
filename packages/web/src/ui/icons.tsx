@@ -284,3 +284,15 @@ export const SettingsConfigIcon = (props: IconProps) => (
     <path d="M4 2h5.5L12 4.5V14H4z" /><path d="M9.5 2v2.5H12M6 8h4M6 10.5h4" />
   </Icon>
 );
+/** A shield: the permission mode. */
+export const ShieldIcon = (props: IconProps) => (
+  <Icon {...props}>
+    <path d="M8 2 3 4v4c0 3 2.2 5 5 6 2.8-1 5-3 5-6V4z" />
+  </Icon>
+);
+/** A short list: a plan. */
+export const PlanIcon = (props: IconProps) => (
+  <Icon {...props}>
+    <path d="M5 4h8M5 8h8M5 12h8M2.5 4h.01M2.5 8h.01M2.5 12h.01" />
+  </Icon>
+);

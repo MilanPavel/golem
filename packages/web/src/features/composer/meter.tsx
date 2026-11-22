@@ -1,5 +1,5 @@
 import { formatElapsed, WAITING_FOR_LOCAL_MODEL, type GolemState } from "@golem/view";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState } from "react";
 import { GOLEM_STATE_LABEL } from "../../ui/golem-state.ts";
 import { PixelGolem } from "../../ui/pixel-golem.tsx";
 
@@ -32,8 +32,6 @@ export type MeterProps = {
   wait?: string | null;
   /** What a call loads while the local model reloads with a larger window. */
   loading?: string | null;
-  /** Something small at the right end of the row, such as the context chip. */
-  aside?: ReactNode;
 };
 
 /** What the meter says, the same word the sidebar uses. */
@@ -51,7 +49,7 @@ export function meterText(state: GolemState, seconds: number): string {
 }
 
 /** The small golem and what golem is doing, above the composer. */
-export function Meter({ state, runStartedAt, localWait = false, wait = null, loading = null, aside }: MeterProps) {
+export function Meter({ state, runStartedAt, localWait = false, wait = null, loading = null }: MeterProps) {
   const now = useTicker(state === "thinking");
   const text =
     state === "thinking" && loading !== null
@@ -63,7 +61,6 @@ export function Meter({ state, runStartedAt, localWait = false, wait = null, loa
     <div data-meter={state} className="flex min-h-5 items-center gap-2.5 px-1 text-meta text-muted">
       <PixelGolem state={state} size="sm" />
       {text === "" ? null : <span>{text}</span>}
-      {aside === undefined ? null : <span className="ml-auto">{aside}</span>}
     </div>
   );
 }

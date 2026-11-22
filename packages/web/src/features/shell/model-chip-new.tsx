@@ -1,11 +1,11 @@
 import { AUTO_MODEL_HINT, namesModel, sessionModelOf, shownModel, shownModelText } from "@golem/view";
 import type { RoutingGetResult } from "../../store/routing.ts";
-import { badgeVariants } from "../../ui/badge.tsx";
 import { cn } from "../../ui/cn.ts";
-import { ChevronDownIcon } from "../../ui/icons.tsx";
+import { CpuIcon } from "../../ui/icons.tsx";
 import type { ModelListResult } from "../../store/models.ts";
 import { useModelList, useNewSessionModel, useRouting } from "../../store/page-context.tsx";
 import { openModelDialog } from "../models/index.ts";
+import { BAR_CHIP, ModelName } from "../composer/index.ts";
 
 /** What the chip says: the pick, else the default with a tag, else a question. `loading` until the list is known. */
 export type NewSessionModelLabel =
@@ -43,7 +43,7 @@ export function newSessionModelLabel(
   return { kind: "default", text: listing.models.find((item) => item.ref === name)?.label ?? name };
 }
 
-/** The model the next session will use, as a chip that opens the model dialog. */
+/** The model the next session will use, as a chip in the composer's row that opens the model dialog. */
 export function NewSessionModelChipView({ label, onOpen }: { label: NewSessionModelLabel; onOpen: (trigger: HTMLElement) => void }) {
   const text = label.kind === "none" ? "Choose a model" : label.kind === "loading" ? "Model" : label.text;
   return (
@@ -53,16 +53,11 @@ export function NewSessionModelChipView({ label, onOpen }: { label: NewSessionMo
       {...(label.kind === "auto" ? { title: AUTO_MODEL_HINT } : {})}
       aria-label={label.kind === "default" ? `Model: ${text}, default` : label.kind === "pick" || label.kind === "auto" ? `Model: ${text}` : text}
       onClick={(event) => onOpen(event.currentTarget)}
-      className={cn(
-        badgeVariants({ tone: label.kind === "none" ? "wait" : "neutral" }),
-        "cursor-pointer outline-offset-2 outline-clay hover:border-line-strong focus-visible:outline-2",
-        label.kind === "none" ? "" : "hover:text-ink",
-      )}
+      className={cn(BAR_CHIP, "max-w-60", label.kind === "none" && "text-wait")}
     >
-      <span aria-hidden="true">◇</span>
-      {text}
-      {label.kind === "default" ? <span className="text-faint">· default</span> : null}
-      <ChevronDownIcon className="size-3" />
+      <CpuIcon />
+      <ModelName name={text} />
+      {label.kind === "default" ? <span className="shrink-0 text-faint @max-row-600/comp:hidden">· default</span> : null}
     </button>
   );
 }

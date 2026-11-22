@@ -5,6 +5,7 @@ import {
   contextShare,
   contextSummary,
   formatTokens,
+  formatWindow,
   suggestedAction,
   windowSourceLine,
   type ContextAction,
@@ -16,13 +17,56 @@ import { useState } from "react";
 import { useNavigate, useSession } from "../../store/page-context.tsx";
 import { actionErrorText } from "../../store/errors.ts";
 import { inspectPath } from "../../store/router.ts";
-import { badgeVariants } from "../../ui/badge.tsx";
 import { cn } from "../../ui/cn.ts";
 import { Popover, PopoverContent, PopoverTrigger } from "../../ui/popover.tsx";
+import { BAR_CHIP } from "./composer-bar.ts";
 import { useContextActions, useRunContextAction } from "./use-context-actions.ts";
 
-const TONE: Record<ContextLevel, "neutral" | "wait" | "deny"> = { ok: "neutral", high: "wait", full: "deny" };
+const TEXT: Record<ContextLevel, string> = { ok: "text-muted", high: "text-wait", full: "text-deny" };
 const FILL: Record<ContextLevel, string> = { ok: "bg-clay", high: "bg-wait", full: "bg-deny" };
+const RING: Record<ContextLevel, string> = { ok: "stroke-allow", high: "stroke-wait", full: "stroke-deny" };
+
+/** A small ring that fills clockwise with the share of the window that is used. */
+function Ring({ share, level }: { share: number | null; level: ContextLevel }) {
+  const length = 2 * Math.PI * 5.5;
+  return (
+    <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false" className="size-4 shrink-0 -rotate-90">
+      <circle cx="8" cy="8" r="5.5" fill="none" strokeWidth="2.5" className="stroke-line-strong" />
+      {share === null ? null : (
+        <circle
+          cx="8"
+          cy="8"
+          r="5.5"
+          fill="none"
+          strokeWidth="2.5"
+          strokeDasharray={`${Math.min(1, share) * length} ${length}`}
+          className={RING[level]}
+        />
+      )}
+    </svg>
+  );
+}
+
+/** What the chip says: the ring, `38.0K / 128K`, and under 500 px the percent alone. */
+function ContextText({ used, window, share, estimated, cleared }: { used: number; window: number | null; share: number | null; estimated: boolean; cleared: number }) {
+  return (
+    <>
+      <span className="@max-row-500/comp:hidden">
+        <b className="font-medium">{formatTokens(used)}</b>
+        {window === null ? null : <span className="@max-row-600/comp:hidden"> / {formatWindow(window)}</span>}
+      </span>
+      {share === null ? null : (
+        <span className="hidden @max-row-500/comp:inline">
+          <b className="font-medium">
+            {estimated ? "≈" : ""}
+            {contextPercent(share)}%
+          </b>
+        </span>
+      )}
+      {cleared > 0 ? <span className="@max-row-600/comp:hidden">· {cleared} cleared</span> : null}
+    </>
+  );
+}
 
 /** What the popover of the chip shows and does. */
 export type ContextPanel = {
@@ -108,15 +152,19 @@ export function ContextChipView({
   const [error, setError] = useState<string | null>(null);
   const share = contextShare(used, window);
   const level = contextLevel(used, window);
-  const base = share === null ? `ctx ${formatTokens(used)}` : `ctx ${windowEstimated ? "≈" : ""}${contextPercent(share)}%`;
-  const text = cleared > 0 ? `${base} · ${cleared} cleared` : base;
   const summary = contextSummary(used, window, windowEstimated);
   const why = windowEstimated && share !== null ? " golem read this window from Ollama. It was not sent." : "";
-  const className = cn(badgeVariants({ tone: TONE[level] }), "cursor-pointer outline-offset-2 outline-clay focus-visible:outline-2");
+  const className = cn(BAR_CHIP, "tabular-nums", TEXT[level]);
+  const body = (
+    <>
+      <Ring share={share} level={level} />
+      <ContextText used={used} window={window} share={share} estimated={windowEstimated} cleared={cleared} />
+    </>
+  );
   if (panel === undefined) {
     return (
       <button type="button" title={`Context ${summary}.${why}`} aria-label={`Context ${summary}. Open the trace panel.`} onClick={onOpen} className={className}>
-        {text}
+        {body}
       </button>
     );
   }
@@ -144,7 +192,7 @@ export function ContextChipView({
       }}
     >
       <PopoverTrigger title={`Context ${summary}.${why}`} aria-label={`Context ${summary}. Act on it.`} className={className}>
-        {text}
+        {body}
       </PopoverTrigger>
       <PopoverContent align="end" aria-label="Context" className="flex w-80 flex-col gap-3 max-sm:w-72">
         <FillBar used={used} window={window} reserve={panel.reserve} />

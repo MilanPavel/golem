@@ -88,7 +88,7 @@ const rowOf = (popover: HTMLElement, name: RegExp) => within(popover).getByRole(
 test("the chip opens a popover with the bar, the window's source, and the rows with their costs", async () => {
   await setup();
   const user = userEvent.setup();
-  await waitFor(() => expect(chip().textContent).toBe("ctx 82%"));
+  await waitFor(() => expect(chip().textContent).toContain("82%"));
   await user.click(chip());
   const popover = await screen.findByRole("dialog", { name: "Context" });
   expect(within(popover).getByText("27.0K of 32K · reply reserve 4K")).toBeTruthy();
@@ -115,7 +115,7 @@ test("a click runs the action, closes the popover, and the chip drops when golem
   expect(fake.raw.compactSession).toHaveBeenCalledWith("a", "clear", undefined);
   await waitFor(() => expect(screen.queryByRole("dialog", { name: "Context" })).toBeNull());
   act(() => fake.emitEvent(ev("a", "context.changed", { action: "cleared", before_tokens: 9000, after_tokens: 1000, count: 2, room: 28672 })));
-  await waitFor(() => expect(chip().textContent).toBe("ctx 57% · 2 cleared"));
+  await waitFor(() => expect(chip().textContent).toMatch(/57%.*· 2 cleared/));
   // The call's messages are out of date until the next turn.
   await user.click(chip());
   const again = await screen.findByRole("dialog", { name: "Context" });

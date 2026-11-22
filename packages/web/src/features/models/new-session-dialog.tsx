@@ -14,7 +14,7 @@ export function NewSessionModelDialog() {
   // The store is cleared before the dialog reports its close, so remember where focus goes back to.
   const returnTo = useRef<HTMLElement | null>(null);
   useEffect(() => {
-    if (open !== null && open.returnTo !== "chip") returnTo.current = open.returnTo;
+    if (open !== null) returnTo.current = open.returnTo;
   }, [open]);
   return (
     <ModelDialog

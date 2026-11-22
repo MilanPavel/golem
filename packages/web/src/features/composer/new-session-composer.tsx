@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { useConnection } from "../../store/connection-context.tsx";
 import { useNewSessionFolder, useDraft, useDraftPastes } from "../../store/page-context.tsx";
 import { Composer } from "./composer.tsx";
@@ -6,8 +7,8 @@ import { NoticeLine } from "./notice-line.tsx";
 import { NEW_DRAFT_KEY, type useStartSession } from "./start-session.ts";
 import { useCommands } from "./use-commands.tsx";
 
-/** The large composer of the empty screen. Its draft is kept under "new". */
-export function NewSessionComposer({ start }: { start: ReturnType<typeof useStartSession> }) {
+/** The large composer of the empty screen, with `barLeft` (the model and the folder) in its row. Its draft is kept under "new". */
+export function NewSessionComposer({ start, barLeft }: { start: ReturnType<typeof useStartSession>; barLeft?: ReactNode }) {
   const connection = useConnection().state.status;
   const [text, setText] = useDraft(NEW_DRAFT_KEY);
   const [pastes, setPastes] = useDraftPastes(NEW_DRAFT_KEY);
@@ -19,6 +20,7 @@ export function NewSessionComposer({ start }: { start: ReturnType<typeof useStar
       <Composer
         forPalette
         size="large"
+        barLeft={barLeft}
         label="Message"
         placeholder='Try "explain this repo"'
         text={text}

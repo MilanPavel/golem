@@ -48,19 +48,18 @@ test("the page shows the title, the summary line, the tree, and the empty detail
   expect(fake.raw.getTrace).toHaveBeenCalledWith("a");
 });
 
-test("the top bar of the chat stays on the trace: title actions, model, folder, and drawer toggle", async () => {
+test("the top bar of the chat stays on the trace: title actions and drawer toggle", async () => {
   const { fake, user } = await open("/s/a/trace");
   await screen.findByRole("tree");
   act(() => {
     fake.emitEvent(ev("a", "session.created", { cwd: "/Users/you/repos/golem", model_profile: "local", model_name: "m" }));
   });
   const bar = within(screen.getByRole("banner"));
-  expect(bar.getByRole("button", { name: "Model: m" })).toBeTruthy();
-  expect(bar.getByText("golem")).toBeTruthy();
+  expect(bar.queryByRole("button", { name: "Model: m" })).toBeNull();
   expect(bar.getByRole("button", { name: /^(Show|Hide) details$/ })).toBeTruthy();
   expect(bar.getByRole("button", { name: /^Session actions/ })).toBeTruthy();
   await user.click(screen.getByRole("link", { name: "Back to chat" }));
-  expect(within(screen.getByRole("banner")).getByRole("button", { name: "Model: m" })).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Model: m" })).toBeTruthy();
   expect(location.pathname).toBe("/s/a");
 });
 

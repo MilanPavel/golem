@@ -9,7 +9,7 @@ import {
   type Pastes,
   type SuggestCommand,
 } from "@golem/view";
-import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ClipboardEvent, type KeyboardEvent } from "react";
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ClipboardEvent, type KeyboardEvent, type ReactNode } from "react";
 import { cn } from "../../ui/cn.ts";
 import { SendIcon, StopIcon } from "../../ui/icons.tsx";
 import { recall, type History, type Recall } from "./history.ts";
@@ -56,6 +56,12 @@ export type ComposerProps = {
   allowEmpty?: boolean;
   /** The command palette runs its commands in this composer, and fills its draft. */
   forPalette?: boolean;
+  /** The chips at the left of the row inside the box: model, folder, and later the branch. */
+  barLeft?: ReactNode;
+  /** The chips at the right of the row, before Send: context and mode. */
+  barRight?: ReactNode;
+  /** A strip just above the box, such as the review notes. */
+  strip?: ReactNode;
 };
 
 /** A slash command is not held back by a run in progress, but `//` is a message. */
@@ -98,6 +104,9 @@ export function Composer({
   forPalette = false,
   sendLabel = "Send",
   allowEmpty = false,
+  barLeft = null,
+  barRight = null,
+  strip = null,
 }: ComposerProps) {
   const field = useRef<HTMLTextAreaElement>(null);
   const [hint, setHint] = useState<string | null>(null);
@@ -337,71 +346,78 @@ export function Composer({
           {count}
         </div>
       )}
-      <div
-        data-composer={size}
-        className={cn(
-          "flex flex-col gap-2.5 rounded-xl border border-line-strong bg-surface py-3 pr-3 pl-4 text-left shadow-soft focus-within:border-clay",
-          disabled && "opacity-70",
-        )}
-      >
-        <textarea
-          ref={field}
-          name="message"
-          rows={large ? 2 : 1}
-          value={text}
-          disabled={disabled}
-          readOnly={pending}
-          aria-busy={pending ? "true" : undefined}
-          aria-label={label}
-          aria-describedby={describedBy}
-          {...(commands === undefined
-            ? {}
-            : {
-                "aria-autocomplete": "list" as const,
-                "aria-controls": open ? listId : undefined,
-                "aria-activedescendant": activeOption,
-              })}
-          placeholder={disabledReason ?? placeholder}
-          spellCheck
+      {strip}
+      <div className="@container/comp min-w-0">
+        <div
+          data-composer={size}
           className={cn(
-            "composer-input min-h-6 w-full resize-none border-0 bg-transparent text-base leading-normal text-ink outline-none placeholder:text-faint",
-            large && "min-h-12",
+            "flex flex-col gap-2.5 rounded-xl border border-line-strong bg-surface py-3 pr-3 pl-4 text-left shadow-soft focus-within:border-clay",
+            disabled && "opacity-70",
           )}
-          onChange={(event) => {
-            recalling(null);
-            setHint(null);
-            onEdit?.();
-            const value = event.target.value;
-            onTextChange(value);
-            const kept = prunePastes(value, pastes);
-            if (kept !== pastes) {
-              onPastesChange(kept);
-            }
-          }}
-          onKeyDown={onKeyDown}
-          onPaste={onPaste}
-        />
-        <div className="flex items-center justify-end">
-          {stopping ? (
-            <button
-              type="button"
-              aria-label="Stop"
-              onClick={onStop}
-              className="grid size-9 place-items-center rounded-md bg-ink text-bg outline-offset-2 outline-clay hover:brightness-110 focus-visible:outline-2"
-            >
-              <StopIcon />
-            </button>
-          ) : (
-            <button
-              type="button"
-              aria-label={sendLabel}
-              disabled={disabled || pending || busy || (text.trim() === "" && !allowEmpty)}
-              onClick={() => void submit()}
-              className="grid size-9 place-items-center rounded-md border border-clay bg-clay text-on-clay outline-offset-2 outline-clay hover:brightness-105 focus-visible:outline-2 disabled:pointer-events-none disabled:opacity-50"
-            >
-              <SendIcon />
-            </button>
-          )}
+        >
+          <textarea
+            ref={field}
+            name="message"
+            rows={large ? 2 : 1}
+            value={text}
+            disabled={disabled}
+            readOnly={pending}
+            aria-busy={pending ? "true" : undefined}
+            aria-label={label}
+            aria-describedby={describedBy}
+            {...(commands === undefined
+              ? {}
+              : {
+                  "aria-autocomplete": "list" as const,
+                  "aria-controls": open ? listId : undefined,
+                  "aria-activedescendant": activeOption,
+                })}
+            placeholder={disabledReason ?? placeholder}
+            spellCheck
+            className={cn(
+              "composer-input min-h-6 w-full resize-none border-0 bg-transparent text-base leading-normal text-ink outline-none placeholder:text-faint",
+              large && "min-h-12",
+            )}
+            onChange={(event) => {
+              recalling(null);
+              setHint(null);
+              onEdit?.();
+              const value = event.target.value;
+              onTextChange(value);
+              const kept = prunePastes(value, pastes);
+              if (kept !== pastes) {
+                onPastesChange(kept);
+              }
+            }}
+            onKeyDown={onKeyDown}
+            onPaste={onPaste}
+          />
+          <div data-composer-bar="" className="-ml-2 flex flex-nowrap items-center gap-0.5">
+            <div className="-m-1 flex min-w-0 flex-1 flex-nowrap items-center gap-0.5 overflow-hidden p-1">{barLeft}</div>
+            <div className="ml-auto flex shrink-0 flex-nowrap items-center gap-0.5">
+              {barRight}
+              {stopping ? (
+                <button
+                  type="button"
+                  aria-label="Stop"
+                  onClick={onStop}
+                  className="grid size-9 place-items-center rounded-md bg-ink text-bg outline-offset-2 outline-clay hover:brightness-110 focus-visible:outline-2"
+                >
+                  <StopIcon />
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  aria-label={sendLabel}
+                  disabled={disabled || pending || busy || (text.trim() === "" && !allowEmpty)}
+                  onClick={() => void submit()}
+                  className="grid size-9 place-items-center rounded-md border border-clay bg-clay text-on-clay outline-offset-2 outline-clay hover:brightness-105 focus-visible:outline-2 disabled:pointer-events-none disabled:opacity-50"
+                >
+                  <SendIcon />
+                </button>
+              )}
+            </div>
+          </div>
         </div>
       </div>
       {busy && hint !== null ? (

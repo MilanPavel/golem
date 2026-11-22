@@ -9,7 +9,7 @@ import { createPage } from "../../store/page.ts";
 import { PageProvider } from "../../store/page-context.tsx";
 import { ev, fakeClient, fakeFrame, rpcError, summary } from "../../store/test-support.ts";
 import { drawerOpenStore } from "../drawer/drawer-open.ts";
-import { RouteChipView } from "./route-chip.tsx";
+import { RoutePanelView } from "./route-panel.tsx";
 import { WaitHintView } from "./wait-hint.tsx";
 
 const CWD = "/Users/you/repos/golem";
@@ -78,7 +78,7 @@ afterEach(() => {
   delete document.documentElement.dataset.theme;
 });
 
-const chip = () => screen.getByRole("button", { name: /^Route: / });
+const chip = () => screen.getByRole("button", { name: /^Model: / });
 const box = () => screen.getByRole("textbox", { name: "Message" }) as HTMLTextAreaElement;
 const notice = () =>
   Array.from(document.querySelectorAll('[role="status"]'))
@@ -91,14 +91,15 @@ async function say(user: ReturnType<typeof userEvent.setup>, text: string) {
   await wait();
 }
 
-test("the chip sits left of the permission chip and follows the session's route", async () => {
+test("the route is in the model chip: a muted suffix on the chip, and the chip sits left of the permission chip", async () => {
   const fake = await setup();
-  await waitFor(() => expect(chip().textContent).toBe("pinned"));
+  await waitFor(() => expect(chip().textContent).toBe("qwen3:27b"));
   const mode = screen.getByRole("button", { name: /^Permission mode: / });
   expect(chip().compareDocumentPosition(mode) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(screen.queryByRole("button", { name: /^Route: / })).toBeNull();
   act(() => fake.emitEvent(ev("a", "session.updated", { route: "auto" })));
-  await waitFor(() => expect(chip().textContent).toBe("auto"));
-  expect(chip().getAttribute("aria-label")).toBe("Route: auto. Change it.");
+  await waitFor(() => expect(chip().textContent).toContain("· auto"));
+  expect(chip().getAttribute("aria-label")).toContain("route auto");
 });
 
 test("opening the popover reads the spend once, shows the pinned model, and Auto sets the route", async () => {
@@ -106,7 +107,7 @@ test("opening the popover reads the spend once, shows the pinned model, and Auto
   const user = userEvent.setup();
   expect(fake.raw.getCost).not.toHaveBeenCalled();
   await user.click(chip());
-  const popover = await screen.findByRole("dialog");
+  const popover = await screen.findByRole("dialog", { name: "Model and route" });
   expect(await within(popover).findByText("Today $0.42 of $2.00")).toBeTruthy();
   expect(within(popover).getByText("This session $0.03 of $0.50")).toBeTruthy();
   expect(fake.raw.getCost).toHaveBeenCalledWith("a");
@@ -172,33 +173,24 @@ test("/route reports, sets, and says why", async () => {
 const ladder = ladderRows(MODELS, null, { profile: "local", provider: "ollama", name: "qwen3:27b", tier: "local" });
 const spend = spendRows(COST as never, { ladder: {}, daily_usd: 2, session_usd: 0.5 });
 
-test("without caps the popover shows the amounts only", () => {
-  render(<RouteChipView mode="local" ladder={ladder} spend={spendRows(COST as never, { ladder: {} })} onSelect={() => {}} onNavigate={() => {}} />);
-  return userEvent
-    .setup()
-    .click(chip())
-    .then(async () => {
-      const popover = await screen.findByRole("dialog");
-      expect(within(popover).getByText("Today $0.42")).toBeTruthy();
-      expect(within(popover).queryByRole("progressbar")).toBeNull();
-      expect(within(popover).getByRole("radio", { name: "Local only" }).getAttribute("aria-checked")).toBe("true");
-    });
+test("without caps the panel shows the amounts only", () => {
+  render(<RoutePanelView mode="local" ladder={ladder} spend={spendRows(COST as never, { ladder: {} })} onSelect={() => {}} onNavigate={() => {}} />);
+  expect(screen.getByText("Today $0.42")).toBeTruthy();
+  expect(screen.queryByRole("progressbar")).toBeNull();
+  expect(screen.getByRole("radio", { name: "Local only" }).getAttribute("aria-checked")).toBe("true");
 });
 
-test("only auto shows the ladder: local shows its local model, pinned the chat's own", async () => {
+test("only auto shows the ladder: local shows its local model, pinned the chat's own", () => {
   const own = { profile: "local", provider: "ollama", name: "qwen3:27b", tier: "local" } as const;
-  const user = userEvent.setup();
   for (const [mode, title, count] of [
     ["auto", "The ladder", 3],
     ["local", "The model", 1],
     ["pinned", "The model", 1],
   ] as const) {
-    const view = render(<RouteChipView mode={mode} ladder={routeRows(mode, MODELS, null, own)} spend={[]} onSelect={() => {}} onNavigate={() => {}} />);
-    await user.click(chip());
-    const popover = await screen.findByRole("dialog");
-    expect(within(popover).getByRole("heading", { name: title })).toBeTruthy();
-    expect(within(popover).getByRole("list", { name: title })).toBeTruthy();
-    expect(within(popover).getAllByRole("listitem")).toHaveLength(count);
+    const view = render(<RoutePanelView mode={mode} ladder={routeRows(mode, MODELS, null, own)} spend={[]} onSelect={() => {}} onNavigate={() => {}} />);
+    expect(screen.getByRole("heading", { name: title })).toBeTruthy();
+    expect(screen.getByRole("list", { name: title })).toBeTruthy();
+    expect(screen.getAllByRole("listitem")).toHaveLength(count);
     view.unmount();
   }
 });
@@ -206,24 +198,19 @@ test("only auto shows the ladder: local shows its local model, pinned the chat's
 test("a tier that is not ready is grey and offers Add key", async () => {
   const onNavigate = vi.fn();
   const rows = ladderRows([MODELS[0]!, model("openrouter/mini", { status: "needs_key", price: { input: 0.1, output: 0.4 } })], null, null);
-  render(<RouteChipView mode="auto" ladder={rows} spend={[]} onSelect={() => {}} onNavigate={onNavigate} />);
-  const user = userEvent.setup();
-  await user.click(chip());
-  const popover = await screen.findByRole("dialog");
-  const budget = within(popover).getByText("budget").closest("li")!;
+  render(<RoutePanelView mode="auto" ladder={rows} spend={[]} onSelect={() => {}} onNavigate={onNavigate} />);
+  const budget = screen.getByText("budget").closest("li")!;
   expect(budget.getAttribute("data-ready")).toBe("false");
   expect(budget.className).toContain("text-faint");
-  await user.click(within(budget).getByRole("link", { name: "Add key" }));
+  await userEvent.setup().click(within(budget).getByRole("link", { name: "Add key" }));
   expect(onNavigate).toHaveBeenCalledWith("/settings/keys");
 });
 
 for (const theme of ["slip", "kiln"]) {
   for (const mode of ["pinned", "local", "auto"] as const) {
-    test(`the chip and its popover pass axe in ${theme}, on ${mode}`, async () => {
+    test(`the route panel passes axe in ${theme}, on ${mode}`, async () => {
       document.documentElement.dataset.theme = theme;
-      render(<RouteChipView mode={mode} ladder={ladder} spend={spend} onSelect={() => {}} onNavigate={() => {}} />);
-      await userEvent.setup().click(screen.getByRole("button", { name: new RegExp(`^Route: ${mode}`) }));
-      await screen.findByRole("dialog");
+      render(<RoutePanelView mode={mode} ladder={ladder} spend={spend} onSelect={() => {}} onNavigate={() => {}} />);
       const results = await axe.run(document.body, { rules: { "color-contrast": { enabled: false }, region: { enabled: false } } });
       expect(results.violations).toEqual([]);
     });
