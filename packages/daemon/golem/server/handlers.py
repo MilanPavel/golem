@@ -69,7 +69,7 @@ from golem.server.agents_edit import (
     agents_save,
     agents_set_wish,
 )
-from golem.server.chat_edit import chat_get, chat_set
+from golem.server.chat_edit import chat_get, chat_prompt, chat_set
 from golem.server.device_rpc import (
     connection_identify,
     device_list,
@@ -217,6 +217,7 @@ from golem_protocol.commands import (
     ChangesSuggestMessageParams,
     ChangesSuggestMessageResult,
     ChatGetParams,
+    ChatPromptParams,
     ChatSetParams,
     ConfigAllowance,
     ConfigGetParams,
@@ -2154,6 +2155,7 @@ def standard_methods() -> dict[str, Method]:
             "config.raw.set_protected", ConfigRawSetParams, True, config_raw_set_protected
         ),
         "chat.get": Method("chat.get", ChatGetParams, True, chat_get),
+        "chat.prompt": Method("chat.prompt", ChatPromptParams, True, chat_prompt),
         "chat.set": Method("chat.set", ChatSetParams, True, chat_set),
         "notifications.get": Method(
             "notifications.get", NotificationsGetParams, True, notifications_get

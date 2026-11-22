@@ -138,3 +138,57 @@ async def test_a_new_session_starts_from_the_chat_default(
     # a session that is already open keeps its setting when the default changes
     (tmp_path / "config.toml").write_text("[chat]\nplan_first = false\n", "utf-8")
     assert await sessions.plan_first(on)
+
+
+async def test_chat_prompt_shows_lines_and_plan_first(short_home: Path) -> None:
+    config = short_home / "config.toml"
+    config.write_text('default_model = "ollama/m"\n', "utf-8")
+    app, task = await start_daemon(short_home)
+    client = await RpcClient.connect(app.paths.socket_path)
+    try:
+        await client.call("hello", HELLO)
+        plain = _call(await client.call("chat.prompt", {}))
+        names = [part["name"] for part in plain["parts"]]
+        assert "instructions" not in names and "plan_first" not in names
+        assert plain["tools_tokens"] > 0
+        parts_total = sum(part["tokens"] for part in plain["parts"])
+        assert plain["total_tokens"] == parts_total + plain["tools_tokens"]
+        for part in plain["parts"]:
+            assert part["tokens"] == -(-len(part["text"]) // 4)
+
+        before = config.read_text("utf-8")
+        shown = _call(await client.call("chat.prompt", {"instructions": [" Be brief. ", "", "Hi"]}))
+        first = shown["parts"][0]
+        assert first["name"] == "instructions"
+        assert "- Be brief." in first["text"] and "- Hi" in first["text"]
+        assert config.read_text("utf-8") == before
+        assert _call(await client.call("chat.get", {}))["instructions"] == []
+
+        none = _call(await client.call("chat.prompt", {"instructions": []}))
+        assert "instructions" not in [part["name"] for part in none["parts"]]
+
+        _call(await client.call("chat.set", {"plan_first": True, "instructions": ["Saved."]}))
+        planned = _call(await client.call("chat.prompt", {}))
+        assert "plan_first" in [part["name"] for part in planned["parts"]]
+        replaced = _call(await client.call("chat.prompt", {"instructions": ["Other."]}))
+        text = replaced["parts"][0]["text"]
+        assert "Other." in text and "Saved." not in text
+    finally:
+        await client.close()
+        await stop_daemon(app, task)
+
+
+async def test_chat_prompt_without_a_default_model(short_home: Path) -> None:
+    app, task = await start_daemon(short_home)
+    client = await RpcClient.connect(app.paths.socket_path)
+    try:
+        await client.call("hello", HELLO)
+        got = _call(await client.call("chat.prompt", {"instructions": ["Be brief."]}))
+        assert got["model"] is None
+        names = [part["name"] for part in got["parts"]]
+        assert names[0] == "instructions" and "memory" not in names
+        bad = await client.call("chat.prompt", {"instructions": ["x" * 301]})
+        assert "error" in bad
+    finally:
+        await client.close()
+        await stop_daemon(app, task)

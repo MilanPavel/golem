@@ -1,0 +1,25 @@
+{
+  "additionalProperties": false,
+  "description": "One named section of the system prompt. ``tokens`` is the characters over four, rounded\nup.",
+  "properties": {
+    "name": {
+      "title": "Name",
+      "type": "string"
+    },
+    "text": {
+      "title": "Text",
+      "type": "string"
+    },
+    "tokens": {
+      "title": "Tokens",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "name",
+    "text",
+    "tokens"
+  ],
+  "title": "ChatPromptPart",
+  "type": "object"
+}

@@ -307,20 +307,46 @@ class ChatRuntime:
         are the names of the tools the call would offer. ``memory`` is the access a run would
         carry, for the memory block.
         """
-        values = await self.values(session_id)
+        parts = await self.prompt_parts(
+            await self.values(session_id),
+            cwd,
+            pinned,
+            mcp_servers,
+            profile=profile,
+            options=options,
+            tools=tools,
+            memory=memory,
+        )
+        return "\n\n".join(text for _, text in parts)
+
+    async def prompt_parts(
+        self,
+        state: Mapping[str, object],
+        cwd: str | None,
+        pinned: Sequence[str] = (),
+        mcp_servers: Sequence[str] = (),
+        *,
+        profile: str | None = None,
+        options: Mapping[str, float | str] | None = None,
+        tools: Sequence[str] = (),
+        memory: MemoryAccess | None = None,
+        plan_first: bool = False,
+    ) -> list[tuple[str, str]]:
+        """The named, non-empty parts of the system prompt for ``state``, in prompt order."""
         window = None
         if profile is not None and self.window_of is not None:
             window = self.window_of(profile, options).window
         context = PromptContext(
-            values,
+            state,
             cwd,
             tuple(pinned),
             mcp_servers=tuple(mcp_servers),
+            plan_first=plan_first,
             tools=tuple(tools),
             window=window,
             memory=await _memory_block(memory, self.tier_of, profile),
         )
-        return self.prompt.text(context)
+        return self.prompt.parts(context)
 
     async def stream(
         self,

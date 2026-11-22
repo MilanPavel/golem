@@ -1,0 +1,23 @@
+{
+  "additionalProperties": false,
+  "description": "``chat.prompt``. What the model of a new chat reads now.\n\nIt is the default model, no folder, no pinned skills, no on-demand MCP servers, and plan\nfirst as ``[chat] plan_first`` says. ``instructions`` stand in for the saved lines for this\nanswer only, and nothing is written. They are checked as ``chat.set`` checks them, and a\nbad line is an invalid params error.",
+  "properties": {
+    "instructions": {
+      "anyOf": [
+        {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Instructions"
+    }
+  },
+  "title": "ChatPromptParams",
+  "type": "object"
+}
