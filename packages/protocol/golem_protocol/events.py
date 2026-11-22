@@ -848,6 +848,10 @@ class ModelCallCompletedData(BaseModel):
     the model, reading the prompt and writing the reply. From the model server's own clock.
     Ollama only.
 
+    ``waited_ms`` is the time the call spent waiting for a slot, for a model load or for a
+    provider that backed off, all waits counted, short ones too. None when it did not wait.
+    A helper's working clock leaves it out.
+
     ``parent_call_id`` is legacy. Old logs set it on an event of a child run: the id of
     the ``delegate`` call that started it. The event is in the parent's run, and a client
     that does not know child runs ignores it. None for the run's own events. A new helper
@@ -870,6 +874,7 @@ class ModelCallCompletedData(BaseModel):
     load_ms: int | None = Field(default=None, ge=0)
     prompt_ms: int | None = Field(default=None, ge=0)
     reply_ms: int | None = Field(default=None, ge=0)
+    waited_ms: int | None = Field(default=None, ge=0)
     parent_call_id: str | None = Field(default=None, min_length=1)
 
 

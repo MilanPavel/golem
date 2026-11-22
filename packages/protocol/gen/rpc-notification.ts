@@ -250,6 +250,7 @@ export type CacheRead = number | null;
 export type CacheWrite = number | null;
 export type Input1 = number | null;
 export type Output1 = number | null;
+export type WaitedMs = number | null;
 export type RunId16 = string;
 export type Seq15 = number;
 export type SessionId17 = string;
@@ -1590,6 +1591,10 @@ export interface ModelCallCompletedEvent {
  * the model, reading the prompt and writing the reply. From the model server's own clock.
  * Ollama only.
  *
+ * ``waited_ms`` is the time the call spent waiting for a slot, for a model load or for a
+ * provider that backed off, all waits counted, short ones too. None when it did not wait.
+ * A helper's working clock leaves it out.
+ *
  * ``parent_call_id`` is legacy. Old logs set it on an event of a child run: the id of
  * the ``delegate`` call that started it. The event is in the parent's run, and a client
  * that does not know child runs ignores it. None for the run's own events. A new helper
@@ -1614,6 +1619,7 @@ export interface ModelCallCompletedData {
   stop_reason?: StopReason;
   text_tool_calls?: TextToolCalls;
   usage?: TokenUsage | null;
+  waited_ms?: WaitedMs;
 }
 /**
  * USD per million tokens, as golem knew it when the call ended.

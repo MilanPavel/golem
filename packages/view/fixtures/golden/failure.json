@@ -127,7 +127,8 @@
         "reply_ms": null,
         "stop_reason": null,
         "text_tool_calls": null,
-        "usage": null
+        "usage": null,
+        "waited_ms": null
       },
       "run_id": "id-2",
       "seq": 7,
@@ -277,7 +278,8 @@
         "reply_ms": null,
         "stop_reason": null,
         "text_tool_calls": null,
-        "usage": null
+        "usage": null,
+        "waited_ms": null
       },
       "run_id": "id-2",
       "seq": 7,

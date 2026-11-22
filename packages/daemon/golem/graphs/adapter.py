@@ -72,6 +72,14 @@ class ModelWaiting:
 
 
 @dataclass(frozen=True, slots=True)
+class ModelWaited:
+    """The call with this ``message_id`` waited ``ms`` for its turn on a line, and has it now."""
+
+    message_id: str
+    ms: int
+
+
+@dataclass(frozen=True, slots=True)
 class ModelRequested:
     """The request of the model call with this ``message_id`` is about to be sent.
 
@@ -365,6 +373,7 @@ class CheckCompleted:
 Fact = (
     ModelStarted
     | ModelWaiting
+    | ModelWaited
     | ModelRouted
     | ModelRequested
     | ModelResponded
@@ -948,6 +957,9 @@ def _custom(data: object) -> Fact | None:
             if isinstance(retry, int) and not isinstance(retry, bool) and retry >= 0
             else None,
         )
+    if kind == "model.waited" and isinstance(message_id, str):
+        ms = item.get("ms")
+        return ModelWaited(message_id, ms) if isinstance(ms, int) and ms > 0 else None
     if kind == "model.routed":
         return _routed_fact(item)
     if kind == "model.request" and isinstance(message_id, str):
@@ -1195,6 +1207,7 @@ __all__ = [
     "ModelResponded",
     "ModelRouted",
     "ModelStarted",
+    "ModelWaited",
     "ModelWaiting",
     "PinRead",
     "PinSkipped",
