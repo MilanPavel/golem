@@ -1,4 +1,4 @@
-import { OLLAMA_FAILED, RpcError, type ApprovalChoice, type ConfigGetResult, type ConfigRawGetResult, type ConfigRawResult, type FsListDirsResult, type McpAddParams, type McpCallResult, type McpImportApplyParams, type McpImportApplyResult, type McpImportScanResult, type McpCatalogResult, type McpListResult, type McpLogsResult, type McpServerConfig, type McpServerDetail, type McpServerLog, type McpLoginDone, type McpTestProgress, type McpTestResult, type GolemClient, type RuntimeName, type SetupStatusResult, type SkillListResult, type AgentsListResult, type AgentsSaveResult, type AgentsDeleteResult, type TraceGetResult, type TraceSpanResult, type ArtifactReadResult, type ChangesDiffResult, type ChangesDiffTarget, type ChangesListResult, type ChangesRevertResult, type ChangesRevertTarget, type ChangesCommitResult, type ChangesCommitInfoResult, type ChangesSuggestMessageResult, type ModelOptionsGetResult, type ModelOptionsSetResult, type SessionSetOptionsResult, type SkillCreateResult, type SkillReadResult, type SkillWriteResult, type AuthListResult, type FileListResult, type FileReadResult, type CostGetResult, type SessionCompactResult, type ConsentChoice, type RoutingGetResult, type RoutingSetParams, type RoutingSetResult, type NotificationsValues, type NotificationsSetParams, type NotificationsSetResult, type NotifyTestResult } from "@golem/client";
+import { OLLAMA_FAILED, RpcError, type ApprovalChoice, type ConfigGetResult, type ConfigRawGetResult, type ConfigRawResult, type FsListDirsResult, type GitInfoResult, type FsChooseFolderResult, type McpAddParams, type McpCallResult, type McpImportApplyParams, type McpImportApplyResult, type McpImportScanResult, type McpCatalogResult, type McpListResult, type McpLogsResult, type McpServerConfig, type McpServerDetail, type McpServerLog, type McpLoginDone, type McpTestProgress, type McpTestResult, type GolemClient, type RuntimeName, type SetupStatusResult, type SkillListResult, type AgentsListResult, type AgentsSaveResult, type AgentsDeleteResult, type TraceGetResult, type TraceSpanResult, type ArtifactReadResult, type ChangesDiffResult, type ChangesDiffTarget, type ChangesListResult, type ChangesRevertResult, type ChangesRevertTarget, type ChangesCommitResult, type ChangesCommitInfoResult, type ChangesSuggestMessageResult, type ModelOptionsGetResult, type ModelOptionsSetResult, type SessionSetOptionsResult, type SkillCreateResult, type SkillReadResult, type SkillWriteResult, type AuthListResult, type FileListResult, type FileReadResult, type CostGetResult, type SessionCompactResult, type ConsentChoice, type RoutingGetResult, type RoutingSetParams, type RoutingSetResult, type NotificationsValues, type NotificationsSetParams, type NotificationsSetResult, type NotifyTestResult } from "@golem/client";
 import { changeToolFilter, installEventOf, type InstallEvent, type PermissionMode, type CompactAction, type RouteMode } from "@golem/view";
 import type { QueryClient } from "@tanstack/react-query";
 import { createDrafts, type Drafts } from "./drafts.ts";
@@ -134,6 +134,9 @@ export type PageClient = Pick<
   | "onRuntimeInstall"
   | "removeMcpServer"
   | "listDirs"
+  | "gitInfo"
+  | "chooseFolder"
+  | "localUi"
   | "updateRule"
   | "removeRule"
   | "revokeAllowance"
@@ -160,6 +163,8 @@ export type PageClient = Pick<
 
 /** Thin calls on the client. Their results arrive as events, so there is nothing to merge. */
 export type PageActions = {
+  /** Opens the macOS folder dialog on the daemon's Mac, in `start` when given. A null path means the person cancelled. */
+  chooseFolder(start: string | null): Promise<FsChooseFolderResult>;
   /** Starts a session in `cwd` on `model` (null: the default). */
   createSession(cwd: string | null, model: string | null): Promise<string>;
   /** Edits a memory's text, or sets whether it is in every chat or may go to a paid model. The list is read again. */
@@ -428,6 +433,10 @@ export type PageQueries = {
   listFiles(sessionId: string, query?: string, limit?: number, hidden?: boolean): Promise<FileListResult>;
   /** The folders directly under `path` in the home folder; `null` is home itself. */
   dirs(path: string | null): Promise<FsListDirsResult>;
+  /** The repo a folder belongs to: its branch and its worktrees. */
+  gitInfo(path: string): Promise<GitInfoResult>;
+  /** Whether the daemon offers the macOS folder dialog to this page. Known once the link is up. */
+  localUi(): Promise<boolean>;
 };
 
 export type Page = {
@@ -541,9 +550,15 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
       listFiles: (sessionId, query, limit, hidden) => client.listFiles(sessionId, query, limit, hidden),
       mcpCatalog: (sessionId) => client.mcpCatalog(sessionId ?? undefined),
       dirs: (path) => (path === null ? client.listDirs() : client.listDirs(path)),
+      gitInfo: (path) => client.gitInfo(path),
+      localUi: async () => {
+        await client.ready;
+        return client.localUi;
+      },
     },
     router,
     actions: {
+      chooseFolder: (start) => client.chooseFolder(start),
       async createSession(cwd, model) {
         const options: { cwd?: string; modelProfile?: string } = {};
         if (cwd !== null) options.cwd = cwd;

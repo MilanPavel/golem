@@ -22,6 +22,7 @@ export const GALLERY_SECTIONS = [
   "sessions-flyout",
   "inbox-panel",
   "folder-browser",
+  "folder-menu",
   "setup-form",
   "mcp-servers",
   "skills",

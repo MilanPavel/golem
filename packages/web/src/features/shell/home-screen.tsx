@@ -1,8 +1,9 @@
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { NewSessionComposer, useStartSession } from "../composer/index.ts";
 import { PixelGolem } from "../../ui/pixel-golem.tsx";
 import { FinishSetupStrip } from "../welcome/index.ts";
-import { useKnownFolders, useNewSessionFolder, useNewSessionModel } from "../../store/page-context.tsx";
+import { folderDialogErrorText } from "../../store/errors.ts";
+import { useFolderBranches, useFolderDialog, useFolderMenuRequest, useGitInfo, useHomeFolder, useKnownFolders, useNewSessionFolder, useNewSessionModel, usePageActions } from "../../store/page-context.tsx";
 import { FolderBrowser } from "./folder-browser.tsx";
 import { FolderChip } from "./folder-chip.tsx";
 import { NewSessionModelChip } from "./model-chip-new.tsx";
@@ -45,6 +46,18 @@ export function HomeView({
 export function HomeScreen() {
   const [folder, setFolder] = useNewSessionFolder();
   const folders = useKnownFolders();
+  const info = useGitInfo(folder);
+  const branches = useFolderBranches(folders.slice(0, 8));
+  const home = useHomeFolder();
+  const dialog = useFolderDialog();
+  const actions = usePageActions();
+  // A session may have sent the person here to pick another folder: the menu opens once.
+  const request = useFolderMenuRequest();
+  const [openAtStart] = useState(request.asked);
+  const { shown } = request;
+  useEffect(() => {
+    shown();
+  }, [shown]);
   const [model] = useNewSessionModel();
   const start = useStartSession(folder, model);
   return (
@@ -60,6 +73,21 @@ export function HomeScreen() {
                 folder={folder}
                 folders={folders}
                 onChange={setFolder}
+                info={info.data ?? null}
+                branches={branches}
+                home={home}
+                defaultOpen={openAtStart}
+                onChoose={
+                  dialog
+                    ? async (start) => {
+                        try {
+                          return (await actions.chooseFolder(start)).path ?? null;
+                        } catch (error) {
+                          throw new Error(folderDialogErrorText(error));
+                        }
+                      }
+                    : undefined
+                }
                 browser={(props) => <FolderBrowser {...props} />}
               />
               {/* The branch chip goes here (ticket 10.20.7). */}

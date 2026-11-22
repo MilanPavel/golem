@@ -11,6 +11,8 @@ export type NewSessionState = {
   chosen: string | null | undefined;
   lastOpened: string | null | undefined;
   model: string | null;
+  /** A session sent the person home to pick another folder: the empty screen opens its folder menu once. */
+  folderMenu: boolean;
 };
 
 export type NewSessionStore = StoreSource<NewSessionState> & {
@@ -20,10 +22,13 @@ export type NewSessionStore = StoreSource<NewSessionState> & {
   opened(cwd: string | null): void;
   /** The person picks a model for the next session (null for the default). */
   chooseModel(model: string | null): void;
+  /** Ask the empty screen to open its folder menu. It calls `folderMenuShown` once it has. */
+  askFolderMenu(): void;
+  folderMenuShown(): void;
 };
 
 export function createNewSession(): NewSessionStore {
-  const store = createStore<NewSessionState>({ chosen: undefined, lastOpened: undefined, model: null });
+  const store = createStore<NewSessionState>({ chosen: undefined, lastOpened: undefined, model: null, folderMenu: false });
   return {
     getSnapshot: store.getSnapshot,
     subscribe: store.subscribe,
@@ -44,6 +49,13 @@ export function createNewSession(): NewSessionStore {
       if (state.model !== model) {
         store.set({ ...state, model });
       }
+    },
+    askFolderMenu() {
+      store.set({ ...store.getSnapshot(), folderMenu: true });
+    },
+    folderMenuShown() {
+      const state = store.getSnapshot();
+      if (state.folderMenu) store.set({ ...state, folderMenu: false });
     },
   };
 }

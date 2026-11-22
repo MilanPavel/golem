@@ -38,12 +38,13 @@ import { cloudFinishedChat, cloudRunningChat, localFinishedChat, localRunningCha
 import { StepsView, stepsBatches } from "../features/workbench/steps-tab.tsx";
 import { ChangesView, ChecksView, Workbench, type WorkbenchTab, CommitDialogView, ConflictDialogView, RewindDialogView, TurnsView, FilesView } from "../features/workbench/index.ts";
 import type { ChangedFile } from "../store/changes.ts";
-import { Composer, ContextBannerView, ContextChipView, DockView, Meter, FolderBarBadge, ModeChipView, ModelBarChipView, NotesChipView, ChecksQuestionView, RoutePanelView, WaitHintView } from "../features/composer/index.ts";
+import { Composer, ContextBannerView, ContextChipView, DockView, Meter, FolderBarBadge, SessionFolderMenuBody, ModeChipView, ModelBarChipView, NotesChipView, ChecksQuestionView, RoutePanelView, WaitHintView } from "../features/composer/index.ts";
 import { PlanCardView } from "../features/chat/plan-card.tsx";
 import { createHistory } from "../features/composer/history.ts";
 import { CommandsDialog } from "../features/composer/help-dialog.tsx";
 import { HomeView, NewSessionModelChipView, SessionTitle } from "../features/shell/index.ts";
 import { FolderChip } from "../features/shell/folder-chip.tsx";
+import { FolderMenuBody } from "../features/shell/folder-menu.tsx";
 import { FolderBrowserView } from "../features/shell/folder-browser.tsx";
 import { CommandPaletteView, KeysDialog } from "../features/palette/index.ts";
 import { ModelDialogView, ModelList, withActivePulls, type ModelDialogViewProps, type ModelListNote } from "../features/models/index.ts";
@@ -2301,6 +2302,59 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
                 </>
               }
             />
+          </div>
+        </div>
+      </section>
+
+      <section className="mt-6" id={anchor("Folder menu")}>
+        <h3 className="mb-2 font-mono text-xs text-faint">Folder menu</h3>
+        <div className="grid gap-4 rounded-lg border border-line bg-bg p-4 sm:grid-cols-2">
+          <div aria-label="Folder menu, new session" role="group" className="flex max-h-120 w-96 max-w-full flex-col overflow-hidden rounded-lg border border-line bg-surface shadow-soft">
+            <FolderMenuBody
+              folder="/Users/you/repos/golem"
+              branch="main"
+              recent={[
+                { path: "/Users/you/repos/golem", branch: "main" },
+                { path: "/Users/you/notes", branch: null },
+                { path: "/Users/you/repos/golem-docs", branch: "main" },
+              ]}
+              worktrees={{
+                repo: "golem",
+                rows: [
+                  { path: "/Users/you/repos/golem", branch: "main" },
+                  { path: "/Users/you/repos/golem-review", branch: "review/1612" },
+                ],
+                agents: [
+                  { path: "/Users/you/repos/golem/.claude/worktrees/agent-a1", branch: "worktree-agent-a1" },
+                  { path: "/Users/you/repos/golem/.claude/worktrees/agent-b2", branch: "worktree-agent-b2" },
+                ],
+              }}
+              home="/Users/you"
+              onPick={() => {}}
+              onChoose={() => {}}
+              onBrowse={() => {}}
+              autoFocus={false}
+            />
+          </div>
+          <div aria-label="Folder menu, waiting for the macOS dialog" role="group" className="flex w-96 max-w-full flex-col rounded-lg border border-line bg-surface shadow-soft">
+            <FolderMenuBody
+              folder="/Users/you/notes"
+              branch={null}
+              recent={[]}
+              worktrees={null}
+              home="/Users/you"
+              onPick={() => {}}
+              onChoose={() => {}}
+              waiting
+              onCancelWait={() => {}}
+              autoFocus={false}
+            />
+          </div>
+          <div aria-label="Folder menu, without the dialog" role="group" className="flex w-96 max-w-full flex-col overflow-hidden rounded-lg border border-line bg-surface shadow-soft">
+            <FolderMenuBody folder="/Users/you/notes" branch={null} recent={[{ path: "/Users/you/repos/golem", branch: "main" }]} worktrees={null} home="/Users/you" onPick={() => {}} onBrowse={() => {}} autoFocus={false} />
+          </div>
+          <div aria-label="Folder menu, open session" role="group" className="w-80 max-w-full rounded-lg border border-line bg-surface shadow-soft">
+            <SessionFolderMenuBody folder="/Users/you/repos/golem" branch="main" onCopy={() => {}} onNewHere={() => {}} onNewElsewhere={() => {}} />
           </div>
         </div>
       </section>

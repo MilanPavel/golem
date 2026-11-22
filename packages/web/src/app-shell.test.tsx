@@ -167,10 +167,10 @@ test("the folder chip lists the folders and picks one", async () => {
   const { fake } = setup("/");
   seed(fake);
   await user.click(screen.getByRole("button", { name: "Folder: golem" }));
-  expect(screen.getByRole("menuitem", { name: "/Users/you/repos/golem" })).toBeTruthy();
-  await user.click(screen.getByRole("menuitem", { name: "/Users/you/notes" }));
+  expect(await screen.findByRole("option", { name: /golem/ })).toBeTruthy();
+  await user.click(screen.getByRole("option", { name: /notes/ }));
   expect(screen.getByRole("button", { name: "Folder: notes" })).toBeTruthy();
   await user.click(screen.getByRole("button", { name: "Folder: notes" }));
-  await user.click(screen.getByRole("menuitem", { name: "No folder" }));
+  await user.click(await screen.findByRole("option", { name: "No folder" }));
   expect(screen.getByRole("button", { name: "Folder: No folder" })).toBeTruthy();
 });

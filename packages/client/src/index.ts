@@ -181,6 +181,8 @@ export type { SessionSetRouteParams } from "../../protocol/gen/session-set-route
 export type { TraceRoute } from "../../protocol/gen/trace-route.ts";
 export type { ListedModel, ModelListResult } from "../../protocol/gen/model-list-result.ts";
 export type { DirEntry, FsListDirsResult } from "../../protocol/gen/fs-list-dirs-result.ts";
+export type { FsChooseFolderResult } from "../../protocol/gen/fs-choose-folder-result.ts";
+export type { GitInfoResult, GitWorktree } from "../../protocol/gen/git-info-result.ts";
 export type { SetupRow, SetupStatusResult } from "../../protocol/gen/setup-status-result.ts";
 export { mergeSummary } from "./session-index.ts";
 export { VERSION as GOLEM_VERSION } from "./version.ts";

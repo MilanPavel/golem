@@ -13,6 +13,7 @@ import { formatWireLine } from "./wire.ts";
 interface FakeOptions {
   answerPing?: boolean;
   mismatch?: boolean;
+  localUi?: boolean;
   onHello?: (socket: Socket) => void;
   onStatus?: boolean;
   eventBeforeStatus?: boolean;
@@ -70,7 +71,7 @@ function attach(socket: Socket, options: FakeOptions): void {
         write(socket, {
           jsonrpc: "2.0",
           id: message.id,
-          result: { protocol_major: PROTOCOL_MAJOR, protocol_minor: 0, daemon_version: "0.0.0" },
+          result: { protocol_major: PROTOCOL_MAJOR, protocol_minor: 0, daemon_version: "0.0.0", ...(options.localUi === undefined ? {} : { local_ui: options.localUi }) },
         });
         options.onHello?.(socket);
       } else if (message.method === "ping" && options.answerPing === true) {
@@ -2203,6 +2204,50 @@ test("listDirs sends the path only when given, and rejects a malformed listing",
   const refused = connectGolem({ socketPath: bad.socketPath, clientName: "tui", reconnect: false, heartbeatMs: 60_000 });
   try {
     await assert.rejects(() => refused.listDirs(), /invalid fs.list_dirs result/);
+  } finally {
+    refused.close();
+    await bad.close();
+  }
+});
+
+test("the repo info and the folder dialog send their arguments, localUi follows hello, and a malformed result is rejected", async () => {
+  const seen: [string, Record<string, unknown>][] = [];
+  const info = { repository: true, branch: "main", root: "/r", detached: false, changed: 0, worktrees: [{ path: "/r", branch: "main", main: true, agent: false }] };
+  const daemon = await listen((socket) => {
+    attach(socket, {
+      answerPing: true,
+      localUi: true,
+      results: { "git.info": info, "fs.choose_folder": { path: "/home/me/x" } },
+      onRequest: (_socket, method, params) => {
+        if (method === "git.info" || method === "fs.choose_folder") seen.push([method, params]);
+      },
+    });
+  });
+  const client = connectGolem({ socketPath: daemon.socketPath, clientName: "tui", reconnect: false, heartbeatMs: 60_000 });
+  try {
+    assert.equal(client.localUi, false);
+    await client.ready;
+    assert.equal(client.localUi, true);
+    assert.deepEqual(await client.gitInfo("/r"), info);
+    assert.deepEqual(await client.chooseFolder("/home/me"), { path: "/home/me/x" });
+    await client.chooseFolder();
+    assert.deepEqual(seen, [
+      ["git.info", { path: "/r" }],
+      ["fs.choose_folder", { start: "/home/me" }],
+      ["fs.choose_folder", {}],
+    ]);
+  } finally {
+    client.close();
+    await daemon.close();
+  }
+  const bad = await listen((socket) => {
+    attach(socket, { answerPing: true, results: { "git.info": { repository: true }, "fs.choose_folder": { path: 3 } } });
+  });
+  const refused = connectGolem({ socketPath: bad.socketPath, clientName: "tui", reconnect: false, heartbeatMs: 60_000 });
+  try {
+    await assert.rejects(() => refused.gitInfo("/r"), /invalid git.info result/);
+    await assert.rejects(() => refused.chooseFolder(), /invalid fs.choose_folder result/);
+    assert.equal(refused.localUi, false);
   } finally {
     refused.close();
     await bad.close();

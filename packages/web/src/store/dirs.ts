@@ -1,3 +1,3 @@
-import type { DirEntry, FsListDirsResult } from "@golem/client";
+import type { DirEntry, FsListDirsResult, GitInfoResult, GitWorktree } from "@golem/client";
 
-export type { DirEntry, FsListDirsResult };
+export type { DirEntry, FsListDirsResult, GitInfoResult, GitWorktree };

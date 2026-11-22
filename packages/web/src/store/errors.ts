@@ -5,6 +5,20 @@ const INVALID_PARAMS = -32602;
 
 export const SESSION_BUSY_TEXT = "golem is still answering. Stop it first, or wait.";
 
+const NOT_LOCAL = -32022;
+const UNSUPPORTED = -32023;
+const DIALOG_BUSY = -32024;
+
+/** One short line for a folder dialog that did not open. */
+export function folderDialogErrorText(error: unknown): string {
+  if (error instanceof RpcError) {
+    if (error.code === NOT_LOCAL || error.code === UNSUPPORTED) return "The folder dialog is not available here. Use Browse in golem.";
+    if (error.code === DIALOG_BUSY) return "A folder dialog is already open on your Mac.";
+    return error.message;
+  }
+  return error instanceof Error && error.message !== "" ? error.message : "The folder dialog did not open.";
+}
+
 /** The daemon refused a call's parameters, such as a folder that is not absolute or does not exist. */
 export function isInvalidParams(error: unknown): error is RpcError {
   return error instanceof RpcError && error.code === INVALID_PARAMS;
