@@ -85,6 +85,11 @@
   /* Below this the trace page is a single column: 760 px. */
   --breakpoint-narrow: 47.5rem;
 
+  /* The composer's row shrinks in steps, measured on the composer's own width: under 600, 500 and 400 px. */
+  --container-row-600: 37.5rem;
+  --container-row-500: 31.25rem;
+  --container-row-400: 25rem;
+
   /* Settings › Routing: from this container width its parts sit side by side (860 px). */
   --container-route: 53.75rem;
   /* Text sizes of that page: 11, 13 and 19 px, and the numbers on its chart (7.5 px). */

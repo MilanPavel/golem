@@ -65,17 +65,17 @@ async function say(user: ReturnType<typeof userEvent.setup>, text: string) {
 
 test("the chip shows the default, then the session's own mode from the event", async () => {
   const fake = await setup("careful");
-  await waitFor(() => expect(chip().textContent).toBe("careful"));
+  await waitFor(() => expect(chip().textContent).toBe("Careful"));
   expect(chip().getAttribute("aria-label")).toBe("Permission mode: careful, the default. Change it.");
   expect(fake.raw.getConfig).toHaveBeenCalledWith(CWD, "a");
   act(() => fake.emitEvent(ev("a", "session.mode.changed", { mode: "autopilot" })));
-  await waitFor(() => expect(chip().textContent).toBe("autopilot"));
+  await waitFor(() => expect(chip().textContent).toBe("Autopilot"));
   expect(chip().getAttribute("aria-label")).toBe("Permission mode: autopilot. Change it.");
 });
 
 test("an older daemon without the default reads balanced", async () => {
   await setup(undefined);
-  await waitFor(() => expect(chip().textContent).toBe("balanced"));
+  await waitFor(() => expect(chip().textContent).toBe("Balanced"));
 });
 
 test("the menu lists the modes with their lines, and a pick sets the mode", async () => {
@@ -98,7 +98,7 @@ test("the menu lists the modes with their lines, and a pick sets the mode", asyn
 test("Use the default sends null", async () => {
   const fake = await setup();
   act(() => fake.emitEvent(ev("a", "session.mode.changed", { mode: "careful" })));
-  await waitFor(() => expect(chip().textContent).toBe("careful"));
+  await waitFor(() => expect(chip().textContent).toBe("Careful"));
   const user = userEvent.setup();
   await user.click(chip());
   await user.click(await screen.findByRole("menuitemradio", { name: "Use the default (balanced)" }));

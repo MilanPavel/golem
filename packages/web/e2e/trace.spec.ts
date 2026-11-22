@@ -57,7 +57,6 @@ test("a run that used a tool shows as a run, a model call, and a tool call in th
   await expect(tree.getByRole("treeitem", { name: /read_file/ })).toBeVisible();
   await expect(page.getByText(/^1 run · /)).toBeVisible();
   // The session's top bar is the chat's. Its header sits inside main, so it is no banner landmark.
-  await expect(page.getByRole("button", { name: /^Model: / })).toBeVisible();
   await expect(page.getByRole("button", { name: /^Session actions/ })).toBeVisible();
   // An open drawer has its own "Hide details" button too; the toggle comes first.
   await expect(page.getByRole("button", { name: /^(Show|Hide) details$/ }).first()).toBeVisible();

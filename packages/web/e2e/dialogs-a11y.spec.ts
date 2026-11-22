@@ -65,6 +65,7 @@ for (const [theme, label] of THEMES) {
     await setTheme(page, theme);
     stack.ollama?.holdPulls();
     await page.getByRole("button", { name: /^Model:/ }).click();
+    await page.getByRole("button", { name: /^Choose a model…/ }).click();
     const picker = page.getByRole("dialog", { name: "Choose a model" });
     await expect(picker).toBeVisible();
     await stack.second.client.pullModel(PULLING);

@@ -1,10 +1,9 @@
 import { useRef, useState, type ReactNode } from "react";
-import { badgeVariants } from "../../ui/badge.tsx";
-import { cn } from "../../ui/cn.ts";
 import { Code } from "../../ui/code.tsx";
-import { ChevronDownIcon, FolderIcon } from "../../ui/icons.tsx";
+import { FolderIcon } from "../../ui/icons.tsx";
 import { Menu, MenuContent, MenuItem, MenuSeparator, MenuTrigger } from "../../ui/menu.tsx";
 import { Popover, PopoverAnchor, PopoverContent } from "../../ui/popover.tsx";
+import { FOLDER_CHIP, FolderChipName } from "../composer/index.ts";
 import { folderName } from "../sessions/folder.ts";
 import type { FolderBrowserProps } from "./folder-browser.tsx";
 
@@ -19,7 +18,7 @@ export type FolderChipProps = {
   browser?: (props: FolderBrowserProps) => ReactNode;
 };
 
-/** The folder the next session will run in, with a menu to change it. Read-only chips are Badges. */
+/** The folder the next session will run in, as a chip in the composer's row, with a menu to change it. */
 export function FolderChip({ folder, folders, onChange, browser }: FolderChipProps) {
   const [browsing, setBrowsing] = useState(false);
   const wantsBrowser = useRef(false);
@@ -32,11 +31,10 @@ export function FolderChip({ folder, folders, onChange, browser }: FolderChipPro
           <MenuTrigger
             title={folder ?? undefined}
             aria-label={`Folder: ${folderName(folder)}`}
-            className={cn(badgeVariants(), "cursor-pointer outline-offset-2 outline-clay hover:border-line-strong hover:text-ink focus-visible:outline-2")}
+            className={FOLDER_CHIP}
           >
-            <FolderIcon className="size-3" />
-            {folderName(folder)}
-            <ChevronDownIcon className="size-3" />
+            <FolderIcon />
+            <FolderChipName folder={folder} />
           </MenuTrigger>
         </PopoverAnchor>
         <MenuContent

@@ -38,11 +38,12 @@ import { cloudFinishedChat, cloudRunningChat, localFinishedChat, localRunningCha
 import { StepsView, stepsBatches } from "../features/workbench/steps-tab.tsx";
 import { ChangesView, ChecksView, Workbench, type WorkbenchTab, CommitDialogView, ConflictDialogView, RewindDialogView, TurnsView, FilesView } from "../features/workbench/index.ts";
 import type { ChangedFile } from "../store/changes.ts";
-import { Composer, ContextBannerView, ContextChipView, DockView, Meter, ModeChipView, NotesChipView, PlanChipView, TuneChipView, ChecksQuestionView, RouteChipView, WaitHintView } from "../features/composer/index.ts";
+import { Composer, ContextBannerView, ContextChipView, DockView, Meter, FolderBarBadge, ModeChipView, ModelBarChipView, NotesChipView, ChecksQuestionView, RoutePanelView, WaitHintView } from "../features/composer/index.ts";
 import { PlanCardView } from "../features/chat/plan-card.tsx";
 import { createHistory } from "../features/composer/history.ts";
 import { CommandsDialog } from "../features/composer/help-dialog.tsx";
-import { HomeView, ModelChipView, NewSessionModelChipView, SessionTitle } from "../features/shell/index.ts";
+import { HomeView, NewSessionModelChipView, SessionTitle } from "../features/shell/index.ts";
+import { FolderChip } from "../features/shell/folder-chip.tsx";
 import { FolderBrowserView } from "../features/shell/folder-browser.tsx";
 import { CommandPaletteView, KeysDialog } from "../features/palette/index.ts";
 import { ModelDialogView, ModelList, withActivePulls, type ModelDialogViewProps, type ModelListNote } from "../features/models/index.ts";
@@ -304,7 +305,13 @@ function DemoComposer({
   initial = "",
   commands,
   withNotes = false,
+  barLeft,
+  barRight,
+  strip,
 }: {
+  barLeft?: ReactNode;
+  barRight?: ReactNode;
+  strip?: ReactNode;
   size?: "dock" | "large";
   busy?: boolean;
   disabledReason?: string | null;
@@ -331,7 +338,45 @@ function DemoComposer({
       busy={busy}
       onStop={() => {}}
       disabledReason={disabledReason}
+      barLeft={barLeft}
+      barRight={barRight}
+      strip={strip}
     />
+  );
+}
+
+/** The composer's row as a session shows it, in a box of a fixed width: the row's steps depend on that width. */
+function ComposerRowDemo({ width }: { width: number }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div aria-label={`Composer row, ${width} px`} role="group" style={{ width }} className="max-w-full">
+      <DemoComposer
+        strip={width === 720 ? <NotesChipView label="2 notes" onOpen={() => {}} onRemoveAll={() => {}} /> : undefined}
+        barLeft={
+          <>
+            <ModelBarChipView
+              name="qwen3.8:27b"
+              route="auto"
+              tuned="temp 0.2"
+              title="qwen3.8:27b · local · ollama"
+              label="Model: qwen3.8:27b, route auto, options changed"
+              open={open}
+              onOpenChange={setOpen}
+              panel={<RoutePanelView mode="auto" ladder={[]} spend={[]} onSelect={() => {}} onNavigate={() => {}} />}
+              onChoose={() => setOpen(false)}
+              onTune={() => setOpen(false)}
+            />
+            <FolderBarBadge folder="/Users/you/repos/golem" />
+          </>
+        }
+        barRight={
+          <>
+            <ContextChipView used={38000} window={128000} onOpen={() => {}} />
+            <ModeChipView own="balanced" fallback="careful" onSelect={() => {}} onPlan={() => {}} />
+          </>
+        }
+      />
+    </div>
   );
 }
 
@@ -2122,22 +2167,34 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
         <div className="flex h-96 flex-col rounded-lg border border-line bg-bg">
           <HomeView
             headingLevel="h4"
-            folder="/Users/you/repos/golem"
-            folders={["/Users/you/repos/golem", "/Users/you/notes"]}
-            onChange={() => {}}
-            composer={<DemoComposer size="large" />}
-            modelChip={<NewSessionModelChipView label={{ kind: "default", text: "Gemma 4 E4B" }} onOpen={() => {}} />}
+            composer={
+              <DemoComposer
+                size="large"
+                barLeft={
+                  <>
+                    <NewSessionModelChipView label={{ kind: "default", text: "Gemma 4 E4B" }} onOpen={() => {}} />
+                    <FolderChip folder="/Users/you/repos/golem" folders={["/Users/you/repos/golem", "/Users/you/notes"]} onChange={() => {}} />
+                  </>
+                }
+              />
+            }
           />
         </div>
         <div aria-label="Empty screen, setup left" role="group" className="mt-2 flex h-96 flex-col rounded-lg border border-line bg-bg">
           <HomeView
             headingLevel="h4"
-            folder="/Users/you/repos/golem"
-            folders={["/Users/you/repos/golem"]}
-            onChange={() => {}}
             notice={<FinishSetupStripView onFinish={() => {}} />}
-            composer={<DemoComposer size="large" />}
-            modelChip={<NewSessionModelChipView label={{ kind: "none" }} onOpen={() => {}} />}
+            composer={
+              <DemoComposer
+                size="large"
+                barLeft={
+                  <>
+                    <NewSessionModelChipView label={{ kind: "none" }} onOpen={() => {}} />
+                    <FolderChip folder="/Users/you/repos/golem" folders={["/Users/you/repos/golem"]} onChange={() => {}} />
+                  </>
+                }
+              />
+            }
           />
         </div>
         <div className="mt-2 flex flex-wrap gap-2 rounded-lg border border-line bg-bg p-4">
@@ -2154,77 +2211,45 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
           <DockView busy={false} meter={<Meter state="idle" runStartedAt={null} />} composer={<DemoComposer />} />
           <DockView
             busy={false}
-            meter={<Meter state="idle" runStartedAt={null} aside={<ContextChipView used={32000} window={128000} onOpen={() => {}} />} />}
-            composer={<DemoComposer />}
+            meter={<Meter state="idle" runStartedAt={null} />}
+            composer={<DemoComposer barRight={<ContextChipView used={32000} window={128000} onOpen={() => {}} />} />}
           />
           <DockView
             busy={false}
-            meter={<Meter state="idle" runStartedAt={null} aside={<NotesChipView label="2 notes" onOpen={() => {}} onRemoveAll={() => {}} />} />}
-            composer={<DemoComposer withNotes />}
+            meter={<Meter state="idle" runStartedAt={null} />}
+            composer={<DemoComposer withNotes strip={<NotesChipView label="2 notes" onOpen={() => {}} onRemoveAll={() => {}} />} />}
           />
           <DockView
             busy={false}
-            meter={<Meter state="idle" runStartedAt={null} aside={<ContextChipView used={110000} window={128000} onOpen={() => {}} />} />}
-            composer={<DemoComposer />}
+            meter={<Meter state="idle" runStartedAt={null} />}
+            composer={<DemoComposer barRight={<ContextChipView used={110000} window={128000} onOpen={() => {}} />} />}
           />
           <DockView
             busy={false}
-            meter={<Meter state="idle" runStartedAt={null} aside={<ContextChipView used={125000} window={128000} onOpen={() => {}} />} />}
-            composer={<DemoComposer />}
+            meter={<Meter state="idle" runStartedAt={null} />}
+            composer={<DemoComposer barRight={<ContextChipView used={125000} window={128000} onOpen={() => {}} />} />}
           />
           <DockView
             busy={false}
-            meter={<Meter state="idle" runStartedAt={null} aside={<ContextChipView used={38000} window={100000} cleared={12} onOpen={() => {}} />} />}
-            composer={<DemoComposer />}
+            meter={<Meter state="idle" runStartedAt={null} />}
+            composer={<DemoComposer barRight={<ContextChipView used={38000} window={100000} cleared={12} onOpen={() => {}} />} />}
           />
           <DockView
             busy={false}
-            meter={<Meter state="idle" runStartedAt={null} aside={<ContextChipView used={1300} window={16384} windowEstimated onOpen={() => {}} />} />}
-            composer={<DemoComposer />}
-          />
-          <DockView
-            busy={false}
-            meter={
-              <Meter
-                state="idle"
-                runStartedAt={null}
-                aside={
-                  <span className="flex items-center gap-2">
-                    <TuneChipView text="temp 0.2 · top_p 0.9" onOpen={() => {}} />
-                    <ContextChipView used={32000} window={128000} onOpen={() => {}} />
-                  </span>
-                }
-              />
-            }
-            composer={<DemoComposer />}
-          />
-          <DockView
-            busy={false}
-            meter={
-              <Meter
-                state="idle"
-                runStartedAt={null}
-                aside={
-                  <span className="flex items-center gap-2">
-                    <ModeChipView own="autopilot" fallback="balanced" onSelect={() => {}} />
-                    <ContextChipView used={32000} window={128000} onOpen={() => {}} />
-                  </span>
-                }
-              />
-            }
-            composer={<DemoComposer />}
+            meter={<Meter state="idle" runStartedAt={null} />}
+            composer={<DemoComposer barRight={<ContextChipView used={1300} window={16384} windowEstimated onOpen={() => {}} />} />}
           />
           <div aria-label="Mode chips" role="group" className="flex flex-wrap gap-2">
             <ModeChipView own="careful" fallback="balanced" onSelect={() => {}} />
             <ModeChipView own={null} fallback="balanced" onSelect={() => {}} />
+            <ModeChipView own="autopilot" fallback="balanced" onSelect={() => {}} />
+            <ModeChipView own="autopilot" fallback="balanced" plan onSelect={() => {}} onPlan={() => {}} />
           </div>
-          <div aria-label="Model chips" role="group" className="flex flex-wrap gap-2">
-            <ModelChipView shown={{ name: "qwen3:27b", pick: false }} title="local · ollama" onOpen={() => {}} />
-            <ModelChipView shown={{ name: "llama3.2:3b", pick: true }} title="local · ollama" onOpen={() => {}} />
-          </div>
-          <div aria-label="Route chips" role="group" className="flex flex-wrap gap-2">
+          <div aria-label="Route panels" role="group" className="flex flex-wrap gap-3">
             {ROUTE_CHIP_CASES.map(({ label, mode, ladder, spend }) => (
-              <RouteChipView key={label} mode={mode} ladder={ladder} spend={spend} onSelect={() => {}} onNavigate={() => {}} />
+              <div key={label} className="w-80 rounded-lg border border-line bg-surface p-4">
+                <RoutePanelView mode={mode} ladder={ladder} spend={spend} onSelect={() => {}} onNavigate={() => {}} />
+              </div>
             ))}
           </div>
           <div aria-label="Context chips" role="group" className="flex flex-wrap gap-2">
@@ -2257,6 +2282,26 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
             meter={<Meter state="offline" runStartedAt={null} />}
             composer={<DemoComposer disabledReason="Not connected to golem" />}
           />
+        </div>
+      </section>
+
+      <section className="mt-6" id={anchor("Composer row")}>
+        <h3 className="mb-2 font-mono text-xs text-faint">Composer row</h3>
+        <div className="grid gap-4 rounded-lg border border-line bg-bg p-4">
+          {[720, 560, 460, 360].map((width) => (
+            <ComposerRowDemo key={width} width={width} />
+          ))}
+          <div aria-label="Composer row, home, 460 px" role="group" style={{ width: 460 }} className="max-w-full">
+            <DemoComposer
+              size="large"
+              barLeft={
+                <>
+                  <NewSessionModelChipView label={{ kind: "default", text: "qwen3.8:27b" }} onOpen={() => {}} />
+                  <FolderChip folder="/Users/you/repos/golem" folders={["/Users/you/repos/golem"]} onChange={() => {}} />
+                </>
+              }
+            />
+          </div>
         </div>
       </section>
 
@@ -2452,10 +2497,6 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
         <div className="flex flex-col gap-3 rounded-lg border border-line bg-bg p-4">
           <PlanCardView title="retry with backoff" steps={PLAN_DEMO_STEPS} actions={{ onBuild: async () => {}, onChange: () => {} }} />
           <PlanCardView title="retry with backoff" steps={PLAN_DEMO_STEPS} actions={null} />
-          <div aria-label="Plan first switch" role="group" className="flex flex-wrap gap-2">
-            <PlanChipView on={false} onToggle={() => {}} />
-            <PlanChipView on onToggle={() => {}} />
-          </div>
         </div>
       </section>
 

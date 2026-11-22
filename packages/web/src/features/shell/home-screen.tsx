@@ -4,26 +4,22 @@ import { PixelGolem } from "../../ui/pixel-golem.tsx";
 import { FinishSetupStrip } from "../welcome/index.ts";
 import { useKnownFolders, useNewSessionFolder, useNewSessionModel } from "../../store/page-context.tsx";
 import { FolderBrowser } from "./folder-browser.tsx";
-import { FolderChip, type FolderChipProps } from "./folder-chip.tsx";
+import { FolderChip } from "./folder-chip.tsx";
 import { NewSessionModelChip } from "./model-chip-new.tsx";
 import "./shell.css";
 
-/** The empty screen: the golem, a line, the composer's slot, and the folder chip. */
+/** The empty screen: the golem, a line, and the composer's slot. The model and folder chips sit in the composer's row. */
 export function HomeView({
   headingLevel: Heading = "h1",
   notice = null,
   composer = null,
-  modelChip = null,
   folderError = null,
-  ...chip
-}: FolderChipProps & {
+}: {
   /** A quiet strip above the composer, such as `Finish setup`. */
   notice?: ReactNode;
   /** The large composer. */
   composer?: ReactNode;
-  /** The model chip, beside the folder chip. */
-  modelChip?: ReactNode;
-  /** Why the daemon refused the folder or the model, shown under the chips. */
+  /** Why the daemon refused the folder or the model, shown under the composer. */
   folderError?: string | null;
   /** The heading level. A page has one h1; the gallery shows the screen under its own headings. */
   headingLevel?: "h1" | "h2" | "h3" | "h4";
@@ -36,10 +32,6 @@ export function HomeView({
         <Heading className="font-prose text-2xl font-normal tracking-tight text-balance">Start a new session</Heading>
         {notice}
         {composer}
-        <div className="flex flex-wrap items-center justify-center gap-2">
-          <FolderChip {...chip} />
-          {modelChip}
-        </div>
         {folderError ? (
           <p role="alert" className="-mt-2 text-xs text-deny">
             {folderError}
@@ -57,13 +49,24 @@ export function HomeScreen() {
   const start = useStartSession(folder, model);
   return (
     <HomeView
-      folder={folder}
-      folders={folders}
-      onChange={setFolder}
-      browser={(props) => <FolderBrowser {...props} />}
       notice={<FinishSetupStrip />}
-      composer={<NewSessionComposer start={start} />}
-      modelChip={<NewSessionModelChip />}
+      composer={
+        <NewSessionComposer
+          start={start}
+          barLeft={
+            <>
+              <NewSessionModelChip />
+              <FolderChip
+                folder={folder}
+                folders={folders}
+                onChange={setFolder}
+                browser={(props) => <FolderBrowser {...props} />}
+              />
+              {/* The branch chip goes here (ticket 10.20.7). */}
+            </>
+          }
+        />
+      }
       folderError={start.folderError}
     />
   );

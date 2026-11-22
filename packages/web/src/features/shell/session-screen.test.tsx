@@ -159,7 +159,7 @@ test("the chat shows ctx after a model call, and the chip opens a popover whose 
     fake.emitEvent(ev("a", "model.call.completed", { message_id: "m_1", latency_ms: 900, usage: { input: 32000, output: 10 } }));
   });
   const chip = screen.getByRole("button", { name: /^Context 32\.0K \/ 128K · 25%/ });
-  expect(chip.textContent).toBe("ctx 25%");
+  expect(chip.textContent).toBe("32.0K / 128K25%");
   expect((await axe.run(container, noContrast)).violations).toEqual([]);
   const user = userEvent.setup();
   await user.click(chip);

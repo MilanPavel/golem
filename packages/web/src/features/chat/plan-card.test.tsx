@@ -69,19 +69,28 @@ afterEach(() => {
   localStorage.clear();
 });
 
-const chip = () => screen.getByRole("button", { name: /Plan first/ });
+const modeChip = () => screen.getByRole("button", { name: /^Permission mode: /, hidden: true });
+/** The Plan first switch, at the bottom of the mode menu. It opens the menu when it is closed. */
+const planSwitch = async (user: ReturnType<typeof userEvent.setup>) => {
+  await user.click(modeChip());
+  return screen.findByRole("menuitemcheckbox", { name: /^Plan first/ });
+};
 const box = () => screen.getByRole("textbox", { name: "Message" }) as HTMLTextAreaElement;
 
-test("the Plan first chip shows the switch from the event and a click calls the store", async () => {
+test("the Plan first switch in the mode menu follows the event, a click calls the store, and with it on the chip reads Plan", async () => {
   const fake = await setup();
-  expect(chip().getAttribute("aria-pressed")).toBe("false");
-  expect(chip().getAttribute("title")).toBe(PLAN_HINT);
   const user = userEvent.setup();
-  await user.click(chip());
+  const off = await planSwitch(user);
+  expect(off.getAttribute("aria-checked")).toBe("false");
+  expect(off.textContent).toContain(PLAN_HINT);
+  expect(modeChip().textContent).not.toBe("Plan");
+  await user.click(off);
   expect(fake.raw.setPlan).toHaveBeenCalledWith("a", true);
   act(() => fake.emitEvent(ev("a", "session.plan.changed", { on: true })));
-  await waitFor(() => expect(chip().getAttribute("aria-pressed")).toBe("true"));
-  await user.click(chip());
+  await waitFor(() => expect(modeChip().textContent).toBe("Plan"));
+  const on = await planSwitch(user);
+  expect(on.getAttribute("aria-checked")).toBe("true");
+  await user.click(on);
   expect(fake.raw.setPlan).toHaveBeenLastCalledWith("a", false);
 });
 

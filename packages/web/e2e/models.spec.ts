@@ -24,6 +24,7 @@ async function openPicker(page: Page, stack: Stack): Promise<void> {
   await firstMessage(page, stack.gateway.url, "hello");
   await expect(answers(page)).toContainText("Done.");
   await chip(page).click();
+  await page.getByRole("button", { name: /^Choose a model…/ }).click();
   await expect(picker(page)).toBeVisible();
   await search(page).fill("llama");
 }

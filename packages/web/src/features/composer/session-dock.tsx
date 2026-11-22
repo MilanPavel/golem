@@ -8,13 +8,12 @@ import { PendingDock } from "./pending-dock.tsx";
 import { DockedChecksQuestion } from "./checks-question.tsx";
 import { Composer } from "./composer.tsx";
 import { ModeChip } from "./mode-chip.tsx";
-import { PlanChip } from "./plan-chip.tsx";
 import { NotesChip } from "./notes-chip.tsx";
-import { RouteChip } from "./route-chip.tsx";
+import { ModelBarChip } from "./model-bar-chip.tsx";
+import { SessionFolder } from "./folder-bar-chip.tsx";
 import { WaitHint } from "./wait-hint.tsx";
 import { ContextBanner } from "./context-banner.tsx";
 import { ContextChip } from "./context-chip.tsx";
-import { TuneChip } from "./tune-chip.tsx";
 import { useCommands } from "./use-commands.tsx";
 import { DockView } from "./dock.tsx";
 import { browserHistory } from "./history.ts";
@@ -119,16 +118,7 @@ export function SessionDock({ sessionId }: { sessionId: string }) {
         busy={run.busy}
         error={line}
         notice={commands.notice}
-        meter={<Meter state={state} runStartedAt={run.runStartedAt} localWait={run.localWait} wait={run.wait} loading={run.loading} aside={
-              <span className="flex items-center gap-2">
-                <NotesChip sessionId={sessionId} />
-                <TuneChip sessionId={sessionId} />
-                <PlanChip sessionId={sessionId} onToggle={(on) => setPlan.mutate(on)} />
-                <RouteChip sessionId={sessionId} onSelect={(mode) => setRoute.mutate(mode)} />
-                <ModeChip sessionId={sessionId} onSelect={(mode) => setMode.mutate(mode)} />
-                <ContextChip sessionId={sessionId} />
-              </span>
-            } />}
+        meter={<Meter state={state} runStartedAt={run.runStartedAt} localWait={run.localWait} wait={run.wait} loading={run.loading} />}
         approval={<PendingDock sessionId={sessionId} />}
         question={<DockedChecksQuestion sessionId={sessionId} />}
         hint={
@@ -140,6 +130,20 @@ export function SessionDock({ sessionId }: { sessionId: string }) {
         composer={
           <Composer
             forPalette
+            strip={<NotesChip sessionId={sessionId} />}
+            barLeft={
+              <>
+                <ModelBarChip sessionId={sessionId} onRoute={(mode) => setRoute.mutate(mode)} />
+                <SessionFolder sessionId={sessionId} />
+                {/* The branch chip goes here (ticket 10.20.7). */}
+              </>
+            }
+            barRight={
+              <>
+                <ContextChip sessionId={sessionId} />
+                <ModeChip sessionId={sessionId} onSelect={(mode) => setMode.mutate(mode)} onPlan={(on) => setPlan.mutate(on)} />
+              </>
+            }
             text={text}
             onTextChange={setText}
             pastes={pastes}

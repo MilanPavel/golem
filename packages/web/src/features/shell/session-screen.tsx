@@ -1,11 +1,11 @@
 import { forkPoint, LOCAL_ONLY_HINT, localOnlyLabel, type TodoItem } from "@golem/view";
 import { INSPECTOR_ID, InspectorPanel } from "../trace/index.ts";
-import { useEffect, useMemo, useRef, type ReactNode, type Ref, type RefObject } from "react";
+import { useEffect, useMemo, useRef, type ReactNode, type Ref } from "react";
 import { Badge } from "../../ui/badge.tsx";
 import { cn } from "../../ui/cn.ts";
 import { HEADER_ROW } from "../../ui/header-row.ts";
 import { Button } from "../../ui/button.tsx";
-import { FolderIcon, InspectIcon, LockIcon, PanelIcon } from "../../ui/icons.tsx";
+import { InspectIcon, LockIcon, PanelIcon } from "../../ui/icons.tsx";
 import { PixelGolem } from "../../ui/pixel-golem.tsx";
 import { useChangedFiles, useNavigate, useRememberOpenedFolder, useRoute, useSession, useSessionList } from "../../store/page-context.tsx";
 import { inspectPath, sessionPath } from "../../store/router.ts";
@@ -16,11 +16,10 @@ import { SessionDock } from "../composer/index.ts";
 import { TodoList, useDrawerOpen } from "../drawer/index.ts";
 import { ChangesTab, checksBadge, ChecksTab, FilesTab, hasSteps, StepsTab, Workbench, WORKBENCH_ID, type WorkbenchTab } from "../workbench/index.ts";
 import { closeModelDialog, ModelDialog, useModelDialogOpen } from "../models/index.ts";
-import { folderName, HelperPanel, useSessionActions } from "../sessions/index.ts";
+import { HelperPanel, useSessionActions } from "../sessions/index.ts";
 import { useRememberSettingsContext } from "../settings/index.ts";
 import { MenuBar, MenuButton } from "../sidebar/index.ts";
 import { LiveRunBanner } from "../runs/index.ts";
-import { ModelChip } from "./model-chip.tsx";
 import { SessionTitle } from "./session-title.tsx";
 
 type Header = Pick<SessionView, "title" | "cwd" | "model" | "status">;
@@ -53,19 +52,11 @@ export function DockSlot({ id }: { id: string }) {
   return <SessionDock key={id} sessionId={id} />;
 }
 
-/** The one model dialog of the session. The chip and `/model` open it; it closes with the session. */
-function SessionModelDialog({
-  sessionId,
-  model,
-  chip,
-}: {
-  sessionId: string;
-  model: SessionModel | null;
-  chip: RefObject<HTMLButtonElement | null>;
-}) {
+/** The one model dialog of the session. The model chip and `/model` open it; it closes with the session. */
+function SessionModelDialog({ sessionId, model }: { sessionId: string; model: SessionModel | null }) {
   const open = useModelDialogOpen(sessionId);
   // The store is cleared before the dialog reports its close, so remember where focus goes back to.
-  const returnTo = useRef<"chip" | HTMLElement | null>("chip");
+  const returnTo = useRef<HTMLElement | null>(null);
   useEffect(() => {
     if (open !== null) returnTo.current = open.returnTo;
   }, [open]);
@@ -80,11 +71,10 @@ function SessionModelDialog({
         if (!next) closeModelDialog();
       }}
       onCloseAutoFocus={(event) => {
-        // The dialog has no trigger of its own, so focus goes back by hand: to the chip, or to
+        // The dialog has no trigger of its own, so focus goes back by hand: to the model chip, or to
         // the composer that ran the command.
         event.preventDefault();
-        const target = returnTo.current === "chip" ? chip.current : returnTo.current;
-        target?.focus();
+        returnTo.current?.focus();
       }}
     />
   );
@@ -175,8 +165,8 @@ function InspectToggle({ open, onToggle, ref }: { open: boolean; onToggle: () =>
 }
 
 /**
- * The chrome both views of a session share: the top bar with the title, the model chip, the
- * folder, and the drawer toggle, the model dialog, and the drawer. The view goes in the column
+ * The chrome both views of a session share: the top bar with the title, the local-only badge, the
+ * inspect and drawer toggles, the model dialog, and the drawer. The view goes in the column
  * below the top bar. A session the daemon no longer has shows the gone screen instead.
  */
 export function SessionFrame({ id, children }: { id: string; children: ReactNode }) {
@@ -232,7 +222,6 @@ export function SessionFrame({ id, children }: { id: string; children: ReactNode
   const route = useRoute();
   const navigate = useNavigate();
   const inspect = route.name === "session" ? route.inspect : null;
-  const chip = useRef<HTMLButtonElement>(null);
   const atMessage = useSession(id, selectForkPoint);
   const session = useSessionActions();
   const titleActions = useMemo(
@@ -277,13 +266,6 @@ export function SessionFrame({ id, children }: { id: string; children: ReactNode
     <div className="flex min-h-0 min-w-0 flex-1">
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         <TopBar title={<SessionTitle title={title || null} canFork={atMessage !== null} actions={titleActions} />}>
-          {model ? <ModelChip sessionId={id} model={model} buttonRef={chip} /> : null}
-          {cwd === undefined ? null : (
-            <Badge title={cwd ?? undefined}>
-              <FolderIcon className="size-3" />
-              {folderName(cwd)}
-            </Badge>
-          )}
           {localOnlyLabel(summary) === "" ? null : (
             <Badge title={LOCAL_ONLY_HINT}>
               <LockIcon className="size-3" />
@@ -313,7 +295,7 @@ export function SessionFrame({ id, children }: { id: string; children: ReactNode
           }}
         />
       )}
-      <SessionModelDialog sessionId={id} model={model} chip={chip} />
+      <SessionModelDialog sessionId={id} model={model} />
       {helperOpen !== null ? (
         <HelperPanel leadId={id} open={helperOpen} />
       ) : drawerOpen ? (

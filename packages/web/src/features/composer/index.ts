@@ -2,11 +2,13 @@ export { ChecksQuestionView, DockedChecksQuestion } from "./checks-question.tsx"
 export { Composer, type ComposerProps } from "./composer.tsx";
 export { ContextBannerView } from "./context-banner.tsx";
 export { ContextChip, ContextChipView, type ContextPanel } from "./context-chip.tsx";
-export { PlanChip, PlanChipView, usePlanOn } from "./plan-chip.tsx";
+export { usePlanOn } from "./use-plan-on.ts";
 export { ModeChip, ModeChipView, useSessionMode } from "./mode-chip.tsx";
 export { NotesChip, NotesChipView } from "./notes-chip.tsx";
-export { RouteChip, RouteChipView } from "./route-chip.tsx";
-export { TuneChip, TuneChipView } from "./tune-chip.tsx";
+export { RoutePanelView } from "./route-panel.tsx";
+export { ModelBarChip, ModelBarChipView, ModelName } from "./model-bar-chip.tsx";
+export { FolderBarBadge, FolderChipName, FOLDER_CHIP, SessionFolder } from "./folder-bar-chip.tsx";
+export { BAR_CHIP, ICON_UNDER_400, ICON_UNDER_500 } from "./composer-bar.ts";
 export { WaitHint, WaitHintView } from "./wait-hint.tsx";
 export { DockView } from "./dock.tsx";
 export { Meter } from "./meter.tsx";

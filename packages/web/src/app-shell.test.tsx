@@ -108,9 +108,10 @@ test("a session shows its title, model, and folder, and attaches", async () => {
   });
   expect(fake.raw.attachSession).toHaveBeenCalledWith("a");
   expect(screen.getByRole("heading", { level: 1, name: "UTF-8 split" })).toBeTruthy();
-  expect(screen.getByText("qwen3-coder:30b")).toBeTruthy();
-  const folder = screen.getAllByText("golem", { selector: "[title]" }).find((el) => !el.closest("aside"))!;
-  expect(folder.getAttribute("title")).toBe("/Users/you/repos/golem");
+  expect(screen.getByRole("button", { name: "Model: qwen3-coder:30b" })).toBeTruthy();
+  const folder = screen.getAllByTitle("/Users/you/repos/golem").find((el) => el.closest("[data-composer-bar]"))!;
+  expect(folder.textContent).toBe("golem");
+  expect(folder.closest("[data-composer-bar]")).not.toBeNull();
   expect((await axe.run(container, noContrast)).violations).toEqual([]);
 });
 

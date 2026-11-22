@@ -58,6 +58,7 @@ async function openDialog(listing: ModelListResult | Error = SAMPLE_LISTING) {
   const view = await setup(listing);
   const user = userEvent.setup();
   await user.click(chip());
+  await user.click(await screen.findByRole("button", { name: /^Choose a model…/ }));
   await screen.findByRole("dialog", { name: "Choose a model" });
   if (!(listing instanceof Error) && !empty) await screen.findAllByRole("option");
   if (empty) await within(dialog()).findByText("No models found.");
@@ -564,8 +565,10 @@ test("it says Loading models… until the first answer", async () => {
   act(() => {
     fake.emitEvent(ev("a", "session.created", { cwd: CWD, model_profile: "local", model_name: "m" }));
   });
-  await userEvent.setup().click(chip());
-  await screen.findByRole("dialog");
+  const user = userEvent.setup();
+  await user.click(chip());
+  await user.click(await screen.findByRole("button", { name: /^Choose a model…/ }));
+  await screen.findByRole("dialog", { name: "Choose a model" });
   expect(within(dialog()).getByText("Loading models…")).toBeTruthy();
   await act(async () => {
     answer(SAMPLE_LISTING);
