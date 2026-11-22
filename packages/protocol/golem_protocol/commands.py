@@ -4112,6 +4112,25 @@ class ChatPromptResult(BaseModel):
     total_tokens: int
 
 
+class ChatDraftParams(BaseModel):
+    """``chat.draft``. Golem drafts instruction lines from what the person says about how
+    they like answers. Nothing is saved."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    description: str = Field(min_length=1, max_length=2000)
+
+
+class ChatDraftResult(BaseModel):
+    """3 to 8 short lines, one rule each, and the model that wrote them. At most 8 lines of
+    300 characters; never empty."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    lines: list[str]
+    model: str
+
+
 class NotificationsGetParams(BaseModel):
     """``notifications.get``. The ``[notifications]`` settings as golem uses them."""
 
@@ -5041,6 +5060,8 @@ __all__ = [
     "ChangesListResult",
     "ChangesSuggestMessageParams",
     "ChangesSuggestMessageResult",
+    "ChatDraftParams",
+    "ChatDraftResult",
     "ChatGetParams",
     "ChatPromptParams",
     "ChatPromptPart",

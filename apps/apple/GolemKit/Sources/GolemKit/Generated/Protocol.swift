@@ -2386,6 +2386,39 @@ public struct ChangesSuggestMessageResult: Codable {
     }
 }
 
+/// ``chat.draft``. Golem drafts instruction lines from what the person says about how
+/// they like answers. Nothing is saved.
+// MARK: - ChatDraftParams
+public struct ChatDraftParams: Codable {
+    public let description: String
+
+    public enum CodingKeys: String, CodingKey {
+        case description = "description"
+    }
+
+    public init(description: String) {
+        self.description = description
+    }
+}
+
+/// 3 to 8 short lines, one rule each, and the model that wrote them. At most 8 lines of
+/// 300 characters; never empty.
+// MARK: - ChatDraftResult
+public struct ChatDraftResult: Codable {
+    public let lines: [String]
+    public let model: String
+
+    public enum CodingKeys: String, CodingKey {
+        case lines = "lines"
+        case model = "model"
+    }
+
+    public init(lines: [String], model: String) {
+        self.lines = lines
+        self.model = model
+    }
+}
+
 /// ``chat.get``. The defaults for every new chat, from ``[chat]``.
 // MARK: - ChatGetParams
 public struct ChatGetParams: Codable {
