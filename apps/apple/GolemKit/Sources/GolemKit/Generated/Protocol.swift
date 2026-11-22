@@ -5314,6 +5314,7 @@ public enum Stopped: String, Codable {
     case budget = "budget"
     case calls = "calls"
     case cancelled = "cancelled"
+    case cost = "cost"
     case done = "done"
     case failed = "failed"
     case time = "time"

@@ -39,7 +39,7 @@ from golem.config import AgentSettings, ModelPrice, PermissionMode, RouteMode
 from golem.evals.whatif import build_report, session_model
 from golem.graphs.adapter import PlainMessage, plain_messages, trace_messages
 from golem.graphs.chat import ChatRuntime, Growth
-from golem.graphs.child import child_thread
+from golem.graphs.child import ChildLimits, child_thread
 from golem.graphs.context_view import ContextView, view
 from golem.graphs.state import SCHEMA_VERSION, AgentState
 from golem.graphs.step_up import Consent, StepAsk, StepRequest, StepUp
@@ -68,6 +68,7 @@ from golem.sessions.approvals import pending_approval, pending_consent
 from golem.sessions.bus import EventTarget, SummaryTarget
 from golem.sessions.context import context_breakdown
 from golem.sessions.helper_clock import clock_paused, working_ms
+from golem.sessions.helper_limits import Used, covered_line, reached, used_of
 from golem.sessions.helpers import (
     DEFAULT_PROMPT,
     NO_NESTED,
@@ -76,6 +77,7 @@ from golem.sessions.helpers import (
     HelperRef,
     check_agent,
     cut_allowances,
+    files_named,
     helper_mode,
     origin_of,
     parked_calls,
@@ -142,6 +144,7 @@ from golem_protocol.commands import (
     TraceSpanResult,
 )
 from golem_protocol.events import (
+    AgentLimits,
     AgentOrigin,
     AgentSnapshot,
     ApprovalDecision,
@@ -1834,15 +1837,36 @@ class SessionManager:
             run_events = [] if run is None else await self._events.for_run(run.run_id)
             if run is not None:
                 answer = summarize_run(run_events).answer
+            stopped = await self._stopped(helper.session_id, run, run_events)
             found.append(
                 HelperOutcome(
                     agent=helper.agent or "explorer",
-                    stopped=await self._stopped(helper.session_id, run, run_events),
+                    stopped=stopped,
                     text=answer[:limit],
                     label=labels.get(helper.session_id, ""),
+                    covered=await self._covered(helper.session_id, stopped),
                 )
             )
         return found
+
+    async def _covered(self, helper_id: str, stopped: HelperStopped) -> str:
+        """The line a helper's result starts with when it hit a limit: which one, and how far it
+        got. Empty when it answered."""
+        if stopped == "done":
+            return ""
+        stored = await self._events.stored(helper_id)
+        created = next((e.data for e in stored if isinstance(e, SessionCreatedEvent)), None)
+        brief = next(
+            (
+                e.data.text
+                for e in stored
+                if isinstance(e, MessageCompletedEvent) and e.data.role == "user"
+            ),
+            "",
+        )
+        limits = AgentLimits() if created is None or created.agent is None else created.agent.limits
+        named = files_named(brief, None if created is None else created.cwd)
+        return covered_line(limits, stopped, stored, named, calls_default=ChildLimits().max_calls)
 
     async def _stopped(
         self, helper_id: str, run: RunRecord | None, run_events: list[ChatEvent]
@@ -1863,7 +1887,11 @@ class SessionManager:
                 and working_ms(stored, at) >= limit * 1000
             )
         return stop_reason(
-            None if run is None else run.status, run_events, agent, timed_out=timed_out
+            None if run is None else run.status,
+            run_events,
+            agent,
+            timed_out=timed_out,
+            events=stored,
         )
 
     async def _helper_ended(self, session_id: str, run_id: str | None) -> None:
@@ -3596,7 +3624,22 @@ class SessionManager:
             session.agent, session.prompt or self._prompt_of(session.agent, session)
         )
         # The helper's allowances are read live: a batch answer reaches a helper still running.
-        return replace(scope, granted=lambda: tuple(session.allowed_tools))
+        return replace(
+            scope, granted=lambda: tuple(session.allowed_tools), spent=self._spent_of(session)
+        )
+
+    def _spent_of(self, session: _LiveSession) -> Callable[[], Awaitable[bool]] | None:
+        """Whether the helper has reached its cost or token limit, from its stored events."""
+        agent = session.agent
+        if agent is None or (agent.limits.max_cost_usd is None and agent.limits.max_tokens is None):
+            return None
+        limits = agent.limits
+
+        async def spent() -> bool:
+            used = used_of(await self._events.stored(session.session_id))
+            return reached(limits, Used(cost_usd=used.cost_usd, tokens=used.tokens)) is not None
+
+        return spent
 
     def _prompt_of(self, agent: AgentSnapshot, session: _LiveSession) -> str:
         """The prompt of a helper that lost it, such as after a restart: its agent file, read

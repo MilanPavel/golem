@@ -794,9 +794,11 @@ def open_chat(
             get_stream_writer()({STREAM_KEY: "model.started", "message_id": message_id})
         scope = scope_of(config)
         child = child_of(config)
-        # A helper that used its calls makes one more, without tools, to give its answer.
-        final = child is not None and sum(isinstance(m, AIMessage) for m in messages) >= (
-            child.max_calls
+        # A helper that used its calls, or reached its cost or token limit, makes one more,
+        # without tools, to give its answer.
+        final = child is not None and (
+            sum(isinstance(m, AIMessage) for m in messages) >= child.max_calls
+            or (child.spent is not None and await child.spent())
         )
         overrides = _options(config)
         local_only = _local_only(config)

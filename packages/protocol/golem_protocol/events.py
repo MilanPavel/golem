@@ -1254,8 +1254,9 @@ HelperState = Literal["queued", "running", "waiting"]
 HelperStep = Literal["running", "done", "failed"]
 """How one tool call of a helper stands: it started, it ended well, it ended in an error."""
 
-HelperStopped = Literal["done", "calls", "time", "budget", "tokens", "cancelled", "failed"]
-"""Why a helper run ended: it answered, hit a limit, was cancelled, or a model call failed."""
+HelperStopped = Literal["done", "calls", "time", "cost", "budget", "tokens", "cancelled", "failed"]
+"""Why a helper run ended: it answered, hit a limit (``cost`` is the helper's own limit in USD;
+``budget`` is a cap in ``[budget]``), was cancelled, or a model call failed."""
 
 HelperWaitState = Literal["parked", "resumed"]
 """A lead that waits for its helpers is ``parked``. When they have answered it is ``resumed``."""

@@ -134,6 +134,9 @@ class ChildScope:
     """What the helper's session allows now, read again at each tool step. A batch answer
     (``approval.respond`` with ``scope: "batch"``) reaches a helper that is still running
     through it, so the helper does not ask for what you allowed."""
+    spent: Callable[[], Awaitable[bool]] | None = field(default=None, compare=False)
+    """Whether the helper has reached its cost or token limit, read from its stored events
+    before each model call. When it has, the call is the last one: it answers without tools."""
 
 
 class HelperHost(Protocol):

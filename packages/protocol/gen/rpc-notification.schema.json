@@ -1184,6 +1184,7 @@
             "done",
             "calls",
             "time",
+            "cost",
             "budget",
             "tokens",
             "cancelled",

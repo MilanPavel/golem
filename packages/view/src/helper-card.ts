@@ -30,7 +30,7 @@ export type BatchHelper = {
   state: HelperState;
   /** The wait reason of `helper.state`, a plain string. */
   reason: string | null;
-  /** The reason it ended: `done`, `calls`, `time`, `budget`, `tokens`, `cancelled` or `failed`. Null while it runs. */
+  /** The reason it ended: `done`, `calls`, `time`, `cost`, `budget`, `tokens`, `cancelled` or `failed`. Null while it runs. */
   stopped: string | null;
   steps: ToolBlock[];
   /** Tokens the helper used, and the size of its answer. Null until it ends. */

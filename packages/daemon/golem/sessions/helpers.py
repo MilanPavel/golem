@@ -21,6 +21,7 @@ from golem.models.facts import ModelFacts
 from golem.models.pick import Choice, Traits
 from golem.models.pick_helper import HelperChoice, pick_helper
 from golem.permissions.engine import Allowance
+from golem.sessions.helper_limits import Used, before_last_call, reached, used_of
 from golem.tools.registry import ToolError
 from golem_protocol.events import (
     AgentLimits,
@@ -280,18 +281,30 @@ def stop_reason(
     agent: AgentSnapshot | None,
     *,
     timed_out: bool = False,
+    events: Sequence[ChatEvent] | None = None,
 ) -> HelperStopped:
     """Why a helper ended, from its last run: its status, its events and its agent's limits.
 
     ``timed_out``: the manager stopped the run at its time limit. A run that was cancelled
     after it took in more than ``TOKEN_FACTOR`` windows was stopped for tokens. A run that
     answered after more model calls than the limit allows ended on its last call: ``calls``.
-    A run that failed because a cap in ``[budget]`` is spent ended ``budget``.
+    A run that answered after its calls had reached the cost or token limit set for the helper
+    ended on its last call too: ``cost`` or ``tokens``. ``events`` are all the stored events of
+    the helper, which those sums are read from; without them, the events of the run.
+    A run that failed because a cap in ``[budget]`` is spent ended ``budget``, and any other
+    run that failed ended ``failed``.
     """
     if status == "completed":
         limit = (agent.limits.max_calls if agent is not None else None) or ChildLimits().max_calls
         calls = sum(isinstance(e, ModelCallCompletedEvent) for e in run_events)
-        return "calls" if calls > limit else "done"
+        if calls > limit:
+            return "calls"
+        if agent is not None:
+            before = before_last_call(run_events if events is None else events)
+            used = used_of(before)
+            hit = reached(agent.limits, Used(cost_usd=used.cost_usd, tokens=used.tokens))
+            return hit if hit in ("cost", "tokens") else "done"
+        return "done"
     if status == "cancelled":
         if timed_out:
             return "time"
@@ -325,6 +338,7 @@ __all__ = [
     "RunSummary",
     "check_agent",
     "cut_allowances",
+    "files_named",
     "helper_mode",
     "origin_of",
     "parked_calls",
@@ -391,6 +405,14 @@ def paths_in(brief: str, cwd: str | None) -> list[str]:
         if inside and shown not in found:
             found.append(shown)
     return found
+
+
+def files_named(brief: str, cwd: str | None) -> list[str]:
+    """The files (not folders) the brief names that exist under ``cwd``: see :func:`paths_in`."""
+    if not cwd:
+        return []
+    root = Path(cwd).resolve()
+    return [path for path in paths_in(brief, cwd) if (root / path).is_file()]
 
 
 def what_is_sent(

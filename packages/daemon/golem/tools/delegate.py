@@ -74,6 +74,9 @@ class HelperOutcome:
     text: str
     artifact_id: str | None = None
     label: str = ""
+    covered: str = ""
+    """What the helper covered when it did not simply answer, such as
+    ``stopped at 25 calls, read 5 of 7 files``. Empty when it answered."""
 
 
 def _section(done: HelperOutcome) -> str:
@@ -87,7 +90,8 @@ def _section(done: HelperOutcome) -> str:
     answer = answer or "(the helper gave no answer)"
     if done.stopped == "done":
         return answer
-    return f"{done.agent} finished: {done.stopped}\n\n{answer}"
+    lead = f"{done.covered}\n\n" if done.covered else ""
+    return f"{done.agent} finished: {done.stopped}\n\n{lead}{answer}"
 
 
 def results_text(ended: Sequence[HelperOutcome]) -> str:

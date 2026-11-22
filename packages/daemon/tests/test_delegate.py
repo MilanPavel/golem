@@ -458,7 +458,11 @@ async def test_past_the_call_limit_the_last_call_has_no_tools(
     last = model.seen[3]
     assert isinstance(last[-1], HumanMessage)
     assert last[-1].content == FINAL_REQUEST
-    assert _delegate_result(events) == "explorer finished: calls\n\nwhat I know so far"
+    assert _delegate_result(events) == (
+        "explorer finished: calls\n\n"
+        "stopped at 2 calls, read 1 file, listed 1 folder\n\n"
+        "what I know so far"
+    )
     assert _ended(events).data.stopped == "calls"
     # The request to answer is sent, never stored.
     (helper_id,) = await chat.helper_ids(events)
@@ -489,7 +493,10 @@ async def test_a_reply_with_tool_calls_at_the_last_call_is_cut_to_its_text(
     )
     _, _, events = await chat.run(project)
 
-    assert _delegate_result(events) == "explorer finished: calls\n\n(the helper gave no answer)"
+    assert _delegate_result(events) == (
+        "explorer finished: calls\n\nstopped at 1 call, listed 1 folder\n\n"
+        "(the helper gave no answer)"
+    )
     assert _ended(events).data.stopped == "calls"
     (helper_id,) = await chat.helper_ids(events)
     thread = plain_messages(await chat.runtime.values(helper_id))

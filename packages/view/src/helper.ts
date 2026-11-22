@@ -136,14 +136,16 @@ export function helperTreeRows(step: ToolBlock): string[] {
 }
 
 /** Why a helper ended, as the `delegate` result names it: `explorer finished: <reason>`. */
-export type HelperStop = "done" | "calls" | "time" | "budget" | "tokens" | "cancelled";
+export type HelperStop = "done" | "calls" | "time" | "cost" | "budget" | "tokens" | "cancelled" | "failed";
 
 const STOP_WORDS: Record<Exclude<HelperStop, "done">, string> = {
   calls: "call limit",
   time: "time limit",
+  cost: "cost limit",
   budget: "budget spent",
   tokens: "token limit",
   cancelled: "cancelled",
+  failed: "a model call failed",
 };
 
 /** The reason a `delegate` result starts with, or `done` when it has none. */
