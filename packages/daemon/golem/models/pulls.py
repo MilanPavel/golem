@@ -119,6 +119,11 @@ class PullManager:
         # Starts a local Ollama that does not answer, and keeps it up while a download runs.
         self.local: ollama.LocalServers | None = None
 
+    @property
+    def transport(self) -> httpx.AsyncBaseTransport | None:
+        """The test transport, so other clients of this daemon can share it."""
+        return self._transport
+
     def pulling(self) -> dict[str, float | None]:
         """Refs being downloaded, with their progress when known."""
         return {ref: pull.progress for ref, pull in self._pulls.items()}
