@@ -282,6 +282,11 @@ class ChatRuntime:
             return {}
         return cast(Mapping[str, object], raw)
 
+    async def branch_seen(self, session_id: str) -> str | None:
+        """The branch the model last heard of, None before the first turn that knew one."""
+        seen = (await self.values(session_id)).get("branch_seen")
+        return seen if isinstance(seen, str) else None
+
     async def system_prompt(
         self,
         session_id: str,
@@ -340,8 +345,14 @@ class ChatRuntime:
         step_up: bool = False,
         child: ChildScope | None = None,
         memory: MemoryAccess | None = None,
+        notes: Sequence[str] = (),
+        branch: str | None = None,
     ) -> AsyncGenerator[object]:
         """Stream one user turn. The first turn writes the state fields.
+
+        ``notes`` are texts from golem the model reads before the user's message, each as a
+        note (see :mod:`golem.graphs.notes`), not as something the user said. ``branch`` is the
+        folder's branch, which the checkpoint keeps as the one the model last heard of.
 
         Tool calls a stopped run left without results get a cancelled result
         first, so the provider accepts the history. ``cwd`` is the folder the
@@ -381,7 +392,7 @@ class ChatRuntime:
         existing = await self.values(session_id)
         undone = await self._undone_note(session_id, existing)
         graph_input = _turn_input(
-            [*undone[0], HumanMessage(content=text, id=user_message_id)],
+            [*undone[0], *map(note, notes), HumanMessage(content=text, id=user_message_id)],
             session_id=session_id,
             model_profile=model_profile,
             schema_version=schema_version,
@@ -390,6 +401,8 @@ class ChatRuntime:
         )
         if undone[1] is not None:
             graph_input["changes_seen"] = undone[1]
+        if branch is not None:
+            graph_input["branch_seen"] = branch
         folders = [*([] if skill_folder is None else [skill_folder]), *read_folders]
         if folders:
             graph_input["skill_folders"] = folders

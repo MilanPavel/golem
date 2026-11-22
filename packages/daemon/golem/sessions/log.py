@@ -23,6 +23,7 @@ from typing import TYPE_CHECKING
 
 from pydantic import BaseModel
 
+from golem.sessions.branch import BranchCache
 from golem.sessions.bus import EventBus, EventTarget, SummaryTarget
 from golem.sessions.summaries import QUEUED_REASONS, summarize
 from golem.store.events import EventLog
@@ -47,6 +48,9 @@ _DELTAS = (
 )
 """Events that do not change a session's summary."""
 
+_TURN_ENDS = ("run.completed", "run.failed", "run.cancelled")
+"""Events after which the summary reads the folder's branch again, not from the cache."""
+
 
 class SessionLog:
     """Owns ``seq`` for every session. One emit or attach per session at a time."""
@@ -55,6 +59,8 @@ class SessionLog:
         self._events = events
         self._bus = bus
         self._records = records
+        self.branches = BranchCache()
+        """The branch of each folder, read at most once every two seconds, for the summaries."""
         self.local_only: Callable[[str | None], bool] = lambda _cwd: False
         """Says whether a folder stays on this Mac, for the summaries."""
         self.after_emit: Callable[[ChatEvent], Awaitable[None]] | None = None
@@ -157,7 +163,11 @@ class SessionLog:
         self._step_pushed.pop(session_id, None)
 
     async def _summary(
-        self, activity: SessionActivity, wait: tuple[WaitReason, str] | None
+        self,
+        activity: SessionActivity,
+        wait: tuple[WaitReason, str] | None,
+        *,
+        fresh_branch: bool = False,
     ) -> SessionSummary:
         session_id = activity.session.session_id
         helpers = await self.helpers(activity)
@@ -179,6 +189,7 @@ class SessionLog:
             helpers,
             self.step(session_id),
             items,
+            await self.branches.get(activity.session.cwd, fresh=fresh_branch),
         )
 
     async def _push_lead(self, lead_id: str) -> None:
@@ -343,7 +354,9 @@ class SessionLog:
                     # the dispatcher's once-a-second notices (position moves) send no summary.
                     if event.type == "model.waiting" and wait == before:
                         return event
-                    self._bus.publish_summary(await self._summary(activity, wait))
+                    self._bus.publish_summary(
+                        await self._summary(activity, wait, fresh_branch=event.type in _TURN_ENDS)
+                    )
                     lead = activity.session.parent_session_id
                     if lead is not None:
                         await self._push_lead(lead)

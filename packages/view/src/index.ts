@@ -393,6 +393,7 @@ export {
   contextBar,
   clearedLegend,
   clearedNote,
+  branchChangedNote,
   contextChangedNote,
   summaryOfLine,
   contextRoom,

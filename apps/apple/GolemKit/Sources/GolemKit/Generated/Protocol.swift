@@ -1935,6 +1935,87 @@ public struct AuthSetResult: Codable {
     }
 }
 
+/// The branch of a session's folder is not the one its model last heard of.
+///
+/// ``from_branch`` and ``to_branch`` are the two branch names. ``paths_count`` is how many
+/// files differ between them, null when git could not say. The model gets a note with the
+/// paths before the turn; this event is the quiet line in the transcript.
+// MARK: - BranchChangedData
+public struct BranchChangedData: Codable {
+    public let fromBranch: String
+    public let pathsCount: Int?
+    public let toBranch: String
+
+    public enum CodingKeys: String, CodingKey {
+        case fromBranch = "from_branch"
+        case pathsCount = "paths_count"
+        case toBranch = "to_branch"
+    }
+
+    public init(fromBranch: String, pathsCount: Int?, toBranch: String) {
+        self.fromBranch = fromBranch
+        self.pathsCount = pathsCount
+        self.toBranch = toBranch
+    }
+}
+
+/// The folder's branch changed under the session, before the run's first model call.
+// MARK: - BranchChangedEvent
+public struct BranchChangedEvent: Codable {
+    public let data: BranchChangedEventData
+    public let runID: String?
+    public let seq: Int
+    public let sessionID: String
+    public let ts: String
+    public let type: BranchChangedEventType
+
+    public enum CodingKeys: String, CodingKey {
+        case data = "data"
+        case runID = "run_id"
+        case seq = "seq"
+        case sessionID = "session_id"
+        case ts = "ts"
+        case type = "type"
+    }
+
+    public init(data: BranchChangedEventData, runID: String?, seq: Int, sessionID: String, ts: String, type: BranchChangedEventType) {
+        self.data = data
+        self.runID = runID
+        self.seq = seq
+        self.sessionID = sessionID
+        self.ts = ts
+        self.type = type
+    }
+}
+
+/// The branch of a session's folder is not the one its model last heard of.
+///
+/// ``from_branch`` and ``to_branch`` are the two branch names. ``paths_count`` is how many
+/// files differ between them, null when git could not say. The model gets a note with the
+/// paths before the turn; this event is the quiet line in the transcript.
+// MARK: - BranchChangedEventData
+public struct BranchChangedEventData: Codable {
+    public let fromBranch: String
+    public let pathsCount: Int?
+    public let toBranch: String
+
+    public enum CodingKeys: String, CodingKey {
+        case fromBranch = "from_branch"
+        case pathsCount = "paths_count"
+        case toBranch = "to_branch"
+    }
+
+    public init(fromBranch: String, pathsCount: Int?, toBranch: String) {
+        self.fromBranch = fromBranch
+        self.pathsCount = pathsCount
+        self.toBranch = toBranch
+    }
+}
+
+public enum BranchChangedEventType: String, Codable {
+    case branchChanged = "branch.changed"
+}
+
 /// USD per million tokens, as golem knew it when the call ended.
 // MARK: - CallPrice
 public struct CallPrice: Codable {
@@ -17000,6 +17081,8 @@ public enum RPCNotificationMethod: String, Codable {
 /// A helper's run ended.
 ///
 /// A helper's log was cut to its receipt. ``run_id`` is null: no run owns the change.
+///
+/// The folder's branch changed under the session, before the run's first model call.
 // MARK: - Params
 public struct Params: Codable {
     public let data: ParamsData
@@ -17412,6 +17495,12 @@ public struct Params: Codable {
 ///
 /// ``removed`` is how many events were removed from the helper's log. The brief, the final
 /// answer and ``session.completed`` stay.
+///
+/// The branch of a session's folder is not the one its model last heard of.
+///
+/// ``from_branch`` and ``to_branch`` are the two branch names. ``paths_count`` is how many
+/// files differ between them, null when git could not say. The model gets a note with the
+/// paths before the turn; this event is the quiet line in the transcript.
 // MARK: - ParamsData
 public struct ParamsData: Codable {
     public let agent: Agent?
@@ -17551,6 +17640,9 @@ public struct ParamsData: Codable {
     public let stopped: Stopped?
     public let tokens: Int?
     public let workingMS: Int?
+    public let fromBranch: String?
+    public let pathsCount: Int?
+    public let toBranch: String?
 
     public enum CodingKeys: String, CodingKey {
         case agent = "agent"
@@ -17690,9 +17782,12 @@ public struct ParamsData: Codable {
         case stopped = "stopped"
         case tokens = "tokens"
         case workingMS = "working_ms"
+        case fromBranch = "from_branch"
+        case pathsCount = "paths_count"
+        case toBranch = "to_branch"
     }
 
-    public init(agent: Agent?, cwd: String?, forkedFrom: PurpleForkedFrom?, modelName: String?, modelProfile: String?, modelProvider: String?, origin: String?, parent: PurpleSessionParent?, route: RouteEnum?, allowedTools: [PurpleSessionAllowance]?, mcpServers: [String]?, paidOk: Bool?, title: String?, runID: String?, status: PurpleStatus?, summary: String?, reason: String?, detail: String?, model: String?, provider: String?, rejected: [FluffyModelRejection]?, replacesModel: String?, tier: Tier?, options: [String: Option]?, mode: DefaultPermissionModeEnum?, on: Bool?, messageID: String?, role: MessageCompletedDataRole?, text: String?, interrupted: Bool?, skill: FluffySkillCall?, thinking: String?, thinkingMS: Int?, clearedIDS: [String]?, contextWindow: Int?, estimatedTokens: Int?, index: Int?, messageBytes: [Int]?, messageChars: [Int]?, messageIDS: [String]?, numCtx: Int?, parentCallID: String?, profile: String?, summaryChars: Int?, systemBytes: Int?, systemChars: Int?, systemPromptSHA: String?, systemSections: [TentacledPromptSectionInfo]?, toolsBytes: Int?, toolsChars: Int?, toolsSHA: String?, windowEstimated: Bool?, windowPlanned: Bool?, costUsd: Double?, failed: Bool?, firstTokenMS: Int?, latencyMS: Int?, loadMS: Int?, price: FluffyCallPrice?, promptMS: Int?, replyMS: Int?, stopReason: String?, textToolCalls: TextToolCalls?, usage: FluffyTokenUsage?, action: ContextChangedDataAction?, afterTokens: Int?, beforeTokens: Int?, count: Int?, reloadMS: Int?, room: Int?, windowFrom: Int?, windowTo: Int?, code: Code?, hint: String?, message: String?, args: [String: JSONAny]?, callID: String?, name: String?, chars: Int?, lines: Int?, path: String?, holder: String?, line: String?, position: Int?, retryInMS: Int?, scope: ModelWaitingDataScope?, silentMS: Int?, waiting: Bool?, willRetry: Bool?, window: Int?, artifactID: String?, diff: String?, durationMS: Int?, preview: String?, sources: [PurpleToolSource]?, truncated: Bool?, source: String?, subject: String?, decision: Decision?, device: String?, rule: String?, alternatives: [Answer]?, caps: FluffyConsentCaps?, estimatedUsd: Double?, helperID: String?, label: String?, notSent: [String]?, sent: [String]?, signal: String?, why: String?, answer: Answer?, todos: [PurpleTodo]?, planID: String?, steps: [FluffyPlanStep]?, added: Int?, changeID: String?, removed: Int?, reverts: String?, hash: String?, how: How?, checks: [FluffyCheckInfo]?, checkID: String?, command: String?, round: Int?, exitCode: Int?, output: String?, pickReason: String?, wish: String?, calls: Int?, stepID: String?, state: PurpleState?, helperIDS: [String]?, answerTokens: Int?, modelCalls: Int?, stopped: Stopped?, tokens: Int?, workingMS: Int?) {
+    public init(agent: Agent?, cwd: String?, forkedFrom: PurpleForkedFrom?, modelName: String?, modelProfile: String?, modelProvider: String?, origin: String?, parent: PurpleSessionParent?, route: RouteEnum?, allowedTools: [PurpleSessionAllowance]?, mcpServers: [String]?, paidOk: Bool?, title: String?, runID: String?, status: PurpleStatus?, summary: String?, reason: String?, detail: String?, model: String?, provider: String?, rejected: [FluffyModelRejection]?, replacesModel: String?, tier: Tier?, options: [String: Option]?, mode: DefaultPermissionModeEnum?, on: Bool?, messageID: String?, role: MessageCompletedDataRole?, text: String?, interrupted: Bool?, skill: FluffySkillCall?, thinking: String?, thinkingMS: Int?, clearedIDS: [String]?, contextWindow: Int?, estimatedTokens: Int?, index: Int?, messageBytes: [Int]?, messageChars: [Int]?, messageIDS: [String]?, numCtx: Int?, parentCallID: String?, profile: String?, summaryChars: Int?, systemBytes: Int?, systemChars: Int?, systemPromptSHA: String?, systemSections: [TentacledPromptSectionInfo]?, toolsBytes: Int?, toolsChars: Int?, toolsSHA: String?, windowEstimated: Bool?, windowPlanned: Bool?, costUsd: Double?, failed: Bool?, firstTokenMS: Int?, latencyMS: Int?, loadMS: Int?, price: FluffyCallPrice?, promptMS: Int?, replyMS: Int?, stopReason: String?, textToolCalls: TextToolCalls?, usage: FluffyTokenUsage?, action: ContextChangedDataAction?, afterTokens: Int?, beforeTokens: Int?, count: Int?, reloadMS: Int?, room: Int?, windowFrom: Int?, windowTo: Int?, code: Code?, hint: String?, message: String?, args: [String: JSONAny]?, callID: String?, name: String?, chars: Int?, lines: Int?, path: String?, holder: String?, line: String?, position: Int?, retryInMS: Int?, scope: ModelWaitingDataScope?, silentMS: Int?, waiting: Bool?, willRetry: Bool?, window: Int?, artifactID: String?, diff: String?, durationMS: Int?, preview: String?, sources: [PurpleToolSource]?, truncated: Bool?, source: String?, subject: String?, decision: Decision?, device: String?, rule: String?, alternatives: [Answer]?, caps: FluffyConsentCaps?, estimatedUsd: Double?, helperID: String?, label: String?, notSent: [String]?, sent: [String]?, signal: String?, why: String?, answer: Answer?, todos: [PurpleTodo]?, planID: String?, steps: [FluffyPlanStep]?, added: Int?, changeID: String?, removed: Int?, reverts: String?, hash: String?, how: How?, checks: [FluffyCheckInfo]?, checkID: String?, command: String?, round: Int?, exitCode: Int?, output: String?, pickReason: String?, wish: String?, calls: Int?, stepID: String?, state: PurpleState?, helperIDS: [String]?, answerTokens: Int?, modelCalls: Int?, stopped: Stopped?, tokens: Int?, workingMS: Int?, fromBranch: String?, pathsCount: Int?, toBranch: String?) {
         self.agent = agent
         self.cwd = cwd
         self.forkedFrom = forkedFrom
@@ -17830,6 +17925,9 @@ public struct ParamsData: Codable {
         self.stopped = stopped
         self.tokens = tokens
         self.workingMS = workingMS
+        self.fromBranch = fromBranch
+        self.pathsCount = pathsCount
+        self.toBranch = toBranch
     }
 }
 
@@ -18245,6 +18343,7 @@ public struct FluffyTokenUsage: Codable {
 public enum ParamsType: String, Codable {
     case approvalNeeded = "approval.needed"
     case approvalResolved = "approval.resolved"
+    case branchChanged = "branch.changed"
     case checkCompleted = "check.completed"
     case checkOffered = "check.offered"
     case checkStarted = "check.started"
@@ -19966,9 +20065,13 @@ public struct SessionListResult: Codable {
 /// ``trimmed_at`` is set on a helper whose steps were removed after its keep days
 /// (``session.trimmed``): the time of the trim. Null for any other session. An older daemon
 /// leaves it out.
+/// ``branch`` is the branch checked out in the session's ``cwd``. Null outside a repo, when
+/// the head is detached, and for a session with no folder. It follows the folder, so it can
+/// change without an event. An older daemon leaves it out.
 // MARK: - SessionElement
 public struct SessionElement: Codable {
     public let agent: String?
+    public let branch: String?
     public let createdAt: String
     public let cwd: String?
     public let forkedFrom: String?
@@ -19994,6 +20097,7 @@ public struct SessionElement: Codable {
 
     public enum CodingKeys: String, CodingKey {
         case agent = "agent"
+        case branch = "branch"
         case createdAt = "created_at"
         case cwd = "cwd"
         case forkedFrom = "forked_from"
@@ -20018,8 +20122,9 @@ public struct SessionElement: Codable {
         case waitReason = "wait_reason"
     }
 
-    public init(agent: String?, createdAt: String, cwd: String?, forkedFrom: String?, helpersRunning: Int?, helpersWaiting: Int?, lastSeq: Int, localOnly: Bool?, modelProfile: String, origin: String?, parentSessionID: String?, pending: SessionPendingItem?, pendingItems: [SessionPendingItem]?, planFirst: Bool?, route: RouteEnum?, sessionID: String, status: SessionStatus, step: String?, title: String?, trimmedAt: String?, updatedAt: String, waitLine: String?, waitReason: Reason?) {
+    public init(agent: String?, branch: String?, createdAt: String, cwd: String?, forkedFrom: String?, helpersRunning: Int?, helpersWaiting: Int?, lastSeq: Int, localOnly: Bool?, modelProfile: String, origin: String?, parentSessionID: String?, pending: SessionPendingItem?, pendingItems: [SessionPendingItem]?, planFirst: Bool?, route: RouteEnum?, sessionID: String, status: SessionStatus, step: String?, title: String?, trimmedAt: String?, updatedAt: String, waitLine: String?, waitReason: Reason?) {
         self.agent = agent
+        self.branch = branch
         self.createdAt = createdAt
         self.cwd = cwd
         self.forkedFrom = forkedFrom
@@ -20736,9 +20841,13 @@ public enum SessionSummaryNotificationMethod: String, Codable {
 /// ``trimmed_at`` is set on a helper whose steps were removed after its keep days
 /// (``session.trimmed``): the time of the trim. Null for any other session. An older daemon
 /// leaves it out.
+/// ``branch`` is the branch checked out in the session's ``cwd``. Null outside a repo, when
+/// the head is detached, and for a session with no folder. It follows the folder, so it can
+/// change without an event. An older daemon leaves it out.
 // MARK: - SessionSummaryNotificationParams
 public struct SessionSummaryNotificationParams: Codable {
     public let agent: String?
+    public let branch: String?
     public let createdAt: String
     public let cwd: String?
     public let forkedFrom: String?
@@ -20764,6 +20873,7 @@ public struct SessionSummaryNotificationParams: Codable {
 
     public enum CodingKeys: String, CodingKey {
         case agent = "agent"
+        case branch = "branch"
         case createdAt = "created_at"
         case cwd = "cwd"
         case forkedFrom = "forked_from"
@@ -20788,8 +20898,9 @@ public struct SessionSummaryNotificationParams: Codable {
         case waitReason = "wait_reason"
     }
 
-    public init(agent: String?, createdAt: String, cwd: String?, forkedFrom: String?, helpersRunning: Int?, helpersWaiting: Int?, lastSeq: Int, localOnly: Bool?, modelProfile: String, origin: String?, parentSessionID: String?, pending: ParamsPendingItem?, pendingItems: [ParamsPendingItem]?, planFirst: Bool?, route: RouteEnum?, sessionID: String, status: SessionStatus, step: String?, title: String?, trimmedAt: String?, updatedAt: String, waitLine: String?, waitReason: Reason?) {
+    public init(agent: String?, branch: String?, createdAt: String, cwd: String?, forkedFrom: String?, helpersRunning: Int?, helpersWaiting: Int?, lastSeq: Int, localOnly: Bool?, modelProfile: String, origin: String?, parentSessionID: String?, pending: ParamsPendingItem?, pendingItems: [ParamsPendingItem]?, planFirst: Bool?, route: RouteEnum?, sessionID: String, status: SessionStatus, step: String?, title: String?, trimmedAt: String?, updatedAt: String, waitLine: String?, waitReason: Reason?) {
         self.agent = agent
+        self.branch = branch
         self.createdAt = createdAt
         self.cwd = cwd
         self.forkedFrom = forkedFrom
@@ -20960,9 +21071,13 @@ public struct FluffyPendingHelper: Codable {
 /// ``trimmed_at`` is set on a helper whose steps were removed after its keep days
 /// (``session.trimmed``): the time of the trim. Null for any other session. An older daemon
 /// leaves it out.
+/// ``branch`` is the branch checked out in the session's ``cwd``. Null outside a repo, when
+/// the head is detached, and for a session with no folder. It follows the folder, so it can
+/// change without an event. An older daemon leaves it out.
 // MARK: - SessionSummary
 public struct SessionSummary: Codable {
     public let agent: String?
+    public let branch: String?
     public let createdAt: String
     public let cwd: String?
     public let forkedFrom: String?
@@ -20988,6 +21103,7 @@ public struct SessionSummary: Codable {
 
     public enum CodingKeys: String, CodingKey {
         case agent = "agent"
+        case branch = "branch"
         case createdAt = "created_at"
         case cwd = "cwd"
         case forkedFrom = "forked_from"
@@ -21012,8 +21128,9 @@ public struct SessionSummary: Codable {
         case waitReason = "wait_reason"
     }
 
-    public init(agent: String?, createdAt: String, cwd: String?, forkedFrom: String?, helpersRunning: Int?, helpersWaiting: Int?, lastSeq: Int, localOnly: Bool?, modelProfile: String, origin: String?, parentSessionID: String?, pending: SessionSummaryPendingItem?, pendingItems: [SessionSummaryPendingItem]?, planFirst: Bool?, route: RouteEnum?, sessionID: String, status: SessionStatus, step: String?, title: String?, trimmedAt: String?, updatedAt: String, waitLine: String?, waitReason: Reason?) {
+    public init(agent: String?, branch: String?, createdAt: String, cwd: String?, forkedFrom: String?, helpersRunning: Int?, helpersWaiting: Int?, lastSeq: Int, localOnly: Bool?, modelProfile: String, origin: String?, parentSessionID: String?, pending: SessionSummaryPendingItem?, pendingItems: [SessionSummaryPendingItem]?, planFirst: Bool?, route: RouteEnum?, sessionID: String, status: SessionStatus, step: String?, title: String?, trimmedAt: String?, updatedAt: String, waitLine: String?, waitReason: Reason?) {
         self.agent = agent
+        self.branch = branch
         self.createdAt = createdAt
         self.cwd = cwd
         self.forkedFrom = forkedFrom

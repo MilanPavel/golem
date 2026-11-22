@@ -2,7 +2,7 @@ import type { ApprovalChoice, ChatEvent, ConsentChoice, SkillCall } from "@golem
 
 import { noChecks, reduceChecks, type ChecksState } from "./checks.ts";
 import { emptyPlan, reducePlan, type PlanState } from "./plan.ts";
-import { contextChangedNote, emptyLiveContext, foldLiveContext, type ContextChangeData, type LiveContextState } from "./context.ts";
+import { branchChangedNote, contextChangedNote, emptyLiveContext, foldLiveContext, type ContextChangeData, type LiveContextState } from "./context.ts";
 import { emptyBatch, reduceBatch, type HelperBatch } from "./helper-card.ts";
 import { emptyRoute, foldRoute, type RouteState } from "./route.ts";
 import { replyWasCut } from "./stop.ts";
@@ -205,7 +205,7 @@ export type ChatMessage = {
 export type ChatNotice = {
   id: string;
   afterId: string | null;
-  action: ContextChangeData["action"];
+  action: ContextChangeData["action"] | "branch";
   text: string;
   at: string;
 };
@@ -668,6 +668,16 @@ function reduceChatEvent(state: ChatState, event: ChatEvent): ChatState {
       };
       const cleared = event.data.action === "cleared" ? state.clearedNow + (event.data.count ?? 0) : state.clearedNow;
       return { ...state, notices: [...state.notices, notice], clearedNow: cleared };
+    }
+    case "branch.changed": {
+      const notice: ChatNotice = {
+        id: `branch-${event.seq}`,
+        afterId: state.messages[state.messages.length - 1]?.id ?? null,
+        action: "branch",
+        text: branchChangedNote(event.data),
+        at: event.ts,
+      };
+      return { ...state, notices: [...state.notices, notice] };
     }
     case "run.started":
       return {

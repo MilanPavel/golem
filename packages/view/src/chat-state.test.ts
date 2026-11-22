@@ -1295,6 +1295,23 @@ function contextEvent(seq: number, data: Extract<ChatEvent, { type: "context.cha
   return event({ seq, session_id: "s", run_id: null, ts: "t", type: "context.changed", data });
 }
 
+test("branch.changed becomes a quiet line after the message it followed, and no message", () => {
+  let state = reduceChat(
+    emptyChat,
+    event({ seq: 1, session_id: "s", run_id: "r", ts: "t", type: "message.completed", data: { message_id: "u", role: "user", text: "hi" } }),
+  );
+  state = reduceChat(
+    state,
+    event({ seq: 2, session_id: "s", run_id: "r", ts: "t", type: "branch.changed", data: { from_branch: "main", to_branch: "fix-x", paths_count: 3 } }),
+  );
+  assert.equal(state.messages.length, 1);
+  assert.deepEqual(
+    state.notices.map((n) => [n.afterId, n.action, n.text]),
+    [["u", "branch", "The branch changed from main to fix-x. Files may differ from what golem read."]],
+  );
+  assert.equal(noticesAfter(state.notices, "u", true).length, 1);
+});
+
 test("context.changed becomes a notice after the message it followed, and no message", () => {
   let state = reduceChat(
     emptyChat,

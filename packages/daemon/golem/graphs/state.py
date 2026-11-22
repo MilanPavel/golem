@@ -48,6 +48,8 @@ class AgentState(MessagesState):
     """What the checks of the latest turn reported. Replaced each turn, empty when none ran."""
     changes_seen: NotRequired[int]
     """The highest ``file_changes.seq`` the model was told about. Missing or 0: none yet."""
+    branch_seen: NotRequired[str]
+    """The branch of the session's folder as of the last turn that had one. Missing: none yet."""
     can_step_up: NotRequired[bool]
     """Whether this run may move to a stronger model once. Set each turn, true on route ``auto``."""
     stepped_up: NotRequired[bool]

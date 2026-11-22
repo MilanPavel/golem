@@ -79,6 +79,11 @@ async def run_git(folder: str, *args: str, seconds: float = GIT_SECONDS) -> GitR
         process.kill()
         await process.wait()
         return GitResult(-1, f"git took longer than {seconds:g} seconds and was stopped")
+    except asyncio.CancelledError:
+        # A caller that stops waiting must not leave git running behind it.
+        process.kill()
+        await asyncio.shield(process.wait())
+        raise
     code = process.returncode if process.returncode is not None else -1
     return GitResult(code, data.decode("utf-8", errors="replace"))
 

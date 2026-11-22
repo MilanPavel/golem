@@ -291,6 +291,9 @@ class SessionSummary(BaseModel):
     ``trimmed_at`` is set on a helper whose steps were removed after its keep days
     (``session.trimmed``): the time of the trim. Null for any other session. An older daemon
     leaves it out.
+    ``branch`` is the branch checked out in the session's ``cwd``. Null outside a repo, when
+    the head is detached, and for a session with no folder. It follows the folder, so it can
+    change without an event. An older daemon leaves it out.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -318,6 +321,7 @@ class SessionSummary(BaseModel):
     helpers_waiting: int | None = Field(default=None, ge=0)
     step: str | None = Field(default=None, min_length=1, max_length=200)
     trimmed_at: str | None = Field(default=None, min_length=1)
+    branch: str | None = Field(default=None, min_length=1)
 
 
 class SessionListResult(BaseModel):

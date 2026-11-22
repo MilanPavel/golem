@@ -790,6 +790,21 @@ class ContextChangedData(BaseModel):
     """The tokens the history may fill (the window less the reply reserve). None when unknown."""
 
 
+class BranchChangedData(BaseModel):
+    """The branch of a session's folder is not the one its model last heard of.
+
+    ``from_branch`` and ``to_branch`` are the two branch names. ``paths_count`` is how many
+    files differ between them, null when git could not say. The model gets a note with the
+    paths before the turn; this event is the quiet line in the transcript.
+    """
+
+    model_config = _CONFIG
+
+    from_branch: str = Field(min_length=1)
+    to_branch: str = Field(min_length=1)
+    paths_count: int | None = Field(default=None, ge=0)
+
+
 class TokenUsage(BaseModel):
     """Tokens one model call used. A field is None when the provider did not report it."""
 
@@ -1421,6 +1436,19 @@ class HelperWaitEvent(BaseModel):
     data: HelperWaitData
 
 
+class BranchChangedEvent(BaseModel):
+    """The folder's branch changed under the session, before the run's first model call."""
+
+    model_config = _CONFIG
+
+    seq: int = Field(ge=1)
+    session_id: str = Field(min_length=1)
+    run_id: str | None = Field(default=None, min_length=1)
+    ts: str = Field(min_length=1)
+    type: Literal["branch.changed"]
+    data: BranchChangedData
+
+
 class SessionTrimmedData(BaseModel):
     """A finished helper's steps were removed and a receipt kept (ADR-059, section 9).
 
@@ -1872,6 +1900,7 @@ EventType = Literal[
     "helper.wait",
     "helper.ended",
     "session.trimmed",
+    "branch.changed",
 ]
 """The ``type`` of each :data:`ChatEvent` member."""
 
@@ -1924,7 +1953,8 @@ ChatEvent = Annotated[
     | HelperStateEvent
     | HelperWaitEvent
     | HelperEndedEvent
-    | SessionTrimmedEvent,
+    | SessionTrimmedEvent
+    | BranchChangedEvent,
     Field(discriminator="type"),
 ]
 
@@ -1942,6 +1972,8 @@ __all__ = [
     "ApprovalNeededEvent",
     "ApprovalResolvedData",
     "ApprovalResolvedEvent",
+    "BranchChangedData",
+    "BranchChangedEvent",
     "CallPrice",
     "ChatEvent",
     "CheckCompletedData",

@@ -168,6 +168,14 @@ export function contextChangedNote(data: ContextChangeData): string {
   return `${head} · ctx ${share(data.before_tokens)} → ${share(data.after_tokens)}`;
 }
 
+/** What `branch.changed` carries. */
+export type BranchChangeData = Extract<ChatEvent, { type: "branch.changed" }>["data"];
+
+/** The one quiet line for a branch that changed under the session. */
+export function branchChangedNote(data: BranchChangeData): string {
+  return `The branch changed from ${data.from_branch} to ${data.to_branch}. Files may differ from what golem read.`;
+}
+
 /** A cell of the bar: a part, the free rest, or the reply reserve at its end. */
 export type ContextCell = ContextKey | "free" | "reserve";
 
