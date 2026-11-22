@@ -85,6 +85,10 @@
   /* Below this the trace page is a single column: 760 px. */
   --breakpoint-narrow: 47.5rem;
 
+  /* Settings › Chat: from this width the preview sits beside the rows (1000 px). The preview is 380 px wide. */
+  --breakpoint-chat: 62.5rem;
+  --spacing-chat-preview: 23.75rem;
+
   /* The composer's row shrinks in steps, measured on the composer's own width: under 600, 500, 400 and 330 px. */
   --container-row-600: 37.5rem;
   --container-row-500: 31.25rem;

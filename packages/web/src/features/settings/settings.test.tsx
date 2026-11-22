@@ -108,7 +108,7 @@ test("every section appears once in the sidebar, under its group, in order", () 
   const links = within(nav).getAllByRole("link");
   const expected = GROUPS.flatMap((group) => SECTIONS.filter((item) => item.group === group.id).map((item) => item.title));
   expect(expected).toHaveLength(SECTIONS.length);
-  expect(links.map((link) => link.textContent.trim())).toEqual(["Info", "Appearance", "Notifications", "API keys", "Routing", "Context", "Usage", "MCP servers", "Skills", "Agents", "Memory", "Devices", "Tool rules", "Config file"]);
+  expect(links.map((link) => link.textContent.trim())).toEqual(["Info", "Chat", "Appearance", "Notifications", "API keys", "Routing", "Context", "Usage", "MCP servers", "Skills", "Agents", "Memory", "Devices", "Tool rules", "Config file"]);
   expect(links.map((link) => link.textContent.trim())).toEqual(expected);
   const headings = Array.from(nav.querySelectorAll("div > span")).map((node) => node.textContent);
   expect(headings).toEqual(GROUPS.map((group) => group.title));
@@ -179,6 +179,16 @@ test("Appearance offers Match system, Light and Dark, and the sidebar has no the
   expect(document.documentElement.dataset.theme).toBe("slip");
   await user.click(within(main).getByRole("button", { name: "Match system" }));
   expect(document.documentElement.dataset.theme).toBeUndefined();
+});
+
+test("Appearance no longer has the chat detail row, and a line there links to Chat", async () => {
+  const { user } = mount("/settings/appearance", OK_ROWS);
+  const main = screen.getByRole("main");
+  expect(within(main).queryByRole("radiogroup", { name: "Chat detail" })).toBeNull();
+  await user.click(within(main).getByRole("link", { name: "How much a chat shows moved to Chat." }));
+  expect(location.pathname).toBe("/settings/chat");
+  expect(screen.getByRole("heading", { level: 2, name: "Chat" })).toBeTruthy();
+  expect(screen.getByRole("radiogroup", { name: "Steps" })).toBeTruthy();
 });
 
 test("Appearance has an App block with the install action when the web job keeps the page", async () => {

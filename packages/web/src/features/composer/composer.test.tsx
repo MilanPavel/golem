@@ -6,6 +6,7 @@ import { createPage } from "../../store/page.ts";
 import { PageProvider, useDraft } from "../../store/page-context.tsx";
 import { ev, fakeClient, fakeFrame, rpcError, SESSION_BUSY_CODE } from "../../store/test-support.ts";
 import { SESSION_BUSY_TEXT } from "../../store/errors.ts";
+import { sendKeyStore } from "../chat/chat-choices.ts";
 import { SessionDock } from "./session-dock.tsx";
 
 const noContrast = { rules: { "color-contrast": { enabled: false } } };
@@ -37,6 +38,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.useRealTimers();
+  sendKeyStore.set("enter");
 });
 
 test("Enter sends and clears; Shift+Enter adds a line", async () => {
@@ -49,6 +51,19 @@ test("Enter sends and clears; Shift+Enter adds a line", async () => {
   await wait();
   expect(fake.raw.sendMessage).toHaveBeenCalledWith("a", "hello\nworld");
   expect(box().value).toBe("");
+});
+
+test("with Send with set to ⌘↵, ↵ adds a line, ⌘↵ sends, and the hint says so", async () => {
+  sendKeyStore.set("mod");
+  const { fake, user } = setup();
+  expect(screen.getByText(/send · ↵ new line$/)).toBeTruthy();
+  await user.click(box());
+  await user.keyboard("hello{Enter}world");
+  expect(box().value).toBe("hello\nworld");
+  expect(fake.raw.sendMessage).not.toHaveBeenCalled();
+  await user.keyboard("{Meta>}{Enter}{/Meta}");
+  await wait();
+  expect(fake.raw.sendMessage).toHaveBeenCalledWith("a", "hello\nworld");
 });
 
 test("Enter during an IME composition sends nothing", async () => {

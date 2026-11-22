@@ -4,6 +4,7 @@ import { settingsPath } from "../../store/router.ts";
 import { installOffer } from "../../store/app-install.ts";
 import { useAppInstall, useNavigate } from "../../store/page-context.tsx";
 import { Link } from "../../ui/link.tsx";
+import { ChatSection } from "./chat-section.tsx";
 import { ConfigSection } from "./config-section.tsx";
 import { ContextSection } from "./context-section.tsx";
 import { useSettingsBack } from "./context.ts";
@@ -21,7 +22,6 @@ import { SettingsSearchBox, SettingsSearchResults } from "./settings-search.tsx"
 import { UsageSection } from "./usage-section.tsx";
 import { SkillsSection } from "./skills-section.tsx";
 import { AgentsSection } from "./agents-section.tsx";
-import { DetailSwitch } from "../chat/index.ts";
 import { AppCard } from "../setup/index.ts";
 import { SetupSection } from "./setup-section.tsx";
 
@@ -38,10 +38,24 @@ function AppearanceApp() {
   );
 }
 
+/** Appearance used to hold the chat detail row; this line says where it went. */
+function ChatMoved() {
+  const navigate = useNavigate();
+  return (
+    <p className="text-sm text-muted">
+      <Link href={settingsPath("chat")} onNavigate={navigate} className="text-clay-ink underline underline-offset-2">
+        How much a chat shows moved to Chat.
+      </Link>
+    </p>
+  );
+}
+
 function Body({ section }: { section: string }) {
   switch (section) {
     case "info":
       return <SetupSection />;
+    case "chat":
+      return <ChatSection />;
     case "mcp":
       return <McpSection />;
     case "devices":
@@ -70,7 +84,7 @@ function Body({ section }: { section: string }) {
       return (
         <div className="flex max-w-column flex-col gap-6">
           <ThemeSwitch />
-          <DetailSwitch />
+          <ChatMoved />
           <AppearanceApp />
         </div>
       );

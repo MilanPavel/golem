@@ -206,6 +206,12 @@ export const SettingsInfoIcon = (props: IconProps) => (
     <circle cx="8" cy="8" r="6.5" /><path d="M8 7.2v4M8 4.9v.1" />
   </Icon>
 );
+/** A speech bubble. */
+export const SettingsChatIcon = (props: IconProps) => (
+  <Icon strokeWidth="1.4" {...props}>
+    <path d="M2.5 3h11a1 1 0 0 1 1 1v6.5a1 1 0 0 1-1 1H8l-3.2 2.5V11.5H2.5a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z" />
+  </Icon>
+);
 /** A half-filled disc. */
 export const SettingsAppearanceIcon = (props: IconProps) => (
   <Icon strokeWidth="1.4" {...props}>

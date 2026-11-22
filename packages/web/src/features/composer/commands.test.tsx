@@ -6,7 +6,7 @@ import { App } from "../../app.tsx";
 import { createPage } from "../../store/page.ts";
 import { PageProvider } from "../../store/page-context.tsx";
 import { ev, fakeClient, fakeFrame, rpcError, summary } from "../../store/test-support.ts";
-import { detailStore, thinkingShownStore, timesShownStore } from "../chat/index.ts";
+import { detailStore, thinkingModeStore, timesShownStore } from "../chat/index.ts";
 import { drawerOpenStore } from "../drawer/drawer-open.ts";
 import { SAMPLE_LISTING } from "../models/sample.ts";
 
@@ -82,7 +82,7 @@ beforeEach(() => {
   localStorage.clear();
   drawerOpenStore.set(true);
   timesShownStore.set(true);
-  thinkingShownStore.set(true);
+  thinkingModeStore.set("collapsed");
   detailStore.set("normal");
 });
 afterEach(() => {

@@ -108,11 +108,11 @@ test("/ focuses the box, Esc clears it, and Enter opens the first result", async
 test("a keyword result scrolls to its data-setting row and rings it, then the ring goes", async () => {
   const scroll = vi.spyOn(Element.prototype, "scrollIntoView").mockImplementation(() => {});
   const { user } = mount("/settings");
-  await user.type(box(), "chat detail");
-  await user.click(within(nav()).getByRole("link", { name: /Appearance/ }));
-  expect(location.pathname).toBe("/settings/appearance");
+  await user.type(box(), "thinking");
+  await user.click(within(nav()).getByRole("link", { name: /Chat/ }));
+  expect(location.pathname).toBe("/settings/chat");
   const row = await waitFor(() => {
-    const found = document.querySelector<HTMLElement>('[data-setting="chat detail"]');
+    const found = document.querySelector<HTMLElement>('[data-setting="thinking"]');
     expect(found?.classList.contains("animate-flash")).toBe(true);
     return found as HTMLElement;
   });

@@ -1,9 +1,15 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import type { ListedModel } from "../../store/models.ts";
-import { expect, test, vi } from "vitest";
+import { beforeEach, expect, test, vi } from "vitest";
+import { footerStore } from "./chat-choices.ts";
 import { ModelRow } from "../models/model-row.tsx";
 import { ROUTED_CASES, ROUTED_SESSION } from "./sample.ts";
 import { TranscriptMessages } from "./transcript.tsx";
+
+// These tests read the whole footer, so the line keeps a $0.00 too.
+beforeEach(() => {
+  footerStore.set({ off: [], leaveOutEmpty: false });
+});
 
 const footers = (container: HTMLElement) => Array.from(container.querySelectorAll("article > p")).map((node) => node.textContent);
 

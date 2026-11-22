@@ -1,4 +1,4 @@
-import { BUILD_TEXT, canTryStronger, lastQuestion, NO_STRONGER_NOTICE, STRONGER_ACTION, strongerLabel, helperLine, isDelegate, openPlan, displayToolName, formatTurnTime, groupTurns, turnFooterParts, stepCount, stepMark, summarizeSteps, turnFooter, LIVE_OUTPUT_CHARS, thinkingLine, unreadCallNotice, writingLabel, REPLY_CUT_NOTE, type ChatMessage, type ChatState, type Detail, type HelperBatch, type IsLocal, isLocalFrom, type StepMark, type ToolBlock, type WritingBlock, noticesAfter, type ChatNotice, turnSources, type TurnSource, checksOf, checksSummary, turnRoutedNote, sessionModelOf, type SessionModelRef, rewoundLine, UNDO_WAIT } from "@golem/view";
+import { BUILD_TEXT, stepFailed, turnFooterLine, canTryStronger, lastQuestion, NO_STRONGER_NOTICE, STRONGER_ACTION, strongerLabel, helperLine, isDelegate, openPlan, displayToolName, groupTurns, stepCount, stepMark, summarizeSteps, turnFooter, LIVE_OUTPUT_CHARS, thinkingLine, unreadCallNotice, writingLabel, REPLY_CUT_NOTE, type ChatMessage, type ChatState, type Detail, type HelperBatch, type IsLocal, isLocalFrom, type StepMark, type ToolBlock, type WritingBlock, noticesAfter, type ChatNotice, turnSources, type TurnSource, checksOf, checksSummary, turnRoutedNote, sessionModelOf, type SessionModelRef, rewoundLine, UNDO_WAIT } from "@golem/view";
 import { Fragment, memo, useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { useConfig, usePageActions, usePulls, useSession, useModelList, useTurnCards } from "../../store/page-context.tsx";
 import type { PullsSnapshot } from "../../store/pulls.ts";
@@ -12,7 +12,8 @@ import { PixelGolem } from "../../ui/pixel-golem.tsx";
 import { useDetail } from "./detail.ts";
 import { BatchCardView } from "./helper-card.tsx";
 import { openHelper } from "./helper-open.ts";
-import { useThinkingShown } from "./thinking-shown.ts";
+import { useFooter, useOpenOnFail } from "./chat-choices.ts";
+import { useThinkingMode } from "./thinking-shown.ts";
 import { useTimesShown } from "./times-shown.ts";
 import { formatClock, shouldStick, squeezeArgs } from "./format.ts";
 import type { DiffMode } from "../diff/diff-mode.ts";
@@ -223,10 +224,12 @@ function StepLine({ tool, defaultOpen, pending }: { tool: ToolBlock; defaultOpen
 /** The line above an answer that came after thinking. It opens into the thinking text. */
 export function ThinkingLine({ message, defaultOpen = false, shown }: { message: ChatMessage; defaultOpen?: boolean; shown?: boolean }) {
   const line = thinkingLine(message);
-  const chosen = useThinkingShown();
-  const [open, setOpen] = useState(defaultOpen);
+  const mode = useThinkingMode();
+  const [chosen, setChosen] = useState<boolean | null>(null);
   const textId = useId();
-  if (line === null || !(shown ?? chosen)) return null;
+  if (line === null || !(shown ?? mode !== "hidden")) return null;
+  // Open shows the text under the line without a click; a click on the line still folds it.
+  const open = chosen ?? (defaultOpen || mode === "open");
   return (
     <div
       // eslint-disable-next-line golem/no-font-mono -- a terminal-like stream of thinking
@@ -239,7 +242,7 @@ export function ThinkingLine({ message, defaultOpen = false, shown }: { message:
         aria-controls={textId}
         className="tool-line-head outline-offset-2 outline-clay focus-visible:outline-2"
         onClick={() => {
-          setOpen((value) => !value);
+          setChosen(!open);
         }}
       >
         <span aria-hidden="true" className="tool-chevron text-faint">›</span>
@@ -340,13 +343,15 @@ export function WritingRow({ writing }: { writing: WritingBlock }) {
  */
 export function ActivityLine({ tools, detail, streaming = false, pendingId = null }: { tools: readonly ToolBlock[]; detail: Detail; streaming?: boolean; pendingId?: string | null }) {
   const [chosen, setChosen] = useState<boolean | null>(null);
+  const openOnFail = useOpenOnFail();
   const listId = useId();
   if (tools.length === 0) return null;
   // Outside Quiet a finished edit is a card above the line, not a row in it.
   const rows = detail === "quiet" ? tools : tools.filter((tool) => !isEditCard(tool));
   const verbose = detail === "verbose";
   const waiting = tools.some((tool) => tool.status === "waiting");
-  const open = waiting || (chosen ?? verbose);
+  // A failed step opens the line, in Quiet too, unless the person turned that off.
+  const open = waiting || (chosen ?? (verbose || (openOnFail && tools.some(stepFailed))));
   const running = streaming ? tools.filter((tool) => tool.status === "running").at(-1) : undefined;
   const text =
     detail === "quiet"
@@ -447,6 +452,7 @@ export function GolemTurn({
 }: { batches?: ChatState["batches"]; isLocal?: IsLocal; steps: readonly ChatMessage[]; pendingId?: string | null; thinkingShown?: boolean; detail?: Detail; plan?: PlanActions; checks?: ReturnType<typeof checksSummary> | null; notices?: readonly ChatNotice[]; routedNote?: string; undo?: TurnUndo; stronger?: StrongerAction }) {
   const chosenDetail = useDetail();
   const detail = detailOverride ?? chosenDetail;
+  const footerChoice = useFooter();
   const footer = turnFooter(steps);
   const allTools = steps.flatMap((step) => step.tools ?? []);
   const runId = [...steps].reverse().find((step) => step.runId !== undefined)?.runId;
@@ -461,7 +467,7 @@ export function GolemTurn({
   const sourcesBar =
     footer !== null && sources !== undefined && sources.length > 0 ? <TurnSources sources={sources} answer={steps.map((step) => step.text).join("\n\n")} /> : null;
   const foot = footer
-    ? [footer.durationMs === undefined ? "" : formatTurnTime(footer.durationMs), footer.tools > 0 ? stepCount(footer.tools) : "", ...turnFooterParts(footer, "", routedNote)].filter(Boolean)
+    ? turnFooterLine(footer, footerChoice, { detail, routedNote })
     : [];
   return (
     <article aria-label="golem" className="flex min-w-0 flex-col gap-2.5">

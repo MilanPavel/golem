@@ -1,40 +1,46 @@
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
-import { readThinkingShown, setThinkingShown, thinkingShownStore, THINKING_KEY, useThinkingShown } from "./thinking-shown.ts";
+import { readThinkingMode, setThinkingMode, thinkingModeStore, THINKING_KEY, useThinkingMode } from "./thinking-shown.ts";
 
 afterEach(() => {
   vi.restoreAllMocks();
   localStorage.clear();
-  thinkingShownStore.set(true);
+  thinkingModeStore.set("collapsed");
 });
 
-test("with nothing stored the thinking line is shown", () => {
+test("with nothing stored the thinking line is collapsed", () => {
   localStorage.clear();
-  expect(readThinkingShown()).toBe(true);
+  expect(readThinkingMode()).toBe("collapsed");
 });
 
-test("a stored hidden choice hides it, and other values are ignored", () => {
+test("the old word shown reads as Collapsed, and hidden and open read as themselves", () => {
+  localStorage.setItem(THINKING_KEY, "shown");
+  expect(readThinkingMode()).toBe("collapsed");
   localStorage.setItem(THINKING_KEY, "hidden");
-  expect(readThinkingShown()).toBe(false);
+  expect(readThinkingMode()).toBe("hidden");
+  localStorage.setItem(THINKING_KEY, "open");
+  expect(readThinkingMode()).toBe("open");
   localStorage.setItem(THINKING_KEY, "banana");
-  expect(readThinkingShown()).toBe(true);
+  expect(readThinkingMode()).toBe("collapsed");
 });
 
-test("storage that throws on read means shown", () => {
+test("storage that throws on read means collapsed", () => {
   vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
     throw new Error("blocked");
   });
-  expect(readThinkingShown()).toBe(true);
+  expect(readThinkingMode()).toBe("collapsed");
 });
 
 test("the hook follows the choice, stores it, and survives storage that throws on write", () => {
-  const view = renderHook(() => useThinkingShown());
-  act(() => setThinkingShown(false));
-  expect(view.result.current).toBe(false);
+  const view = renderHook(() => useThinkingMode());
+  act(() => setThinkingMode("hidden"));
+  expect(view.result.current).toBe("hidden");
   expect(localStorage.getItem(THINKING_KEY)).toBe("hidden");
+  act(() => setThinkingMode("collapsed"));
+  expect(localStorage.getItem(THINKING_KEY)).toBe("shown");
   vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
     throw new Error("full");
   });
-  act(() => setThinkingShown(true));
-  expect(view.result.current).toBe(true);
+  act(() => setThinkingMode("open"));
+  expect(view.result.current).toBe("open");
 });

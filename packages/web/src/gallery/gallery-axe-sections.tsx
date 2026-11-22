@@ -28,6 +28,7 @@ export const GALLERY_SECTIONS = [
   "skills",
   "agents",
   "memory",
+  "settings-chat",
   "api-keys",
   "routing",
   "settings-context",

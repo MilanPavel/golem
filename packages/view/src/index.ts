@@ -162,6 +162,7 @@ export {
   type WhyRow,
 } from "./route.ts";
 export { costReportLines, formatCost, helperCost, type HelperCost, formatCount, referenceName, roleName, sessionCostLabel, turnFooterParts, turnTotals, type TurnTotals } from "./cost.ts";
+export { DEFAULT_FOOTER, FOOTER_PART_LABELS, FOOTER_PARTS, isFooterPart, turnFooterLine, type FooterChoice, type FooterPart, type FooterSource } from "./footer.ts";
 export {
   batchCard,
   batchHead,
