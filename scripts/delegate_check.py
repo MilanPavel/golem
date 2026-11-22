@@ -30,14 +30,19 @@ from typing import Any
 
 from skill_trigger_check import PROTOCOL_MAJOR, Client
 
-PROMPT = "what can you tell me about this repo"
+ASKS = (
+    "what can you tell me about this repo",
+    "where is the config file read and what does it change",
+    "how do the parts of this project fit together",
+)
+"""The fixed set of asks. Each runs in a fresh session. All three are wide questions."""
 
 
-async def play(client: Client, project: Path, timeout: float) -> dict[str, Any]:
+async def play(client: Client, project: Path, ask: str, timeout: float) -> dict[str, Any]:
     created = await client.call("session.create", {"cwd": str(project)})
     session_id = created["session_id"]
     await client.call("session.attach", {"session_id": session_id, "after_seq": 0})
-    await client.call("message.send", {"session_id": session_id, "text": PROMPT})
+    await client.call("message.send", {"session_id": session_id, "text": ask})
     delegates = helpers = reads = 0
     peak = 0.0
     end = "timeout"
@@ -69,7 +74,7 @@ async def play(client: Client, project: Path, timeout: float) -> dict[str, Any]:
     }
 
 
-async def arm(model: str, window: int, project: Path, timeout: float) -> dict[str, Any]:
+async def arm(model: str, window: int, project: Path, ask: str, timeout: float) -> dict[str, Any]:
     root = Path(tempfile.mkdtemp(prefix="gd", dir="/var/tmp")).resolve()
     home, user = root / "g", root / "h"
     for folder in (home, user):
@@ -91,7 +96,7 @@ async def arm(model: str, window: int, project: Path, timeout: float) -> dict[st
         client = Client(reader, writer)
         hello = {"protocol_major": PROTOCOL_MAJOR, "protocol_minor": 0, "client": "tui"}
         await client.call("hello", hello)
-        return {"window": window, **await play(client, project, timeout)}
+        return {"window": window, **await play(client, project, ask, timeout)}
     finally:
         daemon.terminate()
         daemon.wait(timeout=10)
@@ -103,11 +108,14 @@ async def main() -> int:
     parser.add_argument("--model", required=True, help="a provider/model ref")
     parser.add_argument("--project", type=Path, required=True, help="the repo to ask about")
     parser.add_argument("--timeout", type=float, default=600)
+    parser.add_argument("--window", type=int, default=32_768, help="the model's window (ctx)")
+    parser.add_argument(
+        "--label", default="run", help="a name for this run, such as before or after"
+    )
     args = parser.parse_args()
-    for label, window in (("with the line", 32_768), ("without the line", 131_072)):
-        print(
-            label, json.dumps(await arm(args.model, window, args.project.resolve(), args.timeout))
-        )
+    for ask in ASKS:
+        result = await arm(args.model, args.window, args.project.resolve(), ask, args.timeout)
+        print(args.label, json.dumps({"ask": ask, **result}))
     return 0
 
 

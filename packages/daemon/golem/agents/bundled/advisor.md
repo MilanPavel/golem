@@ -1,6 +1,7 @@
 ---
 name: advisor
 description: Answers one hard question from a brief, with a stronger model and no tools. Use it when a decision is hard and everything it needs fits in the brief.
+line: answers one hard question from your brief, with a stronger model
 model: stronger
 max-calls: 1
 max-seconds: 300

@@ -62,14 +62,14 @@ def _reason(
 ) -> Reason | None:
     if _fits_badly(window, used, estimate.read_tokens, cfg):
         return "window"
-    if tier == "local":  # reasons 2 and 3 need a paid or a second model; never for local only
+    if estimate.hard and prices.stronger is not None and tier != "frontier":
+        return "model"  # a local lead too, when a stronger model is ready; never with local only
+    if tier == "local":  # several helpers on one local model take turns; nothing is cheaper
         return None
     each = estimate.read_tokens / max(estimate.jobs, 1)
     big = each >= cfg.job_share * window
     if estimate.jobs >= 2 and big:
         return "at_once"
-    if estimate.hard and prices.stronger is not None and tier != "frontier":
-        return "model"
     if big and _cheaper(prices, cfg):
         return "model"
     return None

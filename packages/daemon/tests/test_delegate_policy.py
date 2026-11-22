@@ -69,6 +69,13 @@ def test_local_only_has_reason_window_only(arm: Arm) -> None:
     assert run(arm, JobEstimate(read_tokens=window // 2, jobs=3, hard=True)).reason == "window"
 
 
+def test_a_local_lead_asks_a_stronger_model_only_when_one_is_ready() -> None:
+    mixed: Arm = (32_768, "local", Prices(stronger=9.0))
+    assert run(mixed, JobEstimate(read_tokens=0, hard=True)).reason == "model"
+    assert run(mixed, JobEstimate(read_tokens=6_000, jobs=3)).reason is None  # never at once
+    assert run(LOCAL_32K, JobEstimate(read_tokens=0, hard=True)).reason is None
+
+
 @pytest.mark.parametrize("arm", [BUDGET, FRONTIER], ids=["budget", "frontier"])
 def test_cloud_only_independent_jobs_run_at_once(arm: Arm) -> None:
     got = run(arm, JobEstimate(read_tokens=arm[0] * 24 // 100, jobs=2))  # 12% each

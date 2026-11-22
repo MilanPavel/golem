@@ -17,6 +17,9 @@ from dataclasses import dataclass
 
 from langchain_core.messages import SystemMessage
 
+from golem.graphs.delegate_policy import Prices
+from golem.models.tiers import Tier
+
 PINNED_KEY = "golem_pinned_skills"
 """The ``configurable`` key that carries the session's pinned skills to each model call."""
 
@@ -46,6 +49,10 @@ class PromptContext:
     """The context window of this call's model in tokens, or None when unknown."""
     memory: str | None = None
     """The fixed memory block made for this call's model, or None (ADR-061)."""
+    tier: Tier | None = None
+    """The tier of this call's model, or None when unknown."""
+    prices: Prices | None = None
+    """What the lead and its possible helpers cost, for the ``delegate`` section. None: unknown."""
 
 
 SectionFn = Callable[[PromptContext], str | None]

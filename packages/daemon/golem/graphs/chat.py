@@ -58,6 +58,7 @@ from golem.graphs.context_view import (
     used_tokens,
     view,
 )
+from golem.graphs.delegate_policy import Prices
 from golem.graphs.estimate import TokenRatios
 from golem.graphs.fit import Fitted, fit_prompt, num_predict_of, prompt_estimate, reply_reserve
 from golem.graphs.memory_stub import stub_local_notes
@@ -223,6 +224,7 @@ class ChatRuntime:
         window_of: WindowOf | None = None,
         price_of: Callable[[str], ModelPrice | None] | None = None,
         tier_of: Callable[[str], Tier | None] | None = None,
+        helper_prices: Callable[[str], Prices] | None = None,
     ) -> None:
         self._graph = graph
         self.router = router
@@ -234,6 +236,8 @@ class ChatRuntime:
         """The price of a profile's model, or None when unknown. No I/O."""
         self.tier_of = tier_of
         """The tier of a profile's model, or None when the profile does not resolve. No I/O."""
+        self.helper_prices = helper_prices
+        """What a profile's model and the helpers it could start cost, for the prompt. No I/O."""
         self.note_speed: Callable[..., object] | None = None
         """Told the profile and server timings of each finished call, for the speed book."""
         self.enable_mcp: EnableMcp | None = None
@@ -345,6 +349,10 @@ class ChatRuntime:
             tools=tuple(tools),
             window=window,
             memory=await _memory_block(memory, self.tier_of, profile),
+            tier=None if profile is None or self.tier_of is None else self.tier_of(profile),
+            prices=None
+            if profile is None or self.helper_prices is None
+            else self.helper_prices(profile),
         )
         return self.prompt.parts(context)
 
@@ -760,6 +768,7 @@ def open_chat(
     budget_refs: Callable[[], list[str]] | None = None,
     next_model: NextModel | None = None,
     label_of: Callable[[str | None, str], str] | None = None,
+    helper_prices: Callable[[str], Prices] | None = None,
 ) -> ChatRuntime:
     """Compile the chat graph against ``checkpointer``.
 
@@ -859,6 +868,8 @@ def open_chat(
                 tools=offered,
                 window=window.window,
                 memory=await _memory_block(memory_of(config), tier_of, profile),
+                tier=None if tier_of is None else tier_of(profile),
+                prices=None if helper_prices is None else helper_prices(profile),
             )
             parts = (
                 [("helper", child.prompt)] if child is not None else system_prompt.parts(context)
@@ -1312,6 +1323,7 @@ def open_chat(
     runtime[0].summariser = summariser
     runtime[0].budget_refs = budget_refs
     runtime[0].next_model = next_model
+    runtime[0].helper_prices = helper_prices
     return runtime[0]
 
 
