@@ -361,7 +361,8 @@ async def test_a_helpers_summary_shows_its_newest_step_and_none_once_it_ended(
     await _until(ended)
     await _until(lambda: _last(chat, helper).status == "idle")
     assert _last(chat, helper).step is None
-    assert chat.log.step(helper) is None
+    # The step is forgotten when the helper's end is stored, a moment after the idle summary.
+    await _until(lambda: chat.log.step(helper) is None)
 
 
 async def test_a_new_step_pushes_the_helpers_summary_at_most_once_a_second(

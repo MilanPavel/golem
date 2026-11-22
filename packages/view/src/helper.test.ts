@@ -99,6 +99,8 @@ test("helperStopWords: a helper that is done says nothing", () => {
 test("helperStopWords: each limit has words", () => {
   assert.equal(helperStopWords("calls"), "stopped: call limit");
   assert.equal(helperStopWords("time"), "stopped: time limit");
+  assert.equal(helperStopWords("cost"), "stopped: cost limit");
+  assert.equal(helperStopWords("failed"), "stopped: a model call failed");
   assert.equal(helperStopWords("budget"), "stopped: budget spent");
   assert.equal(helperStopWords("tokens"), "stopped: token limit");
   assert.equal(helperStopWords("cancelled"), "stopped: cancelled");
