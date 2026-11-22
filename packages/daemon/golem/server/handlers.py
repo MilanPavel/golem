@@ -69,6 +69,7 @@ from golem.server.agents_edit import (
     agents_save,
     agents_set_wish,
 )
+from golem.server.chat_edit import chat_get, chat_set
 from golem.server.device_rpc import (
     connection_identify,
     device_list,
@@ -215,6 +216,8 @@ from golem_protocol.commands import (
     ChangesRevertResult,
     ChangesSuggestMessageParams,
     ChangesSuggestMessageResult,
+    ChatGetParams,
+    ChatSetParams,
     ConfigAllowance,
     ConfigGetParams,
     ConfigGetResult,
@@ -534,7 +537,10 @@ async def _session_create(ctx: RequestContext, params: SessionCreateParams) -> S
         await _switch_branch(params.cwd, params.branch, params.create_branch)
     try:
         session_id = await sessions.create(
-            params.model_profile, cwd=params.cwd, origin=params.origin
+            params.model_profile,
+            cwd=params.cwd,
+            origin=params.origin,
+            plan_first=params.plan_first,
         )
     except ModelConfigError as exc:
         raise RpcCallError(MODEL_NOT_CONFIGURED, str(exc)) from exc
@@ -2147,6 +2153,8 @@ def standard_methods() -> dict[str, Method]:
         "config.raw.set_protected": Method(
             "config.raw.set_protected", ConfigRawSetParams, True, config_raw_set_protected
         ),
+        "chat.get": Method("chat.get", ChatGetParams, True, chat_get),
+        "chat.set": Method("chat.set", ChatSetParams, True, chat_set),
         "notifications.get": Method(
             "notifications.get", NotificationsGetParams, True, notifications_get
         ),

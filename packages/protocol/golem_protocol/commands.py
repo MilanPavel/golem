@@ -116,6 +116,9 @@ class SessionCreateParams(BaseModel):
     model that does not resolve, or whose provider has no key, fails here with
     the same error code and message.
 
+    ``plan_first`` starts the session in plan first (true) or not (false). Left out, the
+    session follows ``[chat] plan_first``.
+
     ``origin`` says who started the session: ``user`` (the default) or ``cli``
     for ``golem ask --detach``. Only the daemon itself starts a ``routine:*``
     session, and any other value is refused.
@@ -137,6 +140,7 @@ class SessionCreateParams(BaseModel):
     origin: Literal["user", "cli"] | None = None
     branch: str | None = Field(default=None, min_length=1)
     create_branch: bool = False
+    plan_first: bool | None = None
 
 
 class SessionCreateResult(BaseModel):
@@ -4025,6 +4029,48 @@ class AgentsKeepResult(BaseModel):
     values: AgentsKeepValues | None = None
 
 
+class ChatGetParams(BaseModel):
+    """``chat.get``. The defaults for every new chat, from ``[chat]``."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+
+class ChatValues(BaseModel):
+    """``[chat]`` as golem uses it. ``mode`` is ``[permissions] mode``, read only here: the
+    page changes it with ``permissions.set_mode``."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    instructions: list[str]
+    plan_first: bool
+    mode: PermissionMode
+
+
+class ChatSetParams(BaseModel):
+    """``chat.set``. Change keys of ``[chat]`` in the user's ``config.toml``.
+
+    Only the keys sent change. ``instructions`` has at most 30 lines of 1 to 300 characters
+    after trimming, and blank lines are dropped. A bad line comes back as an error that
+    names it by number, and nothing is written.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    instructions: list[str] | None = None
+    plan_first: bool | None = None
+
+
+class ChatSetResult(BaseModel):
+    """``ok`` is false when a value was wrong, and the file is then untouched. ``values`` is
+    what ``chat.get`` would now answer, set when ``ok``."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    ok: bool
+    errors: list[ConfigError] = Field(default_factory=list[ConfigError])
+    values: ChatValues | None = None
+
+
 class NotificationsGetParams(BaseModel):
     """``notifications.get``. The ``[notifications]`` settings as golem uses them."""
 
@@ -4954,6 +5000,10 @@ __all__ = [
     "ChangesListResult",
     "ChangesSuggestMessageParams",
     "ChangesSuggestMessageResult",
+    "ChatGetParams",
+    "ChatSetParams",
+    "ChatSetResult",
+    "ChatValues",
     "ConfigAllowance",
     "ConfigError",
     "ConfigGetParams",

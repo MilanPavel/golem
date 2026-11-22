@@ -1,0 +1,121 @@
+{
+  "$defs": {
+    "ChatValues": {
+      "additionalProperties": false,
+      "description": "``[chat]`` as golem uses it. ``mode`` is ``[permissions] mode``, read only here: the\npage changes it with ``permissions.set_mode``.",
+      "properties": {
+        "instructions": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Instructions",
+          "type": "array"
+        },
+        "mode": {
+          "enum": [
+            "careful",
+            "balanced",
+            "autopilot"
+          ],
+          "title": "Mode",
+          "type": "string"
+        },
+        "plan_first": {
+          "title": "Plan First",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "instructions",
+        "plan_first",
+        "mode"
+      ],
+      "title": "ChatValues",
+      "type": "object"
+    },
+    "ConfigError": {
+      "additionalProperties": false,
+      "description": "One problem in a config text. ``line`` and ``column`` count from 1, when known.\n\n``path`` is the setting, as ``mcp.github.headers.Authorization``.",
+      "properties": {
+        "column": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Column"
+        },
+        "line": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Line"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        },
+        "path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Path"
+        }
+      },
+      "required": [
+        "message"
+      ],
+      "title": "ConfigError",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "``ok`` is false when a value was wrong, and the file is then untouched. ``values`` is\nwhat ``chat.get`` would now answer, set when ``ok``.",
+  "properties": {
+    "errors": {
+      "items": {
+        "$ref": "#/$defs/ConfigError"
+      },
+      "title": "Errors",
+      "type": "array"
+    },
+    "ok": {
+      "title": "Ok",
+      "type": "boolean"
+    },
+    "values": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ChatValues"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    }
+  },
+  "required": [
+    "ok"
+  ],
+  "title": "ChatSetResult",
+  "type": "object"
+}

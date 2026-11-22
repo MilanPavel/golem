@@ -534,7 +534,12 @@ class SessionManager:
         """Seconds for the limit on growing, replaceable in tests."""
 
     async def create(
-        self, model_profile: str | None, *, cwd: str | None = None, origin: str | None = None
+        self,
+        model_profile: str | None,
+        *,
+        cwd: str | None = None,
+        origin: str | None = None,
+        plan_first: bool | None = None,
     ) -> str:
         """Store a new session and its ``session.created``. Nobody is attached yet.
 
@@ -543,12 +548,14 @@ class SessionManager:
         daemon code calls this with ``routine:*``: the ``session.create`` command
         accepts ``user`` and ``cli`` only.
         ``model_profile`` is a profile name or a ``provider/model`` ref, or None
-        for the default.
+        for the default. ``plan_first`` None starts from ``[chat] plan_first``.
 
         Raises :class:`~golem.models.router.ModelConfigError` when
         ``model_profile`` does not resolve or its provider has no key, as
         :meth:`set_model` does.
         """
+        if plan_first is None:
+            plan_first = self._runtime.router.chat_settings().plan_first
         if model_profile is None:
             profile = self._runtime.router.profile_name
         else:
@@ -567,6 +574,14 @@ class SessionManager:
                 route=route,
             )
             await self._announce(session)
+            if plan_first:
+                await self._events.emit(
+                    session.session_id,
+                    None,
+                    "session.plan.changed",
+                    SessionPlanChangedData(on=True),
+                )
+                session.plan_first = True
             self._sessions[session.session_id] = session
             return session.session_id
 

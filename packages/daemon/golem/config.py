@@ -473,6 +473,55 @@ class NotificationSettings(BaseModel):
         return value
 
 
+INSTRUCTION_LINES_MAX = 30
+"""The most instruction lines ``[chat] instructions`` may hold."""
+INSTRUCTION_CHARS_MAX = 300
+"""The longest an instruction line may be, after trimming."""
+
+
+def check_instructions(lines: list[str]) -> list[str]:
+    """The lines trimmed, with blank ones dropped. Raises ``ValueError`` naming a bad line.
+
+    Line numbers count the lines as given, blank ones included.
+    """
+    kept: list[str] = []
+    for number, line in enumerate(lines, start=1):
+        text = line.strip()
+        if text == "":
+            continue
+        if len(text) > INSTRUCTION_CHARS_MAX:
+            raise ValueError(
+                f"line {number} is {len(text)} characters; "
+                f"a line may have at most {INSTRUCTION_CHARS_MAX}"
+            )
+        kept.append(text)
+    if len(kept) > INSTRUCTION_LINES_MAX:
+        raise ValueError(
+            f"line {INSTRUCTION_LINES_MAX + 1} is one too many; "
+            f"at most {INSTRUCTION_LINES_MAX} lines are kept"
+        )
+    return kept
+
+
+class ChatSettings(BaseModel):
+    """``[chat]``. The defaults for every new chat.
+
+    ``instructions`` are your lines on how golem should answer. The model reads them on
+    every call, so a change shows on the next call. ``plan_first`` says whether a new
+    session starts in plan first. A session that is already open is not changed.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    instructions: list[str] = Field(default_factory=list[str])
+    plan_first: bool = False
+
+    @field_validator("instructions")
+    @classmethod
+    def _instruction_lines(cls, value: list[str]) -> list[str]:
+        return check_instructions(value)
+
+
 class AgentModelSettings(BaseModel):
     """``[agents.<name>]`` of a bundled type: the wish its file has, unless a file of yours wins.
 
@@ -803,6 +852,7 @@ BROWSER_SETTINGS = frozenset(
         "ollama",
         "routing",
         "notifications",
+        "chat",
         "context",
         "budget",
         "memory",
@@ -886,6 +936,7 @@ class GolemSettings(BaseSettings):
     relay: RelaySettings = Field(default_factory=RelaySettings)
     agents: AgentSettings = Field(default_factory=AgentSettings)
     notifications: NotificationSettings = Field(default_factory=NotificationSettings)
+    chat: ChatSettings = Field(default_factory=ChatSettings)
     routine: list[RoutineSettings] = Field(default_factory=list[RoutineSettings])
 
     @field_validator("routine")

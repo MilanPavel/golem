@@ -2386,6 +2386,129 @@ public struct ChangesSuggestMessageResult: Codable {
     }
 }
 
+/// ``chat.get``. The defaults for every new chat, from ``[chat]``.
+// MARK: - ChatGetParams
+public struct ChatGetParams: Codable {
+
+    public init() {
+    }
+}
+
+/// ``chat.set``. Change keys of ``[chat]`` in the user's ``config.toml``.
+///
+/// Only the keys sent change. ``instructions`` has at most 30 lines of 1 to 300 characters
+/// after trimming, and blank lines are dropped. A bad line comes back as an error that
+/// names it by number, and nothing is written.
+// MARK: - ChatSetParams
+public struct ChatSetParams: Codable {
+    public let instructions: [String]?
+    public let planFirst: Bool?
+
+    public enum CodingKeys: String, CodingKey {
+        case instructions = "instructions"
+        case planFirst = "plan_first"
+    }
+
+    public init(instructions: [String]?, planFirst: Bool?) {
+        self.instructions = instructions
+        self.planFirst = planFirst
+    }
+}
+
+/// ``ok`` is false when a value was wrong, and the file is then untouched. ``values`` is
+/// what ``chat.get`` would now answer, set when ``ok``.
+// MARK: - ChatSetResult
+public struct ChatSetResult: Codable {
+    public let errors: [ChatSetResultError]?
+    public let ok: Bool
+    public let values: ChatValuesClass?
+
+    public enum CodingKeys: String, CodingKey {
+        case errors = "errors"
+        case ok = "ok"
+        case values = "values"
+    }
+
+    public init(errors: [ChatSetResultError]?, ok: Bool, values: ChatValuesClass?) {
+        self.errors = errors
+        self.ok = ok
+        self.values = values
+    }
+}
+
+/// One problem in a config text. ``line`` and ``column`` count from 1, when known.
+///
+/// ``path`` is the setting, as ``mcp.github.headers.Authorization``.
+// MARK: - ChatSetResultError
+public struct ChatSetResultError: Codable {
+    public let column: Int?
+    public let line: Int?
+    public let message: String
+    public let path: String?
+
+    public enum CodingKeys: String, CodingKey {
+        case column = "column"
+        case line = "line"
+        case message = "message"
+        case path = "path"
+    }
+
+    public init(column: Int?, line: Int?, message: String, path: String?) {
+        self.column = column
+        self.line = line
+        self.message = message
+        self.path = path
+    }
+}
+
+/// ``[chat]`` as golem uses it. ``mode`` is ``[permissions] mode``, read only here: the
+/// page changes it with ``permissions.set_mode``.
+// MARK: - ChatValuesClass
+public struct ChatValuesClass: Codable {
+    public let instructions: [String]
+    public let mode: DefaultPermissionModeEnum
+    public let planFirst: Bool
+
+    public enum CodingKeys: String, CodingKey {
+        case instructions = "instructions"
+        case mode = "mode"
+        case planFirst = "plan_first"
+    }
+
+    public init(instructions: [String], mode: DefaultPermissionModeEnum, planFirst: Bool) {
+        self.instructions = instructions
+        self.mode = mode
+        self.planFirst = planFirst
+    }
+}
+
+public enum DefaultPermissionModeEnum: String, Codable {
+    case autopilot = "autopilot"
+    case balanced = "balanced"
+    case careful = "careful"
+}
+
+/// ``[chat]`` as golem uses it. ``mode`` is ``[permissions] mode``, read only here: the
+/// page changes it with ``permissions.set_mode``.
+// MARK: - ChatValues
+public struct ChatValues: Codable {
+    public let instructions: [String]
+    public let mode: DefaultPermissionModeEnum
+    public let planFirst: Bool
+
+    public enum CodingKeys: String, CodingKey {
+        case instructions = "instructions"
+        case mode = "mode"
+        case planFirst = "plan_first"
+    }
+
+    public init(instructions: [String], mode: DefaultPermissionModeEnum, planFirst: Bool) {
+        self.instructions = instructions
+        self.mode = mode
+        self.planFirst = planFirst
+    }
+}
+
 /// A check ended. ``exit_code`` is null when it timed out.
 ///
 /// ``output`` is the last 4,000 characters. When there was more, the whole
@@ -2813,12 +2936,6 @@ public struct ConfigGetResult: Codable {
         self.sessionTitles = sessionTitles
         self.trustedProjects = trustedProjects
     }
-}
-
-public enum DefaultPermissionModeEnum: String, Codable {
-    case autopilot = "autopilot"
-    case balanced = "balanced"
-    case careful = "careful"
 }
 
 public enum OpenIn: String, Codable {
@@ -19507,6 +19624,9 @@ public enum SessionCompletedEventType: String, Codable {
 /// model that does not resolve, or whose provider has no key, fails here with
 /// the same error code and message.
 ///
+/// ``plan_first`` starts the session in plan first (true) or not (false). Left out, the
+/// session follows ``[chat] plan_first``.
+///
 /// ``origin`` says who started the session: ``user`` (the default) or ``cli``
 /// for ``golem ask --detach``. Only the daemon itself starts a ``routine:*``
 /// session, and any other value is refused.
@@ -19526,6 +19646,7 @@ public struct SessionCreateParams: Codable {
     public let cwd: String?
     public let modelProfile: String?
     public let origin: OriginEnum?
+    public let planFirst: Bool?
 
     public enum CodingKeys: String, CodingKey {
         case branch = "branch"
@@ -19533,14 +19654,16 @@ public struct SessionCreateParams: Codable {
         case cwd = "cwd"
         case modelProfile = "model_profile"
         case origin = "origin"
+        case planFirst = "plan_first"
     }
 
-    public init(branch: String?, createBranch: Bool?, cwd: String?, modelProfile: String?, origin: OriginEnum?) {
+    public init(branch: String?, createBranch: Bool?, cwd: String?, modelProfile: String?, origin: OriginEnum?, planFirst: Bool?) {
         self.branch = branch
         self.createBranch = createBranch
         self.cwd = cwd
         self.modelProfile = modelProfile
         self.origin = origin
+        self.planFirst = planFirst
     }
 }
 

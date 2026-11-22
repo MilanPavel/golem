@@ -1,0 +1,7 @@
+{
+  "additionalProperties": false,
+  "description": "``chat.get``. The defaults for every new chat, from ``[chat]``.",
+  "properties": {},
+  "title": "ChatGetParams",
+  "type": "object"
+}

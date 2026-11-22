@@ -1,0 +1,35 @@
+{
+  "additionalProperties": false,
+  "description": "``chat.set``. Change keys of ``[chat]`` in the user's ``config.toml``.\n\nOnly the keys sent change. ``instructions`` has at most 30 lines of 1 to 300 characters\nafter trimming, and blank lines are dropped. A bad line comes back as an error that\nnames it by number, and nothing is written.",
+  "properties": {
+    "instructions": {
+      "anyOf": [
+        {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Instructions"
+    },
+    "plan_first": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Plan First"
+    }
+  },
+  "title": "ChatSetParams",
+  "type": "object"
+}
