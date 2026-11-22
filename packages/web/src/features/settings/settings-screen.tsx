@@ -9,7 +9,7 @@ import { ConfigSection } from "./config-section.tsx";
 import { ContextSection } from "./context-section.tsx";
 import { useSettingsBack } from "./context.ts";
 import { DevicesSection } from "./devices-section.tsx";
-import { KeysSection } from "./keys-section.tsx";
+import { ModelsSection } from "./models/models-section.tsx";
 import { McpSection } from "./mcp-section.tsx";
 import { MemorySection } from "./memory/memory-section.tsx";
 import { NotificationsSection } from "./notifications-section.tsx";
@@ -66,8 +66,8 @@ function Body({ section }: { section: string }) {
       return <AgentsSection />;
     case "memory":
       return <MemorySection />;
-    case "keys":
-      return <KeysSection />;
+    case "models":
+      return <ModelsSection />;
     case "routing":
       return <RoutingSection />;
     case "context":
@@ -121,6 +121,10 @@ export function SettingsScreen({ section }: { section: string }) {
       document.removeEventListener("keydown", onKeyDown);
     };
   }, [goBack]);
+  // `/settings/keys` is the old name of Models, as `/settings/setup` is of Info: the router reads both, and the address follows.
+  useEffect(() => {
+    if (section === "models" && location.pathname === "/settings/keys") navigate(settingsPath("models"), { replace: true });
+  }, [section, navigate]);
   // `/settings/setup` is the old name of Info: the router reads it as Info, and the address follows.
   useEffect(() => {
     if (section === "info" && location.pathname === "/settings/setup") navigate(settingsPath("info"), { replace: true });

@@ -7,6 +7,13 @@ export type { AgentsKeepResult, AgentsKeepValues };
 /** The query key of `agents.keep`. A successful change marks it stale. */
 export const AGENTS_KEEP_KEY = ["agents.keep"] as const;
 
+import type { OllamaSettingsSetParams, OllamaSettingsSetResult, OllamaSettingsValues } from "@golem/client";
+
+export type { OllamaSettingsSetParams, OllamaSettingsSetResult, OllamaSettingsValues };
+
+/** The query key of `ollama.settings.get`. A successful `ollama.settings.set` marks it stale. */
+export const OLLAMA_SETTINGS_KEY = ["ollama.settings.get"] as const;
+
 export type { NotificationsSetParams, NotificationsSetResult, NotificationsValues, NotifyTestResult };
 
 /** The query key of `notifications.get`. A successful `notifications.set` marks it stale. */

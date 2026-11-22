@@ -130,6 +130,9 @@ import type { ModelPullResult } from "../../protocol/gen/model-pull-result.ts";
 import type { ModelScoreResetResult } from "../../protocol/gen/model-score-reset-result.ts";
 import type { ModelSetDefaultResult } from "../../protocol/gen/model-set-default-result.ts";
 import type { ModelStarResult } from "../../protocol/gen/model-star-result.ts";
+import type { OllamaSettingsSetParams } from "../../protocol/gen/ollama-settings-set-params.ts";
+import type { OllamaSettingsSetResult } from "../../protocol/gen/ollama-settings-set-result.ts";
+import type { OllamaSettingsValues } from "../../protocol/gen/ollama-settings-values.ts";
 import type { ModelOptionsGetResult } from "../../protocol/gen/model-options-get-result.ts";
 import type { ModelOptionsSaved } from "../../protocol/gen/model-options-saved.ts";
 import type { ModelOptionsSetResult } from "../../protocol/gen/model-options-set-result.ts";
@@ -228,6 +231,8 @@ import {
   isModelScoreResetResult,
   isModelSetDefaultResult,
   isModelStarResult,
+  isOllamaSettingsSetResult,
+  isOllamaSettingsValues,
   isPermissionsSetModeResult,
   isSessionCompactResult,
   isSessionSetChecksResult,
@@ -524,6 +529,10 @@ export interface GolemClient {
   setDefaultModel(model: string): Promise<ModelSetDefaultResult>;
   /** Star `ref` for the model menu, or take its star away. The first change writes the whole list to `[model_menu] starred`. */
   starModel(ref: string, starred: boolean): Promise<ModelStarResult>;
+  /** The `[ollama]` settings as golem uses them. `running` reads false until golem has looked for Ollama. */
+  getOllamaSettings(): Promise<OllamaSettingsValues>;
+  /** Changes the `[ollama]` keys sent. Nothing is written when a value is wrong. */
+  setOllamaSettings(params: OllamaSettingsSetParams): Promise<OllamaSettingsSetResult>;
   /** Write `[permissions] mode` to the user's config.toml, keeping its comments. New chats start in it. */
   setDefaultPermissionMode(mode: PermissionsSetModeParams["mode"]): Promise<PermissionsSetModeResult>;
   /** The tunable options of a local model, its own defaults, what is saved for it, and `sessionId`'s overrides. */
@@ -2011,6 +2020,22 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       const result = await call("model.set_default", { model });
       if (!isModelSetDefaultResult(result)) {
         throw new Error("invalid model.set_default result");
+      }
+      return result;
+    },
+    async getOllamaSettings(): Promise<OllamaSettingsValues> {
+      await ready;
+      const result = await call("ollama.settings.get", {});
+      if (!isOllamaSettingsValues(result)) {
+        throw new Error("invalid ollama.settings.get result");
+      }
+      return result;
+    },
+    async setOllamaSettings(params: OllamaSettingsSetParams): Promise<OllamaSettingsSetResult> {
+      await ready;
+      const result = await call("ollama.settings.set", { ...params });
+      if (!isOllamaSettingsSetResult(result)) {
+        throw new Error("invalid ollama.settings.set result");
       }
       return result;
     },

@@ -61,8 +61,8 @@ import { HeroCard, PathsGrid } from "../features/setup/info-parts.tsx";
 import { HowFarView } from "../features/settings/chat-alone.tsx";
 import { ChatSection } from "../features/settings/chat-section.tsx";
 import { InstructionsView } from "../features/settings/chat-instructions.tsx";
-import { KeysView } from "../features/settings/keys-section.tsx";
-import { KEYS_CASES } from "../features/settings/keys-sample.ts";
+import { ModelsView } from "../features/settings/models/models-view.tsx";
+import { IDLE_SETUP, MODELS_CASES, NO_ACTIONS, NO_PULLS } from "../features/settings/models/models-sample.ts";
 import { MemoryView } from "../features/settings/memory/memory-view.tsx";
 import { SAMPLE_MEMORIES, SAMPLE_MEMORY_COUNTS, SAMPLE_MEMORY_SETTINGS } from "../features/settings/memory/sample.ts";
 import { MEMORY_OFF_TEXT } from "../store/memory.ts";
@@ -1746,14 +1746,14 @@ function MemoryDemo() {
   );
 }
 
-/** Settings → API keys in each state: mixed, a fresh install, all set, no MCP keys, and a drawer open. */
-function ApiKeysDemo() {
+/** Settings › Models in each state: all starred, Ollama running, stopped, missing and downloading, a hosted provider with and without a key, and oMLX. */
+function ModelsDemo() {
   return (
     <div className="flex flex-col gap-4">
-      {KEYS_CASES.map(({ label, providers, servers, openKey }) => (
-        <section key={label} aria-label={`API keys, ${label}`} className="flex flex-col gap-3 rounded-lg border border-line bg-bg p-4">
+      {MODELS_CASES.map(({ label, pulls, ...props }) => (
+        <section key={label} aria-label={`Models, ${label}`} className="flex flex-col gap-3 rounded-lg border border-line bg-bg p-4">
           <span className="font-mono text-xs text-faint">{label}</span>
-          <KeysView providers={providers} servers={servers} onRefresh={() => {}} onNavigate={() => {}} onServer={() => {}} initialOpen={openKey ?? null} />
+          <ModelsView {...props} pulls={pulls ?? NO_PULLS} setup={IDLE_SETUP} actions={NO_ACTIONS} />
         </section>
       ))}
     </div>
@@ -2280,9 +2280,9 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
         </div>
       </section>
 
-      <section className="mt-6" id={anchor("API keys")}>
-        <h3 className="mb-2 font-mono text-xs text-faint">API keys</h3>
-        <ApiKeysDemo />
+      <section className="mt-6" id={anchor("Settings models")}>
+        <h3 className="mb-2 font-mono text-xs text-faint">Settings › Models</h3>
+        <ModelsDemo />
       </section>
 
       <section className="mt-6" id={anchor("Routing")}>

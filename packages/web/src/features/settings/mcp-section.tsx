@@ -139,7 +139,7 @@ function Installed({ sessionId, added, onCatalog }: { sessionId: string | null; 
     else rows.current.set(key, node);
   }, []);
 
-  // The API keys page asks for one server. Once the list is there it opens that server, and the request is taken.
+  // Another page can ask for one server. Once the list is there it opens that server, and the request is taken.
   const openRequest = useMcpOpenRequest();
   const [handled, setHandled] = useState<typeof openRequest>(null);
   if (openRequest !== null && openRequest !== handled && list.data !== undefined) {

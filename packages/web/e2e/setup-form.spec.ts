@@ -71,18 +71,18 @@ test("Change… then Make default: the Model card shows the new default, and no 
   expect((await second.client.listSessions()).sessions).toHaveLength(0);
 });
 
-test("Setup has no API keys strip; the keys are on their own tab, which has no key field", async ({ page, rig }) => {
+test("Setup has no API keys strip; the keys are on the Models page, which has no key field", async ({ page, rig }) => {
   const { gateway } = await startStack(rig, { ollama: { installed: [NAME] } });
   await open(page, gateway.url);
   await expect(page.getByRole("group", { name: "API keys" })).toHaveCount(0);
-  await page.getByRole("navigation", { name: "Settings sections" }).getByRole("link", { name: "API keys" }).click();
-  await expect(page).toHaveURL(/\/settings\/keys$/);
+  await page.getByRole("navigation", { name: "Settings sections" }).getByRole("link", { name: "Models" }).click();
+  await expect(page).toHaveURL(/\/settings\/models$/);
   // Which providers have a key depends on the keys in the environment the daemon runs in, so only the
-  // row's name and blurb are checked here; the saved and missing rows are in the component's tests.
-  const models = page.getByRole("list", { name: "Model providers" });
-  await expect(models).toBeVisible();
-  await expect(models.getByRole("listitem").filter({ hasText: "Anthropic" })).toContainText("Claude");
-  await expect(page.getByText("Keys are set and removed in a terminal.")).toBeVisible();
+  // provider list is checked here; the set up and saved states are in the component's tests.
+  const providers = page.getByRole("group", { name: "Providers" });
+  await expect(providers).toBeVisible();
+  await expect(providers.getByRole("button", { name: /^Anthropic/ })).toBeVisible();
+  await expect(page.getByText("Keys are set in a terminal.")).toBeVisible();
   await expect(page.locator("input")).toHaveCount(0);
 });
 

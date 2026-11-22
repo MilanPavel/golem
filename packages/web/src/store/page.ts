@@ -10,7 +10,7 @@ import { createNewSession, type NewSessionStore } from "./new-session.ts";
 import { CONFIG_KEY } from "./config.ts";
 import { DEVICE_LIST_KEY, createPairing, type DeviceListResult, type DeviceRevokeResult, type Pairing } from "./devices.ts";
 import { MCP_CATALOG_KEY, MCP_GET_KEY, MCP_LIST_KEY, MCP_TOOLS_KEY, type McpToolsResult } from "./mcp.ts";
-import { AGENTS_KEEP_KEY, CHAT_KEY, PROMPT_KEY, SUGGESTIONS_KEY, NOTIFICATIONS_KEY, type AgentsKeepResult, type AgentsKeepValues } from "./notifications.ts";
+import { AGENTS_KEEP_KEY, OLLAMA_SETTINGS_KEY, type OllamaSettingsSetParams, type OllamaSettingsSetResult, type OllamaSettingsValues, CHAT_KEY, PROMPT_KEY, SUGGESTIONS_KEY, NOTIFICATIONS_KEY, type AgentsKeepResult, type AgentsKeepValues } from "./notifications.ts";
 import { ROUTING_KEY } from "./routing.ts";
 import type { AgentInfo, AgentsListResult as AgentsListed } from "./agents.ts";
 import { MODEL_LIST_ALL_KEY, MODEL_LIST_KEY, SETUP_STATUS_KEY, type ModelListResult } from "./models.ts";
@@ -153,6 +153,8 @@ export type PageClient = Pick<
   | "setSessionModel"
   | "setDefaultModel"
   | "starModel"
+  | "getOllamaSettings"
+  | "setOllamaSettings"
   | "setDefaultPermissionMode"
   | "getModelOptions"
   | "setModelOptions"
@@ -269,6 +271,8 @@ export type PageActions = {
   setDefault(name: string): Promise<void>;
   /** Stars the model for the menu, or takes its star away, and reads the listing again. */
   starModel(ref: string, starred: boolean): Promise<void>;
+  /** Changes keys of `[ollama]` in `config.toml`. A refusal is in the result (`ok: false`), and nothing is written then. */
+  setOllamaSettings(params: OllamaSettingsSetParams): Promise<OllamaSettingsSetResult>;
   /**
    * Changes keys of the routing, budget and context tables in `config.toml`. A refusal is in the result
    * (`ok: false`, with an error for each wrong setting), not a rejection, and nothing is written then.
@@ -441,6 +445,8 @@ export type PageQueries = {
   cost(sessionId?: string): Promise<CostGetResult>;
   /** The routing, budget and context settings, from `routing.get`. */
   routing(): Promise<RoutingGetResult>;
+  /** The `[ollama]` settings, from `ollama.settings.get`. */
+  ollamaSettings(): Promise<OllamaSettingsValues>;
   /** The defaults for every new chat, from `chat.get`. */
   chat(): Promise<ChatValues>;
   /** What the model of a new chat reads, from `chat.prompt`. Lines stand in for the saved ones for this answer only. */
@@ -575,6 +581,7 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
       mcpTools: (name, sessionId) => client.mcpTools(name, sessionId ?? undefined),
       cost: (sessionId) => (sessionId === undefined ? client.getCost() : client.getCost(sessionId)),
       routing: () => client.getRouting(),
+      ollamaSettings: () => client.getOllamaSettings(),
       chat: () => client.getChat(),
       chatSuggestions: () => client.getChatSuggestions(),
       chatPrompt: (instructions) => client.getChatPrompt(instructions === null ? {} : { instructions: [...instructions] }),
@@ -1042,6 +1049,11 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
       async starModel(ref, starred) {
         await client.starModel(ref, starred);
         await queryClient.invalidateQueries({ queryKey: MODEL_LIST_KEY });
+      },
+      async setOllamaSettings(params) {
+        const result = await client.setOllamaSettings(params);
+        if (result.ok) await queryClient.invalidateQueries({ queryKey: OLLAMA_SETTINGS_KEY });
+        return result;
       },
       async pull(ref, after) {
         pulls.begin(ref);

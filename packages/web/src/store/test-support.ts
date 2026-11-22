@@ -246,6 +246,12 @@ export function fakeClient() {
     setDefaultPermissionMode: vi.fn<PageClient["setDefaultPermissionMode"]>(async (mode) => ({ mode, path: "/h/config.toml" })),
     setDefaultModel: vi.fn<PageClient["setDefaultModel"]>(async () => ({}) as never),
     starModel: vi.fn<PageClient["starModel"]>(async () => ({ starred: [] })),
+    getOllamaSettings: vi.fn<PageClient["getOllamaSettings"]>(async () => ({ start: true, idle_stop_minutes: 30, parallel: 1, started_by_golem: true, running: true })),
+    setOllamaSettings: vi.fn<PageClient["setOllamaSettings"]>(async (params) => ({
+      ok: true,
+      errors: [],
+      values: { start: params.start ?? true, idle_stop_minutes: params.idle_stop_minutes ?? 30, parallel: params.parallel ?? 1, started_by_golem: true, running: true },
+    })),
     getModelOptions: vi.fn<PageClient["getModelOptions"]>(async (model) => ({ model, options: [], defaults: {}, saved: {}, session: {} })),
     setModelOptions: vi.fn<PageClient["setModelOptions"]>(async (model) => ({ model, saved: {} })),
     setSessionOptions: vi.fn<PageClient["setSessionOptions"]>(async (id) => ({ session_id: id, options: {} })),

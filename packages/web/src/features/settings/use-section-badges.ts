@@ -13,8 +13,6 @@ export function useSectionBadges(): Record<string, number> {
   const counts: Record<string, number> = {
     info: rows === null ? 0 : rows.filter((row) => row.mark !== "ok").length,
     mcp: mcp.data === undefined ? 0 : mcp.data.servers.filter((server) => server.state === "failed").length,
-    // TODO: keys: count the providers the routing path uses that have no key.
-    keys: 0,
   };
   return Object.fromEntries(Object.entries(counts).filter(([, count]) => count > 0));
 }

@@ -203,7 +203,7 @@ test("a tier that is not ready is grey and offers Add key", async () => {
   expect(budget.getAttribute("data-ready")).toBe("false");
   expect(budget.className).toContain("text-faint");
   await userEvent.setup().click(within(budget).getByRole("link", { name: "Add key" }));
-  expect(onNavigate).toHaveBeenCalledWith("/settings/keys");
+  expect(onNavigate).toHaveBeenCalledWith("/settings/models");
 });
 
 for (const theme of ["slip", "kiln"]) {

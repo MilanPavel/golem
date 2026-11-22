@@ -134,6 +134,9 @@ export type { TraceContextEvent } from "../../protocol/gen/trace-context-event.t
 export type { TraceContextItem } from "../../protocol/gen/trace-context-item.ts";
 export type { TraceContextPart } from "../../protocol/gen/trace-context-part.ts";
 export type { PromptSectionInfo } from "../../protocol/gen/prompt-section-info.ts";
+export type { OllamaSettingsSetParams } from "../../protocol/gen/ollama-settings-set-params.ts";
+export type { OllamaSettingsSetResult } from "../../protocol/gen/ollama-settings-set-result.ts";
+export type { OllamaSettingsValues } from "../../protocol/gen/ollama-settings-values.ts";
 export type { ChatSetParams } from "../../protocol/gen/chat-set-params.ts";
 export type { ChatSetResult } from "../../protocol/gen/chat-set-result.ts";
 export type { ChatPromptParams } from "../../protocol/gen/chat-prompt-params.ts";

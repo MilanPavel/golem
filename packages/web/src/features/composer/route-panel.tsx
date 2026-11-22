@@ -36,7 +36,7 @@ function Ladder({ title, rows, onNavigate }: { title: string; rows: readonly Lad
           <span className="min-w-0 flex-1 truncate">{row.model === null ? "none" : <Code tone="muted">{row.model}</Code>}</span>
           <span className="shrink-0">{row.state}</span>
           {row.needsKey ? (
-            <Link href={settingsPath("keys")} onNavigate={onNavigate} className="shrink-0 text-clay-ink underline">
+            <Link href={settingsPath("models")} onNavigate={onNavigate} className="shrink-0 text-clay-ink underline">
               Add key
             </Link>
           ) : null}
