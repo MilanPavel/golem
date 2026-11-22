@@ -120,6 +120,13 @@ class SessionCreateParams(BaseModel):
     for ``golem ask --detach``. Only the daemon itself starts a ``routine:*``
     session, and any other value is refused.
 
+    ``branch`` asks the daemon to switch ``cwd`` to that git branch before the
+    session starts (``git switch``), or to create it first with
+    ``create_branch`` (``git switch -c``). Uncommitted changes go along, as in
+    git. A ``cwd`` that is not a repository is refused with ``not_a_repo``, and
+    a failed switch with ``branch_switch_failed`` carrying git's own message;
+    no session is made then. Both errors put that name in ``error.data.code``.
+
     The caller is not attached. ``session.attach`` replays ``session.created``.
     """
 
@@ -128,6 +135,8 @@ class SessionCreateParams(BaseModel):
     model_profile: str | None = Field(default=None, min_length=1)
     cwd: str | None = Field(default=None, min_length=1)
     origin: Literal["user", "cli"] | None = None
+    branch: str | None = Field(default=None, min_length=1)
+    create_branch: bool = False
 
 
 class SessionCreateResult(BaseModel):

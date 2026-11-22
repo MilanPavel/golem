@@ -82,6 +82,7 @@ from golem.server.device_rpc import (
 from golem.server.dispatcher import (
     APPROVAL_NOT_FOUND,
     ARTIFACT_NOT_FOUND,
+    BRANCH_SWITCH_FAILED,
     BUDGET_SPENT,
     BUSY,
     INTERNAL_ERROR,
@@ -94,6 +95,7 @@ from golem.server.dispatcher import (
     MESSAGE_NOT_FOUND,
     MODEL_NOT_CONFIGURED,
     MODEL_PULL_FAILED,
+    NOT_A_REPO,
     NOT_LOCAL,
     OLLAMA_FAILED,
     PROTOCOL_MISMATCH,
@@ -502,9 +504,30 @@ async def _ping(ctx: RequestContext, params: PingParams) -> Ping:
     return Ping(type="system.ping", nonce=params.nonce)
 
 
+async def _switch_branch(cwd: str | None, branch: str, create: bool) -> None:
+    """Put ``cwd`` on ``branch`` before a session starts. Local changes go along."""
+    if cwd is None:
+        raise RpcCallError(INVALID_PARAMS, "branch needs a cwd")
+    if branch.startswith("-"):
+        raise RpcCallError(INVALID_PARAMS, "branch cannot start with a dash")
+    inside = await commit_git.run_git(cwd, "rev-parse", "--is-inside-work-tree")
+    if not inside.ok:
+        raise RpcCallError(NOT_A_REPO, f"{cwd} is not a git repository.", {"reason": "not_a_repo"})
+    current = await commit_git.run_git(cwd, "branch", "--show-current")
+    if current.ok and current.output.strip() == branch:
+        return
+    args = ("switch", "-c", branch) if create else ("switch", branch)
+    switched = await commit_git.run_git(cwd, *args)
+    if not switched.ok:
+        message = switched.output.strip() or "git could not switch branches."
+        raise RpcCallError(BRANCH_SWITCH_FAILED, message, {"reason": "branch_switch_failed"})
+
+
 async def _session_create(ctx: RequestContext, params: SessionCreateParams) -> SessionCreateResult:
     sessions = _sessions(ctx)
     _check_cwd(params.cwd)
+    if params.branch is not None:
+        await _switch_branch(params.cwd, params.branch, params.create_branch)
     try:
         session_id = await sessions.create(
             params.model_profile, cwd=params.cwd, origin=params.origin
