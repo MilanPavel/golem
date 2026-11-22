@@ -7,6 +7,7 @@ import { Code } from "../../../ui/code.tsx";
 import { Input } from "../../../ui/input.tsx";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../../ui/tabs.tsx";
 import { diskText, shortName } from "../../models/model-text.ts";
+import { HuggingFaceTab, type HfActions, type HfTabProps } from "./hf-tab.tsx";
 import { Sheet } from "./sheet.tsx";
 
 export type GetModelsProps = {
@@ -16,11 +17,15 @@ export type GetModelsProps = {
   pulls: PullsSnapshot;
   /** Starts a download. It rejects with the words to show. */
   onPull: (ref: string) => Promise<void>;
+  /** Hugging Face: the search and a repo's sizes. */
+  hf: HfActions;
+  /** What the Hugging Face tab starts with, for the gallery. */
+  initialHf?: HfTabProps["initial"];
   /** Where the tab starts, for the gallery. */
   initialTab?: string;
 };
 
-type TabProps = Pick<GetModelsProps, "listing" | "pulls"> & {
+type TabProps = Pick<GetModelsProps, "listing" | "pulls" | "hf" | "initialHf"> & {
   busy: string | null;
   failure: string | null;
   pull: (ref: string) => Promise<boolean>;
@@ -31,6 +36,13 @@ type TabProps = Pick<GetModelsProps, "listing" | "pulls"> & {
  */
 const TABS: readonly { id: string; label: string; panel: (props: TabProps) => ReactNode }[] = [
   { id: "mac", label: "For this Mac", panel: (props) => <ForThisMac {...props} /> },
+  {
+    id: "hf",
+    label: "Hugging Face",
+    panel: ({ hf, initialHf, listing, busy, failure, pull }) => (
+      <HuggingFaceTab hf={hf} ramGb={listing?.ram_gb ?? null} busy={busy} failure={failure} pull={pull} {...(initialHf === undefined ? {} : { initial: initialHf })} />
+    ),
+  },
   { id: "name", label: "By name", panel: (props) => <ByName {...props} /> },
 ];
 
@@ -139,8 +151,8 @@ function ByName({ busy, failure, pull }: TabProps) {
   );
 }
 
-/** Get models: golem's list for this Mac, and a name typed in. The sheet closes once a download has started. */
-export function GetModelsSheet({ open, onOpenChange, listing, pulls, onPull, initialTab = "mac" }: GetModelsProps) {
+/** Get models: golem's list for this Mac, Hugging Face, and a name typed in. The sheet closes once a download has started. */
+export function GetModelsSheet({ open, onOpenChange, listing, pulls, onPull, hf, initialHf, initialTab = "mac" }: GetModelsProps) {
   const [tab, setTab] = useState(initialTab);
   const [busy, setBusy] = useState<string | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
@@ -176,7 +188,7 @@ export function GetModelsSheet({ open, onOpenChange, listing, pulls, onPull, ini
         </TabsList>
         {TABS.map((item) => (
           <TabsContent key={item.id} value={item.id}>
-            {item.panel({ listing, pulls, busy, failure, pull })}
+            {item.panel({ listing, pulls, hf, initialHf, busy, failure, pull })}
           </TabsContent>
         ))}
       </Tabs>

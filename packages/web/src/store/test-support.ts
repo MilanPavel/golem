@@ -259,6 +259,8 @@ export function fakeClient() {
     pullModel: vi.fn<PageClient["pullModel"]>(async (ref) => ({ ref, started: true }) as never),
     cancelPull: vi.fn<PageClient["cancelPull"]>(async (ref) => ({ ref, cancelled: true }) as never),
     deleteModel: vi.fn<PageClient["deleteModel"]>(async (ref) => ({ ref, deleted: true }) as never),
+    searchHf: vi.fn<PageClient["searchHf"]>(async () => ({ repos: [] })),
+    hfFiles: vi.fn<PageClient["hfFiles"]>(async (repo) => ({ repo, sizes: [] })),
     checkNow: vi.fn(),
     close: vi.fn(),
   };

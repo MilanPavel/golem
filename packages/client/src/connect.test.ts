@@ -900,6 +900,33 @@ test("setup.status reads the rows, and the Ollama install's output reaches onOll
   }
 });
 
+test("hf.search and hf.files read repos and sizes, and a malformed result is refused", async () => {
+  const repos = { repos: [{ id: "unsloth/Qwen3-GGUF", downloads: 10, likes: 2, updated: null, gated: false }] };
+  const files = { repo: "unsloth/Qwen3-GGUF", sizes: [{ quant: "Q4_K_M", size_gb: 16.8, files: 1, fit: "fits", recommended: true }] };
+  const server = await listen((socket) => {
+    attach(socket, { answerPing: true, results: { "hf.search": repos, "hf.files": files } });
+  });
+  const client = connectGolem({ socketPath: server.socketPath, clientName: "tui", reconnect: false, heartbeatMs: 60_000 });
+  try {
+    assert.deepEqual(await client.searchHf("qwen"), repos);
+    assert.deepEqual(await client.hfFiles("unsloth/Qwen3-GGUF"), files);
+  } finally {
+    client.close();
+    await server.close();
+  }
+  const bad = await listen((socket) => {
+    attach(socket, { answerPing: true, results: { "hf.search": { repos: [{ id: 1 }] }, "hf.files": { repo: "a/b" } } });
+  });
+  const other = connectGolem({ socketPath: bad.socketPath, clientName: "tui", reconnect: false, heartbeatMs: 60_000 });
+  try {
+    await assert.rejects(other.searchHf("qwen"), /invalid hf.search result/);
+    await assert.rejects(other.hfFiles("a/b"), /invalid hf.files result/);
+  } finally {
+    other.close();
+    await bad.close();
+  }
+});
+
 test("keychain.wait reaches onKeychainWait, and a malformed one is dropped", async () => {
   const server = await listen((socket) => {
     attach(socket, {

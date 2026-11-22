@@ -1,5 +1,5 @@
 import type { AuthKeyStatus } from "../../../store/keys.ts";
-import type { ListedModel, ModelListResult } from "../../../store/models.ts";
+import type { HfFilesResult, HfSearchResult, ListedModel, ModelListResult } from "../../../store/models.ts";
 import type { OllamaSettingsValues } from "../../../store/notifications.ts";
 import type { PullsSnapshot } from "../../../store/pulls.ts";
 import type { SetupActions } from "../../setup/use-setup-actions.ts";
@@ -82,7 +82,27 @@ export const NO_ACTIONS: ModelsActions = {
   remove: () => Promise.resolve(),
   stop: () => Promise.resolve(),
   pull: () => Promise.resolve(),
+  hf: { search: () => Promise.resolve({ repos: [] }), files: (repo) => Promise.resolve({ repo, sizes: [] }) },
   saveOllama: () => Promise.resolve({ ok: true, errors: [], values: OLLAMA_VALUES }),
+};
+
+export const HF_RESULTS: HfSearchResult = {
+  repos: [
+    { id: "unsloth/Qwen3.8-27B-Instruct-GGUF", downloads: 412_000, likes: 380, updated: "2026-11-19T10:00:00Z", gated: false },
+    { id: "bartowski/Qwen3.8-27B-Instruct-GGUF", downloads: 198_000, likes: 120, updated: "2026-11-17T10:00:00Z", gated: false },
+    { id: "meta-llama/Llama-4-Scout-GGUF", downloads: 61_000, likes: 90, updated: null, gated: true },
+  ],
+};
+
+export const HF_FILES: HfFilesResult = {
+  repo: "unsloth/Qwen3.8-27B-Instruct-GGUF",
+  sizes: [
+    { quant: "Q3_K_M", size_gb: 13.1, files: 1, fit: "fits", recommended: false },
+    { quant: "Q4_K_M", size_gb: 16.8, files: 1, fit: "fits", recommended: true },
+    { quant: "Q6_K", size_gb: 22.4, files: 1, fit: "fits", recommended: false },
+    { quant: "Q8_0", size_gb: 48.9, files: 2, fit: "tight", recommended: false },
+    { quant: "F16", size_gb: 94.2, files: 4, fit: "too_big", recommended: false },
+  ],
 };
 
 export type ModelsCase = Omit<ModelsViewProps, "actions" | "setup" | "pulls"> & { label: string; pulls?: PullsSnapshot };
@@ -105,6 +125,8 @@ export const MODELS_CASES: ModelsCase[] = [
 export const SHEET_CASES: { label: string; props: ModelsCase }[] = [
   { label: "Get models, for this Mac", props: { label: "", listing: listing(MODELS), keys: TWO_KEYS, ollama: OLLAMA_VALUES, initial: { selected: "ollama", sheet: "get" } } },
   { label: "Get models, by name", props: { label: "", listing: listing(MODELS), keys: TWO_KEYS, ollama: OLLAMA_VALUES, initial: { selected: "ollama", sheet: "get", tab: "name" } } },
+  { label: "Get models, Hugging Face search", props: { label: "", listing: listing(MODELS), keys: TWO_KEYS, ollama: OLLAMA_VALUES, initial: { selected: "ollama", sheet: "get", tab: "hf", hf: { query: "qwen3.8 27b", results: HF_RESULTS } } } },
+  { label: "Get models, a Hugging Face repo", props: { label: "", listing: listing(MODELS), keys: TWO_KEYS, ollama: OLLAMA_VALUES, initial: { selected: "ollama", sheet: "get", tab: "hf", hf: { query: "qwen3.8 27b", results: HF_RESULTS, repo: { id: HF_FILES.repo, files: HF_FILES } } } } },
   { label: "Ollama settings", props: { label: "", listing: listing(MODELS), keys: TWO_KEYS, ollama: OLLAMA_VALUES, initial: { selected: "ollama", sheet: "settings" } } },
   { label: "Ollama settings, started outside golem", props: { label: "", listing: listing(MODELS), keys: TWO_KEYS, ollama: { ...OLLAMA_VALUES, started_by_golem: false }, initial: { selected: "ollama", sheet: "settings" } } },
   { label: "Replace or remove a key", props: { label: "", listing: listing(MODELS), keys: TWO_KEYS, ollama: OLLAMA_VALUES, initial: { selected: "anthropic", sheet: "key" } } },

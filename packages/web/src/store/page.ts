@@ -13,7 +13,7 @@ import { MCP_CATALOG_KEY, MCP_GET_KEY, MCP_LIST_KEY, MCP_TOOLS_KEY, type McpTool
 import { AGENTS_KEEP_KEY, OLLAMA_SETTINGS_KEY, type OllamaSettingsSetParams, type OllamaSettingsSetResult, type OllamaSettingsValues, CHAT_KEY, PROMPT_KEY, SUGGESTIONS_KEY, NOTIFICATIONS_KEY, type AgentsKeepResult, type AgentsKeepValues } from "./notifications.ts";
 import { ROUTING_KEY } from "./routing.ts";
 import type { AgentInfo, AgentsListResult as AgentsListed } from "./agents.ts";
-import { MODEL_LIST_ALL_KEY, MODEL_LIST_KEY, SETUP_STATUS_KEY, type ModelListResult } from "./models.ts";
+import { MODEL_LIST_ALL_KEY, MODEL_LIST_KEY, SETUP_STATUS_KEY, type HfFilesResult, type HfSearchResult, type ModelListResult } from "./models.ts";
 import { SKILL_LIST_KEY } from "./skills.ts";
 import { MEMORY_LIST_KEY, MEMORY_PAGE, type MemoryExportParams, type MemoryExportResult, type MemoryListRequest, type MemoryListResult, type MemoryPrivacy, type MemoryScope } from "./memory.ts";
 import { ROUTINE_GET_KEY, ROUTINE_LIST_KEY, type RoutineGetResult, type RoutineInfo, type RoutineListResult, type RoutineRunResult } from "./routines.ts";
@@ -163,6 +163,8 @@ export type PageClient = Pick<
   | "pullModel"
   | "cancelPull"
   | "deleteModel"
+  | "searchHf"
+  | "hfFiles"
   | "setupStatus"
   | "startOllama"
   | "installOllama"
@@ -324,6 +326,10 @@ export type PageActions = {
   /** Dismiss the failure of a download. */
   forgetPull(ref: string): void;
   remove(ref: string): Promise<void>;
+  /** Looks for GGUF repos on Hugging Face. Only the query leaves this Mac. */
+  searchHf(query: string): Promise<HfSearchResult>;
+  /** The sizes of one Hugging Face repo, each with a fit check for this Mac. */
+  hfFiles(repo: string): Promise<HfFilesResult>;
   /** Sets an existing rule's action. `cwd` goes with a rule of the folder's `.golem/policy.toml` only. */
   updateRule(target: "user" | "project", index: number, action: "allow" | "ask" | "deny", cwd: string | undefined): Promise<void>;
   /** Deletes a rule. `cwd` goes with a rule of the folder's `.golem/policy.toml` only. */
@@ -1074,6 +1080,12 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
       async cancelPull(ref) {
         pulls.forget(ref);
         await client.cancelPull(ref);
+      },
+      searchHf(query) {
+        return client.searchHf(query);
+      },
+      hfFiles(repo) {
+        return client.hfFiles(repo);
       },
       async remove(ref) {
         await client.deleteModel(ref);

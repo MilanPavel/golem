@@ -7,6 +7,18 @@ export function shortName(ref: string): string {
   return ref.slice(ref.indexOf("/") + 1);
 }
 
+/** `ollama/hf.co/user/repo:Q4_K_M` as a repo and a size, or null when the ref is not a Hugging Face one. */
+export function hfPull(ref: string): { repo: string; quant: string } | null {
+  const match = /^ollama\/hf\.co\/(.+):([^:/]+)$/.exec(ref);
+  return match === null ? null : { repo: match[1] ?? "", quant: match[2] ?? "" };
+}
+
+/** `from Hugging Face · Q4_K_M · 16.8 GB`, with the size once the download knows it. */
+export function hfPullSource(quant: string, entry: PullEntry | undefined): string {
+  const total = entry?.track.total ?? null;
+  return ["from Hugging Face", quant, total !== null && total > 0 ? `${gb(total)} GB` : null].filter((part) => part !== null).join(" · ");
+}
+
 function gb(bytes: number): string {
   return (bytes / 1e9).toFixed(1);
 }
