@@ -6,18 +6,6 @@ import { Button } from "../../ui/button.tsx";
 import { Input } from "../../ui/input.tsx";
 import { instructionTokens, PromptPreview } from "./chat-prompt.tsx";
 
-/** Lines many people use, each one rule in plain words. */
-export const COMMON_LINES: readonly string[] = [
-  "Be direct. No pleasantries, no praise, no offers at the end.",
-  "Keep answers short: the answer first, then stop.",
-  "Explain a term the first time you use it.",
-  "Say so when you're not sure, instead of guessing.",
-  "If a request is unclear, ask one short question first.",
-  "Prefer lists and tables to long paragraphs.",
-  "Link the sources you used.",
-  "Use metric units.",
-];
-
 /** How long typing rests before the preview asks again. */
 const PREVIEW_DELAY_MS = 400;
 
@@ -276,7 +264,6 @@ export function InstructionsView({ saved, onSave, onDraft, onPreview, prompt, pr
   const have = new Set(filled(texts));
   const hidden = new Set([...have, ...dismissed]);
   const offered = (drafts ?? []).filter((line) => !have.has(line.trim()));
-  const common = COMMON_LINES.filter((line) => !have.has(line));
   const count = filled(texts).length;
 
   return (
@@ -435,23 +422,6 @@ export function InstructionsView({ saved, onSave, onDraft, onPreview, prompt, pr
               }}
             />
           )}
-
-          <details className="border-t border-dashed border-line pt-3">
-            <summary className="cursor-pointer text-sm font-medium text-ink">
-              Common ones <span className="font-normal text-muted">a few lines many people use</span>
-            </summary>
-            <ul aria-label="Common ones" className="m-0 mt-2 flex list-none flex-col p-0">
-              {common.map((line) => (
-                <Suggestion
-                  key={line}
-                  text={line}
-                  onAdd={() => {
-                    add([line]);
-                  }}
-                />
-              ))}
-            </ul>
-          </details>
         </div>
         <PromptPreview prompt={prompt} error={promptError} onNavigate={onNavigate} />
       </div>

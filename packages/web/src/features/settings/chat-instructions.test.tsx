@@ -204,20 +204,6 @@ test("without a local model it says it needs one", async () => {
   expect(await screen.findByText("Needs a local model, because it reads your messages.")).toBeTruthy();
 });
 
-test("Common ones is folded, adds a line, and hides a line that is in the list", async () => {
-  const { fake, user } = mount(["Use metric units."]);
-  await box(1);
-  const details = screen.getByText("Common ones").closest("details");
-  expect(details?.open).toBe(false);
-  const list = within(screen.getByRole("list", { name: "Common ones", hidden: true }));
-  expect(list.queryByText("Use metric units.")).toBeNull();
-  expect(list.getAllByRole("listitem", { hidden: true })).toHaveLength(7);
-  await user.click(screen.getByText("Common ones"));
-  await user.click(screen.getByRole("button", { name: "Add “Link the sources you used.”" }));
-  await waitFor(() => expect(lastSet(fake)).toEqual({ instructions: ["Use metric units.", "Link the sources you used."] }));
-  expect(screen.queryByRole("button", { name: "Add “Link the sources you used.”" })).toBeNull();
-});
-
 test("the bar shows each part with its tokens and the total, and a click shows its text", async () => {
   const { user } = mount(["Be direct."]);
   const preview = await screen.findByRole("group", { name: "What the model reads" });

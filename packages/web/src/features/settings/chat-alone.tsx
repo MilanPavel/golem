@@ -13,12 +13,6 @@ export const MODE_ASKS: Readonly<Record<PermissionMode, string>> = {
   autopilot: "Also changes files and runs commands inside the folder without asking. Files outside the folder still ask.",
 };
 
-/** The plan a chat would show first, for an everyday task. */
-const PLAN_EXAMPLE = {
-  task: "Plan a two-day trip to Lisbon",
-  steps: ["Read my notes on places I want to see", "Check the weather for both days", "Draft a plan for each day", "Save it as a note"],
-} as const;
-
 /** The default mode as cards. Autopilot asks in place first. `onSave` writes it. */
 function ModeCards({ mode, onSave, saved }: { mode: PermissionMode; onSave: (mode: PermissionMode) => void; saved: string | null }) {
   const [confirming, setConfirming] = useState(false);
@@ -102,7 +96,7 @@ export type HowFarProps = {
   error?: string | null;
 };
 
-/** How far it goes alone: the default mode, and Start with a plan with an example of the plan. */
+/** How far it goes alone: the default mode, and Start with a plan. */
 export function HowFarView({ mode, planFirst, onMode, onPlan, saved = null, error = null }: HowFarProps) {
   const id = useId();
   return (
@@ -133,16 +127,6 @@ export function HowFarView({ mode, planFirst, onMode, onPlan, saved = null, erro
         >
           golem shows a short plan first. Nothing that changes anything happens until you say yes.
         </ChatRow>
-        <li className="flex flex-col gap-1.5 border-t border-dashed border-line py-3 text-xs text-muted">
-          <p>
-            <b className="font-medium text-ink">What you would see first</b>, for “{PLAN_EXAMPLE.task}”:
-          </p>
-          <ol className="m-0 list-decimal pl-5">
-            {PLAN_EXAMPLE.steps.map((step) => (
-              <li key={step}>{step}</li>
-            ))}
-          </ol>
-        </li>
       </ul>
       {error === null ? null : (
         <p role="alert" className="text-sm text-deny">
