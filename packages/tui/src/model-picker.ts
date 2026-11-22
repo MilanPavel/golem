@@ -4,9 +4,12 @@ import {
   categoriesLabel,
   categoryName,
   contextLabel,
+  menuListing,
   modelNames,
   namesModel,
   nextCategory,
+  noneStarred,
+  NO_STARRED,
   previousCategory,
   pickerGroups,
   pickerModels,
@@ -52,6 +55,8 @@ export type PickerState = {
   showAll: boolean;
   /** Only models of this category are listed, or all of them when null. */
   category: Category | null;
+  /** The session's model: the menu lists it even when it is not starred. */
+  current: string | null;
 };
 
 export const closedPicker: PickerState = {
@@ -62,6 +67,7 @@ export const closedPicker: PickerState = {
   confirm: null,
   showAll: false,
   category: null,
+  current: null,
 };
 
 export type PickerKey =
@@ -79,6 +85,7 @@ export type PickerKey =
   | "category"
   | "category-back"
   | "remove"
+  | "star"
   | { kind: "type"; text: string };
 
 export type PickerAction =
@@ -91,7 +98,8 @@ export type PickerAction =
   | { kind: "pull"; ref: string; use: boolean; setDefault: boolean }
   | { kind: "install"; ref: string; setDefault: boolean }
   | { kind: "cancel-pull"; ref: string }
-  | { kind: "delete"; ref: string };
+  | { kind: "delete"; ref: string }
+  | { kind: "star"; ref: string; starred: boolean };
 
 export type PickerRow =
   | { kind: "tabs"; tabs: { label: string; active: boolean }[] }
@@ -102,6 +110,7 @@ export type PickerRow =
       ref: string;
       selected: boolean;
       current: boolean;
+      starred: boolean;
       ready: boolean;
       label: string;
       detail: string;
@@ -117,7 +126,7 @@ export function openPicker(
   confirm: Confirm | null = null,
   showAll = false,
 ): PickerState {
-  return { open: true, selected: confirm?.ref ?? current, query: "", firstRun, confirm, showAll, category: null };
+  return { open: true, selected: confirm?.ref ?? current, query: "", firstRun, confirm, showAll, category: null, current };
 }
 
 /** What follows a finished install, once the model list is fresh: download, use, or say why not. */
@@ -175,7 +184,7 @@ export function pickerHint(state: PickerState, ramGb: number | null = null): str
   }
   const head = state.firstRun ? "Pick a model to start. " : "";
   const all = state.showAll ? "Ctrl-A current only" : "Ctrl-A show all";
-  return `${head}↑↓ move · Enter use or download · d also make default · x stop or remove · type to filter · Tab category · ${all} · Ctrl-R refresh · Esc close`;
+  return `${head}↑↓ move · Enter use or download · d also make default · s star · x stop or remove · type to filter · Tab category · ${all} · Ctrl-R refresh · Esc close`;
 }
 
 function confirmHint(confirm: Confirm, ramGb: number | null): string {
@@ -242,6 +251,9 @@ export function pickerKeyOf(state: PickerState, press: Press): PickerKey | null 
   if (press.input === "x" && state.query.length === 0) {
     return "remove";
   }
+  if (press.input === "s" && state.query.length === 0) {
+    return "star";
+  }
   return { kind: "type", text: press.input };
 }
 
@@ -285,6 +297,16 @@ export function confirmFor(kind: Confirm["kind"], model: ListedModel, setDefault
   };
 }
 
+/** The first-run picker offers every model: nobody has starred any yet. */
+function everything(state: PickerState): boolean {
+  return state.showAll || state.firstRun;
+}
+
+/** The listing as this picker shows it: the starred models, the default and the session's own. */
+function menuOf(state: PickerState, listing: ModelListResult | null): ModelListResult | null {
+  return menuListing(listing, state.current, everything(state));
+}
+
 export function pressPicker(
   state: PickerState,
   listing: ModelListResult | null,
@@ -315,8 +337,15 @@ export function pressPicker(
   if (typeof key === "object") {
     return { state: { ...state, query: (state.query + key.text).slice(0, QUERY_MAX) }, action: { kind: "none" } };
   }
-  const models = pickerModels(listing, state.query, state.category);
+  const models = pickerModels(menuOf(state, listing), state.query, state.category);
   const index = selectedIndex(state, models);
+  if (key === "star") {
+    const chosen = models[index];
+    if (chosen === undefined) {
+      return { state, action: { kind: "none" } };
+    }
+    return { state, action: { kind: "star", ref: chosen.ref, starred: chosen.starred !== true } };
+  }
   if (key === "enter" || key === "default" || key === "remove") {
     const chosen = models[index];
     if (chosen === undefined) {
@@ -364,11 +393,12 @@ export function layoutPicker(input: {
     return [{ kind: "note", text: "Loading models…" }];
   }
   const { query, category } = input.state;
-  const models = pickerModels(listing, query, category);
+  const menu = menuOf(input.state, listing) ?? listing;
+  const models = pickerModels(menu, query, category);
   const index = selectedIndex(input.state, models);
   const selectedRef = models[index]?.ref ?? null;
   const lines: PickerRow[] = [];
-  for (const group of pickerGroups(listing, query, category)) {
+  for (const group of pickerGroups(menu, query, category)) {
     lines.push({ kind: "header", text: group.title });
     for (const model of group.models) {
       const missing = providerMissing(listing, model.provider);
@@ -380,8 +410,10 @@ export function layoutPicker(input: {
     }
   }
   if (models.length === 0) {
-    const none = query.length > 0 || category !== null ? "No matching models." : "No models found.";
+    const none = query.length > 0 || category !== null ? "No matching models." : !everything(input.state) && noneStarred(listing) ? NO_STARRED : "No models found.";
     lines.push({ kind: "note", text: none });
+  } else if (!everything(input.state) && noneStarred(listing)) {
+    lines.push({ kind: "note", text: NO_STARRED });
   }
   for (const provider of listing.providers) {
     if (provider.status === "needs_key") {
@@ -415,13 +447,14 @@ function modelRow(model: ListedModel, selected: boolean, current: boolean, colum
   const profiles = model.profiles ?? [];
   const label = profiles.length > 0 ? profiles.join(", ") : model.label;
   const detail = profiles.length > 0 || model.label !== model.ref ? model.ref : "";
-  const room = Math.max(0, columns - facts.length - 6);
+  const room = Math.max(0, columns - facts.length - 8);
   const fittedLabel = fit(label, room);
   return {
     kind: "model",
     ref: model.ref,
     selected,
     current,
+    starred: model.starred === true,
     ready: model.status === "ready",
     label: fittedLabel,
     detail: fit(detail, Math.max(0, room - fittedLabel.length - 2)),

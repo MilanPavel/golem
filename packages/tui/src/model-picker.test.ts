@@ -26,6 +26,7 @@ function model(ref: string, extra: Partial<ListedModel> = {}): ListedModel {
     source: "remote",
     status: "ready",
     tier: ref.startsWith("ollama/") ? "local" : "frontier",
+    starred: true,
     ...extra,
   };
 }
@@ -394,4 +395,19 @@ test("Tab and Right go to the next tab, Shift-Tab and Left to the one before, an
   assert.equal(state.category, null);
   state = step(state, press("left"));
   assert.equal(state.category, "long-context");
+});
+
+test("the picker lists the starred models plus the default and the current one, and Show all lists the rest", () => {
+  const starred = new Set(["openrouter/qwen/qwen3-235b"]);
+  const listing: ModelListResult = {
+    ...LISTING,
+    models: LISTING.models.map((item) => ({ ...item, starred: starred.has(item.ref) })),
+  };
+  const refs = (state: PickerState): string[] =>
+    layoutPicker({ state, listing, current: "ollama/gemma4:e4b", columns: 100, rows: 40 }).flatMap((row) => (row.kind === "model" ? [row.ref] : []));
+  // The default is the profile `qwen`, and the session's model is gemma.
+  assert.deepEqual(refs(openPicker("ollama/gemma4:e4b")), ["ollama/qwen3:8b", "ollama/gemma4:e4b", "openrouter/qwen/qwen3-235b"]);
+  assert.equal(refs({ ...openPicker("ollama/gemma4:e4b"), showAll: true }).length, listing.models.length);
+  const selectedStar = pressPicker(openPicker("openrouter/qwen/qwen3-235b"), listing, "star").action;
+  assert.deepEqual(selectedStar, { kind: "star", ref: "openrouter/qwen/qwen3-235b", starred: false });
 });

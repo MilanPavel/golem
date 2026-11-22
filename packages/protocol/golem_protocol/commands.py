@@ -1166,7 +1166,9 @@ class ListedModel(BaseModel):
     or below ``[routing] budget_max_price``, and ``frontier`` otherwise.
     ``stale`` means a cached list was shown because the provider did not
     answer in time. ``speed`` is set for a local model golem has timed. ``score`` is set
-    for a model golem has used on this Mac.
+    for a model golem has used on this Mac. ``starred`` is true for a model in the model menu:
+    in ``[model_menu] starred``, or, while that key is unset, a curated hosted model or an
+    installed local one.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -1192,6 +1194,7 @@ class ListedModel(BaseModel):
     tier: Literal["local", "budget", "frontier"]
     speed: ModelSpeedInfo | None = None
     score: ModelScoreInfo | None = None
+    starred: bool = False
 
 
 class ListedProvider(BaseModel):
@@ -1592,6 +1595,27 @@ class ModelSetDefaultResult(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     default: str = Field(min_length=1)
+
+
+class ModelStarParams(BaseModel):
+    """``model.star``. Star a model for the model menu, or take its star away.
+
+    The first change writes the whole list to ``[model_menu] starred``. A ref no provider lists
+    can be starred: it shows as not ready.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    ref: str = Field(min_length=3)
+    starred: bool
+
+
+class ModelStarResult(BaseModel):
+    """``starred`` is the list as stored, in order."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    starred: list[str]
 
 
 class ModelScoreResetParams(BaseModel):
@@ -5473,6 +5497,8 @@ __all__ = [
     "ModelSetDefaultParams",
     "ModelSetDefaultResult",
     "ModelSpeedInfo",
+    "ModelStarParams",
+    "ModelStarResult",
     "NotificationsGetParams",
     "NotificationsSetParams",
     "NotificationsSetResult",

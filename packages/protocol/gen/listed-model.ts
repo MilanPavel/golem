@@ -25,6 +25,7 @@ export type PromptTps = number | null;
 export type ReplyTps = number | null;
 export type Samples = number;
 export type Stale = boolean;
+export type Starred = boolean;
 export type Status = 'ready' | 'needs_key' | 'not_installed' | 'server_down' | 'pulling';
 export type Tags = string[];
 export type ThinkValues = string[];
@@ -52,7 +53,9 @@ export type Tools = boolean | null;
  * or below ``[routing] budget_max_price``, and ``frontier`` otherwise.
  * ``stale`` means a cached list was shown because the provider did not
  * answer in time. ``speed`` is set for a local model golem has timed. ``score`` is set
- * for a model golem has used on this Mac.
+ * for a model golem has used on this Mac. ``starred`` is true for a model in the model menu:
+ * in ``[model_menu] starred``, or, while that key is unset, a curated hosted model or an
+ * installed local one.
  */
 export interface ListedModel {
   categories?: Categories;
@@ -71,6 +74,7 @@ export interface ListedModel {
   source: Source;
   speed?: ModelSpeedInfo | null;
   stale?: Stale;
+  starred?: Starred;
   status: Status;
   tags?: Tags;
   think_values?: ThinkValues;

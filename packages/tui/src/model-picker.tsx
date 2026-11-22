@@ -46,13 +46,16 @@ export function ModelPickerView({
             </Text>
           );
         }
-        const used = 4 + row.label.length + (row.detail.length > 0 ? row.detail.length + 2 : 0) + row.facts.length;
+        const used = 6 + row.label.length + (row.detail.length > 0 ? row.detail.length + 2 : 0) + row.facts.length;
         const pad = " ".repeat(Math.max(1, columns - used));
         return (
           <Text key={row.ref} wrap="truncate-end" inverse={row.selected}>
             <Text color={CLAY}>{row.selected ? "›" : " "}</Text>
             <Text color={row.current ? "green" : undefined} dimColor={!row.current}>
               {row.current ? " ● " : "   "}
+            </Text>
+            <Text color={row.starred ? CLAY : undefined} dimColor={!row.starred}>
+              {row.starred ? "★ " : "☆ "}
             </Text>
             <Text bold={row.current} dimColor={!row.ready}>
               {row.label}

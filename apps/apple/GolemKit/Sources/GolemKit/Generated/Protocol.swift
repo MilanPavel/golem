@@ -6754,7 +6754,10 @@ public struct KeychainWait: Codable {
 /// or below ``[routing] budget_max_price``, and ``frontier`` otherwise.
 /// ``stale`` means a cached list was shown because the provider did not
 /// answer in time. ``speed`` is set for a local model golem has timed. ``score`` is set
-/// for a model golem has used on this Mac.
+/// for a model golem has used on this Mac. ``starred`` is true for a model in the model
+/// menu:
+/// in ``[model_menu] starred``, or, while that key is unset, a curated hosted model or an
+/// installed local one.
 // MARK: - ListedModel
 public struct ListedModel: Codable {
     public let categories: [Category]?
@@ -6773,6 +6776,7 @@ public struct ListedModel: Codable {
     public let source: ListedModelSource
     public let speed: ListedModelModelSpeedInfo?
     public let stale: Bool?
+    public let starred: Bool?
     public let status: ListedModelStatus
     public let tags: [String]?
     public let thinkValues: [String]?
@@ -6796,6 +6800,7 @@ public struct ListedModel: Codable {
         case source = "source"
         case speed = "speed"
         case stale = "stale"
+        case starred = "starred"
         case status = "status"
         case tags = "tags"
         case thinkValues = "think_values"
@@ -6803,7 +6808,7 @@ public struct ListedModel: Codable {
         case tools = "tools"
     }
 
-    public init(categories: [Category]?, ctx: Int?, fit: Fit?, label: String, price: ListedModelModelPriceInfo?, profiles: [String]?, progress: Double?, provider: String, recommended: Bool?, recommendedFor: [Category]?, ref: String, score: ListedModelModelScoreInfo?, sizeGB: Double?, source: ListedModelSource, speed: ListedModelModelSpeedInfo?, stale: Bool?, status: ListedModelStatus, tags: [String]?, thinkValues: [String]?, tier: Tier, tools: Bool?) {
+    public init(categories: [Category]?, ctx: Int?, fit: Fit?, label: String, price: ListedModelModelPriceInfo?, profiles: [String]?, progress: Double?, provider: String, recommended: Bool?, recommendedFor: [Category]?, ref: String, score: ListedModelModelScoreInfo?, sizeGB: Double?, source: ListedModelSource, speed: ListedModelModelSpeedInfo?, stale: Bool?, starred: Bool?, status: ListedModelStatus, tags: [String]?, thinkValues: [String]?, tier: Tier, tools: Bool?) {
         self.categories = categories
         self.ctx = ctx
         self.fit = fit
@@ -6820,6 +6825,7 @@ public struct ListedModel: Codable {
         self.source = source
         self.speed = speed
         self.stale = stale
+        self.starred = starred
         self.status = status
         self.tags = tags
         self.thinkValues = thinkValues
@@ -12755,7 +12761,10 @@ public struct ModelListResult: Codable {
 /// or below ``[routing] budget_max_price``, and ``frontier`` otherwise.
 /// ``stale`` means a cached list was shown because the provider did not
 /// answer in time. ``speed`` is set for a local model golem has timed. ``score`` is set
-/// for a model golem has used on this Mac.
+/// for a model golem has used on this Mac. ``starred`` is true for a model in the model
+/// menu:
+/// in ``[model_menu] starred``, or, while that key is unset, a curated hosted model or an
+/// installed local one.
 // MARK: - ModelElement
 public struct ModelElement: Codable {
     public let categories: [Category]?
@@ -12774,6 +12783,7 @@ public struct ModelElement: Codable {
     public let source: ListedModelSource
     public let speed: ModelModelSpeedInfo?
     public let stale: Bool?
+    public let starred: Bool?
     public let status: ListedModelStatus
     public let tags: [String]?
     public let thinkValues: [String]?
@@ -12797,6 +12807,7 @@ public struct ModelElement: Codable {
         case source = "source"
         case speed = "speed"
         case stale = "stale"
+        case starred = "starred"
         case status = "status"
         case tags = "tags"
         case thinkValues = "think_values"
@@ -12804,7 +12815,7 @@ public struct ModelElement: Codable {
         case tools = "tools"
     }
 
-    public init(categories: [Category]?, ctx: Int?, fit: Fit?, label: String, price: ModelModelPriceInfo?, profiles: [String]?, progress: Double?, provider: String, recommended: Bool?, recommendedFor: [Category]?, ref: String, score: ModelModelScoreInfo?, sizeGB: Double?, source: ListedModelSource, speed: ModelModelSpeedInfo?, stale: Bool?, status: ListedModelStatus, tags: [String]?, thinkValues: [String]?, tier: Tier, tools: Bool?) {
+    public init(categories: [Category]?, ctx: Int?, fit: Fit?, label: String, price: ModelModelPriceInfo?, profiles: [String]?, progress: Double?, provider: String, recommended: Bool?, recommendedFor: [Category]?, ref: String, score: ModelModelScoreInfo?, sizeGB: Double?, source: ListedModelSource, speed: ModelModelSpeedInfo?, stale: Bool?, starred: Bool?, status: ListedModelStatus, tags: [String]?, thinkValues: [String]?, tier: Tier, tools: Bool?) {
         self.categories = categories
         self.ctx = ctx
         self.fit = fit
@@ -12821,6 +12832,7 @@ public struct ModelElement: Codable {
         self.source = source
         self.speed = speed
         self.stale = stale
+        self.starred = starred
         self.status = status
         self.tags = tags
         self.thinkValues = thinkValues
@@ -14218,6 +14230,41 @@ public struct ModelSpeedInfo: Codable {
         self.promptTps = promptTps
         self.replyTps = replyTps
         self.samples = samples
+    }
+}
+
+/// ``model.star``. Star a model for the model menu, or take its star away.
+///
+/// The first change writes the whole list to ``[model_menu] starred``. A ref no provider
+/// lists
+/// can be starred: it shows as not ready.
+// MARK: - ModelStarParams
+public struct ModelStarParams: Codable {
+    public let ref: String
+    public let starred: Bool
+
+    public enum CodingKeys: String, CodingKey {
+        case ref = "ref"
+        case starred = "starred"
+    }
+
+    public init(ref: String, starred: Bool) {
+        self.ref = ref
+        self.starred = starred
+    }
+}
+
+/// ``starred`` is the list as stored, in order.
+// MARK: - ModelStarResult
+public struct ModelStarResult: Codable {
+    public let starred: [String]
+
+    public enum CodingKeys: String, CodingKey {
+        case starred = "starred"
+    }
+
+    public init(starred: [String]) {
+        self.starred = starred
     }
 }
 

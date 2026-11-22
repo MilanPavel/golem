@@ -1151,3 +1151,38 @@ for (const theme of ["slip", "kiln"]) {
     expect((await axe.run(document.body, popup)).violations).toEqual([]);
   });
 }
+
+const ONLY_ROUTER: ModelListResult = {
+  ...SAMPLE_LISTING,
+  models: SAMPLE_LISTING.models.map((item) => ({ ...item, starred: item.ref === "openrouter/qwen/qwen3-235b" })),
+};
+
+test("the menu lists the starred models, the default and the session's own, and Show all lists the rest", async () => {
+  const { fake, user } = await openDialog(ONLY_ROUTER);
+  expect(options()).toHaveLength(3);
+  expect(optionOf("Qwen3 235B")).toBeDefined();
+  expect(optionOf("Gemma 4 E4B")).toBeDefined();
+  expect(optionOf("ollama/qwen3:8b")).toBeDefined();
+  expect(options().find((option) => option.textContent?.includes("Qwen3 14B"))).toBeUndefined();
+  fake.raw.listModels.mockImplementation(() => Promise.resolve(ONLY_ROUTER));
+  await user.click(within(dialog()).getByRole("checkbox", { name: "Show all models" }));
+  await waitFor(() => expect(options()).toHaveLength(ONLY_ROUTER.models.length));
+  expect(within(optionOf("Qwen3 14B")).getByTitle("Star")).toBeDefined();
+  expect(within(optionOf("Qwen3 235B")).getByTitle("Unstar")).toBeDefined();
+});
+
+test("the star of a row sends model.star, and the Star button does too", async () => {
+  const { fake, user } = await openDialog(ONLY_ROUTER);
+  await user.click(within(optionOf("Qwen3 235B")).getByTitle("Unstar"));
+  await waitFor(() => expect(fake.raw.starModel).toHaveBeenCalledWith("openrouter/qwen/qwen3-235b", false));
+  await pick(user, "Gemma 4 E4B");
+  await user.click(within(dialog()).getByRole("button", { name: /^Star$/ }));
+  await waitFor(() => expect(fake.raw.starModel).toHaveBeenLastCalledWith("ollama/gemma4:e4b", true));
+});
+
+test("with nothing starred the menu says how to star, and still lists the default", async () => {
+  const none = { ...SAMPLE_LISTING, models: SAMPLE_LISTING.models.map((item) => ({ ...item, starred: false })) };
+  await openDialog(none);
+  expect(within(dialog()).getByText("No starred models. Show all, or star some in Settings › Models.")).toBeDefined();
+  expect(optionOf("Gemma 4 E4B")).toBeDefined();
+});

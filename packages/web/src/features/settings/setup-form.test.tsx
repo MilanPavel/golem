@@ -17,7 +17,7 @@ const noContrast = { rules: { "color-contrast": { enabled: false } } };
 const TWO_READY: ModelListResult = {
   ...WORKING_LISTING,
   models: WORKING_LISTING.models.map((each, index) =>
-    index < 2 ? { ...each, status: "ready" as const, source: "installed" as const } : each,
+    index < 2 ? { ...each, status: "ready" as const, source: "installed" as const, starred: true } : each,
   ),
 };
 

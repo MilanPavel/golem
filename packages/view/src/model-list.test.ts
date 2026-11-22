@@ -15,6 +15,8 @@ import {
   pickerModels,
   pickerName,
   keyMissing,
+  menuListing,
+  noneStarred,
   priceLabel,
   providerMissing,
   recommendedLabel,
@@ -226,4 +228,16 @@ test("scoreLabel is one line on how a model did on this Mac", () => {
   assert.equal(scoreLabel(model("ollama/a", { score: { ...score, tool_score: null, runs: 0 } })), "");
   assert.equal(scoreLabel(model("ollama/a")), "");
   assert.equal(scoreLabel(model("ollama/a", { score: null })), "");
+});
+
+test("the menu keeps the starred models, the default and the current one, and show all keeps everything", () => {
+  const listing: ModelListResult = {
+    ...LISTING,
+    models: LISTING.models.map((item) => ({ ...item, starred: item.ref === "openrouter/meta/llama-4" })),
+  };
+  const refs = (shown: ModelListResult | null) => shown?.models.map((item) => item.ref);
+  assert.deepEqual(refs(menuListing(listing, "ollama/gemma4:e4b", false)), ["ollama/qwen3:8b", "ollama/gemma4:e4b", "openrouter/meta/llama-4"]);
+  assert.equal(menuListing(listing, null, true), listing);
+  assert.equal(noneStarred(listing), false);
+  assert.equal(noneStarred(LISTING), true);
 });

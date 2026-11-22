@@ -1,5 +1,8 @@
 import {
+  menuListing,
   namesModel,
+  noneStarred,
+  NO_STARRED,
   pickerGroups,
   pickerName,
   planTry,
@@ -34,6 +37,8 @@ export type ModelDialogActions = {
   /** Use the model for this session. */
   use(name: string): Promise<void>;
   setDefault(name: string): Promise<void>;
+  /** Stars the model for the menu, or takes its star away. */
+  star(ref: string, starred: boolean): Promise<void>;
   /** Download the model, then use it for this session. */
   pull(ref: string): Promise<void>;
   stop(ref: string): Promise<void>;
@@ -142,7 +147,10 @@ function Content({
   const confirmButton = useRef<HTMLButtonElement>(null);
 
   const shown = useMemo(() => withActivePulls(listing, pulls), [listing, pulls]);
-  const groups = useMemo(() => (shown === null ? [] : pickerGroups(shown, query, category)), [shown, query, category]);
+  // The menu lists the starred models, the default and this session's own; Show all lists everything.
+  const filtered = onShowAll !== undefined && showAll !== true;
+  const menu = useMemo(() => menuListing(shown, session?.profile ?? null, !filtered), [shown, session?.profile, filtered]);
+  const groups = useMemo(() => (menu === null ? [] : pickerGroups(menu, query, category)), [menu, query, category]);
   const rows = useMemo(() => listRows(groups), [groups]);
   const active = resolveActive(rows, activeId);
   const model = active?.model ?? null;
@@ -228,6 +236,8 @@ function Content({
     run("use", target.ref, () => actions.use(pickerName(target)), "Could not switch the model.", close);
   const makeDefault = (target: ListedModel) =>
     run("default", target.ref, () => actions.setDefault(pickerName(target)), "Could not make it the default.");
+  const star = (target: ListedModel) =>
+    run("star", target.ref, () => actions.star(target.ref, target.starred !== true), "Could not change the star.");
   const stop = (target: ListedModel) =>
     run("stop", target.ref, () => actions.stop(target.ref), "Could not stop the download.");
   const ask = (next: ModelConfirm) => {
@@ -278,8 +288,16 @@ function Content({
         </div>
       )
     ) : (
-      <p className="px-3 py-6 text-center text-sm text-muted">{query === "" && category === null ? "No models found." : "No matching models."}</p>
+      <p className="px-3 py-6 text-center text-sm text-muted">
+        {query !== "" || category !== null ? "No matching models." : filtered && noneStarred(shown) ? NO_STARRED : "No models found."}
+      </p>
     );
+  const starNote =
+    filtered && groups.length > 0 && noneStarred(shown) ? (
+      <p role="status" className="px-3 pt-3 text-sm text-muted">
+        {NO_STARRED}
+      </p>
+    ) : null;
 
   const modelsPanel = (
     <div hidden={inTune} className="flex min-h-0 flex-1 flex-col">
@@ -310,7 +328,17 @@ function Content({
         onActiveChange={setActiveId}
         onActivate={primary}
         empty={empty}
-        after={shown === null ? null : <ProviderNotes listing={shown} />}
+        after={
+          shown === null ? null : (
+            <>
+              {starNote}
+              <ProviderNotes listing={shown} />
+            </>
+          )
+        }
+        onStar={(target) => {
+          if (busy === null) void star(target);
+        }}
         onTune={tune === undefined ? undefined : openTune}
         tunable={tunable}
         footer={
@@ -346,6 +374,7 @@ function Content({
                 onDefault={() => void makeDefault(model)}
                 onDownload={() => ask({ kind: "pull", ref: model.ref, step: 1 })}
                 onStop={() => void stop(model)}
+                onStar={() => void star(model)}
                 onRemove={() => ask({ kind: "remove", ref: model.ref })}
                 onTune={tune !== undefined && tunable(model) ? () => openTune(model) : undefined}
                 tuneRef={tuneButton}
@@ -458,6 +487,7 @@ function ActionBar({
   onDefault,
   onDownload,
   onStop,
+  onStar,
   onRemove,
   onTune,
   tuneRef,
@@ -474,12 +504,19 @@ function ActionBar({
   onDefault: () => void;
   onDownload: () => void;
   onStop: () => void;
+  onStar: () => void;
   onRemove: () => void;
   /** Opens the Tune view. Only a local model that is installed has one. */
   onTune?: (() => void) | undefined;
   tuneRef: RefObject<HTMLButtonElement | null>;
 }) {
   const idle = busy === null;
+  const starButton = (
+    <Button kind="secondary" disabled={!idle} aria-busy={busy === "star"} onClick={onStar}>
+      <span aria-hidden="true">{model.starred === true ? "★" : "☆"}</span>
+      {model.starred === true ? "Unstar" : "Star"}
+    </Button>
+  );
   let buttons;
   if (model.status === "ready") {
     buttons = (
@@ -489,6 +526,7 @@ function ActionBar({
             Remove
           </Button>
         ) : null}
+        {starButton}
         {onTune === undefined ? null : (
           <Button ref={tuneRef} kind="secondary" disabled={!idle} onClick={onTune}>
             <SlidersIcon />
@@ -512,18 +550,24 @@ function ActionBar({
     );
   } else if (model.status === "not_installed" && !missing) {
     buttons = (
-      <Button kind="ink" disabled={!idle} onClick={onDownload}>
-        Download
-      </Button>
+      <>
+        {starButton}
+        <Button kind="ink" disabled={!idle} onClick={onDownload}>
+          Download
+        </Button>
+      </>
     );
   } else if (model.status === "pulling") {
     buttons = (
-      <Button kind="secondary" disabled={!idle} aria-busy={busy === "stop"} onClick={onStop}>
-        Stop download
-      </Button>
+      <>
+        {starButton}
+        <Button kind="secondary" disabled={!idle} aria-busy={busy === "stop"} onClick={onStop}>
+          Stop download
+        </Button>
+      </>
     );
   } else {
-    return null;
+    buttons = starButton;
   }
   return (
     <div role="group" aria-label={`Actions for ${shortName(model.ref)}`} className="flex flex-wrap items-center justify-end gap-2">
@@ -606,6 +650,7 @@ export function ModelDialog({
       pull: (ref) => page.pull(ref, sessionId === null ? undefined : { sessionId }),
       stop: (ref) => page.cancelPull(ref),
       remove: (ref) => page.remove(ref),
+      star: (ref, starred) => page.starModel(ref, starred),
       refresh: async () => {
         await page.refreshModels(showAll);
       },

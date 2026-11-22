@@ -73,6 +73,8 @@ export type ModelListProps = {
   onTune?: (model: ListedModel) => void;
   /** Which rows have a Tune shortcut. Every row does when it is left out. */
   tunable?: (model: ListedModel) => boolean;
+  /** The star of a row: ☆ or ★, by `model.starred`. A mouse shortcut, since the keyboard has the Star button below. Without it no row has one. */
+  onStar?: (model: ListedModel) => void;
   /** The Stop shortcut of a downloading row, a mouse shortcut like Tune. Without it no row has one. */
   onStop?: (model: ListedModel) => void;
   /** Below the list: the buttons for the selected row. */
@@ -108,6 +110,7 @@ export function ModelList({
   onTune,
   tunable,
   onStop,
+  onStar,
   footer,
   inputRef,
   className,
@@ -168,6 +171,20 @@ export function ModelList({
                   estimate={note?.estimate}
                 />
               </div>
+              {onStar === undefined ? null : (
+                <span
+                  aria-hidden="true"
+                  title={row.model.starred === true ? "Unstar" : "Star"}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onStar(row.model);
+                  }}
+                  onDoubleClick={(event) => event.stopPropagation()}
+                  className={cn("shrink-0 cursor-pointer px-1 text-base leading-none", row.model.starred === true ? "text-clay-ink" : "text-faint")}
+                >
+                  {row.model.starred === true ? "★" : "☆"}
+                </span>
+              )}
               {onTune === undefined ||
               (tunable !== undefined && !tunable(row.model)) ? null : (
                 // A button cannot sit inside an option, so this is for the mouse; the keyboard has the Tune button

@@ -104,6 +104,7 @@ public enum MethodAccess {
         "model.pull_cancel",
         "model.score_reset",
         "model.set_default",
+        "model.star",
         "notifications.get",
         "notifications.set",
         "notify.test",

@@ -1,5 +1,7 @@
 import type { ListedModel, ModelListResult } from "@golem/client";
 
+import { namesModel } from "./first-run.ts";
+
 // What the model picker shows, shared by the terminal and the browser.
 
 /** A download in progress, from `model.pull.progress`. */
@@ -92,6 +94,35 @@ export function withPulls(listing: ModelListResult | null, pulls: Readonly<Recor
     });
   }
   return { ...listing, models };
+}
+
+/** What the menu says when no model in it is starred. */
+export const NO_STARRED = "No starred models. Show all, or star some in Settings › Models.";
+
+/**
+ * The listing as the model menu shows it: the starred models, plus the default and the session's own
+ * model (`current`, a profile or a ref) even when they are not starred, and a download in progress.
+ * `showAll` leaves the listing as it is.
+ */
+export function menuListing(listing: ModelListResult | null, current: string | null, showAll: boolean): ModelListResult | null {
+  if (listing === null || showAll) {
+    return listing;
+  }
+  return {
+    ...listing,
+    models: listing.models.filter(
+      (model) =>
+        model.starred === true ||
+        model.status === "pulling" ||
+        namesModel(model, listing.default) ||
+        namesModel(model, current),
+    ),
+  };
+}
+
+/** True when the listing has models and none is starred. */
+export function noneStarred(listing: ModelListResult | null): boolean {
+  return listing !== null && listing.models.length > 0 && !listing.models.some((model) => model.starred === true);
 }
 
 /** The name to send for a model: its first profile, else its ref. */
