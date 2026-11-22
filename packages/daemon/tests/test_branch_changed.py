@@ -60,10 +60,11 @@ async def _summary_branch(client: RpcClient, session_id: str) -> object:
 
 
 async def test_the_summary_has_the_branch_in_a_repo_and_null_outside_one(
-    short_home: Path,
+    short_home: Path, tmp_path: Path
 ) -> None:
     project = _repo(short_home / "project")
-    plain = short_home / "plain"
+    # short_home is inside this checkout, so a folder there is in golem's own repo.
+    plain = tmp_path / "plain"
     plain.mkdir()
     model = ToolCallingChatModel(replies=["ok"])
     app, task = await start_daemon(short_home, router=ModelRouter(model=model))
@@ -135,7 +136,7 @@ def test_the_note_lists_fifty_paths_and_counts_the_rest() -> None:
     assert branch_note("/p", "main", "fix-x", ["a.py"]).endswith("Files that differ:\na.py")
 
 
-async def test_a_burst_of_reads_asks_git_once_a_window(short_home: Path) -> None:
+async def test_a_burst_of_reads_asks_git_once_a_window(short_home: Path, tmp_path: Path) -> None:
     project = _repo(short_home / "project")
     now = [0.0]
     cache = BranchCache(clock=lambda: now[0])
@@ -144,5 +145,5 @@ async def test_a_burst_of_reads_asks_git_once_a_window(short_home: Path) -> None
     assert await cache.get(str(project)) == "main"
     now[0] = 2.5
     assert await cache.get(str(project)) == "other"
-    assert await read_branch(str(short_home)) is None
+    assert await read_branch(str(tmp_path)) is None
     assert await cache.get(None) is None
