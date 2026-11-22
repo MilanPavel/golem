@@ -24,6 +24,8 @@ export type FolderChipProps = {
   browser?: (props: FolderBrowserProps) => ReactNode;
   /** The macOS folder dialog: resolves with the folder, or null when it was cancelled. Without it the dialog is not offered. */
   onChoose?: (start: string | null) => Promise<string | null>;
+  /** Opens a folder in Finder: resolves when it is open. Without it the item is not offered. */
+  onReveal?: (folder: string) => Promise<void>;
   /** Opens at once, as it does when a session sent the person here to pick another folder. */
   defaultOpen?: boolean;
 };
@@ -49,7 +51,7 @@ function errorText(error: unknown): string {
 }
 
 /** The folder the next session will run in, as a chip in the composer's row, with a menu to change it. */
-export function FolderChip({ folder, folders, onChange, info = null, branches = {}, home = null, browser, onChoose, defaultOpen = false }: FolderChipProps) {
+export function FolderChip({ folder, folders, onChange, info = null, branches = {}, home = null, browser, onChoose, onReveal, defaultOpen = false }: FolderChipProps) {
   const [open, setOpen] = useState(defaultOpen);
   const [view, setView] = useState<"menu" | "browse">("menu");
   const [waiting, setWaiting] = useState(false);
@@ -91,6 +93,15 @@ export function FolderChip({ folder, folders, onChange, info = null, branches = 
     );
   }
 
+  function reveal(): void {
+    if (onReveal === undefined || folder === null) return;
+    setError(null);
+    onReveal(folder).then(
+      () => change(false),
+      (failure: unknown) => setError(errorText(failure)),
+    );
+  }
+
   const here = folder === null ? null : (info?.branch ?? branches[folder] ?? null);
   const recent: FolderRow[] = folders.map((path) => ({ path, branch: path === folder ? here : (branches[path] ?? null) }));
 
@@ -122,6 +133,7 @@ export function FolderChip({ folder, folders, onChange, info = null, branches = 
             home={home}
             onPick={pick}
             onChoose={onChoose === undefined ? undefined : choose}
+            onReveal={onReveal === undefined ? undefined : reveal}
             onBrowse={browser === undefined ? undefined : () => setView("browse")}
             waiting={waiting}
             onCancelWait={() => {

@@ -4894,6 +4894,26 @@ class FsChooseFolderResult(BaseModel):
     path: str | None = None
 
 
+class FsRevealParams(BaseModel):
+    """``fs.reveal``. Opens a folder in Finder on the daemon's Mac.
+
+    ``path`` is an absolute, existing folder under the user's home folder, checked as
+    ``git.info`` checks it. It is refused with ``not_local`` when the caller is not a page on
+    this Mac and with ``unsupported`` when the platform is not macOS (see
+    ``HelloResult.local_ui``).
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    path: str = Field(min_length=1)
+
+
+class FsRevealResult(BaseModel):
+    """Empty. The call returns once ``open`` has exited."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+
 __all__ = [
     "AgentInfo",
     "AgentLimits",
@@ -4987,6 +5007,8 @@ __all__ = [
     "FsChooseFolderResult",
     "FsListDirsParams",
     "FsListDirsResult",
+    "FsRevealParams",
+    "FsRevealResult",
     "GitBranch",
     "GitBranchesParams",
     "GitBranchesResult",

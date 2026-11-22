@@ -220,10 +220,57 @@ test("with the flag, Browse in golem opens the in-app browser", async () => {
   expect(await screen.findByRole("dialog", { name: "Choose a folder" })).toBeTruthy();
 });
 
+test("Open in Finder shows with the flag, calls the action with the folder and closes the menu", async () => {
+  const { user, fake } = setup({ localUi: true });
+  await wait();
+  const dialog = await openMenu(user);
+  await user.click(within(dialog).getByRole("option", { name: "Open golem in Finder" }));
+  expect(fake.raw.reveal).toHaveBeenCalledWith(GOLEM);
+  await waitFor(() => expect(screen.queryByRole("dialog", { name: "Folder" })).toBeNull());
+});
+
+test("Open in Finder is absent without the flag", async () => {
+  const { user } = setup({ localUi: false });
+  await wait();
+  const dialog = await openMenu(user);
+  expect(within(dialog).queryByRole("option", { name: /in Finder/ })).toBeNull();
+});
+
+test("a folder that did not open in Finder shows the line and keeps the menu open", async () => {
+  const { user, fake } = setup({ localUi: true });
+  await wait();
+  fake.raw.reveal.mockRejectedValue(rpcError(-32602, "There is no folder at /home/me/repos/golem."));
+  const dialog = await openMenu(user);
+  await user.click(within(dialog).getByRole("option", { name: "Open golem in Finder" }));
+  expect((await within(dialog).findByRole("alert")).textContent).toBe("There is no folder at /home/me/repos/golem.");
+  expect(screen.getByRole("dialog", { name: "Folder" })).toBeTruthy();
+});
+
+test("a page that is not on the Mac gets the short line", async () => {
+  const { user, fake } = setup({ localUi: true });
+  await wait();
+  fake.raw.reveal.mockRejectedValue(rpcError(-32022, "not local", { reason: "not_local" }));
+  const dialog = await openMenu(user);
+  await user.click(within(dialog).getByRole("option", { name: "Open golem in Finder" }));
+  expect((await within(dialog).findByRole("alert")).textContent).toBe("Finder is not available here. It opens only on the Mac that runs golem.");
+});
+
 // The menu of an open session
 
-async function openSession() {
-  const view = setup();
+test("an open session's menu offers Open in Finder with the flag, and shows an error", async () => {
+  const { user, fake } = await openSession(true);
+  await user.click(await screen.findByRole("button", { name: "Folder: golem" }));
+  const dialog = await screen.findByRole("dialog", { name: "This session's folder" });
+  fake.raw.reveal.mockRejectedValueOnce(rpcError(-32023, "unsupported", { reason: "unsupported" }));
+  await user.click(within(dialog).getByRole("button", { name: "Open in Finder" }));
+  expect(fake.raw.reveal).toHaveBeenCalledWith(GOLEM);
+  expect((await within(dialog).findByRole("alert")).textContent).toContain("Finder is not available here.");
+  await user.click(within(dialog).getByRole("button", { name: "Open in Finder" }));
+  await waitFor(() => expect(screen.queryByRole("dialog", { name: "This session's folder" })).toBeNull());
+});
+
+async function openSession(localUi = false) {
+  const view = setup({ localUi });
   await wait();
   act(() => {
     view.fake.emitEvent(ev("x", "session.created", { cwd: GOLEM, model_profile: "local", model_name: "m", title: "Work" }));
@@ -275,12 +322,13 @@ test("both menus have no accessibility violations", async () => {
           home={HOME}
           onPick={() => {}}
           onChoose={() => {}}
+          onReveal={() => {}}
           onBrowse={() => {}}
           autoFocus={false}
         />
       </div>
       <div aria-label="session" role="group">
-        <SessionFolderMenuBody folder={GOLEM} branch="main" onCopy={() => {}} onNewHere={() => {}} onNewElsewhere={() => {}} />
+        <SessionFolderMenuBody folder={GOLEM} branch="main" onCopy={() => {}} onReveal={() => {}} error="Finder is not available here." onNewHere={() => {}} onNewElsewhere={() => {}} />
       </div>
     </>,
   );

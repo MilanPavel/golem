@@ -2,7 +2,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { BranchSwitchLine, HomeBranchChip, NewSessionComposer, useStartSession } from "../composer/index.ts";
 import { PixelGolem } from "../../ui/pixel-golem.tsx";
 import { FinishSetupStrip } from "../welcome/index.ts";
-import { folderDialogErrorText } from "../../store/errors.ts";
+import { folderDialogErrorText, revealErrorText } from "../../store/errors.ts";
 import { useFolderBranches, useFolderDialog, useFolderMenuRequest, useGitInfo, useHomeFolder, useKnownFolders, useNewSessionBranch, useNewSessionFolder, useNewSessionModel, usePageActions } from "../../store/page-context.tsx";
 import { FolderBrowser } from "./folder-browser.tsx";
 import { FolderChip } from "./folder-chip.tsx";
@@ -86,6 +86,17 @@ export function HomeScreen() {
                           return (await actions.chooseFolder(start)).path ?? null;
                         } catch (error) {
                           throw new Error(folderDialogErrorText(error));
+                        }
+                      }
+                    : undefined
+                }
+                onReveal={
+                  dialog
+                    ? async (path) => {
+                        try {
+                          await actions.reveal(path);
+                        } catch (error) {
+                          throw new Error(revealErrorText(error));
                         }
                       }
                     : undefined

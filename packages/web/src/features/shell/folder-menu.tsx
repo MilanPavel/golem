@@ -27,6 +27,8 @@ export type FolderMenuBodyProps = {
   onPick: (path: string | null) => void;
   /** `Choose folder…`, the macOS dialog. Without it the dialog is not offered and `Browse…` takes its place. */
   onChoose?: () => void;
+  /** `Open <name> in Finder`, for `folder`. Without it, or without a folder, the item is not offered. */
+  onReveal?: () => void;
   /** The in-app browser. Without it the browser is not offered. */
   onBrowse?: () => void;
   /** The macOS dialog is open: the menu waits for it. */
@@ -77,7 +79,7 @@ function RowText({ title, sub }: { title: string; sub?: string }) {
  * The folder menu of the empty screen: a field that filters or takes a typed path, the current
  * folder, recent folders, this repo's worktrees, and the ways to choose one that is not listed.
  */
-export function FolderMenuBody({ folder, branch, recent, worktrees, home, onPick, onChoose, onBrowse, waiting = false, onCancelWait, error = null, autoFocus = true }: FolderMenuBodyProps) {
+export function FolderMenuBody({ folder, branch, recent, worktrees, home, onPick, onChoose, onReveal, onBrowse, waiting = false, onCancelWait, error = null, autoFocus = true }: FolderMenuBodyProps) {
   const base = useId();
   const [query, setQuery] = useState("");
   const [activeKey, setActiveKey] = useState<string | null>(null);
@@ -192,6 +194,19 @@ export function FolderMenuBody({ folder, branch, recent, worktrees, home, onPick
         <>
           <FolderIcon className="size-4 shrink-0 text-muted" />
           <RowText title={onChoose === undefined ? "Browse…" : "Browse in golem"} />
+        </>
+      ),
+    });
+  }
+
+  if (onReveal !== undefined && folder !== null) {
+    footer.push({
+      id: "reveal",
+      run: onReveal,
+      node: (
+        <>
+          <FolderIcon className="size-4 shrink-0 text-muted" />
+          <RowText title={`Open ${folderName(folder)} in Finder`} />
         </>
       ),
     });

@@ -137,6 +137,7 @@ export type PageClient = Pick<
   | "gitInfo"
   | "gitBranches"
   | "chooseFolder"
+  | "reveal"
   | "localUi"
   | "updateRule"
   | "removeRule"
@@ -166,6 +167,8 @@ export type PageClient = Pick<
 export type PageActions = {
   /** Opens the macOS folder dialog on the daemon's Mac, in `start` when given. A null path means the person cancelled. */
   chooseFolder(start: string | null): Promise<FsChooseFolderResult>;
+  /** Opens a folder in Finder on the daemon's Mac. Only offered when the page is on that Mac. */
+  reveal(path: string): Promise<void>;
   /** Starts a session in `cwd` on `model` (null: the default). */
   createSession(cwd: string | null, model: string | null, branch?: { name: string; create: boolean } | null): Promise<string>;
   /** Edits a memory's text, or sets whether it is in every chat or may go to a paid model. The list is read again. */
@@ -563,6 +566,9 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
     router,
     actions: {
       chooseFolder: (start) => client.chooseFolder(start),
+      reveal: async (path) => {
+        await client.reveal(path);
+      },
       async createSession(cwd, model, branch) {
         const options: { cwd?: string; modelProfile?: string; branch?: string; createBranch?: boolean } = {};
         if (cwd !== null) options.cwd = cwd;

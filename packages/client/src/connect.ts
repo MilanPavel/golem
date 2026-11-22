@@ -22,6 +22,7 @@ import type { OllamaStartResult } from "../../protocol/gen/ollama-start-result.t
 import type { FsListDirsResult } from "../../protocol/gen/fs-list-dirs-result.ts";
 import type { FsChooseFolderResult } from "../../protocol/gen/fs-choose-folder-result.ts";
 import type { GitBranchesResult } from "../../protocol/gen/git-branches-result.ts";
+import type { FsRevealResult } from "../../protocol/gen/fs-reveal-result.ts";
 import type { GitInfoResult } from "../../protocol/gen/git-info-result.ts";
 import type { SetupStatusResult } from "../../protocol/gen/setup-status-result.ts";
 import type { ApprovalRespondResult } from "../../protocol/gen/approval-respond-result.ts";
@@ -184,6 +185,7 @@ import {
   isFsListDirsResult,
   isFsChooseFolderResult,
   isGitBranchesResult,
+  isFsRevealResult,
   isGitInfoResult,
   isSetupStatusResult,
   isDaemonStatus,
@@ -616,6 +618,11 @@ export interface GolemClient {
    * offered here (see {@link GolemClient.localUi}).
    */
   chooseFolder(start?: string | null): Promise<FsChooseFolderResult>;
+  /**
+   * Opens `path` in Finder on the daemon's Mac. Refused when this page is not on that Mac
+   * (see {@link GolemClient.localUi}).
+   */
+  reveal(path: string): Promise<FsRevealResult>;
   /** Every part of golem's setup, as `golem doctor` checks it. */
   setupStatus(): Promise<SetupStatusResult>;
   /** Install Ollama with Homebrew, run by the daemon. Output reaches {@link GolemClient.onOllamaInstall}. */
@@ -2308,6 +2315,14 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       const result = await call("fs.choose_folder", start === undefined || start === null ? {} : { start });
       if (!isFsChooseFolderResult(result)) {
         throw new Error("invalid fs.choose_folder result");
+      }
+      return result;
+    },
+    async reveal(path: string): Promise<FsRevealResult> {
+      await ready;
+      const result = await call("fs.reveal", { path });
+      if (!isFsRevealResult(result)) {
+        throw new Error("invalid fs.reveal result");
       }
       return result;
     },

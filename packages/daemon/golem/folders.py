@@ -46,6 +46,24 @@ def _browsable(path: Path, home: Path, hidden: list[Path]) -> bool:
     return not any(part.startswith(".") for part in path.relative_to(home).parts)
 
 
+def checked_folder(path: str, home: Path) -> str:
+    """``path`` resolved, if it is an existing folder the page may ask about."""
+    if not Path(path).is_absolute():
+        raise FolderError("path must be an absolute path")
+    root = home.resolve()
+    try:
+        target = Path(path).resolve()
+    except (OSError, RuntimeError) as exc:
+        raise FolderError(OUTSIDE) from exc
+    if not is_under(target, root) or any(
+        is_under(target, hidden) for hidden in hidden_folders(root)
+    ):
+        raise FolderError(OUTSIDE)
+    if not target.is_dir():
+        raise FolderError(f"There is no folder at {path}.")
+    return str(target)
+
+
 def list_dirs(path: Path | None, home: Path) -> FsListDirsResult:
     """The folders directly under ``path`` (home when None), as ``fs.list_dirs`` returns them.
 
@@ -109,6 +127,10 @@ _dialog_open = False
 
 class DialogUnsupportedError(FolderError):
     """The platform has no folder dialog."""
+
+
+class RevealFailedError(FolderError):
+    """``open`` could not show the folder in Finder."""
 
 
 class DialogBusyError(FolderError):
@@ -175,3 +197,44 @@ async def choose_folder(start: Path | None, home: Path) -> str | None:
     if not chosen:
         return None
     return chosen if chosen == "/" else chosen.rstrip("/")
+
+
+OPEN_SECONDS = 10.0
+"""How long ``open`` may take to hand the folder to Finder."""
+
+
+async def _run_open(path: str) -> int:
+    """Run ``open`` on ``path`` and return its exit code. The path is one argument."""
+    process = await asyncio.create_subprocess_exec(
+        "open",
+        "--",
+        path,
+        stdin=asyncio.subprocess.DEVNULL,
+        stdout=asyncio.subprocess.DEVNULL,
+        stderr=asyncio.subprocess.DEVNULL,
+    )
+    try:
+        async with asyncio.timeout(OPEN_SECONDS):
+            return await process.wait()
+    except BaseException:
+        process.kill()
+        await process.wait()
+        raise
+
+
+async def reveal_folder(path: str, home: Path) -> None:
+    """Open ``path`` in Finder on this Mac.
+
+    The path is checked as ``git.info`` checks it. Raises :class:`DialogUnsupportedError` off
+    macOS, :class:`FolderError` for a path that is refused, and :class:`RevealFailedError` when
+    ``open`` fails.
+    """
+    if not dialog_supported():
+        raise DialogUnsupportedError("Open in Finder is only available on macOS.")
+    folder = checked_folder(path, home)
+    try:
+        code = await _run_open(folder)
+    except (OSError, TimeoutError) as exc:
+        raise RevealFailedError("golem could not open the folder in Finder.") from exc
+    if code != 0:
+        raise RevealFailedError("golem could not open the folder in Finder.")

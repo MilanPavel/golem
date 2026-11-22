@@ -43,9 +43,9 @@ LOCAL_ONLY = -32018
 DEVICE_REFUSED = -32021
 """An unknown or revoked device: ``connection.identify``, or any call on its connection."""
 NOT_LOCAL = -32022
-"""``fs.choose_folder`` from a page that is not on the daemon's Mac."""
+"""``fs.choose_folder`` or ``fs.reveal`` from a page that is not on the daemon's Mac."""
 UNSUPPORTED = -32023
-"""``fs.choose_folder`` on a platform with no folder dialog."""
+"""``fs.choose_folder`` or ``fs.reveal`` on a platform that is not macOS."""
 BUSY = -32024
 """``fs.choose_folder`` while another folder dialog is open."""
 NOT_A_REPO = -32025

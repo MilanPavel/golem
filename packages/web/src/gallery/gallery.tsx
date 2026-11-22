@@ -2346,6 +2346,7 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
               home="/Users/you"
               onPick={() => {}}
               onChoose={() => {}}
+              onReveal={() => {}}
               onBrowse={() => {}}
               autoFocus={false}
             />
@@ -2368,7 +2369,7 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
             <FolderMenuBody folder="/Users/you/notes" branch={null} recent={[{ path: "/Users/you/repos/golem", branch: "main" }]} worktrees={null} home="/Users/you" onPick={() => {}} onBrowse={() => {}} autoFocus={false} />
           </div>
           <div aria-label="Folder menu, open session" role="group" className="w-80 max-w-full rounded-lg border border-line bg-surface shadow-soft">
-            <SessionFolderMenuBody folder="/Users/you/repos/golem" branch="main" onCopy={() => {}} onNewHere={() => {}} onNewElsewhere={() => {}} />
+            <SessionFolderMenuBody folder="/Users/you/repos/golem" branch="main" onCopy={() => {}} onReveal={() => {}} onNewHere={() => {}} onNewElsewhere={() => {}} />
           </div>
         </div>
       </section>
