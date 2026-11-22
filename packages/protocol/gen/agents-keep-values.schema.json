@@ -1,6 +1,6 @@
 {
   "additionalProperties": false,
-  "description": "``[agents] keep_days`` and ``keep_problem_days`` as golem uses them. 0 is for ever.",
+  "description": "``[agents] keep_days`` and ``keep_problem_days`` as golem uses them. 0 is for ever.\n\n``max_calls``, ``working_seconds``, ``max_cost`` and ``max_tokens`` are the limits of\n``[agents]`` that every helper gets when its own table and file leave them open; ``None`` when\n``config.toml`` does not set one. ``agents.set_default_limits`` changes them.",
   "properties": {
     "keep_days": {
       "minimum": 0,
@@ -11,6 +11,54 @@
       "minimum": 0,
       "title": "Keep Problem Days",
       "type": "integer"
+    },
+    "max_calls": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Max Calls"
+    },
+    "max_cost": {
+      "anyOf": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Max Cost"
+    },
+    "max_tokens": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Max Tokens"
+    },
+    "working_seconds": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Working Seconds"
     }
   },
   "required": [

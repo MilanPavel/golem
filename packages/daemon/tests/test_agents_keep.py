@@ -13,6 +13,11 @@ def _result(response: dict[str, Any]) -> dict[str, Any]:
     return rpc_result(response)
 
 
+def _kept(result: dict[str, Any]) -> dict[str, Any]:
+    """The keep values, without the limits of ``[agents]`` that travel beside them."""
+    return {k: v for k, v in result["values"].items() if k.startswith("keep_")}
+
+
 async def test_agents_keep_reads_the_defaults_and_writes_the_file(short_home: Path) -> None:
     config = short_home / "config.toml"
     config.write_text("# mine\n[agents.explorer]\nmodel = 'local'\n", "utf-8")
@@ -21,21 +26,21 @@ async def test_agents_keep_reads_the_defaults_and_writes_the_file(short_home: Pa
     try:
         await client.call("hello", HELLO)
         got = _result(await client.call("agents.keep", {}))
-        assert got["values"] == {"keep_days": 7, "keep_problem_days": 30}
+        assert _kept(got) == {"keep_days": 7, "keep_problem_days": 30}
         assert config.read_text("utf-8").startswith("# mine")
 
         saved = _result(await client.call("agents.keep", {"keep_days": 14}))
         assert saved["ok"] is True
-        assert saved["values"] == {"keep_days": 14, "keep_problem_days": 30}
+        assert _kept(saved) == {"keep_days": 14, "keep_problem_days": 30}
         forever = _result(await client.call("agents.keep", {"keep_problem_days": 0}))
-        assert forever["values"] == {"keep_days": 14, "keep_problem_days": 0}
+        assert _kept(forever) == {"keep_days": 14, "keep_problem_days": 0}
         text = config.read_text("utf-8")
         assert "# mine" in text
         table = tomllib.loads(text)["agents"]
         assert (table["keep_days"], table["keep_problem_days"]) == (14, 0)
         assert table["explorer"] == {"model": "local"}
         again = _result(await client.call("agents.keep", {}))
-        assert again["values"] == {"keep_days": 14, "keep_problem_days": 0}
+        assert _kept(again) == {"keep_days": 14, "keep_problem_days": 0}
     finally:
         await client.close()
         await stop_daemon(app, task)

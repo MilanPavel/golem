@@ -1,0 +1,90 @@
+{
+  "additionalProperties": false,
+  "description": "``agents.set_limits``. Set or clear limits of the helpers of the agent type ``name``.\n\nA limit that is sent is set, and a key named in ``clear`` is removed so that the next place\nin the order applies again. A key that is in neither is left alone. A key in both is\nrefused. For a built-in type the keys go in ``[agents.<name>]`` of ``config.toml``; for one\nof your own files they are the front matter lines ``max-calls``, ``max-seconds``,\n``max-cost-usd`` and ``max-tokens``, and the same keys are then removed from\n``[agents.<name>]`` of ``config.toml`` when your file has a built-in type's name, since that\ntable would win over the file. A project agent is read-only here. ``max_calls`` and\n``working_seconds`` are 1 or more, ``max_tokens`` is 1 or more, ``max_cost`` (US dollars) is\n0 or more, and the explorer's ``max_calls`` is at most 50. Nothing is written when one is\nwrong.",
+  "properties": {
+    "clear": {
+      "items": {
+        "enum": [
+          "max_calls",
+          "working_seconds",
+          "max_cost",
+          "max_tokens"
+        ],
+        "type": "string"
+      },
+      "title": "Clear",
+      "type": "array"
+    },
+    "cwd": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Cwd"
+    },
+    "max_calls": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Max Calls"
+    },
+    "max_cost": {
+      "anyOf": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Max Cost"
+    },
+    "max_tokens": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Max Tokens"
+    },
+    "name": {
+      "minLength": 1,
+      "title": "Name",
+      "type": "string"
+    },
+    "working_seconds": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Working Seconds"
+    }
+  },
+  "required": [
+    "name"
+  ],
+  "title": "AgentsSetLimitsParams",
+  "type": "object"
+}

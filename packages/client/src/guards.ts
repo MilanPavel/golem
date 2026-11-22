@@ -45,6 +45,7 @@ import type { AgentsCopyResult } from "../../protocol/gen/agents-copy-result.ts"
 import type { AgentsDeleteResult } from "../../protocol/gen/agents-delete-result.ts";
 import type { AgentsKeepResult } from "../../protocol/gen/agents-keep-result.ts";
 import type { AgentsSaveResult } from "../../protocol/gen/agents-save-result.ts";
+import type { AgentsSetLimitsResult } from "../../protocol/gen/agents-set-limits-result.ts";
 import type { AgentsSetWishResult } from "../../protocol/gen/agents-set-wish-result.ts";
 import type { MemoryDeleteResult } from "../../protocol/gen/memory-delete-result.ts";
 import type { MemoryExportResult } from "../../protocol/gen/memory-export-result.ts";
@@ -347,6 +348,12 @@ export function isAgentsListResult(value: unknown): value is AgentsListResult {
         typeof agent["wish"] === "string",
     )
   );
+}
+
+export function isAgentsSetLimitsResult(value: unknown): value is AgentsSetLimitsResult {
+  if (!isAgentsSetWishResult(value)) return false;
+  const named = (value as { limits_from_config?: unknown }).limits_from_config;
+  return named === undefined || (Array.isArray(named) && named.every((item) => typeof item === "string"));
 }
 
 export function isAgentsSetWishResult(value: unknown): value is AgentsSetWishResult {

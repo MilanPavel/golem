@@ -8,6 +8,10 @@ export type Errors = ConfigError[];
 export type Ok = boolean;
 export type KeepDays = number;
 export type KeepProblemDays = number;
+export type MaxCalls = number | null;
+export type MaxCost = number | null;
+export type MaxTokens = number | null;
+export type WorkingSeconds = number | null;
 
 /**
  * ``ok`` is false when a value was wrong, and the file is then untouched. ``values`` is
@@ -35,10 +39,18 @@ export interface ConfigError {
 /**
  * ``[agents] keep_days`` and ``keep_problem_days`` as golem uses them. 0 is for ever.
  *
+ * ``max_calls``, ``working_seconds``, ``max_cost`` and ``max_tokens`` are the limits of
+ * ``[agents]`` that every helper gets when its own table and file leave them open; ``None`` when
+ * ``config.toml`` does not set one. ``agents.set_default_limits`` changes them.
+ *
  * This interface was referenced by `AgentsKeepResult`'s JSON-Schema
  * via the `definition` "AgentsKeepValues".
  */
 export interface AgentsKeepValues {
   keep_days: KeepDays;
   keep_problem_days: KeepProblemDays;
+  max_calls?: MaxCalls;
+  max_cost?: MaxCost;
+  max_tokens?: MaxTokens;
+  working_seconds?: WorkingSeconds;
 }

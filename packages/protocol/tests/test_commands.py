@@ -9,8 +9,12 @@ from golem_protocol.commands import (
     AgentRegistryChanged,
     AgentsGetParams,
     AgentsGetResult,
+    AgentsKeepValues,
     AgentsListParams,
     AgentsListResult,
+    AgentsSetDefaultLimitsParams,
+    AgentsSetLimitsParams,
+    AgentsSetLimitsResult,
     AgentsSetWishParams,
     AgentsSetWishResult,
     ApprovalRespondParams,
@@ -367,6 +371,25 @@ def test_agents_set_wish_round_trip_and_limits() -> None:
     ):
         with pytest.raises(ValidationError):
             AgentsSetWishParams.model_validate(bad)
+
+
+def test_agents_set_limits_round_trip_and_clear() -> None:
+    params = AgentsSetLimitsParams(name="worker", max_calls=5, max_cost=0.5, clear=["max_tokens"])
+    assert AgentsSetLimitsParams.model_validate_json(params.model_dump_json()) == params
+    bare = AgentsSetLimitsParams(name="worker")
+    assert (bare.max_calls, bare.clear, bare.cwd) == (None, [], None)
+    for bad in ({"name": ""}, {"name": "a", "clear": ["max_seconds"]}, {"name": "a", "x": 1}):
+        with pytest.raises(ValidationError):
+            AgentsSetLimitsParams.model_validate(bad)
+    both = AgentsSetDefaultLimitsParams(working_seconds=60, clear=["max_calls"])
+    assert AgentsSetDefaultLimitsParams.model_validate_json(both.model_dump_json()) == both
+    info = AgentsSetLimitsResult(
+        name="a", description="", origin="user", wish="same", limits_from_config=["max_calls"]
+    )
+    assert AgentsSetLimitsResult.model_validate_json(info.model_dump_json()) == info
+    assert AgentInfo(name="a", description="", origin="user", wish="same").limits_from_config == []
+    values = AgentsKeepValues(keep_days=7, keep_problem_days=30, max_calls=4)
+    assert (values.max_calls, values.max_tokens) == (4, None)
 
 
 def test_agents_reject_bad_input() -> None:

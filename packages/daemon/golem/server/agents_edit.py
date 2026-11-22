@@ -12,6 +12,12 @@ setup, from the same code a helper uses to pick its model
 - a project file of a folder that is not in ``trusted_projects`` is never edited: the registry
   does not even show it as a winner.
 
+``agents.list`` and ``agents.get`` show the limits a helper of each type really runs with
+(:func:`~golem.agents.limits.resolve_limits`) and which of them ``[agents.<name>]`` sets.
+``agents.set_limits`` writes the limits of one type the same two ways as the wish: the front
+matter lines of your own file, or ``[agents.<name>]`` of ``config.toml`` for a built-in type.
+``agents.set_default_limits`` writes the limits of ``[agents]``, which bound every helper.
+
 ``agents.save``, ``agents.copy`` and ``agents.delete`` write, copy and remove the user's own files
 in ``~/.golem/agents``, and nothing outside that folder. A name is checked against the agent name
 rules before any path is built, and the final path is checked to be a direct child of the folder.
@@ -26,11 +32,13 @@ import os
 import re
 import tempfile
 from pathlib import Path
+from typing import cast
 
 from pydantic import ValidationError
 
 from golem.agents.bundled import bundled_agents_dir
-from golem.agents.edit import AgentEditError, check_wish, with_wish
+from golem.agents.edit import AgentEditError, check_wish, with_limits, with_wish
+from golem.agents.limits import resolve_limits
 from golem.agents.model import AGENT_SUFFIX, Agent
 from golem.agents.parse import parse_agent
 from golem.agents.registry import AgentRegistry, Listed
@@ -55,6 +63,9 @@ from golem_protocol.commands import (
     AgentsSaveParams,
     AgentsSaveProblem,
     AgentsSaveResult,
+    AgentsSetDefaultLimitsParams,
+    AgentsSetLimitsParams,
+    AgentsSetLimitsResult,
     AgentsSetWishParams,
     AgentsSetWishResult,
     ConfigError,
@@ -93,6 +104,7 @@ async def agent_infos(ctx: RequestContext, cwd: str | None) -> list[tuple[AgentI
     counts = await ctx.state.agent_usage.counts() if ctx.state.agent_usage is not None else None
     sessions = ctx.state.sessions
     home = ctx.state.user_home or Path.home()
+    settings = await _agent_settings(ctx)
 
     async def info(entry: Listed, *, trusted: bool) -> tuple[AgentInfo, Agent]:
         agent = entry.agent
@@ -104,6 +116,7 @@ async def agent_infos(ctx: RequestContext, cwd: str | None) -> list[tuple[AgentI
         count = None if counts is None else counts.get(agent.name)
         text = await _file_text(agent.path) if trusted else None
         usable = trusted and agent.valid and sessions is not None
+        resolved = resolve_limits(agent, settings)
         return AgentInfo(
             name=agent.name,
             description=agent.description,
@@ -111,12 +124,13 @@ async def agent_infos(ctx: RequestContext, cwd: str | None) -> list[tuple[AgentI
             wish=agent.wish,
             tools=list(agent.tools),
             limits=AgentLimits(
-                max_calls=agent.limits.max_calls,
-                max_seconds=agent.limits.max_seconds,
-                max_cost_usd=agent.limits.max_cost_usd,
-                max_tokens=agent.limits.max_tokens,
-                answer_chars=agent.limits.answer_chars,
+                max_calls=resolved.max_calls,
+                max_seconds=resolved.max_seconds,
+                max_cost_usd=resolved.max_cost_usd,
+                max_tokens=resolved.max_tokens,
+                answer_chars=resolved.answer_chars,
             ),
+            limits_from_config=_from_config(agent.name, settings),
             asks=agent.asks,
             errors=list(agent.errors),
             shadowed=shadowed,
@@ -142,6 +156,34 @@ async def agent_infos(ctx: RequestContext, cwd: str | None) -> list[tuple[AgentI
         if entry.usable or not entry.agent.valid
     ]
     return held_back + shown
+
+
+async def _agent_settings(ctx: RequestContext) -> AgentSettings:
+    """``[agents]`` as ``config.toml`` has it now; the defaults when the file does not validate."""
+    paths = ctx.state.paths
+    try:
+        loaded = await asyncio.to_thread(load_settings, home=paths.home, project_dir=paths.home)
+    except (OSError, ValueError):
+        return AgentSettings()
+    return loaded.agents
+
+
+_LIMIT_NAMES = {
+    "max_calls": "max_calls",
+    "working_seconds": "max_seconds",
+    "max_cost": "max_cost_usd",
+    "max_tokens": "max_tokens",
+    "answer_chars": "answer_chars",
+}
+"""The keys of ``[agents.<name>]`` and the name each has in ``AgentLimits``."""
+
+
+def _from_config(name: str, settings: AgentSettings) -> list[str]:
+    """The limits that ``[agents.<name>]`` sets for ``name``, by their ``AgentLimits`` names."""
+    table = settings.table_for(name)
+    if table is None:
+        return []
+    return [shown for key, shown in _LIMIT_NAMES.items() if table.given(key) is not None]
 
 
 def shown_path(path: Path, origin: AgentOrigin, root: Path | None, home: Path) -> str:
@@ -276,7 +318,14 @@ async def _keep_values(ctx: RequestContext) -> AgentsKeepValues:
     paths = ctx.state.paths
     settings = await asyncio.to_thread(load_settings, home=paths.home, project_dir=paths.home)
     agents = settings.agents
-    return AgentsKeepValues(keep_days=agents.keep_days, keep_problem_days=agents.keep_problem_days)
+    return AgentsKeepValues(
+        keep_days=agents.keep_days,
+        keep_problem_days=agents.keep_problem_days,
+        max_calls=agents.max_calls,
+        working_seconds=agents.working_seconds,
+        max_cost=agents.max_cost,
+        max_tokens=agents.max_tokens,
+    )
 
 
 async def agents_keep(ctx: RequestContext, params: AgentsKeepParams) -> AgentsKeepResult:
@@ -310,6 +359,166 @@ async def agents_keep(ctx: RequestContext, params: AgentsKeepParams) -> AgentsKe
         raise RpcCallError(INTERNAL_ERROR, f"could not write {config_file}: {exc}") from exc
     if patch:
         log.info("helper keep settings saved keys=%s", sorted(patch))
+    return AgentsKeepResult(ok=True, values=await _keep_values(ctx))
+
+
+# --- agents.set_limits, agents.set_default_limits ---------------------------------------------
+
+_FILE_KEYS = {
+    "max_calls": "max-calls",
+    "working_seconds": "max-seconds",
+    "max_cost": "max-cost-usd",
+    "max_tokens": "max-tokens",
+}
+"""The front matter line of an agent file for each limit key of ``config.toml``."""
+
+_EXPLORER_MAX_CALLS = 50
+
+
+def _limit_changes(
+    params: AgentsSetLimitsParams | AgentsSetDefaultLimitsParams, *, name: str | None
+) -> dict[str, float | None]:
+    """The keys to write, a value or None to remove, after checking each one.
+
+    Raises :class:`AgentEditError` with the first wrong value, and for a key that is both set
+    and cleared. ``name`` is the type: only the explorer's ``max_calls`` has an upper bound.
+    """
+    changes: dict[str, float | None] = {}
+    for key in _FILE_KEYS:
+        value = cast(float | None, getattr(params, key))
+        if value is not None:
+            changes[key] = value
+    for key in params.clear:
+        if key in changes:
+            raise AgentEditError(f"{key} is both set and cleared: send one of them")
+        changes[key] = None
+    for key, value in changes.items():
+        if value is None:
+            continue
+        if key == "max_cost":
+            if value < 0:
+                raise AgentEditError("max_cost must be 0 or more (US dollars)")
+        elif value != int(value) or value < 1:
+            raise AgentEditError(f"{key} must be a whole number, 1 or more")
+        elif key == "max_calls" and name == "explorer" and value > _EXPLORER_MAX_CALLS:
+            raise AgentEditError(f"max_calls of the explorer must be {_EXPLORER_MAX_CALLS} or less")
+    return changes
+
+
+def _shadowing_keys(
+    name: str, changes: dict[str, float | None], settings: AgentSettings
+) -> list[str]:
+    """The keys of ``[agents.<name>]`` that would win over a file for the limits in ``changes``.
+
+    For the explorer, ``timeout_seconds`` goes with ``working_seconds``.
+    """
+    table = settings.table_for(name)
+    if table is None:
+        return []
+    keys = list(changes)
+    if name == "explorer" and "working_seconds" in changes:
+        keys.append("timeout_seconds")
+    return [key for key in keys if table.given(key) is not None]
+
+
+def _file_problems(text: str, name: str) -> list[str]:
+    """What the registry's parser finds wrong with ``text`` as the file of agent ``name``."""
+    with tempfile.TemporaryDirectory(prefix="golem-agent-") as scratch:
+        draft = Path(scratch) / f"{name}{AGENT_SUFFIX}"
+        draft.write_bytes(text.encode("utf-8"))
+        return list(parse_agent(draft).errors)
+
+
+async def agents_set_limits(
+    ctx: RequestContext, params: AgentsSetLimitsParams
+) -> AgentsSetLimitsResult:
+    """Set or clear limits of the type ``name``, and answer with the type.
+
+    A built-in type gets them in ``[agents.<name>]`` of ``config.toml``, a file of the user's
+    in its front matter, and then the same keys are removed from a ``[agents.<name>]`` table of
+    the same name, which would win over the file. A project agent is read-only. The file is
+    checked with the registry's parser before it is written, and a wrong value writes nothing.
+    No restart is needed.
+    """
+    registry = _registry(ctx, params.cwd)
+    root = None if params.cwd is None else Path(params.cwd)
+    view = registry.view(root)
+    winner = next((e for e in view.listed if e.usable and e.agent.name == params.name), None)
+    if winner is None:
+        raise RpcCallError(INVALID_PARAMS, _why_not(registry, root, params.name, view.listed))
+    target: Path | None = None
+    changes: dict[str, float | None] = {}
+    try:
+        changes = _limit_changes(params, name=params.name)
+        if winner.origin == "project":
+            raise AgentEditError(
+                f"{params.name} is a project agent: project agents are read-only here. "
+                "Change its file in the project's .golem/agents yourself."
+            )
+        if not changes:
+            pass
+        elif winner.origin == "bundled":
+            target = ctx.state.paths.config_file
+            if params.name not in BUNDLED_TYPES:
+                raise AgentEditError(f"the limits of {params.name} cannot be changed here")
+            table = dict(changes)
+            if params.name == "explorer" and "working_seconds" in table:
+                table["timeout_seconds"] = None
+            await asyncio.to_thread(set_keys, target, {f"agents.{params.name}": table})
+        else:
+            target = _user_file(_agents_folder(ctx), params.name)
+            if not target.is_file():
+                raise AgentEditError(f"You have no agent file named {params.name}.")
+            text = await asyncio.to_thread(_read, target)
+            lines = {_FILE_KEYS[key]: value for key, value in changes.items()}
+            changed = with_limits(text, lines)
+            problems = _file_problems(changed, params.name)
+            if problems:
+                raise AgentEditError(f"{params.name} would have a problem: {problems[0]}")
+            await asyncio.to_thread(_write, target, changed, False)
+            shadowing = _shadowing_keys(params.name, changes, await _agent_settings(ctx))
+            if shadowing:
+                config_file = ctx.state.paths.config_file
+                await asyncio.to_thread(
+                    set_keys, config_file, {f"agents.{params.name}": dict.fromkeys(shadowing)}
+                )
+    except AgentEditError as exc:
+        raise RpcCallError(INVALID_PARAMS, str(exc)) from exc
+    except (OSError, ValueError, RawConflictError) as exc:
+        raise RpcCallError(INTERNAL_ERROR, f"could not write the limits: {exc}") from exc
+    registry.check()
+    if target is not None:
+        log.info("set limits %s of %s in %s", sorted(changes), params.name, target)
+    found = await agent_infos(ctx, params.cwd)
+    info = next(
+        pair[0]
+        for pair in found
+        if pair[0].name == params.name and pair[0].trusted and not pair[0].errors
+    )
+    return AgentsSetLimitsResult(**info.model_dump())
+
+
+async def agents_set_default_limits(
+    ctx: RequestContext, params: AgentsSetDefaultLimitsParams
+) -> AgentsKeepResult:
+    """Set or clear the limits in ``[agents]`` of ``config.toml``, and answer with what is in
+    force. A wrong value comes back as a field error and nothing is written."""
+    try:
+        changes = _limit_changes(params, name=None)
+    except AgentEditError as exc:
+        key = str(exc).split(" ", maxsplit=1)[0]
+        error = ConfigError(path=f"agents.{key}", message=str(exc))
+        return AgentsKeepResult(ok=False, errors=[error])
+    config_file = ctx.state.paths.config_file
+    try:
+        if changes:
+            await asyncio.to_thread(set_keys, config_file, {"agents": dict(changes)})
+    except (RawConflictError, ValueError) as exc:
+        return AgentsKeepResult(ok=False, errors=[ConfigError(message=str(exc))])
+    except OSError as exc:
+        raise RpcCallError(INTERNAL_ERROR, f"could not write {config_file}: {exc}") from exc
+    if changes:
+        log.info("helper default limits saved keys=%s", sorted(changes))
     return AgentsKeepResult(ok=True, values=await _keep_values(ctx))
 
 
@@ -515,6 +724,8 @@ __all__ = [
     "agents_delete",
     "agents_keep",
     "agents_save",
+    "agents_set_default_limits",
+    "agents_set_limits",
     "agents_set_wish",
     "check_cwd",
 ]

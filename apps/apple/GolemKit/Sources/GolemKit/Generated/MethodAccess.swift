@@ -30,6 +30,8 @@ public enum MethodAccess {
         "agents.keep",
         "agents.list",
         "agents.save",
+        "agents.set_default_limits",
+        "agents.set_limits",
         "agents.set_wish",
         "approval.respond",
         "artifact.read",

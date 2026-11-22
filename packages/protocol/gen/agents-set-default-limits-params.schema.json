@@ -1,0 +1,69 @@
+{
+  "additionalProperties": false,
+  "description": "``agents.set_default_limits``. Set or clear the limits in ``[agents]`` that bound every\nhelper its own table and its file leave open.\n\n``clear`` works as in :class:`AgentsSetLimitsParams`. Answers with ``ok`` false and the\nwrong field when a value is out of range, and nothing is written.",
+  "properties": {
+    "clear": {
+      "items": {
+        "enum": [
+          "max_calls",
+          "working_seconds",
+          "max_cost",
+          "max_tokens"
+        ],
+        "type": "string"
+      },
+      "title": "Clear",
+      "type": "array"
+    },
+    "max_calls": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Max Calls"
+    },
+    "max_cost": {
+      "anyOf": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Max Cost"
+    },
+    "max_tokens": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Max Tokens"
+    },
+    "working_seconds": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Working Seconds"
+    }
+  },
+  "title": "AgentsSetDefaultLimitsParams",
+  "type": "object"
+}

@@ -67,6 +67,8 @@ from golem.server.agents_edit import (
     agents_delete,
     agents_keep,
     agents_save,
+    agents_set_default_limits,
+    agents_set_limits,
     agents_set_wish,
 )
 from golem.server.chat_edit import chat_draft, chat_get, chat_prompt, chat_set
@@ -192,6 +194,8 @@ from golem_protocol.commands import (
     AgentsListParams,
     AgentsListResult,
     AgentsSaveParams,
+    AgentsSetDefaultLimitsParams,
+    AgentsSetLimitsParams,
     AgentsSetWishParams,
     ApprovalRespondParams,
     ApprovalRespondResult,
@@ -2180,6 +2184,15 @@ def standard_methods() -> dict[str, Method]:
         "agents.get": Method("agents.get", AgentsGetParams, True, _agents_get),
         "agents.set_wish": Method("agents.set_wish", AgentsSetWishParams, True, agents_set_wish),
         "agents.keep": Method("agents.keep", AgentsKeepParams, True, agents_keep),
+        "agents.set_limits": Method(
+            "agents.set_limits", AgentsSetLimitsParams, True, agents_set_limits
+        ),
+        "agents.set_default_limits": Method(
+            "agents.set_default_limits",
+            AgentsSetDefaultLimitsParams,
+            True,
+            agents_set_default_limits,
+        ),
         "agents.save": Method("agents.save", AgentsSaveParams, True, agents_save),
         "agents.copy": Method("agents.copy", AgentsCopyParams, True, agents_copy),
         "agents.delete": Method("agents.delete", AgentsDeleteParams, True, agents_delete),
