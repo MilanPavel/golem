@@ -140,6 +140,9 @@ export type { ChatPromptParams } from "../../protocol/gen/chat-prompt-params.ts"
 export type { ChatPromptResult } from "../../protocol/gen/chat-prompt-result.ts";
 export type { ChatPromptPart } from "../../protocol/gen/chat-prompt-part.ts";
 export type { ChatDraftResult } from "../../protocol/gen/chat-draft-result.ts";
+export type { ChatSuggestionsResult } from "../../protocol/gen/chat-suggestions-result.ts";
+export type { ChatSuggestion } from "../../protocol/gen/chat-suggestion.ts";
+export type { ChatSuggestionDismissResult } from "../../protocol/gen/chat-suggestion-dismiss-result.ts";
 export type { ChatValues } from "../../protocol/gen/chat-values.ts";
 export type { NotificationsSetParams } from "../../protocol/gen/notifications-set-params.ts";
 export type { NotificationsSetResult } from "../../protocol/gen/notifications-set-result.ts";

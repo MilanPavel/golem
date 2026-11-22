@@ -1996,6 +1996,43 @@ test("chat.prompt and chat.draft send their params and check what comes back", a
   }
 });
 
+test("chat.suggestions and chat.suggestion_dismiss send their params and check what comes back", async () => {
+  const sent: [string, Record<string, unknown>][] = [];
+  const suggestions = { suggestions: [{ line: "Keep it short.", reason: "You said “shorter” in 4 chats.", source: "chats" }], updated: "2026-11-22T08:00:00Z", needs_local_model: false };
+  const server = await listen((socket) => {
+    attach(socket, {
+      answerPing: true,
+      results: { "chat.suggestions": suggestions, "chat.suggestion_dismiss": { ok: true } },
+      onRequest: (_socket, method, params) => {
+        if (method.startsWith("chat.")) sent.push([method, params]);
+      },
+    });
+  });
+  const client = connectGolem({ socketPath: server.socketPath, clientName: "web", reconnect: false, heartbeatMs: 60_000 });
+  try {
+    assert.deepEqual(await client.getChatSuggestions(), suggestions);
+    assert.deepEqual(await client.dismissChatSuggestion("Keep it short."), { ok: true });
+    assert.deepEqual(sent, [
+      ["chat.suggestions", {}],
+      ["chat.suggestion_dismiss", { line: "Keep it short." }],
+    ]);
+  } finally {
+    client.close();
+    await server.close();
+  }
+  const bad = await listen((socket) => {
+    attach(socket, { answerPing: true, results: { "chat.suggestions": {}, "chat.suggestion_dismiss": {} } });
+  });
+  const refused = connectGolem({ socketPath: bad.socketPath, clientName: "web", reconnect: false, heartbeatMs: 60_000 });
+  try {
+    await assert.rejects(() => refused.getChatSuggestions(), /invalid chat.suggestions result/);
+    await assert.rejects(() => refused.dismissChatSuggestion("x"), /invalid chat.suggestion_dismiss result/);
+  } finally {
+    refused.close();
+    await bad.close();
+  }
+});
+
 test("getTrace and getTraceSpan send their ids and check what comes back", async () => {
   const sent: [string, Record<string, unknown>][] = [];
   const span = { id: "m_1", kind: "model", name: "model 1", start: "t", status: "ok" };

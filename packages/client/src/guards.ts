@@ -108,6 +108,8 @@ import type { EvalRoutingResult } from "../../protocol/gen/eval-routing-result.t
 import type { ChatSetResult } from "../../protocol/gen/chat-set-result.ts";
 import type { ChatPromptResult } from "../../protocol/gen/chat-prompt-result.ts";
 import type { ChatDraftResult } from "../../protocol/gen/chat-draft-result.ts";
+import type { ChatSuggestionsResult } from "../../protocol/gen/chat-suggestions-result.ts";
+import type { ChatSuggestionDismissResult } from "../../protocol/gen/chat-suggestion-dismiss-result.ts";
 import type { ChatValues } from "../../protocol/gen/chat-values.ts";
 import type { NotificationsSetResult } from "../../protocol/gen/notifications-set-result.ts";
 import type { NotificationsValues } from "../../protocol/gen/notifications-values.ts";
@@ -1043,6 +1045,20 @@ export function isChatPromptResult(value: unknown): value is ChatPromptResult {
 
 export function isChatDraftResult(value: unknown): value is ChatDraftResult {
   return isRecord(value) && typeof value["model"] === "string" && Array.isArray(value["lines"]) && value["lines"].every((line) => typeof line === "string");
+}
+
+export function isChatSuggestionsResult(value: unknown): value is ChatSuggestionsResult {
+  return (
+    isRecord(value) &&
+    typeof value["needs_local_model"] === "boolean" &&
+    (typeof value["updated"] === "string" || value["updated"] === null) &&
+    Array.isArray(value["suggestions"]) &&
+    value["suggestions"].every((item) => isRecord(item) && typeof item["line"] === "string" && typeof item["reason"] === "string" && (item["source"] === "memory" || item["source"] === "chats"))
+  );
+}
+
+export function isChatSuggestionDismissResult(value: unknown): value is ChatSuggestionDismissResult {
+  return isRecord(value) && typeof value["ok"] === "boolean";
 }
 
 export function isNotificationsValues(value: unknown): value is NotificationsValues {

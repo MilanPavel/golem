@@ -174,6 +174,15 @@ function GalleryInstructions() {
       prompt={prompt}
       promptError={null}
       onNavigate={() => undefined}
+      suggestions={{
+        suggestions: [
+          { line: "Keep answers short.", reason: "You said “shorter” or “tl;dr” in 4 chats this week.", source: "chats" },
+          { line: "Prefer bullet points to long paragraphs.", reason: "From memory: “Prefers bullet points over long paragraphs.”", source: "memory" },
+        ],
+        updated: "2026-11-22T08:00:00Z",
+        needs_local_model: false,
+      }}
+      onDismiss={async () => undefined}
     />
   );
 }

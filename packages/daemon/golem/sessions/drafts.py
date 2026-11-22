@@ -46,6 +46,10 @@ class DraftUnusable(Exception):
         super().__init__(UNUSABLE)
 
 
+class NoLocalModel(Exception):
+    """A job that reads private text found no local model to run on."""
+
+
 def parse_lines(reply: str) -> list[str]:
     """Lines of ``reply`` without bullets or numbers, no blanks, no repeats, at most 8 of 300."""
     lines: list[str] = []
@@ -137,6 +141,39 @@ class ModelDrafts:
         label = role.profile if name is None else f"{identity.provider}/{name}"
         return lines, label
 
+    def local_profile(self) -> str | None:
+        """The profile of the ``summarise`` role when it is a local model, else None."""
+        role = for_role(
+            "summarise",
+            session_profile=self._router.profile_name,
+            settings=self._router.roles(),
+            tier_of_profile=self._tier_of_profile,
+            budget_models=self._budget_refs(),
+            local_only=True,
+        )
+        return None if role.reason == "no local model" else role.profile
+
+    async def ask_local(self, instruction: str, text: str, label: str) -> str:
+        """The reply of the ``summarise`` model, which must be local: ``text`` is private.
+
+        Raises :class:`NoLocalModel` when there is none. A hosted model is never asked.
+        """
+        profile = self.local_profile()
+        if profile is None:
+            raise NoLocalModel
+        model = self._router.chat_model(profile, local_only=True)
+        line = self._router.local_line(profile)
+        try:
+            async with job_slot(self._dispatcher, line, None, label):
+                answer = await model.ainvoke(
+                    [SystemMessage(content=instruction), HumanMessage(content=text)]
+                )
+        except Exception:
+            await self._record(profile, None, failed=True)
+            raise
+        await self._record(profile, answer.usage_metadata)
+        return answer.text
+
     async def _record(self, profile: str, metadata: object, *, failed: bool = False) -> None:
         if self._usage is None:
             return
@@ -159,4 +196,4 @@ class ModelDrafts:
             log.warning("recording the draft call failed", exc_info=True)
 
 
-__all__ = ["UNUSABLE", "DraftUnusable", "ModelDrafts", "parse_lines"]
+__all__ = ["UNUSABLE", "DraftUnusable", "ModelDrafts", "NoLocalModel", "parse_lines"]

@@ -4257,6 +4257,51 @@ class ChatDraftResult(BaseModel):
     model: str
 
 
+class ChatSuggestionsParams(BaseModel):
+    """``chat.suggestions``. Reads the kept suggestions and starts the job when they are
+    older than a day."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+
+class ChatSuggestion(BaseModel):
+    """One instruction line golem suggests, and why. ``source`` is ``memory`` for a note and
+    ``chats`` for what you keep asking."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    line: str
+    reason: str
+    source: Literal["memory", "chats"]
+
+
+class ChatSuggestionsResult(BaseModel):
+    """At most 5 suggestions, without the lines already in ``[chat] instructions`` and the
+    dismissed ones. ``updated`` is when the job last ran, null before the first run.
+    ``needs_local_model`` is true when there is no local model: the job reads your messages,
+    so it runs on a local model only."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    suggestions: list[ChatSuggestion]
+    updated: str | None
+    needs_local_model: bool
+
+
+class ChatSuggestionDismissParams(BaseModel):
+    """``chat.suggestion_dismiss``. The line is never suggested again."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    line: str = Field(min_length=1, max_length=2000)
+
+
+class ChatSuggestionDismissResult(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    ok: bool
+
+
 class NotificationsGetParams(BaseModel):
     """``notifications.get``. The ``[notifications]`` settings as golem uses them."""
 
@@ -5243,6 +5288,11 @@ __all__ = [
     "ChatPromptResult",
     "ChatSetParams",
     "ChatSetResult",
+    "ChatSuggestion",
+    "ChatSuggestionDismissParams",
+    "ChatSuggestionDismissResult",
+    "ChatSuggestionsParams",
+    "ChatSuggestionsResult",
     "ChatValues",
     "ConfigAllowance",
     "ConfigError",

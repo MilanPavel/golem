@@ -1,0 +1,7 @@
+{
+  "additionalProperties": false,
+  "description": "``chat.suggestions``. Reads the kept suggestions and starts the job when they are\nolder than a day.",
+  "properties": {},
+  "title": "ChatSuggestionsParams",
+  "type": "object"
+}

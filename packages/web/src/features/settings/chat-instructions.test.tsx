@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import axe from "axe-core";
 import { afterEach, beforeEach, expect, test } from "vitest";
 import { App } from "../../app.tsx";
+import type { ChatSuggestionsResult } from "../../store/notifications.ts";
 import { createPage } from "../../store/page.ts";
 import { PageProvider } from "../../store/page-context.tsx";
 import { fakeClient, fakeFrame, rpcError, summary } from "../../store/test-support.ts";
@@ -23,12 +24,13 @@ const PROMPT = {
   total_tokens: 114,
 };
 
-function mount(instructions: string[] = []) {
+function mount(instructions: string[] = [], suggestions?: ChatSuggestionsResult) {
   history.replaceState(null, "", "/settings/chat");
   const fake = fakeClient();
   fake.raw.status.mockResolvedValue({ version: "0.5.0" });
   fake.raw.getChat.mockResolvedValue({ instructions, plan_first: false, mode: "balanced" });
   fake.raw.getChatPrompt.mockResolvedValue(PROMPT);
+  if (suggestions !== undefined) fake.raw.getChatSuggestions.mockResolvedValue(suggestions);
   const page = createPage(fake.client, { frame: fakeFrame() });
   page.start();
   fake.setState({ status: "connected" });
@@ -161,6 +163,45 @@ test("the button says Drafting… while it runs, and an error shows under the fi
   });
   expect((await screen.findByRole("alert")).textContent).toContain("no model is set up");
   expect(screen.getByRole("button", { name: "Draft lines" })).toBeTruthy();
+});
+
+const SUGGESTED = {
+  suggestions: [
+    { line: "Keep answers short.", reason: "You said “shorter” or “tl;dr” in 4 chats this week.", source: "chats" as const },
+    { line: "Prefer bullet points.", reason: "From memory: “Prefers bullet points.”", source: "memory" as const },
+  ],
+  updated: "2026-11-22T08:00:00Z",
+  needs_local_model: false,
+};
+
+test("From your chats shows each line with its reason, and Add saves it appended", async () => {
+  const { fake, user } = mount(["Be direct."], SUGGESTED);
+  const list = within(await screen.findByRole("list", { name: "From your chats" }));
+  expect(list.getByText("You said “shorter” or “tl;dr” in 4 chats this week.")).toBeTruthy();
+  expect(list.getByText("From memory: “Prefers bullet points.”")).toBeTruthy();
+  await user.click(list.getByRole("button", { name: "Add “Keep answers short.”" }));
+  await waitFor(() => {
+    expect(lastSet(fake)).toEqual({ instructions: ["Be direct.", "Keep answers short."] });
+  });
+  expect(screen.queryByRole("button", { name: "Add “Keep answers short.”" })).toBeNull();
+});
+
+test("Not for me sends the dismiss and hides the line", async () => {
+  const { fake, user } = mount([], SUGGESTED);
+  await user.click(await screen.findByRole("button", { name: "Not for me: “Prefer bullet points.”" }));
+  expect(fake.raw.dismissChatSuggestion).toHaveBeenCalledWith("Prefer bullet points.");
+  expect(screen.queryByText("Prefer bullet points.")).toBeNull();
+  expect(screen.getByText("Keep answers short.")).toBeTruthy();
+});
+
+test("with no suggestions it says golem looks once a day", async () => {
+  mount();
+  expect(await screen.findByText("Nothing yet. golem looks at your chats once a day.")).toBeTruthy();
+});
+
+test("without a local model it says it needs one", async () => {
+  mount([], { suggestions: [], updated: null, needs_local_model: true });
+  expect(await screen.findByText("Needs a local model, because it reads your messages.")).toBeTruthy();
 });
 
 test("Common ones is folded, adds a line, and hides a line that is in the list", async () => {

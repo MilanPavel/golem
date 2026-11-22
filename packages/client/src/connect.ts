@@ -159,6 +159,8 @@ import type { ChatValues } from "../../protocol/gen/chat-values.ts";
 import type { ChatPromptParams } from "../../protocol/gen/chat-prompt-params.ts";
 import type { ChatPromptResult } from "../../protocol/gen/chat-prompt-result.ts";
 import type { ChatDraftResult } from "../../protocol/gen/chat-draft-result.ts";
+import type { ChatSuggestionsResult } from "../../protocol/gen/chat-suggestions-result.ts";
+import type { ChatSuggestionDismissResult } from "../../protocol/gen/chat-suggestion-dismiss-result.ts";
 import type { NotificationsSetParams } from "../../protocol/gen/notifications-set-params.ts";
 import type { NotificationsSetResult } from "../../protocol/gen/notifications-set-result.ts";
 import type { NotificationsValues } from "../../protocol/gen/notifications-values.ts";
@@ -286,6 +288,8 @@ import {
   isChatSetResult,
   isChatPromptResult,
   isChatDraftResult,
+  isChatSuggestionsResult,
+  isChatSuggestionDismissResult,
   isChatValues,
   isNotificationsSetResult,
   isNotificationsValues,
@@ -437,6 +441,10 @@ export interface GolemClient {
   getChatPrompt(params?: ChatPromptParams): Promise<ChatPromptResult>;
   /** Golem drafts instruction lines from what the person says about how they like answers. Nothing is saved. */
   draftChat(description: string): Promise<ChatDraftResult>;
+  /** Lines suggested from the person's chats and memory. Answers with what is kept and starts the daily job. */
+  getChatSuggestions(): Promise<ChatSuggestionsResult>;
+  /** The line is never suggested again. */
+  dismissChatSuggestion(line: string): Promise<ChatSuggestionDismissResult>;
   getNotifications(): Promise<NotificationsValues>;
   setNotifications(params: NotificationsSetParams): Promise<NotificationsSetResult>;
   notifyTest(): Promise<NotifyTestResult>;
@@ -1713,6 +1721,22 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       const result = await call("chat.draft", { description });
       if (!isChatDraftResult(result)) {
         throw new Error("invalid chat.draft result");
+      }
+      return result;
+    },
+    async getChatSuggestions(): Promise<ChatSuggestionsResult> {
+      await ready;
+      const result = await call("chat.suggestions", {});
+      if (!isChatSuggestionsResult(result)) {
+        throw new Error("invalid chat.suggestions result");
+      }
+      return result;
+    },
+    async dismissChatSuggestion(line: string): Promise<ChatSuggestionDismissResult> {
+      await ready;
+      const result = await call("chat.suggestion_dismiss", { line });
+      if (!isChatSuggestionDismissResult(result)) {
+        throw new Error("invalid chat.suggestion_dismiss result");
       }
       return result;
     },

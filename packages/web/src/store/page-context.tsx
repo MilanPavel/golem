@@ -5,7 +5,7 @@ import { ConnectionProvider } from "./connection-context.tsx";
 import { changeDiffKey, changesDiffKey, changesListKey, commitInfoKey, type ChangedFiles, type ChangesCommitInfoResult, type FileDiff } from "./changes.ts";
 import { fileListKey, fileReadKey, type FileRead } from "./files.ts";
 import { configKey, type ConfigGetResult } from "./config.ts";
-import { AGENTS_KEEP_KEY, CHAT_KEY, PROMPT_KEY, NOTIFICATIONS_KEY, type ChatValues, type ChatPromptResult, type AgentsKeepValues } from "./notifications.ts";
+import { AGENTS_KEEP_KEY, CHAT_KEY, PROMPT_KEY, SUGGESTIONS_KEY, NOTIFICATIONS_KEY, type ChatValues, type ChatPromptResult, type ChatSuggestionsResult, type AgentsKeepValues } from "./notifications.ts";
 import { DEVICE_LIST_KEY, type DeviceListResult, type PairingSnapshot } from "./devices.ts";
 import { memoryListKey, type MemoryListResult, type MemoryScope } from "./memory.ts";
 import { ROUTING_KEY } from "./routing.ts";
@@ -298,6 +298,20 @@ export function useChatDefaults(enabled = true): UseQueryResult<ChatValues> {
 export function useChatPrompt(instructions: readonly string[] | null, enabled = true): UseQueryResult<ChatPromptResult> {
   const { queries } = usePage();
   return useQuery({ queryKey: [...PROMPT_KEY, instructions], queryFn: () => queries.chatPrompt(instructions), enabled, staleTime: 0, retry: false, refetchOnWindowFocus: true, placeholderData: keepPreviousData });
+}
+
+/** The kept suggestions for instruction lines. Asking starts the daily job, so a first answer without a result is asked for again a few times. */
+export function useChatSuggestions(enabled = true): UseQueryResult<ChatSuggestionsResult> {
+  const { queries } = usePage();
+  return useQuery({
+    queryKey: [...SUGGESTIONS_KEY],
+    queryFn: queries.chatSuggestions,
+    enabled,
+    staleTime: 0,
+    retry: false,
+    refetchOnWindowFocus: true,
+    refetchInterval: (query) => (query.state.data !== undefined && query.state.data.updated === null && !query.state.data.needs_local_model && query.state.dataUpdateCount < 4 ? 15000 : false),
+  });
 }
 
 /** The `[notifications]` settings. Read again whenever the tab is seen: a terminal edit pushes nothing. */

@@ -245,4 +245,19 @@ MIGRATIONS: tuple[tuple[str, ...], ...] = (
         "CREATE INDEX rule_origins_rule ON rule_origins (rule)",
     ),
     ("ALTER TABLE sessions ADD COLUMN trimmed_at TEXT",),
+    (
+        """
+        CREATE TABLE chat_suggestions (
+            id INTEGER PRIMARY KEY CHECK (id = 1),
+            made_at TEXT NOT NULL,
+            data TEXT NOT NULL
+        )
+        """,
+        """
+        CREATE TABLE dismissed_suggestions (
+            line TEXT PRIMARY KEY,
+            at TEXT NOT NULL
+        )
+        """,
+    ),
 )
