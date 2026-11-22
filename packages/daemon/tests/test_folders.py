@@ -435,6 +435,7 @@ async def test_the_reveal_method_serves_this_mac_and_refuses_a_phone(
         assert devices is not None
         device = await devices.add(new_key(), "iPhone", "2026-11-22T10:00:00+01:00")
         rpc_result(await phone.call("connection.identify", {"device": device.id}))
+        rpc_result(await phone.call("hello", HELLO))
         refused = await phone.call("fs.reveal", {"path": str(fake_home / "code")})
         assert error_code(refused) == NOT_LOCAL
         assert refused["error"]["data"] == {"reason": "not_local"}  # type: ignore[index]
