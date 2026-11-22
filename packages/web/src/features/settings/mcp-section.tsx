@@ -1,5 +1,6 @@
 import {
   detailChoices,
+  isRefused,
   formatSeconds,
   mcpStatusWord,
   signsIn,
@@ -19,6 +20,8 @@ import { BrandIcon } from "./mcp/brand-icon.tsx";
 import { CatalogPanel } from "./mcp/catalog-panel.tsx";
 import { ImportPanel } from "./mcp/import-panel.tsx";
 import { EditServer } from "./mcp/edit-form.tsx";
+import { lineFor, TokenLine, useNow, useTokenStates, type TokenStates } from "./mcp/token-line.tsx";
+import { useMcpDetail } from "./mcp/use-detail.ts";
 import { LogsView } from "./mcp/logs-view.tsx";
 import { TestView } from "./mcp/test-view.tsx";
 import { Dot, needsAuth, serverKey, serverSummary, SignInPanel, useSignIns, type Login, type SignIns } from "./mcp/sign-in.tsx";
@@ -125,6 +128,7 @@ export function McpSection() {
 function Installed({ sessionId, added, onCatalog }: { sessionId: string | null; added: string | null; onCatalog: () => void }) {
   const list = useMcpList(sessionId);
   const signIns = useSignIns();
+  const tokens = useTokenStates();
   const narrow = useNarrow();
   const [view, setView] = useState<View>({ kind: "list" });
   const rows = useRef(new Map<string, HTMLButtonElement>());
@@ -197,7 +201,7 @@ function Installed({ sessionId, added, onCatalog }: { sessionId: string | null; 
     back.current = keyOf(server);
     setView({ kind: "list" });
   };
-  const content = <Detail key={keyOf(server)} server={server} sessionId={sessionId} signIns={signIns} onBack={wide ? null : leave} />;
+  const content = <Detail key={keyOf(server)} server={server} sessionId={sessionId} signIns={signIns} tokens={tokens} onBack={wide ? null : leave} />;
   if (!wide) {
     // A narrow window shows the list, or the details in its place.
     return view.kind === "list" || pickedServer === undefined ? listPane : content;
@@ -330,7 +334,7 @@ function isAction(choice: DetailChoice): choice is Choice {
   return typeof choice.action === "object";
 }
 
-function Detail({ server, sessionId, signIns, onBack }: { server: McpServer; sessionId: string | null; signIns: SignIns; onBack: (() => void) | null }) {
+function Detail({ server, sessionId, signIns, tokens, onBack }: { server: McpServer; sessionId: string | null; signIns: SignIns; tokens: TokenStates; onBack: (() => void) | null }) {
   const actions = usePageActions();
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -338,6 +342,9 @@ function Detail({ server, sessionId, signIns, onBack }: { server: McpServer; ses
   const [removing, setRemoving] = useState(false);
   const [tab, setTab] = useState<Tab>("tools");
   const [trying, setTrying] = useState<string | null>(null);
+  /** Goes up each time the sign-in line asks for the token, so Edit opens its field. */
+  const [tokenRequest, setTokenRequest] = useState(0);
+  const now = useNow();
   // "starting github…" is true only until the server is running or has failed.
   const settled = server.state === "running" || server.state === "failed";
   const shownNotice = settled && notice?.endsWith("…") === true ? null : notice;
@@ -366,6 +373,16 @@ function Detail({ server, sessionId, signIns, onBack }: { server: McpServer; ses
   ];
   const removable = detailChoices(shown).some((choice) => choice.action === "ask-remove");
   const editable = !(server.project != null && sessionId === null);
+  const detail = useMcpDetail(server.name, sessionId);
+  const known = tokens.of(server);
+  const line = lineFor(server, { oauth: signsIn(server, catalog.data?.entries ?? null), secrets: detail.data?.secrets ?? [], known, now });
+  // A server that starts running has a token that works, now. A test of another token that was refused stays on the line.
+  const noted = tokens.note;
+  const before = useRef<McpServer["state"] | null>(null);
+  useEffect(() => {
+    if (server.state === "running" && (known === undefined || (before.current !== "running" && known.refused))) noted(server, { ok: true });
+    before.current = server.state;
+  }, [server, known, noted]);
 
   async function run(action: McpDetailAction): Promise<void> {
     try {
@@ -453,6 +470,21 @@ function Detail({ server, sessionId, signIns, onBack }: { server: McpServer; ses
           {mcpStatusWord(server)}
         </p>
       </header>
+      {line === null ? null : (
+        <TokenLine
+          line={line}
+          onAction={(kind) => {
+            if (kind === "sign-in") signIn();
+            else if (kind === "sign-out") void run({ kind: "logout", name: server.name });
+            else if (editable) {
+              setTab("edit");
+              setTokenRequest((count) => count + 1);
+            }
+          }}
+          canEdit={editable}
+          waiting={login?.kind === "waiting"}
+        />
+      )}
       {server.state === "failed" ? (
         <p className="text-sm text-deny wrap-anywhere">
           {server.error ?? "failed"}
@@ -541,11 +573,11 @@ function Detail({ server, sessionId, signIns, onBack }: { server: McpServer; ses
         </TabsContent>
         {editable ? (
           <TabsContent value="edit">
-            <EditServer server={server} sessionId={sessionId} onCancel={toTools} onSaved={toTools} />
+            <EditServer server={server} sessionId={sessionId} tokenRequest={tokenRequest} onToken={(outcome) => tokens.note(server, outcome)} onCancel={toTools} onSaved={toTools} />
           </TabsContent>
         ) : null}
         <TabsContent value="test">
-          <TestView server={server} sessionId={sessionId} onBack={toTools} />
+          <TestView server={server} sessionId={sessionId} onBack={toTools} onResult={(result) => tokens.note(server, result.ok ? { ok: true } : { ok: false, refused: isRefused(result.http_status, null) })} />
         </TabsContent>
       </Tabs>
       <Dialog open={removing} onOpenChange={setRemoving}>

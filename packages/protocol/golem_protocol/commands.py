@@ -3371,7 +3371,9 @@ class McpTestResult(BaseModel):
     ``stderr_tail`` is the server's last 50 lines of stderr, with secrets
     replaced by ``•••``. ``hint`` is one next step for the person, and
     ``runtime`` says which runtime (``node`` or ``uv``) a UI can offer to
-    install when that is the hint.
+    install when that is the hint. ``http_status`` is the HTTP status a hosted
+    server refused with, 401 or 403 when it did not accept the token, and
+    null for any other failure.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -3385,6 +3387,7 @@ class McpTestResult(BaseModel):
     stderr_tail: list[str] = Field(default_factory=list[str])
     hint: str | None = None
     runtime: Literal["node", "uv"] | None = None
+    http_status: int | None = Field(default=None, ge=100, le=599)
 
 
 class McpLogLine(BaseModel):

@@ -7,8 +7,11 @@ import { otherSpec, shellQuote } from "./mcp-catalog.ts";
  * reference, and typing in its field replaces the stored value.
  */
 
-/** One `env` or `headers` row. `ref` is the Keychain reference a stored secret already has. */
-export type EditPair = { key: string; value: string; secret: boolean; ref: string | null };
+/**
+ * One `env` or `headers` row. `ref` is the Keychain reference a stored secret already has, and `prefix`
+ * the text before it (`Bearer ` in `Bearer keychain:mcp/github`). A row without a reference has no prefix.
+ */
+export type EditPair = { key: string; value: string; secret: boolean; ref: string | null; prefix: string };
 
 export type EditForm = {
   target: "command" | "url";
@@ -26,13 +29,16 @@ export type EditForm = {
 };
 
 const KEYCHAIN = "keychain:";
+/** A value that ends in a Keychain reference: all of it, or after a prefix such as `Bearer `. */
+const STORED = /^([\s\S]*?)keychain:(mcp\/\S+)$/;
 
 function pairs(values: Readonly<Record<string, string>> | undefined): EditPair[] {
-  return Object.entries(values ?? {}).map(([key, value]) =>
-    value.startsWith(KEYCHAIN)
-      ? { key, value: "", secret: true, ref: value.slice(KEYCHAIN.length) }
-      : { key, value, secret: false, ref: null },
-  );
+  return Object.entries(values ?? {}).map(([key, value]) => {
+    const stored = STORED.exec(value);
+    return stored === null
+      ? { key, value, secret: false, ref: null, prefix: "" }
+      : { key, value: "", secret: true, ref: stored[2] ?? "", prefix: stored[1] ?? "" };
+  });
 }
 
 /** The form for a server's config (from `mcp.get`). */
@@ -93,7 +99,7 @@ function buildPairs(
     if (row.value.length > 0) {
       secrets[ref] = row.value;
     }
-    values[key] = `${KEYCHAIN}${ref}`;
+    values[key] = `${row.ref === null ? "" : row.prefix}${KEYCHAIN}${ref}`;
   }
   return { values };
 }

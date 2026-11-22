@@ -512,7 +512,8 @@ test("Edit shows the config as a form, and Save sends the change with a stored s
   await user.click(screen.getByRole("tab", { name: "Edit" }));
   const command = await screen.findByLabelText("Command");
   expect((command as HTMLInputElement).value).toBe("mcp-server-git --repository /Users/me/repo");
-  expect((screen.getByLabelText("variable 1 value") as HTMLInputElement).placeholder).toContain("stored in the Keychain");
+  expect(screen.queryByLabelText("variable 1 value")).toBeNull();
+  expect(screen.getByText("in the Keychain")).toBeTruthy();
   await user.clear(screen.getByLabelText("Timeout (seconds)"));
   await user.type(screen.getByLabelText("Timeout (seconds)"), "60");
   await user.click(screen.getByRole("button", { name: "Save" }));
@@ -562,13 +563,15 @@ test("Edit replaces a secret only when a new one is typed, and says what is wron
   fake.raw.mcpGet.mockResolvedValue(detailOf(git, { command: "x", env: { TOKEN: "keychain:mcp/git-token" } }));
   await user.click(await screen.findByRole("button", { name: GIT_ROW }));
   await user.click(screen.getByRole("tab", { name: "Edit" }));
-  await user.type(await screen.findByLabelText("variable 1 value"), "s3cret");
+  await user.click(await screen.findByRole("button", { name: "Replace the token of variable 1" }));
+  await user.type(screen.getByLabelText("variable 1 value"), "s3cret");
   await user.clear(screen.getByLabelText("Command"));
-  await user.click(screen.getByRole("button", { name: "Save" }));
+  await user.click(screen.getByRole("button", { name: "Save and test" }));
   expect((await screen.findByRole("alert")).textContent).toBe("Type a command or an https:// URL.");
   expect(fake.raw.updateMcpServer).not.toHaveBeenCalled();
   await user.type(screen.getByLabelText("Command"), "x");
-  await user.click(screen.getByRole("button", { name: "Save" }));
+  await user.click(screen.getByRole("button", { name: "Save and test" }));
+  await waitFor(() => expect(fake.raw.updateMcpServer).toHaveBeenCalled());
   expect(fake.raw.updateMcpServer.mock.calls[0]![0].secrets).toEqual({ "mcp/git-token": "s3cret" });
 });
 
@@ -1089,7 +1092,7 @@ test("a server that needs a sign-in says so in its row and detail, with a Sign i
   expect(open.textContent).toContain("Sign in needed");
   await user.click(open);
   expect(screen.getByText("linear needs a sign-in.")).toBeTruthy();
-  expect(screen.getByRole("button", { name: "Sign in" })).toBeTruthy();
+  expect(screen.getAllByRole("button", { name: "Sign in" }).length).toBeGreaterThan(0);
   expect(screen.queryByRole("button", { name: "Start" })).toBeNull();
   expect(screen.queryByRole("button", { name: "Reconnect" })).toBeNull();
 });
@@ -1099,7 +1102,7 @@ test("Sign in calls mcp.login, opens the address in a new tab, and waits until i
   vi.stubGlobal("open", opened);
   const { fake, user } = mount("/settings/mcp", [linear]);
   await user.click(await screen.findByRole("button", { name: /linear/ }));
-  await user.click(screen.getByRole("button", { name: "Sign in" }));
+  await user.click(screen.getAllByRole("button", { name: "Sign in" })[0]!);
   expect(fake.raw.mcpLogin).toHaveBeenCalledWith("linear", undefined);
   await waitFor(() => expect(opened).toHaveBeenCalledWith("https://auth.example/authorize?state=x", "_blank", "noopener,noreferrer"));
   expect((await screen.findAllByText(/Waiting for the sign-in…/)).length).toBeGreaterThan(0);
@@ -1113,7 +1116,7 @@ test("a finished sign-in says Signed in once the server runs, and its tools show
     made.raw.mcpTools.mockResolvedValue({ name: "linear", tools: [{ name: "mcp__linear__list_issues", description: "Lists issues." }] });
   });
   await user.click(await screen.findByRole("button", { name: /linear/ }));
-  await user.click(screen.getByRole("button", { name: "Sign in" }));
+  await user.click(screen.getAllByRole("button", { name: "Sign in" })[0]!);
   await screen.findAllByText(/Waiting for the sign-in…/);
   fake.raw.listMcp.mockResolvedValue({ servers: [{ ...linear, state: "running", error: null, tools: ["mcp__linear__list_issues"] }] });
   act(() => {
@@ -1128,7 +1131,7 @@ test("a sign-in that fails says why and offers Try again", async () => {
   vi.stubGlobal("open", vi.fn());
   const { fake, user } = mount("/settings/mcp", [linear]);
   await user.click(await screen.findByRole("button", { name: /linear/ }));
-  await user.click(screen.getByRole("button", { name: "Sign in" }));
+  await user.click(screen.getAllByRole("button", { name: "Sign in" })[0]!);
   await screen.findAllByText(/Waiting for the sign-in…/);
   act(() => {
     fake.emitMcpLoginDone({ name: "linear", ok: false, error: "the sign-in timed out" });
@@ -1142,7 +1145,7 @@ test("a sign-in the daemon refuses to start shows its message", async () => {
   const { fake, user } = mount("/settings/mcp", [linear]);
   fake.raw.mcpLogin.mockRejectedValue(new Error("no such server"));
   await user.click(await screen.findByRole("button", { name: /linear/ }));
-  await user.click(screen.getByRole("button", { name: "Sign in" }));
+  await user.click(screen.getAllByRole("button", { name: "Sign in" })[0]!);
   expect((await screen.findAllByText(/no such server/)).length).toBeGreaterThan(0);
 });
 

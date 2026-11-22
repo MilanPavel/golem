@@ -7,7 +7,7 @@ import { Button } from "../../../ui/button.tsx";
 import { Code } from "../../../ui/code.tsx";
 
 /** A test of the saved server, each step shown as it ends, and then what it found. */
-export function TestView({ server, sessionId, onBack }: { server: McpServer; sessionId: string | null; onBack: () => void }) {
+export function TestView({ server, sessionId, onBack, onResult }: { server: McpServer; sessionId: string | null; onBack: () => void; onResult?: (result: McpTestResult) => void }) {
   const actions = usePageActions();
   const [round, setRound] = useState(0);
   return (
@@ -21,7 +21,15 @@ export function TestView({ server, sessionId, onBack }: { server: McpServer; ses
         </Button>
       </div>
       <h3 className="text-heading font-semibold wrap-anywhere">Test <Code>{server.name}</Code></h3>
-      <TestRun key={round} start={(onStep) => actions.testMcp(server.name, sessionId, onStep)} />
+      <TestRun
+        key={round}
+        start={(onStep) =>
+          actions.testMcp(server.name, sessionId, onStep).then((result) => {
+            onResult?.(result);
+            return result;
+          })
+        }
+      />
     </div>
   );
 }

@@ -114,6 +114,7 @@ async def mcp_test(ctx: RequestContext, params: McpTestParams) -> McpTestResult:
         stderr_tail=found.stderr_tail,
         hint=None if found.hint is None else found.hint.text,
         runtime=None if found.hint is None else found.hint.runtime,
+        http_status=found.http_status,
     )
 
 
