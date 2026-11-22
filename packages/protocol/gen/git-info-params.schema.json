@@ -1,0 +1,16 @@
+{
+  "additionalProperties": false,
+  "description": "``git.info``. What git says about a folder, read only.\n\n``path`` is an absolute folder under the user's home folder, checked as\n``fs.list_dirs`` checks it. A path that is not a folder is refused.",
+  "properties": {
+    "path": {
+      "minLength": 1,
+      "title": "Path",
+      "type": "string"
+    }
+  },
+  "required": [
+    "path"
+  ],
+  "title": "GitInfoParams",
+  "type": "object"
+}

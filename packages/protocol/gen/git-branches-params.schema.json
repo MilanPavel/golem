@@ -1,0 +1,16 @@
+{
+  "additionalProperties": false,
+  "description": "``git.branches``. The local branches of the repo a folder belongs to, read only.",
+  "properties": {
+    "path": {
+      "minLength": 1,
+      "title": "Path",
+      "type": "string"
+    }
+  },
+  "required": [
+    "path"
+  ],
+  "title": "GitBranchesParams",
+  "type": "object"
+}

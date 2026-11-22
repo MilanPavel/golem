@@ -4787,6 +4787,73 @@ class FsListDirsResult(BaseModel):
     truncated: bool
 
 
+class GitInfoParams(BaseModel):
+    """``git.info``. What git says about a folder, read only.
+
+    ``path`` is an absolute folder under the user's home folder, checked as
+    ``fs.list_dirs`` checks it. A path that is not a folder is refused.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    path: str = Field(min_length=1)
+
+
+class GitWorktree(BaseModel):
+    """A checkout of a repo. ``agent`` is true under ``<repo>/.claude/worktrees/``."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    path: str = Field(min_length=1)
+    branch: str | None = None
+    main: bool
+    agent: bool
+
+
+class GitInfoResult(BaseModel):
+    """The repo a folder belongs to. Not a repo: ``repository`` is false and the rest is empty.
+
+    ``changed`` counts the lines of ``git status --porcelain``, tracked and
+    untracked. ``branch`` is null on a detached HEAD, and ``detached`` is true.
+    ``worktrees`` lists the main checkout first, then the others by path.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    repository: bool
+    root: str | None = None
+    branch: str | None = None
+    detached: bool
+    changed: int = Field(ge=0)
+    worktrees: list[GitWorktree]
+
+
+class GitBranchesParams(BaseModel):
+    """``git.branches``. The local branches of the repo a folder belongs to, read only."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    path: str = Field(min_length=1)
+
+
+class GitBranch(BaseModel):
+    """A local branch. ``last_used`` is the time of its last commit, ISO 8601, or null."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    name: str = Field(min_length=1)
+    last_used: str | None = None
+
+
+class GitBranchesResult(BaseModel):
+    """Local branches, newest commit first, at most 200. Not a repo: empty."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    current: str | None = None
+    branches: list[GitBranch]
+
+
 __all__ = [
     "AgentInfo",
     "AgentLimits",
@@ -4878,6 +4945,12 @@ __all__ = [
     "FileReadResult",
     "FsListDirsParams",
     "FsListDirsResult",
+    "GitBranch",
+    "GitBranchesParams",
+    "GitBranchesResult",
+    "GitInfoParams",
+    "GitInfoResult",
+    "GitWorktree",
     "HelloParams",
     "HelloResult",
     "HelperStopParams",

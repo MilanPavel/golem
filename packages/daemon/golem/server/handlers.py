@@ -37,6 +37,7 @@ from golem.config_edit import (
 )
 from golem.doctor import MacPlatform, run_checks
 from golem.folders import FolderError, list_dirs
+from golem.gitinfo import git_branches, git_info
 from golem.mcp import McpServerError, McpSupervisor
 from golem.models import hardware, ollama
 from golem.models import options as model_options
@@ -232,6 +233,10 @@ from golem_protocol.commands import (
     FileReadResult,
     FsListDirsParams,
     FsListDirsResult,
+    GitBranchesParams,
+    GitBranchesResult,
+    GitInfoParams,
+    GitInfoResult,
     HelloParams,
     HelloResult,
     HelperStopParams,
@@ -596,6 +601,22 @@ async def _fs_list_dirs(ctx: RequestContext, params: FsListDirsParams) -> FsList
         raise RpcCallError(INVALID_PARAMS, "path must be an absolute path")
     try:
         return list_dirs(None if params.path is None else Path(params.path), Path.home())
+    except FolderError as exc:
+        raise RpcCallError(INVALID_PARAMS, str(exc)) from exc
+
+
+async def _git_info(ctx: RequestContext, params: GitInfoParams) -> GitInfoResult:
+    del ctx
+    try:
+        return await git_info(params.path, Path.home())
+    except FolderError as exc:
+        raise RpcCallError(INVALID_PARAMS, str(exc)) from exc
+
+
+async def _git_branches(ctx: RequestContext, params: GitBranchesParams) -> GitBranchesResult:
+    del ctx
+    try:
+        return await git_branches(params.path, Path.home())
     except FolderError as exc:
         raise RpcCallError(INVALID_PARAMS, str(exc)) from exc
 
@@ -2111,6 +2132,8 @@ def standard_methods() -> dict[str, Method]:
             "session.set_plan", SessionSetPlanParams, True, _session_set_plan
         ),
         "fs.list_dirs": Method("fs.list_dirs", FsListDirsParams, True, _fs_list_dirs),
+        "git.info": Method("git.info", GitInfoParams, True, _git_info),
+        "git.branches": Method("git.branches", GitBranchesParams, True, _git_branches),
         "setup.status": Method("setup.status", SetupStatusParams, True, _setup_status),
         "ollama.install": Method("ollama.install", OllamaInstallParams, True, _ollama_install),
         "ollama.install_cancel": Method(
