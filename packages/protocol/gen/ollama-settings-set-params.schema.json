@@ -1,0 +1,48 @@
+{
+  "additionalProperties": false,
+  "description": "``ollama.settings.set``. Change keys of ``[ollama]`` in the user's ``config.toml``.\n\nOnly the keys sent change, and the file keeps its comments. ``[ollama.models]`` is not\ntouched. Every value is checked first, and when any is wrong nothing is written.",
+  "properties": {
+    "idle_stop_minutes": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Idle Stop Minutes"
+    },
+    "parallel": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "const": "auto",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Parallel"
+    },
+    "start": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Start"
+    }
+  },
+  "title": "OllamaSettingsSetParams",
+  "type": "object"
+}

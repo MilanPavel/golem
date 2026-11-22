@@ -82,6 +82,8 @@ class DaemonState:
     memory: MemoryService | None = None
     """The memory service. None when ``[memory] enabled = false``."""
     local_servers: LocalServers | None = None
+    apply_ollama: Callable[[], None] = field(default=lambda: None)
+    """Hands the saved ``[ollama]`` table to the server manager and the call dispatcher."""
     installer: OllamaInstaller | None = None
     runtimes: dict[str, BrewInstaller] = field(default_factory=dict[str, BrewInstaller])
     user_home: Path | None = None

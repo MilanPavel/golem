@@ -1,0 +1,7 @@
+{
+  "additionalProperties": false,
+  "description": "``ollama.settings.get``. The ``[ollama]`` settings as golem uses them.",
+  "properties": {},
+  "title": "OllamaSettingsGetParams",
+  "type": "object"
+}

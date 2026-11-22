@@ -135,6 +135,7 @@ from golem.server.memory_rpc import (
     memory_write,
 )
 from golem.server.notifications_edit import notifications_get, notifications_set
+from golem.server.ollama_settings import ollama_settings_get, ollama_settings_set
 from golem.server.routines import (
     routine_get,
     routine_list,
@@ -333,6 +334,8 @@ from golem_protocol.commands import (
     OllamaInstallCancelResult,
     OllamaInstallParams,
     OllamaInstallResult,
+    OllamaSettingsGetParams,
+    OllamaSettingsSetParams,
     OllamaStartParams,
     OllamaStartResult,
     PermissionsSetModeParams,
@@ -2164,6 +2167,12 @@ def standard_methods() -> dict[str, Method]:
         ),
         "notifications.set": Method(
             "notifications.set", NotificationsSetParams, True, notifications_set
+        ),
+        "ollama.settings.get": Method(
+            "ollama.settings.get", OllamaSettingsGetParams, True, ollama_settings_get
+        ),
+        "ollama.settings.set": Method(
+            "ollama.settings.set", OllamaSettingsSetParams, True, ollama_settings_set
         ),
         "routing.get": Method("routing.get", RoutingGetParams, True, routing_get),
         "routing.set": Method("routing.set", RoutingSetParams, True, routing_set),

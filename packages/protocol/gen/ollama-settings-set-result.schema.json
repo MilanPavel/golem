@@ -1,0 +1,131 @@
+{
+  "$defs": {
+    "ConfigError": {
+      "additionalProperties": false,
+      "description": "One problem in a config text. ``line`` and ``column`` count from 1, when known.\n\n``path`` is the setting, as ``mcp.github.headers.Authorization``.",
+      "properties": {
+        "column": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Column"
+        },
+        "line": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Line"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        },
+        "path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Path"
+        }
+      },
+      "required": [
+        "message"
+      ],
+      "title": "ConfigError",
+      "type": "object"
+    },
+    "OllamaSettingsValues": {
+      "additionalProperties": false,
+      "description": "``[ollama]`` without ``models``. ``parallel`` is 1 to 8 or ``\"auto\"``.\n``running`` is true when a local server answers and ``started_by_golem`` when golem\nstarted it. A server you started keeps its own ``OLLAMA_NUM_PARALLEL``.",
+      "properties": {
+        "idle_stop_minutes": {
+          "title": "Idle Stop Minutes",
+          "type": "integer"
+        },
+        "parallel": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "const": "auto",
+              "type": "string"
+            }
+          ],
+          "title": "Parallel"
+        },
+        "running": {
+          "title": "Running",
+          "type": "boolean"
+        },
+        "start": {
+          "title": "Start",
+          "type": "boolean"
+        },
+        "started_by_golem": {
+          "title": "Started By Golem",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "start",
+        "idle_stop_minutes",
+        "parallel",
+        "started_by_golem",
+        "running"
+      ],
+      "title": "OllamaSettingsValues",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "``ok`` is false when a value was wrong, and the file is then untouched. ``values`` is\nwhat ``ollama.settings.get`` would now answer, set when ``ok``.",
+  "properties": {
+    "errors": {
+      "items": {
+        "$ref": "#/$defs/ConfigError"
+      },
+      "title": "Errors",
+      "type": "array"
+    },
+    "ok": {
+      "title": "Ok",
+      "type": "boolean"
+    },
+    "values": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/OllamaSettingsValues"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    }
+  },
+  "required": [
+    "ok"
+  ],
+  "title": "OllamaSettingsSetResult",
+  "type": "object"
+}

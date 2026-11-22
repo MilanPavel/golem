@@ -60,6 +60,8 @@ METHOD_ACCESS: Final[Mapping[str, Access]] = {
     "chat.draft": "browser",
     "notifications.get": "browser",
     "notifications.set": "browser",
+    "ollama.settings.get": "browser",
+    "ollama.settings.set": "browser",
     "routing.get": "browser",
     "routing.set": "browser",
     "trace.get": "device",
