@@ -45,11 +45,12 @@ def summarize(
     session carries it. ``helpers`` is ``(running, waiting)`` of a lead's helpers, None for no
     helper at work. ``step`` is a helper's newest step, and only a helper with a run open
     carries it. ``items`` is a lead's pending list, its own item and its helpers', oldest first;
-    without it the list is ``pending``. ``pending`` is the first item.
+    without it the list is ``pending``. ``pending`` is the first item that is not a ``batch``,
+    because an older client reads it.
     ``branch`` is the branch checked out in the session's folder, None when there is none."""
     session = activity.session
     listed = items if items is not None else ([] if pending is None else [pending])
-    pending = listed[0] if listed else pending
+    pending = next((item for item in listed if item.kind != "batch"), None)
     at_work = (activity.running or activity.waiting) and session.closed_at is None
     shown = step if at_work and session.parent_session_id is not None else None
     queued = wait if wait is not None and activity.running and session.closed_at is None else None

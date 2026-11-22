@@ -215,6 +215,11 @@ ShortText = Annotated[str, Field(min_length=1, max_length=120)]
 """One short line of the paid question: what is sent, or what is not."""
 
 
+UseHelpers = Literal["when_needed", "ask", "never"]
+"""``[agents] use_helpers``, the setting "Use helpers": ``when_needed`` lets the lead start helpers
+for a stated reason, ``ask`` shows a batch card to confirm first, ``never`` starts none."""
+
+
 class PendingHelper(BaseModel):
     """The helper a pending item belongs to: its session, its agent type, its label and its
     place (``index``) in the ``delegate`` call. For a grouped item (``count`` above 1) it is the
@@ -246,11 +251,18 @@ class PendingItem(BaseModel):
     (the helper's ``session_id``, ``agent``, ``label`` and ``index``). ``count`` is the number
     of helpers that ask this same question (the same ``kind``, ``name`` and ``subject``), which
     the lead lists once; null for a single item. An older daemon leaves both out.
+
+    A ``batch`` item is the card that asks the user to confirm a ``delegate`` batch before its
+    helpers start ("Use helpers: Ask me first"). ``call_id`` is the ``delegate`` call, the id an
+    answer names. ``helper_count`` is how many helpers the batch starts and ``agents`` their agent
+    type names, one for each helper, in the order of the call. It is only ever in
+    ``SessionSummary.pending_items``: ``SessionSummary.pending`` never holds one, because an
+    older client reads that field and knows only ``approval`` and ``consent``.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    kind: Literal["approval", "consent"]
+    kind: Literal["approval", "consent", "batch"]
     since: str = Field(min_length=1)
     call_id: str | None = Field(default=None, min_length=1)
     name: str | None = Field(default=None, min_length=1)
@@ -266,6 +278,8 @@ class PendingItem(BaseModel):
     not_sent: list[ShortText] | None = Field(default=None, max_length=10)
     helper: PendingHelper | None = None
     count: int | None = Field(default=None, ge=2)
+    helper_count: int | None = Field(default=None, ge=1, le=100)
+    agents: list[str] | None = Field(default=None, max_length=100)
 
 
 class SessionSummary(BaseModel):
@@ -335,6 +349,12 @@ class SessionSummary(BaseModel):
     step: str | None = Field(default=None, min_length=1, max_length=200)
     trimmed_at: str | None = Field(default=None, min_length=1)
     branch: str | None = Field(default=None, min_length=1)
+
+    @model_validator(mode="after")
+    def _pending_is_not_a_batch(self) -> Self:
+        if self.pending is not None and self.pending.kind == "batch":
+            raise ValueError("pending never holds a batch item; it is only in pending_items")
+        return self
 
 
 class SessionListResult(BaseModel):
@@ -4151,6 +4171,7 @@ class AgentsKeepParams(BaseModel):
 
     keep_days: int | None = None
     keep_problem_days: int | None = None
+    use_helpers: UseHelpers | None = None
 
 
 class AgentsKeepValues(BaseModel):
@@ -4159,6 +4180,8 @@ class AgentsKeepValues(BaseModel):
     ``max_calls``, ``working_seconds``, ``max_cost`` and ``max_tokens`` are the limits of
     ``[agents]`` that every helper gets when its own table and file leave them open; ``None`` when
     ``config.toml`` does not set one. ``agents.set_default_limits`` changes them.
+    ``use_helpers`` is ``[agents] use_helpers``; ``when_needed`` when ``config.toml`` does not
+    set it and for a daemon that does not know it.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -4169,6 +4192,7 @@ class AgentsKeepValues(BaseModel):
     working_seconds: int | None = None
     max_cost: float | None = None
     max_tokens: int | None = None
+    use_helpers: UseHelpers = "when_needed"
 
 
 class AgentsKeepResult(BaseModel):

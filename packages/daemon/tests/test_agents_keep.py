@@ -61,3 +61,22 @@ async def test_agents_keep_names_the_field_of_a_wrong_value(short_home: Path) ->
     finally:
         await client.close()
         await stop_daemon(app, task)
+
+
+async def test_agents_keep_reads_and_writes_use_helpers(short_home: Path) -> None:
+    config = short_home / "config.toml"
+    app, task = await start_daemon(short_home)
+    client = await RpcClient.connect(app.paths.socket_path)
+    try:
+        await client.call("hello", HELLO)
+        got = _result(await client.call("agents.keep", {}))
+        assert got["values"]["use_helpers"] == "when_needed"
+        saved = _result(await client.call("agents.keep", {"use_helpers": "ask"}))
+        assert saved["ok"] is True
+        assert saved["values"]["use_helpers"] == "ask"
+        assert tomllib.loads(config.read_text("utf-8"))["agents"]["use_helpers"] == "ask"
+        again = _result(await client.call("agents.keep", {}))
+        assert again["values"]["use_helpers"] == "ask"
+    finally:
+        await client.close()
+        await stop_daemon(app, task)

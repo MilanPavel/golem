@@ -640,8 +640,9 @@ class AgentSettings(BaseModel):
     helper of every type that its file and its own table leave open. ``at_once`` is how many
     helpers run at once, ``max_per_batch`` how many one message of the lead may start,
     ``per_message_cost`` the most (US dollars) all helpers of one message may cost, and
-    ``estimate_over`` the estimate (US dollars) above which a batch asks you first. They are only
-    read and checked here: a later step enforces them. ``max_per_batch`` is the one key that
+    ``estimate_over`` the estimate (US dollars) above which a batch asks you first.
+    ``use_helpers`` is the setting "Use helpers" (``when_needed``, ``ask``, ``never``). They are
+    only read and checked here: a later step enforces them. ``max_per_batch`` is the one key that
     ``[agents.explorer] max_per_turn`` also sets, so the two must agree when both are given.
 
     A finished helper keeps its steps for ``keep_days`` days from its end, then only a receipt
@@ -663,6 +664,7 @@ class AgentSettings(BaseModel):
     per_message_cost: float = Field(default=1.0, ge=0)
     estimate_over: float = Field(default=0.25, ge=0)
     delegate: DelegateSettings = Field(default_factory=DelegateSettings)
+    use_helpers: Literal["when_needed", "ask", "never"] = "when_needed"
     explorer: ExplorerSettings = Field(default_factory=ExplorerSettings)
     worker: AgentModelSettings = Field(default_factory=AgentModelSettings)
     reviewer: AgentModelSettings = Field(default_factory=AgentModelSettings)

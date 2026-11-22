@@ -6,7 +6,8 @@
 
 /** What a session waits for, as its summary carries it. */
 export interface InboxPending {
-  kind: "approval" | "consent";
+  /** `batch` is the card that confirms a batch of helpers; the Inbox does not list it yet, and a kind it does not know is skipped. */
+  kind: "approval" | "consent" | "batch";
   since: string;
   call_id?: string | null;
   name?: string | null;
@@ -22,6 +23,9 @@ export interface InboxPending {
   /** For a helper's paid question: what goes to the paid model, and what does not. */
   sent?: readonly string[] | null;
   not_sent?: readonly string[] | null;
+  /** For a `batch`: how many helpers it starts, and their agent type names. */
+  helper_count?: number | null;
+  agents?: readonly string[] | null;
 }
 
 /** The part of a session summary the Inbox reads. */
@@ -192,6 +196,7 @@ export function inboxItems(sessions: readonly InboxSession[], now: number): Inbo
     const lead = session.parent_session_id;
     if (lead !== undefined && lead !== null && ids.has(lead)) continue;
     for (const pending of pendingItemsOf(session)) {
+      if (pending.kind !== "approval" && pending.kind !== "consent") continue;
       const approval = pending.kind === "approval";
       const helper = helperOf(pending);
       items.push({

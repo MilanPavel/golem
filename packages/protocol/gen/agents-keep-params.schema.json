@@ -25,6 +25,23 @@
       ],
       "default": null,
       "title": "Keep Problem Days"
+    },
+    "use_helpers": {
+      "anyOf": [
+        {
+          "enum": [
+            "when_needed",
+            "ask",
+            "never"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Use Helpers"
     }
   },
   "title": "AgentsKeepParams",
