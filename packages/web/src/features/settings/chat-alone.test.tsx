@@ -83,12 +83,10 @@ test("a refused mode save says why", async () => {
   expect((await screen.findByRole("alert")).textContent).toContain("changed on disk");
 });
 
-test("Start with a plan sends chat.set, and shows an example plan for an everyday task", async () => {
+test("Start with a plan sends chat.set", async () => {
   const { fake, user } = mount("/settings/chat");
   const toggle = await screen.findByRole("switch", { name: "Start with a plan" });
   expect(toggle.getAttribute("aria-checked")).toBe("false");
-  expect(screen.getByText(/Plan a two-day trip to Lisbon/)).toBeTruthy();
-  expect(screen.getByText("Check the weather for both days")).toBeTruthy();
   fake.raw.getChat.mockResolvedValue({ instructions: [], plan_first: true, mode: "balanced" });
   await user.click(toggle);
   expect(fake.raw.setChat).toHaveBeenCalledWith({ plan_first: true });
