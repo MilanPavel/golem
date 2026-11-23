@@ -2,6 +2,83 @@
 
 What changed in each release of golem, newest first. `just release` writes each section from the commit messages on `main` ([CONTRIBUTING.md](CONTRIBUTING.md)), and the release pull request is the place to edit it. The GitHub release shows the same section. How a release is made is in [docs/sre.md](docs/sre.md), section 5.
 
+## [0.19.0] - 2026-11-23
+
+### Features
+
+- **client:** GolemKit's connection, with the relay, Noise and resume from seq ([#759](https://github.com/MilanPavel/golem/pull/759)) ([#1552](https://github.com/MilanPavel/golem/pull/1552))
+- **web:** the gateway connects out to the relay and serves paired phones ([#754](https://github.com/MilanPavel/golem/pull/754)) ([#1554](https://github.com/MilanPavel/golem/pull/1554))
+- **client:** GolemKit's view state for sessions, approvals and runs ([#760](https://github.com/MilanPavel/golem/pull/760)) ([#1555](https://github.com/MilanPavel/golem/pull/1555))
+- **protocol:** pair a phone with golem devices pair and Settings › Devices ([#755](https://github.com/MilanPavel/golem/pull/755)) ([#1557](https://github.com/MilanPavel/golem/pull/1557))
+- **client:** the iPhone app, its device key, and QR pairing ([#762](https://github.com/MilanPavel/golem/pull/762)) ([#1562](https://github.com/MilanPavel/golem/pull/1562))
+- **web:** helpers are rows under the lead in view, and a fork has a tag ([#1565](https://github.com/MilanPavel/golem/pull/1565)) ([#1569](https://github.com/MilanPavel/golem/pull/1569))
+- **daemon:** a finished helper is trimmed to a receipt after 7 days ([#1564](https://github.com/MilanPavel/golem/pull/1564)) ([#1570](https://github.com/MilanPavel/golem/pull/1570))
+- **web:** Settings sets how long a finished helper keeps its steps ([#1567](https://github.com/MilanPavel/golem/pull/1567)) ([#1571](https://github.com/MilanPavel/golem/pull/1571))
+- **web:** a helper's chat has a banner, and a trimmed helper opens as a receipt ([#1566](https://github.com/MilanPavel/golem/pull/1566)) ([#1572](https://github.com/MilanPavel/golem/pull/1572))
+- **daemon:** Continue as chat turns a helper into your own chat ([#1568](https://github.com/MilanPavel/golem/pull/1568)) ([#1573](https://github.com/MilanPavel/golem/pull/1573))
+- **client:** a golem://pair link opens pairing in every build ([#762](https://github.com/MilanPavel/golem/pull/762)) ([#1575](https://github.com/MilanPavel/golem/pull/1575))
+- **protocol:** the agents list carries the file, its path and why an agent cannot run ([#1583](https://github.com/MilanPavel/golem/pull/1583)) ([#1588](https://github.com/MilanPavel/golem/pull/1588))
+- **client:** answer approvals from the iPhone, with Face ID for Always allow ([#764](https://github.com/MilanPavel/golem/pull/764)) ([#1590](https://github.com/MilanPavel/golem/pull/1590))
+- **client:** the iPhone Inbox shows what needs you, what runs, and today ([#763](https://github.com/MilanPavel/golem/pull/763)) ([#1589](https://github.com/MilanPavel/golem/pull/1589))
+- **daemon:** save, copy and delete your own agent files, with a parse check first ([#1585](https://github.com/MilanPavel/golem/pull/1585)) ([#1592](https://github.com/MilanPavel/golem/pull/1592))
+- **web:** Settings › Agents is a list and a detail, with the definition on screen ([#1584](https://github.com/MilanPavel/golem/pull/1584)) ([#1593](https://github.com/MilanPavel/golem/pull/1593))
+- **client:** the iPhone says when it can't reach your Mac and keeps answers until it can ([#766](https://github.com/MilanPavel/golem/pull/766)) ([#1594](https://github.com/MilanPavel/golem/pull/1594))
+- **web:** edit, add, copy and delete your own agents in Settings ([#1586](https://github.com/MilanPavel/golem/pull/1586)) ([#1598](https://github.com/MilanPavel/golem/pull/1598))
+- **client:** read a session, reply, and start a new task from the iPhone ([#765](https://github.com/MilanPavel/golem/pull/765)) ([#1596](https://github.com/MilanPavel/golem/pull/1596))
+- **tui:** /agents opens an agent to read it, and copies, edits and deletes your own ([#1587](https://github.com/MilanPavel/golem/pull/1587)) ([#1595](https://github.com/MilanPavel/golem/pull/1595))
+- **web:** Settings hides the Sessions panel, and Back replaces the close button ([#1605](https://github.com/MilanPavel/golem/pull/1605))
+- **daemon:** git.info and git.branches tell the page about a folder's repo ([#1616](https://github.com/MilanPavel/golem/pull/1616))
+- **web:** model, folder and controls sit in one row inside the composer ([#1615](https://github.com/MilanPavel/golem/pull/1615))
+- **daemon:** fs.choose_folder opens the macOS folder dialog for a page on this Mac ([#1617](https://github.com/MilanPavel/golem/pull/1617))
+- **daemon:** a session knows its branch and tells its model when it changes ([#1619](https://github.com/MilanPavel/golem/pull/1619))
+- **daemon:** a new session can start on another branch of its folder ([#1618](https://github.com/MilanPavel/golem/pull/1618))
+- **web:** a bigger app icon, the golem carved in stone ([#1621](https://github.com/MilanPavel/golem/pull/1621))
+- **web:** the folder menu offers recent folders, worktrees and the macOS dialog ([#1622](https://github.com/MilanPavel/golem/pull/1622))
+- **web:** a branch chip in the composer starts a session on another branch ([#1623](https://github.com/MilanPavel/golem/pull/1623))
+- **daemon:** fs.reveal opens a folder in Finder, and the folder menus offer it ([#1625](https://github.com/MilanPavel/golem/pull/1625))
+- **daemon:** [agents] and [agents.<type>] set the limits of a helper, over its agent file ([#1333](https://github.com/MilanPavel/golem/pull/1333)) ([#1644](https://github.com/MilanPavel/golem/pull/1644))
+- **web:** Settings gets a Chat page with what the chat shows ([#1645](https://github.com/MilanPavel/golem/pull/1645))
+- **daemon:** defaults for new chats, and your instruction lines in the prompt ([#1646](https://github.com/MilanPavel/golem/pull/1646))
+- **daemon:** a helper's time limit counts working time, not waiting, and survives a restart ([#1334](https://github.com/MilanPavel/golem/pull/1334)) ([#1647](https://github.com/MilanPavel/golem/pull/1647))
+- **web:** MCP servers show a sign-in line, and a new token is tested before it is kept ([#1648](https://github.com/MilanPavel/golem/pull/1648))
+- **daemon:** chat.prompt shows what a new chat's model reads ([#1652](https://github.com/MilanPavel/golem/pull/1652))
+- **web:** Chat settings choose how far it goes alone, and Tool rules links to it ([#1653](https://github.com/MilanPavel/golem/pull/1653))
+- **daemon:** a helper stops at its cost and token limits too, and says how far it got ([#1335](https://github.com/MilanPavel/golem/pull/1335)) ([#1654](https://github.com/MilanPavel/golem/pull/1654))
+- **daemon:** chat.draft drafts instruction lines from your own words ([#1655](https://github.com/MilanPavel/golem/pull/1655))
+- **daemon:** Ollama settings can be read and changed over the wire ([#1657](https://github.com/MilanPavel/golem/pull/1657))
+- **daemon:** agents.set_limits sets the limits of a helper type, agents.list shows them ([#1656](https://github.com/MilanPavel/golem/pull/1656)) ([#1658](https://github.com/MilanPavel/golem/pull/1658))
+- **web:** Chat settings has Your instructions, with what the model reads ([#1659](https://github.com/MilanPavel/golem/pull/1659))
+- **daemon:** hf.search and hf.files look up GGUF models on Hugging Face and check what fits ([#1641](https://github.com/MilanPavel/golem/pull/1641)) ([#1661](https://github.com/MilanPavel/golem/pull/1661))
+- **web:** Settings › Agents sets the limits of each helper type and of every helper ([#1339](https://github.com/MilanPavel/golem/pull/1339)) ([#1660](https://github.com/MilanPavel/golem/pull/1660))
+- **tui:** /agents shows the limits a helper really runs with, and those of every helper ([#1340](https://github.com/MilanPavel/golem/pull/1340)) ([#1664](https://github.com/MilanPavel/golem/pull/1664))
+- **daemon:** chat.suggestions suggests instruction lines from your chats and memory ([#1663](https://github.com/MilanPavel/golem/pull/1663))
+- **models:** stars decide the model menu ([#1662](https://github.com/MilanPavel/golem/pull/1662))
+- **daemon:** a pure policy says when a helper is worth starting, and in which shape ([#1311](https://github.com/MilanPavel/golem/pull/1311)) ([#1665](https://github.com/MilanPavel/golem/pull/1665))
+- **protocol:** the "Use helpers" setting and a batch pending item old clients never see ([#1315](https://github.com/MilanPavel/golem/pull/1315)) ([#1666](https://github.com/MilanPavel/golem/pull/1666))
+- **daemon:** the delegate prompt gives the reasons and a line per agent type, by tier ([#1313](https://github.com/MilanPavel/golem/pull/1313)) ([#1668](https://github.com/MilanPavel/golem/pull/1668))
+- **web:** Settings › Models replaces API keys ([#1670](https://github.com/MilanPavel/golem/pull/1670))
+- **web:** find and download a model from Hugging Face in Get models ([#1673](https://github.com/MilanPavel/golem/pull/1673))
+- **daemon:** "Use helpers" is applied: never hides delegate, ask parks the lead first ([#1317](https://github.com/MilanPavel/golem/pull/1317)) ([#1672](https://github.com/MilanPavel/golem/pull/1672))
+- **web:** browser checks for Settings › Chat, Models and MCP tokens, and a guide for them ([#1674](https://github.com/MilanPavel/golem/pull/1674))
+- **daemon:** golem evals helpers measures helpers on and off in four arms ([#1319](https://github.com/MilanPavel/golem/pull/1319)) ([#1675](https://github.com/MilanPavel/golem/pull/1675))
+- **web:** Settings › Agents has "Use helpers", and "Ask me first" shows a card with Run ([#1323](https://github.com/MilanPavel/golem/pull/1323)) ([#1676](https://github.com/MilanPavel/golem/pull/1676))
+- **tui:** /agents sets "Use helpers", and "Ask me first" asks before helpers start ([#1324](https://github.com/MilanPavel/golem/pull/1324)) ([#1680](https://github.com/MilanPavel/golem/pull/1680))
+- **web:** the composer starts taller and stops growing at 40% of the window ([#1681](https://github.com/MilanPavel/golem/pull/1681))
+
+### Fixes
+
+- **daemon:** a lead can name any ready hosted model for a helper, loosely written too ([#1558](https://github.com/MilanPavel/golem/pull/1558)) ([#1560](https://github.com/MilanPavel/golem/pull/1560))
+- **tools:** delegate needs an agent and no longer starts an explorer by default ([#1576](https://github.com/MilanPavel/golem/pull/1576)) ([#1577](https://github.com/MilanPavel/golem/pull/1577))
+- **client:** GolemKit's relay tests no longer hang ([#1556](https://github.com/MilanPavel/golem/pull/1556)) ([#1579](https://github.com/MilanPavel/golem/pull/1579))
+- **sessions:** a helper's time limit fires, the manager no longer overwrites its clock ([#1578](https://github.com/MilanPavel/golem/pull/1578)) ([#1580](https://github.com/MilanPavel/golem/pull/1580))
+- **client:** the iPhone app says why it asks for Face ID, so iOS does not end it ([#1597](https://github.com/MilanPavel/golem/pull/1597))
+- **web:** centre the app icon's golem, and version the icon URLs so installed apps update ([#1626](https://github.com/MilanPavel/golem/pull/1626))
+- **daemon:** the branch tests use a folder that is really outside a repo ([#1649](https://github.com/MilanPavel/golem/pull/1649)) ([#1650](https://github.com/MilanPavel/golem/pull/1650))
+
+### Docs
+
+- ADR-051 records the pairing wire settled in #755 ([#1561](https://github.com/MilanPavel/golem/pull/1561))
+
 ## [0.18.0] - 2026-11-21
 
 ### Features
