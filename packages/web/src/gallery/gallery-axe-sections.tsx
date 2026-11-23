@@ -32,6 +32,7 @@ export const GALLERY_SECTIONS = [
   "memory",
   "chat-stage",
   "settings-chat",
+  "mode-track",
   "settings-models",
   "routing",
   "settings-context",

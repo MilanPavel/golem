@@ -2342,6 +2342,16 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
         </div>
       </section>
 
+      <section className="mt-6" id={anchor("Mode track")}>
+        <h3 className="mb-2 font-mono text-xs text-faint">Settings › Chat › While it works: the mode track</h3>
+        <div className="flex flex-col gap-4 rounded-lg border border-line bg-bg p-4">
+          {(["careful", "balanced", "autopilot"] as const).map((item) => (
+            <HowFarView key={item} mode={item} planFirst={false} onMode={() => undefined} onPlan={() => undefined} />
+          ))}
+          <HowFarView mode="balanced" planFirst onMode={() => undefined} onPlan={() => undefined} />
+        </div>
+      </section>
+
       <section className="mt-6" id={anchor("Settings models")}>
         <h3 className="mb-2 font-mono text-xs text-faint">Settings › Models</h3>
         <ModelsDemo />
