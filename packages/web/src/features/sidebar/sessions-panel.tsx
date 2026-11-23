@@ -16,11 +16,10 @@ import {
 import { cn } from "../../ui/cn.ts";
 import { Code } from "../../ui/code.tsx";
 import { IconButton } from "../../ui/icon-button.tsx";
-import { ClockIcon, FolderIcon, MoreIcon, SlidersIcon } from "../../ui/icons.tsx";
+import { ClockIcon, FolderIcon, MoreIcon } from "../../ui/icons.tsx";
 import { Link } from "../../ui/link.tsx";
 import { Input } from "../../ui/input.tsx";
-import { Menu, MenuCheckboxItem, MenuContent, MenuItem, MenuTrigger } from "../../ui/menu.tsx";
-import { useShowHelpers } from "./show-helpers.ts";
+import { Menu, MenuContent, MenuItem, MenuTrigger } from "../../ui/menu.tsx";
 import { HelperRowCard, SQUARE, type HelperCardActions } from "./helper-row-card.tsx";
 import { openHelper, useHelperOpen } from "../chat/index.ts";
 import { useNavigate, usePageActions, useRoute, useSessionList } from "../../store/page-context.tsx";
@@ -417,10 +416,9 @@ export function SessionsPanel({ sessions, selectedId, openHelperId = null, now, 
     setClosing(session);
   };
   const open = useMemo(() => sessions.filter((session) => session.status !== "closed"), [sessions]);
-  const [showHelpers, setShowHelpers] = useShowHelpers();
-  // A helper is not a row of its own (ADR-059). The filter reads the lead rows, and the helpers only with "Show helpers".
-  // The lead in view, or the lead of the helper in view, shows its helpers as rows; with "Show helpers" every lead does.
-  const grouped = useMemo(() => groupHelpers(open, { showHelpers, openId: openHelperId ?? selectedId }), [open, showHelpers, openHelperId, selectedId]);
+  // A helper is not a row of its own (ADR-059), and the filter reads the lead rows only.
+  // The lead in view, or the lead of the helper in view, shows its helpers as rows.
+  const grouped = useMemo(() => groupHelpers(open, { openId: openHelperId ?? selectedId }), [open, openHelperId, selectedId]);
   const needle = filter.trim().toLowerCase();
   const shown = useMemo(
     () =>
@@ -429,10 +427,9 @@ export function SessionsPanel({ sessions, selectedId, openHelperId = null, now, 
         : grouped.rows.filter(
             (session) =>
               (session.title ?? "").toLowerCase().includes(needle) ||
-              (session.cwd ? folderName(session.cwd) : "").toLowerCase().includes(needle) ||
-              (showHelpers && (grouped.nested.get(session.session_id) ?? []).some((helper) => (helper.title ?? "").toLowerCase().includes(needle))),
+              (session.cwd ? folderName(session.cwd) : "").toLowerCase().includes(needle),
           ),
-    [grouped, needle, showHelpers],
+    [grouped, needle],
   );
   const groups = useMemo(() => timeChunks(shown, now), [shown, now]);
   return (
@@ -454,18 +451,6 @@ export function SessionsPanel({ sessions, selectedId, openHelperId = null, now, 
           }}
           className="py-1.5"
         />
-        <Menu>
-          <MenuTrigger asChild>
-            <IconButton label="List options" tooltip="List options" className="size-8 shrink-0">
-              <SlidersIcon />
-            </IconButton>
-          </MenuTrigger>
-          <MenuContent align="end">
-            <MenuCheckboxItem checked={showHelpers} onCheckedChange={(next) => setShowHelpers(next === true)}>
-              Show helpers
-            </MenuCheckboxItem>
-          </MenuContent>
-        </Menu>
       </div>
       <div ref={list} tabIndex={-1} className="flex min-h-0 flex-1 flex-col gap-3.5 overflow-y-auto pr-0.5 outline-none">
         {groups.length === 0 ? (
