@@ -100,3 +100,85 @@ test("Steps and Thinking on the Chat page change how the transcript shows a turn
   await expect(page.getByRole("region", { name: "Thinking" })).toHaveCount(0);
   await expect(page.locator("[data-thinking] button")).toHaveAttribute("aria-expanded", "false");
 });
+
+test("an instruction line moves the count and the reads line, and See all of it lists the parts", async ({ page, rig }) => {
+  const stack = await startStack(rig);
+  await openSettings(page, stack.gateway.url, "Chat");
+  const reads = page.getByRole("group", { name: "What the model reads" });
+  await expect(reads).toContainText("yours are 0");
+  await expect(page.getByText("No instructions. The model answers in its own style.")).toBeVisible();
+
+  await page.getByRole("button", { name: "+ Write a line" }).click();
+  const line = page.getByRole("textbox", { name: "Line 1" });
+  await line.fill(LINE);
+  await line.press("Enter");
+  await expect(page.getByText(/^1 line · about [1-9]\d* tokens in every chat$/)).toBeVisible();
+  await expect(reads).not.toContainText("yours are 0");
+
+  await reads.getByRole("button", { name: "See all of it" }).click();
+  const parts = reads.getByRole("list", { name: "Parts" });
+  await expect(parts.getByRole("button").first()).toHaveText(/^Your instructions/);
+  await expect(reads.getByRole("button", { name: "Hide" })).toBeVisible();
+});
+
+test("the mode track follows the stop, and Autopilot asks first and then saves", async ({ page, rig }) => {
+  const stack = await startStack(rig);
+  await openSettings(page, stack.gateway.url, "Chat");
+  const mode = page.getByRole("radiogroup", { name: "Mode" });
+  const zones = (state: string) => mode.locator(`[data-zone="${state}"]`);
+
+  await expect(mode.getByRole("radio", { name: "Balanced" })).toHaveAttribute("aria-checked", "true");
+  await expect(zones("alone")).toHaveCount(2);
+  await expect(zones("asks")).toHaveCount(1);
+
+  await mode.getByRole("radio", { name: "Careful" }).click();
+  await expect(mode.getByRole("radio", { name: "Careful" })).toHaveAttribute("aria-checked", "true");
+  await expect(zones("alone")).toHaveCount(1);
+  await expect(zones("asks")).toHaveCount(2);
+  await expect(zones("lock")).toHaveCount(1);
+  await expect(page.getByRole("status").filter({ hasText: /^Saved to / })).toBeVisible();
+
+  // Autopilot asks in place first, and Cancel keeps the old stop.
+  await mode.getByRole("radio", { name: "Autopilot" }).click();
+  const ask = page.getByRole("group", { name: "Use Autopilot?" });
+  await expect(ask).toBeVisible();
+  await ask.getByRole("button", { name: "Cancel" }).click();
+  await expect(mode.getByRole("radio", { name: "Careful" })).toHaveAttribute("aria-checked", "true");
+
+  await mode.getByRole("radio", { name: "Autopilot" }).click();
+  await ask.getByRole("button", { name: "Use Autopilot" }).click();
+  await expect(mode.getByRole("radio", { name: "Autopilot" })).toHaveAttribute("aria-checked", "true");
+  await expect(zones("alone")).toHaveCount(3);
+  await expect(page.getByRole("status").filter({ hasText: /^Saved to / })).toBeVisible();
+
+  // It was saved: a new load shows it.
+  await page.reload();
+  await expect(page.getByRole("radiogroup", { name: "Mode" }).getByRole("radio", { name: "Autopilot" })).toHaveAttribute("aria-checked", "true");
+});
+
+test("the sample answer follows Steps and Thinking, and a footer part can be turned off", async ({ page, rig }) => {
+  const stack = await startStack(rig);
+  await openSettings(page, stack.gateway.url, "Chat");
+  const shows = page.getByRole("list", { name: "What you see" });
+  const steps = shows.locator("[data-activity] button").first();
+  const thinking = shows.locator("[data-thinking] button");
+
+  await shows.getByRole("radiogroup", { name: "Steps" }).getByRole("radio", { name: "Verbose" }).click();
+  await shows.getByRole("radiogroup", { name: "Thinking" }).getByRole("radio", { name: "Open" }).click();
+  await expect(steps).toHaveAttribute("aria-expanded", "true");
+  await expect(shows.getByRole("region", { name: "Thinking" })).toBeVisible();
+
+  await shows.getByRole("radiogroup", { name: "Steps" }).getByRole("radio", { name: "Quiet" }).click();
+  await shows.getByRole("radiogroup", { name: "Thinking" }).getByRole("radio", { name: "Collapsed" }).click();
+  await expect(steps).toHaveAttribute("aria-expanded", "false");
+  await expect(shows.getByRole("region", { name: "Thinking" })).toHaveCount(0);
+  await expect(thinking).toHaveAttribute("aria-expanded", "false");
+
+  await shows.getByRole("radiogroup", { name: "Thinking" }).getByRole("radio", { name: "Hidden" }).click();
+  await expect(shows.getByText("thinking is hidden")).toBeVisible();
+
+  const footer = shows.locator("[data-footer-line]");
+  await expect(footer).toContainText("local");
+  await shows.getByRole("group", { name: "Parts of the line under each answer" }).getByRole("button", { name: "Local or hosted" }).click();
+  await expect(footer).not.toContainText("local");
+});
