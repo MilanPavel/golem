@@ -6,7 +6,7 @@ import { ToolLine, TranscriptColumn, TranscriptMessages, waitingLine } from "./t
 import type { PullsSnapshot } from "../../store/pulls.ts";
 import { NOTICE_CHAT, SAMPLE_CHAT } from "./sample.ts";
 import { detailStore } from "./detail.ts";
-import { footerStore, openOnFailStore } from "./chat-choices.ts";
+import { footerStore } from "./chat-choices.ts";
 import { readThinkingMode, setThinkingMode, thinkingModeStore } from "./thinking-shown.ts";
 
 const noContrast = { rules: { "color-contrast": { enabled: false } } };
@@ -387,16 +387,14 @@ const fourTools: ToolBlock[] = [
 ];
 const turn = (tools: ToolBlock[], over: Partial<ChatMessage> = {}) => render(<TranscriptMessages chat={chat([answer({ tools, durationMs: 42_100, ...over })])} />);
 
-// The older tests below read the whole footer and a folded line, so they start with both choices off. The newer ones set what they test.
+// The older tests below read the whole footer, so they start with nothing left out. The newer ones set what they test.
 beforeEach(() => {
-  openOnFailStore.set(false);
   footerStore.set({ off: [], leaveOutEmpty: false });
 });
 
 afterEach(() => {
   detailStore.set("normal");
   thinkingModeStore.set("collapsed");
-  openOnFailStore.set(true);
   footerStore.set({ off: [], leaveOutEmpty: true });
   localStorage.clear();
 });
@@ -677,23 +675,26 @@ test("a turn without a web tool keeps its links plain", () => {
 const failedStep: ToolBlock = { callId: "f1", name: "run_shell", args: { command: "date +%A" }, status: "done", summary: "exit 1", unsuccessful: true };
 const goodStep: ToolBlock = { callId: "g1", name: "read_file", args: { path: "a.ts" }, status: "done", summary: "3 lines" };
 
-test("with a failed step the activity line starts open, even in Quiet", () => {
+test("a failed step does not open the activity line in Quiet or Normal", () => {
   detailStore.set("quiet");
-  openOnFailStore.set(true);
+  const { unmount } = turn([goodStep, failedStep]);
+  expect(screen.getByRole("button", { name: "2 steps" }).getAttribute("aria-expanded")).toBe("false");
+  unmount();
+  detailStore.set("normal");
   turn([goodStep, failedStep]);
-  expect(screen.getByRole("button", { name: "2 steps" }).getAttribute("aria-expanded")).toBe("true");
+  expect(screen.getByRole("button", { name: /1 failed/ }).getAttribute("aria-expanded")).toBe("false");
+});
+
+test("Verbose opens the activity line, with a failed step or not", () => {
+  detailStore.set("verbose");
+  turn([goodStep, failedStep]);
   expect(screen.getByRole("list", { name: "Tool calls" })).toBeTruthy();
 });
 
-test("a turn with no failed step starts folded in Quiet, and so does a failed one when the choice is off", () => {
+test("a step waiting for approval opens the activity line in Quiet", () => {
   detailStore.set("quiet");
-  openOnFailStore.set(true);
-  const { unmount } = turn([goodStep]);
-  expect(screen.getByRole("button", { name: "1 step" }).getAttribute("aria-expanded")).toBe("false");
-  unmount();
-  openOnFailStore.set(false);
-  turn([goodStep, failedStep]);
-  expect(screen.getByRole("button", { name: "2 steps" }).getAttribute("aria-expanded")).toBe("false");
+  turn([goodStep, { callId: "w1", name: "run_shell", args: { command: "ls" }, status: "waiting" }]);
+  expect(screen.getByRole("button", { name: "2 steps" }).getAttribute("aria-expanded")).toBe("true");
 });
 
 test("Thinking Open shows the text under the line without a click, and a click folds it", () => {

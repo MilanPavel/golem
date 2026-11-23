@@ -100,13 +100,7 @@ export type HowFarProps = {
 export function HowFarView({ mode, planFirst, onMode, onPlan, saved = null, error = null }: HowFarProps) {
   const id = useId();
   return (
-    <section aria-labelledby={`${id}-head`} className="flex flex-col gap-3">
-      <div className="flex max-w-column flex-col gap-1">
-        <h3 id={`${id}-head`} className="text-base font-semibold text-ink">
-          How far it goes alone
-        </h3>
-        <p className="text-sm text-muted">What golem may do before it checks with you. The composer changes one chat.</p>
-      </div>
+    <div className="flex flex-col gap-3">
       <ul aria-label="How far it goes alone" className="m-0 flex max-w-column list-none flex-col rounded-lg border border-line bg-surface px-4 py-1">
         <ChatRow setting="default mode" label="Mode" labelId={`${id}-mode`} stacked control={<ModeCards mode={mode} onSave={onMode} saved={saved} />}>
           Your tool rules are checked first, in every mode.
@@ -133,7 +127,7 @@ export function HowFarView({ mode, planFirst, onMode, onPlan, saved = null, erro
           {error}
         </p>
       )}
-    </section>
+    </div>
   );
 }
 

@@ -74,17 +74,3 @@ export function Switch({ labelledBy, checked, onToggle }: { labelledBy: string; 
     </button>
   );
 }
-
-/** A part of the line under an answer: pressed means it shows. */
-export function PartChip({ on, onToggle, children }: { on: boolean; onToggle: () => void; children: string }) {
-  return (
-    <button
-      type="button"
-      aria-pressed={on}
-      onClick={onToggle}
-      className="cursor-pointer rounded-full border border-line-strong bg-surface px-3 py-1 text-xs text-muted outline-offset-2 outline-clay hover:text-ink focus-visible:outline-2 aria-pressed:border-clay aria-pressed:bg-clay-soft aria-pressed:text-clay-ink"
-    >
-      {children}
-    </button>
-  );
-}

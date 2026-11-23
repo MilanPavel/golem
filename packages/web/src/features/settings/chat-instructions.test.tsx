@@ -248,7 +248,7 @@ test("search finds instructions, response style and system prompt in Chat", () =
 
 test("the page has no general or code wording in the section", async () => {
   mount();
-  const section = (await screen.findByRole("heading", { name: "Your instructions" })).closest("section");
+  const section = (await screen.findByRole("list", { name: "Parts" })).closest("[data-setting]");
   expect(section?.textContent ?? "").not.toMatch(/\b(git|commits?|code|repos?)\b/i);
 });
 

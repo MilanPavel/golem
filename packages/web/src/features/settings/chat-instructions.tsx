@@ -175,12 +175,12 @@ export function InstructionsView({ saved, onSave, onDraft, onPreview, prompt, pr
   const dragFrom = useRef<number | null>(null);
   const [done, setDone] = useState(false);
   const [error, setError] = useState<{ id: number | null; message: string } | null>(null);
+  const id = useId();
   const [description, setDescription] = useState("");
   const [drafts, setDrafts] = useState<string[] | null>(null);
   const [drafting, setDrafting] = useState(false);
   const [draftError, setDraftError] = useState<string | null>(null);
   const [dismissed, setDismissed] = useState<ReadonlySet<string>>(new Set());
-  const id = useId();
 
   function put(list: Row[]): void {
     rowsRef.current = list;
@@ -267,13 +267,7 @@ export function InstructionsView({ saved, onSave, onDraft, onPreview, prompt, pr
   const count = filled(texts).length;
 
   return (
-    <section aria-labelledby={`${id}-head`} data-setting="instructions" className="flex flex-col gap-3">
-      <div className="flex max-w-column flex-col gap-1">
-        <h3 id={`${id}-head`} className="text-base font-semibold text-ink">
-          Your instructions
-        </h3>
-        <p className="text-sm text-muted">Lines golem puts in the system prompt of every chat, word for word. Empty means nothing is added.</p>
-      </div>
+    <div data-setting="instructions" className="flex flex-col gap-3">
       <div className="flex flex-col items-stretch gap-5 chat:flex-row chat:items-start">
         <div className="flex min-w-0 flex-1 flex-col gap-4 rounded-lg border border-line bg-surface p-4">
           {rows.length === 0 ? (
@@ -425,7 +419,7 @@ export function InstructionsView({ saved, onSave, onDraft, onPreview, prompt, pr
         </div>
         <PromptPreview prompt={prompt} error={promptError} onNavigate={onNavigate} />
       </div>
-    </section>
+    </div>
   );
 }
 

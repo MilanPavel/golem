@@ -62,6 +62,7 @@ import { FORM_CASES } from "../features/setup/sample.ts";
 import { HeroCard, PathsGrid } from "../features/setup/info-parts.tsx";
 import { HowFarView } from "../features/settings/chat-alone.tsx";
 import { ChatSection } from "../features/settings/chat-section.tsx";
+import { Stage, YouRow } from "../features/settings/chat-stage.tsx";
 import { InstructionsView } from "../features/settings/chat-instructions.tsx";
 import { ModelsView } from "../features/settings/models/models-view.tsx";
 import { IDLE_SETUP, MODELS_CASES, NO_ACTIONS, NO_PULLS } from "../features/settings/models/models-sample.ts";
@@ -2319,6 +2320,19 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
       <section className="mt-6" id={anchor("Memory")}>
         <h3 className="mb-2 font-mono text-xs text-faint">Memory</h3>
         <MemoryDemo />
+      </section>
+
+      <section className="mt-6" id={anchor("Chat stage")}>
+        <h3 className="mb-2 font-mono text-xs text-faint">Chat stage</h3>
+        <div className="rounded-lg border border-line bg-bg p-4">
+          <Stage number={1} title="Before you write" hint="golem puts these lines in every chat, word for word">
+            <p className="rounded-lg border border-line bg-surface p-4 text-sm text-muted">The content of the stage.</p>
+          </Stage>
+          <YouRow>Plan a weekend in Porto and save it to my notes</YouRow>
+          <Stage number={2} title="While it works" hint="how far it goes before it checks with you" last>
+            <p className="rounded-lg border border-line bg-surface p-4 text-sm text-muted">The last stage has no line below its badge.</p>
+          </Stage>
+        </div>
       </section>
 
       <section className="mt-6" id={anchor("Settings chat")}>

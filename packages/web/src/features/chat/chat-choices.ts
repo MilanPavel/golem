@@ -20,24 +20,11 @@ function write(key: string, value: string): void {
   }
 }
 
-// Open it when a step fails.
-
-export const OPEN_ON_FAIL_KEY = "golem.openOnFail";
-
-/** On unless the stored word is `off`. */
-export function readOpenOnFail(): boolean {
-  return read(OPEN_ON_FAIL_KEY) !== "off";
-}
-
-export const openOnFailStore = createStore<boolean>(readOpenOnFail());
-
-export function setOpenOnFail(on: boolean): void {
-  openOnFailStore.set(on);
-  write(OPEN_ON_FAIL_KEY, on ? "on" : "off");
-}
-
-export function useOpenOnFail(): boolean {
-  return useSyncExternalStore(openOnFailStore.subscribe, openOnFailStore.getSnapshot);
+// The old "open it when a step fails" choice is gone: its key is removed once on load.
+try {
+  globalThis.localStorage.removeItem("golem.openOnFail");
+} catch {
+  // Storage is not there; there is nothing to remove.
 }
 
 // The line under each answer.
