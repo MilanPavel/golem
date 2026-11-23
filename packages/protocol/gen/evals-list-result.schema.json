@@ -1,0 +1,141 @@
+{
+  "$defs": {
+    "EvalArmUsed": {
+      "additionalProperties": false,
+      "description": "An arm of a measurement and the model it ran with.",
+      "properties": {
+        "model": {
+          "minLength": 1,
+          "title": "Model",
+          "type": "string"
+        },
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "model"
+      ],
+      "title": "EvalArmUsed",
+      "type": "object"
+    },
+    "EvalSummary": {
+      "additionalProperties": false,
+      "description": "One line of ``evals.list``. ``runs_played`` of ``runs_total`` are done, and ``proposes``\nis how many of the four numbers it measured.",
+      "properties": {
+        "arms": {
+          "items": {
+            "$ref": "#/$defs/EvalArmUsed"
+          },
+          "title": "Arms",
+          "type": "array"
+        },
+        "cost_usd": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cost Usd"
+        },
+        "ended_at": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Ended At"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "in_use": {
+          "default": false,
+          "title": "In Use",
+          "type": "boolean"
+        },
+        "proposes": {
+          "default": 0,
+          "maximum": 4,
+          "minimum": 0,
+          "title": "Proposes",
+          "type": "integer"
+        },
+        "runs_played": {
+          "minimum": 0,
+          "title": "Runs Played",
+          "type": "integer"
+        },
+        "runs_total": {
+          "minimum": 0,
+          "title": "Runs Total",
+          "type": "integer"
+        },
+        "started_at": {
+          "minLength": 1,
+          "title": "Started At",
+          "type": "string"
+        },
+        "state": {
+          "enum": [
+            "running",
+            "stopped",
+            "done"
+          ],
+          "title": "State",
+          "type": "string"
+        },
+        "stop_reason": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Stop Reason"
+        }
+      },
+      "required": [
+        "id",
+        "started_at",
+        "state",
+        "arms",
+        "runs_played",
+        "runs_total"
+      ],
+      "title": "EvalSummary",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "measurements": {
+      "items": {
+        "$ref": "#/$defs/EvalSummary"
+      },
+      "title": "Measurements",
+      "type": "array"
+    }
+  },
+  "title": "EvalsListResult",
+  "type": "object"
+}

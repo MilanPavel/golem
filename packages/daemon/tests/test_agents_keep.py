@@ -80,3 +80,30 @@ async def test_agents_keep_reads_and_writes_use_helpers(short_home: Path) -> Non
     finally:
         await client.close()
         await stop_daemon(app, task)
+
+
+async def test_agents_keep_reads_the_delegate_numbers_and_whether_they_are_defaults(
+    short_home: Path,
+) -> None:
+    config = short_home / "config.toml"
+    config.write_text("[agents.delegate]\nread_share = 0.42\n", "utf-8")
+    app, task = await start_daemon(short_home)
+    client = await RpcClient.connect(app.paths.socket_path)
+    try:
+        await client.call("hello", HELLO)
+        got = _result(await client.call("agents.keep", {}))
+        assert got["values"]["delegate"] == {
+            "read_share": {"value": 0.42, "default": 0.3, "is_default": False},
+            "fill_share": {"value": 0.85, "default": 0.85, "is_default": True},
+            "job_share": {"value": 0.1, "default": 0.1, "is_default": True},
+            "price_ratio": {"value": 3.0, "default": 3.0, "is_default": True},
+        }
+        # They are read-only: writing another key leaves them alone.
+        saved = _result(await client.call("agents.keep", {"keep_days": 9}))
+        assert saved["ok"] is True
+        assert saved["values"]["delegate"]["read_share"]["value"] == 0.42
+        refused = await client.call("agents.keep", {"delegate": {"read_share": 0.5}})
+        assert "error" in refused
+    finally:
+        await client.close()
+        await stop_daemon(app, task)

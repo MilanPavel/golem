@@ -1,0 +1,53 @@
+{
+  "$defs": {
+    "AgentsDelegateNumber": {
+      "additionalProperties": false,
+      "description": "One number of ``[agents.delegate]``: ``value`` is the one in force, ``default`` the one\ngolem ships, and ``is_default`` is true when the two are equal.",
+      "properties": {
+        "default": {
+          "title": "Default",
+          "type": "number"
+        },
+        "is_default": {
+          "title": "Is Default",
+          "type": "boolean"
+        },
+        "value": {
+          "title": "Value",
+          "type": "number"
+        }
+      },
+      "required": [
+        "value",
+        "default",
+        "is_default"
+      ],
+      "title": "AgentsDelegateNumber",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "The four numbers of ``[agents.delegate]`` that say when a helper is worth starting.\n\n``read_share``, ``fill_share`` and ``job_share`` are shares of the lead's window, and\n``price_ratio`` is how many times dearer the lead must be. Read-only here: a measurement\nchanges them (``evals.apply``), or the user edits ``config.toml``.",
+  "properties": {
+    "fill_share": {
+      "$ref": "#/$defs/AgentsDelegateNumber"
+    },
+    "job_share": {
+      "$ref": "#/$defs/AgentsDelegateNumber"
+    },
+    "price_ratio": {
+      "$ref": "#/$defs/AgentsDelegateNumber"
+    },
+    "read_share": {
+      "$ref": "#/$defs/AgentsDelegateNumber"
+    }
+  },
+  "required": [
+    "read_share",
+    "fill_share",
+    "job_share",
+    "price_ratio"
+  ],
+  "title": "AgentsDelegateValues",
+  "type": "object"
+}

@@ -1,0 +1,7 @@
+{
+  "additionalProperties": false,
+  "description": "``evals.list``. The measurements kept on this machine, the newest first.",
+  "properties": {},
+  "title": "EvalsListParams",
+  "type": "object"
+}

@@ -1923,6 +1923,150 @@ test("agentsKeep sends only the keys it was given and checks what comes back", a
   }
 });
 
+const EVAL_NUMBERS = [
+  { key: "read_share", current: 0.3, proposed: 0.42, measured: true, note: "" },
+  { key: "fill_share", current: 0.85, proposed: 0.8, measured: true, note: "" },
+  { key: "job_share", current: 0.1, measured: false, note: "not measured" },
+  { key: "price_ratio", current: 3, measured: false, note: "not measured" },
+];
+const EVAL_ARMS = [{ name: "local-32k", model: "ollama/qwen3.8:27b" }];
+
+test("the evals methods send their params and check what comes back", async () => {
+  const sent: [string, Record<string, unknown>][] = [];
+  const measurement = {
+    id: "7f3a",
+    started_at: "2026-11-23T14:02:00Z",
+    ended_at: "2026-11-23T14:36:10Z",
+    state: "done",
+    arms: EVAL_ARMS,
+    runs: [
+      { arm: "local-32k", ask: "read-many-files", mode: "on", end: "completed", quality: 0.9, seconds: 191, window_left: 0.7, helpers_started: 3 },
+      { arm: "local-32k", ask: "small", mode: "off", end: "not_run" },
+    ],
+    proposal: { numbers: EVAL_NUMBERS, pairs: 1, wins: 1 },
+    in_use: false,
+  };
+  const plan = {
+    arms: [
+      { name: "local-32k", label: "Local, 32K window", kind: "local", tier: "local", window: 32768, model: "ollama/qwen3.8:27b", needed_gb: 21.1, ram_gb: 36, free_gb: 24.3, verdict: "tight", reason: "", asks: 10 },
+      { name: "budget-cloud", label: "Budget cloud", kind: "cloud", tier: "budget", window: 200000, model: "claude-haiku-5-5", cost_usd: 0.4, asks: 10 },
+    ],
+    running: null,
+  };
+  const keep = { ok: true, errors: [], values: { keep_days: 7, keep_problem_days: 30, delegate: { read_share: { value: 0.42, default: 0.3, is_default: false }, fill_share: { value: 0.8, default: 0.85, is_default: false }, job_share: { value: 0.1, default: 0.1, is_default: true }, price_ratio: { value: 3, default: 3, is_default: true } } } };
+  const server = await listen((socket) => {
+    attach(socket, {
+      answerPing: true,
+      results: {
+        "evals.plan": plan,
+        "evals.start": { id: "7f3a" },
+        "evals.stop": { stopped: true },
+        "evals.resume": { id: "7f3a" },
+        "evals.list": { measurements: [{ id: "7f3a", started_at: "t", ended_at: "t", state: "done", arms: EVAL_ARMS, runs_played: 20, runs_total: 20, proposes: 2, in_use: false }] },
+        "evals.get": { measurement },
+        "evals.apply": keep,
+        "evals.delete": { deleted: true },
+      },
+      onRequest: (_socket, method, params) => {
+        if (method.startsWith("evals.")) sent.push([method, params]);
+      },
+    });
+  });
+  const client = connectGolem({ socketPath: server.socketPath, clientName: "web", reconnect: false, heartbeatMs: 60_000 });
+  try {
+    assert.deepEqual(await client.evalsPlan(), plan);
+    assert.deepEqual(await client.evalsPlan(["local-32k"], { "local-32k": "ollama/qwen3:8b" }), plan);
+    assert.deepEqual(await client.evalsStart({ arms: ["local-32k"], allow_tight: true }), { id: "7f3a" });
+    assert.deepEqual(await client.evalsStop("7f3a"), { stopped: true });
+    assert.deepEqual(await client.evalsResume("7f3a"), { id: "7f3a" });
+    assert.deepEqual(await client.evalsResume("7f3a", true), { id: "7f3a" });
+    assert.equal((await client.evalsList()).measurements?.[0]?.runs_played, 20);
+    assert.deepEqual((await client.evalsGet("7f3a")).measurement, measurement);
+    assert.equal((await client.evalsApply("7f3a")).values?.delegate?.read_share.value, 0.42);
+    assert.deepEqual(await client.evalsDelete("7f3a"), { deleted: true });
+    assert.deepEqual(sent, [
+      ["evals.plan", {}],
+      ["evals.plan", { arms: ["local-32k"], models: { "local-32k": "ollama/qwen3:8b" } }],
+      ["evals.start", { arms: ["local-32k"], allow_tight: true }],
+      ["evals.stop", { id: "7f3a" }],
+      ["evals.resume", { id: "7f3a" }],
+      ["evals.resume", { id: "7f3a", allow_tight: true }],
+      ["evals.list", {}],
+      ["evals.get", { id: "7f3a" }],
+      ["evals.apply", { id: "7f3a" }],
+      ["evals.delete", { id: "7f3a" }],
+    ]);
+  } finally {
+    client.close();
+    await server.close();
+  }
+  const bad = await listen((socket) => {
+    attach(socket, {
+      answerPing: true,
+      results: {
+        "evals.plan": { arms: [{ name: "x" }] },
+        "evals.start": {},
+        "evals.stop": { stopped: "yes" },
+        "evals.resume": { id: "" },
+        "evals.list": { measurements: [{ id: "a" }] },
+        "evals.get": { measurement: { id: "a", state: "paused" } },
+        "evals.apply": { ok: true, values: { keep_days: 7, keep_problem_days: 30, delegate: { read_share: 1 } } },
+        "evals.delete": {},
+      },
+    });
+  });
+  const refused = connectGolem({ socketPath: bad.socketPath, clientName: "web", reconnect: false, heartbeatMs: 60_000 });
+  try {
+    await assert.rejects(() => refused.evalsPlan(), /invalid evals.plan result/);
+    await assert.rejects(() => refused.evalsStart({ arms: ["a"] }), /invalid evals.start result/);
+    await assert.rejects(() => refused.evalsStop("a"), /invalid evals.stop result/);
+    await assert.rejects(() => refused.evalsResume("a"), /invalid evals.resume result/);
+    await assert.rejects(() => refused.evalsList(), /invalid evals.list result/);
+    await assert.rejects(() => refused.evalsGet("a"), /invalid evals.get result/);
+    await assert.rejects(() => refused.evalsApply("a"), /invalid evals.apply result/);
+    await assert.rejects(() => refused.evalsDelete("a"), /invalid evals.delete result/);
+  } finally {
+    refused.close();
+    await bad.close();
+  }
+});
+
+test("eval.started, eval.progress and eval.ended reach onEval; a malformed one is dropped", async () => {
+  const server = await listen((socket) => {
+    attach(socket, {
+      answerPing: true,
+      onHello: (current) => {
+        write(current, { jsonrpc: "2.0", method: "eval.started", params: { id: "7f3a", started_at: "t", arms: EVAL_ARMS, total: 20 } });
+        write(current, { jsonrpc: "2.0", method: "eval.progress", params: { id: "7f3a" } });
+        write(current, {
+          jsonrpc: "2.0",
+          method: "eval.progress",
+          params: { id: "7f3a", index: 9, total: 20, arm: "local-32k", mode: "on", ask: "read-many-files", state: "running", elapsed: 760, memory_used_gb: 33, memory_total_gb: 36 },
+        });
+        write(current, { jsonrpc: "2.0", method: "eval.ended", params: { id: "7f3a", state: "stopped", stop_reason: "you stopped it" } });
+      },
+    });
+  });
+  const client = connectGolem({ socketPath: server.socketPath, clientName: "web", reconnect: false, heartbeatMs: 60_000 });
+  const updates: string[] = [];
+  const stop = client.onEval((update) => {
+    if (update.kind === "started") updates.push(`started ${update.started.total}`);
+    else if (update.kind === "progress") updates.push(`progress ${update.progress.index}/${update.progress.total} ${update.progress.memory_used_gb}`);
+    else updates.push(`ended ${update.ended.state} ${update.ended.stop_reason}`);
+  });
+  try {
+    await client.ready;
+    for (let tries = 0; tries < 50 && updates.length < 3; tries += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+    assert.deepEqual(updates, ["started 20", "progress 9/20 33", "ended stopped you stopped it"]);
+  } finally {
+    stop();
+    client.close();
+    await server.close();
+  }
+});
+
 test("saveAgent, copyAgent and deleteAgent send their params and check what comes back", async () => {
   const sent: [string, Record<string, unknown>][] = [];
   const agent = { name: "mine", description: "d", origin: "user", wish: "cheapest" };

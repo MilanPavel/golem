@@ -1,0 +1,80 @@
+{
+  "$defs": {
+    "EvalNumber": {
+      "additionalProperties": false,
+      "description": "One of the four numbers of ``[agents.delegate]``.\n\n``current`` is the value in force, ``proposed`` the measured one. ``measured`` is false when\nthe arms that ran could not tell, and ``proposed`` is then null. ``note`` says in one plain\nline what it was measured from, or why it was not.",
+      "properties": {
+        "current": {
+          "title": "Current",
+          "type": "number"
+        },
+        "key": {
+          "enum": [
+            "read_share",
+            "fill_share",
+            "job_share",
+            "price_ratio"
+          ],
+          "title": "Key",
+          "type": "string"
+        },
+        "measured": {
+          "title": "Measured",
+          "type": "boolean"
+        },
+        "note": {
+          "default": "",
+          "title": "Note",
+          "type": "string"
+        },
+        "proposed": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Proposed"
+        }
+      },
+      "required": [
+        "key",
+        "current",
+        "measured"
+      ],
+      "title": "EvalNumber",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "What a measurement proposes: all four numbers, once each. ``pairs`` is how many asks ran\nboth with and without helpers, and ``wins`` in how many of them helpers did better.",
+  "properties": {
+    "numbers": {
+      "items": {
+        "$ref": "#/$defs/EvalNumber"
+      },
+      "title": "Numbers",
+      "type": "array"
+    },
+    "pairs": {
+      "minimum": 0,
+      "title": "Pairs",
+      "type": "integer"
+    },
+    "wins": {
+      "minimum": 0,
+      "title": "Wins",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "numbers",
+    "pairs",
+    "wins"
+  ],
+  "title": "EvalProposal",
+  "type": "object"
+}

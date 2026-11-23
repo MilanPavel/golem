@@ -477,6 +477,75 @@ public struct AgentsCopyResultWishResolution: Codable {
     }
 }
 
+/// One number of ``[agents.delegate]``: ``value`` is the one in force, ``default`` the one
+/// golem ships, and ``is_default`` is true when the two are equal.
+// MARK: - AgentsDelegateNumber
+public struct AgentsDelegateNumber: Codable {
+    public let agentsDelegateNumberDefault: Double
+    public let isDefault: Bool
+    public let value: Double
+
+    public enum CodingKeys: String, CodingKey {
+        case agentsDelegateNumberDefault = "default"
+        case isDefault = "is_default"
+        case value = "value"
+    }
+
+    public init(agentsDelegateNumberDefault: Double, isDefault: Bool, value: Double) {
+        self.agentsDelegateNumberDefault = agentsDelegateNumberDefault
+        self.isDefault = isDefault
+        self.value = value
+    }
+}
+
+/// The four numbers of ``[agents.delegate]`` that say when a helper is worth starting.
+///
+/// ``read_share``, ``fill_share`` and ``job_share`` are shares of the lead's window, and
+/// ``price_ratio`` is how many times dearer the lead must be. Read-only here: a measurement
+/// changes them (``evals.apply``), or the user edits ``config.toml``.
+// MARK: - AgentsDelegateValues
+public struct AgentsDelegateValues: Codable {
+    public let fillShare: PurpleAgentsDelegateNumber
+    public let jobShare: PurpleAgentsDelegateNumber
+    public let priceRatio: PurpleAgentsDelegateNumber
+    public let readShare: PurpleAgentsDelegateNumber
+
+    public enum CodingKeys: String, CodingKey {
+        case fillShare = "fill_share"
+        case jobShare = "job_share"
+        case priceRatio = "price_ratio"
+        case readShare = "read_share"
+    }
+
+    public init(fillShare: PurpleAgentsDelegateNumber, jobShare: PurpleAgentsDelegateNumber, priceRatio: PurpleAgentsDelegateNumber, readShare: PurpleAgentsDelegateNumber) {
+        self.fillShare = fillShare
+        self.jobShare = jobShare
+        self.priceRatio = priceRatio
+        self.readShare = readShare
+    }
+}
+
+/// One number of ``[agents.delegate]``: ``value`` is the one in force, ``default`` the one
+/// golem ships, and ``is_default`` is true when the two are equal.
+// MARK: - PurpleAgentsDelegateNumber
+public struct PurpleAgentsDelegateNumber: Codable {
+    public let agentsDelegateNumberDefault: Double
+    public let isDefault: Bool
+    public let value: Double
+
+    public enum CodingKeys: String, CodingKey {
+        case agentsDelegateNumberDefault = "default"
+        case isDefault = "is_default"
+        case value = "value"
+    }
+
+    public init(agentsDelegateNumberDefault: Double, isDefault: Bool, value: Double) {
+        self.agentsDelegateNumberDefault = agentsDelegateNumberDefault
+        self.isDefault = isDefault
+        self.value = value
+    }
+}
+
 /// ``agents.delete``. Remove the user's file ``~/.golem/agents/<name>.md``. A bundled or
 /// project agent is refused.
 // MARK: - AgentsDeleteParams
@@ -852,7 +921,7 @@ public enum UseHelpers: String, Codable {
 public struct AgentsKeepResult: Codable {
     public let errors: [AgentsKeepResultError]?
     public let ok: Bool
-    public let values: AgentsKeepValuesClass?
+    public let values: AgentsKeepResultAgentsKeepValues?
 
     public enum CodingKeys: String, CodingKey {
         case errors = "errors"
@@ -860,7 +929,7 @@ public struct AgentsKeepResult: Codable {
         case values = "values"
     }
 
-    public init(errors: [AgentsKeepResultError]?, ok: Bool, values: AgentsKeepValuesClass?) {
+    public init(errors: [AgentsKeepResultError]?, ok: Bool, values: AgentsKeepResultAgentsKeepValues?) {
         self.errors = errors
         self.ok = ok
         self.values = values
@@ -900,9 +969,12 @@ public struct AgentsKeepResultError: Codable {
 /// ``config.toml`` does not set one. ``agents.set_default_limits`` changes them.
 /// ``use_helpers`` is ``[agents] use_helpers``; ``when_needed`` when ``config.toml`` does
 /// not
-/// set it and for a daemon that does not know it.
-// MARK: - AgentsKeepValuesClass
-public struct AgentsKeepValuesClass: Codable {
+/// set it and for a daemon that does not know it. ``delegate`` is ``[agents.delegate]``,
+/// read-only
+/// (``agents.keep`` does not accept it); an older daemon leaves it out.
+// MARK: - AgentsKeepResultAgentsKeepValues
+public struct AgentsKeepResultAgentsKeepValues: Codable {
+    public let delegate: PurpleAgentsDelegateValues?
     public let keepDays: Int
     public let keepProblemDays: Int
     public let maxCalls: Int?
@@ -912,6 +984,7 @@ public struct AgentsKeepValuesClass: Codable {
     public let workingSeconds: Int?
 
     public enum CodingKeys: String, CodingKey {
+        case delegate = "delegate"
         case keepDays = "keep_days"
         case keepProblemDays = "keep_problem_days"
         case maxCalls = "max_calls"
@@ -921,7 +994,8 @@ public struct AgentsKeepValuesClass: Codable {
         case workingSeconds = "working_seconds"
     }
 
-    public init(keepDays: Int, keepProblemDays: Int, maxCalls: Int?, maxCost: Double?, maxTokens: Int?, useHelpers: UseHelpers?, workingSeconds: Int?) {
+    public init(delegate: PurpleAgentsDelegateValues?, keepDays: Int, keepProblemDays: Int, maxCalls: Int?, maxCost: Double?, maxTokens: Int?, useHelpers: UseHelpers?, workingSeconds: Int?) {
+        self.delegate = delegate
         self.keepDays = keepDays
         self.keepProblemDays = keepProblemDays
         self.maxCalls = maxCalls
@@ -929,6 +1003,54 @@ public struct AgentsKeepValuesClass: Codable {
         self.maxTokens = maxTokens
         self.useHelpers = useHelpers
         self.workingSeconds = workingSeconds
+    }
+}
+
+/// The four numbers of ``[agents.delegate]`` that say when a helper is worth starting.
+///
+/// ``read_share``, ``fill_share`` and ``job_share`` are shares of the lead's window, and
+/// ``price_ratio`` is how many times dearer the lead must be. Read-only here: a measurement
+/// changes them (``evals.apply``), or the user edits ``config.toml``.
+// MARK: - PurpleAgentsDelegateValues
+public struct PurpleAgentsDelegateValues: Codable {
+    public let fillShare: FluffyAgentsDelegateNumber
+    public let jobShare: FluffyAgentsDelegateNumber
+    public let priceRatio: FluffyAgentsDelegateNumber
+    public let readShare: FluffyAgentsDelegateNumber
+
+    public enum CodingKeys: String, CodingKey {
+        case fillShare = "fill_share"
+        case jobShare = "job_share"
+        case priceRatio = "price_ratio"
+        case readShare = "read_share"
+    }
+
+    public init(fillShare: FluffyAgentsDelegateNumber, jobShare: FluffyAgentsDelegateNumber, priceRatio: FluffyAgentsDelegateNumber, readShare: FluffyAgentsDelegateNumber) {
+        self.fillShare = fillShare
+        self.jobShare = jobShare
+        self.priceRatio = priceRatio
+        self.readShare = readShare
+    }
+}
+
+/// One number of ``[agents.delegate]``: ``value`` is the one in force, ``default`` the one
+/// golem ships, and ``is_default`` is true when the two are equal.
+// MARK: - FluffyAgentsDelegateNumber
+public struct FluffyAgentsDelegateNumber: Codable {
+    public let agentsDelegateNumberDefault: Double
+    public let isDefault: Bool
+    public let value: Double
+
+    public enum CodingKeys: String, CodingKey {
+        case agentsDelegateNumberDefault = "default"
+        case isDefault = "is_default"
+        case value = "value"
+    }
+
+    public init(agentsDelegateNumberDefault: Double, isDefault: Bool, value: Double) {
+        self.agentsDelegateNumberDefault = agentsDelegateNumberDefault
+        self.isDefault = isDefault
+        self.value = value
     }
 }
 
@@ -940,9 +1062,12 @@ public struct AgentsKeepValuesClass: Codable {
 /// ``config.toml`` does not set one. ``agents.set_default_limits`` changes them.
 /// ``use_helpers`` is ``[agents] use_helpers``; ``when_needed`` when ``config.toml`` does
 /// not
-/// set it and for a daemon that does not know it.
+/// set it and for a daemon that does not know it. ``delegate`` is ``[agents.delegate]``,
+/// read-only
+/// (``agents.keep`` does not accept it); an older daemon leaves it out.
 // MARK: - AgentsKeepValues
 public struct AgentsKeepValues: Codable {
+    public let delegate: FluffyAgentsDelegateValues?
     public let keepDays: Int
     public let keepProblemDays: Int
     public let maxCalls: Int?
@@ -952,6 +1077,7 @@ public struct AgentsKeepValues: Codable {
     public let workingSeconds: Int?
 
     public enum CodingKeys: String, CodingKey {
+        case delegate = "delegate"
         case keepDays = "keep_days"
         case keepProblemDays = "keep_problem_days"
         case maxCalls = "max_calls"
@@ -961,7 +1087,8 @@ public struct AgentsKeepValues: Codable {
         case workingSeconds = "working_seconds"
     }
 
-    public init(keepDays: Int, keepProblemDays: Int, maxCalls: Int?, maxCost: Double?, maxTokens: Int?, useHelpers: UseHelpers?, workingSeconds: Int?) {
+    public init(delegate: FluffyAgentsDelegateValues?, keepDays: Int, keepProblemDays: Int, maxCalls: Int?, maxCost: Double?, maxTokens: Int?, useHelpers: UseHelpers?, workingSeconds: Int?) {
+        self.delegate = delegate
         self.keepDays = keepDays
         self.keepProblemDays = keepProblemDays
         self.maxCalls = maxCalls
@@ -969,6 +1096,54 @@ public struct AgentsKeepValues: Codable {
         self.maxTokens = maxTokens
         self.useHelpers = useHelpers
         self.workingSeconds = workingSeconds
+    }
+}
+
+/// The four numbers of ``[agents.delegate]`` that say when a helper is worth starting.
+///
+/// ``read_share``, ``fill_share`` and ``job_share`` are shares of the lead's window, and
+/// ``price_ratio`` is how many times dearer the lead must be. Read-only here: a measurement
+/// changes them (``evals.apply``), or the user edits ``config.toml``.
+// MARK: - FluffyAgentsDelegateValues
+public struct FluffyAgentsDelegateValues: Codable {
+    public let fillShare: TentacledAgentsDelegateNumber
+    public let jobShare: TentacledAgentsDelegateNumber
+    public let priceRatio: TentacledAgentsDelegateNumber
+    public let readShare: TentacledAgentsDelegateNumber
+
+    public enum CodingKeys: String, CodingKey {
+        case fillShare = "fill_share"
+        case jobShare = "job_share"
+        case priceRatio = "price_ratio"
+        case readShare = "read_share"
+    }
+
+    public init(fillShare: TentacledAgentsDelegateNumber, jobShare: TentacledAgentsDelegateNumber, priceRatio: TentacledAgentsDelegateNumber, readShare: TentacledAgentsDelegateNumber) {
+        self.fillShare = fillShare
+        self.jobShare = jobShare
+        self.priceRatio = priceRatio
+        self.readShare = readShare
+    }
+}
+
+/// One number of ``[agents.delegate]``: ``value`` is the one in force, ``default`` the one
+/// golem ships, and ``is_default`` is true when the two are equal.
+// MARK: - TentacledAgentsDelegateNumber
+public struct TentacledAgentsDelegateNumber: Codable {
+    public let agentsDelegateNumberDefault: Double
+    public let isDefault: Bool
+    public let value: Double
+
+    public enum CodingKeys: String, CodingKey {
+        case agentsDelegateNumberDefault = "default"
+        case isDefault = "is_default"
+        case value = "value"
+    }
+
+    public init(agentsDelegateNumberDefault: Double, isDefault: Bool, value: Double) {
+        self.agentsDelegateNumberDefault = agentsDelegateNumberDefault
+        self.isDefault = isDefault
+        self.value = value
     }
 }
 
@@ -5024,6 +5199,604 @@ public struct EmptyEventData: Codable {
     }
 }
 
+/// An arm of a measurement and the model it ran with.
+// MARK: - EvalArmUsed
+public struct EvalArmUsed: Codable {
+    public let model: String
+    public let name: String
+
+    public enum CodingKeys: String, CodingKey {
+        case model = "model"
+        case name = "name"
+    }
+
+    public init(model: String, name: String) {
+        self.model = model
+        self.name = name
+    }
+}
+
+/// Server → every connection: a measurement is no longer running. Not stored.
+// MARK: - EvalEndedNotification
+public struct EvalEndedNotification: Codable {
+    public let jsonrpc: Jsonrpc?
+    public let method: EvalEndedNotificationMethod?
+    public let params: EvalEndedNotificationParams
+
+    public enum CodingKeys: String, CodingKey {
+        case jsonrpc = "jsonrpc"
+        case method = "method"
+        case params = "params"
+    }
+
+    public init(jsonrpc: Jsonrpc?, method: EvalEndedNotificationMethod?, params: EvalEndedNotificationParams) {
+        self.jsonrpc = jsonrpc
+        self.method = method
+        self.params = params
+    }
+}
+
+public enum EvalEndedNotificationMethod: String, Codable {
+    case evalEnded = "eval.ended"
+}
+
+/// ``eval.ended``. A measurement is no longer running. ``state`` is ``done`` or ``stopped``,
+/// and ``stop_reason`` says why in plain text when it stopped.
+// MARK: - EvalEndedNotificationParams
+public struct EvalEndedNotificationParams: Codable {
+    public let id: String
+    public let state: EvalEndedState
+    public let stopReason: String?
+
+    public enum CodingKeys: String, CodingKey {
+        case id = "id"
+        case state = "state"
+        case stopReason = "stop_reason"
+    }
+
+    public init(id: String, state: EvalEndedState, stopReason: String?) {
+        self.id = id
+        self.state = state
+        self.stopReason = stopReason
+    }
+}
+
+public enum EvalEndedState: String, Codable {
+    case done = "done"
+    case stopped = "stopped"
+}
+
+/// ``eval.ended``. A measurement is no longer running. ``state`` is ``done`` or ``stopped``,
+/// and ``stop_reason`` says why in plain text when it stopped.
+// MARK: - EvalEnded
+public struct EvalEnded: Codable {
+    public let id: String
+    public let state: EvalEndedState
+    public let stopReason: String?
+
+    public enum CodingKeys: String, CodingKey {
+        case id = "id"
+        case state = "state"
+        case stopReason = "stop_reason"
+    }
+
+    public init(id: String, state: EvalEndedState, stopReason: String?) {
+        self.id = id
+        self.state = state
+        self.stopReason = stopReason
+    }
+}
+
+/// A whole measurement, as ``evals.get`` returns it.
+///
+/// ``runs`` holds every planned run in order, with the ones not yet played as ``pending``
+/// and
+/// the ones that will not be played as ``not_run``. ``stop_reason`` is plain text and is set
+/// only when the state is ``stopped``. ``proposal`` is null while it runs and when too
+/// little
+/// ran to propose anything. ``in_use`` is true when its numbers were applied and still are
+/// the ones in ``config.toml``. ``cost_usd`` is what the paid arms cost.
+// MARK: - EvalMeasurement
+public struct EvalMeasurement: Codable {
+    public let arms: [EvalMeasurementArm]
+    public let costUsd: Double?
+    public let endedAt: String?
+    public let id: String
+    public let inUse: Bool?
+    public let proposal: EvalMeasurementEvalProposal?
+    public let runs: [EvalMeasurementRun]
+    public let startedAt: String
+    public let state: EvalMeasurementState
+    public let stopReason: String?
+
+    public enum CodingKeys: String, CodingKey {
+        case arms = "arms"
+        case costUsd = "cost_usd"
+        case endedAt = "ended_at"
+        case id = "id"
+        case inUse = "in_use"
+        case proposal = "proposal"
+        case runs = "runs"
+        case startedAt = "started_at"
+        case state = "state"
+        case stopReason = "stop_reason"
+    }
+
+    public init(arms: [EvalMeasurementArm], costUsd: Double?, endedAt: String?, id: String, inUse: Bool?, proposal: EvalMeasurementEvalProposal?, runs: [EvalMeasurementRun], startedAt: String, state: EvalMeasurementState, stopReason: String?) {
+        self.arms = arms
+        self.costUsd = costUsd
+        self.endedAt = endedAt
+        self.id = id
+        self.inUse = inUse
+        self.proposal = proposal
+        self.runs = runs
+        self.startedAt = startedAt
+        self.state = state
+        self.stopReason = stopReason
+    }
+}
+
+/// An arm of a measurement and the model it ran with.
+// MARK: - EvalMeasurementArm
+public struct EvalMeasurementArm: Codable {
+    public let model: String
+    public let name: String
+
+    public enum CodingKeys: String, CodingKey {
+        case model = "model"
+        case name = "name"
+    }
+
+    public init(model: String, name: String) {
+        self.model = model
+        self.name = name
+    }
+}
+
+/// What a measurement proposes: all four numbers, once each. ``pairs`` is how many asks ran
+/// both with and without helpers, and ``wins`` in how many of them helpers did better.
+// MARK: - EvalMeasurementEvalProposal
+public struct EvalMeasurementEvalProposal: Codable {
+    public let numbers: [PurpleEvalNumber]
+    public let pairs: Int
+    public let wins: Int
+
+    public enum CodingKeys: String, CodingKey {
+        case numbers = "numbers"
+        case pairs = "pairs"
+        case wins = "wins"
+    }
+
+    public init(numbers: [PurpleEvalNumber], pairs: Int, wins: Int) {
+        self.numbers = numbers
+        self.pairs = pairs
+        self.wins = wins
+    }
+}
+
+/// One of the four numbers of ``[agents.delegate]``.
+///
+/// ``current`` is the value in force, ``proposed`` the measured one. ``measured`` is false
+/// when
+/// the arms that ran could not tell, and ``proposed`` is then null. ``note`` says in one
+/// plain
+/// line what it was measured from, or why it was not.
+// MARK: - PurpleEvalNumber
+public struct PurpleEvalNumber: Codable {
+    public let current: Double
+    public let key: NumberKey
+    public let measured: Bool
+    public let note: String?
+    public let proposed: Double?
+
+    public enum CodingKeys: String, CodingKey {
+        case current = "current"
+        case key = "key"
+        case measured = "measured"
+        case note = "note"
+        case proposed = "proposed"
+    }
+
+    public init(current: Double, key: NumberKey, measured: Bool, note: String?, proposed: Double?) {
+        self.current = current
+        self.key = key
+        self.measured = measured
+        self.note = note
+        self.proposed = proposed
+    }
+}
+
+public enum NumberKey: String, Codable {
+    case fillShare = "fill_share"
+    case jobShare = "job_share"
+    case priceRatio = "price_ratio"
+    case readShare = "read_share"
+}
+
+/// One ask played once on one arm.
+///
+/// ``quality`` is the answer's score from 0 to 1, ``seconds`` the time, ``window_left`` the
+/// share of the window that was still free at the fullest point (0 to 1), and
+/// ``helpers_started`` how many helpers the lead started. They are null for a run that has
+/// no
+/// result: ``pending``, ``running`` and ``not_run``.
+// MARK: - EvalMeasurementRun
+public struct EvalMeasurementRun: Codable {
+    public let arm: String
+    public let ask: String
+    public let end: End
+    public let helpersStarted: Int?
+    public let mode: Mode
+    public let quality: Double?
+    public let seconds: Double?
+    public let windowLeft: Double?
+
+    public enum CodingKeys: String, CodingKey {
+        case arm = "arm"
+        case ask = "ask"
+        case end = "end"
+        case helpersStarted = "helpers_started"
+        case mode = "mode"
+        case quality = "quality"
+        case seconds = "seconds"
+        case windowLeft = "window_left"
+    }
+
+    public init(arm: String, ask: String, end: End, helpersStarted: Int?, mode: Mode, quality: Double?, seconds: Double?, windowLeft: Double?) {
+        self.arm = arm
+        self.ask = ask
+        self.end = end
+        self.helpersStarted = helpersStarted
+        self.mode = mode
+        self.quality = quality
+        self.seconds = seconds
+        self.windowLeft = windowLeft
+    }
+}
+
+public enum End: String, Codable {
+    case cancelled = "cancelled"
+    case completed = "completed"
+    case failed = "failed"
+    case notRun = "not_run"
+    case pending = "pending"
+    case running = "running"
+    case timeout = "timeout"
+}
+
+public enum Mode: String, Codable {
+    case off = "off"
+    case on = "on"
+}
+
+public enum EvalMeasurementState: String, Codable {
+    case done = "done"
+    case running = "running"
+    case stopped = "stopped"
+}
+
+/// A model an arm may use instead of its own. ``size_gb`` is its size in memory, if known.
+// MARK: - EvalModelChoice
+public struct EvalModelChoice: Codable {
+    public let ref: String
+    public let sizeGB: Double?
+
+    public enum CodingKeys: String, CodingKey {
+        case ref = "ref"
+        case sizeGB = "size_gb"
+    }
+
+    public init(ref: String, sizeGB: Double?) {
+        self.ref = ref
+        self.sizeGB = sizeGB
+    }
+}
+
+/// One of the four numbers of ``[agents.delegate]``.
+///
+/// ``current`` is the value in force, ``proposed`` the measured one. ``measured`` is false
+/// when
+/// the arms that ran could not tell, and ``proposed`` is then null. ``note`` says in one
+/// plain
+/// line what it was measured from, or why it was not.
+// MARK: - EvalNumber
+public struct EvalNumber: Codable {
+    public let current: Double
+    public let key: NumberKey
+    public let measured: Bool
+    public let note: String?
+    public let proposed: Double?
+
+    public enum CodingKeys: String, CodingKey {
+        case current = "current"
+        case key = "key"
+        case measured = "measured"
+        case note = "note"
+        case proposed = "proposed"
+    }
+
+    public init(current: Double, key: NumberKey, measured: Bool, note: String?, proposed: Double?) {
+        self.current = current
+        self.key = key
+        self.measured = measured
+        self.note = note
+        self.proposed = proposed
+    }
+}
+
+/// One arm of a measurement as ``evals.plan`` sees it now.
+///
+/// ``kind`` is ``local`` for a model on this machine and ``cloud`` for a paid one. ``model``
+/// is
+/// the model it would use, and ``choices`` the others it could use. A local arm has the
+/// memory
+/// numbers and a ``verdict``; ``needed_gb`` is what the model needs at this window,
+/// ``ram_gb``
+/// the machine's memory and ``free_gb`` what is free now, each null when it could not be
+/// read.
+/// A cloud arm has none of these and may have ``cost_usd``, the estimate for all its runs.
+/// ``reason`` is one plain line on the verdict, or on the cost. ``asks`` is how many asks it
+/// plays (twice each: with helpers and without), and ``minutes`` a rough time for the arm.
+// MARK: - EvalPlanArm
+public struct EvalPlanArm: Codable {
+    public let asks: Int
+    public let choices: [EvalPlanArmChoice]?
+    public let costUsd: Double?
+    public let freeGB: Double?
+    public let kind: EvalPlanArmKind
+    public let label: String
+    public let minutes: Double?
+    public let model: String
+    public let name: String
+    public let neededGB: Double?
+    public let ramGB: Double?
+    public let reason: String?
+    public let tier: Tier
+    public let verdict: EvalPlanArmVerdict?
+    public let window: Int
+
+    public enum CodingKeys: String, CodingKey {
+        case asks = "asks"
+        case choices = "choices"
+        case costUsd = "cost_usd"
+        case freeGB = "free_gb"
+        case kind = "kind"
+        case label = "label"
+        case minutes = "minutes"
+        case model = "model"
+        case name = "name"
+        case neededGB = "needed_gb"
+        case ramGB = "ram_gb"
+        case reason = "reason"
+        case tier = "tier"
+        case verdict = "verdict"
+        case window = "window"
+    }
+
+    public init(asks: Int, choices: [EvalPlanArmChoice]?, costUsd: Double?, freeGB: Double?, kind: EvalPlanArmKind, label: String, minutes: Double?, model: String, name: String, neededGB: Double?, ramGB: Double?, reason: String?, tier: Tier, verdict: EvalPlanArmVerdict?, window: Int) {
+        self.asks = asks
+        self.choices = choices
+        self.costUsd = costUsd
+        self.freeGB = freeGB
+        self.kind = kind
+        self.label = label
+        self.minutes = minutes
+        self.model = model
+        self.name = name
+        self.neededGB = neededGB
+        self.ramGB = ramGB
+        self.reason = reason
+        self.tier = tier
+        self.verdict = verdict
+        self.window = window
+    }
+}
+
+/// A model an arm may use instead of its own. ``size_gb`` is its size in memory, if known.
+// MARK: - EvalPlanArmChoice
+public struct EvalPlanArmChoice: Codable {
+    public let ref: String
+    public let sizeGB: Double?
+
+    public enum CodingKeys: String, CodingKey {
+        case ref = "ref"
+        case sizeGB = "size_gb"
+    }
+
+    public init(ref: String, sizeGB: Double?) {
+        self.ref = ref
+        self.sizeGB = sizeGB
+    }
+}
+
+public enum EvalPlanArmKind: String, Codable {
+    case cloud = "cloud"
+    case local = "local"
+}
+
+public enum EvalPlanArmVerdict: String, Codable {
+    case fits = "fits"
+    case noRoom = "no_room"
+    case tight = "tight"
+    case tooBig = "too_big"
+    case unknown = "unknown"
+}
+
+/// Server → every connection: a run of a measurement began or ended. Not stored.
+// MARK: - EvalProgressNotification
+public struct EvalProgressNotification: Codable {
+    public let jsonrpc: Jsonrpc?
+    public let method: EvalProgressNotificationMethod?
+    public let params: EvalProgressNotificationParams
+
+    public enum CodingKeys: String, CodingKey {
+        case jsonrpc = "jsonrpc"
+        case method = "method"
+        case params = "params"
+    }
+
+    public init(jsonrpc: Jsonrpc?, method: EvalProgressNotificationMethod?, params: EvalProgressNotificationParams) {
+        self.jsonrpc = jsonrpc
+        self.method = method
+        self.params = params
+    }
+}
+
+public enum EvalProgressNotificationMethod: String, Codable {
+    case evalProgress = "eval.progress"
+}
+
+/// ``eval.progress``. A run began, or its state changed. ``index`` counts from 1 of
+/// ``total``. ``state`` is ``running`` while it plays and then how it ended. ``elapsed`` is
+/// the seconds since the measurement began. ``memory_used_gb`` and ``memory_total_gb`` are
+/// the
+/// machine's memory now, each null when it could not be read.
+// MARK: - EvalProgressNotificationParams
+public struct EvalProgressNotificationParams: Codable {
+    public let arm: String
+    public let ask: String
+    public let elapsed: Double
+    public let id: String
+    public let index: Int
+    public let memoryTotalGB: Double?
+    public let memoryUsedGB: Double?
+    public let mode: Mode
+    public let state: EvalProgressState
+    public let total: Int
+
+    public enum CodingKeys: String, CodingKey {
+        case arm = "arm"
+        case ask = "ask"
+        case elapsed = "elapsed"
+        case id = "id"
+        case index = "index"
+        case memoryTotalGB = "memory_total_gb"
+        case memoryUsedGB = "memory_used_gb"
+        case mode = "mode"
+        case state = "state"
+        case total = "total"
+    }
+
+    public init(arm: String, ask: String, elapsed: Double, id: String, index: Int, memoryTotalGB: Double?, memoryUsedGB: Double?, mode: Mode, state: EvalProgressState, total: Int) {
+        self.arm = arm
+        self.ask = ask
+        self.elapsed = elapsed
+        self.id = id
+        self.index = index
+        self.memoryTotalGB = memoryTotalGB
+        self.memoryUsedGB = memoryUsedGB
+        self.mode = mode
+        self.state = state
+        self.total = total
+    }
+}
+
+public enum EvalProgressState: String, Codable {
+    case cancelled = "cancelled"
+    case completed = "completed"
+    case failed = "failed"
+    case running = "running"
+    case timeout = "timeout"
+}
+
+/// ``eval.progress``. A run began, or its state changed. ``index`` counts from 1 of
+/// ``total``. ``state`` is ``running`` while it plays and then how it ended. ``elapsed`` is
+/// the seconds since the measurement began. ``memory_used_gb`` and ``memory_total_gb`` are
+/// the
+/// machine's memory now, each null when it could not be read.
+// MARK: - EvalProgress
+public struct EvalProgress: Codable {
+    public let arm: String
+    public let ask: String
+    public let elapsed: Double
+    public let id: String
+    public let index: Int
+    public let memoryTotalGB: Double?
+    public let memoryUsedGB: Double?
+    public let mode: Mode
+    public let state: EvalProgressState
+    public let total: Int
+
+    public enum CodingKeys: String, CodingKey {
+        case arm = "arm"
+        case ask = "ask"
+        case elapsed = "elapsed"
+        case id = "id"
+        case index = "index"
+        case memoryTotalGB = "memory_total_gb"
+        case memoryUsedGB = "memory_used_gb"
+        case mode = "mode"
+        case state = "state"
+        case total = "total"
+    }
+
+    public init(arm: String, ask: String, elapsed: Double, id: String, index: Int, memoryTotalGB: Double?, memoryUsedGB: Double?, mode: Mode, state: EvalProgressState, total: Int) {
+        self.arm = arm
+        self.ask = ask
+        self.elapsed = elapsed
+        self.id = id
+        self.index = index
+        self.memoryTotalGB = memoryTotalGB
+        self.memoryUsedGB = memoryUsedGB
+        self.mode = mode
+        self.state = state
+        self.total = total
+    }
+}
+
+/// What a measurement proposes: all four numbers, once each. ``pairs`` is how many asks ran
+/// both with and without helpers, and ``wins`` in how many of them helpers did better.
+// MARK: - EvalProposal
+public struct EvalProposal: Codable {
+    public let numbers: [FluffyEvalNumber]
+    public let pairs: Int
+    public let wins: Int
+
+    public enum CodingKeys: String, CodingKey {
+        case numbers = "numbers"
+        case pairs = "pairs"
+        case wins = "wins"
+    }
+
+    public init(numbers: [FluffyEvalNumber], pairs: Int, wins: Int) {
+        self.numbers = numbers
+        self.pairs = pairs
+        self.wins = wins
+    }
+}
+
+/// One of the four numbers of ``[agents.delegate]``.
+///
+/// ``current`` is the value in force, ``proposed`` the measured one. ``measured`` is false
+/// when
+/// the arms that ran could not tell, and ``proposed`` is then null. ``note`` says in one
+/// plain
+/// line what it was measured from, or why it was not.
+// MARK: - FluffyEvalNumber
+public struct FluffyEvalNumber: Codable {
+    public let current: Double
+    public let key: NumberKey
+    public let measured: Bool
+    public let note: String?
+    public let proposed: Double?
+
+    public enum CodingKeys: String, CodingKey {
+        case current = "current"
+        case key = "key"
+        case measured = "measured"
+        case note = "note"
+        case proposed = "proposed"
+    }
+
+    public init(current: Double, key: NumberKey, measured: Bool, note: String?, proposed: Double?) {
+        self.current = current
+        self.key = key
+        self.measured = measured
+        self.note = note
+        self.proposed = proposed
+    }
+}
+
 /// ``eval.routing``. What the recorded sessions of the last ``days`` days would have cost
 /// on a frontier model, on a local model and on ``auto``. A calculation over the stored
 /// events: it calls no model. With ``session_id``, only that session. Not for a browser.
@@ -5190,6 +5963,47 @@ public struct TopElement: Codable {
     }
 }
 
+/// One ask played once on one arm.
+///
+/// ``quality`` is the answer's score from 0 to 1, ``seconds`` the time, ``window_left`` the
+/// share of the window that was still free at the fullest point (0 to 1), and
+/// ``helpers_started`` how many helpers the lead started. They are null for a run that has
+/// no
+/// result: ``pending``, ``running`` and ``not_run``.
+// MARK: - EvalRun
+public struct EvalRun: Codable {
+    public let arm: String
+    public let ask: String
+    public let end: End
+    public let helpersStarted: Int?
+    public let mode: Mode
+    public let quality: Double?
+    public let seconds: Double?
+    public let windowLeft: Double?
+
+    public enum CodingKeys: String, CodingKey {
+        case arm = "arm"
+        case ask = "ask"
+        case end = "end"
+        case helpersStarted = "helpers_started"
+        case mode = "mode"
+        case quality = "quality"
+        case seconds = "seconds"
+        case windowLeft = "window_left"
+    }
+
+    public init(arm: String, ask: String, end: End, helpersStarted: Int?, mode: Mode, quality: Double?, seconds: Double?, windowLeft: Double?) {
+        self.arm = arm
+        self.ask = ask
+        self.end = end
+        self.helpersStarted = helpersStarted
+        self.mode = mode
+        self.quality = quality
+        self.seconds = seconds
+        self.windowLeft = windowLeft
+    }
+}
+
 /// One scenario over every session asked for.
 ///
 /// ``cuts`` are prompts that would not fit the model's window. ``step_ups`` is null for a
@@ -5235,6 +6049,174 @@ public struct EvalScenarioRow: Codable {
     }
 }
 
+/// Server → every connection: a measurement of the helper rules began. Not stored.
+// MARK: - EvalStartedNotification
+public struct EvalStartedNotification: Codable {
+    public let jsonrpc: Jsonrpc?
+    public let method: EvalStartedNotificationMethod?
+    public let params: EvalStartedNotificationParams
+
+    public enum CodingKeys: String, CodingKey {
+        case jsonrpc = "jsonrpc"
+        case method = "method"
+        case params = "params"
+    }
+
+    public init(jsonrpc: Jsonrpc?, method: EvalStartedNotificationMethod?, params: EvalStartedNotificationParams) {
+        self.jsonrpc = jsonrpc
+        self.method = method
+        self.params = params
+    }
+}
+
+public enum EvalStartedNotificationMethod: String, Codable {
+    case evalStarted = "eval.started"
+}
+
+/// ``eval.started``. A measurement began, or went on after ``evals.resume``. ``total`` is
+/// the runs it will play.
+// MARK: - EvalStartedNotificationParams
+public struct EvalStartedNotificationParams: Codable {
+    public let arms: [ParamsArm]
+    public let id: String
+    public let startedAt: String
+    public let total: Int
+
+    public enum CodingKeys: String, CodingKey {
+        case arms = "arms"
+        case id = "id"
+        case startedAt = "started_at"
+        case total = "total"
+    }
+
+    public init(arms: [ParamsArm], id: String, startedAt: String, total: Int) {
+        self.arms = arms
+        self.id = id
+        self.startedAt = startedAt
+        self.total = total
+    }
+}
+
+/// An arm of a measurement and the model it ran with.
+// MARK: - ParamsArm
+public struct ParamsArm: Codable {
+    public let model: String
+    public let name: String
+
+    public enum CodingKeys: String, CodingKey {
+        case model = "model"
+        case name = "name"
+    }
+
+    public init(model: String, name: String) {
+        self.model = model
+        self.name = name
+    }
+}
+
+/// ``eval.started``. A measurement began, or went on after ``evals.resume``. ``total`` is
+/// the runs it will play.
+// MARK: - EvalStarted
+public struct EvalStarted: Codable {
+    public let arms: [EvalStartedArm]
+    public let id: String
+    public let startedAt: String
+    public let total: Int
+
+    public enum CodingKeys: String, CodingKey {
+        case arms = "arms"
+        case id = "id"
+        case startedAt = "started_at"
+        case total = "total"
+    }
+
+    public init(arms: [EvalStartedArm], id: String, startedAt: String, total: Int) {
+        self.arms = arms
+        self.id = id
+        self.startedAt = startedAt
+        self.total = total
+    }
+}
+
+/// An arm of a measurement and the model it ran with.
+// MARK: - EvalStartedArm
+public struct EvalStartedArm: Codable {
+    public let model: String
+    public let name: String
+
+    public enum CodingKeys: String, CodingKey {
+        case model = "model"
+        case name = "name"
+    }
+
+    public init(model: String, name: String) {
+        self.model = model
+        self.name = name
+    }
+}
+
+/// One line of ``evals.list``. ``runs_played`` of ``runs_total`` are done, and ``proposes``
+/// is how many of the four numbers it measured.
+// MARK: - EvalSummary
+public struct EvalSummary: Codable {
+    public let arms: [EvalSummaryArm]
+    public let costUsd: Double?
+    public let endedAt: String?
+    public let id: String
+    public let inUse: Bool?
+    public let proposes: Int?
+    public let runsPlayed: Int
+    public let runsTotal: Int
+    public let startedAt: String
+    public let state: EvalMeasurementState
+    public let stopReason: String?
+
+    public enum CodingKeys: String, CodingKey {
+        case arms = "arms"
+        case costUsd = "cost_usd"
+        case endedAt = "ended_at"
+        case id = "id"
+        case inUse = "in_use"
+        case proposes = "proposes"
+        case runsPlayed = "runs_played"
+        case runsTotal = "runs_total"
+        case startedAt = "started_at"
+        case state = "state"
+        case stopReason = "stop_reason"
+    }
+
+    public init(arms: [EvalSummaryArm], costUsd: Double?, endedAt: String?, id: String, inUse: Bool?, proposes: Int?, runsPlayed: Int, runsTotal: Int, startedAt: String, state: EvalMeasurementState, stopReason: String?) {
+        self.arms = arms
+        self.costUsd = costUsd
+        self.endedAt = endedAt
+        self.id = id
+        self.inUse = inUse
+        self.proposes = proposes
+        self.runsPlayed = runsPlayed
+        self.runsTotal = runsTotal
+        self.startedAt = startedAt
+        self.state = state
+        self.stopReason = stopReason
+    }
+}
+
+/// An arm of a measurement and the model it ran with.
+// MARK: - EvalSummaryArm
+public struct EvalSummaryArm: Codable {
+    public let model: String
+    public let name: String
+
+    public enum CodingKeys: String, CodingKey {
+        case model = "model"
+        case name = "name"
+    }
+
+    public init(model: String, name: String) {
+        self.model = model
+        self.name = name
+    }
+}
+
 /// A session where ``auto`` would have spent much. No title and no text.
 // MARK: - EvalTopSession
 public struct EvalTopSession: Codable {
@@ -5252,6 +6234,686 @@ public struct EvalTopSession: Codable {
         self.calls = calls
         self.costUsd = costUsd
         self.sessionID = sessionID
+    }
+}
+
+/// ``evals.apply``. Write the measured numbers of a measurement to ``[agents.delegate]`` in
+/// ``config.toml``. A number that was not measured stays as it is.
+// MARK: - EvalsApplyParams
+public struct EvalsApplyParams: Codable {
+    public let id: String
+
+    public enum CodingKeys: String, CodingKey {
+        case id = "id"
+    }
+
+    public init(id: String) {
+        self.id = id
+    }
+}
+
+/// ``ok`` is false when nothing could be written, with the reasons in ``errors``. ``values``
+/// is what is in force now, set when ``ok``.
+// MARK: - EvalsApplyResult
+public struct EvalsApplyResult: Codable {
+    public let errors: [EvalsApplyResultError]?
+    public let ok: Bool
+    public let values: EvalsApplyResultAgentsKeepValues?
+
+    public enum CodingKeys: String, CodingKey {
+        case errors = "errors"
+        case ok = "ok"
+        case values = "values"
+    }
+
+    public init(errors: [EvalsApplyResultError]?, ok: Bool, values: EvalsApplyResultAgentsKeepValues?) {
+        self.errors = errors
+        self.ok = ok
+        self.values = values
+    }
+}
+
+/// One problem in a config text. ``line`` and ``column`` count from 1, when known.
+///
+/// ``path`` is the setting, as ``mcp.github.headers.Authorization``.
+// MARK: - EvalsApplyResultError
+public struct EvalsApplyResultError: Codable {
+    public let column: Int?
+    public let line: Int?
+    public let message: String
+    public let path: String?
+
+    public enum CodingKeys: String, CodingKey {
+        case column = "column"
+        case line = "line"
+        case message = "message"
+        case path = "path"
+    }
+
+    public init(column: Int?, line: Int?, message: String, path: String?) {
+        self.column = column
+        self.line = line
+        self.message = message
+        self.path = path
+    }
+}
+
+/// ``[agents] keep_days`` and ``keep_problem_days`` as golem uses them. 0 is for ever.
+///
+/// ``max_calls``, ``working_seconds``, ``max_cost`` and ``max_tokens`` are the limits of
+/// ``[agents]`` that every helper gets when its own table and file leave them open; ``None``
+/// when
+/// ``config.toml`` does not set one. ``agents.set_default_limits`` changes them.
+/// ``use_helpers`` is ``[agents] use_helpers``; ``when_needed`` when ``config.toml`` does
+/// not
+/// set it and for a daemon that does not know it. ``delegate`` is ``[agents.delegate]``,
+/// read-only
+/// (``agents.keep`` does not accept it); an older daemon leaves it out.
+// MARK: - EvalsApplyResultAgentsKeepValues
+public struct EvalsApplyResultAgentsKeepValues: Codable {
+    public let delegate: TentacledAgentsDelegateValues?
+    public let keepDays: Int
+    public let keepProblemDays: Int
+    public let maxCalls: Int?
+    public let maxCost: Double?
+    public let maxTokens: Int?
+    public let useHelpers: UseHelpers?
+    public let workingSeconds: Int?
+
+    public enum CodingKeys: String, CodingKey {
+        case delegate = "delegate"
+        case keepDays = "keep_days"
+        case keepProblemDays = "keep_problem_days"
+        case maxCalls = "max_calls"
+        case maxCost = "max_cost"
+        case maxTokens = "max_tokens"
+        case useHelpers = "use_helpers"
+        case workingSeconds = "working_seconds"
+    }
+
+    public init(delegate: TentacledAgentsDelegateValues?, keepDays: Int, keepProblemDays: Int, maxCalls: Int?, maxCost: Double?, maxTokens: Int?, useHelpers: UseHelpers?, workingSeconds: Int?) {
+        self.delegate = delegate
+        self.keepDays = keepDays
+        self.keepProblemDays = keepProblemDays
+        self.maxCalls = maxCalls
+        self.maxCost = maxCost
+        self.maxTokens = maxTokens
+        self.useHelpers = useHelpers
+        self.workingSeconds = workingSeconds
+    }
+}
+
+/// The four numbers of ``[agents.delegate]`` that say when a helper is worth starting.
+///
+/// ``read_share``, ``fill_share`` and ``job_share`` are shares of the lead's window, and
+/// ``price_ratio`` is how many times dearer the lead must be. Read-only here: a measurement
+/// changes them (``evals.apply``), or the user edits ``config.toml``.
+// MARK: - TentacledAgentsDelegateValues
+public struct TentacledAgentsDelegateValues: Codable {
+    public let fillShare: StickyAgentsDelegateNumber
+    public let jobShare: StickyAgentsDelegateNumber
+    public let priceRatio: StickyAgentsDelegateNumber
+    public let readShare: StickyAgentsDelegateNumber
+
+    public enum CodingKeys: String, CodingKey {
+        case fillShare = "fill_share"
+        case jobShare = "job_share"
+        case priceRatio = "price_ratio"
+        case readShare = "read_share"
+    }
+
+    public init(fillShare: StickyAgentsDelegateNumber, jobShare: StickyAgentsDelegateNumber, priceRatio: StickyAgentsDelegateNumber, readShare: StickyAgentsDelegateNumber) {
+        self.fillShare = fillShare
+        self.jobShare = jobShare
+        self.priceRatio = priceRatio
+        self.readShare = readShare
+    }
+}
+
+/// One number of ``[agents.delegate]``: ``value`` is the one in force, ``default`` the one
+/// golem ships, and ``is_default`` is true when the two are equal.
+// MARK: - StickyAgentsDelegateNumber
+public struct StickyAgentsDelegateNumber: Codable {
+    public let agentsDelegateNumberDefault: Double
+    public let isDefault: Bool
+    public let value: Double
+
+    public enum CodingKeys: String, CodingKey {
+        case agentsDelegateNumberDefault = "default"
+        case isDefault = "is_default"
+        case value = "value"
+    }
+
+    public init(agentsDelegateNumberDefault: Double, isDefault: Bool, value: Double) {
+        self.agentsDelegateNumberDefault = agentsDelegateNumberDefault
+        self.isDefault = isDefault
+        self.value = value
+    }
+}
+
+/// ``evals.delete``. Delete a measurement that is not running. The numbers in
+/// ``config.toml`` stay.
+// MARK: - EvalsDeleteParams
+public struct EvalsDeleteParams: Codable {
+    public let id: String
+
+    public enum CodingKeys: String, CodingKey {
+        case id = "id"
+    }
+
+    public init(id: String) {
+        self.id = id
+    }
+}
+
+/// ``deleted`` is false when there was no such measurement.
+// MARK: - EvalsDeleteResult
+public struct EvalsDeleteResult: Codable {
+    public let deleted: Bool
+
+    public enum CodingKeys: String, CodingKey {
+        case deleted = "deleted"
+    }
+
+    public init(deleted: Bool) {
+        self.deleted = deleted
+    }
+}
+
+/// ``evals.get``. One measurement with its runs and its proposal.
+// MARK: - EvalsGetParams
+public struct EvalsGetParams: Codable {
+    public let id: String
+
+    public enum CodingKeys: String, CodingKey {
+        case id = "id"
+    }
+
+    public init(id: String) {
+        self.id = id
+    }
+}
+
+// MARK: - EvalsGetResult
+public struct EvalsGetResult: Codable {
+    public let measurement: MeasurementClass
+
+    public enum CodingKeys: String, CodingKey {
+        case measurement = "measurement"
+    }
+
+    public init(measurement: MeasurementClass) {
+        self.measurement = measurement
+    }
+}
+
+/// A whole measurement, as ``evals.get`` returns it.
+///
+/// ``runs`` holds every planned run in order, with the ones not yet played as ``pending``
+/// and
+/// the ones that will not be played as ``not_run``. ``stop_reason`` is plain text and is set
+/// only when the state is ``stopped``. ``proposal`` is null while it runs and when too
+/// little
+/// ran to propose anything. ``in_use`` is true when its numbers were applied and still are
+/// the ones in ``config.toml``. ``cost_usd`` is what the paid arms cost.
+// MARK: - MeasurementClass
+public struct MeasurementClass: Codable {
+    public let arms: [PurpleEvalArmUsed]
+    public let costUsd: Double?
+    public let endedAt: String?
+    public let id: String
+    public let inUse: Bool?
+    public let proposal: MeasurementEvalProposal?
+    public let runs: [MeasurementRun]
+    public let startedAt: String
+    public let state: EvalMeasurementState
+    public let stopReason: String?
+
+    public enum CodingKeys: String, CodingKey {
+        case arms = "arms"
+        case costUsd = "cost_usd"
+        case endedAt = "ended_at"
+        case id = "id"
+        case inUse = "in_use"
+        case proposal = "proposal"
+        case runs = "runs"
+        case startedAt = "started_at"
+        case state = "state"
+        case stopReason = "stop_reason"
+    }
+
+    public init(arms: [PurpleEvalArmUsed], costUsd: Double?, endedAt: String?, id: String, inUse: Bool?, proposal: MeasurementEvalProposal?, runs: [MeasurementRun], startedAt: String, state: EvalMeasurementState, stopReason: String?) {
+        self.arms = arms
+        self.costUsd = costUsd
+        self.endedAt = endedAt
+        self.id = id
+        self.inUse = inUse
+        self.proposal = proposal
+        self.runs = runs
+        self.startedAt = startedAt
+        self.state = state
+        self.stopReason = stopReason
+    }
+}
+
+/// An arm of a measurement and the model it ran with.
+// MARK: - PurpleEvalArmUsed
+public struct PurpleEvalArmUsed: Codable {
+    public let model: String
+    public let name: String
+
+    public enum CodingKeys: String, CodingKey {
+        case model = "model"
+        case name = "name"
+    }
+
+    public init(model: String, name: String) {
+        self.model = model
+        self.name = name
+    }
+}
+
+/// What a measurement proposes: all four numbers, once each. ``pairs`` is how many asks ran
+/// both with and without helpers, and ``wins`` in how many of them helpers did better.
+// MARK: - MeasurementEvalProposal
+public struct MeasurementEvalProposal: Codable {
+    public let numbers: [TentacledEvalNumber]
+    public let pairs: Int
+    public let wins: Int
+
+    public enum CodingKeys: String, CodingKey {
+        case numbers = "numbers"
+        case pairs = "pairs"
+        case wins = "wins"
+    }
+
+    public init(numbers: [TentacledEvalNumber], pairs: Int, wins: Int) {
+        self.numbers = numbers
+        self.pairs = pairs
+        self.wins = wins
+    }
+}
+
+/// One of the four numbers of ``[agents.delegate]``.
+///
+/// ``current`` is the value in force, ``proposed`` the measured one. ``measured`` is false
+/// when
+/// the arms that ran could not tell, and ``proposed`` is then null. ``note`` says in one
+/// plain
+/// line what it was measured from, or why it was not.
+// MARK: - TentacledEvalNumber
+public struct TentacledEvalNumber: Codable {
+    public let current: Double
+    public let key: NumberKey
+    public let measured: Bool
+    public let note: String?
+    public let proposed: Double?
+
+    public enum CodingKeys: String, CodingKey {
+        case current = "current"
+        case key = "key"
+        case measured = "measured"
+        case note = "note"
+        case proposed = "proposed"
+    }
+
+    public init(current: Double, key: NumberKey, measured: Bool, note: String?, proposed: Double?) {
+        self.current = current
+        self.key = key
+        self.measured = measured
+        self.note = note
+        self.proposed = proposed
+    }
+}
+
+/// One ask played once on one arm.
+///
+/// ``quality`` is the answer's score from 0 to 1, ``seconds`` the time, ``window_left`` the
+/// share of the window that was still free at the fullest point (0 to 1), and
+/// ``helpers_started`` how many helpers the lead started. They are null for a run that has
+/// no
+/// result: ``pending``, ``running`` and ``not_run``.
+// MARK: - MeasurementRun
+public struct MeasurementRun: Codable {
+    public let arm: String
+    public let ask: String
+    public let end: End
+    public let helpersStarted: Int?
+    public let mode: Mode
+    public let quality: Double?
+    public let seconds: Double?
+    public let windowLeft: Double?
+
+    public enum CodingKeys: String, CodingKey {
+        case arm = "arm"
+        case ask = "ask"
+        case end = "end"
+        case helpersStarted = "helpers_started"
+        case mode = "mode"
+        case quality = "quality"
+        case seconds = "seconds"
+        case windowLeft = "window_left"
+    }
+
+    public init(arm: String, ask: String, end: End, helpersStarted: Int?, mode: Mode, quality: Double?, seconds: Double?, windowLeft: Double?) {
+        self.arm = arm
+        self.ask = ask
+        self.end = end
+        self.helpersStarted = helpersStarted
+        self.mode = mode
+        self.quality = quality
+        self.seconds = seconds
+        self.windowLeft = windowLeft
+    }
+}
+
+/// ``evals.list``. The measurements kept on this machine, the newest first.
+// MARK: - EvalsListParams
+public struct EvalsListParams: Codable {
+
+    public init() {
+    }
+}
+
+// MARK: - EvalsListResult
+public struct EvalsListResult: Codable {
+    public let measurements: [MeasurementElement]?
+
+    public enum CodingKeys: String, CodingKey {
+        case measurements = "measurements"
+    }
+
+    public init(measurements: [MeasurementElement]?) {
+        self.measurements = measurements
+    }
+}
+
+/// One line of ``evals.list``. ``runs_played`` of ``runs_total`` are done, and ``proposes``
+/// is how many of the four numbers it measured.
+// MARK: - MeasurementElement
+public struct MeasurementElement: Codable {
+    public let arms: [FluffyEvalArmUsed]
+    public let costUsd: Double?
+    public let endedAt: String?
+    public let id: String
+    public let inUse: Bool?
+    public let proposes: Int?
+    public let runsPlayed: Int
+    public let runsTotal: Int
+    public let startedAt: String
+    public let state: EvalMeasurementState
+    public let stopReason: String?
+
+    public enum CodingKeys: String, CodingKey {
+        case arms = "arms"
+        case costUsd = "cost_usd"
+        case endedAt = "ended_at"
+        case id = "id"
+        case inUse = "in_use"
+        case proposes = "proposes"
+        case runsPlayed = "runs_played"
+        case runsTotal = "runs_total"
+        case startedAt = "started_at"
+        case state = "state"
+        case stopReason = "stop_reason"
+    }
+
+    public init(arms: [FluffyEvalArmUsed], costUsd: Double?, endedAt: String?, id: String, inUse: Bool?, proposes: Int?, runsPlayed: Int, runsTotal: Int, startedAt: String, state: EvalMeasurementState, stopReason: String?) {
+        self.arms = arms
+        self.costUsd = costUsd
+        self.endedAt = endedAt
+        self.id = id
+        self.inUse = inUse
+        self.proposes = proposes
+        self.runsPlayed = runsPlayed
+        self.runsTotal = runsTotal
+        self.startedAt = startedAt
+        self.state = state
+        self.stopReason = stopReason
+    }
+}
+
+/// An arm of a measurement and the model it ran with.
+// MARK: - FluffyEvalArmUsed
+public struct FluffyEvalArmUsed: Codable {
+    public let model: String
+    public let name: String
+
+    public enum CodingKeys: String, CodingKey {
+        case model = "model"
+        case name = "name"
+    }
+
+    public init(model: String, name: String) {
+        self.model = model
+        self.name = name
+    }
+}
+
+/// ``evals.plan``. What a measurement would run and whether this machine has room for it.
+///
+/// It reads the memory and calls no model. ``models`` maps an arm's name to the model to
+/// plan it
+/// with, instead of its own. With ``arms``, only those arms are planned; with none, every
+/// arm.
+// MARK: - EvalsPlanParams
+public struct EvalsPlanParams: Codable {
+    public let arms: [String]?
+    public let models: [String: String]?
+
+    public enum CodingKeys: String, CodingKey {
+        case arms = "arms"
+        case models = "models"
+    }
+
+    public init(arms: [String]?, models: [String: String]?) {
+        self.arms = arms
+        self.models = models
+    }
+}
+
+/// The arms, and ``running``: the id of the measurement that runs now, else null. Only one
+/// runs at a time, so while it does ``evals.start`` is refused.
+// MARK: - EvalsPlanResult
+public struct EvalsPlanResult: Codable {
+    public let arms: [ArmElement]
+    public let running: String?
+
+    public enum CodingKeys: String, CodingKey {
+        case arms = "arms"
+        case running = "running"
+    }
+
+    public init(arms: [ArmElement], running: String?) {
+        self.arms = arms
+        self.running = running
+    }
+}
+
+/// One arm of a measurement as ``evals.plan`` sees it now.
+///
+/// ``kind`` is ``local`` for a model on this machine and ``cloud`` for a paid one. ``model``
+/// is
+/// the model it would use, and ``choices`` the others it could use. A local arm has the
+/// memory
+/// numbers and a ``verdict``; ``needed_gb`` is what the model needs at this window,
+/// ``ram_gb``
+/// the machine's memory and ``free_gb`` what is free now, each null when it could not be
+/// read.
+/// A cloud arm has none of these and may have ``cost_usd``, the estimate for all its runs.
+/// ``reason`` is one plain line on the verdict, or on the cost. ``asks`` is how many asks it
+/// plays (twice each: with helpers and without), and ``minutes`` a rough time for the arm.
+// MARK: - ArmElement
+public struct ArmElement: Codable {
+    public let asks: Int
+    public let choices: [ArmChoice]?
+    public let costUsd: Double?
+    public let freeGB: Double?
+    public let kind: EvalPlanArmKind
+    public let label: String
+    public let minutes: Double?
+    public let model: String
+    public let name: String
+    public let neededGB: Double?
+    public let ramGB: Double?
+    public let reason: String?
+    public let tier: Tier
+    public let verdict: EvalPlanArmVerdict?
+    public let window: Int
+
+    public enum CodingKeys: String, CodingKey {
+        case asks = "asks"
+        case choices = "choices"
+        case costUsd = "cost_usd"
+        case freeGB = "free_gb"
+        case kind = "kind"
+        case label = "label"
+        case minutes = "minutes"
+        case model = "model"
+        case name = "name"
+        case neededGB = "needed_gb"
+        case ramGB = "ram_gb"
+        case reason = "reason"
+        case tier = "tier"
+        case verdict = "verdict"
+        case window = "window"
+    }
+
+    public init(asks: Int, choices: [ArmChoice]?, costUsd: Double?, freeGB: Double?, kind: EvalPlanArmKind, label: String, minutes: Double?, model: String, name: String, neededGB: Double?, ramGB: Double?, reason: String?, tier: Tier, verdict: EvalPlanArmVerdict?, window: Int) {
+        self.asks = asks
+        self.choices = choices
+        self.costUsd = costUsd
+        self.freeGB = freeGB
+        self.kind = kind
+        self.label = label
+        self.minutes = minutes
+        self.model = model
+        self.name = name
+        self.neededGB = neededGB
+        self.ramGB = ramGB
+        self.reason = reason
+        self.tier = tier
+        self.verdict = verdict
+        self.window = window
+    }
+}
+
+/// A model an arm may use instead of its own. ``size_gb`` is its size in memory, if known.
+// MARK: - ArmChoice
+public struct ArmChoice: Codable {
+    public let ref: String
+    public let sizeGB: Double?
+
+    public enum CodingKeys: String, CodingKey {
+        case ref = "ref"
+        case sizeGB = "size_gb"
+    }
+
+    public init(ref: String, sizeGB: Double?) {
+        self.ref = ref
+        self.sizeGB = sizeGB
+    }
+}
+
+/// ``evals.resume``. Play the runs a stopped measurement did not play. The same checks as
+/// ``evals.start`` apply, and ``allow_tight`` is asked for again.
+// MARK: - EvalsResumeParams
+public struct EvalsResumeParams: Codable {
+    public let allowTight: Bool?
+    public let id: String
+
+    public enum CodingKeys: String, CodingKey {
+        case allowTight = "allow_tight"
+        case id = "id"
+    }
+
+    public init(allowTight: Bool?, id: String) {
+        self.allowTight = allowTight
+        self.id = id
+    }
+}
+
+/// The measurement goes on under the same ``id``.
+// MARK: - EvalsResumeResult
+public struct EvalsResumeResult: Codable {
+    public let id: String
+
+    public enum CodingKeys: String, CodingKey {
+        case id = "id"
+    }
+
+    public init(id: String) {
+        self.id = id
+    }
+}
+
+/// ``evals.start``. Begin a measurement of ``arms``, with the helper rules of
+/// ``config.toml``.
+///
+/// ``models`` maps an arm's name to the model to use instead of its own. ``allow_tight``
+/// lets
+/// a local arm run when its verdict is ``tight``; a ``too_big`` or ``no_room`` arm never
+/// runs.
+/// It answers at once; the progress arrives as ``eval.progress`` and the end as
+/// ``eval.ended``.
+// MARK: - EvalsStartParams
+public struct EvalsStartParams: Codable {
+    public let allowTight: Bool?
+    public let arms: [String]
+    public let models: [String: String]?
+
+    public enum CodingKeys: String, CodingKey {
+        case allowTight = "allow_tight"
+        case arms = "arms"
+        case models = "models"
+    }
+
+    public init(allowTight: Bool?, arms: [String], models: [String: String]?) {
+        self.allowTight = allowTight
+        self.arms = arms
+        self.models = models
+    }
+}
+
+/// ``id`` is the new measurement.
+// MARK: - EvalsStartResult
+public struct EvalsStartResult: Codable {
+    public let id: String
+
+    public enum CodingKeys: String, CodingKey {
+        case id = "id"
+    }
+
+    public init(id: String) {
+        self.id = id
+    }
+}
+
+/// ``evals.stop``. Stop a running measurement and keep the runs done so far.
+// MARK: - EvalsStopParams
+public struct EvalsStopParams: Codable {
+    public let id: String
+
+    public enum CodingKeys: String, CodingKey {
+        case id = "id"
+    }
+
+    public init(id: String) {
+        self.id = id
+    }
+}
+
+/// ``stopped`` is false when that measurement was not running.
+// MARK: - EvalsStopResult
+public struct EvalsStopResult: Codable {
+    public let stopped: Bool
+
+    public enum CodingKeys: String, CodingKey {
+        case stopped = "stopped"
+    }
+
+    public init(stopped: Bool) {
+        self.stopped = stopped
     }
 }
 
@@ -12437,7 +14099,7 @@ public struct ModelCheckDoneNotificationParams: Codable {
     public let recovered: Int?
     public let ref: String
     public let total: Int?
-    public let verdict: Verdict?
+    public let verdict: ParamsVerdict?
 
     public enum CodingKeys: String, CodingKey {
         case cases = "cases"
@@ -12451,7 +14113,7 @@ public struct ModelCheckDoneNotificationParams: Codable {
         case verdict = "verdict"
     }
 
-    public init(cases: [ParamsCase]?, costUsd: Double?, error: String?, ok: Bool, passed: Int?, recovered: Int?, ref: String, total: Int?, verdict: Verdict?) {
+    public init(cases: [ParamsCase]?, costUsd: Double?, error: String?, ok: Bool, passed: Int?, recovered: Int?, ref: String, total: Int?, verdict: ParamsVerdict?) {
         self.cases = cases
         self.costUsd = costUsd
         self.error = error
@@ -12490,7 +14152,7 @@ public struct ParamsCase: Codable {
     }
 }
 
-public enum Verdict: String, Codable {
+public enum ParamsVerdict: String, Codable {
     case notRecommended = "not_recommended"
     case reliable = "reliable"
     case usable = "usable"
@@ -12510,7 +14172,7 @@ public struct ModelCheckDone: Codable {
     public let recovered: Int?
     public let ref: String
     public let total: Int?
-    public let verdict: Verdict?
+    public let verdict: ParamsVerdict?
 
     public enum CodingKeys: String, CodingKey {
         case cases = "cases"
@@ -12524,7 +14186,7 @@ public struct ModelCheckDone: Codable {
         case verdict = "verdict"
     }
 
-    public init(cases: [ModelCheckDoneCase]?, costUsd: Double?, error: String?, ok: Bool, passed: Int?, recovered: Int?, ref: String, total: Int?, verdict: Verdict?) {
+    public init(cases: [ModelCheckDoneCase]?, costUsd: Double?, error: String?, ok: Bool, passed: Int?, recovered: Int?, ref: String, total: Int?, verdict: ParamsVerdict?) {
         self.cases = cases
         self.costUsd = costUsd
         self.error = error
@@ -24553,7 +26215,7 @@ public struct TraceContextItem: Codable {
 public struct TraceContextPart: Codable {
     public let chars: Int
     public let items: [TraceContextPartItem]?
-    public let key: Key
+    public let key: TraceContextPartKey
     public let tokens: Int
 
     public enum CodingKeys: String, CodingKey {
@@ -24563,7 +26225,7 @@ public struct TraceContextPart: Codable {
         case tokens = "tokens"
     }
 
-    public init(chars: Int, items: [TraceContextPartItem]?, key: Key, tokens: Int) {
+    public init(chars: Int, items: [TraceContextPartItem]?, key: TraceContextPartKey, tokens: Int) {
         self.chars = chars
         self.items = items
         self.key = key
@@ -24591,7 +26253,7 @@ public struct TraceContextPartItem: Codable {
     }
 }
 
-public enum Key: String, Codable {
+public enum TraceContextPartKey: String, Codable {
     case assistant = "assistant"
     case summary = "summary"
     case system = "system"
@@ -24680,7 +26342,7 @@ public struct PurpleTraceContextCleared: Codable {
 public struct PurpleTraceContextPart: Codable {
     public let chars: Int
     public let items: [PurpleTraceContextItem]?
-    public let key: Key
+    public let key: TraceContextPartKey
     public let tokens: Int
 
     public enum CodingKeys: String, CodingKey {
@@ -24690,7 +26352,7 @@ public struct PurpleTraceContextPart: Codable {
         case tokens = "tokens"
     }
 
-    public init(chars: Int, items: [PurpleTraceContextItem]?, key: Key, tokens: Int) {
+    public init(chars: Int, items: [PurpleTraceContextItem]?, key: TraceContextPartKey, tokens: Int) {
         self.chars = chars
         self.items = items
         self.key = key
@@ -26474,7 +28136,7 @@ public struct FluffyTraceContextCleared: Codable {
 public struct FluffyTraceContextPart: Codable {
     public let chars: Int
     public let items: [FluffyTraceContextItem]?
-    public let key: Key
+    public let key: TraceContextPartKey
     public let tokens: Int
 
     public enum CodingKeys: String, CodingKey {
@@ -26484,7 +28146,7 @@ public struct FluffyTraceContextPart: Codable {
         case tokens = "tokens"
     }
 
-    public init(chars: Int, items: [FluffyTraceContextItem]?, key: Key, tokens: Int) {
+    public init(chars: Int, items: [FluffyTraceContextItem]?, key: TraceContextPartKey, tokens: Int) {
         self.chars = chars
         self.items = items
         self.key = key

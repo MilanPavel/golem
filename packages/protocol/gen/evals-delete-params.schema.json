@@ -1,0 +1,16 @@
+{
+  "additionalProperties": false,
+  "description": "``evals.delete``. Delete a measurement that is not running. The numbers in\n``config.toml`` stay.",
+  "properties": {
+    "id": {
+      "minLength": 1,
+      "title": "Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id"
+  ],
+  "title": "EvalsDeleteParams",
+  "type": "object"
+}

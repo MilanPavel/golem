@@ -42,7 +42,7 @@ from golem.agents.limits import resolve_limits
 from golem.agents.model import AGENT_SUFFIX, Agent
 from golem.agents.parse import parse_agent
 from golem.agents.registry import AgentRegistry, Listed
-from golem.config import BUNDLED_TYPES, AgentSettings, load_settings
+from golem.config import BUNDLED_TYPES, AgentSettings, DelegateSettings, load_settings
 from golem.config_edit import RawConflictError, set_keys
 from golem.server.dispatcher import (
     INTERNAL_ERROR,
@@ -55,6 +55,8 @@ from golem_protocol.commands import (
     AgentInfo,
     AgentsCopyParams,
     AgentsCopyResult,
+    AgentsDelegateNumber,
+    AgentsDelegateValues,
     AgentsDeleteParams,
     AgentsDeleteResult,
     AgentsKeepParams,
@@ -314,6 +316,24 @@ def _write(path: Path, text: str, create: bool) -> None:
         raise
 
 
+def _delegate_values(delegate: DelegateSettings) -> AgentsDelegateValues:
+    """The four numbers of ``[agents.delegate]``, each with the shipped value and whether the
+    user's file leaves it at that."""
+    shipped = DelegateSettings()
+
+    def number(key: str) -> AgentsDelegateNumber:
+        value = float(getattr(delegate, key))
+        default = float(getattr(shipped, key))
+        return AgentsDelegateNumber(value=value, default=default, is_default=value == default)
+
+    return AgentsDelegateValues(
+        read_share=number("read_share"),
+        fill_share=number("fill_share"),
+        job_share=number("job_share"),
+        price_ratio=number("price_ratio"),
+    )
+
+
 async def _keep_values(ctx: RequestContext) -> AgentsKeepValues:
     paths = ctx.state.paths
     settings = await asyncio.to_thread(load_settings, home=paths.home, project_dir=paths.home)
@@ -326,6 +346,7 @@ async def _keep_values(ctx: RequestContext) -> AgentsKeepValues:
         max_cost=agents.max_cost,
         max_tokens=agents.max_tokens,
         use_helpers=agents.use_helpers,
+        delegate=_delegate_values(agents.delegate),
     )
 
 
@@ -336,7 +357,7 @@ async def agents_keep(ctx: RequestContext, params: AgentsKeepParams) -> AgentsKe
     again on its next pass, so no restart is needed.
     """
     patch = params.model_dump(exclude_none=True)
-    current = (await _keep_values(ctx)).model_dump()
+    current = (await _keep_values(ctx)).model_dump(exclude={"delegate"})
     try:
         AgentSettings.model_validate({**current, **patch})
     except ValidationError as exc:

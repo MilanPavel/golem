@@ -1,0 +1,31 @@
+{
+  "additionalProperties": false,
+  "description": "``evals.start``. Begin a measurement of ``arms``, with the helper rules of ``config.toml``.\n\n``models`` maps an arm's name to the model to use instead of its own. ``allow_tight`` lets\na local arm run when its verdict is ``tight``; a ``too_big`` or ``no_room`` arm never runs.\nIt answers at once; the progress arrives as ``eval.progress`` and the end as ``eval.ended``.",
+  "properties": {
+    "allow_tight": {
+      "default": false,
+      "title": "Allow Tight",
+      "type": "boolean"
+    },
+    "arms": {
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Arms",
+      "type": "array"
+    },
+    "models": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "title": "Models",
+      "type": "object"
+    }
+  },
+  "required": [
+    "arms"
+  ],
+  "title": "EvalsStartParams",
+  "type": "object"
+}

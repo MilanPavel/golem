@@ -90,6 +90,18 @@ import type { SkillListResult } from "../../protocol/gen/skill-list-result.ts";
 import type { AgentsListResult } from "../../protocol/gen/agents-list-result.ts";
 import type { AgentsCopyResult } from "../../protocol/gen/agents-copy-result.ts";
 import type { AgentsDeleteResult } from "../../protocol/gen/agents-delete-result.ts";
+import type { EvalEnded } from "../../protocol/gen/eval-ended.ts";
+import type { EvalProgress } from "../../protocol/gen/eval-progress.ts";
+import type { EvalStarted } from "../../protocol/gen/eval-started.ts";
+import type { EvalsApplyResult } from "../../protocol/gen/evals-apply-result.ts";
+import type { EvalsDeleteResult } from "../../protocol/gen/evals-delete-result.ts";
+import type { EvalsGetResult } from "../../protocol/gen/evals-get-result.ts";
+import type { EvalsListResult } from "../../protocol/gen/evals-list-result.ts";
+import type { EvalsPlanResult } from "../../protocol/gen/evals-plan-result.ts";
+import type { EvalsResumeResult } from "../../protocol/gen/evals-resume-result.ts";
+import type { EvalsStartParams } from "../../protocol/gen/evals-start-params.ts";
+import type { EvalsStartResult } from "../../protocol/gen/evals-start-result.ts";
+import type { EvalsStopResult } from "../../protocol/gen/evals-stop-result.ts";
 import type { AgentsKeepResult } from "../../protocol/gen/agents-keep-result.ts";
 import type { AgentsSaveResult } from "../../protocol/gen/agents-save-result.ts";
 import type { AgentsSetDefaultLimitsParams } from "../../protocol/gen/agents-set-default-limits-params.ts";
@@ -277,6 +289,17 @@ import {
   isAgentsCopyResult,
   isAgentsDeleteResult,
   isAgentsKeepResult,
+  isEvalEnded,
+  isEvalProgress,
+  isEvalStarted,
+  isEvalsApplyResult,
+  isEvalsDeleteResult,
+  isEvalsGetResult,
+  isEvalsListResult,
+  isEvalsPlanResult,
+  isEvalsResumeResult,
+  isEvalsStartResult,
+  isEvalsStopResult,
   isAgentsSaveResult,
   isAgentsSetLimitsResult,
   isAgentsSetWishResult,
@@ -748,6 +771,30 @@ export interface GolemClient {
   setAgentLimits(name: string, change: AgentLimitsChange, cwd?: string): Promise<AgentsSetLimitsResult>;
   /** `agents.set_default_limits`: set or clear the limits in `[agents]` that bound every helper. Resolves to what `agents.keep` returns, with the limits in `values`. */
   setDefaultAgentLimits(change: AgentLimitsChange): Promise<AgentsKeepResult>;
+  /**
+   * `evals.plan`: what a measurement of the helper rules would run, and whether this Mac has room for each local arm.
+   * It reads memory and calls no model. `arms` limits the plan to those arms; `models` maps an arm to the model to plan it with.
+   */
+  evalsPlan(arms?: string[], models?: Record<string, string>): Promise<EvalsPlanResult>;
+  /**
+   * `evals.start`: begin a measurement. It answers at once with the id; progress reaches {@link GolemClient.onEval}.
+   * A refused start (one is already running, an arm does not fit) comes back as an RPC error.
+   */
+  evalsStart(params: EvalsStartParams): Promise<EvalsStartResult>;
+  /** `evals.stop`: stop a running measurement and keep the runs done. `stopped` is false when it was not running. */
+  evalsStop(id: string): Promise<EvalsStopResult>;
+  /** `evals.resume`: play the runs a stopped measurement did not play. `allowTight` is asked for again. */
+  evalsResume(id: string, allowTight?: boolean): Promise<EvalsResumeResult>;
+  /** `evals.list`: the measurements kept on this Mac, the newest first. */
+  evalsList(): Promise<EvalsListResult>;
+  /** `evals.get`: one measurement with its runs and its proposal. */
+  evalsGet(id: string): Promise<EvalsGetResult>;
+  /** `evals.apply`: write the measured numbers of a measurement to `[agents.delegate]`. Resolves with the values now in force. */
+  evalsApply(id: string): Promise<EvalsApplyResult>;
+  /** `evals.delete`: delete a measurement that is not running. */
+  evalsDelete(id: string): Promise<EvalsDeleteResult>;
+  /** `eval.started`, `eval.progress` and `eval.ended`, from any client's measurement. */
+  onEval(listener: (update: EvalUpdate) => void): () => void;
   /** `agents.save`: save the whole text of a user agent file. `name` is the file it replaces; leave it out for a new agent. When `ok` is false nothing was saved and `problems` each carry a message and, for a frontmatter key, its line. */
   saveAgent(text: string, name?: string, cwd?: string): Promise<AgentsSaveResult>;
   /** `agents.copy`: copy the bundled agent `name` to the user's own agents, unchanged. Resolves to the new user agent. */
@@ -818,6 +865,11 @@ export type BenchUpdate =
   | { kind: "progress"; progress: ModelBenchProgress }
   | { kind: "done"; done: ModelBenchDone };
 
+export type EvalUpdate =
+  | { kind: "started"; started: EvalStarted }
+  | { kind: "progress"; progress: EvalProgress }
+  | { kind: "ended"; ended: EvalEnded };
+
 interface Pending {
   method: string;
   resolve: (value: unknown) => void;
@@ -851,6 +903,7 @@ export function connectGolem(options: ConnectOptions): GolemClient {
   const pullListeners = new Set<(update: PullUpdate) => void>();
   const checkListeners = new Set<(update: CheckUpdate) => void>();
   const benchListeners = new Set<(update: BenchUpdate) => void>();
+  const evalListeners = new Set<(update: EvalUpdate) => void>();
   const mcpListeners = new Set<(server: McpServer) => void>();
   const loginListeners = new Set<(done: McpLoginDone) => void>();
   const testListeners = new Set<(progress: McpTestProgress) => void>();
@@ -1036,6 +1089,29 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       }
       if (update !== undefined) {
         for (const listener of checkListeners) {
+          try {
+            listener(update);
+          } catch {
+            // A listener must not tear the socket down.
+          }
+        }
+      }
+      return;
+    }
+    if (isRecord(message) && (message["method"] === "eval.started" || message["method"] === "eval.progress" || message["method"] === "eval.ended")) {
+      const params = message["params"];
+      const id = isRecord(params) && typeof params["id"] === "string" ? params["id"] : "";
+      record({ direction: "in", kind: message["method"], detail: id, json: line });
+      let update: EvalUpdate | undefined;
+      if (message["method"] === "eval.started" && isEvalStarted(params)) {
+        update = { kind: "started", started: params };
+      } else if (message["method"] === "eval.progress" && isEvalProgress(params)) {
+        update = { kind: "progress", progress: params };
+      } else if (message["method"] === "eval.ended" && isEvalEnded(params)) {
+        update = { kind: "ended", ended: params };
+      }
+      if (update !== undefined) {
+        for (const listener of evalListeners) {
           try {
             listener(update);
           } catch {
@@ -2680,6 +2756,79 @@ export function connectGolem(options: ConnectOptions): GolemClient {
         throw new Error("invalid agents.set_default_limits result");
       }
       return result;
+    },
+    async evalsPlan(arms?: string[], models?: Record<string, string>): Promise<EvalsPlanResult> {
+      await ready;
+      const result = await call("evals.plan", {
+        ...(arms === undefined ? {} : { arms }),
+        ...(models === undefined ? {} : { models }),
+      });
+      if (!isEvalsPlanResult(result)) {
+        throw new Error("invalid evals.plan result");
+      }
+      return result;
+    },
+    async evalsStart(params: EvalsStartParams): Promise<EvalsStartResult> {
+      await ready;
+      const result = await call("evals.start", { ...params });
+      if (!isEvalsStartResult(result)) {
+        throw new Error("invalid evals.start result");
+      }
+      return result;
+    },
+    async evalsStop(id: string): Promise<EvalsStopResult> {
+      await ready;
+      const result = await call("evals.stop", { id });
+      if (!isEvalsStopResult(result)) {
+        throw new Error("invalid evals.stop result");
+      }
+      return result;
+    },
+    async evalsResume(id: string, allowTight?: boolean): Promise<EvalsResumeResult> {
+      await ready;
+      const result = await call("evals.resume", allowTight === undefined ? { id } : { id, allow_tight: allowTight });
+      if (!isEvalsResumeResult(result)) {
+        throw new Error("invalid evals.resume result");
+      }
+      return result;
+    },
+    async evalsList(): Promise<EvalsListResult> {
+      await ready;
+      const result = await call("evals.list", {});
+      if (!isEvalsListResult(result)) {
+        throw new Error("invalid evals.list result");
+      }
+      return result;
+    },
+    async evalsGet(id: string): Promise<EvalsGetResult> {
+      await ready;
+      const result = await call("evals.get", { id });
+      if (!isEvalsGetResult(result)) {
+        throw new Error("invalid evals.get result");
+      }
+      return result;
+    },
+    async evalsApply(id: string): Promise<EvalsApplyResult> {
+      await ready;
+      const result = await call("evals.apply", { id });
+      if (!isEvalsApplyResult(result)) {
+        throw new Error("invalid evals.apply result");
+      }
+      return result;
+    },
+    async evalsDelete(id: string): Promise<EvalsDeleteResult> {
+      await ready;
+      const result = await call("evals.delete", { id });
+      if (!isEvalsDeleteResult(result)) {
+        throw new Error("invalid evals.delete result");
+      }
+      return result;
+    },
+    onEval(listener: (update: EvalUpdate) => void): () => void {
+      evalListeners.add(listener);
+      return () => {
+        evalListeners.delete(listener);
+      };
     },
     async saveAgent(text: string, name?: string, cwd?: string): Promise<AgentsSaveResult> {
       await ready;

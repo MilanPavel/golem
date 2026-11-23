@@ -1,0 +1,16 @@
+{
+  "additionalProperties": false,
+  "description": "``id`` is the new measurement.",
+  "properties": {
+    "id": {
+      "minLength": 1,
+      "title": "Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id"
+  ],
+  "title": "EvalsStartResult",
+  "type": "object"
+}

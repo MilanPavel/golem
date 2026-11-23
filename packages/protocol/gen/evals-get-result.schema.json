@@ -1,0 +1,317 @@
+{
+  "$defs": {
+    "EvalArmUsed": {
+      "additionalProperties": false,
+      "description": "An arm of a measurement and the model it ran with.",
+      "properties": {
+        "model": {
+          "minLength": 1,
+          "title": "Model",
+          "type": "string"
+        },
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "model"
+      ],
+      "title": "EvalArmUsed",
+      "type": "object"
+    },
+    "EvalMeasurement": {
+      "additionalProperties": false,
+      "description": "A whole measurement, as ``evals.get`` returns it.\n\n``runs`` holds every planned run in order, with the ones not yet played as ``pending`` and\nthe ones that will not be played as ``not_run``. ``stop_reason`` is plain text and is set\nonly when the state is ``stopped``. ``proposal`` is null while it runs and when too little\nran to propose anything. ``in_use`` is true when its numbers were applied and still are\nthe ones in ``config.toml``. ``cost_usd`` is what the paid arms cost.",
+      "properties": {
+        "arms": {
+          "items": {
+            "$ref": "#/$defs/EvalArmUsed"
+          },
+          "title": "Arms",
+          "type": "array"
+        },
+        "cost_usd": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cost Usd"
+        },
+        "ended_at": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Ended At"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "in_use": {
+          "default": false,
+          "title": "In Use",
+          "type": "boolean"
+        },
+        "proposal": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/EvalProposal"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "runs": {
+          "items": {
+            "$ref": "#/$defs/EvalRun"
+          },
+          "title": "Runs",
+          "type": "array"
+        },
+        "started_at": {
+          "minLength": 1,
+          "title": "Started At",
+          "type": "string"
+        },
+        "state": {
+          "enum": [
+            "running",
+            "stopped",
+            "done"
+          ],
+          "title": "State",
+          "type": "string"
+        },
+        "stop_reason": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Stop Reason"
+        }
+      },
+      "required": [
+        "id",
+        "started_at",
+        "state",
+        "arms",
+        "runs"
+      ],
+      "title": "EvalMeasurement",
+      "type": "object"
+    },
+    "EvalNumber": {
+      "additionalProperties": false,
+      "description": "One of the four numbers of ``[agents.delegate]``.\n\n``current`` is the value in force, ``proposed`` the measured one. ``measured`` is false when\nthe arms that ran could not tell, and ``proposed`` is then null. ``note`` says in one plain\nline what it was measured from, or why it was not.",
+      "properties": {
+        "current": {
+          "title": "Current",
+          "type": "number"
+        },
+        "key": {
+          "enum": [
+            "read_share",
+            "fill_share",
+            "job_share",
+            "price_ratio"
+          ],
+          "title": "Key",
+          "type": "string"
+        },
+        "measured": {
+          "title": "Measured",
+          "type": "boolean"
+        },
+        "note": {
+          "default": "",
+          "title": "Note",
+          "type": "string"
+        },
+        "proposed": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Proposed"
+        }
+      },
+      "required": [
+        "key",
+        "current",
+        "measured"
+      ],
+      "title": "EvalNumber",
+      "type": "object"
+    },
+    "EvalProposal": {
+      "additionalProperties": false,
+      "description": "What a measurement proposes: all four numbers, once each. ``pairs`` is how many asks ran\nboth with and without helpers, and ``wins`` in how many of them helpers did better.",
+      "properties": {
+        "numbers": {
+          "items": {
+            "$ref": "#/$defs/EvalNumber"
+          },
+          "title": "Numbers",
+          "type": "array"
+        },
+        "pairs": {
+          "minimum": 0,
+          "title": "Pairs",
+          "type": "integer"
+        },
+        "wins": {
+          "minimum": 0,
+          "title": "Wins",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "numbers",
+        "pairs",
+        "wins"
+      ],
+      "title": "EvalProposal",
+      "type": "object"
+    },
+    "EvalRun": {
+      "additionalProperties": false,
+      "description": "One ask played once on one arm.\n\n``quality`` is the answer's score from 0 to 1, ``seconds`` the time, ``window_left`` the\nshare of the window that was still free at the fullest point (0 to 1), and\n``helpers_started`` how many helpers the lead started. They are null for a run that has no\nresult: ``pending``, ``running`` and ``not_run``.",
+      "properties": {
+        "arm": {
+          "minLength": 1,
+          "title": "Arm",
+          "type": "string"
+        },
+        "ask": {
+          "minLength": 1,
+          "title": "Ask",
+          "type": "string"
+        },
+        "end": {
+          "enum": [
+            "completed",
+            "failed",
+            "cancelled",
+            "timeout",
+            "not_run",
+            "running",
+            "pending"
+          ],
+          "title": "End",
+          "type": "string"
+        },
+        "helpers_started": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Helpers Started"
+        },
+        "mode": {
+          "enum": [
+            "on",
+            "off"
+          ],
+          "title": "Mode",
+          "type": "string"
+        },
+        "quality": {
+          "anyOf": [
+            {
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Quality"
+        },
+        "seconds": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Seconds"
+        },
+        "window_left": {
+          "anyOf": [
+            {
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Window Left"
+        }
+      },
+      "required": [
+        "arm",
+        "ask",
+        "mode",
+        "end"
+      ],
+      "title": "EvalRun",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "measurement": {
+      "$ref": "#/$defs/EvalMeasurement"
+    }
+  },
+  "required": [
+    "measurement"
+  ],
+  "title": "EvalsGetResult",
+  "type": "object"
+}

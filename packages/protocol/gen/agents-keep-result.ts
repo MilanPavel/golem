@@ -6,6 +6,9 @@ export type Message = string;
 export type Path = string | null;
 export type Errors = ConfigError[];
 export type Ok = boolean;
+export type Default = number;
+export type IsDefault = boolean;
+export type Value = number;
 export type KeepDays = number;
 export type KeepProblemDays = number;
 export type MaxCalls = number | null;
@@ -44,12 +47,14 @@ export interface ConfigError {
  * ``[agents]`` that every helper gets when its own table and file leave them open; ``None`` when
  * ``config.toml`` does not set one. ``agents.set_default_limits`` changes them.
  * ``use_helpers`` is ``[agents] use_helpers``; ``when_needed`` when ``config.toml`` does not
- * set it and for a daemon that does not know it.
+ * set it and for a daemon that does not know it. ``delegate`` is ``[agents.delegate]``, read-only
+ * (``agents.keep`` does not accept it); an older daemon leaves it out.
  *
  * This interface was referenced by `AgentsKeepResult`'s JSON-Schema
  * via the `definition` "AgentsKeepValues".
  */
 export interface AgentsKeepValues {
+  delegate?: AgentsDelegateValues | null;
   keep_days: KeepDays;
   keep_problem_days: KeepProblemDays;
   max_calls?: MaxCalls;
@@ -57,4 +62,32 @@ export interface AgentsKeepValues {
   max_tokens?: MaxTokens;
   use_helpers?: UseHelpers;
   working_seconds?: WorkingSeconds;
+}
+/**
+ * The four numbers of ``[agents.delegate]`` that say when a helper is worth starting.
+ *
+ * ``read_share``, ``fill_share`` and ``job_share`` are shares of the lead's window, and
+ * ``price_ratio`` is how many times dearer the lead must be. Read-only here: a measurement
+ * changes them (``evals.apply``), or the user edits ``config.toml``.
+ *
+ * This interface was referenced by `AgentsKeepResult`'s JSON-Schema
+ * via the `definition` "AgentsDelegateValues".
+ */
+export interface AgentsDelegateValues {
+  fill_share: AgentsDelegateNumber;
+  job_share: AgentsDelegateNumber;
+  price_ratio: AgentsDelegateNumber;
+  read_share: AgentsDelegateNumber;
+}
+/**
+ * One number of ``[agents.delegate]``: ``value`` is the one in force, ``default`` the one
+ * golem ships, and ``is_default`` is true when the two are equal.
+ *
+ * This interface was referenced by `AgentsKeepResult`'s JSON-Schema
+ * via the `definition` "AgentsDelegateNumber".
+ */
+export interface AgentsDelegateNumber {
+  default: Default;
+  is_default: IsDefault;
+  value: Value;
 }

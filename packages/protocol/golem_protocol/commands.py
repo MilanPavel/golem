@@ -4174,6 +4174,33 @@ class AgentsKeepParams(BaseModel):
     use_helpers: UseHelpers | None = None
 
 
+class AgentsDelegateNumber(BaseModel):
+    """One number of ``[agents.delegate]``: ``value`` is the one in force, ``default`` the one
+    golem ships, and ``is_default`` is true when the two are equal."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    value: float
+    default: float
+    is_default: bool
+
+
+class AgentsDelegateValues(BaseModel):
+    """The four numbers of ``[agents.delegate]`` that say when a helper is worth starting.
+
+    ``read_share``, ``fill_share`` and ``job_share`` are shares of the lead's window, and
+    ``price_ratio`` is how many times dearer the lead must be. Read-only here: a measurement
+    changes them (``evals.apply``), or the user edits ``config.toml``.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    read_share: AgentsDelegateNumber
+    fill_share: AgentsDelegateNumber
+    job_share: AgentsDelegateNumber
+    price_ratio: AgentsDelegateNumber
+
+
 class AgentsKeepValues(BaseModel):
     """``[agents] keep_days`` and ``keep_problem_days`` as golem uses them. 0 is for ever.
 
@@ -4181,7 +4208,8 @@ class AgentsKeepValues(BaseModel):
     ``[agents]`` that every helper gets when its own table and file leave them open; ``None`` when
     ``config.toml`` does not set one. ``agents.set_default_limits`` changes them.
     ``use_helpers`` is ``[agents] use_helpers``; ``when_needed`` when ``config.toml`` does not
-    set it and for a daemon that does not know it.
+    set it and for a daemon that does not know it. ``delegate`` is ``[agents.delegate]``, read-only
+    (``agents.keep`` does not accept it); an older daemon leaves it out.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -4193,6 +4221,7 @@ class AgentsKeepValues(BaseModel):
     max_cost: float | None = None
     max_tokens: int | None = None
     use_helpers: UseHelpers = "when_needed"
+    delegate: AgentsDelegateValues | None = None
 
 
 class AgentsKeepResult(BaseModel):
@@ -5311,12 +5340,448 @@ class FsRevealResult(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
 
+# --- evals.*: the measurement of the helper rules (step 15.14) ---------------------------------
+
+EvalTier = Literal["local", "budget", "frontier"]
+"""The kind of model an arm uses, as the model ladder names it."""
+
+EvalMemoryVerdict = Literal["fits", "tight", "too_big", "no_room", "unknown"]
+"""Whether a local arm's model fits in memory. ``fits``: plenty of room. ``tight``: it fits, but
+takes most of the free memory, so it needs ``allow_tight``. ``too_big``: it can never fit on this
+machine. ``no_room``: it would fit if other apps let go of memory. ``unknown``: the size or the
+memory could not be read."""
+
+EvalState = Literal["running", "stopped", "done"]
+"""``running`` is being measured now. ``stopped`` ended early and may be resumed. ``done`` ran
+every run."""
+
+EvalMode = Literal["on", "off"]
+"""Whether the lead could start helpers in a run."""
+
+EvalRunEnd = Literal["completed", "failed", "cancelled", "timeout", "not_run", "running", "pending"]
+"""How a run ended. ``not_run`` was skipped and is not counted. ``running`` is the one in
+progress and ``pending`` waits its turn; both are only on a measurement that is running."""
+
+EvalNumberKey = Literal["read_share", "fill_share", "job_share", "price_ratio"]
+"""The four numbers of ``[agents.delegate]``."""
+
+_EVAL_NUMBER_KEYS = ("fill_share", "job_share", "price_ratio", "read_share")
+
+
+class EvalModelChoice(BaseModel):
+    """A model an arm may use instead of its own. ``size_gb`` is its size in memory, if known."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    ref: str = Field(min_length=1)
+    size_gb: float | None = Field(default=None, ge=0)
+
+
+class EvalPlanArm(BaseModel):
+    """One arm of a measurement as ``evals.plan`` sees it now.
+
+    ``kind`` is ``local`` for a model on this machine and ``cloud`` for a paid one. ``model`` is
+    the model it would use, and ``choices`` the others it could use. A local arm has the memory
+    numbers and a ``verdict``; ``needed_gb`` is what the model needs at this window, ``ram_gb``
+    the machine's memory and ``free_gb`` what is free now, each null when it could not be read.
+    A cloud arm has none of these and may have ``cost_usd``, the estimate for all its runs.
+    ``reason`` is one plain line on the verdict, or on the cost. ``asks`` is how many asks it
+    plays (twice each: with helpers and without), and ``minutes`` a rough time for the arm.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    name: str = Field(min_length=1)
+    label: str = Field(min_length=1)
+    kind: Literal["local", "cloud"]
+    tier: EvalTier
+    window: int = Field(ge=1)
+    model: str = Field(min_length=1)
+    choices: list[EvalModelChoice] = Field(default_factory=list[EvalModelChoice])
+    needed_gb: float | None = Field(default=None, ge=0)
+    ram_gb: float | None = Field(default=None, ge=0)
+    free_gb: float | None = Field(default=None, ge=0)
+    verdict: EvalMemoryVerdict | None = None
+    reason: str = ""
+    cost_usd: float | None = Field(default=None, ge=0)
+    asks: int = Field(ge=1)
+    minutes: float | None = Field(default=None, ge=0)
+
+    @model_validator(mode="after")
+    def _memory_only_for_local(self) -> Self:
+        if self.kind == "local":
+            if self.verdict is None:
+                raise ValueError("a local arm has a verdict")
+            if self.cost_usd is not None:
+                raise ValueError("a local arm costs nothing")
+        elif (
+            self.verdict is not None
+            or self.needed_gb is not None
+            or self.ram_gb is not None
+            or self.free_gb is not None
+        ):
+            raise ValueError("a cloud arm takes no memory")
+        return self
+
+
+class EvalsPlanParams(BaseModel):
+    """``evals.plan``. What a measurement would run and whether this machine has room for it.
+
+    It reads the memory and calls no model. ``models`` maps an arm's name to the model to plan it
+    with, instead of its own. With ``arms``, only those arms are planned; with none, every arm.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    arms: list[str] = Field(default_factory=list[str])
+    models: dict[str, str] = Field(default_factory=dict[str, str])
+
+
+class EvalsPlanResult(BaseModel):
+    """The arms, and ``running``: the id of the measurement that runs now, else null. Only one
+    runs at a time, so while it does ``evals.start`` is refused."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    arms: list[EvalPlanArm]
+    running: str | None = Field(default=None, min_length=1)
+
+
+class EvalsStartParams(BaseModel):
+    """``evals.start``. Begin a measurement of ``arms``, with the helper rules of ``config.toml``.
+
+    ``models`` maps an arm's name to the model to use instead of its own. ``allow_tight`` lets
+    a local arm run when its verdict is ``tight``; a ``too_big`` or ``no_room`` arm never runs.
+    It answers at once; the progress arrives as ``eval.progress`` and the end as ``eval.ended``.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    arms: list[str] = Field(min_length=1)
+    models: dict[str, str] = Field(default_factory=dict[str, str])
+    allow_tight: bool = False
+
+    @model_validator(mode="after")
+    def _arms_are_distinct(self) -> Self:
+        if len(set(self.arms)) != len(self.arms):
+            raise ValueError("an arm is named once")
+        return self
+
+
+class EvalsStartResult(BaseModel):
+    """``id`` is the new measurement."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    id: str = Field(min_length=1)
+
+
+class EvalArmUsed(BaseModel):
+    """An arm of a measurement and the model it ran with."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    name: str = Field(min_length=1)
+    model: str = Field(min_length=1)
+
+
+class EvalRun(BaseModel):
+    """One ask played once on one arm.
+
+    ``quality`` is the answer's score from 0 to 1, ``seconds`` the time, ``window_left`` the
+    share of the window that was still free at the fullest point (0 to 1), and
+    ``helpers_started`` how many helpers the lead started. They are null for a run that has no
+    result: ``pending``, ``running`` and ``not_run``.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    arm: str = Field(min_length=1)
+    ask: str = Field(min_length=1)
+    mode: EvalMode
+    end: EvalRunEnd
+    quality: float | None = Field(default=None, ge=0, le=1)
+    seconds: float | None = Field(default=None, ge=0)
+    window_left: float | None = Field(default=None, ge=0, le=1)
+    helpers_started: int | None = Field(default=None, ge=0)
+
+    @model_validator(mode="after")
+    def _no_numbers_without_a_result(self) -> Self:
+        if self.end in ("pending", "running", "not_run") and (
+            self.quality is not None
+            or self.seconds is not None
+            or self.window_left is not None
+            or self.helpers_started is not None
+        ):
+            raise ValueError(f"a run that is {self.end} has no numbers")
+        return self
+
+
+class EvalNumber(BaseModel):
+    """One of the four numbers of ``[agents.delegate]``.
+
+    ``current`` is the value in force, ``proposed`` the measured one. ``measured`` is false when
+    the arms that ran could not tell, and ``proposed`` is then null. ``note`` says in one plain
+    line what it was measured from, or why it was not.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    key: EvalNumberKey
+    current: float
+    proposed: float | None = None
+    measured: bool
+    note: str = ""
+
+    @model_validator(mode="after")
+    def _measured_has_a_value(self) -> Self:
+        if self.measured != (self.proposed is not None):
+            raise ValueError("a number is measured exactly when it has a proposed value")
+        return self
+
+
+class EvalProposal(BaseModel):
+    """What a measurement proposes: all four numbers, once each. ``pairs`` is how many asks ran
+    both with and without helpers, and ``wins`` in how many of them helpers did better."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    numbers: list[EvalNumber]
+    pairs: int = Field(ge=0)
+    wins: int = Field(ge=0)
+
+    @model_validator(mode="after")
+    def _the_four_numbers(self) -> Self:
+        if tuple(sorted(number.key for number in self.numbers)) != _EVAL_NUMBER_KEYS:
+            raise ValueError("a proposal has the four numbers, once each")
+        if self.wins > self.pairs:
+            raise ValueError("wins cannot be more than pairs")
+        return self
+
+
+class EvalMeasurement(BaseModel):
+    """A whole measurement, as ``evals.get`` returns it.
+
+    ``runs`` holds every planned run in order, with the ones not yet played as ``pending`` and
+    the ones that will not be played as ``not_run``. ``stop_reason`` is plain text and is set
+    only when the state is ``stopped``. ``proposal`` is null while it runs and when too little
+    ran to propose anything. ``in_use`` is true when its numbers were applied and still are
+    the ones in ``config.toml``. ``cost_usd`` is what the paid arms cost.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    id: str = Field(min_length=1)
+    started_at: str = Field(min_length=1)
+    ended_at: str | None = Field(default=None, min_length=1)
+    state: EvalState
+    stop_reason: str | None = Field(default=None, min_length=1)
+    arms: list[EvalArmUsed]
+    runs: list[EvalRun]
+    proposal: EvalProposal | None = None
+    in_use: bool = False
+    cost_usd: float | None = Field(default=None, ge=0)
+
+    @model_validator(mode="after")
+    def _state_fits_the_rest(self) -> Self:
+        if self.state == "running" and self.ended_at is not None:
+            raise ValueError("a running measurement has not ended")
+        if self.state != "running" and self.ended_at is None:
+            raise ValueError("a measurement that is not running has ended")
+        if self.stop_reason is not None and self.state != "stopped":
+            raise ValueError("only a stopped measurement has a stop reason")
+        if self.in_use and self.proposal is None:
+            raise ValueError("a measurement without a proposal cannot be in use")
+        return self
+
+
+class EvalSummary(BaseModel):
+    """One line of ``evals.list``. ``runs_played`` of ``runs_total`` are done, and ``proposes``
+    is how many of the four numbers it measured."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    id: str = Field(min_length=1)
+    started_at: str = Field(min_length=1)
+    ended_at: str | None = Field(default=None, min_length=1)
+    state: EvalState
+    stop_reason: str | None = Field(default=None, min_length=1)
+    arms: list[EvalArmUsed]
+    runs_played: int = Field(ge=0)
+    runs_total: int = Field(ge=0)
+    proposes: int = Field(default=0, ge=0, le=4)
+    in_use: bool = False
+    cost_usd: float | None = Field(default=None, ge=0)
+
+    @model_validator(mode="after")
+    def _played_within_total(self) -> Self:
+        if self.runs_played > self.runs_total:
+            raise ValueError("runs_played is at most runs_total")
+        if self.stop_reason is not None and self.state != "stopped":
+            raise ValueError("only a stopped measurement has a stop reason")
+        return self
+
+
+class EvalsStopParams(BaseModel):
+    """``evals.stop``. Stop a running measurement and keep the runs done so far."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    id: str = Field(min_length=1)
+
+
+class EvalsStopResult(BaseModel):
+    """``stopped`` is false when that measurement was not running."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    stopped: bool
+
+
+class EvalsResumeParams(BaseModel):
+    """``evals.resume``. Play the runs a stopped measurement did not play. The same checks as
+    ``evals.start`` apply, and ``allow_tight`` is asked for again."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    id: str = Field(min_length=1)
+    allow_tight: bool = False
+
+
+class EvalsResumeResult(BaseModel):
+    """The measurement goes on under the same ``id``."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    id: str = Field(min_length=1)
+
+
+class EvalsListParams(BaseModel):
+    """``evals.list``. The measurements kept on this machine, the newest first."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+
+class EvalsListResult(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    measurements: list[EvalSummary] = Field(default_factory=list[EvalSummary])
+
+
+class EvalsGetParams(BaseModel):
+    """``evals.get``. One measurement with its runs and its proposal."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    id: str = Field(min_length=1)
+
+
+class EvalsGetResult(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    measurement: EvalMeasurement
+
+
+class EvalsApplyParams(BaseModel):
+    """``evals.apply``. Write the measured numbers of a measurement to ``[agents.delegate]`` in
+    ``config.toml``. A number that was not measured stays as it is."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    id: str = Field(min_length=1)
+
+
+class EvalsApplyResult(BaseModel):
+    """``ok`` is false when nothing could be written, with the reasons in ``errors``. ``values``
+    is what is in force now, set when ``ok``."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    ok: bool
+    errors: list[ConfigError] = Field(default_factory=list[ConfigError])
+    values: AgentsKeepValues | None = None
+
+
+class EvalsDeleteParams(BaseModel):
+    """``evals.delete``. Delete a measurement that is not running. The numbers in
+    ``config.toml`` stay."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    id: str = Field(min_length=1)
+
+
+class EvalsDeleteResult(BaseModel):
+    """``deleted`` is false when there was no such measurement."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    deleted: bool
+
+
+class EvalStarted(BaseModel):
+    """``eval.started``. A measurement began, or went on after ``evals.resume``. ``total`` is
+    the runs it will play."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    id: str = Field(min_length=1)
+    started_at: str = Field(min_length=1)
+    arms: list[EvalArmUsed]
+    total: int = Field(ge=1)
+
+
+class EvalProgress(BaseModel):
+    """``eval.progress``. A run began, or its state changed. ``index`` counts from 1 of
+    ``total``. ``state`` is ``running`` while it plays and then how it ended. ``elapsed`` is
+    the seconds since the measurement began. ``memory_used_gb`` and ``memory_total_gb`` are the
+    machine's memory now, each null when it could not be read."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    id: str = Field(min_length=1)
+    index: int = Field(ge=1)
+    total: int = Field(ge=1)
+    arm: str = Field(min_length=1)
+    mode: EvalMode
+    ask: str = Field(min_length=1)
+    state: Literal["running", "completed", "failed", "cancelled", "timeout"]
+    elapsed: float = Field(ge=0)
+    memory_used_gb: float | None = Field(default=None, ge=0)
+    memory_total_gb: float | None = Field(default=None, ge=0)
+
+    @model_validator(mode="after")
+    def _index_within_total(self) -> Self:
+        if self.index > self.total:
+            raise ValueError("index is at most total")
+        return self
+
+
+class EvalEnded(BaseModel):
+    """``eval.ended``. A measurement is no longer running. ``state`` is ``done`` or ``stopped``,
+    and ``stop_reason`` says why in plain text when it stopped."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    id: str = Field(min_length=1)
+    state: Literal["stopped", "done"]
+    stop_reason: str | None = Field(default=None, min_length=1)
+
+    @model_validator(mode="after")
+    def _reason_only_when_stopped(self) -> Self:
+        if self.stop_reason is not None and self.state != "stopped":
+            raise ValueError("only a stopped measurement has a stop reason")
+        return self
+
+
 __all__ = [
     "AgentInfo",
     "AgentLimitKey",
     "AgentLimits",
     "AgentOrigin",
     "AgentRegistryChanged",
+    "AgentsDelegateNumber",
+    "AgentsDelegateValues",
     "AgentsGetParams",
     "AgentsGetResult",
     "AgentsKeepParams",
@@ -5409,11 +5874,44 @@ __all__ = [
     "DeviceSyncParams",
     "DeviceSyncResult",
     "DirEntry",
+    "EvalArmUsed",
+    "EvalEnded",
     "EvalHelperRow",
+    "EvalMeasurement",
+    "EvalMemoryVerdict",
+    "EvalMode",
+    "EvalModelChoice",
+    "EvalNumber",
+    "EvalNumberKey",
+    "EvalPlanArm",
+    "EvalProgress",
+    "EvalProposal",
     "EvalRoutingParams",
     "EvalRoutingResult",
+    "EvalRun",
+    "EvalRunEnd",
     "EvalScenarioRow",
+    "EvalStarted",
+    "EvalState",
+    "EvalSummary",
+    "EvalTier",
     "EvalTopSession",
+    "EvalsApplyParams",
+    "EvalsApplyResult",
+    "EvalsDeleteParams",
+    "EvalsDeleteResult",
+    "EvalsGetParams",
+    "EvalsGetResult",
+    "EvalsListParams",
+    "EvalsListResult",
+    "EvalsPlanParams",
+    "EvalsPlanResult",
+    "EvalsResumeParams",
+    "EvalsResumeResult",
+    "EvalsStartParams",
+    "EvalsStartResult",
+    "EvalsStopParams",
+    "EvalsStopResult",
     "FileListParams",
     "FileListResult",
     "FileReadParams",

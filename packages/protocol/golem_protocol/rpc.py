@@ -8,6 +8,9 @@ from golem_protocol.commands import (
     AgentRegistryChanged,
     DeviceChanged,
     DevicePairChanged,
+    EvalEnded,
+    EvalProgress,
+    EvalStarted,
     KeychainWait,
     McpLoginDone,
     McpServer,
@@ -309,6 +312,36 @@ class MemoryChangedNotification(BaseModel):
     params: MemoryChanged
 
 
+class EvalStartedNotification(BaseModel):
+    """Server → every connection: a measurement of the helper rules began. Not stored."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    jsonrpc: Literal["2.0"] = "2.0"
+    method: Literal["eval.started"] = "eval.started"
+    params: EvalStarted
+
+
+class EvalProgressNotification(BaseModel):
+    """Server → every connection: a run of a measurement began or ended. Not stored."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    jsonrpc: Literal["2.0"] = "2.0"
+    method: Literal["eval.progress"] = "eval.progress"
+    params: EvalProgress
+
+
+class EvalEndedNotification(BaseModel):
+    """Server → every connection: a measurement is no longer running. Not stored."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    jsonrpc: Literal["2.0"] = "2.0"
+    method: Literal["eval.ended"] = "eval.ended"
+    params: EvalEnded
+
+
 class DeviceChangedNotification(BaseModel):
     """Server → every connection: the device registry changed. Not stored.
 
@@ -339,6 +372,9 @@ __all__ = [
     "AgentRegistryChangedNotification",
     "DeviceChangedNotification",
     "DevicePairChangedNotification",
+    "EvalEndedNotification",
+    "EvalProgressNotification",
+    "EvalStartedNotification",
     "KeychainWaitNotification",
     "McpLoginDoneNotification",
     "McpServerLogNotification",

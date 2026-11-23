@@ -36,6 +36,7 @@ export {
   type OllamaInstallUpdate,
   type RuntimeInstallUpdate,
   type BenchUpdate,
+  type EvalUpdate,
   type CheckUpdate,
   type PullUpdate,
   type SessionSummary,
@@ -188,6 +189,28 @@ export type { AgentsSaveProblem } from "../../protocol/gen/agents-save-problem.t
 export type { AgentsSaveResult } from "../../protocol/gen/agents-save-result.ts";
 export type { AgentsKeepResult } from "../../protocol/gen/agents-keep-result.ts";
 export type { AgentsKeepValues } from "../../protocol/gen/agents-keep-values.ts";
+export type { AgentsDelegateNumber } from "../../protocol/gen/agents-delegate-number.ts";
+export type { AgentsDelegateValues } from "../../protocol/gen/agents-delegate-values.ts";
+export type { EvalArmUsed } from "../../protocol/gen/eval-arm-used.ts";
+export type { EvalEnded } from "../../protocol/gen/eval-ended.ts";
+export type { EvalMeasurement } from "../../protocol/gen/eval-measurement.ts";
+export type { EvalModelChoice } from "../../protocol/gen/eval-model-choice.ts";
+export type { EvalNumber } from "../../protocol/gen/eval-number.ts";
+export type { EvalPlanArm } from "../../protocol/gen/eval-plan-arm.ts";
+export type { EvalProgress } from "../../protocol/gen/eval-progress.ts";
+export type { EvalProposal } from "../../protocol/gen/eval-proposal.ts";
+export type { EvalRun } from "../../protocol/gen/eval-run.ts";
+export type { EvalStarted } from "../../protocol/gen/eval-started.ts";
+export type { EvalSummary } from "../../protocol/gen/eval-summary.ts";
+export type { EvalsApplyResult } from "../../protocol/gen/evals-apply-result.ts";
+export type { EvalsDeleteResult } from "../../protocol/gen/evals-delete-result.ts";
+export type { EvalsGetResult } from "../../protocol/gen/evals-get-result.ts";
+export type { EvalsListResult } from "../../protocol/gen/evals-list-result.ts";
+export type { EvalsPlanResult } from "../../protocol/gen/evals-plan-result.ts";
+export type { EvalsResumeResult } from "../../protocol/gen/evals-resume-result.ts";
+export type { EvalsStartParams } from "../../protocol/gen/evals-start-params.ts";
+export type { EvalsStartResult } from "../../protocol/gen/evals-start-result.ts";
+export type { EvalsStopResult } from "../../protocol/gen/evals-stop-result.ts";
 export type { AgentsSetDefaultLimitsParams } from "../../protocol/gen/agents-set-default-limits-params.ts";
 export type { AgentsSetLimitsParams } from "../../protocol/gen/agents-set-limits-params.ts";
 export type { AgentsSetLimitsResult } from "../../protocol/gen/agents-set-limits-result.ts";

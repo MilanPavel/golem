@@ -1,0 +1,186 @@
+{
+  "$defs": {
+    "EvalModelChoice": {
+      "additionalProperties": false,
+      "description": "A model an arm may use instead of its own. ``size_gb`` is its size in memory, if known.",
+      "properties": {
+        "ref": {
+          "minLength": 1,
+          "title": "Ref",
+          "type": "string"
+        },
+        "size_gb": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Size Gb"
+        }
+      },
+      "required": [
+        "ref"
+      ],
+      "title": "EvalModelChoice",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "One arm of a measurement as ``evals.plan`` sees it now.\n\n``kind`` is ``local`` for a model on this machine and ``cloud`` for a paid one. ``model`` is\nthe model it would use, and ``choices`` the others it could use. A local arm has the memory\nnumbers and a ``verdict``; ``needed_gb`` is what the model needs at this window, ``ram_gb``\nthe machine's memory and ``free_gb`` what is free now, each null when it could not be read.\nA cloud arm has none of these and may have ``cost_usd``, the estimate for all its runs.\n``reason`` is one plain line on the verdict, or on the cost. ``asks`` is how many asks it\nplays (twice each: with helpers and without), and ``minutes`` a rough time for the arm.",
+  "properties": {
+    "asks": {
+      "minimum": 1,
+      "title": "Asks",
+      "type": "integer"
+    },
+    "choices": {
+      "items": {
+        "$ref": "#/$defs/EvalModelChoice"
+      },
+      "title": "Choices",
+      "type": "array"
+    },
+    "cost_usd": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Cost Usd"
+    },
+    "free_gb": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Free Gb"
+    },
+    "kind": {
+      "enum": [
+        "local",
+        "cloud"
+      ],
+      "title": "Kind",
+      "type": "string"
+    },
+    "label": {
+      "minLength": 1,
+      "title": "Label",
+      "type": "string"
+    },
+    "minutes": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Minutes"
+    },
+    "model": {
+      "minLength": 1,
+      "title": "Model",
+      "type": "string"
+    },
+    "name": {
+      "minLength": 1,
+      "title": "Name",
+      "type": "string"
+    },
+    "needed_gb": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Needed Gb"
+    },
+    "ram_gb": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Ram Gb"
+    },
+    "reason": {
+      "default": "",
+      "title": "Reason",
+      "type": "string"
+    },
+    "tier": {
+      "enum": [
+        "local",
+        "budget",
+        "frontier"
+      ],
+      "title": "Tier",
+      "type": "string"
+    },
+    "verdict": {
+      "anyOf": [
+        {
+          "enum": [
+            "fits",
+            "tight",
+            "too_big",
+            "no_room",
+            "unknown"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Verdict"
+    },
+    "window": {
+      "minimum": 1,
+      "title": "Window",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "name",
+    "label",
+    "kind",
+    "tier",
+    "window",
+    "model",
+    "asks"
+  ],
+  "title": "EvalPlanArm",
+  "type": "object"
+}
