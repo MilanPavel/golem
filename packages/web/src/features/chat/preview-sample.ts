@@ -26,20 +26,18 @@ const HELPER: NonNullable<ToolBlock["child"]> = {
   durationMs: 9000,
 };
 
-function steps(failed: boolean): ToolBlock[] {
+function steps(): ToolBlock[] {
   return [
     { callId: "pv1", name: "web_search", args: { query: "Porto weekend itinerary" }, status: "done", summary: "12 results" },
     { callId: "pv2", name: "delegate", args: { agent: "explorer", brief: "Check opening hours" }, status: "done", preview: "Both are open on Sunday.", child: HELPER },
     { callId: "pv3", name: "read_file", args: { path: "~/Notes/Travel/Porto ideas.md" }, status: "done", summary: "1.2 KB" },
-    failed
-      ? { callId: "pv4", name: "run_shell", args: { command: "date +%A" }, status: "done", summary: "exit 1", unsuccessful: true, preview: "date: illegal option" }
-      : { callId: "pv4", name: "run_shell", args: { command: "date +%A" }, status: "done", summary: "exit 0", preview: "Saturday" },
+    { callId: "pv4", name: "run_shell", args: { command: "date +%A" }, status: "done", summary: "exit 0", preview: "Saturday" },
     { callId: "pv5", name: "write_file", args: { path: "~/Notes/Porto weekend.md" }, status: "done", summary: "new file +3 -0", diff: NOTES_DIFF },
   ];
 }
 
-/** One turn for the preview on Settings › Chat: a question, an answer after some thinking, five steps on a local model, one of them a helper. `failed` makes the command step fail. */
-export function previewChat(failed: boolean): Pick<ChatState, "messages" | "error" | "notice"> {
+/** One turn for the preview on Settings › Chat: a question, an answer after some thinking, five steps on a local model, one of them a helper. */
+export function previewChat(): Pick<ChatState, "messages" | "error" | "notice"> {
   return {
     messages: [
       { id: "pq", role: "user", text: "Plan a weekend in Porto and save it to my notes", streaming: false, at: "2026-11-01T15:00:00" },
@@ -52,7 +50,7 @@ export function previewChat(failed: boolean): Pick<ChatState, "messages" | "erro
         thinking: "Two days. Use their notes first, then check the day before saving.",
         thinkingMs: 3000,
         call: { model: "qwen3.8:27b", tier: "local", tokens: 34_200, costUsd: 0, done: true },
-        tools: steps(failed),
+        tools: steps(),
       },
     ] satisfies ChatMessage[],
     error: null,

@@ -1,4 +1,4 @@
-export { ThinkingLine, ToolLine, Transcript, TranscriptColumn, TranscriptMessages, WritingRow, type TurnUndo } from "./transcript.tsx";
+export { ActivityLine, ThinkingLine, ToolLine, Transcript, TranscriptColumn, TranscriptMessages, WritingRow, type TurnUndo } from "./transcript.tsx";
 export { closeHelper, closeHelperNotOf, closeHelperOf, openHelper, useHelperOpen, type HelperOpen } from "./helper-open.ts";
 export { ChecksStrip } from "./checks-strip.tsx";
 export { EditCard, EditCards, isEditCard } from "./edit-card.tsx";
@@ -8,18 +8,13 @@ export { readThinkingMode, setThinkingMode, thinkingModeStore, THINKING_KEY, THI
 export {
   FOOTER_KEY,
   footerStore,
-  OPEN_ON_FAIL_KEY,
-  openOnFailStore,
   readFooter,
-  readOpenOnFail,
   readSendKey,
   SEND_KEY_KEY,
   sendKeyStore,
   setFooter,
-  setOpenOnFail,
   setSendKey,
   useFooter,
-  useOpenOnFail,
   useSendKey,
   type SendKey,
 } from "./chat-choices.ts";

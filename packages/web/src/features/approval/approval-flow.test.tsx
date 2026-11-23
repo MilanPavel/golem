@@ -86,8 +86,8 @@ test("a denied call reads denied on the tool line, with a denied chip", async ()
   ask(send);
   send("approval.resolved", { call_id: "c1", name: "edit_file", decision: "deny" });
   send("tool.failed", { call_id: "c1", message: "the user denied this tool call" });
-  // A failed step opens the line by itself.
-  expect(screen.getByRole("button", { name: /1 failed/ }).getAttribute("aria-expanded")).toBe("true");
+  // The line folds again once the approval is answered: a failed step does not hold it open.
+  fireEvent.click(screen.getByRole("button", { name: /1 failed/ }));
   const line = document.querySelector("[data-tool-status=failed]");
   expect(line?.textContent).toContain("✗ denied");
   expect(line?.textContent).not.toContain("the user denied");

@@ -88,6 +88,9 @@
   /* Settings › Chat: from this width the preview sits beside the rows (1000 px). The preview is 380 px wide. */
   --breakpoint-chat: 62.5rem;
   --spacing-chat-preview: 23.75rem;
+  /* Settings › Chat is one column, 1060 px at most; a margin note beside a piece of the sample turn is 270 px. */
+  --container-chat-page: 66.25rem;
+  --spacing-chat-note: 16.875rem;
 
   /* The message box grows with its text up to this, then scrolls inside. */
   --spacing-composer-max: 40vh;

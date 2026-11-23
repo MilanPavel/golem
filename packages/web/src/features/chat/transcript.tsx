@@ -1,4 +1,4 @@
-import { BUILD_TEXT, stepFailed, turnFooterLine, canTryStronger, lastQuestion, NO_STRONGER_NOTICE, STRONGER_ACTION, strongerLabel, helperLine, isDelegate, openPlan, displayToolName, groupTurns, stepCount, stepMark, summarizeSteps, turnFooter, LIVE_OUTPUT_CHARS, thinkingLine, unreadCallNotice, writingLabel, REPLY_CUT_NOTE, type ChatMessage, type ChatState, type Detail, type HelperBatch, type IsLocal, isLocalFrom, type StepMark, type ToolBlock, type WritingBlock, noticesAfter, type ChatNotice, turnSources, type TurnSource, checksOf, checksSummary, turnRoutedNote, sessionModelOf, type SessionModelRef, rewoundLine, UNDO_WAIT } from "@golem/view";
+import { BUILD_TEXT, turnFooterLine, canTryStronger, lastQuestion, NO_STRONGER_NOTICE, STRONGER_ACTION, strongerLabel, helperLine, isDelegate, openPlan, displayToolName, groupTurns, stepCount, stepMark, summarizeSteps, turnFooter, LIVE_OUTPUT_CHARS, thinkingLine, unreadCallNotice, writingLabel, REPLY_CUT_NOTE, type ChatMessage, type ChatState, type Detail, type HelperBatch, type IsLocal, isLocalFrom, type StepMark, type ToolBlock, type WritingBlock, noticesAfter, type ChatNotice, turnSources, type TurnSource, checksOf, checksSummary, turnRoutedNote, sessionModelOf, type SessionModelRef, rewoundLine, UNDO_WAIT } from "@golem/view";
 import { Fragment, memo, useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { useConfig, usePageActions, usePulls, useSession, useModelList, useTurnCards } from "../../store/page-context.tsx";
 import type { PullsSnapshot } from "../../store/pulls.ts";
@@ -12,7 +12,7 @@ import { PixelGolem } from "../../ui/pixel-golem.tsx";
 import { useDetail } from "./detail.ts";
 import { BatchCardView } from "./helper-card.tsx";
 import { openHelper } from "./helper-open.ts";
-import { useFooter, useOpenOnFail } from "./chat-choices.ts";
+import { useFooter } from "./chat-choices.ts";
 import { useThinkingMode } from "./thinking-shown.ts";
 import { useTimesShown } from "./times-shown.ts";
 import { formatClock, shouldStick, squeezeArgs } from "./format.ts";
@@ -343,15 +343,13 @@ export function WritingRow({ writing }: { writing: WritingBlock }) {
  */
 export function ActivityLine({ tools, detail, streaming = false, pendingId = null }: { tools: readonly ToolBlock[]; detail: Detail; streaming?: boolean; pendingId?: string | null }) {
   const [chosen, setChosen] = useState<boolean | null>(null);
-  const openOnFail = useOpenOnFail();
   const listId = useId();
   if (tools.length === 0) return null;
   // Outside Quiet a finished edit is a card above the line, not a row in it.
   const rows = detail === "quiet" ? tools : tools.filter((tool) => !isEditCard(tool));
   const verbose = detail === "verbose";
   const waiting = tools.some((tool) => tool.status === "waiting");
-  // A failed step opens the line, in Quiet too, unless the person turned that off.
-  const open = waiting || (chosen ?? (verbose || (openOnFail && tools.some(stepFailed))));
+  const open = waiting || (chosen ?? verbose);
   const running = streaming ? tools.filter((tool) => tool.status === "running").at(-1) : undefined;
   const text =
     detail === "quiet"

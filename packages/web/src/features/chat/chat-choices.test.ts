@@ -3,15 +3,11 @@ import { afterEach, expect, test, vi } from "vitest";
 import {
   FOOTER_KEY,
   footerStore,
-  OPEN_ON_FAIL_KEY,
-  openOnFailStore,
   readFooter,
-  readOpenOnFail,
   readSendKey,
   SEND_KEY_KEY,
   sendKeyStore,
   setFooter,
-  setOpenOnFail,
   setSendKey,
   useFooter,
 } from "./chat-choices.ts";
@@ -19,23 +15,20 @@ import {
 afterEach(() => {
   vi.restoreAllMocks();
   localStorage.clear();
-  openOnFailStore.set(true);
   sendKeyStore.set("enter");
   footerStore.set({ off: [], leaveOutEmpty: true });
 });
 
-test("with nothing stored: open on fail is on, the send key is enter, every part shows and what says nothing is left out", () => {
-  expect(readOpenOnFail()).toBe(true);
+test("with nothing stored: the send key is enter, every part shows and what says nothing is left out", () => {
   expect(readSendKey()).toBe("enter");
   expect(readFooter()).toEqual({ off: [], leaveOutEmpty: true });
 });
 
-test("open on fail is kept, and odd values mean the default", () => {
-  setOpenOnFail(false);
-  expect(localStorage.getItem(OPEN_ON_FAIL_KEY)).toBe("off");
-  expect(readOpenOnFail()).toBe(false);
-  localStorage.setItem(OPEN_ON_FAIL_KEY, "banana");
-  expect(readOpenOnFail()).toBe(true);
+test("the old open-on-fail key is removed once on load", async () => {
+  localStorage.setItem("golem.openOnFail", "off");
+  vi.resetModules();
+  await import("./chat-choices.ts");
+  expect(localStorage.getItem("golem.openOnFail")).toBeNull();
 });
 
 test("the send key is kept", () => {
@@ -66,7 +59,6 @@ test("storage that throws is the default on read, and a choice still lasts on wr
   vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
     throw new Error("full");
   });
-  expect(readOpenOnFail()).toBe(true);
   expect(readSendKey()).toBe("enter");
   expect(readFooter()).toEqual({ off: [], leaveOutEmpty: true });
   setSendKey("mod");
