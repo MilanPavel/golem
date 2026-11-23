@@ -56,12 +56,13 @@ Some answers in the TUI and the web UI edit `config.toml` for you. golem keeps y
 - `/mcp` turns a server on or off with `enabled`.
 - `/mcp add` and `golem mcp add` add a `[mcp.<name>]` table, and `golem mcp remove` deletes one.
 - Settings → Routing in the web UI changes the routing and budget keys, and Settings → Context changes the context keys.
+- Settings › Chat in the web UI changes `[chat]` and the default `[permissions] mode`, and Settings › Models changes `[model_menu] starred` and `[ollama]` ([the web page](./web.md#settings-›-chat)).
 
 The web page has two forms. Settings → Routing has `[routing]`, `[routing.ladder]`, `[routing.roles]` and `[budget]`. Settings → Context has `[context]` ([the web page](./web.md)). They write the same keys, and a key set back to its default is removed from the file.
 
 ## Secrets stay out of the file
 
-A key named like a secret, such as `api_key`, `token`, or `password`, is refused, and the file doesn't load. Keys go in the macOS Keychain instead: `/login` in the TUI, or `golem auth set <provider>`. A provider's `api_key_env` names an environment variable to read first. An MCP server's `env` or `headers` names a stored secret as `keychain:mcp/<name>`.
+A key named like a secret, such as `api_key`, `token`, or `password`, is refused, and the file doesn't load. Keys go in the macOS Keychain instead: `/login` in the TUI, or `golem auth set <provider>`. A provider's `api_key_env` names an environment variable to read first. An MCP server's `env` or `headers` names a stored secret as `keychain:mcp/<name>`. Settings › Models shows where each provider's key is and the command to set it, but never takes a key. Settings › MCP servers does take an MCP token: it tests the token against the server, then stores it in the Keychain ([tokens in the web UI](./web.md#settings-›-mcp-servers-tokens)).
 
 ## An example
 
@@ -283,7 +284,7 @@ The defaults for every new chat. A chat that is already open keeps what it has.
 | `instructions` | `[]` | Your lines on how golem should answer, such as "Keep answers short" or "Explain it plainly". At most 30 lines, each 1 to 300 characters after trimming. Blank lines are dropped. The model reads them on every call, so a change shows on the next call with no restart. A helper chat does not get them |
 | `plan_first` | `false` | Whether a new chat starts in plan first. A chat that sets plan first itself wins |
 
-`chat.get` and `chat.set` read and write these keys for the web page. `chat.get` also returns `mode`, which is `[permissions] mode` and is read only there.
+Settings › Chat in the web UI writes these keys ([the web page](./web.md#settings-›-chat)). `chat.get` and `chat.set` read and write these keys for the web page. `chat.get` also returns `mode`, which is `[permissions] mode` and is read only there.
 
 ### `[model_menu]`
 
