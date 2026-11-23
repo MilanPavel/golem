@@ -20,7 +20,7 @@ export type FolderChipProps = {
   branches?: Readonly<Record<string, string | null>>;
   /** The home folder, for `~`. */
   home?: string | null;
-  /** The folder browser, for `Browse in golem`. Without it the item is not offered. */
+  /** The folder browser, for `Browse…` where the macOS dialog is not offered. Without it the item is not offered. */
   browser?: (props: FolderBrowserProps) => ReactNode;
   /** The macOS folder dialog: resolves with the folder, or null when it was cancelled. Without it the dialog is not offered. */
   onChoose?: (start: string | null) => Promise<string | null>;

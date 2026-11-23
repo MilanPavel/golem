@@ -206,18 +206,17 @@ test("without the flag the item reads Browse… and opens the in-app browser", a
   await wait();
   const dialog = await openMenu(user);
   expect(within(dialog).queryByRole("option", { name: /Choose folder/ })).toBeNull();
-  expect(within(dialog).queryByRole("option", { name: "Browse in golem" })).toBeNull();
   await user.click(within(dialog).getByRole("option", { name: "Browse…" }));
   expect(await screen.findByRole("dialog", { name: "Choose a folder" })).toBeTruthy();
   expect(fake.raw.chooseFolder).not.toHaveBeenCalled();
 });
 
-test("with the flag, Browse in golem opens the in-app browser", async () => {
+test("with the flag, the dialog is offered and the in-app browser is not", async () => {
   const { user } = setup({ localUi: true });
   await wait();
   const dialog = await openMenu(user);
-  await user.click(within(dialog).getByRole("option", { name: "Browse in golem" }));
-  expect(await screen.findByRole("dialog", { name: "Choose a folder" })).toBeTruthy();
+  expect(within(dialog).getByRole("option", { name: /^Choose folder…/ })).toBeTruthy();
+  expect(within(dialog).queryByRole("option", { name: /Browse/ })).toBeNull();
 });
 
 test("Open in Finder shows with the flag, calls the action with the folder and closes the menu", async () => {
