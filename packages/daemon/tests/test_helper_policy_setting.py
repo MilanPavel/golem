@@ -276,6 +276,12 @@ async def _asked(chat: _Chat, lead: str) -> str:
     needed = next(e for e in events if e.type == "approval.needed")
     assert needed.data.source == "use_helpers"
     assert needed.data.name == "delegate"
+
+    # approval.needed is logged before the run is marked waiting; a cancel in between would stop it.
+    async def parked() -> bool:
+        return await chat.runs.waiting(lead) is not None
+
+    await _until(parked)
     return needed.data.call_id
 
 
