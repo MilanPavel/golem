@@ -379,8 +379,9 @@ export function Composer({
             placeholder={disabledReason ?? placeholder}
             spellCheck
             className={cn(
-              "composer-input min-h-6 w-full resize-none border-0 bg-transparent text-base leading-normal text-ink outline-none placeholder:text-faint",
-              large && "min-h-12",
+              // Three lines in a chat (two on a phone), four on the empty screen; it grows to a limit, then scrolls.
+              "composer-input max-h-composer-max w-full resize-none overflow-y-auto border-0 bg-transparent text-base leading-normal text-ink outline-none placeholder:text-faint",
+              large ? "min-h-24" : "min-h-12 sm:min-h-18",
             )}
             onChange={(event) => {
               recalling(null);
