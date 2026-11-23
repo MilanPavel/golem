@@ -186,14 +186,15 @@ export function FolderMenuBody({ folder, branch, recent, worktrees, home, onPick
       ),
     });
   }
-  if (onBrowse !== undefined) {
+  // golem's own browser stands in for the dialog where there is none; beside it, it adds nothing.
+  if (onBrowse !== undefined && onChoose === undefined) {
     footer.push({
       id: "browse",
       run: onBrowse,
       node: (
         <>
           <FolderIcon className="size-4 shrink-0 text-muted" />
-          <RowText title={onChoose === undefined ? "Browse…" : "Browse in golem"} />
+          <RowText title="Browse…" />
         </>
       ),
     });

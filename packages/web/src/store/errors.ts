@@ -12,7 +12,7 @@ const DIALOG_BUSY = -32024;
 /** One short line for a folder dialog that did not open. */
 export function folderDialogErrorText(error: unknown): string {
   if (error instanceof RpcError) {
-    if (error.code === NOT_LOCAL || error.code === UNSUPPORTED) return "The folder dialog is not available here. Use Browse in golem.";
+    if (error.code === NOT_LOCAL || error.code === UNSUPPORTED) return "The folder dialog is not available here. Type a path above.";
     if (error.code === DIALOG_BUSY) return "A folder dialog is already open on your Mac.";
     return error.message;
   }
