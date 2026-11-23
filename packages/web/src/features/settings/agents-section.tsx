@@ -8,6 +8,7 @@ import { cn } from "../../ui/cn.ts";
 import { Code } from "../../ui/code.tsx";
 import { useNarrow } from "../trace/use-narrow.ts";
 import { FinishedHelpersSection } from "./agents-keep.tsx";
+import { UseHelpersSection } from "./use-helpers-setting.tsx";
 import { AgentDetail, NotYetMark, OriginMark } from "./agents-detail.tsx";
 import { NewAgentDetail } from "./agents-editor.tsx";
 import { useAgentEditing, type AgentCallbacks, type AgentControls, type AgentsDemo, type Draft } from "./agents-editing.ts";
@@ -343,6 +344,7 @@ export function AgentsSection() {
         onCopy={(name) => actions.copyAgent(name, folder)}
         onDelete={(name) => actions.deleteAgent(name, folder)}
       />
+      <UseHelpersSection />
       <FinishedHelpersSection setup={wishSetup(models)} />
     </div>
   );

@@ -83,7 +83,7 @@ export function approvalAnswerForKey(options: readonly ApprovalAnswerOption[], k
 
 /** The answers an Inbox item offers: none for a consent or an item without a call id. */
 export function inboxAnswerOptions(item: {
-  kind: "approval" | "consent";
+  kind: "approval" | "consent" | "batch";
   callId: string | null;
   helper: unknown;
   count: number;

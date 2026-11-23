@@ -27,12 +27,19 @@ describe("inboxItems", () => {
     assert.deepEqual(items.map((item) => item.sessionId), ["b", "a", "c"]);
   });
 
-  it("skips a batch item and any kind it does not know, without throwing", () => {
-    const batch: InboxPending = { kind: "batch", since: "2026-11-16T11:50:00Z", call_id: "c9", helper_count: 2, agents: ["explorer", "worker"] };
+  it("lists a batch item with the card's head, and skips a kind it does not know", () => {
+    const batch: InboxPending = { kind: "batch", since: "2026-11-16T11:50:00Z", call_id: "c9", helper_count: 3, agents: ["explorer", "explorer", "worker"] };
     const unknown = { kind: "future", since: "2026-11-16T11:51:00Z" } as unknown as InboxPending;
     const items = inboxItems([session("a", null, { pending_items: [batch, unknown, approval("shell", "ls")] }), session("b", null, { pending_items: [batch] })], NOW);
-    assert.deepEqual(items.map((item) => item.sessionId), ["a"]);
-    assert.equal(items[0]!.kind, "approval");
+    assert.deepEqual(items.map((item) => [item.sessionId, item.kind]), [["a", "batch"], ["b", "batch"], ["a", "approval"]]);
+    const first = items[0]!;
+    assert.equal(first.headline, "3 helpers · explorer ×2, worker");
+    assert.equal(first.callId, "c9");
+    assert.equal(first.answerSessionId, "a");
+    assert.equal(first.helper, null);
+    assert.equal(first.source, null);
+    assert.deepEqual(first.agents, ["explorer", "explorer", "worker"]);
+    assert.equal(headlineOf({ kind: "batch", since: "2026-11-16T11:50:00Z", call_id: "c1", helper_count: 1, agents: ["explorer"] }), "1 helper · explorer");
   });
 
   it("skips sessions with nothing pending and closed sessions", () => {

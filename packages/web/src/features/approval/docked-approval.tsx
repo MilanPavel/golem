@@ -1,8 +1,9 @@
-import type { ApprovalChoice, ToolBlock } from "@golem/view";
+import { helperCardOf, isUseHelpersQuestion, type ApprovalChoice, type ToolBlock } from "@golem/view";
 import { useCallback, useState } from "react";
 import { useDraftReader, usePageActions, useSession } from "../../store/page-context.tsx";
 import { approvalCardId } from "../../store/inbox.ts";
 import { ApprovalBar } from "./approval-bar.tsx";
+import { HelperBatchCard } from "./helper-batch-card.tsx";
 import { useApprovalAnswer } from "./use-approval-answer.ts";
 import { useApprovalKeys } from "./use-approval-keys.ts";
 
@@ -24,15 +25,22 @@ function useWaitingTool(sessionId: string): ToolBlock | null {
 /**
  * The approval of a session, docked above its composer, with the keys that answer it: Enter, S, W, D,
  * and E to edit. A key answers only while the composer is empty and the arguments are not being edited.
+ * When the setting "Use helpers" asks (source `use_helpers`), the batch card shows instead: Enter runs the helpers,
+ * "Do it in the chat" declines, and the other keys do nothing. The answer goes through `helpers.respond`.
  */
 export function DockedApproval({ sessionId }: { sessionId: string }) {
   const tool = useWaitingTool(sessionId);
-  const { respond } = usePageActions();
+  const { respond, respondHelpers } = usePageActions();
   const callId = tool?.callId ?? null;
+  const batch = tool !== null && isUseHelpersQuestion({ name: tool.name, source: tool.approval?.source });
   const send = useCallback(
     (call: string, decision: ApprovalChoice, args?: Args) =>
-      args === undefined ? respond(sessionId, call, decision) : respond(sessionId, call, decision, args),
-    [respond, sessionId],
+      batch
+        ? respondHelpers(sessionId, call, decision !== "deny")
+        : args === undefined
+          ? respond(sessionId, call, decision)
+          : respond(sessionId, call, decision, args),
+    [batch, respond, respondHelpers, sessionId],
   );
   const { answer, sendingId, error } = useApprovalAnswer(send, callId);
   // The editor belongs to the call it was opened on; a new pending call starts closed.
@@ -48,12 +56,29 @@ export function DockedApproval({ sessionId }: { sessionId: string }) {
   useApprovalKeys({
     callId,
     canAnswer: () => readDraft() === "" && !editing,
-    onAnswer: answer,
+    onAnswer: (call, decision) => {
+      // The batch card has one key: Enter runs.
+      if (!batch || decision === "allow") answer(call, decision);
+    },
     onEdit: () => {
-      onEdit(true);
+      if (!batch) onEdit(true);
     },
   });
   if (tool === null || callId === null) return null;
+  if (batch) {
+    return (
+      <HelperBatchCard
+        key={callId}
+        model={helperCardOf({ args: tool.args })}
+        id={approvalCardId(callId)}
+        sending={sendingId === callId}
+        error={error}
+        onAnswer={(run) => {
+          answer(callId, run ? "allow" : "deny");
+        }}
+      />
+    );
+  }
   return (
     <ApprovalBar
       key={callId}
