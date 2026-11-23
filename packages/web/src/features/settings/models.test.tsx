@@ -109,12 +109,32 @@ test("the star sends model.star, and a starred model asks to be unstarred", asyn
   const { fake, user } = mount();
   await user.click(await screen.findByRole("button", { name: "Anthropic, 2 of 3 starred" }));
   const table = await screen.findByRole("table", { name: "Anthropic models" });
+  await user.click(screen.getByRole("button", { name: "Show all 3" }));
   const opus = within(table).getByRole("button", { name: "Show Claude Opus in the model menu" });
   expect(opus.getAttribute("aria-pressed")).toBe("false");
   await user.click(opus);
   await waitFor(() => expect(fake.raw.starModel).toHaveBeenCalledWith("anthropic/claude-opus", true));
   await user.click(within(table).getByRole("button", { name: "Show Claude Haiku in the model menu" }));
   await waitFor(() => expect(fake.raw.starModel).toHaveBeenCalledWith("anthropic/claude-haiku", false));
+});
+
+test("a hosted provider lists its starred models, and Show all lists the rest", async () => {
+  const { fake, user } = mount();
+  await user.click(await screen.findByRole("button", { name: "Anthropic, 2 of 3 starred" }));
+  const table = await screen.findByRole("table", { name: "Anthropic models" });
+  expect(screen.getByText("2 of 3 starred")).toBeTruthy();
+  expect(within(table).getAllByRole("row").slice(1)).toHaveLength(2);
+  expect(within(table).queryByText("claude-opus")).toBeNull();
+  const toggle = screen.getByRole("button", { name: "Show all 3" });
+  expect(toggle.getAttribute("aria-pressed")).toBe("false");
+  await user.click(toggle);
+  expect(within(table).getAllByRole("row").slice(1)).toHaveLength(3);
+  await user.click(screen.getByRole("button", { name: "Show starred only" }));
+  expect(within(table).getAllByRole("row").slice(1)).toHaveLength(2);
+  // An unstarred row stays until another provider is picked.
+  await user.click(within(table).getByRole("button", { name: "Show Claude Haiku in the model menu" }));
+  await waitFor(() => expect(fake.raw.starModel).toHaveBeenCalledWith("anthropic/claude-haiku", false));
+  expect(within(table).getByText("claude-haiku")).toBeTruthy();
 });
 
 test("a provider says where its key is, and its menu opens the sheet with the two commands", async () => {
