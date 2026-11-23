@@ -4,6 +4,7 @@
 ``daemon logs`` prints ``logs/golem.jsonl``. ``doctor`` prints the install
 checks as JSON for ``golem doctor``. ``skills check <path>`` validates skills
 without a daemon. ``coding bench <model>`` measures how often a model's edits apply.
+``evals helpers`` measures helpers on and off in four arms (``--live`` for real models).
 The user-facing ``golem`` bin is
 the TypeScript package; it delegates these subcommands here.
 """
@@ -96,6 +97,23 @@ def _parser() -> argparse.ArgumentParser:
     bench.add_argument("model", help="a profile name or a provider/model ref")
     bench.add_argument("--task", help="run only the task with this name")
     bench.set_defaults(func=_coding_bench)
+
+    evals = sub.add_parser("evals", help="evals that need no daemon of yours")
+    evals_sub = evals.add_subparsers(dest="action", required=True)
+    helpers = evals_sub.add_parser(
+        "helpers", help="helpers on and off in four arms: quality, time, window, cost, thresholds"
+    )
+    helpers.add_argument(
+        "--live", action="store_true", help="run real models (without it: print the plan only)"
+    )
+    helpers.add_argument("--arm", action="append", default=[], help="run only this arm")
+    helpers.add_argument("--ask", action="append", default=[], help="run only this ask")
+    helpers.add_argument(
+        "--model", action="append", default=[], metavar="ARM=REF", help="the lead of an arm"
+    )
+    helpers.add_argument("--project", type=Path, help="the repo the repo-* asks are about")
+    helpers.add_argument("--timeout", type=float, default=600, help="seconds a run may take")
+    helpers.set_defaults(func=_evals_helpers)
     return parser
 
 
@@ -135,6 +153,20 @@ def _coding_bench(args: argparse.Namespace) -> int:
         results = asyncio.run(run_all(model, tasks, Path(folder)))
     print(report(results))
     return 0
+
+
+def _evals_helpers(args: argparse.Namespace) -> int:
+    """Run the helper eval, or print its plan without ``--live``. A measure, not a gate."""
+    from golem.evals.helpers import command
+
+    return command(
+        live=cast(bool, args.live),
+        arm_names=cast("list[str]", args.arm),
+        ask_names=cast("list[str]", args.ask),
+        models=cast("list[str]", args.model),
+        project=cast("Path | None", args.project),
+        timeout=cast(float, args.timeout),
+    )
 
 
 def _serve(_args: argparse.Namespace) -> int:
