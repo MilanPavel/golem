@@ -112,13 +112,18 @@ function LineRow({ row, index, count, error, input, onText, onCommit, onRemove, 
 }
 
 /** A line with an Add button, for a draft or a common one. */
-function Suggestion({ text, onAdd }: { text: string; onAdd: () => void }) {
+function Suggestion({ text, onAdd, onRemove }: { text: string; onAdd: () => void; onRemove?: () => void }) {
   return (
     <li className="flex items-center gap-2 border-t border-dashed border-line py-1.5 first:border-t-0">
       <span className="min-w-0 flex-1 text-sm text-ink wrap-anywhere">{text}</span>
       <Button size="sm" aria-label={`Add “${text}”`} onClick={onAdd}>
         Add
       </Button>
+      {onRemove === undefined ? null : (
+        <Button size="sm" kind="ghost" aria-label="Remove this draft" onClick={onRemove}>
+          ✕
+        </Button>
+      )}
     </li>
   );
 }
@@ -189,6 +194,8 @@ export function InstructionsView({ saved, onSave, onDraft, onPreview, prompt, pr
   const [error, setError] = useState<{ id: number | null; message: string } | null>(null);
   const [description, setDescription] = useState("");
   const [drafts, setDrafts] = useState<ChatDraftResult | null>(null);
+  // True once a drafted line was added or removed: an empty list is then just finished, not "nothing new".
+  const [draftUsed, setDraftUsed] = useState(false);
   const [panel, setPanel] = useState<"draft" | "ideas" | null>(null);
   const [drafting, setDrafting] = useState(false);
   const [draftError, setDraftError] = useState<string | null>(null);
@@ -265,7 +272,10 @@ export function InstructionsView({ saved, onSave, onDraft, onPreview, prompt, pr
     setDrafting(true);
     setDraftError(null);
     onDraft(description.trim())
-      .then(setDrafts, (failure: unknown) => {
+      .then((result) => {
+        setDraftUsed(false);
+        setDrafts(result);
+      }, (failure: unknown) => {
         setDraftError(actionErrorText(failure, "Could not draft lines."));
       })
       .finally(() => {
@@ -407,7 +417,7 @@ export function InstructionsView({ saved, onSave, onDraft, onPreview, prompt, pr
                 </p>
               )}
               {drafts === null ? null : offered.length === 0 ? (
-                <p className="text-xs text-muted">Nothing new here: these lines are in your list already.</p>
+                draftUsed ? null : <p className="text-xs text-muted">Nothing new here: these lines are in your list already.</p>
               ) : (
                 <div className="flex flex-col gap-1.5">
                   <ul aria-label="Drafted lines" className="m-0 flex list-none flex-col p-0">
@@ -416,21 +426,37 @@ export function InstructionsView({ saved, onSave, onDraft, onPreview, prompt, pr
                         key={line}
                         text={line}
                         onAdd={() => {
+                          setDraftUsed(true);
                           add([line]);
+                        }}
+                        onRemove={() => {
+                          setDraftUsed(true);
+                          setDrafts({ ...drafts, lines: drafts.lines.filter((item) => item !== line) });
                         }}
                       />
                     ))}
                   </ul>
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <Button
-                      size="sm"
-                      onClick={() => {
-                        add(offered);
-                        setDrafts(null);
-                      }}
-                    >
-                      Add all
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        onClick={() => {
+                          add(offered);
+                          setDrafts(null);
+                        }}
+                      >
+                        Add all
+                      </Button>
+                      <Button
+                        size="sm"
+                        kind="ghost"
+                        onClick={() => {
+                          setDrafts(null);
+                        }}
+                      >
+                        Clear
+                      </Button>
+                    </div>
                     <p className="text-xs text-faint">
                       Drafted by <b className="font-medium text-muted">{drafts.model}</b>, the model for titles and summaries. Change it in{" "}
                       <Link href={settingsPath("routing")} onNavigate={onNavigate} className="text-clay-ink underline underline-offset-2">

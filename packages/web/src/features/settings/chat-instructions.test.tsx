@@ -153,7 +153,7 @@ test("Draft lines shows what golem drafted with Add, and hides lines already the
   await user.click(screen.getByRole("button", { name: "Draft lines" }));
   expect(fake.raw.draftChat).toHaveBeenCalledWith("simple and friendly");
   const drafted = await screen.findByRole("list", { name: "Drafted lines" });
-  expect(within(drafted).getAllByRole("listitem").map((item) => item.textContent)).toEqual(["Keep it friendly.Add", "Use short words.Add"]);
+  expect(within(drafted).getAllByRole("listitem").map((item) => item.textContent)).toEqual(["Keep it friendly.Add✕", "Use short words.Add✕"]);
   expect(screen.getByText("ollama/qwen3").closest("p")?.textContent).toBe("Drafted by ollama/qwen3, the model for titles and summaries. Change it in Routing.");
   expect(within(screen.getByText("ollama/qwen3").closest("p")!).getByRole("link", { name: "Routing" }).getAttribute("href")).toBe("/settings/routing");
   await user.click(within(drafted).getByRole("button", { name: "Add “Keep it friendly.”" }));
@@ -170,6 +170,41 @@ test("Add all adds the drafted lines that are not there yet", async () => {
   await user.click(screen.getByRole("button", { name: "Draft lines" }));
   await user.click(await screen.findByRole("button", { name: "Add all" }));
   await waitFor(() => expect(lastSet(fake)).toEqual({ instructions: ["Use metric units.", "Keep it friendly.", "Use short words."] }));
+});
+
+test("a drafted line can be removed one by one, and the list goes when the last one is gone", async () => {
+  const { fake, user } = mount(["Use metric units."]);
+  fake.raw.draftChat.mockResolvedValue({ lines: ["Use metric units.", "Keep it friendly.", "Use short words."], model: "m" });
+  await box(1);
+  await openDraft(user);
+  await user.type(screen.getByRole("textbox", { name: "Describe how you like answers, in your words" }), "x");
+  await user.click(screen.getByRole("button", { name: "Draft lines" }));
+  const drafted = await screen.findByRole("list", { name: "Drafted lines" });
+  await user.click(within(drafted).getAllByRole("button", { name: "Remove this draft" })[0]!);
+  expect(within(screen.getByRole("list", { name: "Drafted lines" })).getAllByRole("listitem").map((item) => item.textContent)).toEqual(["Use short words.Add✕"]);
+  expect(fake.raw.setChat).not.toHaveBeenCalled();
+  await user.click(screen.getByRole("button", { name: "Remove this draft" }));
+  expect(screen.queryByRole("list", { name: "Drafted lines" })).toBeNull();
+  expect(screen.queryByText(/Drafted by/)).toBeNull();
+  expect(screen.queryByText(/Nothing new here/)).toBeNull();
+  expect(fake.raw.setChat).not.toHaveBeenCalled();
+});
+
+test("Clear drops all drafted lines and keeps the panel and the description", async () => {
+  const { fake, user } = mount();
+  fake.raw.draftChat.mockResolvedValue({ lines: ["Keep it friendly.", "Use short words."], model: "m" });
+  await screen.findByText("No instructions. The model answers in its own style.");
+  await openDraft(user);
+  const field = screen.getByRole("textbox", { name: "Describe how you like answers, in your words" });
+  await user.type(field, "simple");
+  await user.click(screen.getByRole("button", { name: "Draft lines" }));
+  await screen.findByRole("list", { name: "Drafted lines" });
+  await user.click(screen.getByRole("button", { name: "Clear" }));
+  expect(screen.queryByRole("list", { name: "Drafted lines" })).toBeNull();
+  expect(screen.queryByText(/Nothing new here/)).toBeNull();
+  expect(screen.getByRole("heading", { name: "Draft with golem" })).toBeTruthy();
+  expect((screen.getByRole("textbox", { name: "Describe how you like answers, in your words" }) as HTMLInputElement).value).toBe("simple");
+  expect(fake.raw.setChat).not.toHaveBeenCalled();
 });
 
 test("the button says Drafting… while it runs, and an error shows under the field", async () => {

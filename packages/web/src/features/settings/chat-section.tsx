@@ -88,7 +88,9 @@ function WhatTheChatShows() {
             <div className="prose">
               <Markdown text={answer.text} streaming={false} />
             </div>
-            <EditCards tools={tools.filter((tool) => tool.name === "write_file")} />
+            <div className="w-full min-w-0">
+              <EditCards tools={tools.filter((tool) => tool.name === "write_file")} />
+            </div>
           </>
         }
       />
