@@ -1,9 +1,11 @@
-import { useEffect, useId, useRef, useState, type DragEvent, type KeyboardEvent } from "react";
+import { useEffect, useId, useRef, useState, type DragEvent, type KeyboardEvent, type ReactNode } from "react";
 import { actionErrorText } from "../../store/errors.ts";
-import type { ChatPromptResult, ChatSuggestionsResult } from "../../store/notifications.ts";
+import type { ChatDraftResult, ChatPromptResult, ChatSuggestionsResult } from "../../store/notifications.ts";
 import { useChatDefaults, useChatPrompt, useChatSuggestions, useNavigate, usePageActions } from "../../store/page-context.tsx";
 import { Button } from "../../ui/button.tsx";
 import { Input } from "../../ui/input.tsx";
+import { Link } from "../../ui/link.tsx";
+import { settingsPath } from "../../store/router.ts";
 import { instructionTokens, PromptPreview } from "./chat-prompt.tsx";
 
 /** How long typing rests before the preview asks again. */
@@ -21,8 +23,8 @@ export type InstructionsProps = {
   saved: readonly string[];
   /** Saves the lines with `chat.set`. Resolves to the refusal's words, or null when it was saved. */
   onSave: (lines: string[]) => Promise<string | null>;
-  /** Drafts lines from the person's words with `chat.draft`. Rejects with the reason. */
-  onDraft: (description: string) => Promise<string[]>;
+  /** Drafts lines from the person's words with `chat.draft`: the lines, and the model that wrote them. Rejects with the reason. */
+  onDraft: (description: string) => Promise<ChatDraftResult>;
   /** The lines to preview, once typing rests; null for the saved ones. */
   onPreview: (lines: string[] | null) => void;
   prompt: ChatPromptResult | undefined;
@@ -62,8 +64,12 @@ function LineRow({ row, index, count, error, input, onText, onCommit, onRemove, 
     }
   };
   return (
-    <li onDragOver={onDrag.over} onDrop={onDrag.drop} className="flex flex-col gap-1">
+    <li onDragOver={onDrag.over} onDrop={onDrag.drop} className="flex flex-col gap-1 border-t border-dashed border-line py-1.5 first:border-t-0 first:pt-0 last:pb-0">
       <div className="flex items-center gap-2">
+        {/* eslint-disable-next-line golem/no-font-mono -- the number of the line, small and mono */}
+        <span aria-hidden="true" className="w-3 shrink-0 text-right font-mono text-micro font-semibold text-faint">
+          {index + 1}
+        </span>
         <span
           draggable
           role="img"
@@ -97,7 +103,7 @@ function LineRow({ row, index, count, error, input, onText, onCommit, onRemove, 
         </Button>
       </div>
       {error === null ? null : (
-        <p id={errorId} role="alert" className="pl-6 text-xs text-deny wrap-anywhere">
+        <p id={errorId} role="alert" className="pl-9 text-xs text-deny wrap-anywhere">
           {error}
         </p>
       )}
@@ -117,16 +123,12 @@ function Suggestion({ text, onAdd }: { text: string; onAdd: () => void }) {
   );
 }
 
-/** A suggestion from the person's chats or memory: the line, why, and Add or Not for me. */
-function FromYourChats({ suggestions, have, onAdd, onDismiss }: { suggestions: ChatSuggestionsResult; have: ReadonlySet<string>; onAdd: (line: string) => void; onDismiss: (line: string) => void }) {
-  const shown = suggestions.suggestions.filter((item) => !have.has(item.line.trim()));
+/** The panel of suggestions from the person's chats or memory: the line, why, and Add or Not for me. */
+function FromYourChats({ suggestions, shown, onAdd, onDismiss }: { suggestions: ChatSuggestionsResult; shown: ChatSuggestionsResult["suggestions"]; onAdd: (line: string) => void; onDismiss: (line: string) => void }) {
   return (
-    <div className="flex flex-col gap-1.5 border-t border-dashed border-line pt-3">
-      <h4 className="text-sm font-medium text-ink">From your chats</h4>
+    <Panel title="From your chats">
       {suggestions.needs_local_model ? (
         <p className="text-xs text-muted">Needs a local model, because it reads your messages.</p>
-      ) : shown.length === 0 ? (
-        <p className="text-xs text-muted">Nothing yet. golem looks at your chats once a day.</p>
       ) : (
         <ul aria-label="From your chats" className="m-0 flex list-none flex-col p-0">
           {shown.map((item) => (
@@ -158,13 +160,23 @@ function FromYourChats({ suggestions, have, onAdd, onDismiss }: { suggestions: C
           ))}
         </ul>
       )}
+    </Panel>
+  );
+}
+
+/** A helper's panel inside the card: a heading, and what it holds. */
+function Panel({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <div className="flex flex-col gap-1.5 rounded-md border border-line bg-bg px-3.5 py-3">
+      <h4 className="text-sm font-medium text-ink">{title}</h4>
+      {children}
     </div>
   );
 }
 
 /**
- * Your instructions: the lines golem adds to the system prompt of every chat, written, drafted or picked, next to what the
- * model reads. A line is saved when its box loses focus, on Enter, after a move and after ✕: there is no Save button.
+ * Your instructions: the lines golem adds to the system prompt of every chat, written, drafted or picked, in one card, with
+ * what the model reads as one line under it. A line is saved when its box loses focus, on Enter, after a move and after ✕: there is no Save button.
  */
 export function InstructionsView({ saved, onSave, onDraft, onPreview, prompt, promptError, onNavigate, suggestions, onDismiss }: InstructionsProps) {
   const [rows, setRows] = useState<Row[]>(() => saved.map(make));
@@ -175,9 +187,9 @@ export function InstructionsView({ saved, onSave, onDraft, onPreview, prompt, pr
   const dragFrom = useRef<number | null>(null);
   const [done, setDone] = useState(false);
   const [error, setError] = useState<{ id: number | null; message: string } | null>(null);
-  const id = useId();
   const [description, setDescription] = useState("");
-  const [drafts, setDrafts] = useState<string[] | null>(null);
+  const [drafts, setDrafts] = useState<ChatDraftResult | null>(null);
+  const [panel, setPanel] = useState<"draft" | "ideas" | null>(null);
   const [drafting, setDrafting] = useState(false);
   const [draftError, setDraftError] = useState<string | null>(null);
   const [dismissed, setDismissed] = useState<ReadonlySet<string>>(new Set());
@@ -263,17 +275,22 @@ export function InstructionsView({ saved, onSave, onDraft, onPreview, prompt, pr
 
   const have = new Set(filled(texts));
   const hidden = new Set([...have, ...dismissed]);
-  const offered = (drafts ?? []).filter((line) => !have.has(line.trim()));
+  const offered = (drafts?.lines ?? []).filter((line) => !have.has(line.trim()));
   const count = filled(texts).length;
+  const ideas = suggestions === undefined ? [] : suggestions.suggestions.filter((item) => !hidden.has(item.line.trim()));
+  const needsModel = suggestions?.needs_local_model === true;
+  const hasIdeas = needsModel || ideas.length > 0;
+  const toggle = (name: "draft" | "ideas"): void => {
+    setPanel(panel === name ? null : name);
+  };
 
   return (
     <div data-setting="instructions" className="flex flex-col gap-3">
-      <div className="flex flex-col items-stretch gap-5 chat:flex-row chat:items-start">
-        <div className="flex min-w-0 flex-1 flex-col gap-4 rounded-lg border border-line bg-surface p-4">
+      <div className="flex min-w-0 flex-col gap-3.5 rounded-lg border border-line bg-surface p-4">
           {rows.length === 0 ? (
             <p className="text-sm text-muted">No instructions. The model answers in its own style.</p>
           ) : (
-            <ol aria-label="Your instructions" className="m-0 flex list-none flex-col gap-2 p-0">
+            <ol aria-label="Your instructions" className="m-0 flex list-none flex-col p-0">
               {rows.map((row, index) => (
                 <LineRow
                   key={row.id}
@@ -320,7 +337,7 @@ export function InstructionsView({ saved, onSave, onDraft, onPreview, prompt, pr
               {error.message}
             </p>
           ) : null}
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2">
             <Button
               size="sm"
               onClick={() => {
@@ -331,82 +348,106 @@ export function InstructionsView({ saved, onSave, onDraft, onPreview, prompt, pr
             >
               + Write a line
             </Button>
+            <Button
+              size="sm"
+              aria-expanded={panel === "draft"}
+              onClick={() => {
+                toggle("draft");
+              }}
+            >
+              ✦ Draft with golem
+            </Button>
+            {hasIdeas ? (
+              <Button
+                size="sm"
+                aria-expanded={panel === "ideas"}
+                onClick={() => {
+                  toggle("ideas");
+                }}
+                className={needsModel ? undefined : "border-clay bg-clay-soft text-clay-ink hover:border-clay"}
+              >
+                {needsModel ? "From your chats" : `${ideas.length} ${ideas.length === 1 ? "idea" : "ideas"} from your chats`}
+              </Button>
+            ) : null}
             <span role="status" aria-live="polite" className="text-xs text-muted">
               {done ? "Saved" : null}
             </span>
-          </div>
-          <p className="flex justify-between gap-3 border-t border-dashed border-line pt-2 text-xs text-muted">
-            <span>
+            <span className="ml-auto text-xs text-faint">
               {count} {count === 1 ? "line" : "lines"} · about {instructionTokens(prompt)} tokens in every chat
             </span>
-            <span>Sent top to bottom</span>
-          </p>
-
-          <div className="flex flex-col gap-1.5 border-t border-dashed border-line pt-3">
-            <h4 className="text-sm font-medium text-ink">Write them with golem</h4>
-            <label htmlFor={`${id}-describe`} className="text-xs text-muted">
-              Describe how you like answers, in your words
-            </label>
-            <div className="flex gap-2">
-              <Input
-                id={`${id}-describe`}
-                value={description}
-                placeholder="e.g. I teach maths to 12-year-olds; keep it simple and friendly"
-                aria-invalid={draftError === null ? undefined : true}
-                onChange={(event) => {
-                  setDescription(event.target.value);
-                }}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") {
-                    event.preventDefault();
-                    draft();
-                  }
-                }}
-                className="min-w-0 flex-1"
-              />
-              <Button onClick={draft} aria-busy={drafting}>
-                {drafting ? "Drafting…" : "Draft lines"}
-              </Button>
-            </div>
-            {draftError === null ? null : (
-              <p role="alert" className="text-xs text-deny wrap-anywhere">
-                {draftError}
-              </p>
-            )}
-            {drafts === null ? null : offered.length === 0 ? (
-              <p className="text-xs text-muted">Nothing new here: these lines are in your list already.</p>
-            ) : (
-              <div className="flex flex-col gap-1.5">
-                <ul aria-label="Drafted lines" className="m-0 flex list-none flex-col p-0">
-                  {offered.map((line) => (
-                    <Suggestion
-                      key={line}
-                      text={line}
-                      onAdd={() => {
-                        add([line]);
-                      }}
-                    />
-                  ))}
-                </ul>
-                <div>
-                  <Button
-                    size="sm"
-                    onClick={() => {
-                      add(offered);
-                      setDrafts(null);
-                    }}
-                  >
-                    Add all
-                  </Button>
-                </div>
-              </div>
-            )}
           </div>
 
-          {suggestions === undefined ? null : (
+          {panel === "draft" ? (
+            <Panel title="Draft with golem">
+              <p className="text-xs text-muted">Describe how you like answers, in your words. golem turns it into lines; you pick.</p>
+              <div className="flex gap-2">
+                <Input
+                  aria-label="Describe how you like answers, in your words"
+                  value={description}
+                  placeholder="e.g. I teach maths to 12-year-olds; keep it simple and friendly"
+                  aria-invalid={draftError === null ? undefined : true}
+                  onChange={(event) => {
+                    setDescription(event.target.value);
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      draft();
+                    }
+                  }}
+                  className="min-w-0 flex-1"
+                />
+                <Button onClick={draft} aria-busy={drafting}>
+                  {drafting ? "Drafting…" : "Draft lines"}
+                </Button>
+              </div>
+              {draftError === null ? null : (
+                <p role="alert" className="text-xs text-deny wrap-anywhere">
+                  {draftError}
+                </p>
+              )}
+              {drafts === null ? null : offered.length === 0 ? (
+                <p className="text-xs text-muted">Nothing new here: these lines are in your list already.</p>
+              ) : (
+                <div className="flex flex-col gap-1.5">
+                  <ul aria-label="Drafted lines" className="m-0 flex list-none flex-col p-0">
+                    {offered.map((line) => (
+                      <Suggestion
+                        key={line}
+                        text={line}
+                        onAdd={() => {
+                          add([line]);
+                        }}
+                      />
+                    ))}
+                  </ul>
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        add(offered);
+                        setDrafts(null);
+                      }}
+                    >
+                      Add all
+                    </Button>
+                    <p className="text-xs text-faint">
+                      Drafted by <b className="font-medium text-muted">{drafts.model}</b>, the model for titles and summaries. Change it in{" "}
+                      <Link href={settingsPath("routing")} onNavigate={onNavigate} className="text-clay-ink underline underline-offset-2">
+                        Routing
+                      </Link>
+                      .
+                    </p>
+                  </div>
+                </div>
+              )}
+            </Panel>
+          ) : null}
+
+          {panel === "ideas" && hasIdeas && suggestions !== undefined ? (
             <FromYourChats
               suggestions={suggestions}
-              have={hidden}
+              shown={ideas}
               onAdd={(line) => {
                 add([line]);
               }}
@@ -415,10 +456,9 @@ export function InstructionsView({ saved, onSave, onDraft, onPreview, prompt, pr
                 void onDismiss?.(line);
               }}
             />
-          )}
-        </div>
-        <PromptPreview prompt={prompt} error={promptError} onNavigate={onNavigate} />
+          ) : null}
       </div>
+      <PromptPreview prompt={prompt} error={promptError} onNavigate={onNavigate} />
     </div>
   );
 }
@@ -455,7 +495,7 @@ export function YourInstructions() {
           return actionErrorText(failure, "Could not save your instructions.");
         }
       }}
-      onDraft={async (description) => (await actions.draftChat(description)).lines}
+      onDraft={(description) => actions.draftChat(description)}
       onPreview={setPreview}
       onNavigate={navigate}
       suggestions={suggestions.data}

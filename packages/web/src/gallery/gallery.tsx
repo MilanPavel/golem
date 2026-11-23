@@ -172,7 +172,7 @@ function GalleryInstructions() {
         setLines(next);
         return null;
       }}
-      onDraft={async () => ["Be direct. No pleasantries, no praise, no offers at the end.", "Use metric units.", "Explain a term the first time you use it."]}
+      onDraft={async () => ({ lines: ["Be direct. No pleasantries, no praise, no offers at the end.", "Use metric units.", "Explain a term the first time you use it."], model: "ollama/qwen3" })}
       onPreview={setShown}
       prompt={prompt}
       promptError={null}
