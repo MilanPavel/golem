@@ -35,8 +35,9 @@ test("an instruction line shows in what the model reads, and reaches the model i
   await expect(page.getByRole("status").filter({ hasText: "Saved" })).toBeVisible();
 
   const reads = page.getByRole("group", { name: "What the model reads" });
-  await expect(reads.getByRole("button", { name: /^Instructions/ })).toBeVisible();
-  await expect(reads.getByLabel("Instructions, as the model reads it")).toContainText(LINE);
+  await reads.getByRole("button", { name: "See all of it" }).click();
+  await reads.getByRole("button", { name: /^Your instructions/ }).click();
+  await expect(reads.getByLabel("Your instructions, as the model reads it")).toContainText(LINE);
 
   // A new chat starts from the saved line.
   await page.goto(stack.gateway.url);
