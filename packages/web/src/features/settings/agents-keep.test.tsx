@@ -8,6 +8,7 @@ import { PageProvider } from "../../store/page-context.tsx";
 import { fakeClient, fakeFrame, summary } from "../../store/test-support.ts";
 import { closePalette } from "../palette/index.ts";
 import { SAMPLE_AGENTS } from "./agents-sample.ts";
+import { showAgentsTab } from "./agents-tab.ts";
 import { settingsContextStore } from "./index.ts";
 
 const FOLDER = "/Users/you/repos/golem";
@@ -15,6 +16,7 @@ const noContrast = { rules: { "color-contrast": { enabled: false } } };
 
 function mount(values = { keep_days: 7, keep_problem_days: 30 }) {
   history.replaceState(null, "", "/settings/agents");
+  showAgentsTab("rules");
   const fake = fakeClient();
   fake.raw.listAgents.mockResolvedValue({ agents: SAMPLE_AGENTS });
   fake.raw.agentsKeep.mockResolvedValue({ ok: true, errors: [], values });
@@ -39,6 +41,7 @@ beforeEach(() => {
   settingsContextStore.set(null);
 });
 afterEach(() => {
+  showAgentsTab("agents");
   closePalette();
   settingsContextStore.set(null);
   history.replaceState(null, "", "/");

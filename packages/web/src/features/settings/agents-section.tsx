@@ -1,13 +1,15 @@
 import { agentKey, agentsTable, wishSetup, type AgentRow, type WishModel, type WishSetup } from "@golem/view";
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { AGENTS_OLD_TEXT, isAgentsMissing, type AgentInfo } from "../../store/agents.ts";
 import { actionErrorText } from "../../store/errors.ts";
 import { useAgentList, useModelList, usePageActions } from "../../store/page-context.tsx";
 import { Button } from "../../ui/button.tsx";
 import { cn } from "../../ui/cn.ts";
 import { Code } from "../../ui/code.tsx";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../ui/tabs.tsx";
 import { useNarrow } from "../trace/use-narrow.ts";
-import { FinishedHelpersSection } from "./agents-keep.tsx";
+import { DefaultLimitsSection, FinishedHelpersSection } from "./agents-keep.tsx";
+import { showAgentsTab, useAgentsTab, type AgentsTab } from "./agents-tab.ts";
 import { UseHelpersSection } from "./use-helpers-setting.tsx";
 import { AgentDetail, NotYetMark, OriginMark } from "./agents-detail.tsx";
 import { NewAgentDetail } from "./agents-editor.tsx";
@@ -306,8 +308,8 @@ export function AgentsPage({
   );
 }
 
-/** Settings › Agents: the agent types the folder sees, read from the daemon, and the Finished helpers band. */
-export function AgentsSection() {
+/** The Agents tab: the agent types the folder sees, read from the daemon. */
+function AgentsTabBody() {
   const folder = useSettingsFolder();
   const list = useAgentList(folder);
   const models = useModelList().data?.models;
@@ -328,24 +330,63 @@ export function AgentsSection() {
   }
   if (list.data === undefined) return <p className="text-body text-muted">asking the daemon…</p>;
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-4">
-      <AgentsPage
-        agents={list.data.agents}
-        setup={wishSetup(models)}
-        models={models ?? []}
-        narrow={narrow}
-        onSetWish={async (name, wish) => {
-          await actions.setAgentWish(name, wish, folder);
-        }}
-        onSetLimits={async (name, change) => {
-          await actions.setAgentLimits(name, change, folder);
-        }}
-        onSave={(text, name) => actions.saveAgent(text, name, folder)}
-        onCopy={(name) => actions.copyAgent(name, folder)}
-        onDelete={(name) => actions.deleteAgent(name, folder)}
-      />
+    <AgentsPage
+      agents={list.data.agents}
+      setup={wishSetup(models)}
+      models={models ?? []}
+      narrow={narrow}
+      onSetWish={async (name, wish) => {
+        await actions.setAgentWish(name, wish, folder);
+      }}
+      onSetLimits={async (name, change) => {
+        await actions.setAgentLimits(name, change, folder);
+      }}
+      onSave={(text, name) => actions.saveAgent(text, name, folder)}
+      onCopy={(name) => actions.copyAgent(name, folder)}
+      onDelete={(name) => actions.deleteAgent(name, folder)}
+    />
+  );
+}
+
+/** The Rules tab: when helpers are used, the limits every helper gets, and how long finished ones are kept. One block each. */
+function AgentsRules({ setup = "mixed" }: { setup?: WishSetup }) {
+  return (
+    <div className="flex max-w-column flex-col gap-3">
       <UseHelpersSection />
-      <FinishedHelpersSection setup={wishSetup(models)} />
+      <DefaultLimitsSection setup={setup} />
+      <FinishedHelpersSection />
     </div>
   );
+}
+
+/** The Measure tab: empty until helpers can be measured on this Mac. */
+function AgentsMeasure() {
+  return <p className="text-sm text-muted">Measuring helpers on this Mac comes in a later version.</p>;
+}
+
+/** The three tabs with what each shows. Apart from the hooks, so the gallery can show each tab. */
+export function AgentsTabs({ tab, onTab, agents, rules }: { tab: AgentsTab; onTab: (tab: AgentsTab) => void; agents: ReactNode; rules: ReactNode }) {
+  return (
+    <Tabs value={tab} onValueChange={(next) => onTab(next as AgentsTab)} className="flex min-h-0 flex-1 flex-col gap-4">
+      <TabsList aria-label="Parts of Agents">
+        <TabsTrigger value="agents">Agents</TabsTrigger>
+        <TabsTrigger value="rules">Rules</TabsTrigger>
+        <TabsTrigger value="measure">Measure</TabsTrigger>
+      </TabsList>
+      <TabsContent value="agents" className="flex min-h-0 flex-1 flex-col">
+        {agents}
+      </TabsContent>
+      <TabsContent value="rules">{rules}</TabsContent>
+      <TabsContent value="measure">
+        <AgentsMeasure />
+      </TabsContent>
+    </Tabs>
+  );
+}
+
+/** Settings › Agents: three tabs, the agent types, the rules for helpers, and how they measure up. */
+export function AgentsSection() {
+  const tab = useAgentsTab();
+  const models = useModelList().data?.models;
+  return <AgentsTabs tab={tab} onTab={showAgentsTab} agents={<AgentsTabBody />} rules={<AgentsRules setup={wishSetup(models)} />} />;
 }

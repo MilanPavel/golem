@@ -11,7 +11,8 @@ import { fakeClient, fakeFrame, rpcError, summary } from "../../store/test-suppo
 import { closePalette } from "../palette/index.ts";
 import { SAMPLE_AGENTS, SAMPLE_CONFIG_LIMITS } from "./agents-sample.ts";
 import { AgentsPage } from "./agents-section.tsx";
-import { FinishedHelpers } from "./agents-keep.tsx";
+import { DefaultLimits } from "./agents-keep.tsx";
+import { showAgentsTab } from "./agents-tab.ts";
 import { settingsContextStore } from "./index.ts";
 
 const FOLDER = "/Users/you/repos/golem";
@@ -64,6 +65,7 @@ beforeEach(() => {
   settingsContextStore.set(null);
 });
 afterEach(() => {
+  showAgentsTab("agents");
   closePalette();
   settingsContextStore.set(null);
   history.replaceState(null, "", "/");
@@ -144,7 +146,7 @@ test("an agent with a broken file has no Edit", async () => {
 
 test("the band saves the limits of [agents] and shows a field error", async () => {
   const { fake, user } = mount(SAMPLE_AGENTS, { max_calls: 10 });
-  await screen.findByText("7 agents");
+  await user.click(await screen.findByRole("tab", { name: "Rules" }));
   await screen.findByRole("region", { name: "Limits for every helper" });
   const box = within(band()).getByRole("textbox", { name: "Tool calls calls" }) as HTMLInputElement;
   expect(box.value).toBe("10");
@@ -167,16 +169,16 @@ test("the band saves the limits of [agents] and shows a field error", async () =
 });
 
 test("a cloud-only setup asks for cost first, a mixed one for calls", async () => {
-  mount(SAMPLE_AGENTS, {}, listing(["frontier"]));
-  await screen.findByText("7 agents");
+  const { user } = mount(SAMPLE_AGENTS, {}, listing(["frontier"]));
+  await user.click(await screen.findByRole("tab", { name: "Rules" }));
   await screen.findByRole("region", { name: "Limits for every helper" });
   await waitFor(() => expect(within(band()).getAllByRole("textbox")[0]!.getAttribute("aria-labelledby")).toMatch(/.+/));
   await waitFor(() => expect(within(band()).getAllByRole("textbox").map((box) => box.closest("div.flex-col")?.textContent)[0]).toMatch(/^Cost/));
 });
 
 test("a mixed setup starts with tool calls", async () => {
-  mount(SAMPLE_AGENTS, {}, listing(["local", "frontier"]));
-  await screen.findByText("7 agents");
+  const { user } = mount(SAMPLE_AGENTS, {}, listing(["local", "frontier"]));
+  await user.click(await screen.findByRole("tab", { name: "Rules" }));
   await screen.findByRole("region", { name: "Limits for every helper" });
   expect(within(band()).getAllByRole("textbox")[0]!.closest("div.flex-col")?.textContent).toMatch(/^Tool calls/);
 });
@@ -192,6 +194,6 @@ test("the gallery states are axe-clean", async () => {
     expect((await axe.run(container, noContrast)).violations).toEqual([]);
     unmount();
   }
-  const { container } = render(<FinishedHelpers values={{ keep_days: 7, keep_problem_days: 30, max_cost: 1 }} errors={{ "agents.max_calls": "Enter a whole number, 1 or more." }} failure={null} onSave={() => {}} setup="cloud" onSaveLimit={() => {}} />);
+  const { container } = render(<DefaultLimits values={{ keep_days: 7, keep_problem_days: 30, max_cost: 1 }} errors={{ "agents.max_calls": "Enter a whole number, 1 or more." }} failure={null} setup="cloud" onSaveLimit={() => {}} />);
   expect((await axe.run(container, noContrast)).violations).toEqual([]);
 });

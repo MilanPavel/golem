@@ -15,6 +15,7 @@ import { MemorySection } from "./memory/memory-section.tsx";
 import { NotificationsSection } from "./notifications-section.tsx";
 import { RoutingSection } from "./routing-section.tsx";
 import { RulesSection } from "./rules-section.tsx";
+import { agentsTabOf, showAgentsTab } from "./agents-tab.ts";
 import { SECTIONS } from "./sections.ts";
 import { SettingsNav, SettingsPicker } from "./settings-nav.tsx";
 import { searchSettings, useSettingJump, type SettingsMatch } from "./settings-search.ts";
@@ -128,6 +129,8 @@ export function SettingsScreen({ section }: { section: string }) {
   const open = (match: SettingsMatch | null, href: string) => {
     setQuery("");
     setJump(match?.keyword == null ? null : { section: match.section.id, keyword: match.keyword });
+    // A row on another tab of Agents: the tab opens first, and the jump finds the row once it is there.
+    if (match?.keyword != null && match.section.id === "agents") showAgentsTab(agentsTabOf(match.keyword));
     navigate(href);
   };
   return (
