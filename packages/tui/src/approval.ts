@@ -1,4 +1,4 @@
-import { approvalQuestion, type PendingApproval } from "@golem/view";
+import { approvalQuestion, helperCardOf, isUseHelpersQuestion, type PendingApproval } from "@golem/view";
 import { type DiffTone, diffWindow, parseDiff } from "./diff-view.ts";
 import { toolLabel } from "./layout-chat.ts";
 
@@ -14,6 +14,10 @@ export type ApprovalLine = {
 
 /** Rows the band wants: its three, and the diff up to half the screen. */
 export function approvalRows(approval: PendingApproval, screenRows: number): number {
+  if (isUseHelpersQuestion(approval)) {
+    const jobs = helperCardOf({ args: approval.args }).jobs.length;
+    return Math.min(APPROVAL_ROWS + jobs, Math.max(APPROVAL_ROWS, Math.floor(screenRows / 2)));
+  }
   const diff = diffLineCount(approval);
   const room = Math.max(0, Math.floor(screenRows / 2) - APPROVAL_ROWS);
   return APPROVAL_ROWS + Math.min(diff, room);
@@ -35,6 +39,7 @@ export function approvalLines(
   pager: string | null = null,
 ): ApprovalLine[] {
   const width = Math.max(1, columns);
+  if (isUseHelpersQuestion(approval)) return helpersQuestionLines(approval, width, rows, pager);
   const label = toolLabel(approval.args);
   const call = label.length > 0 ? `${approval.name} ${label}` : approval.name;
   const diff = approval.diff === null ? [] : parseDiff(approval.diff);
@@ -52,4 +57,30 @@ export function approvalLines(
 
 function fit(text: string, width: number): string {
   return text.length <= width ? text : `${text.slice(0, Math.max(0, width - 1))}…`;
+}
+
+/** The keys of the batch question: `Enter run · d do it in the chat`. No "for this session" choice. */
+export const HELPERS_KEYS = "Enter run · d do it in the chat · Esc the same";
+/** Why the question is asked: the setting, in the words of Settings. */
+export const HELPERS_WHY = 'Use helpers is set to "Ask me first".';
+
+/**
+ * "Start these helpers?" (Use helpers: Ask me first): the head, one line per job (`agent · label`, then its brief,
+ * cut to the width), and the two answers. When the jobs do not fit in `rows`, the last row says how many more.
+ */
+export function helpersQuestionLines(approval: PendingApproval, width: number, rows: number = APPROVAL_ROWS, pager: string | null = null): ApprovalLine[] {
+  const card = helperCardOf({ args: approval.args });
+  const room = Math.max(1, rows - APPROVAL_ROWS);
+  const jobs = card.jobs.length > room ? card.jobs.slice(0, Math.max(0, room - 1)) : card.jobs;
+  const hidden = card.jobs.length - jobs.length;
+  return [
+    { text: fit(`Start ${card.head}?`, width), bold: true, tone: "question" },
+    ...jobs.map((job) => {
+      const who = job.label === null ? job.agent : `${job.agent} · ${job.label}`;
+      return { text: fit(job.brief === "" ? `  ${who}` : `  ${who} — ${job.brief.replace(/\s+/g, " ")}`, width) };
+    }),
+    ...(hidden > 0 ? [{ text: fit(`  … and ${String(hidden)} more`, width), dim: true }] : []),
+    { text: fit(HELPERS_WHY, width), dim: true },
+    { text: fit(pager === null ? HELPERS_KEYS : `${HELPERS_KEYS} · ${pager}`, width) },
+  ];
 }

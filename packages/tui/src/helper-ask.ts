@@ -8,7 +8,7 @@ import {
   type InboxSession,
 } from "@golem/view";
 
-import type { ApprovalLine } from "./approval.ts";
+import { HELPERS_KEYS, HELPERS_WHY, type ApprovalLine } from "./approval.ts";
 import type { HelperAskAnswer } from "./keys.ts";
 
 /**
@@ -96,6 +96,13 @@ export function helperAskLines(dock: HelperDock, columns: number): ApprovalLine[
   const width = Math.max(1, columns);
   const item = dock.item;
   const pager = pagerText(dock);
+  if (item.kind === "batch") {
+    return [
+      { text: fit(`Start ${plain(item.headline)}?${pager === null ? "" : ` · ${pager}`}`, width), bold: true, tone: "question" },
+      { text: fit(HELPERS_WHY, width), dim: true },
+      { text: fit(HELPERS_KEYS, width) },
+    ];
+  }
   const name = item.helper?.name ?? "A helper";
   const asks = inboxHelperAskWords(item.count);
   const head = fit(`${name} asks${pager === null ? "" : ` · ${pager}`}`, width);

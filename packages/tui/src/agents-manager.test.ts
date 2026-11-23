@@ -507,7 +507,7 @@ test("d on your agent asks once: y deletes, any other key cancels; bundled and p
 });
 
 test("the footers say what each view can do", () => {
-  assert.ok(texts(layout(openAgentsManager(), ALL)).includes("↑/↓ move · Enter read · w model · c copy · e edit · n new · d delete · Esc close"));
+  assert.ok(texts(layout(openAgentsManager(), ALL)).includes("↑/↓ move · Enter read · w model · u use helpers · c copy · e edit · n new · d delete · Esc close"));
   const user = in2({ kind: "detail", name: "reviewer", origin: "user" });
   assert.ok(texts(layout(user, ALL)).includes("w model · e edit · d delete · ↑/↓ scroll · Esc back"));
   const project = in2({ kind: "detail", name: "triage", origin: "project" });

@@ -1,5 +1,5 @@
 import { RpcError, type AgentInfo, type AgentsKeepValues } from "@golem/client";
-import { AGENT_GROUPS, AGENT_TEMPLATE, agentRow, agentWarnings, formatLimitSeconds, limitFields, limitTexts, wishLine, wishOptions, type WishModel, type WishOption, type WishSetup } from "@golem/view";
+import { AGENT_GROUPS, AGENT_TEMPLATE, USE_HELPERS_POSITIONS, useHelpersExplain, useHelpersPosition, agentRow, agentWarnings, formatLimitSeconds, limitFields, limitTexts, wishLine, wishOptions, type WishModel, type WishOption, type WishSetup } from "@golem/view";
 
 import { readLines, rule, runsText, wrapText } from "./agents-read.ts";
 import type { Press } from "./keys.ts";
@@ -63,6 +63,7 @@ export type AgentsManagerKey =
   | "enter"
   | "back"
   | "wish"
+  | "helpers"
   | "copy"
   | "edit"
   | "new"
@@ -73,6 +74,8 @@ export type AgentsManagerAction =
   | { kind: "none" }
   | { kind: "close" }
   | { kind: "set_wish"; name: string; wish: string }
+  /** Save `[agents] use_helpers` with `agents.keep`. */
+  | { kind: "use_helpers"; value: "when_needed" | "ask" | "never" }
   | { kind: "copy"; name: string }
   /** Open `text` in `$EDITOR` on a temporary copy, then save it with `agents.save`. `name` is the file it replaces. */
   | { kind: "edit"; text: string; name?: string }
@@ -82,7 +85,7 @@ export type AgentsManagerAction =
 export type AgentsWishContext = { setup: WishSetup; models: readonly WishModel[] };
 
 /** The wish context, and the screen size the read view scrolls in. */
-export type AgentsContext = AgentsWishContext & { columns?: number; rows?: number };
+export type AgentsContext = AgentsWishContext & { columns?: number; rows?: number; /** `[agents] use_helpers` as it is now, or null while unknown. */ useHelpers?: string | null };
 
 export const WISH_OLD = "This golem is too old to change a wish. Update golem.";
 
@@ -92,7 +95,7 @@ export type AgentsManagerLine = McpManagerLine;
 /** What an older daemon, which does not know `agents.list`, gets in place of the list. */
 export const NO_AGENTS = "this daemon has no agents yet";
 export const AGENTS_HINT = "Add one as ~/.golem/agents/<name>.md, or .golem/agents/<name>.md in a project.";
-export const LIST_HINT = "↑/↓ move · Enter read · w model · c copy · e edit · n new · d delete · Esc close";
+export const LIST_HINT = "↑/↓ move · Enter read · w model · u use helpers · c copy · e edit · n new · d delete · Esc close";
 const PICK_HINT = "↑/↓ to choose · Enter to save · Esc to cancel";
 const PROBLEMS_HINT = "e edit again · d drop the change · Esc drop the change";
 const METHOD_NOT_FOUND = -32601;
@@ -160,6 +163,7 @@ export function agentsManagerKeyOf(press: Press): AgentsManagerKey | null {
 
 const LETTER_KEYS: Record<string, AgentsManagerKey | undefined> = {
   w: "wish",
+  u: "helpers",
   c: "copy",
   e: "edit",
   n: "new",
@@ -210,6 +214,11 @@ export function pressAgentsManager(
       const next = clamp(selected + (key === "up" ? -1 : 1), ordered.length);
       return { state: at({ kind: "list", selected: next }), action: none };
     }
+    if (key === "helpers") {
+      return context.useHelpers === undefined || context.useHelpers === null
+        ? { state: at({ ...view, notice: USE_HELPERS_UNKNOWN }), action: none }
+        : { state: at(view), action: { kind: "use_helpers", value: nextUseHelpers(context.useHelpers) } };
+    }
     if (current === undefined) {
       return { state: at(view), action: none };
     }
@@ -255,6 +264,33 @@ export function pressAgentsManager(
     return { state: at(scroll), action: none };
   }
   return changeKey(state, view, current, key);
+}
+
+export const USE_HELPERS_UNKNOWN = "Use helpers is not known yet. Try again in a moment.";
+
+/** The position after `value` when `u` is pressed: the three in order, going round. */
+export function nextUseHelpers(value: string): "when_needed" | "ask" | "never" {
+  const at = USE_HELPERS_POSITIONS.findIndex((position) => position.value === useHelpersPosition(value).value);
+  return (USE_HELPERS_POSITIONS[(at + 1) % USE_HELPERS_POSITIONS.length] ?? USE_HELPERS_POSITIONS[0]!).value;
+}
+
+/** The state after `agents.keep` refused the change: one plain line, the old position stays. */
+export function useHelpersFailed(state: AgentsManagerState, error: unknown): AgentsManagerState {
+  const text =
+    error instanceof RpcError && error.code === METHOD_NOT_FOUND
+      ? "This golem is too old to change Use helpers. Update golem."
+      : error instanceof Error && error.message.length > 0
+        ? error.message
+        : "Could not change Use helpers.";
+  return agentsNoticed(state, text);
+}
+
+/** The two lines of the setting in the list: the position with its key, then what it does. */
+export function useHelpersLines(value: string | null | undefined, width = 80): AgentsManagerLine[] {
+  return [
+    { text: `use helpers: ${useHelpersPosition(value).label} (u changes)` },
+    ...wrapText(useHelpersExplain(value), Math.max(10, width - 2)).map((part) => ({ text: `  ${part}`, dim: true })),
+  ];
 }
 
 function pickView(agent: AgentInfo, context: AgentsContext): AgentsDetailView {
@@ -426,7 +462,7 @@ export function layoutAgentsManager(input: {
     }
     if (view.kind === "list" || chosen === undefined) {
       const selected = view.kind === "list" ? view.selected : 0;
-      body = scrollToSelected(listLines(agents, selected, input.cwd, input.home, setup, input.keep ?? null), room());
+      body = scrollToSelected(listLines(agents, selected, input.cwd, input.home, setup, input.keep ?? null, width), room());
     } else if (view.pick !== undefined) {
       body = pickLines(chosen, view.pick.selected, setup, input.models ?? [], width);
       hint = PICK_HINT;
@@ -501,10 +537,11 @@ function listWish(agent: AgentInfo, setup: WishSetup): string {
   return agentRow(agent, setup).listLine;
 }
 
-function listLines(agents: readonly AgentInfo[], selected: number, cwd: string, home: string, setup: WishSetup, keep: AgentsKeepValues | null): AgentsManagerLine[] {
+function listLines(agents: readonly AgentInfo[], selected: number, cwd: string, home: string, setup: WishSetup, keep: AgentsKeepValues | null, width: number): AgentsManagerLine[] {
   const count = `${agents.length} ${agents.length === 1 ? "agent" : "agents"}`;
   const lines: AgentsManagerLine[] = [{ text: "Agents", bold: true }, { text: `${count} · helpers, last 30 days`, dim: true }];
   if (keep !== null) lines.push({ text: keepLine(keep), dim: true });
+  if (keep !== null) lines.push(...useHelpersLines(keep.use_helpers, width));
   const every = keep === null ? "" : everyHelperLine(keep, setup);
   if (every !== "") lines.push({ text: every, dim: true });
   if (agents.length === 0) {

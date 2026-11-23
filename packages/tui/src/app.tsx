@@ -198,6 +198,7 @@ import {
   tryTitle,
   loadingLine,
   type TryRun,
+  isUseHelpersQuestion,
 } from "@golem/view";
 import { compactWaiting, runCompact } from "./compact.ts";
 import { contextKeyLine, contextRowForPress, readContextActions } from "./context-actions.ts";
@@ -406,6 +407,7 @@ import {
   layoutAgentsManager,
   openAgentsManager,
   pressAgentsManager,
+  useHelpersFailed,
   type AgentList,
   type AgentsManagerAction,
   type AgentsManagerState,
@@ -4826,6 +4828,7 @@ export function App({
       models: listing?.models ?? [],
       columns,
       rows: budget.body,
+      useHelpers: agentsKeep === null ? null : (agentsKeep.use_helpers ?? "when_needed"),
     });
     showAgentsManager(pressed.state);
     onAgentsAction(pressed.action);
@@ -4835,6 +4838,9 @@ export function App({
     switch (action.kind) {
       case "set_wish":
         saveAgentWish(action.name, action.wish);
+        return;
+      case "use_helpers":
+        saveUseHelpers(action.value);
         return;
       case "copy":
         void changeAgentFiles(async () => {
@@ -4925,6 +4931,14 @@ export function App({
         }
       },
       (error: unknown) => showAgentsManager(agentWishFailed(agentsManagerRef.current, error)),
+    );
+  }
+
+  /** `agents.keep` with `use_helpers`: on an answer the line shows the saved position; on a refusal one plain line shows. */
+  function saveUseHelpers(value: "when_needed" | "ask" | "never"): void {
+    client.agentsKeep({ use_helpers: value }).then(
+      (result) => setAgentsKeep(result.values ?? null),
+      (error: unknown) => showAgentsManager(useHelpersFailed(agentsManagerRef.current, error)),
     );
   }
 
@@ -5333,6 +5347,7 @@ export function App({
       history: historyCursorRef.current !== null,
       approval: approvalRef.current !== null,
       helperAsk: isHelperApproval(dockRef.current),
+      useHelpers: isUseHelpersQuestion(approvalRef.current),
       askPages: (dockRef.current?.items.length ?? 0) > 1,
       approvalDiff: approvalRef.current !== null && approvalRef.current.diff !== null,
       approvalEdit: argsEditRef.current !== null,
@@ -5418,6 +5433,9 @@ export function App({
       case "helper-ask":
         answerHelperAsk(effect.answer);
         return;
+      case "helpers-run":
+        answerHelpers(effect.run);
+        return;
       case "ask-next":
         if (dockRef.current !== null) setAskPick(nextAskKey(dockRef.current));
         return;
@@ -5499,6 +5517,18 @@ export function App({
       return;
     }
     void client.respondApproval(current, pending.callId, decision).catch((error: unknown) => {
+      setChat((state) => ({ ...state, error: messageOf(error) }));
+    });
+  }
+
+  /** A key on "start these helpers?": `helpers.respond` with the lead's session and the `delegate` call. */
+  function answerHelpers(run: boolean): void {
+    const pending = approvalRef.current;
+    const current = sessionRef.current;
+    if (pending === null || current === null || !isUseHelpersQuestion(pending)) {
+      return;
+    }
+    void client.respondHelpers(current, pending.callId, run).catch((error: unknown) => {
       setChat((state) => ({ ...state, error: messageOf(error) }));
     });
   }
