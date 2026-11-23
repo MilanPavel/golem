@@ -13,6 +13,7 @@ import { withActivePulls } from "../../models/model-text.ts";
 import type { SetupActions } from "../../setup/use-setup-actions.ts";
 import type { HfActions, HfTabProps } from "./hf-tab.tsx";
 import { GetModelsSheet } from "./get-models-sheet.tsx";
+import { HostedModels } from "./hosted-models.tsx";
 import { groupProviders, isStarred, keyWhere, modelsOf, ollamaState, providerEntry, usableModels, type ProviderEntry } from "./derive.ts";
 import { ModelTable } from "./models-table.tsx";
 import { OllamaPanel } from "./ollama-panel.tsx";
@@ -213,12 +214,11 @@ export function ModelsView({ listing, keys, ollama, pulls, setup, actions, initi
               </MenuContent>
             </Menu>
           </Head>
-          <p className="text-sm text-muted">{`${models.filter(isStarred).length} of ${models.length} starred`}</p>
           {errorLine}
           {models.length === 0 ? (
             <p className="rounded-lg border border-dashed border-line-strong p-4 text-sm text-muted">{`golem has not listed any ${provider.name} models yet. They show here once the provider answers.`}</p>
           ) : (
-            <ModelTable label={`${provider.name} models`} models={models} defaultName={defaultName} pulls={pulls} busy={busy} onStar={onStar} />
+            <HostedModels key={provider.id} providerName={provider.name} models={models} defaultName={defaultName} pulls={pulls} busy={busy} onStar={onStar} />
           )}
         </div>
       );
