@@ -226,11 +226,12 @@ export function ModelsView({ listing, keys, ollama, pulls, setup, actions, initi
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-4 md:flex-row" data-setting="key">
-      <div data-setting="provider" className="shrink-0 rounded-lg border border-line bg-sunken md:w-60">
+      {/* From md the page stays put: the provider list and the models scroll on their own. */}
+      <div data-setting="provider" className="shrink-0 rounded-lg border border-line bg-sunken md:max-h-full md:w-60 md:self-start md:overflow-y-auto">
         <ProviderList groups={groups} selected={selected} onSelect={pick} starredCount={starred.length} models={shown?.models ?? null} />
         <p className="border-t border-line px-3 py-2 text-meta text-faint">Keys are set in a terminal. This page never sees one.</p>
       </div>
-      <div className="min-w-0 flex-1 pb-8">{detail}</div>
+      <div className="min-w-0 flex-1 pb-8 md:min-h-0 md:overflow-y-auto">{detail}</div>
       <GetModelsSheet
         open={sheet === "get"}
         onOpenChange={(open) => {
