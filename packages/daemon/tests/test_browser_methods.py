@@ -2,16 +2,7 @@ from golem.server.handlers import standard_methods
 from golem_protocol.methods import BROWSER_METHODS, DEVICE_METHODS, METHOD_ACCESS
 
 # Methods in the protocol with no daemon handler yet. Remove a name when its handler is added.
-NOT_YET_IN_THE_DAEMON: set[str] = {
-    "evals.plan",
-    "evals.start",
-    "evals.stop",
-    "evals.resume",
-    "evals.list",
-    "evals.get",
-    "evals.apply",
-    "evals.delete",
-}
+NOT_YET_IN_THE_DAEMON: set[str] = set()
 
 
 def test_every_daemon_method_says_whether_a_browser_may_call_it() -> None:

@@ -122,6 +122,16 @@ from golem.server.dispatcher import (
     RequestContext,
     RpcCallError,
 )
+from golem.server.evals_rpc import (
+    evals_apply,
+    evals_delete,
+    evals_get,
+    evals_list,
+    evals_plan,
+    evals_resume,
+    evals_start,
+    evals_stop,
+)
 from golem.server.mcp_catalog import mcp_catalog, runtime_install, runtime_install_cancel
 from golem.server.mcp_edit import (
     config_raw_get,
@@ -262,6 +272,14 @@ from golem_protocol.commands import (
     DeviceSyncParams,
     EvalRoutingParams,
     EvalRoutingResult,
+    EvalsApplyParams,
+    EvalsDeleteParams,
+    EvalsGetParams,
+    EvalsListParams,
+    EvalsPlanParams,
+    EvalsResumeParams,
+    EvalsStartParams,
+    EvalsStopParams,
     FileListParams,
     FileListResult,
     FileReadParams,
@@ -2284,6 +2302,14 @@ def standard_methods() -> dict[str, Method]:
         "agents.get": Method("agents.get", AgentsGetParams, True, _agents_get),
         "agents.set_wish": Method("agents.set_wish", AgentsSetWishParams, True, agents_set_wish),
         "agents.keep": Method("agents.keep", AgentsKeepParams, True, agents_keep),
+        "evals.plan": Method("evals.plan", EvalsPlanParams, True, evals_plan),
+        "evals.start": Method("evals.start", EvalsStartParams, True, evals_start),
+        "evals.stop": Method("evals.stop", EvalsStopParams, True, evals_stop),
+        "evals.resume": Method("evals.resume", EvalsResumeParams, True, evals_resume),
+        "evals.list": Method("evals.list", EvalsListParams, True, evals_list),
+        "evals.get": Method("evals.get", EvalsGetParams, True, evals_get),
+        "evals.apply": Method("evals.apply", EvalsApplyParams, True, evals_apply),
+        "evals.delete": Method("evals.delete", EvalsDeleteParams, True, evals_delete),
         "agents.set_limits": Method(
             "agents.set_limits", AgentsSetLimitsParams, True, agents_set_limits
         ),

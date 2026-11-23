@@ -58,6 +58,22 @@ def build(window: int | None, tier: Tier | None, prices: Prices | None = None) -
     return section()(context)
 
 
+def test_the_thresholds_are_read_again_each_time_the_section_is_built() -> None:
+    now = [DelegateSettings(price_ratio=100.0)]
+    live = delegate_prompt(lambda _root: AGENTS, writes, lambda: now[0])
+    context = PromptContext(
+        state={},
+        tools=("read_file", "delegate"),
+        window=100_000,
+        tier="frontier",
+        prices=Prices(10.0, 1.0, None),
+    )
+    before = live(context)
+    now[0] = DelegateSettings(price_ratio=2.0)  # as if evals.apply had written the file
+    after = live(context)
+    assert before != after
+
+
 def names(text: str | None) -> list[str]:
     return [line[2:].split(":")[0] for line in (text or "").splitlines() if line.startswith("- ")]
 

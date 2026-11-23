@@ -474,15 +474,34 @@ def measure(
 # --- drivers --------------------------------------------------------------------------------------
 
 
+OnStart = Callable[[Ask], None]
+"""Called just before an ask is played, so a caller can show that it began."""
+
+OnRun = Callable[[Run], None]
+"""Called after each run, a ``not run`` one included, with the run. It may raise to end the play:
+the exception goes up through the driver, which still stops its throwaway daemon."""
+
+
 class Driver(Protocol):
-    """Plays asks in one arm and mode. Scripted in tests, a real daemon with ``--live``."""
+    """Plays asks in one arm and mode. Scripted in tests, a real daemon with ``--live``.
+
+    ``on_start`` and ``on_run`` let a caller follow the play one run at a time (the service's
+    measurement does); both are optional.
+    """
 
     def unavailable(self, arm: Arm) -> str | None:
         """Why the arm cannot run (a line for the report), or None when it can."""
         ...
 
     async def play(
-        self, arm: Arm, mode: Mode, asks: Sequence[Ask], project: Path, scratch: Path
+        self,
+        arm: Arm,
+        mode: Mode,
+        asks: Sequence[Ask],
+        project: Path,
+        scratch: Path,
+        on_start: OnStart | None = None,
+        on_run: OnRun | None = None,
     ) -> list[Run]: ...
 
 
@@ -513,11 +532,23 @@ class ScriptedDriver:
         return self._unavailable.get(arm.name)
 
     async def play(
-        self, arm: Arm, mode: Mode, asks: Sequence[Ask], project: Path, scratch: Path
+        self,
+        arm: Arm,
+        mode: Mode,
+        asks: Sequence[Ask],
+        project: Path,
+        scratch: Path,
+        on_start: OnStart | None = None,
+        on_run: OnRun | None = None,
     ) -> list[Run]:
         runs: list[Run] = []
         for ask in asks:
-            runs.append(await self._one(arm, mode, ask, project, scratch / ask.name))
+            if on_start is not None:
+                on_start(ask)
+            run = await self._one(arm, mode, ask, project, scratch / ask.name)
+            runs.append(run)
+            if on_run is not None:
+                on_run(run)
         return runs
 
     async def _one(self, arm: Arm, mode: Mode, ask: Ask, project: Path, scratch: Path) -> Run:
@@ -868,6 +899,8 @@ async def play_until_dead(
     one: Callable[[Ask], Awaitable[Run]],
     alive: Callable[[], bool] | None = None,
     low: Callable[[], bool] | None = None,
+    on_start: OnStart | None = None,
+    on_run: OnRun | None = None,
 ) -> list[Run]:
     """Play ``asks`` with ``one``. A local arm ends when its server dies or memory runs low.
 
@@ -875,20 +908,36 @@ async def play_until_dead(
     that run and every one after it are ``not run``: the run died with the server, so its failure
     says nothing about helpers. Before each ask of a local arm ``low`` is asked. When it says
     yes, that ask and every one after it are ``not run``, so the arm stops before the Mac swaps.
+    ``on_start`` is called before an ask that is played, ``on_run`` after every run, a ``not run``
+    one included. ``on_run`` may raise to end the play at once.
     """
     runs: list[Run] = []
     dead = False
     for ask in asks:
         dead = dead or (arm.local and low is not None and low())
         if dead:
-            runs.append(not_run(arm, mode, ask))
-            continue
-        run = await one(ask)
-        if not run.ok and arm.local and alive is not None and not alive():
-            dead = True
             run = not_run(arm, mode, ask)
+        else:
+            if on_start is not None:
+                on_start(ask)
+            run = await one(ask)
+            if not run.ok and arm.local and alive is not None and not alive():
+                dead = True
+                run = not_run(arm, mode, ask)
         runs.append(run)
+        if on_run is not None:
+            on_run(run)
     return runs
+
+
+def serve_command(*, frozen: bool, executable: str | None = None) -> list[str]:
+    """The command that starts a golem daemon: ``python -m golem.cli serve`` from a checkout.
+
+    In the PyInstaller build ``sys.executable`` is the daemon binary itself, which has no ``-m``;
+    its entry point (``golem/__main__.py``) reads ``serve`` as its first argument.
+    """
+    program = executable or sys.executable
+    return [program, "serve"] if frozen else [program, "-m", "golem.cli", "serve"]
 
 
 class LiveDriver:
@@ -932,7 +981,14 @@ class LiveDriver:
         return None
 
     async def play(
-        self, arm: Arm, mode: Mode, asks: Sequence[Ask], project: Path, scratch: Path
+        self,
+        arm: Arm,
+        mode: Mode,
+        asks: Sequence[Ask],
+        project: Path,
+        scratch: Path,
+        on_start: OnStart | None = None,
+        on_run: OnRun | None = None,
     ) -> list[Run]:
         from golem_protocol import PROTOCOL_MAJOR
 
@@ -943,7 +999,9 @@ class LiveDriver:
         (home / "config.toml").write_text(arm_config(arm, mode), "utf-8")
         env = {**os.environ, "GOLEM_HOME": str(home), "HOME": str(user)}
         daemon = subprocess.Popen(
-            [sys.executable, "-m", "golem.cli", "serve"], env=env, stderr=subprocess.DEVNULL
+            serve_command(frozen=bool(getattr(sys, "frozen", False))),
+            env=env,
+            stderr=subprocess.DEVNULL,
         )
         try:
             socket = home / "run" / "golem.sock"
@@ -960,11 +1018,13 @@ class LiveDriver:
                 folder = materialise(ask, scratch / mode / ask.name, project)
                 return await self._one(client, arm, mode, ask, folder)
 
-            runs = await play_until_dead(arm, mode, asks, one, self._alive, self._low)
+            runs = await play_until_dead(
+                arm, mode, asks, one, self._alive, self._low, on_start, on_run
+            )
         finally:
             daemon.terminate()
-            try:
-                daemon.wait(timeout=10)
+            try:  # in a thread: the caller may be a service whose loop must not block
+                await asyncio.shield(asyncio.to_thread(daemon.wait, 10))
             except subprocess.TimeoutExpired:
                 daemon.kill()
             shutil.rmtree(root, ignore_errors=True)
@@ -1518,4 +1578,5 @@ __all__ = [
     "propose",
     "run_eval",
     "score",
+    "serve_command",
 ]

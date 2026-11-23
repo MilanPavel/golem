@@ -19,6 +19,7 @@ from support import ServeProcess
 
 from golem import __version__
 from golem.config import OllamaSettings, load_settings
+from golem.evals.job import EvalParts
 from golem.logging import configure_logging
 from golem.models.discovery import ModelDiscovery
 from golem.models.facts import FactsSource
@@ -229,6 +230,7 @@ async def start_daemon(
     local_servers: LocalServers | None = None,
     socket_check_seconds: float = 5.0,
     bundled_agents: Path | None = None,
+    evals: EvalParts | None = None,
 ) -> tuple[DaemonApp, asyncio.Task[None]]:
     """Serve in this process. Unless a test passes ``local_servers``, golem never starts Ollama."""
     paths = resolve_paths(home)
@@ -252,6 +254,7 @@ async def start_daemon(
         local_servers=local_servers,
         socket_check_seconds=socket_check_seconds,
         bundled_agents=bundled_agents,
+        evals=evals,
     )
     task = asyncio.create_task(app.serve(install_signals=False))
     await _wait_listening(paths.socket_path, task)

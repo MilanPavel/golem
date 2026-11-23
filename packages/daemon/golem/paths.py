@@ -44,6 +44,11 @@ class GolemPaths:
         return self.home / "flows"
 
     @property
+    def evals_dir(self) -> Path:
+        """One ``<id>.json`` for each helper measurement (``evals.start``)."""
+        return self.home / "evals"
+
+    @property
     def logs_dir(self) -> Path:
         return self.home / "logs"
 
@@ -78,6 +83,7 @@ class GolemPaths:
         for directory in (
             self.skills_dir,
             self.flows_dir,
+            self.evals_dir,
             self.logs_dir,
             self.run_dir,
             self.cache_dir,

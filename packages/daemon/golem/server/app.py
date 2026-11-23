@@ -17,7 +17,8 @@ from pydantic import BaseModel
 from golem.agents.bundled import bundled_agents_dir
 from golem.agents.registry import AgentRegistry
 from golem.coding.changes import ChangeStore
-from golem.config import MemorySettings, ModelPrice, load_settings
+from golem.config import DelegateSettings, MemorySettings, ModelPrice, load_settings
+from golem.evals.job import EvalJobs, EvalParts
 from golem.graphs.chat import ChatRuntime, open_chat
 from golem.graphs.cite_prompt import CITE_PROMPT
 from golem.graphs.delegate_policy import Prices
@@ -141,6 +142,14 @@ def assert_socket_path_fits(path: Path) -> None:
         raise SocketPathTooLong(path)
 
 
+def _delegate_now(home: Path) -> DelegateSettings:
+    """``[agents.delegate]`` as ``config.toml`` has it now; the defaults when it does not load."""
+    try:
+        return load_settings(home=home, project_dir=home).agents.delegate
+    except (OSError, ValueError):
+        return DelegateSettings()
+
+
 class DaemonApp:
     """Accepts clients, dispatches commands, and drains tasks on shutdown."""
 
@@ -163,8 +172,10 @@ class DaemonApp:
         local_servers: LocalServers | None = None,
         socket_check_seconds: float = SOCKET_CHECK_SECONDS,
         poster: Poster | None = None,
+        evals: EvalParts | None = None,
     ) -> None:
         self.paths = paths
+        self._eval_parts = evals
         self._socket_check_seconds = socket_check_seconds
         self._socket_inode: int | None = None
         self._user_home = user_home
@@ -387,7 +398,7 @@ class DaemonApp:
                                     [] if state.agents is None else state.agents.view(root).usable()
                                 ),
                                 lambda name: not _is_read_only(self.state.tools, name),
-                                settings.agents.delegate,
+                                lambda: router.agent_settings().delegate,
                             ),
                             CITE_PROMPT,
                             PLAN,
@@ -510,6 +521,13 @@ class DaemonApp:
                 self.state.benches = BenchManager(
                     router, local, broadcast=self._broadcast, store=bench_store
                 )
+                self.state.evals = EvalJobs(
+                    self.paths.evals_dir,
+                    delegate=lambda: _delegate_now(self.paths.home),
+                    broadcast=self._broadcast,
+                    clock=lambda: self.state.clock(),
+                    parts=self._eval_parts,
+                )
                 self.state.installer = OllamaInstaller(broadcast=self._broadcast)
                 self.state.runtimes = {
                     name: runtime_installer(name, broadcast=self._broadcast) for name in RUNTIMES
@@ -571,6 +589,9 @@ class DaemonApp:
             if self.state.checks is not None:
                 await self.state.checks.aclose()
             self.state.checks = None
+            if self.state.evals is not None:
+                await self.state.evals.aclose()
+            self.state.evals = None
             if self.state.benches is not None:
                 await self.state.benches.aclose()
             self.state.benches = None
