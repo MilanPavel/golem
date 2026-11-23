@@ -38,18 +38,6 @@ function AppearanceApp() {
   );
 }
 
-/** Appearance used to hold the chat detail row; this line says where it went. */
-function ChatMoved() {
-  const navigate = useNavigate();
-  return (
-    <p className="text-sm text-muted">
-      <Link href={settingsPath("chat")} onNavigate={navigate} className="text-clay-ink underline underline-offset-2">
-        How much a chat shows moved to Chat.
-      </Link>
-    </p>
-  );
-}
-
 function Body({ section }: { section: string }) {
   switch (section) {
     case "info":
@@ -84,7 +72,6 @@ function Body({ section }: { section: string }) {
       return (
         <div className="flex max-w-column flex-col gap-6">
           <ThemeSwitch />
-          <ChatMoved />
           <AppearanceApp />
         </div>
       );
