@@ -1,0 +1,16 @@
+{
+  "additionalProperties": false,
+  "description": "``evals.apply``. Write the measured numbers of a measurement to ``[agents.delegate]`` in\n``config.toml``. A number that was not measured stays as it is.",
+  "properties": {
+    "id": {
+      "minLength": 1,
+      "title": "Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id"
+  ],
+  "title": "EvalsApplyParams",
+  "type": "object"
+}

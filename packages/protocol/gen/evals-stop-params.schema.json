@@ -1,0 +1,16 @@
+{
+  "additionalProperties": false,
+  "description": "``evals.stop``. Stop a running measurement and keep the runs done so far.",
+  "properties": {
+    "id": {
+      "minLength": 1,
+      "title": "Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id"
+  ],
+  "title": "EvalsStopParams",
+  "type": "object"
+}

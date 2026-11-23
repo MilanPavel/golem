@@ -1,0 +1,15 @@
+{
+  "additionalProperties": false,
+  "description": "``stopped`` is false when that measurement was not running.",
+  "properties": {
+    "stopped": {
+      "title": "Stopped",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "stopped"
+  ],
+  "title": "EvalsStopResult",
+  "type": "object"
+}

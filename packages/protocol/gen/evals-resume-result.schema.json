@@ -1,0 +1,16 @@
+{
+  "additionalProperties": false,
+  "description": "The measurement goes on under the same ``id``.",
+  "properties": {
+    "id": {
+      "minLength": 1,
+      "title": "Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id"
+  ],
+  "title": "EvalsResumeResult",
+  "type": "object"
+}

@@ -61,6 +61,17 @@ import type { DevicePairChanged } from "../../protocol/gen/device-pair-changed.t
 import type { DevicePairConfirmResult } from "../../protocol/gen/device-pair-confirm-result.ts";
 import type { DeviceRenameResult } from "../../protocol/gen/device-rename-result.ts";
 import type { DeviceRevokeResult } from "../../protocol/gen/device-revoke-result.ts";
+import type { EvalEnded } from "../../protocol/gen/eval-ended.ts";
+import type { EvalProgress } from "../../protocol/gen/eval-progress.ts";
+import type { EvalStarted } from "../../protocol/gen/eval-started.ts";
+import type { EvalsApplyResult } from "../../protocol/gen/evals-apply-result.ts";
+import type { EvalsDeleteResult } from "../../protocol/gen/evals-delete-result.ts";
+import type { EvalsGetResult } from "../../protocol/gen/evals-get-result.ts";
+import type { EvalsListResult } from "../../protocol/gen/evals-list-result.ts";
+import type { EvalsPlanResult } from "../../protocol/gen/evals-plan-result.ts";
+import type { EvalsResumeResult } from "../../protocol/gen/evals-resume-result.ts";
+import type { EvalsStartResult } from "../../protocol/gen/evals-start-result.ts";
+import type { EvalsStopResult } from "../../protocol/gen/evals-stop-result.ts";
 import type { MemoryChanged } from "../../protocol/gen/memory-changed.ts";
 import type { RoutineGetResult } from "../../protocol/gen/routine-get-result.ts";
 import type { RoutineInfo, RoutineListResult } from "../../protocol/gen/routine-list-result.ts";
@@ -1043,7 +1054,183 @@ export function isAgentsKeepResult(value: unknown): value is AgentsKeepResult {
   if (value["errors"] !== undefined && !Array.isArray(value["errors"])) return false;
   const values = value["values"];
   if (values == null) return true;
-  return isRecord(values) && typeof values["keep_days"] === "number" && typeof values["keep_problem_days"] === "number";
+  return (
+    isRecord(values) &&
+    typeof values["keep_days"] === "number" &&
+    typeof values["keep_problem_days"] === "number" &&
+    (values["delegate"] == null || isDelegateValues(values["delegate"]))
+  );
+}
+
+const DELEGATE_KEYS = ["read_share", "fill_share", "job_share", "price_ratio"];
+
+function isDelegateValues(value: unknown): boolean {
+  return (
+    isRecord(value) &&
+    DELEGATE_KEYS.every((key) => {
+      const number = value[key];
+      return (
+        isRecord(number) &&
+        typeof number["value"] === "number" &&
+        typeof number["default"] === "number" &&
+        typeof number["is_default"] === "boolean"
+      );
+    })
+  );
+}
+
+function isNonEmptyString(value: unknown): value is string {
+  return typeof value === "string" && value !== "";
+}
+
+function isNumberOrNull(value: unknown): boolean {
+  return value == null || typeof value === "number";
+}
+
+const EVAL_STATES = ["running", "stopped", "done"];
+const EVAL_RUN_ENDS = ["completed", "failed", "cancelled", "timeout", "not_run", "running", "pending"];
+
+function isEvalArmUsed(value: unknown): boolean {
+  return isRecord(value) && isNonEmptyString(value["name"]) && isNonEmptyString(value["model"]);
+}
+
+function isEvalPlanArm(value: unknown): boolean {
+  return (
+    isRecord(value) &&
+    isNonEmptyString(value["name"]) &&
+    isNonEmptyString(value["model"]) &&
+    (value["kind"] === "local" || value["kind"] === "cloud") &&
+    typeof value["window"] === "number" &&
+    typeof value["asks"] === "number" &&
+    isNumberOrNull(value["needed_gb"]) &&
+    isNumberOrNull(value["ram_gb"]) &&
+    isNumberOrNull(value["free_gb"]) &&
+    isNumberOrNull(value["cost_usd"]) &&
+    (value["verdict"] == null || ["fits", "tight", "too_big", "no_room", "unknown"].includes(String(value["verdict"])))
+  );
+}
+
+function isEvalRun(value: unknown): boolean {
+  return (
+    isRecord(value) &&
+    isNonEmptyString(value["arm"]) &&
+    isNonEmptyString(value["ask"]) &&
+    (value["mode"] === "on" || value["mode"] === "off") &&
+    EVAL_RUN_ENDS.includes(String(value["end"])) &&
+    isNumberOrNull(value["quality"]) &&
+    isNumberOrNull(value["seconds"]) &&
+    isNumberOrNull(value["window_left"]) &&
+    isNumberOrNull(value["helpers_started"])
+  );
+}
+
+function isEvalProposal(value: unknown): boolean {
+  return (
+    isRecord(value) &&
+    typeof value["pairs"] === "number" &&
+    typeof value["wins"] === "number" &&
+    Array.isArray(value["numbers"]) &&
+    value["numbers"].every(
+      (n) =>
+        isRecord(n) &&
+        DELEGATE_KEYS.includes(String(n["key"])) &&
+        typeof n["current"] === "number" &&
+        typeof n["measured"] === "boolean" &&
+        isNumberOrNull(n["proposed"]),
+    )
+  );
+}
+
+function isEvalMeasurement(value: unknown): boolean {
+  return (
+    isRecord(value) &&
+    isNonEmptyString(value["id"]) &&
+    isNonEmptyString(value["started_at"]) &&
+    EVAL_STATES.includes(String(value["state"])) &&
+    Array.isArray(value["arms"]) &&
+    value["arms"].every(isEvalArmUsed) &&
+    Array.isArray(value["runs"]) &&
+    value["runs"].every(isEvalRun) &&
+    (value["proposal"] == null || isEvalProposal(value["proposal"]))
+  );
+}
+
+function isEvalSummary(value: unknown): boolean {
+  return (
+    isRecord(value) &&
+    isNonEmptyString(value["id"]) &&
+    EVAL_STATES.includes(String(value["state"])) &&
+    typeof value["runs_played"] === "number" &&
+    typeof value["runs_total"] === "number" &&
+    Array.isArray(value["arms"]) &&
+    value["arms"].every(isEvalArmUsed)
+  );
+}
+
+export function isEvalsPlanResult(value: unknown): value is EvalsPlanResult {
+  return isRecord(value) && Array.isArray(value["arms"]) && value["arms"].every(isEvalPlanArm);
+}
+
+export function isEvalsStartResult(value: unknown): value is EvalsStartResult {
+  return isRecord(value) && isNonEmptyString(value["id"]);
+}
+
+export function isEvalsResumeResult(value: unknown): value is EvalsResumeResult {
+  return isRecord(value) && isNonEmptyString(value["id"]);
+}
+
+export function isEvalsStopResult(value: unknown): value is EvalsStopResult {
+  return isRecord(value) && typeof value["stopped"] === "boolean";
+}
+
+export function isEvalsDeleteResult(value: unknown): value is EvalsDeleteResult {
+  return isRecord(value) && typeof value["deleted"] === "boolean";
+}
+
+export function isEvalsListResult(value: unknown): value is EvalsListResult {
+  return isRecord(value) && (value["measurements"] === undefined || (Array.isArray(value["measurements"]) && value["measurements"].every(isEvalSummary)));
+}
+
+export function isEvalsGetResult(value: unknown): value is EvalsGetResult {
+  return isRecord(value) && isEvalMeasurement(value["measurement"]);
+}
+
+export function isEvalsApplyResult(value: unknown): value is EvalsApplyResult {
+  return isAgentsKeepLike(value);
+}
+
+function isAgentsKeepLike(value: unknown): boolean {
+  return isRecord(value) && typeof value["ok"] === "boolean" && (value["values"] == null || isAgentsKeepResult({ ok: true, values: value["values"] }));
+}
+
+export function isEvalStarted(value: unknown): value is EvalStarted {
+  return (
+    isRecord(value) &&
+    isNonEmptyString(value["id"]) &&
+    typeof value["total"] === "number" &&
+    Array.isArray(value["arms"]) &&
+    value["arms"].every(isEvalArmUsed)
+  );
+}
+
+export function isEvalProgress(value: unknown): value is EvalProgress {
+  return (
+    isRecord(value) &&
+    isNonEmptyString(value["id"]) &&
+    typeof value["index"] === "number" &&
+    typeof value["total"] === "number" &&
+    isNonEmptyString(value["arm"]) &&
+    isNonEmptyString(value["ask"]) &&
+    (value["mode"] === "on" || value["mode"] === "off") &&
+    ["running", "completed", "failed", "cancelled", "timeout"].includes(String(value["state"])) &&
+    typeof value["elapsed"] === "number" &&
+    isNumberOrNull(value["memory_used_gb"]) &&
+    isNumberOrNull(value["memory_total_gb"])
+  );
+}
+
+export function isEvalEnded(value: unknown): value is EvalEnded {
+  return isRecord(value) && isNonEmptyString(value["id"]) && (value["state"] === "stopped" || value["state"] === "done");
 }
 
 function isAgentInfoLike(value: unknown): boolean {

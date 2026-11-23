@@ -1,0 +1,25 @@
+{
+  "additionalProperties": false,
+  "description": "One number of ``[agents.delegate]``: ``value`` is the one in force, ``default`` the one\ngolem ships, and ``is_default`` is true when the two are equal.",
+  "properties": {
+    "default": {
+      "title": "Default",
+      "type": "number"
+    },
+    "is_default": {
+      "title": "Is Default",
+      "type": "boolean"
+    },
+    "value": {
+      "title": "Value",
+      "type": "number"
+    }
+  },
+  "required": [
+    "value",
+    "default",
+    "is_default"
+  ],
+  "title": "AgentsDelegateNumber",
+  "type": "object"
+}

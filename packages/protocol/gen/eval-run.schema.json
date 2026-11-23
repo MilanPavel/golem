@@ -1,0 +1,99 @@
+{
+  "additionalProperties": false,
+  "description": "One ask played once on one arm.\n\n``quality`` is the answer's score from 0 to 1, ``seconds`` the time, ``window_left`` the\nshare of the window that was still free at the fullest point (0 to 1), and\n``helpers_started`` how many helpers the lead started. They are null for a run that has no\nresult: ``pending``, ``running`` and ``not_run``.",
+  "properties": {
+    "arm": {
+      "minLength": 1,
+      "title": "Arm",
+      "type": "string"
+    },
+    "ask": {
+      "minLength": 1,
+      "title": "Ask",
+      "type": "string"
+    },
+    "end": {
+      "enum": [
+        "completed",
+        "failed",
+        "cancelled",
+        "timeout",
+        "not_run",
+        "running",
+        "pending"
+      ],
+      "title": "End",
+      "type": "string"
+    },
+    "helpers_started": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Helpers Started"
+    },
+    "mode": {
+      "enum": [
+        "on",
+        "off"
+      ],
+      "title": "Mode",
+      "type": "string"
+    },
+    "quality": {
+      "anyOf": [
+        {
+          "maximum": 1,
+          "minimum": 0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Quality"
+    },
+    "seconds": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Seconds"
+    },
+    "window_left": {
+      "anyOf": [
+        {
+          "maximum": 1,
+          "minimum": 0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Window Left"
+    }
+  },
+  "required": [
+    "arm",
+    "ask",
+    "mode",
+    "end"
+  ],
+  "title": "EvalRun",
+  "type": "object"
+}

@@ -1,0 +1,15 @@
+{
+  "additionalProperties": false,
+  "description": "``deleted`` is false when there was no such measurement.",
+  "properties": {
+    "deleted": {
+      "title": "Deleted",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "deleted"
+  ],
+  "title": "EvalsDeleteResult",
+  "type": "object"
+}

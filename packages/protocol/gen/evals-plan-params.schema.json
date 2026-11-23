@@ -1,0 +1,22 @@
+{
+  "additionalProperties": false,
+  "description": "``evals.plan``. What a measurement would run and whether this machine has room for it.\n\nIt reads the memory and calls no model. ``models`` maps an arm's name to the model to plan it\nwith, instead of its own. With ``arms``, only those arms are planned; with none, every arm.",
+  "properties": {
+    "arms": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Arms",
+      "type": "array"
+    },
+    "models": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "title": "Models",
+      "type": "object"
+    }
+  },
+  "title": "EvalsPlanParams",
+  "type": "object"
+}

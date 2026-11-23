@@ -1,0 +1,29 @@
+{
+  "additionalProperties": false,
+  "description": "A model an arm may use instead of its own. ``size_gb`` is its size in memory, if known.",
+  "properties": {
+    "ref": {
+      "minLength": 1,
+      "title": "Ref",
+      "type": "string"
+    },
+    "size_gb": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Size Gb"
+    }
+  },
+  "required": [
+    "ref"
+  ],
+  "title": "EvalModelChoice",
+  "type": "object"
+}

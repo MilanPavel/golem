@@ -1,0 +1,38 @@
+{
+  "additionalProperties": false,
+  "description": "``eval.ended``. A measurement is no longer running. ``state`` is ``done`` or ``stopped``,\nand ``stop_reason`` says why in plain text when it stopped.",
+  "properties": {
+    "id": {
+      "minLength": 1,
+      "title": "Id",
+      "type": "string"
+    },
+    "state": {
+      "enum": [
+        "stopped",
+        "done"
+      ],
+      "title": "State",
+      "type": "string"
+    },
+    "stop_reason": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Stop Reason"
+    }
+  },
+  "required": [
+    "id",
+    "state"
+  ],
+  "title": "EvalEnded",
+  "type": "object"
+}

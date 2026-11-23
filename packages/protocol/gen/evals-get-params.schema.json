@@ -1,0 +1,16 @@
+{
+  "additionalProperties": false,
+  "description": "``evals.get``. One measurement with its runs and its proposal.",
+  "properties": {
+    "id": {
+      "minLength": 1,
+      "title": "Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id"
+  ],
+  "title": "EvalsGetParams",
+  "type": "object"
+}

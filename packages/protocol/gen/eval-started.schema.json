@@ -1,0 +1,60 @@
+{
+  "$defs": {
+    "EvalArmUsed": {
+      "additionalProperties": false,
+      "description": "An arm of a measurement and the model it ran with.",
+      "properties": {
+        "model": {
+          "minLength": 1,
+          "title": "Model",
+          "type": "string"
+        },
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "model"
+      ],
+      "title": "EvalArmUsed",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "``eval.started``. A measurement began, or went on after ``evals.resume``. ``total`` is\nthe runs it will play.",
+  "properties": {
+    "arms": {
+      "items": {
+        "$ref": "#/$defs/EvalArmUsed"
+      },
+      "title": "Arms",
+      "type": "array"
+    },
+    "id": {
+      "minLength": 1,
+      "title": "Id",
+      "type": "string"
+    },
+    "started_at": {
+      "minLength": 1,
+      "title": "Started At",
+      "type": "string"
+    },
+    "total": {
+      "minimum": 1,
+      "title": "Total",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "id",
+    "started_at",
+    "arms",
+    "total"
+  ],
+  "title": "EvalStarted",
+  "type": "object"
+}

@@ -1,0 +1,121 @@
+{
+  "$defs": {
+    "EvalProgress": {
+      "additionalProperties": false,
+      "description": "``eval.progress``. A run began, or its state changed. ``index`` counts from 1 of\n``total``. ``state`` is ``running`` while it plays and then how it ended. ``elapsed`` is\nthe seconds since the measurement began. ``memory_used_gb`` and ``memory_total_gb`` are the\nmachine's memory now, each null when it could not be read.",
+      "properties": {
+        "arm": {
+          "minLength": 1,
+          "title": "Arm",
+          "type": "string"
+        },
+        "ask": {
+          "minLength": 1,
+          "title": "Ask",
+          "type": "string"
+        },
+        "elapsed": {
+          "minimum": 0,
+          "title": "Elapsed",
+          "type": "number"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "index": {
+          "minimum": 1,
+          "title": "Index",
+          "type": "integer"
+        },
+        "memory_total_gb": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Memory Total Gb"
+        },
+        "memory_used_gb": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Memory Used Gb"
+        },
+        "mode": {
+          "enum": [
+            "on",
+            "off"
+          ],
+          "title": "Mode",
+          "type": "string"
+        },
+        "state": {
+          "enum": [
+            "running",
+            "completed",
+            "failed",
+            "cancelled",
+            "timeout"
+          ],
+          "title": "State",
+          "type": "string"
+        },
+        "total": {
+          "minimum": 1,
+          "title": "Total",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "index",
+        "total",
+        "arm",
+        "mode",
+        "ask",
+        "state",
+        "elapsed"
+      ],
+      "title": "EvalProgress",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Server → every connection: a run of a measurement began or ended. Not stored.",
+  "properties": {
+    "jsonrpc": {
+      "const": "2.0",
+      "default": "2.0",
+      "title": "Jsonrpc",
+      "type": "string"
+    },
+    "method": {
+      "const": "eval.progress",
+      "default": "eval.progress",
+      "title": "Method",
+      "type": "string"
+    },
+    "params": {
+      "$ref": "#/$defs/EvalProgress"
+    }
+  },
+  "required": [
+    "params"
+  ],
+  "title": "EvalProgressNotification",
+  "type": "object"
+}

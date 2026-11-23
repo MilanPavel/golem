@@ -1,0 +1,22 @@
+{
+  "additionalProperties": false,
+  "description": "An arm of a measurement and the model it ran with.",
+  "properties": {
+    "model": {
+      "minLength": 1,
+      "title": "Model",
+      "type": "string"
+    },
+    "name": {
+      "minLength": 1,
+      "title": "Name",
+      "type": "string"
+    }
+  },
+  "required": [
+    "name",
+    "model"
+  ],
+  "title": "EvalArmUsed",
+  "type": "object"
+}

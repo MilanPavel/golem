@@ -1,0 +1,21 @@
+{
+  "additionalProperties": false,
+  "description": "``evals.resume``. Play the runs a stopped measurement did not play. The same checks as\n``evals.start`` apply, and ``allow_tight`` is asked for again.",
+  "properties": {
+    "allow_tight": {
+      "default": false,
+      "title": "Allow Tight",
+      "type": "boolean"
+    },
+    "id": {
+      "minLength": 1,
+      "title": "Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id"
+  ],
+  "title": "EvalsResumeParams",
+  "type": "object"
+}

@@ -1,0 +1,230 @@
+{
+  "$defs": {
+    "AgentsDelegateNumber": {
+      "additionalProperties": false,
+      "description": "One number of ``[agents.delegate]``: ``value`` is the one in force, ``default`` the one\ngolem ships, and ``is_default`` is true when the two are equal.",
+      "properties": {
+        "default": {
+          "title": "Default",
+          "type": "number"
+        },
+        "is_default": {
+          "title": "Is Default",
+          "type": "boolean"
+        },
+        "value": {
+          "title": "Value",
+          "type": "number"
+        }
+      },
+      "required": [
+        "value",
+        "default",
+        "is_default"
+      ],
+      "title": "AgentsDelegateNumber",
+      "type": "object"
+    },
+    "AgentsDelegateValues": {
+      "additionalProperties": false,
+      "description": "The four numbers of ``[agents.delegate]`` that say when a helper is worth starting.\n\n``read_share``, ``fill_share`` and ``job_share`` are shares of the lead's window, and\n``price_ratio`` is how many times dearer the lead must be. Read-only here: a measurement\nchanges them (``evals.apply``), or the user edits ``config.toml``.",
+      "properties": {
+        "fill_share": {
+          "$ref": "#/$defs/AgentsDelegateNumber"
+        },
+        "job_share": {
+          "$ref": "#/$defs/AgentsDelegateNumber"
+        },
+        "price_ratio": {
+          "$ref": "#/$defs/AgentsDelegateNumber"
+        },
+        "read_share": {
+          "$ref": "#/$defs/AgentsDelegateNumber"
+        }
+      },
+      "required": [
+        "read_share",
+        "fill_share",
+        "job_share",
+        "price_ratio"
+      ],
+      "title": "AgentsDelegateValues",
+      "type": "object"
+    },
+    "AgentsKeepValues": {
+      "additionalProperties": false,
+      "description": "``[agents] keep_days`` and ``keep_problem_days`` as golem uses them. 0 is for ever.\n\n``max_calls``, ``working_seconds``, ``max_cost`` and ``max_tokens`` are the limits of\n``[agents]`` that every helper gets when its own table and file leave them open; ``None`` when\n``config.toml`` does not set one. ``agents.set_default_limits`` changes them.\n``use_helpers`` is ``[agents] use_helpers``; ``when_needed`` when ``config.toml`` does not\nset it and for a daemon that does not know it. ``delegate`` is ``[agents.delegate]``, read-only\n(``agents.keep`` does not accept it); an older daemon leaves it out.",
+      "properties": {
+        "delegate": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AgentsDelegateValues"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "keep_days": {
+          "minimum": 0,
+          "title": "Keep Days",
+          "type": "integer"
+        },
+        "keep_problem_days": {
+          "minimum": 0,
+          "title": "Keep Problem Days",
+          "type": "integer"
+        },
+        "max_calls": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Max Calls"
+        },
+        "max_cost": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Max Cost"
+        },
+        "max_tokens": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Max Tokens"
+        },
+        "use_helpers": {
+          "default": "when_needed",
+          "enum": [
+            "when_needed",
+            "ask",
+            "never"
+          ],
+          "title": "Use Helpers",
+          "type": "string"
+        },
+        "working_seconds": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Working Seconds"
+        }
+      },
+      "required": [
+        "keep_days",
+        "keep_problem_days"
+      ],
+      "title": "AgentsKeepValues",
+      "type": "object"
+    },
+    "ConfigError": {
+      "additionalProperties": false,
+      "description": "One problem in a config text. ``line`` and ``column`` count from 1, when known.\n\n``path`` is the setting, as ``mcp.github.headers.Authorization``.",
+      "properties": {
+        "column": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Column"
+        },
+        "line": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Line"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        },
+        "path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Path"
+        }
+      },
+      "required": [
+        "message"
+      ],
+      "title": "ConfigError",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "``ok`` is false when nothing could be written, with the reasons in ``errors``. ``values``\nis what is in force now, set when ``ok``.",
+  "properties": {
+    "errors": {
+      "items": {
+        "$ref": "#/$defs/ConfigError"
+      },
+      "title": "Errors",
+      "type": "array"
+    },
+    "ok": {
+      "title": "Ok",
+      "type": "boolean"
+    },
+    "values": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/AgentsKeepValues"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    }
+  },
+  "required": [
+    "ok"
+  ],
+  "title": "EvalsApplyResult",
+  "type": "object"
+}
