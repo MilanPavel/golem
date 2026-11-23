@@ -60,3 +60,16 @@ test("a hosted provider without a key shows the command to set it up in a termin
   await expect(setup).toContainText("This page never sees it.");
   await expect(setup.getByRole("button", { name: /copy/i })).toBeVisible();
 });
+
+test("a long model list scrolls on its own: the title and the provider list stay in view", async ({ page, rig }) => {
+  const many = Array.from({ length: 30 }, (_, index) => `qwen3:${index + 1}b`);
+  const stack = await startStack(rig, { ollama: { installed: many } });
+  await page.setViewportSize({ width: 1280, height: 700 });
+  await openModels(page, stack.gateway.url);
+  await page.getByRole("button", { name: /^Ollama, / }).click();
+  const last = page.getByRole("button", { name: /^Show .*qwen3:30b.* in the model menu/i });
+  await last.scrollIntoViewIfNeeded();
+  await expect(last).toBeInViewport();
+  await expect(page.getByRole("heading", { name: "Models", level: 2 })).toBeInViewport();
+  await expect(page.getByRole("button", { name: /^Ollama, / })).toBeInViewport();
+});
