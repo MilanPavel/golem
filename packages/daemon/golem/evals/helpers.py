@@ -19,9 +19,26 @@ Run it by hand:
 
     uv run python -m golem evals helpers                       # the plan: arms and asks, no model
     uv run python -m golem evals helpers --live                # all four arms, real models
+    uv run python -m golem evals helpers --live --allow-tight  # also run a local arm that is tight
     uv run python -m golem evals helpers --live --arm local-32k --ask sweep-handlers-24
     uv run python -m golem evals helpers --live --model local-32k=ollama/qwen3.5:9b \\
         --model budget-cloud=anthropic/claude-haiku-5-5 --project .
+
+A local arm is guarded, because a model that does not fit in memory froze a Mac (ticket 15.4.10).
+Before each local arm the harness adds up the model's size on disk (from Ollama), the KV cache of
+the arm's window for one slot and a fixed overhead, and compares that with this Mac's RAM
+(``golem.models.hardware.fit``) and with the memory free right now. An arm that is ``too big``, or
+whose need plus a 2 GB reserve is more than the free memory, is skipped with a line that gives the
+numbers. One that is
+``tight`` runs only with ``--allow-tight``. A size or a RAM figure that is not known skips the arm.
+A local arm runs one model (the helpers use the lead's own: ``model = "same"``) and one request at
+a time (``[ollama] parallel = 1``). The check counts one slot: an Ollama that was started with
+``OLLAMA_NUM_PARALLEL`` above 1 holds more, and the harness cannot see that. So between two asks
+the arm also stops when less than 1.5 GB is free. When Ollama stops answering during an arm, or
+memory runs low, the arm stops: the
+runs left (and the one that died) are ``not run``, shown in the table and left out of the
+averages, of the on/off pairs and of the proposal. The plan prints the memory check of each local
+arm and says "unknown" when Ollama is down.
 
 Without ``--live`` nothing reaches a network or a model. With ``--live`` each (arm, mode) starts
 a daemon in a throwaway golem home (never ``~/.golem``), so the daemon's own wiring decides the
@@ -41,6 +58,7 @@ import asyncio
 import json
 import math
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -48,7 +66,7 @@ import tempfile
 import time
 import tomllib
 import urllib.request
-from collections.abc import Callable, Iterable, Mapping, Sequence
+from collections.abc import Awaitable, Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from importlib import resources
 from pathlib import Path
@@ -63,6 +81,7 @@ from golem.graphs.chat import open_chat
 from golem.graphs.delegate_prompt import delegate_prompt, prices_of
 from golem.graphs.prompt import SystemPrompt
 from golem.models.discovery import ListedModel
+from golem.models.hardware import OVERHEAD_GB, Fit, fit, kv_gb, total_ram_gb
 from golem.models.router import PRESETS, ModelRouter
 from golem.models.tiers import Tier, blended
 from golem.models.window import ContextWindow
@@ -74,6 +93,15 @@ from golem.store.database import Database
 from golem.store.events import EventLog
 from golem.store.records import RunRecords, SessionRecords
 from golem.tools import default_registry
+
+NOT_RUN = "not run"
+"""The ``end`` of a run that did not happen: Ollama stopped answering, or memory ran low."""
+
+FREE_RESERVE_GB = 2.0
+"""Free memory an arm must leave over its need before it starts: room for what else runs."""
+
+FREE_FLOOR_GB = 1.5
+"""With less free memory than this between two asks, a local arm stops before the Mac swaps."""
 
 Mode = Literal["on", "off"]
 MODES: tuple[Mode, ...] = ("off", "on")
@@ -236,14 +264,12 @@ ARMS: tuple[Arm, ...] = (
         "local",
         32_768,
         "ollama/qwen3.5:9b",
-        others=(Other("ollama/llama3.2:3b", "local"),),
     ),
     Arm(
         "local-128k",
         "local",
         131_072,
         "ollama/qwen3.5:9b",
-        others=(Other("ollama/llama3.2:3b", "local"),),
     ),
     Arm(
         "budget-cloud",
@@ -268,7 +294,10 @@ ARMS: tuple[Arm, ...] = (
         ),
     ),
 )
-"""The four arms. The nominal prices (USD per million tokens) only feed scripted runs."""
+"""The four arms. The nominal prices (USD per million tokens) only feed scripted runs.
+
+A local arm lists no other model: its helpers run on the lead's own (one model in memory).
+"""
 
 
 def with_models(arms: Sequence[Arm], models: Mapping[str, str]) -> list[Arm]:
@@ -295,7 +324,7 @@ class Run:
     read_tokens: int
     jobs: int
     mode: Mode
-    end: str  # completed | failed | cancelled | timeout
+    end: str  # completed | failed | cancelled | timeout | not run
     quality: float
     seconds: float
     peak_share: float  # the most of the window one call of the lead used, 0..1
@@ -312,6 +341,11 @@ class Run:
     @property
     def ok(self) -> bool:
         return self.end == "completed"
+
+    @property
+    def ran(self) -> bool:
+        """False for a run that never happened (its arm's server died): it counts for nothing."""
+        return self.end != NOT_RUN
 
     @property
     def cost(self) -> float:
@@ -334,6 +368,32 @@ class Run:
     @property
     def helper_price(self) -> float | None:
         return _price(self.helper_cost, self.helper_tokens)
+
+
+def not_run(arm: Arm, mode: Mode, ask: Ask) -> Run:
+    """The placeholder for a run that did not happen. Zeros, and left out of every figure."""
+    return Run(
+        arm=arm.name,
+        tier=arm.tier,
+        window=arm.window,
+        ask=ask.name,
+        size=ask.size,
+        reason=ask.reason,
+        read_tokens=ask.read_tokens,
+        jobs=ask.jobs,
+        mode=mode,
+        end=NOT_RUN,
+        quality=0.0,
+        seconds=0.0,
+        peak_share=0.0,
+        window_left=arm.window,
+        lead_cost=0.0,
+        helper_cost=0.0,
+        lead_tokens=0,
+        helper_tokens=0,
+        delegate_calls=0,
+        helpers_started=0,
+    )
 
 
 def _price(cost: float, tokens: int) -> float | None:
@@ -580,14 +640,148 @@ class _FixedRouter(ModelRouter):
 OLLAMA_TAGS = "http://127.0.0.1:11434/api/tags"
 
 
-def ollama_models() -> set[str] | None:
-    """The names of the models Ollama has, or None when it is not reachable."""
+def ollama_sizes() -> dict[str, int] | None:
+    """The models Ollama has, name to size on disk in bytes, or None when it is not reachable."""
     try:
         with urllib.request.urlopen(OLLAMA_TAGS, timeout=3) as reply:
             body = json.load(reply)
     except (OSError, ValueError):
         return None
-    return {str(m.get("name")) for m in body.get("models", [])}
+    return {str(m.get("name")): int(m.get("size") or 0) for m in body.get("models", [])}
+
+
+def parse_vm_stat(text: str) -> float | None:
+    """GiB of memory that is free now, from the output of macOS ``vm_stat``. None if unreadable.
+
+    It adds the free, inactive and speculative pages: what the system gives back at once.
+    """
+    head = re.search(r"page size of (\d+) bytes", text)
+    if head is None:
+        return None
+    pages = 0
+    seen = 0
+    for key in ("free", "inactive", "speculative"):
+        found = re.search(rf"^Pages {key}:\s+(\d+)", text, re.MULTILINE)
+        if found is not None:
+            pages += int(found.group(1))
+            seen += 1
+    return pages * int(head.group(1)) / 2**30 if seen else None
+
+
+def free_memory_gb() -> float | None:
+    """GiB of memory free right now (macOS ``vm_stat``), or None when it cannot be read."""
+    try:
+        out = subprocess.run(["vm_stat"], capture_output=True, text=True, timeout=3, check=True)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    return parse_vm_stat(out.stdout)
+
+
+@dataclass(frozen=True, slots=True)
+class Machine:
+    """What this Mac and its Ollama say: RAM and free memory in GiB, and the models' sizes in bytes.
+
+    ``sizes`` is None when Ollama is not reachable. A figure that is not known is None.
+    """
+
+    ram_gb: float | None = None
+    free_gb: float | None = None
+    sizes: Mapping[str, int] | None = None
+
+
+def read_machine() -> Machine:
+    """The real machine, read now: three probes, none of which loads a model."""
+    return Machine(total_ram_gb(), free_memory_gb(), ollama_sizes())
+
+
+def model_size_gb(sizes: Mapping[str, int] | None, name: str) -> float | None:
+    """The size on disk of the Ollama model ``name`` in GiB, or None when it is not known."""
+    if sizes is None:
+        return None
+    size = sizes.get(name) or sizes.get(f"{name}:latest")
+    return size / 2**30 if size else None
+
+
+@dataclass(frozen=True, slots=True)
+class MemoryCheck:
+    """Whether a local arm's model fits: what it needs against RAM and the free memory."""
+
+    model_gb: float | None
+    window: int
+    ram_gb: float | None
+    free_gb: float | None
+
+    @property
+    def cache_gb(self) -> float:
+        """The KV cache of the arm's window, for one slot."""
+        return kv_gb(self.window, slots=1)
+
+    @property
+    def need_gb(self) -> float | None:
+        if self.model_gb is None:
+            return None
+        return self.model_gb + self.cache_gb + OVERHEAD_GB
+
+    @property
+    def fit(self) -> Fit | None:
+        """The rule of :mod:`golem.models.hardware`, or None when the size or the RAM is unknown."""
+        if self.model_gb is None or self.ram_gb is None:
+            return None
+        return fit(self.model_gb, self.ram_gb, self.window, slots=1)
+
+    @property
+    def short(self) -> bool:
+        """Less memory is free now than the need plus the reserve (False when either is unknown)."""
+        need = self.need_gb
+        if need is None or self.free_gb is None:
+            return False
+        return self.free_gb < need + FREE_RESERVE_GB
+
+    @property
+    def verdict(self) -> str:
+        if self.fit is None:
+            return "unknown"
+        return "too big" if self.fit == "too_big" else self.fit
+
+    def numbers(self) -> str:
+        """The figures in GB, for a line of the report."""
+
+        def gb(value: float | None) -> str:
+            return "unknown" if value is None else f"{value:.1f} GB"
+
+        return (
+            f"needs {gb(self.need_gb)} (model {gb(self.model_gb)} + cache {self.cache_gb:.1f} GB "
+            f"at {self.window:,} tokens, one slot + overhead {OVERHEAD_GB:.1f} GB), "
+            f"RAM {gb(self.ram_gb)}, free now {gb(self.free_gb)}"
+        )
+
+    def skip(self, allow_tight: bool = False) -> str | None:
+        """Why the arm must not run (a line with the numbers), or None when it may.
+
+        Skipped: the size or the RAM unknown, ``too big``, free memory known and below the need,
+        and ``tight`` unless ``allow_tight``.
+        """
+        fits = self.fit
+        if fits is None:
+            return f"memory not known, so not run to be safe: {self.numbers()}"
+        if fits == "too_big":
+            return f"too big for this Mac: {self.numbers()}"
+        if self.short:
+            return (
+                f"not enough free memory (the need plus a {FREE_RESERVE_GB:.1f} GB reserve): "
+                f"{self.numbers()}"
+            )
+        if fits == "tight" and not allow_tight:
+            return f"tight (run it with --allow-tight): {self.numbers()}"
+        return None
+
+
+def memory_check(arm: Arm, machine: Machine) -> MemoryCheck:
+    """The memory check of a local arm on ``machine``. Pure."""
+    name = arm.lead.partition("/")[2]
+    return MemoryCheck(
+        model_size_gb(machine.sizes, name), arm.window, machine.ram_gb, machine.free_gb
+    )
 
 
 def provider_key_found(provider: str) -> bool:
@@ -636,29 +830,103 @@ class _Client:
         return cast("dict[str, Any]", reply["result"])
 
 
+def ollama_alive() -> bool:
+    """Whether Ollama answers now. The probe after a failed run."""
+    return ollama_sizes() is not None
+
+
+def memory_low() -> bool:
+    """Whether less than ``FREE_FLOOR_GB`` is free now. False when it cannot be read."""
+    free = free_memory_gb()
+    return free is not None and free < FREE_FLOOR_GB
+
+
+LOCAL_HELPERS = ("explorer", "worker", "reviewer", "advisor")
+"""The bundled helper types. In a local arm each is told ``model = "same"``: the lead's model."""
+
+
+def arm_config(arm: Arm, mode: Mode) -> str:
+    """The ``config.toml`` of the throwaway golem home of one arm and mode.
+
+    A local arm sets its window, one Ollama slot (``[ollama] parallel = 1``) and, for every
+    bundled helper type, ``model = "same"``, so no second model is ever loaded.
+    """
+    config = f'default_model = "t"\n[models.t]\nmodel = "{arm.lead}"\n'
+    if arm.local:
+        config += f"ctx = {arm.window}\n"
+    config += f'[agents]\nuse_helpers = "{SETTING[mode]}"\n'
+    if arm.local:
+        config += "[ollama]\nparallel = 1\n"
+        config += "".join(f'[agents.{name}]\nmodel = "same"\n' for name in LOCAL_HELPERS)
+    return config + '[permissions]\nmode = "autopilot"\n'
+
+
+async def play_until_dead(
+    arm: Arm,
+    mode: Mode,
+    asks: Sequence[Ask],
+    one: Callable[[Ask], Awaitable[Run]],
+    alive: Callable[[], bool] | None = None,
+    low: Callable[[], bool] | None = None,
+) -> list[Run]:
+    """Play ``asks`` with ``one``. A local arm ends when its server dies or memory runs low.
+
+    After a run that did not complete, ``alive`` is asked (a local arm only). When it says no,
+    that run and every one after it are ``not run``: the run died with the server, so its failure
+    says nothing about helpers. Before each ask of a local arm ``low`` is asked. When it says
+    yes, that ask and every one after it are ``not run``, so the arm stops before the Mac swaps.
+    """
+    runs: list[Run] = []
+    dead = False
+    for ask in asks:
+        dead = dead or (arm.local and low is not None and low())
+        if dead:
+            runs.append(not_run(arm, mode, ask))
+            continue
+        run = await one(ask)
+        if not run.ok and arm.local and alive is not None and not alive():
+            dead = True
+            run = not_run(arm, mode, ask)
+        runs.append(run)
+    return runs
+
+
 class LiveDriver:
     """Real models, through a real daemon in a throwaway golem home.
 
-    A local arm needs Ollama up with the lead's model pulled. A cloud arm needs a key for the
+    A local arm needs Ollama up with the lead's model pulled, and the model must fit in memory
+    (:class:`MemoryCheck`; ``allow_tight`` lets a tight one run). A cloud arm needs a key for the
     lead's provider. The daemon applies ``use_helpers`` and picks the helper's model from the
-    models that are ready on this machine, so a cloud arm's helper is whatever is ready.
+    models that are ready on this machine, so a cloud arm's helper is whatever is ready. A local
+    arm's helpers run on the lead's own model. ``machine`` reads RAM, free memory and Ollama's
+    model sizes, and ``alive`` says whether Ollama still answers: both can be injected.
     """
 
     def __init__(
-        self, *, timeout: float = 600.0, tags: Callable[[], set[str] | None] | None = None
+        self,
+        *,
+        timeout: float = 600.0,
+        allow_tight: bool = False,
+        machine: Callable[[], Machine] | None = None,
+        alive: Callable[[], bool] | None = None,
+        low: Callable[[], bool] | None = None,
     ):
+        self._low = low or memory_low
         self._timeout = timeout
-        self._tags = tags or ollama_models
+        self._allow_tight = allow_tight
+        self._machine = machine or read_machine
+        self._alive = alive or ollama_alive
 
     def unavailable(self, arm: Arm) -> str | None:
         provider, _, name = arm.lead.partition("/")
         if provider == "ollama":
-            have = self._tags()
+            machine = self._machine()
+            have = machine.sizes
             if have is None:
                 return f"Ollama is not reachable at {OLLAMA_TAGS}"
             if name not in have and f"{name}:latest" not in have:
                 return f"Ollama does not have {name} (ollama pull {name})"
-            return None
+            return memory_check(arm, machine).skip(self._allow_tight)
         if not provider_key_found(provider):
             return f"no key for {provider} in the environment or the Keychain"
         return None
@@ -672,16 +940,11 @@ class LiveDriver:
         home, user = root / "g", root / "h"
         for folder in (home, user):
             folder.mkdir(parents=True)
-        config = f'default_model = "t"\n[models.t]\nmodel = "{arm.lead}"\n'
-        if arm.local:
-            config += f"ctx = {arm.window}\n"
-        config += f'[agents]\nuse_helpers = "{SETTING[mode]}"\n[permissions]\nmode = "autopilot"\n'
-        (home / "config.toml").write_text(config, "utf-8")
+        (home / "config.toml").write_text(arm_config(arm, mode), "utf-8")
         env = {**os.environ, "GOLEM_HOME": str(home), "HOME": str(user)}
         daemon = subprocess.Popen(
             [sys.executable, "-m", "golem.cli", "serve"], env=env, stderr=subprocess.DEVNULL
         )
-        runs: list[Run] = []
         try:
             socket = home / "run" / "golem.sock"
             for _ in range(150):
@@ -692,9 +955,12 @@ class LiveDriver:
             client = _Client(reader, writer)
             hello = {"protocol_major": PROTOCOL_MAJOR, "protocol_minor": 0, "client": "tui"}
             await client.call("hello", hello)
-            for ask in asks:
+
+            async def one(ask: Ask) -> Run:
                 folder = materialise(ask, scratch / mode / ask.name, project)
-                runs.append(await self._one(client, arm, mode, ask, folder))
+                return await self._one(client, arm, mode, ask, folder)
+
+            runs = await play_until_dead(arm, mode, asks, one, self._alive, self._low)
         finally:
             daemon.terminate()
             try:
@@ -750,7 +1016,10 @@ async def run_eval(
     project: Path | None = None,
     scratch: Path | None = None,
 ) -> list[ArmResult]:
-    """Play ``asks`` in each arm, helpers off then on. An arm the driver cannot run is skipped."""
+    """Play ``asks`` in each arm, helpers off then on. An arm the driver cannot run is skipped.
+
+    An arm with a run that did not happen (its server died) plays no more runs.
+    """
     keep = scratch is not None
     base = scratch or Path(tempfile.mkdtemp(prefix="golem-helpers-eval-"))
     results: list[ArmResult] = []
@@ -762,6 +1031,9 @@ async def run_eval(
                 continue
             runs: list[Run] = []
             for mode in MODES:
+                if any(not r.ran for r in runs):  # the arm's server died: the rest does not run
+                    runs += [not_run(arm, mode, ask) for ask in asks]
+                    continue
                 folder = base / arm.name / mode
                 runs += await driver.play(arm, mode, asks, project or Path.cwd(), folder)
             results.append(ArmResult(arm, runs=tuple(runs)))
@@ -822,8 +1094,14 @@ def arm_table(result: ArmResult) -> str:
             )
         )
     lines = [title, *_table(rows)]
+    unrun = sum(1 for r in result.runs if not r.ran)
+    if unrun:
+        lines.append(
+            f"{unrun} runs not run (Ollama stopped answering, or memory ran low), "
+            "left out of the figures below"
+        )
     for mode in MODES:
-        runs = [r for r in result.runs if r.mode == mode]
+        runs = [r for r in result.runs if r.mode == mode and r.ran]
         if not runs:
             continue
         lines.append(
@@ -1140,12 +1418,19 @@ def full_report(results: Sequence[ArmResult]) -> str:
 # --- the command ----------------------------------------------------------------------------------
 
 
-def plan(arms: Sequence[Arm], asks: Sequence[Ask]) -> str:
-    """What ``--live`` would run, with no model called."""
+def plan(arms: Sequence[Arm], asks: Sequence[Ask], machine: Machine | None = None) -> str:
+    """What ``--live`` would run, with no model called.
+
+    For each local arm it says the memory needed, the RAM, the free memory and ``fits`` /
+    ``tight`` / ``too big`` (``unknown`` when Ollama or the figure is not there).
+    """
     lines = ["helper eval plan (nothing ran; pass --live to run it against real models)", ""]
     lines.append("arms (each with helpers on = when_needed and off = never):")
     for arm in arms:
         lines.append(f"  {arm.name}: {arm.lead}, window {arm.window:,}, {arm.tier}")
+        if arm.local:
+            check = memory_check(arm, machine or Machine())
+            lines.append(f"    memory: {check.verdict}; {check.numbers()}")
     lines += ["", "asks:"]
     for ask in asks:
         extra = " (about --project)" if ask.needs_project else ""
@@ -1164,7 +1449,9 @@ def command(
     models: Sequence[str] = (),
     project: Path | None = None,
     timeout: float = 600.0,
+    allow_tight: bool = False,
     driver: Driver | None = None,
+    machine: Callable[[], Machine] = read_machine,
     out: Callable[[str], None] = print,
 ) -> int:
     """``golem evals helpers``. 0 when it ran or planned; 1 for an unknown arm, ask or model."""
@@ -1194,9 +1481,9 @@ def command(
             return 1
         asks = [a for a in asks if a.name in ask_names]
     if not live and driver is None:
-        out(plan(arms, asks))
+        out(plan(arms, asks, machine() if any(a.local for a in arms) else None))
         return 0
-    chosen: Driver = driver or LiveDriver(timeout=timeout)
+    chosen: Driver = driver or LiveDriver(timeout=timeout, allow_tight=allow_tight)
     results = asyncio.run(run_eval(chosen, asks, arms, project=(project or Path.cwd()).resolve()))
     out(full_report(results))
     return 0
@@ -1209,18 +1496,25 @@ __all__ = [
     "Ask",
     "Driver",
     "LiveDriver",
+    "Machine",
+    "MemoryCheck",
     "Pair",
     "Proposal",
     "Run",
     "ScriptedDriver",
+    "arm_config",
     "arm_table",
     "command",
     "full_report",
     "load_asks",
     "measure",
+    "memory_check",
+    "not_run",
     "open_question",
     "pairs_of",
+    "parse_vm_stat",
     "plan",
+    "play_until_dead",
     "propose",
     "run_eval",
     "score",
