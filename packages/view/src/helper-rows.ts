@@ -64,15 +64,13 @@ export type HelperRows<T> = {
   helpers: Map<string, T[]>;
   /**
    * The helpers that are rows under their lead, in the order of the call. Only the lead that is open has
-   * any, or every lead with `showHelpers`. A trimmed helper is left out. A lead in here shows no squares.
+   * any. A trimmed helper is left out. A lead in here shows no squares.
    */
   nested: Map<string, T[]>;
 };
 
 /** Options of {@link groupHelpers}. */
 export type GroupHelpersOptions = {
-  /** The debug switch: every lead shows its helpers as rows. */
-  showHelpers?: boolean;
   /** The chat in view: a lead, or one of its helpers. The lead it names has its helpers as rows. */
   openId?: string | null;
 };
@@ -95,7 +93,7 @@ function byCall<T extends HelperSession>(list: readonly T[]): T[] {
 
 /**
  * Take the helpers out of the rows. Each lead gets squares for its helpers that are not done, and the
- * lead that is open (see `openId`), or every lead with `showHelpers`, gets them as nested rows. A helper
+ * lead that is open (see `openId`) gets them as nested rows. A helper
  * is never a row on its own, and not when its lead is not in the list.
  */
 export function groupHelpers<T extends HelperSession>(sessions: readonly T[], options: GroupHelpersOptions = {}): HelperRows<T> {
@@ -129,7 +127,7 @@ export function groupHelpers<T extends HelperSession>(sessions: readonly T[], op
   }
   const nested = new Map<string, T[]>();
   for (const [lead, list] of all) {
-    if (options.showHelpers === true || lead === openLead) nested.set(lead, byCall(list));
+    if (lead === openLead) nested.set(lead, byCall(list));
   }
   return { rows, squares, helpers, nested };
 }

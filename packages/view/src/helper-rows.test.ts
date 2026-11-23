@@ -47,16 +47,6 @@ test("an older daemon, with no parent_session_id, keeps every row", () => {
   assert.equal(squares.size, 0);
 });
 
-test("show helpers nests the helpers of every lead and keeps the squares", () => {
-  const other = s("other", "idle");
-  const list = [LEAD, s("h1", "running", { parent_session_id: "lead" }), other, s("o1", "idle", { parent_session_id: "other" })];
-  const { rows, squares, nested } = groupHelpers(list, { showHelpers: true });
-  assert.deepEqual(rows.map((r) => r.session_id), ["lead", "other"]);
-  assert.deepEqual(squares.get("lead"), ["working"]);
-  assert.deepEqual(nested.get("lead")?.map((r) => r.session_id), ["h1"]);
-  assert.deepEqual(nested.get("other")?.map((r) => r.session_id), ["o1"]);
-});
-
 const TWO = [
   LEAD,
   s("h2", "idle", { parent_session_id: "lead", created_at: "2026-11-21T10:05:00Z" }),

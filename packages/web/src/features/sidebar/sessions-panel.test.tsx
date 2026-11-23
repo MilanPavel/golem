@@ -4,7 +4,6 @@ import axe from "axe-core";
 import { expect, test, vi } from "vitest";
 import type { SessionSummary } from "../../store/session-list.ts";
 import { SessionsPanel } from "./sessions-panel.tsx";
-import { SHOW_HELPERS_KEY, showHelpersStore } from "./show-helpers.ts";
 
 const NOW = new Date(2026, 10, 17, 12, 0).getTime();
 const at = (days: number, hour = 11) => new Date(2026, 10, 17 - days, hour, 0).toISOString();
@@ -110,8 +109,7 @@ test("the time is on the folder line and stays visible on hover and focus; the b
   expect(screen.getByText("Fix the socket").parentElement?.className).toContain("pr-6");
   expect(button.className).toContain("group-hover:opacity-100");
   await user.hover(row);
-  // The filter, the list options, the row's link, then its button.
-  await user.tab();
+  // The filter, the row's link, then its button.
   await user.tab();
   await user.tab();
   await user.tab();
@@ -304,22 +302,9 @@ test("an older daemon, with no parent_session_id, shows the list as before", () 
   expect(container.querySelector("[data-testid=helper-squares]")).toBeNull();
 });
 
-test("Show helpers is off by default, nests the helpers of every lead, and is kept", async () => {
-  const user = userEvent.setup();
-  localStorage.clear();
-  showHelpersStore.set(false);
+test("only the lead in view nests its helpers, and there is no list options menu", () => {
   const other = session("o", "Other lead", "/Users/you/repos/golem", at(0, 9));
   const { container } = setup([LEAD, helper("h1", "lead", "running"), other, helper("o1", "o", "idle")], undefined, "a");
   expect(helperRows(container)).toHaveLength(0);
-  await user.click(screen.getByRole("button", { name: "List options" }));
-  const item = screen.getByRole("menuitemcheckbox", { name: "Show helpers" });
-  expect(item.getAttribute("aria-checked")).toBe("false");
-  await user.click(item);
-  expect(screen.getAllByRole("link")).toHaveLength(4);
-  expect(helperRows(container).map((row) => row.getAttribute("data-helper-row"))).toEqual(["working", "done"]);
-  expect(localStorage.getItem(SHOW_HELPERS_KEY)).toBe("1");
-  await user.type(screen.getByRole("textbox", { name: "Filter sessions" }), "explorer · o1");
-  expect(screen.getAllByRole("link")).toHaveLength(2);
-  showHelpersStore.set(false);
-  localStorage.clear();
+  expect(screen.queryByRole("button", { name: "List options" })).toBeNull();
 });
