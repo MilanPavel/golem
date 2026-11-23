@@ -150,6 +150,30 @@ test("larger: none when no ready model has a larger window, and a free one says 
   assert.equal(row(contextActions(input({ models: [OWN, dear, CHEAP] })), "larger")?.consequence.startsWith("deepseek-chat"), true);
 });
 
+test("larger: a smaller local model with a bigger window is not offered for a larger local model", () => {
+  const own = { ...OWN, ref: "ollama/qwen3.6:27b", size_gb: 17 };
+  const small = listed("ollama/llama3.2:3b", { tier: "local", size_gb: 2, ctx: 131072, price: { input: 0, output: 0 } });
+  const unknown = listed("ollama/mystery", { tier: "local", ctx: 131072, price: { input: 0, output: 0 } });
+  const session = { profile: null, provider: "ollama", name: "qwen3.6:27b" };
+  assert.equal(row(contextActions(input({ session, models: [own, small, unknown] })), "larger"), undefined);
+});
+
+test("larger: a hosted budget model is offered when no local model is a step up", () => {
+  const own = { ...OWN, ref: "ollama/qwen3.6:27b", size_gb: 17 };
+  const small = listed("ollama/llama3.2:3b", { tier: "local", size_gb: 2, ctx: 131072, price: { input: 0, output: 0 } });
+  const session = { profile: null, provider: "ollama", name: "qwen3.6:27b" };
+  const rows = contextActions(input({ session, models: [own, small, CHEAP] }));
+  assert.equal(row(rows, "larger")?.consequence.startsWith("deepseek-chat"), true);
+});
+
+test("larger: a larger local model is preferred over a hosted one", () => {
+  const own = { ...OWN, ref: "ollama/qwen3.6:27b", size_gb: 17 };
+  const big = listed("ollama/big", { tier: "local", size_gb: 40, ctx: 65536, price: { input: 0, output: 0 } });
+  const session = { profile: null, provider: "ollama", name: "qwen3.6:27b" };
+  const rows = contextActions(input({ session, models: [own, CHEAP, big] }));
+  assert.equal(row(rows, "larger")?.consequence, "big · 64K · free");
+});
+
 test("larger: a big prompt costs more a turn, and auto already steps up by itself", () => {
   const dear = listed("openrouter/dear", { tier: "frontier", ctx: 200000, price: { input: 5, output: 20 } });
   const rows = contextActions(input({ models: [OWN, dear], used: 30000 }));

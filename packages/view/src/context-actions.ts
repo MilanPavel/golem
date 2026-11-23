@@ -169,14 +169,32 @@ function growAction(input: ContextActionsInput): ContextAction {
 
 const price = (model: ListedModel): number => model.price?.input ?? 0;
 
+const TIER_RANK: Record<ListedModel["tier"], number> = { local: 0, budget: 1, frontier: 2 };
+
+/** Whether a model is at least as strong as the current one: the same tier or above, and not smaller or cheaper within it. */
+function atLeastAsStrong(model: ListedModel, own: ListedModel | undefined): boolean {
+  if (own === undefined) return true;
+  if (TIER_RANK[model.tier] !== TIER_RANK[own.tier]) return TIER_RANK[model.tier] > TIER_RANK[own.tier];
+  if (own.tier !== "local") return price(model) >= price(own);
+  if (own.size_gb == null) return true;
+  return model.size_gb != null && model.size_gb >= own.size_gb;
+}
+
 function largerAction(input: ContextActionsInput): ContextAction | null {
   const base = { id: "larger" as const, key: "m" as const, label: "Continue on a larger model", short: "larger model" };
   if (input.models === null) return null;
   const own = listedFor(input);
   const window = input.window ?? 0;
+  // A step up: a bigger window and no weaker than now. The closest tier first, then the cheapest, then the biggest window.
   const bigger = input.models
-    .filter((model) => model.status === "ready" && model.tools !== false && (model.ctx ?? 0) > window && model !== own)
-    .sort((a, b) => price(a) - price(b) || (b.ctx ?? 0) - (a.ctx ?? 0) || a.ref.localeCompare(b.ref));
+    .filter(
+      (model) =>
+        model.status === "ready" && model.tools !== false && (model.ctx ?? 0) > window && model !== own && atLeastAsStrong(model, own),
+    )
+    .sort(
+      (a, b) =>
+        TIER_RANK[a.tier] - TIER_RANK[b.tier] || price(a) - price(b) || (b.ctx ?? 0) - (a.ctx ?? 0) || a.ref.localeCompare(b.ref),
+    );
   const pick = bigger[0];
   if (pick === undefined) return null;
   const paid = pick.tier !== "local" && price(pick) > 0;
@@ -194,7 +212,7 @@ function largerAction(input: ContextActionsInput): ContextAction | null {
 
 /**
  * The rows for a context: clear, summarise, grow (a local model only), and a larger model (when a ready
- * one has a bigger window). A row that cannot run says why. Sizes are estimates, so they start with `≈`.
+ * one has a bigger window and is no weaker than the current model). A row that cannot run says why. Sizes are estimates, so they start with `≈`.
  */
 export function contextActions(input: ContextActionsInput): ContextAction[] {
   const local = input.session.provider === "ollama";
