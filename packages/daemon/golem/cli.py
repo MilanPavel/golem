@@ -111,6 +111,11 @@ def _parser() -> argparse.ArgumentParser:
     helpers.add_argument(
         "--model", action="append", default=[], metavar="ARM=REF", help="the lead of an arm"
     )
+    helpers.add_argument(
+        "--allow-tight",
+        action="store_true",
+        help="also run a local arm whose model is tight in memory (too big is never run)",
+    )
     helpers.add_argument("--project", type=Path, help="the repo the repo-* asks are about")
     helpers.add_argument("--timeout", type=float, default=600, help="seconds a run may take")
     helpers.set_defaults(func=_evals_helpers)
@@ -166,6 +171,7 @@ def _evals_helpers(args: argparse.Namespace) -> int:
         models=cast("list[str]", args.model),
         project=cast("Path | None", args.project),
         timeout=cast(float, args.timeout),
+        allow_tight=cast(bool, args.allow_tight),
     )
 
 

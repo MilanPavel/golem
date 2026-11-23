@@ -3,11 +3,17 @@
 The real chat graph, tools, ``delegate`` and session manager run. Only the model is scripted, so
 no network or model is touched. A local-only arm and a cloud-only arm each have a test; the
 threshold proposal is checked on constructed runs.
+
+The guard of ticket 15.4.10 is checked with injected figures (RAM, free memory, Ollama's model
+sizes, whether Ollama answers): a model too big or without free memory is skipped, a tight one
+needs ``--allow-tight``, a local arm's config names one model and one slot, and a dead server
+ends its arm with runs that are ``not run``, left out of the averages and the proposal.
 """
 
 from __future__ import annotations
 
 import sys
+import tomllib
 from dataclasses import replace
 from pathlib import Path
 from typing import Any
@@ -22,16 +28,23 @@ from golem.evals.helpers import (
     ArmResult,
     Ask,
     LiveDriver,
+    Machine,
     Run,
     ScriptedDriver,
+    arm_config,
     arm_table,
     command,
     full_report,
     load_asks,
     materialise,
     measure,
+    memory_check,
+    not_run,
     open_question,
     pairs_of,
+    parse_vm_stat,
+    plan,
+    play_until_dead,
     propose,
     run_eval,
     score,
@@ -420,7 +433,7 @@ def test_measure_reads_the_events_of_a_run() -> None:
 
 def test_without_live_the_command_prints_the_plan_and_runs_no_model(capsys: Any) -> None:
     lines: list[str] = []
-    assert command(live=False, out=lines.append) == 0
+    assert command(live=False, machine=Machine, out=lines.append) == 0
     assert "nothing ran" in lines[0] and "80 runs" in lines[0]
     assert command(live=False, arm_names=["nope"], out=lines.append) == 1
     assert command(live=False, ask_names=["nope"], out=lines.append) == 1
@@ -443,10 +456,209 @@ def test_a_live_arm_without_its_model_is_skipped_with_a_line(
         return False
 
     monkeypatch.setattr(helpers, "provider_key_found", no_key)
-    down = LiveDriver(tags=lambda: None)
+    down = LiveDriver(machine=lambda: Machine(ram_gb=64))
     assert "not reachable" in (down.unavailable(ARMS[0]) or "")
-    empty = LiveDriver(tags=lambda: {"llama3.2:3b"})
+    empty = LiveDriver(machine=lambda: _machine(sizes={"llama3.2:3b": 2 * GIB}))
     assert "does not have qwen3.5:9b" in (empty.unavailable(ARMS[1]) or "")
     assert "no key for anthropic" in (empty.unavailable(ARMS[2]) or "")
-    ready = LiveDriver(tags=lambda: {"qwen3.5:9b"})
+    ready = LiveDriver(machine=lambda: _machine())
     assert ready.unavailable(ARMS[0]) is None
+
+
+# --- the guard of a local arm (ticket 15.4.10) ----------------------------------------------------
+
+GIB = 2**30
+LOCAL = ARMS[0]  # local-32k: window 32,768 -> cache 1.92 GB for one slot, overhead 1.0 GB
+
+
+def _machine(
+    model_gb: float = 6.0,
+    ram_gb: float | None = 36.0,
+    free_gb: float | None = 20.0,
+    sizes: dict[str, int] | None = None,
+) -> Machine:
+    return Machine(
+        ram_gb=ram_gb, free_gb=free_gb, sizes=sizes or {"qwen3.5:9b": int(model_gb * GIB)}
+    )
+
+
+def test_a_model_that_fits_runs_and_the_need_adds_cache_and_overhead() -> None:
+    check = memory_check(LOCAL, _machine(6.0))
+    assert check.need_gb == pytest.approx(6.0 + 1.92 + 1.0)
+    assert (check.verdict, check.skip()) == ("fits", None)
+
+
+def test_a_model_too_big_for_the_ram_is_skipped_with_the_numbers() -> None:
+    check = memory_check(LOCAL, _machine(model_gb=30.0, free_gb=40.0))
+    assert check.verdict == "too big"
+    line = check.skip(allow_tight=True) or ""  # the flag never lets a too big arm run
+    assert line.startswith("too big") and "needs 32.9 GB" in line and "RAM 36.0 GB" in line
+
+
+def test_too_little_free_memory_skips_an_arm_that_fits() -> None:
+    check = memory_check(LOCAL, _machine(6.0, free_gb=4.0))
+    assert check.verdict == "fits"
+    line = check.skip(allow_tight=True) or ""
+    assert line.startswith("not enough free memory") and "free now 4.0 GB" in line
+
+
+def test_free_memory_must_cover_the_need_and_a_reserve() -> None:
+    need = 6.0 + 1.92 + 1.0
+    assert memory_check(LOCAL, _machine(6.0, free_gb=need + 1.0)).skip() is not None
+    assert memory_check(LOCAL, _machine(6.0, free_gb=need + 2.5)).skip() is None
+
+
+def test_an_unknown_free_memory_does_not_skip_an_arm_that_fits() -> None:
+    assert memory_check(LOCAL, _machine(6.0, free_gb=None)).skip() is None
+
+
+def test_a_tight_model_runs_only_with_allow_tight() -> None:
+    check = memory_check(LOCAL, _machine(model_gb=20.0, free_gb=30.0))  # need 22.9 of 36
+    assert check.verdict == "tight"
+    assert "--allow-tight" in (check.skip() or "")
+    assert check.skip(allow_tight=True) is None
+
+
+def test_an_unknown_size_or_ram_skips_the_arm() -> None:
+    no_size = memory_check(LOCAL, _machine(sizes={"qwen3.5:9b": 0}))
+    assert no_size.verdict == "unknown" and "not known" in (no_size.skip(True) or "")
+    no_ram = memory_check(LOCAL, _machine(ram_gb=None))
+    assert no_ram.skip(True) is not None
+
+
+def test_the_live_driver_applies_the_memory_rules_to_a_local_arm() -> None:
+    big = _machine(model_gb=30.0, free_gb=40.0)
+    assert "too big" in (LiveDriver(machine=lambda: big).unavailable(LOCAL) or "")
+    tight = _machine(model_gb=20.0, free_gb=30.0)
+    assert "--allow-tight" in (LiveDriver(machine=lambda: tight).unavailable(LOCAL) or "")
+    assert LiveDriver(machine=lambda: tight, allow_tight=True).unavailable(LOCAL) is None
+
+
+def test_the_vm_stat_pages_free_inactive_and_speculative_are_added() -> None:
+    text = (
+        "Mach Virtual Memory Statistics: (page size of 16384 bytes)\n"
+        "Pages free:                               65536.\n"
+        "Pages active:                            999999.\n"
+        "Pages inactive:                           65536.\n"
+        "Pages speculative:                        32768.\n"
+    )
+    assert parse_vm_stat(text) == pytest.approx(2.5)
+    assert parse_vm_stat("nothing") is None
+
+
+def test_a_local_arm_has_no_other_local_model_listed() -> None:
+    assert all(not arm.others for arm in ARMS if arm.local)
+
+
+def test_a_local_arm_config_names_one_model_and_one_slot() -> None:
+    config = tomllib.loads(arm_config(LOCAL, "on"))
+    assert config["ollama"]["parallel"] == 1
+    assert config["models"]["t"]["ctx"] == LOCAL.window
+    for helper in ("explorer", "worker", "reviewer", "advisor"):
+        assert config["agents"][helper]["model"] == "same"
+    assert config["agents"]["use_helpers"] == "when_needed"
+    cloud = tomllib.loads(arm_config(ARMS[2], "off"))
+    assert "ollama" not in cloud and "explorer" not in cloud["agents"]
+    assert cloud["agents"]["use_helpers"] == "never"
+
+
+def test_the_written_config_loads_as_golem_settings() -> None:
+    from golem.config import GolemSettings
+
+    settings = GolemSettings.model_validate(tomllib.loads(arm_config(LOCAL, "on")))
+    assert settings.ollama.parallel == 1 and settings.agents.explorer.model == "same"
+
+
+def _ended(arm: Arm, ask: Ask, end: str) -> Run:
+    return replace(not_run(arm, "off", ask), end=end, quality=1.0 if end == "completed" else 0.0)
+
+
+async def test_a_dead_server_ends_the_arm_and_the_rest_is_not_run() -> None:
+    asks_ = _asks()
+    played: list[str] = []
+
+    async def one(ask: Ask) -> Run:
+        played.append(ask.name)
+        return _ended(LOCAL, ask, "completed" if ask.name == asks_[0].name else "failed")
+
+    runs = await play_until_dead(LOCAL, "off", asks_, one, alive=lambda: False)
+    assert played == [asks_[0].name, asks_[1].name]  # the second died, the others never started
+    assert [r.end for r in runs] == ["completed", "not run", "not run", "not run"]
+
+
+async def test_low_memory_between_asks_ends_a_local_arm() -> None:
+    asks_ = _asks()
+    played: list[str] = []
+
+    async def one(ask: Ask) -> Run:
+        played.append(ask.name)
+        return _ended(LOCAL, ask, "completed")
+
+    runs = await play_until_dead(LOCAL, "off", asks_, one, low=lambda: len(played) >= 2)
+    assert played == [asks_[0].name, asks_[1].name]
+    assert [r.end for r in runs] == ["completed", "completed", "not run", "not run"]
+    cloud = await play_until_dead(ARMS[2], "off", asks_, one, low=lambda: True)
+    assert all(r.ran for r in cloud)  # a cloud arm holds no model in memory
+
+
+async def test_a_failed_run_with_the_server_still_up_is_a_real_failure() -> None:
+    asks_ = _asks()
+
+    async def one(ask: Ask) -> Run:
+        return _ended(LOCAL, ask, "failed")
+
+    runs = await play_until_dead(LOCAL, "off", asks_, one, alive=lambda: True)
+    assert [r.end for r in runs] == ["failed"] * 4
+    cloud = await play_until_dead(ARMS[2], "off", asks_, one, alive=lambda: False)
+    assert all(r.ran for r in cloud)  # a cloud arm never reads Ollama's state
+
+
+class _DyingDriver:
+    """A local arm whose server dies at its second ask of the first mode."""
+
+    def unavailable(self, arm: Arm) -> str | None:
+        return None
+
+    async def play(self, arm: Arm, mode: Any, asks: Any, project: Path, scratch: Path) -> list[Run]:
+        del project, scratch
+        first, *rest = list(asks)
+        return [_ended(arm, first, "completed"), *(not_run(arm, mode, a) for a in rest)]
+
+
+async def test_not_run_runs_are_shown_and_left_out_of_averages_pairs_and_proposal(
+    tmp_path: Path,
+) -> None:
+    asks_ = _asks()
+    results = await run_eval(
+        _DyingDriver(), asks_, [LOCAL], project=tmp_path, scratch=tmp_path / "s"
+    )
+    (result,) = results
+    assert sum(r.ran for r in result.runs) == 1
+    assert len(result.runs) == 2 * len(asks_)
+    assert [r.end for r in result.runs if r.mode == "on"] == ["not run"] * len(asks_)
+    table = arm_table(result)
+    assert "7 runs not run" in table
+    assert "helpers on:" not in table  # nothing ran with helpers on: no average of zeros
+    assert "helpers off: quality 1.00" in table  # the one run that ran is the whole average
+    assert pairs_of(result.runs) == []
+    assert propose(result.runs).pairs == 0
+    assert "7 runs not run" in full_report(results)
+
+
+def test_the_plan_prints_the_memory_of_each_local_arm_and_says_unknown_without_ollama() -> None:
+    asks_ = _asks()
+    text = plan(list(ARMS), asks_, _machine(model_gb=17.0))
+    lines = [line for line in text.splitlines() if "memory:" in line]
+    assert len(lines) == 2 and all("memory: tight" in line for line in lines)
+    assert "RAM 36.0 GB" in lines[0] and "free now 20.0 GB" in lines[0]
+    assert "memory: fits" in plan(list(ARMS), asks_, _machine(model_gb=4.0))
+    assert "memory: too big" in plan(list(ARMS), asks_, _machine(model_gb=40.0))
+    down = plan(list(ARMS), asks_, Machine(ram_gb=36.0))
+    assert "memory: unknown" in down and "model unknown" in down
+
+
+def test_the_command_plan_reads_the_machine_through_a_probe(capsys: Any) -> None:
+    lines: list[str] = []
+    assert command(live=False, machine=lambda: _machine(4.0), out=lines.append) == 0
+    assert "memory: fits" in lines[0] and "80 runs" in lines[0]
+    assert capsys.readouterr().out == ""
