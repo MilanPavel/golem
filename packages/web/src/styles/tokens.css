@@ -89,6 +89,9 @@
   --breakpoint-chat: 62.5rem;
   --spacing-chat-preview: 23.75rem;
 
+  /* The message box grows with its text up to this, then scrolls inside. */
+  --spacing-composer-max: 40vh;
+
   /* The composer's row shrinks in steps, measured on the composer's own width: under 600, 500, 400 and 330 px. */
   --container-row-600: 37.5rem;
   --container-row-500: 31.25rem;
