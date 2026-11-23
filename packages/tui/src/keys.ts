@@ -96,6 +96,8 @@ export type KeyPlace = {
   consent?: boolean;
   /** The question shown is a helper's tool call (ADR-059), answered for once, this helper, or all helpers. */
   helperAsk?: boolean;
+  /** The question shown is "start these helpers?" (Use helpers: Ask me first): Run or do it in the chat. */
+  useHelpers?: boolean;
   /** Two or more questions wait, so Tab moves to the next. */
   askPages?: boolean;
 };
@@ -127,6 +129,7 @@ export type KeyEffect =
   | { kind: "approve"; decision: "allow" | "allow_session" | "allow_always" | "deny" }
   | { kind: "consent"; answer: "session" | "once" | "local" }
   | { kind: "helper-ask"; answer: HelperAskAnswer }
+  | { kind: "helpers-run"; run: boolean }
   | { kind: "ask-next" }
   | { kind: "scroll-diff"; toward: ScrollToward; line: boolean }
   | { kind: "edit-args" }
@@ -157,6 +160,7 @@ type KeyWhen = {
   question?: boolean;
   consent?: boolean;
   helperAsk?: boolean;
+  useHelpers?: boolean;
   askPages?: boolean;
 };
 
@@ -223,6 +227,7 @@ export const KEYS: readonly KeyBinding[] = [
   },
   ...argsEditKeys(),
   ...helperAskKeys(),
+  ...useHelpersKeys(),
   ...approvalKeys(),
   ...checksKeys(),
   ...consentKeys(),
@@ -538,6 +543,23 @@ function helperAskKeys(): KeyBinding[] {
   ];
 }
 
+/** The keys of "start these helpers?": Enter runs, d or Esc has golem do the work in the chat. Nothing is saved for the session. */
+function useHelpersKeys(): KeyBinding[] {
+  const answer = (id: string, label: string, description: string, press: { name?: PressName; input?: string }, run: boolean): KeyBinding => ({
+    id,
+    label,
+    contexts: ["approval"],
+    description,
+    when: { ...press, overlay: false, switcher: false, approval: true, approvalEdit: false, useHelpers: true },
+    run: () => ({ kind: "helpers-run", run }),
+  });
+  return [
+    answer("helpers-run", "Enter", "While golem asks to start helpers: runs them.", { name: "return" }, true),
+    answer("helpers-chat", "d", "While golem asks to start helpers: it does the work in the chat. Esc does the same.", { input: "d" }, false),
+    answer("helpers-chat-esc", "Esc", "While golem asks to start helpers: it does the work in the chat.", { name: "escape" }, false),
+  ];
+}
+
 function approvalKeys(): KeyBinding[] {
   const answer = (
     id: string,
@@ -550,7 +572,7 @@ function approvalKeys(): KeyBinding[] {
     label,
     contexts: ["approval"],
     description,
-    when: { ...press, overlay: false, switcher: false, approval: true, approvalEdit: false },
+    when: { ...press, overlay: false, switcher: false, approval: true, approvalEdit: false, useHelpers: false },
     run: () => ({ kind: "approve", decision }),
   });
   const scroll = (
@@ -595,7 +617,7 @@ function approvalKeys(): KeyBinding[] {
       label: "e",
       contexts: ["approval"],
       description: "Opens the call's arguments as JSON to edit, then allow once.",
-      when: { input: "e", overlay: false, switcher: false, approval: true, approvalEdit: false },
+      when: { input: "e", overlay: false, switcher: false, approval: true, approvalEdit: false, useHelpers: false },
       run: () => ({ kind: "edit-args" }),
     },
     answer("deny-esc", "Esc", "Denies the waiting tool call.", { name: "escape" }, "deny"),
@@ -928,6 +950,9 @@ function whenMatches(when: KeyWhen, place: KeyPlace, press: Press): boolean {
     return false;
   }
   if (when.helperAsk !== undefined && when.helperAsk !== (place.helperAsk === true)) {
+    return false;
+  }
+  if (when.useHelpers !== undefined && when.useHelpers !== (place.useHelpers === true)) {
     return false;
   }
   if (when.askPages !== undefined && when.askPages !== (place.askPages === true)) {
