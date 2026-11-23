@@ -181,14 +181,11 @@ test("Appearance offers Match system, Light and Dark, and the sidebar has no the
   expect(document.documentElement.dataset.theme).toBeUndefined();
 });
 
-test("Appearance no longer has the chat detail row, and a line there links to Chat", async () => {
-  const { user } = mount("/settings/appearance", OK_ROWS);
+test("Appearance has no chat detail row and no line about where it went", () => {
+  mount("/settings/appearance", OK_ROWS);
   const main = screen.getByRole("main");
   expect(within(main).queryByRole("radiogroup", { name: "Chat detail" })).toBeNull();
-  await user.click(within(main).getByRole("link", { name: "How much a chat shows moved to Chat." }));
-  expect(location.pathname).toBe("/settings/chat");
-  expect(screen.getByRole("heading", { level: 2, name: "Chat" })).toBeTruthy();
-  expect(screen.getByRole("radiogroup", { name: "Steps" })).toBeTruthy();
+  expect(within(main).queryByText(/moved to Chat/)).toBeNull();
 });
 
 test("Appearance has an App block with the install action when the web job keeps the page", async () => {
