@@ -215,6 +215,29 @@ async def test_a_helper_is_titled_with_its_agent_and_its_label_or_brief(
     assert "\n" not in second.title
 
 
+async def test_a_helper_starts_for_a_non_chat_call_id_and_its_result_is_read(
+    database: Database, project: Path, tmp_path: Path
+) -> None:
+    """A workflow starts helpers with ``wf:<step>`` as the call id, no chat graph involved."""
+    chat = _Chat(database, ["found it"], home=tmp_path)
+    run = await chat.manager.create(None, cwd=str(project))
+    ref = await chat.manager.start_helper(
+        run, "wf:find", 0, EXPLORER, "look", "ollama/qwen3:8b", str(project), label="find"
+    )
+    await chat.until(ref.session_id, "session.completed")
+    led = await chat.until(run, "helper.ended")
+
+    started = next(e for e in led if e.type == "helper.started")
+    assert (started.data.call_id, started.data.index) == ("wf:find", 0)
+    (outcome,) = await chat.manager.helper_results(run, "wf:find")
+    assert (outcome.agent, outcome.stopped, outcome.text, outcome.label) == (
+        "explorer",
+        "done",
+        "found it",
+        "find",
+    )
+
+
 async def test_a_helper_session_is_linked_to_its_lead_and_its_agent(
     database: Database, project: Path, tmp_path: Path
 ) -> None:
