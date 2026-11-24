@@ -1,5 +1,7 @@
 """A failed download: plain words, the parts it leaves behind, and their removal."""
 
+# pyright: reportPrivateUsage=false
+
 from __future__ import annotations
 
 import asyncio
@@ -10,7 +12,7 @@ from typing import cast
 import httpx
 import pytest
 from pydantic import BaseModel
-from test_pulls import (  # pyright: ignore[reportPrivateUsage]
+from test_pulls import (
     FakeOllama,
     _dumped,
     _lines,
