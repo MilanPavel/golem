@@ -1,7 +1,9 @@
-import type { ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState, type MutableRefObject, type ReactNode } from "react";
 import type { PullsSnapshot } from "../../../store/pulls.ts";
 import { cn } from "../../../ui/cn.ts";
+import { Button } from "../../../ui/button.tsx";
 import { Code } from "../../../ui/code.tsx";
+import { ChevronLeftIcon } from "../../../ui/icons.tsx";
 import { MemoryBar, PullAction, type Fit } from "./get-models-action.tsx";
 
 /*
@@ -41,12 +43,130 @@ export function Avatar({ children, size = "sm" }: { children: ReactNode; size?: 
   );
 }
 
-/** The list on the left and the detail on the right. Each scrolls on its own. Below a medium width they stack. */
-export function SplitPane({ list, detail }: { list: ReactNode; detail: ReactNode }) {
+/** The least width the two columns need side by side: 48rem, the width of Tailwind's `md` and `3xl`. Measured on the pane itself, so a Settings sidebar counts. */
+const SPLIT_MIN_PX = 768;
+
+/**
+ * What the page gives the split so that Esc can step back inside it first. A split that shows only its detail puts a
+ * function here that goes back to the list and returns true; the page asks it before it leaves for Ollama.
+ */
+export const SplitBackContext = createContext<MutableRefObject<(() => boolean) | null> | null>(null);
+
+export type Split = {
+  /** The pane is wide enough for the list and the detail side by side. */
+  wide: boolean;
+  /** Narrow only: the detail is shown in place of the list. */
+  opened: boolean;
+  open: () => void;
+  close: () => void;
+  ref: (element: HTMLDivElement | null) => void;
+};
+
+/**
+ * Whether a list and its detail fit side by side, and, when they do not, whether the detail is the one showing.
+ * Before the pane is measured (or where nothing can be measured) it counts as wide.
+ */
+export function useSplit(initialOpen = false): Split {
+  // A callback ref, so a pane that shows up later (after the results come) is measured too.
+  const [element, setElement] = useState<HTMLDivElement | null>(null);
+  const [wide, setWide] = useState(true);
+  const [opened, setOpened] = useState(initialOpen);
+  useLayoutEffect(() => {
+    if (element === null) return;
+    const measure = () => {
+      const width = element.getBoundingClientRect().width;
+      setWide(width === 0 || width >= SPLIT_MIN_PX);
+    };
+    measure();
+    if (typeof ResizeObserver === "undefined") {
+      window.addEventListener("resize", measure);
+      return () => {
+        window.removeEventListener("resize", measure);
+      };
+    }
+    const observer = new ResizeObserver(measure);
+    observer.observe(element);
+    return () => {
+      observer.disconnect();
+    };
+  }, [element]);
+  const open = useCallback(() => {
+    setOpened(true);
+  }, []);
+  const close = useCallback(() => {
+    setOpened(false);
+  }, []);
+  return { wide, opened, open, close, ref: setElement };
+}
+
+/**
+ * The list on the left and the detail on the right. Each scrolls on its own. When the pane is too narrow for both, the
+ * list has all of it, and a picked row shows the detail in its place with a way back. Both stay in the page, so the
+ * list keeps its place.
+ */
+export function SplitPane({ list, detail, split, backLabel }: { list: ReactNode; detail: ReactNode; split: Split; /** What the list is called, in the way back: "Repos". */ backLabel: string }) {
+  const { wide, opened, close, ref } = split;
+  const stacked = !wide;
+  const listPane = useRef<HTMLDivElement>(null);
+  const detailPane = useRef<HTMLDivElement>(null);
+  const shown = useRef(opened);
+  const returning = useRef(false);
+  const backRef = useContext(SplitBackContext);
+
+  const goBack = useCallback(() => {
+    returning.current = true;
+    close();
+  }, [close]);
+
+  // The detail opened: its heading takes the focus. It closed by the way back: the picked row does.
+  useEffect(() => {
+    if (opened === shown.current) return;
+    shown.current = opened;
+    if (!stacked) return;
+    if (opened) detailPane.current?.querySelector<HTMLElement>("h4")?.focus();
+    else if (returning.current) listPane.current?.querySelector<HTMLElement>("[aria-current='true']")?.focus();
+    returning.current = false;
+  }, [opened, stacked]);
+
+  // Esc in the detail goes back to the list. The page's own Esc asks this first.
+  const active = stacked && opened;
+  useEffect(() => {
+    if (!active) return;
+    const handle = () => {
+      goBack();
+      return true;
+    };
+    if (backRef !== null) {
+      backRef.current = handle;
+      return () => {
+        if (backRef.current === handle) backRef.current = null;
+      };
+    }
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || event.defaultPrevented) return;
+      event.preventDefault();
+      handle();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [active, backRef, goBack]);
+
   return (
-    <div className="grid min-h-0 flex-1 grid-cols-1 grid-rows-2 md:grid-cols-5 md:grid-rows-1">
-      <div className="min-h-0 overflow-y-auto border-b border-line pb-3 md:col-span-2 md:border-b-0 md:border-r md:pr-2.5">{list}</div>
-      <div className="min-h-0 overflow-y-auto py-4 md:col-span-3 md:pl-5">{detail}</div>
+    <div ref={ref} className={cn("min-h-0 flex-1", stacked ? "flex flex-col" : "grid grid-cols-5")}>
+      <div ref={listPane} hidden={active} className={cn("min-h-0 overflow-y-auto pb-3", stacked ? "flex-1" : "col-span-2 border-r border-line pr-2.5")}>
+        {list}
+      </div>
+      <div ref={detailPane} hidden={stacked && !opened} className={cn("min-h-0 overflow-y-auto", stacked ? "flex-1 pb-4" : "col-span-3 py-4 pl-5")}>
+        {stacked ? (
+          <Button size="sm" kind="ghost" className="-ml-2 mb-2" aria-label={`Back to ${backLabel.toLowerCase()}`} onClick={goBack}>
+            <ChevronLeftIcon />
+            {backLabel}
+          </Button>
+        ) : null}
+        {detail}
+      </div>
     </div>
   );
 }
@@ -98,7 +218,9 @@ export function DetailHead({ mark, above, title, blurb, stats, link }: { mark: R
         {mark}
         <div className="min-w-0">
           {above === undefined ? null : <p className="text-sm text-faint">{above}</p>}
-          <h4 className="break-words text-lg font-semibold">{title}</h4>
+          <h4 tabIndex={-1} className="break-words text-lg font-semibold outline-none">
+            {title}
+          </h4>
           {blurb === undefined || blurb === "" ? null : <p className="text-sm text-faint">{blurb}</p>}
         </div>
       </div>
@@ -184,25 +306,31 @@ export function SizeRows({ label, intro, items, ramGb, pulls, pull, onStop }: Si
       <h5 className="text-sm font-semibold">Pick a size</h5>
       <p className="mb-1.5 text-sm text-faint">{intro}</p>
       {shared === null ? null : <p className="mb-1.5 text-sm text-wait">{shared}</p>}
-      <ul className="flex flex-col">
+      <ul className="@container flex flex-col">
         {items.map((item) => {
           const failed = pulls.failed.get(item.ref);
           return (
             <li key={item.key} className={cn("rounded-lg border-t border-line px-2.5 py-2", item.recommended ? "border-transparent bg-clay-soft" : "")}>
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-                <span className="min-w-40 flex-1">
-                  <span className="flex flex-wrap items-baseline gap-x-2">
-                    <b className="text-sm font-semibold">{item.title}</b>
-                    {item.code === undefined ? null : <Code tone="muted">{item.code}</Code>}
-                    {item.recommended ? <span className="rounded-sm bg-allow-soft px-1.5 py-0.5 text-xs font-semibold tracking-wide text-allow">RECOMMENDED</span> : null}
+              {/* In a roomy detail: words, size, memory and the button on one line. In a tight one the size and the memory drop under the words, and the button stays at the top right. */}
+              <div className="flex items-start gap-x-3 @xl:items-center">
+                <div className="flex min-w-0 flex-1 flex-col gap-y-1 @xl:flex-row @xl:items-center @xl:gap-x-3">
+                  <span className="min-w-0 flex-1">
+                    <span className="flex flex-wrap items-baseline gap-x-2">
+                      <b className="text-sm font-semibold">{item.title}</b>
+                      {item.code === undefined ? null : <Code tone="muted">{item.code}</Code>}
+                      {item.recommended ? <span className="rounded-sm bg-allow-soft px-1.5 py-0.5 text-xs font-semibold tracking-wide text-allow">RECOMMENDED</span> : null}
+                    </span>
+                    {item.note === "" ? null : <small className="block text-sm text-faint">{item.note}</small>}
                   </span>
-                  {item.note === "" ? null : <small className="block text-sm text-faint">{item.note}</small>}
-                </span>
-                <span className="w-16 text-right text-xs tabular-nums text-ink-soft">{`${item.sizeGb} GB`}</span>
-                <span className="w-36">
-                  <MemoryBar fit={item.fit} sizeGb={item.sizeGb} ramGb={ramGb} />
-                </span>
-                <span className="w-36">
+                  <span className="flex items-center gap-x-3">
+                    <span className="shrink-0 text-xs tabular-nums text-ink-soft @xl:w-14 @xl:text-right">{`${item.sizeGb} GB`}</span>
+                    <span className="shrink-0 @xl:w-36">
+                      <MemoryBar fit={item.fit} sizeGb={item.sizeGb} ramGb={ramGb} />
+                    </span>
+                  </span>
+                </div>
+                {/* As wide as its content; on one line it keeps room for a progress bar, so the columns of the rows line up. */}
+                <span className="shrink-0 @xl:min-w-32">
                   <PullAction target={{ ref: item.ref, name: item.name, installed: item.installed === true, tooBig: item.fit === "too_big" }} pulls={pulls} pull={pull} onStop={onStop} primary={item.recommended} />
                 </span>
               </div>

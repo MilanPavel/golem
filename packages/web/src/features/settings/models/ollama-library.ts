@@ -15,6 +15,8 @@ export type OllamaLibraryInitial = {
   results: OllamaLibraryResult;
   /** The name that is chosen. */
   chosen?: string;
+  /** In a narrow pane: the detail is the one showing. */
+  open?: boolean;
   /** What the registry said for a name outside the list. */
   found?: { query: string; results: OllamaLibraryResult };
 };

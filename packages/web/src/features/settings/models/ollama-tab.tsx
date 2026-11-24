@@ -4,7 +4,7 @@ import type { ModelListResult, OllamaLibraryModel } from "../../../store/models.
 import type { PullsSnapshot } from "../../../store/pulls.ts";
 import { Button } from "../../../ui/button.tsx";
 import { ProviderIcon } from "../../../ui/provider-icons.tsx";
-import { Avatar, DetailHead, EmptyState, ResultList, ResultRow, SizeRows, SplitPane } from "./get-models-split.tsx";
+import { Avatar, DetailHead, EmptyState, ResultList, ResultRow, SizeRows, SplitPane, useSplit } from "./get-models-split.tsx";
 import { libraryQuery, libraryRows, librarySizeItems, libraryUrl, sizesLine, type LibraryList, type OllamaLibraryActions, type OllamaLibraryInitial } from "./ollama-library.ts";
 import { useDebounced, type Timer } from "./use-debounced.ts";
 
@@ -51,6 +51,15 @@ export function OllamaLibraryTab({ library, list, listing, pulls, pull, onStop, 
   // With a state to start in, the question for the starting text is the one that state already holds. A ref, so strict mode's second run skips it too.
   const seeded = useRef<string | null>(initial?.found?.query ?? null);
   const all = list.all;
+  const split = useSplit(initial?.open === true);
+  const closeSplit = split.close;
+  // A new search is a new list: in a narrow pane, the list comes back.
+  const searched = useRef(query);
+  useEffect(() => {
+    if (searched.current === query) return;
+    searched.current = query;
+    closeSplit();
+  }, [query, closeSplit]);
 
   useEffect(() => {
     if (all === null || rested === "" || libraryRows(all, rested).length > 0) return;
@@ -97,6 +106,9 @@ export function OllamaLibraryTab({ library, list, listing, pulls, pull, onStop, 
   const heading = phase === "checking" ? "checking the Ollama library…" : phase === "loading" ? "loading the Ollama library…" : typed ? `${rows.length} in the Ollama library` : "The Ollama library";
   const exact = rows.find((row) => row.name === query.split(":")[0]);
   const selected = rows.find((row) => row.name === (chosen?.query === query ? chosen.name : undefined)) ?? exact ?? rows[0];
+
+  // Side by side, one name is chosen from the start. In a narrow pane only a name the person picked is marked.
+  const marked = split.wide ? selected?.name : chosen?.query === query && rows.some((row) => row.name === chosen.name) ? chosen.name : undefined;
 
   const alert =
     problem === null ? null : (
@@ -166,9 +178,10 @@ export function OllamaLibraryTab({ library, list, listing, pulls, pull, onStop, 
       {rows.map((row) => (
         <ResultRow
           key={row.name}
-          selected={row.name === selected?.name}
+          selected={row.name === marked}
           onSelect={() => {
             setChosen({ name: row.name, query });
+            split.open();
           }}
           mark={
             <Avatar>
@@ -185,7 +198,7 @@ export function OllamaLibraryTab({ library, list, listing, pulls, pull, onStop, 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       {alert}
-      <SplitPane list={names} detail={picked} />
+      <SplitPane list={names} detail={picked} split={split} backLabel="Names" />
     </div>
   );
 }

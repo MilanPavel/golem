@@ -1,11 +1,19 @@
 import { render, screen, within } from "@testing-library/react";
-import { expect, test } from "vitest";
+import { afterEach, expect, test, vi } from "vitest";
 import { GET_CASES, IDLE_SETUP, MODELS_CASES, NO_ACTIONS, NO_PULLS, SHEET_CASES } from "../features/settings/models/models-sample.ts";
 import { ModelsView } from "../features/settings/models/models-view.tsx";
 import { Gallery } from "./gallery.tsx";
 import { DIALOG_RULES, expectAxeClean, resetThemeAfterEach, showTheme } from "./gallery-test-utils.ts";
 
 resetThemeAfterEach();
+afterEach(() => {
+  vi.restoreAllMocks();
+});
+
+/** jsdom has no layout: a state drawn in a narrow column measures 400 px. */
+function measureAs(width: number): void {
+  vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({ width, height: 600, top: 0, left: 0, right: width, bottom: 600, x: 0, y: 0, toJSON: () => ({}) });
+}
 
 // One test per state and theme: axe is slow in jsdom, and a loop in one test outgrows the timeout on CI.
 for (const theme of ["slip", "kiln"] as const) {
@@ -29,6 +37,7 @@ for (const theme of ["slip", "kiln"] as const) {
   for (const { label } of GET_CASES) {
     test(`the gallery's Get models page shows "${label}" in ${theme}, and passes axe`, async () => {
       showTheme(theme);
+      if (label.includes("narrow")) measureAs(400);
       render(<Gallery />);
       const region = screen.getByRole("region", { name: `Get models, ${label}` });
       const page = within(region);
@@ -61,6 +70,32 @@ for (const theme of ["slip", "kiln"] as const) {
         expect(page.getByRole("list", { name: "Hugging Face repos" })).toBeTruthy();
         expect(page.getByRole("group", { name: /Sizes of unsloth/ })).toBeTruthy();
         expect(page.getByText("RECOMMENDED")).toBeTruthy();
+      }
+      if (label === "Hugging Face, a detail 500 px wide") {
+        const rows = within(page.getByRole("group", { name: /Sizes of unsloth/ })).getAllByRole("listitem");
+        expect(rows).toHaveLength(5);
+        expect(within(rows[1] as HTMLElement).getByRole("button", { name: "Download Q4_K_M" })).toBeTruthy();
+      }
+      if (label === "Hugging Face, sizes with the same plain name") {
+        const rows = within(page.getByRole("group", { name: /Sizes of unsloth/ })).getAllByRole("listitem");
+        expect(rows.map((row) => row.querySelector("b")?.textContent)).toEqual(["Q4_K_S", "Balanced", "Q8", "Largest"]);
+      }
+      if (label === "Hugging Face, narrow list") {
+        expect(page.getByRole("list", { name: "Hugging Face repos" })).toBeTruthy();
+        expect(page.queryByRole("group", { name: /Sizes of/ })).toBeNull();
+      }
+      if (label === "Hugging Face, narrow detail") {
+        expect(page.getByRole("group", { name: /Sizes of unsloth/ })).toBeTruthy();
+        expect(page.getByRole("button", { name: "Back to repos" })).toBeTruthy();
+        expect(page.queryByRole("list", { name: "Hugging Face repos" })).toBeNull();
+      }
+      if (label === "Ollama library, narrow list") {
+        expect(page.getByRole("list", { name: "Ollama library names" })).toBeTruthy();
+        expect(page.queryByRole("group", { name: /Sizes of/ })).toBeNull();
+      }
+      if (label === "Ollama library, narrow detail") {
+        expect(page.getByRole("group", { name: "Sizes of qwen3.8" })).toBeTruthy();
+        expect(page.getByRole("button", { name: "Back to names" })).toBeTruthy();
       }
       if (label === "Hugging Face, downloading") expect(page.getByRole("progressbar", { name: "Downloading Q6_K" })).toBeTruthy();
       if (label === "Hugging Face, a repo that needs a token") expect(page.getByText(/asks you to accept its terms/)).toBeTruthy();

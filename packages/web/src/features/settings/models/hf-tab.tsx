@@ -5,7 +5,7 @@ import type { PullsSnapshot } from "../../../store/pulls.ts";
 import { Button } from "../../../ui/button.tsx";
 import { Code } from "../../../ui/code.tsx";
 import { HuggingFaceIcon } from "../../../ui/hugging-face-icon.tsx";
-import { Avatar, Chip, DetailHead, EmptyState, Note, ResultList, ResultRow, SizeRows, SplitPane } from "./get-models-split.tsx";
+import { Avatar, Chip, DetailHead, EmptyState, Note, ResultList, ResultRow, SizeRows, SplitPane, useSplit } from "./get-models-split.tsx";
 import { hfSizeItems, paramsOf, shortCount, shortDate, splitRepo } from "./hf-sizes.ts";
 import { useDebounced, type Timer } from "./use-debounced.ts";
 
@@ -32,7 +32,7 @@ export type HfTabProps = {
   /** A timer a test can move. */
   timer?: Timer;
   /** The state the tab starts in, for the gallery: the results for the starting search, and one repo's sizes. */
-  initial?: { results: HfSearchResult; files?: HfFilesResult; chosen?: string };
+  initial?: { results: HfSearchResult; files?: HfFilesResult; chosen?: string; /** In a narrow pane: the detail is the one showing. */ open?: boolean };
 };
 
 /** Searches to try while nothing is typed. */
@@ -70,6 +70,15 @@ export function HuggingFaceTab({ hf, listing, pulls, pull, onStop, failure, sear
   const [files, setFiles] = useState<Record<string, HfFilesResult>>(initial?.files === undefined ? {} : { [initial.files.repo]: initial.files });
   const [filesError, setFilesError] = useState<{ repo: string; text: string } | null>(null);
   const [now] = useState(() => new Date());
+  const split = useSplit(initial?.open === true);
+  const closeSplit = split.close;
+  // A new search is a new list: in a narrow pane, the list comes back.
+  const searched = useRef(search);
+  useEffect(() => {
+    if (searched.current === search) return;
+    searched.current = search;
+    closeSplit();
+  }, [search, closeSplit]);
   // With a state to start in, the search for the starting text is the one that state already holds. A ref, so strict mode's second run skips it too.
   const seeded = useRef<string | null>(initial === undefined ? null : query);
 
@@ -100,6 +109,8 @@ export function HuggingFaceTab({ hf, listing, pulls, pull, onStop, failure, sear
   const repos = results?.repos ?? [];
   const selected = repos.find((repo) => repo.id === chosen) ?? repos[0];
   const selectedId = selected?.id ?? null;
+  // Side by side, the first repo is chosen from the start. In a narrow pane only a repo the person picked is marked.
+  const marked = split.wide ? selectedId : repos.some((repo) => repo.id === chosen) ? chosen : null;
   const gated = selected?.gated === true;
   const loaded = selectedId !== null && files[selectedId] !== undefined;
 
@@ -166,9 +177,10 @@ export function HuggingFaceTab({ hf, listing, pulls, pull, onStop, failure, sear
         return (
           <ResultRow
             key={repo.id}
-            selected={repo.id === selectedId}
+            selected={repo.id === marked}
             onSelect={() => {
               setChosen(repo.id);
+              split.open();
             }}
             mark={<Avatar>{(owner[0] ?? name[0] ?? "?").toUpperCase()}</Avatar>}
             above={owner}
@@ -254,14 +266,15 @@ export function HuggingFaceTab({ hf, listing, pulls, pull, onStop, failure, sear
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      {bar}
+      {/* The strip belongs to the list: a narrow pane that shows a detail gives its room to the detail. */}
+      {split.wide || !split.opened ? bar : null}
       {alert}
       {results === null ? (
         <p role="status" className="py-6 text-center text-sm text-muted">
           {problem === null ? "asking Hugging Face…" : ""}
         </p>
       ) : (
-        <SplitPane list={list} detail={detail} />
+        <SplitPane list={list} detail={detail} split={split} backLabel="Repos" />
       )}
     </div>
   );

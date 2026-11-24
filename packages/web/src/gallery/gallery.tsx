@@ -4,6 +4,7 @@ import { createContext, useContext, useEffect, useId, useState, type ReactNode }
 import { Badge } from "../ui/badge.tsx";
 import { Button } from "../ui/button.tsx";
 import { Card } from "../ui/card.tsx";
+import { cn } from "../ui/cn.ts";
 import { CopyButton, CopyCommand } from "../ui/copy-command.tsx";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from "../ui/dialog.tsx";
 import { GOLEM_STATE_LABEL, type GolemState } from "../ui/golem-state.ts";
@@ -1883,8 +1884,12 @@ function ModelsDemo() {
 function GetModelsDemo() {
   return (
     <div className="flex flex-col gap-4">
-      {GET_CASES.map(({ label, props, pulls }) => (
-        <section key={label} aria-label={`Get models, ${label}`} className="flex h-160 flex-col gap-3 rounded-lg border border-line bg-bg p-4">
+      {GET_CASES.map(({ label, props, pulls, width }) => (
+        <section
+          key={label}
+          aria-label={`Get models, ${label}`}
+          className={cn("flex h-160 flex-col gap-3 rounded-lg border border-line bg-bg p-4", width === "narrow" ? "w-sm max-w-full" : width === "constrained" ? "w-4xl max-w-full" : "")}
+        >
           <span className="font-mono text-xs text-faint">{label}</span>
           <ModelsView {...props} pulls={pulls ?? NO_PULLS} setup={IDLE_SETUP} actions={NO_ACTIONS} />
         </section>
