@@ -24,7 +24,13 @@ async def test_ollama_library_over_the_socket(short_home: Path) -> None:
         short_home,
         router=ModelRouter(GolemSettings()),
         discovery=lambda routed: ModelDiscovery(
-            routed, None, transport=transport, ram_gb=36.0, catalog=[], fetch_prices=False
+            routed,
+            None,
+            transport=transport,
+            ram_gb=36.0,
+            catalog=[],
+            fetch_prices=False,
+            ollama_installed=lambda: True,
         ),
         pulls=lambda routed, ram: PullManager(
             routed, transport=transport, ram_gb=ram, models_dir=short_home, clock=lambda: 0.0
@@ -33,8 +39,7 @@ async def test_ollama_library_over_the_socket(short_home: Path) -> None:
     client = await RpcClient.connect(app.paths.socket_path)
     try:
         await client.call("hello", HELLO)
-        # The fake Ollama has qwen3:8b installed; a listing makes the daemon know it.
-        await client.call("model.list", {})
+        # The fake Ollama has qwen3:8b installed. No listing came first: the handler lists itself.
         found = rpc_result(await client.call("ollama.library", {"query": "qwen3"}))
         models = {m["name"]: m for m in cast(list[dict[str, object]], found["models"])}
         assert "qwen3" in models and "qwen3-coder" in models

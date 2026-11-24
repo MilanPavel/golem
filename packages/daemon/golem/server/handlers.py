@@ -2075,15 +2075,13 @@ async def _ollama_library(ctx: RequestContext, params: OllamaLibraryParams) -> O
     if library is None:
         raise RpcCallError(INTERNAL_ERROR, "The Ollama library is not ready")
     discovery = ctx.state.models
-    installed = (
-        {
-            listed.ref.partition("/")[2]
-            for listed in discovery.cached()
-            if listed.source == "installed"
+    installed: set[str] = set()
+    if discovery is not None:
+        # The cache is empty before the first listing: list once, so no model is wrongly missing.
+        listed_models = discovery.cached() or (await discovery.list()).models
+        installed = {
+            listed.ref.partition("/")[2] for listed in listed_models if listed.source == "installed"
         }
-        if discovery is not None
-        else set[str]()
-    )
     try:
         models = await library.search(params.query, installed)
     except OllamaLibraryError as exc:
