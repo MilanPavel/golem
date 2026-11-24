@@ -169,6 +169,7 @@ from golem_protocol.events import (
     ModelOptionsChangedData,
     ModelRoutedEvent,
     ModelSelectedData,
+    ModelWaitingEvent,
     RouteConsentAnsweredData,
     RunCancelledData,
     RunFailedData,
@@ -526,6 +527,8 @@ class SessionManager:
         self._steps: dict[str, dict[str, tuple[str, dict[str, object]]]] = {}
         """The name and the shown arguments of each tool call a helper asked for, by its session."""
         self._step_counts: dict[str, int] = {}
+        self._dispatcher_waits: set[str] = set()
+        """Helpers whose lead was told ``helper.state waiting`` for a slot or a provider."""
         self.wall_clock: Callable[[], float] = _now
         """Seconds since the epoch. A helper's time limit counts from its ``session.created``."""
         self.pause: Callable[[float], Awaitable[None]] = _pause
@@ -2144,6 +2147,7 @@ class SessionManager:
         self._ended_helpers.add(session_id)
         self._steps.pop(session_id, None)
         self._step_counts.pop(session_id, None)
+        self._dispatcher_waits.discard(session_id)
         self._events.clear_step(session_id)
         stored = await self._events.stored(lead)
         if not any(
@@ -2179,8 +2183,47 @@ class SessionManager:
             )
         self._spawn_wake(lead)
 
+    async def _relay_wait(self, event: ModelWaitingEvent) -> None:
+        """Tell the lead when a helper's model call waits in the dispatcher, and when it stops.
+
+        The dispatcher's reason (``slot`` or ``provider``) goes to the lead's log as
+        ``helper.state waiting`` with the line, the position, the holder and the backoff. The
+        dispatcher already tells only on a new reason or position. The end is ``running``.
+        """
+        data = event.data
+        helper = self._sessions.get(event.session_id)
+        parent = None if helper is None else helper.parent
+        if parent is None:
+            return
+        if data.waiting:
+            if data.reason not in ("slot", "provider"):
+                return
+            state = HelperStateData(
+                call_id=parent.call_id,
+                index=parent.index,
+                state="waiting",
+                reason=data.reason,
+                line=data.line,
+                position=data.position,
+                holder=data.holder,
+                retry_in_ms=data.retry_in_ms,
+            )
+            self._dispatcher_waits.add(event.session_id)
+        elif event.session_id in self._dispatcher_waits:
+            self._dispatcher_waits.discard(event.session_id)
+            state = HelperStateData(call_id=parent.call_id, index=parent.index, state="running")
+        else:
+            return
+        lead = await self._run_records.latest(parent.session_id)
+        await self._events.emit(
+            parent.session_id, None if lead is None else lead.run_id, "helper.state", state
+        )
+
     async def _relay_step(self, event: ChatEvent) -> None:
         """Put a tool call of a helper into its lead's log as ``helper.step``, thin on purpose."""
+        if isinstance(event, ModelWaitingEvent):
+            await self._relay_wait(event)
+            return
         if not isinstance(
             event, ToolRequestedEvent | ToolStartedEvent | ToolCompletedEvent | ToolFailedEvent
         ):
