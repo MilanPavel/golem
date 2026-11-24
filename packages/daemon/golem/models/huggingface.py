@@ -6,6 +6,7 @@ by the name ``hf.co/<user>/<repo>:<quant>``, so nothing is downloaded here.
 
 from __future__ import annotations
 
+import asyncio
 import re
 from collections import defaultdict
 from typing import Any, cast
@@ -20,6 +21,15 @@ TIMEOUT_SECONDS = 10.0
 PREFERRED_QUANT = "Q4_K_M"
 
 SLOW = "Hugging Face didn't answer. Try again in a moment."
+MISSING_FILE = (
+    "Hugging Face is missing a file for this size, so the download can't finish right now."
+)
+# How long the check for a missing file may take in all. A size it did not reach stays unmarked.
+CHECK_SECONDS = 3.0
+_MANIFEST_TYPES = (
+    "application/vnd.docker.distribution.manifest.v2+json, "
+    "application/vnd.oci.image.manifest.v1+json"
+)
 
 _QUANT = re.compile(
     r"(?<![A-Za-z0-9])(IQ\d(?:_[A-Z0-9]+)*|Q\d(?:_[A-Z0-9]+)*|BF16|F16|F32)(?![A-Za-z0-9])",
@@ -142,10 +152,57 @@ class HuggingFace:
                     "files": parts[quant],
                     "fit": fit,
                     "recommended": False,
+                    "problem": None,
                 }
             )
         _recommend(rows)
+        await self._mark_missing(repo, rows)
         return rows
+
+    async def _mark_missing(self, repo: str, rows: list[dict[str, Any]]) -> None:
+        """Set ``problem`` on a size whose config file Hugging Face definitely does not have.
+
+        Ollama asks the repo for the config file named in each size's manifest after it has
+        fetched every layer, and a 404 there fails a download of many gigabytes. Only that 404
+        marks a size: a slow answer, an error, or any other status leaves it unmarked.
+        """
+        if not rows:
+            return
+        tasks = [asyncio.create_task(self._config_missing(repo, row["quant"])) for row in rows]
+        try:
+            await asyncio.wait(tasks, timeout=CHECK_SECONDS)
+        finally:
+            for task in tasks:
+                if not task.done():
+                    task.cancel()
+        for row, task in zip(rows, tasks, strict=True):
+            if task.done() and not task.cancelled() and task.exception() is None and task.result():
+                row["problem"] = MISSING_FILE
+
+    async def _config_missing(self, repo: str, quant: str) -> bool:
+        """True only when the config file of this size's manifest answers 404."""
+        client = self._http()
+        try:
+            response = await client.get(
+                f"{BASE_URL}/v2/{repo}/manifests/{quant}",
+                headers={"Accept": _MANIFEST_TYPES},
+                follow_redirects=True,
+            )
+            if response.status_code != 200:
+                return False
+            body = response.json()
+            config = cast(dict[str, Any], body).get("config") if isinstance(body, dict) else None
+            digest = (
+                cast(dict[str, Any], config).get("digest") if isinstance(config, dict) else None
+            )
+            if not isinstance(digest, str) or not digest:
+                return False
+            async with client.stream(
+                "GET", f"{BASE_URL}/v2/{repo}/blobs/{digest}", follow_redirects=True
+            ) as blob:
+                return blob.status_code == 404
+        except (httpx.HTTPError, ValueError, AttributeError):
+            return False
 
 
 def repo_of(query: str) -> str:

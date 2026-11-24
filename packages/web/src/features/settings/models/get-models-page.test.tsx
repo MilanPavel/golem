@@ -97,3 +97,27 @@ test("a failed download says why, and Try again pulls it again", async () => {
   await user.click(within(tray()).getByRole("button", { name: "Dismiss gemma4:12b" }));
   expect(screen.queryByRole("list", { name: "Downloads" })).toBeNull();
 });
+
+test("a failed download shows its reason, the parts left, and Remove asks to clear them", async () => {
+  const user = userEvent.setup();
+  const onCleanup = vi.fn(() => Promise.resolve());
+  const hfRef = "ollama/hf.co/unsloth/Qwen3.8-27B-GGUF:Q4_K_S";
+  const pulls: PullsSnapshot = {
+    active: new Map(),
+    failed: new Map([[hfRef, "Hugging Face is missing a file for this model. Try another repo or the Ollama library."]]),
+    extra: new Map([[hfRef, { detail: "file does not exist", leftoverGb: 16.2 }]]),
+  };
+  render(<GetModelsPage listing={LISTING} pulls={pulls} onPull={() => Promise.resolve()} onStop={() => Promise.resolve()} onCleanup={onCleanup} hf={NO_ACTIONS.hf} library={NO_ACTIONS.library} onBack={() => undefined} />);
+  const reason = within(tray()).getByText("Failed: Hugging Face is missing a file for this model. Try another repo or the Ollama library.");
+  expect(reason.getAttribute("title")).toBe("file does not exist");
+  expect(within(tray()).getByText("16.2 GB of this download is still on disk.")).toBeTruthy();
+  await user.click(within(tray()).getByRole("button", { name: "Remove what is left of unsloth/Qwen3.8-27B-GGUF:Q4_K_S" }));
+  expect(onCleanup).toHaveBeenCalledWith(hfRef);
+});
+
+test("after the parts are removed the row stops offering to remove them", () => {
+  const pulls: PullsSnapshot = { active: new Map(), failed: new Map([[GEMMA, "boom"]]), extra: new Map([[GEMMA, { detail: null, leftoverGb: null }]]) };
+  render(<GetModelsPage listing={LISTING} pulls={pulls} onPull={() => Promise.resolve()} onStop={() => Promise.resolve()} onCleanup={() => Promise.resolve()} hf={NO_ACTIONS.hf} library={NO_ACTIONS.library} onBack={() => undefined} />);
+  expect(within(tray()).queryByText(/still on disk/)).toBeNull();
+  expect(within(tray()).queryByRole("button", { name: /Remove what is left/ })).toBeNull();
+});

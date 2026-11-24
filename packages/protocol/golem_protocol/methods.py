@@ -117,6 +117,7 @@ METHOD_ACCESS: Final[Mapping[str, Access]] = {
     "ollama.library": "browser",
     "model.pull": "browser",
     "model.pull_cancel": "browser",
+    "model.pull_cleanup": "browser",
     "model.delete": "browser",
     "model.score_reset": "browser",
     "model.check": "local",

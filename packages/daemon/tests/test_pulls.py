@@ -123,7 +123,13 @@ async def test_a_pull_sums_its_layers_and_says_when_it_is_done(tmp_path: Path) -
     assert notes[-1] == {
         "jsonrpc": "2.0",
         "method": "model.pull.done",
-        "params": {"ref": "ollama/qwen3:30b-a3b", "ok": True, "error": None},
+        "params": {
+            "ref": "ollama/qwen3:30b-a3b",
+            "ok": True,
+            "error": None,
+            "detail": None,
+            "leftover_gb": None,
+        },
     }
     await manager.aclose()
 
@@ -157,7 +163,13 @@ async def test_an_ollama_error_ends_the_pull(tmp_path: Path) -> None:
     ref, _ = await manager.start("qwen3:30b-a3b")
     await _until_done(manager, ref)
     done = _dumped(sent)[-1]["params"]
-    assert done == {"ref": ref, "ok": False, "error": "file does not exist"}
+    assert done == {
+        "ref": ref,
+        "ok": False,
+        "error": "file does not exist",
+        "detail": None,
+        "leftover_gb": None,
+    }
     await manager.aclose()
 
 
@@ -176,7 +188,13 @@ async def test_cancel_stops_the_pull_and_says_so(tmp_path: Path) -> None:
     assert again == (ref, False)
     assert await manager.cancel(ref) == (ref, True)
     assert manager.pulling() == {}
-    assert _dumped(sent)[-1]["params"] == {"ref": ref, "ok": False, "error": "cancelled"}
+    assert _dumped(sent)[-1]["params"] == {
+        "ref": ref,
+        "ok": False,
+        "error": "cancelled",
+        "detail": None,
+        "leftover_gb": None,
+    }
     assert await manager.cancel(ref) == (ref, False)
     await manager.aclose()
 

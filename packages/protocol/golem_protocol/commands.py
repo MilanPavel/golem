@@ -1763,7 +1763,9 @@ class HfSize(BaseModel):
     """One quantization. ``files`` is the number of parts summed into ``size_gb``.
 
     ``fit`` is null when golem cannot tell how much memory this Mac has. ``recommended`` marks
-    the size to pick: ``Q4_K_M`` when it fits, else the largest that fits.
+    the size to pick: ``Q4_K_M`` when it fits, else the largest that fits. ``problem`` is set
+    only when Hugging Face answered that a file the download needs is missing; it is never set
+    on doubt.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -1773,6 +1775,7 @@ class HfSize(BaseModel):
     files: int = Field(ge=1)
     fit: Literal["fits", "tight", "too_big"] | None = None
     recommended: bool
+    problem: str | None = None
 
 
 class HfFilesResult(BaseModel):
@@ -1856,13 +1859,41 @@ class ModelPullProgress(BaseModel):
 
 
 class ModelPullDone(BaseModel):
-    """A download ended. ``error`` says why when ``ok`` is false; ``cancelled`` for a stop."""
+    """A download ended. ``error`` says why when ``ok`` is false; ``cancelled`` for a stop.
+
+    ``error`` is plain words. ``detail`` is Ollama's own text when it differs. ``leftover_gb`` is
+    the size of downloaded parts that no model uses, when a failed download left 0.1 GB or more;
+    ``model.pull_cleanup`` removes them.
+    """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     ref: str = Field(min_length=3)
     ok: bool
     error: str | None = None
+    detail: str | None = None
+    leftover_gb: float | None = Field(default=None, ge=0)
+
+
+class ModelPullCleanupParams(BaseModel):
+    """``model.pull_cleanup``. Remove the parts a failed download of ``ref`` left behind.
+
+    Only the parts named in that download's ``leftover_gb`` go, and only while no model uses them
+    and no download of ``ref`` runs.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    ref: str = Field(min_length=3)
+
+
+class ModelPullCleanupResult(BaseModel):
+    """``freed_gb`` is 0 when nothing was left to remove."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    ref: str = Field(min_length=3)
+    freed_gb: float = Field(ge=0)
 
 
 class ModelBenchParams(BaseModel):
@@ -6084,6 +6115,8 @@ __all__ = [
     "ModelProbeResult",
     "ModelPullCancelParams",
     "ModelPullCancelResult",
+    "ModelPullCleanupParams",
+    "ModelPullCleanupResult",
     "ModelPullDone",
     "ModelPullParams",
     "ModelPullProgress",

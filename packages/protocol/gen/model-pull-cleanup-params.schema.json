@@ -1,0 +1,16 @@
+{
+  "additionalProperties": false,
+  "description": "``model.pull_cleanup``. Remove the parts a failed download of ``ref`` left behind.\n\nOnly the parts named in that download's ``leftover_gb`` go, and only while no model uses them\nand no download of ``ref`` runs.",
+  "properties": {
+    "ref": {
+      "minLength": 3,
+      "title": "Ref",
+      "type": "string"
+    }
+  },
+  "required": [
+    "ref"
+  ],
+  "title": "ModelPullCleanupParams",
+  "type": "object"
+}

@@ -116,3 +116,22 @@ test("the live region says the announcement, not the percent", () => {
   rerender(<PullStatusView summary={more} announcement="Downloading Qwen3 8B" onOpen={() => {}} onDismiss={() => {}} />);
   expect(document.querySelector("[aria-live=polite]")?.textContent).toBe("Downloading Qwen3 8B");
 });
+
+test("pullSummary: a failed Hugging Face download is named by repo and size, with its reason", () => {
+  const ref = "ollama/hf.co/unsloth/Qwen3.8-27B-GGUF:Q4_K_S";
+  const words = "Hugging Face is missing a file for this model. Try another repo or the Ollama library.";
+  const summary = pullSummary(new Map(), new Map([[ref, words]]), LABELS, new Map([[ref, { detail: "file does not exist", leftoverGb: null }]]));
+  expect(summary).toMatchObject({ title: "Download of unsloth/Qwen3.8-27B-GGUF:Q4_K_S failed", text: words, detail: "file does not exist" });
+  expect(summary?.spoken).toBe(`Download of unsloth/Qwen3.8-27B-GGUF:Q4_K_S failed: ${words}`);
+  // A label wins over the ref.
+  expect(pullSummary(new Map(), new Map([[ref, words]]), new Map([[ref, "Qwen3.8 27B"]]))?.title).toBe("Download of Qwen3.8 27B failed");
+});
+
+test("a failed row shows the reason under the title, and the daemon's text is reachable", () => {
+  const words = "Hugging Face is missing a file for this model. Try another repo or the Ollama library.";
+  const summary = pullSummary(new Map(), new Map([["ollama/qwen3:8b", words]]), LABELS, new Map([["ollama/qwen3:8b", { detail: "file does not exist", leftoverGb: null }]]));
+  render(<PullStatusView summary={summary} announcement="" onOpen={() => {}} onDismiss={() => {}} />);
+  const row = screen.getByRole("button", { name: `Download of Qwen3 8B failed: ${words}. Open models` });
+  expect(row.textContent).toContain(words);
+  expect(row.getAttribute("title")).toContain("file does not exist");
+});

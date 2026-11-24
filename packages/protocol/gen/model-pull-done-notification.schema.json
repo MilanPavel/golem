@@ -2,8 +2,20 @@
   "$defs": {
     "ModelPullDone": {
       "additionalProperties": false,
-      "description": "A download ended. ``error`` says why when ``ok`` is false; ``cancelled`` for a stop.",
+      "description": "A download ended. ``error`` says why when ``ok`` is false; ``cancelled`` for a stop.\n\n``error`` is plain words. ``detail`` is Ollama's own text when it differs. ``leftover_gb`` is\nthe size of downloaded parts that no model uses, when a failed download left 0.1 GB or more;\n``model.pull_cleanup`` removes them.",
       "properties": {
+        "detail": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Detail"
+        },
         "error": {
           "anyOf": [
             {
@@ -15,6 +27,19 @@
           ],
           "default": null,
           "title": "Error"
+        },
+        "leftover_gb": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Leftover Gb"
         },
         "ok": {
           "title": "Ok",

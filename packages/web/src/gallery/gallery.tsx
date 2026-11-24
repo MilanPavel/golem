@@ -65,7 +65,7 @@ import { ChatSection } from "../features/settings/chat-section.tsx";
 import { Stage, YouRow } from "../features/settings/chat-stage.tsx";
 import { InstructionsView } from "../features/settings/chat-instructions.tsx";
 import { ModelsView } from "../features/settings/models/models-view.tsx";
-import { GET_CASES, IDLE_SETUP, MODELS_CASES, NO_ACTIONS, NO_PULLS } from "../features/settings/models/models-sample.ts";
+import { GET_CASES, HF_FAILED, IDLE_SETUP, MODELS_CASES, NO_ACTIONS, NO_PULLS } from "../features/settings/models/models-sample.ts";
 import { MemoryView } from "../features/settings/memory/memory-view.tsx";
 import { SAMPLE_MEMORIES, SAMPLE_MEMORY_COUNTS, SAMPLE_MEMORY_SETTINGS } from "../features/settings/memory/sample.ts";
 import { MEMORY_OFF_TEXT } from "../store/memory.ts";
@@ -1371,6 +1371,7 @@ const DOWNLOAD_ROWS = [
     ),
   },
   { label: "Failed", summary: pullSummary(new Map(), SAMPLE_PULLS.failed, SAMPLE_LABELS) },
+  { label: "Failed, Hugging Face", summary: pullSummary(new Map(), HF_FAILED.failed, SAMPLE_LABELS, HF_FAILED.extra) },
 ] as const;
 
 const BROWSER_HOME = "/Users/you";

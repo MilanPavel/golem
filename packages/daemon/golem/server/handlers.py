@@ -359,6 +359,8 @@ from golem_protocol.commands import (
     ModelProbeResult,
     ModelPullCancelParams,
     ModelPullCancelResult,
+    ModelPullCleanupParams,
+    ModelPullCleanupResult,
     ModelPullParams,
     ModelPullResult,
     ModelScoreInfo,
@@ -2107,6 +2109,16 @@ async def _model_pull_cancel(
     return ModelPullCancelResult(ref=ref, cancelled=cancelled)
 
 
+async def _model_pull_cleanup(
+    ctx: RequestContext, params: ModelPullCleanupParams
+) -> ModelPullCleanupResult:
+    try:
+        ref, freed_gb = _pulls(ctx).cleanup(params.ref)
+    except PullError as exc:
+        raise RpcCallError(MODEL_PULL_FAILED, str(exc)) from exc
+    return ModelPullCleanupResult(ref=ref, freed_gb=freed_gb)
+
+
 async def _model_delete(ctx: RequestContext, params: ModelDeleteParams) -> ModelDeleteResult:
     try:
         ref, deleted = await _pulls(ctx).delete(params.name)
@@ -2377,6 +2389,9 @@ def standard_methods() -> dict[str, Method]:
         "model.pull": Method("model.pull", ModelPullParams, True, _model_pull),
         "model.pull_cancel": Method(
             "model.pull_cancel", ModelPullCancelParams, True, _model_pull_cancel
+        ),
+        "model.pull_cleanup": Method(
+            "model.pull_cleanup", ModelPullCleanupParams, True, _model_pull_cleanup
         ),
         "model.delete": Method("model.delete", ModelDeleteParams, True, _model_delete),
         "model.score_reset": Method(

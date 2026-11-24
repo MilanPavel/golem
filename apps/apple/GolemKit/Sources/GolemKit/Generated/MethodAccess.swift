@@ -112,6 +112,7 @@ public enum MethodAccess {
         "model.probe",
         "model.pull",
         "model.pull_cancel",
+        "model.pull_cleanup",
         "model.score_reset",
         "model.set_default",
         "model.star",

@@ -2739,3 +2739,26 @@ test("agents.set_default_limits sends the keys it was given and checks what come
     await bad.close();
   }
 });
+
+test("model.pull_cleanup reads the freed size, and a malformed result is refused", async () => {
+  const server = await listen((socket) => {
+    attach(socket, { answerPing: true, results: { "model.pull_cleanup": { ref: "ollama/a:1b", freed_gb: 16.2 } } });
+  });
+  const client = connectGolem({ socketPath: server.socketPath, clientName: "tui", reconnect: false, heartbeatMs: 60_000 });
+  try {
+    assert.deepEqual(await client.cleanupPull("ollama/a:1b"), { ref: "ollama/a:1b", freed_gb: 16.2 });
+  } finally {
+    client.close();
+    await server.close();
+  }
+  const bad = await listen((socket) => {
+    attach(socket, { answerPing: true, results: { "model.pull_cleanup": { ref: "ollama/a:1b" } } });
+  });
+  const other = connectGolem({ socketPath: bad.socketPath, clientName: "tui", reconnect: false, heartbeatMs: 60_000 });
+  try {
+    await assert.rejects(other.cleanupPull("ollama/a:1b"), /invalid model.pull_cleanup result/);
+  } finally {
+    other.close();
+    await bad.close();
+  }
+});

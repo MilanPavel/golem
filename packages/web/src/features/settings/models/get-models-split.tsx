@@ -141,6 +141,8 @@ export type SizeItem = {
   recommended: boolean;
   /** Where it is installed already. */
   installed?: boolean;
+  /** What golem knows will go wrong with this size. The button stays. */
+  problem?: string;
 };
 
 /** A line under the sizes when none sits comfortably. It informs; the buttons stay. */
@@ -149,6 +151,16 @@ export function fitNote(items: readonly SizeItem[], ramGb: number | null): strin
   const mac = ramGb === null ? "this Mac's memory" : `this Mac's ${ramGb} GB of memory`;
   if (items.some((item) => item.fit === "tight")) return `No size sits comfortably in ${mac}. The tight ones run, with part of the work on the CPU, so they answer slower.`;
   return `Every size is bigger than ${mac}. You can still download one, but it will be very slow.`;
+}
+
+const SIZE_MISSING_FILE = "Hugging Face is missing a file for this size, so the download can't finish right now.";
+const MODEL_MISSING_FILE = "Hugging Face is missing a file for this model, so no size can finish downloading right now.";
+
+/** The one problem every size shares, or null when sizes differ or have none. */
+export function sharedProblem(items: readonly SizeItem[]): string | null {
+  const first = items[0]?.problem;
+  if (first === undefined || !items.every((item) => item.problem === first)) return null;
+  return first === SIZE_MISSING_FILE ? MODEL_MISSING_FILE : first;
 }
 
 export type SizeRowsProps = {
@@ -165,10 +177,13 @@ export type SizeRowsProps = {
 /** "Pick a size": one row a size with its words, its weight on this Mac's memory and the action. */
 export function SizeRows({ label, intro, items, ramGb, pulls, pull, onStop }: SizeRowsProps) {
   const note = fitNote(items, ramGb);
+  // When every size has the same trouble, say it once.
+  const shared = sharedProblem(items);
   return (
     <div role="group" aria-label={label} className="mt-5">
       <h5 className="text-sm font-semibold">Pick a size</h5>
       <p className="mb-1.5 text-sm text-faint">{intro}</p>
+      {shared === null ? null : <p className="mb-1.5 text-sm text-wait">{shared}</p>}
       <ul className="flex flex-col">
         {items.map((item) => {
           const failed = pulls.failed.get(item.ref);
@@ -191,6 +206,7 @@ export function SizeRows({ label, intro, items, ramGb, pulls, pull, onStop }: Si
                   <PullAction target={{ ref: item.ref, name: item.name, installed: item.installed === true, tooBig: item.fit === "too_big" }} pulls={pulls} pull={pull} onStop={onStop} primary={item.recommended} />
                 </span>
               </div>
+              {shared !== null || item.problem === undefined ? null : <p className="pt-1 text-meta text-wait">{item.problem}</p>}
               {failed === undefined || failed === "cancelled" ? null : <p className="pt-1 text-meta text-deny">{`Download failed: ${failed}`}</p>}
             </li>
           );

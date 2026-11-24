@@ -2,7 +2,9 @@
 
 export type Jsonrpc = '2.0';
 export type Method = 'model.pull.done';
+export type Detail = string | null;
 export type Error = string | null;
+export type LeftoverGb = number | null;
 export type Ok = boolean;
 export type Ref = string;
 
@@ -17,11 +19,17 @@ export interface ModelPullDoneNotification {
 /**
  * A download ended. ``error`` says why when ``ok`` is false; ``cancelled`` for a stop.
  *
+ * ``error`` is plain words. ``detail`` is Ollama's own text when it differs. ``leftover_gb`` is
+ * the size of downloaded parts that no model uses, when a failed download left 0.1 GB or more;
+ * ``model.pull_cleanup`` removes them.
+ *
  * This interface was referenced by `ModelPullDoneNotification`'s JSON-Schema
  * via the `definition` "ModelPullDone".
  */
 export interface ModelPullDone {
+  detail?: Detail;
   error?: Error;
+  leftover_gb?: LeftoverGb;
   ok: Ok;
   ref: Ref;
 }

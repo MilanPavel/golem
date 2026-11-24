@@ -96,6 +96,7 @@ export const NO_ACTIONS: ModelsActions = {
   remove: () => Promise.resolve(),
   stop: () => Promise.resolve(),
   pull: () => Promise.resolve(),
+  cleanup: () => Promise.resolve(),
   hf: { search: () => Promise.resolve({ repos: [] }), files: (repo) => Promise.resolve({ repo, sizes: [] }) },
   library: { search: () => Promise.resolve({ models: [] }) },
   saveOllama: () => Promise.resolve({ ok: true, errors: [], values: OLLAMA_VALUES }),
@@ -140,6 +141,20 @@ export const LIBRARY_RESULTS: OllamaLibraryResult = {
 };
 
 const OUTSIDE_RESULTS: OllamaLibraryResult = { models: [{ name: "my-tune", blurb: "", sizes: [size("7b", 4.1, "fits", { recommended: true })] }] };
+
+const MISSING_FILE = "Hugging Face is missing a file for this size, so the download can't finish right now.";
+
+/** A repo whose Q4_K_M cannot finish: Hugging Face lacks a file it names. */
+export const HF_FILES_ONE_PROBLEM: HfFilesResult = {
+  ...HF_FILES,
+  sizes: HF_FILES.sizes.map((size) => (size.quant === "Q4_K_M" ? { ...size, problem: MISSING_FILE } : size)),
+};
+
+/** A repo where no size can finish. */
+export const HF_FILES_ALL_PROBLEM: HfFilesResult = {
+  ...HF_FILES,
+  sizes: HF_FILES.sizes.map((size) => ({ ...size, problem: MISSING_FILE })),
+};
 
 export type ModelsCase = Omit<ModelsViewProps, "actions" | "setup" | "pulls"> & { label: string; pulls?: PullsSnapshot };
 
@@ -190,6 +205,16 @@ const MANY_DOWNLOADS: PullsSnapshot = {
   failed: new Map([["ollama/qwen2.5-coder:7b", "no space left on the disk"]]),
 };
 
+const HF_FAILED_REF = "ollama/hf.co/unsloth/Qwen3.8-27B-GGUF:Q4_K_S";
+const HF_FAILED_WORDS = "Hugging Face is missing a file for this model. Try another repo or the Ollama library.";
+
+/** The download that failed after 16 GB: the reason in plain words, Ollama's text, and the parts left on disk. */
+export const HF_FAILED: PullsSnapshot = {
+  active: new Map(),
+  failed: new Map([[HF_FAILED_REF, HF_FAILED_WORDS]]),
+  extra: new Map([[HF_FAILED_REF, { detail: "file does not exist", leftoverGb: 16.2 }]]),
+};
+
 /** Get models as a page, in the states it draws. It covers the Models page, so the gallery draws it apart. */
 export const GET_CASES: { label: string; props: ModelsCase; pulls?: PullsSnapshot }[] = [
   { label: "Picked for this Mac", props: { ...GET_BASE, listing: listing(CATALOG), initial: { selected: "ollama", sheet: "get" } } },
@@ -207,5 +232,8 @@ export const GET_CASES: { label: string; props: ModelsCase; pulls?: PullsSnapsho
   { label: "Hugging Face, a search", props: { ...GET_BASE, listing: listing(CATALOG), initial: { selected: "ollama", sheet: "get", tab: "hf", search: "qwen3.8 27b", hf: { results: HF_RESULTS, files: HF_FILES } } } },
   { label: "Hugging Face, downloading", props: { ...GET_BASE, listing: listing(CATALOG), initial: { selected: "ollama", sheet: "get", tab: "hf", hf: { results: HF_RESULTS, files: HF_FILES } } }, pulls: HF_DOWNLOADING },
   { label: "Hugging Face, a repo that needs a token", props: { ...GET_BASE, listing: listing(CATALOG), initial: { selected: "ollama", sheet: "get", tab: "hf", hf: { results: HF_RESULTS, chosen: "meta-llama/Llama-4-Scout-GGUF" } } } },
+  { label: "Hugging Face, a size that cannot finish", props: { ...GET_BASE, listing: listing(CATALOG), initial: { selected: "ollama", sheet: "get", tab: "hf", hf: { results: HF_RESULTS, files: HF_FILES_ONE_PROBLEM } } } },
+  { label: "Hugging Face, no size can finish", props: { ...GET_BASE, listing: listing(CATALOG), initial: { selected: "ollama", sheet: "get", tab: "hf", hf: { results: HF_RESULTS, files: HF_FILES_ALL_PROBLEM } } } },
+  { label: "Hugging Face, a failed download with parts left", props: { ...GET_BASE, listing: listing(CATALOG), initial: { selected: "ollama", sheet: "get", tab: "hf", hf: { results: HF_RESULTS, files: HF_FILES } } }, pulls: HF_FAILED },
   { label: "Hugging Face, no result", props: { ...GET_BASE, listing: listing(CATALOG), initial: { selected: "ollama", sheet: "get", tab: "hf", search: "zzzz", hf: { results: { repos: [] } } } } },
 ];

@@ -139,6 +139,7 @@ import type { ModelCheckDone } from "../../protocol/gen/model-check-done.ts";
 import type { ModelCheckProgress } from "../../protocol/gen/model-check-progress.ts";
 import type { ModelCheckResult } from "../../protocol/gen/model-check-result.ts";
 import type { ModelPullCancelResult } from "../../protocol/gen/model-pull-cancel-result.ts";
+import type { ModelPullCleanupResult } from "../../protocol/gen/model-pull-cleanup-result.ts";
 import type { ModelPullDone } from "../../protocol/gen/model-pull-done.ts";
 import type { ModelPullProgress } from "../../protocol/gen/model-pull-progress.ts";
 import type { ModelPullResult } from "../../protocol/gen/model-pull-result.ts";
@@ -264,6 +265,7 @@ import {
   isCheckDone,
   isCheckProgress,
   isPullDone,
+  isPullCleanupResult,
   isPullProgress,
   isRefResult,
   isDeviceListResult,
@@ -594,6 +596,8 @@ export interface GolemClient {
   /** Start downloading. Progress reaches {@link GolemClient.onPull} on every connection. */
   pullModel(name: string): Promise<ModelPullResult>;
   cancelPull(name: string): Promise<ModelPullCancelResult>;
+  /** Remove the parts a failed download left on disk (the `leftover_gb` of its `done`). */
+  cleanupPull(ref: string): Promise<ModelPullCleanupResult>;
   deleteModel(name: string): Promise<ModelDeleteResult>;
   /** Looks for GGUF repos on Hugging Face. Only the query leaves this Mac. */
   searchHf(query: string, limit?: number): Promise<HfSearchResult>;
@@ -2251,6 +2255,14 @@ export function connectGolem(options: ConnectOptions): GolemClient {
         throw new Error("invalid model.pull_cancel result");
       }
       return result as ModelPullCancelResult;
+    },
+    async cleanupPull(ref: string): Promise<ModelPullCleanupResult> {
+      await ready;
+      const result = await call("model.pull_cleanup", { ref });
+      if (!isPullCleanupResult(result)) {
+        throw new Error("invalid model.pull_cleanup result");
+      }
+      return result;
     },
     async searchHf(query: string, limit?: number): Promise<HfSearchResult> {
       await ready;

@@ -7,11 +7,16 @@ export type PullsClient = Pick<GolemClient, "onPull" | "onState" | "setSessionMo
 /** A download in progress: its byte track for speed and time left, and the daemon's last words. */
 export type PullEntry = { track: PullTrack; status: string; progress: number | null };
 
+/** What a failure carries beyond its words: the daemon's own text, and the parts left on disk. */
+export type FailedExtra = { detail: string | null; leftoverGb: number | null };
+
 export type PullsSnapshot = {
   /** Downloads that are running, from any connection. */
   active: ReadonlyMap<string, PullEntry>;
   /** The last failure of a ref, until it starts again or ends well. A stop is not a failure. */
   failed: ReadonlyMap<string, string>;
+  /** More about a failure, by ref. A ref without a row here has only its words. */
+  extra?: ReadonlyMap<string, FailedExtra>;
 };
 
 export type Pulls = StoreSource<PullsSnapshot> & {
@@ -25,11 +30,13 @@ export type Pulls = StoreSource<PullsSnapshot> & {
   defaultWhenDone(ref: string, name: string): void;
   /** Drop the wishes for a download the person stopped, and its failure if it has one. */
   forget(ref: string): void;
+  /** The parts a failed download left were removed: its row stops offering to remove them. */
+  cleaned(ref: string): void;
   start(): void;
   stop(): void;
 };
 
-const EMPTY: PullsSnapshot = { active: new Map(), failed: new Map() };
+const EMPTY: PullsSnapshot = { active: new Map(), failed: new Map(), extra: new Map() };
 const CANCELLED = "cancelled";
 
 function without<V>(map: ReadonlyMap<string, V>, ref: string): ReadonlyMap<string, V> {
@@ -57,10 +64,15 @@ export function createPulls(client: PullsClient, now: () => number = Date.now, o
   let dropped = false;
 
   /** A new snapshot only when a map changed, so a no-op wakes nobody. */
-  function commit(active: PullsSnapshot["active"], failed: PullsSnapshot["failed"]): void {
+  function commit(active: PullsSnapshot["active"], failed: PullsSnapshot["failed"], more?: ReadonlyMap<string, FailedExtra>): void {
     const snapshot = store.getSnapshot();
-    if (active !== snapshot.active || failed !== snapshot.failed) {
-      store.set({ active, failed });
+    let extra = more ?? snapshot.extra ?? new Map<string, FailedExtra>();
+    // More about a failure goes with the failure.
+    for (const ref of extra.keys()) {
+      if (!failed.has(ref)) extra = without(extra, ref);
+    }
+    if (active !== snapshot.active || failed !== snapshot.failed || extra !== snapshot.extra) {
+      store.set({ active, failed, extra });
     }
   }
 
@@ -73,7 +85,7 @@ export function createPulls(client: PullsClient, now: () => number = Date.now, o
   }
 
   function done(update: Extract<PullUpdate, { kind: "done" }>): void {
-    const { ref, ok, error } = update.done;
+    const { ref, ok, error, detail, leftover_gb: leftover } = update.done;
     const snapshot = store.getSnapshot();
     const sessionId = wishes.get(ref);
     wishes.delete(ref);
@@ -83,7 +95,12 @@ export function createPulls(client: PullsClient, now: () => number = Date.now, o
       ok || error === CANCELLED
         ? without(snapshot.failed, ref)
         : withEntry(snapshot.failed, ref, error ?? "The download failed.");
-    commit(without(snapshot.active, ref), failed);
+    const known = snapshot.extra ?? new Map<string, FailedExtra>();
+    const more =
+      ok || error === CANCELLED || (detail == null && leftover == null)
+        ? without(known, ref)
+        : withEntry(known, ref, { detail: detail ?? null, leftoverGb: leftover ?? null });
+    commit(without(snapshot.active, ref), failed, more);
     if (ok && sessionId !== undefined) {
       client.setSessionModel(sessionId, ref).catch(() => undefined);
     }
@@ -120,6 +137,12 @@ export function createPulls(client: PullsClient, now: () => number = Date.now, o
       defaults.delete(ref);
       const snapshot = store.getSnapshot();
       commit(snapshot.active, without(snapshot.failed, ref));
+    },
+    cleaned(ref) {
+      const snapshot = store.getSnapshot();
+      const known = snapshot.extra?.get(ref);
+      if (known === undefined || known.leftoverGb === null) return;
+      commit(snapshot.active, snapshot.failed, withEntry(snapshot.extra ?? new Map<string, FailedExtra>(), ref, { ...known, leftoverGb: null }));
     },
     start() {
       if (offs !== undefined) {

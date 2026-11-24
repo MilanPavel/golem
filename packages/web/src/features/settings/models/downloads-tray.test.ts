@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
 import type { PullEntry, PullsSnapshot } from "../../../store/pulls.ts";
-import { dismissFailed, dismissReady, EMPTY_TRAY, stopTray, trayName, trayRows, trayStatus, trayText, watchTray } from "./downloads-tray.ts";
+import { dismissFailed, dismissReady, EMPTY_TRAY, leftoverText, stopTray, trayName, trayRows, trayStatus, trayText, watchTray } from "./downloads-tray.ts";
 
 const REF = "ollama/gemma4:12b";
 const HF = "ollama/hf.co/unsloth/Qwen3.8-27B-Instruct-GGUF:Q4_K_M";
@@ -80,4 +80,13 @@ test("a stop is not ready, and the same download started again and finished is",
   expect(stopped.stopped.size).toBe(0);
   const again = watchTray(stopped, snapshot([[REF, entry(7.9e9, 8e9)]]), NONE);
   expect(watchTray(again, snapshot(), NONE).ready).toEqual([REF]);
+});
+
+test("a failed row carries the daemon's text and the parts left on disk", () => {
+  const pulls: PullsSnapshot = { ...snapshot([], [[HF, "Hugging Face is missing a file for this model."]]), extra: new Map([[HF, { detail: "file does not exist", leftoverGb: 16.2 }]]) };
+  const [row] = trayRows(EMPTY_TRAY, pulls);
+  expect(row).toMatchObject({ kind: "failed", name: "unsloth/Qwen3.8-27B-Instruct-GGUF:Q4_K_M", detail: "file does not exist", leftoverGb: 16.2 });
+  expect(leftoverText(16.2)).toBe("16.2 GB of this download is still on disk.");
+  const plain = trayRows(EMPTY_TRAY, snapshot([], [[REF, "boom"]]));
+  expect(plain[0]).toMatchObject({ detail: null, leftoverGb: null });
 });

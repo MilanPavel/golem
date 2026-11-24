@@ -8222,11 +8222,15 @@ public struct HFFilesResult: Codable {
 ///
 /// ``fit`` is null when golem cannot tell how much memory this Mac has. ``recommended``
 /// marks
-/// the size to pick: ``Q4_K_M`` when it fits, else the largest that fits.
+/// the size to pick: ``Q4_K_M`` when it fits, else the largest that fits. ``problem`` is set
+/// only when Hugging Face answered that a file the download needs is missing; it is never
+/// set
+/// on doubt.
 // MARK: - SizeElement
 public struct SizeElement: Codable {
     public let files: Int
     public let fit: Fit?
+    public let problem: String?
     public let quant: String
     public let recommended: Bool
     public let sizeGB: Double
@@ -8234,14 +8238,16 @@ public struct SizeElement: Codable {
     public enum CodingKeys: String, CodingKey {
         case files = "files"
         case fit = "fit"
+        case problem = "problem"
         case quant = "quant"
         case recommended = "recommended"
         case sizeGB = "size_gb"
     }
 
-    public init(files: Int, fit: Fit?, quant: String, recommended: Bool, sizeGB: Double) {
+    public init(files: Int, fit: Fit?, problem: String?, quant: String, recommended: Bool, sizeGB: Double) {
         self.files = files
         self.fit = fit
+        self.problem = problem
         self.quant = quant
         self.recommended = recommended
         self.sizeGB = sizeGB
@@ -8344,11 +8350,15 @@ public struct RepoElement: Codable {
 ///
 /// ``fit`` is null when golem cannot tell how much memory this Mac has. ``recommended``
 /// marks
-/// the size to pick: ``Q4_K_M`` when it fits, else the largest that fits.
+/// the size to pick: ``Q4_K_M`` when it fits, else the largest that fits. ``problem`` is set
+/// only when Hugging Face answered that a file the download needs is missing; it is never
+/// set
+/// on doubt.
 // MARK: - HFSize
 public struct HFSize: Codable {
     public let files: Int
     public let fit: Fit?
+    public let problem: String?
     public let quant: String
     public let recommended: Bool
     public let sizeGB: Double
@@ -8356,14 +8366,16 @@ public struct HFSize: Codable {
     public enum CodingKeys: String, CodingKey {
         case files = "files"
         case fit = "fit"
+        case problem = "problem"
         case quant = "quant"
         case recommended = "recommended"
         case sizeGB = "size_gb"
     }
 
-    public init(files: Int, fit: Fit?, quant: String, recommended: Bool, sizeGB: Double) {
+    public init(files: Int, fit: Fit?, problem: String?, quant: String, recommended: Bool, sizeGB: Double) {
         self.files = files
         self.fit = fit
+        self.problem = problem
         self.quant = quant
         self.recommended = recommended
         self.sizeGB = sizeGB
@@ -15273,6 +15285,41 @@ public struct ModelPullCancelResult: Codable {
     }
 }
 
+/// ``model.pull_cleanup``. Remove the parts a failed download of ``ref`` left behind.
+///
+/// Only the parts named in that download's ``leftover_gb`` go, and only while no model uses
+/// them
+/// and no download of ``ref`` runs.
+// MARK: - ModelPullCleanupParams
+public struct ModelPullCleanupParams: Codable {
+    public let ref: String
+
+    public enum CodingKeys: String, CodingKey {
+        case ref = "ref"
+    }
+
+    public init(ref: String) {
+        self.ref = ref
+    }
+}
+
+/// ``freed_gb`` is 0 when nothing was left to remove.
+// MARK: - ModelPullCleanupResult
+public struct ModelPullCleanupResult: Codable {
+    public let freedGB: Double
+    public let ref: String
+
+    public enum CodingKeys: String, CodingKey {
+        case freedGB = "freed_gb"
+        case ref = "ref"
+    }
+
+    public init(freedGB: Double, ref: String) {
+        self.freedGB = freedGB
+        self.ref = ref
+    }
+}
+
 /// Server → every connection: a download ended. Not stored.
 // MARK: - ModelPullDoneNotification
 public struct ModelPullDoneNotification: Codable {
@@ -15298,40 +15345,64 @@ public enum ModelPullDoneNotificationMethod: String, Codable {
 }
 
 /// A download ended. ``error`` says why when ``ok`` is false; ``cancelled`` for a stop.
+///
+/// ``error`` is plain words. ``detail`` is Ollama's own text when it differs.
+/// ``leftover_gb`` is
+/// the size of downloaded parts that no model uses, when a failed download left 0.1 GB or
+/// more;
+/// ``model.pull_cleanup`` removes them.
 // MARK: - ModelPullDoneNotificationParams
 public struct ModelPullDoneNotificationParams: Codable {
+    public let detail: String?
     public let error: String?
+    public let leftoverGB: Double?
     public let ok: Bool
     public let ref: String
 
     public enum CodingKeys: String, CodingKey {
+        case detail = "detail"
         case error = "error"
+        case leftoverGB = "leftover_gb"
         case ok = "ok"
         case ref = "ref"
     }
 
-    public init(error: String?, ok: Bool, ref: String) {
+    public init(detail: String?, error: String?, leftoverGB: Double?, ok: Bool, ref: String) {
+        self.detail = detail
         self.error = error
+        self.leftoverGB = leftoverGB
         self.ok = ok
         self.ref = ref
     }
 }
 
 /// A download ended. ``error`` says why when ``ok`` is false; ``cancelled`` for a stop.
+///
+/// ``error`` is plain words. ``detail`` is Ollama's own text when it differs.
+/// ``leftover_gb`` is
+/// the size of downloaded parts that no model uses, when a failed download left 0.1 GB or
+/// more;
+/// ``model.pull_cleanup`` removes them.
 // MARK: - ModelPullDone
 public struct ModelPullDone: Codable {
+    public let detail: String?
     public let error: String?
+    public let leftoverGB: Double?
     public let ok: Bool
     public let ref: String
 
     public enum CodingKeys: String, CodingKey {
+        case detail = "detail"
         case error = "error"
+        case leftoverGB = "leftover_gb"
         case ok = "ok"
         case ref = "ref"
     }
 
-    public init(error: String?, ok: Bool, ref: String) {
+    public init(detail: String?, error: String?, leftoverGB: Double?, ok: Bool, ref: String) {
+        self.detail = detail
         self.error = error
+        self.leftoverGB = leftoverGB
         self.ok = ok
         self.ref = ref
     }
