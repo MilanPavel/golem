@@ -1,6 +1,6 @@
 import { render, screen, within } from "@testing-library/react";
 import { expect, test } from "vitest";
-import { IDLE_SETUP, MODELS_CASES, NO_ACTIONS, NO_PULLS, SHEET_CASES } from "../features/settings/models/models-sample.ts";
+import { GET_CASES, IDLE_SETUP, MODELS_CASES, NO_ACTIONS, NO_PULLS, SHEET_CASES } from "../features/settings/models/models-sample.ts";
 import { ModelsView } from "../features/settings/models/models-view.tsx";
 import { Gallery } from "./gallery.tsx";
 import { DIALOG_RULES, expectAxeClean, resetThemeAfterEach, showTheme } from "./gallery-test-utils.ts";
@@ -23,6 +23,29 @@ for (const theme of ["slip", "kiln"] as const) {
         expect(page.getByRole("progressbar")).toBeTruthy();
         expect(page.getByText(/Remove qwen3.8:27b from Ollama/)).toBeTruthy();
       }
+      await expectAxeClean(region, DIALOG_RULES);
+    });
+  }
+  for (const { label } of GET_CASES) {
+    test(`the gallery's Get models page shows "${label}" in ${theme}, and passes axe`, async () => {
+      showTheme(theme);
+      render(<Gallery />);
+      const region = screen.getByRole("region", { name: `Get models, ${label}` });
+      const page = within(region);
+      expect(page.getByRole("heading", { name: "Get models" })).toBeTruthy();
+      expect(page.queryByRole("group", { name: "Providers" })).toBeNull();
+      expect(page.getAllByRole("tab")).toHaveLength(3);
+      expect(page.getByText("Downloads keep going when you leave.")).toBeTruthy();
+      if (label === "Picked for this Mac") {
+        expect(page.getByRole("group", { name: "Recommended for this Mac" })).toBeTruthy();
+        expect(page.getByRole("button", { name: "Download gpt-oss:120b" }).textContent).toBe("Download anyway");
+      }
+      if (label === "Picked for this Mac, downloading") {
+        // The card and the line both show it.
+        expect(page.getAllByRole("progressbar", { name: "Downloading gemma4:12b" })).toHaveLength(2);
+        expect(page.getByText("Download failed: no space left on the disk")).toBeTruthy();
+      }
+      if (label === "Picked for this Mac, no match") expect(page.getByText("Not in golem's list")).toBeTruthy();
       await expectAxeClean(region, DIALOG_RULES);
     });
   }
