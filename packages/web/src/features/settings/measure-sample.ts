@@ -5,7 +5,7 @@ import type { MeasureLive } from "@golem/view";
 
 export const SAMPLE_ARMS: readonly EvalPlanArm[] = [
   { name: "local-32k", label: "Local, 32K window", kind: "local", tier: "local", model: "ollama/qwen3.8:27b", window: 32768, asks: 10, minutes: 35, verdict: "tight", needed_gb: 21.1, ram_gb: 36, free_gb: 24.3, reason: "It fits, but it takes more than half of the memory. Save your work in other apps first.", choices: [{ ref: "ollama/qwen3.8:27b", size_gb: 18.2 }, { ref: "ollama/qwen3.8:8b", size_gb: 5.2 }] },
-  { name: "local-128k", label: "Local, 128K window", kind: "local", tier: "local", model: "ollama/qwen3.8:27b", window: 131072, asks: 10, minutes: 45, verdict: "too_big", needed_gb: 26.9, ram_gb: 36, free_gb: 24.3, reason: "Does not fit on this Mac with this model. Pick a smaller model for this arm, or leave it out." },
+  { name: "local-64k", label: "Local, 64K window", kind: "local", tier: "local", model: "ollama/qwen3.8:27b", window: 65536, asks: 10, minutes: 45, verdict: "too_big", needed_gb: 26.9, ram_gb: 36, free_gb: 24.3, reason: "Does not fit on this Mac with this model. Pick a smaller model for this arm, or leave it out." },
   { name: "budget", label: "Budget cloud", kind: "cloud", tier: "budget", model: "claude-haiku-5-5", window: 32768, asks: 10, minutes: 5, cost_usd: 0.4, reason: "Costs money. Helpers go to the same model or a cheaper one." },
   { name: "frontier", label: "Frontier cloud", kind: "cloud", tier: "frontier", model: "claude-opus-5-5", window: 32768, asks: 10, minutes: 8, cost_usd: 6, reason: "Costs money. Answers the open question: should large reads go to a cheaper model?" },
 ];

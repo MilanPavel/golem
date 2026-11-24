@@ -24,7 +24,7 @@ const WHEN = "2026-11-24T14:02:00";
 
 const ARMS: EvalPlanArm[] = [
   { name: "local-32k", label: "Local, 32K window", kind: "local", tier: "local", model: "ollama/qwen3.8:27b", window: 32768, asks: 10, minutes: 35, verdict: "tight", needed_gb: 21.1, ram_gb: 36, free_gb: 24.3 },
-  { name: "local-128k", label: "Local, 128K window", kind: "local", tier: "local", model: "ollama/qwen3.8:27b", window: 131072, asks: 10, minutes: 45, verdict: "too_big", needed_gb: 26.9, ram_gb: 36, free_gb: 24.3 },
+  { name: "local-64k", label: "Local, 64K window", kind: "local", tier: "local", model: "ollama/qwen3.8:27b", window: 65536, asks: 10, minutes: 45, verdict: "too_big", needed_gb: 26.9, ram_gb: 36, free_gb: 24.3 },
   { name: "budget", label: "Budget cloud", kind: "cloud", tier: "budget", model: "claude-haiku-5-5", window: 32768, asks: 10, minutes: 5, cost_usd: 0.4 },
   { name: "frontier", label: "Frontier cloud", kind: "cloud", tier: "frontier", model: "claude-opus-5-5", window: 32768, asks: 10, minutes: 8, cost_usd: 6 },
 ];
@@ -105,7 +105,7 @@ test("list, ready: arms with the memory line, a tight tag, earlier ones below", 
   const out = text(openMeasure(), data());
   assert.match(out[0]!, /^Agents › Measure +esc back$/);
   assert.ok(out.some((l) => /\[ \] Local, 32K window\s+qwen3\.8:27b\s+needs 21\.1 GB of 36 GB, 24\.3 GB free\s+TIGHT/.test(l)));
-  assert.ok(out.some((l) => /\[ \] Local, 128K window.*TOO BIG/.test(l)));
+  assert.ok(out.some((l) => /\[ \] Local, 64K window.*TOO BIG/.test(l)));
   assert.ok(out.some((l) => /Budget cloud.*no memory, about \$0\.40\s+PAID/.test(l)));
   assert.ok(out.some((l) => l.includes("earlier")));
   assert.ok(out.some((l) => /Done\s+21 Nov\s+Budget · claude-haiku-5-5 · 20 runs · \$0\.38/.test(l)));
@@ -127,9 +127,9 @@ test("list, no room: a warning shows and the arm can still be ticked", () => {
 
 test("too big is a warning too: space ticks it, the box says own risk, start sends own_risk", () => {
   const down = press(openMeasure(), data(), "down", "space");
-  assert.deepEqual(down.state.list.ticked, ["local-128k"]);
+  assert.deepEqual(down.state.list.ticked, ["local-64k"]);
   assert.equal(press(down.state, data(), "enter").action.kind, "none");
-  assert.deepEqual(press(down.state, data(), "saved", "enter").action, { kind: "start", arms: ["local-128k"], allowTight: true, ownRisk: true });
+  assert.deepEqual(press(down.state, data(), "saved", "enter").action, { kind: "start", arms: ["local-64k"], allowTight: true, ownRisk: true });
 });
 
 test("an arm with no model to run still cannot be ticked", () => {
