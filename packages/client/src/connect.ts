@@ -791,8 +791,8 @@ export interface GolemClient {
   evalsStart(params: EvalsStartParams): Promise<EvalsStartResult>;
   /** `evals.stop`: stop a running measurement and keep the runs done. `stopped` is false when it was not running. */
   evalsStop(id: string): Promise<EvalsStopResult>;
-  /** `evals.resume`: play the runs a stopped measurement did not play. `allowTight` is asked for again. */
-  evalsResume(id: string, allowTight?: boolean): Promise<EvalsResumeResult>;
+  /** `evals.resume`: play the runs a stopped measurement did not play. `allowTight` and `ownRisk` are asked for again. */
+  evalsResume(id: string, allowTight?: boolean, ownRisk?: boolean): Promise<EvalsResumeResult>;
   /** `evals.list`: the measurements kept on this Mac, the newest first. */
   evalsList(): Promise<EvalsListResult>;
   /** `evals.get`: one measurement with its runs and its proposal. */
@@ -2808,9 +2808,13 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       }
       return result;
     },
-    async evalsResume(id: string, allowTight?: boolean): Promise<EvalsResumeResult> {
+    async evalsResume(id: string, allowTight?: boolean, ownRisk?: boolean): Promise<EvalsResumeResult> {
       await ready;
-      const result = await call("evals.resume", allowTight === undefined ? { id } : { id, allow_tight: allowTight });
+      const result = await call("evals.resume", {
+        id,
+        ...(allowTight === undefined ? {} : { allow_tight: allowTight }),
+        ...(ownRisk === undefined ? {} : { own_risk: ownRisk }),
+      });
       if (!isEvalsResumeResult(result)) {
         throw new Error("invalid evals.resume result");
       }

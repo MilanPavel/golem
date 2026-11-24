@@ -10,7 +10,9 @@ from golem_protocol.commands import (
     AgentsDelegateValues,
     AgentsKeepParams,
     AgentsKeepValues,
+    EvalArmParams,
     EvalArmUsed,
+    EvalAsk,
     EvalEnded,
     EvalMeasurement,
     EvalModelChoice,
@@ -400,3 +402,91 @@ def test_agents_keep_values_carry_the_delegate_numbers_read_only() -> None:
         AgentsKeepParams.model_validate({"delegate": {"read_share": 0.5}})
     with pytest.raises(ValidationError):
         AgentsDelegateNumber.model_validate({"value": 1, "default": 1})
+
+
+def test_own_risk_asks_and_what_a_run_kept() -> None:
+    assert EvalsStartParams(arms=["a"]).own_risk is False
+    _round_trips(EvalsStartParams(arms=["local-32k"], own_risk=True))
+    assert EvalsResumeParams(id="7f3a").own_risk is False
+    _round_trips(EvalsResumeParams(id="7f3a", allow_tight=True, own_risk=True))
+    ask = EvalAsk(
+        name="rename",
+        text="rename old_name to new_name everywhere",
+        facts=["new_name", "six or 6"],
+        setup="6 small files",
+        reason="none",
+        why="A plain ask: no helper is needed.",
+    )
+    params = EvalArmParams(
+        name="local-32k", model="ollama/q", window=32768, at_a_time=1, helper_model="the same"
+    )
+    _round_trips(ask)
+    _round_trips(params)
+    _round_trips(
+        EvalsPlanResult(
+            arms=[
+                EvalPlanArm(
+                    name="local-32k",
+                    label="Local",
+                    kind="local",
+                    tier="local",
+                    window=32768,
+                    model="ollama/q",
+                    verdict="no_room",
+                    loaded_gb=7.7,
+                    asks=1,
+                )
+            ],
+            asks=[ask],
+        )
+    )
+    with pytest.raises(ValidationError):  # a hosted arm takes no memory, loaded included
+        EvalPlanArm(
+            name="b",
+            label="B",
+            kind="cloud",
+            tier="budget",
+            window=1,
+            model="m",
+            loaded_gb=1.0,
+            asks=1,
+        )
+    done = EvalRun(
+        arm="a",
+        ask="rename",
+        mode="on",
+        end="completed",
+        quality=0.5,
+        seconds=1.0,
+        window_left=0.5,
+        helpers_started=0,
+        answer="x" * 2000,
+        found=["new_name"],
+        missing=["six or 6"],
+    )
+    _round_trips(done)
+    with pytest.raises(ValidationError):  # the answer is kept up to 2,000 characters
+        done.model_copy(update={"answer": "x" * 2001}).model_validate(
+            done.model_copy(update={"answer": "x" * 2001}).model_dump()
+        )
+    with pytest.raises(ValidationError):  # a run that did not play has no answer
+        EvalRun(arm="a", ask="rename", mode="on", end="not_run", answer="hi")
+    got = EvalMeasurement(
+        id="m",
+        started_at="2026-11-24T14:00:00+00:00",
+        state="running",
+        arms=[EvalArmUsed(name="local-32k", model="ollama/q")],
+        runs=[],
+    )
+    assert got.own_risk is False and got.asks == [] and got.arm_params == [] and got.rules == {}
+    _round_trips(
+        got.model_copy(
+            update={
+                "asks": [ask],
+                "arm_params": [params],
+                "rules": {"read_share": 0.3},
+                "golem_version": "0.9.1",
+                "own_risk": True,
+            }
+        )
+    )

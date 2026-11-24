@@ -48,13 +48,27 @@ An **arm** is a model with a window size, such as "Local, 32K window" or "Budget
 
 ### Memory rules
 
-A local model that does not fit can freeze the Mac, so golem checks memory before it starts and again before each run.
+A local model that does not fit can make the Mac stop answering, so golem checks memory before it starts and warns you. It warns; it does not forbid. The choice is yours.
 
-- **Too big** (the model and its window need more than this Mac has) and **no room** (not enough memory is free now) cannot be started. There is no way around it. Close other apps and press **Check memory again**.
-- **Tight** (it fits, but takes more than half of the memory) starts only after you tick "I saved my work. Run although memory is tight." On the command line add `--allow-tight`.
+- **Fits.** Nothing to tick.
+- **Tight** (it fits, but takes more than half of the memory) starts after you tick "I saved my work. Run although memory is tight." On the command line add `--allow-tight`.
+- **Too big** (the model and its window need more than this Mac has), **no room** (not enough memory is free now) and **not known** (the memory could not be read) show a warning, and you can still run them at your own risk. Tick "I saved my work. Run at my own risk: this can make the Mac stop answering." On the command line add `--own-risk`. golem notes in the measurement that it was started at your own risk.
+- A model that Ollama already holds in memory is not counted as missing memory. Only the memory still to load is checked against the free memory, so the second half of a measurement is not refused because the model is loaded.
+- Only an arm with nothing to run cannot be started: a model that is not installed, or a paid model without a key.
 - One model and one request run at a time.
-- The run stops by itself when memory runs low or the model server stops answering. It says why.
-- A stopped run can be **continued**. It plays only the runs that did not run, and it asks the same memory question again. Stopped runs are kept, and a run that did not play is never counted.
+- Even at your own risk, the run stops by itself when the free memory gets very low (below about 1.5 GB), or when the model server stops answering. It says why. This is the one stop that stays, to keep the Mac answering.
+- A stopped run can be **continued**. It plays only the runs that did not run, and it asks the same memory question again: the same warning and the same box. Stopped runs are kept, and a run that did not play is never counted.
+
+### What is asked
+
+Every measurement plays the same fixed asks. You can read them before anything starts and see them again after a run.
+
+- **Before a start.** On the Measure tab, under **New measurement**, open **See the N asks**. In the terminal UI press `a` on the list. On the command line run `golem eval helpers asks`.
+- **For each ask** you see the message sent to the model, what the answer must mention, what the ask is set up with (for example "6 small files" or "24 modules of 60 lines") and why it is in the set: a plain ask, a large reading that can crowd the window, independent jobs, or a question a stronger or cheaper model may fit better.
+- **After a run.** Each row of the runs table opens to the message, the facts the answer was checked for (marked found or missing) and the model's answer, kept up to 2,000 characters. The **Answer** column is the share of those facts found, from 0 to 1. In the terminal UI press `a` on a measurement to list its runs and `o` to open one. On the command line `golem eval helpers show <id> --verbose` prints every run, and `--ask <name>` prints the runs of one ask.
+- **Parameters.** Above the table, **Parameters** lists for each arm the model, the window in tokens, that one request runs at a time, which model helpers use, the four helper rules in force when it started, and the golem version. It also says when the measurement was started at your own risk.
+
+A measurement kept before this was added shows the asks as they are now, and no answers.
 
 ### Paid arms
 

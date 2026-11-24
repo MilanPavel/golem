@@ -1,3 +1,3 @@
-import type { EvalMeasurement, EvalPlanArm, EvalRun, EvalSummary, EvalUpdate, EvalsPlanResult } from "@golem/client";
+import type { EvalArmParams, EvalAsk, EvalMeasurement, EvalPlanArm, EvalRun, EvalSummary, EvalUpdate, EvalsPlanResult } from "@golem/client";
 
-export type { EvalMeasurement, EvalPlanArm, EvalRun, EvalSummary, EvalUpdate, EvalsPlanResult };
+export type { EvalArmParams, EvalAsk, EvalMeasurement, EvalPlanArm, EvalRun, EvalSummary, EvalUpdate, EvalsPlanResult };

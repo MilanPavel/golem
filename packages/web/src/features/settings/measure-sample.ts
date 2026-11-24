@@ -1,4 +1,4 @@
-import type { EvalMeasurement, EvalPlanArm, EvalRun, EvalSummary } from "../../store/evals.ts";
+import type { EvalArmParams, EvalAsk, EvalMeasurement, EvalPlanArm, EvalRun, EvalSummary } from "../../store/evals.ts";
 import type { MeasureLive } from "@golem/view";
 
 /** Made-up arms, measurements and numbers for the gallery. Nothing here was measured. */
@@ -8,6 +8,19 @@ export const SAMPLE_ARMS: readonly EvalPlanArm[] = [
   { name: "local-128k", label: "Local, 128K window", kind: "local", tier: "local", model: "ollama/qwen3.8:27b", window: 131072, asks: 10, minutes: 45, verdict: "too_big", needed_gb: 26.9, ram_gb: 36, free_gb: 24.3, reason: "Does not fit on this Mac with this model. Pick a smaller model for this arm, or leave it out." },
   { name: "budget", label: "Budget cloud", kind: "cloud", tier: "budget", model: "claude-haiku-5-5", window: 32768, asks: 10, minutes: 5, cost_usd: 0.4, reason: "Costs money. Helpers go to the same model or a cheaper one." },
   { name: "frontier", label: "Frontier cloud", kind: "cloud", tier: "frontier", model: "claude-opus-5-5", window: 32768, asks: 10, minutes: 8, cost_usd: 6, reason: "Costs money. Answers the open question: should large reads go to a cheaper model?" },
+];
+
+/** The asks of the set, made up for the gallery. */
+export const SAMPLE_ASKS: readonly EvalAsk[] = [
+  { name: "Find where a setting is read", text: "where is the setting use_helpers read?", facts: ["config.py", "use_helpers"], setup: "6 small files", reason: "none", why: "A plain ask: no helper is needed." },
+  { name: "Summarise one file", text: "what does double in util.py do?", facts: ["x * 2 or times two or twice or doubles"], setup: "1 small file", reason: "none", why: "A plain ask: no helper is needed." },
+  { name: "Read the whole repo", text: "in the folder, list the modules that define handle_ functions", facts: ["orbit", "ember"], setup: "24 modules of 60 lines", reason: "window", why: "The reading is large, so it can crowd the model's window." },
+  { name: "Trace a bug across modules", text: "list the modules that define handle_ functions, and also count the modules that define filler_0 functions, as two separate jobs", facts: ["falcon"], setup: "28 modules of 60 lines, 2 separate jobs", reason: "at_once", why: "Independent jobs that can run at the same time." },
+  { name: "Compare two designs", text: "which of the two designs answers a question better, and why?", facts: ["cache"], setup: "one hard question", reason: "model", why: "A stronger or cheaper model may fit this one better." },
+];
+
+export const SAMPLE_PARAMS: readonly EvalArmParams[] = [
+  { name: "local-32k", model: "ollama/qwen3.8:27b", window: 32768, at_a_time: 1, helper_model: "the same model as the lead (no second model is loaded)" },
 ];
 
 export const SAMPLE_ARMS_NO_ROOM: readonly EvalPlanArm[] = SAMPLE_ARMS.map((arm, at) =>
@@ -25,7 +38,9 @@ function runs(played: number, over: "none" | "stopped" = "none"): EvalRun[] {
       const big = ASKS.indexOf(ask) >= 2;
       const base = { arm: "local-32k", ask, mode };
       if (at < played) {
-        all.push({ ...base, end: "completed", quality: mode === "on" && big ? 0.9 : 0.8, seconds: mode === "on" && big ? 95 : 70, window_left: mode === "on" && big ? 0.6 : 0.4, helpers_started: mode === "on" && big ? 3 : 0 });
+        const facts = SAMPLE_ASKS.find((each) => each.name === ask)?.facts ?? [];
+        const held = mode === "on" && big ? facts.length : Math.max(facts.length - 1, 0);
+        all.push({ ...base, end: "completed", answer: `I read the files and answered: ${facts.slice(0, held).join(", ")}.`, found: facts.slice(0, held), missing: facts.slice(held), quality: mode === "on" && big ? 0.9 : 0.8, seconds: mode === "on" && big ? 95 : 70, window_left: mode === "on" && big ? 0.6 : 0.4, helpers_started: mode === "on" && big ? 3 : 0 });
       } else if (at === played && over === "none") {
         all.push({ ...base, end: "running" });
       } else {
@@ -39,9 +54,13 @@ function runs(played: number, over: "none" | "stopped" = "none"): EvalRun[] {
 
 const ARMS = [{ name: "local-32k", model: "qwen3.8:27b" }];
 
-export const SAMPLE_RUNNING: EvalMeasurement = { id: "m1", arms: ARMS, runs: runs(5), started_at: WHEN, state: "running" };
+const EXTRA = { asks: [...SAMPLE_ASKS], arm_params: [...SAMPLE_PARAMS], rules: { read_share: 0.3, fill_share: 0.85, job_share: 0.1, price_ratio: 3 }, golem_version: "0.9.1" };
+
+export const SAMPLE_RUNNING: EvalMeasurement = { id: "m1", arms: ARMS, runs: runs(5), started_at: WHEN, state: "running", ...EXTRA };
 export const SAMPLE_LIVE: MeasureLive = { id: "m1", index: 6, total: 10, arm: "local-32k", mode: "on", ask: "Read the whole repo", elapsed: 760, memoryUsedGb: 33, memoryTotalGb: 36 };
-export const SAMPLE_STOPPED: EvalMeasurement = { id: "m1", arms: ARMS, runs: runs(3, "stopped"), started_at: WHEN, state: "stopped", stop_reason: "Ollama stopped answering." };
+export const SAMPLE_STOPPED: EvalMeasurement = { id: "m1", arms: ARMS, runs: runs(3, "stopped"), started_at: WHEN, state: "stopped", stop_reason: "Ollama stopped answering.", ...EXTRA };
+/** Stopped by the memory floor after a start at the person's own risk. */
+export const SAMPLE_STOPPED_OWN_RISK: EvalMeasurement = { ...SAMPLE_STOPPED, stop_reason: "The Mac is running low on memory.", own_risk: true };
 export const SAMPLE_DONE: EvalMeasurement = {
   id: "m1",
   arms: ARMS,
@@ -49,6 +68,7 @@ export const SAMPLE_DONE: EvalMeasurement = {
   started_at: WHEN,
   ended_at: "2026-11-24T14:36:10",
   state: "done",
+  ...EXTRA,
   proposal: {
     pairs: 5,
     wins: 3,

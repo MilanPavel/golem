@@ -7,6 +7,7 @@ import type { EvalSummary } from "../../protocol/gen/eval-summary.ts";
 import {
   clock,
   costLine,
+  formatAsks,
   formatList,
   formatMeasurement,
   formatPlan,
@@ -44,24 +45,29 @@ const CLOUD: EvalPlanArm = {
 };
 
 test("parse: the plan, a start, and the sub-commands", () => {
-  assert.deepEqual(parseHelpersArgs([]), { kind: "start", arms: [], models: {}, allowTight: false });
+  assert.deepEqual(parseHelpersArgs([]), { kind: "start", arms: [], models: {}, allowTight: false, ownRisk: false });
+  assert.deepEqual(parseHelpersArgs(["--arm", "a", "--own-risk"]), { kind: "start", arms: ["a"], models: {}, allowTight: false, ownRisk: true });
   assert.deepEqual(parseHelpersArgs(["--arm", "a", "--arm", "b", "--model", "a=x:1b", "--allow-tight"]), {
     kind: "start",
     arms: ["a", "b"],
     models: { a: "x:1b" },
     allowTight: true,
+    ownRisk: false,
   });
   assert.deepEqual(parseHelpersArgs(["list"]), { kind: "list" });
-  assert.deepEqual(parseHelpersArgs(["show", "7f3a"]), { kind: "show", id: "7f3a" });
+  assert.deepEqual(parseHelpersArgs(["show", "7f3a"]), { kind: "show", id: "7f3a", verbose: false });
+  assert.deepEqual(parseHelpersArgs(["show", "7f3a", "--ask", "rename", "--verbose"]), { kind: "show", id: "7f3a", ask: "rename", verbose: true });
+  assert.deepEqual(parseHelpersArgs(["asks"]), { kind: "asks" });
   assert.deepEqual(parseHelpersArgs(["stop"]), { kind: "stop" });
   assert.deepEqual(parseHelpersArgs(["stop", "7f3a"]), { kind: "stop", id: "7f3a" });
-  assert.deepEqual(parseHelpersArgs(["resume", "7f3a", "--allow-tight"]), { kind: "resume", id: "7f3a", allowTight: true });
+  assert.deepEqual(parseHelpersArgs(["resume", "7f3a", "--allow-tight"]), { kind: "resume", id: "7f3a", allowTight: true, ownRisk: false });
+  assert.deepEqual(parseHelpersArgs(["resume", "7f3a", "--own-risk"]), { kind: "resume", id: "7f3a", allowTight: false, ownRisk: true });
   assert.deepEqual(parseHelpersArgs(["apply", "7f3a"]), { kind: "apply", id: "7f3a" });
   assert.deepEqual(parseHelpersArgs(["delete", "7f3a"]), { kind: "delete", id: "7f3a" });
 });
 
 test("parse: wrong arguments are errors", () => {
-  for (const args of [["show"], ["list", "x"], ["resume"], ["--arm"], ["--model", "nope"], ["--model", "a="], ["--bogus"], ["x"], ["apply", "--x"]]) {
+  for (const args of [["show"], ["show", "7f3a", "--ask"], ["asks", "x"], ["list", "x"], ["resume"], ["--arm"], ["--model", "nope"], ["--model", "a="], ["--bogus"], ["x"], ["apply", "--x"]]) {
     assert.equal(parseHelpersArgs(args).kind, "error", args.join(" "));
   }
 });
@@ -84,10 +90,12 @@ test("refusals: unknown, too big, no room, tight", () => {
   assert.deepEqual(refusals(plan, ["budget-cloud"], false), []);
   assert.deepEqual(refusals(plan, ["local-32k"], true), []);
   assert.match(refusals(plan, ["local-32k"], false)[0] ?? "", /tight on memory.*Save your work.*--allow-tight/);
-  assert.match(refusals(plan, ["big"], true)[0] ?? "", /big cannot run \(too big\)/);
-  assert.match(refusals(plan, ["full"], true)[0] ?? "", /full cannot run \(no room now\)/);
+  assert.match(refusals(plan, ["big"], true)[0] ?? "", /big is too big.*your own risk.*--own-risk/);
+  assert.match(refusals(plan, ["full"], true)[0] ?? "", /full is no room now.*--own-risk/);
+  // the own risk flag lets every memory verdict run
+  assert.deepEqual(refusals(plan, ["big", "full", "local-32k"], false, true), []);
   const gone = { ...LOCAL, name: "gone", verdict: "unknown" as const, reason: "Ollama does not have qwen3.8:27b. Choose another model, or pull it first." };
-  assert.match(refusals([gone], ["gone"], true)[0] ?? "", /gone cannot run \(not installed\): Ollama does not have qwen3.8:27b\. Choose another model, or pull it first\./);
+  assert.match(refusals([gone], ["gone"], true, true)[0] ?? "", /gone cannot run \(not installed\): Ollama does not have qwen3.8:27b\. Choose another model, or pull it first\./);
   assert.match(memoryLine(gone), /· not installed$/);
   assert.match(refusals(plan, ["nope"], true)[0] ?? "", /unknown arm nope \(arms: local-32k, budget-cloud/);
 });
@@ -170,4 +178,37 @@ test("show: a stopped measurement says why and how to go on; no proposal is said
   assert.match(text, /no proposal/);
   assert.match(text, /resume 7f3a/);
   assert.doesNotMatch(text, /apply 7f3a/);
+});
+
+test("asks, parameters and the details of a run", () => {
+  const ask = { name: "rename", text: "rename old_name to new_name everywhere", facts: ["new_name", "six or 6"], setup: "6 small files", reason: "none" as const, why: "A plain ask: no helper is needed." };
+  const text = formatAsks([ask]);
+  assert.match(text, /rename\n {2}message {2}rename old_name to new_name everywhere\n {2}set-up {3}6 small files · A plain ask/);
+  assert.match(text, /must mention {2}new_name; six or 6/);
+  const measurement = {
+    id: "7f3a",
+    started_at: "2026-11-24T14:00:00Z",
+    ended_at: "2026-11-24T14:10:00Z",
+    state: "done" as const,
+    arms: [{ name: "local-32k", model: "ollama/qwen3.8:27b" }],
+    asks: [ask],
+    own_risk: true,
+    golem_version: "0.9.1",
+    rules: { read_share: 0.3 },
+    arm_params: [{ name: "local-32k", model: "ollama/qwen3.8:27b", window: 32768, at_a_time: 1, helper_model: "the same model" }],
+    runs: [
+      { arm: "local-32k", ask: "rename", mode: "off" as const, end: "completed" as const, quality: 0.5, seconds: 5, window_left: 0.5, helpers_started: 0, answer: "Renamed to new_name.", found: ["new_name"], missing: ["six or 6"] },
+    ],
+  };
+  const shown = formatMeasurement(measurement);
+  assert.match(shown, /parameters\n {2}local-32k · ollama\/qwen3.8:27b · window 32,768 tokens · 1 request at a time · helpers use the same model/);
+  assert.match(shown, /helper rules: read_share 0.3/);
+  assert.match(shown, /golem 0.9.1/);
+  assert.match(shown, /own risk/);
+  assert.match(shown, /show 7f3a --verbose/);
+  assert.doesNotMatch(shown, /answer {3}/);
+  const verbose = formatMeasurement(measurement, { verbose: true });
+  assert.match(verbose, /rename {2}local-32k {2}helpers off {2}completed {2}quality 0.50/);
+  assert.match(verbose, /message {2}rename old_name to new_name everywhere\n {2}found {4}new_name\n {2}missing {2}six or 6\n {2}answer {3}Renamed to new_name\./);
+  assert.match(formatMeasurement(measurement, { ask: "nothing" }), /no run of that ask was played/);
 });

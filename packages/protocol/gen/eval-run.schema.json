@@ -1,7 +1,13 @@
 {
   "additionalProperties": false,
-  "description": "One ask played once on one arm.\n\n``quality`` is the answer's score from 0 to 1, ``seconds`` the time, ``window_left`` the\nshare of the window that was still free at the fullest point (0 to 1), and\n``helpers_started`` how many helpers the lead started. They are null for a run that has no\nresult: ``pending``, ``running`` and ``not_run``.",
+  "description": "One ask played once on one arm.\n\n``quality`` is the answer's score from 0 to 1, ``seconds`` the time, ``window_left`` the\nshare of the window that was still free at the fullest point (0 to 1), and\n``helpers_started`` how many helpers the lead started. They are null for a run that has no\nresult: ``pending``, ``running`` and ``not_run``. ``answer`` is the model's final answer, cut\nto 2,000 characters (empty when none was kept), and ``found`` and ``missing`` are the facts\nof the ask that it mentions and lacks.",
   "properties": {
+    "answer": {
+      "default": "",
+      "maxLength": 2000,
+      "title": "Answer",
+      "type": "string"
+    },
     "arm": {
       "minLength": 1,
       "title": "Arm",
@@ -25,6 +31,13 @@
       "title": "End",
       "type": "string"
     },
+    "found": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Found",
+      "type": "array"
+    },
     "helpers_started": {
       "anyOf": [
         {
@@ -37,6 +50,13 @@
       ],
       "default": null,
       "title": "Helpers Started"
+    },
+    "missing": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Missing",
+      "type": "array"
     },
     "mode": {
       "enum": [

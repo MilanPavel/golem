@@ -16,7 +16,7 @@ export function MeasureTab({ measure: m }: { measure: Measure }) {
         busy={m.busy}
         onBack={m.toList}
         onStop={() => void m.stop(m.open ?? "")}
-        onResume={(allowTight) => void m.resume(m.open ?? "", allowTight)}
+        onResume={(allowTight, ownRisk) => void m.resume(m.open ?? "", allowTight, ownRisk)}
         onApply={() => void m.apply(m.open ?? "")}
         onDelete={() => void m.remove(m.open ?? "")}
       />
@@ -38,13 +38,14 @@ export function MeasureTab({ measure: m }: { measure: Measure }) {
   return (
     <MeasureListView
       arms={m.plan.arms}
+      asks={m.plan.asks ?? []}
       history={m.list}
       running={m.plan.running ?? runningId(m.list)}
       models={m.models}
       error={m.error}
       busy={m.busy}
       onModel={m.chooseModel}
-      onStart={(arms, allowTight) => void m.start(arms, allowTight)}
+      onStart={(arms, allowTight, ownRisk) => void m.start(arms, allowTight, ownRisk)}
       onCheck={m.refresh}
       onOpen={m.openRun}
     />

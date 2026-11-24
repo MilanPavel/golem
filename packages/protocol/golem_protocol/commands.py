@@ -5426,9 +5426,10 @@ EvalTier = Literal["local", "budget", "frontier"]
 
 EvalMemoryVerdict = Literal["fits", "tight", "too_big", "no_room", "unknown"]
 """Whether a local arm's model fits in memory. ``fits``: plenty of room. ``tight``: it fits, but
-takes most of the free memory, so it needs ``allow_tight``. ``too_big``: it can never fit on this
-machine. ``no_room``: it would fit if other apps let go of memory. ``unknown``: the size or the
-memory could not be read."""
+takes most of the free memory, so it needs ``allow_tight`` or ``own_risk``. ``too_big``: it will
+not fit on this machine. ``no_room``: it would fit if other apps let go of memory. ``unknown``:
+the size or the memory could not be read. The last three run only with ``own_risk``. Memory a
+model already holds in Ollama counts as taken, not as missing."""
 
 EvalState = Literal["running", "stopped", "done"]
 """``running`` is being measured now. ``stopped`` ended early and may be resumed. ``done`` ran
@@ -5463,9 +5464,13 @@ class EvalPlanArm(BaseModel):
     the model it would use, and ``choices`` the others it could use. A local arm has the memory
     numbers and a ``verdict``; ``needed_gb`` is what the model needs at this window, ``ram_gb``
     the machine's memory and ``free_gb`` what is free now, each null when it could not be read.
-    A cloud arm has none of these and may have ``cost_usd``, the estimate for all its runs.
-    ``reason`` is one plain line on the verdict, or on the cost. ``asks`` is how many asks it
-    plays (twice each: with helpers and without), and ``minutes`` a rough time for the arm.
+    ``loaded_gb`` is what Ollama already holds in memory for that model (null when it is not
+    loaded); it is not counted as missing. ``runnable`` is false when the arm cannot run at all,
+    whatever the person says: a hosted model without a key, or a local model that Ollama does not
+    have. A cloud arm has none of the memory numbers and may have ``cost_usd``, the estimate for
+    all its runs. ``reason`` is one plain line on the verdict, or on the cost. ``asks`` is how
+    many asks it plays (twice each: with helpers and without), and ``minutes`` a rough time for
+    the arm.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -5480,7 +5485,9 @@ class EvalPlanArm(BaseModel):
     needed_gb: float | None = Field(default=None, ge=0)
     ram_gb: float | None = Field(default=None, ge=0)
     free_gb: float | None = Field(default=None, ge=0)
+    loaded_gb: float | None = Field(default=None, ge=0)
     verdict: EvalMemoryVerdict | None = None
+    runnable: bool = True
     reason: str = ""
     cost_usd: float | None = Field(default=None, ge=0)
     asks: int = Field(ge=1)
@@ -5498,9 +5505,48 @@ class EvalPlanArm(BaseModel):
             or self.needed_gb is not None
             or self.ram_gb is not None
             or self.free_gb is not None
+            or self.loaded_gb is not None
         ):
             raise ValueError("a cloud arm takes no memory")
         return self
+
+
+EvalAskReason = Literal["none", "window", "at_once", "model"]
+"""Why an ask is in the set: ``none`` a plain ask, ``window`` the reading crowds the window,
+``at_once`` independent jobs, ``model`` a stronger or cheaper model may fit."""
+
+
+class EvalAsk(BaseModel):
+    """One ask of the set, as a person can read it before and after a measurement.
+
+    ``text`` is the message sent to the model. ``facts`` is what a good answer must mention, each
+    as a readable string (``a or b`` holds when either is there). ``setup`` is one short line on
+    what the ask is set up with, and ``why`` says in plain words why it is in the set (``reason``
+    is the same as a code).
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    name: str = Field(min_length=1)
+    text: str = Field(min_length=1)
+    facts: list[str] = Field(default_factory=list[str])
+    setup: str = ""
+    reason: EvalAskReason = "none"
+    why: str = ""
+
+
+class EvalArmParams(BaseModel):
+    """What one arm ran with. ``window`` is in tokens. ``at_a_time`` is how many requests the
+    model gets at once (1 for a local model, null for a hosted one). ``helper_model`` says in
+    plain words which model the helpers use."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    name: str = Field(min_length=1)
+    model: str = Field(min_length=1)
+    window: int = Field(ge=1)
+    at_a_time: int | None = Field(default=None, ge=1)
+    helper_model: str = ""
 
 
 class EvalsPlanParams(BaseModel):
@@ -5524,14 +5570,18 @@ class EvalsPlanResult(BaseModel):
 
     arms: list[EvalPlanArm]
     running: str | None = Field(default=None, min_length=1)
+    asks: list[EvalAsk] = Field(default_factory=list[EvalAsk])
 
 
 class EvalsStartParams(BaseModel):
     """``evals.start``. Begin a measurement of ``arms``, with the helper rules of ``config.toml``.
 
     ``models`` maps an arm's name to the model to use instead of its own. ``allow_tight`` lets
-    a local arm run when its verdict is ``tight``; a ``too_big`` or ``no_room`` arm never runs.
-    It answers at once; the progress arrives as ``eval.progress`` and the end as ``eval.ended``.
+    a local arm run when its verdict is ``tight``. ``own_risk`` also lets one run whose verdict is
+    ``too_big``, ``no_room`` or ``unknown`` (and a ``tight`` one); it is the person's yes to a
+    warning, and is recorded in the measurement. An arm that cannot run at all (``runnable`` is
+    false in the plan) is refused either way. It answers at once; the progress arrives as
+    ``eval.progress`` and the end as ``eval.ended``.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -5539,6 +5589,7 @@ class EvalsStartParams(BaseModel):
     arms: list[str] = Field(min_length=1)
     models: dict[str, str] = Field(default_factory=dict[str, str])
     allow_tight: bool = False
+    own_risk: bool = False
 
     @model_validator(mode="after")
     def _arms_are_distinct(self) -> Self:
@@ -5570,7 +5621,9 @@ class EvalRun(BaseModel):
     ``quality`` is the answer's score from 0 to 1, ``seconds`` the time, ``window_left`` the
     share of the window that was still free at the fullest point (0 to 1), and
     ``helpers_started`` how many helpers the lead started. They are null for a run that has no
-    result: ``pending``, ``running`` and ``not_run``.
+    result: ``pending``, ``running`` and ``not_run``. ``answer`` is the model's final answer, cut
+    to 2,000 characters (empty when none was kept), and ``found`` and ``missing`` are the facts
+    of the ask that it mentions and lacks.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -5583,6 +5636,9 @@ class EvalRun(BaseModel):
     seconds: float | None = Field(default=None, ge=0)
     window_left: float | None = Field(default=None, ge=0, le=1)
     helpers_started: int | None = Field(default=None, ge=0)
+    answer: str = Field(default="", max_length=2000)
+    found: list[str] = Field(default_factory=list[str])
+    missing: list[str] = Field(default_factory=list[str])
 
     @model_validator(mode="after")
     def _no_numbers_without_a_result(self) -> Self:
@@ -5591,6 +5647,9 @@ class EvalRun(BaseModel):
             or self.seconds is not None
             or self.window_left is not None
             or self.helpers_started is not None
+            or self.answer
+            or self.found
+            or self.missing
         ):
             raise ValueError(f"a run that is {self.end} has no numbers")
         return self
@@ -5642,9 +5701,13 @@ class EvalMeasurement(BaseModel):
     """A whole measurement, as ``evals.get`` returns it.
 
     ``runs`` holds every planned run in order, with the ones not yet played as ``pending`` and
-    the ones that will not be played as ``not_run``. ``stop_reason`` is plain text and is set
-    only when the state is ``stopped``. ``proposal`` is null while it runs and when too little
-    ran to propose anything. ``in_use`` is true when its numbers were applied and still are
+    the ones that will not be played as ``not_run``. ``asks`` are the asks of the set as they
+    were when it started, ``arm_params`` what each arm ran with, ``rules`` the four numbers of
+    ``[agents.delegate]`` in force when it started and ``golem_version`` the version that ran it
+    (each empty or null for a measurement kept before they were recorded). ``own_risk`` is true
+    when it was started, or resumed, at the person's own risk. ``stop_reason`` is plain text and
+    is set only when the state is ``stopped``. ``proposal`` is null while it runs and when too
+    little ran to propose anything. ``in_use`` is true when its numbers were applied and still are
     the ones in ``config.toml``. ``cost_usd`` is what the paid arms cost.
     """
 
@@ -5660,6 +5723,11 @@ class EvalMeasurement(BaseModel):
     proposal: EvalProposal | None = None
     in_use: bool = False
     cost_usd: float | None = Field(default=None, ge=0)
+    asks: list[EvalAsk] = Field(default_factory=list[EvalAsk])
+    arm_params: list[EvalArmParams] = Field(default_factory=list[EvalArmParams])
+    rules: dict[str, float] = Field(default_factory=dict[str, float])
+    golem_version: str | None = Field(default=None, min_length=1)
+    own_risk: bool = False
 
     @model_validator(mode="after")
     def _state_fits_the_rest(self) -> Self:
@@ -5719,12 +5787,13 @@ class EvalsStopResult(BaseModel):
 
 class EvalsResumeParams(BaseModel):
     """``evals.resume``. Play the runs a stopped measurement did not play. The same checks as
-    ``evals.start`` apply, and ``allow_tight`` is asked for again."""
+    ``evals.start`` apply, and ``allow_tight`` or ``own_risk`` is asked for again."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     id: str = Field(min_length=1)
     allow_tight: bool = False
+    own_risk: bool = False
 
 
 class EvalsResumeResult(BaseModel):
@@ -5953,7 +6022,10 @@ __all__ = [
     "DeviceSyncParams",
     "DeviceSyncResult",
     "DirEntry",
+    "EvalArmParams",
     "EvalArmUsed",
+    "EvalAsk",
+    "EvalAskReason",
     "EvalEnded",
     "EvalHelperRow",
     "EvalMeasurement",

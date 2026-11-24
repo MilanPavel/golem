@@ -1,0 +1,46 @@
+{
+  "additionalProperties": false,
+  "description": "What one arm ran with. ``window`` is in tokens. ``at_a_time`` is how many requests the\nmodel gets at once (1 for a local model, null for a hosted one). ``helper_model`` says in\nplain words which model the helpers use.",
+  "properties": {
+    "at_a_time": {
+      "anyOf": [
+        {
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "At A Time"
+    },
+    "helper_model": {
+      "default": "",
+      "title": "Helper Model",
+      "type": "string"
+    },
+    "model": {
+      "minLength": 1,
+      "title": "Model",
+      "type": "string"
+    },
+    "name": {
+      "minLength": 1,
+      "title": "Name",
+      "type": "string"
+    },
+    "window": {
+      "minimum": 1,
+      "title": "Window",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "name",
+    "model",
+    "window"
+  ],
+  "title": "EvalArmParams",
+  "type": "object"
+}

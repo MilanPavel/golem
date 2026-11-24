@@ -123,7 +123,7 @@ export function useMeasure(client: GolemClient): {
           void work(async () => {
             const [first, ...rest] = action.arms;
             if (first === undefined) throw new Error("Choose an arm first.");
-            const { id } = await client.evalsStart({ arms: [first, ...rest], allow_tight: action.allowTight });
+            const { id } = await client.evalsStart({ arms: [first, ...rest], allow_tight: action.allowTight, ...(action.ownRisk ? { own_risk: true } : {}) });
             setMeasurement(null);
             show(measureOpened(stateRef.current, id));
             await Promise.all([loadOne(id), loadList(), loadPlan()]);
@@ -134,7 +134,7 @@ export function useMeasure(client: GolemClient): {
           return;
         case "resume":
           void work(async () => {
-            await client.evalsResume(action.id, action.allowTight);
+            await (action.ownRisk ? client.evalsResume(action.id, action.allowTight, true) : client.evalsResume(action.id, action.allowTight));
             await Promise.all([loadOne(action.id), loadList(), loadPlan()]);
           }, "Could not run the rest.");
           return;

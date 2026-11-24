@@ -194,7 +194,9 @@ export type { AgentsKeepResult } from "../../protocol/gen/agents-keep-result.ts"
 export type { AgentsKeepValues } from "../../protocol/gen/agents-keep-values.ts";
 export type { AgentsDelegateNumber } from "../../protocol/gen/agents-delegate-number.ts";
 export type { AgentsDelegateValues } from "../../protocol/gen/agents-delegate-values.ts";
+export type { EvalArmParams } from "../../protocol/gen/eval-arm-params.ts";
 export type { EvalArmUsed } from "../../protocol/gen/eval-arm-used.ts";
+export type { EvalAsk } from "../../protocol/gen/eval-ask.ts";
 export type { EvalEnded } from "../../protocol/gen/eval-ended.ts";
 export type { EvalMeasurement } from "../../protocol/gen/eval-measurement.ts";
 export type { EvalModelChoice } from "../../protocol/gen/eval-model-choice.ts";

@@ -1,5 +1,51 @@
 {
   "$defs": {
+    "EvalArmParams": {
+      "additionalProperties": false,
+      "description": "What one arm ran with. ``window`` is in tokens. ``at_a_time`` is how many requests the\nmodel gets at once (1 for a local model, null for a hosted one). ``helper_model`` says in\nplain words which model the helpers use.",
+      "properties": {
+        "at_a_time": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "At A Time"
+        },
+        "helper_model": {
+          "default": "",
+          "title": "Helper Model",
+          "type": "string"
+        },
+        "model": {
+          "minLength": 1,
+          "title": "Model",
+          "type": "string"
+        },
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "window": {
+          "minimum": 1,
+          "title": "Window",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "name",
+        "model",
+        "window"
+      ],
+      "title": "EvalArmParams",
+      "type": "object"
+    },
     "EvalArmUsed": {
       "additionalProperties": false,
       "description": "An arm of a measurement and the model it ran with.",
@@ -20,6 +66,56 @@
         "model"
       ],
       "title": "EvalArmUsed",
+      "type": "object"
+    },
+    "EvalAsk": {
+      "additionalProperties": false,
+      "description": "One ask of the set, as a person can read it before and after a measurement.\n\n``text`` is the message sent to the model. ``facts`` is what a good answer must mention, each\nas a readable string (``a or b`` holds when either is there). ``setup`` is one short line on\nwhat the ask is set up with, and ``why`` says in plain words why it is in the set (``reason``\nis the same as a code).",
+      "properties": {
+        "facts": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Facts",
+          "type": "array"
+        },
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "reason": {
+          "default": "none",
+          "enum": [
+            "none",
+            "window",
+            "at_once",
+            "model"
+          ],
+          "title": "Reason",
+          "type": "string"
+        },
+        "setup": {
+          "default": "",
+          "title": "Setup",
+          "type": "string"
+        },
+        "text": {
+          "minLength": 1,
+          "title": "Text",
+          "type": "string"
+        },
+        "why": {
+          "default": "",
+          "title": "Why",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "text"
+      ],
+      "title": "EvalAsk",
       "type": "object"
     },
     "EvalNumber": {
@@ -102,8 +198,14 @@
     },
     "EvalRun": {
       "additionalProperties": false,
-      "description": "One ask played once on one arm.\n\n``quality`` is the answer's score from 0 to 1, ``seconds`` the time, ``window_left`` the\nshare of the window that was still free at the fullest point (0 to 1), and\n``helpers_started`` how many helpers the lead started. They are null for a run that has no\nresult: ``pending``, ``running`` and ``not_run``.",
+      "description": "One ask played once on one arm.\n\n``quality`` is the answer's score from 0 to 1, ``seconds`` the time, ``window_left`` the\nshare of the window that was still free at the fullest point (0 to 1), and\n``helpers_started`` how many helpers the lead started. They are null for a run that has no\nresult: ``pending``, ``running`` and ``not_run``. ``answer`` is the model's final answer, cut\nto 2,000 characters (empty when none was kept), and ``found`` and ``missing`` are the facts\nof the ask that it mentions and lacks.",
       "properties": {
+        "answer": {
+          "default": "",
+          "maxLength": 2000,
+          "title": "Answer",
+          "type": "string"
+        },
         "arm": {
           "minLength": 1,
           "title": "Arm",
@@ -127,6 +229,13 @@
           "title": "End",
           "type": "string"
         },
+        "found": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Found",
+          "type": "array"
+        },
         "helpers_started": {
           "anyOf": [
             {
@@ -139,6 +248,13 @@
           ],
           "default": null,
           "title": "Helpers Started"
+        },
+        "missing": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Missing",
+          "type": "array"
         },
         "mode": {
           "enum": [
@@ -201,13 +317,27 @@
     }
   },
   "additionalProperties": false,
-  "description": "A whole measurement, as ``evals.get`` returns it.\n\n``runs`` holds every planned run in order, with the ones not yet played as ``pending`` and\nthe ones that will not be played as ``not_run``. ``stop_reason`` is plain text and is set\nonly when the state is ``stopped``. ``proposal`` is null while it runs and when too little\nran to propose anything. ``in_use`` is true when its numbers were applied and still are\nthe ones in ``config.toml``. ``cost_usd`` is what the paid arms cost.",
+  "description": "A whole measurement, as ``evals.get`` returns it.\n\n``runs`` holds every planned run in order, with the ones not yet played as ``pending`` and\nthe ones that will not be played as ``not_run``. ``asks`` are the asks of the set as they\nwere when it started, ``arm_params`` what each arm ran with, ``rules`` the four numbers of\n``[agents.delegate]`` in force when it started and ``golem_version`` the version that ran it\n(each empty or null for a measurement kept before they were recorded). ``own_risk`` is true\nwhen it was started, or resumed, at the person's own risk. ``stop_reason`` is plain text and\nis set only when the state is ``stopped``. ``proposal`` is null while it runs and when too\nlittle ran to propose anything. ``in_use`` is true when its numbers were applied and still are\nthe ones in ``config.toml``. ``cost_usd`` is what the paid arms cost.",
   "properties": {
+    "arm_params": {
+      "items": {
+        "$ref": "#/$defs/EvalArmParams"
+      },
+      "title": "Arm Params",
+      "type": "array"
+    },
     "arms": {
       "items": {
         "$ref": "#/$defs/EvalArmUsed"
       },
       "title": "Arms",
+      "type": "array"
+    },
+    "asks": {
+      "items": {
+        "$ref": "#/$defs/EvalAsk"
+      },
+      "title": "Asks",
       "type": "array"
     },
     "cost_usd": {
@@ -236,6 +366,19 @@
       "default": null,
       "title": "Ended At"
     },
+    "golem_version": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Golem Version"
+    },
     "id": {
       "minLength": 1,
       "title": "Id",
@@ -244,6 +387,11 @@
     "in_use": {
       "default": false,
       "title": "In Use",
+      "type": "boolean"
+    },
+    "own_risk": {
+      "default": false,
+      "title": "Own Risk",
       "type": "boolean"
     },
     "proposal": {
@@ -256,6 +404,13 @@
         }
       ],
       "default": null
+    },
+    "rules": {
+      "additionalProperties": {
+        "type": "number"
+      },
+      "title": "Rules",
+      "type": "object"
     },
     "runs": {
       "items": {

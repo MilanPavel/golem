@@ -38,17 +38,19 @@ import tempfile
 import time
 import uuid
 from collections.abc import Awaitable, Callable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import Any, cast
 
 from pydantic import BaseModel
 
+from golem import __version__
 from golem.config import DelegateSettings, ModelPrice
 from golem.evals.helpers import (
     ARMS,
     MODES,
+    REASONS,
     Arm,
     Ask,
     Driver,
@@ -57,6 +59,8 @@ from golem.evals.helpers import (
     MemoryCheck,
     Mode,
     Run,
+    fact_label,
+    facts_found,
     free_memory_gb,
     load_asks,
     memory_check,
@@ -65,12 +69,15 @@ from golem.evals.helpers import (
     propose,
     provider_key_found,
     read_machine,
+    setup_of,
     with_models,
 )
 from golem.models.hardware import total_ram_gb
 from golem.models.tiers import Tier
 from golem_protocol.commands import (
+    EvalArmParams,
     EvalArmUsed,
+    EvalAsk,
     EvalMeasurement,
     EvalModelChoice,
     EvalNumber,
@@ -114,8 +121,9 @@ Broadcast = Callable[[BaseModel], None]
 MemoryReading = Callable[[], tuple[float | None, float | None]]
 """Memory in use and memory in all, in GiB; a figure that cannot be read is None."""
 
-DriverFactory = Callable[[bool], Driver]
-"""Makes the driver of a measurement from ``allow_tight``. The default is :class:`LiveDriver`."""
+DriverFactory = Callable[[bool, bool], Driver]
+"""Makes the driver of a measurement from ``allow_tight`` and ``own_risk``. The default is
+:class:`LiveDriver`."""
 
 
 class EvalRefused(Exception):
@@ -182,6 +190,13 @@ class Measurement:
     stop_reason: str | None = None
     applied: dict[str, float] | None = None
     """The four numbers in force right after ``evals.apply`` wrote this one's."""
+    own_risk: bool = False
+    """Started, or resumed, at the person's own risk: an arm may have been too big or short."""
+    asks: list[dict[str, Any]] = field(default_factory=list[dict[str, Any]])
+    """The asks of the set when it started, as :class:`EvalAsk` dumps (empty in an old file)."""
+    rules: dict[str, float] = field(default_factory=dict[str, float])
+    """The four numbers of ``[agents.delegate]`` in force when it started."""
+    golem_version: str | None = None
 
 
 def _arm_dump(arm: Arm) -> dict[str, Any]:
@@ -222,6 +237,10 @@ def dump(item: Measurement) -> dict[str, Any]:
         "state": item.state,
         "stop_reason": item.stop_reason,
         "applied": item.applied,
+        "own_risk": item.own_risk,
+        "asks": item.asks,
+        "rules": item.rules,
+        "golem_version": item.golem_version,
         "arms": [_arm_dump(arm) for arm in item.arms],
         "slots": [
             {
@@ -258,6 +277,12 @@ def load(raw: Mapping[str, Any]) -> Measurement:
         ended_at=raw.get("ended_at"),
         stop_reason=raw.get("stop_reason"),
         applied=None if applied is None else {str(k): float(v) for k, v in applied.items()},
+        own_risk=bool(raw.get("own_risk", False)),
+        asks=[dict(a) for a in raw.get("asks", [])],
+        rules={
+            str(k): float(v) for k, v in cast("Mapping[str, Any]", raw.get("rules") or {}).items()
+        },
+        golem_version=raw.get("golem_version"),
     )
 
 
@@ -309,9 +334,18 @@ def _local_reason(arm: Arm, check: MemoryCheck, verdict: str, machine: Machine) 
     return {
         "fits": f"Fits: {numbers}.",
         "tight": f"Tight: it fits but takes most of the memory, so it needs your yes: {numbers}.",
-        "too_big": f"Too big for this Mac: {numbers}.",
-        "no_room": f"Not enough free memory, so it will not run now: {numbers}.",
-        "unknown": f"Memory not known, so it will not run to be safe: {numbers}.",
+        "too_big": (
+            f"Too big for this Mac: {numbers}. You can still run it at your own risk, "
+            "but the Mac may stop answering."
+        ),
+        "no_room": (
+            f"Not enough free memory right now: {numbers}. You can still run it at your own "
+            "risk, but the Mac may stop answering."
+        ),
+        "unknown": (
+            f"The memory is not known: {numbers}. You can still run it at your own risk, "
+            "but the Mac may stop answering."
+        ),
     }[verdict]
 
 
@@ -363,7 +397,9 @@ def plan_arm(
             needed_gb=None if check.need_gb is None else round(check.need_gb, 2),
             ram_gb=machine.ram_gb,
             free_gb=machine.free_gb,
+            loaded_gb=round(check.loaded_gb, 2) if check.loaded_gb > 0 else None,
             verdict=cast("Any", verdict),
+            runnable=check.model_gb is not None,
             reason=_local_reason(arm, check, verdict, machine),
             **common,
         )
@@ -371,6 +407,7 @@ def plan_arm(
     cost = estimated_cost(arm, asks, default)
     if not key_found(provider):
         reason = no_key_reason(provider)
+        common["runnable"] = False
     elif cost is None:
         reason = "A hosted model costs money. The cost of this one is not estimated."
     else:
@@ -379,19 +416,29 @@ def plan_arm(
 
 
 def refusal_of(
-    planned: EvalPlanArm, allow_tight: bool, key_found: Callable[[str], bool]
+    planned: EvalPlanArm, allow_tight: bool, own_risk: bool, key_found: Callable[[str], bool]
 ) -> str | None:
-    """Why this arm must not run now, as a plain sentence, or None when it may."""
+    """Why this arm must not run now, as a plain sentence, or None when it may.
+
+    A hosted model without a key, and a local model Ollama does not have, never run: there is
+    nothing to load. A tight arm needs ``allow_tight`` or ``own_risk``; a too big one, one with
+    no room and one of unknown size need ``own_risk``.
+    """
     if planned.kind == "cloud":
         provider = planned.model.partition("/")[0]
         if key_found(provider):
             return None
         return f"{planned.name} cannot run: {no_key_reason(provider)}"
-    if planned.verdict == "fits" or (planned.verdict == "tight" and allow_tight):
+    if not planned.runnable:
+        return f"{planned.name} cannot run: {planned.reason}"
+    if planned.verdict == "fits" or own_risk or (planned.verdict == "tight" and allow_tight):
         return None
     if planned.verdict == "tight":
         return f"{planned.name} is tight on memory and needs your yes: {planned.reason}"
-    return f"{planned.name} cannot run: {planned.reason}"
+    return (
+        f"{planned.name} needs your own risk to run: {planned.reason} "
+        "To run it anyway, set own_risk (golem eval helpers ... --own-risk)."
+    )
 
 
 # --- the proposal ---------------------------------------------------------------------------------
@@ -435,10 +482,14 @@ def _end_of(run: Run) -> str:
     return run.end if run.end in ("completed", "failed", "cancelled", "timeout") else "failed"
 
 
-def _slot_wire(slot: Slot) -> EvalRun:
+def _slot_wire(slot: Slot, asks: Mapping[str, Ask]) -> EvalRun:
     run = slot.run
     if run is None:
         return EvalRun(arm=slot.arm, ask=slot.ask, mode=slot.mode, end=cast("Any", slot.end))
+    ask = asks.get(slot.ask)
+    found, missing = (
+        ([], []) if ask is None or not run.answer else facts_found(run.answer, ask.facts)
+    )
     return EvalRun(
         arm=slot.arm,
         ask=slot.ask,
@@ -448,6 +499,36 @@ def _slot_wire(slot: Slot) -> EvalRun:
         seconds=max(run.seconds, 0.0),
         window_left=min(max(run.left_share, 0.0), 1.0),
         helpers_started=run.helpers_started,
+        answer=run.answer,
+        found=found,
+        missing=missing,
+    )
+
+
+def ask_wire(ask: Ask) -> EvalAsk:
+    """An ask as a person reads it: the message, what the answer must mention, the set-up, why."""
+    return EvalAsk(
+        name=ask.name,
+        text=ask.text,
+        facts=[fact_label(f) for f in ask.facts],
+        setup=setup_of(ask),
+        reason=ask.reason,
+        why=REASONS[ask.reason],
+    )
+
+
+def arm_params_wire(arm: Arm) -> EvalArmParams:
+    """What an arm runs with: its model, window, requests at once and where helpers run."""
+    return EvalArmParams(
+        name=arm.name,
+        model=arm.lead,
+        window=arm.window,
+        at_a_time=1 if arm.local else None,
+        helper_model=(
+            "the same model as the lead (no second model is loaded)"
+            if arm.local
+            else "chosen by golem from the models that are ready"
+        ),
     )
 
 
@@ -492,7 +573,7 @@ class EvalJobs:
         parts = parts or EvalParts()
         self._parts = parts
         self._driver: DriverFactory = parts.driver or (
-            lambda allow_tight: LiveDriver(allow_tight=allow_tight)
+            lambda allow_tight, own_risk: LiveDriver(allow_tight=allow_tight, own_risk=own_risk)
         )
         self._machine = parts.machine or read_machine
         self._key_found = parts.key_found or provider_key_found
@@ -605,11 +686,17 @@ class EvalJobs:
         machine = await self._read_machine(arms)
         return self._planned(arms, machine, len(self._asks())), self.running_id()
 
-    async def _guard(self, arms: Sequence[Arm], allow_tight: bool) -> None:
+    def asks_wire(self) -> list[EvalAsk]:
+        """The asks of the set now, so they can be read before a measurement starts."""
+        return [ask_wire(ask) for ask in self._asks()]
+
+    async def _guard(self, arms: Sequence[Arm], allow_tight: bool, own_risk: bool) -> None:
         """Raise :class:`EvalRefused` naming every arm that must not run now."""
         machine = await self._read_machine(arms)
         planned = self._planned(arms, machine, len(self._asks()))
-        refusals = [r for p in planned if (r := refusal_of(p, allow_tight, self._key_found))]
+        refusals = [
+            r for p in planned if (r := refusal_of(p, allow_tight, own_risk, self._key_found))
+        ]
         if refusals:
             raise EvalRefused("\n".join(refusals))
 
@@ -624,11 +711,12 @@ class EvalJobs:
         names: Sequence[str],
         models: Mapping[str, str] | None = None,
         allow_tight: bool = False,
+        own_risk: bool = False,
     ) -> str:
         """Begin a measurement of ``names``. Returns its id at once; the play goes on behind."""
         self._busy()
         arms = await self._arms(names, models or {})
-        await self._guard(arms, allow_tight)
+        await self._guard(arms, allow_tight, own_risk)
         self._busy()  # another start may have got in while the machine was read
         asks = self._asks()
         item = Measurement(
@@ -638,13 +726,17 @@ class EvalJobs:
             slots=[
                 Slot(arm.name, mode, ask.name) for arm in arms for mode in MODES for ask in asks
             ],
+            own_risk=own_risk,
+            asks=[ask_wire(ask).model_dump() for ask in asks],
+            rules=in_force(self._current_numbers()),
+            golem_version=__version__,
         )
         self._items[item.id] = item
         self._save(item)
-        self._launch(item, allow_tight)
+        self._launch(item, allow_tight, own_risk)
         return item.id
 
-    async def resume(self, id: str, allow_tight: bool = False) -> str:
+    async def resume(self, id: str, allow_tight: bool = False, own_risk: bool = False) -> str:
         """Play the runs a stopped measurement did not play. The same checks as ``start``."""
         item = self._items.get(id)
         if item is None:
@@ -659,20 +751,23 @@ class EvalJobs:
             raise EvalRefused(
                 f"The ask {', '.join(sorted(gone))} no longer exists, so it cannot go on."
             )
-        await self._guard([arm for arm in item.arms if arm.name in left], allow_tight)
+        await self._guard([arm for arm in item.arms if arm.name in left], allow_tight, own_risk)
         self._busy()
         for slot in item.slots:
             if slot.end == "not_run":
                 slot.end = "pending"
         item.state, item.ended_at, item.stop_reason = "running", None, None
+        item.own_risk = item.own_risk or own_risk
         self._save(item)
-        self._launch(item, allow_tight)
+        self._launch(item, allow_tight, own_risk)
         return item.id
 
-    def _launch(self, item: Measurement, allow_tight: bool) -> None:
+    def _launch(self, item: Measurement, allow_tight: bool, own_risk: bool) -> None:
         self._running = item
         self._why = STOPPED_BY_SHUTDOWN
-        self._task = asyncio.create_task(self._run(item, allow_tight), name=f"golem-eval-{item.id}")
+        self._task = asyncio.create_task(
+            self._run(item, allow_tight, own_risk), name=f"golem-eval-{item.id}"
+        )
 
     async def stop(self, id: str) -> bool:
         """Stop the running measurement ``id``; false when it is not the one running.
@@ -709,7 +804,7 @@ class EvalJobs:
         except Exception:
             log.debug("broadcast failed", exc_info=True)
 
-    async def _run(self, item: Measurement, allow_tight: bool) -> None:
+    async def _run(self, item: Measurement, allow_tight: bool, own_risk: bool) -> None:
         todo = [s for s in item.slots if s.end == "pending"]
         play = _Play(item, len(todo), time.monotonic())
         self._notify(
@@ -725,7 +820,7 @@ class EvalJobs:
         scratch = Path(tempfile.mkdtemp(prefix="golem-eval-"))
         reason: str | None = None
         try:
-            driver = self._driver(allow_tight)
+            driver = self._driver(allow_tight, own_risk)
             for arm, mode, slots in _groups(item, todo):
                 await self._play_group(driver, play, arm, mode, slots, scratch)
         except _Stop as stop:
@@ -878,6 +973,11 @@ class EvalJobs:
             return None
         current = self._current_numbers()
         proposal = proposal_of(item, current)
+        current_asks = {ask.name: ask for ask in self._asks()}
+        kept = [EvalAsk.model_validate(a) for a in item.asks]
+        if not kept:  # a file from before the asks were kept: the asks of the set now
+            names = dict.fromkeys(s.ask for s in item.slots)
+            kept = [ask_wire(current_asks[n]) for n in names if n in current_asks]
         return EvalMeasurement(
             id=item.id,
             started_at=item.started_at,
@@ -885,10 +985,15 @@ class EvalJobs:
             state=cast("Any", item.state),
             stop_reason=item.stop_reason,
             arms=_arms_wire(item),
-            runs=[_slot_wire(s) for s in item.slots],
+            runs=[_slot_wire(s, current_asks) for s in item.slots],
             proposal=proposal,
             in_use=proposal is not None and is_in_use(item, current),
             cost_usd=_cost_of(item),
+            asks=kept,
+            arm_params=[arm_params_wire(arm) for arm in item.arms],
+            rules=item.rules,
+            golem_version=item.golem_version,
+            own_risk=item.own_risk,
         )
 
     # --- apply and delete

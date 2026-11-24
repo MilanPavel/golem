@@ -8,16 +8,25 @@ export type CostUsd = number | null;
 export type FreeGb = number | null;
 export type Kind = 'local' | 'cloud';
 export type Label = string;
+export type LoadedGb = number | null;
 export type Minutes = number | null;
 export type Model = string;
 export type Name = string;
 export type NeededGb = number | null;
 export type RamGb = number | null;
 export type Reason = string;
+export type Runnable = boolean;
 export type Tier = 'local' | 'budget' | 'frontier';
 export type Verdict = ('fits' | 'tight' | 'too_big' | 'no_room' | 'unknown') | null;
 export type Window = number;
 export type Arms = EvalPlanArm[];
+export type Facts = string[];
+export type Name1 = string;
+export type Reason1 = 'none' | 'window' | 'at_once' | 'model';
+export type Setup = string;
+export type Text = string;
+export type Why = string;
+export type Asks1 = EvalAsk[];
 export type Running = string | null;
 
 /**
@@ -26,6 +35,7 @@ export type Running = string | null;
  */
 export interface EvalsPlanResult {
   arms: Arms;
+  asks?: Asks1;
   running?: Running;
 }
 /**
@@ -35,9 +45,13 @@ export interface EvalsPlanResult {
  * the model it would use, and ``choices`` the others it could use. A local arm has the memory
  * numbers and a ``verdict``; ``needed_gb`` is what the model needs at this window, ``ram_gb``
  * the machine's memory and ``free_gb`` what is free now, each null when it could not be read.
- * A cloud arm has none of these and may have ``cost_usd``, the estimate for all its runs.
- * ``reason`` is one plain line on the verdict, or on the cost. ``asks`` is how many asks it
- * plays (twice each: with helpers and without), and ``minutes`` a rough time for the arm.
+ * ``loaded_gb`` is what Ollama already holds in memory for that model (null when it is not
+ * loaded); it is not counted as missing. ``runnable`` is false when the arm cannot run at all,
+ * whatever the person says: a hosted model without a key, or a local model that Ollama does not
+ * have. A cloud arm has none of the memory numbers and may have ``cost_usd``, the estimate for
+ * all its runs. ``reason`` is one plain line on the verdict, or on the cost. ``asks`` is how
+ * many asks it plays (twice each: with helpers and without), and ``minutes`` a rough time for
+ * the arm.
  *
  * This interface was referenced by `EvalsPlanResult`'s JSON-Schema
  * via the `definition` "EvalPlanArm".
@@ -49,12 +63,14 @@ export interface EvalPlanArm {
   free_gb?: FreeGb;
   kind: Kind;
   label: Label;
+  loaded_gb?: LoadedGb;
   minutes?: Minutes;
   model: Model;
   name: Name;
   needed_gb?: NeededGb;
   ram_gb?: RamGb;
   reason?: Reason;
+  runnable?: Runnable;
   tier: Tier;
   verdict?: Verdict;
   window: Window;
@@ -68,4 +84,23 @@ export interface EvalPlanArm {
 export interface EvalModelChoice {
   ref: Ref;
   size_gb?: SizeGb;
+}
+/**
+ * One ask of the set, as a person can read it before and after a measurement.
+ *
+ * ``text`` is the message sent to the model. ``facts`` is what a good answer must mention, each
+ * as a readable string (``a or b`` holds when either is there). ``setup`` is one short line on
+ * what the ask is set up with, and ``why`` says in plain words why it is in the set (``reason``
+ * is the same as a code).
+ *
+ * This interface was referenced by `EvalsPlanResult`'s JSON-Schema
+ * via the `definition` "EvalAsk".
+ */
+export interface EvalAsk {
+  facts?: Facts;
+  name: Name1;
+  reason?: Reason1;
+  setup?: Setup;
+  text: Text;
+  why?: Why;
 }

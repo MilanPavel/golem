@@ -8,12 +8,14 @@ export type CostUsd = number | null;
 export type FreeGb = number | null;
 export type Kind = 'local' | 'cloud';
 export type Label = string;
+export type LoadedGb = number | null;
 export type Minutes = number | null;
 export type Model = string;
 export type Name = string;
 export type NeededGb = number | null;
 export type RamGb = number | null;
 export type Reason = string;
+export type Runnable = boolean;
 export type Tier = 'local' | 'budget' | 'frontier';
 export type Verdict = ('fits' | 'tight' | 'too_big' | 'no_room' | 'unknown') | null;
 export type Window = number;
@@ -25,9 +27,13 @@ export type Window = number;
  * the model it would use, and ``choices`` the others it could use. A local arm has the memory
  * numbers and a ``verdict``; ``needed_gb`` is what the model needs at this window, ``ram_gb``
  * the machine's memory and ``free_gb`` what is free now, each null when it could not be read.
- * A cloud arm has none of these and may have ``cost_usd``, the estimate for all its runs.
- * ``reason`` is one plain line on the verdict, or on the cost. ``asks`` is how many asks it
- * plays (twice each: with helpers and without), and ``minutes`` a rough time for the arm.
+ * ``loaded_gb`` is what Ollama already holds in memory for that model (null when it is not
+ * loaded); it is not counted as missing. ``runnable`` is false when the arm cannot run at all,
+ * whatever the person says: a hosted model without a key, or a local model that Ollama does not
+ * have. A cloud arm has none of the memory numbers and may have ``cost_usd``, the estimate for
+ * all its runs. ``reason`` is one plain line on the verdict, or on the cost. ``asks`` is how
+ * many asks it plays (twice each: with helpers and without), and ``minutes`` a rough time for
+ * the arm.
  */
 export interface EvalPlanArm {
   asks: Asks;
@@ -36,12 +42,14 @@ export interface EvalPlanArm {
   free_gb?: FreeGb;
   kind: Kind;
   label: Label;
+  loaded_gb?: LoadedGb;
   minutes?: Minutes;
   model: Model;
   name: Name;
   needed_gb?: NeededGb;
   ram_gb?: RamGb;
   reason?: Reason;
+  runnable?: Runnable;
   tier: Tier;
   verdict?: Verdict;
   window: Window;

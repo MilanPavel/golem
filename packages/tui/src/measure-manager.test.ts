@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import type { EvalMeasurement, EvalPlanArm, EvalRun, EvalSummary } from "@golem/client";
+import type { EvalAsk, EvalMeasurement, EvalPlanArm, EvalRun, EvalSummary } from "@golem/client";
 import type { MeasureLive } from "@golem/view";
 
 import type { Press } from "./keys.ts";
@@ -94,6 +94,8 @@ test("keys: letters, arrows and Esc map to measure keys", () => {
   assert.equal(measureKeyOf(p(null, " ")), "space");
   assert.equal(measureKeyOf(p(null, "t")), "saved");
   assert.equal(measureKeyOf(p(null, "x")), "stop");
+  assert.equal(measureKeyOf(p(null, "a")), "asks");
+  assert.equal(measureKeyOf(p(null, "o")), "open");
   assert.equal(measureKeyOf(p("return")), "enter");
   assert.equal(measureKeyOf(p("escape")), "back");
   assert.equal(measureKeyOf(p(null, "q")), null);
@@ -103,7 +105,7 @@ test("list, ready: arms with the memory line, a tight tag, earlier ones below", 
   const out = text(openMeasure(), data());
   assert.match(out[0]!, /^Agents › Measure +esc back$/);
   assert.ok(out.some((l) => /\[ \] Local, 32K window\s+qwen3\.8:27b\s+needs 21\.1 GB of 36 GB, 24\.3 GB free\s+TIGHT/.test(l)));
-  assert.ok(out.some((l) => /-\s+Local, 128K window.*TOO BIG/.test(l)));
+  assert.ok(out.some((l) => /\[ \] Local, 128K window.*TOO BIG/.test(l)));
   assert.ok(out.some((l) => /Budget cloud.*no memory, about \$0\.40\s+PAID/.test(l)));
   assert.ok(out.some((l) => l.includes("earlier")));
   assert.ok(out.some((l) => /Done\s+21 Nov\s+Budget · claude-haiku-5-5 · 20 runs · \$0\.38/.test(l)));
@@ -111,21 +113,30 @@ test("list, ready: arms with the memory line, a tight tag, earlier ones below", 
   assert.ok(out.at(-1)!.includes("space tick"));
 });
 
-test("list, no room: the banner shows and the arm cannot be ticked", () => {
+test("list, no room: a warning shows and the arm can still be ticked", () => {
   const d = data({ plan: { arms: NO_ROOM } });
   const out = text(openMeasure(), d);
   assert.ok(out.some((l) => l.includes("Local, 32K window") && l.includes("NO ROOM NOW")));
+  assert.ok(out.some((l) => l.includes("the Mac may stop answering")));
   const asked = press(openMeasure(), d, "space");
-  assert.deepEqual(asked.state.list.ticked, []);
-  assert.match(asked.state.list.notice ?? "", /Not enough memory is free now/);
-  assert.equal(asked.action.kind, "none");
+  assert.deepEqual(asked.state.list.ticked, ["local-32k"]);
+  assert.ok(text(asked.state, d).some((l) => l.includes("I saved my work. Run at my own risk: this can make the Mac stop answering.")));
+  assert.equal(press(asked.state, d, "enter").action.kind, "none");
+  assert.deepEqual(press(asked.state, d, "saved", "enter").action, { kind: "start", arms: ["local-32k"], allowTight: true, ownRisk: true });
 });
 
-test("too big has no override: space refuses and enter starts nothing", () => {
+test("too big is a warning too: space ticks it, the box says own risk, start sends own_risk", () => {
   const down = press(openMeasure(), data(), "down", "space");
-  assert.deepEqual(down.state.list.ticked, []);
-  assert.match(down.state.list.notice ?? "", /Does not fit on this Mac/);
+  assert.deepEqual(down.state.list.ticked, ["local-128k"]);
   assert.equal(press(down.state, data(), "enter").action.kind, "none");
+  assert.deepEqual(press(down.state, data(), "saved", "enter").action, { kind: "start", arms: ["local-128k"], allowTight: true, ownRisk: true });
+});
+
+test("an arm with no model to run still cannot be ticked", () => {
+  const missing: EvalPlanArm[] = [{ ...ARMS[0]!, verdict: "unknown", runnable: false, reason: "Ollama does not have qwen3.8:27b. Choose another model, or pull it first." }, ...ARMS.slice(2)];
+  const out = press(openMeasure(), data({ plan: { arms: missing } }), "space");
+  assert.deepEqual(out.state.list.ticked, []);
+  assert.match(out.state.list.notice ?? "", /cannot run: Ollama does not have/);
 });
 
 test("a tight arm needs the saved-work box, then starts with allow_tight", () => {
@@ -136,14 +147,14 @@ test("a tight arm needs the saved-work box, then starts with allow_tight", () =>
   assert.equal(early.action.kind, "none");
   assert.match(early.state.list.notice ?? "", /Tick the box/);
   const go = press(ticked.state, data(), "saved", "enter");
-  assert.deepEqual(go.action, { kind: "start", arms: ["local-32k"], allowTight: true });
+  assert.deepEqual(go.action, { kind: "start", arms: ["local-32k"], allowTight: true, ownRisk: false });
 });
 
 test("a paid arm is never ticked by default, shows its cost, and starts without allow_tight", () => {
   assert.deepEqual(openMeasure().list.ticked, []);
   const ticked = press(openMeasure(), data(), "down", "down", "space");
   assert.ok(text(ticked.state, data()).some((l) => l.includes("enter start") && l.includes("about $0.4")));
-  assert.deepEqual(press(ticked.state, data(), "enter").action, { kind: "start", arms: ["budget"], allowTight: false });
+  assert.deepEqual(press(ticked.state, data(), "enter").action, { kind: "start", arms: ["budget"], allowTight: false, ownRisk: false });
 });
 
 test("t with nothing tight to confirm only says so", () => {
@@ -199,7 +210,7 @@ test("run, running: progress bar, the ask, memory, the last runs; x stops; Esc l
   assert.ok(out.some((l) => l.includes("mem 33 of 36 GB")));
   assert.ok(out.some((l) => l.startsWith("✓ ")));
   assert.ok(out.some((l) => l.startsWith("● ") && l.includes("running")));
-  assert.ok(out.at(-1)!.includes("x stop · Esc back to the list (the run goes on)"));
+  assert.ok(out.at(-1)!.includes("x stop · a the runs · Esc back to the list (the run goes on)"));
   assert.deepEqual(press(withRun(), d, "stop").action, { kind: "stop", id: "m1" });
   const back = press(withRun(), d, "back");
   assert.equal(back.state.run, null);
@@ -218,10 +229,20 @@ test("run, stopped: the reason, what is kept, run the rest, delete", () => {
   assert.match(out[0]!, /Agents › Measure › .* · stopped +esc back$/);
   assert.ok(out.some((l) => l.includes("Stopped after 3 of 10 runs.")));
   assert.ok(out.some((l) => l.includes("Ollama stopped answering. 3 runs are kept. 7 were not run")));
-  assert.ok(out.at(-1)!.includes("enter run the other 7 · d delete · Esc back"));
-  assert.deepEqual(press(withRun(), d, "enter").action, { kind: "resume", id: "m1", allowTight: false });
-  const saved: MeasureState = { ...withRun(), list: { ...closedMeasure.list, saved: true } };
-  assert.deepEqual(press(saved, d, "enter").action, { kind: "resume", id: "m1", allowTight: true });
+  assert.ok(out.at(-1)!.includes("enter run the other 7 · t the box · a the runs · d delete · Esc back"));
+  // local-32k is tight in the plan: the rest needs the box, and it is never off for memory.
+  assert.ok(out.some((l) => l.includes("I saved my work. Run although memory is tight.")));
+  const early = press(withRun(), d, "enter");
+  assert.equal(early.action.kind, "none");
+  assert.match(early.state.run?.notice ?? "", /Press t/);
+  const ticked = press(withRun(), d, "saved");
+  assert.equal(ticked.state.list.saved, true);
+  assert.deepEqual(press(ticked.state, d, "enter").action, { kind: "resume", id: "m1", allowTight: true, ownRisk: false });
+  const fits = data({ measurement: STOPPED, plan: { arms: [{ ...ARMS[0]!, verdict: "fits" }] } });
+  assert.deepEqual(press(withRun(), fits, "enter").action, { kind: "resume", id: "m1", allowTight: false, ownRisk: false });
+  const risky = data({ measurement: STOPPED, plan: { arms: NO_ROOM } });
+  assert.ok(text(withRun(), risky).some((l) => l.includes("Run at my own risk")));
+  assert.deepEqual(press(withRun(), risky, "saved", "enter").action, { kind: "resume", id: "m1", allowTight: true, ownRisk: true });
   const ask = press(withRun(), d, "delete");
   assert.equal(ask.state.run?.confirm, true);
   assert.ok(text(ask.state, d).at(-1)!.includes("Delete this measurement?"));
@@ -238,7 +259,7 @@ test("run, done: the verdict, the four numbers, use these numbers", () => {
   assert.ok(out.some((l) => /fill_share\s+85% → 80%/.test(l)));
   assert.ok(out.some((l) => /job_share\s+not measured/.test(l)));
   assert.ok(out.some((l) => /price_ratio\s+not measured/.test(l)));
-  assert.ok(out.at(-1)!.includes("enter use these numbers · v the table · d delete · Esc back (keeps yours)"));
+  assert.ok(out.at(-1)!.includes("enter use these numbers · v the table · a the runs · d delete · Esc back (keeps yours)"));
   assert.deepEqual(press(withRun(), d, "enter").action, { kind: "apply", id: "m1" });
   // Esc keeps the numbers the user has.
   assert.deepEqual(press(withRun(), d, "back").action, { kind: "refresh" });
@@ -307,4 +328,45 @@ test("layout fits the screen: no line wider than the columns, no more rows than 
     assert.ok(out.length <= 12);
     for (const line of out) assert.ok((line.prefix?.length ?? 0) + (line.mark ? line.mark.text.length + 1 : 0) + line.text.length <= 50, line.text);
   }
+});
+
+const ASK: EvalAsk = { name: "Read the whole repo", text: "list the modules that define handle_ functions", facts: ["orbit", "ember"], setup: "24 modules of 60 lines", reason: "window", why: "The reading is large." };
+const DETAILED: EvalMeasurement = {
+  ...DONE,
+  asks: [ASK],
+  own_risk: true,
+  golem_version: "0.9.1",
+  arm_params: [{ name: "local-32k", model: "ollama/qwen3.8:27b", window: 32768, at_a_time: 1, helper_model: "the same model as the lead" }],
+  runs: DONE.runs.map((run) => (run.ask === ASK.name && run.mode === "off" ? { ...run, answer: "It is orbit.", found: ["orbit"], missing: ["ember"] } : run)),
+};
+
+test("list: a shows the asks with their message and what the answer must mention, and Esc goes back", () => {
+  const d = data({ plan: { arms: ARMS, asks: [ASK] } });
+  const shown = press(openMeasure(), d, "asks");
+  assert.equal(shown.state.list.asks, true);
+  const out = text(shown.state, d);
+  assert.ok(out.some((l) => l.includes('"list the modules that define handle_ functions"')));
+  assert.ok(out.some((l) => l.includes("The answer must mention: orbit; ember")));
+  assert.ok(out.some((l) => l.includes("24 modules of 60 lines")));
+  assert.equal(press(shown.state, d, "back").state.list.asks, undefined);
+  assert.match(press(openMeasure(), data(), "asks").state.list.notice ?? "", /not read yet/);
+});
+
+test("run: a lists every run, o opens the one under the cursor with its message, facts and answer", () => {
+  const d = data({ measurement: DETAILED });
+  const listed = press(withRun(), d, "asks");
+  assert.equal(listed.state.run?.runs, true);
+  const out = text(listed.state, d, 100, 40);
+  assert.ok(out.some((l) => l.includes("window 32,768 tokens · one request at a time")));
+  assert.ok(out.some((l) => l.includes("started at your own risk")));
+  assert.ok(out.some((l) => l.includes("share of the expected facts")));
+  const find = press(listed.state, d, "down", "down", "down", "down", "open");
+  const open = text(find.state, d, 100, 60);
+  assert.ok(open.some((l) => l.includes("The message:")));
+  assert.ok(open.some((l) => /✓ +orbit/.test(l)) || open.some((l) => l.includes("✓ orbit")) || open.some((l) => l.includes("orbit")));
+  assert.ok(open.some((l) => l.includes("It is orbit.")));
+  assert.ok(open.some((l) => l.includes("✗") && l.includes("ember")));
+  assert.equal(press(find.state, d, "open").state.run?.open, undefined);
+  assert.equal(press(listed.state, d, "back").state.run?.runs, undefined);
+  assert.equal(press(listed.state, d, "back").state.run?.id, "m1");
 });

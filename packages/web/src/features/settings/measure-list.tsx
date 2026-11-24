@@ -1,5 +1,5 @@
-import { CHOOSE_MODEL_TEXT, SAVED_WORK_TEXT, armRows, measureList, noRoomLine, startPlan, type ArmRow, type MeasureListRow, type MeasureTone } from "@golem/view";
-import type { EvalPlanArm, EvalSummary } from "../../store/evals.ts";
+import { CHOOSE_MODEL_TEXT, armRows, askLines, measureList, memoryWarning, startPlan, type ArmRow, type MeasureListRow, type MeasureTone } from "@golem/view";
+import type { EvalAsk, EvalPlanArm, EvalSummary } from "../../store/evals.ts";
 import { useId, useState } from "react";
 import { Badge } from "../../ui/badge.tsx";
 import { Button } from "../../ui/button.tsx";
@@ -84,6 +84,26 @@ function ArmItem({ row, checked, onTick, model, onModel }: { row: ArmRow; checke
   );
 }
 
+/** The asks of the set, as lines to read: the message, the set-up, why it is in the set and what the answer must mention. */
+export function AsksList({ asks, label, open = false }: { asks: readonly EvalAsk[]; label: string; open?: boolean }) {
+  const lines = askLines(asks);
+  return (
+    <details open={open} className="rounded-md border border-line bg-bg px-3 py-2">
+      <summary className="cursor-pointer text-sm text-ink outline-offset-2 outline-clay focus-visible:outline-2">{label}</summary>
+      <ul aria-label="Asks" className="mt-2 flex flex-col gap-3">
+        {lines.map((line) => (
+          <li key={line.name} className="flex flex-col gap-0.5">
+            <Code tone="muted" className="text-xs">{line.name}</Code>
+            <span className="text-sm text-ink">&ldquo;{line.message}&rdquo;</span>
+            <span className="text-meta text-muted">{[line.setup, line.why].filter((part) => part !== "").join(" · ")}</span>
+            <span className="text-meta text-muted">The answer must mention: {line.mustMention}</span>
+          </li>
+        ))}
+      </ul>
+    </details>
+  );
+}
+
 /** One line of the list of earlier measurements, as a button that opens it. */
 function HistoryRow({ row, onOpen }: { row: MeasureListRow; onOpen: (id: string) => void }) {
   return (
@@ -111,11 +131,14 @@ function HistoryRow({ row, onOpen }: { row: MeasureListRow; onOpen: (id: string)
 
 /**
  * The list of the Measure tab: the arms of a new measurement with their memory and a verdict, the line and the Start
- * button, then the measurements kept on this Mac. An arm that is too big, or has no room now, cannot be ticked: this
- * is the one place that does not say "inform, never disable", because that case froze a Mac.
+ * button, then the measurements kept on this Mac. An arm that is too big, has no room now or is not known is shown with
+ * a warning and can still be ticked: starting it needs the box "I saved my work. Run at my own risk". Only an arm with
+ * nothing to run (the model is not installed, or the provider has no key) cannot be ticked.
  */
 export function MeasureListView({
   arms,
+  asks = [],
+  asksOpen = false,
   history,
   running,
   models = {},
@@ -130,6 +153,10 @@ export function MeasureListView({
   onOpen,
 }: {
   arms: readonly EvalPlanArm[];
+  /** The asks of the set, to read before anything starts. */
+  asks?: readonly EvalAsk[];
+  /** The asks shown open at first, for the gallery. */
+  asksOpen?: boolean;
   history: readonly EvalSummary[];
   /** The id of the measurement that runs now, or null. */
   running: string | null;
@@ -141,21 +168,21 @@ export function MeasureListView({
   busy?: boolean;
   now?: Date;
   onModel?: (arm: string, model: string) => void;
-  onStart: (arms: string[], allowTight: boolean) => void;
+  onStart: (arms: string[], allowTight: boolean, ownRisk: boolean) => void;
   onCheck: () => void;
   onOpen: (id: string) => void;
 }) {
   const rows = armRows(arms);
   const [ticked, setTicked] = useState<ReadonlySet<string>>(new Set(firstTicked));
   const [saved, setSaved] = useState(firstSaved);
-  // An arm that cannot be ticked now (memory changed since) is not counted, whatever was ticked before.
+  // An arm with nothing to run now (its model went away since) is not counted, whatever was ticked before.
   const chosen = new Set([...ticked].filter((name) => rows.find((row) => row.name === name)?.canTick === true));
   const plan = startPlan(rows, chosen, saved, running !== null);
   const lines = measureList(history, now);
   const current = lines.find((row) => row.running);
-  const blocked = noRoomLine(rows);
+  const warning = memoryWarning(rows);
   const boxId = useId();
-  const asks = rows[0]?.asks ?? 10;
+  const count = rows[0]?.asks ?? asks.length;
   return (
     <div className="flex max-w-column flex-col gap-4">
       <section aria-labelledby={`${boxId}-new`} className="flex flex-col gap-3 rounded-lg border border-line bg-surface px-4 py-3">
@@ -163,8 +190,9 @@ export function MeasureListView({
           New measurement
         </h3>
         <p className="text-sm text-muted">
-          golem plays {asks} fixed asks twice, with helpers and without, and compares the answer, the time and the room left in the window. The result proposes the four numbers on the Rules tab. Nothing changes until you say so.
+          golem plays {count} fixed asks twice, with helpers and without, and compares the answer, the time and the room left in the window. The result proposes the four numbers on the Rules tab. Nothing changes until you say so.
         </p>
+        {asks.length === 0 ? null : <AsksList asks={asks} label={`See the ${asks.length} asks`} open={asksOpen} />}
         {current === undefined ? null : (
           <p className="rounded-md bg-wait-soft px-3 py-2 text-sm text-wait" role="status">
             <b className="font-medium">A measurement is running: {current.note}.</b> One runs at a time.{" "}
@@ -173,9 +201,9 @@ export function MeasureListView({
             </button>
           </p>
         )}
-        {blocked === null ? null : (
-          <p className="rounded-md bg-deny-soft px-3 py-2 text-sm text-deny" role="status">
-            {blocked}
+        {warning === null ? null : (
+          <p className="rounded-md bg-wait-soft px-3 py-2 text-sm text-wait" role="status">
+            <b className="font-medium">Warning.</b> {warning}
           </p>
         )}
         {rows.length === 0 ? <p className="text-sm text-muted">There is nothing to measure yet.</p> : null}
@@ -204,10 +232,10 @@ export function MeasureListView({
           </p>
         )}
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-line pt-3">
-          {rows.some((row) => row.needsSaved) ? (
+          {plan.needsSaved ? (
             <label className="flex items-center gap-2 text-sm text-ink">
               <input type="checkbox" checked={saved} onChange={(event) => setSaved(event.target.checked)} className="accent-clay" />
-              <span>{SAVED_WORK_TEXT}</span>
+              <span>{plan.confirm}</span>
             </label>
           ) : null}
           <Button size="sm" onClick={onCheck}>
@@ -216,7 +244,7 @@ export function MeasureListView({
           <span className="flex-1 text-sm text-muted" data-measure-line="">
             {plan.line}
           </span>
-          <Button kind="primary" disabled={!plan.canStart || busy} onClick={() => onStart(plan.arms, plan.allowTight)}>
+          <Button kind="primary" disabled={!plan.canStart || busy} onClick={() => onStart(plan.arms, plan.allowTight, plan.ownRisk)}>
             Start
           </Button>
         </div>

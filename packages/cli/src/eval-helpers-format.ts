@@ -1,3 +1,4 @@
+import type { EvalAsk } from "../../protocol/gen/eval-ask.ts";
 import type { EvalMeasurement } from "../../protocol/gen/evals-get-result.ts";
 import type { EvalPlanArm } from "../../protocol/gen/eval-plan-arm.ts";
 import type { EvalProgress } from "../../protocol/gen/eval-progress.ts";
@@ -8,15 +9,16 @@ const DASH = "-";
 const BASE = "golem eval helpers";
 
 export const HELPERS_USAGE =
-  "usage: golem eval helpers [--arm <name>]… [--model <arm>=<model>]… [--allow-tight]\n" +
-  "       golem eval helpers list | show <id> | stop [<id>] | resume <id> [--allow-tight] | apply <id> | delete <id>";
+  "usage: golem eval helpers [--arm <name>]… [--model <arm>=<model>]… [--allow-tight] [--own-risk]\n" +
+  "       golem eval helpers list | asks | show <id> [--ask <name>] [--verbose] | stop [<id>] | resume <id> [--allow-tight] [--own-risk] | apply <id> | delete <id>";
 
 export type HelpersArgs =
-  | { kind: "start"; arms: string[]; models: Record<string, string>; allowTight: boolean }
+  | { kind: "start"; arms: string[]; models: Record<string, string>; allowTight: boolean; ownRisk: boolean }
   | { kind: "list" }
-  | { kind: "show"; id: string }
+  | { kind: "asks" }
+  | { kind: "show"; id: string; ask?: string; verbose: boolean }
   | { kind: "stop"; id?: string }
-  | { kind: "resume"; id: string; allowTight: boolean }
+  | { kind: "resume"; id: string; allowTight: boolean; ownRisk: boolean }
   | { kind: "apply"; id: string }
   | { kind: "delete"; id: string }
   | { kind: "error" };
@@ -36,7 +38,10 @@ export function parseHelpersArgs(args: readonly string[]): HelpersArgs {
   switch (first) {
     case "list":
       return rest.length === 0 ? { kind: "list" } : BAD;
+    case "asks":
+      return rest.length === 0 ? { kind: "asks" } : BAD;
     case "show":
+      return parseShow(rest);
     case "apply":
     case "delete":
       return rest.length === 1 && isId(rest[0]) ? { kind: first, id: rest[0] } : BAD;
@@ -45,22 +50,48 @@ export function parseHelpersArgs(args: readonly string[]): HelpersArgs {
       return rest.length === 1 && isId(rest[0]) ? { kind: "stop", id: rest[0] } : BAD;
     case "resume": {
       const allowTight = rest.includes("--allow-tight");
-      const ids = rest.filter((arg) => arg !== "--allow-tight");
-      return ids.length === 1 && isId(ids[0]) ? { kind: "resume", id: ids[0], allowTight } : BAD;
+      const ownRisk = rest.includes("--own-risk");
+      const ids = rest.filter((arg) => arg !== "--allow-tight" && arg !== "--own-risk");
+      return ids.length === 1 && isId(ids[0]) ? { kind: "resume", id: ids[0], allowTight, ownRisk } : BAD;
     }
     default:
       return parseStart(args);
   }
 }
 
+function parseShow(args: readonly string[]): HelpersArgs {
+  let id: string | undefined;
+  let ask: string | undefined;
+  let verbose = false;
+  for (let i = 0; i < args.length; i += 1) {
+    const arg = args[i] ?? "";
+    if (arg === "--verbose") {
+      verbose = true;
+    } else if (arg === "--ask") {
+      const value = args[i + 1];
+      if (!isId(value)) return BAD;
+      ask = value;
+      i += 1;
+    } else if (id === undefined && isId(arg)) {
+      id = arg;
+    } else {
+      return BAD;
+    }
+  }
+  return id === undefined ? BAD : { kind: "show", id, ...(ask === undefined ? {} : { ask }), verbose };
+}
+
 function parseStart(args: readonly string[]): HelpersArgs {
   const arms: string[] = [];
   const models: Record<string, string> = {};
   let allowTight = false;
+  let ownRisk = false;
   for (let i = 0; i < args.length; i += 1) {
     const arg = args[i] ?? "";
     if (arg === "--allow-tight") {
       allowTight = true;
+    } else if (arg === "--own-risk") {
+      ownRisk = true;
     } else if (arg === "--arm") {
       const value = args[i + 1];
       if (!isId(value)) return BAD;
@@ -76,7 +107,7 @@ function parseStart(args: readonly string[]): HelpersArgs {
       return BAD;
     }
   }
-  return { kind: "start", arms, models, allowTight };
+  return { kind: "start", arms, models, allowTight, ownRisk };
 }
 
 // ---------------------------------------------------------------- plan
@@ -146,15 +177,24 @@ export function formatPlan(arms: readonly EvalPlanArm[], running: string | null 
   if (arms.some((arm) => arm.verdict === "tight")) {
     lines.push("a tight arm needs --allow-tight: save your work in other apps first");
   }
+  if (arms.some((arm) => arm.kind === "local" && arm.runnable !== false && arm.verdict !== undefined && arm.verdict !== null && arm.verdict !== "fits" && arm.verdict !== "tight")) {
+    lines.push("an arm that is too big, has no room now or is not known can run with --own-risk: save your work first, the Mac may stop answering");
+  }
+  lines.push(`${BASE} asks   what is asked`);
   lines.push("nothing was started.");
   return lines.join("\n");
 }
 
-/** One line for each requested arm that may not run, with what to do. Empty when all may run. */
+/**
+ * One line for each requested arm that may not run, with what to do. Empty when all may run.
+ * Memory only warns: a tight arm needs --allow-tight or --own-risk, a too big one, one with no room
+ * and one of unknown size need --own-risk. An arm with nothing to run (no model, no key) never runs.
+ */
 export function refusals(
   plan: readonly EvalPlanArm[],
   requested: readonly string[],
   allowTight: boolean,
+  ownRisk = false,
 ): string[] {
   const names = plan.map((arm) => arm.name);
   const out: string[] = [];
@@ -165,17 +205,31 @@ export function refusals(
       continue;
     }
     const why = arm.reason ? `: ${arm.reason}` : "";
-    if (arm.kind !== "local") continue;
+    if (arm.runnable === false || (arm.kind === "local" && verdictWord(arm) === "not installed")) {
+      out.push(`${name} cannot run (${arm.kind === "local" ? "not installed" : "no key"})${why}`);
+      continue;
+    }
+    if (arm.kind !== "local" || ownRisk) continue;
     if (arm.verdict === "tight") {
       if (!allowTight) {
         out.push(`${name} is tight on memory${why}. Save your work in other apps, then run again with --allow-tight.`);
       }
     } else if (arm.verdict !== "fits") {
       const word = verdictWord(arm);
-      out.push(`${name} cannot run (${word})${why}`);
+      out.push(`${name} is ${word}${why}. You can run it at your own risk, but the Mac may stop answering. Save your work, then run again with --own-risk.`);
     }
   }
   return out;
+}
+
+/** A warning line for each requested arm that runs only because of --own-risk. */
+export function riskLines(plan: readonly EvalPlanArm[], requested: readonly string[]): string[] {
+  return plan
+    .filter((arm) => requested.includes(arm.name) && arm.kind === "local" && arm.runnable !== false && arm.verdict !== "fits" && arm.verdict !== "tight")
+    .map(
+      (arm) =>
+        `warning ${arm.name} is ${verdictWord(arm)}; it runs at your own risk and the Mac may stop answering. It still stops by itself when the free memory gets very low.`,
+    );
 }
 
 /** The paid arms among the requested ones, as a line, or null when none is paid. */
@@ -186,6 +240,59 @@ export function costLine(plan: readonly EvalPlanArm[], requested: readonly strin
     .map((arm) => `${arm.name}: ${arm.cost_usd === null || arm.cost_usd === undefined ? "paid, no estimate" : `about ${money(arm.cost_usd)}`}`)
     .join(" · ")
     .replace(/^/, "cost    ");
+}
+
+// ---------------------------------------------------------------- asks and parameters
+
+/** `golem eval helpers asks`: each ask with its message, set-up, why it is in the set and what the answer must mention. */
+export function formatAsks(asks: readonly EvalAsk[]): string {
+  if (asks.length === 0) return "no asks";
+  const lines: string[] = [];
+  for (const ask of asks) {
+    lines.push(ask.name);
+    lines.push(`  message  ${ask.text}`);
+    const note = [ask.setup, ask.why].filter((part): part is string => typeof part === "string" && part !== "").join(" · ");
+    if (note !== "") lines.push(`  set-up   ${note}`);
+    lines.push(`  must mention  ${(ask.facts ?? []).join("; ")}`);
+  }
+  lines.push("", "each ask is played twice, with helpers and without. quality is the share of the facts found (0 to 1).");
+  return lines.join("\n");
+}
+
+/** What the arms ran with, the helper rules in force and the golem version, one line each. */
+export function formatParams(measurement: EvalMeasurement): string[] {
+  const lines: string[] = [];
+  for (const item of measurement.arm_params ?? []) {
+    const parts = [item.name, item.model, `window ${item.window.toLocaleString("en-US")} tokens`];
+    parts.push(item.at_a_time === null || item.at_a_time === undefined ? "requests as the provider allows" : `${item.at_a_time} request at a time`);
+    if (item.helper_model) parts.push(`helpers use ${item.helper_model}`);
+    lines.push(`  ${parts.join(" · ")}`);
+  }
+  const rules = measurement.rules ?? {};
+  const keys = Object.keys(rules);
+  if (keys.length > 0) lines.push(`  helper rules: ${keys.map((key) => `${key} ${rules[key]}`).join(", ")}`);
+  if (measurement.golem_version) lines.push(`  golem ${measurement.golem_version}`);
+  if (measurement.own_risk) lines.push("  started at the person's own risk");
+  return lines.length === 0 ? [] : ["parameters", ...lines];
+}
+
+/** The runs with what was asked and answered: every ask, or the one named. `facts` shows found and missing. */
+export function formatRunDetails(measurement: EvalMeasurement, ask?: string): string[] {
+  const asks = new Map((measurement.asks ?? []).map((item) => [item.name, item]));
+  const lines: string[] = [];
+  for (const run of measurement.runs) {
+    if (ask !== undefined && run.ask !== ask) continue;
+    if (!PLAYED.has(run.end)) continue;
+    const quality = run.quality === null || run.quality === undefined ? DASH : run.quality.toFixed(2);
+    lines.push(`${run.ask}  ${run.arm}  helpers ${run.mode}  ${run.end}  quality ${quality}`);
+    const known = asks.get(run.ask);
+    if (known !== undefined) lines.push(`  message  ${known.text}`);
+    for (const fact of run.found ?? []) lines.push(`  found    ${fact}`);
+    for (const fact of run.missing ?? []) lines.push(`  missing  ${fact}`);
+    if (run.answer) lines.push(`  answer   ${run.answer.replace(/\s+/g, " ")}`);
+    else lines.push("  answer   not kept");
+  }
+  return lines;
 }
 
 // ---------------------------------------------------------------- progress
@@ -337,7 +444,10 @@ export function duration(measurement: EvalMeasurement): number | null {
 }
 
 /** `golem eval helpers show <id>`: the state, the table and the proposal. */
-export function formatMeasurement(measurement: EvalMeasurement): string {
+export function formatMeasurement(
+  measurement: EvalMeasurement,
+  options: { ask?: string; verbose?: boolean } = {},
+): string {
   const played = measurement.runs.filter((run) => PLAYED.has(run.end)).length;
   const took = duration(measurement);
   const head = [`measurement ${measurement.id}`, measurement.state];
@@ -351,6 +461,14 @@ export function formatMeasurement(measurement: EvalMeasurement): string {
     lines.push(`stopped: ${measurement.stop_reason}`);
   }
   lines.push("", ...formatRunTable(measurement.runs), "", ...formatProposal(measurement), "");
+  const params = formatParams(measurement);
+  if (params.length > 0) lines.push(...params, "");
+  if (options.verbose === true || options.ask !== undefined) {
+    const details = formatRunDetails(measurement, options.ask);
+    lines.push(...(details.length > 0 ? details : ["no run of that ask was played"]), "");
+  } else {
+    lines.push(`${BASE} show ${measurement.id} --verbose   what was asked and answered, run by run`, "");
+  }
   if (measurement.state === "stopped") lines.push(`${BASE} resume ${measurement.id}   play the runs left`);
   if (measurement.state !== "running" && measurement.proposal) {
     lines.push(`${BASE} apply ${measurement.id}   write them to config.toml`);

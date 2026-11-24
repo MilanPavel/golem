@@ -641,7 +641,7 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
         evalsPlan: (arms, models) => client.evalsPlan(arms, models),
         evalsStart: (params) => client.evalsStart(params),
         evalsStop: (id) => client.evalsStop(id),
-        evalsResume: (id, allowTight) => client.evalsResume(id, allowTight),
+        evalsResume: (id, allowTight, ownRisk) => (ownRisk === undefined ? client.evalsResume(id, allowTight) : client.evalsResume(id, allowTight, ownRisk)),
         evalsList: () => client.evalsList(),
         evalsGet: (id) => client.evalsGet(id),
         // The numbers are in config.toml now, so what the Rules tab read before is stale.
