@@ -92,7 +92,7 @@ function Recommended({ model, listing, ...action }: ActionProps & { listing: Mod
   );
 }
 
-const COLUMNS = "flex items-center gap-x-3.5";
+const COLUMNS = "flex flex-wrap items-center gap-x-3.5 gap-y-1 md:flex-nowrap";
 
 export type PicksProps = {
   listing: ModelListResult | null;
@@ -179,7 +179,7 @@ export function PicksTab({ listing, pulls, search, pull, onStop, failure, places
         </div>
       ) : (
         <>
-          <div aria-hidden="true" className={cn(COLUMNS, "shrink-0 px-2.5 pb-1.5 pt-2 text-xs font-semibold uppercase tracking-wider text-faint")}>
+          <div aria-hidden="true" className={cn(COLUMNS, "shrink-0 max-md:hidden px-2.5 pb-1.5 pt-2 text-xs font-semibold uppercase tracking-wider text-faint")}>
             <span className="min-w-0 flex-1">Model</span>
             <span className="hidden w-36 shrink-0 lg:block">Good for</span>
             <span className="w-16 shrink-0 text-right">Size</span>
@@ -193,7 +193,7 @@ export function PicksTab({ listing, pulls, search, pull, onStop, failure, places
               return (
                 <li key={model.ref} className="border-t border-line px-2.5 py-1.5 hover:bg-surface/80">
                   <div className={cn(COLUMNS, "min-h-11 lg:min-h-8")}>
-                    <span className="flex min-w-0 flex-1 items-baseline gap-2 overflow-hidden whitespace-nowrap">
+                    <span className="flex min-w-0 basis-full items-baseline gap-2 overflow-hidden whitespace-nowrap md:flex-1 md:basis-0">
                       <b className="truncate text-sm font-semibold">{model.label}</b>
                       <Code tone="muted" className="truncate">{shortName(model.ref)}</Code>
                       {model.recommended === true ? <span className="rounded-sm bg-allow-soft px-1.5 py-0.5 text-xs font-semibold tracking-wide text-allow">RECOMMENDED</span> : null}
