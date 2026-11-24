@@ -1691,6 +1691,22 @@ function AgentsDemo() {
           }
         />
       </section>
+      <section aria-label="Agents, tabs narrow" className="flex h-96 max-w-md flex-col gap-3 rounded-lg border border-line bg-bg p-4">
+        <span className="font-mono text-xs text-faint">Tabs, narrow: the tab list and one column</span>
+        <AgentsTabs tab="agents" onTab={() => {}} agents={<AgentsPage agents={SAMPLE_AGENTS} narrow onSetWish={async () => {}} />} rules={null} />
+      </section>
+      <section aria-label="Agents, empty" className="flex flex-col gap-3 rounded-lg border border-line bg-bg p-4">
+        <span className="font-mono text-xs text-faint">Empty</span>
+        <AgentsPage agents={[]} />
+      </section>
+    </div>
+  );
+}
+
+/** Settings → Agents → Measure: the list in its states, a run in progress, stopped and finished, and the tab with its dot. Its own section so axe has one smaller tree each. */
+function MeasureDemo() {
+  return (
+    <div className="flex flex-col gap-4">
       {(
         [
           ["Measure, new measurement: a tight arm ticked, the box not yet", <MeasureListView key="a" arms={SAMPLE_ARMS} history={SAMPLE_HISTORY} running={null} ticked={["local-32k"]} error={null} onStart={() => {}} onCheck={() => {}} onOpen={() => {}} />],
@@ -1712,14 +1728,6 @@ function AgentsDemo() {
       <section aria-label="Agents, tab Measure" className="flex flex-col gap-3 rounded-lg border border-line bg-bg p-4">
         <span className="font-mono text-xs text-faint">Tabs: Measure, with the dot while a measurement runs</span>
         <AgentsTabs tab="measure" onTab={() => {}} agents={null} rules={null} measuring measure={<MeasureListView arms={SAMPLE_ARMS} history={SAMPLE_HISTORY_RUNNING} running="m1" error={null} onStart={() => {}} onCheck={() => {}} onOpen={() => {}} />} />
-      </section>
-      <section aria-label="Agents, tabs narrow" className="flex h-96 max-w-md flex-col gap-3 rounded-lg border border-line bg-bg p-4">
-        <span className="font-mono text-xs text-faint">Tabs, narrow: the tab list and one column</span>
-        <AgentsTabs tab="agents" onTab={() => {}} agents={<AgentsPage agents={SAMPLE_AGENTS} narrow onSetWish={async () => {}} />} rules={null} />
-      </section>
-      <section aria-label="Agents, empty" className="flex flex-col gap-3 rounded-lg border border-line bg-bg p-4">
-        <span className="font-mono text-xs text-faint">Empty</span>
-        <AgentsPage agents={[]} />
       </section>
     </div>
   );
@@ -2359,6 +2367,11 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
       <section className="mt-6" id={anchor("Agents")}>
         <h3 className="mb-2 font-mono text-xs text-faint">Agents</h3>
         <AgentsDemo />
+      </section>
+
+      <section className="mt-6" id={anchor("Measure")}>
+        <h3 className="mb-2 font-mono text-xs text-faint">Measure</h3>
+        <MeasureDemo />
       </section>
 
       <section className="mt-6" id={anchor("Agent limits")}>
