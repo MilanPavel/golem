@@ -35,14 +35,16 @@ for (const theme of ["slip", "kiln"] as const) {
       expect(page.getByRole("heading", { name: "Get models" })).toBeTruthy();
       expect(page.queryByRole("group", { name: "Providers" })).toBeNull();
       expect(page.getAllByRole("tab")).toHaveLength(3);
-      expect(page.getByText("Downloads keep going when you leave.")).toBeTruthy();
+      if (!label.includes("download")) expect(page.getByText("Downloads show up here. They keep going when you leave.")).toBeTruthy();
+      else expect(page.getByRole("list", { name: "Downloads" })).toBeTruthy();
       if (label === "Picked for this Mac") {
         expect(page.getByRole("group", { name: "Recommended for this Mac" })).toBeTruthy();
         expect(page.getByRole("button", { name: "Download gpt-oss:120b" }).textContent).toBe("Download anyway");
       }
       if (label === "Picked for this Mac, downloading") {
-        // The card and the line both show it.
-        expect(page.getAllByRole("progressbar", { name: "Downloading gemma4:12b" })).toHaveLength(2);
+        // The card, the line and the tray all show it.
+        expect(page.getAllByRole("progressbar", { name: "Downloading gemma4:12b" })).toHaveLength(3);
+        expect(page.getByText("32% · 2.6 of 8.1 GB")).toBeTruthy();
         expect(page.getByText("Download failed: no space left on the disk")).toBeTruthy();
       }
       if (label === "Picked for this Mac, no match") expect(page.getByText("Not in golem's list")).toBeTruthy();
