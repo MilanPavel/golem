@@ -10,20 +10,45 @@ afterEach(() => showAgentsTab("agents"));
 
 const tile = (key: string) => document.querySelector(`[data-reason="${key}"]`) as HTMLElement;
 
-test("the three tiles show the default numbers and say what golem suggests", () => {
+test("the three blocks show the default numbers as When and Then lines", () => {
   render(<UseHelpers value="when_needed" delegate={SAMPLE_DELEGATE} onChoose={() => {}} />);
-  expect(within(tile("fit")).getByText("It would not fit")).toBeTruthy();
-  expect(tile("fit").textContent).toContain("golem suggests a helper when the reading is over 30% of the window, or the window is already 85% full.");
-  expect(tile("parallel").textContent).toContain("each at least 10% of the window.");
-  expect(tile("model").textContent).toContain("a model 3× cheaper");
+  expect(within(tile("fit")).getByText("Too much to read")).toBeTruthy();
+  expect(tile("fit").textContent).toContain("A job needs to read more than 30% of the context window, or the window is already 85% full.");
+  expect(tile("fit").textContent).toContain("A helper reads it in its own window and brings back the answer.");
+  expect(tile("parallel").textContent).toContain("each needs at least 10% of the window.");
+  expect(tile("parallel").textContent).toContain("One helper per job, all at once.");
+  expect(tile("model").textContent).toContain("a model at least 3× cheaper");
+  expect(tile("model").textContent).toContain("Needs a second model that is ready");
+  expect(screen.getByText("The context window is what the model can hold at once. These numbers come from Measure.")).toBeTruthy();
   expect(document.querySelectorAll("[data-changed]").length).toBe(0);
+  expect(document.querySelectorAll("[data-default-tag]").length).toBe(0);
   expect(screen.getByText("FIRST GUESS")).toBeTruthy();
 });
 
-test("changed numbers show, are marked, and the foot says so", () => {
+test("each block has a decorative picture and bars that match its numbers", () => {
   render(<UseHelpers value="when_needed" delegate={SAMPLE_DELEGATE_CHANGED} onChoose={() => {}} />);
-  expect(tile("fit").textContent).toContain("over 42% of the window, or the window is already 80% full");
+  for (const key of ["fit", "parallel", "model"]) {
+    const svg = tile(key).querySelector("svg");
+    expect(svg?.getAttribute("aria-hidden")).toBe("true");
+    expect(tile(key).querySelector("[data-window]")?.getAttribute("aria-hidden")).toBe("true");
+  }
+  const widths = (key: string) => Array.from(tile(key).querySelectorAll<HTMLElement>("[data-part]")).map((each) => each.style.width);
+  expect(widths("fit")).toEqual(["42%", "80%"]);
+  expect(widths("parallel")).toEqual(["10%", "10%"]);
+  expect(widths("model")[0]).toBe("100%");
+  expect(Number.parseFloat(widths("model")[1] ?? "")).toBeCloseTo(100 / 3, 1);
+  expect(Array.from(tile("fit").querySelectorAll("[data-window] span")).map((each) => each.textContent)).toEqual(["one read", "window full"]);
+});
+
+test("changed numbers show, are marked, and keep the default tag next to the chip", () => {
+  render(<UseHelpers value="when_needed" delegate={SAMPLE_DELEGATE_CHANGED} onChoose={() => {}} />);
+  expect(tile("fit").textContent).toContain("more than 42% default 30% of the context window, or the window is already 80% default 85% full");
   expect(Array.from(document.querySelectorAll("[data-changed]")).map((each) => each.textContent)).toEqual(["42%", "80%"]);
+  const tag = tile("fit").querySelector("[data-default-tag]") as HTMLElement;
+  expect(tag.textContent).toBe("default 30%");
+  // The chip and its tag sit in one box that does not wrap.
+  expect(tag.parentElement?.className).toContain("whitespace-nowrap");
+  expect(tag.parentElement?.querySelector("[data-number]")?.textContent).toBe("42%");
   expect(screen.getByText("CHANGED")).toBeTruthy();
 });
 
@@ -34,15 +59,17 @@ test("a measurement in use is named in the foot", () => {
   expect(screen.getByRole("button", { name: "Measure again" })).toBeTruthy();
 });
 
-test("Never dims the tiles but keeps them", () => {
+test("Never dims the blocks, keeps them, and says they are not used", () => {
   const { rerender } = render(<UseHelpers value="never" delegate={SAMPLE_DELEGATE} onChoose={() => {}} />);
   expect(document.querySelector("[data-reasons]")?.hasAttribute("data-dimmed")).toBe(true);
   expect(tile("fit")).toBeTruthy();
+  expect(screen.getByText("Not used while helpers are off.")).toBeTruthy();
   rerender(<UseHelpers value="ask" delegate={SAMPLE_DELEGATE} onChoose={() => {}} />);
   expect(document.querySelector("[data-reasons]")?.hasAttribute("data-dimmed")).toBe(false);
+  expect(screen.queryByText("Not used while helpers are off.")).toBeNull();
 });
 
-test("no numbers from the daemon, no tiles", () => {
+test("no numbers from the daemon, no blocks", () => {
   render(<UseHelpers value="when_needed" onChoose={() => {}} />);
   expect(document.querySelector("[data-reasons]")).toBeNull();
 });
@@ -53,7 +80,7 @@ test("Measure on this Mac opens the Measure tab", async () => {
   expect(agentsTabStore.getSnapshot()).toBe("measure");
 });
 
-test("the tiles pass axe", async () => {
+test("the blocks pass axe", async () => {
   const { container } = render(<UseHelpers value="when_needed" delegate={SAMPLE_DELEGATE_CHANGED} onChoose={() => {}} />);
   const result = await axe.run(container, { rules: { "color-contrast": { enabled: false } } });
   expect(result.violations).toEqual([]);

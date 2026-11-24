@@ -19,18 +19,33 @@ export interface RulesMeasurement {
   model: string;
 }
 
-/** A piece of a tile line: plain text, or a number (`changed` when it is not the one golem ships). */
+/** A piece of a When line: plain text, or a number (`changed` when it is not the one golem ships, with `tag` saying what that is). */
 export interface TilePart {
   text: string;
   number?: boolean;
   changed?: boolean;
+  /** The small note after a changed number, such as `default 85%`. */
+  tag?: string;
+}
+
+/** One bar of a block's picture of the window: the share of the bar that is filled, in one or more segments. */
+export interface ReasonBar {
+  label: string;
+  /** Each segment as a share of the bar, 0 to 1. */
+  parts: number[];
 }
 
 export interface ReasonTile {
   key: "fit" | "parallel" | "model";
   title: string;
-  line: TilePart[];
+  /** The When line, with the numbers as parts. */
+  when: TilePart[];
+  /** The Then line. */
+  then: string;
+  /** Where it works. */
   note: string;
+  /** The picture of the window, as bars. It only repeats the numbers in the When line. */
+  bars: ReasonBar[];
 }
 
 export interface RulesFoot {
@@ -50,53 +65,73 @@ export function formatRatio(value: number): string {
   return `${Number.isInteger(value) ? value : Number(value.toFixed(1))}×`;
 }
 
-function num(text: string, from: DelegateNumber): TilePart {
-  return { text, number: true, changed: !from.is_default };
+function num(from: DelegateNumber, format: (value: number) => string): TilePart {
+  const part: TilePart = { text: format(from.value), number: true, changed: !from.is_default };
+  if (!from.is_default) part.tag = `default ${format(from.default)}`;
+  return part;
+}
+
+/** A share kept between 0 and 1, so a bar never leaves its track. */
+function share(value: number): number {
+  return Number.isFinite(value) ? Math.min(1, Math.max(0, value)) : 0;
 }
 
 /**
- * The three reasons "When needed" lists, with the four numbers in them. The wording says what golem
- * suggests to the model: the numbers shape the prompt and never stop a helper.
+ * The three reasons "When needed" lists, each as a When line with the four numbers, a Then line, and the bars that
+ * picture the numbers. The numbers shape the prompt and never stop a helper.
  */
 export function reasonTiles(delegate: DelegateNumbers): ReasonTile[] {
+  const job = share(delegate.job_share.value);
   return [
     {
       key: "fit",
-      title: "It would not fit",
-      line: [
-        { text: "golem suggests a helper when the reading is over " },
-        num(formatShare(delegate.read_share.value), delegate.read_share),
-        { text: " of the window, or the window is already " },
-        num(formatShare(delegate.fill_share.value), delegate.fill_share),
+      title: "Too much to read",
+      when: [
+        { text: "A job needs to read more than " },
+        num(delegate.read_share, formatShare),
+        { text: " of the context window, or the window is already " },
+        num(delegate.fill_share, formatShare),
         { text: " full." },
       ],
-      note: "Any model.",
+      then: "A helper reads it in its own window and brings back the answer.",
+      note: "Any model",
+      bars: [
+        { label: "one read", parts: [share(delegate.read_share.value)] },
+        { label: "window full", parts: [share(delegate.fill_share.value)] },
+      ],
     },
     {
       key: "parallel",
-      title: "Jobs can run at once",
-      line: [
-        { text: "golem suggests several when there are two or more separate jobs, each at least " },
-        num(formatShare(delegate.job_share.value), delegate.job_share),
+      title: "Jobs that do not depend on each other",
+      when: [
+        { text: "There are two or more separate jobs, and each needs at least " },
+        num(delegate.job_share, formatShare),
         { text: " of the window." },
       ],
+      then: "One helper per job, all at once.",
       note: "Cloud models. Local helpers take turns.",
+      bars: [{ label: "two jobs", parts: [job, job] }],
     },
     {
       key: "model",
-      title: "Another model suits it",
-      line: [
-        { text: "golem suggests moving a large read to a model " },
-        num(formatRatio(delegate.price_ratio.value), delegate.price_ratio),
-        { text: " cheaper, and one hard question to a stronger model." },
+      title: "Another model fits better",
+      when: [
+        { text: "A large read can go to a model at least " },
+        num(delegate.price_ratio, formatRatio),
+        { text: " cheaper. One hard question can go to a stronger model." },
       ],
-      note: "Needs a second model that is ready.",
+      then: "The helper runs on that model.",
+      note: "Needs a second model that is ready",
+      bars: [
+        { label: "this model", parts: [1] },
+        { label: "cheaper model", parts: [share(1 / Math.max(delegate.price_ratio.value, 1))] },
+      ],
     },
   ];
 }
 
 /**
- * The line under the tiles. The daemon does not say where a number came from, so without a measurement
+ * The line under the blocks. The daemon does not say where a number came from, so without a measurement
  * the line can only tell the first guess (all four are the shipped ones) from numbers that were changed.
  */
 export function rulesFoot(delegate: DelegateNumbers, measurement: RulesMeasurement | null = null): RulesFoot {

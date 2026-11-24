@@ -21,17 +21,17 @@ export const USE_HELPERS_POSITIONS: readonly UseHelpersPosition[] = [
   {
     value: "when_needed",
     label: "When needed",
-    explain: "the reading would not fit the window, or several jobs can run at once, or a stronger model is worth one question.",
+    explain: "golem starts a helper by itself when one of the reasons below holds.",
   },
   {
     value: "ask",
     label: "Ask me first",
-    explain: "golem shows the helpers it wants to start, with what each is asked, and waits for your Run.",
+    explain: "golem asks before it starts a helper.",
   },
   {
     value: "never",
     label: "Never",
-    explain: "golem does all the work itself in the chat, however large it is.",
+    explain: "golem works alone.",
   },
 ];
 
@@ -40,7 +40,7 @@ export function useHelpersPosition(value: string | null | undefined): UseHelpers
   return USE_HELPERS_POSITIONS.find((position) => position.value === value) ?? (USE_HELPERS_POSITIONS[0] as UseHelpersPosition);
 }
 
-/** The one line under the control for the chosen position, such as `Never: golem does all the work itself…`. */
+/** The one line under the control for the chosen position, such as `Never: golem works alone.`. */
 export function useHelpersExplain(value: string | null | undefined): string {
   const position = useHelpersPosition(value);
   return `${position.label}: ${position.explain}`;

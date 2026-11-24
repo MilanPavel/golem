@@ -8,9 +8,9 @@ import { fakeClient, fakeFrame } from "../../store/test-support.ts";
 import { UseHelpers, UseHelpersSection } from "./use-helpers-setting.tsx";
 
 const LINES = {
-  when_needed: "When needed: the reading would not fit the window, or several jobs can run at once, or a stronger model is worth one question.",
-  ask: "Ask me first: golem shows the helpers it wants to start, with what each is asked, and waits for your Run.",
-  never: "Never: golem does all the work itself in the chat, however large it is.",
+  when_needed: "golem starts a helper by itself when one of the reasons below holds.",
+  ask: "golem asks before it starts a helper.",
+  never: "golem works alone.",
 } as const;
 
 test.each(["when_needed", "ask", "never"] as const)("%s: the control checks it and the line explains it", (value) => {

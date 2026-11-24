@@ -71,7 +71,7 @@ import { SAMPLE_MEMORIES, SAMPLE_MEMORY_COUNTS, SAMPLE_MEMORY_SETTINGS } from ".
 import { MEMORY_OFF_TEXT } from "../store/memory.ts";
 import { DefaultLimits, FinishedHelpers } from "../features/settings/agents-keep.tsx";
 import { LimitsBlock } from "../features/settings/agents-limits.tsx";
-import { AgentsPage, AgentsTabs } from "../features/settings/agents-section.tsx";
+import { AgentsPage, AgentsTabs, RulesLayout } from "../features/settings/agents-section.tsx";
 import { MeasureListView } from "../features/settings/measure-list.tsx";
 import { MeasureRunView } from "../features/settings/measure-run.tsx";
 import { SAMPLE_ARMS, SAMPLE_ARMS_NO_ROOM, SAMPLE_ASKS, SAMPLE_DONE, SAMPLE_HISTORY, SAMPLE_HISTORY_RUNNING, SAMPLE_LIVE, SAMPLE_RUNNING, SAMPLE_STOPPED, SAMPLE_STOPPED_OWN_RISK } from "../features/settings/measure-sample.ts";
@@ -1696,11 +1696,11 @@ function AgentsDemo() {
           onTab={() => {}}
           agents={null}
           rules={
-            <div className="flex max-w-column flex-col gap-3">
-              <UseHelpers value="when_needed" delegate={SAMPLE_DELEGATE} onChoose={() => {}} />
-              <DefaultLimits values={{ keep_days: 7, keep_problem_days: 30 }} errors={{}} failure={null} onSaveLimit={() => {}} />
-              <FinishedHelpers values={{ keep_days: 7, keep_problem_days: 30 }} errors={{}} failure={null} onSave={() => {}} />
-            </div>
+            <RulesLayout
+              use={<UseHelpers value="when_needed" delegate={SAMPLE_DELEGATE_CHANGED} onChoose={() => {}} />}
+              limits={<DefaultLimits values={{ keep_days: 7, keep_problem_days: 30 }} errors={{}} failure={null} onSaveLimit={() => {}} />}
+              finished={<FinishedHelpers values={{ keep_days: 7, keep_problem_days: 30 }} errors={{}} failure={null} onSave={() => {}} />}
+            />
           }
         />
       </section>
