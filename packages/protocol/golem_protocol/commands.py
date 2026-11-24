@@ -5922,6 +5922,259 @@ class EvalEnded(BaseModel):
         return self
 
 
+WorkflowState = Literal["ok", "broken", "untrusted"]
+"""``broken`` did not load (see ``error``). ``untrusted`` sits in a folder that is not trusted."""
+WorkflowRunStatus = Literal["pending", "running", "waiting", "done", "failed", "cancelled"]
+WorkflowStepStatus = Literal[
+    "pending", "running", "waiting", "done", "failed", "skipped", "in_doubt"
+]
+WorkflowStepKind = Literal["step", "agent", "review", "notify", "llm", "tool", "skill"]
+WorkflowTriggerKind = Literal["manual", "schedule", "on_file"]
+
+
+class WorkflowTriggerInfo(BaseModel):
+    """What starts a workflow. ``expr`` is for ``schedule``, ``path`` for ``on_file``."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    kind: WorkflowTriggerKind
+    expr: str | None = None
+    path: str | None = None
+
+
+class WorkflowInputInfo(BaseModel):
+    """One declared input: its name, its type name and the default as written, if any."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    name: str = Field(min_length=1)
+    type: str | None = None
+    default: str | None = None
+
+
+class WorkflowEntryInfo(BaseModel):
+    """One workflow the daemon found (ADR-062).
+
+    ``id`` is ``<path>::<name>``, or the path for a file with no workflow. ``project`` is the
+    project folder, null for the user's folder. ``error`` is the traceback tail of a ``broken``
+    file. ``trigger`` is null for a workflow with none.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    id: str = Field(min_length=1)
+    name: str
+    path: str = Field(min_length=1)
+    project: str | None = None
+    state: WorkflowState
+    error: str | None = None
+    trigger: WorkflowTriggerInfo | None = None
+    inputs: list[WorkflowInputInfo] = Field(default_factory=list[WorkflowInputInfo])
+    description: str = ""
+
+
+class WorkflowOutlineStep(BaseModel):
+    """One step read from the source, without running it.
+
+    ``lines`` is the first and last line in the file (from 1). ``key`` and ``group`` are the
+    step's key and the group it belongs to, when the source says them. ``for_each`` and
+    ``condition`` are the source text of the loop and the guard. ``after`` lists the ids of the
+    steps this one follows.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    id: str = Field(min_length=1)
+    kind: str = Field(min_length=1)
+    title: str
+    agent: str | None = None
+    lines: tuple[int, int]
+    group: str | None = None
+    for_each: str | None = None
+    condition: str | None = None
+    key: str | None = None
+    gets: str | None = None
+    budget: str | None = None
+    brief_line: int | None = Field(default=None, ge=1)
+    budget_line: int | None = Field(default=None, ge=1)
+    after: list[str] = Field(default_factory=list[str])
+
+
+class WorkflowListParams(BaseModel):
+    """``workflow.list``. The workflows of the user's folder and of ``folders``.
+
+    A project folder that is not trusted lists its files as ``untrusted`` and never imports them.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    folders: list[str] = Field(default_factory=list[str])
+
+
+class WorkflowListResult(BaseModel):
+    """The workflows, user ones first, each group in file order."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    workflows: list[WorkflowEntryInfo]
+
+
+class WorkflowGetParams(BaseModel):
+    """``workflow.get``. One workflow by its ``id``."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    id: str = Field(min_length=1)
+
+
+class WorkflowGetResult(BaseModel):
+    """The workflow and its outline steps (empty for a ``broken`` or ``untrusted`` file)."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    workflow: WorkflowEntryInfo
+    steps: list[WorkflowOutlineStep] = Field(default_factory=list[WorkflowOutlineStep])
+
+
+class WorkflowStartParams(BaseModel):
+    """``workflow.start``. Start a run of the workflow ``id`` with ``inputs``.
+
+    ``trigger`` says what asked for it. A person pressing Run is ``manual``.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    id: str = Field(min_length=1)
+    inputs: dict[str, Any] = Field(default_factory=dict[str, Any])
+    trigger: WorkflowTriggerKind = "manual"
+
+
+class WorkflowStartResult(BaseModel):
+    """The run ``workflow.start`` made."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    workflow_run_id: str = Field(min_length=1)
+
+
+class WorkflowRunInfo(BaseModel):
+    """One run of a workflow, from its ``workflow_runs`` row.
+
+    The times are ISO 8601 with an offset. ``session_id`` is the run's headless session.
+    ``error`` says why a ``failed`` run failed.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    workflow_run_id: str = Field(min_length=1)
+    workflow_id: str = Field(min_length=1)
+    name: str
+    status: WorkflowRunStatus
+    trigger: WorkflowTriggerKind
+    inputs: dict[str, Any] = Field(default_factory=dict[str, Any])
+    session_id: str | None = Field(default=None, min_length=1)
+    started_at: str | None = None
+    ended_at: str | None = None
+    error: str | None = None
+
+
+class WorkflowStepInfo(BaseModel):
+    """One step of a run, from its ``workflow_steps`` row.
+
+    ``key`` is the step key the engine journals by, ``group`` the key of the group it runs in.
+    ``attempts`` counts starts. ``child_session_id`` is the helper session of an ``agent`` step.
+    ``in_doubt`` is a step that may have had its effect before the daemon stopped.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    key: str = Field(min_length=1)
+    kind: WorkflowStepKind
+    title: str
+    status: WorkflowStepStatus
+    group: str | None = None
+    attempts: int = Field(default=0, ge=0)
+    error: str | None = None
+    child_session_id: str | None = Field(default=None, min_length=1)
+    started_at: str | None = None
+    ended_at: str | None = None
+
+
+class WorkflowStatusParams(BaseModel):
+    """``workflow.status``. A run and its steps."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    workflow_run_id: str = Field(min_length=1)
+
+
+class WorkflowStatusResult(BaseModel):
+    """The run and its steps, in the order they started."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    run: WorkflowRunInfo
+    steps: list[WorkflowStepInfo] = Field(default_factory=list[WorkflowStepInfo])
+
+
+class WorkflowCancelParams(BaseModel):
+    """``workflow.cancel``. Stop a run. A run that already ended is left as it is."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    workflow_run_id: str = Field(min_length=1)
+
+
+class WorkflowCancelResult(BaseModel):
+    """``cancelled`` is false when the run had already ended."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    cancelled: bool
+
+
+class WorkflowRunEvent(BaseModel):
+    """The params of ``workflow.run.started|waiting|resumed|done|failed|cancelled``.
+
+    The method names the change, ``status`` is the run's state after it. ``error`` is set for
+    ``workflow.run.failed``. The name is ``workflow.run.*``, never ``run.*`` (ADR-050).
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    workflow_run_id: str = Field(min_length=1)
+    workflow_id: str = Field(min_length=1)
+    name: str
+    status: WorkflowRunStatus
+    trigger: WorkflowTriggerKind | None = None
+    session_id: str | None = Field(default=None, min_length=1)
+    started_at: str | None = None
+    ended_at: str | None = None
+    error: str | None = None
+
+
+class WorkflowStepEvent(BaseModel):
+    """The params of ``workflow.step.started|done|failed|waiting|in_doubt``.
+
+    The method names the change, ``status`` is the step's state after it. ``key`` is the step
+    key, ``group`` the key of its group, ``attempts`` the number of starts so far.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    workflow_run_id: str = Field(min_length=1)
+    key: str = Field(min_length=1)
+    kind: WorkflowStepKind
+    title: str
+    status: WorkflowStepStatus
+    group: str | None = None
+    attempts: int = Field(default=0, ge=0)
+    error: str | None = None
+    child_session_id: str | None = Field(default=None, min_length=1)
+    started_at: str | None = None
+    ended_at: str | None = None
+
+
 __all__ = [
     "AgentInfo",
     "AgentLimitKey",
@@ -6338,4 +6591,27 @@ __all__ = [
     "TraceTokens",
     "TraceToolSpan",
     "WishResolution",
+    "WorkflowCancelParams",
+    "WorkflowCancelResult",
+    "WorkflowEntryInfo",
+    "WorkflowGetParams",
+    "WorkflowGetResult",
+    "WorkflowInputInfo",
+    "WorkflowListParams",
+    "WorkflowListResult",
+    "WorkflowOutlineStep",
+    "WorkflowRunEvent",
+    "WorkflowRunInfo",
+    "WorkflowRunStatus",
+    "WorkflowStartParams",
+    "WorkflowStartResult",
+    "WorkflowState",
+    "WorkflowStatusParams",
+    "WorkflowStatusResult",
+    "WorkflowStepEvent",
+    "WorkflowStepInfo",
+    "WorkflowStepKind",
+    "WorkflowStepStatus",
+    "WorkflowTriggerInfo",
+    "WorkflowTriggerKind",
 ]

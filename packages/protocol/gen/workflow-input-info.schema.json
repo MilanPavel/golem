@@ -1,0 +1,40 @@
+{
+  "additionalProperties": false,
+  "description": "One declared input: its name, its type name and the default as written, if any.",
+  "properties": {
+    "default": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Default"
+    },
+    "name": {
+      "minLength": 1,
+      "title": "Name",
+      "type": "string"
+    },
+    "type": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Type"
+    }
+  },
+  "required": [
+    "name"
+  ],
+  "title": "WorkflowInputInfo",
+  "type": "object"
+}

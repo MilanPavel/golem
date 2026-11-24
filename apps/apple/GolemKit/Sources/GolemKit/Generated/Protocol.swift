@@ -29341,6 +29341,1626 @@ public struct WishResolution: Codable {
     }
 }
 
+/// ``workflow.cancel``. Stop a run. A run that already ended is left as it is.
+// MARK: - WorkflowCancelParams
+public struct WorkflowCancelParams: Codable {
+    public let workflowRunID: String
+
+    public enum CodingKeys: String, CodingKey {
+        case workflowRunID = "workflow_run_id"
+    }
+
+    public init(workflowRunID: String) {
+        self.workflowRunID = workflowRunID
+    }
+}
+
+/// ``cancelled`` is false when the run had already ended.
+// MARK: - WorkflowCancelResult
+public struct WorkflowCancelResult: Codable {
+    public let cancelled: Bool
+
+    public enum CodingKeys: String, CodingKey {
+        case cancelled = "cancelled"
+    }
+
+    public init(cancelled: Bool) {
+        self.cancelled = cancelled
+    }
+}
+
+/// One workflow the daemon found (ADR-062).
+///
+/// ``id`` is ``<path>::<name>``, or the path for a file with no workflow. ``project`` is the
+/// project folder, null for the user's folder. ``error`` is the traceback tail of a
+/// ``broken``
+/// file. ``trigger`` is null for a workflow with none.
+// MARK: - WorkflowEntryInfo
+public struct WorkflowEntryInfo: Codable {
+    public let description: String?
+    public let error: String?
+    public let id: String
+    public let inputs: [WorkflowEntryInfoInput]?
+    public let name: String
+    public let path: String
+    public let project: String?
+    public let state: WorkflowEntryInfoState
+    public let trigger: WorkflowEntryInfoWorkflowTriggerInfo?
+
+    public enum CodingKeys: String, CodingKey {
+        case description = "description"
+        case error = "error"
+        case id = "id"
+        case inputs = "inputs"
+        case name = "name"
+        case path = "path"
+        case project = "project"
+        case state = "state"
+        case trigger = "trigger"
+    }
+
+    public init(description: String?, error: String?, id: String, inputs: [WorkflowEntryInfoInput]?, name: String, path: String, project: String?, state: WorkflowEntryInfoState, trigger: WorkflowEntryInfoWorkflowTriggerInfo?) {
+        self.description = description
+        self.error = error
+        self.id = id
+        self.inputs = inputs
+        self.name = name
+        self.path = path
+        self.project = project
+        self.state = state
+        self.trigger = trigger
+    }
+}
+
+/// One declared input: its name, its type name and the default as written, if any.
+// MARK: - WorkflowEntryInfoInput
+public struct WorkflowEntryInfoInput: Codable {
+    public let workflowInputInfoDefault: String?
+    public let name: String
+    public let type: String?
+
+    public enum CodingKeys: String, CodingKey {
+        case workflowInputInfoDefault = "default"
+        case name = "name"
+        case type = "type"
+    }
+
+    public init(workflowInputInfoDefault: String?, name: String, type: String?) {
+        self.workflowInputInfoDefault = workflowInputInfoDefault
+        self.name = name
+        self.type = type
+    }
+}
+
+public enum WorkflowEntryInfoState: String, Codable {
+    case broken = "broken"
+    case ok = "ok"
+    case untrusted = "untrusted"
+}
+
+/// What starts a workflow. ``expr`` is for ``schedule``, ``path`` for ``on_file``.
+// MARK: - WorkflowEntryInfoWorkflowTriggerInfo
+public struct WorkflowEntryInfoWorkflowTriggerInfo: Codable {
+    public let expr: String?
+    public let kind: Kind
+    public let path: String?
+
+    public enum CodingKeys: String, CodingKey {
+        case expr = "expr"
+        case kind = "kind"
+        case path = "path"
+    }
+
+    public init(expr: String?, kind: Kind, path: String?) {
+        self.expr = expr
+        self.kind = kind
+        self.path = path
+    }
+}
+
+public enum Kind: String, Codable {
+    case manual = "manual"
+    case onFile = "on_file"
+    case schedule = "schedule"
+}
+
+/// ``workflow.get``. One workflow by its ``id``.
+// MARK: - WorkflowGetParams
+public struct WorkflowGetParams: Codable {
+    public let id: String
+
+    public enum CodingKeys: String, CodingKey {
+        case id = "id"
+    }
+
+    public init(id: String) {
+        self.id = id
+    }
+}
+
+/// The workflow and its outline steps (empty for a ``broken`` or ``untrusted`` file).
+// MARK: - WorkflowGetResult
+public struct WorkflowGetResult: Codable {
+    public let steps: [StepClass]?
+    public let workflow: WorkflowGetResultWorkflow
+
+    public enum CodingKeys: String, CodingKey {
+        case steps = "steps"
+        case workflow = "workflow"
+    }
+
+    public init(steps: [StepClass]?, workflow: WorkflowGetResultWorkflow) {
+        self.steps = steps
+        self.workflow = workflow
+    }
+}
+
+/// One step read from the source, without running it.
+///
+/// ``lines`` is the first and last line in the file (from 1). ``key`` and ``group`` are the
+/// step's key and the group it belongs to, when the source says them. ``for_each`` and
+/// ``condition`` are the source text of the loop and the guard. ``after`` lists the ids of
+/// the
+/// steps this one follows.
+// MARK: - StepClass
+public struct StepClass: Codable {
+    public let after: [String]?
+    public let agent: String?
+    public let briefLine: Int?
+    public let budget: String?
+    public let budgetLine: Int?
+    public let condition: String?
+    public let forEach: String?
+    public let gets: String?
+    public let group: String?
+    public let id: String
+    public let key: String?
+    public let kind: String
+    public let lines: [Int]
+    public let title: String
+
+    public enum CodingKeys: String, CodingKey {
+        case after = "after"
+        case agent = "agent"
+        case briefLine = "brief_line"
+        case budget = "budget"
+        case budgetLine = "budget_line"
+        case condition = "condition"
+        case forEach = "for_each"
+        case gets = "gets"
+        case group = "group"
+        case id = "id"
+        case key = "key"
+        case kind = "kind"
+        case lines = "lines"
+        case title = "title"
+    }
+
+    public init(after: [String]?, agent: String?, briefLine: Int?, budget: String?, budgetLine: Int?, condition: String?, forEach: String?, gets: String?, group: String?, id: String, key: String?, kind: String, lines: [Int], title: String) {
+        self.after = after
+        self.agent = agent
+        self.briefLine = briefLine
+        self.budget = budget
+        self.budgetLine = budgetLine
+        self.condition = condition
+        self.forEach = forEach
+        self.gets = gets
+        self.group = group
+        self.id = id
+        self.key = key
+        self.kind = kind
+        self.lines = lines
+        self.title = title
+    }
+}
+
+/// One workflow the daemon found (ADR-062).
+///
+/// ``id`` is ``<path>::<name>``, or the path for a file with no workflow. ``project`` is the
+/// project folder, null for the user's folder. ``error`` is the traceback tail of a
+/// ``broken``
+/// file. ``trigger`` is null for a workflow with none.
+// MARK: - WorkflowGetResultWorkflow
+public struct WorkflowGetResultWorkflow: Codable {
+    public let description: String?
+    public let error: String?
+    public let id: String
+    public let inputs: [PurpleWorkflowInputInfo]?
+    public let name: String
+    public let path: String
+    public let project: String?
+    public let state: WorkflowEntryInfoState
+    public let trigger: PurpleWorkflowTriggerInfo?
+
+    public enum CodingKeys: String, CodingKey {
+        case description = "description"
+        case error = "error"
+        case id = "id"
+        case inputs = "inputs"
+        case name = "name"
+        case path = "path"
+        case project = "project"
+        case state = "state"
+        case trigger = "trigger"
+    }
+
+    public init(description: String?, error: String?, id: String, inputs: [PurpleWorkflowInputInfo]?, name: String, path: String, project: String?, state: WorkflowEntryInfoState, trigger: PurpleWorkflowTriggerInfo?) {
+        self.description = description
+        self.error = error
+        self.id = id
+        self.inputs = inputs
+        self.name = name
+        self.path = path
+        self.project = project
+        self.state = state
+        self.trigger = trigger
+    }
+}
+
+/// One declared input: its name, its type name and the default as written, if any.
+// MARK: - PurpleWorkflowInputInfo
+public struct PurpleWorkflowInputInfo: Codable {
+    public let workflowInputInfoDefault: String?
+    public let name: String
+    public let type: String?
+
+    public enum CodingKeys: String, CodingKey {
+        case workflowInputInfoDefault = "default"
+        case name = "name"
+        case type = "type"
+    }
+
+    public init(workflowInputInfoDefault: String?, name: String, type: String?) {
+        self.workflowInputInfoDefault = workflowInputInfoDefault
+        self.name = name
+        self.type = type
+    }
+}
+
+/// What starts a workflow. ``expr`` is for ``schedule``, ``path`` for ``on_file``.
+// MARK: - PurpleWorkflowTriggerInfo
+public struct PurpleWorkflowTriggerInfo: Codable {
+    public let expr: String?
+    public let kind: Kind
+    public let path: String?
+
+    public enum CodingKeys: String, CodingKey {
+        case expr = "expr"
+        case kind = "kind"
+        case path = "path"
+    }
+
+    public init(expr: String?, kind: Kind, path: String?) {
+        self.expr = expr
+        self.kind = kind
+        self.path = path
+    }
+}
+
+/// One declared input: its name, its type name and the default as written, if any.
+// MARK: - WorkflowInputInfo
+public struct WorkflowInputInfo: Codable {
+    public let workflowInputInfoDefault: String?
+    public let name: String
+    public let type: String?
+
+    public enum CodingKeys: String, CodingKey {
+        case workflowInputInfoDefault = "default"
+        case name = "name"
+        case type = "type"
+    }
+
+    public init(workflowInputInfoDefault: String?, name: String, type: String?) {
+        self.workflowInputInfoDefault = workflowInputInfoDefault
+        self.name = name
+        self.type = type
+    }
+}
+
+/// ``workflow.list``. The workflows of the user's folder and of ``folders``.
+///
+/// A project folder that is not trusted lists its files as ``untrusted`` and never imports
+/// them.
+// MARK: - WorkflowListParams
+public struct WorkflowListParams: Codable {
+    public let folders: [String]?
+
+    public enum CodingKeys: String, CodingKey {
+        case folders = "folders"
+    }
+
+    public init(folders: [String]?) {
+        self.folders = folders
+    }
+}
+
+/// The workflows, user ones first, each group in file order.
+// MARK: - WorkflowListResult
+public struct WorkflowListResult: Codable {
+    public let workflows: [WorkflowElement]
+
+    public enum CodingKeys: String, CodingKey {
+        case workflows = "workflows"
+    }
+
+    public init(workflows: [WorkflowElement]) {
+        self.workflows = workflows
+    }
+}
+
+/// One workflow the daemon found (ADR-062).
+///
+/// ``id`` is ``<path>::<name>``, or the path for a file with no workflow. ``project`` is the
+/// project folder, null for the user's folder. ``error`` is the traceback tail of a
+/// ``broken``
+/// file. ``trigger`` is null for a workflow with none.
+// MARK: - WorkflowElement
+public struct WorkflowElement: Codable {
+    public let description: String?
+    public let error: String?
+    public let id: String
+    public let inputs: [FluffyWorkflowInputInfo]?
+    public let name: String
+    public let path: String
+    public let project: String?
+    public let state: WorkflowEntryInfoState
+    public let trigger: FluffyWorkflowTriggerInfo?
+
+    public enum CodingKeys: String, CodingKey {
+        case description = "description"
+        case error = "error"
+        case id = "id"
+        case inputs = "inputs"
+        case name = "name"
+        case path = "path"
+        case project = "project"
+        case state = "state"
+        case trigger = "trigger"
+    }
+
+    public init(description: String?, error: String?, id: String, inputs: [FluffyWorkflowInputInfo]?, name: String, path: String, project: String?, state: WorkflowEntryInfoState, trigger: FluffyWorkflowTriggerInfo?) {
+        self.description = description
+        self.error = error
+        self.id = id
+        self.inputs = inputs
+        self.name = name
+        self.path = path
+        self.project = project
+        self.state = state
+        self.trigger = trigger
+    }
+}
+
+/// One declared input: its name, its type name and the default as written, if any.
+// MARK: - FluffyWorkflowInputInfo
+public struct FluffyWorkflowInputInfo: Codable {
+    public let workflowInputInfoDefault: String?
+    public let name: String
+    public let type: String?
+
+    public enum CodingKeys: String, CodingKey {
+        case workflowInputInfoDefault = "default"
+        case name = "name"
+        case type = "type"
+    }
+
+    public init(workflowInputInfoDefault: String?, name: String, type: String?) {
+        self.workflowInputInfoDefault = workflowInputInfoDefault
+        self.name = name
+        self.type = type
+    }
+}
+
+/// What starts a workflow. ``expr`` is for ``schedule``, ``path`` for ``on_file``.
+// MARK: - FluffyWorkflowTriggerInfo
+public struct FluffyWorkflowTriggerInfo: Codable {
+    public let expr: String?
+    public let kind: Kind
+    public let path: String?
+
+    public enum CodingKeys: String, CodingKey {
+        case expr = "expr"
+        case kind = "kind"
+        case path = "path"
+    }
+
+    public init(expr: String?, kind: Kind, path: String?) {
+        self.expr = expr
+        self.kind = kind
+        self.path = path
+    }
+}
+
+/// One step read from the source, without running it.
+///
+/// ``lines`` is the first and last line in the file (from 1). ``key`` and ``group`` are the
+/// step's key and the group it belongs to, when the source says them. ``for_each`` and
+/// ``condition`` are the source text of the loop and the guard. ``after`` lists the ids of
+/// the
+/// steps this one follows.
+// MARK: - WorkflowOutlineStep
+public struct WorkflowOutlineStep: Codable {
+    public let after: [String]?
+    public let agent: String?
+    public let briefLine: Int?
+    public let budget: String?
+    public let budgetLine: Int?
+    public let condition: String?
+    public let forEach: String?
+    public let gets: String?
+    public let group: String?
+    public let id: String
+    public let key: String?
+    public let kind: String
+    public let lines: [Int]
+    public let title: String
+
+    public enum CodingKeys: String, CodingKey {
+        case after = "after"
+        case agent = "agent"
+        case briefLine = "brief_line"
+        case budget = "budget"
+        case budgetLine = "budget_line"
+        case condition = "condition"
+        case forEach = "for_each"
+        case gets = "gets"
+        case group = "group"
+        case id = "id"
+        case key = "key"
+        case kind = "kind"
+        case lines = "lines"
+        case title = "title"
+    }
+
+    public init(after: [String]?, agent: String?, briefLine: Int?, budget: String?, budgetLine: Int?, condition: String?, forEach: String?, gets: String?, group: String?, id: String, key: String?, kind: String, lines: [Int], title: String) {
+        self.after = after
+        self.agent = agent
+        self.briefLine = briefLine
+        self.budget = budget
+        self.budgetLine = budgetLine
+        self.condition = condition
+        self.forEach = forEach
+        self.gets = gets
+        self.group = group
+        self.id = id
+        self.key = key
+        self.kind = kind
+        self.lines = lines
+        self.title = title
+    }
+}
+
+/// Server → every connection: ``workflow.run.cancelled``. Not stored.
+// MARK: - WorkflowRunCancelledNotification
+public struct WorkflowRunCancelledNotification: Codable {
+    public let jsonrpc: Jsonrpc?
+    public let method: WorkflowRunCancelledNotificationMethod?
+    public let params: WorkflowRunCancelledNotificationParams
+
+    public enum CodingKeys: String, CodingKey {
+        case jsonrpc = "jsonrpc"
+        case method = "method"
+        case params = "params"
+    }
+
+    public init(jsonrpc: Jsonrpc?, method: WorkflowRunCancelledNotificationMethod?, params: WorkflowRunCancelledNotificationParams) {
+        self.jsonrpc = jsonrpc
+        self.method = method
+        self.params = params
+    }
+}
+
+public enum WorkflowRunCancelledNotificationMethod: String, Codable {
+    case workflowRunCancelled = "workflow.run.cancelled"
+}
+
+/// The params of ``workflow.run.started|waiting|resumed|done|failed|cancelled``.
+///
+/// The method names the change, ``status`` is the run's state after it. ``error`` is set for
+/// ``workflow.run.failed``. The name is ``workflow.run.*``, never ``run.*`` (ADR-050).
+// MARK: - WorkflowRunCancelledNotificationParams
+public struct WorkflowRunCancelledNotificationParams: Codable {
+    public let endedAt: String?
+    public let error: String?
+    public let name: String
+    public let sessionID: String?
+    public let startedAt: String?
+    public let status: WorkflowRunEventStatus
+    public let trigger: Kind?
+    public let workflowID: String
+    public let workflowRunID: String
+
+    public enum CodingKeys: String, CodingKey {
+        case endedAt = "ended_at"
+        case error = "error"
+        case name = "name"
+        case sessionID = "session_id"
+        case startedAt = "started_at"
+        case status = "status"
+        case trigger = "trigger"
+        case workflowID = "workflow_id"
+        case workflowRunID = "workflow_run_id"
+    }
+
+    public init(endedAt: String?, error: String?, name: String, sessionID: String?, startedAt: String?, status: WorkflowRunEventStatus, trigger: Kind?, workflowID: String, workflowRunID: String) {
+        self.endedAt = endedAt
+        self.error = error
+        self.name = name
+        self.sessionID = sessionID
+        self.startedAt = startedAt
+        self.status = status
+        self.trigger = trigger
+        self.workflowID = workflowID
+        self.workflowRunID = workflowRunID
+    }
+}
+
+public enum WorkflowRunEventStatus: String, Codable {
+    case cancelled = "cancelled"
+    case done = "done"
+    case failed = "failed"
+    case pending = "pending"
+    case running = "running"
+    case waiting = "waiting"
+}
+
+/// Server → every connection: ``workflow.run.done``. Not stored.
+// MARK: - WorkflowRunDoneNotification
+public struct WorkflowRunDoneNotification: Codable {
+    public let jsonrpc: Jsonrpc?
+    public let method: WorkflowRunDoneNotificationMethod?
+    public let params: WorkflowRunDoneNotificationParams
+
+    public enum CodingKeys: String, CodingKey {
+        case jsonrpc = "jsonrpc"
+        case method = "method"
+        case params = "params"
+    }
+
+    public init(jsonrpc: Jsonrpc?, method: WorkflowRunDoneNotificationMethod?, params: WorkflowRunDoneNotificationParams) {
+        self.jsonrpc = jsonrpc
+        self.method = method
+        self.params = params
+    }
+}
+
+public enum WorkflowRunDoneNotificationMethod: String, Codable {
+    case workflowRunDone = "workflow.run.done"
+}
+
+/// The params of ``workflow.run.started|waiting|resumed|done|failed|cancelled``.
+///
+/// The method names the change, ``status`` is the run's state after it. ``error`` is set for
+/// ``workflow.run.failed``. The name is ``workflow.run.*``, never ``run.*`` (ADR-050).
+// MARK: - WorkflowRunDoneNotificationParams
+public struct WorkflowRunDoneNotificationParams: Codable {
+    public let endedAt: String?
+    public let error: String?
+    public let name: String
+    public let sessionID: String?
+    public let startedAt: String?
+    public let status: WorkflowRunEventStatus
+    public let trigger: Kind?
+    public let workflowID: String
+    public let workflowRunID: String
+
+    public enum CodingKeys: String, CodingKey {
+        case endedAt = "ended_at"
+        case error = "error"
+        case name = "name"
+        case sessionID = "session_id"
+        case startedAt = "started_at"
+        case status = "status"
+        case trigger = "trigger"
+        case workflowID = "workflow_id"
+        case workflowRunID = "workflow_run_id"
+    }
+
+    public init(endedAt: String?, error: String?, name: String, sessionID: String?, startedAt: String?, status: WorkflowRunEventStatus, trigger: Kind?, workflowID: String, workflowRunID: String) {
+        self.endedAt = endedAt
+        self.error = error
+        self.name = name
+        self.sessionID = sessionID
+        self.startedAt = startedAt
+        self.status = status
+        self.trigger = trigger
+        self.workflowID = workflowID
+        self.workflowRunID = workflowRunID
+    }
+}
+
+/// The params of ``workflow.run.started|waiting|resumed|done|failed|cancelled``.
+///
+/// The method names the change, ``status`` is the run's state after it. ``error`` is set for
+/// ``workflow.run.failed``. The name is ``workflow.run.*``, never ``run.*`` (ADR-050).
+// MARK: - WorkflowRunEvent
+public struct WorkflowRunEvent: Codable {
+    public let endedAt: String?
+    public let error: String?
+    public let name: String
+    public let sessionID: String?
+    public let startedAt: String?
+    public let status: WorkflowRunEventStatus
+    public let trigger: Kind?
+    public let workflowID: String
+    public let workflowRunID: String
+
+    public enum CodingKeys: String, CodingKey {
+        case endedAt = "ended_at"
+        case error = "error"
+        case name = "name"
+        case sessionID = "session_id"
+        case startedAt = "started_at"
+        case status = "status"
+        case trigger = "trigger"
+        case workflowID = "workflow_id"
+        case workflowRunID = "workflow_run_id"
+    }
+
+    public init(endedAt: String?, error: String?, name: String, sessionID: String?, startedAt: String?, status: WorkflowRunEventStatus, trigger: Kind?, workflowID: String, workflowRunID: String) {
+        self.endedAt = endedAt
+        self.error = error
+        self.name = name
+        self.sessionID = sessionID
+        self.startedAt = startedAt
+        self.status = status
+        self.trigger = trigger
+        self.workflowID = workflowID
+        self.workflowRunID = workflowRunID
+    }
+}
+
+/// Server → every connection: ``workflow.run.failed``. Not stored.
+// MARK: - WorkflowRunFailedNotification
+public struct WorkflowRunFailedNotification: Codable {
+    public let jsonrpc: Jsonrpc?
+    public let method: WorkflowRunFailedNotificationMethod?
+    public let params: WorkflowRunFailedNotificationParams
+
+    public enum CodingKeys: String, CodingKey {
+        case jsonrpc = "jsonrpc"
+        case method = "method"
+        case params = "params"
+    }
+
+    public init(jsonrpc: Jsonrpc?, method: WorkflowRunFailedNotificationMethod?, params: WorkflowRunFailedNotificationParams) {
+        self.jsonrpc = jsonrpc
+        self.method = method
+        self.params = params
+    }
+}
+
+public enum WorkflowRunFailedNotificationMethod: String, Codable {
+    case workflowRunFailed = "workflow.run.failed"
+}
+
+/// The params of ``workflow.run.started|waiting|resumed|done|failed|cancelled``.
+///
+/// The method names the change, ``status`` is the run's state after it. ``error`` is set for
+/// ``workflow.run.failed``. The name is ``workflow.run.*``, never ``run.*`` (ADR-050).
+// MARK: - WorkflowRunFailedNotificationParams
+public struct WorkflowRunFailedNotificationParams: Codable {
+    public let endedAt: String?
+    public let error: String?
+    public let name: String
+    public let sessionID: String?
+    public let startedAt: String?
+    public let status: WorkflowRunEventStatus
+    public let trigger: Kind?
+    public let workflowID: String
+    public let workflowRunID: String
+
+    public enum CodingKeys: String, CodingKey {
+        case endedAt = "ended_at"
+        case error = "error"
+        case name = "name"
+        case sessionID = "session_id"
+        case startedAt = "started_at"
+        case status = "status"
+        case trigger = "trigger"
+        case workflowID = "workflow_id"
+        case workflowRunID = "workflow_run_id"
+    }
+
+    public init(endedAt: String?, error: String?, name: String, sessionID: String?, startedAt: String?, status: WorkflowRunEventStatus, trigger: Kind?, workflowID: String, workflowRunID: String) {
+        self.endedAt = endedAt
+        self.error = error
+        self.name = name
+        self.sessionID = sessionID
+        self.startedAt = startedAt
+        self.status = status
+        self.trigger = trigger
+        self.workflowID = workflowID
+        self.workflowRunID = workflowRunID
+    }
+}
+
+/// One run of a workflow, from its ``workflow_runs`` row.
+///
+/// The times are ISO 8601 with an offset. ``session_id`` is the run's headless session.
+/// ``error`` says why a ``failed`` run failed.
+// MARK: - WorkflowRunInfo
+public struct WorkflowRunInfo: Codable {
+    public let endedAt: String?
+    public let error: String?
+    public let inputs: [String: JSONAny]?
+    public let name: String
+    public let sessionID: String?
+    public let startedAt: String?
+    public let status: WorkflowRunEventStatus
+    public let trigger: Kind
+    public let workflowID: String
+    public let workflowRunID: String
+
+    public enum CodingKeys: String, CodingKey {
+        case endedAt = "ended_at"
+        case error = "error"
+        case inputs = "inputs"
+        case name = "name"
+        case sessionID = "session_id"
+        case startedAt = "started_at"
+        case status = "status"
+        case trigger = "trigger"
+        case workflowID = "workflow_id"
+        case workflowRunID = "workflow_run_id"
+    }
+
+    public init(endedAt: String?, error: String?, inputs: [String: JSONAny]?, name: String, sessionID: String?, startedAt: String?, status: WorkflowRunEventStatus, trigger: Kind, workflowID: String, workflowRunID: String) {
+        self.endedAt = endedAt
+        self.error = error
+        self.inputs = inputs
+        self.name = name
+        self.sessionID = sessionID
+        self.startedAt = startedAt
+        self.status = status
+        self.trigger = trigger
+        self.workflowID = workflowID
+        self.workflowRunID = workflowRunID
+    }
+}
+
+/// Server → every connection: ``workflow.run.resumed``. Not stored.
+// MARK: - WorkflowRunResumedNotification
+public struct WorkflowRunResumedNotification: Codable {
+    public let jsonrpc: Jsonrpc?
+    public let method: WorkflowRunResumedNotificationMethod?
+    public let params: WorkflowRunResumedNotificationParams
+
+    public enum CodingKeys: String, CodingKey {
+        case jsonrpc = "jsonrpc"
+        case method = "method"
+        case params = "params"
+    }
+
+    public init(jsonrpc: Jsonrpc?, method: WorkflowRunResumedNotificationMethod?, params: WorkflowRunResumedNotificationParams) {
+        self.jsonrpc = jsonrpc
+        self.method = method
+        self.params = params
+    }
+}
+
+public enum WorkflowRunResumedNotificationMethod: String, Codable {
+    case workflowRunResumed = "workflow.run.resumed"
+}
+
+/// The params of ``workflow.run.started|waiting|resumed|done|failed|cancelled``.
+///
+/// The method names the change, ``status`` is the run's state after it. ``error`` is set for
+/// ``workflow.run.failed``. The name is ``workflow.run.*``, never ``run.*`` (ADR-050).
+// MARK: - WorkflowRunResumedNotificationParams
+public struct WorkflowRunResumedNotificationParams: Codable {
+    public let endedAt: String?
+    public let error: String?
+    public let name: String
+    public let sessionID: String?
+    public let startedAt: String?
+    public let status: WorkflowRunEventStatus
+    public let trigger: Kind?
+    public let workflowID: String
+    public let workflowRunID: String
+
+    public enum CodingKeys: String, CodingKey {
+        case endedAt = "ended_at"
+        case error = "error"
+        case name = "name"
+        case sessionID = "session_id"
+        case startedAt = "started_at"
+        case status = "status"
+        case trigger = "trigger"
+        case workflowID = "workflow_id"
+        case workflowRunID = "workflow_run_id"
+    }
+
+    public init(endedAt: String?, error: String?, name: String, sessionID: String?, startedAt: String?, status: WorkflowRunEventStatus, trigger: Kind?, workflowID: String, workflowRunID: String) {
+        self.endedAt = endedAt
+        self.error = error
+        self.name = name
+        self.sessionID = sessionID
+        self.startedAt = startedAt
+        self.status = status
+        self.trigger = trigger
+        self.workflowID = workflowID
+        self.workflowRunID = workflowRunID
+    }
+}
+
+/// Server → every connection: ``workflow.run.started``. Not stored.
+// MARK: - WorkflowRunStartedNotification
+public struct WorkflowRunStartedNotification: Codable {
+    public let jsonrpc: Jsonrpc?
+    public let method: WorkflowRunStartedNotificationMethod?
+    public let params: WorkflowRunStartedNotificationParams
+
+    public enum CodingKeys: String, CodingKey {
+        case jsonrpc = "jsonrpc"
+        case method = "method"
+        case params = "params"
+    }
+
+    public init(jsonrpc: Jsonrpc?, method: WorkflowRunStartedNotificationMethod?, params: WorkflowRunStartedNotificationParams) {
+        self.jsonrpc = jsonrpc
+        self.method = method
+        self.params = params
+    }
+}
+
+public enum WorkflowRunStartedNotificationMethod: String, Codable {
+    case workflowRunStarted = "workflow.run.started"
+}
+
+/// The params of ``workflow.run.started|waiting|resumed|done|failed|cancelled``.
+///
+/// The method names the change, ``status`` is the run's state after it. ``error`` is set for
+/// ``workflow.run.failed``. The name is ``workflow.run.*``, never ``run.*`` (ADR-050).
+// MARK: - WorkflowRunStartedNotificationParams
+public struct WorkflowRunStartedNotificationParams: Codable {
+    public let endedAt: String?
+    public let error: String?
+    public let name: String
+    public let sessionID: String?
+    public let startedAt: String?
+    public let status: WorkflowRunEventStatus
+    public let trigger: Kind?
+    public let workflowID: String
+    public let workflowRunID: String
+
+    public enum CodingKeys: String, CodingKey {
+        case endedAt = "ended_at"
+        case error = "error"
+        case name = "name"
+        case sessionID = "session_id"
+        case startedAt = "started_at"
+        case status = "status"
+        case trigger = "trigger"
+        case workflowID = "workflow_id"
+        case workflowRunID = "workflow_run_id"
+    }
+
+    public init(endedAt: String?, error: String?, name: String, sessionID: String?, startedAt: String?, status: WorkflowRunEventStatus, trigger: Kind?, workflowID: String, workflowRunID: String) {
+        self.endedAt = endedAt
+        self.error = error
+        self.name = name
+        self.sessionID = sessionID
+        self.startedAt = startedAt
+        self.status = status
+        self.trigger = trigger
+        self.workflowID = workflowID
+        self.workflowRunID = workflowRunID
+    }
+}
+
+/// Server → every connection: ``workflow.run.waiting``. Not stored.
+// MARK: - WorkflowRunWaitingNotification
+public struct WorkflowRunWaitingNotification: Codable {
+    public let jsonrpc: Jsonrpc?
+    public let method: WorkflowRunWaitingNotificationMethod?
+    public let params: WorkflowRunWaitingNotificationParams
+
+    public enum CodingKeys: String, CodingKey {
+        case jsonrpc = "jsonrpc"
+        case method = "method"
+        case params = "params"
+    }
+
+    public init(jsonrpc: Jsonrpc?, method: WorkflowRunWaitingNotificationMethod?, params: WorkflowRunWaitingNotificationParams) {
+        self.jsonrpc = jsonrpc
+        self.method = method
+        self.params = params
+    }
+}
+
+public enum WorkflowRunWaitingNotificationMethod: String, Codable {
+    case workflowRunWaiting = "workflow.run.waiting"
+}
+
+/// The params of ``workflow.run.started|waiting|resumed|done|failed|cancelled``.
+///
+/// The method names the change, ``status`` is the run's state after it. ``error`` is set for
+/// ``workflow.run.failed``. The name is ``workflow.run.*``, never ``run.*`` (ADR-050).
+// MARK: - WorkflowRunWaitingNotificationParams
+public struct WorkflowRunWaitingNotificationParams: Codable {
+    public let endedAt: String?
+    public let error: String?
+    public let name: String
+    public let sessionID: String?
+    public let startedAt: String?
+    public let status: WorkflowRunEventStatus
+    public let trigger: Kind?
+    public let workflowID: String
+    public let workflowRunID: String
+
+    public enum CodingKeys: String, CodingKey {
+        case endedAt = "ended_at"
+        case error = "error"
+        case name = "name"
+        case sessionID = "session_id"
+        case startedAt = "started_at"
+        case status = "status"
+        case trigger = "trigger"
+        case workflowID = "workflow_id"
+        case workflowRunID = "workflow_run_id"
+    }
+
+    public init(endedAt: String?, error: String?, name: String, sessionID: String?, startedAt: String?, status: WorkflowRunEventStatus, trigger: Kind?, workflowID: String, workflowRunID: String) {
+        self.endedAt = endedAt
+        self.error = error
+        self.name = name
+        self.sessionID = sessionID
+        self.startedAt = startedAt
+        self.status = status
+        self.trigger = trigger
+        self.workflowID = workflowID
+        self.workflowRunID = workflowRunID
+    }
+}
+
+/// ``workflow.start``. Start a run of the workflow ``id`` with ``inputs``.
+///
+/// ``trigger`` says what asked for it. A person pressing Run is ``manual``.
+// MARK: - WorkflowStartParams
+public struct WorkflowStartParams: Codable {
+    public let id: String
+    public let inputs: [String: JSONAny]?
+    public let trigger: Kind?
+
+    public enum CodingKeys: String, CodingKey {
+        case id = "id"
+        case inputs = "inputs"
+        case trigger = "trigger"
+    }
+
+    public init(id: String, inputs: [String: JSONAny]?, trigger: Kind?) {
+        self.id = id
+        self.inputs = inputs
+        self.trigger = trigger
+    }
+}
+
+/// The run ``workflow.start`` made.
+// MARK: - WorkflowStartResult
+public struct WorkflowStartResult: Codable {
+    public let workflowRunID: String
+
+    public enum CodingKeys: String, CodingKey {
+        case workflowRunID = "workflow_run_id"
+    }
+
+    public init(workflowRunID: String) {
+        self.workflowRunID = workflowRunID
+    }
+}
+
+/// ``workflow.status``. A run and its steps.
+// MARK: - WorkflowStatusParams
+public struct WorkflowStatusParams: Codable {
+    public let workflowRunID: String
+
+    public enum CodingKeys: String, CodingKey {
+        case workflowRunID = "workflow_run_id"
+    }
+
+    public init(workflowRunID: String) {
+        self.workflowRunID = workflowRunID
+    }
+}
+
+/// The run and its steps, in the order they started.
+// MARK: - WorkflowStatusResult
+public struct WorkflowStatusResult: Codable {
+    public let run: WorkflowStatusResultRun
+    public let steps: [WorkflowStatusResultStep]?
+
+    public enum CodingKeys: String, CodingKey {
+        case run = "run"
+        case steps = "steps"
+    }
+
+    public init(run: WorkflowStatusResultRun, steps: [WorkflowStatusResultStep]?) {
+        self.run = run
+        self.steps = steps
+    }
+}
+
+/// One run of a workflow, from its ``workflow_runs`` row.
+///
+/// The times are ISO 8601 with an offset. ``session_id`` is the run's headless session.
+/// ``error`` says why a ``failed`` run failed.
+// MARK: - WorkflowStatusResultRun
+public struct WorkflowStatusResultRun: Codable {
+    public let endedAt: String?
+    public let error: String?
+    public let inputs: [String: JSONAny]?
+    public let name: String
+    public let sessionID: String?
+    public let startedAt: String?
+    public let status: WorkflowRunEventStatus
+    public let trigger: Kind
+    public let workflowID: String
+    public let workflowRunID: String
+
+    public enum CodingKeys: String, CodingKey {
+        case endedAt = "ended_at"
+        case error = "error"
+        case inputs = "inputs"
+        case name = "name"
+        case sessionID = "session_id"
+        case startedAt = "started_at"
+        case status = "status"
+        case trigger = "trigger"
+        case workflowID = "workflow_id"
+        case workflowRunID = "workflow_run_id"
+    }
+
+    public init(endedAt: String?, error: String?, inputs: [String: JSONAny]?, name: String, sessionID: String?, startedAt: String?, status: WorkflowRunEventStatus, trigger: Kind, workflowID: String, workflowRunID: String) {
+        self.endedAt = endedAt
+        self.error = error
+        self.inputs = inputs
+        self.name = name
+        self.sessionID = sessionID
+        self.startedAt = startedAt
+        self.status = status
+        self.trigger = trigger
+        self.workflowID = workflowID
+        self.workflowRunID = workflowRunID
+    }
+}
+
+/// One step of a run, from its ``workflow_steps`` row.
+///
+/// ``key`` is the step key the engine journals by, ``group`` the key of the group it runs
+/// in.
+/// ``attempts`` counts starts. ``child_session_id`` is the helper session of an ``agent``
+/// step.
+/// ``in_doubt`` is a step that may have had its effect before the daemon stopped.
+// MARK: - WorkflowStatusResultStep
+public struct WorkflowStatusResultStep: Codable {
+    public let attempts: Int?
+    public let childSessionID: String?
+    public let endedAt: String?
+    public let error: String?
+    public let group: String?
+    public let key: String
+    public let kind: StepKind
+    public let startedAt: String?
+    public let status: StepStatus
+    public let title: String
+
+    public enum CodingKeys: String, CodingKey {
+        case attempts = "attempts"
+        case childSessionID = "child_session_id"
+        case endedAt = "ended_at"
+        case error = "error"
+        case group = "group"
+        case key = "key"
+        case kind = "kind"
+        case startedAt = "started_at"
+        case status = "status"
+        case title = "title"
+    }
+
+    public init(attempts: Int?, childSessionID: String?, endedAt: String?, error: String?, group: String?, key: String, kind: StepKind, startedAt: String?, status: StepStatus, title: String) {
+        self.attempts = attempts
+        self.childSessionID = childSessionID
+        self.endedAt = endedAt
+        self.error = error
+        self.group = group
+        self.key = key
+        self.kind = kind
+        self.startedAt = startedAt
+        self.status = status
+        self.title = title
+    }
+}
+
+public enum StepKind: String, Codable {
+    case agent = "agent"
+    case llm = "llm"
+    case notify = "notify"
+    case review = "review"
+    case skill = "skill"
+    case step = "step"
+    case tool = "tool"
+}
+
+public enum StepStatus: String, Codable {
+    case done = "done"
+    case failed = "failed"
+    case inDoubt = "in_doubt"
+    case pending = "pending"
+    case running = "running"
+    case skipped = "skipped"
+    case waiting = "waiting"
+}
+
+/// Server → every connection: ``workflow.step.done``. Not stored.
+// MARK: - WorkflowStepDoneNotification
+public struct WorkflowStepDoneNotification: Codable {
+    public let jsonrpc: Jsonrpc?
+    public let method: WorkflowStepDoneNotificationMethod?
+    public let params: WorkflowStepDoneNotificationParams
+
+    public enum CodingKeys: String, CodingKey {
+        case jsonrpc = "jsonrpc"
+        case method = "method"
+        case params = "params"
+    }
+
+    public init(jsonrpc: Jsonrpc?, method: WorkflowStepDoneNotificationMethod?, params: WorkflowStepDoneNotificationParams) {
+        self.jsonrpc = jsonrpc
+        self.method = method
+        self.params = params
+    }
+}
+
+public enum WorkflowStepDoneNotificationMethod: String, Codable {
+    case workflowStepDone = "workflow.step.done"
+}
+
+/// The params of ``workflow.step.started|done|failed|waiting|in_doubt``.
+///
+/// The method names the change, ``status`` is the step's state after it. ``key`` is the step
+/// key, ``group`` the key of its group, ``attempts`` the number of starts so far.
+// MARK: - WorkflowStepDoneNotificationParams
+public struct WorkflowStepDoneNotificationParams: Codable {
+    public let attempts: Int?
+    public let childSessionID: String?
+    public let endedAt: String?
+    public let error: String?
+    public let group: String?
+    public let key: String
+    public let kind: StepKind
+    public let startedAt: String?
+    public let status: StepStatus
+    public let title: String
+    public let workflowRunID: String
+
+    public enum CodingKeys: String, CodingKey {
+        case attempts = "attempts"
+        case childSessionID = "child_session_id"
+        case endedAt = "ended_at"
+        case error = "error"
+        case group = "group"
+        case key = "key"
+        case kind = "kind"
+        case startedAt = "started_at"
+        case status = "status"
+        case title = "title"
+        case workflowRunID = "workflow_run_id"
+    }
+
+    public init(attempts: Int?, childSessionID: String?, endedAt: String?, error: String?, group: String?, key: String, kind: StepKind, startedAt: String?, status: StepStatus, title: String, workflowRunID: String) {
+        self.attempts = attempts
+        self.childSessionID = childSessionID
+        self.endedAt = endedAt
+        self.error = error
+        self.group = group
+        self.key = key
+        self.kind = kind
+        self.startedAt = startedAt
+        self.status = status
+        self.title = title
+        self.workflowRunID = workflowRunID
+    }
+}
+
+/// The params of ``workflow.step.started|done|failed|waiting|in_doubt``.
+///
+/// The method names the change, ``status`` is the step's state after it. ``key`` is the step
+/// key, ``group`` the key of its group, ``attempts`` the number of starts so far.
+// MARK: - WorkflowStepEvent
+public struct WorkflowStepEvent: Codable {
+    public let attempts: Int?
+    public let childSessionID: String?
+    public let endedAt: String?
+    public let error: String?
+    public let group: String?
+    public let key: String
+    public let kind: StepKind
+    public let startedAt: String?
+    public let status: StepStatus
+    public let title: String
+    public let workflowRunID: String
+
+    public enum CodingKeys: String, CodingKey {
+        case attempts = "attempts"
+        case childSessionID = "child_session_id"
+        case endedAt = "ended_at"
+        case error = "error"
+        case group = "group"
+        case key = "key"
+        case kind = "kind"
+        case startedAt = "started_at"
+        case status = "status"
+        case title = "title"
+        case workflowRunID = "workflow_run_id"
+    }
+
+    public init(attempts: Int?, childSessionID: String?, endedAt: String?, error: String?, group: String?, key: String, kind: StepKind, startedAt: String?, status: StepStatus, title: String, workflowRunID: String) {
+        self.attempts = attempts
+        self.childSessionID = childSessionID
+        self.endedAt = endedAt
+        self.error = error
+        self.group = group
+        self.key = key
+        self.kind = kind
+        self.startedAt = startedAt
+        self.status = status
+        self.title = title
+        self.workflowRunID = workflowRunID
+    }
+}
+
+/// Server → every connection: ``workflow.step.failed``. Not stored.
+// MARK: - WorkflowStepFailedNotification
+public struct WorkflowStepFailedNotification: Codable {
+    public let jsonrpc: Jsonrpc?
+    public let method: WorkflowStepFailedNotificationMethod?
+    public let params: WorkflowStepFailedNotificationParams
+
+    public enum CodingKeys: String, CodingKey {
+        case jsonrpc = "jsonrpc"
+        case method = "method"
+        case params = "params"
+    }
+
+    public init(jsonrpc: Jsonrpc?, method: WorkflowStepFailedNotificationMethod?, params: WorkflowStepFailedNotificationParams) {
+        self.jsonrpc = jsonrpc
+        self.method = method
+        self.params = params
+    }
+}
+
+public enum WorkflowStepFailedNotificationMethod: String, Codable {
+    case workflowStepFailed = "workflow.step.failed"
+}
+
+/// The params of ``workflow.step.started|done|failed|waiting|in_doubt``.
+///
+/// The method names the change, ``status`` is the step's state after it. ``key`` is the step
+/// key, ``group`` the key of its group, ``attempts`` the number of starts so far.
+// MARK: - WorkflowStepFailedNotificationParams
+public struct WorkflowStepFailedNotificationParams: Codable {
+    public let attempts: Int?
+    public let childSessionID: String?
+    public let endedAt: String?
+    public let error: String?
+    public let group: String?
+    public let key: String
+    public let kind: StepKind
+    public let startedAt: String?
+    public let status: StepStatus
+    public let title: String
+    public let workflowRunID: String
+
+    public enum CodingKeys: String, CodingKey {
+        case attempts = "attempts"
+        case childSessionID = "child_session_id"
+        case endedAt = "ended_at"
+        case error = "error"
+        case group = "group"
+        case key = "key"
+        case kind = "kind"
+        case startedAt = "started_at"
+        case status = "status"
+        case title = "title"
+        case workflowRunID = "workflow_run_id"
+    }
+
+    public init(attempts: Int?, childSessionID: String?, endedAt: String?, error: String?, group: String?, key: String, kind: StepKind, startedAt: String?, status: StepStatus, title: String, workflowRunID: String) {
+        self.attempts = attempts
+        self.childSessionID = childSessionID
+        self.endedAt = endedAt
+        self.error = error
+        self.group = group
+        self.key = key
+        self.kind = kind
+        self.startedAt = startedAt
+        self.status = status
+        self.title = title
+        self.workflowRunID = workflowRunID
+    }
+}
+
+/// Server → every connection: ``workflow.step.in_doubt``. Not stored.
+// MARK: - WorkflowStepInDoubtNotification
+public struct WorkflowStepInDoubtNotification: Codable {
+    public let jsonrpc: Jsonrpc?
+    public let method: WorkflowStepInDoubtNotificationMethod?
+    public let params: WorkflowStepInDoubtNotificationParams
+
+    public enum CodingKeys: String, CodingKey {
+        case jsonrpc = "jsonrpc"
+        case method = "method"
+        case params = "params"
+    }
+
+    public init(jsonrpc: Jsonrpc?, method: WorkflowStepInDoubtNotificationMethod?, params: WorkflowStepInDoubtNotificationParams) {
+        self.jsonrpc = jsonrpc
+        self.method = method
+        self.params = params
+    }
+}
+
+public enum WorkflowStepInDoubtNotificationMethod: String, Codable {
+    case workflowStepInDoubt = "workflow.step.in_doubt"
+}
+
+/// The params of ``workflow.step.started|done|failed|waiting|in_doubt``.
+///
+/// The method names the change, ``status`` is the step's state after it. ``key`` is the step
+/// key, ``group`` the key of its group, ``attempts`` the number of starts so far.
+// MARK: - WorkflowStepInDoubtNotificationParams
+public struct WorkflowStepInDoubtNotificationParams: Codable {
+    public let attempts: Int?
+    public let childSessionID: String?
+    public let endedAt: String?
+    public let error: String?
+    public let group: String?
+    public let key: String
+    public let kind: StepKind
+    public let startedAt: String?
+    public let status: StepStatus
+    public let title: String
+    public let workflowRunID: String
+
+    public enum CodingKeys: String, CodingKey {
+        case attempts = "attempts"
+        case childSessionID = "child_session_id"
+        case endedAt = "ended_at"
+        case error = "error"
+        case group = "group"
+        case key = "key"
+        case kind = "kind"
+        case startedAt = "started_at"
+        case status = "status"
+        case title = "title"
+        case workflowRunID = "workflow_run_id"
+    }
+
+    public init(attempts: Int?, childSessionID: String?, endedAt: String?, error: String?, group: String?, key: String, kind: StepKind, startedAt: String?, status: StepStatus, title: String, workflowRunID: String) {
+        self.attempts = attempts
+        self.childSessionID = childSessionID
+        self.endedAt = endedAt
+        self.error = error
+        self.group = group
+        self.key = key
+        self.kind = kind
+        self.startedAt = startedAt
+        self.status = status
+        self.title = title
+        self.workflowRunID = workflowRunID
+    }
+}
+
+/// One step of a run, from its ``workflow_steps`` row.
+///
+/// ``key`` is the step key the engine journals by, ``group`` the key of the group it runs
+/// in.
+/// ``attempts`` counts starts. ``child_session_id`` is the helper session of an ``agent``
+/// step.
+/// ``in_doubt`` is a step that may have had its effect before the daemon stopped.
+// MARK: - WorkflowStepInfo
+public struct WorkflowStepInfo: Codable {
+    public let attempts: Int?
+    public let childSessionID: String?
+    public let endedAt: String?
+    public let error: String?
+    public let group: String?
+    public let key: String
+    public let kind: StepKind
+    public let startedAt: String?
+    public let status: StepStatus
+    public let title: String
+
+    public enum CodingKeys: String, CodingKey {
+        case attempts = "attempts"
+        case childSessionID = "child_session_id"
+        case endedAt = "ended_at"
+        case error = "error"
+        case group = "group"
+        case key = "key"
+        case kind = "kind"
+        case startedAt = "started_at"
+        case status = "status"
+        case title = "title"
+    }
+
+    public init(attempts: Int?, childSessionID: String?, endedAt: String?, error: String?, group: String?, key: String, kind: StepKind, startedAt: String?, status: StepStatus, title: String) {
+        self.attempts = attempts
+        self.childSessionID = childSessionID
+        self.endedAt = endedAt
+        self.error = error
+        self.group = group
+        self.key = key
+        self.kind = kind
+        self.startedAt = startedAt
+        self.status = status
+        self.title = title
+    }
+}
+
+/// Server → every connection: ``workflow.step.started``. Not stored.
+// MARK: - WorkflowStepStartedNotification
+public struct WorkflowStepStartedNotification: Codable {
+    public let jsonrpc: Jsonrpc?
+    public let method: WorkflowStepStartedNotificationMethod?
+    public let params: WorkflowStepStartedNotificationParams
+
+    public enum CodingKeys: String, CodingKey {
+        case jsonrpc = "jsonrpc"
+        case method = "method"
+        case params = "params"
+    }
+
+    public init(jsonrpc: Jsonrpc?, method: WorkflowStepStartedNotificationMethod?, params: WorkflowStepStartedNotificationParams) {
+        self.jsonrpc = jsonrpc
+        self.method = method
+        self.params = params
+    }
+}
+
+public enum WorkflowStepStartedNotificationMethod: String, Codable {
+    case workflowStepStarted = "workflow.step.started"
+}
+
+/// The params of ``workflow.step.started|done|failed|waiting|in_doubt``.
+///
+/// The method names the change, ``status`` is the step's state after it. ``key`` is the step
+/// key, ``group`` the key of its group, ``attempts`` the number of starts so far.
+// MARK: - WorkflowStepStartedNotificationParams
+public struct WorkflowStepStartedNotificationParams: Codable {
+    public let attempts: Int?
+    public let childSessionID: String?
+    public let endedAt: String?
+    public let error: String?
+    public let group: String?
+    public let key: String
+    public let kind: StepKind
+    public let startedAt: String?
+    public let status: StepStatus
+    public let title: String
+    public let workflowRunID: String
+
+    public enum CodingKeys: String, CodingKey {
+        case attempts = "attempts"
+        case childSessionID = "child_session_id"
+        case endedAt = "ended_at"
+        case error = "error"
+        case group = "group"
+        case key = "key"
+        case kind = "kind"
+        case startedAt = "started_at"
+        case status = "status"
+        case title = "title"
+        case workflowRunID = "workflow_run_id"
+    }
+
+    public init(attempts: Int?, childSessionID: String?, endedAt: String?, error: String?, group: String?, key: String, kind: StepKind, startedAt: String?, status: StepStatus, title: String, workflowRunID: String) {
+        self.attempts = attempts
+        self.childSessionID = childSessionID
+        self.endedAt = endedAt
+        self.error = error
+        self.group = group
+        self.key = key
+        self.kind = kind
+        self.startedAt = startedAt
+        self.status = status
+        self.title = title
+        self.workflowRunID = workflowRunID
+    }
+}
+
+/// Server → every connection: ``workflow.step.waiting``. Not stored.
+// MARK: - WorkflowStepWaitingNotification
+public struct WorkflowStepWaitingNotification: Codable {
+    public let jsonrpc: Jsonrpc?
+    public let method: WorkflowStepWaitingNotificationMethod?
+    public let params: WorkflowStepWaitingNotificationParams
+
+    public enum CodingKeys: String, CodingKey {
+        case jsonrpc = "jsonrpc"
+        case method = "method"
+        case params = "params"
+    }
+
+    public init(jsonrpc: Jsonrpc?, method: WorkflowStepWaitingNotificationMethod?, params: WorkflowStepWaitingNotificationParams) {
+        self.jsonrpc = jsonrpc
+        self.method = method
+        self.params = params
+    }
+}
+
+public enum WorkflowStepWaitingNotificationMethod: String, Codable {
+    case workflowStepWaiting = "workflow.step.waiting"
+}
+
+/// The params of ``workflow.step.started|done|failed|waiting|in_doubt``.
+///
+/// The method names the change, ``status`` is the step's state after it. ``key`` is the step
+/// key, ``group`` the key of its group, ``attempts`` the number of starts so far.
+// MARK: - WorkflowStepWaitingNotificationParams
+public struct WorkflowStepWaitingNotificationParams: Codable {
+    public let attempts: Int?
+    public let childSessionID: String?
+    public let endedAt: String?
+    public let error: String?
+    public let group: String?
+    public let key: String
+    public let kind: StepKind
+    public let startedAt: String?
+    public let status: StepStatus
+    public let title: String
+    public let workflowRunID: String
+
+    public enum CodingKeys: String, CodingKey {
+        case attempts = "attempts"
+        case childSessionID = "child_session_id"
+        case endedAt = "ended_at"
+        case error = "error"
+        case group = "group"
+        case key = "key"
+        case kind = "kind"
+        case startedAt = "started_at"
+        case status = "status"
+        case title = "title"
+        case workflowRunID = "workflow_run_id"
+    }
+
+    public init(attempts: Int?, childSessionID: String?, endedAt: String?, error: String?, group: String?, key: String, kind: StepKind, startedAt: String?, status: StepStatus, title: String, workflowRunID: String) {
+        self.attempts = attempts
+        self.childSessionID = childSessionID
+        self.endedAt = endedAt
+        self.error = error
+        self.group = group
+        self.key = key
+        self.kind = kind
+        self.startedAt = startedAt
+        self.status = status
+        self.title = title
+        self.workflowRunID = workflowRunID
+    }
+}
+
+/// What starts a workflow. ``expr`` is for ``schedule``, ``path`` for ``on_file``.
+// MARK: - WorkflowTriggerInfo
+public struct WorkflowTriggerInfo: Codable {
+    public let expr: String?
+    public let kind: Kind
+    public let path: String?
+
+    public enum CodingKeys: String, CodingKey {
+        case expr = "expr"
+        case kind = "kind"
+        case path = "path"
+    }
+
+    public init(expr: String?, kind: Kind, path: String?) {
+        self.expr = expr
+        self.kind = kind
+        self.path = path
+    }
+}
+
 // MARK: - Encode/decode helpers
 
 public class JSONNull: Codable, Hashable {

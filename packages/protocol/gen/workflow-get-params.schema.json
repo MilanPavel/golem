@@ -1,0 +1,16 @@
+{
+  "additionalProperties": false,
+  "description": "``workflow.get``. One workflow by its ``id``.",
+  "properties": {
+    "id": {
+      "minLength": 1,
+      "title": "Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id"
+  ],
+  "title": "WorkflowGetParams",
+  "type": "object"
+}

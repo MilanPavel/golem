@@ -1,0 +1,122 @@
+{
+  "additionalProperties": false,
+  "description": "The params of ``workflow.step.started|done|failed|waiting|in_doubt``.\n\nThe method names the change, ``status`` is the step's state after it. ``key`` is the step\nkey, ``group`` the key of its group, ``attempts`` the number of starts so far.",
+  "properties": {
+    "attempts": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Attempts",
+      "type": "integer"
+    },
+    "child_session_id": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Child Session Id"
+    },
+    "ended_at": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Ended At"
+    },
+    "error": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Error"
+    },
+    "group": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Group"
+    },
+    "key": {
+      "minLength": 1,
+      "title": "Key",
+      "type": "string"
+    },
+    "kind": {
+      "enum": [
+        "step",
+        "agent",
+        "review",
+        "notify",
+        "llm",
+        "tool",
+        "skill"
+      ],
+      "title": "Kind",
+      "type": "string"
+    },
+    "started_at": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Started At"
+    },
+    "status": {
+      "enum": [
+        "pending",
+        "running",
+        "waiting",
+        "done",
+        "failed",
+        "skipped",
+        "in_doubt"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "title": {
+      "title": "Title",
+      "type": "string"
+    },
+    "workflow_run_id": {
+      "minLength": 1,
+      "title": "Workflow Run Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "workflow_run_id",
+    "key",
+    "kind",
+    "title",
+    "status"
+  ],
+  "title": "WorkflowStepEvent",
+  "type": "object"
+}

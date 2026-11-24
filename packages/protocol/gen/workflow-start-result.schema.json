@@ -1,0 +1,16 @@
+{
+  "additionalProperties": false,
+  "description": "The run ``workflow.start`` made.",
+  "properties": {
+    "workflow_run_id": {
+      "minLength": 1,
+      "title": "Workflow Run Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "workflow_run_id"
+  ],
+  "title": "WorkflowStartResult",
+  "type": "object"
+}

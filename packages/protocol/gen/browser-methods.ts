@@ -143,6 +143,11 @@ export const BROWSER_METHODS: ReadonlySet<string> = new Set([
   "skill.write",
   "trace.get",
   "trace.span",
+  "workflow.cancel",
+  "workflow.get",
+  "workflow.list",
+  "workflow.start",
+  "workflow.status",
 ]);
 
 export const LOCAL_ONLY_METHODS: ReadonlySet<string> = new Set([
