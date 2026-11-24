@@ -39,6 +39,11 @@
   --color-ctx-results: light-dark(#8A5A86, #B98BB4);
   --color-ctx-summary: light-dark(#3F8A8A, #6FB5B5);
   --color-ctx-summary-soft: light-dark(#D8EBEA, #182A2A);
+  /* Hugging Face logo: brand colours, the same in both themes (the yellow face reads on light and dark). */
+  --color-hf-yellow: light-dark(#FFD21E, #FFD21E);
+  --color-hf-orange: light-dark(#FF9D0B, #FF9D0B);
+  --color-hf-ink: light-dark(#3A3B45, #3A3B45);
+  --color-hf-red: light-dark(#FF323D, #FF323D);
 
   /* Type scale: one voice. Geist for words, Geist Mono only for literals (through <Code>, <Path>, <Kbd>).
      title: a page title (24 px). heading: a section heading (14 px). label: a nav item or row label (14 px).
