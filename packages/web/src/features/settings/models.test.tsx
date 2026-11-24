@@ -8,7 +8,7 @@ import { createPage } from "../../store/page.ts";
 import { PageProvider } from "../../store/page-context.tsx";
 import { fakeClient, fakeFrame } from "../../store/test-support.ts";
 import { closePalette } from "../palette/index.ts";
-import { HF_FILES, HF_RESULTS, OLLAMA_VALUES, SAMPLE_LISTING, TWO_KEYS } from "./models/models-sample.ts";
+import { HF_FILES, HF_RESULTS, LIBRARY_RESULTS, OLLAMA_VALUES, SAMPLE_LISTING, TWO_KEYS } from "./models/models-sample.ts";
 import { settingsContextStore } from "./index.ts";
 
 const KEYS: AuthListResult = { providers: TWO_KEYS };
@@ -223,8 +223,8 @@ test("Get models opens as a page with the three tabs, and Back returns to Ollama
   const tabs = within(page).getAllByRole("tab");
   expect(tabs).toHaveLength(3);
   expect(tabs[0]?.textContent).toContain("Picked for this Mac");
-  expect(tabs[1]?.textContent).toContain("Hugging Face");
-  expect(tabs[2]?.textContent).toContain("By name");
+  expect(tabs[1]?.textContent).toContain("Ollama library");
+  expect(tabs[2]?.textContent).toContain("Hugging Face");
   expect(within(page).getByText("Downloads show up here. They keep going when you leave.")).toBeTruthy();
   await user.click(within(page).getByRole("button", { name: "Back to Ollama" }));
   expect(await screen.findByRole("button", { name: "Get models" })).toBeTruthy();
@@ -307,13 +307,18 @@ test("Get models › a model that is too big still downloads", async () => {
   expect(screen.getByRole("group", { name: "Get models" })).toBeTruthy();
 });
 
-test("Get models › By name downloads the name that was typed", async () => {
+test("Get models › Ollama library lists the names, filters as you type, and downloads a size with the ollama/ name", async () => {
   const { fake, user } = mount();
+  fake.raw.ollamaLibrary.mockResolvedValue(LIBRARY_RESULTS);
   await openGetModels(user);
-  await user.click(await screen.findByRole("tab", { name: /By name/ }));
-  await user.type(screen.getByRole("textbox", { name: /An Ollama name/ }), "mistral-small3");
-  await user.click(screen.getByRole("button", { name: "Download" }));
-  await waitFor(() => expect(fake.raw.pullModel).toHaveBeenCalledWith("ollama/mistral-small3"));
+  await user.click(await screen.findByRole("tab", { name: /Ollama library/ }));
+  const list = await screen.findByRole("list", { name: "Ollama library names" });
+  expect(within(list).getAllByRole("listitem")).toHaveLength(LIBRARY_RESULTS.models.length);
+  await user.type(screen.getByRole("searchbox", { name: "Search" }), "mistral-n");
+  expect(within(list).getAllByRole("listitem")).toHaveLength(1);
+  expect(fake.raw.ollamaLibrary).toHaveBeenCalledTimes(1);
+  await user.click(screen.getByRole("button", { name: "Download mistral-nemo:12b" }));
+  await waitFor(() => expect(fake.raw.pullModel).toHaveBeenCalledWith("ollama/mistral-nemo:12b"));
   expect(screen.getByRole("group", { name: "Get models" })).toBeTruthy();
 });
 

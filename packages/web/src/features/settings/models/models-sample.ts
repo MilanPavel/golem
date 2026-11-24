@@ -1,5 +1,5 @@
 import type { AuthKeyStatus } from "../../../store/keys.ts";
-import type { HfFilesResult, HfSearchResult, ListedModel, ModelListResult } from "../../../store/models.ts";
+import type { HfFilesResult, HfSearchResult, ListedModel, ModelListResult, OllamaLibraryResult } from "../../../store/models.ts";
 import type { OllamaSettingsValues } from "../../../store/notifications.ts";
 import type { PullsSnapshot } from "../../../store/pulls.ts";
 import type { SetupActions } from "../../setup/use-setup-actions.ts";
@@ -97,6 +97,7 @@ export const NO_ACTIONS: ModelsActions = {
   stop: () => Promise.resolve(),
   pull: () => Promise.resolve(),
   hf: { search: () => Promise.resolve({ repos: [] }), files: (repo) => Promise.resolve({ repo, sizes: [] }) },
+  library: { search: () => Promise.resolve({ models: [] }) },
   saveOllama: () => Promise.resolve({ ok: true, errors: [], values: OLLAMA_VALUES }),
 };
 
@@ -118,6 +119,27 @@ export const HF_FILES: HfFilesResult = {
     { quant: "F16", size_gb: 94.2, files: 4, fit: "too_big", recommended: false },
   ],
 };
+
+const size = (tag: string, gb: number, fit: "fits" | "tight" | "too_big", extra: { recommended?: boolean; installed?: boolean } = {}) => ({ tag, size_gb: gb, fit, recommended: extra.recommended ?? false, installed: extra.installed ?? false });
+
+/** The names of the Ollama library as the daemon lists them for a 64 GB Mac. */
+export const LIBRARY_RESULTS: OllamaLibraryResult = {
+  models: [
+    { name: "gemma4", blurb: "Google's open model. Reads images.", sizes: [size("e2b", 4.6, "fits"), size("e4b", 6.6, "fits"), size("12b", 8.9, "fits"), size("27b", 17.4, "fits", { recommended: true })] },
+    { name: "qwen3.8", blurb: "Alibaba's general model, with thinking.", sizes: [size("4b", 3.1, "fits"), size("9b", 6.4, "fits"), size("27b", 18.2, "fits", { recommended: true, installed: true })] },
+    { name: "qwen3-coder", blurb: "Qwen tuned for code and tools.", sizes: [size("30b", 18.6, "fits", { recommended: true })] },
+    { name: "mistral", blurb: "Mistral 7B, the small classic.", sizes: [size("7b", 4.4, "fits", { recommended: true })] },
+    { name: "mistral-small3.2", blurb: "Mistral's mid-size model. Reads images.", sizes: [size("24b", 15.2, "fits", { recommended: true })] },
+    { name: "mistral-nemo", blurb: "A 12B model from Mistral and NVIDIA.", sizes: [size("12b", 7.1, "fits", { recommended: true })] },
+    { name: "mistral-large", blurb: "Mistral's largest open model.", sizes: [size("123b", 73, "too_big")] },
+    { name: "llama3.2", blurb: "Meta's small models.", sizes: [size("1b", 1.3, "fits"), size("3b", 2, "fits", { recommended: true })] },
+    { name: "llama3.3", blurb: "Meta's 70B model.", sizes: [size("70b", 43, "tight", { recommended: false })] },
+    { name: "deepseek-r1", blurb: "A reasoning model in many sizes.", sizes: [size("1.5b", 1.1, "fits"), size("8b", 5.2, "fits"), size("14b", 9, "fits"), size("32b", 20, "fits", { recommended: true }), size("70b", 43, "tight")] },
+    { name: "gpt-oss", blurb: "OpenAI's open-weight models.", sizes: [size("20b", 13.8, "fits", { recommended: true }), size("120b", 65, "too_big")] },
+  ],
+};
+
+const OUTSIDE_RESULTS: OllamaLibraryResult = { models: [{ name: "my-tune", blurb: "", sizes: [size("7b", 4.1, "fits", { recommended: true })] }] };
 
 export type ModelsCase = Omit<ModelsViewProps, "actions" | "setup" | "pulls"> & { label: string; pulls?: PullsSnapshot };
 
@@ -149,6 +171,11 @@ const DOWNLOADING: PullsSnapshot = {
   failed: new Map([["ollama/qwen2.5-coder:7b", "no space left on the disk"]]),
 };
 
+const LIBRARY_DOWNLOADING: PullsSnapshot = {
+  active: new Map([["ollama/qwen3.8:9b", { track: { completed: 2.1e9, total: 6.4e9, samples: [] }, status: "pulling", progress: null }]]),
+  failed: new Map(),
+};
+
 const HF_DOWNLOADING: PullsSnapshot = {
   active: new Map([[`ollama/hf.co/${HF_FILES.repo}:Q6_K`, { track: { completed: 9e9, total: 22.4e9, samples: [] }, status: "pulling", progress: null }]]),
   failed: new Map(),
@@ -170,7 +197,12 @@ export const GET_CASES: { label: string; props: ModelsCase; pulls?: PullsSnapsho
   { label: "Picked for this Mac, many downloads", props: { ...GET_BASE, listing: listing(CATALOG), initial: { selected: "ollama", sheet: "get" } }, pulls: MANY_DOWNLOADS },
   { label: "Picked for this Mac, no match", props: { ...GET_BASE, listing: listing(CATALOG), initial: { selected: "ollama", sheet: "get", search: "zzz" } } },
   { label: "Picked for this Mac, coding", props: { ...GET_BASE, listing: listing(CATALOG), initial: { selected: "ollama", sheet: "get", filter: { category: "coding", hideTooBig: true } } } },
-  { label: "By name", props: { ...GET_BASE, listing: listing(CATALOG), initial: { selected: "ollama", sheet: "get", tab: "name" } } },
+  { label: "Ollama library", props: { ...GET_BASE, listing: listing(CATALOG), initial: { selected: "ollama", sheet: "get", tab: "lib", library: { results: LIBRARY_RESULTS, chosen: "qwen3.8" } } } },
+  { label: "Ollama library, a search", props: { ...GET_BASE, listing: listing(CATALOG), initial: { selected: "ollama", sheet: "get", tab: "lib", search: "mistral", library: { results: LIBRARY_RESULTS } } } },
+  { label: "Ollama library, a name and a size", props: { ...GET_BASE, listing: listing(CATALOG), initial: { selected: "ollama", sheet: "get", tab: "lib", search: "gpt-oss:120b", library: { results: LIBRARY_RESULTS } } } },
+  { label: "Ollama library, downloading", props: { ...GET_BASE, listing: listing(CATALOG), initial: { selected: "ollama", sheet: "get", tab: "lib", library: { results: LIBRARY_RESULTS, chosen: "qwen3.8" } } }, pulls: LIBRARY_DOWNLOADING },
+  { label: "Ollama library, a name outside the list", props: { ...GET_BASE, listing: listing(CATALOG), initial: { selected: "ollama", sheet: "get", tab: "lib", search: "my-tune:7b", library: { results: LIBRARY_RESULTS, found: { query: "my-tune:7b", results: OUTSIDE_RESULTS } } } } },
+  { label: "Ollama library, no result", props: { ...GET_BASE, listing: listing(CATALOG), initial: { selected: "ollama", sheet: "get", tab: "lib", search: "mistrall", library: { results: LIBRARY_RESULTS, found: { query: "mistrall", results: { models: [] } } } } } },
   { label: "Hugging Face, popular", props: { ...GET_BASE, listing: listing(CATALOG), initial: { selected: "ollama", sheet: "get", tab: "hf", hf: { results: HF_RESULTS, files: HF_FILES } } } },
   { label: "Hugging Face, a search", props: { ...GET_BASE, listing: listing(CATALOG), initial: { selected: "ollama", sheet: "get", tab: "hf", search: "qwen3.8 27b", hf: { results: HF_RESULTS, files: HF_FILES } } } },
   { label: "Hugging Face, downloading", props: { ...GET_BASE, listing: listing(CATALOG), initial: { selected: "ollama", sheet: "get", tab: "hf", hf: { results: HF_RESULTS, files: HF_FILES } } }, pulls: HF_DOWNLOADING },

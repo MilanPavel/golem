@@ -8,9 +8,10 @@ import { HuggingFaceIcon } from "../../../ui/hugging-face-icon.tsx";
 import { ProviderIcon } from "../../../ui/provider-icons.tsx";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../../ui/tabs.tsx";
 import { GetModelsFoot } from "./get-models-foot.tsx";
-import { ByNameTab } from "./get-models-name.tsx";
 import { PicksTab, visiblePicks, type PicksFilter } from "./get-models-picks.tsx";
 import { HuggingFaceTab, type HfActions, type HfTabProps } from "./hf-tab.tsx";
+import { libraryRows, useLibraryList, type LibraryList, type OllamaLibraryActions, type OllamaLibraryInitial } from "./ollama-library.ts";
+import { OllamaLibraryTab } from "./ollama-tab.tsx";
 
 export type GetModelsProps = {
   listing: ModelListResult | null;
@@ -21,10 +22,14 @@ export type GetModelsProps = {
   onStop: (ref: string) => Promise<void>;
   /** Hugging Face: the search and a repo's sizes. */
   hf: HfActions;
+  /** The Ollama library: its names and their sizes. */
+  library: OllamaLibraryActions;
   /** Back to Ollama's models. */
   onBack: () => void;
   /** What the Hugging Face tab starts with, for the gallery. */
   initialHf?: HfTabProps["initial"];
+  /** What the Ollama library tab starts with, for the gallery. */
+  initialLibrary?: OllamaLibraryInitial;
   /** Where the page starts, for the gallery. */
   initialTab?: string;
   /** The search starts with this text, for the gallery. */
@@ -34,7 +39,9 @@ export type GetModelsProps = {
 };
 
 /** What every panel gets. Each one reads what it needs. */
-type PanelProps = Pick<GetModelsProps, "listing" | "pulls" | "hf" | "initialHf"> & {
+type PanelProps = Pick<GetModelsProps, "listing" | "pulls" | "hf" | "library" | "initialHf" | "initialLibrary"> & {
+  /** The names of the Ollama library, which the page asked for once so the count of the tab follows the search. */
+  list: LibraryList;
   /** The category and the switch of the first tab. The page holds them so the count of the tab follows them. */
   filter: PicksFilter;
   setFilter: (filter: PicksFilter) => void;
@@ -58,11 +65,6 @@ type TabEntry = {
   panel: (props: PanelProps) => ReactNode;
 };
 
-/** A body that scrolls by itself, for a panel that is one flow of content. */
-function Scrolling({ children }: { children: ReactNode }) {
-  return <div className="min-h-0 flex-1 overflow-y-auto">{children}</div>;
-}
-
 /**
  * The tabs of Get models. A new place to get models from is one more entry here, with its own panel.
  * The ids stay as they are, and each panel is given the text of the search.
@@ -84,11 +86,39 @@ const TABS: readonly TabEntry[] = [
         failure={failure}
         places={[
           { id: "hf", label: "Search Hugging Face" },
-          { id: "name", label: "Get one by name" },
+          { id: "lib", label: "Search the Ollama library" },
         ]}
         onPlace={goTo}
         filter={filter}
         onFilter={setFilter}
+      />
+    ),
+  },
+  {
+    id: "lib",
+    label: "Ollama library",
+    icon: <ProviderIcon provider="ollama" name="Ollama" />,
+    placeholder: "A name from the Ollama library, such as mistral or qwen3.8:9b",
+    // A name outside golem's list is known only after the registry is asked, so it has no count.
+    count: ({ list, search }) => {
+      if (list.all === null) return null;
+      const found = libraryRows(list.all, search).length;
+      return found === 0 && search.trim() !== "" ? null : found;
+    },
+    panel: ({ library, list, initialLibrary, listing, pulls, failure, pull, stop, search, goTo }) => (
+      <OllamaLibraryTab
+        library={library}
+        list={list}
+        listing={listing}
+        pulls={pulls}
+        failure={failure}
+        pull={pull}
+        onStop={stop}
+        search={search}
+        onHuggingFace={() => {
+          goTo("hf");
+        }}
+        {...(initialLibrary === undefined ? {} : { initial: initialLibrary })}
       />
     ),
   },
@@ -100,18 +130,6 @@ const TABS: readonly TabEntry[] = [
     count: () => null,
     panel: ({ hf, initialHf, listing, pulls, failure, pull, stop, search, setSearch }) => (
       <HuggingFaceTab hf={hf} listing={listing} pulls={pulls} failure={failure} pull={pull} onStop={stop} search={search} onSearch={setSearch} {...(initialHf === undefined ? {} : { initial: initialHf })} />
-    ),
-  },
-  {
-    id: "name",
-    label: "By name",
-    icon: <ProviderIcon provider="ollama" name="Ollama" />,
-    placeholder: null,
-    count: () => null,
-    panel: ({ failure, pull }) => (
-      <Scrolling>
-        <ByNameTab failure={failure} pull={pull} />
-      </Scrolling>
     ),
   },
 ];
@@ -140,12 +158,13 @@ function MacLine({ listing }: { listing: ModelListResult | null }) {
  * Get models: a page that takes the place of the Models page. The header, the search, the tabs and the foot stay;
  * only the body scrolls. A download starts and the page stays: its line shows the progress.
  */
-export function GetModelsPage({ listing, pulls, onPull, onStop, hf, onBack, initialHf, initialTab = "mac", initialSearch = "", initialFilter }: GetModelsProps) {
+export function GetModelsPage({ listing, pulls, onPull, onStop, hf, library, onBack, initialHf, initialLibrary, initialTab = "mac", initialSearch = "", initialFilter }: GetModelsProps) {
   const [tab, setTab] = useState(initialTab);
   const [search, setSearch] = useState(initialSearch);
   const [filter, setFilter] = useState<PicksFilter>({ category: null, hideTooBig: false, ...initialFilter });
   const [failure, setFailure] = useState<string | null>(null);
   const field = useRef<HTMLInputElement>(null);
+  const list = useLibraryList(library, initialLibrary);
   const entry = TABS.find((item) => item.id === tab) ?? TABS[0];
 
   useEffect(() => {
@@ -194,7 +213,7 @@ export function GetModelsPage({ listing, pulls, onPull, onStop, hf, onBack, init
     setFailure(null);
   }
 
-  const props: PanelProps = { listing, pulls, hf, initialHf, filter, setFilter, search, setSearch, failure, pull, stop, goTo: go };
+  const props: PanelProps = { listing, pulls, hf, library, list, initialHf, initialLibrary, filter, setFilter, search, setSearch, failure, pull, stop, goTo: go };
   const own = entry?.placeholder === null;
   return (
     <div role="group" aria-label="Get models" data-setting="get models" className="flex min-h-0 w-full max-w-6xl flex-1 flex-col">

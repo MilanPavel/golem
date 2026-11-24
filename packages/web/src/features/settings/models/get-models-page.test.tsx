@@ -11,7 +11,7 @@ if (FIRST?.props.listing == null) throw new Error("The first case has a listing.
 const LISTING: ModelListResult = FIRST.props.listing;
 
 function page(listing: ModelListResult, pulls: PullsSnapshot = NO_PULLS) {
-  return <GetModelsPage listing={listing} pulls={pulls} onPull={() => Promise.resolve()} onStop={() => Promise.resolve()} hf={NO_ACTIONS.hf} onBack={() => undefined} />;
+  return <GetModelsPage listing={listing} pulls={pulls} onPull={() => Promise.resolve()} onStop={() => Promise.resolve()} hf={NO_ACTIONS.hf} library={NO_ACTIONS.library} onBack={() => undefined} />;
 }
 
 function rowOf(name: string): HTMLElement {
@@ -42,7 +42,7 @@ test("a line goes from Download to progress to Installed without the page closin
 test("a download that cannot start says why, and the page stays", async () => {
   const user = userEvent.setup();
   const onPull = vi.fn(() => Promise.reject(new Error("Ollama is not running.")));
-  render(<GetModelsPage listing={LISTING} pulls={NO_PULLS} onPull={onPull} onStop={() => Promise.resolve()} hf={NO_ACTIONS.hf} onBack={() => undefined} />);
+  render(<GetModelsPage listing={LISTING} pulls={NO_PULLS} onPull={onPull} onStop={() => Promise.resolve()} hf={NO_ACTIONS.hf} library={NO_ACTIONS.library} onBack={() => undefined} />);
   await user.click(screen.getByRole("button", { name: "Download gpt-oss:120b" }));
   expect((await screen.findByRole("alert")).textContent).toBe("Ollama is not running.");
 });
@@ -66,7 +66,7 @@ test("with no download the foot is one quiet line", () => {
 test("a running download shows its numbers in the tray, and Cancel stops it", async () => {
   const user = userEvent.setup();
   const onStop = vi.fn(() => Promise.resolve());
-  render(<GetModelsPage listing={LISTING} pulls={running(2.6e9)} onPull={() => Promise.resolve()} onStop={onStop} hf={NO_ACTIONS.hf} onBack={() => undefined} />);
+  render(<GetModelsPage listing={LISTING} pulls={running(2.6e9)} onPull={() => Promise.resolve()} onStop={onStop} hf={NO_ACTIONS.hf} library={NO_ACTIONS.library} onBack={() => undefined} />);
   expect(within(tray()).getByText("32% · 2.6 of 8.0 GB")).toBeTruthy();
   await user.click(within(tray()).getByRole("button", { name: "Cancel the download of gemma4:12b" }));
   expect(onStop).toHaveBeenCalledWith(GEMMA);
@@ -75,7 +75,7 @@ test("a running download shows its numbers in the tray, and Cancel stops it", as
 test("a finished download says Ready, Show in Ollama goes back, and dismiss removes the row", async () => {
   const user = userEvent.setup();
   const onBack = vi.fn();
-  const view = (pulls: PullsSnapshot) => <GetModelsPage listing={LISTING} pulls={pulls} onPull={() => Promise.resolve()} onStop={() => Promise.resolve()} hf={NO_ACTIONS.hf} onBack={onBack} />;
+  const view = (pulls: PullsSnapshot) => <GetModelsPage listing={LISTING} pulls={pulls} onPull={() => Promise.resolve()} onStop={() => Promise.resolve()} hf={NO_ACTIONS.hf} library={NO_ACTIONS.library} onBack={onBack} />;
   const { rerender } = render(view(running(7.9e9)));
   rerender(view(NO_PULLS));
   expect(within(tray()).getByText("✓ Ready")).toBeTruthy();
@@ -90,7 +90,7 @@ test("a failed download says why, and Try again pulls it again", async () => {
   const user = userEvent.setup();
   const onPull = vi.fn(() => Promise.resolve());
   const failed: PullsSnapshot = { active: new Map(), failed: new Map([[GEMMA, "no space left on the disk"]]) };
-  render(<GetModelsPage listing={LISTING} pulls={failed} onPull={onPull} onStop={() => Promise.resolve()} hf={NO_ACTIONS.hf} onBack={() => undefined} />);
+  render(<GetModelsPage listing={LISTING} pulls={failed} onPull={onPull} onStop={() => Promise.resolve()} hf={NO_ACTIONS.hf} library={NO_ACTIONS.library} onBack={() => undefined} />);
   expect(within(tray()).getByText("Failed: no space left on the disk")).toBeTruthy();
   await user.click(within(tray()).getByRole("button", { name: "Try again" }));
   expect(onPull).toHaveBeenCalledWith(GEMMA);

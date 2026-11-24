@@ -12,6 +12,7 @@ import { ProviderIcon } from "../../../ui/provider-icons.tsx";
 import { withActivePulls } from "../../models/model-text.ts";
 import type { SetupActions } from "../../setup/use-setup-actions.ts";
 import type { HfActions, HfTabProps } from "./hf-tab.tsx";
+import type { OllamaLibraryActions, OllamaLibraryInitial } from "./ollama-library.ts";
 import { GetModelsPage, type GetModelsProps } from "./get-models-page.tsx";
 import { HostedModels } from "./hosted-models.tsx";
 import { groupProviders, isStarred, keyWhere, modelsOf, ollamaState, providerEntry, usableModels, type ProviderEntry } from "./derive.ts";
@@ -33,6 +34,8 @@ export type ModelsActions = {
   pull(ref: string): Promise<void>;
   /** Hugging Face: the search and a repo's sizes. */
   hf: HfActions;
+  /** The Ollama library: its names and their sizes. */
+  library: OllamaLibraryActions;
   /** Saves `[ollama]` settings. A refusal is in the result. */
   saveOllama(params: OllamaSettingsSetParams): Promise<OllamaSettingsSetResult>;
 };
@@ -46,7 +49,7 @@ export type ModelsViewProps = {
   setup: SetupActions;
   actions: ModelsActions;
   /** Where the page starts, for the gallery. */
-  initial?: { selected?: string; sheet?: "get" | "settings" | "key"; tab?: string; removing?: string; hf?: HfTabProps["initial"]; search?: string; filter?: GetModelsProps["initialFilter"] };
+  initial?: { selected?: string; sheet?: "get" | "settings" | "key"; tab?: string; removing?: string; hf?: HfTabProps["initial"]; library?: OllamaLibraryInitial; search?: string; filter?: GetModelsProps["initialFilter"] };
 };
 
 type Sheet = "get" | "settings" | "key" | null;
@@ -233,10 +236,12 @@ export function ModelsView({ listing, keys, ollama, pulls, setup, actions, initi
         onPull={actions.pull}
         onStop={actions.stop}
         hf={actions.hf}
+        library={actions.library}
         onBack={() => {
           setSheet(null);
         }}
         {...(initial?.hf === undefined ? {} : { initialHf: initial.hf })}
+        {...(initial?.library === undefined ? {} : { initialLibrary: initial.library })}
         {...(initial?.tab === undefined ? {} : { initialTab: initial.tab })}
         {...(initial?.search === undefined ? {} : { initialSearch: initial.search })}
         {...(initial?.filter === undefined ? {} : { initialFilter: initial.filter })}

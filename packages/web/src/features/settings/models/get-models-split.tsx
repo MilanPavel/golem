@@ -90,8 +90,8 @@ export function ResultRow({ selected, onSelect, mark, above, title, meta }: { se
   );
 }
 
-/** The top of the detail: a mark, the owner in small text, the name, a line of numbers and a link out. */
-export function DetailHead({ mark, above, title, stats, link }: { mark: ReactNode; above?: string; title: string; stats: readonly ReactNode[]; link?: { href: string; label: string; icon: ReactNode } }) {
+/** The top of the detail: a mark, the owner in small text, the name, a line of what it is, a line of numbers and a link out. */
+export function DetailHead({ mark, above, title, blurb, stats, link }: { mark: ReactNode; above?: string; title: string; blurb?: string; stats: readonly ReactNode[]; link?: { href: string; label: string; icon: ReactNode } }) {
   return (
     <header>
       <div className="flex items-start gap-3.5">
@@ -99,6 +99,7 @@ export function DetailHead({ mark, above, title, stats, link }: { mark: ReactNod
         <div className="min-w-0">
           {above === undefined ? null : <p className="text-sm text-faint">{above}</p>}
           <h4 className="break-words text-lg font-semibold">{title}</h4>
+          {blurb === undefined || blurb === "" ? null : <p className="text-sm text-faint">{blurb}</p>}
         </div>
       </div>
       <p className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted">
