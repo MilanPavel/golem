@@ -250,9 +250,35 @@ async def test_events_come_in_order(store: WorkflowRuns, calls: Any, tmp_path: P
     ]
     step = events.items[1][1]
     assert step["workflow_run_id"] == rid
-    assert step["step_key"] == "one"
-    assert step["kind"] == "step"
+    assert (step["key"], step["kind"], step["status"]) == ("one", "step", "running")
     assert step["attempts"] == 1
+    assert set(step) == {
+        "workflow_run_id",
+        "key",
+        "kind",
+        "title",
+        "status",
+        "group",
+        "attempts",
+        "error",
+        "child_session_id",
+        "started_at",
+        "finished_at",
+    }
+    done = events.items[3][1]
+    assert done["status"] == "done"
+    assert done["finished_at"]
+    assert set(done) == {
+        "workflow_run_id",
+        "workflow_id",
+        "name",
+        "status",
+        "trigger",
+        "session_id",
+        "started_at",
+        "finished_at",
+        "error",
+    }
 
 
 @pytest.mark.parametrize(
@@ -270,3 +296,55 @@ async def test_stubs_name_their_ticket(name: str, ticket: str) -> None:
     run = Run(None, "r")  # type: ignore[arg-type]
     with pytest.raises(NotImplementedError, match=ticket):
         await getattr(run, name)()
+
+
+async def test_top_level_code_does_not_block_the_loop(
+    store: WorkflowRuns, calls: Any, tmp_path: Path
+) -> None:
+    import asyncio
+
+    path = tmp_path / "wf.py"
+    path.write_text(
+        "import time\nfrom golem.workflow import workflow, Run\ntime.sleep(0.3)\n\n"
+        "@workflow()\nasync def flow(run: Run):\n    return None\n"
+    )
+    ticks = 0
+
+    async def ticker() -> None:
+        nonlocal ticks
+        while True:
+            await asyncio.sleep(0.01)
+            ticks += 1
+
+    task = asyncio.create_task(ticker())
+    await WorkflowEngine(store).start(path, "flow")
+    task.cancel()
+    assert ticks >= 10
+
+
+async def test_cancelling_sets_cancelled_and_emits(
+    store: WorkflowRuns, calls: Any, tmp_path: Path
+) -> None:
+    import asyncio
+
+    events = Events()
+    path = write(
+        tmp_path,
+        """
+        import asyncio
+
+        @workflow()
+        async def flow(run: Run):
+            await asyncio.sleep(10)
+        """,
+    )
+    rid = await store.create_run("w", "flow", str(path), "t")
+    task = asyncio.create_task(WorkflowEngine(store, events).execute(rid))
+    await asyncio.sleep(0.3)
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+    run = await store.get_run(rid)
+    assert run is not None
+    assert run.status == "cancelled"
+    assert events.names[-1] == "workflow.run.cancelled"

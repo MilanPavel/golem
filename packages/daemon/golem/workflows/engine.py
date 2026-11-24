@@ -86,30 +86,72 @@ class WorkflowEngine:
         await self.execute(run_id)
         return run_id
 
+    async def _run_event(self, name: str, workflow_run_id: str) -> None:
+        """Send a run event from the row as it is now (the shape of ``WorkflowRunEvent``)."""
+        run = await self._store.get_run(workflow_run_id)
+        if run is None:
+            return
+        self.send(
+            name,
+            {
+                "workflow_run_id": run.workflow_run_id,
+                "workflow_id": run.workflow_id,
+                "name": run.name,
+                "status": run.status,
+                "trigger": run.trigger,
+                "session_id": run.session_id,
+                "started_at": run.started_at,
+                "finished_at": run.finished_at,
+                "error": run.error,
+            },
+        )
+
+    async def step_event(self, name: str, workflow_run_id: str, key: str) -> None:
+        """Send a step event from the row as it is now (the shape of ``WorkflowStepEvent``)."""
+        step = await self._store.get_step(workflow_run_id, key)
+        if step is None:
+            return
+        self.send(
+            name,
+            {
+                "workflow_run_id": step.workflow_run_id,
+                "key": step.step_key,
+                "kind": step.kind,
+                "title": step.title or step.step_key,
+                "status": step.status,
+                "group": step.group_key,
+                "attempts": step.attempts,
+                "error": step.error,
+                "child_session_id": step.child_session_id,
+                "started_at": step.started_at,
+                "finished_at": step.finished_at,
+            },
+        )
+
     async def execute(self, workflow_run_id: str) -> None:
         """Run the workflow function from the top; finished steps return their saved result."""
         record = await self._store.get_run(workflow_run_id)
         if record is None:
             raise WorkflowError(f"no workflow run {workflow_run_id}")
         await self._store.set_run_status(workflow_run_id, "running", _now())
-        base = {"workflow_run_id": workflow_run_id, "name": record.name}
-        self.send("workflow.run.started", base)
+        await self._run_event("workflow.run.started", workflow_run_id)
         try:
-            fn = _find(Path(record.path), record.name)
+            fn = await asyncio.to_thread(_find, Path(record.path), record.name)
             inputs: dict[str, Any] = json.loads(record.inputs_json or "{}")
             names = list(inspect.signature(fn).parameters)[1:]
             kwargs = {k: v for k, v in inputs.items() if k in names}
             await fn(Run(_Journal(self), workflow_run_id, inputs), **kwargs)
         except asyncio.CancelledError:
             await self._store.set_run_status(workflow_run_id, "cancelled", _now())
+            await self._run_event("workflow.run.cancelled", workflow_run_id)
             raise
         except Exception as exc:
             error = f"{type(exc).__name__}: {exc}"
             await self._store.set_run_status(workflow_run_id, "failed", _now(), error)
-            self.send("workflow.run.failed", {**base, "error": error})
+            await self._run_event("workflow.run.failed", workflow_run_id)
             return
         await self._store.set_run_status(workflow_run_id, "done", _now())
-        self.send("workflow.run.done", base)
+        await self._run_event("workflow.run.done", workflow_run_id)
 
 
 class _Journal:
@@ -130,23 +172,12 @@ class _Journal:
         kwargs: dict[str, Any],
     ) -> Any:
         store = self._engine.store
-        send = self._engine.send
+        event = self._engine.step_event
         row = await store.begin_step(workflow_run_id, key, kind, title, group_key, _now())
         if row.status == "done":
             return json.loads(row.result_json) if row.result_json is not None else None
 
-        def payload(error: str | None = None) -> dict[str, Any]:
-            return {
-                "workflow_run_id": workflow_run_id,
-                "step_key": key,
-                "kind": kind,
-                "title": title,
-                "group_key": group_key,
-                "attempts": row.attempts,
-                "error": error,
-            }
-
-        send("workflow.step.started", payload())
+        await event("workflow.step.started", workflow_run_id, key)
         try:
             if inspect.iscoroutinefunction(fn):
                 result = await fn(*args, **kwargs)
@@ -164,8 +195,8 @@ class _Journal:
         except Exception as exc:
             error = f"{type(exc).__name__}: {exc}"
             await store.fail_step(workflow_run_id, key, error, _now())
-            send("workflow.step.failed", payload(error))
+            await event("workflow.step.failed", workflow_run_id, key)
             raise
         await store.finish_step(workflow_run_id, key, encoded, _now())
-        send("workflow.step.done", payload())
+        await event("workflow.step.done", workflow_run_id, key)
         return result
