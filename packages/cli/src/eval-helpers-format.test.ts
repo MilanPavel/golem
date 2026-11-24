@@ -86,6 +86,9 @@ test("refusals: unknown, too big, no room, tight", () => {
   assert.match(refusals(plan, ["local-32k"], false)[0] ?? "", /tight on memory.*Save your work.*--allow-tight/);
   assert.match(refusals(plan, ["big"], true)[0] ?? "", /big cannot run \(too big\)/);
   assert.match(refusals(plan, ["full"], true)[0] ?? "", /full cannot run \(no room now\)/);
+  const gone = { ...LOCAL, name: "gone", verdict: "unknown" as const, reason: "Ollama does not have qwen3.8:27b. Choose another model, or pull it first." };
+  assert.match(refusals([gone], ["gone"], true)[0] ?? "", /gone cannot run \(not installed\): Ollama does not have qwen3.8:27b\. Choose another model, or pull it first\./);
+  assert.match(memoryLine(gone), /· not installed$/);
   assert.match(refusals(plan, ["nope"], true)[0] ?? "", /unknown arm nope \(arms: local-32k, budget-cloud/);
 });
 

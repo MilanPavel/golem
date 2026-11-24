@@ -11,7 +11,7 @@ import asyncio
 import json
 import sys
 import tomllib
-from collections.abc import Sequence
+from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
@@ -167,6 +167,7 @@ def _jobs(
     notes: Notes | None = None,
     delegate: DelegateSettings | None = None,
     interval: float = 60.0,
+    local_model: Callable[[], Awaitable[str | None]] | None = None,
 ) -> EvalJobs:
     parts = EvalParts(
         driver=lambda _tight: driver,
@@ -178,6 +179,7 @@ def _jobs(
         asks=lambda: ASKS,
         interval=interval,
         project=tmp_path,
+        local_model=local_model,
     )
     return EvalJobs(
         tmp_path / "evals",
@@ -247,7 +249,8 @@ async def test_the_plan_prices_a_cloud_arm_and_notes_a_missing_key(tmp_path: Pat
     assert arm.cost_usd == pytest.approx(0.25)
     assert arm.minutes == pytest.approx(3.0)
     mac.keys = False
-    assert "no key for anthropic" in (await jobs.plan(["budget-cloud"]))[0][0].reason.lower()
+    reason = (await jobs.plan(["budget-cloud"]))[0][0].reason
+    assert reason == "No key for anthropic. Add it in Settings \u203a Models."
     swapped = await jobs.plan(["budget-cloud"], {"budget-cloud": "anthropic/claude-sonnet-5"})
     assert swapped[0][0].model == "anthropic/claude-sonnet-5"
     assert swapped[0][0].cost_usd is None
@@ -429,7 +432,10 @@ async def test_a_refused_arm_starts_nothing(tmp_path: Path) -> None:
     with pytest.raises(EvalRefused, match="needs your yes"):
         await jobs.start(["local-32k"])
     mac.keys = False
-    with pytest.raises(EvalRefused, match="budget-cloud cannot run: there is no key for anthropic"):
+    with pytest.raises(
+        EvalRefused,
+        match=r"budget-cloud cannot run: No key for anthropic\. Add it in Settings \u203a Models\.",
+    ):
         await jobs.start(["budget-cloud"])
 
     assert driver.played == [] and jobs.summaries() == []
@@ -865,3 +871,109 @@ async def test_the_whole_way_over_the_socket_refusals_stop_resume_apply(short_ho
         gate.set()
         await client.close()
         await stop_daemon(app, task)
+
+
+# --- the local model the service uses -------------------------------------------------------------
+
+
+def _own(ref: str | None) -> Callable[[], Awaitable[str | None]]:
+    async def read() -> str | None:
+        return ref
+
+    return read
+
+
+async def test_a_local_arm_takes_the_configured_installed_model(tmp_path: Path) -> None:
+    mac = Mac()
+    mac.machine = Machine(64.0, 48.0, {"qwen3.8:27b": 17 * GIB, "llama3.2:3b": 2 * GIB})
+    jobs = _jobs(tmp_path, mac, FakeDriver(mac), local_model=_own("ollama/qwen3.8:27b"))
+    planned, _ = await jobs.plan(["local-32k", "local-128k"])
+    assert [p.model for p in planned] == ["ollama/qwen3.8:27b"] * 2
+    assert all("Ollama does not have" not in p.reason for p in planned)
+    # a model named by the person beats the configured one
+    named = await jobs.plan(["local-32k"], {"local-32k": "ollama/llama3.2:3b"})
+    assert named[0][0].model == "ollama/llama3.2:3b"
+
+
+async def test_a_configured_model_that_is_missing_is_named_not_swapped(tmp_path: Path) -> None:
+    mac = Mac()
+    mac.machine = Machine(64.0, 48.0, {"llama3.2:3b": 2 * GIB})
+    jobs = _jobs(tmp_path, mac, FakeDriver(mac), local_model=_own("ollama/qwen3.8:27b"))
+    arm = (await jobs.plan(["local-32k"]))[0][0]
+    assert arm.model == "ollama/qwen3.8:27b"  # not the smallest installed model
+    assert arm.verdict == "unknown"
+    assert arm.reason == (
+        "Ollama does not have qwen3.8:27b. Choose another model, or pull it first."
+    )
+    assert [c.ref for c in arm.choices] == ["ollama/llama3.2:3b"]
+    with pytest.raises(EvalRefused, match="Choose another model, or pull it first"):
+        await jobs.start(["local-32k"])
+
+
+async def test_without_a_configured_model_the_harness_default_stays(tmp_path: Path) -> None:
+    mac = Mac()
+    mac.machine = Machine(64.0, 48.0, {"llama3.2:3b": 2 * GIB})
+    for own in (_own(None), None):
+        jobs = _jobs(tmp_path, mac, FakeDriver(mac), local_model=own)
+        arm = (await jobs.plan(["local-32k"]))[0][0]
+        assert arm.model == "ollama/qwen3.5:9b" and arm.verdict == "unknown"
+
+    async def broken() -> str | None:
+        raise RuntimeError("facts are down")
+
+    jobs = _jobs(tmp_path, mac, FakeDriver(mac), local_model=broken)
+    assert (await jobs.plan(["local-32k"]))[0][0].model == "ollama/qwen3.5:9b"
+
+
+# --- keys and plain errors ------------------------------------------------------------------------
+
+SECRET = "sk-fake-not-a-real-key-123"
+
+
+class KeyFailDriver(FakeDriver):
+    """A driver whose first message is refused the way a daemon with no key refuses it."""
+
+    async def play(self, arm: Arm, mode: Any, asks: Sequence[Ask], *args: Any, **kw: Any) -> Any:
+        from golem.evals.helpers import RpcError
+
+        raise RpcError(
+            "message.send",
+            {"code": -32005, "message": "needs key: /login anthropic", "data": None},
+        )
+
+
+async def test_an_rpc_error_stops_the_measurement_with_its_plain_message(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from golem.evals import helpers
+
+    def fake_key(provider: str) -> str:
+        del provider
+        return SECRET
+
+    monkeypatch.setattr(helpers, "provider_key", fake_key)
+    mac = Mac()
+    notes = Notes()
+    jobs = _jobs(tmp_path, mac, KeyFailDriver(mac), notes=notes)
+    item_id = await jobs.start(["budget-cloud"])
+    await jobs.wait()
+    got = jobs.get(item_id)
+    assert got is not None and got.state == "stopped"
+    assert got.stop_reason == "It stopped on an error: needs key: /login anthropic"
+    assert "{" not in (got.stop_reason or "") and "-32005" not in (got.stop_reason or "")
+    saved = (tmp_path / "evals" / f"{item_id}.json").read_text("utf-8")
+    assert SECRET not in saved
+    assert all(SECRET not in json.dumps(params) for _, params in notes.items)
+
+
+async def test_a_cloud_arm_without_a_key_is_refused_before_anything_starts(tmp_path: Path) -> None:
+    mac = Mac()
+    mac.keys = False
+    driver = FakeDriver(mac)
+    jobs = _jobs(tmp_path, mac, driver)
+    with pytest.raises(EvalRefused) as raised:
+        await jobs.start(["frontier-cloud"])
+    assert str(raised.value) == (
+        "frontier-cloud cannot run: No key for anthropic. Add it in Settings \u203a Models."
+    )
+    assert driver.played == [] and list((tmp_path / "evals").glob("*.json")) == []

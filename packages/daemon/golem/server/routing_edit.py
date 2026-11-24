@@ -66,6 +66,31 @@ async def _picked(ctx: RequestContext) -> RoutingPicked:
     )
 
 
+async def local_model_in_use(sessions: Any) -> str | None:
+    """The Ollama model golem treats as "the local model", for the helper measurement.
+
+    The same pick as the Routing page, but with the ladder in force: ``[routing.ladder] local``
+    when set, else the session model when it is local, else the local model with the widest
+    window that is ready. None when there is none, or it is not an Ollama model. A model that
+    is named but not installed is returned too: the measurement says so, and never swaps it
+    for another.
+    """
+    if sessions is None or sessions.facts is None:
+        return None
+    default = sessions.configured_model().profile or ""
+    try:
+        refs = [sessions.router.resolve(default).ref] if default else []
+    except ModelConfigError:
+        refs = []
+    refs.extend(sessions.listed_refs())
+    facts = await sessions.facts.facts(list(dict.fromkeys(refs)))
+    ladder = sessions.router.routing_settings().ladder
+    pick = tier_picks(ladder, default, facts)["local"]
+    if pick is None or not pick.ref.startswith("ollama/"):
+        return None
+    return pick.ref
+
+
 async def _values(ctx: RequestContext) -> RoutingGetResult:
     router = _router(ctx)
     routing = router.routing_settings()

@@ -34,6 +34,42 @@ test("too big, no room and unknown cannot be ticked", () => {
   assert.equal(blind.bar, null);
 });
 
+const MISSING = "Ollama does not have qwen3.8:27b. Choose another model, or pull it first.";
+const choices = [{ ref: "ollama/llama3.2:3b", size_gb: 1.9 }];
+
+test("a model that is not installed is not a memory problem", () => {
+  const row = armRow(local({ verdict: "unknown", reason: MISSING, needed_gb: null, free_gb: null, choices }));
+  assert.deepEqual(row.tag, { text: "NOT INSTALLED", tone: "bad" });
+  assert.equal(row.memoryLine, "model not installed");
+  assert.equal(row.reason, MISSING);
+  assert.equal(row.blocked, "missing");
+  assert.equal(row.canTick, false);
+  // the dropdown does not show a model that is not planned
+  assert.equal(row.modelValue, "");
+  const known = armRow(local({ model: "ollama/llama3.2:3b", choices }));
+  assert.equal(known.modelValue, "ollama/llama3.2:3b");
+  assert.equal(known.blocked, null);
+  // a memory problem keeps its own tag
+  assert.equal(armRow(local({ verdict: "unknown", reason: "Memory not known." })).tag.text, "NOT KNOWN");
+});
+
+test("a paid arm whose provider has no key cannot be ticked", () => {
+  const row = armRow(cloud({ reason: "No key for anthropic. Add it in Settings \u203a Models." }));
+  assert.deepEqual(row.tag, { text: "NO KEY", tone: "bad" });
+  assert.equal(row.canTick, false);
+  assert.equal(row.reason, "No key for anthropic. Add it in Settings \u203a Models.");
+  assert.equal(armRow(cloud({})).canTick, true);
+});
+
+test("the banner talks about memory only when memory is the reason", () => {
+  const missing = local({ verdict: "unknown", reason: MISSING, choices });
+  const full = local({ name: "b", verdict: "no_room" });
+  assert.match(noRoomLine(armRows([missing, { ...missing, name: "c" }])) ?? "", /^No local arm can run with the chosen models\. Choose a model that is installed and fits\.$/);
+  assert.match(noRoomLine(armRows([missing, local({ name: "d", verdict: "too_big" })])) ?? "", /chosen models/);
+  assert.match(noRoomLine(armRows([missing, full])) ?? "", /Close other apps and check again/);
+  assert.doesNotMatch(noRoomLine(armRows([missing])) ?? "", /Close other apps/);
+});
+
 test("a paid arm shows its cost and has no memory bar", () => {
   const row = armRow(cloud({}));
   assert.equal(row.memoryLine, "no memory, about $0.40");

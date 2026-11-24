@@ -89,6 +89,12 @@ const VERDICT_WORDS: Record<string, string> = {
   unknown: "unknown",
 };
 
+/** The verdict as a word. A model Ollama does not have is `unknown` on the wire; its reason tells it apart. */
+function verdictWord(arm: EvalPlanArm): string {
+  if (arm.verdict === "unknown" && (arm.reason ?? "").startsWith("Ollama does not have ")) return "not installed";
+  return VERDICT_WORDS[arm.verdict ?? "unknown"] ?? "unknown";
+}
+
 function gb(value: number | null | undefined): string {
   return value === null || value === undefined ? DASH : `${value.toFixed(1)} GB`;
 }
@@ -104,7 +110,7 @@ function money(usd: number): string {
 /** The memory line of a local arm: `memory  qwen3.8:27b at 32K needs 21.1 GB · 24.3 GB free of 36 GB · tight`. */
 export function memoryLine(arm: EvalPlanArm): string {
   const total = arm.ram_gb === null || arm.ram_gb === undefined ? DASH : `${Math.round(arm.ram_gb)} GB`;
-  const verdict = VERDICT_WORDS[arm.verdict ?? "unknown"] ?? "unknown";
+  const verdict = verdictWord(arm);
   return `memory  ${arm.model} at ${windowText(arm.window)} needs ${gb(arm.needed_gb)} · ${gb(arm.free_gb)} free of ${total} · ${verdict}`;
 }
 
@@ -165,7 +171,7 @@ export function refusals(
         out.push(`${name} is tight on memory${why}. Save your work in other apps, then run again with --allow-tight.`);
       }
     } else if (arm.verdict !== "fits") {
-      const word = VERDICT_WORDS[arm.verdict ?? "unknown"] ?? "unknown";
+      const word = verdictWord(arm);
       out.push(`${name} cannot run (${word})${why}`);
     }
   }

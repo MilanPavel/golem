@@ -24,6 +24,10 @@ export type ArmRow = {
   /** The verdict tag, such as `TIGHT`, or `PAID` for a cloud arm. */
   tag: { text: string; tone: Tone };
   reason: string;
+  /** What stops the arm, or null: the model is not installed, the Mac has no room now, or it will never fit. */
+  blocked: "missing" | "no_room" | "other" | null;
+  /** The value of the model dropdown: the planned model if the list holds it, else "" (shown as "Choose a model"). */
+  modelValue: string;
   /** False for a verdict that never runs. There is no override: this is the case that froze the Mac. */
   canTick: boolean;
   /** True when the arm runs only after "I saved my work". */
@@ -42,6 +46,11 @@ const NO_RUN: Record<string, string> = {
   unknown: "The memory could not be read, so it will not run to be safe.",
 };
 const TIGHT_TEXT = "It fits, but it takes more than half of the memory. Save your work in other apps first.";
+export const CHOOSE_MODEL_TEXT = "Choose a model";
+/** The daemon's reason for a local model Ollama does not have; the verdict is `unknown` and the wording tells it apart. */
+const MISSING_PREFIX = "Ollama does not have ";
+const NO_KEY_PREFIX = "No key for ";
+const MISSING_TEXT = "The model is not installed. Choose another model, or pull it first.";
 const PAID_TEXT = "Costs money. Helpers go to the same model or a cheaper one.";
 
 const gb = (value: number): string => `${Math.round(value * 10) / 10} GB`;
@@ -69,17 +78,25 @@ export function armRow(arm: EvalPlanArm): ArmRow {
     asks: arm.asks,
     minutes: arm.minutes ?? null,
     costUsd: arm.cost_usd ?? null,
+    modelValue: (arm.choices ?? []).some((choice) => choice.ref === arm.model) ? arm.model : "",
   };
   if (paid) {
     const cost = arm.cost_usd == null ? "cost not known" : `about ${roundedCost(arm.cost_usd)}`;
-    return { ...base, memoryLine: `no memory, ${cost}`, bar: null, tag: { text: "PAID", tone: "view" }, reason: arm.reason ?? PAID_TEXT, canTick: true, needsSaved: false, paid: true };
+    const reason = arm.reason ?? PAID_TEXT;
+    // A cloud arm has no verdict: the daemon's reason says when its provider has no key, and start would refuse it.
+    if (reason.startsWith(NO_KEY_PREFIX)) {
+      return { ...base, memoryLine: "no key", bar: null, tag: { text: "NO KEY", tone: "bad" }, reason, blocked: "other", canTick: false, needsSaved: false, paid: true };
+    }
+    return { ...base, memoryLine: `no memory, ${cost}`, bar: null, tag: { text: "PAID", tone: "view" }, reason, blocked: null, canTick: true, needsSaved: false, paid: true };
   }
   const verdict = arm.verdict ?? "unknown";
   const need = arm.needed_gb;
   const ram = arm.ram_gb;
   const free = arm.free_gb;
-  const memoryLine =
-    need == null || ram == null || free == null ? "memory could not be read" : `needs ${gb(need)} of ${gb(ram)}, ${gb(free)} free`;
+  const missing = verdict === "unknown" && (arm.reason ?? "").startsWith(MISSING_PREFIX);
+  const memoryLine = missing
+    ? "model not installed"
+    : need == null || ram == null || free == null ? "memory could not be read" : `needs ${gb(need)} of ${gb(ram)}, ${gb(free)} free`;
   let bar: MemoryBar | null = null;
   if (need != null && ram != null && ram > 0 && free != null) {
     const other = Math.min(1, Math.max(0, (ram - free) / ram));
@@ -93,19 +110,27 @@ export function armRow(arm: EvalPlanArm): ArmRow {
     unknown: { text: "NOT KNOWN", tone: "bad" },
   };
   const canTick = verdict === "fits" || verdict === "tight";
-  const reason = arm.reason ?? (verdict === "tight" ? TIGHT_TEXT : (NO_RUN[verdict] ?? ""));
-  return { ...base, memoryLine, bar, tag: tags[verdict] ?? { text: "NOT KNOWN", tone: "bad" }, reason, canTick, needsSaved: verdict === "tight", paid: false };
+  const reason = arm.reason ?? (missing ? MISSING_TEXT : verdict === "tight" ? TIGHT_TEXT : (NO_RUN[verdict] ?? ""));
+  const blocked = canTick ? null : missing ? "missing" : verdict === "no_room" ? "no_room" : "other";
+  const tag = missing ? { text: "NOT INSTALLED", tone: "bad" as const } : (tags[verdict] ?? { text: "NOT KNOWN", tone: "bad" as const });
+  return { ...base, memoryLine, bar, tag, reason, blocked, canTick, needsSaved: verdict === "tight", paid: false };
 }
 
 export function armRows(arms: readonly EvalPlanArm[]): ArmRow[] {
   return arms.map(armRow);
 }
 
-/** What the page says above the arms when no local arm can run now. */
+/**
+ * What the page says above the arms when no local arm can run now. The advice to close apps is only for an arm held back by
+ * memory; an arm whose model is missing, too big or not known gets the plain line about the models.
+ */
 export function noRoomLine(rows: readonly ArmRow[]): string | null {
   const local = rows.filter((row) => !row.paid);
   if (local.length === 0 || local.some((row) => row.canTick)) return null;
-  return "No local arm can run now. Close other apps and check again, or run the paid arms only. golem will not start a run that would freeze the Mac.";
+  if (local.some((row) => row.blocked === "no_room")) {
+    return "No local arm can run now. Close other apps and check again, or run the paid arms only. golem will not start a run that would freeze the Mac.";
+  }
+  return "No local arm can run with the chosen models. Choose a model that is installed and fits.";
 }
 
 export type StartPlan = {

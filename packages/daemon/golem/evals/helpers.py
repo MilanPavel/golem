@@ -815,18 +815,60 @@ def memory_check(arm: Arm, machine: Machine) -> MemoryCheck:
     )
 
 
-def provider_key_found(provider: str) -> bool:
-    """Whether a key for the provider is in the environment or the Keychain."""
+def provider_key(provider: str) -> str | None:
+    """The key of the provider as the service resolves it: the environment, then the Keychain.
+
+    Callers must never print, log or store the value.
+    """
     from golem.models.keys import ProviderKeys
     from golem.secrets import KeychainSecrets
 
     preset = PRESETS.get(provider)
-    if preset is not None and preset.api_key_env and os.environ.get(preset.api_key_env):
-        return True
+    if preset is not None and preset.api_key_env:
+        found = os.environ.get(preset.api_key_env, "").strip()
+        if found:
+            return found
     try:
-        return ProviderKeys(KeychainSecrets()).get(provider) is not None
+        return ProviderKeys(KeychainSecrets()).get(provider) or None
     except Exception:
-        return False
+        return None
+
+
+def provider_key_found(provider: str) -> bool:
+    """Whether a key for the provider is in the environment or the Keychain."""
+    return provider_key(provider) is not None
+
+
+def key_env(arm: Arm, find: Callable[[str], str | None] | None = None) -> dict[str, str]:
+    """The environment variables that hand the arm's provider keys to its throwaway daemon.
+
+    The throwaway daemon has an empty home and a fake ``HOME``, so it cannot read the real
+    Keychain. The key goes in the child's environment only: never in the throwaway home, the
+    measurement file, an event or a log. It covers the lead's provider and the providers of the
+    other models a helper may run on. A provider with no key, or none needed, adds nothing.
+    """
+    read = find or provider_key
+    providers = {arm.lead.partition("/")[0], *(o.ref.partition("/")[0] for o in arm.others)}
+    found: dict[str, str] = {}
+    for provider in sorted(providers):
+        preset = PRESETS.get(provider)
+        if preset is None or not preset.api_key_env:
+            continue
+        key = read(provider)
+        if key:
+            found[preset.api_key_env] = key
+    return found
+
+
+class RpcError(RuntimeError):
+    """A JSON-RPC error reply. ``str()`` is the plain ``message``, not the reply's repr."""
+
+    def __init__(self, method: str, error: Any) -> None:
+        fields: dict[str, Any] = cast("dict[str, Any]", error) if isinstance(error, dict) else {}
+        message = fields.get("message")
+        self.method = method
+        self.code = fields.get("code")
+        super().__init__(str(message) if message else f"{method} failed")
 
 
 class _Client:
@@ -857,7 +899,7 @@ class _Client:
         await self.writer.drain()
         reply = await asyncio.wait_for(waiter, timeout=60)
         if "error" in reply:
-            raise RuntimeError(f"{method}: {reply['error']}")
+            raise RpcError(method, reply["error"])
         return cast("dict[str, Any]", reply["result"])
 
 
@@ -977,7 +1019,7 @@ class LiveDriver:
                 return f"Ollama does not have {name} (ollama pull {name})"
             return memory_check(arm, machine).skip(self._allow_tight)
         if not provider_key_found(provider):
-            return f"no key for {provider} in the environment or the Keychain"
+            return f"No key for {provider}. Add it in Settings \u203a Models."
         return None
 
     async def play(
@@ -997,7 +1039,7 @@ class LiveDriver:
         for folder in (home, user):
             folder.mkdir(parents=True)
         (home / "config.toml").write_text(arm_config(arm, mode), "utf-8")
-        env = {**os.environ, "GOLEM_HOME": str(home), "HOME": str(user)}
+        env = {**os.environ, **key_env(arm), "GOLEM_HOME": str(home), "HOME": str(user)}
         daemon = subprocess.Popen(
             serve_command(frozen=bool(getattr(sys, "frozen", False))),
             env=env,

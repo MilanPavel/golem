@@ -37,7 +37,7 @@ import shutil
 import tempfile
 import time
 import uuid
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -143,6 +143,8 @@ class EvalParts:
     asks: Callable[[], list[Ask]] | None = None
     interval: float = MEMORY_SECONDS
     project: Path | None = None
+    local_model: Callable[[], Awaitable[str | None]] | None = None
+    """The Ollama model the service uses as its local one (``ollama/name``), or None."""
 
 
 def read_memory() -> tuple[float | None, float | None]:
@@ -287,6 +289,10 @@ def verdict_of(check: MemoryCheck) -> str:
     return fits
 
 
+def no_key_reason(provider: str) -> str:
+    return f"No key for {provider}. Add it in Settings \u203a Models."
+
+
 def _label(arm: Arm) -> str:
     if arm.local:
         return f"Local model, {arm.window // 1024}K window"
@@ -298,7 +304,7 @@ def _local_reason(arm: Arm, check: MemoryCheck, verdict: str, machine: Machine) 
     if machine.sizes is None:
         return "Ollama is not reachable, so the size of the model is not known."
     if check.model_gb is None:
-        return f"Ollama does not have {name}. Pull it first."
+        return f"Ollama does not have {name}. Choose another model, or pull it first."
     numbers = check.numbers()
     return {
         "fits": f"Fits: {numbers}.",
@@ -364,7 +370,7 @@ def plan_arm(
     provider = arm.lead.partition("/")[0]
     cost = estimated_cost(arm, asks, default)
     if not key_found(provider):
-        reason = f"There is no key for {provider}. Add one in Settings before you run it."
+        reason = no_key_reason(provider)
     elif cost is None:
         reason = "A hosted model costs money. The cost of this one is not estimated."
     else:
@@ -380,7 +386,7 @@ def refusal_of(
         provider = planned.model.partition("/")[0]
         if key_found(provider):
             return None
-        return f"{planned.name} cannot run: there is no key for {provider}."
+        return f"{planned.name} cannot run: {no_key_reason(provider)}"
     if planned.verdict == "fits" or (planned.verdict == "tight" and allow_tight):
         return None
     if planned.verdict == "tight":
@@ -490,6 +496,7 @@ class EvalJobs:
         )
         self._machine = parts.machine or read_machine
         self._key_found = parts.key_found or provider_key_found
+        self._local_model = parts.local_model
         self._memory = parts.memory or read_memory
         self._alive = parts.alive or ollama_alive
         self._low = parts.low or memory_low
@@ -550,8 +557,12 @@ class EvalJobs:
     def running_id(self) -> str | None:
         return None if self._running is None else self._running.id
 
-    def _arms(self, names: Sequence[str], models: Mapping[str, str]) -> list[Arm]:
-        """The arms of ``names`` (all when empty), in the harness order, with the model swaps."""
+    async def _arms(self, names: Sequence[str], models: Mapping[str, str]) -> list[Arm]:
+        """The arms of ``names`` (all when empty), in the harness order, with the model swaps.
+
+        A local arm whose model is not named takes the service's own local model, when it has
+        one; otherwise it keeps the harness default.
+        """
         known = {arm.name for arm in ARMS}
         unknown = [n for n in [*names, *models] if n not in known]
         if unknown:
@@ -565,7 +576,16 @@ class EvalJobs:
             if not model or (provider == "ollama") != arm.local:
                 kind = "an Ollama model (ollama/name)" if arm.local else "a hosted model"
                 raise EvalRefused(f"{name} needs {kind}, not {ref!r}.")
-        swapped = with_models(ARMS, models)
+        chosen = dict(models)
+        if self._local_model is not None and any(a.local and a.name not in models for a in ARMS):
+            try:
+                own = await self._local_model()
+            except Exception:
+                log.warning("the local model could not be read", exc_info=True)
+                own = None
+            if own:
+                chosen.update({a.name: own for a in ARMS if a.local and a.name not in models})
+        swapped = with_models(ARMS, chosen)
         return [arm for arm in swapped if not names or arm.name in names]
 
     async def _read_machine(self, arms: Sequence[Arm]) -> Machine:
@@ -581,7 +601,7 @@ class EvalJobs:
         self, names: Sequence[str] = (), models: Mapping[str, str] | None = None
     ) -> tuple[list[EvalPlanArm], str | None]:
         """The arms as they stand now and the id of the running measurement. No model is called."""
-        arms = self._arms(names, models or {})
+        arms = await self._arms(names, models or {})
         machine = await self._read_machine(arms)
         return self._planned(arms, machine, len(self._asks())), self.running_id()
 
@@ -607,7 +627,7 @@ class EvalJobs:
     ) -> str:
         """Begin a measurement of ``names``. Returns its id at once; the play goes on behind."""
         self._busy()
-        arms = self._arms(names, models or {})
+        arms = await self._arms(names, models or {})
         await self._guard(arms, allow_tight)
         self._busy()  # another start may have got in while the machine was read
         asks = self._asks()

@@ -1016,6 +1016,7 @@ export {
   type WaitState,
 } from "./wait.ts";
 export {
+  CHOOSE_MODEL_TEXT,
   SAVED_WORK_TEXT,
   armLabel,
   armRow,
