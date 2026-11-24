@@ -23,6 +23,7 @@ from golem.models.facts import FactsSource
 from golem.models.huggingface import HuggingFace
 from golem.models.install import BrewInstaller, OllamaInstaller
 from golem.models.ollama import LocalServers
+from golem.models.ollama_library import OllamaLibrary
 from golem.models.pulls import PullManager
 from golem.models.scores import Scores
 from golem.notify import Notifier
@@ -67,6 +68,7 @@ class DaemonState:
     facts: FactsSource | None = None
     pulls: PullManager | None = None
     hf: HuggingFace | None = None
+    ollama_library: OllamaLibrary | None = None
     checks: CheckManager | None = None
     benches: BenchManager | None = None
     evals: EvalJobs | None = None

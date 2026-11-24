@@ -1,0 +1,80 @@
+{
+  "$defs": {
+    "OllamaLibrarySize": {
+      "additionalProperties": false,
+      "description": "One tag of a library name. ``fit`` is null when golem cannot tell this Mac's memory.\n\n``recommended`` marks the largest size that fits. ``installed`` is true when Ollama has it.",
+      "properties": {
+        "fit": {
+          "anyOf": [
+            {
+              "enum": [
+                "fits",
+                "tight",
+                "too_big"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Fit"
+        },
+        "installed": {
+          "title": "Installed",
+          "type": "boolean"
+        },
+        "recommended": {
+          "title": "Recommended",
+          "type": "boolean"
+        },
+        "size_gb": {
+          "minimum": 0,
+          "title": "Size Gb",
+          "type": "number"
+        },
+        "tag": {
+          "minLength": 1,
+          "title": "Tag",
+          "type": "string"
+        }
+      },
+      "required": [
+        "tag",
+        "size_gb",
+        "recommended",
+        "installed"
+      ],
+      "title": "OllamaLibrarySize",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "One library name with a one-line ``blurb`` (empty for a name found in the registry).",
+  "properties": {
+    "blurb": {
+      "title": "Blurb",
+      "type": "string"
+    },
+    "name": {
+      "minLength": 1,
+      "title": "Name",
+      "type": "string"
+    },
+    "sizes": {
+      "items": {
+        "$ref": "#/$defs/OllamaLibrarySize"
+      },
+      "title": "Sizes",
+      "type": "array"
+    }
+  },
+  "required": [
+    "name",
+    "blurb",
+    "sizes"
+  ],
+  "title": "OllamaLibraryModel",
+  "type": "object"
+}

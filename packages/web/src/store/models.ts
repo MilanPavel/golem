@@ -1,6 +1,6 @@
-import type { HfFilesResult, HfRepo, HfSearchResult, HfSize, ListedModel, ModelListResult, SetupRow, SetupStatusResult } from "@golem/client";
+import type { HfFilesResult, HfRepo, HfSearchResult, HfSize, ListedModel, OllamaLibraryModel, OllamaLibraryResult, OllamaLibrarySize, ModelListResult, SetupRow, SetupStatusResult } from "@golem/client";
 
-export type { HfFilesResult, HfRepo, HfSearchResult, HfSize, ListedModel, ModelListResult, SetupRow, SetupStatusResult };
+export type { HfFilesResult, HfRepo, HfSearchResult, HfSize, ListedModel, OllamaLibraryModel, OllamaLibraryResult, OllamaLibrarySize, ModelListResult, SetupRow, SetupStatusResult };
 
 /** The query key of the model listing. The pushed events that change it invalidate this key. */
 export const MODEL_LIST_KEY = ["model.list"] as const;

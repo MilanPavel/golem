@@ -46,6 +46,7 @@ from golem.models.huggingface import HuggingFace
 from golem.models.install import RUNTIMES, OllamaInstaller, runtime_installer
 from golem.models.keys import ProviderKeys
 from golem.models.ollama import LocalServer, LocalServers, ServerState
+from golem.models.ollama_library import OllamaLibrary
 from golem.models.pulls import PullManager
 from golem.models.router import ModelConfigError, ModelRouter
 from golem.models.scores import Scores
@@ -507,6 +508,9 @@ class DaemonApp:
                 sessions.listed_models = models.cached
                 self.state.pulls = pulls
                 self.state.hf = HuggingFace(transport=pulls.transport, ram_gb=models.ram_gb)
+                self.state.ollama_library = OllamaLibrary(
+                    transport=pulls.transport, ram_gb=models.ram_gb
+                )
                 checks = CheckManager(
                     router,
                     scores,

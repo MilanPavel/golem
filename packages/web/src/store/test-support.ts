@@ -262,6 +262,7 @@ export function fakeClient() {
     deleteModel: vi.fn<PageClient["deleteModel"]>(async (ref) => ({ ref, deleted: true }) as never),
     searchHf: vi.fn<PageClient["searchHf"]>(async () => ({ repos: [] })),
     hfFiles: vi.fn<PageClient["hfFiles"]>(async (repo) => ({ repo, sizes: [] })),
+    ollamaLibrary: vi.fn<PageClient["ollamaLibrary"]>(async () => ({ models: [] })),
     checkNow: vi.fn(),
     close: vi.fn(),
   };
