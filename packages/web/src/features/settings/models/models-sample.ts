@@ -154,10 +154,20 @@ const HF_DOWNLOADING: PullsSnapshot = {
   failed: new Map(),
 };
 
+const MANY_DOWNLOADS: PullsSnapshot = {
+  active: new Map([
+    ["ollama/gemma4:12b", { track: { completed: 2.6e9, total: 8.1e9, samples: [] }, status: "pulling", progress: null }],
+    ["ollama/hf.co/unsloth/Qwen3.8-27B-Instruct-GGUF:Q4_K_M", { track: { completed: 5.5e9, total: 16.2e9, samples: [] }, status: "pulling", progress: null }],
+    ["ollama/qwen3.8:32b", { track: { completed: 0.4e9, total: 20e9, samples: [] }, status: "pulling", progress: null }],
+  ]),
+  failed: new Map([["ollama/qwen2.5-coder:7b", "no space left on the disk"]]),
+};
+
 /** Get models as a page, in the states it draws. It covers the Models page, so the gallery draws it apart. */
 export const GET_CASES: { label: string; props: ModelsCase; pulls?: PullsSnapshot }[] = [
   { label: "Picked for this Mac", props: { ...GET_BASE, listing: listing(CATALOG), initial: { selected: "ollama", sheet: "get" } } },
   { label: "Picked for this Mac, downloading", props: { ...GET_BASE, listing: listing(CATALOG), initial: { selected: "ollama", sheet: "get" } }, pulls: DOWNLOADING },
+  { label: "Picked for this Mac, many downloads", props: { ...GET_BASE, listing: listing(CATALOG), initial: { selected: "ollama", sheet: "get" } }, pulls: MANY_DOWNLOADS },
   { label: "Picked for this Mac, no match", props: { ...GET_BASE, listing: listing(CATALOG), initial: { selected: "ollama", sheet: "get", search: "zzz" } } },
   { label: "Picked for this Mac, coding", props: { ...GET_BASE, listing: listing(CATALOG), initial: { selected: "ollama", sheet: "get", filter: { category: "coding", hideTooBig: true } } } },
   { label: "By name", props: { ...GET_BASE, listing: listing(CATALOG), initial: { selected: "ollama", sheet: "get", tab: "name" } } },

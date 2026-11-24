@@ -225,7 +225,7 @@ test("Get models opens as a page with the three tabs, and Back returns to Ollama
   expect(tabs[0]?.textContent).toContain("Picked for this Mac");
   expect(tabs[1]?.textContent).toContain("Hugging Face");
   expect(tabs[2]?.textContent).toContain("By name");
-  expect(within(page).getByText("Downloads keep going when you leave.")).toBeTruthy();
+  expect(within(page).getByText("Downloads show up here. They keep going when you leave.")).toBeTruthy();
   await user.click(within(page).getByRole("button", { name: "Back to Ollama" }));
   expect(await screen.findByRole("button", { name: "Get models" })).toBeTruthy();
   expect(screen.getByRole("group", { name: "Providers" })).toBeTruthy();

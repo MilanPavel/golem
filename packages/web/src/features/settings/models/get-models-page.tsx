@@ -265,7 +265,7 @@ export function GetModelsPage({ listing, pulls, onPull, onStop, hf, onBack, init
           </TabsContent>
         ))}
       </Tabs>
-      <GetModelsFoot />
+      <GetModelsFoot listing={listing} pulls={pulls} pull={pull} stop={stop} onBack={onBack} />
     </div>
   );
 }
