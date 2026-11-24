@@ -89,11 +89,14 @@ export const GALLERY_SECTIONS = [
 
 /**
  * One axe test per section. Axe reads computed styles node by node, which is slow in jsdom, so one
- * test over the whole gallery outgrew its 60 s on a busy CI runner. The tests are in a file per theme,
- * so vitest runs the two themes in parallel.
+ * test over the whole gallery outgrew its 60 s on a busy CI runner. The tests are in two files per theme,
+ * so vitest runs them in parallel, and each worker renders the whole gallery only half as often: every
+ * render leaves memory behind in jsdom, and one file for all sections ran a CI worker out of heap.
  */
-export function sectionAxeTests(theme: "slip" | "kiln"): void {
-  for (const id of GALLERY_SECTIONS) {
+export function sectionAxeTests(theme: "slip" | "kiln", part: 1 | 2): void {
+  const half = Math.ceil(GALLERY_SECTIONS.length / 2);
+  const ids = part === 1 ? GALLERY_SECTIONS.slice(0, half) : GALLERY_SECTIONS.slice(half);
+  for (const id of ids) {
     test(`the gallery's ${id} section in ${theme} passes axe`, async () => {
       showTheme(theme);
       const { container } = render(<Gallery />);
