@@ -46,3 +46,54 @@ test("a download that cannot start says why, and the page stays", async () => {
   await user.click(screen.getByRole("button", { name: "Download gpt-oss:120b" }));
   expect((await screen.findByRole("alert")).textContent).toBe("Ollama is not running.");
 });
+
+const GEMMA = "ollama/gemma4:12b";
+const running = (completed: number): PullsSnapshot => ({
+  active: new Map([[GEMMA, { track: { completed, total: 8e9, samples: [] }, status: "pulling", progress: null }]]),
+  failed: new Map(),
+});
+
+function tray(): HTMLElement {
+  return screen.getByRole("list", { name: "Downloads" });
+}
+
+test("with no download the foot is one quiet line", () => {
+  render(page(LISTING));
+  expect(screen.getByText("Downloads show up here. They keep going when you leave.")).toBeTruthy();
+  expect(screen.queryByRole("list", { name: "Downloads" })).toBeNull();
+});
+
+test("a running download shows its numbers in the tray, and Cancel stops it", async () => {
+  const user = userEvent.setup();
+  const onStop = vi.fn(() => Promise.resolve());
+  render(<GetModelsPage listing={LISTING} pulls={running(2.6e9)} onPull={() => Promise.resolve()} onStop={onStop} hf={NO_ACTIONS.hf} onBack={() => undefined} />);
+  expect(within(tray()).getByText("32% · 2.6 of 8.0 GB")).toBeTruthy();
+  await user.click(within(tray()).getByRole("button", { name: "Cancel the download of gemma4:12b" }));
+  expect(onStop).toHaveBeenCalledWith(GEMMA);
+});
+
+test("a finished download says Ready, Show in Ollama goes back, and dismiss removes the row", async () => {
+  const user = userEvent.setup();
+  const onBack = vi.fn();
+  const view = (pulls: PullsSnapshot) => <GetModelsPage listing={LISTING} pulls={pulls} onPull={() => Promise.resolve()} onStop={() => Promise.resolve()} hf={NO_ACTIONS.hf} onBack={onBack} />;
+  const { rerender } = render(view(running(7.9e9)));
+  rerender(view(NO_PULLS));
+  expect(within(tray()).getByText("✓ Ready")).toBeTruthy();
+  expect(screen.getByRole("status").textContent).toBe("gemma4:12b is ready.");
+  await user.click(within(tray()).getByRole("button", { name: "Show in Ollama" }));
+  expect(onBack).toHaveBeenCalled();
+  await user.click(within(tray()).getByRole("button", { name: "Dismiss gemma4:12b" }));
+  expect(screen.queryByRole("list", { name: "Downloads" })).toBeNull();
+});
+
+test("a failed download says why, and Try again pulls it again", async () => {
+  const user = userEvent.setup();
+  const onPull = vi.fn(() => Promise.resolve());
+  const failed: PullsSnapshot = { active: new Map(), failed: new Map([[GEMMA, "no space left on the disk"]]) };
+  render(<GetModelsPage listing={LISTING} pulls={failed} onPull={onPull} onStop={() => Promise.resolve()} hf={NO_ACTIONS.hf} onBack={() => undefined} />);
+  expect(within(tray()).getByText("Failed: no space left on the disk")).toBeTruthy();
+  await user.click(within(tray()).getByRole("button", { name: "Try again" }));
+  expect(onPull).toHaveBeenCalledWith(GEMMA);
+  await user.click(within(tray()).getByRole("button", { name: "Dismiss gemma4:12b" }));
+  expect(screen.queryByRole("list", { name: "Downloads" })).toBeNull();
+});
