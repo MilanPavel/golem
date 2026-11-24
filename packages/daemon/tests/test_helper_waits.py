@@ -148,3 +148,46 @@ async def test_budget_never_holds_a_local_helper(
     run_id = await chat.manager.send(lead, "go")
     await chat.finished(run_id)
     assert "helper.state" not in _types(await chat.stored(lead))
+
+
+async def _held(chat: _Chat, spent: _Spent) -> tuple[str, str]:
+    lead_ids: list[str] = []
+    spent._lead = lead_ids
+    chat.manager.budget = spent
+    lead = await chat.manager.create(chat.setup.profile, cwd=str(chat.project))
+    lead_ids.append(lead)
+    run_id = await chat.manager.send(lead, "go")
+    await chat.until(lead, "helper.state")
+    return lead, run_id
+
+
+async def test_raising_the_cap_starts_a_held_helper_with_no_other_helper_running(
+    database: Database, project: Path, tmp_path: Path
+) -> None:
+    chat = _Chat(database, [[QUICK], "first", "done"], project, tmp_path, setup=_CappedSetup(True))
+    spent = _Spent([])
+    lead, run_id = await _held(chat, spent)
+    assert chat.manager._busy_helpers(lead) == 0
+
+    spent.open = True
+    await chat.manager.release_budget_held()
+    events = await chat.finished(run_id)
+    assert _state(await chat.stored(lead), "call_1")[-1] == ("running", None)
+    assert "run.completed" in _types(events)
+
+
+async def test_the_recheck_frees_a_held_helper_once_the_cap_is_not_spent(
+    database: Database, project: Path, tmp_path: Path
+) -> None:
+    chat = _Chat(database, [[QUICK], "first", "done"], project, tmp_path, setup=_CappedSetup(True))
+    chat.manager.recheck_seconds = 0.02
+    spent = _Spent([])
+    _lead, run_id = await _held(chat, spent)
+    assert chat.manager._recheck is not None and not chat.manager._recheck.done()
+
+    spent.open = True  # a day cap reset at midnight
+    events = await chat.finished(run_id)
+    assert "run.completed" in _types(events)
+    assert not chat.manager._budget_held
+    assert chat.manager._recheck is not None
+    await chat.manager._recheck

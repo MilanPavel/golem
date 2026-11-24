@@ -555,9 +555,14 @@ class SessionManager:
         self._stopping: set[str] = set()
         """Leads being cancelled or closed: a helper that ends must not wake them."""
         self._queued: dict[str, list[tuple[str, str]]] = {}
-        self._budget_held: set[str] = set()
         """For each lead, the helpers that wait for a turn, oldest first: ``(helper id, brief)``.
         In memory only: a restart ends a helper that never started, like any helper with no run."""
+        self._budget_held: set[str] = set()
+        """Queued helpers that a spent cap holds back (a subset of ``_queued``)."""
+        self._recheck: asyncio.Task[None] | None = None
+        """The one task that looks again at held helpers while any is held."""
+        self.recheck_seconds: float = 60.0
+        """Seconds between those looks, replaceable in tests."""
         self._ended_helpers: set[str] = set()
         """Helpers whose ``helper.ended`` is stored, which no longer hold a turn."""
         self._lock = asyncio.Lock()
@@ -1597,7 +1602,7 @@ class SessionManager:
             if held is not None:
                 # A spent cap holds the helper until the cap allows it (ADR-060, `budget`).
                 self._queued.setdefault(parent, []).append((sid, brief))
-                self._budget_held.add(sid)
+                self._hold(sid)
                 await self._emit_budget_wait(parent, run_id, call_id, index, held)
                 return HelperRef(sid, picked.profile, True)
             try:
@@ -1626,6 +1631,30 @@ class SessionManager:
         """Whether a helper of ``lead_id`` may start now: fewer than ``[agents] at_once`` of
         its helpers hold a turn."""
         return self._busy_helpers(lead_id) < self._runtime.router.agent_settings().at_once
+
+    def _hold(self, helper_id: str) -> None:
+        """Note a helper held by a spent cap, and start the re-check if it is not running."""
+        self._budget_held.add(helper_id)
+        if self._recheck is None or self._recheck.done():
+            self._recheck = asyncio.create_task(self._recheck_held(), name="golem-budget-recheck")
+
+    async def _recheck_held(self) -> None:
+        """Look again at held helpers every ``recheck_seconds`` (a day cap resets at midnight),
+        until none is held."""
+        while self._budget_held:
+            await asyncio.sleep(self.recheck_seconds)
+            await self.release_budget_held()
+
+    async def release_budget_held(self) -> None:
+        """Start the held helpers whose cap now allows them: after a change of ``[budget]``
+        and on the re-check. Takes the manager's lock."""
+        async with self._lock:
+            for lead_id in [
+                lead
+                for lead, items in self._queued.items()
+                if any(helper_id in self._budget_held for helper_id, _ in items)
+            ]:
+                await self._start_queued(lead_id)
 
     async def _budget_hold(self, helper: _LiveSession) -> Room | None:
         """The spent cap that holds ``helper`` back, None when it may start.
@@ -1681,7 +1710,7 @@ class SessionManager:
             held = await self._budget_hold(helper)
             if held is not None:
                 if helper_id not in self._budget_held:
-                    self._budget_held.add(helper_id)
+                    self._hold(helper_id)
                     await self._emit_budget_wait(
                         lead_id, lead_run, parent.call_id, parent.index, held
                     )
@@ -3614,6 +3643,8 @@ class SessionManager:
         """
         await self._stop(list(self._runs.values()), "shutdown")
         naming = set(self._naming) | set(self._wakes)
+        if self._recheck is not None:
+            naming.add(self._recheck)
         for task in naming:
             task.cancel()
         if naming:

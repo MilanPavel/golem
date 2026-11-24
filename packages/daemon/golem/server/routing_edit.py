@@ -255,4 +255,7 @@ async def routing_set(ctx: RequestContext, params: RoutingSetParams) -> RoutingS
     except OSError as exc:
         raise RpcCallError(INTERNAL_ERROR, f"could not write {config_file}: {exc}") from exc
     log.info("routing settings saved tables=%s", sorted(changes))
+    if budget and ctx.state.sessions is not None:
+        # A raised cap frees the helpers it held back.
+        await ctx.state.sessions.release_budget_held()
     return RoutingSetResult(ok=True, values=await _values(ctx))
