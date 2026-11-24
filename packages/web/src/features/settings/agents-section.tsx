@@ -10,6 +10,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../ui/tabs.tsx";
 import { useNarrow } from "../trace/use-narrow.ts";
 import { DefaultLimitsSection, FinishedHelpersSection } from "./agents-keep.tsx";
 import { showAgentsTab, useAgentsTab, type AgentsTab } from "./agents-tab.ts";
+import { MeasureTab } from "./measure-section.tsx";
+import { MeasuringDot } from "./measure-dot.tsx";
+import { useMeasure } from "./measure-state.ts";
 import { UseHelpersSection } from "./use-helpers-setting.tsx";
 import { AgentDetail, NotYetMark, OriginMark } from "./agents-detail.tsx";
 import { NewAgentDetail } from "./agents-editor.tsx";
@@ -359,27 +362,23 @@ function AgentsRules({ setup = "mixed" }: { setup?: WishSetup }) {
   );
 }
 
-/** The Measure tab: empty until helpers can be measured on this Mac. */
-function AgentsMeasure() {
-  return <p className="text-sm text-muted">Measuring helpers on this Mac comes in a later version.</p>;
-}
-
 /** The three tabs with what each shows. Apart from the hooks, so the gallery can show each tab. */
-export function AgentsTabs({ tab, onTab, agents, rules }: { tab: AgentsTab; onTab: (tab: AgentsTab) => void; agents: ReactNode; rules: ReactNode }) {
+export function AgentsTabs({ tab, onTab, agents, rules, measure = null, measuring = false }: { tab: AgentsTab; onTab: (tab: AgentsTab) => void; agents: ReactNode; rules: ReactNode; measure?: ReactNode; measuring?: boolean }) {
   return (
     <Tabs value={tab} onValueChange={(next) => onTab(next as AgentsTab)} className="flex min-h-0 flex-1 flex-col gap-4">
       <TabsList aria-label="Parts of Agents">
         <TabsTrigger value="agents">Agents</TabsTrigger>
         <TabsTrigger value="rules">Rules</TabsTrigger>
-        <TabsTrigger value="measure">Measure</TabsTrigger>
+        <TabsTrigger value="measure">
+          Measure
+          {measuring ? <MeasuringDot /> : null}
+        </TabsTrigger>
       </TabsList>
       <TabsContent value="agents" className="flex min-h-0 flex-1 flex-col">
         {agents}
       </TabsContent>
       <TabsContent value="rules">{rules}</TabsContent>
-      <TabsContent value="measure">
-        <AgentsMeasure />
-      </TabsContent>
+      <TabsContent value="measure">{measure}</TabsContent>
     </Tabs>
   );
 }
@@ -388,5 +387,6 @@ export function AgentsTabs({ tab, onTab, agents, rules }: { tab: AgentsTab; onTa
 export function AgentsSection() {
   const tab = useAgentsTab();
   const models = useModelList().data?.models;
-  return <AgentsTabs tab={tab} onTab={showAgentsTab} agents={<AgentsTabBody />} rules={<AgentsRules setup={wishSetup(models)} />} />;
+  const measure = useMeasure();
+  return <AgentsTabs tab={tab} onTab={showAgentsTab} agents={<AgentsTabBody />} rules={<AgentsRules setup={wishSetup(models)} />} measure={<MeasureTab measure={measure} />} measuring={measure.running} />;
 }

@@ -72,6 +72,9 @@ import { MEMORY_OFF_TEXT } from "../store/memory.ts";
 import { DefaultLimits, FinishedHelpers } from "../features/settings/agents-keep.tsx";
 import { LimitsBlock } from "../features/settings/agents-limits.tsx";
 import { AgentsPage, AgentsTabs } from "../features/settings/agents-section.tsx";
+import { MeasureListView } from "../features/settings/measure-list.tsx";
+import { MeasureRunView } from "../features/settings/measure-run.tsx";
+import { SAMPLE_ARMS, SAMPLE_ARMS_NO_ROOM, SAMPLE_DONE, SAMPLE_HISTORY, SAMPLE_HISTORY_RUNNING, SAMPLE_LIVE, SAMPLE_RUNNING, SAMPLE_STOPPED } from "../features/settings/measure-sample.ts";
 import { SAMPLE_AGENTS, SAMPLE_CONFIG_LIMITS, SAMPLE_DELEGATE, SAMPLE_DELEGATE_CHANGED, SAMPLE_COPY, WISH_AGENTS_CLOUD, WISH_AGENTS_LOCAL, WISH_AGENTS_MIXED } from "../features/settings/agents-sample.ts";
 import { SkillList } from "../features/settings/skills-section.tsx";
 import { SkillOverview } from "../features/settings/skills/skill-detail.tsx";
@@ -1688,9 +1691,27 @@ function AgentsDemo() {
           }
         />
       </section>
+      {(
+        [
+          ["Measure, new measurement: a tight arm ticked, the box not yet", <MeasureListView key="a" arms={SAMPLE_ARMS} history={SAMPLE_HISTORY} running={null} ticked={["local-32k"]} error={null} onStart={() => {}} onCheck={() => {}} onOpen={() => {}} />],
+          ["Measure, new measurement: ready to start", <MeasureListView key="b" arms={SAMPLE_ARMS} history={SAMPLE_HISTORY} running={null} ticked={["local-32k", "budget"]} saved error={null} onStart={() => {}} onCheck={() => {}} onOpen={() => {}} />],
+          ["Measure, no room now: the local arm cannot be ticked", <MeasureListView key="c" arms={SAMPLE_ARMS_NO_ROOM} history={[]} running={null} error={null} onStart={() => {}} onCheck={() => {}} onOpen={() => {}} />],
+          ["Measure, one runs: Start is off and the list says so", <MeasureListView key="d" arms={SAMPLE_ARMS} history={SAMPLE_HISTORY_RUNNING} running="m1" error={null} onStart={() => {}} onCheck={() => {}} onOpen={() => {}} />],
+          ["Measure, a start the daemon refused", <MeasureListView key="e" arms={SAMPLE_ARMS} history={SAMPLE_HISTORY} running={null} ticked={["budget"]} error="A measurement is already running." onStart={() => {}} onCheck={() => {}} onOpen={() => {}} />],
+          ["Measure, a run in progress", <MeasureRunView key="f" measurement={SAMPLE_RUNNING} live={SAMPLE_LIVE} plan={SAMPLE_ARMS} error={null} onBack={() => {}} onStop={() => {}} onResume={() => {}} onApply={() => {}} onDelete={() => {}} />],
+          ["Measure, a stopped run", <MeasureRunView key="g" measurement={SAMPLE_STOPPED} live={null} plan={[{ ...SAMPLE_ARMS[0], verdict: "fits" } as (typeof SAMPLE_ARMS)[number]]} error={null} onBack={() => {}} onStop={() => {}} onResume={() => {}} onApply={() => {}} onDelete={() => {}} />],
+          ["Measure, a finished run with its proposal", <MeasureRunView key="h" measurement={SAMPLE_DONE} live={null} plan={[]} error={null} onBack={() => {}} onStop={() => {}} onResume={() => {}} onApply={() => {}} onDelete={() => {}} />],
+          ["Measure, a finished run whose numbers could not be written", <MeasureRunView key="i" measurement={SAMPLE_DONE} live={null} plan={[]} error="Could not write the numbers." onBack={() => {}} onStop={() => {}} onResume={() => {}} onApply={() => {}} onDelete={() => {}} />],
+        ] as const
+      ).map(([title, body]) => (
+        <section key={title} aria-label={title} className="flex flex-col gap-3 rounded-lg border border-line bg-bg p-4">
+          <span className="font-mono text-xs text-faint">{title}</span>
+          {body}
+        </section>
+      ))}
       <section aria-label="Agents, tab Measure" className="flex flex-col gap-3 rounded-lg border border-line bg-bg p-4">
-        <span className="font-mono text-xs text-faint">Tabs: Measure, one line until it is built</span>
-        <AgentsTabs tab="measure" onTab={() => {}} agents={null} rules={null} />
+        <span className="font-mono text-xs text-faint">Tabs: Measure, with the dot while a measurement runs</span>
+        <AgentsTabs tab="measure" onTab={() => {}} agents={null} rules={null} measuring measure={<MeasureListView arms={SAMPLE_ARMS} history={SAMPLE_HISTORY_RUNNING} running="m1" error={null} onStart={() => {}} onCheck={() => {}} onOpen={() => {}} />} />
       </section>
       <section aria-label="Agents, tabs narrow" className="flex h-96 max-w-md flex-col gap-3 rounded-lg border border-line bg-bg p-4">
         <span className="font-mono text-xs text-faint">Tabs, narrow: the tab list and one column</span>
