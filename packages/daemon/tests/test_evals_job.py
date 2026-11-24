@@ -791,3 +791,77 @@ async def test_apply_with_nothing_measured_changes_nothing(tmp_path: Path) -> No
     assert "nothing to apply" in NOTHING_MEASURED
     with pytest.raises(EvalRefused):
         again.numbers_to_apply("missing")
+
+
+async def test_the_whole_way_over_the_socket_refusals_stop_resume_apply(short_home: Path) -> None:
+    """Plan, refusals, start, progress, stop, resume, done, apply: the client's path, scripted."""
+    mac = Mac()
+    gate = asyncio.Event()
+    driver = FakeDriver(mac, gate, hold_after=2)  # the third run waits until the test lets it go
+    parts = EvalParts(
+        driver=lambda _tight: driver,
+        machine=lambda: mac.machine,
+        key_found=lambda _provider: True,
+        memory=lambda: mac.reading,
+        alive=lambda: mac.alive,
+        low=lambda: mac.low,
+        asks=lambda: ASKS,
+        interval=0.01,
+    )
+    app, task = await start_daemon(short_home, evals=parts)
+    client = await RpcClient.connect(app.paths.socket_path)
+    need = _need_gb(_local(), 6.0)
+    try:
+        await client.call("hello", HELLO)
+
+        # Too big and no room cannot start, even with allow_tight; tight needs allow_tight.
+        mac.machine = Machine(need / 2, 100.0, {"qwen3.5:9b": 6 * GIB})
+        too_big = await client.call("evals.start", {"arms": ["local-32k"], "allow_tight": True})
+        assert "Too big for this Mac" in str(too_big["error"])
+        mac.machine = Machine(64.0, need + 1.0, {"qwen3.5:9b": 6 * GIB})
+        no_room = await client.call("evals.start", {"arms": ["local-32k"], "allow_tight": True})
+        assert "Not enough free memory" in str(no_room["error"])
+        mac.machine = Machine(need / 0.6, 100.0, {"qwen3.5:9b": 6 * GIB})
+        tight = await client.call("evals.start", {"arms": ["local-32k"]})
+        assert "needs your yes" in str(tight["error"])
+        assert not list((short_home / "evals").glob("*.json"))
+        mac.machine = FITS
+
+        # Start; stop at the waiting run.
+        started = rpc_result(await client.call("evals.start", {"arms": ["budget-cloud"]}))
+        for _ in range(400):
+            if len(driver.played) == 3:
+                break
+            await asyncio.sleep(0.005)
+        stopped = rpc_result(await client.call("evals.stop", {"id": started["id"]}))
+        assert stopped == {"stopped": True}
+        notices = await _until_ended(client)
+        methods = [str(n["method"]) for n in notices]
+        assert methods[0] == "eval.started" and "eval.progress" in methods
+        assert methods[-1] == "eval.ended"
+        mid: Any = rpc_result(await client.call("evals.get", {"id": started["id"]}))
+        assert mid["measurement"]["state"] == "stopped"
+        assert [r["end"] for r in mid["measurement"]["runs"]].count("completed") == 2
+
+        # Resume plays only the rest, and the measurement ends done.
+        driver.played.clear()
+        driver.gate = None
+        client.notices.clear()
+        rpc_result(await client.call("evals.resume", {"id": started["id"]}))
+        await _until_ended(client)
+        assert len(driver.played) == 2
+        done: Any = rpc_result(await client.call("evals.get", {"id": started["id"]}))
+        assert done["measurement"]["state"] == "done"
+        assert done["measurement"]["in_use"] is False
+
+        # Apply writes the numbers; agents.keep shows them and the list marks the one in use.
+        applied = rpc_result(await client.call("evals.apply", {"id": started["id"]}))
+        assert applied["ok"] is True
+        keep: Any = rpc_result(await client.call("agents.keep", {}))
+        assert keep["values"]["delegate"]["fill_share"]["value"] != 0.85
+        listed: Any = rpc_result(await client.call("evals.list", {}))
+        assert [(m["id"], m["in_use"]) for m in listed["measurements"]] == [(started["id"], True)]
+    finally:
+        gate.set()
+        await client.close()
+        await stop_daemon(app, task)

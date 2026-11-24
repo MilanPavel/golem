@@ -1,4 +1,4 @@
-import { agentKey, agentsTable, wishSetup, type AgentRow, type WishModel, type WishSetup } from "@golem/view";
+import { agentKey, agentsTable, rulesMeasurement, type RulesMeasurement, wishSetup, type AgentRow, type WishModel, type WishSetup } from "@golem/view";
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { AGENTS_OLD_TEXT, isAgentsMissing, type AgentInfo } from "../../store/agents.ts";
 import { actionErrorText } from "../../store/errors.ts";
@@ -352,10 +352,10 @@ function AgentsTabBody() {
 }
 
 /** The Rules tab: when helpers are used, the limits every helper gets, and how long finished ones are kept. One block each. */
-function AgentsRules({ setup = "mixed" }: { setup?: WishSetup }) {
+function AgentsRules({ setup = "mixed", measurement = null }: { setup?: WishSetup; measurement?: RulesMeasurement | null }) {
   return (
     <div className="flex max-w-column flex-col gap-3">
-      <UseHelpersSection />
+      <UseHelpersSection measurement={measurement} />
       <DefaultLimitsSection setup={setup} />
       <FinishedHelpersSection />
     </div>
@@ -388,5 +388,5 @@ export function AgentsSection() {
   const tab = useAgentsTab();
   const models = useModelList().data?.models;
   const measure = useMeasure();
-  return <AgentsTabs tab={tab} onTab={showAgentsTab} agents={<AgentsTabBody />} rules={<AgentsRules setup={wishSetup(models)} />} measure={<MeasureTab measure={measure} />} measuring={measure.running} />;
+  return <AgentsTabs tab={tab} onTab={showAgentsTab} agents={<AgentsTabBody />} rules={<AgentsRules setup={wishSetup(models)} measurement={rulesMeasurement(measure.list, new Date())} />} measure={<MeasureTab measure={measure} />} measuring={measure.running} />;
 }
