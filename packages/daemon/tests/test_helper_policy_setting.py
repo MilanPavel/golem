@@ -567,13 +567,13 @@ async def test_when_one_helper_runs_at_a_time_the_next_waits_queued_for_its_turn
     # The second helper has no run while the first one holds the only turn.
     assert await chat.runs.latest(second) is None
     stored = await chat.stored(lead)
-    assert _state(stored, "call_2") == [("queued", "one at a time")]
+    assert _state(stored, "call_2") == [("queued", "team")]
     assert _state(stored, "call_1") == []
 
     chat.model.release()
     events = await chat.finished(run_id)
     stored = await chat.stored(lead)
-    assert _state(stored, "call_2") == [("queued", "one at a time"), ("running", None)]
+    assert _state(stored, "call_2") == [("queued", "team"), ("running", None)]
     ended = [e.data.call_id for e in stored if e.type == "helper.ended"]
     assert ended == ["call_1", "call_2"]  # one after the other
     assert "run.completed" in _types(events)

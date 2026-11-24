@@ -1468,17 +1468,69 @@
     },
     "HelperStateData": {
       "additionalProperties": false,
-      "description": "A helper queued, started running, started waiting, or went on.\n\n``reason`` says why it waits or queues. It is a plain string, not a fixed list: the\nwords today are ``you`` and ``team``, and later phases add more, so a new word is not\na protocol change. It is None when the helper runs with nothing to explain.",
+      "description": "A helper queued, started running, started waiting, or went on.\n\n``reason`` says why it waits or queues. It is a plain string, so a new word is not a\nprotocol change. The words are ADR-060's: ``you``, ``team``, ``slot``, ``load``,\n``provider``, ``budget`` and ``stalled``. It is None when the helper runs with nothing to\nexplain. It carries no sentence: the view words it.\n\nThe fields after ``reason`` are all optional, so an old daemon's event still reads, and\nthey mirror :class:`ModelWaitingData`. ``line`` names the model, the provider or ``shell``\nthe helper waits on, for ``slot`` and ``provider``. ``position`` (1 is next) and ``holder``\n(the label of the call that frees a slot first) say where it stands. ``retry_in_ms`` is the\nbackoff left, for ``provider``. ``spent_usd`` and ``cap_usd`` are for ``budget``: what is\nspent and the cap that holds the helper.",
       "properties": {
         "call_id": {
           "minLength": 1,
           "title": "Call Id",
           "type": "string"
         },
+        "cap_usd": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cap Usd"
+        },
+        "holder": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Holder"
+        },
         "index": {
           "minimum": 0,
           "title": "Index",
           "type": "integer"
+        },
+        "line": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Line"
+        },
+        "position": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Position"
         },
         "reason": {
           "anyOf": [
@@ -1492,6 +1544,32 @@
           ],
           "default": null,
           "title": "Reason"
+        },
+        "retry_in_ms": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Retry In Ms"
+        },
+        "spent_usd": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Spent Usd"
         },
         "state": {
           "enum": [

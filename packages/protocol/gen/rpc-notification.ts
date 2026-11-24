@@ -899,8 +899,14 @@ export type SessionId45 = string;
 export type Ts43 = string;
 export type Type43 = 'helper.step';
 export type CallId14 = string;
+export type CapUsd = number | null;
+export type Holder1 = string | null;
 export type Index6 = number;
+export type Line1 = string | null;
+export type Position1 = number | null;
 export type Reason6 = string | null;
+export type RetryInMs1 = number | null;
+export type SpentUsd = number | null;
 export type State = 'queued' | 'running' | 'waiting';
 export type RunId45 = string | null;
 export type Seq44 = number;
@@ -2635,17 +2641,31 @@ export interface HelperStateEvent {
 /**
  * A helper queued, started running, started waiting, or went on.
  *
- * ``reason`` says why it waits or queues. It is a plain string, not a fixed list: the
- * words today are ``you`` and ``team``, and later phases add more, so a new word is not
- * a protocol change. It is None when the helper runs with nothing to explain.
+ * ``reason`` says why it waits or queues. It is a plain string, so a new word is not a
+ * protocol change. The words are ADR-060's: ``you``, ``team``, ``slot``, ``load``,
+ * ``provider``, ``budget`` and ``stalled``. It is None when the helper runs with nothing to
+ * explain. It carries no sentence: the view words it.
+ *
+ * The fields after ``reason`` are all optional, so an old daemon's event still reads, and
+ * they mirror :class:`ModelWaitingData`. ``line`` names the model, the provider or ``shell``
+ * the helper waits on, for ``slot`` and ``provider``. ``position`` (1 is next) and ``holder``
+ * (the label of the call that frees a slot first) say where it stands. ``retry_in_ms`` is the
+ * backoff left, for ``provider``. ``spent_usd`` and ``cap_usd`` are for ``budget``: what is
+ * spent and the cap that holds the helper.
  *
  * This interface was referenced by `RpcNotification`'s JSON-Schema
  * via the `definition` "HelperStateData".
  */
 export interface HelperStateData {
   call_id: CallId14;
+  cap_usd?: CapUsd;
+  holder?: Holder1;
   index: Index6;
+  line?: Line1;
+  position?: Position1;
   reason?: Reason6;
+  retry_in_ms?: RetryInMs1;
+  spent_usd?: SpentUsd;
   state: State;
 }
 /**
