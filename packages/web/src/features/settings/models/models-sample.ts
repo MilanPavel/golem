@@ -35,9 +35,9 @@ const MODELS: ListedModel[] = [
   local("qwen3.8:8b", "Qwen 3.8 · 8B", 5.2, { starred: true, speed: { reply_tps: 71, samples: 30 } }),
   local("gemma4:12b", "Gemma 4 · 12B", 8.1, { speed: { reply_tps: 46, samples: 8 } }),
   local("nomic-embed-text", "Embeddings, not for chat", 0.3, { tools: false }),
-  local("qwen3.8:32b", "Qwen 3.8 · 32B", 20, { source: "catalog", status: "not_installed", recommended: true, fit: "fits" }),
-  local("llama4-scout", "Llama 4 Scout", 35, { source: "catalog", status: "not_installed", fit: "tight" }),
-  local("qwen3.8:72b", "Qwen 3.8 · 72B", 47, { source: "catalog", status: "not_installed", fit: "too_big" }),
+  local("qwen3.8:32b", "Qwen 3.8 · 32B", 20, { source: "catalog", status: "not_installed", recommended: true, fit: "fits", categories: ["general", "reasoning"] }),
+  local("llama4-scout", "Llama 4 Scout", 35, { source: "catalog", status: "not_installed", fit: "tight", categories: ["general", "vision"] }),
+  local("qwen3.8:72b", "Qwen 3.8 · 72B", 47, { source: "catalog", status: "not_installed", fit: "too_big", categories: ["reasoning"] }),
   hosted("openai", "gpt-5", "GPT-5", 1.25, 10),
   hosted("openai", "gpt-5-mini", "GPT-5 mini", 0.25, 2, { starred: true, tools: true }),
   hosted("openai", "gpt-5-nano", "GPT-5 nano", 0.05, 0.4),
@@ -66,6 +66,20 @@ export const SAMPLE_LISTING = listing(MODELS);
 export const OLLAMA_VALUES: OllamaSettingsValues = { start: true, idle_stop_minutes: 30, parallel: 1, started_by_golem: true, running: true };
 
 export const NO_PULLS: PullsSnapshot = { active: new Map(), failed: new Map() };
+
+/** The catalog as the daemon lists it for a 64 GB Mac: with categories, and a pick for each. */
+const CATALOG: ListedModel[] = [
+  local("qwen3.8:27b", "Qwen 3.8 · 27B", 16.8, { categories: ["general", "reasoning"] }),
+  local("llama3.2:3b", "Llama 3.2 · 3B", 2, { categories: ["general", "fast"] }),
+  local("gemma4:12b", "Gemma 4 · 12B", 8.1, { source: "catalog", status: "not_installed", fit: "fits", categories: ["general", "vision"], recommended: true, recommended_for: ["general", "vision"] }),
+  local("qwen2.5-coder:7b", "Qwen2.5 Coder · 7B", 4.7, { source: "catalog", status: "not_installed", fit: "fits", categories: ["coding"], recommended_for: ["coding"] }),
+  local("deepseek-r1:8b", "DeepSeek R1 · 8B", 5.2, { source: "catalog", status: "not_installed", fit: "fits", categories: ["reasoning"] }),
+  local("phi4-mini:3.8b", "Phi-4-mini", 2.5, { source: "catalog", status: "not_installed", fit: "fits", categories: ["fast"] }),
+  local("llama4-scout", "Llama 4 Scout", 35, { source: "catalog", status: "not_installed", fit: "tight", categories: ["general", "vision"] }),
+  local("gpt-oss:120b", "gpt-oss · 120B", 65, { source: "catalog", status: "not_installed", fit: "too_big", categories: ["reasoning"] }),
+];
+
+const GET_BASE = { label: "", keys: TWO_KEYS, ollama: OLLAMA_VALUES } as const;
 
 const pulling = (name: string): ListedModel => local(name, name, 20, { source: "catalog", status: "pulling", progress: 0.34 });
 
@@ -121,14 +135,26 @@ export const MODELS_CASES: ModelsCase[] = [
   { label: "oMLX", listing: listing(MODELS), keys: TWO_KEYS, ollama: OLLAMA_VALUES, initial: { selected: "omlx" } },
 ];
 
-/** The sheets, each over the Ollama page. They are tested apart from the gallery, since a sheet covers the page. */
+/** The sheets, each over the page. They are tested apart from the gallery, since a sheet covers the page. */
 export const SHEET_CASES: { label: string; props: ModelsCase }[] = [
-  { label: "Get models, for this Mac", props: { label: "", listing: listing(MODELS), keys: TWO_KEYS, ollama: OLLAMA_VALUES, initial: { selected: "ollama", sheet: "get" } } },
-  { label: "Get models, by name", props: { label: "", listing: listing(MODELS), keys: TWO_KEYS, ollama: OLLAMA_VALUES, initial: { selected: "ollama", sheet: "get", tab: "name" } } },
-  { label: "Get models, Hugging Face search", props: { label: "", listing: listing(MODELS), keys: TWO_KEYS, ollama: OLLAMA_VALUES, initial: { selected: "ollama", sheet: "get", tab: "hf", hf: { query: "qwen3.8 27b", results: HF_RESULTS } } } },
-  { label: "Get models, a Hugging Face repo", props: { label: "", listing: listing(MODELS), keys: TWO_KEYS, ollama: OLLAMA_VALUES, initial: { selected: "ollama", sheet: "get", tab: "hf", hf: { query: "qwen3.8 27b", results: HF_RESULTS, repo: { id: HF_FILES.repo, files: HF_FILES } } } } },
   { label: "Ollama settings", props: { label: "", listing: listing(MODELS), keys: TWO_KEYS, ollama: OLLAMA_VALUES, initial: { selected: "ollama", sheet: "settings" } } },
   { label: "Ollama settings, started outside golem", props: { label: "", listing: listing(MODELS), keys: TWO_KEYS, ollama: { ...OLLAMA_VALUES, started_by_golem: false }, initial: { selected: "ollama", sheet: "settings" } } },
   { label: "Replace or remove a key", props: { label: "", listing: listing(MODELS), keys: TWO_KEYS, ollama: OLLAMA_VALUES, initial: { selected: "anthropic", sheet: "key" } } },
   { label: "Replace or remove a key from the environment", props: { label: "", listing: listing(MODELS), keys: TWO_KEYS, ollama: OLLAMA_VALUES, initial: { selected: "openai", sheet: "key" } } },
+];
+
+const DOWNLOADING: PullsSnapshot = {
+  active: new Map([["ollama/gemma4:12b", { track: { completed: 2.6e9, total: 8.1e9, samples: [] }, status: "pulling", progress: null }]]),
+  failed: new Map([["ollama/qwen2.5-coder:7b", "no space left on the disk"]]),
+};
+
+/** Get models as a page, in the states it draws. It covers the Models page, so the gallery draws it apart. */
+export const GET_CASES: { label: string; props: ModelsCase; pulls?: PullsSnapshot }[] = [
+  { label: "Picked for this Mac", props: { ...GET_BASE, listing: listing(CATALOG), initial: { selected: "ollama", sheet: "get" } } },
+  { label: "Picked for this Mac, downloading", props: { ...GET_BASE, listing: listing(CATALOG), initial: { selected: "ollama", sheet: "get" } }, pulls: DOWNLOADING },
+  { label: "Picked for this Mac, no match", props: { ...GET_BASE, listing: listing(CATALOG), initial: { selected: "ollama", sheet: "get", search: "zzz" } } },
+  { label: "Picked for this Mac, coding", props: { ...GET_BASE, listing: listing(CATALOG), initial: { selected: "ollama", sheet: "get", filter: { category: "coding", hideTooBig: true } } } },
+  { label: "By name", props: { ...GET_BASE, listing: listing(CATALOG), initial: { selected: "ollama", sheet: "get", tab: "name" } } },
+  { label: "Hugging Face search", props: { ...GET_BASE, listing: listing(CATALOG), initial: { selected: "ollama", sheet: "get", tab: "hf", hf: { query: "qwen3.8 27b", results: HF_RESULTS } } } },
+  { label: "A Hugging Face repo", props: { ...GET_BASE, listing: listing(CATALOG), initial: { selected: "ollama", sheet: "get", tab: "hf", hf: { query: "qwen3.8 27b", results: HF_RESULTS, repo: { id: HF_FILES.repo, files: HF_FILES } } } } },
 ];

@@ -65,7 +65,7 @@ import { ChatSection } from "../features/settings/chat-section.tsx";
 import { Stage, YouRow } from "../features/settings/chat-stage.tsx";
 import { InstructionsView } from "../features/settings/chat-instructions.tsx";
 import { ModelsView } from "../features/settings/models/models-view.tsx";
-import { IDLE_SETUP, MODELS_CASES, NO_ACTIONS, NO_PULLS } from "../features/settings/models/models-sample.ts";
+import { GET_CASES, IDLE_SETUP, MODELS_CASES, NO_ACTIONS, NO_PULLS } from "../features/settings/models/models-sample.ts";
 import { MemoryView } from "../features/settings/memory/memory-view.tsx";
 import { SAMPLE_MEMORIES, SAMPLE_MEMORY_COUNTS, SAMPLE_MEMORY_SETTINGS } from "../features/settings/memory/sample.ts";
 import { MEMORY_OFF_TEXT } from "../store/memory.ts";
@@ -1837,6 +1837,20 @@ function ModelsDemo() {
   );
 }
 
+/** Get models, the page that takes the place of Settings › Models, in each state. A fixed height shows that only the body scrolls. */
+function GetModelsDemo() {
+  return (
+    <div className="flex flex-col gap-4">
+      {GET_CASES.map(({ label, props, pulls }) => (
+        <section key={label} aria-label={`Get models, ${label}`} className="flex h-160 flex-col gap-3 rounded-lg border border-line bg-bg p-4">
+          <span className="font-mono text-xs text-faint">{label}</span>
+          <ModelsView {...props} pulls={pulls ?? NO_PULLS} setup={IDLE_SETUP} actions={NO_ACTIONS} />
+        </section>
+      ))}
+    </div>
+  );
+}
+
 /** Settings → Routing in each state: auto with limits, no frontier model, never pay, local, pinned, a save error, a phone. */
 function RoutingDemo() {
   const none = () => {};
@@ -2388,6 +2402,8 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
       <section className="mt-6" id={anchor("Settings models")}>
         <h3 className="mb-2 font-mono text-xs text-faint">Settings › Models</h3>
         <ModelsDemo />
+        <h3 className="mb-2 mt-4 font-mono text-xs text-faint">Settings › Models › Get models</h3>
+        <GetModelsDemo />
       </section>
 
       <section className="mt-6" id={anchor("Routing")}>

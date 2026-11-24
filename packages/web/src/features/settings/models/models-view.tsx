@@ -12,7 +12,7 @@ import { ProviderIcon } from "../../../ui/provider-icons.tsx";
 import { withActivePulls } from "../../models/model-text.ts";
 import type { SetupActions } from "../../setup/use-setup-actions.ts";
 import type { HfActions, HfTabProps } from "./hf-tab.tsx";
-import { GetModelsSheet } from "./get-models-sheet.tsx";
+import { GetModelsPage, type GetModelsProps } from "./get-models-page.tsx";
 import { HostedModels } from "./hosted-models.tsx";
 import { groupProviders, isStarred, keyWhere, modelsOf, ollamaState, providerEntry, usableModels, type ProviderEntry } from "./derive.ts";
 import { ModelTable } from "./models-table.tsx";
@@ -46,7 +46,7 @@ export type ModelsViewProps = {
   setup: SetupActions;
   actions: ModelsActions;
   /** Where the page starts, for the gallery. */
-  initial?: { selected?: string; sheet?: "get" | "settings" | "key"; tab?: string; removing?: string; hf?: HfTabProps["initial"] };
+  initial?: { selected?: string; sheet?: "get" | "settings" | "key"; tab?: string; removing?: string; hf?: HfTabProps["initial"]; search?: string; filter?: GetModelsProps["initialFilter"] };
 };
 
 type Sheet = "get" | "settings" | "key" | null;
@@ -224,6 +224,25 @@ export function ModelsView({ listing, keys, ollama, pulls, setup, actions, initi
       );
   }
 
+  // Get models takes the place of the page: the provider list is hidden while it is open, and it keeps its own state.
+  if (sheet === "get") {
+    return (
+      <GetModelsPage
+        listing={shown}
+        pulls={pulls}
+        onPull={actions.pull}
+        onStop={actions.stop}
+        hf={actions.hf}
+        onBack={() => {
+          setSheet(null);
+        }}
+        {...(initial?.hf === undefined ? {} : { initialHf: initial.hf })}
+        {...(initial?.tab === undefined ? {} : { initialTab: initial.tab })}
+        {...(initial?.search === undefined ? {} : { initialSearch: initial.search })}
+        {...(initial?.filter === undefined ? {} : { initialFilter: initial.filter })}
+      />
+    );
+  }
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-4 md:flex-row" data-setting="key">
       {/* From md the page stays put: the provider list and the models scroll on their own. */}
@@ -232,18 +251,6 @@ export function ModelsView({ listing, keys, ollama, pulls, setup, actions, initi
         <p className="border-t border-line px-3 py-2 text-meta text-faint">Keys are set in a terminal. This page never sees one.</p>
       </div>
       <div className="min-w-0 flex-1 pb-8 md:min-h-0 md:overflow-y-auto">{detail}</div>
-      <GetModelsSheet
-        open={sheet === "get"}
-        onOpenChange={(open) => {
-          setSheet(open ? "get" : null);
-        }}
-        listing={shown}
-        pulls={pulls}
-        onPull={actions.pull}
-        hf={actions.hf}
-        {...(initial?.hf === undefined ? {} : { initialHf: initial.hf })}
-        {...(initial?.tab === undefined ? {} : { initialTab: initial.tab })}
-      />
       <OllamaSettingsSheet
         open={sheet === "settings"}
         onOpenChange={(open) => {

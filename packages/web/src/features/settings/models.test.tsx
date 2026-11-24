@@ -208,33 +208,118 @@ test("Ollama's state comes from the model list: stopped offers Start, not instal
   expect(screen.getByRole("button", { name: "Start Ollama" })).toBeTruthy();
 });
 
-test("Get models has the three tabs, lists golem's models for this Mac, and downloads one", async () => {
-  const { fake, user } = mount();
+async function openGetModels(user: ReturnType<typeof userEvent.setup>) {
   await user.click(await screen.findByRole("button", { name: /^Ollama/ }));
   await user.click(await screen.findByRole("button", { name: "Get models" }));
-  const sheet = await screen.findByRole("dialog", { name: "Get models" });
-  expect(within(sheet).getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["For this Mac", "Hugging Face", "By name"]);
-  const list = within(sheet).getByRole("list", { name: "Models for this Mac" });
-  expect(within(list).getAllByRole("listitem")[0]?.textContent).toContain("RECOMMENDED");
-  expect(within(list).getByText("too big for this Mac", { exact: false })).toBeTruthy();
+  return await screen.findByRole("group", { name: "Get models" });
+}
+
+test("Get models opens as a page with the three tabs, and Back returns to Ollama's models", async () => {
+  const { user } = mount();
+  const page = await openGetModels(user);
+  expect(screen.queryByRole("dialog")).toBeNull();
+  expect(screen.queryByRole("group", { name: "Providers" })).toBeNull();
+  expect(within(page).getByText("64 GB memory")).toBeTruthy();
+  const tabs = within(page).getAllByRole("tab");
+  expect(tabs).toHaveLength(3);
+  expect(tabs[0]?.textContent).toContain("Picked for this Mac");
+  expect(tabs[1]?.textContent).toContain("Hugging Face");
+  expect(tabs[2]?.textContent).toContain("By name");
+  expect(within(page).getByText("Downloads keep going when you leave.")).toBeTruthy();
+  await user.click(within(page).getByRole("button", { name: "Back to Ollama" }));
+  expect(await screen.findByRole("button", { name: "Get models" })).toBeTruthy();
+  expect(screen.getByRole("group", { name: "Providers" })).toBeTruthy();
+});
+
+test("Esc leaves Get models, and / goes to the search", async () => {
+  const { user } = mount();
+  const page = await openGetModels(user);
+  await user.keyboard("/");
+  expect(document.activeElement).toBe(within(page).getByRole("searchbox", { name: "Search" }));
+  await user.keyboard("qw");
+  expect((document.activeElement as HTMLInputElement).value).toBe("qw");
+  await user.keyboard("{Escape}");
+  expect(await screen.findByRole("group", { name: "Providers" })).toBeTruthy();
+});
+
+test("Get models › Picked for this Mac: a line a model, with its categories, size and fit", async () => {
+  const { user } = mount();
+  const page = await openGetModels(user);
+  const card = within(page).getByRole("group", { name: "Recommended for this Mac" });
+  expect(card.textContent).toContain("Qwen 3.8 · 32B");
+  expect(card.textContent).toContain("20 GB. The pick for this Mac's 64 GB of memory. Good for general and reasoning.");
+  const list = within(page).getByRole("list", { name: "Models for this Mac" });
+  const rows = within(list).getAllByRole("listitem");
+  expect(rows).toHaveLength(7);
+  const big = rows.find((row) => row.textContent?.includes("qwen3.8:72b"));
+  expect(big?.textContent).toContain("Reasoning");
+  expect(big?.textContent).toContain("47 GB");
+  expect(big?.textContent).toContain("Too big");
+  expect(rows.find((row) => row.textContent?.includes("llama4-scout"))?.textContent).toContain("Tight · slower");
+  expect(rows.find((row) => row.textContent?.includes("qwen3.8:8b"))?.textContent).toContain("Installed");
+});
+
+test("Get models › the search, the chips and Hide the ones too big filter the list, and an empty result offers the other tabs", async () => {
+  const { user } = mount();
+  const page = await openGetModels(user);
+  const names = () => within(within(page).getByRole("list", { name: "Models for this Mac" })).getAllByRole("listitem").map((row) => row.textContent ?? "");
+  await user.click(within(page).getByRole("button", { name: "Vision" }));
+  expect(names()).toHaveLength(1);
+  expect(names()[0]).toContain("llama4-scout");
+  expect(within(page).queryByRole("group", { name: "Recommended for this Mac" })).toBeNull();
+  await user.click(within(page).getByRole("button", { name: "All" }));
+  expect(within(page).getByRole("group", { name: "Recommended for this Mac" })).toBeTruthy();
+  await user.click(within(page).getByRole("switch", { name: "Hide the ones too big" }));
+  expect(names().some((name) => name.includes("qwen3.8:72b"))).toBe(false);
+  await user.type(within(page).getByRole("searchbox", { name: "Search" }), "gemma");
+  expect(names()).toHaveLength(1);
+  expect(names()[0]).toContain("gemma4:12b");
+  await user.clear(within(page).getByRole("searchbox", { name: "Search" }));
+  await user.type(within(page).getByRole("searchbox", { name: "Search" }), "nothing like this");
+  expect(within(page).getByText("Not in golem's list")).toBeTruthy();
+  await user.click(within(page).getByRole("button", { name: "Search Hugging Face" }));
+  expect(within(page).getByRole("tab", { name: /Hugging Face/ }).getAttribute("aria-selected")).toBe("true");
+  expect(within(page).getByRole("textbox", { name: "Search Hugging Face" })).toBeTruthy();
+});
+
+test("Get models › Download starts the pull and the page stays: progress, a cancel, then Installed", async () => {
+  const { fake, user } = mount();
+  const page = await openGetModels(user);
+  const list = within(page).getByRole("list", { name: "Models for this Mac" });
   await user.click(within(list).getByRole("button", { name: "Download qwen3.8:32b" }));
   await waitFor(() => expect(fake.raw.pullModel).toHaveBeenCalledWith("ollama/qwen3.8:32b"));
+  expect(screen.getByRole("group", { name: "Get models" })).toBeTruthy();
+  expect(within(list).getByRole("progressbar", { name: "Downloading qwen3.8:32b" })).toBeTruthy();
+  act(() => {
+    fake.emitPull({ kind: "progress", progress: { ref: "ollama/qwen3.8:32b", status: "pulling", completed: 5e9, total: 20e9, progress: 0.25 } });
+  });
+  expect(within(list).getByText("25%")).toBeTruthy();
+  await user.click(within(list).getByRole("button", { name: "Stop downloading qwen3.8:32b" }));
+  await waitFor(() => expect(fake.raw.cancelPull).toHaveBeenCalledWith("ollama/qwen3.8:32b"));
+});
+
+test("Get models › a model that is too big still downloads", async () => {
+  const { fake, user } = mount();
+  const page = await openGetModels(user);
+  await user.click(within(page).getByRole("button", { name: "Download qwen3.8:72b" }));
+  await waitFor(() => expect(fake.raw.pullModel).toHaveBeenCalledWith("ollama/qwen3.8:72b"));
+  expect(screen.getByRole("group", { name: "Get models" })).toBeTruthy();
 });
 
 test("Get models › By name downloads the name that was typed", async () => {
   const { fake, user } = mount();
-  await user.click(await screen.findByRole("button", { name: /^Ollama/ }));
-  await user.click(await screen.findByRole("button", { name: "Get models" }));
-  await user.click(await screen.findByRole("tab", { name: "By name" }));
+  await openGetModels(user);
+  await user.click(await screen.findByRole("tab", { name: /By name/ }));
   await user.type(screen.getByRole("textbox", { name: /An Ollama name/ }), "mistral-small3");
   await user.click(screen.getByRole("button", { name: "Download" }));
   await waitFor(() => expect(fake.raw.pullModel).toHaveBeenCalledWith("ollama/mistral-small3"));
+  expect(screen.getByRole("group", { name: "Get models" })).toBeTruthy();
 });
 
 async function openHf(user: ReturnType<typeof userEvent.setup>) {
   await user.click(await screen.findByRole("button", { name: /^Ollama/ }));
   await user.click(await screen.findByRole("button", { name: "Get models" }));
-  await user.click(await screen.findByRole("tab", { name: "Hugging Face" }));
+  await user.click(await screen.findByRole("tab", { name: /Hugging Face/ }));
   await user.type(screen.getByRole("textbox", { name: "Search Hugging Face" }), "qwen3.8 27b{Enter}");
 }
 
@@ -266,7 +351,7 @@ test("a Hugging Face repo shows its sizes in words, and a too big size still dow
   expect(screen.getByRole("link", { name: "Open on Hugging Face ↗" }).getAttribute("href")).toBe(`https://huggingface.co/${HF_FILES.repo}`);
   await user.click(within(sizes).getByRole("button", { name: "Download F16" }));
   await waitFor(() => expect(fake.raw.pullModel).toHaveBeenCalledWith(`ollama/hf.co/${HF_FILES.repo}:F16`));
-  await waitFor(() => expect(screen.queryByRole("dialog", { name: "Get models" })).toBeNull());
+  expect(screen.getByRole("group", { name: "Get models" })).toBeTruthy();
 });
 
 test("a Hugging Face download shows as a row in Ollama's table with where it comes from", async () => {
@@ -276,6 +361,7 @@ test("a Hugging Face download shows as a row in Ollama's table with where it com
   await openHf(user);
   await user.click(await screen.findByRole("button", { name: `Open ${HF_FILES.repo}` }));
   await user.click(await screen.findByRole("button", { name: "Download Q4_K_M" }));
+  await user.click(screen.getByRole("button", { name: "Back to Ollama" }));
   await waitFor(() => expect(screen.getByRole("progressbar", { name: `Downloading hf.co/${HF_FILES.repo}:Q4_K_M` })).toBeTruthy());
   expect(screen.getByText("from Hugging Face · Q4_K_M")).toBeTruthy();
   expect(screen.getByRole("button", { name: `Stop downloading hf.co/${HF_FILES.repo}:Q4_K_M` })).toBeTruthy();
