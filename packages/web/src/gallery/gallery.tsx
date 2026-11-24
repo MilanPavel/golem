@@ -74,7 +74,7 @@ import { LimitsBlock } from "../features/settings/agents-limits.tsx";
 import { AgentsPage, AgentsTabs } from "../features/settings/agents-section.tsx";
 import { MeasureListView } from "../features/settings/measure-list.tsx";
 import { MeasureRunView } from "../features/settings/measure-run.tsx";
-import { SAMPLE_ARMS, SAMPLE_ARMS_NO_ROOM, SAMPLE_DONE, SAMPLE_HISTORY, SAMPLE_HISTORY_RUNNING, SAMPLE_LIVE, SAMPLE_RUNNING, SAMPLE_STOPPED } from "../features/settings/measure-sample.ts";
+import { SAMPLE_ARMS, SAMPLE_ARMS_NO_ROOM, SAMPLE_ASKS, SAMPLE_DONE, SAMPLE_HISTORY, SAMPLE_HISTORY_RUNNING, SAMPLE_LIVE, SAMPLE_RUNNING, SAMPLE_STOPPED, SAMPLE_STOPPED_OWN_RISK } from "../features/settings/measure-sample.ts";
 import { SAMPLE_AGENTS, SAMPLE_CONFIG_LIMITS, SAMPLE_DELEGATE, SAMPLE_DELEGATE_CHANGED, SAMPLE_COPY, WISH_AGENTS_CLOUD, WISH_AGENTS_LOCAL, WISH_AGENTS_MIXED } from "../features/settings/agents-sample.ts";
 import { SkillList } from "../features/settings/skills-section.tsx";
 import { SkillOverview } from "../features/settings/skills/skill-detail.tsx";
@@ -1724,10 +1724,13 @@ function MeasureDemo() {
         [
           ["Measure, new measurement: a tight arm ticked, the box not yet", <MeasureListView key="a" arms={SAMPLE_ARMS} history={SAMPLE_HISTORY} running={null} ticked={["local-32k"]} error={null} onStart={() => {}} onCheck={() => {}} onOpen={() => {}} />],
           ["Measure, new measurement: ready to start", <MeasureListView key="b" arms={SAMPLE_ARMS} history={SAMPLE_HISTORY} running={null} ticked={["local-32k", "budget"]} saved error={null} onStart={() => {}} onCheck={() => {}} onOpen={() => {}} />],
-          ["Measure, no room now: the local arm cannot be ticked", <MeasureListView key="c" arms={SAMPLE_ARMS_NO_ROOM} history={[]} running={null} error={null} onStart={() => {}} onCheck={() => {}} onOpen={() => {}} />],
+          ["Measure, no room now: a warning, the arm can still be ticked at your own risk", <MeasureListView key="c" arms={SAMPLE_ARMS_NO_ROOM} history={[]} running={null} ticked={["local-32k"]} error={null} onStart={() => {}} onCheck={() => {}} onOpen={() => {}} />],
+          ["Measure, the asks to read before anything starts", <MeasureListView key="c2" arms={SAMPLE_ARMS} asks={SAMPLE_ASKS} asksOpen history={[]} running={null} error={null} onStart={() => {}} onCheck={() => {}} onOpen={() => {}} />],
           ["Measure, one runs: Start is off and the list says so", <MeasureListView key="d" arms={SAMPLE_ARMS} history={SAMPLE_HISTORY_RUNNING} running="m1" error={null} onStart={() => {}} onCheck={() => {}} onOpen={() => {}} />],
           ["Measure, a start the daemon refused", <MeasureListView key="e" arms={SAMPLE_ARMS} history={SAMPLE_HISTORY} running={null} ticked={["budget"]} error="A measurement is already running." onStart={() => {}} onCheck={() => {}} onOpen={() => {}} />],
           ["Measure, a run in progress", <MeasureRunView key="f" measurement={SAMPLE_RUNNING} live={SAMPLE_LIVE} plan={SAMPLE_ARMS} error={null} onBack={() => {}} onStop={() => {}} onResume={() => {}} onApply={() => {}} onDelete={() => {}} />],
+          ["Measure, a run with a row opened: the message, the facts, the answer, and the parameters", <MeasureRunView key="f2" measurement={SAMPLE_RUNNING} live={SAMPLE_LIVE} plan={SAMPLE_ARMS} firstOpen error={null} onBack={() => {}} onStop={() => {}} onResume={() => {}} onApply={() => {}} onDelete={() => {}} />],
+          ["Measure, stopped at the memory floor after a start at your own risk: the rest needs the box", <MeasureRunView key="g2" measurement={SAMPLE_STOPPED_OWN_RISK} live={null} plan={SAMPLE_ARMS_NO_ROOM} error={null} onBack={() => {}} onStop={() => {}} onResume={() => {}} onApply={() => {}} onDelete={() => {}} />],
           ["Measure, a stopped run", <MeasureRunView key="g" measurement={SAMPLE_STOPPED} live={null} plan={[{ ...SAMPLE_ARMS[0], verdict: "fits" } as (typeof SAMPLE_ARMS)[number]]} error={null} onBack={() => {}} onStop={() => {}} onResume={() => {}} onApply={() => {}} onDelete={() => {}} />],
           ["Measure, a finished run with its proposal", <MeasureRunView key="h" measurement={SAMPLE_DONE} live={null} plan={[]} error={null} onBack={() => {}} onStop={() => {}} onResume={() => {}} onApply={() => {}} onDelete={() => {}} />],
           ["Measure, a finished run whose numbers could not be written", <MeasureRunView key="i" measurement={SAMPLE_DONE} live={null} plan={[]} error="Could not write the numbers." onBack={() => {}} onStop={() => {}} onResume={() => {}} onApply={() => {}} onDelete={() => {}} />],

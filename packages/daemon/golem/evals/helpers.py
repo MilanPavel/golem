@@ -121,6 +121,9 @@ SOURCE_DEFAULT = "defaults"
 
 # --- the asks -------------------------------------------------------------------------------------
 
+ANSWER_KEPT = 2000
+"""How many characters of the lead's answer a run keeps."""
+
 
 @dataclass(frozen=True, slots=True)
 class Ask:
@@ -183,6 +186,48 @@ def load_asks(path: Path | None = None) -> list[Ask]:
     if len(set(names)) != len(names):
         raise ValueError(f"{source}: ask names are not unique")
     return asks
+
+
+def fact_label(fact: str) -> str:
+    """A fact pattern as a person reads it: ``a|b`` becomes ``a or b``."""
+    return " or ".join(alt.strip() for alt in fact.split("|"))
+
+
+def facts_found(answer: str, facts: Sequence[str]) -> tuple[list[str], list[str]]:
+    """The facts (as :func:`fact_label` reads them) the answer holds and the ones it lacks."""
+    text = answer.lower()
+    found: list[str] = []
+    missing: list[str] = []
+    for fact in facts:
+        held = any(alt.strip().lower() in text for alt in fact.split("|"))
+        (found if held else missing).append(fact_label(fact))
+    return found, missing
+
+
+def setup_of(ask: Ask) -> str:
+    """One short line on what the ask is set up with, from its fields."""
+    if ask.needs_project:
+        return "this project's own files"
+    parts: list[str] = []
+    if ask.sweep_files:
+        parts.append(f"{ask.sweep_files} modules of {ask.sweep_lines} lines")
+    if ask.files:
+        count = len(ask.files)
+        parts.append(f"{count} small file{'s' if count != 1 else ''}")
+    if ask.jobs > 1:
+        parts.append(f"{ask.jobs} separate jobs")
+    if ask.hard:
+        parts.append("one hard question")
+    return ", ".join(parts) or "no files"
+
+
+REASONS = {
+    "none": "A plain ask: no helper is needed.",
+    "window": "The reading is large, so it can crowd the model's window.",
+    "at_once": "Independent jobs that can run at the same time.",
+    "model": "A stronger or cheaper model may fit this one better.",
+}
+"""Why an ask is in the set, in plain words, by its ``reason``."""
 
 
 def materialise(ask: Ask, folder: Path, project: Path) -> Path:
@@ -337,6 +382,8 @@ class Run:
     helpers_started: int
     helper_stops: tuple[str, ...] = ()
     helper_models: tuple[str, ...] = ()
+    answer: str = ""
+    """The lead's final answer, cut to ``ANSWER_KEPT`` characters."""
 
     @property
     def ok(self) -> bool:
@@ -468,6 +515,7 @@ def measure(
         helpers_started=len(models),
         helper_stops=tuple(stops),
         helper_models=tuple(models),
+        answer=answer[:ANSWER_KEPT],
     )
 
 
@@ -669,6 +717,7 @@ class _FixedRouter(ModelRouter):
 
 
 OLLAMA_TAGS = "http://127.0.0.1:11434/api/tags"
+OLLAMA_PS = "http://127.0.0.1:11434/api/ps"
 
 
 def ollama_sizes() -> dict[str, int] | None:
@@ -679,6 +728,24 @@ def ollama_sizes() -> dict[str, int] | None:
     except (OSError, ValueError):
         return None
     return {str(m.get("name")): int(m.get("size") or 0) for m in body.get("models", [])}
+
+
+def ollama_loaded() -> dict[str, int]:
+    """The models Ollama holds in memory now, name to bytes (``GET /api/ps``), else empty.
+
+    A read-only status call: it loads nothing. When Ollama cannot be reached nothing is loaded.
+    """
+    try:
+        with urllib.request.urlopen(OLLAMA_PS, timeout=3) as reply:
+            body = json.load(reply)
+    except (OSError, ValueError):
+        return {}
+    loaded: dict[str, int] = {}
+    for m in body.get("models", []):
+        name = str(m.get("name") or m.get("model") or "")
+        if name:
+            loaded[name] = int(m.get("size") or 0)
+    return loaded
 
 
 def parse_vm_stat(text: str) -> float | None:
@@ -712,17 +779,19 @@ def free_memory_gb() -> float | None:
 class Machine:
     """What this Mac and its Ollama say: RAM and free memory in GiB, and the models' sizes in bytes.
 
-    ``sizes`` is None when Ollama is not reachable. A figure that is not known is None.
+    ``sizes`` is None when Ollama is not reachable. ``loaded`` is what Ollama holds in memory
+    now, name to bytes (empty when nothing is loaded). A figure that is not known is None.
     """
 
     ram_gb: float | None = None
     free_gb: float | None = None
     sizes: Mapping[str, int] | None = None
+    loaded: Mapping[str, int] | None = None
 
 
 def read_machine() -> Machine:
-    """The real machine, read now: three probes, none of which loads a model."""
-    return Machine(total_ram_gb(), free_memory_gb(), ollama_sizes())
+    """The real machine, read now: four probes, none of which loads a model."""
+    return Machine(total_ram_gb(), free_memory_gb(), ollama_sizes(), ollama_loaded())
 
 
 def model_size_gb(sizes: Mapping[str, int] | None, name: str) -> float | None:
@@ -733,6 +802,14 @@ def model_size_gb(sizes: Mapping[str, int] | None, name: str) -> float | None:
     return size / 2**30 if size else None
 
 
+def loaded_gb_of(loaded: Mapping[str, int] | None, name: str) -> float:
+    """What Ollama already holds in memory for model ``name``, in GiB (0 when it is not loaded)."""
+    if not loaded:
+        return 0.0
+    size = loaded.get(name) or loaded.get(f"{name}:latest") or 0
+    return size / 2**30
+
+
 @dataclass(frozen=True, slots=True)
 class MemoryCheck:
     """Whether a local arm's model fits: what it needs against RAM and the free memory."""
@@ -741,6 +818,8 @@ class MemoryCheck:
     window: int
     ram_gb: float | None
     free_gb: float | None
+    loaded_gb: float = 0.0
+    """What Ollama already holds in memory for this model. It is not free, but it is not new."""
 
     @property
     def cache_gb(self) -> float:
@@ -761,9 +840,19 @@ class MemoryCheck:
         return fit(self.model_gb, self.ram_gb, self.window, slots=1)
 
     @property
-    def short(self) -> bool:
-        """Less memory is free now than the need plus the reserve (False when either is unknown)."""
+    def to_load_gb(self) -> float | None:
+        """The memory still to be taken: the need less what the model already holds."""
         need = self.need_gb
+        return None if need is None else max(need - self.loaded_gb, 0.0)
+
+    @property
+    def short(self) -> bool:
+        """Less memory is free now than what is still to load plus the reserve.
+
+        A model that is already loaded holds its memory, so that part is not counted against the
+        free memory. False when the need or the free memory is unknown.
+        """
+        need = self.to_load_gb
         if need is None or self.free_gb is None:
             return False
         return self.free_gb < need + FREE_RESERVE_GB
@@ -780,27 +869,40 @@ class MemoryCheck:
         def gb(value: float | None) -> str:
             return "unknown" if value is None else f"{value:.1f} GB"
 
+        held = (
+            f" (the model is already loaded and holds {self.loaded_gb:.1f} GB of it)"
+            if self.loaded_gb > 0
+            else ""
+        )
         return (
             f"needs {gb(self.need_gb)} (model {gb(self.model_gb)} + cache {self.cache_gb:.1f} GB "
-            f"at {self.window:,} tokens, one slot + overhead {OVERHEAD_GB:.1f} GB), "
+            f"at {self.window:,} tokens, one slot + overhead {OVERHEAD_GB:.1f} GB){held}, "
             f"RAM {gb(self.ram_gb)}, free now {gb(self.free_gb)}"
         )
 
-    def skip(self, allow_tight: bool = False) -> str | None:
+    def skip(self, allow_tight: bool = False, own_risk: bool = False) -> str | None:
         """Why the arm must not run (a line with the numbers), or None when it may.
 
-        Skipped: the size or the RAM unknown, ``too big``, free memory known and below the need,
-        and ``tight`` unless ``allow_tight``.
+        Skipped: the size or the RAM unknown, ``too big``, free memory known and below what is
+        still to load, and ``tight`` unless ``allow_tight``. ``own_risk`` lets every one of these
+        run: the person was warned and said yes.
         """
+        if own_risk:
+            return None
         fits = self.fit
         if fits is None:
-            return f"memory not known, so not run to be safe: {self.numbers()}"
+            return (
+                "memory not known, so not run to be safe (run it at your own risk with "
+                f"--own-risk): {self.numbers()}"
+            )
         if fits == "too_big":
-            return f"too big for this Mac: {self.numbers()}"
+            return (
+                f"too big for this Mac (run it at your own risk with --own-risk): {self.numbers()}"
+            )
         if self.short:
             return (
-                f"not enough free memory (the need plus a {FREE_RESERVE_GB:.1f} GB reserve): "
-                f"{self.numbers()}"
+                f"not enough free memory (what is still to load plus a {FREE_RESERVE_GB:.1f} GB "
+                f"reserve; run it at your own risk with --own-risk): {self.numbers()}"
             )
         if fits == "tight" and not allow_tight:
             return f"tight (run it with --allow-tight): {self.numbers()}"
@@ -811,7 +913,11 @@ def memory_check(arm: Arm, machine: Machine) -> MemoryCheck:
     """The memory check of a local arm on ``machine``. Pure."""
     name = arm.lead.partition("/")[2]
     return MemoryCheck(
-        model_size_gb(machine.sizes, name), arm.window, machine.ram_gb, machine.free_gb
+        model_size_gb(machine.sizes, name),
+        arm.window,
+        machine.ram_gb,
+        machine.free_gb,
+        loaded_gb_of(machine.loaded, name),
     )
 
 
@@ -986,10 +1092,12 @@ class LiveDriver:
     """Real models, through a real daemon in a throwaway golem home.
 
     A local arm needs Ollama up with the lead's model pulled, and the model must fit in memory
-    (:class:`MemoryCheck`; ``allow_tight`` lets a tight one run). A cloud arm needs a key for the
-    lead's provider. The daemon applies ``use_helpers`` and picks the helper's model from the
-    models that are ready on this machine, so a cloud arm's helper is whatever is ready. A local
-    arm's helpers run on the lead's own model. ``machine`` reads RAM, free memory and Ollama's
+    (:class:`MemoryCheck`; ``allow_tight`` lets a tight one run, ``own_risk`` any one the Ollama
+    has). A model that is already loaded is not counted against the free memory. A cloud arm
+    needs a key for the lead's provider. The daemon applies ``use_helpers`` and picks the
+    helper's model from the models that are ready on this machine, so a cloud arm's helper is
+    whatever is ready. A local arm's helpers run on the lead's own model. ``machine`` reads RAM,
+    free memory and Ollama's
     model sizes, and ``alive`` says whether Ollama still answers: both can be injected.
     """
 
@@ -998,6 +1106,7 @@ class LiveDriver:
         *,
         timeout: float = 600.0,
         allow_tight: bool = False,
+        own_risk: bool = False,
         machine: Callable[[], Machine] | None = None,
         alive: Callable[[], bool] | None = None,
         low: Callable[[], bool] | None = None,
@@ -1005,6 +1114,7 @@ class LiveDriver:
         self._low = low or memory_low
         self._timeout = timeout
         self._allow_tight = allow_tight
+        self._own_risk = own_risk
         self._machine = machine or read_machine
         self._alive = alive or ollama_alive
 
@@ -1017,7 +1127,7 @@ class LiveDriver:
                 return f"Ollama is not reachable at {OLLAMA_TAGS}"
             if name not in have and f"{name}:latest" not in have:
                 return f"Ollama does not have {name} (ollama pull {name})"
-            return memory_check(arm, machine).skip(self._allow_tight)
+            return memory_check(arm, machine).skip(self._allow_tight, self._own_risk)
         if not provider_key_found(provider):
             return f"No key for {provider}. Add it in Settings \u203a Models."
         return None
@@ -1552,6 +1662,7 @@ def command(
     project: Path | None = None,
     timeout: float = 600.0,
     allow_tight: bool = False,
+    own_risk: bool = False,
     driver: Driver | None = None,
     machine: Callable[[], Machine] = read_machine,
     out: Callable[[str], None] = print,
@@ -1585,7 +1696,9 @@ def command(
     if not live and driver is None:
         out(plan(arms, asks, machine() if any(a.local for a in arms) else None))
         return 0
-    chosen: Driver = driver or LiveDriver(timeout=timeout, allow_tight=allow_tight)
+    chosen: Driver = driver or LiveDriver(
+        timeout=timeout, allow_tight=allow_tight, own_risk=own_risk
+    )
     results = asyncio.run(run_eval(chosen, asks, arms, project=(project or Path.cwd()).resolve()))
     out(full_report(results))
     return 0
@@ -1607,6 +1720,8 @@ __all__ = [
     "arm_config",
     "arm_table",
     "command",
+    "fact_label",
+    "facts_found",
     "full_report",
     "load_asks",
     "measure",
@@ -1621,4 +1736,5 @@ __all__ = [
     "run_eval",
     "score",
     "serve_command",
+    "setup_of",
 ]

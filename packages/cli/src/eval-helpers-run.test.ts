@@ -66,7 +66,7 @@ function setup(script: Script) {
   const client = {
     evalsPlan: async (arms?: string[], models?: Record<string, string>) => {
       calls.push(["plan", { arms, models }]);
-      return { arms: script.plan ?? [FITS, CLOUD], running: script.running ?? null };
+      return { arms: script.plan ?? [FITS, CLOUD], running: script.running ?? null, asks: [{ name: "rename", text: "rename old_name to new_name everywhere", facts: ["new_name"], setup: "6 small files", reason: "none", why: "A plain ask." }] };
     },
     evalsStart: async (params: unknown) => {
       calls.push(["start", params]);
@@ -74,8 +74,8 @@ function setup(script: Script) {
       queueMicrotask(emit);
       return { id: "7f3a" };
     },
-    evalsResume: async (id: string, allowTight?: boolean) => {
-      calls.push(["resume", { id, allowTight }]);
+    evalsResume: async (id: string, allowTight?: boolean, ownRisk?: boolean) => {
+      calls.push(["resume", { id, allowTight, ...(ownRisk === undefined ? {} : { ownRisk }) }]);
       if (script.startError) throw script.startError;
       queueMicrotask(emit);
       return { id };
@@ -156,11 +156,40 @@ test("a tight arm without --allow-tight is refused before anything starts", asyn
   assert.equal(t.err.at(-1), "nothing was started.");
 });
 
-test("too big and unknown arms are refused even with --allow-tight", async () => {
+test("too big needs --own-risk, and an unknown arm is refused whatever the flags", async () => {
   const t = setup({ plan: [{ ...LOCAL, verdict: "too_big", reason: "Too big." }] });
   assert.equal(await run(t, ["--arm", "local-32k", "--arm", "zzz", "--allow-tight"]), 1);
   assert.equal(t.calls.length, 1);
   assert.equal(t.err.length, 3);
+  assert.match(t.err[0] ?? "", /local-32k is too big.*--own-risk/);
+  const own = setup({ plan: [{ ...LOCAL, verdict: "too_big", reason: "Too big." }], updates: [ended("done")] });
+  assert.equal(await run(own, ["--arm", "local-32k", "--own-risk"]), 0);
+  assert.deepEqual(own.calls[1], ["start", { arms: ["local-32k"], allow_tight: false, own_risk: true }]);
+  assert.match(own.out.join("\n"), /^warning local-32k is too big; it runs at your own risk/m);
+  const zzz = setup({ plan: [LOCAL] });
+  assert.equal(await run(zzz, ["--arm", "zzz", "--own-risk"]), 1);
+});
+
+test("a model that is not installed is refused even with --own-risk", async () => {
+  const gone = { ...LOCAL, verdict: "unknown" as const, runnable: false, reason: "Ollama does not have qwen3.8:27b. Choose another model, or pull it first." };
+  const t = setup({ plan: [gone] });
+  assert.equal(await run(t, ["--arm", "local-32k", "--own-risk"]), 1);
+  assert.equal(t.calls.length, 1);
+  assert.match(t.err[0] ?? "", /cannot run \(not installed\)/);
+});
+
+test("asks prints each ask with its message", async () => {
+  const t = setup({});
+  assert.equal(await run(t, ["asks"]), 0);
+  assert.match(t.out.join("\n"), /rename\n {2}message {2}rename old_name to new_name everywhere/);
+});
+
+test("show --verbose and --ask print the runs with what was asked", async () => {
+  const t = setup({ measurement: { ...DONE, runs: [{ ...DONE.runs[0]!, answer: "done", found: ["new_name"], missing: [] }] } });
+  assert.equal(await run(t, ["show", "7f3a", "--verbose"]), 0);
+  assert.match(t.out.at(-1) ?? "", /found {4}new_name\n {2}answer {3}done/);
+  assert.equal(await run(t, ["show", "7f3a", "--ask", "a"]), 0);
+  assert.match(t.out.at(-1) ?? "", /^measurement 7f3a/);
 });
 
 test("a start shows progress lines, then the table, and exits 0 when done", async () => {
@@ -214,6 +243,12 @@ test("resume plays the rest and follows it; a tight refusal gets the hint", asyn
   const t = setup({ updates: [ended("done")] });
   assert.equal(await run(t, ["resume", "7f3a", "--allow-tight"]), 0);
   assert.deepEqual(t.calls[0], ["resume", { id: "7f3a", allowTight: true }]);
+  const own = setup({ updates: [ended("done")] });
+  assert.equal(await run(own, ["resume", "7f3a", "--own-risk"]), 0);
+  assert.deepEqual(own.calls[0], ["resume", { id: "7f3a", allowTight: false, ownRisk: true }]);
+  const risky = setup({ startError: new Error("local-32k needs your own risk to run: Too big. To run it anyway, set own_risk (golem eval helpers ... --own-risk).") });
+  assert.equal(await run(risky, ["resume", "7f3a"]), 1);
+  assert.match(risky.err[0] ?? "", /add --own-risk to run it anyway/);
   const bad = setup({ startError: new Error("local-32k is tight on memory") });
   assert.equal(await run(bad, ["resume", "7f3a"]), 1);
   assert.match(bad.err[0] ?? "", /--allow-tight/);

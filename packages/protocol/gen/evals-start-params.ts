@@ -5,18 +5,23 @@ export type AllowTight = boolean;
  * @minItems 1
  */
 export type Arms = [string, ...string[]];
+export type OwnRisk = boolean;
 
 /**
  * ``evals.start``. Begin a measurement of ``arms``, with the helper rules of ``config.toml``.
  *
  * ``models`` maps an arm's name to the model to use instead of its own. ``allow_tight`` lets
- * a local arm run when its verdict is ``tight``; a ``too_big`` or ``no_room`` arm never runs.
- * It answers at once; the progress arrives as ``eval.progress`` and the end as ``eval.ended``.
+ * a local arm run when its verdict is ``tight``. ``own_risk`` also lets one run whose verdict is
+ * ``too_big``, ``no_room`` or ``unknown`` (and a ``tight`` one); it is the person's yes to a
+ * warning, and is recorded in the measurement. An arm that cannot run at all (``runnable`` is
+ * false in the plan) is refused either way. It answers at once; the progress arrives as
+ * ``eval.progress`` and the end as ``eval.ended``.
  */
 export interface EvalsStartParams {
   allow_tight?: AllowTight;
   arms: Arms;
   models?: Models;
+  own_risk?: OwnRisk;
 }
 export interface Models {
   [k: string]: string;

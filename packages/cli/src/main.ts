@@ -96,7 +96,7 @@ const USAGE =
   "       golem daemon install|start|stop|restart|uninstall|logs\n" +
   "       golem auth set <provider> [--no-check] | golem auth remove <provider> | golem auth list | golem models [--refresh] | golem models score --reset <ref> | golem models check <model> | golem models check --parallel [--engine <id>] <model> | golem cost\n" +
   "       golem eval routing [--days N] [--session ID]\n" +
-  "       golem eval helpers [--arm <name>]… [--model <arm>=<model>]… [--allow-tight] | golem eval helpers list|show <id>|stop [<id>]|resume <id> [--allow-tight]|apply <id>|delete <id>\n" +
+  "       golem eval helpers [--arm <name>]… [--model <arm>=<model>]… [--allow-tight] [--own-risk] | golem eval helpers list|asks|show <id> [--ask <name>] [--verbose]|stop [<id>]|resume <id> [--allow-tight] [--own-risk]|apply <id>|delete <id>\n" +
   "       golem mcp add <name> -- <command…> [--token-env VAR] | golem mcp add <name> --url <url> [--token] [--env K=V] [--header K=V] [--cwd D] [--on-demand] [--project] [--timeout S] [--approval allow] | golem mcp add --catalog <id> [--input <id>=<value>] | golem mcp remove <name> | golem mcp export [--format claude|vscode] [--scope user|project]\n" +
   "       golem mcp list [--json] | show <name> [--json] | test <name> | test --catalog <id> | edit <name> [--project] | import [--from <app>|<file>] [--all] | logs <name> [-f] | enable <name> [--on-demand] | disable <name> | restart <name> | login <name> | logout <name> | tools <name> [--hide <glob>] [--show <glob>]\n" +
   "       golem devices [list] | golem devices pair [--link] | golem devices rename <phone> <name> | golem devices revoke <phone> [--yes]\n" +

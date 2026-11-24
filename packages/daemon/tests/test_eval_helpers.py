@@ -535,6 +535,81 @@ def test_the_live_driver_applies_the_memory_rules_to_a_local_arm() -> None:
     assert LiveDriver(machine=lambda: tight, allow_tight=True).unavailable(LOCAL) is None
 
 
+def test_the_models_own_loaded_memory_is_not_counted_against_the_free_memory() -> None:
+    """The second half of a measurement: the model is loaded, so free memory is lower."""
+    need = 7.1 + 1.92 + 1.0
+    base = _machine(7.1, free_gb=11.8)  # the numbers the person saw: free 11.8 GB, need 10.0 GB
+    loaded = Machine(base.ram_gb, base.free_gb, base.sizes, {"qwen3.5:9b": int(need * GIB)})
+    assert memory_check(LOCAL, base).short and memory_check(LOCAL, base).skip() is not None
+    check = memory_check(LOCAL, loaded)
+    assert not check.short and check.skip() is None and check.verdict == "fits"
+    assert "already loaded" in check.numbers()
+    assert LiveDriver(machine=lambda: loaded).unavailable(LOCAL) is None
+    assert LiveDriver(machine=lambda: base).unavailable(LOCAL) is not None
+    # A loaded model also counts by its `:latest` name, and no more than its need is subtracted.
+    big = Machine(36.0, 0.5, {"qwen3.5:9b": 6 * GIB}, {"qwen3.5:9b:latest": 60 * GIB})
+    assert memory_check(LOCAL, big).to_load_gb == 0.0
+
+
+def test_own_risk_lets_every_memory_verdict_run_and_the_refusal_names_the_flag() -> None:
+    cases = {
+        "too big": _machine(model_gb=30.0, free_gb=40.0),
+        "fits": _machine(6.0, free_gb=1.0),
+        "tight": _machine(model_gb=20.0, free_gb=30.0),
+        "unknown": _machine(ram_gb=None),
+    }
+    for machine in cases.values():
+        check = memory_check(LOCAL, machine)
+        assert check.skip(own_risk=True) is None
+        assert LiveDriver(machine=lambda m=machine: m, own_risk=True).unavailable(LOCAL) is None
+    for kind in ("too big", "unknown", "fits"):
+        assert "--own-risk" in (memory_check(LOCAL, cases[kind]).skip() or "")
+    # A model Ollama does not have still cannot run.
+    missing = LiveDriver(machine=lambda: _machine(sizes={"x:1b": GIB}), own_risk=True)
+    assert "does not have" in (missing.unavailable(LOCAL) or "")
+
+
+def test_ollama_loaded_reads_api_ps_and_is_empty_when_it_is_down(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import io
+
+    from golem.evals import helpers
+
+    body = b'{"models":[{"name":"qwen3.5:9b","size":8000000000},{"model":"b:1","size":5}]}'
+    seen: list[str] = []
+
+    def fake(url: str, timeout: float) -> io.BytesIO:
+        seen.append(url)
+        return io.BytesIO(body)
+
+    monkeypatch.setattr("urllib.request.urlopen", fake)
+    assert helpers.ollama_loaded() == {"qwen3.5:9b": 8_000_000_000, "b:1": 5}
+    assert seen == [helpers.OLLAMA_PS] and helpers.OLLAMA_PS.endswith("/api/ps")
+
+    def down(url: str, timeout: float) -> io.BytesIO:
+        raise OSError("down")
+
+    monkeypatch.setattr("urllib.request.urlopen", down)
+    assert helpers.ollama_loaded() == {}
+
+
+def test_a_run_keeps_the_answer_and_the_facts_are_split() -> None:
+    from golem.evals.helpers import ANSWER_KEPT, facts_found, setup_of
+
+    by_name = {a.name: a for a in load_asks()}
+    ask = by_name["rename-six-files"]
+    events = [{"type": "message.completed", "data": {"role": "assistant", "text": "x" * 5000}}]
+    run = measure(events, ARMS[1], ask, "off", 1.0, "completed")
+    assert run.answer == "x" * ANSWER_KEPT
+    found, missing = facts_found("renamed to new_name in 6 files", ask.facts)
+    assert (found, missing) == (["new_name", "six or 6"], [])
+    assert facts_found("nothing", ask.facts)[1] == ["new_name", "six or 6"]
+    assert setup_of(ask) == "6 small files"
+    assert setup_of(by_name["sweep-handlers-24"]) == "24 modules of 60 lines"
+    assert setup_of(by_name["two-sweeps-at-once"]).endswith("2 separate jobs")
+
+
 def test_the_vm_stat_pages_free_inactive_and_speculative_are_added() -> None:
     text = (
         "Mach Virtual Memory Statistics: (page size of 16384 bytes)\n"

@@ -1,4 +1,4 @@
-import type { EvalMeasurement, EvalNumber, EvalPlanArm, EvalProgress, EvalRun, EvalSummary, EvalUpdate } from "@golem/client";
+import type { EvalArmParams, EvalAsk, EvalMeasurement, EvalNumber, EvalPlanArm, EvalProgress, EvalRun, EvalSummary, EvalUpdate } from "@golem/client";
 
 /**
  * Settings › Agents › Measure (ADR for #1710): what the page says about a measurement of the helper rules.
@@ -24,13 +24,15 @@ export type ArmRow = {
   /** The verdict tag, such as `TIGHT`, or `PAID` for a cloud arm. */
   tag: { text: string; tone: Tone };
   reason: string;
-  /** What stops the arm, or null: the model is not installed, the Mac has no room now, or it will never fit. */
-  blocked: "missing" | "no_room" | "other" | null;
+  /** What stops the arm for good, or null: the model is not installed, or the provider has no key. Memory never stops it. */
+  blocked: "missing" | "other" | null;
   /** The value of the model dropdown: the planned model if the list holds it, else "" (shown as "Choose a model"). */
   modelValue: string;
-  /** False for a verdict that never runs. There is no override: this is the case that froze the Mac. */
+  /** False only when there is nothing to run: the model is not installed, or the provider has no key. */
   canTick: boolean;
-  /** True when the arm runs only after "I saved my work". */
+  /** `tight`: it fits but takes most of the memory. `own_risk`: too big, no room now or not known; it can run, but the Mac may stop answering. */
+  risk: "none" | "tight" | "own_risk";
+  /** True when the arm runs only after "I saved my work" (`risk` is not `none`). */
   needsSaved: boolean;
   paid: boolean;
   costUsd: number | null;
@@ -39,11 +41,16 @@ export type ArmRow = {
 };
 
 export const SAVED_WORK_TEXT = "I saved my work. Run although memory is tight.";
+export const OWN_RISK_TEXT = "I saved my work. Run at my own risk: this can make the Mac stop answering.";
+/** The note on the stopped view: the floor stays even for a run at your own risk. */
+export const FLOOR_NOTE = "A run at your own risk still stops when the free memory gets very low, to keep the Mac answering. You can run the rest again.";
+/** The hint on the Answer column. */
+export const ANSWER_HINT = "The share of the expected facts the answer mentions, from 0 to 1.";
 
 const NO_RUN: Record<string, string> = {
-  too_big: "Does not fit on this Mac with this model. Pick a smaller model for this arm, or leave it out.",
-  no_room: "Not enough memory is free now. Loading the model would make the Mac swap until it stops answering.",
-  unknown: "The memory could not be read, so it will not run to be safe.",
+  too_big: "This model is too big for this Mac. You can still run it at your own risk, but the Mac may stop answering.",
+  no_room: "Not enough memory is free now. You can still run it at your own risk, but the Mac may stop answering.",
+  unknown: "The memory could not be read. You can still run it at your own risk, but the Mac may stop answering.",
 };
 const TIGHT_TEXT = "It fits, but it takes more than half of the memory. Save your work in other apps first.";
 export const CHOOSE_MODEL_TEXT = "Choose a model";
@@ -85,15 +92,15 @@ export function armRow(arm: EvalPlanArm): ArmRow {
     const reason = arm.reason ?? PAID_TEXT;
     // A cloud arm has no verdict: the daemon's reason says when its provider has no key, and start would refuse it.
     if (reason.startsWith(NO_KEY_PREFIX)) {
-      return { ...base, memoryLine: "no key", bar: null, tag: { text: "NO KEY", tone: "bad" }, reason, blocked: "other", canTick: false, needsSaved: false, paid: true };
+      return { ...base, memoryLine: "no key", bar: null, tag: { text: "NO KEY", tone: "bad" }, reason, blocked: "other", canTick: false, risk: "none", needsSaved: false, paid: true };
     }
-    return { ...base, memoryLine: `no memory, ${cost}`, bar: null, tag: { text: "PAID", tone: "view" }, reason, blocked: null, canTick: true, needsSaved: false, paid: true };
+    return { ...base, memoryLine: `no memory, ${cost}`, bar: null, tag: { text: "PAID", tone: "view" }, reason, blocked: null, canTick: arm.runnable !== false, risk: "none", needsSaved: false, paid: true };
   }
   const verdict = arm.verdict ?? "unknown";
   const need = arm.needed_gb;
   const ram = arm.ram_gb;
   const free = arm.free_gb;
-  const missing = verdict === "unknown" && (arm.reason ?? "").startsWith(MISSING_PREFIX);
+  const missing = verdict === "unknown" && ((arm.reason ?? "").startsWith(MISSING_PREFIX) || arm.runnable === false);
   const memoryLine = missing
     ? "model not installed"
     : need == null || ram == null || free == null ? "memory could not be read" : `needs ${gb(need)} of ${gb(ram)}, ${gb(free)} free`;
@@ -109,28 +116,36 @@ export function armRow(arm: EvalPlanArm): ArmRow {
     no_room: { text: "NO ROOM NOW", tone: "bad" },
     unknown: { text: "NOT KNOWN", tone: "bad" },
   };
-  const canTick = verdict === "fits" || verdict === "tight";
+  // Memory only warns. What stops an arm is nothing to run: the model is not installed.
+  const canTick = !missing && arm.runnable !== false;
   const reason = arm.reason ?? (missing ? MISSING_TEXT : verdict === "tight" ? TIGHT_TEXT : (NO_RUN[verdict] ?? ""));
-  const blocked = canTick ? null : missing ? "missing" : verdict === "no_room" ? "no_room" : "other";
+  const blocked = canTick ? null : missing ? "missing" : "other";
   const tag = missing ? { text: "NOT INSTALLED", tone: "bad" as const } : (tags[verdict] ?? { text: "NOT KNOWN", tone: "bad" as const });
-  return { ...base, memoryLine, bar, tag, reason, blocked, canTick, needsSaved: verdict === "tight", paid: false };
+  const risk = !canTick || verdict === "fits" ? "none" : verdict === "tight" ? "tight" : "own_risk";
+  return { ...base, memoryLine, bar, tag, reason, blocked, canTick, risk, needsSaved: risk !== "none", paid: false };
 }
 
 export function armRows(arms: readonly EvalPlanArm[]): ArmRow[] {
   return arms.map(armRow);
 }
 
+/** The text of the box that says "I saved my work": by the worst risk among the arms. */
+export function confirmText(rows: readonly ArmRow[]): string {
+  return rows.some((row) => row.risk === "own_risk") ? OWN_RISK_TEXT : SAVED_WORK_TEXT;
+}
+
 /**
- * What the page says above the arms when no local arm can run now. The advice to close apps is only for an arm held back by
- * memory; an arm whose model is missing, too big or not known gets the plain line about the models.
+ * The warning over the arms, or null. Memory never stops an arm: a model that is too big, has no room now or is not known
+ * can still be run at your own risk. What stops one is no model to load.
  */
-export function noRoomLine(rows: readonly ArmRow[]): string | null {
+export function memoryWarning(rows: readonly ArmRow[]): string | null {
   const local = rows.filter((row) => !row.paid);
-  if (local.length === 0 || local.some((row) => row.canTick)) return null;
-  if (local.some((row) => row.blocked === "no_room")) {
-    return "No local arm can run now. Close other apps and check again, or run the paid arms only. golem will not start a run that would freeze the Mac.";
+  if (local.length === 0) return null;
+  if (local.every((row) => !row.canTick)) return "No local arm can run with the chosen models. Choose a model that is installed.";
+  if (local.some((row) => row.risk === "own_risk")) {
+    return "Memory is short for a local arm. You can still run it, but the Mac may stop answering and you may lose unsaved work. Save your work first, then tick the box below.";
   }
-  return "No local arm can run with the chosen models. Choose a model that is installed and fits.";
+  return null;
 }
 
 export type StartPlan = {
@@ -140,8 +155,12 @@ export type StartPlan = {
   arms: string[];
   /** `allow_tight` to send. */
   allowTight: boolean;
-  /** True when a ticked arm is tight and the "I saved my work" box shows as needed. */
+  /** `own_risk` to send: a ticked arm is too big, has no room or is not known, and the box is ticked. */
+  ownRisk: boolean;
+  /** True when a ticked arm is tight or riskier and the "I saved my work" box shows as needed. */
   needsSaved: boolean;
+  /** The words of that box, by the worst risk among the ticked arms. */
+  confirm: string;
   /** The line next to Start. */
   line: string;
 };
@@ -154,10 +173,11 @@ export function startPlan(rows: readonly ArmRow[], ticked: ReadonlySet<string>, 
   const chosen = rows.filter((row) => ticked.has(row.name));
   const needsSaved = chosen.some((row) => row.needsSaved);
   const arms = chosen.map((row) => row.name);
-  const off = (line: string): StartPlan => ({ canStart: false, arms, allowTight: false, needsSaved, line });
+  const confirm = confirmText(chosen);
+  const off = (line: string): StartPlan => ({ canStart: false, arms, allowTight: false, ownRisk: false, needsSaved, confirm, line });
   if (running) return off("Wait for the running one, or stop it");
   if (chosen.length === 0) return off("Nothing chosen yet");
-  if (chosen.some((row) => !row.canTick)) return off("An arm that does not fit is ticked");
+  if (chosen.some((row) => !row.canTick)) return off("An arm that cannot run is ticked");
   if (needsSaved && !saved) return off("Tick the box on the left to go on");
   const runs = chosen.reduce((sum, row) => sum + runsOf(row), 0);
   const minutes = chosen.reduce<number | null>((sum, row) => (row.minutes === null ? sum : (sum ?? 0) + row.minutes), null);
@@ -167,7 +187,7 @@ export function startPlan(rows: readonly ArmRow[], ticked: ReadonlySet<string>, 
   if (minutes !== null) parts.push(`about ${Math.max(1, Math.round(minutes))} min`);
   parts.push(cost);
   if (chosen.some((row) => !row.paid)) parts.push("one model, one request at a time");
-  return { canStart: true, arms, allowTight: needsSaved && saved, needsSaved, line: parts.join(" · ") };
+  return { canStart: true, arms, allowTight: needsSaved && saved, ownRisk: chosen.some((row) => row.risk === "own_risk") && saved, needsSaved, confirm, line: parts.join(" · ") };
 }
 
 // --- the list of measurements
@@ -329,7 +349,34 @@ export type RunRow = {
   started: string;
   /** A word in place of the numbers: `running`, `not run`, `failed`, and so on. */
   word: string;
+  /** What was asked and what came back, for the row that opens. Null when the ask is not known. */
+  detail: RunDetail | null;
 };
+
+export type FactMark = { text: string; mark: "found" | "missing" | "unknown" };
+
+export type RunDetail = {
+  /** The message sent to the model. */
+  message: string;
+  /** What the ask is set up with, such as `6 small files`. */
+  setup: string;
+  /** Why the ask is in the set. */
+  why: string;
+  /** What the answer must mention, each with whether it did. */
+  facts: FactMark[];
+  /** The model's answer as kept (up to 2,000 characters), or null when none was kept. */
+  answer: string | null;
+};
+
+/** What was asked, the facts the answer must mention (found, missing, or not known yet) and the answer kept. */
+export function runDetail(run: EvalRun, ask: EvalAsk | undefined): RunDetail | null {
+  if (ask === undefined) return null;
+  const found = new Set(run.found ?? []);
+  const missing = new Set(run.missing ?? []);
+  const facts = (ask.facts ?? []).map((text): FactMark => ({ text, mark: found.has(text) ? "found" : missing.has(text) ? "missing" : "unknown" }));
+  const answer = run.answer == null || run.answer === "" ? null : run.answer;
+  return { message: ask.text, setup: ask.setup ?? "", why: ask.why ?? "", facts, answer };
+}
 
 export function mmss(seconds: number): string {
   const whole = Math.max(0, Math.round(seconds));
@@ -339,8 +386,8 @@ export function mmss(seconds: number): string {
 const percent = (share: number): string => `${Math.round(share * 100)}%`;
 
 /** One row of the table of runs. */
-export function runRow(run: EvalRun, at: number): RunRow {
-  const base = { key: `${run.arm}/${run.mode}/${run.ask}/${at}`, arm: run.arm, ask: run.ask, helpers: run.mode, answer: "", time: "", windowLeft: "", started: "" };
+export function runRow(run: EvalRun, at: number, ask?: EvalAsk): RunRow {
+  const base = { key: `${run.arm}/${run.mode}/${run.ask}/${at}`, arm: run.arm, ask: run.ask, helpers: run.mode, answer: "", time: "", windowLeft: "", started: "", detail: runDetail(run, ask) };
   if (run.end === "pending") return { ...base, state: "pending", mark: "○", word: "" };
   if (run.end === "running") return { ...base, state: "running", mark: "●", word: "running" };
   if (run.end === "not_run") return { ...base, state: "not_run", mark: "–", word: "not run" };
@@ -356,7 +403,54 @@ export function runRow(run: EvalRun, at: number): RunRow {
 }
 
 export function runRows(measurement: EvalMeasurement): RunRow[] {
-  return measurement.runs.map(runRow);
+  const asks = new Map((measurement.asks ?? []).map((ask) => [ask.name, ask]));
+  return measurement.runs.map((run, at) => runRow(run, at, asks.get(run.ask)));
+}
+
+// --- what is asked, and with which parameters
+
+export type AskLine = { name: string; message: string; setup: string; why: string; mustMention: string };
+
+/** The asks as lines to read: the message, the set-up, why it is in the set and what the answer must mention. */
+export function askLines(asks: readonly EvalAsk[]): AskLine[] {
+  return asks.map((ask) => ({ name: ask.name, message: ask.text, setup: ask.setup ?? "", why: ask.why ?? "", mustMention: (ask.facts ?? []).join("; ") }));
+}
+
+export type ParamsView = {
+  /** One line per arm: model, window, requests at a time, where helpers run. */
+  arms: string[];
+  /** `Helper rules: read 30%, fill 85%, job 10%, price 3×`, or null for a measurement kept before they were. */
+  rules: string | null;
+  /** `golem 0.9.1`, or null. */
+  version: string | null;
+  /** True when it was started at the person's own risk. */
+  ownRisk: boolean;
+  /** The label of the disclosure. */
+  label: string;
+};
+
+function armParamsLine(param: EvalArmParams): string {
+  const parts = [armLabel(param.name), param.model, `window ${param.window.toLocaleString("en-US")} tokens`];
+  parts.push(param.at_a_time == null ? "requests as the provider allows" : param.at_a_time === 1 ? "one request at a time" : `${param.at_a_time} requests at a time`);
+  if ((param.helper_model ?? "") !== "") parts.push(`helpers use ${param.helper_model}`);
+  return parts.join(" · ");
+}
+
+/** The parameters a measurement ran with, for the disclosure above the table of runs. */
+export function paramsView(measurement: EvalMeasurement): ParamsView {
+  const params = measurement.arm_params ?? [];
+  const arms = params.length > 0 ? params.map(armParamsLine) : measurement.arms.map((arm) => `${armLabel(arm.name)} · ${arm.model}`);
+  const rules = measurement.rules ?? {};
+  const keys = ["read_share", "fill_share", "job_share", "price_ratio"] as const;
+  const names = { read_share: "read", fill_share: "fill", job_share: "job", price_ratio: "price" } as const;
+  const shown = keys.filter((key) => typeof rules[key] === "number").map((key) => `${names[key]} ${numberText(key, rules[key] as number)}`);
+  return {
+    arms,
+    rules: shown.length === 0 ? null : `Helper rules: ${shown.join(", ")}`,
+    version: measurement.golem_version == null ? null : `golem ${measurement.golem_version}`,
+    ownRisk: measurement.own_risk === true,
+    label: "Parameters",
+  };
 }
 
 /** How many runs are played (they have an end) and how many there are. */
@@ -423,7 +517,8 @@ export function stoppedView(measurement: EvalMeasurement): StoppedView {
   const kept = `${played} ${played === 1 ? "run is" : "runs are"} kept.`;
   const rest = left === 0 ? "" : ` ${left} ${left === 1 ? "was" : "were"} not run and ${left === 1 ? "is" : "are"} not counted.`;
   const proposal = measurement.proposal == null ? " There is not enough data for a proposal." : "";
-  return { title: `Stopped after ${played} of ${total} runs.`, detail: `${why} ${kept}${rest}${proposal}`, resume: left === 0 ? null : `Run the other ${left}`, left };
+  const floor = measurement.own_risk === true && left > 0 ? ` ${FLOOR_NOTE}` : "";
+  return { title: `Stopped after ${played} of ${total} runs.`, detail: `${why} ${kept}${rest}${proposal}${floor}`, resume: left === 0 ? null : `Run the other ${left}`, left };
 }
 
 // --- the result
@@ -530,4 +625,32 @@ export function doneFooter(measurement: EvalMeasurement): string {
   if (measurement.in_use === true) return "These numbers are in use. See them on the Rules tab.";
   if (proposalLines(measurement).some((line) => line.measured)) return "One run per ask. Measure again to see how much the numbers move.";
   return "Too little ran to propose a number.";
+}
+
+// --- going on with a stopped measurement
+
+export type ResumePlan = {
+  /** The warning over the button, or null when the check is clean. */
+  warning: string | null;
+  /** True when the box "I saved my work" shows. */
+  needsSaved: boolean;
+  confirm: string;
+  /** The button is on: the box is ticked when it is needed. Memory never turns it off. */
+  ready: boolean;
+  allowTight: boolean;
+  ownRisk: boolean;
+};
+
+/** The rest of a stopped measurement, from the plan of its arms now: the same rule as for a new one. */
+export function resumePlan(rows: readonly ArmRow[], saved: boolean): ResumePlan {
+  const needsSaved = rows.some((row) => row.needsSaved);
+  const gone = rows.some((row) => !row.canTick);
+  return {
+    warning: gone ? "An arm of the rest cannot run now: its model is not installed, or it has no key." : memoryWarning(rows),
+    needsSaved,
+    confirm: confirmText(rows),
+    ready: !gone && (!needsSaved || saved),
+    allowTight: needsSaved && saved,
+    ownRisk: rows.some((row) => row.risk === "own_risk") && saved,
+  };
 }

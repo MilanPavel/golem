@@ -1,6 +1,6 @@
 {
   "additionalProperties": false,
-  "description": "``evals.resume``. Play the runs a stopped measurement did not play. The same checks as\n``evals.start`` apply, and ``allow_tight`` is asked for again.",
+  "description": "``evals.resume``. Play the runs a stopped measurement did not play. The same checks as\n``evals.start`` apply, and ``allow_tight`` or ``own_risk`` is asked for again.",
   "properties": {
     "allow_tight": {
       "default": false,
@@ -11,6 +11,11 @@
       "minLength": 1,
       "title": "Id",
       "type": "string"
+    },
+    "own_risk": {
+      "default": false,
+      "title": "Own Risk",
+      "type": "boolean"
     }
   },
   "required": [

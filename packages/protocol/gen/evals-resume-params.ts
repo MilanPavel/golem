@@ -2,12 +2,14 @@
 
 export type AllowTight = boolean;
 export type Id = string;
+export type OwnRisk = boolean;
 
 /**
  * ``evals.resume``. Play the runs a stopped measurement did not play. The same checks as
- * ``evals.start`` apply, and ``allow_tight`` is asked for again.
+ * ``evals.start`` apply, and ``allow_tight`` or ``own_risk`` is asked for again.
  */
 export interface EvalsResumeParams {
   allow_tight?: AllowTight;
   id: Id;
+  own_risk?: OwnRisk;
 }

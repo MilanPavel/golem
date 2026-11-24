@@ -2,12 +2,14 @@ import type { EvalUpdate, GolemClient } from "@golem/client";
 
 import {
   costLine,
+  formatAsks,
   formatList,
   formatMeasurement,
   formatPlan,
   formatProgress,
   memoryLine,
   refusals,
+  riskLines,
   type HelpersArgs,
 } from "./eval-helpers-format.ts";
 
@@ -112,7 +114,7 @@ async function runStart(
     deps.write(formatPlan(plan.arms, plan.running));
     return 0;
   }
-  const refused = refusals(plan.arms, args.arms, args.allowTight);
+  const refused = refusals(plan.arms, args.arms, args.allowTight, args.ownRisk);
   if (refused.length > 0) {
     for (const line of refused) deps.error(line);
     deps.error("nothing was started.");
@@ -122,6 +124,7 @@ async function runStart(
   for (const arm of chosen) {
     if (arm.kind === "local") deps.write(memoryLine(arm));
   }
+  if (args.ownRisk) for (const line of riskLines(plan.arms, args.arms)) deps.write(line);
   const cost = costLine(plan.arms, args.arms);
   if (cost !== null) deps.write(cost);
   const [first, ...more] = args.arms;
@@ -134,6 +137,7 @@ async function runStart(
           arms: [first, ...more],
           ...(models === undefined ? {} : { models }),
           allow_tight: args.allowTight,
+          ...(args.ownRisk ? { own_risk: true } : {}),
         })
       ).id,
     deps,
@@ -149,13 +153,19 @@ async function runResume(
   try {
     return await follow(
       client,
-      async () => (await client.evalsResume(args.id, args.allowTight)).id,
+      async () => (await (args.ownRisk ? client.evalsResume(args.id, args.allowTight, true) : client.evalsResume(args.id, args.allowTight))).id,
       deps,
       (id) => [`resumed measurement ${id} in the golem service. Ctrl-C leaves it running.`, ""],
     );
   } catch (error) {
     const text = message(error);
-    deps.error(/tight/i.test(text) && !args.allowTight ? `${text} Save your work in other apps, then add --allow-tight.` : text);
+    const hint =
+      /own risk|--own-risk/i.test(text) && !args.ownRisk
+        ? " Save your work, then add --own-risk to run it anyway."
+        : /tight/i.test(text) && !args.allowTight
+          ? " Save your work in other apps, then add --allow-tight."
+          : "";
+    deps.error(`${text}${hint}`);
     return 1;
   }
 }
@@ -208,8 +218,11 @@ export async function runHelpers(client: HelpersClient, args: HelpersArgs, deps:
       case "list":
         deps.write(formatList((await client.evalsList()).measurements ?? [], deps.now()));
         return 0;
+      case "asks":
+        deps.write(formatAsks((await client.evalsPlan()).asks ?? []));
+        return 0;
       case "show":
-        deps.write(formatMeasurement((await client.evalsGet(args.id)).measurement));
+        deps.write(formatMeasurement((await client.evalsGet(args.id)).measurement, { ...(args.ask === undefined ? {} : { ask: args.ask }), verbose: args.verbose }));
         return 0;
       case "stop":
         return await runStop(client, args.id, deps);

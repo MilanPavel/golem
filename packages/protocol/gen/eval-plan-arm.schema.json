@@ -31,7 +31,7 @@
     }
   },
   "additionalProperties": false,
-  "description": "One arm of a measurement as ``evals.plan`` sees it now.\n\n``kind`` is ``local`` for a model on this machine and ``cloud`` for a paid one. ``model`` is\nthe model it would use, and ``choices`` the others it could use. A local arm has the memory\nnumbers and a ``verdict``; ``needed_gb`` is what the model needs at this window, ``ram_gb``\nthe machine's memory and ``free_gb`` what is free now, each null when it could not be read.\nA cloud arm has none of these and may have ``cost_usd``, the estimate for all its runs.\n``reason`` is one plain line on the verdict, or on the cost. ``asks`` is how many asks it\nplays (twice each: with helpers and without), and ``minutes`` a rough time for the arm.",
+  "description": "One arm of a measurement as ``evals.plan`` sees it now.\n\n``kind`` is ``local`` for a model on this machine and ``cloud`` for a paid one. ``model`` is\nthe model it would use, and ``choices`` the others it could use. A local arm has the memory\nnumbers and a ``verdict``; ``needed_gb`` is what the model needs at this window, ``ram_gb``\nthe machine's memory and ``free_gb`` what is free now, each null when it could not be read.\n``loaded_gb`` is what Ollama already holds in memory for that model (null when it is not\nloaded); it is not counted as missing. ``runnable`` is false when the arm cannot run at all,\nwhatever the person says: a hosted model without a key, or a local model that Ollama does not\nhave. A cloud arm has none of the memory numbers and may have ``cost_usd``, the estimate for\nall its runs. ``reason`` is one plain line on the verdict, or on the cost. ``asks`` is how\nmany asks it plays (twice each: with helpers and without), and ``minutes`` a rough time for\nthe arm.",
   "properties": {
     "asks": {
       "minimum": 1,
@@ -83,6 +83,19 @@
       "minLength": 1,
       "title": "Label",
       "type": "string"
+    },
+    "loaded_gb": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Loaded Gb"
     },
     "minutes": {
       "anyOf": [
@@ -137,6 +150,11 @@
       "default": "",
       "title": "Reason",
       "type": "string"
+    },
+    "runnable": {
+      "default": true,
+      "title": "Runnable",
+      "type": "boolean"
     },
     "tier": {
       "enum": [

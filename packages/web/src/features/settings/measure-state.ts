@@ -24,9 +24,9 @@ export type Measure = {
   /** Loads the plan and the list again. */
   refresh: () => void;
   chooseModel: (arm: string, model: string) => void;
-  start: (arms: string[], allowTight: boolean) => Promise<void>;
+  start: (arms: string[], allowTight: boolean, ownRisk?: boolean) => Promise<void>;
   stop: (id: string) => Promise<void>;
-  resume: (id: string, allowTight: boolean) => Promise<void>;
+  resume: (id: string, allowTight: boolean, ownRisk?: boolean) => Promise<void>;
   openRun: (id: string) => void;
   toList: () => void;
   /** Writes the numbers and goes to the Rules tab. */
@@ -166,12 +166,12 @@ export function useMeasure(): Measure {
     models,
     refresh,
     chooseModel,
-    start: (arms, allowTight) =>
+    start: (arms, allowTight, ownRisk = false) =>
       run(async () => {
         const chosen = Object.fromEntries(Object.entries(modelsRef.current).filter(([arm]) => arms.includes(arm)));
         const [first, ...rest] = arms;
         if (first === undefined) throw new Error("Choose an arm first.");
-        const { id } = await evals.evalsStart({ arms: [first, ...rest], allow_tight: allowTight, ...(Object.keys(chosen).length === 0 ? {} : { models: chosen }) });
+        const { id } = await evals.evalsStart({ arms: [first, ...rest], allow_tight: allowTight, ...(ownRisk ? { own_risk: true } : {}), ...(Object.keys(chosen).length === 0 ? {} : { models: chosen }) });
         openRun(id);
         await Promise.all([loadList(), loadPlan()]);
       }, "Could not start the measurement."),
@@ -179,9 +179,9 @@ export function useMeasure(): Measure {
       run(async () => {
         await evals.evalsStop(id);
       }, "Could not stop the measurement."),
-    resume: (id, allowTight) =>
+    resume: (id, allowTight, ownRisk = false) =>
       run(async () => {
-        await evals.evalsResume(id, allowTight);
+        await (ownRisk ? evals.evalsResume(id, allowTight, true) : evals.evalsResume(id, allowTight));
         await Promise.all([loadOne(id), loadList(), loadPlan()]);
       }, "Could not run the rest."),
     openRun,

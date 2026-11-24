@@ -2006,6 +2006,7 @@ test("the evals methods send their params and check what comes back", async () =
     assert.deepEqual(await client.evalsStop("7f3a"), { stopped: true });
     assert.deepEqual(await client.evalsResume("7f3a"), { id: "7f3a" });
     assert.deepEqual(await client.evalsResume("7f3a", true), { id: "7f3a" });
+    assert.deepEqual(await client.evalsResume("7f3a", undefined, true), { id: "7f3a" });
     assert.equal((await client.evalsList()).measurements?.[0]?.runs_played, 20);
     assert.deepEqual((await client.evalsGet("7f3a")).measurement, measurement);
     assert.equal((await client.evalsApply("7f3a")).values?.delegate?.read_share.value, 0.42);
@@ -2017,6 +2018,7 @@ test("the evals methods send their params and check what comes back", async () =
       ["evals.stop", { id: "7f3a" }],
       ["evals.resume", { id: "7f3a" }],
       ["evals.resume", { id: "7f3a", allow_tight: true }],
+      ["evals.resume", { id: "7f3a", own_risk: true }],
       ["evals.list", {}],
       ["evals.get", { id: "7f3a" }],
       ["evals.apply", { id: "7f3a" }],

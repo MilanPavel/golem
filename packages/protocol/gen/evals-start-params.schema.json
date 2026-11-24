@@ -1,6 +1,6 @@
 {
   "additionalProperties": false,
-  "description": "``evals.start``. Begin a measurement of ``arms``, with the helper rules of ``config.toml``.\n\n``models`` maps an arm's name to the model to use instead of its own. ``allow_tight`` lets\na local arm run when its verdict is ``tight``; a ``too_big`` or ``no_room`` arm never runs.\nIt answers at once; the progress arrives as ``eval.progress`` and the end as ``eval.ended``.",
+  "description": "``evals.start``. Begin a measurement of ``arms``, with the helper rules of ``config.toml``.\n\n``models`` maps an arm's name to the model to use instead of its own. ``allow_tight`` lets\na local arm run when its verdict is ``tight``. ``own_risk`` also lets one run whose verdict is\n``too_big``, ``no_room`` or ``unknown`` (and a ``tight`` one); it is the person's yes to a\nwarning, and is recorded in the measurement. An arm that cannot run at all (``runnable`` is\nfalse in the plan) is refused either way. It answers at once; the progress arrives as\n``eval.progress`` and the end as ``eval.ended``.",
   "properties": {
     "allow_tight": {
       "default": false,
@@ -21,6 +21,11 @@
       },
       "title": "Models",
       "type": "object"
+    },
+    "own_risk": {
+      "default": false,
+      "title": "Own Risk",
+      "type": "boolean"
     }
   },
   "required": [

@@ -1,0 +1,50 @@
+{
+  "additionalProperties": false,
+  "description": "One ask of the set, as a person can read it before and after a measurement.\n\n``text`` is the message sent to the model. ``facts`` is what a good answer must mention, each\nas a readable string (``a or b`` holds when either is there). ``setup`` is one short line on\nwhat the ask is set up with, and ``why`` says in plain words why it is in the set (``reason``\nis the same as a code).",
+  "properties": {
+    "facts": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Facts",
+      "type": "array"
+    },
+    "name": {
+      "minLength": 1,
+      "title": "Name",
+      "type": "string"
+    },
+    "reason": {
+      "default": "none",
+      "enum": [
+        "none",
+        "window",
+        "at_once",
+        "model"
+      ],
+      "title": "Reason",
+      "type": "string"
+    },
+    "setup": {
+      "default": "",
+      "title": "Setup",
+      "type": "string"
+    },
+    "text": {
+      "minLength": 1,
+      "title": "Text",
+      "type": "string"
+    },
+    "why": {
+      "default": "",
+      "title": "Why",
+      "type": "string"
+    }
+  },
+  "required": [
+    "name",
+    "text"
+  ],
+  "title": "EvalAsk",
+  "type": "object"
+}

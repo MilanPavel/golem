@@ -48,14 +48,16 @@ async def evals_plan(ctx: RequestContext, params: EvalsPlanParams) -> EvalsPlanR
         arms, running = await _jobs(ctx).plan(params.arms, params.models)
     except EvalRefused as exc:
         raise RpcCallError(INVALID_PARAMS, str(exc)) from exc
-    return EvalsPlanResult(arms=arms, running=running)
+    return EvalsPlanResult(arms=arms, running=running, asks=_jobs(ctx).asks_wire())
 
 
 async def evals_start(ctx: RequestContext, params: EvalsStartParams) -> EvalsStartResult:
     """Start a measurement in the background. Refused, with nothing started, when one runs or an
     arm may not run."""
     try:
-        started = await _jobs(ctx).start(params.arms, params.models, params.allow_tight)
+        started = await _jobs(ctx).start(
+            params.arms, params.models, params.allow_tight, params.own_risk
+        )
     except EvalRefused as exc:
         raise RpcCallError(INVALID_PARAMS, str(exc)) from exc
     return EvalsStartResult(id=started)
@@ -67,7 +69,7 @@ async def evals_stop(ctx: RequestContext, params: EvalsStopParams) -> EvalsStopR
 
 async def evals_resume(ctx: RequestContext, params: EvalsResumeParams) -> EvalsResumeResult:
     try:
-        resumed = await _jobs(ctx).resume(params.id, params.allow_tight)
+        resumed = await _jobs(ctx).resume(params.id, params.allow_tight, params.own_risk)
     except EvalRefused as exc:
         raise RpcCallError(INVALID_PARAMS, str(exc)) from exc
     return EvalsResumeResult(id=resumed)

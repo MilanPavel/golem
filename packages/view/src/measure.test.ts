@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import type { EvalMeasurement, EvalPlanArm, EvalRun, EvalSummary } from "@golem/client";
+import type { EvalAsk, EvalMeasurement, EvalPlanArm, EvalRun, EvalSummary } from "@golem/client";
 
-import { armLabel, armRow, armRows, canUseNumbers, doneFooter, doneLine, foldEval, foldLive, measureList, noRoomLine, rulesMeasurement, progressView, proposalLines, resultTables, runRows, startPlan, stoppedView, whenText } from "./measure.ts";
+import { armLabel, armRow, armRows, canUseNumbers, doneFooter, doneLine, foldEval, foldLive, askLines, confirmText, measureList, memoryWarning, paramsView, resumePlan, rulesMeasurement, progressView, proposalLines, resultTables, runRows, startPlan, stoppedView, whenText, OWN_RISK_TEXT, SAVED_WORK_TEXT } from "./measure.ts";
 
 const local = (over: Partial<EvalPlanArm>): EvalPlanArm => ({ name: "local-32k", label: "Local, 32K window", kind: "local", tier: "local", model: "ollama/qwen3.8:27b", window: 32768, asks: 10, minutes: 35, verdict: "fits", needed_gb: 21.1, ram_gb: 36, free_gb: 24.3, ...over });
 const cloud = (over: Partial<EvalPlanArm>): EvalPlanArm => ({ name: "budget", label: "Budget cloud", kind: "cloud", tier: "budget", model: "claude-haiku", window: 32768, asks: 10, minutes: 5, cost_usd: 0.4, ...over });
@@ -20,18 +20,23 @@ test("a local arm says what it needs, and a tight one asks for the box", () => {
   assert.equal(tight.tag.text, "TIGHT");
 });
 
-test("too big, no room and unknown cannot be ticked", () => {
+test("too big, no room and unknown are warned about and can still be ticked", () => {
   for (const verdict of ["too_big", "no_room", "unknown"] as const) {
     const row = armRow(local({ verdict, reason: undefined }));
-    assert.equal(row.canTick, false, verdict);
-    assert.ok(row.reason.length > 0, verdict);
+    assert.equal(row.canTick, true, verdict);
+    assert.equal(row.risk, "own_risk", verdict);
+    assert.ok(row.needsSaved, verdict);
+    assert.match(row.reason, /at your own risk/, verdict);
   }
   assert.equal(armRow(local({ verdict: "too_big" })).tag.text, "TOO BIG");
   assert.equal(armRow(local({ verdict: "no_room" })).tag.text, "NO ROOM NOW");
   const blind = armRow(local({ verdict: null, needed_gb: null, free_gb: null }));
   assert.equal(blind.memoryLine, "memory could not be read");
-  assert.equal(blind.canTick, false);
+  assert.equal(blind.canTick, true);
+  assert.equal(blind.risk, "own_risk");
   assert.equal(blind.bar, null);
+  assert.equal(armRow(local({ verdict: "tight" })).risk, "tight");
+  assert.equal(armRow(local({})).risk, "none");
 });
 
 const MISSING = "Ollama does not have qwen3.8:27b. Choose another model, or pull it first.";
@@ -44,6 +49,7 @@ test("a model that is not installed is not a memory problem", () => {
   assert.equal(row.reason, MISSING);
   assert.equal(row.blocked, "missing");
   assert.equal(row.canTick, false);
+  assert.equal(armRow(local({ verdict: "unknown", reason: "Gone.", runnable: false })).canTick, false);
   // the dropdown does not show a model that is not planned
   assert.equal(row.modelValue, "");
   const known = armRow(local({ model: "ollama/llama3.2:3b", choices }));
@@ -61,13 +67,12 @@ test("a paid arm whose provider has no key cannot be ticked", () => {
   assert.equal(armRow(cloud({})).canTick, true);
 });
 
-test("the banner talks about memory only when memory is the reason", () => {
+test("the warning talks about memory only when memory is the reason", () => {
   const missing = local({ verdict: "unknown", reason: MISSING, choices });
   const full = local({ name: "b", verdict: "no_room" });
-  assert.match(noRoomLine(armRows([missing, { ...missing, name: "c" }])) ?? "", /^No local arm can run with the chosen models\. Choose a model that is installed and fits\.$/);
-  assert.match(noRoomLine(armRows([missing, local({ name: "d", verdict: "too_big" })])) ?? "", /chosen models/);
-  assert.match(noRoomLine(armRows([missing, full])) ?? "", /Close other apps and check again/);
-  assert.doesNotMatch(noRoomLine(armRows([missing])) ?? "", /Close other apps/);
+  assert.match(memoryWarning(armRows([missing, { ...missing, name: "c" }])) ?? "", /^No local arm can run with the chosen models\. Choose a model that is installed\.$/);
+  assert.match(memoryWarning(armRows([missing, full])) ?? "", /You can still run it/);
+  assert.doesNotMatch(memoryWarning(armRows([missing])) ?? "", /Mac may stop/);
 });
 
 test("a paid arm shows its cost and has no memory bar", () => {
@@ -79,10 +84,10 @@ test("a paid arm shows its cost and has no memory bar", () => {
   assert.equal(armRow(cloud({ cost_usd: null })).memoryLine, "no memory, cost not known");
 });
 
-test("no local arm can run now", () => {
-  assert.ok(noRoomLine(armRows([local({ verdict: "no_room" }), local({ name: "b", verdict: "too_big" }), cloud({})])) !== null);
-  assert.equal(noRoomLine(armRows([local({}), local({ name: "b", verdict: "too_big" })])), null);
-  assert.equal(noRoomLine(armRows([cloud({})])), null);
+test("a short local arm gets a warning, never a block", () => {
+  assert.match(memoryWarning(armRows([local({ verdict: "no_room" }), local({ name: "b", verdict: "too_big" }), cloud({})])) ?? "", /may stop answering/);
+  assert.equal(memoryWarning(armRows([local({}), local({ name: "b", verdict: "tight" })])), null);
+  assert.equal(memoryWarning(armRows([cloud({})])), null);
 });
 
 test("Start is off while one runs, with nothing chosen, or before the box is ticked", () => {
@@ -97,8 +102,64 @@ test("Start is off while one runs, with nothing chosen, or before the box is tic
   assert.equal(unsaved.canStart, false);
   assert.ok(unsaved.needsSaved);
   assert.equal(unsaved.line, "Tick the box on the left to go on");
-  const bad = startPlan(rows, new Set(["big"]), true, false);
-  assert.equal(bad.canStart, false);
+  const unsure = startPlan(rows, new Set(["big"]), false, false);
+  assert.equal(unsure.canStart, false);
+  assert.equal(unsure.confirm, OWN_RISK_TEXT);
+  assert.equal(unsaved.confirm, SAVED_WORK_TEXT);
+});
+
+test("a too big arm starts with own_risk once the box is ticked", () => {
+  const rows = armRows([local({ verdict: "tight" }), local({ name: "big", verdict: "too_big" })]);
+  const on = startPlan(rows, new Set(["big"]), true, false);
+  assert.ok(on.canStart);
+  assert.equal(on.ownRisk, true);
+  assert.deepEqual(on.arms, ["big"]);
+  const both = startPlan(rows, new Set(["big", "local-32k"]), true, false);
+  assert.ok(both.ownRisk && both.allowTight);
+  const tightOnly = startPlan(rows, new Set(["local-32k"]), true, false);
+  assert.ok(tightOnly.allowTight && !tightOnly.ownRisk);
+  assert.equal(confirmText(rows.filter((r) => r.name === "big")), OWN_RISK_TEXT);
+  assert.equal(confirmText(rows.filter((r) => r.name !== "big")), SAVED_WORK_TEXT);
+});
+
+test("the rest of a stopped measurement warns and asks for the box, and is never off for memory", () => {
+  const clean = resumePlan(armRows([local({})]), false);
+  assert.deepEqual([clean.warning, clean.needsSaved, clean.ready], [null, false, true]);
+  const risky = armRows([local({ verdict: "too_big" })]);
+  const before = resumePlan(risky, false);
+  assert.match(before.warning ?? "", /may stop answering/);
+  assert.deepEqual([before.needsSaved, before.ready, before.confirm], [true, false, OWN_RISK_TEXT]);
+  const after = resumePlan(risky, true);
+  assert.deepEqual([after.ready, after.ownRisk, after.allowTight], [true, true, true]);
+  const missing = resumePlan(armRows([local({ verdict: "unknown", reason: MISSING, choices })]), true);
+  assert.equal(missing.ready, false);
+});
+
+const ASK: EvalAsk = { name: "rename-six-files", text: "rename old_name to new_name everywhere", facts: ["new_name", "six or 6"], setup: "6 small files", reason: "none", why: "A plain ask: no helper is needed." };
+
+test("a run opens to the message, the facts with marks, and the answer kept", () => {
+  const done: EvalRun = { arm: "local-32k", ask: ASK.name, mode: "on", end: "completed", quality: 0.5, seconds: 5, window_left: 0.5, helpers_started: 0, answer: "Renamed to new_name.", found: ["new_name"], missing: ["six or 6"] };
+  const rows = runRows(base([done, { ...done, mode: "off", answer: "", found: [], missing: [] }, { arm: "local-32k", ask: ASK.name, mode: "on", end: "pending" }], { asks: [ASK] }));
+  const detail = rows[0]?.detail;
+  assert.equal(detail?.message, "rename old_name to new_name everywhere");
+  assert.equal(detail?.setup, "6 small files");
+  assert.deepEqual(detail?.facts, [{ text: "new_name", mark: "found" }, { text: "six or 6", mark: "missing" }]);
+  assert.equal(detail?.answer, "Renamed to new_name.");
+  assert.equal(rows[1]?.detail?.answer, null);
+  assert.deepEqual(rows[1]?.detail?.facts.map((f) => f.mark), ["unknown", "unknown"]);
+  assert.equal(runRows(base([done])).every((row) => row.detail === null), true);
+  assert.deepEqual(askLines([ASK]), [{ name: ASK.name, message: ASK.text, setup: "6 small files", why: ASK.why, mustMention: "new_name; six or 6" }]);
+});
+
+test("the parameters of a measurement read as one line per arm", () => {
+  const view = paramsView(base([], { own_risk: true, golem_version: "0.9.1", rules: { read_share: 0.3, fill_share: 0.85, job_share: 0.1, price_ratio: 3 }, arm_params: [{ name: "local-32k", model: "ollama/qwen3.8:27b", window: 32768, at_a_time: 1, helper_model: "the same model as the lead" }, { name: "budget", model: "claude-haiku", window: 32768, helper_model: "chosen by golem" }] }));
+  assert.deepEqual(view.arms, ["Local 32K · ollama/qwen3.8:27b · window 32,768 tokens · one request at a time · helpers use the same model as the lead", "Budget · claude-haiku · window 32,768 tokens · requests as the provider allows · helpers use chosen by golem"]);
+  assert.equal(view.rules, "Helper rules: read 30%, fill 85%, job 10%, price 3×");
+  assert.equal(view.version, "golem 0.9.1");
+  assert.ok(view.ownRisk);
+  const old = paramsView(base([]));
+  assert.deepEqual([old.rules, old.version, old.ownRisk], [null, null, false]);
+  assert.equal(old.arms.length, 1);
 });
 
 test("a tight arm starts with allow_tight once the box is ticked; a paid arm alone needs no box", () => {
@@ -292,4 +353,10 @@ test("the measurement in use names its day and its local model", () => {
   assert.deepEqual(rulesMeasurement([summary({ arms: [{ name: "budget-cloud", model: "haiku" }], in_use: true })], now), { date: "21 Nov", model: "haiku" });
   assert.equal(rulesMeasurement([summary({})], now), null);
   assert.equal(rulesMeasurement(null, now), null);
+});
+
+test("a stopped run at your own risk says the memory floor stays", () => {
+  const stopped = base([run({}), run({ ask: "b", end: "not_run" })], { state: "stopped", stop_reason: "The Mac is running low on memory.", own_risk: true });
+  assert.match(stoppedView(stopped).detail, /still stops when the free memory gets very low/);
+  assert.doesNotMatch(stoppedView({ ...stopped, own_risk: false }).detail, /own risk/);
 });

@@ -170,7 +170,7 @@ def _jobs(
     local_model: Callable[[], Awaitable[str | None]] | None = None,
 ) -> EvalJobs:
     parts = EvalParts(
-        driver=lambda _tight: driver,
+        driver=lambda _tight, _risk: driver,
         machine=lambda: mac.machine,
         key_found=lambda _provider: mac.keys,
         memory=lambda: mac.reading,
@@ -420,14 +420,17 @@ async def test_a_refused_arm_starts_nothing(tmp_path: Path) -> None:
     need = _need_gb(_local(), 6.0)
 
     mac.machine = Machine(need / 2, 100.0, {"qwen3.5:9b": 6 * GIB})
-    with pytest.raises(EvalRefused, match="local-32k cannot run: Too big for this Mac"):
-        await jobs.start(["budget-cloud", "local-32k"])
+    with pytest.raises(EvalRefused, match="local-32k needs your own risk to run: Too big"):
+        await jobs.start(["budget-cloud", "local-32k"], allow_tight=True)
     mac.machine = Machine(64.0, need + 1.0, {"qwen3.5:9b": 6 * GIB})
-    with pytest.raises(EvalRefused, match="Not enough free memory"):
+    with pytest.raises(EvalRefused, match=r"Not enough free memory.*--own-risk"):
         await jobs.start(["local-32k"])
     mac.machine = Machine(64.0, 48.0, None)
     with pytest.raises(EvalRefused, match="Ollama is not reachable"):
-        await jobs.start(["local-32k"])
+        await jobs.start(["local-32k"], own_risk=True)  # nothing to load: no override
+    mac.machine = Machine(64.0, 48.0, {})
+    with pytest.raises(EvalRefused, match="does not have"):
+        await jobs.start(["local-32k"], own_risk=True)
     mac.machine = Machine(need / 0.6, 100.0, {"qwen3.5:9b": 6 * GIB})
     with pytest.raises(EvalRefused, match="needs your yes"):
         await jobs.start(["local-32k"])
@@ -445,6 +448,76 @@ async def test_a_refused_arm_starts_nothing(tmp_path: Path) -> None:
     await jobs.start(["local-32k"], allow_tight=True)  # a tight arm runs when you allow it
     await jobs.wait()
     assert driver.played
+
+
+async def test_own_risk_runs_an_arm_that_is_too_big_or_short_and_is_recorded(
+    tmp_path: Path,
+) -> None:
+    mac = Mac()
+    driver = FakeDriver(mac)
+    jobs = _jobs(tmp_path, mac, driver)
+    need = _need_gb(_local(), 6.0)
+    kinds = {
+        "too_big": Machine(need / 2, 100.0, {"qwen3.5:9b": 6 * GIB}),
+        "no_room": Machine(64.0, need + 1.0, {"qwen3.5:9b": 6 * GIB}),
+        "unknown": Machine(None, 50.0, {"qwen3.5:9b": 6 * GIB}),
+        "tight": Machine(need / 0.6, 100.0, {"qwen3.5:9b": 6 * GIB}),
+    }
+    for verdict, machine in kinds.items():
+        mac.machine = machine
+        planned = (await jobs.plan(["local-32k"]))[0][0]
+        assert planned.verdict == verdict and planned.runnable
+        with pytest.raises(EvalRefused):
+            await jobs.start(["local-32k"])
+        started = await jobs.start(["local-32k"], own_risk=True)
+        await jobs.wait()
+        got = jobs.get(started)
+        assert got is not None and got.own_risk and got.state == "done"
+    plain = await jobs.start(["budget-cloud"])
+    await jobs.wait()
+    got = jobs.get(plain)
+    assert got is not None and not got.own_risk
+
+
+async def test_a_loaded_model_is_not_counted_against_the_free_memory(tmp_path: Path) -> None:
+    """The model that Ollama already holds is not new memory (the bug of a second half refused)."""
+    mac = Mac()
+    jobs = _jobs(tmp_path, mac, FakeDriver(mac))
+    need = _need_gb(_local(), 6.0)
+    free = need  # 2 GB reserve short of the need, as with 11.8 free of 10.0 + 2.0
+    mac.machine = Machine(64.0, free, {"qwen3.5:9b": 6 * GIB})
+    arm = (await jobs.plan(["local-32k"]))[0][0]
+    assert arm.verdict == "no_room" and arm.loaded_gb is None
+    mac.machine = Machine(64.0, free, {"qwen3.5:9b": 6 * GIB}, {"qwen3.5:9b": int(need * GIB)})
+    arm = (await jobs.plan(["local-32k"]))[0][0]
+    assert arm.verdict == "fits" and arm.loaded_gb == pytest.approx(need, abs=0.01)
+    assert "already loaded" in arm.reason
+    started = await jobs.start(["local-32k"])  # no override needed
+    await jobs.wait()
+    got = jobs.get(started)
+    assert got is not None and got.state == "done" and not got.own_risk
+
+
+async def test_the_asks_and_the_parameters_are_kept_and_shown(tmp_path: Path) -> None:
+    mac = Mac()
+    jobs = _jobs(tmp_path, mac, FakeDriver(mac))
+    shown = jobs.asks_wire()
+    assert [a.name for a in shown] == [a.name for a in ASKS]
+    assert shown[0].text == ASKS[0].text and shown[0].setup and shown[0].why
+    started = await jobs.start(["local-32k", "budget-cloud"])
+    await jobs.wait()
+    got = jobs.get(started)
+    assert got is not None
+    assert [a.name for a in got.asks] == [a.name for a in ASKS]
+    assert [(p.name, p.at_a_time) for p in got.arm_params] == [
+        ("local-32k", 1),
+        ("budget-cloud", None),
+    ]
+    assert "same model" in got.arm_params[0].helper_model
+    assert set(got.rules) == {"read_share", "fill_share", "job_share", "price_ratio"}
+    assert got.golem_version
+    kept = json.loads((tmp_path / "evals" / f"{started}.json").read_text())
+    assert kept["asks"][0]["text"] == ASKS[0].text and kept["own_risk"] is False
 
 
 # --- stop, a dead server, resume ------------------------------------------------------------------
@@ -507,6 +580,29 @@ async def test_low_memory_stops_it_before_the_next_ask(tmp_path: Path) -> None:
     assert got is not None and got.state == "stopped"
     assert got.stop_reason == "The Mac is running low on memory."
     assert driver.played == []
+
+
+async def test_the_floor_stops_a_run_at_your_own_risk_and_it_resumes_with_the_box(
+    tmp_path: Path,
+) -> None:
+    mac = Mac()
+    driver = FakeDriver(mac)
+    jobs = _jobs(tmp_path, mac, driver)
+    need = _need_gb(_local(), 6.0)
+    mac.machine = Machine(need / 2, 100.0, {"qwen3.5:9b": 6 * GIB})  # too big
+    mac.low = True  # the hard floor is crossed
+    started = await jobs.start(["local-32k"], own_risk=True)
+    await jobs.wait()
+    got = jobs.get(started)
+    assert got is not None and got.state == "stopped" and got.own_risk
+    assert got.stop_reason == "The Mac is running low on memory."
+    mac.low = False
+    with pytest.raises(EvalRefused, match="own risk"):  # the rest asks for the box again
+        await jobs.resume(started)
+    await jobs.resume(started, own_risk=True)
+    await jobs.wait()
+    done = jobs.get(started)
+    assert done is not None and done.state == "done" and done.own_risk
 
 
 async def test_resume_plays_only_the_runs_that_did_not_run(tmp_path: Path) -> None:
@@ -618,7 +714,7 @@ async def test_the_list_is_newest_first_and_delete_is_refused_while_running(
     gate = asyncio.Event()
     driver = FakeDriver(mac, gate)
     parts = EvalParts(
-        driver=lambda _t: driver,
+        driver=lambda _tight, _risk: driver,
         machine=lambda: mac.machine,
         key_found=lambda _p: True,
         asks=lambda: ASKS,
@@ -714,7 +810,7 @@ async def test_a_measurement_over_the_socket_and_apply_writes_the_config(
     config = short_home / "config.toml"
     config.write_text("# mine\n[agents]\nkeep_days = 3  # a week and a bit\n", "utf-8")
     parts = EvalParts(
-        driver=lambda _tight: ScriptedDriver(_models),
+        driver=lambda _tight, _risk: ScriptedDriver(_models),
         machine=lambda: mac.machine,
         key_found=lambda _provider: True,
         asks=lambda: ASKS,
@@ -805,7 +901,7 @@ async def test_the_whole_way_over_the_socket_refusals_stop_resume_apply(short_ho
     gate = asyncio.Event()
     driver = FakeDriver(mac, gate, hold_after=2)  # the third run waits until the test lets it go
     parts = EvalParts(
-        driver=lambda _tight: driver,
+        driver=lambda _tight, _risk: driver,
         machine=lambda: mac.machine,
         key_found=lambda _provider: True,
         memory=lambda: mac.reading,
@@ -820,7 +916,7 @@ async def test_the_whole_way_over_the_socket_refusals_stop_resume_apply(short_ho
     try:
         await client.call("hello", HELLO)
 
-        # Too big and no room cannot start, even with allow_tight; tight needs allow_tight.
+        # Too big and no room need own_risk, even with allow_tight; tight needs allow_tight.
         mac.machine = Machine(need / 2, 100.0, {"qwen3.5:9b": 6 * GIB})
         too_big = await client.call("evals.start", {"arms": ["local-32k"], "allow_tight": True})
         assert "Too big for this Mac" in str(too_big["error"])
