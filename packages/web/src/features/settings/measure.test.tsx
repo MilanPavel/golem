@@ -8,7 +8,7 @@ import { createPage } from "../../store/page.ts";
 import { PageProvider } from "../../store/page-context.tsx";
 import { fakeClient, fakeFrame, summary } from "../../store/test-support.ts";
 import { closePalette } from "../palette/index.ts";
-import { SAMPLE_AGENTS } from "./agents-sample.ts";
+import { SAMPLE_AGENTS, SAMPLE_DELEGATE, SAMPLE_DELEGATE_CHANGED } from "./agents-sample.ts";
 import { showAgentsTab } from "./agents-tab.ts";
 import { settingsContextStore } from "./index.ts";
 
@@ -42,11 +42,11 @@ const DONE = measurement({
   },
 });
 
-function mount(opts: { plan?: { arms: EvalPlanArm[]; running: string | null }; list?: EvalSummary[]; get?: EvalMeasurement } = {}) {
+function mount(opts: { plan?: { arms: EvalPlanArm[]; running: string | null }; list?: EvalSummary[]; get?: EvalMeasurement; delegate?: typeof SAMPLE_DELEGATE } = {}) {
   history.replaceState(null, "", "/settings/agents");
   const fake = fakeClient();
   fake.raw.listAgents.mockResolvedValue({ agents: SAMPLE_AGENTS });
-  fake.raw.agentsKeep.mockResolvedValue({ ok: true, errors: [], values: { keep_days: 7, keep_problem_days: 30, use_helpers: "ask" } });
+  fake.raw.agentsKeep.mockResolvedValue({ ok: true, errors: [], values: { keep_days: 7, keep_problem_days: 30, use_helpers: "ask", ...(opts.delegate === undefined ? {} : { delegate: opts.delegate }) } });
   fake.raw.status.mockResolvedValue({ version: "0.5.0" });
   fake.raw.evalsPlan.mockResolvedValue(opts.plan ?? PLAN);
   fake.raw.evalsList.mockResolvedValue({ measurements: opts.list ?? [] });
@@ -336,4 +336,74 @@ test("the earlier measurements are listed with the running one first", async () 
   const rows = within(list).getAllByRole("button");
   expect(rows[0]?.textContent).toContain("Running");
   expect(rows[1]?.textContent).toContain("proposes 2 numbers");
+});
+
+const foot = () => document.querySelector("[data-reasons-foot]")?.textContent ?? "";
+
+test("Rules names the measurement in use in the foot line, and says first guess when none is", async () => {
+  const used = item({ id: "u", state: "done", in_use: true, arms: [{ name: "budget-cloud", model: "haiku" }, { name: "local-32k", model: "qwen3.8:27b" }], started_at: new Date(2026, 10, 21, 9, 0).toISOString() });
+  const m = mount({ list: [used], delegate: SAMPLE_DELEGATE_CHANGED });
+  await screen.findByText("7 agents");
+  await m.user.click(screen.getByRole("tab", { name: "Rules" }));
+  await waitFor(() => expect(foot()).toContain("MEASURED"));
+  expect(foot()).toContain("on 21 Nov with qwen3.8:27b.");
+  expect(screen.getByRole("button", { name: "Measure again" })).toBeTruthy();
+  m.unmount();
+  showAgentsTab("agents");
+  const none = mount({ list: [item({ id: "u", state: "done", in_use: false })], delegate: SAMPLE_DELEGATE });
+  await screen.findByText("7 agents");
+  await none.user.click(screen.getByRole("tab", { name: "Rules" }));
+  await waitFor(() => expect(foot()).toContain("FIRST GUESS"));
+  expect(foot()).not.toContain("MEASURED");
+});
+
+test("the whole way: start, progress, stop, resume, done, use the numbers, and Rules shows them as measured", async () => {
+  const m = mount({ delegate: SAMPLE_DELEGATE });
+  const panel = await openMeasure(m);
+  await within(panel).findByRole("list", { name: "Arms of the measurement" });
+  // Start a tight local arm: only after the box.
+  await m.user.click(within(panel).getByRole("checkbox", { name: "Local, 32K window" }));
+  await m.user.click(within(panel).getByRole("checkbox", { name: "I saved my work. Run although memory is tight." }));
+  m.fake.raw.evalsGet.mockResolvedValue({ measurement: RUNNING });
+  m.fake.raw.evalsPlan.mockResolvedValue({ ...PLAN, running: "m1" });
+  await m.user.click(within(panel).getByRole("button", { name: "Start" }));
+  await waitFor(() => expect(m.fake.raw.evalsStart).toHaveBeenCalledWith({ arms: ["local-32k"], allow_tight: true }));
+  await within(panel).findByRole("progressbar", { name: "Progress of the measurement" });
+  emit(m, { kind: "progress", progress: { id: "m1", arm: "local-32k", mode: "on", ask: "Big", index: 2, total: 3, elapsed: 125, state: "running", memory_used_gb: 33, memory_total_gb: 36 } });
+  await waitFor(() => expect(panel.textContent).toContain("33 of 36 GB"));
+  // Stop it, and the run ends as stopped.
+  await m.user.click(within(panel).getByRole("button", { name: "Stop" }));
+  await waitFor(() => expect(m.fake.raw.evalsStop).toHaveBeenCalledWith("m1"));
+  m.fake.raw.evalsGet.mockResolvedValue({ measurement: STOPPED });
+  m.fake.raw.evalsList.mockResolvedValue({ measurements: [item({ state: "stopped", runs_played: 1 })] });
+  m.fake.raw.evalsPlan.mockResolvedValue({ arms: [local({ verdict: "fits" }), paid()], running: null });
+  emit(m, { kind: "ended", ended: { id: "m1", state: "stopped", stop_reason: "You stopped it." } });
+  await within(panel).findByRole("button", { name: /Delete this measurement/ });
+  // Resume plays the rest, and it ends done.
+  m.fake.raw.evalsGet.mockResolvedValue({ measurement: RUNNING });
+  await m.user.click(within(panel).getByRole("button", { name: "Run the other 2" }));
+  await waitFor(() => expect(m.fake.raw.evalsResume).toHaveBeenCalledWith("m1", false));
+  m.fake.raw.evalsGet.mockResolvedValue({ measurement: DONE });
+  m.fake.raw.evalsList.mockResolvedValue({ measurements: [item({ state: "done", runs_played: 4, runs_total: 4, proposes: 2 })] });
+  emit(m, { kind: "ended", ended: { id: "m1", state: "done" } });
+  await within(panel).findByRole("button", { name: "Use these numbers" });
+  // Apply: the daemon now reports the measured numbers, and the measurement as in use.
+  m.fake.raw.agentsKeep.mockResolvedValue({ ok: true, errors: [], values: { keep_days: 7, keep_problem_days: 30, use_helpers: "ask", delegate: SAMPLE_DELEGATE_CHANGED } });
+  m.fake.raw.evalsList.mockResolvedValue({ measurements: [item({ state: "done", runs_played: 4, runs_total: 4, proposes: 2, in_use: true, started_at: new Date(2026, 10, 21, 9, 0).toISOString() })] });
+  await m.user.click(within(panel).getByRole("button", { name: "Use these numbers" }));
+  await waitFor(() => expect(m.fake.raw.evalsApply).toHaveBeenCalledWith("m1"));
+  await waitFor(() => expect(screen.getByRole("tab", { name: "Rules" }).getAttribute("aria-selected")).toBe("true"));
+  await waitFor(() => expect(foot()).toContain("MEASURED"));
+  expect(foot()).toContain("with qwen3.8:27b.");
+  expect(Array.from(document.querySelectorAll("[data-changed]")).map((each) => each.textContent)).toEqual(["42%", "80%"]);
+});
+
+test("a local arm that does not fit, or has no room, cannot be started", async () => {
+  const m = mount({ plan: { arms: [big(), local({ name: "local-64k", label: "Local, 64K window", verdict: "no_room", reason: "Not enough memory is free now." })], running: null } });
+  const panel = await openMeasure(m);
+  await within(panel).findByRole("list", { name: "Arms of the measurement" });
+  expect((within(panel).getByRole("checkbox", { name: "Local, 128K window" }) as HTMLInputElement).disabled).toBe(true);
+  expect((within(panel).getByRole("checkbox", { name: "Local, 64K window" }) as HTMLInputElement).disabled).toBe(true);
+  expect((within(panel).getByRole("button", { name: "Start" }) as HTMLButtonElement).disabled).toBe(true);
+  expect(m.fake.raw.evalsStart).not.toHaveBeenCalled();
 });

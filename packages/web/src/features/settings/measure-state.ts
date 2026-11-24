@@ -193,6 +193,8 @@ export function useMeasure(): Measure {
           const reasons = (result.errors ?? []).map((each) => each.message).join(" ");
           throw new Error(reasons === "" ? "Could not write the numbers." : `Could not write the numbers. ${reasons}`);
         }
+        // The list says which measurement is in use now; the Rules tab names it.
+        await Promise.all([loadOne(id), loadList()]);
         showAgentsTab("rules");
       }, "Could not write the numbers."),
     remove: (id) =>

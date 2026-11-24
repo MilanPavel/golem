@@ -3,7 +3,7 @@ import { test } from "node:test";
 
 import type { EvalMeasurement, EvalPlanArm, EvalRun, EvalSummary } from "@golem/client";
 
-import { armLabel, armRow, armRows, canUseNumbers, doneFooter, doneLine, foldEval, foldLive, measureList, noRoomLine, progressView, proposalLines, resultTables, runRows, startPlan, stoppedView, whenText } from "./measure.ts";
+import { armLabel, armRow, armRows, canUseNumbers, doneFooter, doneLine, foldEval, foldLive, measureList, noRoomLine, rulesMeasurement, progressView, proposalLines, resultTables, runRows, startPlan, stoppedView, whenText } from "./measure.ts";
 
 const local = (over: Partial<EvalPlanArm>): EvalPlanArm => ({ name: "local-32k", label: "Local, 32K window", kind: "local", tier: "local", model: "ollama/qwen3.8:27b", window: 32768, asks: 10, minutes: 35, verdict: "fits", needed_gb: 21.1, ram_gb: 36, free_gb: 24.3, ...over });
 const cloud = (over: Partial<EvalPlanArm>): EvalPlanArm => ({ name: "budget", label: "Budget cloud", kind: "cloud", tier: "budget", model: "claude-haiku", window: 32768, asks: 10, minutes: 5, cost_usd: 0.4, ...over });
@@ -247,4 +247,13 @@ test("Use these numbers is offered only for a done measurement with something to
   assert.equal(doneFooter(done({ in_use: true })), "These numbers are in use. See them on the Rules tab.");
   assert.equal(doneFooter(done()), "One run per ask. Measure again to see how much the numbers move.");
   assert.equal(doneFooter(done({ proposal: null })), "Too little ran to propose a number.");
+});
+
+test("the measurement in use names its day and its local model", () => {
+  const now = new Date(2026, 10, 24, 16, 0);
+  const arms = [{ name: "budget-cloud", model: "haiku" }, { name: "local-32k", model: "qwen3.8:27b" }];
+  assert.deepEqual(rulesMeasurement([summary({ id: "a" }), summary({ id: "b", arms, in_use: true })], now), { date: "21 Nov", model: "qwen3.8:27b" });
+  assert.deepEqual(rulesMeasurement([summary({ arms: [{ name: "budget-cloud", model: "haiku" }], in_use: true })], now), { date: "21 Nov", model: "haiku" });
+  assert.equal(rulesMeasurement([summary({})], now), null);
+  assert.equal(rulesMeasurement(null, now), null);
 });

@@ -166,6 +166,18 @@ export function whenText(iso: string, now: Date): string {
   return today ? `Today ${two(at.getHours())}:${two(at.getMinutes())}` : `${at.getDate()} ${MONTHS[at.getMonth()] ?? ""}`;
 }
 
+/**
+ * The measurement whose numbers are in use, for the foot of the tiles on Rules: its day (as the list shows it) and the
+ * model of its local arm, or of its first arm. Null when none of the list is in use. The newest one wins.
+ */
+export function rulesMeasurement(list: readonly EvalSummary[] | null, now: Date): { date: string; model: string } | null {
+  const used = (list ?? []).filter((item) => item.in_use === true).sort((a, b) => b.started_at.localeCompare(a.started_at))[0];
+  if (used === undefined) return null;
+  const arm = used.arms.find((each) => each.name.startsWith("local")) ?? used.arms[0];
+  if (arm === undefined) return null;
+  return { date: whenText(used.started_at, now), model: arm.model };
+}
+
 /** `Local 32K · qwen3.8:27b`, one per arm, joined by a comma. */
 export function armsText(arms: readonly { name: string; model: string }[]): string {
   return arms.map((arm) => `${armLabel(arm.name)} · ${arm.model}`).join(", ");

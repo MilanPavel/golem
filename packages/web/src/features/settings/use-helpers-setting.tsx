@@ -98,7 +98,7 @@ export function UseHelpers({
 }
 
 /** Settings › Agents, Use helpers: reads `[agents] use_helpers` and saves a change at once. */
-export function UseHelpersSection() {
+export function UseHelpersSection({ measurement = null }: { measurement?: RulesMeasurement | null }) {
   const query = useAgentsKeep();
   const actions = usePageActions();
   const [errors, setErrors] = useState<RoutingErrors>({});
@@ -125,5 +125,5 @@ export function UseHelpersSection() {
       </p>
     ) : null;
   }
-  return <UseHelpers value={query.data.use_helpers} errors={errors} failure={failure} onChoose={(value) => void save(value)} delegate={query.data.delegate} />;
+  return <UseHelpers value={query.data.use_helpers} errors={errors} failure={failure} onChoose={(value) => void save(value)} delegate={query.data.delegate} measurement={measurement} />;
 }

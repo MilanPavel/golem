@@ -121,6 +121,7 @@ const sidebar: DefaultTheme.Sidebar = [
       { text: "MCP servers", link: "/guide/mcp" },
       { text: "Skills", link: "/guide/skills" },
       { text: "Memory", link: "/guide/memory" },
+      { text: "Helpers and Measure", link: "/guide/helpers" },
       { text: "Routines", link: "/guide/routines" },
       { text: "The web UI", link: "/guide/web" },
       { text: "Settings", link: "/guide/settings" },

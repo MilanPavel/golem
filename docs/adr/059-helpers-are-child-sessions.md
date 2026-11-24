@@ -41,7 +41,7 @@ golem does the work in the chat. It starts a helper for one of three reasons, an
 2. **Independent jobs that can truly run at once.**
 3. **A different model fits better:** one hard question to a stronger model, or a large read on a cheaper one.
 
-There are no chains of helpers (find, fix, check). Anything with a fixed order is a lead's decision or a workflow. A procedure is a skill the lead loads, not an agent. Thresholds are a share of the window plus a price, not a token count, and the eval of 15.4 (#1212) sets them. **Open, decided by that eval:** whether a cloud lead hands large sweeps to a cheaper cloud model by default, or only with "save money" on.
+There are no chains of helpers (find, fix, check). Anything with a fixed order is a lead's decision or a workflow. A procedure is a skill the lead loads, not an agent. Thresholds are a share of the window plus a price, not a token count, and the eval of 15.4 (#1212) sets them. Since step 15.14 you can measure them on your own Mac (Settings › Agents › Measure, `golem eval helpers`): the daemon runs the measurement as one job, and "Use these numbers" writes the result to `[agents.delegate]`. The numbers shape what golem suggests to the model; they never gate a helper. **Open, decided by that eval:** whether a cloud lead hands large sweeps to a cheaper cloud model by default, or only with "save money" on.
 
 ### 3. `delegate` starts one helper or a batch
 
