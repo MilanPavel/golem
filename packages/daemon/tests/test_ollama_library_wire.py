@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from functools import partial
 from pathlib import Path
 from typing import cast
 
@@ -9,8 +10,9 @@ import httpx
 from test_pulls import FakeOllama
 from test_server import HELLO, RpcClient, error_code, rpc_result, start_daemon, stop_daemon
 
-from golem.config import GolemSettings
+from golem.config import GolemSettings, OllamaSettings
 from golem.models.discovery import ModelDiscovery
+from golem.models.ollama import LocalServer, LocalServers
 from golem.models.ollama_library import DOWN
 from golem.models.pulls import PullManager
 from golem.models.router import ModelRouter
@@ -22,6 +24,13 @@ async def test_ollama_library_over_the_socket(short_home: Path) -> None:
     transport = httpx.MockTransport(fake)
     app, task = await start_daemon(
         short_home,
+        # Local servers that see a binary, so a runner without Ollama still lists the fakes.
+        local_servers=LocalServers(
+            OllamaSettings(start=False),
+            log_file=short_home / "ollama.log",
+            run_dir=short_home,
+            make=partial(LocalServer, find_binary=lambda: "/opt/homebrew/bin/ollama"),
+        ),
         router=ModelRouter(GolemSettings()),
         discovery=lambda routed: ModelDiscovery(
             routed,
