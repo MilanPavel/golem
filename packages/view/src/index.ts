@@ -177,6 +177,8 @@ export {
   helperWorkingMs,
   lastSentence,
   reduceBatch,
+  batchAtOnce,
+  batchCounts,
   isLocalFrom,
   withLocal,
   windowK,

@@ -5,7 +5,7 @@ import type { ChatEvent } from "@golem/client";
 
 import { emptyChat, reduceChat, type ChatMessage, type ChatState, type ToolBlock } from "./chat-state.ts";
 import { isLocalFrom, withLocal } from "./helper-card.ts";
-import { batchCard, batchNumber, foldBatch, helperLimits, helperNumber, helperPanelState, helperRight, helperSummary, lastSentence, windowK } from "./helper-card.ts";
+import { batchAtOnce, batchCard, batchCounts, batchNumber, foldBatch, helperLimits, helperNumber, helperPanelState, helperRight, helperSummary, lastSentence, windowK } from "./helper-card.ts";
 
 let seq = 0;
 function ev(type: string, data: Record<string, unknown>): ChatEvent {
@@ -274,4 +274,69 @@ test("isLocalFrom reads the tier of the model list, and withLocal applies it", (
   assert.equal(isLocal("nope"), null);
   const batch = withLocal(foldBatch("d1", [started(0, "a", "qwen3:8b")]), isLocal);
   assert.equal(batch.helpers[0]?.local, true);
+});
+
+function stateEv(index: number, state: string, over: Record<string, unknown> = {}): ChatEvent {
+  return ev("helper.state", { call_id: "d1", index, state, ...over });
+}
+
+const LOCAL = "local:ollama:default:qwen3:14b";
+
+test("a local-only batch says the place in line for each helper", () => {
+  const events = [
+    started(0, "a", "qwen3:14b"),
+    started(1, "b", "qwen3:14b"),
+    started(2, "c", "qwen3:14b"),
+    stateEv(0, "running"),
+    stateEv(1, "queued", { reason: "slot", line: LOCAL, position: 1, holder: "a" }),
+    stateEv(2, "queued", { reason: "slot", line: LOCAL, position: 3 }),
+  ];
+  const batch = foldBatch("d1", events, () => true);
+  assert.deepEqual(batchCounts(batch), { running: 1, total: 3 });
+  assert.equal(batchAtOnce(batch), null);
+  const card = batchCard(batch, "normal");
+  assert.deepEqual(
+    card.rows.map((row) => row.right),
+    ["running", "next in line for qwen3:14b", "3rd in line for qwen3:14b"],
+  );
+  const tui = batchCard(batch, "normal", "tui");
+  assert.deepEqual(
+    tui.rows.map((row) => row.right),
+    ["running", "next for qwen3:14b", "3rd for qwen3:14b"],
+  );
+});
+
+test("two running helpers say how many run at once, and a wait is cleared when it runs", () => {
+  const events = [
+    started(0, "a", "qwen3:14b"),
+    started(1, "b", "qwen3:14b"),
+    stateEv(1, "queued", { reason: "slot", line: LOCAL, position: 1 }),
+    stateEv(0, "running"),
+    stateEv(1, "running"),
+  ];
+  const batch = foldBatch("d1", events);
+  assert.equal(batchAtOnce(batch), "2 at once");
+  assert.deepEqual(batchCounts(batch), { running: 2, total: 2 });
+  assert.equal(batch.helpers[1]?.position, null);
+  assert.equal(batch.helpers[1]?.line, null);
+});
+
+test("a cloud-only batch words the provider retry and the budget, with no local text", () => {
+  const events = [
+    started(0, "a", "claude-haiku"),
+    started(1, "b", "claude-sonnet"),
+    stateEv(0, "waiting", { reason: "provider", line: "provider:anthropic", retry_in_ms: 8000 }),
+    stateEv(1, "waiting", { reason: "budget", spent_usd: 2, cap_usd: 2 }),
+  ];
+  const batch = foldBatch("d1", events, () => false);
+  const web = batchCard(batch, "verbose").rows.map((row) => row.right);
+  assert.deepEqual(web, ["anthropic is busy · trying again in 8 s", "budget spent: $2.00 of $2.00"]);
+  const tui = batchCard(batch, "normal", "tui").rows.map((row) => row.right);
+  assert.deepEqual(tui, ["anthropic is busy · again in 8 s", "spent $2.00 of $2.00"]);
+  for (const text of [...web, ...tui]) assert.doesNotMatch(text, /local|qwen|line for|waiting for/);
+  assert.equal(batchAtOnce(batch), null);
+});
+
+test("a budget wait without amounts keeps the plain words", () => {
+  assert.equal(helperRight({ model: null, stopped: null, state: "waiting", reason: "budget" }), "the spend cap is reached · ask me, or go local");
 });
