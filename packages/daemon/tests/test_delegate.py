@@ -18,7 +18,7 @@ from langchain_core.messages import (
 )
 from langchain_core.outputs import ChatResult
 from langgraph.checkpoint.memory import InMemorySaver
-from pydantic import Field, PrivateAttr
+from pydantic import Field, PrivateAttr, ValidationError
 
 from golem.agents.bundled import bundled_agents_dir
 from golem.agents.parse import parse_agent
@@ -1054,10 +1054,12 @@ async def test_a_delegate_without_an_agent_starts_no_helper_and_names_the_agents
     assert run.status == "completed"
 
 
-def test_the_schema_requires_agent_and_lists_it_first() -> None:
+def test_the_schema_lists_agent_first_and_the_batch_beside_it() -> None:
     parameters = DelegateArgs.model_json_schema()
     assert next(iter(parameters["properties"])) == "agent"
-    assert "agent" in parameters["required"]
+    assert "batch" in parameters["properties"]
+    with pytest.raises(ValidationError, match="agent and brief"):
+        DelegateArgs.model_validate({"brief": "look"})
 
 
 async def test_the_worker_is_listed_but_not_available_yet(

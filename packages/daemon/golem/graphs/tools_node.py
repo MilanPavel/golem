@@ -201,6 +201,8 @@ ERROR_KEY = "golem_error"
 """``additional_kwargs`` key on a failed ``ToolMessage``: why the call did not give a result."""
 
 MEMORY_IDS_KEY = "golem_memory_ids"
+HELPER_COUNT_KEY = "golem_helper_count"
+"""On a ``delegate`` result: how many helpers the call started, for the per-message limit."""
 """``additional_kwargs`` key on a ``recall`` result: the ids of the memories it shows, in order."""
 
 ErrorKind = Literal["invalid_args", "unknown_tool", "tool_error", "denied", "cancelled"]
@@ -319,6 +321,7 @@ def tools_node(
         )
         planned: dict[Path, str] = {}
         verdicts: list[_Verdict] = []
+        helper_counts: dict[str, int] = {}
         for index, call in enumerate(last.tool_calls):
             if session_tools.get(call["name"]) is None:
                 verdicts.append(
@@ -372,8 +375,9 @@ def tools_node(
                 assert host is not None
                 try:
                     specs = _specs(call if verdict.args is None else {**call, "args": verdict.args})
-                    if delegated >= host.child_limits.max_per_turn:
-                        raise ToolError(NO_MORE_HELPERS)
+                    over = _over_limit(len(specs), delegated, host.child_limits.max_per_turn)
+                    if over is not None:
+                        raise ToolError(over)
                     await host.start_helpers(
                         state=state, config=config, call_id=ids[index], helpers=specs
                     )
@@ -383,7 +387,8 @@ def tools_node(
                     message = str(exc) or type(exc).__name__
                     verdict = _Verdict(run=False, message=message, kind="denied")
                 else:
-                    delegated += 1
+                    delegated += len(specs)
+                    helper_counts[ids[index]] = len(specs)
                     parked.append(ids[index])
             verdicts.append(verdict)
         if parked:
@@ -473,7 +478,15 @@ def tools_node(
             )
             if verdict.args is not None:
                 output = _edited(verdict.args, output)
-            results.append(_result(call_id, call["name"], output, memory_ids=result.memory_ids))
+            results.append(
+                _result(
+                    call_id,
+                    call["name"],
+                    output,
+                    memory_ids=result.memory_ids,
+                    helpers=helper_counts.get(call_id),
+                )
+            )
             changed = {k: v for k, v in (result.update or {}).items() if k in STATE_KEYS}
             if "todos" in changed:
                 write({STREAM_KEY: "todos.updated", "call_id": call_id, "todos": changed["todos"]})
@@ -655,10 +668,13 @@ def _result(
     *,
     error: ErrorKind | None = None,
     memory_ids: tuple[str, ...] | None = None,
+    helpers: int | None = None,
 ) -> ToolMessage:
     extra: dict[str, object] = {} if error is None else {ERROR_KEY: error}
     if memory_ids is not None:
         extra[MEMORY_IDS_KEY] = list(memory_ids)
+    if helpers is not None:
+        extra[HELPER_COUNT_KEY] = helpers
     return ToolMessage(
         content=content,
         tool_call_id=call_id,
@@ -682,25 +698,45 @@ def _delegated_this_turn(messages: Sequence[BaseMessage]) -> int:
         if isinstance(message, HumanMessage) and not is_note(message):
             break
         if isinstance(message, ToolMessage) and message.name == "delegate":
-            found += 1
+            count = message.additional_kwargs.get(HELPER_COUNT_KEY)
+            found += count if isinstance(count, int) else 1
     return found
+
+
+def _over_limit(asked: int, delegated: int, limit: int) -> str | None:
+    """Why ``asked`` more helpers may not start when ``delegated`` already did, or None."""
+    if delegated >= limit:
+        return NO_MORE_HELPERS
+    if asked > limit:
+        return (
+            f"a batch of {asked} helpers is more than the limit of {limit} per message "
+            f"([agents] max_per_batch); send {limit} or fewer"
+        )
+    if delegated + asked > limit:
+        return (
+            f"{asked} more helpers would be more than the limit of {limit} per message "
+            f"([agents] max_per_batch); {delegated} already started, so start {limit - delegated} "
+            "or fewer"
+        )
+    return None
 
 
 def _delegate_refusal(call: ToolCall, delegated: int, limit: int) -> _Verdict | None:
     """Why a ``delegate`` call starts no helper, before the user is asked about it, or None."""
     try:
-        _specs(call)
+        specs = _specs(call)
     except InvalidArguments as exc:
         return _Verdict(run=False, message=str(exc), kind="invalid_args")
-    if delegated >= limit:
-        return _Verdict(run=False, message=NO_MORE_HELPERS, kind="denied")
+    over = _over_limit(len(specs), delegated, limit)
+    if over is not None:
+        return _Verdict(run=False, message=over, kind="denied")
     return None
 
 
 def _specs(call: ToolCall) -> list[HelperSpec]:
     """The helpers a ``delegate`` call asks for. Bad arguments raise :class:`InvalidArguments`."""
     raw = dict(call["args"])
-    if raw.get("agent") in (None, ""):
+    if raw.get("batch") is None and raw.get("agent") in (None, ""):
         # No type named: the host answers with the types the session may use.
         brief = raw.get("brief")
         return [HelperSpec(agent="", brief=brief if isinstance(brief, str) else "")]
@@ -712,7 +748,7 @@ def _specs(call: ToolCall) -> list[HelperSpec]:
         said = first["msg"].removeprefix("Value error, ")
         message = f"invalid arguments for delegate: {exc.error_count()} problem(s); {field}: {said}"
         raise InvalidArguments(message) from exc
-    return [HelperSpec(agent=args.agent, brief=args.brief, model=args.model)]
+    return args.helpers()
 
 
 def _streamer(write: Callable[[object], None], call_id: str) -> Callable[[str], None]:

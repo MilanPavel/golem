@@ -10,7 +10,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from golem.tools.registry import Tool, ToolContext, ToolError, ToolResult
 
@@ -18,18 +18,56 @@ MODEL_MAX = 100
 """The longest ``model`` a call may name."""
 MODELS_SHOWN = 8
 """How many models the description lists."""
+LABEL_MAX = 60
+"""The longest ``label`` a batch item may carry."""
+
+
+def _checked_model(value: str | None) -> str | None:
+    if value is None:
+        return None
+    if value.strip() == "":
+        raise ValueError("model is empty: name a model or leave it out")
+    if value != value.strip() or any(c.isspace() for c in value):
+        raise ValueError("model must be one name with no spaces, such as local or ollama/qwen3")
+    if len(value) > MODEL_MAX:
+        raise ValueError(f"model is longer than {MODEL_MAX} characters")
+    return value
+
+
+class BatchItem(BaseModel):
+    """One helper of a batch."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    agent: str = Field(min_length=1, description="The agent type of this helper.")
+    brief: str = Field(min_length=1, description="What this helper finds out and returns.")
+    label: str = Field(
+        default="",
+        max_length=LABEL_MAX,
+        description="Optional short name for this helper's section of the result.",
+    )
+    model: str | None = Field(default=None, description="Optional: the model of this helper.")
+
+    @field_validator("model")
+    @classmethod
+    def _named(cls, value: str | None) -> str | None:
+        return _checked_model(value)
 
 
 class DelegateArgs(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    agent: str = Field(
+    agent: str | None = Field(
+        default=None,
         description=(
-            "Which helper to use: the name of one agent type listed in this tool. Required."
+            "Which helper to use: the name of one agent type listed in this tool. "
+            "Required with brief, unless batch is given."
         ),
     )
-    brief: str = Field(
-        min_length=1, description="What to find out, and what to return. The helper sees only this."
+    brief: str | None = Field(
+        default=None,
+        min_length=1,
+        description="What to find out, and what to return. The helper sees only this.",
     )
     model: str | None = Field(
         default=None,
@@ -39,19 +77,35 @@ class DelegateArgs(BaseModel):
             "helper's own choice."
         ),
     )
+    batch: list[BatchItem] | None = Field(
+        default=None,
+        min_length=1,
+        description=(
+            "Several independent jobs that run at the same time: a list of "
+            "{agent, brief, label, model}. Use it instead of agent and brief, not with them."
+        ),
+    )
 
     @field_validator("model")
     @classmethod
     def _named(cls, value: str | None) -> str | None:
-        if value is None:
-            return None
-        if value.strip() == "":
-            raise ValueError("model is empty: name a model or leave it out")
-        if value != value.strip() or any(c.isspace() for c in value):
-            raise ValueError("model must be one name with no spaces, such as local or ollama/qwen3")
-        if len(value) > MODEL_MAX:
-            raise ValueError(f"model is longer than {MODEL_MAX} characters")
-        return value
+        return _checked_model(value)
+
+    @model_validator(mode="after")
+    def _one_form(self) -> DelegateArgs:
+        single = self.agent is not None or self.brief is not None or self.model is not None
+        if self.batch is not None and single:
+            raise ValueError("give either batch or agent and brief, not both")
+        if self.batch is None and (self.agent is None or self.brief is None):
+            raise ValueError("give agent and brief, or a batch of helpers")
+        return self
+
+    def helpers(self) -> list[HelperSpec]:
+        """The helpers this call asks for, in call order."""
+        if self.batch is not None:
+            return [HelperSpec(i.agent, i.brief, i.label, i.model) for i in self.batch]
+        assert self.agent is not None and self.brief is not None
+        return [HelperSpec(agent=self.agent, brief=self.brief, model=self.model)]
 
 
 @dataclass(frozen=True, slots=True)
@@ -124,7 +178,9 @@ async def _delegate(args: DelegateArgs, ctx: ToolContext) -> ToolResult:
 DESCRIPTION = (
     "Hand a reading or searching job to a helper that starts with an empty context. "
     "Use it for wide questions about many files. It returns a short answer, not the files. "
-    "It cannot change anything."
+    "It cannot change anything. "
+    "For several independent jobs, give batch: a list of {agent, brief, label}. "
+    "They run at the same time, and no order is promised."
 )
 
 
@@ -134,7 +190,10 @@ def describe(types: Sequence[tuple[str, str]], models: Sequence[str] = ()) -> st
     text = DESCRIPTION
     if types:
         lines = "\n".join(f"- {name}: {about}" for name, about in types)
-        text = f"{text}\nThe agent argument is required and is one of these types:\n{lines}"
+        text = (
+            f"{text}\nThe agent argument (or the agent of each batch item) "
+            f"is one of these types:\n{lines}"
+        )
     if models:
         shown = ", ".join(models[:MODELS_SHOWN])
         text = (
@@ -155,8 +214,10 @@ DELEGATE = Tool(
 __all__ = [
     "DELEGATE",
     "DESCRIPTION",
+    "LABEL_MAX",
     "MODELS_SHOWN",
     "MODEL_MAX",
+    "BatchItem",
     "DelegateArgs",
     "HelperOutcome",
     "HelperSpec",
