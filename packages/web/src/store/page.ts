@@ -171,6 +171,7 @@ export type PageClient = Pick<
   | "onOptionsSaved"
   | "pullModel"
   | "cancelPull"
+  | "cleanupPull"
   | "deleteModel"
   | "searchHf"
   | "hfFiles"
@@ -338,6 +339,8 @@ export type PageActions = {
   defaultWhenPulled(ref: string, name: string): void;
   /** Stops a download. Ollama keeps the bytes for the next try. */
   cancelPull(ref: string): Promise<void>;
+  /** Removes the parts a failed download left on disk. */
+  cleanupPull(ref: string): Promise<void>;
   /** Dismiss the failure of a download. */
   forgetPull(ref: string): void;
   remove(ref: string): Promise<void>;
@@ -1116,6 +1119,10 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
       async cancelPull(ref) {
         pulls.forget(ref);
         await client.cancelPull(ref);
+      },
+      async cleanupPull(ref) {
+        await client.cleanupPull(ref);
+        pulls.cleaned(ref);
       },
       searchHf(query) {
         return client.searchHf(query);

@@ -28,7 +28,7 @@ export function hfSizeItems(repo: string, files: HfFilesResult, listing: ModelLi
   const installed = new Set((listing?.models ?? []).filter((model) => model.source === "installed" && model.status === "ready").map((model) => model.ref));
   return files.sizes.map((size) => {
     const ref = hfRef(repo, size.quant);
-    return { key: size.quant, ...quantWords(size.quant), sizeGb: size.size_gb, fit: size.fit, ref, name: size.quant, recommended: size.recommended, installed: installed.has(ref) };
+    return { key: size.quant, ...quantWords(size.quant), sizeGb: size.size_gb, fit: size.fit, ref, name: size.quant, recommended: size.recommended, installed: installed.has(ref), ...(size.problem == null ? {} : { problem: size.problem }) };
   });
 }
 

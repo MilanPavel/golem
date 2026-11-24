@@ -361,6 +361,7 @@ Downloads go through Ollama (`golem/models/pulls.py`):
 - **Progress:** it is summed over layers and goes out as `model.pull.progress` at most four times a second, and `model.pull.done` goes out at the end. Both go to every welcomed connection. They are the first notifications outside a session, and they are not stored, because a download is not a fact about any session.
 - **After reattaching:** `model.list` marks a running download as `pulling` with its progress, so a client that attaches later still sees it.
 - **`model.pull_cancel`** stops the task; Ollama keeps the fetched layers for the next try. **`model.delete`** calls `/api/delete`.
+- **A failed download** says why in plain words in `model.pull.done` `error` (a small table in `pulls.py`, for example a Hugging Face repo that lacks a file), with Ollama's own text in `detail`. The parts it fetched stay in Ollama's `blobs` folder; when no model names them and they weigh 0.1 GB or more, `leftover_gb` says so, and **`model.pull_cleanup`** removes exactly those parts (never one a manifest names or a running download fetches). A new download of the same ref forgets the list. `hf.files` checks each size's config file with Hugging Face and sets `problem` only on a 404, so a size that cannot finish is flagged before the download.
 
 ### The model list
 

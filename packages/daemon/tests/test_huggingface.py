@@ -13,7 +13,14 @@ from pydantic import BaseModel
 from test_pulls import FakeOllama
 
 from golem.config import GolemSettings
-from golem.models.huggingface import SLOW, HuggingFace, HuggingFaceError, quant_of, repo_of
+from golem.models.huggingface import (
+    MISSING_FILE,
+    SLOW,
+    HuggingFace,
+    HuggingFaceError,
+    quant_of,
+    repo_of,
+)
 from golem.models.pulls import PullManager
 from golem.models.router import ModelRouter
 
@@ -248,5 +255,65 @@ async def test_a_pull_by_an_hf_name_reaches_ollama_with_that_name(tmp_path: Path
         "ref": ref,
         "ok": True,
         "error": None,
+        "detail": None,
+        "leftover_gb": None,
     }
     await manager.aclose()
+
+
+CONFIG = "sha256:8d753d16" + "0" * 56
+
+
+def _checked_hub(blob_status: dict[str, int] | None = None, *, slow: bool = False) -> HuggingFace:
+    """A hub whose manifests name a config blob; ``blob_status`` maps a size to its status."""
+    status = blob_status or {}
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        path = request.url.path
+        if path == "/api/models/bartowski/Qwen3-8B-GGUF/tree/main":
+            return httpx.Response(200, json=TREE)
+        if "/manifests/" in path:
+            quant = path.rsplit("/", 1)[1]
+            return httpx.Response(200, json={"config": {"digest": f"{CONFIG}{quant}"}})
+        if "/blobs/" in path:
+            if slow:
+                await asyncio.sleep(5)
+            quant = path.rsplit(CONFIG, 1)[1]
+            return httpx.Response(status.get(quant, 200), json={"error": "Blob not found"})
+        return httpx.Response(404)
+
+    return HuggingFace(transport=httpx.MockTransport(handler), ram_gb=32.0)
+
+
+async def test_a_size_whose_config_blob_is_a_404_carries_the_problem() -> None:
+    sizes = await _checked_hub({"Q4_K_M": 404, "Q8_0": 200}).sizes("bartowski/Qwen3-8B-GGUF")
+    problems = {s["quant"]: s["problem"] for s in sizes}
+    assert problems["Q4_K_M"] == MISSING_FILE
+    assert MISSING_FILE == (
+        "Hugging Face is missing a file for this size, so the download can't finish right now."
+    )
+    assert [quant for quant, problem in problems.items() if problem is None] == [
+        "Q2_K",
+        "Q6_K",
+        "Q8_0",
+        "F16",
+    ]
+
+
+async def test_other_answers_never_mark_a_size() -> None:
+    codes = {"Q4_K_M": 500, "Q8_0": 403, "Q2_K": 429}
+    sizes = await _checked_hub(codes).sizes("bartowski/Qwen3-8B-GGUF")
+    assert {s["problem"] for s in sizes} == {None}
+
+
+async def test_a_slow_check_leaves_every_size_unmarked(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("golem.models.huggingface.CHECK_SECONDS", 0.05)
+    sizes = await _checked_hub({"Q4_K_M": 404}, slow=True).sizes("bartowski/Qwen3-8B-GGUF")
+    assert len(sizes) == 5
+    assert {s["problem"] for s in sizes} == {None}
+
+
+async def test_a_missing_manifest_leaves_sizes_unmarked() -> None:
+    # FakeHub has the tree but answers 404 to a manifest, so nothing is known about the config.
+    sizes = await _hub(FakeHub()).sizes("bartowski/Qwen3-8B-GGUF")
+    assert {s["problem"] for s in sizes} == {None}

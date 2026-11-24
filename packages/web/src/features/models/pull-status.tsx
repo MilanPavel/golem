@@ -3,7 +3,7 @@ import { CloseIcon } from "../../ui/icons.tsx";
 import { useModelList, usePageActions, usePulls, useRoute } from "../../store/page-context.tsx";
 import type { PullsSnapshot } from "../../store/pulls.ts";
 import { openModelDialog } from "./model-dialog-open.ts";
-import { pullSummary, type PullSummary } from "./model-text.ts";
+import { pullSummary, refName, type PullSummary } from "./model-text.ts";
 import { PullBar } from "./pull-bar.tsx";
 
 export type PullStatusViewProps = {
@@ -28,12 +28,17 @@ export function PullStatusView({ summary, announcement, onOpen, onDismiss }: Pul
         <div className="flex items-start gap-1 rounded-md border border-line px-2 py-1.5 text-wait">
           <button
             type="button"
-            title={summary.text}
+            title={summary.detail === undefined ? summary.text : `${summary.text}\n\n${summary.detail}`}
             onClick={(event) => onOpen(event.currentTarget)}
             className="min-w-0 flex-1 cursor-pointer rounded-sm text-left text-xs outline-offset-2 outline-clay focus-visible:outline-2"
           >
             <span className="sr-only">{summary.spoken}. Open models</span>
-            <span aria-hidden="true">{summary.title}</span>
+            <span aria-hidden="true" className="block break-words">
+              {summary.title}
+            </span>
+            <span aria-hidden="true" className="mt-0.5 block break-words text-faint">
+              {summary.text}
+            </span>
           </button>
           <button
             type="button"
@@ -92,10 +97,10 @@ export function PullStatus() {
   const route = useRoute();
   const page = usePageActions();
   const labels = new Map((listing.data?.models ?? []).map((model) => [model.ref, model.label]));
-  const announcement = useAnnouncement(pulls, (ref) => labels.get(ref) ?? ref);
+  const announcement = useAnnouncement(pulls, (ref) => labels.get(ref) ?? refName(ref));
   return (
     <PullStatusView
-      summary={pullSummary(pulls.active, pulls.failed, labels)}
+      summary={pullSummary(pulls.active, pulls.failed, labels, pulls.extra)}
       announcement={announcement}
       onOpen={(trigger) => openModelDialog({ sessionId: route.name === "session" ? route.id : null, returnTo: trigger })}
       onDismiss={(ref) => page.forgetPull(ref)}

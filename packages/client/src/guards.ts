@@ -104,6 +104,7 @@ import type { ModelBenchDone } from "../../protocol/gen/model-bench-done.ts";
 import type { ModelBenchProgress } from "../../protocol/gen/model-bench-progress.ts";
 import type { ModelCheckDone } from "../../protocol/gen/model-check-done.ts";
 import type { ModelCheckProgress } from "../../protocol/gen/model-check-progress.ts";
+import type { ModelPullCleanupResult } from "../../protocol/gen/model-pull-cleanup-result.ts";
 import type { ModelPullDone } from "../../protocol/gen/model-pull-done.ts";
 import type { ModelPullProgress } from "../../protocol/gen/model-pull-progress.ts";
 import type { ModelScoreResetResult } from "../../protocol/gen/model-score-reset-result.ts";
@@ -575,6 +576,10 @@ export function isPullProgress(value: unknown): value is ModelPullProgress {
 
 export function isPullDone(value: unknown): value is ModelPullDone {
   return isRecord(value) && typeof value["ref"] === "string" && typeof value["ok"] === "boolean";
+}
+
+export function isPullCleanupResult(value: unknown): value is ModelPullCleanupResult {
+  return isRecord(value) && typeof value["ref"] === "string" && typeof value["freed_gb"] === "number";
 }
 
 export function isCheckProgress(value: unknown): value is ModelCheckProgress {

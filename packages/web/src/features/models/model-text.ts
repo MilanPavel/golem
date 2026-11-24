@@ -7,6 +7,12 @@ export function shortName(ref: string): string {
   return ref.slice(ref.indexOf("/") + 1);
 }
 
+/** A ref as a person reads it: `user/repo:Q4_K_M` for a Hugging Face one, else as it is. */
+export function refName(ref: string): string {
+  const hf = hfPull(ref);
+  return hf === null ? ref : `${hf.repo}:${hf.quant}`;
+}
+
 /** `ollama/hf.co/user/repo:Q4_K_M` as a repo and a size, or null when the ref is not a Hugging Face one. */
 export function hfPull(ref: string): { repo: string; quant: string } | null {
   const match = /^ollama\/hf\.co\/(.+):([^:/]+)$/.exec(ref);
@@ -109,6 +115,8 @@ export type PullSummary = {
   title: string;
   share: number | null;
   text: string;
+  /** The daemon's own words for a failure, when they differ from `text`. */
+  detail?: string;
   /** What a screen reader says of it: `Downloading Qwen3, 12 percent, 38 minutes left`. */
   spoken: string;
   ref?: string;
@@ -140,8 +148,9 @@ export function pullSummary(
   active: ReadonlyMap<string, PullEntry>,
   failed: ReadonlyMap<string, string>,
   labels: ReadonlyMap<string, string>,
+  extra?: PullsSnapshot["extra"],
 ): PullSummary | null {
-  const name = (ref: string) => labels.get(ref) ?? ref;
+  const name = (ref: string) => labels.get(ref) ?? refName(ref);
   const entries = [...active.entries()];
   if (entries.length === 0) {
     const first = [...failed.entries()].find(([, error]) => error !== "cancelled");
@@ -152,6 +161,7 @@ export function pullSummary(
           title: `Download of ${name(first[0])} failed`,
           share: null,
           text: first[1],
+          ...(extra?.get(first[0])?.detail == null ? {} : { detail: extra.get(first[0])?.detail ?? "" }),
           spoken: `Download of ${name(first[0])} failed: ${first[1]}`,
           ref: first[0],
         };

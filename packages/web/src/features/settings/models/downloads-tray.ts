@@ -69,7 +69,7 @@ export function dismissFailed(memory: TrayMemory, ref: string, words: string): T
 export type TrayRow =
   | { kind: "running"; ref: string; name: string; hf: boolean; share: number | null; text: string }
   | { kind: "ready"; ref: string; name: string; hf: boolean }
-  | { kind: "failed"; ref: string; name: string; hf: boolean; words: string };
+  | { kind: "failed"; ref: string; name: string; hf: boolean; words: string; detail: string | null; leftoverGb: number | null };
 
 /** `qwen3:8b`, or `user/repo:Q4_K_M` for a Hugging Face one. */
 export function trayName(ref: string): string {
@@ -79,6 +79,11 @@ export function trayName(ref: string): string {
 
 function gb(bytes: number): string {
   return (bytes / 1e9).toFixed(1);
+}
+
+/** `16.2 GB of this download is still on disk.` */
+export function leftoverText(leftoverGb: number): string {
+  return `${leftoverGb.toFixed(1)} GB of this download is still on disk.`;
 }
 
 /** `34% · 5.5 of 16.2 GB · 3 min left`, with what is known so far. */
@@ -104,7 +109,8 @@ export function trayRows(memory: TrayMemory, pulls: PullsSnapshot): TrayRow[] {
   for (const ref of memory.ready) rows.push({ kind: "ready", ...base(ref) });
   for (const [ref, words] of pulls.failed) {
     if (words === "cancelled" || pulls.active.has(ref) || memory.dismissed.get(ref) === words) continue;
-    rows.push({ kind: "failed", ...base(ref), words });
+    const more = pulls.extra?.get(ref);
+    rows.push({ kind: "failed", ...base(ref), words, detail: more?.detail ?? null, leftoverGb: more?.leftoverGb ?? null });
   }
   return rows;
 }

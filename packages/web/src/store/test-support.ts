@@ -269,6 +269,7 @@ export function fakeClient() {
     onOptionsSaved: saved.on,
     pullModel: vi.fn<PageClient["pullModel"]>(async (ref) => ({ ref, started: true }) as never),
     cancelPull: vi.fn<PageClient["cancelPull"]>(async (ref) => ({ ref, cancelled: true }) as never),
+    cleanupPull: vi.fn<PageClient["cleanupPull"]>(async (ref) => ({ ref, freed_gb: 0 })),
     deleteModel: vi.fn<PageClient["deleteModel"]>(async (ref) => ({ ref, deleted: true }) as never),
     searchHf: vi.fn<PageClient["searchHf"]>(async () => ({ repos: [] })),
     hfFiles: vi.fn<PageClient["hfFiles"]>(async (repo) => ({ repo, sizes: [] })),

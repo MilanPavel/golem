@@ -32,6 +32,8 @@ export type ModelsActions = {
   stop(ref: string): Promise<void>;
   /** Starts a download. */
   pull(ref: string): Promise<void>;
+  /** Removes the parts a failed download left on disk. */
+  cleanup(ref: string): Promise<void>;
   /** Hugging Face: the search and a repo's sizes. */
   hf: HfActions;
   /** The Ollama library: its names and their sizes. */
@@ -235,6 +237,7 @@ export function ModelsView({ listing, keys, ollama, pulls, setup, actions, initi
         pulls={pulls}
         onPull={actions.pull}
         onStop={actions.stop}
+        onCleanup={actions.cleanup}
         hf={actions.hf}
         library={actions.library}
         onBack={() => {

@@ -88,6 +88,7 @@ export const BROWSER_METHODS: ReadonlySet<string> = new Set([
   "model.probe",
   "model.pull",
   "model.pull_cancel",
+  "model.pull_cleanup",
   "model.score_reset",
   "model.set_default",
   "model.star",

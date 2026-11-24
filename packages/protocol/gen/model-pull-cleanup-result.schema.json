@@ -1,0 +1,22 @@
+{
+  "additionalProperties": false,
+  "description": "``freed_gb`` is 0 when nothing was left to remove.",
+  "properties": {
+    "freed_gb": {
+      "minimum": 0,
+      "title": "Freed Gb",
+      "type": "number"
+    },
+    "ref": {
+      "minLength": 3,
+      "title": "Ref",
+      "type": "string"
+    }
+  },
+  "required": [
+    "ref",
+    "freed_gb"
+  ],
+  "title": "ModelPullCleanupResult",
+  "type": "object"
+}

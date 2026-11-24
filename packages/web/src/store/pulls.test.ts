@@ -22,8 +22,8 @@ function setup() {
         progress: { ref, status: "pulling", completed, total, progress: completed === null || total === null ? null : completed / total },
       });
     },
-    done(ok: boolean, error: string | null = null, ref = REF) {
-      fake.emitPull({ kind: "done", done: { ref, ok, error } });
+    done(ok: boolean, error: string | null = null, ref = REF, more: { detail?: string; leftover_gb?: number } = {}) {
+      fake.emitPull({ kind: "done", done: { ref, ok, error, ...more } });
     },
   };
 }
@@ -228,4 +228,26 @@ test("forget drops a failure, so the person can dismiss it", () => {
   expect(pulls.getSnapshot().failed.get(REF)).toBe("no space");
   pulls.forget(REF);
   expect(pulls.getSnapshot().failed.has(REF)).toBe(false);
+});
+
+test("a failure keeps the daemon's own text and the size of the parts left until they are removed", () => {
+  const { pulls, progress, done } = setup();
+  progress(1);
+  done(false, "Hugging Face is missing a file for this model.", REF, { detail: "file does not exist", leftover_gb: 16.2 });
+  expect(pulls.getSnapshot().extra?.get(REF)).toEqual({ detail: "file does not exist", leftoverGb: 16.2 });
+  pulls.cleaned(REF);
+  expect(pulls.getSnapshot().extra?.get(REF)).toEqual({ detail: "file does not exist", leftoverGb: null });
+  expect(pulls.getSnapshot().failed.has(REF)).toBe(true);
+  pulls.begin(REF);
+  expect(pulls.getSnapshot().extra?.size).toBe(0);
+});
+
+test("a failure with nothing more has no extra, and a stop clears it", () => {
+  const { pulls, progress, done } = setup();
+  progress(1);
+  done(false, "disk full");
+  expect(pulls.getSnapshot().extra?.has(REF)).toBe(false);
+  done(false, "x", REF, { leftover_gb: 1 });
+  done(false, "cancelled");
+  expect(pulls.getSnapshot().extra?.size).toBe(0);
 });

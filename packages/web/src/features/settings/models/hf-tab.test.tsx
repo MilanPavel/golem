@@ -5,7 +5,7 @@ import { expect, test, vi } from "vitest";
 import type { HfFilesResult, HfSearchResult } from "../../../store/models.ts";
 import type { PullsSnapshot } from "../../../store/pulls.ts";
 import { HuggingFaceTab, type HfActions } from "./hf-tab.tsx";
-import { HF_FILES, HF_RESULTS, NO_PULLS, SAMPLE_LISTING } from "./models-sample.ts";
+import { HF_FILES, HF_FILES_ALL_PROBLEM, HF_FILES_ONE_PROBLEM, HF_RESULTS, NO_PULLS, SAMPLE_LISTING } from "./models-sample.ts";
 import type { Timer } from "./use-debounced.ts";
 
 /** A timer that only moves when the test says so. */
@@ -135,4 +135,27 @@ test("an error shows its words and the old results stay", async () => {
   pause();
   expect((await screen.findByRole("alert")).textContent).toBe("Hugging Face did not answer.");
   expect(within(screen.getByRole("list", { name: "Hugging Face repos" })).getAllByRole("listitem")).toHaveLength(3);
+});
+
+const MISSING = "Hugging Face is missing a file for this size, so the download can't finish right now.";
+
+test("a size Hugging Face cannot finish says so under that size, and its button stays", async () => {
+  const user = userEvent.setup();
+  const pull = vi.fn(() => Promise.resolve(true));
+  render(<Host hf={actions(() => Promise.resolve(HF_RESULTS), () => Promise.resolve(HF_FILES_ONE_PROBLEM))} timer={stepTimer().timer} pull={pull} />);
+  const sizes = await screen.findByRole("group", { name: `Sizes of ${HF_FILES.repo}` });
+  expect(within(sizes).getAllByText(MISSING)).toHaveLength(1);
+  const row = within(sizes).getByText(MISSING).closest("li");
+  expect(row?.textContent).toContain("Q4_K_M");
+  await user.click(within(row as HTMLElement).getByRole("button", { name: /Download/ }));
+  expect(pull).toHaveBeenCalledWith(`ollama/hf.co/${HF_FILES.repo}:Q4_K_M`);
+});
+
+const MISSING_ALL = "Hugging Face is missing a file for this model, so no size can finish downloading right now.";
+
+test("when every size has the problem it is said once", async () => {
+  render(<Host hf={actions(() => Promise.resolve(HF_RESULTS), () => Promise.resolve(HF_FILES_ALL_PROBLEM))} timer={stepTimer().timer} />);
+  const sizes = await screen.findByRole("group", { name: `Sizes of ${HF_FILES.repo}` });
+  expect(within(sizes).getAllByText(MISSING_ALL)).toHaveLength(1);
+  expect(within(sizes).getAllByRole("button", { name: /Download/ }).length).toBeGreaterThan(1);
 });

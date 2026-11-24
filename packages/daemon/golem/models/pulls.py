@@ -15,6 +15,7 @@ import contextlib
 import json
 import logging
 import os
+import re
 import shutil
 import time
 from collections.abc import Callable
@@ -40,6 +41,28 @@ Broadcast = Callable[[BaseModel], None]
 _SEND_EVERY_SECONDS = 0.25
 _SPACE_MARGIN = 1.1
 _OLLAMA_TIMEOUT = 5.0
+_LEFTOVER_MIN_GB = 0.1
+_DIGEST = re.compile(r"^sha256:([0-9a-f]{64})$")
+_NAMED_DIGEST = re.compile(r"sha256:([0-9a-f]{64})")
+
+# Plain words for an Ollama error: (model name starts with, Ollama's text, what to say).
+# The first row that matches wins. Any other error is shown as Ollama wrote it.
+_PLAIN_ERRORS: tuple[tuple[str, str, str], ...] = (
+    (
+        "hf.co/",
+        "file does not exist",
+        "Hugging Face is missing a file for this model. Try another repo or the Ollama library.",
+    ),
+)
+
+
+def plain_error(model_id: str, raw: str) -> tuple[str, str | None]:
+    """``(error, detail)``: plain words for the error, and Ollama's own text when it differs."""
+    wanted = raw.strip().lower().rstrip(".")
+    for prefix, text, plain in _PLAIN_ERRORS:
+        if model_id.lower().startswith(prefix) and wanted == text:
+            return plain, raw
+    return raw, None
 
 
 class PullError(Exception):
@@ -64,6 +87,8 @@ class _Pull:
     layers: dict[str, tuple[int, int]] = field(default_factory=lambda: {})
     sent_at: float = 0.0
     error: str | None = None
+    # Hex digests of every layer seen in the stream, for the parts a failure leaves behind.
+    digests: set[str] = field(default_factory=lambda: set[str]())
 
     @property
     def completed(self) -> int | None:
@@ -116,6 +141,8 @@ class PullManager:
         self._ollama_installed = ollama_installed or ollama.installed
         self._client: httpx.AsyncClient | None = None
         self._pulls: dict[str, _Pull] = {}
+        # Per ref, the hex digests of the parts its last failed download left unused.
+        self._leftovers: dict[str, list[str]] = {}
         # Starts a local Ollama that does not answer, and keeps it up while a download runs.
         self.local: ollama.LocalServers | None = None
 
@@ -184,6 +211,8 @@ class PullManager:
             return target.ref, False
         pull = _Pull(ref=target.ref)
         self._pulls[target.ref] = pull
+        # The parts of an earlier failure are being reused now, so they are not leftovers.
+        self._leftovers.pop(target.ref, None)
         pull.task = asyncio.create_task(self._run(target, pull), name=f"golem-pull-{target.ref}")
         log.info("pull started ref=%s", target.ref)
         return target.ref, True
@@ -211,6 +240,32 @@ class PullManager:
         pull.task.cancel()
         await asyncio.gather(pull.task, return_exceptions=True)
         return target.ref, True
+
+    def cleanup(self, name: str) -> tuple[str, float]:
+        """Remove the parts the last failed download of ``name`` left behind; returns the GB freed.
+
+        Only the digests remembered from that failure are touched, and each one is checked
+        again: a part that a model now names, or that any download is fetching, stays.
+        """
+        target = self._target(name)
+        digests = self._leftovers.pop(target.ref, [])
+        if target.ref in self._pulls or not digests:
+            return target.ref, 0.0
+        busy = {digest for pull in self._pulls.values() for digest in pull.digests}
+        named = self._named_digests()
+        freed = 0
+        for digest in digests:
+            if digest in named or digest in busy:
+                continue
+            for path in self._blob_files(digest):
+                try:
+                    size = path.stat().st_size
+                    path.unlink()
+                except OSError:
+                    continue
+                freed += size
+        log.info("pull cleanup ref=%s freed=%d", target.ref, freed)
+        return target.ref, round(freed / 1e9, 2)
 
     async def delete(self, name: str) -> tuple[str, bool]:
         """Remove an installed model. Raises :class:`PullError` while it downloads."""
@@ -311,11 +366,75 @@ class PullManager:
         except ModelUnreachable as exc:
             error = f"{exc.message}: {exc.hint}"
         finally:
+            detail: str | None = None
+            leftover: float | None = None
+            if error is not None and error != "cancelled":
+                # Ollama resumes a stopped download, so only a failure has leftovers.
+                leftover = self._remember_leftovers(target.ref, pull)
+                error, detail = plain_error(target.model_id, error)
             pull.error = error
             self._pulls.pop(target.ref, None)
-            done = ModelPullDone(ref=target.ref, ok=error is None, error=error)
+            done = ModelPullDone(
+                ref=target.ref,
+                ok=error is None,
+                error=error,
+                detail=detail,
+                leftover_gb=leftover,
+            )
             self._send(ModelPullDoneNotification(params=done))
-            log.info("pull ended ref=%s ok=%s error=%s", target.ref, error is None, error)
+            log.info(
+                "pull ended ref=%s ok=%s error=%s detail=%s leftover_gb=%s",
+                target.ref,
+                error is None,
+                error,
+                detail,
+                leftover,
+            )
+
+    def _blob_files(self, digest: str) -> list[Path]:
+        blobs = self._models_dir / "blobs"
+        found = [blobs / f"sha256-{digest}"] if (blobs / f"sha256-{digest}").is_file() else []
+        with contextlib.suppress(OSError):
+            found.extend(path for path in blobs.glob(f"sha256-{digest}-partial*") if path.is_file())
+        return found
+
+    def _named_digests(self) -> set[str]:
+        """Every digest that a manifest under the models folder names."""
+        named: set[str] = set()
+        try:
+            for path in (self._models_dir / "manifests").rglob("*"):
+                if not path.is_file():
+                    continue
+                try:
+                    named.update(_NAMED_DIGEST.findall(path.read_text(errors="ignore")))
+                except OSError:
+                    log.debug("manifest unreadable path=%s", path, exc_info=True)
+        except OSError:
+            log.debug("manifests unreadable", exc_info=True)
+        return named
+
+    def _remember_leftovers(self, ref: str, pull: _Pull) -> float | None:
+        """Remember the parts of this download that no model uses; their size in GB, or None."""
+        if not pull.digests:
+            return None
+        named = self._named_digests()
+        keep: list[str] = []
+        size = 0
+        for digest in sorted(pull.digests - named):
+            files = self._blob_files(digest)
+            if not files:
+                continue
+            keep.append(digest)
+            for path in files:
+                try:
+                    size += path.stat().st_size
+                except OSError:
+                    continue
+        gb = size / 1e9
+        if gb < _LEFTOVER_MIN_GB:
+            return None
+        self._leftovers[ref] = keep
+        return round(gb, 2)
 
     def _step(self, pull: _Pull, line: str) -> str | None:
         if line.strip() == "":
@@ -332,6 +451,9 @@ class PullManager:
             pull.status = status
         digest = item.get("digest")
         total = item.get("total")
+        found = _DIGEST.match(digest) if isinstance(digest, str) else None
+        if found is not None:
+            pull.digests.add(found[1])
         if isinstance(digest, str) and isinstance(total, int):
             completed = item.get("completed")
             pull.layers[digest] = (completed if isinstance(completed, int) else 0, total)

@@ -1,6 +1,6 @@
 {
   "additionalProperties": false,
-  "description": "One quantization. ``files`` is the number of parts summed into ``size_gb``.\n\n``fit`` is null when golem cannot tell how much memory this Mac has. ``recommended`` marks\nthe size to pick: ``Q4_K_M`` when it fits, else the largest that fits.",
+  "description": "One quantization. ``files`` is the number of parts summed into ``size_gb``.\n\n``fit`` is null when golem cannot tell how much memory this Mac has. ``recommended`` marks\nthe size to pick: ``Q4_K_M`` when it fits, else the largest that fits. ``problem`` is set\nonly when Hugging Face answered that a file the download needs is missing; it is never set\non doubt.",
   "properties": {
     "files": {
       "minimum": 1,
@@ -23,6 +23,18 @@
       ],
       "default": null,
       "title": "Fit"
+    },
+    "problem": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Problem"
     },
     "quant": {
       "minLength": 1,

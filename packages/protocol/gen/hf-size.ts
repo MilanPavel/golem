@@ -2,6 +2,7 @@
 
 export type Files = number;
 export type Fit = ('fits' | 'tight' | 'too_big') | null;
+export type Problem = string | null;
 export type Quant = string;
 export type Recommended = boolean;
 export type SizeGb = number;
@@ -10,11 +11,14 @@ export type SizeGb = number;
  * One quantization. ``files`` is the number of parts summed into ``size_gb``.
  *
  * ``fit`` is null when golem cannot tell how much memory this Mac has. ``recommended`` marks
- * the size to pick: ``Q4_K_M`` when it fits, else the largest that fits.
+ * the size to pick: ``Q4_K_M`` when it fits, else the largest that fits. ``problem`` is set
+ * only when Hugging Face answered that a file the download needs is missing; it is never set
+ * on doubt.
  */
 export interface HfSize {
   files: Files;
   fit?: Fit;
+  problem?: Problem;
   quant: Quant;
   recommended: Recommended;
   size_gb: SizeGb;

@@ -20,6 +20,8 @@ export type GetModelsProps = {
   onPull: (ref: string) => Promise<void>;
   /** Stops a download. */
   onStop: (ref: string) => Promise<void>;
+  /** Removes the parts a failed download left on disk. */
+  onCleanup?: (ref: string) => Promise<void>;
   /** Hugging Face: the search and a repo's sizes. */
   hf: HfActions;
   /** The Ollama library: its names and their sizes. */
@@ -158,7 +160,7 @@ function MacLine({ listing }: { listing: ModelListResult | null }) {
  * Get models: a page that takes the place of the Models page. The header, the search, the tabs and the foot stay;
  * only the body scrolls. A download starts and the page stays: its line shows the progress.
  */
-export function GetModelsPage({ listing, pulls, onPull, onStop, hf, library, onBack, initialHf, initialLibrary, initialTab = "mac", initialSearch = "", initialFilter }: GetModelsProps) {
+export function GetModelsPage({ listing, pulls, onPull, onStop, onCleanup, hf, library, onBack, initialHf, initialLibrary, initialTab = "mac", initialSearch = "", initialFilter }: GetModelsProps) {
   const [tab, setTab] = useState(initialTab);
   const [search, setSearch] = useState(initialSearch);
   const [filter, setFilter] = useState<PicksFilter>({ category: null, hideTooBig: false, ...initialFilter });
@@ -205,6 +207,12 @@ export function GetModelsPage({ listing, pulls, onPull, onStop, hf, library, onB
   function stop(ref: string): void {
     onStop(ref).catch((error: unknown) => {
       setFailure(error instanceof Error && error.message !== "" ? error.message : "Could not stop the download.");
+    });
+  }
+
+  function cleanup(ref: string): void {
+    onCleanup?.(ref).catch((error: unknown) => {
+      setFailure(error instanceof Error && error.message !== "" ? error.message : "Could not remove the files.");
     });
   }
 
@@ -284,7 +292,7 @@ export function GetModelsPage({ listing, pulls, onPull, onStop, hf, library, onB
           </TabsContent>
         ))}
       </Tabs>
-      <GetModelsFoot listing={listing} pulls={pulls} pull={pull} stop={stop} onBack={onBack} />
+      <GetModelsFoot listing={listing} pulls={pulls} pull={pull} stop={stop} cleanup={cleanup} onBack={onBack} />
     </div>
   );
 }

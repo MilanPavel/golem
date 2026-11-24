@@ -6,7 +6,7 @@ import { Code } from "../../../ui/code.tsx";
 import { HuggingFaceIcon } from "../../../ui/hugging-face-icon.tsx";
 import { CloseIcon } from "../../../ui/icons.tsx";
 import { ProviderIcon } from "../../../ui/provider-icons.tsx";
-import { dismissFailed, dismissReady, EMPTY_TRAY, stopTray, trayRows, trayStatus, watchTray, type TrayRow } from "./downloads-tray.ts";
+import { dismissFailed, dismissReady, EMPTY_TRAY, leftoverText, stopTray, trayRows, trayStatus, watchTray, type TrayRow } from "./downloads-tray.ts";
 
 export type GetModelsFootProps = {
   listing: ModelListResult | null;
@@ -15,6 +15,8 @@ export type GetModelsFootProps = {
   pull: (ref: string) => Promise<boolean>;
   /** Stops a download. */
   stop: (ref: string) => void;
+  /** Removes the parts a failed download left on disk. */
+  cleanup?: (ref: string) => void;
   /** Back to Ollama's models. */
   onBack: () => void;
 };
@@ -23,7 +25,7 @@ export type GetModelsFootProps = {
  * The foot of Get models, a downloads tray: one quiet line with nothing running, else a row for each download.
  * Past two rows it scrolls inside itself, so the page keeps its size. Downloads from the terminal show too.
  */
-export function GetModelsFoot({ listing, pulls, pull, stop, onBack }: GetModelsFootProps) {
+export function GetModelsFoot({ listing, pulls, pull, stop, cleanup, onBack }: GetModelsFootProps) {
   const [memory, setMemory] = useState(EMPTY_TRAY);
   const installed = new Set((listing?.models ?? []).filter((model) => model.source === "installed").map((model) => model.ref));
   const next = watchTray(memory, pulls, installed);
@@ -94,7 +96,10 @@ export function GetModelsFoot({ listing, pulls, pull, stop, onBack }: GetModelsF
     return (
       <li key={ref} className="flex items-center gap-3 py-2">
         {lead}
-        <span className="min-w-0 flex-1 text-meta text-deny">{`Failed: ${item.words}`}</span>
+        <span className="min-w-0 flex-1 text-meta">
+          <span className="block text-deny" title={item.detail ?? undefined}>{`Failed: ${item.words}`}</span>
+          {item.leftoverGb === null ? null : <span className="block text-faint">{leftoverText(item.leftoverGb)}</span>}
+        </span>
         <Button
           size="sm"
           onClick={() => {
@@ -103,6 +108,17 @@ export function GetModelsFoot({ listing, pulls, pull, stop, onBack }: GetModelsF
         >
           Try again
         </Button>
+        {item.leftoverGb === null || cleanup === undefined ? null : (
+          <Button
+            size="sm"
+            aria-label={`Remove what is left of ${name}`}
+            onClick={() => {
+              cleanup(ref);
+            }}
+          >
+            Remove
+          </Button>
+        )}
         <Button
           size="sm"
           kind="ghost"
@@ -126,7 +142,7 @@ export function GetModelsFoot({ listing, pulls, pull, stop, onBack }: GetModelsF
       {rows.length === 0 ? (
         <p className="py-2.5">Downloads show up here. They keep going when you leave.</p>
       ) : (
-        <ul aria-label="Downloads" className="max-h-24 divide-y divide-line overflow-y-auto">
+        <ul aria-label="Downloads" className="max-h-32 divide-y divide-line overflow-y-auto">
           {rows.map(row)}
         </ul>
       )}
