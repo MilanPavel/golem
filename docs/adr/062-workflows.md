@@ -50,7 +50,7 @@ async def upgrade_dependencies(run: Run) -> None: ...
 | `run.tool(...)` | One tool, through the permission engine. |
 | `run.skill(...)` | One skill, as `/skill` in a headless session. |
 
-`key=` means exactly once: a step with a key that finished is never run again, across retries and restarts. A real-world action (a pull request, an email) carries one.
+`key=` means "do this once": a finished step with a key never runs again, across retries and restarts. A real-world action (a pull request, an email) carries one. One gap remains, which no engine can close: a crash after the action happened but before golem saved its result. Then the step is left "may have run", and on retry golem passes the key to the receiver as an idempotency key, so the receiver can drop the second copy (spike, 2026-11-24).
 
 ### A run owns one headless session
 
@@ -91,7 +91,8 @@ Later tickets add `workflow.resume`, `workflow.review.answer`, `workflow.check` 
 ### Untrusted code
 
 - A workflow file loads only from a trusted folder (`trusted_folders` in `routine_scheduler.py`, the same rule as agent files).
-- It is imported in isolation. A crash at import or at run time never reaches the daemon.
+- Finding and checking files imports them in a short-lived subprocess, so an import that crashes, hangs or calls `sys.exit` never reaches the daemon.
+- A run executes in the daemon as an asyncio task. An exception in workflow code fails that run (or that step), never the daemon. Plain (sync) functions run in a worker thread, so they cannot block the event loop.
 - A broken file is a visible state, "broken", with its traceback. It never silently disappears from the list.
 
 ### Engine
@@ -110,7 +111,21 @@ The engine saves each step, resumes after a restart, and does Try from a step. T
 | Work to build | Less at the start. | More at the start (about one ticket). |
 | Fit with [ADR-006](006-checkpoint-continuity.md) | The checkpoint is the memory. Fits, if workflows are graphs. | The checkpoint stays the chat's memory. Workflows get their own journal. |
 
-**Engine decision:** PENDING-SPIKE
+**Engine decision:** B, golem's own step journal (spike, 2026-11-24).
+
+Both passed the same tests: a review answered from a new process, `kill -9` mid-`run.parallel`, and a kill between a side effect and its saved result. Each finished step ran once and its result was reused. They did not differ on crashes. B wins because the run view, the `workflow.step.*` events, the Inbox and the agent steps all need a table of steps anyway:
+
+- With A, golem would still write `workflow_steps` for the UI and still save each helper's session id itself, so a restart re-attaches to the child session instead of starting a second one. A would be a second, version-pinned store holding the same facts.
+- A puts multi-day workflow state in `checkpoints.db`. That file would stop being something we can delete or rebuild after a LangGraph upgrade ([ADR-006](006-checkpoint-continuity.md)). It also puts workflow behaviour inside LangGraph, outside `golem/graphs/` ([ADR-002](002-langgraph-boundary.md)).
+- A matches tasks by call order and allows one waiting `interrupt()` at a time. B matches by step key, and several reviews can wait at once, each in its own row.
+
+The rules B puts on workflow code (written in the guide, enforced at run time):
+
+- Step keys must be unique within a run and stable across restarts. A repeated key fails the run with a clear error. It never silently returns the earlier result.
+- After a restart the function runs again from the top. Code outside steps runs again, and finished steps return their saved results.
+- Results are saved as JSON.
+
+LangGraph stays where it is: the chat loop and helper child sessions.
 
 Whichever wins, the public API, the wire names and the tables the editor reads (`workflow_runs`, `workflow_steps`) are the same. The decision changes only `D/workflows/engine.py` and the migration.
 
@@ -134,7 +149,7 @@ Also decided on 2026-11-23, from the Phase 3 plan:
 | W3 | Chats appear in Runs only when "from chats" is ticked. |
 | W4 | 3.10 (make from chat) and 3.11 (editor) are planned now and get their tickets later. |
 
-Other decisions of 2026-11-23: start now, engine first; Workflows gets one implementation lane; tickets are split one stage at a time.
+Other decisions of 2026-11-23: start now, engine first; Workflows gets one implementation lane (raised to parallel waves of at most two agents on 2026-11-24); tickets are split one stage at a time.
 
 ## Alternatives Considered
 
@@ -192,7 +207,7 @@ Other decisions of 2026-11-23: start now, engine first; Workflows gets one imple
 | User code crashes the daemon | Import and run in isolation. A broken workflow is a state with a traceback (A.4). |
 | Exactly-once is wrong | Keyed steps get a dedicated `kill -9` test between "done" and "saved" (stage B). |
 | Outline drifts from the code | AST rules only, never a model. Unknown code is a grey `code` step. |
-| Mac overload in tests | One lane. Targeted tests per ticket. CI runs the full check. |
+| Mac overload in tests | At most two agents at once. Targeted tests per ticket. CI runs the full check. |
 | Heavy local models in tests | Fake models in all tests. No live eval on a large local model without asking. |
 
 ## References

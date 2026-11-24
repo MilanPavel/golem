@@ -44,7 +44,8 @@ The only module user code imports is `golem.workflow` (`D/workflow/__init__.py`)
 
 Rules:
 
-- `key=` means exactly once. A finished keyed step is never run again.
+- `key=` means "do this once". A finished keyed step never runs again. A crash between the action and saving its result leaves the step "may have run". On retry, the key goes to the receiver as an idempotency key.
+- Step keys are unique within a run and stable across restarts. A repeated key fails the run.
 - There are no model names in the file. `type` names an agent file. The file wishes `cheapest` or `stronger`, and routing decides.
 - `gets=` hands earlier results over as they are (saved artifacts), without retelling them.
 - `worktree=` needs copies (15.10). Until then, Check fails it with "copies arrive with 15.10".
@@ -117,7 +118,7 @@ A workflow file that changes while a run is open is versioning (3.7, stage F).
 
 ## Storage
 
-New tables in `D/store/migrations.py`, accessed through `D/store/workflow_runs.py`. Columns are a first sketch. Ticket A.2 fixes them, and the engine decision (see below) may change them.
+New tables in `D/store/migrations.py`, accessed through `D/store/workflow_runs.py`. Columns are a first sketch; ticket A.2 fixes them.
 
 | Table | Holds | Main columns |
 |---|---|---|
@@ -125,7 +126,7 @@ New tables in `D/store/migrations.py`, accessed through `D/store/workflow_runs.p
 | `workflow_steps` | One row per step | `workflow_run_id`, `step_key`, `name`, `kind`, `state`, `result`, `helper_session_id`, `cost`, `started_at`, `ended_at` |
 | `workflow_reviews` | One row per `run.review` | `workflow_run_id`, `step_key`, `pending` (a `PendingItem`), `answer`, `answered_at` |
 
-The engine (LangGraph Functional API, or an own journal in `workflow_steps`) is decided in ADR-062, section "Engine". The tables the editor reads are the same either way.
+The engine is golem's own step journal in `workflow_steps` (ADR-062, section "Engine"). A `run.agent` row saves its child `session_id` as soon as the helper starts, so after a restart the step re-attaches to the child instead of starting a second one.
 
 ## Events and commands
 
@@ -193,7 +194,7 @@ Each agent-step ticket states its behaviour and has a test for local-only and cl
 ## Trust and broken files
 
 - Files load only from trusted folders (`trusted_folders`, same rule as agent files).
-- Each file is imported in isolation. A crash never reaches the daemon.
+- Each file is imported in a short-lived subprocess to list and check it, so a crash or hang at import never reaches the daemon. A run is an asyncio task in the daemon; an exception fails the run or the step, never the daemon. Sync functions run in a worker thread.
 - A broken file is listed as "broken" with its traceback. A fixed file loads again without a restart (hot reload).
 
 ## Stages
