@@ -129,7 +129,8 @@ test("with no agents the page says how to add one", async () => {
   mount([]);
   expect(await screen.findByText("0 agents")).toBeTruthy();
   expect(screen.getByText(/Add one as ~\/\.golem\/agents/)).toBeTruthy();
-  expect(screen.queryByRole("tablist")).toBeNull();
+  // The page's own tabs stay; there is no agent, so no Overview and Definition.
+  expect(screen.queryByRole("tab", { name: "Overview" })).toBeNull();
 });
 
 test("the Overview of a bundled agent says its model, tools, limits, prompt and use", async () => {
@@ -209,7 +210,7 @@ test("the tabs are real tabs: the arrow keys move between them", async () => {
   await screen.findByText("7 agents");
   const overview = screen.getByRole("tab", { name: "Overview" });
   expect(overview.getAttribute("aria-selected")).toBe("true");
-  expect(screen.getByRole("tabpanel").getAttribute("aria-labelledby")).toBe(overview.id);
+  expect(screen.getByRole("tabpanel", { name: "Overview" }).getAttribute("aria-labelledby")).toBe(overview.id);
   overview.focus();
   await user.keyboard("{ArrowRight}");
   expect(screen.getByRole("tab", { name: "Definition" }).getAttribute("aria-selected")).toBe("true");

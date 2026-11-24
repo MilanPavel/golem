@@ -69,9 +69,9 @@ import { IDLE_SETUP, MODELS_CASES, NO_ACTIONS, NO_PULLS } from "../features/sett
 import { MemoryView } from "../features/settings/memory/memory-view.tsx";
 import { SAMPLE_MEMORIES, SAMPLE_MEMORY_COUNTS, SAMPLE_MEMORY_SETTINGS } from "../features/settings/memory/sample.ts";
 import { MEMORY_OFF_TEXT } from "../store/memory.ts";
-import { FinishedHelpers } from "../features/settings/agents-keep.tsx";
+import { DefaultLimits, FinishedHelpers } from "../features/settings/agents-keep.tsx";
 import { LimitsBlock } from "../features/settings/agents-limits.tsx";
-import { AgentsPage } from "../features/settings/agents-section.tsx";
+import { AgentsPage, AgentsTabs } from "../features/settings/agents-section.tsx";
 import { SAMPLE_AGENTS, SAMPLE_CONFIG_LIMITS, SAMPLE_COPY, WISH_AGENTS_CLOUD, WISH_AGENTS_LOCAL, WISH_AGENTS_MIXED } from "../features/settings/agents-sample.ts";
 import { SkillList } from "../features/settings/skills-section.tsx";
 import { SkillOverview } from "../features/settings/skills/skill-detail.tsx";
@@ -1661,14 +1661,41 @@ function AgentsDemo() {
         [
           ["Finished helpers, the defaults", { keep_days: 7, keep_problem_days: 30 }, {}],
           ["Finished helpers, for ever", { keep_days: 0, keep_problem_days: 0 }, {}],
-          ["Finished helpers, a value the config refused", { keep_days: 7, keep_problem_days: 30 }, { "agents.keep_days": "Input should be greater than or equal to 0" }, "mixed"],
+          ["Finished helpers, a value the config refused", { keep_days: 7, keep_problem_days: 30 }, { "agents.keep_days": "Input should be greater than or equal to 0" }],
         ] as const
-      ).map(([title, values, errors, setup]) => (
+      ).map(([title, values, errors]) => (
         <section key={title} aria-label={title} className="flex flex-col gap-3 rounded-lg border border-line bg-bg p-4">
           <span className="font-mono text-xs text-faint">{title}</span>
-          <FinishedHelpers values={values} errors={errors} failure={null} onSave={() => {}} setup={setup} onSaveLimit={() => {}} />
+          <FinishedHelpers values={values} errors={errors} failure={null} onSave={() => {}} />
         </section>
       ))}
+      <section aria-label="Agents, tab Agents" className="flex h-96 flex-col gap-3 rounded-lg border border-line bg-bg p-4">
+        <span className="font-mono text-xs text-faint">Tabs: Agents, the list and detail fill the page</span>
+        <AgentsTabs tab="agents" onTab={() => {}} agents={<AgentsPage agents={SAMPLE_AGENTS} start="bundled/explorer" onSetWish={async () => {}} />} rules={null} />
+      </section>
+      <section aria-label="Agents, tab Rules" className="flex flex-col gap-3 rounded-lg border border-line bg-bg p-4">
+        <span className="font-mono text-xs text-faint">Tabs: Rules, one block each</span>
+        <AgentsTabs
+          tab="rules"
+          onTab={() => {}}
+          agents={null}
+          rules={
+            <div className="flex max-w-column flex-col gap-3">
+              <UseHelpers value="when_needed" onChoose={() => {}} />
+              <DefaultLimits values={{ keep_days: 7, keep_problem_days: 30 }} errors={{}} failure={null} onSaveLimit={() => {}} />
+              <FinishedHelpers values={{ keep_days: 7, keep_problem_days: 30 }} errors={{}} failure={null} onSave={() => {}} />
+            </div>
+          }
+        />
+      </section>
+      <section aria-label="Agents, tab Measure" className="flex flex-col gap-3 rounded-lg border border-line bg-bg p-4">
+        <span className="font-mono text-xs text-faint">Tabs: Measure, one line until it is built</span>
+        <AgentsTabs tab="measure" onTab={() => {}} agents={null} rules={null} />
+      </section>
+      <section aria-label="Agents, tabs narrow" className="flex h-96 max-w-md flex-col gap-3 rounded-lg border border-line bg-bg p-4">
+        <span className="font-mono text-xs text-faint">Tabs, narrow: the tab list and one column</span>
+        <AgentsTabs tab="agents" onTab={() => {}} agents={<AgentsPage agents={SAMPLE_AGENTS} narrow onSetWish={async () => {}} />} rules={null} />
+      </section>
       <section aria-label="Agents, empty" className="flex flex-col gap-3 rounded-lg border border-line bg-bg p-4">
         <span className="font-mono text-xs text-faint">Empty</span>
         <AgentsPage agents={[]} />
@@ -1746,7 +1773,7 @@ function AgentLimitsDemo() {
       ).map(([title, values, errors, setup]) => (
         <section key={title} aria-label={title} className="flex flex-col gap-3 rounded-lg border border-line bg-bg p-4">
           <span className="font-mono text-xs text-faint">{title}</span>
-          <FinishedHelpers values={values} errors={errors} failure={null} onSave={() => {}} setup={setup} onSaveLimit={() => {}} />
+          <DefaultLimits values={values} errors={errors} failure={null} setup={setup} onSaveLimit={() => {}} />
         </section>
       ))}
     </div>

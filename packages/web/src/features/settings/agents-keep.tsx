@@ -117,14 +117,52 @@ function DefaultLimitRow({ field, value, errors, onSave }: { field: LimitField; 
   );
 }
 
+/** The "Limits for every helper" block: what a helper may spend when its agent sets no limit of its own. Apart from the hooks, so the gallery can show it. */
+export function DefaultLimits({
+  values,
+  errors,
+  failure,
+  setup = "mixed",
+  onSaveLimit,
+}: {
+  values: AgentsKeepValues;
+  /** The errors of the last save, by path such as `agents.max_calls`. */
+  errors: RoutingErrors;
+  /** A save that could not be sent at all, or null. */
+  failure: string | null;
+  /** Cost comes first when no local model is set up. */
+  setup?: WishSetup;
+  /** Saves one limit for every helper. `text` is what was typed: empty is no limit of your own. */
+  onSaveLimit: (key: LimitKey, text: string) => void;
+}) {
+  const heading = useId();
+  const texts = limitTexts(values);
+  return (
+    <section data-setting="limits for every helper" aria-labelledby={heading} className="flex shrink-0 flex-col gap-1 rounded-lg border border-line bg-surface px-4 py-3">
+      <div className="flex flex-wrap items-start gap-x-6 gap-y-2">
+        <h3 id={heading} className="text-sm font-medium text-ink">
+          Limits for every helper
+        </h3>
+        {limitFields(setup).map((field) => (
+          <DefaultLimitRow key={field.key} field={field} value={texts[field.key]} errors={errors} onSave={onSaveLimit} />
+        ))}
+      </div>
+      <p className="text-xs text-faint">{LIMITS_DEFAULT_HINT}</p>
+      {failure === null ? null : (
+        <p role="alert" className="text-xs text-deny">
+          {failure}
+        </p>
+      )}
+    </section>
+  );
+}
+
 /** The "Finished helpers" block. Apart from the hooks, so the gallery can show it. */
 export function FinishedHelpers({
   values,
   errors,
   failure,
   onSave,
-  setup = "mixed",
-  onSaveLimit,
 }: {
   values: AgentsKeepValues;
   /** The errors of the last save, by path such as `agents.keep_days`. */
@@ -133,14 +171,8 @@ export function FinishedHelpers({
   failure: string | null;
   /** Saves one count. `null` is text that is not a whole number. */
   onSave: (field: KeepKey, days: number | null) => void;
-  /** Cost comes first when no local model is set up. */
-  setup?: WishSetup;
-  /** Saves one limit for every helper. `text` is what was typed: empty is no limit of your own. */
-  onSaveLimit: (key: LimitKey, text: string) => void;
 }) {
   const heading = useId();
-  const limitsHeading = useId();
-  const texts = limitTexts(values);
   return (
     <section data-setting="finished helpers" aria-labelledby={heading} className="flex shrink-0 flex-col gap-1 rounded-lg border border-line bg-surface px-4 py-3">
       <div className="flex flex-wrap items-start gap-x-6 gap-y-2">
@@ -150,15 +182,6 @@ export function FinishedHelpers({
         <KeepRow label="Keep the steps for" field="keep_days" value={values.keep_days} errors={errors} onSave={onSave} />
         <KeepRow label="Keep failed, stopped and asking helpers for" field="keep_problem_days" value={values.keep_problem_days} errors={errors} onSave={onSave} />
       </div>
-      <section aria-labelledby={limitsHeading} className="flex flex-wrap items-start gap-x-6 gap-y-2">
-        <h3 id={limitsHeading} className="text-sm font-medium text-ink">
-          Limits for every helper
-        </h3>
-        {limitFields(setup).map((field) => (
-          <DefaultLimitRow key={field.key} field={field} value={texts[field.key]} errors={errors} onSave={onSaveLimit} />
-        ))}
-      </section>
-      <p className="text-xs text-faint">{LIMITS_DEFAULT_HINT}</p>
       {failure === null ? null : (
         <p role="alert" className="text-xs text-deny">
           {failure}
@@ -169,8 +192,49 @@ export function FinishedHelpers({
   );
 }
 
-/** Settings › Agents, Finished helpers: reads `[agents]` and saves a change at once. */
-export function FinishedHelpersSection({ setup = "mixed" }: { setup?: WishSetup }) {
+/** What a block shows while its values are not read yet: nothing, or the error of the read. */
+function KeepUnread({ query, text }: { query: ReturnType<typeof useAgentsKeep>; text: string }) {
+  return query.isError ? (
+    <p role="alert" className="text-sm text-deny">
+      {actionErrorText(query.error, text)}
+    </p>
+  ) : null;
+}
+
+/** Settings › Agents › Rules, Limits for every helper: reads `[agents]` and saves a change at once. */
+export function DefaultLimitsSection({ setup = "mixed" }: { setup?: WishSetup }) {
+  const query = useAgentsKeep();
+  const actions = usePageActions();
+  const [errors, setErrors] = useState<RoutingErrors>({});
+  const [failure, setFailure] = useState<string | null>(null);
+
+  async function saveLimit(key: LimitKey, text: string): Promise<void> {
+    setFailure(null);
+    const path = `agents.${key}`;
+    const { change, errors: wrong, empty } = limitsChange(limitTexts(query.data), { ...limitTexts(query.data), [key]: text }, [key]);
+    if (wrong[key] !== undefined) {
+      setErrors({ [path]: wrong[key] });
+      return;
+    }
+    if (empty) return;
+    try {
+      const result = await actions.setDefaultAgentLimits(change);
+      if (result.ok) {
+        setErrors({});
+        return;
+      }
+      setErrors(Object.fromEntries((result.errors ?? []).map((error) => [error.path ?? path, error.message])));
+    } catch (error) {
+      setFailure(actionErrorText(error, "Could not save the limits for every helper."));
+    }
+  }
+
+  if (query.data === undefined) return <KeepUnread query={query} text="Could not read the limits for every helper." />;
+  return <DefaultLimits values={query.data} errors={errors} failure={failure} setup={setup} onSaveLimit={(key, text) => void saveLimit(key, text)} />;
+}
+
+/** Settings › Agents › Rules, Finished helpers: reads `[agents]` and saves a change at once. */
+export function FinishedHelpersSection() {
   const query = useAgentsKeep();
   const actions = usePageActions();
   const [errors, setErrors] = useState<RoutingErrors>({});
@@ -194,33 +258,6 @@ export function FinishedHelpersSection({ setup = "mixed" }: { setup?: WishSetup 
     }
   }
 
-  async function saveLimit(key: LimitKey, text: string): Promise<void> {
-    setFailure(null);
-    const path = `agents.${key}`;
-    const { change, errors: wrong, empty } = limitsChange(limitTexts(query.data), { ...limitTexts(query.data), [key]: text }, [key]);
-    if (wrong[key] !== undefined) {
-      setErrors({ [path]: wrong[key] });
-      return;
-    }
-    if (empty) return;
-    try {
-      const result = await actions.setDefaultAgentLimits(change);
-      if (result.ok) {
-        setErrors({});
-        return;
-      }
-      setErrors(Object.fromEntries((result.errors ?? []).map((error) => [error.path ?? path, error.message])));
-    } catch (error) {
-      setFailure(actionErrorText(error, "Could not save the limits for every helper."));
-    }
-  }
-
-  if (query.data === undefined) {
-    return query.isError ? (
-      <p role="alert" className="text-sm text-deny">
-        {actionErrorText(query.error, "Could not read how long the steps are kept.")}
-      </p>
-    ) : null;
-  }
-  return <FinishedHelpers values={query.data} errors={errors} failure={failure} onSave={(field, days) => void save(field, days)} setup={setup} onSaveLimit={(key, text) => void saveLimit(key, text)} />;
+  if (query.data === undefined) return <KeepUnread query={query} text="Could not read how long the steps are kept." />;
+  return <FinishedHelpers values={query.data} errors={errors} failure={failure} onSave={(field, days) => void save(field, days)} />;
 }
