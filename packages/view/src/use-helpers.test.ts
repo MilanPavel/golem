@@ -13,7 +13,7 @@ test("three positions with their labels and one line each", () => {
     ],
   );
   for (const p of USE_HELPERS_POSITIONS) assert.ok(p.explain.length > 0 && !p.explain.includes("\n"));
-  assert.ok(useHelpersExplain("when_needed").startsWith("When needed: the reading would not fit the window"));
+  assert.ok(useHelpersExplain("when_needed").startsWith("When needed: golem starts a helper by itself"));
   assert.ok(useHelpersExplain("ask").startsWith("Ask me first: "));
   assert.ok(useHelpersExplain("never").startsWith("Never: "));
   assert.equal(useHelpersPosition("weird").value, "when_needed");

@@ -903,6 +903,7 @@ export {
   rulesFoot,
   type DelegateNumber,
   type DelegateNumbers,
+  type ReasonBar,
   type ReasonTile,
   type RulesFoot,
   type RulesMeasurement,

@@ -351,15 +351,22 @@ function AgentsTabBody() {
   );
 }
 
-/** The Rules tab: when helpers are used, the limits every helper gets, and how long finished ones are kept. One block each. */
-function AgentsRules({ setup = "mixed", measurement = null }: { setup?: WishSetup; measurement?: RulesMeasurement | null }) {
+/** The Rules tab's layout: "Use helpers" across the page, then the two cards side by side, stacked when the page is narrow. */
+export function RulesLayout({ use, limits, finished }: { use: ReactNode; limits: ReactNode; finished: ReactNode }) {
   return (
-    <div className="flex max-w-column flex-col gap-3">
-      <UseHelpersSection measurement={measurement} />
-      <DefaultLimitsSection setup={setup} />
-      <FinishedHelpersSection />
+    <div className="@container flex max-w-6xl flex-col gap-3">
+      {use}
+      <div className="grid items-start gap-3 @4xl:grid-cols-2">
+        {limits}
+        {finished}
+      </div>
     </div>
   );
+}
+
+/** The Rules tab: when helpers are used, the limits every helper gets, and how long finished ones are kept. One card each. */
+function AgentsRules({ setup = "mixed", measurement = null }: { setup?: WishSetup; measurement?: RulesMeasurement | null }) {
+  return <RulesLayout use={<UseHelpersSection measurement={measurement} />} limits={<DefaultLimitsSection setup={setup} />} finished={<FinishedHelpersSection />} />;
 }
 
 /** The three tabs with what each shows. Apart from the hooks, so the gallery can show each tab. */
