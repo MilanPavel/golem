@@ -407,3 +407,61 @@ test("a local arm that does not fit, or has no room, cannot be started", async (
   expect((within(panel).getByRole("button", { name: "Start" }) as HTMLButtonElement).disabled).toBe(true);
   expect(m.fake.raw.evalsStart).not.toHaveBeenCalled();
 });
+
+const MISSING = "Ollama does not have qwen3.8:27b. Choose another model, or pull it first.";
+const CHOICES = [
+  { ref: "ollama/llama3.2:3b", size_gb: 1.9 },
+  { ref: "ollama/qwen3.8:27b", size_gb: 17.2 },
+];
+
+test("the model dropdown shows the planned model, or Choose a model when it is not installed", async () => {
+  const gone = local({ model: "ollama/qwen3.5:9b", verdict: "unknown", needed_gb: null, free_gb: null, reason: MISSING, choices: [CHOICES[0] as (typeof CHOICES)[number]] });
+  const m = mount({ plan: { arms: [gone], running: null } });
+  const panel = await openMeasure(m);
+  const select = (await within(panel).findByRole("combobox", { name: "Model for Local, 32K window" })) as HTMLSelectElement;
+  expect(select.value).toBe("");
+  expect(select.selectedOptions[0]?.textContent).toBe("Choose a model");
+  expect(panel.textContent).toContain("NOT INSTALLED");
+  expect(panel.textContent).toContain(MISSING);
+  expect(panel.textContent).not.toContain("memory could not be read");
+  expect(panel.textContent).not.toContain("NOT KNOWN");
+  expect(panel.textContent).toContain("No local arm can run with the chosen models. Choose a model that is installed and fits.");
+  expect(panel.textContent).not.toContain("Close other apps");
+});
+
+test("choosing a model re-plans, and the dropdown and the plan agree, also after Check memory again", async () => {
+  const gone = local({ model: "ollama/qwen3.5:9b", verdict: "unknown", reason: MISSING, choices: CHOICES });
+  const m = mount({ plan: { arms: [gone], running: null } });
+  m.fake.raw.evalsPlan.mockImplementation(async (_arms?: unknown, models?: Record<string, string>) => ({
+    arms: [local({ model: models?.["local-32k"] ?? "ollama/qwen3.5:9b", verdict: models?.["local-32k"] === undefined ? "unknown" : "fits", reason: "Fits.", choices: CHOICES })],
+    running: null,
+  }));
+  const panel = await openMeasure(m);
+  const select = (await within(panel).findByRole("combobox", { name: "Model for Local, 32K window" })) as HTMLSelectElement;
+  await m.user.selectOptions(select, "ollama/qwen3.8:27b");
+  await waitFor(() => expect(panel.textContent).toContain("FITS"));
+  expect((within(panel).getByRole("combobox", { name: "Model for Local, 32K window" }) as HTMLSelectElement).value).toBe("ollama/qwen3.8:27b");
+  expect(panel.textContent).not.toContain("No local arm can run");
+  await m.user.click(within(panel).getByRole("button", { name: "Check memory again" }));
+  await waitFor(() => expect(m.fake.raw.evalsPlan.mock.calls.length).toBeGreaterThan(2));
+  expect((within(panel).getByRole("combobox", { name: "Model for Local, 32K window" }) as HTMLSelectElement).value).toBe("ollama/qwen3.8:27b");
+});
+
+test("the memory advice shows when memory holds an arm back, even if another arm lacks its model", async () => {
+  const gone = local({ verdict: "unknown", reason: MISSING, choices: CHOICES });
+  const full = local({ name: "local-128k", label: "Local, 128K window", model: "ollama/llama3.2:3b", verdict: "no_room", reason: "Not enough memory is free now.", choices: CHOICES });
+  const m = mount({ plan: { arms: [gone, full], running: null } });
+  const panel = await openMeasure(m);
+  await within(panel).findByRole("list", { name: "Arms of the measurement" });
+  expect(panel.textContent).toContain("Close other apps and check again");
+});
+
+test("a paid arm whose provider has no key says so and cannot be ticked", async () => {
+  const nokey = { ...paid(), reason: "No key for anthropic. Add it in Settings › Models." };
+  const m = mount({ plan: { arms: [nokey], running: null } });
+  const panel = await openMeasure(m);
+  await within(panel).findByRole("list", { name: "Arms of the measurement" });
+  expect(panel.textContent).toContain("NO KEY");
+  expect(panel.textContent).toContain("No key for anthropic. Add it in Settings › Models.");
+  expect((within(panel).getByRole("checkbox", { name: "Budget cloud" }) as HTMLInputElement).disabled).toBe(true);
+});

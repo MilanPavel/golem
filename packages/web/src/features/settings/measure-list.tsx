@@ -1,4 +1,4 @@
-import { SAVED_WORK_TEXT, armRows, measureList, noRoomLine, startPlan, type ArmRow, type MeasureListRow, type MeasureTone } from "@golem/view";
+import { CHOOSE_MODEL_TEXT, SAVED_WORK_TEXT, armRows, measureList, noRoomLine, startPlan, type ArmRow, type MeasureListRow, type MeasureTone } from "@golem/view";
 import type { EvalPlanArm, EvalSummary } from "../../store/evals.ts";
 import { useId, useState } from "react";
 import { Badge } from "../../ui/badge.tsx";
@@ -38,6 +38,8 @@ function MemoryBar({ row }: { row: ArmRow }) {
 function ArmItem({ row, checked, onTick, model, onModel }: { row: ArmRow; checked: boolean; onTick: (on: boolean) => void; model: string | undefined; onModel: (model: string) => void }) {
   const id = useId();
   const why = `${id}-why`;
+  // The dropdown shows the model the plan uses. A model the list does not hold shows "Choose a model", never the first entry.
+  const shown = model !== undefined && row.choices.some((choice) => choice.ref === model) ? model : row.modelValue;
   return (
     <li className={cn("flex flex-col gap-1 border-t border-line py-3 first:border-t-0", !row.canTick && "opacity-90")}>
       <div className="flex flex-wrap items-start gap-x-3 gap-y-1">
@@ -57,8 +59,13 @@ function ArmItem({ row, checked, onTick, model, onModel }: { row: ArmRow; checke
           <span className="text-meta text-muted">{row.memoryLine}</span>
           <MemoryBar row={row} />
         </div>
-        {row.choices.length > 1 ? (
-          <select aria-label={`Model for ${row.title}`} value={model ?? row.model} onChange={(event) => onModel(event.target.value)} className="rounded-md border border-line-strong bg-surface px-2 py-1 text-xs text-ink">
+        {row.choices.length > 1 || (row.choices.length === 1 && row.modelValue === "") ? (
+          <select aria-label={`Model for ${row.title}`} value={shown} onChange={(event) => onModel(event.target.value)} className="rounded-md border border-line-strong bg-surface px-2 py-1 text-xs text-ink">
+            {shown === "" ? (
+              <option value="" disabled>
+                {CHOOSE_MODEL_TEXT}
+              </option>
+            ) : null}
             {row.choices.map((choice) => (
               <option key={choice.ref} value={choice.ref}>
                 {choice.label}

@@ -12,6 +12,7 @@ ends its arm with runs that are ``not run``, left out of the averages and the pr
 
 from __future__ import annotations
 
+import asyncio
 import sys
 import tomllib
 from dataclasses import replace
@@ -460,7 +461,7 @@ def test_a_live_arm_without_its_model_is_skipped_with_a_line(
     assert "not reachable" in (down.unavailable(ARMS[0]) or "")
     empty = LiveDriver(machine=lambda: _machine(sizes={"llama3.2:3b": 2 * GIB}))
     assert "does not have qwen3.5:9b" in (empty.unavailable(ARMS[1]) or "")
-    assert "no key for anthropic" in (empty.unavailable(ARMS[2]) or "")
+    assert "No key for anthropic" in (empty.unavailable(ARMS[2]) or "")
     ready = LiveDriver(machine=lambda: _machine())
     assert ready.unavailable(ARMS[0]) is None
 
@@ -671,3 +672,73 @@ def test_the_command_plan_reads_the_machine_through_a_probe(capsys: Any) -> None
     assert command(live=False, machine=lambda: _machine(4.0), out=lines.append) == 0
     assert "memory: fits" in lines[0] and "80 runs" in lines[0]
     assert capsys.readouterr().out == ""
+
+
+# --- the keys of a throwaway daemon ---------------------------------------------------------------
+
+FAKE_KEY = "sk-fake-not-a-real-key-123"
+
+
+def test_key_env_hands_over_the_keys_of_the_arm_providers_only() -> None:
+    from golem.evals.helpers import key_env
+
+    seen = {"anthropic": FAKE_KEY, "deepseek": "ds-fake", "openai": "oa-fake"}
+    got = key_env(ARMS[2], seen.get)  # budget-cloud: anthropic lead, deepseek and anthropic others
+    assert got == {"ANTHROPIC_API_KEY": FAKE_KEY, "DEEPSEEK_API_KEY": "ds-fake"}
+    assert key_env(ARMS[2], lambda _provider: None) == {}
+    assert key_env(ARMS[0], seen.get) == {}  # a local arm needs no key
+
+
+async def test_the_live_driver_gives_the_key_to_the_child_environment_only(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    import subprocess
+
+    from golem.evals import helpers
+
+    def fake_key(provider: str) -> str:
+        del provider
+        return FAKE_KEY
+
+    monkeypatch.setattr(helpers, "provider_key", fake_key)
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    seen: dict[str, Any] = {}
+
+    class FakePopen:
+        def __init__(self, command: list[str], env: dict[str, str], **_: Any) -> None:
+            seen["env"] = env
+            sock = Path(env["GOLEM_HOME"]) / "run" / "golem.sock"
+            sock.parent.mkdir(parents=True)
+            sock.touch()
+            seen["home"] = Path(env["GOLEM_HOME"]).parent
+
+        def terminate(self) -> None: ...
+
+        def wait(self, timeout: float | None = None) -> int:
+            return 0
+
+        def kill(self) -> None: ...
+
+    async def refuse(path: str) -> Any:
+        del path
+        files = [p for p in seen["home"].rglob("*") if p.is_file()]
+        seen["leaked"] = [p for p in files if FAKE_KEY in p.read_text("utf-8", errors="ignore")]
+        raise ConnectionRefusedError("stop here")
+
+    monkeypatch.setattr(subprocess, "Popen", FakePopen)
+    monkeypatch.setattr(asyncio, "open_unix_connection", refuse)
+    with pytest.raises(ConnectionRefusedError):
+        await LiveDriver().play(ARMS[2], "on", [], tmp_path, tmp_path)
+    assert seen["env"]["ANTHROPIC_API_KEY"] == FAKE_KEY
+    assert seen["leaked"] == []
+    assert not seen["home"].exists()  # the throwaway home goes away with whatever was in it
+
+
+def test_an_rpc_error_reads_as_its_message() -> None:
+    from golem.evals.helpers import RpcError
+
+    error = RpcError(
+        "message.send", {"code": -32005, "message": "needs key: /login anthropic", "data": None}
+    )
+    assert str(error) == "needs key: /login anthropic"
+    assert str(RpcError("x.y", None)) == "x.y failed"

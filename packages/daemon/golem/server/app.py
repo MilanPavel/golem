@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import dataclasses
 import logging
 import os
 import signal
@@ -72,6 +73,7 @@ from golem.server.framing import MAX_LINE_BYTES, FrameTooLong, read_frame
 from golem.server.handlers import standard_methods
 from golem.server.mcp_model import turn_on_for_model
 from golem.server.routine_launch import SessionLauncher
+from golem.server.routing_edit import local_model_in_use
 from golem.server.start_error import (
     clear_start_error,
     describe_database_too_new,
@@ -530,7 +532,7 @@ class DaemonApp:
                     delegate=lambda: _delegate_now(self.paths.home),
                     broadcast=self._broadcast,
                     clock=lambda: self.state.clock(),
-                    parts=self._eval_parts,
+                    parts=self._eval_parts_with_local(),
                 )
                 self.state.installer = OllamaInstaller(broadcast=self._broadcast)
                 self.state.runtimes = {
@@ -795,6 +797,15 @@ class DaemonApp:
                 log.warning("socket %s is gone; stopping", self.paths.socket_path)
                 self.request_shutdown()
                 return
+
+    def _eval_parts_with_local(self) -> EvalParts:
+        """The test parts for the measurements, with the service's own local model added."""
+        parts = self._eval_parts or EvalParts()
+        if parts.local_model is not None:
+            return parts
+        return dataclasses.replace(
+            parts, local_model=lambda: local_model_in_use(self.state.sessions)
+        )
 
     def _unlink_socket(self) -> None:
         # Another daemon's socket at the same path is left alone.
