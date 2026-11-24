@@ -313,6 +313,18 @@ function slug(title: string): string {
  */
 const AnchorPrefix = createContext("");
 
+/**
+ * The one section to draw, by id without the prefix, or undefined for all of them. A test that checks one
+ * section passes `<Gallery only="agents" />`, so it does not render the other 77 and their jsdom nodes.
+ */
+const OnlySection = createContext<string | undefined>(undefined);
+
+/** Draws its section, or nothing when `OnlySection` names another one. The element is built, but React never renders its children. */
+function Only({ id, children }: { id: string; children: ReactNode }) {
+  const only = useContext(OnlySection);
+  return only === undefined || only === id ? <>{children}</> : null;
+}
+
 /** The id for a section, so a link such as `/gallery/#trace` reaches it. */
 function useAnchor(): (title: string) => string {
   const prefix = useContext(AnchorPrefix);
@@ -2075,6 +2087,7 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
     <section data-theme={theme} aria-label={`${theme} theme`} className="rounded-lg border border-line bg-bg p-4 text-ink">
       <h2 className="font-prose text-xl">{theme}</h2>
 
+      <Only id="trace">
       <Group title="Trace">
         <SummaryDemo label="Summary, context growing" runs={GROWING_TRACE} />
         <SummaryDemo label="Summary, ticks where golem cleared and grew the window" runs={GROWING_TRACE} events={GROWING_EVENTS} />
@@ -2101,7 +2114,9 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
         <DetailDemo label="A system prompt in two sections" result={SECTIONS_DETAIL} />
         <DetailDemo label="No system prompt sent" result={NO_PROMPT_DETAIL} />
       </Group>
+      </Only>
 
+      <Only id="button">
       <Group title="Button">
         <Button kind="primary">Primary</Button>
         <Button kind="secondary">Secondary</Button>
@@ -2116,7 +2131,9 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
           Allow once <Kbd>↵</Kbd>
         </Button>
       </Group>
+      </Only>
 
+      <Only id="icon-button">
       <Group title="Icon button">
         <IconButton label="New session"><PlusIcon /></IconButton>
         <IconButton label="Close"><CloseIcon /></IconButton>
@@ -2126,7 +2143,9 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
         <IconButton label="Search"><SearchIcon /></IconButton>
         <IconButton label="Disabled" disabled><CopyIcon /></IconButton>
       </Group>
+      </Only>
 
+      <Only id="type">
       <Group title="Type">
         {TYPE_SCALE.map(([token, sample, className]) => (
           <p key={token} className="flex w-full items-baseline gap-3">
@@ -2138,13 +2157,17 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
           A literal sits in the sentence as <Code>golem install</Code>, or muted as <Code tone="muted">~/.golem/config.toml</Code>.
         </p>
       </Group>
+      </Only>
 
+      <Only id="copy">
       <Group title="Copy">
         <CopyButton text="golem install" label="command" />
         <IconButton label="Copied"><CheckIcon className="text-allow" /></IconButton>
         <CopyCommand command="golem install" />
       </Group>
+      </Only>
 
+      <Only id="connection-screens">
       <section className="mt-6" id={anchor("Connection screens")}>
         <h3 className="mb-2 font-mono text-xs text-faint">Connection screens</h3>
         <div className="grid gap-4">
@@ -2158,7 +2181,9 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
           })}
         </div>
       </section>
+      </Only>
 
+      <Only id="sessions-panel">
       <section className="mt-6" id={anchor("Sessions panel")}>
         <h3 className="mb-2 font-mono text-xs text-faint">Sessions panel</h3>
         <div className="flex flex-wrap gap-4">
@@ -2191,7 +2216,9 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
           </div>
         </div>
       </section>
+      </Only>
 
+      <Only id="helpers-in-the-list">
       <section className="mt-6" id={anchor("Helpers in the list")}>
         <h3 className="mb-2 font-mono text-xs text-faint">Helpers in the list</h3>
         <div className="flex flex-wrap gap-4">
@@ -2214,14 +2241,18 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
           ))}
         </div>
       </section>
+      </Only>
 
+      <Only id="helper-card">
       <section className="mt-6" id={anchor("Helper card")}>
         <h3 className="mb-2 font-mono text-xs text-faint">Helper card</h3>
         <div aria-label={`Helpers of Map the daemon modules, ${theme}`} role="group" className="w-80 overflow-hidden rounded-lg border border-line bg-surface text-sm text-ink shadow-soft">
           <HelperRowCardBody helpers={CARD_HELPERS} leadId="lead-a" now={NOW} actions={CARD_ACTIONS} />
         </div>
       </section>
+      </Only>
 
+      <Only id="routines">
       <section className="mt-6" id={anchor("Routines")}>
         <h3 className="mb-2 font-mono text-xs text-faint">Routines</h3>
         <div className="flex flex-wrap gap-4">
@@ -2250,7 +2281,9 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
           <RoutinesEmpty onNavigate={() => {}} />
         </div>
       </section>
+      </Only>
 
+      <Only id="runs">
       <section className="mt-6" id={anchor("Runs")}>
         <h3 className="mb-2 font-mono text-xs text-faint">Runs</h3>
         <div className="flex flex-wrap gap-4">
@@ -2279,7 +2312,9 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
           />
         </div>
       </section>
+      </Only>
 
+      <Only id="rail">
       <section className="mt-6" id={anchor("Rail")}>
         <h3 className="mb-2 font-mono text-xs text-faint">Rail</h3>
         <div className="flex flex-wrap gap-4">
@@ -2308,7 +2343,9 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
           ))}
         </div>
       </section>
+      </Only>
 
+      <Only id="sessions-flyout">
       <section className="mt-6" id={anchor("Sessions flyout")}>
         <h3 className="mb-2 font-mono text-xs text-faint">Sessions flyout</h3>
         <figure className="m-0">
@@ -2328,7 +2365,9 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
           <figcaption className="mt-1 font-mono text-xs text-faint">opens beside the Sessions icon while the panel is hidden</figcaption>
         </figure>
       </section>
+      </Only>
 
+      <Only id="inbox-panel">
       <section className="mt-6" id={anchor("Inbox panel")}>
         <h3 className="mb-2 font-mono text-xs text-faint">Inbox panel</h3>
         <div className="flex flex-wrap items-start gap-4">
@@ -2357,52 +2396,72 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
           </figure>
         </div>
       </section>
+      </Only>
 
+      <Only id="folder-browser">
       <section className="mt-6" id={anchor("Folder browser")}>
         <h3 className="mb-2 font-mono text-xs text-faint">Folder browser</h3>
         <FolderBrowserDemo theme={theme} />
       </section>
+      </Only>
 
+      <Only id="setup-form">
       <section className="mt-6" id={anchor("Setup form")}>
         <h3 className="mb-2 font-mono text-xs text-faint">Setup form</h3>
         <SetupFormDemo />
       </section>
+      </Only>
 
+      <Only id="mcp-servers">
       <section className="mt-6" id={anchor("MCP servers")}>
         <h3 className="mb-2 font-mono text-xs text-faint">MCP servers</h3>
         <McpTabsDemo />
       </section>
+      </Only>
 
+      <Only id="skills">
       <section className="mt-6" id={anchor("Skills")}>
         <h3 className="mb-2 font-mono text-xs text-faint">Skills</h3>
         <SkillsDemo />
       </section>
+      </Only>
 
+      <Only id="agents">
       <section className="mt-6" id={anchor("Agents")}>
         <h3 className="mb-2 font-mono text-xs text-faint">Agents</h3>
         <AgentsDemo />
       </section>
+      </Only>
 
+      <Only id="measure">
       <section className="mt-6" id={anchor("Measure")}>
         <h3 className="mb-2 font-mono text-xs text-faint">Measure</h3>
         <MeasureDemo />
       </section>
+      </Only>
 
+      <Only id="agent-limits">
       <section className="mt-6" id={anchor("Agent limits")}>
         <h3 className="mb-2 font-mono text-xs text-faint">Agent limits</h3>
         <AgentLimitsDemo />
       </section>
+      </Only>
 
+      <Only id="use-helpers">
       <section className="mt-6" id={anchor("Use helpers")}>
         <h3 className="mb-2 font-mono text-xs text-faint">Use helpers</h3>
         <UseHelpersDemo />
       </section>
+      </Only>
 
+      <Only id="memory">
       <section className="mt-6" id={anchor("Memory")}>
         <h3 className="mb-2 font-mono text-xs text-faint">Memory</h3>
         <MemoryDemo />
       </section>
+      </Only>
 
+      <Only id="chat-stage">
       <section className="mt-6" id={anchor("Chat stage")}>
         <h3 className="mb-2 font-mono text-xs text-faint">Chat stage</h3>
         <div className="rounded-lg border border-line bg-bg p-4">
@@ -2415,14 +2474,18 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
           </Stage>
         </div>
       </section>
+      </Only>
 
+      <Only id="settings-chat">
       <section className="mt-6" id={anchor("Settings chat")}>
         <h3 className="mb-2 font-mono text-xs text-faint">Settings › Chat</h3>
         <div className="rounded-lg border border-line bg-bg p-4">
           <GalleryChatSettings />
         </div>
       </section>
+      </Only>
 
+      <Only id="mode-track">
       <section className="mt-6" id={anchor("Mode track")}>
         <h3 className="mb-2 font-mono text-xs text-faint">Settings › Chat › While it works: the mode track</h3>
         <div className="flex flex-col gap-4 rounded-lg border border-line bg-bg p-4">
@@ -2432,59 +2495,81 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
           <HowFarView mode="balanced" planFirst onMode={() => undefined} onPlan={() => undefined} />
         </div>
       </section>
+      </Only>
 
+      <Only id="settings-models">
       <section className="mt-6" id={anchor("Settings models")}>
         <h3 className="mb-2 font-mono text-xs text-faint">Settings › Models</h3>
         <ModelsDemo />
         <h3 className="mb-2 mt-4 font-mono text-xs text-faint">Settings › Models › Get models</h3>
         <GetModelsDemo />
       </section>
+      </Only>
 
+      <Only id="routing">
       <section className="mt-6" id={anchor("Routing")}>
         <h3 className="mb-2 font-mono text-xs text-faint">Routing</h3>
         <RoutingDemo />
       </section>
+      </Only>
 
+      <Only id="settings-context">
       <section className="mt-6" id={anchor("Settings Context")}>
         <h3 className="mb-2 font-mono text-xs text-faint">Settings › Context</h3>
         <ContextDemo />
       </section>
+      </Only>
 
+      <Only id="usage">
       <section className="mt-6" id={anchor("Usage")}>
         <h3 className="mb-2 font-mono text-xs text-faint">Usage</h3>
         <UsageDemo />
       </section>
+      </Only>
 
+      <Only id="tools-panel">
       <section className="mt-6" id={anchor("Tools panel")}>
         <h3 className="mb-2 font-mono text-xs text-faint">Tools panel</h3>
         <ToolsOfferDemo />
       </section>
+      </Only>
 
+      <Only id="mcp-sign-in">
       <section className="mt-6" id={anchor("MCP sign-in")}>
         <h3 className="mb-2 font-mono text-xs text-faint">MCP sign-in</h3>
         <McpSignInDemo />
       </section>
+      </Only>
 
+      <Only id="mcp-token">
       <section className="mt-6" id={anchor("MCP token")}>
         <h3 className="mb-2 font-mono text-xs text-faint">MCP token</h3>
         <McpTokenDemo />
       </section>
+      </Only>
 
+      <Only id="welcome-page">
       <section className="mt-6" id={anchor("Welcome page")}>
         <h3 className="mb-2 font-mono text-xs text-faint">Welcome page</h3>
         <WelcomeDemo />
       </section>
+      </Only>
 
+      <Only id="download-row">
       <section className="mt-6" id={anchor("Download row")}>
         <h3 className="mb-2 font-mono text-xs text-faint">Download row</h3>
         <DownloadRowDemo />
       </section>
+      </Only>
 
+      <Only id="session-title-rename-and-close">
       <section className="mt-6" id={anchor("Session title, rename, and close")}>
         <h3 className="mb-2 font-mono text-xs text-faint">Session title, rename, and close</h3>
         <SessionActionsDemo theme={theme} />
       </section>
+      </Only>
 
+      <Only id="empty-screen">
       <section className="mt-6" id={anchor("Empty screen")}>
         <h3 className="mb-2 font-mono text-xs text-faint">Empty screen</h3>
         <div className="flex h-96 flex-col rounded-lg border border-line bg-bg">
@@ -2527,7 +2612,9 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
           <NewSessionModelChipView label={{ kind: "none" }} onOpen={() => {}} />
         </div>
       </section>
+      </Only>
 
+      <Only id="branch-chip-and-menu">
       <section className="mt-6" id={anchor("Branch chip and menu")}>
         <h3 className="mb-2 font-mono text-xs text-faint">Branch chip and menu</h3>
         <div className="flex flex-wrap items-start gap-2 rounded-lg border border-line bg-bg p-4">
@@ -2540,7 +2627,9 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
           <BranchSwitchLineView folder="/Users/you/repos/golem" from="main" to="fix-y" create />
         </div>
       </section>
+      </Only>
 
+      <Only id="dock">
       <section className="mt-6" id={anchor("Dock")}>
         <h3 className="mb-2 font-mono text-xs text-faint">Dock</h3>
         <div className="grid gap-4 rounded-lg border border-line bg-bg p-4">
@@ -2620,7 +2709,9 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
           />
         </div>
       </section>
+      </Only>
 
+      <Only id="composer-row">
       <section className="mt-6" id={anchor("Composer row")}>
         <h3 className="mb-2 font-mono text-xs text-faint">Composer row</h3>
         <div className="grid gap-4 rounded-lg border border-line bg-bg p-4">
@@ -2640,7 +2731,9 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
           </div>
         </div>
       </section>
+      </Only>
 
+      <Only id="folder-menu">
       <section className="mt-6" id={anchor("Folder menu")}>
         <h3 className="mb-2 font-mono text-xs text-faint">Folder menu</h3>
         <div className="grid gap-4 rounded-lg border border-line bg-bg p-4 sm:grid-cols-2">
@@ -2694,7 +2787,9 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
           </div>
         </div>
       </section>
+      </Only>
 
+      <Only id="dock-slash-commands">
       <section className="mt-6" id={anchor("Dock, slash commands")}>
         <h3 className="mb-2 font-mono text-xs text-faint">Dock, slash commands</h3>
         <div className="grid gap-4 rounded-lg border border-line bg-bg p-4">
@@ -2726,9 +2821,13 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
           <CommandsDemo theme={theme} />
         </div>
       </section>
+      </Only>
 
+      <Only id="approval">
       <ApprovalDemo />
+      </Only>
 
+      <Only id="input-textarea">
       <Group title="Input, textarea">
         <Input aria-label={`Name, ${theme}`} placeholder="Name" />
         <Input aria-label={`Disabled name, ${theme}`} placeholder="Disabled" disabled />
@@ -2736,14 +2835,18 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
         <Textarea aria-label={`Message, ${theme}`} placeholder="Message golem" />
         <Textarea aria-label={`Bad message, ${theme}`} defaultValue="Too long" aria-invalid="true" />
       </Group>
+      </Only>
 
+      <Only id="card">
       <Group title="Card">
         <Card>
           <p className="text-sm">A card holds one thing.</p>
           <p className="mt-1 text-xs text-muted">Surface, a soft shadow, and a large radius.</p>
         </Card>
       </Group>
+      </Only>
 
+      <Only id="badge">
       <Group title="Badge">
         <Badge>neutral</Badge>
         <Badge tone="clay">clay</Badge>
@@ -2751,12 +2854,16 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
         <Badge tone="deny">deny</Badge>
         <Badge tone="wait">wait</Badge>
       </Group>
+      </Only>
 
+      <Only id="kbd">
       <Group title="Kbd">
         <Kbd>⌘ K</Kbd>
         <Kbd>⇧ ↵</Kbd>
       </Group>
+      </Only>
 
+      <Only id="status-dot">
       <Group title="Status dot">
         {STATES.map((state) => (
           <span key={state} className="inline-flex items-center gap-2 text-sm">
@@ -2765,7 +2872,9 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
           </span>
         ))}
       </Group>
+      </Only>
 
+      <Only id="pixel-golem">
       <Group title="Pixel golem">
         {STATES.map((state) => (
           <PixelGolem key={state} state={state} showLabel />
@@ -2773,7 +2882,9 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
         <PixelGolem state="idle" size="sm" />
         <PixelGolem state="idle" size="lg" />
       </Group>
+      </Only>
 
+      <Only id="tab-icon-and-title">
       <Group title="Tab icon and title">
         {STATES.map((state) => (
           <span key={state} className="inline-flex items-center gap-2 text-sm">
@@ -2782,7 +2893,9 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
           </span>
         ))}
       </Group>
+      </Only>
 
+      <Only id="transcript">
       <section className="mt-6" id={anchor("Transcript")}>
         <h3 className="mb-2 font-mono text-xs text-faint">Transcript</h3>
         <div className="flex flex-col gap-6 rounded-lg border border-line bg-bg p-4">
@@ -2794,7 +2907,9 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
           </ul>
         </div>
       </section>
+      </Only>
 
+      <Only id="turn">
       <section className="mt-6" id={anchor("Turn")}>
         <h3 className="mb-2 font-mono text-xs text-faint">Turn</h3>
         <div className="flex flex-col gap-3">
@@ -2826,7 +2941,9 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
           </div>
         </div>
       </section>
+      </Only>
 
+      <Only id="thinking">
       <section className="mt-6" id={anchor("Thinking")}>
         <h3 className="mb-2 font-mono text-xs text-faint">Thinking</h3>
         <div className="flex flex-col gap-6 rounded-lg border border-line bg-bg p-4">
@@ -2838,7 +2955,9 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
           ))}
         </div>
       </section>
+      </Only>
 
+      <Only id="cost">
       <section className="mt-6" id={anchor("Cost")}>
         <h3 className="mb-2 font-mono text-xs text-faint">Cost</h3>
         <div className="flex flex-col gap-6 rounded-lg border border-line bg-bg p-4">
@@ -2850,7 +2969,9 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
           ))}
         </div>
       </section>
+      </Only>
 
+      <Only id="routed-answers">
       <section className="mt-6" id={anchor("Routed answers")}>
         <h3 className="mb-2 font-mono text-xs text-faint">Routed answers</h3>
         <div className="flex flex-col gap-6 rounded-lg border border-line bg-bg p-4">
@@ -2862,14 +2983,18 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
           ))}
         </div>
       </section>
+      </Only>
 
+      <Only id="cut-reply">
       <section className="mt-6" id={anchor("Cut reply")}>
         <h3 className="mb-2 font-mono text-xs text-faint">Cut reply</h3>
         <div className="rounded-lg border border-line bg-bg p-4">
           <TranscriptMessages chat={{ messages: [CUT_REPLY], error: null, notice: null }} />
         </div>
       </section>
+      </Only>
 
+      <Only id="writing-a-file">
       <section className="mt-6" id={anchor("Writing a file")}>
         <h3 className="mb-2 font-mono text-xs text-faint">Writing a file</h3>
         <div className="flex flex-col gap-3 rounded-lg border border-line bg-bg p-4">
@@ -2878,7 +3003,9 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
           <WritingRow writing={{ name: "edit_file", path: "src/fetch.py", lines: 6, chars: 180 }} />
         </div>
       </section>
+      </Only>
 
+      <Only id="plan-card">
       <section className="mt-6" id={anchor("Plan card")}>
         <h3 className="mb-2 font-mono text-xs text-faint">Plan card</h3>
         <div className="flex flex-col gap-3 rounded-lg border border-line bg-bg p-4">
@@ -2886,49 +3013,89 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
           <PlanCardView title="retry with backoff" steps={PLAN_DEMO_STEPS} actions={null} />
         </div>
       </section>
+      </Only>
 
+      <Only id="diff">
       <DiffDemo />
+      </Only>
 
+      <Only id="todo-list">
       <TodoListDemo />
+      </Only>
 
+      <Only id="workbench">
       <WorkbenchDemo />
+      </Only>
+      <Only id="batch-card">
       <BatchCardDemo />
+      </Only>
+      <Only id="steps-tab">
       <StepsTabDemo />
+      </Only>
+      <Only id="runs-helpers">
       <LeadRunDemo />
+      </Only>
+      <Only id="helper-panel">
       <HelperPanelDemo />
+      </Only>
+      <Only id="helper-banner-receipt">
       <HelperBannerDemo />
+      </Only>
 
+      <Only id="changes-tab">
       <ChangesDemo />
+      </Only>
 
+      <Only id="changes-by-turn">
       <TurnsDemo />
+      </Only>
 
+      <Only id="files-tab">
       <FilesDemo />
+      </Only>
 
+      <Only id="checks-strip">
       <ChecksStripDemo />
+      </Only>
 
+      <Only id="checks-tab">
       <ChecksTabDemo />
+      </Only>
 
+      <Only id="checks-question">
       <ChecksQuestionDemo />
+      </Only>
 
+      <Only id="commit-dialog">
       <CommitDialogDemo theme={theme} />
+      </Only>
 
+      <Only id="undo-dialogs">
       <UndoDialogsDemo theme={theme} />
+      </Only>
 
+      <Only id="command-palette-and-keys">
       <section className="mt-6" id={anchor("Command palette and keys")}>
         <h3 className="mb-2 font-mono text-xs text-faint">Command palette and keys</h3>
         <PaletteDemo theme={theme} />
       </section>
+      </Only>
 
+      <Only id="model-dialog">
       <section className="mt-6" id={anchor("Model dialog")}>
         <h3 className="mb-2 font-mono text-xs text-faint">Model dialog</h3>
         <ModelDialogDemo theme={theme} />
       </section>
+      </Only>
 
+      <Only id="model-list">
       <section className="mt-6" id={anchor("Model list")}>
         <h3 className="mb-2 font-mono text-xs text-faint">Model list</h3>
         <ModelListDemo />
       </section>
+      </Only>
 
+      <Only id="dialog-popover-menu-tooltip">
       <Group title="Dialog, popover, menu, tooltip">
         <Dialog>
           <DialogTrigger asChild>
@@ -2980,6 +3147,7 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
           <TooltipContent>A tooltip</TooltipContent>
         </Tooltip>
       </Group>
+      </Only>
     </section>
   );
 }
@@ -3007,7 +3175,7 @@ function initialView(): View {
 }
 
 /** Every primitive in both themes, side by side, or one at a time. Each section has an id: `#trace`, `#approval`. */
-export function Gallery() {
+export function Gallery({ only }: { only?: string } = {}) {
   const [view, setView] = useState<View>(initialView);
 
   // The sections are drawn after the browser looked for the hash, so scroll to it once they are.
@@ -3051,10 +3219,12 @@ export function Gallery() {
           </button>
         ))}
       </div>
-      <div className={view === "both" ? "mt-6 grid gap-4 md:grid-cols-2" : "mt-6 grid gap-4"}>
-        {view !== "kiln" && <Panel theme="slip" prefix="" />}
-        {view !== "slip" && <Panel theme="kiln" prefix={view === "both" ? "kiln-" : ""} />}
-      </div>
+      <OnlySection.Provider value={only}>
+        <div className={view === "both" ? "mt-6 grid gap-4 md:grid-cols-2" : "mt-6 grid gap-4"}>
+          {view !== "kiln" && <Panel theme="slip" prefix="" />}
+          {view !== "slip" && <Panel theme="kiln" prefix={view === "both" ? "kiln-" : ""} />}
+        </div>
+      </OnlySection.Provider>
     </main>
   );
 }
