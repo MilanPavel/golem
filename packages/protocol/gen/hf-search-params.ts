@@ -5,8 +5,11 @@ export type Query = string;
 
 /**
  * ``hf.search``. Look for GGUF models on Hugging Face. Only the query leaves this Mac.
+ *
+ * An empty ``query`` lists the most downloaded GGUF repos. A pasted link such as
+ * ``https://huggingface.co/<user>/<repo>`` or ``hf.co/<user>/<repo>`` is read as that repo's id.
  */
 export interface HfSearchParams {
   limit?: Limit;
-  query: Query;
+  query?: Query;
 }

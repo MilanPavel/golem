@@ -1,0 +1,13 @@
+{
+  "additionalProperties": false,
+  "description": "``ollama.library``. Names of the Ollama library that contain ``query``, best match first.\n\n``query`` may be empty, and then every shipped name comes back. A ``:tag`` after the name is\nignored for the match. The list ships with golem, so this needs no network, except for a full\nname that is not in it: then the registry is asked for that one manifest.",
+  "properties": {
+    "query": {
+      "default": "",
+      "title": "Query",
+      "type": "string"
+    }
+  },
+  "title": "OllamaLibraryParams",
+  "type": "object"
+}

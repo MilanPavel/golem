@@ -120,6 +120,7 @@ public enum MethodAccess {
         "notify.test",
         "ollama.install",
         "ollama.install_cancel",
+        "ollama.library",
         "ollama.settings.get",
         "ollama.settings.set",
         "ollama.start",

@@ -1,0 +1,610 @@
+# The Ollama library names golem knows, so a search needs no network.
+# Ollama has no search API, so this list ships with golem, as catalog.toml does.
+# `just catalog` refreshes each size and reports tags that are gone. It never adds
+# a name: which models appear here stays a human choice.
+# Chat models only, no embedding models. size_gb is the download size from the
+# registry manifest (the sum of its layers).
+
+[[model]]
+name = "llama3.3"
+blurb = "Meta's 70B model, close to the 405B one in quality"
+
+[[model.sizes]]
+tag = "70b"
+size_gb = 42.5
+
+[[model]]
+name = "llama3.2"
+blurb = "Small Llama models for phones and laptops"
+
+[[model.sizes]]
+tag = "1b"
+size_gb = 1.3
+
+[[model.sizes]]
+tag = "3b"
+size_gb = 2.0
+
+[[model]]
+name = "llama3.1"
+blurb = "Meta's general chat model with long context"
+
+[[model.sizes]]
+tag = "8b"
+size_gb = 4.9
+
+[[model.sizes]]
+tag = "70b"
+size_gb = 42.5
+
+[[model]]
+name = "llama3"
+blurb = "Meta's earlier general chat model"
+
+[[model.sizes]]
+tag = "8b"
+size_gb = 4.7
+
+[[model.sizes]]
+tag = "70b"
+size_gb = 40.0
+
+[[model]]
+name = "llama4"
+blurb = "Meta's mixture-of-experts model with vision"
+
+[[model.sizes]]
+tag = "16x17b"
+size_gb = 67.4
+
+[[model]]
+name = "mistral"
+blurb = "The 7B model from Mistral AI, fast and capable"
+
+[[model.sizes]]
+tag = "7b"
+size_gb = 4.4
+
+[[model]]
+name = "mistral-nemo"
+blurb = "A 12B model from Mistral AI and NVIDIA with 128k context"
+
+[[model.sizes]]
+tag = "12b"
+size_gb = 7.1
+
+[[model]]
+name = "mistral-small"
+blurb = "Mistral's small model for everyday chat and tools"
+
+[[model.sizes]]
+tag = "22b"
+size_gb = 12.6
+
+[[model.sizes]]
+tag = "24b"
+size_gb = 14.3
+
+[[model]]
+name = "mixtral"
+blurb = "A mixture-of-experts model from Mistral AI"
+
+[[model.sizes]]
+tag = "8x7b"
+size_gb = 26.4
+
+[[model]]
+name = "deepseek-r1"
+blurb = "DeepSeek's reasoning model, shown thinking step by step"
+
+[[model.sizes]]
+tag = "1.5b"
+size_gb = 1.1
+
+[[model.sizes]]
+tag = "7b"
+size_gb = 4.7
+
+[[model.sizes]]
+tag = "8b"
+size_gb = 5.2
+
+[[model.sizes]]
+tag = "14b"
+size_gb = 9.0
+
+[[model.sizes]]
+tag = "32b"
+size_gb = 19.9
+
+[[model.sizes]]
+tag = "70b"
+size_gb = 42.5
+
+[[model]]
+name = "deepseek-v3"
+blurb = "A large DeepSeek mixture-of-experts chat model"
+
+[[model.sizes]]
+tag = "671b"
+size_gb = 404.4
+
+[[model]]
+name = "deepseek-coder-v2"
+blurb = "A DeepSeek model for code"
+
+[[model.sizes]]
+tag = "16b"
+size_gb = 8.9
+
+[[model]]
+name = "phi4"
+blurb = "Microsoft's 14B model, strong for its size"
+
+[[model.sizes]]
+tag = "14b"
+size_gb = 9.1
+
+[[model]]
+name = "phi4-mini"
+blurb = "Microsoft's small model with tool support"
+
+[[model.sizes]]
+tag = "3.8b"
+size_gb = 2.5
+
+[[model]]
+name = "phi3"
+blurb = "Microsoft's small, efficient model"
+
+[[model.sizes]]
+tag = "3.8b"
+size_gb = 2.2
+
+[[model.sizes]]
+tag = "14b"
+size_gb = 7.9
+
+[[model]]
+name = "gemma3"
+blurb = "Google's model with vision and long context"
+
+[[model.sizes]]
+tag = "1b"
+size_gb = 0.8
+
+[[model.sizes]]
+tag = "4b"
+size_gb = 3.4
+
+[[model.sizes]]
+tag = "12b"
+size_gb = 8.2
+
+[[model.sizes]]
+tag = "27b"
+size_gb = 17.4
+
+[[model]]
+name = "gemma2"
+blurb = "Google's earlier open model"
+
+[[model.sizes]]
+tag = "2b"
+size_gb = 1.6
+
+[[model.sizes]]
+tag = "9b"
+size_gb = 5.4
+
+[[model.sizes]]
+tag = "27b"
+size_gb = 15.6
+
+[[model]]
+name = "gemma4"
+blurb = "Google's newest open model, with vision"
+
+[[model.sizes]]
+tag = "e2b"
+size_gb = 4.6
+
+[[model.sizes]]
+tag = "e4b"
+size_gb = 6.6
+
+[[model]]
+name = "qwen3"
+blurb = "Alibaba's model with a thinking mode"
+
+[[model.sizes]]
+tag = "0.6b"
+size_gb = 0.5
+
+[[model.sizes]]
+tag = "1.7b"
+size_gb = 1.4
+
+[[model.sizes]]
+tag = "4b"
+size_gb = 2.5
+
+[[model.sizes]]
+tag = "8b"
+size_gb = 5.2
+
+[[model.sizes]]
+tag = "14b"
+size_gb = 9.3
+
+[[model.sizes]]
+tag = "30b"
+size_gb = 18.6
+
+[[model.sizes]]
+tag = "32b"
+size_gb = 20.2
+
+[[model]]
+name = "qwen3.5"
+blurb = "Alibaba's newer general model"
+
+[[model.sizes]]
+tag = "9b"
+size_gb = 6.6
+
+[[model]]
+name = "qwen3-coder"
+blurb = "Alibaba's model for code and agents"
+
+[[model.sizes]]
+tag = "30b"
+size_gb = 18.6
+
+[[model]]
+name = "qwen2.5"
+blurb = "Alibaba's general chat model"
+
+[[model.sizes]]
+tag = "0.5b"
+size_gb = 0.4
+
+[[model.sizes]]
+tag = "1.5b"
+size_gb = 1.0
+
+[[model.sizes]]
+tag = "3b"
+size_gb = 1.9
+
+[[model.sizes]]
+tag = "7b"
+size_gb = 4.7
+
+[[model.sizes]]
+tag = "14b"
+size_gb = 9.0
+
+[[model.sizes]]
+tag = "32b"
+size_gb = 19.9
+
+[[model.sizes]]
+tag = "72b"
+size_gb = 47.4
+
+[[model]]
+name = "qwen2.5-coder"
+blurb = "Alibaba's model for code"
+
+[[model.sizes]]
+tag = "0.5b"
+size_gb = 0.4
+
+[[model.sizes]]
+tag = "1.5b"
+size_gb = 1.0
+
+[[model.sizes]]
+tag = "3b"
+size_gb = 1.9
+
+[[model.sizes]]
+tag = "7b"
+size_gb = 4.7
+
+[[model.sizes]]
+tag = "14b"
+size_gb = 9.0
+
+[[model.sizes]]
+tag = "32b"
+size_gb = 19.9
+
+[[model]]
+name = "qwq"
+blurb = "Alibaba's reasoning model"
+
+[[model.sizes]]
+tag = "32b"
+size_gb = 19.9
+
+[[model]]
+name = "qwen2.5vl"
+blurb = "Alibaba's model that reads images"
+
+[[model.sizes]]
+tag = "3b"
+size_gb = 3.2
+
+[[model.sizes]]
+tag = "7b"
+size_gb = 6.0
+
+[[model.sizes]]
+tag = "32b"
+size_gb = 21.2
+
+[[model.sizes]]
+tag = "72b"
+size_gb = 48.7
+
+[[model]]
+name = "gpt-oss"
+blurb = "OpenAI's open-weight models with thinking levels"
+
+[[model.sizes]]
+tag = "20b"
+size_gb = 13.8
+
+[[model.sizes]]
+tag = "120b"
+size_gb = 65.4
+
+[[model]]
+name = "command-r"
+blurb = "Cohere's model for long documents and tools"
+
+[[model.sizes]]
+tag = "35b"
+size_gb = 18.7
+
+[[model]]
+name = "granite3.3"
+blurb = "IBM's model for business tasks and tools"
+
+[[model.sizes]]
+tag = "2b"
+size_gb = 1.5
+
+[[model.sizes]]
+tag = "8b"
+size_gb = 4.9
+
+[[model]]
+name = "smollm2"
+blurb = "Very small models that run anywhere"
+
+[[model.sizes]]
+tag = "135m"
+size_gb = 0.3
+
+[[model.sizes]]
+tag = "360m"
+size_gb = 0.7
+
+[[model.sizes]]
+tag = "1.7b"
+size_gb = 1.8
+
+[[model]]
+name = "olmo2"
+blurb = "A fully open model from the Allen Institute"
+
+[[model.sizes]]
+tag = "7b"
+size_gb = 4.5
+
+[[model.sizes]]
+tag = "13b"
+size_gb = 8.4
+
+[[model]]
+name = "codellama"
+blurb = "Meta's Llama tuned for code"
+
+[[model.sizes]]
+tag = "7b"
+size_gb = 3.8
+
+[[model.sizes]]
+tag = "13b"
+size_gb = 7.4
+
+[[model.sizes]]
+tag = "34b"
+size_gb = 19.1
+
+[[model]]
+name = "codegemma"
+blurb = "Google's small model for code"
+
+[[model.sizes]]
+tag = "2b"
+size_gb = 1.6
+
+[[model.sizes]]
+tag = "7b"
+size_gb = 5.0
+
+[[model]]
+name = "starcoder2"
+blurb = "A model for code from the BigCode project"
+
+[[model.sizes]]
+tag = "3b"
+size_gb = 1.7
+
+[[model.sizes]]
+tag = "7b"
+size_gb = 4.0
+
+[[model.sizes]]
+tag = "15b"
+size_gb = 9.1
+
+[[model]]
+name = "devstral"
+blurb = "Mistral's model for coding agents"
+
+[[model.sizes]]
+tag = "24b"
+size_gb = 14.3
+
+[[model]]
+name = "magistral"
+blurb = "Mistral's reasoning model"
+
+[[model.sizes]]
+tag = "24b"
+size_gb = 14.3
+
+[[model]]
+name = "llava"
+blurb = "A model that reads images and chats"
+
+[[model.sizes]]
+tag = "7b"
+size_gb = 4.7
+
+[[model.sizes]]
+tag = "13b"
+size_gb = 8.0
+
+[[model.sizes]]
+tag = "34b"
+size_gb = 20.2
+
+[[model]]
+name = "minicpm-v"
+blurb = "A small model that reads images"
+
+[[model.sizes]]
+tag = "8b"
+size_gb = 5.5
+
+[[model]]
+name = "llama3.2-vision"
+blurb = "Meta's Llama with image input"
+
+[[model.sizes]]
+tag = "11b"
+size_gb = 7.8
+
+[[model.sizes]]
+tag = "90b"
+size_gb = 54.6
+
+[[model]]
+name = "hermes3"
+blurb = "Nous Research's chat model with tool calls"
+
+[[model.sizes]]
+tag = "3b"
+size_gb = 2.0
+
+[[model.sizes]]
+tag = "8b"
+size_gb = 4.7
+
+[[model.sizes]]
+tag = "70b"
+size_gb = 40.0
+
+[[model]]
+name = "yi"
+blurb = "01.AI's bilingual chat model"
+
+[[model.sizes]]
+tag = "6b"
+size_gb = 3.5
+
+[[model.sizes]]
+tag = "9b"
+size_gb = 5.0
+
+[[model.sizes]]
+tag = "34b"
+size_gb = 19.5
+
+[[model]]
+name = "openchat"
+blurb = "An open chat model tuned on mixed data"
+
+[[model.sizes]]
+tag = "7b"
+size_gb = 4.1
+
+[[model]]
+name = "tinyllama"
+blurb = "A 1.1B model for the smallest machines"
+
+[[model.sizes]]
+tag = "1.1b"
+size_gb = 0.6
+
+[[model]]
+name = "nemotron-mini"
+blurb = "NVIDIA's small chat model"
+
+[[model.sizes]]
+tag = "4b"
+size_gb = 2.7
+
+[[model]]
+name = "exaone3.5"
+blurb = "LG's model for English and Korean"
+
+[[model.sizes]]
+tag = "2.4b"
+size_gb = 1.6
+
+[[model.sizes]]
+tag = "7.8b"
+size_gb = 4.8
+
+[[model.sizes]]
+tag = "32b"
+size_gb = 19.3
+
+[[model]]
+name = "cogito"
+blurb = "A hybrid reasoning model that can think or answer fast"
+
+[[model.sizes]]
+tag = "3b"
+size_gb = 2.2
+
+[[model.sizes]]
+tag = "8b"
+size_gb = 4.9
+
+[[model.sizes]]
+tag = "14b"
+size_gb = 9.0
+
+[[model.sizes]]
+tag = "32b"
+size_gb = 19.8
+
+[[model.sizes]]
+tag = "70b"
+size_gb = 42.5
+
+[[model]]
+name = "glm4"
+blurb = "Zhipu's model for chat and tools"
+
+[[model.sizes]]
+tag = "9b"
+size_gb = 5.5

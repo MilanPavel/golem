@@ -8281,17 +8281,21 @@ public struct HFRepo: Codable {
 }
 
 /// ``hf.search``. Look for GGUF models on Hugging Face. Only the query leaves this Mac.
+///
+/// An empty ``query`` lists the most downloaded GGUF repos. A pasted link such as
+/// ``https://huggingface.co/<user>/<repo>`` or ``hf.co/<user>/<repo>`` is read as that
+/// repo's id.
 // MARK: - HFSearchParams
 public struct HFSearchParams: Codable {
     public let limit: Int?
-    public let query: String
+    public let query: String?
 
     public enum CodingKeys: String, CodingKey {
         case limit = "limit"
         case query = "query"
     }
 
-    public init(limit: Int?, query: String) {
+    public init(limit: Int?, query: String?) {
         self.limit = limit
         self.query = query
     }
@@ -16498,6 +16502,167 @@ public struct OllamaInstallResult: Codable {
 
     public init(started: Bool) {
         self.started = started
+    }
+}
+
+/// One library name with a one-line ``blurb`` (empty for a name found in the registry).
+// MARK: - OllamaLibraryModel
+public struct OllamaLibraryModel: Codable {
+    public let blurb: String
+    public let name: String
+    public let sizes: [OllamaLibraryModelSize]
+
+    public enum CodingKeys: String, CodingKey {
+        case blurb = "blurb"
+        case name = "name"
+        case sizes = "sizes"
+    }
+
+    public init(blurb: String, name: String, sizes: [OllamaLibraryModelSize]) {
+        self.blurb = blurb
+        self.name = name
+        self.sizes = sizes
+    }
+}
+
+/// One tag of a library name. ``fit`` is null when golem cannot tell this Mac's memory.
+///
+/// ``recommended`` marks the largest size that fits. ``installed`` is true when Ollama has
+/// it.
+// MARK: - OllamaLibraryModelSize
+public struct OllamaLibraryModelSize: Codable {
+    public let fit: Fit?
+    public let installed: Bool
+    public let recommended: Bool
+    public let sizeGB: Double
+    public let tag: String
+
+    public enum CodingKeys: String, CodingKey {
+        case fit = "fit"
+        case installed = "installed"
+        case recommended = "recommended"
+        case sizeGB = "size_gb"
+        case tag = "tag"
+    }
+
+    public init(fit: Fit?, installed: Bool, recommended: Bool, sizeGB: Double, tag: String) {
+        self.fit = fit
+        self.installed = installed
+        self.recommended = recommended
+        self.sizeGB = sizeGB
+        self.tag = tag
+    }
+}
+
+/// ``ollama.library``. Names of the Ollama library that contain ``query``, best match
+/// first.
+///
+/// ``query`` may be empty, and then every shipped name comes back. A ``:tag`` after the name
+/// is
+/// ignored for the match. The list ships with golem, so this needs no network, except for a
+/// full
+/// name that is not in it: then the registry is asked for that one manifest.
+// MARK: - OllamaLibraryParams
+public struct OllamaLibraryParams: Codable {
+    public let query: String?
+
+    public enum CodingKeys: String, CodingKey {
+        case query = "query"
+    }
+
+    public init(query: String?) {
+        self.query = query
+    }
+}
+
+// MARK: - OllamaLibraryResult
+public struct OllamaLibraryResult: Codable {
+    public let models: [ModelClass]
+
+    public enum CodingKeys: String, CodingKey {
+        case models = "models"
+    }
+
+    public init(models: [ModelClass]) {
+        self.models = models
+    }
+}
+
+/// One library name with a one-line ``blurb`` (empty for a name found in the registry).
+// MARK: - ModelClass
+public struct ModelClass: Codable {
+    public let blurb: String
+    public let name: String
+    public let sizes: [ModelSize]
+
+    public enum CodingKeys: String, CodingKey {
+        case blurb = "blurb"
+        case name = "name"
+        case sizes = "sizes"
+    }
+
+    public init(blurb: String, name: String, sizes: [ModelSize]) {
+        self.blurb = blurb
+        self.name = name
+        self.sizes = sizes
+    }
+}
+
+/// One tag of a library name. ``fit`` is null when golem cannot tell this Mac's memory.
+///
+/// ``recommended`` marks the largest size that fits. ``installed`` is true when Ollama has
+/// it.
+// MARK: - ModelSize
+public struct ModelSize: Codable {
+    public let fit: Fit?
+    public let installed: Bool
+    public let recommended: Bool
+    public let sizeGB: Double
+    public let tag: String
+
+    public enum CodingKeys: String, CodingKey {
+        case fit = "fit"
+        case installed = "installed"
+        case recommended = "recommended"
+        case sizeGB = "size_gb"
+        case tag = "tag"
+    }
+
+    public init(fit: Fit?, installed: Bool, recommended: Bool, sizeGB: Double, tag: String) {
+        self.fit = fit
+        self.installed = installed
+        self.recommended = recommended
+        self.sizeGB = sizeGB
+        self.tag = tag
+    }
+}
+
+/// One tag of a library name. ``fit`` is null when golem cannot tell this Mac's memory.
+///
+/// ``recommended`` marks the largest size that fits. ``installed`` is true when Ollama has
+/// it.
+// MARK: - OllamaLibrarySize
+public struct OllamaLibrarySize: Codable {
+    public let fit: Fit?
+    public let installed: Bool
+    public let recommended: Bool
+    public let sizeGB: Double
+    public let tag: String
+
+    public enum CodingKeys: String, CodingKey {
+        case fit = "fit"
+        case installed = "installed"
+        case recommended = "recommended"
+        case sizeGB = "size_gb"
+        case tag = "tag"
+    }
+
+    public init(fit: Fit?, installed: Bool, recommended: Bool, sizeGB: Double, tag: String) {
+        self.fit = fit
+        self.installed = installed
+        self.recommended = recommended
+        self.sizeGB = sizeGB
+        self.tag = tag
     }
 }
 

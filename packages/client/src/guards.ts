@@ -97,6 +97,7 @@ import type { HelloResult } from "../../protocol/gen/hello-result.ts";
 import type { MessageSendResult } from "../../protocol/gen/message-send-result.ts";
 import type { HfFilesResult } from "../../protocol/gen/hf-files-result.ts";
 import type { HfSearchResult } from "../../protocol/gen/hf-search-result.ts";
+import type { OllamaLibraryResult } from "../../protocol/gen/ollama-library-result.ts";
 import type { ModelListResult } from "../../protocol/gen/model-list-result.ts";
 import type { ModelProbeResult } from "../../protocol/gen/model-probe-result.ts";
 import type { ModelBenchDone } from "../../protocol/gen/model-bench-done.ts";
@@ -532,6 +533,29 @@ export function isHfFilesResult(value: unknown): value is HfFilesResult {
         typeof size["files"] === "number" &&
         typeof size["recommended"] === "boolean" &&
         (size["fit"] === undefined || size["fit"] === null || size["fit"] === "fits" || size["fit"] === "tight" || size["fit"] === "too_big"),
+    )
+  );
+}
+
+export function isOllamaLibraryResult(value: unknown): value is OllamaLibraryResult {
+  return (
+    isRecord(value) &&
+    Array.isArray(value["models"]) &&
+    value["models"].every(
+      (model) =>
+        isRecord(model) &&
+        typeof model["name"] === "string" &&
+        typeof model["blurb"] === "string" &&
+        Array.isArray(model["sizes"]) &&
+        model["sizes"].every(
+          (size) =>
+            isRecord(size) &&
+            typeof size["tag"] === "string" &&
+            typeof size["size_gb"] === "number" &&
+            typeof size["recommended"] === "boolean" &&
+            typeof size["installed"] === "boolean" &&
+            (size["fit"] === undefined || size["fit"] === null || size["fit"] === "fits" || size["fit"] === "tight" || size["fit"] === "too_big"),
+        ),
     )
   );
 }

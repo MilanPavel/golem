@@ -58,6 +58,7 @@ from golem.models.errors import ModelUnreachable
 from golem.models.huggingface import HuggingFace, HuggingFaceError
 from golem.models.install import InstallError, OllamaInstaller
 from golem.models.keys import KeyStore, KeyStoreError, MemoryKeyStore
+from golem.models.ollama_library import OllamaLibraryError
 from golem.models.pulls import PullError, PullManager
 from golem.models.router import OLLAMA_BASE_URL, ModelConfigError, ModelRouter
 from golem.models.tiers import blended
@@ -377,6 +378,9 @@ from golem_protocol.commands import (
     OllamaInstallCancelResult,
     OllamaInstallParams,
     OllamaInstallResult,
+    OllamaLibraryModel,
+    OllamaLibraryParams,
+    OllamaLibraryResult,
     OllamaSettingsGetParams,
     OllamaSettingsSetParams,
     OllamaStartParams,
@@ -2066,6 +2070,25 @@ async def _hf_files(ctx: RequestContext, params: HfFilesParams) -> HfFilesResult
     return HfFilesResult(repo=params.repo, sizes=[HfSize(**size) for size in sizes])
 
 
+async def _ollama_library(ctx: RequestContext, params: OllamaLibraryParams) -> OllamaLibraryResult:
+    library = ctx.state.ollama_library
+    if library is None:
+        raise RpcCallError(INTERNAL_ERROR, "The Ollama library is not ready")
+    discovery = ctx.state.models
+    installed: set[str] = set()
+    if discovery is not None:
+        # The cache is empty before the first listing: list once, so no model is wrongly missing.
+        listed_models = discovery.cached() or (await discovery.list()).models
+        installed = {
+            listed.ref.partition("/")[2] for listed in listed_models if listed.source == "installed"
+        }
+    try:
+        models = await library.search(params.query, installed)
+    except OllamaLibraryError as exc:
+        raise RpcCallError(MODEL_PULL_FAILED, str(exc)) from exc
+    return OllamaLibraryResult(models=[OllamaLibraryModel(**model) for model in models])
+
+
 async def _model_pull(ctx: RequestContext, params: ModelPullParams) -> ModelPullResult:
     try:
         ref, started = await _pulls(ctx).start(params.name)
@@ -2350,6 +2373,7 @@ def standard_methods() -> dict[str, Method]:
         "model.check": Method("model.check", ModelCheckParams, True, _model_check),
         "hf.search": Method("hf.search", HfSearchParams, True, _hf_search),
         "hf.files": Method("hf.files", HfFilesParams, True, _hf_files),
+        "ollama.library": Method("ollama.library", OllamaLibraryParams, True, _ollama_library),
         "model.pull": Method("model.pull", ModelPullParams, True, _model_pull),
         "model.pull_cancel": Method(
             "model.pull_cancel", ModelPullCancelParams, True, _model_pull_cancel

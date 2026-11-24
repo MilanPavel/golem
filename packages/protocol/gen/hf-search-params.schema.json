@@ -1,6 +1,6 @@
 {
   "additionalProperties": false,
-  "description": "``hf.search``. Look for GGUF models on Hugging Face. Only the query leaves this Mac.",
+  "description": "``hf.search``. Look for GGUF models on Hugging Face. Only the query leaves this Mac.\n\nAn empty ``query`` lists the most downloaded GGUF repos. A pasted link such as\n``https://huggingface.co/<user>/<repo>`` or ``hf.co/<user>/<repo>`` is read as that repo's id.",
   "properties": {
     "limit": {
       "default": 20,
@@ -10,14 +10,11 @@
       "type": "integer"
     },
     "query": {
-      "minLength": 1,
+      "default": "",
       "title": "Query",
       "type": "string"
     }
   },
-  "required": [
-    "query"
-  ],
   "title": "HfSearchParams",
   "type": "object"
 }

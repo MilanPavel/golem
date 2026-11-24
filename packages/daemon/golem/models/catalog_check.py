@@ -5,6 +5,9 @@ the download changed size. Then it tries the next version numbers of each
 family (``qwen3.9`` and ``qwen4`` for ``qwen3.8``) and prints the tags that
 exist, so a newer release is noticed. Which models the catalog lists stays a
 human choice.
+
+The same run refreshes the sizes in ``ollama-library.toml`` and reports its tags that are
+gone from the registry. It never adds a name.
 """
 
 from __future__ import annotations
@@ -22,6 +25,7 @@ from golem.models import registry
 from golem.net_tls import tls_context
 
 CATALOG = Path(__file__).resolve().parent / "data" / "catalog.toml"
+LIBRARY = Path(__file__).resolve().parent / "data" / "ollama-library.toml"
 _FAMILY = re.compile(r"^(?P<prefix>[a-z]+?)(?P<major>\d+)(?:\.(?P<minor>\d+))?(?P<suffix>.*)$")
 
 
@@ -86,5 +90,45 @@ async def check(path: Path = CATALOG) -> int:
     return 1 if missing else 0
 
 
+async def check_library(
+    path: Path = LIBRARY, *, transport: httpx.AsyncBaseTransport | None = None
+) -> int:
+    """Refresh each listed tag's size from the registry. Report tags that are gone."""
+    document = tomlkit.parse(path.read_text("utf-8"))
+    table = cast(dict[str, Any], document)
+    changed = 0
+    missing: list[str] = []
+    async with httpx.AsyncClient(transport=transport, verify=tls_context()) as client:
+        for model in cast(list[dict[str, Any]], table.get("model", [])):
+            for size in cast(list[dict[str, Any]], model["sizes"]):
+                ref = f"{model['name']}:{size['tag']}"
+                parsed = registry.OllamaName(
+                    repository=f"library/{model['name']}", tag=str(size["tag"])
+                )
+                exists, found = await registry.manifest_size_gb(client, parsed)
+                if exists is False:
+                    missing.append(f"{ref}: gone from the registry")
+                elif found is None:
+                    missing.append(f"{ref}: the registry did not answer")
+                elif float(size["size_gb"]) != found:
+                    print(f"{ref}: size {size['size_gb']} GB -> {found} GB")
+                    size["size_gb"] = found
+                    changed += 1
+    if changed:
+        path.write_text(tomlkit.dumps(document), "utf-8")
+        print(f"rewrote {changed} size(s) in {path}")
+    for line in missing:
+        print(f"check: {line}")
+    if not changed and not missing:
+        print("the Ollama library list is current")
+    return 1 if missing else 0
+
+
+async def main() -> int:
+    catalog = await check()
+    library = await check_library()
+    return 1 if catalog or library else 0
+
+
 if __name__ == "__main__":
-    sys.exit(asyncio.run(check()))
+    sys.exit(asyncio.run(main()))

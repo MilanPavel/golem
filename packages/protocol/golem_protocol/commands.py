@@ -1721,11 +1721,15 @@ class ModelPullCancelResult(BaseModel):
 
 
 class HfSearchParams(BaseModel):
-    """``hf.search``. Look for GGUF models on Hugging Face. Only the query leaves this Mac."""
+    """``hf.search``. Look for GGUF models on Hugging Face. Only the query leaves this Mac.
+
+    An empty ``query`` lists the most downloaded GGUF repos. A pasted link such as
+    ``https://huggingface.co/<user>/<repo>`` or ``hf.co/<user>/<repo>`` is read as that repo's id.
+    """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    query: str = Field(min_length=1)
+    query: str = ""
     limit: int = Field(default=20, ge=1, le=100)
 
 
@@ -1776,6 +1780,50 @@ class HfFilesResult(BaseModel):
 
     repo: str = Field(min_length=3)
     sizes: list[HfSize]
+
+
+class OllamaLibraryParams(BaseModel):
+    """``ollama.library``. Names of the Ollama library that contain ``query``, best match first.
+
+    ``query`` may be empty, and then every shipped name comes back. A ``:tag`` after the name is
+    ignored for the match. The list ships with golem, so this needs no network, except for a full
+    name that is not in it: then the registry is asked for that one manifest.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    query: str = ""
+
+
+class OllamaLibrarySize(BaseModel):
+    """One tag of a library name. ``fit`` is null when golem cannot tell this Mac's memory.
+
+    ``recommended`` marks the largest size that fits. ``installed`` is true when Ollama has it.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    tag: str = Field(min_length=1)
+    size_gb: float = Field(ge=0)
+    fit: Literal["fits", "tight", "too_big"] | None = None
+    recommended: bool
+    installed: bool
+
+
+class OllamaLibraryModel(BaseModel):
+    """One library name with a one-line ``blurb`` (empty for a name found in the registry)."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    name: str = Field(min_length=1)
+    blurb: str
+    sizes: list[OllamaLibrarySize]
+
+
+class OllamaLibraryResult(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    models: list[OllamaLibraryModel]
 
 
 class ModelDeleteParams(BaseModel):

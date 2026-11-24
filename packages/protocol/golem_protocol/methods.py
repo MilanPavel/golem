@@ -114,6 +114,7 @@ METHOD_ACCESS: Final[Mapping[str, Access]] = {
     "model.probe": "browser",
     "hf.search": "browser",
     "hf.files": "browser",
+    "ollama.library": "browser",
     "model.pull": "browser",
     "model.pull_cancel": "browser",
     "model.delete": "browser",

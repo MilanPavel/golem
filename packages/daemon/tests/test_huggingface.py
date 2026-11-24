@@ -13,7 +13,7 @@ from pydantic import BaseModel
 from test_pulls import FakeOllama
 
 from golem.config import GolemSettings
-from golem.models.huggingface import SLOW, HuggingFace, HuggingFaceError, quant_of
+from golem.models.huggingface import SLOW, HuggingFace, HuggingFaceError, quant_of, repo_of
 from golem.models.pulls import PullManager
 from golem.models.router import ModelRouter
 
@@ -112,6 +112,39 @@ async def test_search_parses_repos_and_the_gated_flag() -> None:
         "limit": "5",
     }
     assert fake.requests[0].content == b""
+
+
+async def test_an_empty_query_asks_for_the_most_downloaded_repos() -> None:
+    fake = FakeHub()
+    repos = await _hub(fake).search("  ", 7)
+    assert [repo["id"] for repo in repos] == ["bartowski/Qwen3-8B-GGUF", "meta/Llama-GGUF"]
+    assert dict(fake.requests[0].url.params) == {
+        "filter": "gguf",
+        "sort": "downloads",
+        "limit": "7",
+    }
+
+
+@pytest.mark.parametrize(
+    "link",
+    [
+        "https://huggingface.co/bartowski/Qwen3-8B-GGUF",
+        "https://huggingface.co/bartowski/Qwen3-8B-GGUF/tree/main",
+        "http://www.huggingface.co/bartowski/Qwen3-8B-GGUF?show=1",
+        "hf.co/bartowski/Qwen3-8B-GGUF:Q4_K_M",
+        "  huggingface.co/bartowski/Qwen3-8B-GGUF/ ",
+    ],
+)
+async def test_a_pasted_link_is_read_as_the_repo_id(link: str) -> None:
+    assert repo_of(link) == "bartowski/Qwen3-8B-GGUF"
+    fake = FakeHub()
+    await _hub(fake).search(link)
+    assert fake.requests[0].url.params["search"] == "bartowski/Qwen3-8B-GGUF"
+
+
+def test_other_text_is_not_taken_for_a_link() -> None:
+    assert repo_of(" qwen3 coder ") == "qwen3 coder"
+    assert repo_of("https://example.com/a/b") == "https://example.com/a/b"
 
 
 async def test_files_group_quants_sum_splits_and_mark_fit_on_a_32_gb_mac() -> None:

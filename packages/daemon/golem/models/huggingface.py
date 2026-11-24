@@ -26,6 +26,10 @@ _QUANT = re.compile(
     re.IGNORECASE,
 )
 _SPLIT = re.compile(r"-\d{5}-of-\d{5}", re.IGNORECASE)
+_LINK = re.compile(
+    r"^(?:https?://)?(?:www\.)?(?:huggingface\.co|hf\.co)/(?P<repo>[\w.-]+/[\w.-]+)(?:[/?#:].*)?$",
+    re.IGNORECASE,
+)
 
 
 class HuggingFaceError(Exception):
@@ -74,11 +78,15 @@ class HuggingFace:
             raise HuggingFaceError(SLOW) from exc
 
     async def search(self, query: str, limit: int = 20) -> list[dict[str, Any]]:
-        """Repos as dicts of ``id``, ``downloads``, ``likes``, ``updated``, ``gated``."""
-        body = await self._get(
-            "/api/models",
-            {"search": query, "filter": "gguf", "sort": "downloads", "limit": limit},
-        )
+        """Repos as dicts of ``id``, ``downloads``, ``likes``, ``updated``, ``gated``.
+
+        An empty query lists the most downloaded GGUF repos. A pasted link is read as its repo id.
+        """
+        params: dict[str, str | int] = {"filter": "gguf", "sort": "downloads", "limit": limit}
+        words = repo_of(query)
+        if words:
+            params["search"] = words
+        body = await self._get("/api/models", params)
         if not isinstance(body, list):
             raise HuggingFaceError(SLOW)
         repos: list[dict[str, Any]] = []
@@ -138,6 +146,16 @@ class HuggingFace:
             )
         _recommend(rows)
         return rows
+
+
+def repo_of(query: str) -> str:
+    """``user/repo`` from a pasted ``https://huggingface.co/user/repo`` or ``hf.co/user/repo`` link.
+
+    Any other text comes back trimmed.
+    """
+    text = query.strip()
+    found = _LINK.match(text)
+    return found["repo"] if found else text
 
 
 def quant_of(path: str) -> str | None:
