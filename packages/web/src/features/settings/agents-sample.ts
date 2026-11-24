@@ -6,6 +6,19 @@ function file(settings: Record<string, string | number | boolean>, prompt: strin
   return `---\n${lines.join("\n")}\n---\n${prompt}\n`;
 }
 
+const delegateNumber = (value: number, def: number) => ({ value, default: def, is_default: value === def });
+
+/** The four delegate numbers as golem ships them. */
+export const SAMPLE_DELEGATE = {
+  read_share: delegateNumber(0.3, 0.3),
+  fill_share: delegateNumber(0.85, 0.85),
+  job_share: delegateNumber(0.1, 0.1),
+  price_ratio: delegateNumber(3, 3),
+};
+
+/** The same numbers after a change: two differ from what golem ships. */
+export const SAMPLE_DELEGATE_CHANGED = { ...SAMPLE_DELEGATE, read_share: delegateNumber(0.42, 0.3), fill_share: delegateNumber(0.8, 0.85) };
+
 const READ = ["read_file", "list_dir", "glob", "grep", "git_log", "git_diff", "git_status"];
 const LIMITS = { max_calls: 15, max_seconds: 300, answer_chars: 6000 };
 

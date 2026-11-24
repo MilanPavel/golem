@@ -72,7 +72,7 @@ import { MEMORY_OFF_TEXT } from "../store/memory.ts";
 import { DefaultLimits, FinishedHelpers } from "../features/settings/agents-keep.tsx";
 import { LimitsBlock } from "../features/settings/agents-limits.tsx";
 import { AgentsPage, AgentsTabs } from "../features/settings/agents-section.tsx";
-import { SAMPLE_AGENTS, SAMPLE_CONFIG_LIMITS, SAMPLE_COPY, WISH_AGENTS_CLOUD, WISH_AGENTS_LOCAL, WISH_AGENTS_MIXED } from "../features/settings/agents-sample.ts";
+import { SAMPLE_AGENTS, SAMPLE_CONFIG_LIMITS, SAMPLE_DELEGATE, SAMPLE_DELEGATE_CHANGED, SAMPLE_COPY, WISH_AGENTS_CLOUD, WISH_AGENTS_LOCAL, WISH_AGENTS_MIXED } from "../features/settings/agents-sample.ts";
 import { SkillList } from "../features/settings/skills-section.tsx";
 import { SkillOverview } from "../features/settings/skills/skill-detail.tsx";
 import { SAMPLE_BROKEN_SKILL_MD, SAMPLE_SKILLS } from "../features/settings/skills/sample.ts";
@@ -1681,7 +1681,7 @@ function AgentsDemo() {
           agents={null}
           rules={
             <div className="flex max-w-column flex-col gap-3">
-              <UseHelpers value="when_needed" onChoose={() => {}} />
+              <UseHelpers value="when_needed" delegate={SAMPLE_DELEGATE} onChoose={() => {}} />
               <DefaultLimits values={{ keep_days: 7, keep_problem_days: 30 }} errors={{}} failure={null} onSaveLimit={() => {}} />
               <FinishedHelpers values={{ keep_days: 7, keep_problem_days: 30 }} errors={{}} failure={null} onSave={() => {}} />
             </div>
@@ -1723,9 +1723,15 @@ function UseHelpersDemo() {
     <div className="flex flex-col gap-4">
       {(["when_needed", "ask", "never"] as const).map((value) => (
         <section key={value} aria-label={`Use helpers, ${value}`} className="rounded-lg border border-line bg-bg p-4">
-          <UseHelpers value={value} onChoose={() => {}} />
+          <UseHelpers value={value} delegate={SAMPLE_DELEGATE} onChoose={() => {}} />
         </section>
       ))}
+      <section aria-label="Use helpers, numbers changed" className="rounded-lg border border-line bg-bg p-4">
+        <UseHelpers value="when_needed" delegate={SAMPLE_DELEGATE_CHANGED} onChoose={() => {}} />
+      </section>
+      <section aria-label="Use helpers, measured" className="rounded-lg border border-line bg-bg p-4">
+        <UseHelpers value="when_needed" delegate={SAMPLE_DELEGATE_CHANGED} measurement={{ date: "23 Nov", model: "qwen3.8:27b" }} onChoose={() => {}} />
+      </section>
       <section aria-label="Use helpers, a wrong value" className="rounded-lg border border-line bg-bg p-4">
         <UseHelpers value="ask" errors={{ "agents.use_helpers": "Not one of when_needed, ask, never." }} onChoose={() => {}} />
       </section>

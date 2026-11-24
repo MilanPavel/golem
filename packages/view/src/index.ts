@@ -897,6 +897,18 @@ export { keyWhere } from "./key-where.ts";
 export { keyGroups, mcpRefParts, savedCount, type KeyGroups, type KeyRow, type KeyServer } from "./key-groups.ts";
 export { AGENT_TEMPLATE } from "./agent-template.ts";
 export {
+  formatRatio,
+  formatShare,
+  reasonTiles,
+  rulesFoot,
+  type DelegateNumber,
+  type DelegateNumbers,
+  type ReasonTile,
+  type RulesFoot,
+  type RulesMeasurement,
+  type TilePart,
+} from "./agents-rules.ts";
+export {
   agentActions,
   agentKey,
   agentProblemText,
