@@ -197,8 +197,10 @@ from golem_protocol.events import (
 )
 
 NOT_APPROVED = "cancelled before it was approved"
-ONE_AT_A_TIME = "one at a time"
-"""``helper.state`` reason of a helper that waits because nothing can run at once."""
+TEAM_WAIT = "team"
+"""``helper.state`` reason of a helper held back by ``[agents] at_once`` (ADR-060)."""
+BUDGET_WAIT = "budget"
+"""``helper.state`` reason of a helper held back by a spent cap in ``[budget]`` (ADR-060)."""
 
 NO_STRONGER = "No stronger model is ready. Add a key in Settings."
 
@@ -553,6 +555,7 @@ class SessionManager:
         self._stopping: set[str] = set()
         """Leads being cancelled or closed: a helper that ends must not wake them."""
         self._queued: dict[str, list[tuple[str, str]]] = {}
+        self._budget_held: set[str] = set()
         """For each lead, the helpers that wait for a turn, oldest first: ``(helper id, brief)``.
         In memory only: a restart ends a helper that never started, like any helper with no run."""
         self._ended_helpers: set[str] = set()
@@ -1581,19 +1584,21 @@ class SessionManager:
                     parent, run_id, "tool.started", ToolStartedData(call_id=call_id)
                 )
             if not self._turn_free(parent):
-                # Nothing can run at once: the helpers take turns (ADR-059, section 2).
+                # `at_once` helpers already run: the next ones take turns (ADR-059, section 2).
                 self._queued.setdefault(parent, []).append((sid, brief))
                 await self._events.emit(
                     parent,
                     run_id,
                     "helper.state",
-                    HelperStateData(
-                        call_id=call_id,
-                        index=index,
-                        state="queued",
-                        reason=ONE_AT_A_TIME,
-                    ),
+                    HelperStateData(call_id=call_id, index=index, state="queued", reason=TEAM_WAIT),
                 )
+                return HelperRef(sid, picked.profile, True)
+            held = await self._budget_hold(helper)
+            if held is not None:
+                # A spent cap holds the helper until the cap allows it (ADR-060, `budget`).
+                self._queued.setdefault(parent, []).append((sid, brief))
+                self._budget_held.add(sid)
+                await self._emit_budget_wait(parent, run_id, call_id, index, held)
                 return HelperRef(sid, picked.profile, True)
             try:
                 await self._send(helper, brief)
@@ -1618,29 +1623,74 @@ class SessionManager:
         )
 
     def _turn_free(self, lead_id: str) -> bool:
-        """Whether a helper of ``lead_id`` may start now.
+        """Whether a helper of ``lead_id`` may start now: fewer than ``[agents] at_once`` of
+        its helpers hold a turn."""
+        return self._busy_helpers(lead_id) < self._runtime.router.agent_settings().at_once
 
-        Only ``[agents] at_once = 1`` is enforced here: then a helper starts when none runs.
-        More at once is the dispatcher's job (step 15.8), so helpers still all start together.
+    async def _budget_hold(self, helper: _LiveSession) -> Room | None:
+        """The spent cap that holds ``helper`` back, None when it may start.
+
+        Only a helper on a paid model is held: a local one never costs. This is the same test
+        as :meth:`_check_budget`, made before the run so the wait shows as ``budget``.
         """
-        return self._runtime.router.agent_settings().at_once > 1 or self._busy_helpers(lead_id) == 0
+        if self.budget is None or self._runtime.tier_of is None:
+            return None
+        if self._runtime.tier_of(helper.model_profile) in (None, "local"):
+            return None
+        room = await self.budget.room(helper.session_id)
+        return room if room.spent else None
+
+    async def _emit_budget_wait(
+        self, lead_id: str, run_id: str | None, call_id: str, index: int, room: Room
+    ) -> None:
+        cap = self._runtime.router.budget_settings()
+        day = room.cap == "day"
+        await self._events.emit(
+            lead_id,
+            run_id,
+            "helper.state",
+            HelperStateData(
+                call_id=call_id,
+                index=index,
+                state="waiting",
+                reason=BUDGET_WAIT,
+                spent_usd=room.spent_today if day else room.spent_session,
+                cap_usd=(cap.daily_usd if day else cap.session_usd) or 0.0,
+            ),
+        )
 
     async def _start_queued(self, lead_id: str) -> None:
         """Start the helpers of ``lead_id`` that wait for a turn, while a turn is free.
 
-        With the manager's lock held. A helper that fails to start is closed and ends.
+        With the manager's lock held. A helper that a spent cap holds stays queued, and the
+        helpers behind it may start. A helper that fails to start is closed and ends.
         """
         waiting = self._queued.get(lead_id, [])
-        while waiting and self._turn_free(lead_id):
-            helper_id, brief = waiting.pop(0)
+        for item in list(waiting):
+            if not self._turn_free(lead_id):
+                break
+            helper_id, brief = item
             helper = self._sessions.get(helper_id)
             if helper is None or helper.closed or helper.parent is None:
+                waiting.remove(item)
+                self._budget_held.discard(helper_id)
                 continue
             parent = helper.parent
             lead = await self._run_records.latest(lead_id)
+            lead_run = None if lead is None else lead.run_id
+            held = await self._budget_hold(helper)
+            if held is not None:
+                if helper_id not in self._budget_held:
+                    self._budget_held.add(helper_id)
+                    await self._emit_budget_wait(
+                        lead_id, lead_run, parent.call_id, parent.index, held
+                    )
+                continue
+            waiting.remove(item)
+            self._budget_held.discard(helper_id)
             await self._events.emit(
                 lead_id,
-                None if lead is None else lead.run_id,
+                lead_run,
                 "helper.state",
                 HelperStateData(call_id=parent.call_id, index=parent.index, state="running"),
             )
@@ -1667,6 +1717,7 @@ class SessionManager:
         else:
             self._queued.pop(lead_id, None)
         for helper_id, _brief in gone:
+            self._budget_held.discard(helper_id)
             helper = self._sessions.pop(helper_id, None)
             if helper is not None:
                 helper.closed = True

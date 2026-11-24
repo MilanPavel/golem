@@ -1328,9 +1328,17 @@ class HelperStepData(BaseModel):
 class HelperStateData(BaseModel):
     """A helper queued, started running, started waiting, or went on.
 
-    ``reason`` says why it waits or queues. It is a plain string, not a fixed list: the
-    words today are ``you`` and ``team``, and later phases add more, so a new word is not
-    a protocol change. It is None when the helper runs with nothing to explain.
+    ``reason`` says why it waits or queues. It is a plain string, so a new word is not a
+    protocol change. The words are ADR-060's: ``you``, ``team``, ``slot``, ``load``,
+    ``provider``, ``budget`` and ``stalled``. It is None when the helper runs with nothing to
+    explain. It carries no sentence: the view words it.
+
+    The fields after ``reason`` are all optional, so an old daemon's event still reads, and
+    they mirror :class:`ModelWaitingData`. ``line`` names the model, the provider or ``shell``
+    the helper waits on, for ``slot`` and ``provider``. ``position`` (1 is next) and ``holder``
+    (the label of the call that frees a slot first) say where it stands. ``retry_in_ms`` is the
+    backoff left, for ``provider``. ``spent_usd`` and ``cap_usd`` are for ``budget``: what is
+    spent and the cap that holds the helper.
     """
 
     model_config = _CONFIG
@@ -1339,6 +1347,12 @@ class HelperStateData(BaseModel):
     index: int = Field(ge=0)
     state: HelperState
     reason: str | None = Field(default=None, min_length=1)
+    line: str | None = Field(default=None, min_length=1)
+    position: int | None = Field(default=None, ge=1)
+    holder: str | None = Field(default=None, min_length=1)
+    retry_in_ms: int | None = Field(default=None, ge=0)
+    spent_usd: float | None = Field(default=None, ge=0)
+    cap_usd: float | None = Field(default=None, ge=0)
 
 
 class HelperWaitData(BaseModel):

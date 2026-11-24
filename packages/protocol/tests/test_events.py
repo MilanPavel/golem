@@ -297,6 +297,33 @@ def test_a_model_waiting_event_carries_the_wait_fields_and_reads_without_them() 
         ModelWaitingData.model_validate({"message_id": "m_abc", "waiting": True, "scope": "batch"})
 
 
+def test_a_helper_state_carries_the_wait_fields_and_reads_without_them() -> None:
+    old = HelperStateData.model_validate(
+        {"call_id": "call_1", "index": 0, "state": "queued", "reason": "team"}
+    )
+    assert old.line is None and old.position is None and old.spent_usd is None
+    waiting = HelperStateData(
+        call_id="call_1",
+        index=1,
+        state="queued",
+        reason="provider",
+        line="anthropic",
+        position=1,
+        holder="explorer 1",
+        retry_in_ms=8000,
+    )
+    assert HelperStateData.model_validate_json(waiting.model_dump_json()) == waiting
+    budget = HelperStateData(
+        call_id="call_1", index=2, state="waiting", reason="budget", spent_usd=0.62, cap_usd=0.5
+    )
+    assert HelperStateData.model_validate(budget.model_dump()) == budget
+    for bad in ({"position": 0}, {"retry_in_ms": -1}, {"spent_usd": -0.1}, {"cap_usd": -1}):
+        with pytest.raises(ValidationError):
+            HelperStateData.model_validate(
+                {"call_id": "call_1", "index": 0, "state": "waiting", **bad}
+            )
+
+
 def test_session_created_names_its_parent_and_agent() -> None:
     data = SessionCreatedData(
         model_profile="remote",

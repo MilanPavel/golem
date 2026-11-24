@@ -8188,27 +8188,56 @@ public enum HelperStartedEventType: String, Codable {
 
 /// A helper queued, started running, started waiting, or went on.
 ///
-/// ``reason`` says why it waits or queues. It is a plain string, not a fixed list: the
-/// words today are ``you`` and ``team``, and later phases add more, so a new word is not
-/// a protocol change. It is None when the helper runs with nothing to explain.
+/// ``reason`` says why it waits or queues. It is a plain string, so a new word is not a
+/// protocol change. The words are ADR-060's: ``you``, ``team``, ``slot``, ``load``,
+/// ``provider``, ``budget`` and ``stalled``. It is None when the helper runs with nothing to
+/// explain. It carries no sentence: the view words it.
+///
+/// The fields after ``reason`` are all optional, so an old daemon's event still reads, and
+/// they mirror :class:`ModelWaitingData`. ``line`` names the model, the provider or
+/// ``shell``
+/// the helper waits on, for ``slot`` and ``provider``. ``position`` (1 is next) and
+/// ``holder``
+/// (the label of the call that frees a slot first) say where it stands. ``retry_in_ms`` is
+/// the
+/// backoff left, for ``provider``. ``spent_usd`` and ``cap_usd`` are for ``budget``: what is
+/// spent and the cap that holds the helper.
 // MARK: - HelperStateData
 public struct HelperStateData: Codable {
     public let callID: String
+    public let capUsd: Double?
+    public let holder: String?
     public let index: Int
+    public let line: String?
+    public let position: Int?
     public let reason: String?
+    public let retryInMS: Int?
+    public let spentUsd: Double?
     public let state: HelperStateDataState
 
     public enum CodingKeys: String, CodingKey {
         case callID = "call_id"
+        case capUsd = "cap_usd"
+        case holder = "holder"
         case index = "index"
+        case line = "line"
+        case position = "position"
         case reason = "reason"
+        case retryInMS = "retry_in_ms"
+        case spentUsd = "spent_usd"
         case state = "state"
     }
 
-    public init(callID: String, index: Int, reason: String?, state: HelperStateDataState) {
+    public init(callID: String, capUsd: Double?, holder: String?, index: Int, line: String?, position: Int?, reason: String?, retryInMS: Int?, spentUsd: Double?, state: HelperStateDataState) {
         self.callID = callID
+        self.capUsd = capUsd
+        self.holder = holder
         self.index = index
+        self.line = line
+        self.position = position
         self.reason = reason
+        self.retryInMS = retryInMS
+        self.spentUsd = spentUsd
         self.state = state
     }
 }
@@ -8250,27 +8279,56 @@ public struct HelperStateEvent: Codable {
 
 /// A helper queued, started running, started waiting, or went on.
 ///
-/// ``reason`` says why it waits or queues. It is a plain string, not a fixed list: the
-/// words today are ``you`` and ``team``, and later phases add more, so a new word is not
-/// a protocol change. It is None when the helper runs with nothing to explain.
+/// ``reason`` says why it waits or queues. It is a plain string, so a new word is not a
+/// protocol change. The words are ADR-060's: ``you``, ``team``, ``slot``, ``load``,
+/// ``provider``, ``budget`` and ``stalled``. It is None when the helper runs with nothing to
+/// explain. It carries no sentence: the view words it.
+///
+/// The fields after ``reason`` are all optional, so an old daemon's event still reads, and
+/// they mirror :class:`ModelWaitingData`. ``line`` names the model, the provider or
+/// ``shell``
+/// the helper waits on, for ``slot`` and ``provider``. ``position`` (1 is next) and
+/// ``holder``
+/// (the label of the call that frees a slot first) say where it stands. ``retry_in_ms`` is
+/// the
+/// backoff left, for ``provider``. ``spent_usd`` and ``cap_usd`` are for ``budget``: what is
+/// spent and the cap that holds the helper.
 // MARK: - HelperStateEventData
 public struct HelperStateEventData: Codable {
     public let callID: String
+    public let capUsd: Double?
+    public let holder: String?
     public let index: Int
+    public let line: String?
+    public let position: Int?
     public let reason: String?
+    public let retryInMS: Int?
+    public let spentUsd: Double?
     public let state: HelperStateDataState
 
     public enum CodingKeys: String, CodingKey {
         case callID = "call_id"
+        case capUsd = "cap_usd"
+        case holder = "holder"
         case index = "index"
+        case line = "line"
+        case position = "position"
         case reason = "reason"
+        case retryInMS = "retry_in_ms"
+        case spentUsd = "spent_usd"
         case state = "state"
     }
 
-    public init(callID: String, index: Int, reason: String?, state: HelperStateDataState) {
+    public init(callID: String, capUsd: Double?, holder: String?, index: Int, line: String?, position: Int?, reason: String?, retryInMS: Int?, spentUsd: Double?, state: HelperStateDataState) {
         self.callID = callID
+        self.capUsd = capUsd
+        self.holder = holder
         self.index = index
+        self.line = line
+        self.position = position
         self.reason = reason
+        self.retryInMS = retryInMS
+        self.spentUsd = spentUsd
         self.state = state
     }
 }
@@ -20917,9 +20975,20 @@ public struct Params: Codable {
 ///
 /// A helper queued, started running, started waiting, or went on.
 ///
-/// ``reason`` says why it waits or queues. It is a plain string, not a fixed list: the
-/// words today are ``you`` and ``team``, and later phases add more, so a new word is not
-/// a protocol change. It is None when the helper runs with nothing to explain.
+/// ``reason`` says why it waits or queues. It is a plain string, so a new word is not a
+/// protocol change. The words are ADR-060's: ``you``, ``team``, ``slot``, ``load``,
+/// ``provider``, ``budget`` and ``stalled``. It is None when the helper runs with nothing to
+/// explain. It carries no sentence: the view words it.
+///
+/// The fields after ``reason`` are all optional, so an old daemon's event still reads, and
+/// they mirror :class:`ModelWaitingData`. ``line`` names the model, the provider or
+/// ``shell``
+/// the helper waits on, for ``slot`` and ``provider``. ``position`` (1 is next) and
+/// ``holder``
+/// (the label of the call that frees a slot first) say where it stands. ``retry_in_ms`` is
+/// the
+/// backoff left, for ``provider``. ``spent_usd`` and ``cap_usd`` are for ``budget``: what is
+/// spent and the cap that holds the helper.
 ///
 /// The lead parked to wait for its helpers, or went on.
 ///
@@ -21076,6 +21145,8 @@ public struct ParamsData: Codable {
     public let wish: String?
     public let calls: Int?
     public let stepID: String?
+    public let capUsd: Double?
+    public let spentUsd: Double?
     public let state: PurpleState?
     public let helperIDS: [String]?
     public let answerTokens: Int?
@@ -21219,6 +21290,8 @@ public struct ParamsData: Codable {
         case wish = "wish"
         case calls = "calls"
         case stepID = "step_id"
+        case capUsd = "cap_usd"
+        case spentUsd = "spent_usd"
         case state = "state"
         case helperIDS = "helper_ids"
         case answerTokens = "answer_tokens"
@@ -21231,7 +21304,7 @@ public struct ParamsData: Codable {
         case toBranch = "to_branch"
     }
 
-    public init(agent: Agent?, cwd: String?, forkedFrom: PurpleForkedFrom?, modelName: String?, modelProfile: String?, modelProvider: String?, origin: String?, parent: PurpleSessionParent?, route: RouteEnum?, allowedTools: [PurpleSessionAllowance]?, mcpServers: [String]?, paidOk: Bool?, title: String?, runID: String?, status: PurpleStatus?, summary: String?, reason: String?, detail: String?, model: String?, provider: String?, rejected: [FluffyModelRejection]?, replacesModel: String?, tier: Tier?, options: [String: Option]?, mode: DefaultPermissionModeEnum?, on: Bool?, messageID: String?, role: MessageCompletedDataRole?, text: String?, interrupted: Bool?, skill: FluffySkillCall?, thinking: String?, thinkingMS: Int?, clearedIDS: [String]?, contextWindow: Int?, estimatedTokens: Int?, index: Int?, messageBytes: [Int]?, messageChars: [Int]?, messageIDS: [String]?, numCtx: Int?, parentCallID: String?, profile: String?, summaryChars: Int?, systemBytes: Int?, systemChars: Int?, systemPromptSHA: String?, systemSections: [TentacledPromptSectionInfo]?, toolsBytes: Int?, toolsChars: Int?, toolsSHA: String?, windowEstimated: Bool?, windowPlanned: Bool?, costUsd: Double?, failed: Bool?, firstTokenMS: Int?, latencyMS: Int?, loadMS: Int?, price: FluffyCallPrice?, promptMS: Int?, replyMS: Int?, stopReason: String?, textToolCalls: TextToolCalls?, usage: FluffyTokenUsage?, waitedMS: Int?, action: ContextChangedDataAction?, afterTokens: Int?, beforeTokens: Int?, count: Int?, reloadMS: Int?, room: Int?, windowFrom: Int?, windowTo: Int?, code: Code?, hint: String?, message: String?, args: [String: JSONAny]?, callID: String?, name: String?, chars: Int?, lines: Int?, path: String?, holder: String?, line: String?, position: Int?, retryInMS: Int?, scope: ModelWaitingDataScope?, silentMS: Int?, waiting: Bool?, willRetry: Bool?, window: Int?, artifactID: String?, diff: String?, durationMS: Int?, preview: String?, sources: [PurpleToolSource]?, truncated: Bool?, source: String?, subject: String?, decision: Decision?, device: String?, rule: String?, alternatives: [Answer]?, caps: FluffyConsentCaps?, estimatedUsd: Double?, helperID: String?, label: String?, notSent: [String]?, sent: [String]?, signal: String?, why: String?, answer: Answer?, todos: [PurpleTodo]?, planID: String?, steps: [FluffyPlanStep]?, added: Int?, changeID: String?, removed: Int?, reverts: String?, hash: String?, how: How?, checks: [FluffyCheckInfo]?, checkID: String?, command: String?, round: Int?, exitCode: Int?, output: String?, pickReason: String?, wish: String?, calls: Int?, stepID: String?, state: PurpleState?, helperIDS: [String]?, answerTokens: Int?, modelCalls: Int?, stopped: Stopped?, tokens: Int?, workingMS: Int?, fromBranch: String?, pathsCount: Int?, toBranch: String?) {
+    public init(agent: Agent?, cwd: String?, forkedFrom: PurpleForkedFrom?, modelName: String?, modelProfile: String?, modelProvider: String?, origin: String?, parent: PurpleSessionParent?, route: RouteEnum?, allowedTools: [PurpleSessionAllowance]?, mcpServers: [String]?, paidOk: Bool?, title: String?, runID: String?, status: PurpleStatus?, summary: String?, reason: String?, detail: String?, model: String?, provider: String?, rejected: [FluffyModelRejection]?, replacesModel: String?, tier: Tier?, options: [String: Option]?, mode: DefaultPermissionModeEnum?, on: Bool?, messageID: String?, role: MessageCompletedDataRole?, text: String?, interrupted: Bool?, skill: FluffySkillCall?, thinking: String?, thinkingMS: Int?, clearedIDS: [String]?, contextWindow: Int?, estimatedTokens: Int?, index: Int?, messageBytes: [Int]?, messageChars: [Int]?, messageIDS: [String]?, numCtx: Int?, parentCallID: String?, profile: String?, summaryChars: Int?, systemBytes: Int?, systemChars: Int?, systemPromptSHA: String?, systemSections: [TentacledPromptSectionInfo]?, toolsBytes: Int?, toolsChars: Int?, toolsSHA: String?, windowEstimated: Bool?, windowPlanned: Bool?, costUsd: Double?, failed: Bool?, firstTokenMS: Int?, latencyMS: Int?, loadMS: Int?, price: FluffyCallPrice?, promptMS: Int?, replyMS: Int?, stopReason: String?, textToolCalls: TextToolCalls?, usage: FluffyTokenUsage?, waitedMS: Int?, action: ContextChangedDataAction?, afterTokens: Int?, beforeTokens: Int?, count: Int?, reloadMS: Int?, room: Int?, windowFrom: Int?, windowTo: Int?, code: Code?, hint: String?, message: String?, args: [String: JSONAny]?, callID: String?, name: String?, chars: Int?, lines: Int?, path: String?, holder: String?, line: String?, position: Int?, retryInMS: Int?, scope: ModelWaitingDataScope?, silentMS: Int?, waiting: Bool?, willRetry: Bool?, window: Int?, artifactID: String?, diff: String?, durationMS: Int?, preview: String?, sources: [PurpleToolSource]?, truncated: Bool?, source: String?, subject: String?, decision: Decision?, device: String?, rule: String?, alternatives: [Answer]?, caps: FluffyConsentCaps?, estimatedUsd: Double?, helperID: String?, label: String?, notSent: [String]?, sent: [String]?, signal: String?, why: String?, answer: Answer?, todos: [PurpleTodo]?, planID: String?, steps: [FluffyPlanStep]?, added: Int?, changeID: String?, removed: Int?, reverts: String?, hash: String?, how: How?, checks: [FluffyCheckInfo]?, checkID: String?, command: String?, round: Int?, exitCode: Int?, output: String?, pickReason: String?, wish: String?, calls: Int?, stepID: String?, capUsd: Double?, spentUsd: Double?, state: PurpleState?, helperIDS: [String]?, answerTokens: Int?, modelCalls: Int?, stopped: Stopped?, tokens: Int?, workingMS: Int?, fromBranch: String?, pathsCount: Int?, toBranch: String?) {
         self.agent = agent
         self.cwd = cwd
         self.forkedFrom = forkedFrom
@@ -21363,6 +21436,8 @@ public struct ParamsData: Codable {
         self.wish = wish
         self.calls = calls
         self.stepID = stepID
+        self.capUsd = capUsd
+        self.spentUsd = spentUsd
         self.state = state
         self.helperIDS = helperIDS
         self.answerTokens = answerTokens

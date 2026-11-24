@@ -32,7 +32,7 @@ from test_helper_model import (  # pyright: ignore
 from test_helper_sessions import SETTINGS, WORKER  # pyright: ignore
 from test_server import HELLO, RpcClient, error_code, rpc_result, start_daemon, stop_daemon
 
-from golem.config import GolemSettings
+from golem.config import AgentSettings, GolemSettings
 from golem.graphs.chat import open_chat
 from golem.models.dispatcher import Dispatcher
 from golem.models.router import ModelRouter
@@ -211,7 +211,8 @@ async def test_a_batch_answer_for_one_workers_call_answers_all_five(
     database: Database, project: Path, tmp_path: Path
 ) -> None:
     briefs = [f"w{i}" for i in range(5)]
-    rig = _Rig(database, _model(*briefs), tmp_path)
+    five = SETTINGS.model_copy(update={"agents": AgentSettings(at_once=5)})
+    rig = _Rig(database, _model(*briefs), tmp_path, settings=five)
     lead = await rig.lead(project)
     helpers = [await rig.worker(lead, project, b, index=i) for i, b in enumerate(briefs)]
     calls = [await rig.asked(h) for h in helpers]
