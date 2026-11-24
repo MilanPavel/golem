@@ -35,6 +35,7 @@ export function ModelsSection() {
       stop: (ref) => page.cancelPull(ref),
       pull: (ref) => page.pull(ref),
       hf: { search: (query) => page.searchHf(query), files: (repo) => page.hfFiles(repo) },
+      library: { search: (query) => page.ollamaLibrary(query) },
       saveOllama: (params) => page.setOllamaSettings(params),
     }),
     [page],

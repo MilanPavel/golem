@@ -48,6 +48,15 @@ for (const theme of ["slip", "kiln"] as const) {
         expect(page.getByText("Download failed: no space left on the disk")).toBeTruthy();
       }
       if (label === "Picked for this Mac, no match") expect(page.getByText("Not in golem's list")).toBeTruthy();
+      if (label === "Ollama library") {
+        expect(page.getByRole("list", { name: "Ollama library names" })).toBeTruthy();
+        expect(page.getByRole("group", { name: "Sizes of qwen3.8" })).toBeTruthy();
+        expect(page.getByText("Installed")).toBeTruthy();
+      }
+      if (label === "Ollama library, a name and a size") expect(page.getByRole("button", { name: "Download gpt-oss:120b" }).textContent).toBe("Download anyway");
+      if (label === "Ollama library, downloading") expect(page.getAllByRole("progressbar", { name: "Downloading qwen3.8:9b" })).toHaveLength(2);
+      if (label === "Ollama library, a name outside the list") expect(page.getByRole("group", { name: "Sizes of my-tune" })).toBeTruthy();
+      if (label === "Ollama library, no result") expect(page.getByText("No “mistrall” in the Ollama library")).toBeTruthy();
       if (label === "Hugging Face, popular") {
         expect(page.getByRole("list", { name: "Hugging Face repos" })).toBeTruthy();
         expect(page.getByRole("group", { name: /Sizes of unsloth/ })).toBeTruthy();
