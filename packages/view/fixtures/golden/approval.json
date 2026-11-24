@@ -72,7 +72,7 @@
       "data": {
         "cleared_ids": [],
         "context_window": null,
-        "estimated_tokens": 3895,
+        "estimated_tokens": 4195,
         "index": 1,
         "message_bytes": [
           10
@@ -100,9 +100,9 @@
           }
         ],
         "tier": null,
-        "tools_bytes": 12696,
-        "tools_chars": 12696,
-        "tools_sha": "a16a0a5dcc84eec5f37185b05b793b8aff1798bff947cb03c45708e1fc277811",
+        "tools_bytes": 13697,
+        "tools_chars": 13697,
+        "tools_sha": "d70bc3a6f7aa34af7354bc72e7be03b742ef2ece7e4cacb1ff133b7faaf8df87",
         "window_estimated": false,
         "window_planned": false
       },
@@ -289,7 +289,7 @@
       "data": {
         "cleared_ids": [],
         "context_window": null,
-        "estimated_tokens": 3935,
+        "estimated_tokens": 4235,
         "index": 2,
         "message_bytes": [
           10,
@@ -323,9 +323,9 @@
           }
         ],
         "tier": null,
-        "tools_bytes": 12696,
-        "tools_chars": 12696,
-        "tools_sha": "a16a0a5dcc84eec5f37185b05b793b8aff1798bff947cb03c45708e1fc277811",
+        "tools_bytes": 13697,
+        "tools_chars": 13697,
+        "tools_sha": "d70bc3a6f7aa34af7354bc72e7be03b742ef2ece7e4cacb1ff133b7faaf8df87",
         "window_estimated": false,
         "window_planned": false
       },
@@ -457,7 +457,7 @@
       "data": {
         "cleared_ids": [],
         "context_window": null,
-        "estimated_tokens": 3895,
+        "estimated_tokens": 4195,
         "index": 1,
         "message_bytes": [
           10
@@ -485,9 +485,9 @@
           }
         ],
         "tier": null,
-        "tools_bytes": 12696,
-        "tools_chars": 12696,
-        "tools_sha": "a16a0a5dcc84eec5f37185b05b793b8aff1798bff947cb03c45708e1fc277811",
+        "tools_bytes": 13697,
+        "tools_chars": 13697,
+        "tools_sha": "d70bc3a6f7aa34af7354bc72e7be03b742ef2ece7e4cacb1ff133b7faaf8df87",
         "window_estimated": false,
         "window_planned": false
       },
@@ -674,7 +674,7 @@
       "data": {
         "cleared_ids": [],
         "context_window": null,
-        "estimated_tokens": 3935,
+        "estimated_tokens": 4235,
         "index": 2,
         "message_bytes": [
           10,
@@ -708,9 +708,9 @@
           }
         ],
         "tier": null,
-        "tools_bytes": 12696,
-        "tools_chars": 12696,
-        "tools_sha": "a16a0a5dcc84eec5f37185b05b793b8aff1798bff947cb03c45708e1fc277811",
+        "tools_bytes": 13697,
+        "tools_chars": 13697,
+        "tools_sha": "d70bc3a6f7aa34af7354bc72e7be03b742ef2ece7e4cacb1ff133b7faaf8df87",
         "window_estimated": false,
         "window_planned": false
       },
