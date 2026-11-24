@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass
+from typing import cast
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -203,10 +204,31 @@ def describe(types: Sequence[tuple[str, str]], models: Sequence[str] = ()) -> st
     return text
 
 
+def _parameters() -> dict[str, object]:
+    """The schema of :class:`DelegateArgs` with no ``$defs`` or ``$ref``: small models read it as
+    text, and some providers handle references poorly."""
+    schema = DelegateArgs.model_json_schema()
+    defs = cast(dict[str, dict[str, object]], schema.pop("$defs", {}))
+
+    def inline(node: object) -> object:
+        if isinstance(node, dict):
+            found = cast(dict[str, object], node)
+            ref = found.get("$ref")
+            if isinstance(ref, str):
+                return inline(defs[ref.rsplit("/", 1)[-1]])
+            return {k: inline(v) for k, v in found.items() if k != "title"}
+        if isinstance(node, list):
+            return [inline(v) for v in cast(list[object], node)]
+        return node
+
+    return cast(dict[str, object], inline(schema))
+
+
 DELEGATE = Tool(
     name="delegate",
     description=DESCRIPTION,
     args=DelegateArgs,
+    parameters=_parameters(),
     run=_delegate,
     read_only=True,
 )

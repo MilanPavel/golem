@@ -185,3 +185,16 @@ async def test_a_batch_runs_three_scripted_helpers_and_the_lead_gets_three_secti
     assert result.index("### 1. part 1") < result.index("### 2. part 2")
     assert result.index("### 2. part 2") < result.index("### 3. part 3")
     assert result.count("found it") == 3
+
+
+def test_the_schema_is_self_contained_with_the_batch_item_inline() -> None:
+    from golem.tools.delegate import DELEGATE
+
+    function: Any = DELEGATE.schema()["function"]
+    parameters = function["parameters"]
+    assert "$ref" not in str(parameters)
+    assert "$defs" not in parameters
+    branches = parameters["properties"]["batch"]["anyOf"]
+    item = next(b["items"] for b in branches if "items" in b)
+    assert set(item["properties"]) == {"agent", "brief", "label", "model"}
+    assert sorted(item["required"]) == ["agent", "brief"]

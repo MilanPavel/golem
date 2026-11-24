@@ -201,9 +201,9 @@ ERROR_KEY = "golem_error"
 """``additional_kwargs`` key on a failed ``ToolMessage``: why the call did not give a result."""
 
 MEMORY_IDS_KEY = "golem_memory_ids"
+"""``additional_kwargs`` key on a ``recall`` result: the ids of the memories it shows, in order."""
 HELPER_COUNT_KEY = "golem_helper_count"
 """On a ``delegate`` result: how many helpers the call started, for the per-message limit."""
-"""``additional_kwargs`` key on a ``recall`` result: the ids of the memories it shows, in order."""
 
 ErrorKind = Literal["invalid_args", "unknown_tool", "tool_error", "denied", "cancelled"]
 
