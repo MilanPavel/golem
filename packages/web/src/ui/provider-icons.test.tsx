@@ -14,5 +14,5 @@ test("Ollama and oMLX draw a mark, not a letter", () => {
 test("the Hugging Face icon keeps its own colours and is hidden from screen readers", () => {
   const { container } = render(<HuggingFaceIcon />);
   expect(container.querySelector("svg")?.getAttribute("aria-hidden")).toBe("true");
-  expect(container.querySelector('path[fill="#FFD21E"]')).not.toBeNull();
+  expect(container.querySelector('path.fill-hf-yellow')).not.toBeNull();
 });
