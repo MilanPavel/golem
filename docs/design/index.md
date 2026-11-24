@@ -235,3 +235,7 @@ These rules came from the 10.17 redesign. A turn should read like an answer, not
 - Plain words, and the names the TUI already uses: session, fork, model, folder, rule, approval, todo.
 - A button says what happens: `Allow once`, `Deny`, `New session`.
 - An error says what is wrong and the one thing to do: `golem's daemon is not running` with `golem daemon start`.
+
+## Other design docs
+
+- [Workflows](workflows.md): the API, the run, the storage and the stages of Phase 3 ([ADR-062](../adr/062-workflows.md)).

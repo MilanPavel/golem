@@ -180,6 +180,7 @@ const sidebar: DefaultTheme.Sidebar = [
     text: "Design",
     items: [
       { text: "The design system", link: "/design/" },
+      { text: "Workflows", link: "/design/workflows" },
       { text: "Gallery", link: "/gallery/", target: "_self" },
     ],
   },

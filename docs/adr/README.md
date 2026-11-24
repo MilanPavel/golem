@@ -65,7 +65,8 @@ An Architecture Decision Record (ADR) is a short note of one choice: what was de
 | [059](059-helpers-are-child-sessions.md) | A helper is a headless session with a parent, started for a reason, never by habit | proposed | 2026-11-19 |
 | [060](060-dispatcher-and-engine-profile.md) | One dispatcher decides how many model calls run at once, and every wait has a named reason | proposed | 2026-11-19 |
 | [061](061-memory.md) | golem keeps long-term memory in `memory.db`, recalls it inside a small budget, and never sends it somewhere less private than the chat | proposed | 2026-11-19 |
+| [062](062-workflows.md) | Workflows on `golem.workflow`: your code decides the order, golem keeps every step | proposed | 2026-11-24 |
 
 How the running code fits together is in [../architecture.md](../architecture.md).
 
-New records use [template.md](template.md). Number the next file `062-….md` and add a row here.
+New records use [template.md](template.md). Number the next file `063-….md` and add a row here.
