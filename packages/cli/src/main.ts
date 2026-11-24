@@ -74,6 +74,8 @@ import {
   uninstallWebJob,
   webPlistPath,
 } from "./web-launchd.ts";
+import { runHelpers } from "./eval-helpers-run.ts";
+import { parseHelpersArgs } from "./eval-helpers-format.ts";
 import { formatEvalRouting, parseEvalArgs } from "./format-eval.ts";
 import { findWorkspaceRoot } from "./workspace.ts";
 import { resolveRunDir } from "@golem/gateway/node";
@@ -94,6 +96,7 @@ const USAGE =
   "       golem daemon install|start|stop|restart|uninstall|logs\n" +
   "       golem auth set <provider> [--no-check] | golem auth remove <provider> | golem auth list | golem models [--refresh] | golem models score --reset <ref> | golem models check <model> | golem models check --parallel [--engine <id>] <model> | golem cost\n" +
   "       golem eval routing [--days N] [--session ID]\n" +
+  "       golem eval helpers [--arm <name>]… [--model <arm>=<model>]… [--allow-tight] | golem eval helpers list|show <id>|stop [<id>]|resume <id> [--allow-tight]|apply <id>|delete <id>\n" +
   "       golem mcp add <name> -- <command…> [--token-env VAR] | golem mcp add <name> --url <url> [--token] [--env K=V] [--header K=V] [--cwd D] [--on-demand] [--project] [--timeout S] [--approval allow] | golem mcp add --catalog <id> [--input <id>=<value>] | golem mcp remove <name> | golem mcp export [--format claude|vscode] [--scope user|project]\n" +
   "       golem mcp list [--json] | show <name> [--json] | test <name> | test --catalog <id> | edit <name> [--project] | import [--from <app>|<file>] [--all] | logs <name> [-f] | enable <name> [--on-demand] | disable <name> | restart <name> | login <name> | logout <name> | tools <name> [--hide <glob>] [--show <glob>]\n" +
   "       golem devices [list] | golem devices pair [--link] | golem devices rename <phone> <name> | golem devices revoke <phone> [--yes]\n" +
@@ -202,6 +205,12 @@ async function run(args: string[]): Promise<number> {
   }
   if (command === "eval" && rest[0] === "routing") {
     return runEvalRouting(rest.slice(1));
+  }
+  if (command === "eval" && rest[0] === "helpers") {
+    return runEvalHelpers(rest.slice(1));
+  }
+  if (command === "eval" && ["list", "show", "stop", "resume", "apply", "delete"].includes(rest[0] ?? "")) {
+    return runEvalHelpers(rest);
   }
   if (command === "skills" && (rest.length === 0 || (rest.length === 1 && rest[0] === "list"))) {
     return runSkillsList();
@@ -540,6 +549,26 @@ async function runEvalRouting(given: string[]): Promise<number> {
   } finally {
     client.close();
   }
+}
+
+/** The helper rules measured in the service: the plan, a measurement with progress, and the kept ones. */
+async function runEvalHelpers(given: string[]): Promise<number> {
+  const parsed = parseHelpersArgs(given);
+  if (parsed.kind === "error") {
+    process.stderr.write(`${USAGE}\n`);
+    return 1;
+  }
+  return runWithClient((client) =>
+    runHelpers(client, parsed, {
+      now: () => new Date(),
+      write: (line) => process.stdout.write(`${line}\n`),
+      error: (line) => process.stderr.write(`${line}\n`),
+      onInterrupt(handler) {
+        process.on("SIGINT", handler);
+        return () => void process.off("SIGINT", handler);
+      },
+    }),
+  );
 }
 
 async function runAuth(given: string[]): Promise<number> {
