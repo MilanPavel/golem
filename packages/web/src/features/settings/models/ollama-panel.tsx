@@ -64,7 +64,7 @@ function SetupLine({ setup }: { setup: SetupActions }) {
   );
 }
 
-/** Ollama's page: its state, its models with ★, size, speed and Remove, its downloads, and the two sheets' buttons. */
+/** Ollama's page: its state, its models with ★, size, speed and Remove, its downloads, and the buttons for Get models (a page) and Ollama settings (a sheet). */
 export function OllamaPanel({ state, listing, models, pulls, setup, busy, error, onStar, onRemove, onStop, onGetModels, onSettings, initialRemoving = null }: OllamaPanelProps) {
   const [removing, setRemoving] = useState<string | null>(initialRemoving);
   const target = models.find((model) => model.ref === removing) ?? null;
