@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, expect, test } from "vitest";
-import { ALL_CLOUD, ALL_LOCAL, askingBatchChat, cloudBatchChat, localBatchChat } from "./helper-card-sample.ts";
+import { ALL_CLOUD, ALL_LOCAL, askingBatchChat, cloudBatchChat, cloudWaitsChat, localBatchChat, localSlotsChat } from "./helper-card-sample.ts";
 import { closeHelper, useHelperOpen } from "./helper-open.ts";
 import { TranscriptMessages } from "./transcript.tsx";
 
@@ -66,4 +66,26 @@ test("a helper that asks says so in its row and on the head", () => {
   render(<TranscriptMessages chat={askingBatchChat()} detail="normal" isLocal={ALL_LOCAL} />);
   const row = screen.getByRole("button", { name: /^Open writer, / });
   expect(row.getAttribute("aria-label")).toMatch(/you/i);
+});
+
+test("local only: the head counts what runs at once and a row says its place in line", () => {
+  render(<TranscriptMessages chat={localSlotsChat()} detail="normal" isLocal={ALL_LOCAL} />);
+  const card = screen.getByRole("group", { name: "Helpers" });
+  expect(card.querySelector("[data-at-once]")?.textContent).toContain("2 at once");
+  expect(card.textContent).toContain("next in line for ollama/qwen3:14b");
+  expect(screen.getByRole("button", { name: /^Open reader2, .*next in line/ })).toBeTruthy();
+});
+
+test("cloud only: a provider retry and a spend cap read with no local-model text", () => {
+  render(<TranscriptMessages chat={cloudWaitsChat()} detail="normal" isLocal={ALL_CLOUD} />);
+  const card = screen.getByRole("group", { name: "Helpers" });
+  expect(card.textContent).toContain("anthropic is busy");
+  expect(card.textContent).toContain("trying again in 8 s");
+  expect(card.textContent).toContain("budget spent: $2.00 of $2.00");
+  expect(card.textContent).not.toMatch(/local|qwen|ollama|in line for|go local/i);
+});
+
+test("the at-once count is gone when fewer than two run", () => {
+  render(<TranscriptMessages chat={askingBatchChat()} detail="normal" isLocal={ALL_LOCAL} />);
+  expect(document.querySelector("[data-at-once]")).toBeNull();
 });

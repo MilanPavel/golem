@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
+import type { HelperBatch } from "@golem/view";
+
 import {
   alertLabel,
   contextLabel,
@@ -8,6 +10,7 @@ import {
   fitSegments,
   formatMessageCount,
   formatUptime,
+  helpersLabel,
   modelChip,
   preferModel,
   sessionTitleLabel,
@@ -384,4 +387,25 @@ test("the notes segment reads 💬 and the count, and is hidden with none", () =
   const none = fitSegments(statusSegments({ ...base }), 200);
   assert.equal(none.some((part) => part.id === "notes"), false);
   assert.equal(fitSegments(statusSegments({ ...base, notes: "1 note" }), 200).some((part) => part.text === "💬 1 note"), true);
+});
+
+test("the status line says helpers running over total while a batch is open, and hides when none is", () => {
+  const helper = (index: number, state: "running" | "queued" | "done") =>
+    ({ index, state }) as unknown as HelperBatch["helpers"][number];
+  const batch = (callId: string, states: ("running" | "queued" | "done")[]): HelperBatch => ({
+    callId,
+    parked: false,
+    helpers: states.map((state, index) => helper(index, state)),
+  });
+  assert.equal(helpersLabel(undefined), "");
+  assert.equal(helpersLabel({}), "");
+  assert.equal(helpersLabel({ a: batch("a", ["done", "done"]) }), "");
+  assert.equal(helpersLabel({ a: batch("a", ["running", "running", "queued", "queued", "queued"]) }), "helpers 2/5");
+  // Local only: queued behind a slot. Cloud only: all run at once.
+  assert.equal(helpersLabel({ a: batch("a", ["running", "queued", "queued"]) }), "helpers 1/3");
+  assert.equal(helpersLabel({ a: batch("a", ["running", "running", "running"]) }), "helpers 3/3");
+  // The newest open batch wins over an older ended one.
+  assert.equal(helpersLabel({ a: batch("a", ["done"]), b: batch("b", ["running", "done"]) }), "helpers 1/2");
+  const segments = statusSegments({ connection: "connected", title: "t", model: "m", folder: "f", messageCount: null, uptimeSeconds: null, helpers: "helpers 2/5" });
+  assert.ok(segments.some((part) => part.id === "helpers" && part.text === "helpers 2/5"));
 });
