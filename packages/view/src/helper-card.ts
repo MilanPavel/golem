@@ -5,7 +5,7 @@ import type { Detail } from "./activity.ts";
 import { formatCost } from "./cost.ts";
 import { formatElapsed } from "./duration.ts";
 import { helperCounts, helperStopWords } from "./helper.ts";
-import { waitText, type WaitLength, type WaitReason, type WaitState } from "./wait.ts";
+import { lineName, ordinal, waitText, waitWords, type WaitLength, type WaitReason, type WaitState } from "./wait.ts";
 
 /**
  * The model of the batch card (ADR-059): one card for the helpers of one `delegate` call, at the
@@ -30,6 +30,15 @@ export type BatchHelper = {
   state: HelperState;
   /** The wait reason of `helper.state`, a plain string. */
   reason: string | null;
+  /** Where it waits, from `helper.state`. All null when it runs, ended, or an older daemon said nothing. */
+  line: string | null;
+  /** 1 is next. */
+  position: number | null;
+  /** The label of the call that frees a slot first. */
+  holder: string | null;
+  retryInMs: number | null;
+  spentUsd: number | null;
+  capUsd: number | null;
   /** The reason it ended: `done`, `calls`, `time`, `cost`, `budget`, `tokens`, `cancelled` or `failed`. Null while it runs. */
   stopped: string | null;
   steps: ToolBlock[];
@@ -64,6 +73,12 @@ function blank(index: number): BatchHelper {
     local: null,
     state: "queued",
     reason: null,
+    line: null,
+    position: null,
+    holder: null,
+    retryInMs: null,
+    spentUsd: null,
+    capUsd: null,
     stopped: null,
     steps: [],
     tokens: null,
@@ -122,7 +137,21 @@ export function reduceBatch(batch: HelperBatch, event: ChatEvent, isLocal: IsLoc
     case "helper.state": {
       const data = event.data;
       if (data.call_id !== batch.callId) return batch;
-      return withHelper(batch, data.index, (helper) => ({ ...helper, state: data.state, reason: data.reason ?? null }));
+      return withHelper(batch, data.index, (helper) => {
+        // Where it waits belongs to the wait: a helper that runs has none of it.
+        const waits = data.state !== "running";
+        return {
+          ...helper,
+          state: data.state,
+          reason: data.reason ?? null,
+          line: waits ? (data.line ?? null) : null,
+          position: waits ? (data.position ?? null) : null,
+          holder: waits ? (data.holder ?? null) : null,
+          retryInMs: waits ? (data.retry_in_ms ?? null) : null,
+          spentUsd: waits ? (data.spent_usd ?? null) : null,
+          capUsd: waits ? (data.cap_usd ?? null) : null,
+        };
+      });
     }
     case "helper.step": {
       const data = event.data;
@@ -147,6 +176,12 @@ export function reduceBatch(batch: HelperBatch, event: ChatEvent, isLocal: IsLoc
         ...helper,
         state: endState(data.stopped),
         reason: null,
+        line: null,
+        position: null,
+        holder: null,
+        retryInMs: null,
+        spentUsd: null,
+        capUsd: null,
         stopped: data.stopped,
         tokens: data.tokens,
         answerTokens: data.answer_tokens,
@@ -214,26 +249,49 @@ export function helperNumber(helper: Pick<BatchHelper, "local" | "tokens" | "ans
   return [cost, saved].filter((part): part is string => part !== null && part !== "").join(" · ") || null;
 }
 
+type RightHelper = Pick<BatchHelper, "state" | "reason" | "stopped" | "model"> &
+  Partial<Pick<BatchHelper, "line" | "position" | "holder" | "retryInMs" | "spentUsd" | "capUsd">>;
+
+/** The wait of a helper that queues or waits, or null when its reason is not one of ADR-060's. */
+function helperWait(helper: RightHelper): WaitState | null {
+  const reason = helper.reason;
+  if (reason === null || !WAIT_REASONS.includes(reason)) return null;
+  return {
+    reason: reason as WaitReason,
+    line: helper.line ?? null,
+    model: helper.model,
+    position: helper.position ?? null,
+    holder: helper.holder ?? null,
+    retryInMs: helper.retryInMs ?? null,
+    silentMs: null,
+    scope: null,
+    willRetry: null,
+  };
+}
+
+/** Words for a wait that has more to say than `waitWords`: a place in line for a slot, the amounts of a budget. */
+function helperWaitWords(wait: WaitState, helper: RightHelper, length: WaitLength): string {
+  const web = length === "web";
+  if (wait.reason === "slot" && wait.position !== null && wait.position >= 1) {
+    const name = lineName(wait.line) ?? (wait.model !== null && wait.model !== "" ? wait.model : "the model");
+    const place = wait.position === 1 ? "next" : ordinal(wait.position);
+    return web ? `${place} in line for ${name}` : `${place} for ${name}`;
+  }
+  if (wait.reason === "budget" && helper.spentUsd != null && helper.capUsd != null) {
+    const amounts = `${formatCost(helper.spentUsd)} of ${formatCost(helper.capUsd)}`;
+    return web ? `budget spent: ${amounts}` : `spent ${amounts}`;
+  }
+  return waitWords(wait, length);
+}
+
 /** The right column of a row: the state, or the reason it waits, or why it stopped. */
-export function helperRight(helper: Pick<BatchHelper, "state" | "reason" | "stopped" | "model">, length: WaitLength = "web"): string {
+export function helperRight(helper: RightHelper, length: WaitLength = "web"): string {
   switch (helper.state) {
     case "queued":
     case "waiting": {
+      const wait = helperWait(helper);
+      if (wait !== null) return helperWaitWords(wait, helper, length);
       const reason = helper.reason;
-      if (reason !== null && WAIT_REASONS.includes(reason)) {
-        const wait: WaitState = {
-          reason: reason as WaitReason,
-          line: null,
-          model: helper.model,
-          position: null,
-          holder: null,
-          retryInMs: null,
-          silentMs: null,
-          scope: null,
-          willRetry: null,
-        };
-        return waitText(wait, length);
-      }
       return reason !== null && reason !== "" ? `${helper.state} · ${reason}` : helper.state;
     }
     case "running":
@@ -329,6 +387,17 @@ export function batchNumber(helpers: readonly BatchHelper[]): string | null {
   const cost = costs.length === 0 ? null : costs.reduce((sum, value) => sum + value, 0);
   const local = ended.every((helper) => helper.local === true);
   return helperNumber({ local, tokens, answerTokens: answers, costUsd: cost });
+}
+
+/** How many helpers run, and how many there are: the `2/5` of the TUI's `helpers 2/5`. */
+export function batchCounts(batch: Pick<HelperBatch, "helpers">): { running: number; total: number } {
+  return { running: batch.helpers.filter((helper) => helper.state === "running").length, total: batch.helpers.length };
+}
+
+/** `2 at once` when two or more helpers run together, else null. */
+export function batchAtOnce(batch: Pick<HelperBatch, "helpers">): string | null {
+  const { running } = batchCounts(batch);
+  return running >= 2 ? `${String(running)} at once` : null;
 }
 
 function batchRight(batch: HelperBatch, length: WaitLength): { text: string; tone: CardTone } {
