@@ -6,7 +6,7 @@ thresholds of ``[agents.delegate]`` (``read_share``, ``fill_share``, ``job_share
 (``data/helper_asks.toml``) in four arms:
 
 - ``local-32k``: a local lead with a 32K window,
-- ``local-128k``: a local lead with a 128K window,
+- ``local-64k``: a local lead with a 64K window,
 - ``budget-cloud``: a budget cloud lead,
 - ``frontier-cloud``: a frontier cloud lead,
 
@@ -311,9 +311,9 @@ ARMS: tuple[Arm, ...] = (
         "ollama/qwen3.5:9b",
     ),
     Arm(
-        "local-128k",
+        "local-64k",
         "local",
-        131_072,
+        65_536,
         "ollama/qwen3.5:9b",
     ),
     Arm(

@@ -16,7 +16,7 @@ const FOLDER = "/Users/you/repos/golem";
 const noContrast = { rules: { "color-contrast": { enabled: false } } };
 
 const local = (over: Partial<EvalPlanArm> = {}): EvalPlanArm => ({ name: "local-32k", label: "Local, 32K window", kind: "local", tier: "local", model: "ollama/qwen3.8:27b", window: 32768, asks: 10, minutes: 35, verdict: "tight", needed_gb: 21.1, ram_gb: 36, free_gb: 24.3, reason: "It fits, but it takes more than half of the memory.", ...over });
-const big = (): EvalPlanArm => local({ name: "local-128k", label: "Local, 128K window", verdict: "too_big", needed_gb: 26.9, reason: "Does not fit on this Mac with this model." });
+const big = (): EvalPlanArm => local({ name: "local-64k", label: "Local, 64K window", verdict: "too_big", needed_gb: 26.9, reason: "Does not fit on this Mac with this model." });
 const paid = (): EvalPlanArm => ({ name: "budget", label: "Budget cloud", kind: "cloud", tier: "budget", model: "claude-haiku", window: 32768, asks: 10, minutes: 5, cost_usd: 0.4, reason: "Costs money." });
 const PLAN = { arms: [local(), big(), paid()], running: null };
 
@@ -429,12 +429,12 @@ test("the whole way: start, progress, stop, resume, done, use the numbers, and R
 });
 
 test("a local arm that does not fit, or has no room, can be ticked and needs the own-risk box to start", async () => {
-  const m = mount({ plan: { arms: [big(), local({ name: "local-64k", label: "Local, 64K window", verdict: "no_room", reason: "Not enough memory is free now." })], running: null } });
+  const m = mount({ plan: { arms: [big(), local({ name: "local-32k", label: "Local, 32K window", verdict: "no_room", reason: "Not enough memory is free now." })], running: null } });
   const panel = await openMeasure(m);
   await within(panel).findByRole("list", { name: "Arms of the measurement" });
-  expect((within(panel).getByRole("checkbox", { name: "Local, 128K window" }) as HTMLInputElement).disabled).toBe(false);
   expect((within(panel).getByRole("checkbox", { name: "Local, 64K window" }) as HTMLInputElement).disabled).toBe(false);
-  await m.user.click(within(panel).getByRole("checkbox", { name: "Local, 128K window" }));
+  expect((within(panel).getByRole("checkbox", { name: "Local, 32K window" }) as HTMLInputElement).disabled).toBe(false);
+  await m.user.click(within(panel).getByRole("checkbox", { name: "Local, 64K window" }));
   expect((within(panel).getByRole("button", { name: "Start" }) as HTMLButtonElement).disabled).toBe(true);
   expect(m.fake.raw.evalsStart).not.toHaveBeenCalled();
 });
@@ -480,7 +480,7 @@ test("choosing a model re-plans, and the dropdown and the plan agree, also after
 
 test("the memory warning shows when memory is short, even if another arm lacks its model", async () => {
   const gone = local({ verdict: "unknown", reason: MISSING, choices: CHOICES });
-  const full = local({ name: "local-128k", label: "Local, 128K window", model: "ollama/llama3.2:3b", verdict: "no_room", reason: "Not enough memory is free now.", choices: CHOICES });
+  const full = local({ name: "local-64k", label: "Local, 64K window", model: "ollama/llama3.2:3b", verdict: "no_room", reason: "Not enough memory is free now.", choices: CHOICES });
   const m = mount({ plan: { arms: [gone, full], running: null } });
   const panel = await openMeasure(m);
   await within(panel).findByRole("list", { name: "Arms of the measurement" });

@@ -557,7 +557,7 @@ async def test_a_dead_server_stops_the_measurement_and_leaves_the_rest_not_run(
     mac.alive = False
     jobs = _jobs(tmp_path, mac, driver, notes=notes)
 
-    started = await jobs.start(["local-32k", "local-128k"])
+    started = await jobs.start(["local-32k", "local-64k"])
     await jobs.wait()
 
     got = jobs.get(started)
@@ -704,6 +704,36 @@ async def test_a_measurement_left_running_is_stopped_at_the_next_start(tmp_path:
     again = jobs.get(left.id)
     assert again is not None and again.state == "done"
     assert [r.end for r in again.runs] == ["completed"] * 4
+
+
+async def test_a_stored_128k_measurement_still_lists_opens_and_deletes(tmp_path: Path) -> None:
+    """An older file holds the arm ``local-128k``, which is no longer offered."""
+    arm = replace(_local(), name="local-128k", window=131_072)
+    played = replace(
+        not_run(arm, "off", ASKS[0]), end="completed", quality=1.0, seconds=3.0, window_left=1000
+    )
+    old = Measurement(
+        id="20261120-110000-abc123",
+        started_at="2026-11-20T11:00:00+00:00",
+        arms=[arm],
+        slots=[Slot(arm.name, "off", "alpha", "completed", played)],
+        state="done",
+        ended_at="2026-11-20T11:05:00+00:00",
+    )
+    folder = tmp_path / "evals"
+    folder.mkdir()
+    (folder / f"{old.id}.json").write_text(json.dumps(dump(old)), "utf-8")
+
+    mac = Mac()
+    jobs = _jobs(tmp_path, mac, FakeDriver(mac))
+    assert [s.id for s in jobs.summaries()] == [old.id]
+    got = jobs.get(old.id)
+    assert got is not None and got.state == "done"
+    assert [r.arm for r in got.runs] == ["local-128k"]
+    with pytest.raises(EvalRefused, match="There is no arm named local-128k"):
+        await jobs.plan(["local-128k"])
+    assert jobs.delete(old.id)
+    assert not (folder / f"{old.id}.json").exists()
 
 
 async def test_the_list_is_newest_first_and_delete_is_refused_while_running(
@@ -983,7 +1013,7 @@ async def test_a_local_arm_takes_the_configured_installed_model(tmp_path: Path) 
     mac = Mac()
     mac.machine = Machine(64.0, 48.0, {"qwen3.8:27b": 17 * GIB, "llama3.2:3b": 2 * GIB})
     jobs = _jobs(tmp_path, mac, FakeDriver(mac), local_model=_own("ollama/qwen3.8:27b"))
-    planned, _ = await jobs.plan(["local-32k", "local-128k"])
+    planned, _ = await jobs.plan(["local-32k", "local-64k"])
     assert [p.model for p in planned] == ["ollama/qwen3.8:27b"] * 2
     assert all("Ollama does not have" not in p.reason for p in planned)
     # a model named by the person beats the configured one

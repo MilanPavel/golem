@@ -186,7 +186,7 @@ async def test_four_arms_run_on_and_off_and_plain_asks_start_no_helper(
 
     assert [r.arm.name for r in results] == [
         "local-32k",
-        "local-128k",
+        "local-64k",
         "budget-cloud",
         "frontier-cloud",
     ]
@@ -241,10 +241,10 @@ async def test_a_cloud_only_arm_splits_the_cost_of_the_lead_and_its_helper(
 async def test_a_skipped_arm_is_reported_as_skipped_and_the_others_still_run(
     tmp_path: Path, asks: list[Ask]
 ) -> None:
-    driver = ScriptedDriver(_models, unavailable={"local-128k": "Ollama is not reachable"})
+    driver = ScriptedDriver(_models, unavailable={"local-64k": "Ollama is not reachable"})
     results = await run_eval(driver, asks[:1], list(ARMS), project=tmp_path)
 
-    skipped = next(r for r in results if r.arm.name == "local-128k")
+    skipped = next(r for r in results if r.arm.name == "local-64k")
     assert skipped.skipped == "Ollama is not reachable"
     assert skipped.runs == ()
     assert "skipped: Ollama is not reachable" in arm_table(skipped)
@@ -260,7 +260,7 @@ async def test_the_report_has_a_table_for_each_arm_a_proposal_and_the_open_quest
 ) -> None:
     text = full_report(await _run(tmp_path, asks))
 
-    for name in ("local-32k", "local-128k", "budget-cloud", "frontier-cloud"):
+    for name in ("local-32k", "local-64k", "budget-cloud", "frontier-cloud"):
         assert f"== {name}:" in text
     for column in ("quality", "seconds", "peak window", "left", "lead $", "helper $", "stopped"):
         assert column in text
