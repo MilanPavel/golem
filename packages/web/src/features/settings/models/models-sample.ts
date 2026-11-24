@@ -216,7 +216,21 @@ export const HF_FAILED: PullsSnapshot = {
 };
 
 /** Get models as a page, in the states it draws. It covers the Models page, so the gallery draws it apart. */
-export const GET_CASES: { label: string; props: ModelsCase; pulls?: PullsSnapshot }[] = [
+/** A repo with two sizes that would both read "Largest", and two that would both read "Balanced". */
+export const HF_FILES_SAME_NAMES: HfFilesResult = {
+  repo: "unsloth/Qwen3.8-27B-Instruct-GGUF",
+  sizes: [
+    { quant: "Q4_K_S", size_gb: 15.9, files: 1, fit: "fits", recommended: false },
+    { quant: "Q4_K_M", size_gb: 16.8, files: 1, fit: "fits", recommended: true },
+    { quant: "Q8", size_gb: 28.6, files: 1, fit: "fits", recommended: false },
+    { quant: "Q8_0_V2", size_gb: 29.1, files: 1, fit: "tight", recommended: false },
+  ],
+};
+
+/** How wide a state is drawn: a phone-width column, or a detail pane of about 500 px beside its list. */
+export type GetWidth = "narrow" | "constrained";
+
+export const GET_CASES: { label: string; props: ModelsCase; pulls?: PullsSnapshot; width?: GetWidth }[] = [
   { label: "Picked for this Mac", props: { ...GET_BASE, listing: listing(CATALOG), initial: { selected: "ollama", sheet: "get" } } },
   { label: "Picked for this Mac, downloading", props: { ...GET_BASE, listing: listing(CATALOG), initial: { selected: "ollama", sheet: "get" } }, pulls: DOWNLOADING },
   { label: "Picked for this Mac, many downloads", props: { ...GET_BASE, listing: listing(CATALOG), initial: { selected: "ollama", sheet: "get" } }, pulls: MANY_DOWNLOADS },
@@ -236,4 +250,10 @@ export const GET_CASES: { label: string; props: ModelsCase; pulls?: PullsSnapsho
   { label: "Hugging Face, no size can finish", props: { ...GET_BASE, listing: listing(CATALOG), initial: { selected: "ollama", sheet: "get", tab: "hf", hf: { results: HF_RESULTS, files: HF_FILES_ALL_PROBLEM } } } },
   { label: "Hugging Face, a failed download with parts left", props: { ...GET_BASE, listing: listing(CATALOG), initial: { selected: "ollama", sheet: "get", tab: "hf", hf: { results: HF_RESULTS, files: HF_FILES } } }, pulls: HF_FAILED },
   { label: "Hugging Face, no result", props: { ...GET_BASE, listing: listing(CATALOG), initial: { selected: "ollama", sheet: "get", tab: "hf", search: "zzzz", hf: { results: { repos: [] } } } } },
+  { label: "Hugging Face, a detail 500 px wide", width: "constrained", props: { ...GET_BASE, listing: listing(CATALOG), initial: { selected: "ollama", sheet: "get", tab: "hf", hf: { results: HF_RESULTS, files: HF_FILES } } } },
+  { label: "Hugging Face, sizes with the same plain name", props: { ...GET_BASE, listing: listing(CATALOG), initial: { selected: "ollama", sheet: "get", tab: "hf", hf: { results: HF_RESULTS, files: HF_FILES_SAME_NAMES } } } },
+  { label: "Hugging Face, narrow list", width: "narrow", props: { ...GET_BASE, listing: listing(CATALOG), initial: { selected: "ollama", sheet: "get", tab: "hf", hf: { results: HF_RESULTS } } } },
+  { label: "Hugging Face, narrow detail", width: "narrow", props: { ...GET_BASE, listing: listing(CATALOG), initial: { selected: "ollama", sheet: "get", tab: "hf", hf: { results: HF_RESULTS, files: HF_FILES, open: true } } } },
+  { label: "Ollama library, narrow list", width: "narrow", props: { ...GET_BASE, listing: listing(CATALOG), initial: { selected: "ollama", sheet: "get", tab: "lib", library: { results: LIBRARY_RESULTS } } } },
+  { label: "Ollama library, narrow detail", width: "narrow", props: { ...GET_BASE, listing: listing(CATALOG), initial: { selected: "ollama", sheet: "get", tab: "lib", library: { results: LIBRARY_RESULTS, chosen: "qwen3.8", open: true } } } },
 ];

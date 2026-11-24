@@ -8,6 +8,7 @@ import { HuggingFaceIcon } from "../../../ui/hugging-face-icon.tsx";
 import { ProviderIcon } from "../../../ui/provider-icons.tsx";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../../ui/tabs.tsx";
 import { GetModelsFoot } from "./get-models-foot.tsx";
+import { SplitBackContext } from "./get-models-split.tsx";
 import { PicksTab, visiblePicks, type PicksFilter } from "./get-models-picks.tsx";
 import { HuggingFaceTab, type HfActions, type HfTabProps } from "./hf-tab.tsx";
 import { libraryRows, useLibraryList, type LibraryList, type OllamaLibraryActions, type OllamaLibraryInitial } from "./ollama-library.ts";
@@ -166,6 +167,7 @@ export function GetModelsPage({ listing, pulls, onPull, onStop, onCleanup, hf, l
   const [filter, setFilter] = useState<PicksFilter>({ category: null, hideTooBig: false, ...initialFilter });
   const [failure, setFailure] = useState<string | null>(null);
   const field = useRef<HTMLInputElement>(null);
+  const innerBack = useRef<(() => boolean) | null>(null);
   const list = useLibraryList(library, initialLibrary);
   const entry = TABS.find((item) => item.id === tab) ?? TABS[0];
 
@@ -177,6 +179,8 @@ export function GetModelsPage({ listing, pulls, onPull, onStop, onCleanup, hf, l
       if (target instanceof Element && target.closest("[role='dialog'], [role='alertdialog'], [role='menu']") !== null) return;
       if (event.key === "Escape") {
         event.preventDefault();
+        // A list and a detail that show one at a time step back first: detail, then list, then Ollama.
+        if (innerBack.current?.() === true) return;
         onBack();
         return;
       }
@@ -224,75 +228,77 @@ export function GetModelsPage({ listing, pulls, onPull, onStop, onCleanup, hf, l
   const props: PanelProps = { listing, pulls, hf, library, list, initialHf, initialLibrary, filter, setFilter, search, setSearch, failure, pull, stop, goTo: go };
   const own = entry?.placeholder === null;
   return (
-    <div role="group" aria-label="Get models" data-setting="get models" className="flex min-h-0 w-full max-w-6xl flex-1 flex-col">
-      <header className="flex shrink-0 flex-wrap items-center gap-3 pb-3">
-        <Button size="sm" kind="ghost" className="-ml-2" aria-label="Back to Ollama" onClick={onBack}>
-          <ChevronLeftIcon />
-          Ollama
-        </Button>
-        <h3 className="text-xl font-semibold">Get models</h3>
-        <span className="flex items-center gap-1.5 text-sm text-muted">
-          for Ollama
-          <ProviderIcon provider="ollama" name="Ollama" width="16" height="16" />
-        </span>
-        <span className="ml-auto">
-          <MacLine listing={listing} />
-        </span>
-      </header>
-      <div
-        // A tab with a search of its own keeps the room of this one, so the page does not change size between tabs.
-        className={cn("flex h-11 shrink-0 items-center gap-2.5 rounded-lg border border-line-strong bg-surface px-3 focus-within:border-clay", own ? "invisible" : "")}
-        aria-hidden={own ? true : undefined}
-      >
-        <SearchIcon aria-hidden="true" className="shrink-0 text-faint" />
-        <input
-          ref={field}
-          type="search"
-          value={search}
-          disabled={own}
-          aria-label="Search"
-          placeholder={entry?.placeholder ?? ""}
-          autoComplete="off"
-          spellCheck={false}
-          onChange={(event) => {
-            setSearch(event.target.value);
-          }}
-          className="min-w-0 flex-1 appearance-none bg-transparent text-sm text-ink outline-none placeholder:text-faint [&::-webkit-search-cancel-button]:hidden"
-        />
-        {search === "" ? null : (
-          <button
-            type="button"
-            aria-label="Clear the search"
-            onClick={() => {
-              setSearch("");
-              field.current?.focus();
+    <SplitBackContext.Provider value={innerBack}>
+      <div role="group" aria-label="Get models" data-setting="get models" className="flex min-h-0 w-full max-w-6xl flex-1 flex-col">
+        <header className="flex shrink-0 flex-wrap items-center gap-3 pb-3">
+          <Button size="sm" kind="ghost" className="-ml-2" aria-label="Back to Ollama" onClick={onBack}>
+            <ChevronLeftIcon />
+            Ollama
+          </Button>
+          <h3 className="text-xl font-semibold">Get models</h3>
+          <span className="flex items-center gap-1.5 text-sm text-muted">
+            for Ollama
+            <ProviderIcon provider="ollama" name="Ollama" width="16" height="16" />
+          </span>
+          <span className="ml-auto">
+            <MacLine listing={listing} />
+          </span>
+        </header>
+        <div
+          // A tab with a search of its own keeps the room of this one, so the page does not change size between tabs.
+          className={cn("flex h-11 shrink-0 items-center gap-2.5 rounded-lg border border-line-strong bg-surface px-3 focus-within:border-clay", own ? "invisible" : "")}
+          aria-hidden={own ? true : undefined}
+        >
+          <SearchIcon aria-hidden="true" className="shrink-0 text-faint" />
+          <input
+            ref={field}
+            type="search"
+            value={search}
+            disabled={own}
+            aria-label="Search"
+            placeholder={entry?.placeholder ?? ""}
+            autoComplete="off"
+            spellCheck={false}
+            onChange={(event) => {
+              setSearch(event.target.value);
             }}
-            className="grid size-6 place-items-center rounded-sm text-faint outline-offset-2 outline-clay hover:text-ink focus-visible:outline-2"
-          >
-            <CloseIcon width="12" height="12" />
-          </button>
-        )}
+            className="min-w-0 flex-1 appearance-none bg-transparent text-sm text-ink outline-none placeholder:text-faint [&::-webkit-search-cancel-button]:hidden"
+          />
+          {search === "" ? null : (
+            <button
+              type="button"
+              aria-label="Clear the search"
+              onClick={() => {
+                setSearch("");
+                field.current?.focus();
+              }}
+              className="grid size-6 place-items-center rounded-sm text-faint outline-offset-2 outline-clay hover:text-ink focus-visible:outline-2"
+            >
+              <CloseIcon width="12" height="12" />
+            </button>
+          )}
+        </div>
+        <Tabs value={tab} onValueChange={go} className="mt-3 flex min-h-0 flex-1 flex-col">
+          <TabsList aria-label="Where to get models" className="shrink-0">
+            {TABS.map((item) => {
+              const count = item.count(props);
+              return (
+                <TabsTrigger key={item.id} value={item.id} className="flex items-center gap-2 py-2">
+                  {item.icon}
+                  {item.label}
+                  {count === null ? null : <span className="rounded-full bg-sunken px-1.5 py-0.5 text-xs tabular-nums text-faint">{count}</span>}
+                </TabsTrigger>
+              );
+            })}
+          </TabsList>
+          {TABS.map((item) => (
+            <TabsContent key={item.id} value={item.id} className="flex min-h-0 flex-1 flex-col">
+              {item.panel(props)}
+            </TabsContent>
+          ))}
+        </Tabs>
+        <GetModelsFoot listing={listing} pulls={pulls} pull={pull} stop={stop} cleanup={cleanup} onBack={onBack} />
       </div>
-      <Tabs value={tab} onValueChange={go} className="mt-3 flex min-h-0 flex-1 flex-col">
-        <TabsList aria-label="Where to get models" className="shrink-0">
-          {TABS.map((item) => {
-            const count = item.count(props);
-            return (
-              <TabsTrigger key={item.id} value={item.id} className="flex items-center gap-2 py-2">
-                {item.icon}
-                {item.label}
-                {count === null ? null : <span className="rounded-full bg-sunken px-1.5 py-0.5 text-xs tabular-nums text-faint">{count}</span>}
-              </TabsTrigger>
-            );
-          })}
-        </TabsList>
-        {TABS.map((item) => (
-          <TabsContent key={item.id} value={item.id} className="flex min-h-0 flex-1 flex-col">
-            {item.panel(props)}
-          </TabsContent>
-        ))}
-      </Tabs>
-      <GetModelsFoot listing={listing} pulls={pulls} pull={pull} stop={stop} cleanup={cleanup} onBack={onBack} />
-    </div>
+    </SplitBackContext.Provider>
   );
 }
