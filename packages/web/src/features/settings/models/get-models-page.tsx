@@ -4,6 +4,7 @@ import type { PullsSnapshot } from "../../../store/pulls.ts";
 import { Button } from "../../../ui/button.tsx";
 import { cn } from "../../../ui/cn.ts";
 import { ChevronLeftIcon, CloseIcon, CpuIcon, SearchIcon } from "../../../ui/icons.tsx";
+import { HuggingFaceIcon } from "../../../ui/hugging-face-icon.tsx";
 import { ProviderIcon } from "../../../ui/provider-icons.tsx";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../../ui/tabs.tsx";
 import { GetModelsFoot } from "./get-models-foot.tsx";
@@ -39,6 +40,7 @@ type PanelProps = Pick<GetModelsProps, "listing" | "pulls" | "hf" | "initialHf">
   setFilter: (filter: PicksFilter) => void;
   /** The text of the search field. */
   search: string;
+  setSearch: (text: string) => void;
   failure: string | null;
   pull: (ref: string) => Promise<boolean>;
   stop: (ref: string) => void;
@@ -93,14 +95,11 @@ const TABS: readonly TabEntry[] = [
   {
     id: "hf",
     label: "Hugging Face",
-    icon: <ProviderIcon provider="huggingface" name="Hugging Face" />,
-    // The tab keeps its own search field for now: its search asks Hugging Face, and the field is not wired to this one yet.
-    placeholder: null,
+    icon: <HuggingFaceIcon />,
+    placeholder: "Search Hugging Face, or paste a repo link",
     count: () => null,
-    panel: ({ hf, initialHf, listing, failure, pull }) => (
-      <Scrolling>
-        <HuggingFaceTab hf={hf} ramGb={listing?.ram_gb ?? null} busy={null} failure={failure} pull={pull} {...(initialHf === undefined ? {} : { initial: initialHf })} />
-      </Scrolling>
+    panel: ({ hf, initialHf, listing, pulls, failure, pull, stop, search, setSearch }) => (
+      <HuggingFaceTab hf={hf} listing={listing} pulls={pulls} failure={failure} pull={pull} onStop={stop} search={search} onSearch={setSearch} {...(initialHf === undefined ? {} : { initial: initialHf })} />
     ),
   },
   {
@@ -195,7 +194,7 @@ export function GetModelsPage({ listing, pulls, onPull, onStop, hf, onBack, init
     setFailure(null);
   }
 
-  const props: PanelProps = { listing, pulls, hf, initialHf, filter, setFilter, search, failure, pull, stop, goTo: go };
+  const props: PanelProps = { listing, pulls, hf, initialHf, filter, setFilter, search, setSearch, failure, pull, stop, goTo: go };
   const own = entry?.placeholder === null;
   return (
     <div role="group" aria-label="Get models" data-setting="get models" className="flex min-h-0 w-full max-w-6xl flex-1 flex-col">
