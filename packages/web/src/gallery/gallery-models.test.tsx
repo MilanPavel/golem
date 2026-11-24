@@ -48,6 +48,14 @@ for (const theme of ["slip", "kiln"] as const) {
         expect(page.getByText("Download failed: no space left on the disk")).toBeTruthy();
       }
       if (label === "Picked for this Mac, no match") expect(page.getByText("Not in golem's list")).toBeTruthy();
+      if (label === "Hugging Face, popular") {
+        expect(page.getByRole("list", { name: "Hugging Face repos" })).toBeTruthy();
+        expect(page.getByRole("group", { name: /Sizes of unsloth/ })).toBeTruthy();
+        expect(page.getByText("RECOMMENDED")).toBeTruthy();
+      }
+      if (label === "Hugging Face, downloading") expect(page.getByRole("progressbar", { name: "Downloading Q6_K" })).toBeTruthy();
+      if (label === "Hugging Face, a repo that needs a token") expect(page.getByText(/asks you to accept its terms/)).toBeTruthy();
+      if (label === "Hugging Face, no result") expect(page.getByText("Hugging Face has no GGUF repos for “zzzz”")).toBeTruthy();
       await expectAxeClean(region, DIALOG_RULES);
     });
   }

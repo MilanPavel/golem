@@ -149,6 +149,11 @@ const DOWNLOADING: PullsSnapshot = {
   failed: new Map([["ollama/qwen2.5-coder:7b", "no space left on the disk"]]),
 };
 
+const HF_DOWNLOADING: PullsSnapshot = {
+  active: new Map([[`ollama/hf.co/${HF_FILES.repo}:Q6_K`, { track: { completed: 9e9, total: 22.4e9, samples: [] }, status: "pulling", progress: null }]]),
+  failed: new Map(),
+};
+
 const MANY_DOWNLOADS: PullsSnapshot = {
   active: new Map([
     ["ollama/gemma4:12b", { track: { completed: 2.6e9, total: 8.1e9, samples: [] }, status: "pulling", progress: null }],
@@ -166,6 +171,9 @@ export const GET_CASES: { label: string; props: ModelsCase; pulls?: PullsSnapsho
   { label: "Picked for this Mac, no match", props: { ...GET_BASE, listing: listing(CATALOG), initial: { selected: "ollama", sheet: "get", search: "zzz" } } },
   { label: "Picked for this Mac, coding", props: { ...GET_BASE, listing: listing(CATALOG), initial: { selected: "ollama", sheet: "get", filter: { category: "coding", hideTooBig: true } } } },
   { label: "By name", props: { ...GET_BASE, listing: listing(CATALOG), initial: { selected: "ollama", sheet: "get", tab: "name" } } },
-  { label: "Hugging Face search", props: { ...GET_BASE, listing: listing(CATALOG), initial: { selected: "ollama", sheet: "get", tab: "hf", hf: { query: "qwen3.8 27b", results: HF_RESULTS } } } },
-  { label: "A Hugging Face repo", props: { ...GET_BASE, listing: listing(CATALOG), initial: { selected: "ollama", sheet: "get", tab: "hf", hf: { query: "qwen3.8 27b", results: HF_RESULTS, repo: { id: HF_FILES.repo, files: HF_FILES } } } } },
+  { label: "Hugging Face, popular", props: { ...GET_BASE, listing: listing(CATALOG), initial: { selected: "ollama", sheet: "get", tab: "hf", hf: { results: HF_RESULTS, files: HF_FILES } } } },
+  { label: "Hugging Face, a search", props: { ...GET_BASE, listing: listing(CATALOG), initial: { selected: "ollama", sheet: "get", tab: "hf", search: "qwen3.8 27b", hf: { results: HF_RESULTS, files: HF_FILES } } } },
+  { label: "Hugging Face, downloading", props: { ...GET_BASE, listing: listing(CATALOG), initial: { selected: "ollama", sheet: "get", tab: "hf", hf: { results: HF_RESULTS, files: HF_FILES } } }, pulls: HF_DOWNLOADING },
+  { label: "Hugging Face, a repo that needs a token", props: { ...GET_BASE, listing: listing(CATALOG), initial: { selected: "ollama", sheet: "get", tab: "hf", hf: { results: HF_RESULTS, chosen: "meta-llama/Llama-4-Scout-GGUF" } } } },
+  { label: "Hugging Face, no result", props: { ...GET_BASE, listing: listing(CATALOG), initial: { selected: "ollama", sheet: "get", tab: "hf", search: "zzzz", hf: { results: { repos: [] } } } } },
 ];

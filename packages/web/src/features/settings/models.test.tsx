@@ -279,7 +279,8 @@ test("Get models › the search, the chips and Hide the ones too big filter the 
   expect(within(page).getByText("Not in golem's list")).toBeTruthy();
   await user.click(within(page).getByRole("button", { name: "Search Hugging Face" }));
   expect(within(page).getByRole("tab", { name: /Hugging Face/ }).getAttribute("aria-selected")).toBe("true");
-  expect(within(page).getByRole("textbox", { name: "Search Hugging Face" })).toBeTruthy();
+  expect((within(page).getByRole("searchbox", { name: "Search" }) as HTMLInputElement).value).toBe("nothing like this");
+  expect(within(page).getByRole("searchbox", { name: "Search" }).getAttribute("placeholder")).toBe("Search Hugging Face, or paste a repo link");
 });
 
 test("Get models › Download starts the pull and the page stays: progress, a cancel, then Installed", async () => {
@@ -320,38 +321,51 @@ async function openHf(user: ReturnType<typeof userEvent.setup>) {
   await user.click(await screen.findByRole("button", { name: /^Ollama/ }));
   await user.click(await screen.findByRole("button", { name: "Get models" }));
   await user.click(await screen.findByRole("tab", { name: /Hugging Face/ }));
-  await user.type(screen.getByRole("textbox", { name: "Search Hugging Face" }), "qwen3.8 27b{Enter}");
 }
 
-test("Get models › Hugging Face lists the repos found, and a gated one cannot be opened", async () => {
-  const { fake, user } = mount();
-  fake.raw.searchHf.mockResolvedValue(HF_RESULTS);
-  await openHf(user);
-  await waitFor(() => expect(fake.raw.searchHf).toHaveBeenCalledWith("qwen3.8 27b"));
-  const list = await screen.findByRole("list", { name: "Hugging Face repos" });
-  expect(within(list).getAllByRole("listitem")).toHaveLength(3);
-  expect(within(list).getByText("↓ 412K", { exact: false })).toBeTruthy();
-  expect(within(list).getByText("Needs a Hugging Face token (later)")).toBeTruthy();
-  expect(within(list).queryByRole("button", { name: /Llama-4-Scout/ })).toBeNull();
-});
-
-test("a Hugging Face repo shows its sizes in words, and a too big size still downloads", async () => {
+test("Get models › Hugging Face opens on the popular repos with the first one chosen, and a click shows another one's sizes", async () => {
   const { fake, user } = mount();
   fake.raw.searchHf.mockResolvedValue(HF_RESULTS);
   fake.raw.hfFiles.mockResolvedValue(HF_FILES);
   await openHf(user);
-  await user.click(await screen.findByRole("button", { name: `Open ${HF_FILES.repo}` }));
-  expect(fake.raw.hfFiles).toHaveBeenCalledWith(HF_FILES.repo);
-  const sizes = await screen.findByRole("list", { name: `Sizes of ${HF_FILES.repo}` });
+  const list = await screen.findByRole("list", { name: "Hugging Face repos" });
+  expect(fake.raw.searchHf).toHaveBeenCalledWith("");
+  expect(within(list).getAllByRole("listitem")).toHaveLength(3);
+  expect(within(list).getByText("↓ 412K")).toBeTruthy();
+  expect(within(list).getByText(/needs a token/)).toBeTruthy();
+  expect(within(list).getAllByRole("button")[0]?.getAttribute("aria-current")).toBe("true");
+  await waitFor(() => expect(fake.raw.hfFiles).toHaveBeenCalledWith(HF_FILES.repo));
+  await user.click(within(list).getByRole("button", { name: /bartowski/ }));
+  await waitFor(() => expect(fake.raw.hfFiles).toHaveBeenCalledWith("bartowski/Qwen3.8-27B-Instruct-GGUF"));
+});
+
+test("Get models › a Hugging Face repo shows its sizes in words, and a too big size still downloads", async () => {
+  const { fake, user } = mount();
+  fake.raw.searchHf.mockResolvedValue(HF_RESULTS);
+  fake.raw.hfFiles.mockResolvedValue(HF_FILES);
+  await openHf(user);
+  const sizes = await screen.findByRole("group", { name: `Sizes of ${HF_FILES.repo}` });
   const rows = within(sizes).getAllByRole("listitem");
-  expect(rows[1]?.textContent).toContain("Recommended");
-  expect(rows[0]?.textContent).toContain("Fits");
-  expect(rows[3]?.textContent).toContain("Tight: it will spill to the CPU and run slower");
-  expect(rows[4]?.textContent).toContain("Too big for this Mac");
+  expect(rows[1]?.textContent).toContain("Balanced");
+  expect(rows[1]?.textContent).toContain("RECOMMENDED");
+  expect(rows[4]?.textContent).toContain("F16");
+  expect(rows[4]?.textContent).toContain("Too big");
   expect(screen.getByRole("link", { name: "Open on Hugging Face ↗" }).getAttribute("href")).toBe(`https://huggingface.co/${HF_FILES.repo}`);
   await user.click(within(sizes).getByRole("button", { name: "Download F16" }));
   await waitFor(() => expect(fake.raw.pullModel).toHaveBeenCalledWith(`ollama/hf.co/${HF_FILES.repo}:F16`));
   expect(screen.getByRole("group", { name: "Get models" })).toBeTruthy();
+});
+
+test("Get models › typing in the search asks Hugging Face after a pause, and nothing is asked on another tab", async () => {
+  const { fake, user } = mount();
+  fake.raw.searchHf.mockResolvedValue(HF_RESULTS);
+  fake.raw.hfFiles.mockResolvedValue(HF_FILES);
+  await user.click(await screen.findByRole("button", { name: /^Ollama/ }));
+  await user.click(await screen.findByRole("button", { name: "Get models" }));
+  await user.type(await screen.findByRole("searchbox", { name: "Search" }), "qwen");
+  expect(fake.raw.searchHf).not.toHaveBeenCalled();
+  await user.click(await screen.findByRole("tab", { name: /Hugging Face/ }));
+  await waitFor(() => expect(fake.raw.searchHf).toHaveBeenCalledWith("qwen"));
 });
 
 test("a Hugging Face download shows as a row in Ollama's table with where it comes from", async () => {
@@ -359,7 +373,6 @@ test("a Hugging Face download shows as a row in Ollama's table with where it com
   fake.raw.searchHf.mockResolvedValue(HF_RESULTS);
   fake.raw.hfFiles.mockResolvedValue(HF_FILES);
   await openHf(user);
-  await user.click(await screen.findByRole("button", { name: `Open ${HF_FILES.repo}` }));
   await user.click(await screen.findByRole("button", { name: "Download Q4_K_M" }));
   await user.click(screen.getByRole("button", { name: "Back to Ollama" }));
   await waitFor(() => expect(screen.getByRole("progressbar", { name: `Downloading hf.co/${HF_FILES.repo}:Q4_K_M` })).toBeTruthy());

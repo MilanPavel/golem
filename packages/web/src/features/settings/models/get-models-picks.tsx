@@ -4,9 +4,9 @@ import type { PullsSnapshot } from "../../../store/pulls.ts";
 import { Button } from "../../../ui/button.tsx";
 import { cn } from "../../../ui/cn.ts";
 import { Code } from "../../../ui/code.tsx";
-import { IconButton } from "../../../ui/icon-button.tsx";
-import { CheckIcon, CloseIcon } from "../../../ui/icons.tsx";
-import { diskText, pullShare, pullText, shortName } from "../../models/model-text.ts";
+import { diskText, shortName } from "../../models/model-text.ts";
+import { MemoryBar, PullAction } from "./get-models-action.tsx";
+import { Chip } from "./get-models-split.tsx";
 
 /** The chips of the list: All, then the categories a person looks by. */
 const CHIPS: readonly (Category | null)[] = [null, "general", "coding", "reasoning", "vision", "fast"];
@@ -35,26 +35,8 @@ export function visiblePicks(listing: ModelListResult | null, search: string, fi
   );
 }
 
-const FIT_TEXT = { fits: "Fits", tight: "Tight · slower", too_big: "Too big" } as const;
-
 function FitMeter({ model, ramGb }: { model: ListedModel; ramGb: number | null }) {
-  if (model.fit === null || model.fit === undefined) return <span className="text-meta text-faint">Fit unknown</span>;
-  const size = model.size_gb ?? null;
-  const share = size === null || ramGb === null || ramGb <= 0 ? 0 : Math.min(1, size / ramGb);
-  const tone = model.fit === "too_big" ? "text-deny" : model.fit === "tight" ? "text-wait" : "text-faint";
-  const color = model.fit === "too_big" ? "bg-deny" : model.fit === "tight" ? "bg-wait" : "bg-allow";
-  return (
-    <span className={cn("flex items-center gap-2 whitespace-nowrap text-meta", tone)}>
-      <span
-        role="img"
-        aria-label={size === null || ramGb === null ? "Memory use unknown" : `${size} GB of ${ramGb} GB of memory`}
-        className="h-1.5 w-14 shrink-0 overflow-hidden rounded-full bg-line-strong"
-      >
-        <span className={cn("block h-full rounded-full", color)} style={{ width: `${Math.round(share * 100)}%` }} />
-      </span>
-      {FIT_TEXT[model.fit]}
-    </span>
-  );
+  return <MemoryBar fit={model.fit} sizeGb={model.size_gb} ramGb={ramGb} />;
 }
 
 type ActionProps = {
@@ -66,79 +48,20 @@ type ActionProps = {
 };
 
 /** Download, then a bar with a percent and a cancel, then Installed. */
-function Action({ model, pulls, pull, onStop, primary = false }: ActionProps) {
-  const name = shortName(model.ref);
-  const entry = pulls.active.get(model.ref);
-  if (entry !== undefined || model.status === "pulling") {
-    const share = pullShare(entry, model.progress);
-    const percent = share === null ? undefined : Math.floor(share * 100);
-    return (
-      <span className="flex items-center justify-end gap-2" title={pullText(entry)}>
-        <span
-          role="progressbar"
-          aria-label={`Downloading ${name}`}
-          aria-valuemin={0}
-          aria-valuemax={100}
-          aria-valuenow={percent}
-          className="h-1.5 w-14 shrink-0 overflow-hidden rounded-full bg-line-strong"
-        >
-          <span className="block h-full rounded-full bg-clay" style={{ width: `${percent ?? 0}%` }} />
-        </span>
-        <span className="text-meta tabular-nums text-muted">{percent === undefined ? "…" : `${percent}%`}</span>
-        <IconButton
-          label={`Stop downloading ${name}`}
-          className="size-6"
-          onClick={() => {
-            onStop(model.ref);
-          }}
-        >
-          <CloseIcon width="12" height="12" />
-        </IconButton>
-      </span>
-    );
-  }
-  if (model.source === "installed" && model.status === "ready") {
-    return (
-      <span className="flex items-center justify-end gap-1 text-meta font-semibold text-allow">
-        <CheckIcon width="14" height="14" />
-        Installed
-      </span>
-    );
-  }
-  return (
-    <span className="flex justify-end">
-      <Button
-        size="sm"
-        kind={primary ? "primary" : "secondary"}
-        aria-label={`Download ${name}`}
-        onClick={() => {
-          void pull(model.ref);
-        }}
-      >
-        {model.fit === "too_big" ? "Download anyway" : "Download"}
-      </Button>
-    </span>
-  );
+function Action({ model, ...rest }: ActionProps) {
+  const target = {
+    ref: model.ref,
+    name: shortName(model.ref),
+    installed: model.source === "installed" && model.status === "ready",
+    pulling: model.status === "pulling",
+    progress: model.progress,
+    tooBig: model.fit === "too_big",
+  };
+  return <PullAction target={target} {...rest} />;
 }
 
 function sizeText(model: ListedModel): string {
   return model.size_gb === null || model.size_gb === undefined ? "" : `${model.size_gb} GB`;
-}
-
-function Chip({ pressed, onClick, children }: { pressed: boolean; onClick: () => void; children: string }) {
-  return (
-    <button
-      type="button"
-      aria-pressed={pressed}
-      onClick={onClick}
-      className={cn(
-        "rounded-full border px-2.5 py-0.5 text-meta outline-offset-2 outline-clay focus-visible:outline-2",
-        pressed ? "border-transparent bg-clay-soft font-semibold text-clay-ink" : "border-line-strong text-muted hover:border-faint hover:text-ink",
-      )}
-    >
-      {children}
-    </button>
-  );
 }
 
 /** The card for the model golem recommends for this Mac. */
