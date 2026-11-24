@@ -21,8 +21,8 @@ function started(index: number, agent: string, model: string, pick = ""): ChatEv
   return { ...base, ts: T, seq: next(), type: "helper.started", data: { call_id: "d1", index, helper_id: `h${String(index + 1)}`, agent, label: agent, model, wish: "read", pick_reason: pick } };
 }
 
-function state(index: number, value: "queued" | "running" | "waiting", reason?: string): ChatEvent {
-  return { ...base, ts: T, seq: next(), type: "helper.state", data: { call_id: "d1", index, state: value, ...(reason === undefined ? {} : { reason }) } };
+function state(index: number, value: "queued" | "running" | "waiting", reason?: string, more: Record<string, unknown> = {}): ChatEvent {
+  return { ...base, ts: T, seq: next(), type: "helper.state", data: { call_id: "d1", index, state: value, ...(reason === undefined ? {} : { reason }), ...more } } as ChatEvent;
 }
 
 function step(index: number, id: string, name: string, done: boolean): ChatEvent {
@@ -51,6 +51,37 @@ export function localBatchChat(): ChatState {
     step(1, "k2", "read_file", false),
     started(2, "tests", "ollama/qwen3:27b", "fits your machine"),
     state(2, "queued", "slot"),
+  ]);
+}
+
+/** Five helpers on local models: two run, one is next in line for the slot, two wait behind it. */
+export function localSlotsChat(): ChatState {
+  const q = (index: number, position: number): ChatEvent[] => [
+    started(index, `reader${String(index)}`, "ollama/qwen3:14b"),
+    state(index, "queued", "slot", { line: "local:qwen3:14b", position, holder: "reader0" }),
+  ];
+  return chatOf([
+    ...lead(),
+    started(0, "reader0", "ollama/qwen3:14b"),
+    state(0, "running"),
+    started(1, "reader1", "ollama/qwen3:14b"),
+    state(1, "running"),
+    ...q(2, 1),
+    ...q(3, 2),
+    ...q(4, 3),
+  ]);
+}
+
+/** Three helpers on a cloud model: one runs, one waits for the provider to answer again, one hit the spend cap. */
+export function cloudWaitsChat(): ChatState {
+  return chatOf([
+    ...lead(),
+    started(0, "explorer", "anthropic/claude-haiku"),
+    state(0, "running"),
+    started(1, "docs", "anthropic/claude-haiku"),
+    state(1, "waiting", "provider", { line: "anthropic", retry_in_ms: 8000 }),
+    started(2, "tests", "anthropic/claude-haiku"),
+    state(2, "waiting", "budget", { spent_usd: 2, cap_usd: 2 }),
   ]);
 }
 

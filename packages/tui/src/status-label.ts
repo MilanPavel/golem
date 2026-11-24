@@ -1,4 +1,4 @@
-import { connectionLabel, contextLevel, formatTokens, type LiveContext } from "@golem/view";
+import { batchCounts, connectionLabel, contextLevel, formatTokens, type HelperBatch, type LiveContext } from "@golem/view";
 
 import { newLinesLabel } from "./transcript.ts";
 
@@ -75,6 +75,7 @@ export const STATUS_PRIORITY = {
   connection: 100,
   alert: 90,
   runs: 89,
+  helpers: 61,
   title: 80,
   model: 60,
   local: 59,
@@ -151,6 +152,20 @@ export function shownSessionTitle(
     return sessionTitleLabel(live.title);
   }
   return sessionTitleLabel(indexed);
+}
+
+/**
+ * `helpers 2/5`: running over total of the newest batch that still has a helper not ended.
+ * "" when every batch has ended, so the segment is hidden.
+ */
+export function helpersLabel(batches: Readonly<Record<string, HelperBatch>> | undefined): string {
+  const open = Object.values(batches ?? {}).filter((batch) =>
+    batch.helpers.some((helper) => helper.state === "running" || helper.state === "waiting" || helper.state === "queued"),
+  );
+  const batch = open[open.length - 1];
+  if (batch === undefined) return "";
+  const { running, total } = batchCounts(batch);
+  return `helpers ${String(running)}/${String(total)}`;
 }
 
 /** `Δ 3 files`, or "" for none. */
@@ -272,6 +287,8 @@ export function statusSegments(input: {
   notes?: string;
   /** `runs: 2 waiting`, from `runsWaitingLabel`. Red, and hidden when empty. */
   runs?: string;
+  /** `helpers 2/5`, from `helpersLabel`. Hidden when empty. */
+  helpers?: string;
   /** `local only` while the session's folder stays on this Mac. */
   localOnly?: string;
 }): StatusSegment[] {
@@ -284,6 +301,7 @@ export function statusSegments(input: {
     segment("route", input.route ?? "", STATUS_PRIORITY.route, "dim"),
     segment("mode", input.mode ?? "", STATUS_PRIORITY.mode, "dim"),
     segment("context", contextLabel(input.context ?? null), STATUS_PRIORITY.context, contextTone(input.context ?? null)),
+    segment("helpers", input.helpers ?? "", STATUS_PRIORITY.helpers, "fresh"),
     segment("plan", input.plan === true ? "◇ plan" : "", STATUS_PRIORITY.plan, "fresh"),
     segment("local", input.localOnly ?? "", STATUS_PRIORITY.local, "warn"),
     segment("tune", input.tune ?? "", STATUS_PRIORITY.tune, "dim"),

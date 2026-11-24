@@ -1,4 +1,4 @@
-import { batchCard, withLocal, type CardTone, type Detail, type HelperBatch, type HelperRef, type IsLocal } from "@golem/view";
+import { batchAtOnce, batchCard, withLocal, type CardTone, type Detail, type HelperBatch, type HelperRef, type IsLocal } from "@golem/view";
 import { cn } from "../../ui/cn.ts";
 import { openHelper } from "./helper-open.ts";
 
@@ -17,6 +17,7 @@ const TONE: Record<CardTone, string> = {
 export function BatchCardView({ callId, batch, refs, detail, isLocal }: { callId: string; batch: HelperBatch; refs: readonly HelperRef[]; detail: Detail; isLocal?: IsLocal }) {
   const told = isLocal === undefined ? batch : withLocal(batch, isLocal);
   const card = batchCard(told, detail);
+  const atOnce = batchAtOnce(told);
   if (detail === "quiet") {
     return (
       <p data-batch-card data-detail="quiet" className="text-meta text-muted">
@@ -27,7 +28,10 @@ export function BatchCardView({ callId, batch, refs, detail, isLocal }: { callId
   return (
     <div role="group" aria-label="Helpers" data-batch-card data-detail={detail} className="flex min-w-0 flex-col rounded-md border border-line bg-sunken text-meta leading-snug">
       <p className="flex flex-wrap items-baseline justify-between gap-x-3 px-3 py-1.5 text-muted">
-        <span>{card.total ?? card.head}</span>
+        <span>
+          {card.total ?? card.head}
+          {atOnce === null ? null : <span data-at-once className="text-faint"> · {atOnce}</span>}
+        </span>
         <span className={cn("whitespace-nowrap", TONE[card.tone])}>{card.right}</span>
       </p>
       {card.rows.length === 0 ? null : (
