@@ -5,6 +5,8 @@ import { Badge } from "../../../ui/badge.tsx";
 import { Button } from "../../../ui/button.tsx";
 import { cn } from "../../../ui/cn.ts";
 import { Code } from "../../../ui/code.tsx";
+import { HuggingFaceIcon } from "../../../ui/hugging-face-icon.tsx";
+import { ProviderIcon } from "../../../ui/provider-icons.tsx";
 import { hfPull, hfPullSource, pullShare, pullText, shortName } from "../../models/model-text.ts";
 import { PullBar } from "../../models/pull-bar.tsx";
 import { priceText, providerEntry, speedText, toolsText } from "./derive.ts";
@@ -29,6 +31,18 @@ export type ModelTableProps = {
 
 const TH = "px-3 py-2 text-left text-meta font-semibold tracking-wide text-faint uppercase";
 const TD = "px-3 py-2 align-middle";
+
+/** Where an Ollama model came from: Hugging Face for an `ollama/hf.co/` ref, the Ollama library for the rest. The words hide on a narrow screen, the icon stays. */
+function Source({ model }: { model: ListedModel }) {
+  const hf = model.ref.startsWith("ollama/hf.co/");
+  const text = hf ? "Hugging Face" : "Ollama library";
+  return (
+    <span className="inline-flex items-center gap-1.5 whitespace-nowrap" title={text}>
+      {hf ? <HuggingFaceIcon width="16" height="16" /> : <ProviderIcon provider="ollama" width="16" height="16" className="text-muted" />}
+      <span className="max-sm:sr-only">{text}</span>
+    </span>
+  );
+}
 
 /** The star: on is clay and a filled star, off an outline. It is a toggle, so its name stays the same. */
 function Star({ model, busy, onStar }: { model: ListedModel; busy: boolean; onStar: (model: ListedModel) => void }) {
@@ -107,6 +121,11 @@ export function ModelTable({ label, models, defaultName, showProvider = false, l
               </th>
             ) : null}
             {local ? (
+              <th scope="col" className={TH}>
+                From
+              </th>
+            ) : null}
+            {local ? (
               <th scope="col" className={cn(TH, "hidden lg:table-cell")}>
                 Speed here
               </th>
@@ -148,6 +167,11 @@ export function ModelTable({ label, models, defaultName, showProvider = false, l
                   <small className="block text-sm text-faint">{`${model.label}${size}`}</small>
                 </td>
                 {showProvider ? <td className={TD}>{providerEntry(model.provider)?.name ?? model.provider}</td> : null}
+                {local ? (
+                  <td className={TD}>
+                    <Source model={model} />
+                  </td>
+                ) : null}
                 {local ? <td className={cn(TD, "hidden lg:table-cell")}>
                     <Code>{speedText(model)}</Code>
                   </td> : null}

@@ -114,6 +114,7 @@ export const MODELS_CASES: ModelsCase[] = [
   { label: "Ollama stopped", listing: listing(MODELS, { ollama_running: false }), keys: TWO_KEYS, ollama: { ...OLLAMA_VALUES, running: false }, initial: { selected: "ollama" } },
   { label: "Ollama not installed", listing: listing([], { ollama_installed: false, ollama_running: false }), keys: NO_KEYS, ollama: null, initial: { selected: "ollama" } },
   { label: "Ollama downloading and removing", listing: listing([...MODELS, pulling("qwen3.8:32b")]), keys: TWO_KEYS, ollama: OLLAMA_VALUES, initial: { selected: "ollama", removing: "ollama/qwen3.8:27b" } },
+  { label: "Ollama with a Hugging Face model", listing: listing([...MODELS, local("hf.co/unsloth/gemma-4-12b-it-GGUF:Q4_K_M", "Gemma 4 · 12B, from Hugging Face", 7.3, { speed: { reply_tps: 52, samples: 5 } })]), keys: TWO_KEYS, ollama: OLLAMA_VALUES, initial: { selected: "ollama" } },
   { label: "Hosted with a key", listing: listing(MODELS), keys: TWO_KEYS, ollama: OLLAMA_VALUES, initial: { selected: "anthropic" } },
   { label: "Key from the environment", listing: listing(MODELS), keys: TWO_KEYS, ollama: OLLAMA_VALUES, initial: { selected: "openai" } },
   { label: "Not set up", listing: listing(MODELS), keys: TWO_KEYS, ollama: OLLAMA_VALUES, initial: { selected: "google" } },
