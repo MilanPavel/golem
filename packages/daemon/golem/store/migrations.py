@@ -260,4 +260,68 @@ MIGRATIONS: tuple[tuple[str, ...], ...] = (
         )
         """,
     ),
+    (
+        """
+        CREATE TABLE workflow_runs (
+            workflow_run_id TEXT PRIMARY KEY,
+            workflow_id TEXT NOT NULL,
+            name TEXT NOT NULL,
+            path TEXT NOT NULL,
+            project TEXT,
+            session_id TEXT,
+            status TEXT NOT NULL DEFAULT 'pending' CHECK (
+                status IN ('pending', 'running', 'waiting', 'done', 'failed', 'cancelled')
+            ),
+            inputs_json TEXT,
+            trigger TEXT NOT NULL DEFAULT 'manual' CHECK (
+                trigger IN ('manual', 'schedule', 'file', 'chat', 'try')
+            ),
+            error TEXT,
+            created_at TEXT NOT NULL,
+            started_at TEXT,
+            finished_at TEXT,
+            source_hash TEXT
+        )
+        """,
+        "CREATE INDEX workflow_runs_status ON workflow_runs (status)",
+        "CREATE INDEX workflow_runs_workflow ON workflow_runs (workflow_id, created_at DESC)",
+        """
+        CREATE TABLE workflow_steps (
+            workflow_run_id TEXT NOT NULL REFERENCES workflow_runs (workflow_run_id)
+                ON DELETE CASCADE,
+            step_key TEXT NOT NULL,
+            kind TEXT NOT NULL CHECK (
+                kind IN ('step', 'agent', 'review', 'notify', 'llm', 'tool', 'skill')
+            ),
+            title TEXT,
+            group_key TEXT,
+            status TEXT NOT NULL DEFAULT 'pending' CHECK (
+                status IN ('pending', 'running', 'waiting', 'done', 'failed', 'skipped', 'in_doubt')
+            ),
+            attempts INTEGER NOT NULL DEFAULT 0,
+            result_json TEXT,
+            error TEXT,
+            child_session_id TEXT,
+            cost_usd REAL,
+            started_at TEXT,
+            finished_at TEXT,
+            seq INTEGER NOT NULL,
+            PRIMARY KEY (workflow_run_id, step_key)
+        )
+        """,
+        """
+        CREATE TABLE workflow_reviews (
+            workflow_run_id TEXT NOT NULL REFERENCES workflow_runs (workflow_run_id)
+                ON DELETE CASCADE,
+            step_key TEXT NOT NULL,
+            pending_json TEXT NOT NULL,
+            answer_json TEXT,
+            created_at TEXT NOT NULL,
+            answered_at TEXT,
+            PRIMARY KEY (workflow_run_id, step_key)
+        )
+        """,
+        "CREATE INDEX workflow_reviews_open ON workflow_reviews (created_at)"
+        " WHERE answered_at IS NULL",
+    ),
 )
