@@ -44,6 +44,15 @@ export type PageClient = Pick<
   | "copyAgent"
   | "deleteAgent"
   | "agentsKeep"
+  | "evalsPlan"
+  | "evalsStart"
+  | "evalsStop"
+  | "evalsResume"
+  | "evalsList"
+  | "evalsGet"
+  | "evalsApply"
+  | "evalsDelete"
+  | "onEval"
   | "onMemoryChanged"
   | "onDevicesChanged"
   | "onDevicePairChanged"
@@ -179,6 +188,8 @@ export type PageClient = Pick<
 
 /** Thin calls on the client. Their results arrive as events, so there is nothing to merge. */
 export type PageActions = {
+  /** The measurement of the helper rules (`evals.*`): the plan, start, stop, resume, list, get, apply and delete, and the `eval.*` notifications. */
+  evals: Pick<PageClient, "evalsPlan" | "evalsStart" | "evalsStop" | "evalsResume" | "evalsList" | "evalsGet" | "evalsApply" | "evalsDelete" | "onEval">;
   /** Opens the macOS folder dialog on the daemon's Mac, in `start` when given. A null path means the person cancelled. */
   chooseFolder(start: string | null): Promise<FsChooseFolderResult>;
   /** Opens a folder in Finder on the daemon's Mac. Only offered when the page is on that Mac. */
@@ -620,6 +631,22 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
     },
     router,
     actions: {
+      evals: {
+        evalsPlan: (arms, models) => client.evalsPlan(arms, models),
+        evalsStart: (params) => client.evalsStart(params),
+        evalsStop: (id) => client.evalsStop(id),
+        evalsResume: (id, allowTight) => client.evalsResume(id, allowTight),
+        evalsList: () => client.evalsList(),
+        evalsGet: (id) => client.evalsGet(id),
+        // The numbers are in config.toml now, so what the Rules tab read before is stale.
+        evalsApply: async (id) => {
+          const result = await client.evalsApply(id);
+          if (result.ok) await queryClient.invalidateQueries({ queryKey: AGENTS_KEEP_KEY });
+          return result;
+        },
+        evalsDelete: (id) => client.evalsDelete(id),
+        onEval: (listener) => client.onEval(listener),
+      },
       chooseFolder: (start) => client.chooseFolder(start),
       reveal: async (path) => {
         await client.reveal(path);

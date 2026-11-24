@@ -27,6 +27,7 @@ export const GALLERY_SECTIONS = [
   "mcp-servers",
   "skills",
   "agents",
+  "measure",
   "agent-limits",
   "use-helpers",
   "memory",
@@ -89,11 +90,14 @@ export const GALLERY_SECTIONS = [
 
 /**
  * One axe test per section. Axe reads computed styles node by node, which is slow in jsdom, so one
- * test over the whole gallery outgrew its 60 s on a busy CI runner. The tests are in a file per theme,
- * so vitest runs the two themes in parallel.
+ * test over the whole gallery outgrew its 60 s on a busy CI runner. The tests are in two files per theme,
+ * so vitest runs them in parallel, and each worker renders the whole gallery only half as often: every
+ * render leaves memory behind in jsdom, and one file for all sections ran a CI worker out of heap.
  */
-export function sectionAxeTests(theme: "slip" | "kiln"): void {
-  for (const id of GALLERY_SECTIONS) {
+export function sectionAxeTests(theme: "slip" | "kiln", part: 1 | 2): void {
+  const half = Math.ceil(GALLERY_SECTIONS.length / 2);
+  const ids = part === 1 ? GALLERY_SECTIONS.slice(0, half) : GALLERY_SECTIONS.slice(half);
+  for (const id of ids) {
     test(`the gallery's ${id} section in ${theme} passes axe`, async () => {
       showTheme(theme);
       const { container } = render(<Gallery />);
@@ -101,7 +105,7 @@ export function sectionAxeTests(theme: "slip" | "kiln"): void {
       expect(section, id).toBeTruthy();
       // The trace demos repeat the same "Context window" landmark, and the welcome cases the same "Keep golem
       // one click away" one, and the two import demos the same app names, and the three Finished helpers demos the same block, so unique landmark names are not checked in those.
-      const rules = id === "trace" || id === "dock" || id === "routing" || id === "settings-context" || id === "workbench" || id === "helper-panel" || id === "helper-banner-receipt" || id === "welcome-page" || id === "mcp-servers" || id === "agents" || id === "agent-limits" || id === "use-helpers" ? { ...DIALOG_RULES, "landmark-unique": { enabled: false } } : DIALOG_RULES;
+      const rules = id === "trace" || id === "dock" || id === "routing" || id === "settings-context" || id === "workbench" || id === "helper-panel" || id === "helper-banner-receipt" || id === "welcome-page" || id === "mcp-servers" || id === "agents" || id === "measure" || id === "agent-limits" || id === "use-helpers" ? { ...DIALOG_RULES, "landmark-unique": { enabled: false } } : DIALOG_RULES;
       await expectAxeClean(section as Element, rules);
     });
   }

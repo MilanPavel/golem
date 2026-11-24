@@ -1,4 +1,4 @@
-import { OLLAMA_FAILED, RpcError, SESSION_BUSY, type ChatEvent, type ConnectionState, type OllamaInstallUpdate, type RuntimeInstallUpdate, type McpServerLog, type McpLoginDone, type ModelServerStatus, type MemoryChanged, type DevicePairChanged, type PullUpdate, type SessionSummary } from "@golem/client";
+import { OLLAMA_FAILED, RpcError, SESSION_BUSY, type ChatEvent, type ConnectionState, type OllamaInstallUpdate, type RuntimeInstallUpdate, type McpServerLog, type McpLoginDone, type ModelServerStatus, type MemoryChanged, type DevicePairChanged, type PullUpdate, type EvalUpdate, type SessionSummary } from "@golem/client";
 import { vi } from "vitest";
 import type { ModelListResult } from "./models.ts";
 import type { PageClient } from "./page.ts";
@@ -88,6 +88,7 @@ export function fakeClient() {
   const mcpLogin = listeners<McpLoginDone>();
   const runtime = listeners<RuntimeInstallUpdate>();
   const pull = listeners<PullUpdate>();
+  const evals = listeners<EvalUpdate>();
   const server = listeners<ModelServerStatus>();
   const install = listeners<OllamaInstallUpdate>();
   const saved = listeners<{ model: string; saved: Record<string, number | string> }>();
@@ -132,6 +133,15 @@ export function fakeClient() {
     previewRoutine: vi.fn<PageClient["previewRoutine"]>(async () => ({ next: [] })),
     onMcpStatus: mcp.on,
     onPull: pull.on,
+    onEval: evals.on,
+    evalsPlan: vi.fn<PageClient["evalsPlan"]>(async () => ({ arms: [], running: null })),
+    evalsStart: vi.fn<PageClient["evalsStart"]>(async () => ({ id: "m1" })),
+    evalsStop: vi.fn<PageClient["evalsStop"]>(async () => ({ stopped: true })),
+    evalsResume: vi.fn<PageClient["evalsResume"]>(async (id) => ({ id })),
+    evalsList: vi.fn<PageClient["evalsList"]>(async () => ({ measurements: [] })),
+    evalsGet: vi.fn<PageClient["evalsGet"]>(async (id) => ({ measurement: { id, arms: [], runs: [], started_at: "2026-11-24T14:00:00Z", state: "done" } })),
+    evalsApply: vi.fn<PageClient["evalsApply"]>(async () => ({ ok: true, errors: [], values: { keep_days: 7, keep_problem_days: 30 } })),
+    evalsDelete: vi.fn<PageClient["evalsDelete"]>(async () => ({ deleted: true })),
     onModelServer: server.on,
     onOllamaInstall: install.on,
     setupStatus: vi.fn<PageClient["setupStatus"]>(async () => ({ rows: [] })),
@@ -295,6 +305,7 @@ export function fakeClient() {
       mcp.emit({});
     },
     emitPull: pull.emit,
+    emitEval: evals.emit,
     emitModelServer: server.emit,
     emitInstall: install.emit,
     emitOptionsSaved: saved.emit,

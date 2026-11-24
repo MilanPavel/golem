@@ -74,11 +74,14 @@ test("Rules is three blocks, one after the other, each with its own heading", as
   expect((await axe.run(panel, noContrast)).violations).toEqual([]);
 });
 
-test("Measure says it comes later", async () => {
+test("Measure opens on its list of arms and measurements", async () => {
   const { user } = mount();
   await screen.findByText("7 agents");
   await user.click(tab("Measure"));
-  expect(screen.getByRole("tabpanel", { name: "Measure" }).textContent).toBe("Measuring helpers on this Mac comes in a later version.");
+  const panel = screen.getByRole("tabpanel", { name: "Measure" });
+  await within(panel).findByRole("heading", { name: "New measurement" });
+  expect(within(panel).getByRole("heading", { name: "Measurements" })).toBeTruthy();
+  expect(within(panel).getByText("No measurements yet.")).toBeTruthy();
 });
 
 test("arrow keys move between the tabs, and the tab stays when the page is left and opened again", async () => {
