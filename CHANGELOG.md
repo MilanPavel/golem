@@ -2,6 +2,42 @@
 
 What changed in each release of golem, newest first. `just release` writes each section from the commit messages on `main` ([CONTRIBUTING.md](CONTRIBUTING.md)), and the release pull request is the place to edit it. The GitHub release shows the same section. How a release is made is in [docs/sre.md](docs/sre.md), section 5.
 
+## [0.20.0] - 2026-11-24
+
+### Features
+
+- **web:** Settings › Models shows a hosted provider's starred models, with Show all for the rest ([#1690](https://github.com/MilanPavel/golem/pull/1690))
+- **web:** Settings › Chat reads as one chat turn, and "Open it when a step fails" goes ([#1693](https://github.com/MilanPavel/golem/pull/1693)) ([#1699](https://github.com/MilanPavel/golem/pull/1699))
+- **web:** Chat › Before you write is one card, and what the model reads is one line ([#1694](https://github.com/MilanPavel/golem/pull/1694)) ([#1703](https://github.com/MilanPavel/golem/pull/1703))
+- **web:** Chat › While it works shows the default mode as a track ([#1695](https://github.com/MilanPavel/golem/pull/1695)) ([#1702](https://github.com/MilanPavel/golem/pull/1702))
+- **daemon:** the helper eval runs a local arm only when its model fits in memory ([#1701](https://github.com/MilanPavel/golem/pull/1701)) ([#1704](https://github.com/MilanPavel/golem/pull/1704))
+- **web:** drafted instruction lines can be removed, and the Chat page is checked end to end ([#1696](https://github.com/MilanPavel/golem/pull/1696)) ([#1716](https://github.com/MilanPavel/golem/pull/1716))
+- **protocol:** a helper measurement (evals.*) and the four delegate numbers ([#1706](https://github.com/MilanPavel/golem/pull/1706)) ([#1715](https://github.com/MilanPavel/golem/pull/1715))
+- **web:** Settings › Agents has three tabs: Agents, Rules and Measure ([#1708](https://github.com/MilanPavel/golem/pull/1708)) ([#1714](https://github.com/MilanPavel/golem/pull/1714))
+- **daemon:** the golem service runs a helper measurement as a job (evals.*) ([#1707](https://github.com/MilanPavel/golem/pull/1707)) ([#1718](https://github.com/MilanPavel/golem/pull/1718))
+- **web:** Rules shows the three reasons for a helper with the four numbers ([#1709](https://github.com/MilanPavel/golem/pull/1709)) ([#1719](https://github.com/MilanPavel/golem/pull/1719))
+- **cli:** golem eval helpers measures the helper rules in the service, with progress ([#1712](https://github.com/MilanPavel/golem/pull/1712)) ([#1721](https://github.com/MilanPavel/golem/pull/1721))
+- **web:** the Measure tab starts a helper measurement, shows it run and uses its numbers ([#1710](https://github.com/MilanPavel/golem/pull/1710)) ([#1720](https://github.com/MilanPavel/golem/pull/1720))
+- **tui:** /agents then m measures the helper rules: start, watch, stop and use the numbers ([#1711](https://github.com/MilanPavel/golem/pull/1711)) ([#1722](https://github.com/MilanPavel/golem/pull/1722))
+- **web:** Get models is a page with one search, tabs and a list picked for this Mac ([#1726](https://github.com/MilanPavel/golem/pull/1726)) ([#1733](https://github.com/MilanPavel/golem/pull/1733))
+- **web:** Ollama, oMLX and Hugging Face have icons; Ollama's table shows a model's source ([#1725](https://github.com/MilanPavel/golem/pull/1725)) ([#1732](https://github.com/MilanPavel/golem/pull/1732))
+- **web:** Rules names the measurement in use, plus the Measure checks and guide ([#1713](https://github.com/MilanPavel/golem/pull/1713)) ([#1736](https://github.com/MilanPavel/golem/pull/1736))
+- **daemon:** search the Ollama library by name, and list popular Hugging Face models ([#1724](https://github.com/MilanPavel/golem/pull/1724)) ([#1731](https://github.com/MilanPavel/golem/pull/1731))
+- **web:** the Get models page has a downloads tray ([#1727](https://github.com/MilanPavel/golem/pull/1727)) ([#1739](https://github.com/MilanPavel/golem/pull/1739))
+- **web:** Hugging Face is a list next to a detail on the Get models page ([#1728](https://github.com/MilanPavel/golem/pull/1728)) ([#1741](https://github.com/MilanPavel/golem/pull/1741))
+- **web:** the Ollama library is a tab on the Get models page ([#1729](https://github.com/MilanPavel/golem/pull/1729)) ([#1743](https://github.com/MilanPavel/golem/pull/1743))
+- **daemon:** Measure warns and lets you run at your own risk, and shows what is asked ([#1745](https://github.com/MilanPavel/golem/pull/1745)) ([#1747](https://github.com/MilanPavel/golem/pull/1747))
+- **web:** Rules shows each reason as a When / Then block with a picture ([#1750](https://github.com/MilanPavel/golem/pull/1750)) ([#1751](https://github.com/MilanPavel/golem/pull/1751))
+- **daemon:** Measure has a 64K local arm in place of the 128K one ([#1752](https://github.com/MilanPavel/golem/pull/1752)) ([#1753](https://github.com/MilanPavel/golem/pull/1753))
+
+### Fixes
+
+- **web:** Settings › Models scrolls the model list on its own, not the whole page ([#1697](https://github.com/MilanPavel/golem/pull/1697))
+- **web:** the larger-model row offers only a model no weaker than the current one ([#1700](https://github.com/MilanPavel/golem/pull/1700))
+- **daemon:** Measure starts from your local model and hands paid arms their key (#1737, #1738) ([#1740](https://github.com/MilanPavel/golem/pull/1740))
+- **web:** a failed model download says why, and offers to remove what it left ([#1742](https://github.com/MilanPavel/golem/pull/1742)) ([#1744](https://github.com/MilanPavel/golem/pull/1744))
+- **web:** Get models keeps Download on the right, and fits a narrow window ([#1746](https://github.com/MilanPavel/golem/pull/1746)) ([#1749](https://github.com/MilanPavel/golem/pull/1749))
+
 ## [0.19.0] - 2026-11-23
 
 ### Features
