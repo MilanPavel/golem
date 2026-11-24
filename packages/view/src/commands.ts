@@ -434,7 +434,7 @@ export const COMMANDS: readonly Command[] = [
     name: "/agents",
     group: "tools",
     args: "",
-    description: "Lists the agent types helpers can run as, with how often each was used.",
+    description: "Lists the agent types helpers run as and how often each ran. m measures the rules.",
     run: withoutArgs({ kind: "agents" }),
   },
   {

@@ -507,7 +507,7 @@ test("d on your agent asks once: y deletes, any other key cancels; bundled and p
 });
 
 test("the footers say what each view can do", () => {
-  assert.ok(texts(layout(openAgentsManager(), ALL)).includes("↑/↓ move · Enter read · w model · u use helpers · c copy · e edit · n new · d delete · Esc close"));
+  assert.ok(texts(layout(openAgentsManager(), ALL)).includes("↑/↓ move · Enter read · w model · u use helpers · m measure · c copy · e edit · n new · d delete · Esc close"));
   const user = in2({ kind: "detail", name: "reviewer", origin: "user" });
   assert.ok(texts(layout(user, ALL)).includes("w model · e edit · d delete · ↑/↓ scroll · Esc back"));
   const project = in2({ kind: "detail", name: "triage", origin: "project" });
@@ -517,4 +517,11 @@ test("the footers say what each view can do", () => {
 test("w in the list opens the wish choices of the chosen agent", () => {
   const opened = pressAgentsManager(in2({ kind: "list", selected: 2 }), FILES, "wish");
   assert.deepEqual(opened.state.view, { kind: "detail", name: "scout", origin: "bundled", pick: { selected: 0 } });
+});
+
+test("m in the list opens Measure and changes nothing else", () => {
+  assert.equal(agentsManagerKeyOf(press(null, "m")), "measure");
+  const pressed = pressAgentsManager(openAgentsManager(), ALL, "measure");
+  assert.deepEqual(pressed.action, { kind: "measure" });
+  assert.deepEqual(pressed.state, openAgentsManager());
 });
