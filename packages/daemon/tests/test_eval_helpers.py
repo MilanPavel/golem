@@ -619,8 +619,17 @@ class _DyingDriver:
     def unavailable(self, arm: Arm) -> str | None:
         return None
 
-    async def play(self, arm: Arm, mode: Any, asks: Any, project: Path, scratch: Path) -> list[Run]:
-        del project, scratch
+    async def play(
+        self,
+        arm: Arm,
+        mode: Any,
+        asks: Any,
+        project: Path,
+        scratch: Path,
+        on_start: Any = None,
+        on_run: Any = None,
+    ) -> list[Run]:
+        del project, scratch, on_start, on_run
         first, *rest = list(asks)
         return [_ended(arm, first, "completed"), *(not_run(arm, mode, a) for a in rest)]
 

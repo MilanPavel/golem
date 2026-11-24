@@ -31,6 +31,7 @@ import logging
 import os
 import re
 import tempfile
+from collections.abc import Mapping
 from pathlib import Path
 from typing import cast
 
@@ -381,6 +382,42 @@ async def agents_keep(ctx: RequestContext, params: AgentsKeepParams) -> AgentsKe
         raise RpcCallError(INTERNAL_ERROR, f"could not write {config_file}: {exc}") from exc
     if patch:
         log.info("helper keep settings saved keys=%s", sorted(patch))
+    return AgentsKeepResult(ok=True, values=await _keep_values(ctx))
+
+
+async def set_delegate_numbers(
+    ctx: RequestContext, numbers: Mapping[str, float]
+) -> AgentsKeepResult:
+    """Write some of the four numbers of ``[agents.delegate]``, the way ``agents.keep`` writes.
+
+    The numbers are checked first against ``DelegateSettings``; a wrong one comes back as a
+    field error and nothing is written. The file keeps its comments. Every use of the numbers
+    reads ``config.toml`` again (``router.agent_settings()``), so no restart is needed.
+    """
+    delegate = (await _agent_settings(ctx)).delegate
+    try:
+        DelegateSettings.model_validate({**delegate.model_dump(), **numbers})
+    except ValidationError as exc:
+        return AgentsKeepResult(
+            ok=False,
+            errors=[
+                ConfigError(
+                    path=f"agents.delegate.{'.'.join(str(part) for part in error['loc'])}",
+                    message=error["msg"],
+                )
+                for error in exc.errors()
+            ],
+        )
+    config_file = ctx.state.paths.config_file
+    try:
+        if numbers:
+            await asyncio.to_thread(set_keys, config_file, {"agents.delegate": dict(numbers)})
+    except (RawConflictError, ValueError) as exc:
+        return AgentsKeepResult(ok=False, errors=[ConfigError(message=str(exc))])
+    except OSError as exc:
+        raise RpcCallError(INTERNAL_ERROR, f"could not write {config_file}: {exc}") from exc
+    if numbers:
+        log.info("delegate numbers saved keys=%s", sorted(numbers))
     return AgentsKeepResult(ok=True, values=await _keep_values(ctx))
 
 

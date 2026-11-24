@@ -157,12 +157,14 @@ def prices_of(
 def delegate_prompt(
     agents_of: Callable[[Path | None], Sequence[Agent]],
     writes: Callable[[str], bool],
-    settings: DelegateSettings | None = None,
+    settings: DelegateSettings | Callable[[], DelegateSettings] | None = None,
 ) -> Section:
     """The section, for the agent types ``agents_of`` gives for a session folder.
 
-    ``writes`` says whether a tool changes something. The section is left out when ``delegate``
-    is not offered (a helper, or a model that takes no tools) or the window is unknown.
+    ``writes`` says whether a tool changes something. ``settings`` may be a function, read each
+    time the section is built, so a new ``[agents.delegate]`` applies without a restart. The
+    section is left out when ``delegate`` is not offered (a helper, or a model that takes no
+    tools) or the window is unknown.
     """
 
     def build(context: PromptContext) -> str | None:
@@ -175,7 +177,7 @@ def delegate_prompt(
             context.tier or "frontier",  # a model of unknown tier is hosted
             context.prices or Prices(),
             writes,
-            settings,
+            settings() if callable(settings) else settings,
         )
 
     return Section(DELEGATE_SECTION, build)

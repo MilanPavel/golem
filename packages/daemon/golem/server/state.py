@@ -12,6 +12,7 @@ from pydantic import BaseModel
 
 from golem.agents.registry import AgentRegistry
 from golem.coding.changes import ChangeStore
+from golem.evals.job import EvalJobs
 from golem.mcp import McpSupervisor
 from golem.mcp.importer import ScanStore
 from golem.memory.service import MemoryService
@@ -68,6 +69,8 @@ class DaemonState:
     hf: HuggingFace | None = None
     checks: CheckManager | None = None
     benches: BenchManager | None = None
+    evals: EvalJobs | None = None
+    """The helper measurement job (``evals.*``), once the daemon serves."""
     policy: Policy | None = None
     tools: ToolRegistry | None = None
     artifacts: ArtifactStore | None = None
