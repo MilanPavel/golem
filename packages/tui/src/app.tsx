@@ -329,6 +329,8 @@ import {
   pagerText,
 } from "./helper-ask.ts";
 import { useHelperConsent } from "./use-helper-consent.ts";
+import { useMeasure } from "./use-measure.ts";
+import { layoutMeasure } from "./measure-manager.ts";
 import {
   ARGS_EDIT_ROWS,
   type ArgsEdit,
@@ -721,6 +723,7 @@ export function App({
   const [agentsManager, setAgentsManager] = useState<AgentsManagerState>(closedAgentsManager);
   const agentsManagerRef = useRef(agentsManager);
   agentsManagerRef.current = agentsManager;
+  const measure = useMeasure(client);
   const [agentList, setAgentList] = useState<AgentList>({ agents: null, error: null });
   const [agentsKeep, setAgentsKeep] = useState<AgentsKeepValues | null>(null);
   const agentListRef = useRef(agentList);
@@ -4836,6 +4839,9 @@ export function App({
 
   function onAgentsAction(action: AgentsManagerAction): void {
     switch (action.kind) {
+      case "measure":
+        measure.open();
+        return;
       case "set_wish":
         saveAgentWish(action.name, action.wish);
         return;
@@ -5699,6 +5705,10 @@ export function App({
       onSkillsManagerPress(press);
       return;
     }
+    if (measure.state.open && !keysOpenRef.current && press.name !== "f1" && press.name !== "ctrl-c") {
+      measure.press(press);
+      return;
+    }
     if (agentsManagerRef.current.open && !keysOpenRef.current && press.name !== "f1" && press.name !== "ctrl-c") {
       onAgentsManagerPress(press);
       return;
@@ -6078,6 +6088,12 @@ export function App({
             rows: budget.body,
             pinned: chat.activeSkills,
           }).map((line, index) => (
+            <McpManagerRow key={index} line={line} />
+          ))}
+        </Box>
+      ) : agentsManager.open && measure.state.open ? (
+        <Box flexDirection="column" width={columns} height={budget.body} flexShrink={0} overflow="hidden">
+          {layoutMeasure({ state: measure.state, data: measure.data, columns, rows: budget.body }).map((line, index) => (
             <McpManagerRow key={index} line={line} />
           ))}
         </Box>

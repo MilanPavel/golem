@@ -64,6 +64,7 @@ export type AgentsManagerKey =
   | "back"
   | "wish"
   | "helpers"
+  | "measure"
   | "copy"
   | "edit"
   | "new"
@@ -73,6 +74,8 @@ export type AgentsManagerKey =
 export type AgentsManagerAction =
   | { kind: "none" }
   | { kind: "close" }
+  /** `m` in the list: open Measure (`measure-manager.ts`). */
+  | { kind: "measure" }
   | { kind: "set_wish"; name: string; wish: string }
   /** Save `[agents] use_helpers` with `agents.keep`. */
   | { kind: "use_helpers"; value: "when_needed" | "ask" | "never" }
@@ -95,7 +98,7 @@ export type AgentsManagerLine = McpManagerLine;
 /** What an older daemon, which does not know `agents.list`, gets in place of the list. */
 export const NO_AGENTS = "this daemon has no agents yet";
 export const AGENTS_HINT = "Add one as ~/.golem/agents/<name>.md, or .golem/agents/<name>.md in a project.";
-export const LIST_HINT = "↑/↓ move · Enter read · w model · u use helpers · c copy · e edit · n new · d delete · Esc close";
+export const LIST_HINT = "↑/↓ move · Enter read · w model · u use helpers · m measure · c copy · e edit · n new · d delete · Esc close";
 const PICK_HINT = "↑/↓ to choose · Enter to save · Esc to cancel";
 const PROBLEMS_HINT = "e edit again · d drop the change · Esc drop the change";
 const METHOD_NOT_FOUND = -32601;
@@ -164,6 +167,7 @@ export function agentsManagerKeyOf(press: Press): AgentsManagerKey | null {
 const LETTER_KEYS: Record<string, AgentsManagerKey | undefined> = {
   w: "wish",
   u: "helpers",
+  m: "measure",
   c: "copy",
   e: "edit",
   n: "new",
@@ -213,6 +217,9 @@ export function pressAgentsManager(
     if (key === "up" || key === "down") {
       const next = clamp(selected + (key === "up" ? -1 : 1), ordered.length);
       return { state: at({ kind: "list", selected: next }), action: none };
+    }
+    if (key === "measure") {
+      return { state: at(view), action: { kind: "measure" } };
     }
     if (key === "helpers") {
       return context.useHelpers === undefined || context.useHelpers === null
