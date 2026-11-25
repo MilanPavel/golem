@@ -11,6 +11,7 @@ import { Counts, FileDiffPanel, Row, plural } from "./file-row.tsx";
 import { TurnsTab } from "./turns-view.tsx";
 import { openFile, useCommitRequest, useRequestedChange } from "./workbench-state.ts";
 import { useUndo } from "./undo.tsx";
+import { WorkerBlocks } from "./worker-blocks.tsx";
 import { useWorkbenchWidth } from "./workbench-width.ts";
 
 /** From this panel width, in rem, a diff may be shown side by side. Narrower, it is unified. */
@@ -234,6 +235,7 @@ export function ChangesTab({ sessionId }: { sessionId: string }) {
     <div className="flex min-w-0 flex-col gap-3">
       <ChangesViewSwitch view={view} onChange={setView} />
       <ShellNote sessionId={sessionId} />
+      <WorkerBlocks sessionId={sessionId} />
       {view === "turn" ? <TurnsTab sessionId={sessionId} /> : <ByFileTab sessionId={sessionId} />}
     </div>
   );

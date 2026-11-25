@@ -2764,3 +2764,30 @@ test("model.pull_cleanup reads the freed size, and a malformed result is refused
     await bad.close();
   }
 });
+
+test("applyHelper, discardHelper and retryHelper send helper.apply, helper.discard and helper.retry", async () => {
+  const sent: [string, Record<string, unknown>][] = [];
+  const server = await listen((socket) => {
+    attach(socket, {
+      answerPing: true,
+      results: { "helper.apply": { change_ids: ["c_1"] }, "helper.discard": {}, "helper.retry": { helper_id: "h_2" } },
+      onRequest: (_socket, method, params) => {
+        if (method.startsWith("helper.")) sent.push([method, params]);
+      },
+    });
+  });
+  const client = connectGolem({ socketPath: server.socketPath, clientName: "web", reconnect: false, heartbeatMs: 60_000 });
+  try {
+    assert.deepEqual(await client.applyHelper("s_test", "h_1"), { change_ids: ["c_1"] });
+    await client.discardHelper("s_test", "h_1");
+    assert.deepEqual(await client.retryHelper("s_test", "h_1"), { helper_id: "h_2" });
+    assert.deepEqual(sent, [
+      ["helper.apply", { session_id: "s_test", helper_id: "h_1" }],
+      ["helper.discard", { session_id: "s_test", helper_id: "h_1" }],
+      ["helper.retry", { session_id: "s_test", helper_id: "h_1", model: "stronger" }],
+    ]);
+  } finally {
+    client.close();
+    await server.close();
+  }
+});

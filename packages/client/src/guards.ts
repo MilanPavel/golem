@@ -124,6 +124,8 @@ import type { SessionSetModelResult } from "../../protocol/gen/session-set-model
 import type { Ping } from "../../protocol/gen/ping.ts";
 import type { Params as ChatEvent } from "../../protocol/gen/rpc-notification.ts";
 import type { RunCancelResult } from "../../protocol/gen/run-cancel-result.ts";
+import type { HelperApplyResult } from "../../protocol/gen/helper-apply-result.ts";
+import type { HelperRetryResult } from "../../protocol/gen/helper-retry-result.ts";
 import type { HelperStopResult } from "../../protocol/gen/helper-stop-result.ts";
 import type { HelpersRespondResult } from "../../protocol/gen/helpers-respond-result.ts";
 import type { SessionAttachResult } from "../../protocol/gen/session-attach-result.ts";
@@ -1044,6 +1046,14 @@ export function isRunCancelResult(value: unknown): value is RunCancelResult {
 
 export function isHelperStopResult(value: unknown): value is HelperStopResult {
   return isRecord(value) && typeof value["stopped"] === "boolean";
+}
+
+export function isHelperApplyResult(value: unknown): value is HelperApplyResult {
+  return isRecord(value) && Array.isArray(value["change_ids"]) && value["change_ids"].every((id) => typeof id === "string");
+}
+
+export function isHelperRetryResult(value: unknown): value is HelperRetryResult {
+  return isRecord(value) && typeof value["helper_id"] === "string" && value["helper_id"] !== "";
 }
 
 export function isHelpersRespondResult(value: unknown): value is HelpersRespondResult {
