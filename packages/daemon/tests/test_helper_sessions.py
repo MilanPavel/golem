@@ -26,7 +26,7 @@ from golem.sessions.summaries import summarize
 from golem.store.database import Database
 from golem.store.events import EventLog
 from golem.store.records import RunRecords, SessionRecords
-from golem.tools import default_registry
+from golem.tools import default_registry, sandbox
 from golem.tools.registry import Tool, ToolContext, ToolError, ToolRegistry, ToolResult
 from golem_protocol.events import (
     AgentSnapshot,
@@ -389,7 +389,9 @@ async def test_the_scope_is_read_again_from_the_record_after_a_restart(
     await after.manager.respond(helper, call_id, "allow")
     await after.until(helper, "session.completed")
     found = await after.records.copy_of(helper)
-    assert found is not None and (Path(found[0]) / "new.txt").read_text(encoding="utf-8") == "x"
+    assert found is not None  # the copy is read again from the record
+    if sandbox.available():  # the command runs only where there is a sandbox
+        assert (Path(found[0]) / "new.txt").read_text(encoding="utf-8") == "x"
 
 
 async def test_closing_the_lead_cancels_and_closes_its_helpers(

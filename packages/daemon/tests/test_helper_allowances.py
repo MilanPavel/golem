@@ -45,6 +45,7 @@ from golem.sessions.manager import NotAHelperBatchError, SessionManager
 from golem.store.database import Database
 from golem.store.events import EventLog
 from golem.store.records import RunRecords, SessionRecords
+from golem.tools import sandbox
 from golem_protocol.events import ApprovalNeededEvent, ChatEvent
 
 WRITE = {"command": "printf x > new.txt"}
@@ -233,7 +234,8 @@ async def test_a_batch_answer_for_one_workers_call_answers_all_five(
     for helper in helpers:
         await _done(rig, helper)
         assert await rig.asks(helper) == 1
-    assert await rig.wrote(helpers[0]) == "x"
+    if sandbox.available():  # the command runs only where there is a sandbox
+        assert await rig.wrote(helpers[0]) == "x"
     # The lead holds nothing a helper was given.
     assert await rig.allowed(lead) == []
     record = await rig.records.get(lead)
@@ -259,7 +261,8 @@ async def test_a_helper_that_asks_later_is_not_asked(
     await _done(rig, later)
 
     assert await rig.asks(later) == 0
-    assert await rig.wrote(now) == "x"
+    if sandbox.available():
+        assert await rig.wrote(now) == "x"
     # It is held in the helper's session, in its log too, so a restart keeps it.
     (pair,) = await rig.allowed(later)
     assert pair[0] == "shell"

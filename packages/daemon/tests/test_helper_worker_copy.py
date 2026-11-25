@@ -33,8 +33,10 @@ from golem.sessions.manager import SessionManager
 from golem.store.database import Database
 from golem.store.events import EventLog
 from golem.store.records import RunRecords, SessionRecords
-from golem.tools import default_registry
+from golem.tools import default_registry, sandbox
 from golem_protocol.events import ChatEvent
+
+needs_sandbox = pytest.mark.skipif(not sandbox.available(), reason="needs macOS sandbox-exec")
 
 
 def _git(folder: Path, *args: str) -> str:
@@ -183,6 +185,7 @@ async def test_a_worker_reads_the_lead_folder_and_writes_only_in_its_copy(
     assert _git(lead, "status", "--porcelain") == ""
 
 
+@needs_sandbox
 @pytest.mark.parametrize("setup", SETUPS)
 async def test_the_shell_of_a_worker_runs_in_its_copy(
     setup: _Setup,
