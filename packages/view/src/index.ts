@@ -1080,3 +1080,16 @@ export {
   type Tone as MeasureTone,
 } from "./measure.ts";
 export { encodeQr, qrSpan, qrToPath, qrToTerminal, type QrCode, type TerminalOptions } from "./qr.ts";
+export {
+  applyGreenLabel,
+  copiesFooter,
+  greenCount,
+  workerBlocks,
+  workerDiffStat,
+  type WorkerAction,
+  type WorkerBlock,
+  type WorkerBlockFile,
+  type WorkerOptions,
+  type WorkerStatus,
+} from "./worker-changes.ts";
+export { workerFixture } from "./worker-changes.fixture.ts";
