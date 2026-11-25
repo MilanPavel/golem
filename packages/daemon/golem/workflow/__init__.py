@@ -146,6 +146,18 @@ class StepBackend(Protocol):
         """One model call; saves the model and the cost on the step ``key``."""
         ...
 
+    async def tool(
+        self,
+        workflow_run_id: str,
+        key: str,
+        name: str,
+        args: dict[str, Any],
+        group_key: str | None,
+        keyed: bool,
+    ) -> Any:
+        """Call a golem or MCP tool through the permission engine (the ``tool`` step)."""
+        ...
+
 
 _group: ContextVar[str | None] = ContextVar("golem_workflow_group", default=None)
 IDEMPOTENCY_KEY: ContextVar[str | None] = ContextVar("golem_workflow_key", default=None)
@@ -348,8 +360,23 @@ class Run:
             {},
         )
 
-    async def tool(self, *args: Any, **kwargs: Any) -> Any:
-        raise NotImplementedError("run.tool arrives with 3.6 (#740)")
+    async def tool(self, name: str, /, key: str | None = None, **args: Any) -> str:
+        """Call the golem or MCP tool ``name`` with ``args`` and return its output as text.
+
+        The rules are the chat's: ``allow`` runs it, ``deny`` fails the step with the rule's
+        reason, and ``ask`` makes the run ``waiting`` until you answer in the Inbox (approve
+        runs it, anything else fails the step). A step of kind ``tool`` keyed
+        ``key or f"tool:{name}"``: each key may be used once per run, so two calls of one tool
+        need their own ``key=``. An explicit ``key=`` marks the call as a real-world action
+        (see ``run.step``), and ``idempotency_key()`` works inside the tool. Output over a few
+        KB is kept as an artifact of the run's session; the step keeps a one-line summary and
+        the artifact id, and this call still returns all of it. ``key`` is not a tool argument.
+        """
+        step_key = key or f"tool:{name}"
+        self._use_key(step_key, f"tool {name}")
+        return await self._backend.tool(
+            self.workflow_run_id, step_key, name, args, _group.get(), key is not None
+        )
 
     async def skill(self, *args: Any, **kwargs: Any) -> Any:
         raise NotImplementedError("run.skill arrives with 3.6 (#740)")

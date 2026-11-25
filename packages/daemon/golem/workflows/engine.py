@@ -17,7 +17,7 @@ import logging
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from golem.store.workflow_runs import WorkflowRuns
 from golem.workflow import (
@@ -30,8 +30,12 @@ from golem.workflow import (
     WorkflowWaiting,
 )
 from golem.workflows.llm import Llm, parse_object
+from golem.workflows.tools import ToolVerdict, WorkflowTools
 
-__all__ = ["WorkflowEngine", "restart_policy"]
+__all__ = ["BIG_OUTPUT_CHARS", "WorkflowEngine", "restart_policy"]
+
+BIG_OUTPUT_CHARS = 4096
+"""A tool's output over this goes to the artifact table; the step keeps a summary."""
 
 log = logging.getLogger(__name__)
 
@@ -81,9 +85,11 @@ class WorkflowEngine:
         notify: Notify | None = None,
         agent: AgentRunner | None = None,
         llm: Llm | None = None,
+        tools: WorkflowTools | None = None,
     ) -> None:
         self._store = store
         self._llm = llm
+        self._tools = tools
         self._emit: Emit = emit or _no_emit
         self._notify = notify
         self._agent = agent
@@ -135,11 +141,49 @@ class WorkflowEngine:
                 raise WorkflowError(f"run.llm: the answer does not fit the schema ({exc})") from exc
         return value
 
+    async def run_tool(
+        self, workflow_run_id: str, key: str, name: str, args: dict[str, Any]
+    ) -> str | dict[str, Any]:
+        """Run a tool step: its output, or the summary and artifact id of a big one."""
+        tools = self._tools
+        record = await self._store.get_run(workflow_run_id)
+        if tools is None or record is None:
+            raise WorkflowError("run.tool is not available: this daemon has no tools")
+        text = await tools.call(record.session_id, record.project, name, args)
+        if len(text) <= BIG_OUTPUT_CHARS or record.session_id is None:
+            return text
+        artifact_id = await tools.keep(record.session_id, key, text)
+        first = " ".join(text.split())[:120]
+        return {
+            "summary": f"{first} ({len(text)} characters)",
+            "artifact_id": artifact_id,
+            "size": len(text),
+        }
+
+    async def tool_output(self, workflow_run_id: str, saved: Any) -> str:
+        """The tool's whole output from what its step saved (a big output is read back)."""
+        if isinstance(saved, str):
+            return saved
+        record = await self._store.get_run(workflow_run_id)
+        if (
+            self._tools is None
+            or record is None
+            or record.session_id is None
+            or not isinstance(saved, dict)
+        ):
+            raise WorkflowError("the saved output of this tool step cannot be read")
+        found = cast(dict[str, Any], saved)
+        return await self._tools.load(record.session_id, found["artifact_id"], found["size"])
+
     def send(self, name: str, payload: dict[str, Any]) -> None:
         try:
             self._emit(name, payload)
         except Exception:
             log.exception("workflow event %s failed", name)
+
+    @property
+    def tools(self) -> WorkflowTools | None:
+        return self._tools
 
     @property
     def store(self) -> WorkflowRuns:
@@ -366,6 +410,88 @@ class _Journal:
             {},
         )
 
+    async def tool(
+        self,
+        workflow_run_id: str,
+        key: str,
+        name: str,
+        args: dict[str, Any],
+        group_key: str | None,
+        keyed: bool,
+    ) -> str:
+        """The ``run.tool`` step: the rules decide; ``ask`` waits like a review."""
+        engine, store = self._engine, self._engine.store
+        before = await store.get_step(workflow_run_id, key)
+        if before is not None and before.status == "done":
+            return await engine.tool_output(
+                workflow_run_id, json.loads(before.result_json or "null")
+            )
+        tools, record = engine.tools, await store.get_run(workflow_run_id)
+        if tools is None or record is None:
+            raise WorkflowError("run.tool is not available: this daemon has no tools")
+        verdict = await tools.decide(record.project, name, args)
+        refusal: str | None = None
+        if verdict.action == "deny":
+            refusal = verdict.reason
+        elif verdict.action == "ask":
+            refusal = await self._tool_approval(
+                workflow_run_id, key, name, args, verdict, group_key
+            )
+        if refusal is not None:
+            await self.run_step(
+                workflow_run_id, key, "tool", name, group_key, _refuse, (refusal,), {}
+            )
+        saved = await self.run_step(
+            workflow_run_id,
+            key,
+            "tool",
+            name,
+            group_key,
+            engine.run_tool,
+            (workflow_run_id, key, name, args),
+            {},
+            keyed=keyed,
+        )
+        return await engine.tool_output(workflow_run_id, saved)
+
+    async def _tool_approval(
+        self,
+        workflow_run_id: str,
+        key: str,
+        name: str,
+        args: dict[str, Any],
+        verdict: ToolVerdict,
+        group_key: str | None,
+    ) -> str | None:
+        """None when you approved the call; the refusal when you did not. Waits when unanswered.
+
+        The question is a ``workflow_reviews`` row, so the pending item and the answer command
+        are the review's.
+        """
+        store, event = self._engine.store, self._engine.step_event
+        review = await store.get_review(workflow_run_id, key)
+        if review is None:
+            try:
+                pending = json.dumps(
+                    {
+                        "ask": f"Run {name}?",
+                        "draft": {"tool": name, "args": args, "source": verdict.source},
+                    }
+                )
+            except (TypeError, ValueError) as exc:
+                raise WorkflowError(
+                    f"tool {name!r} got arguments that are not JSON ({exc})"
+                ) from exc
+            await store.begin_step(workflow_run_id, key, "tool", name, group_key, _now())
+            await event("workflow.step.started", workflow_run_id, key)
+            await store.create_review(workflow_run_id, key, pending, _now())
+        elif review.answer_json is not None:
+            answered = json.loads(review.answer_json).get("verdict")
+            return None if answered == "approve" else f"{name} was not approved: you said no"
+        await store.set_step_status(workflow_run_id, key, "waiting")
+        await event("workflow.step.waiting", workflow_run_id, key)
+        raise WorkflowWaiting
+
     async def review(
         self,
         workflow_run_id: str,
@@ -400,6 +526,10 @@ class _Journal:
         await store.set_step_status(workflow_run_id, key, "waiting")
         await event("workflow.step.waiting", workflow_run_id, key)
         raise WorkflowWaiting
+
+
+def _refuse(reason: str) -> None:
+    raise WorkflowError(reason)
 
 
 async def _call(fn: Callable[..., Any], args: tuple[Any, ...], kwargs: dict[str, Any]) -> Any:
