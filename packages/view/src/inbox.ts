@@ -8,10 +8,13 @@ import { helperCardOf, helperEstimateOf, type HelperEstimate, type HelperEstimat
 
 /** What a session waits for, as its summary carries it. */
 export interface InboxPending extends HelperEstimateFields {
-  /** `batch` is the card that confirms a batch of helpers ("Use helpers: Ask me first"). `review` is a workflow run waiting for an answer (`ask`, `preview`); the Inbox skips it until its card arrives (#1786), as it skips a kind it does not know. */
+  /** `batch` is the card that confirms a batch of helpers ("Use helpers: Ask me first"). `review` is a workflow run waiting for an answer (`ask`, `preview`); `inboxItems` skips it, as it skips a kind it does not know; `reviewItemsOf` lists it. */
   kind: "approval" | "consent" | "batch" | "review";
   ask?: string | null;
   preview?: string | null;
+  /** For a `review`: the run and the step key that `workflow.review.answer` names. */
+  workflow_run_id?: string | null;
+  key?: string | null;
   since: string;
   call_id?: string | null;
   name?: string | null;
@@ -265,4 +268,38 @@ export function inboxGroups(sessions: readonly InboxSession[], now: number): Inb
  */
 export function inboxCount(items: readonly Pick<InboxItem, "count">[]): number {
   return items.reduce((sum, item) => sum + item.count, 0);
+}
+
+/** A workflow review that waits for an answer: what it asks, the start of its draft, and what answers it. */
+export interface ReviewItem {
+  sessionId: string;
+  workflowRunId: string;
+  key: string;
+  ask: string;
+  /** The first characters of the draft (the item carries no more); empty when there is none. */
+  preview: string;
+  since: string;
+  age: string;
+}
+
+/** The reviews that wait in a session's summary, oldest first. An item without its run id or key cannot be answered and is left out. */
+export function reviewItemsOf(session: InboxSession, now: number): ReviewItem[] {
+  if (session.status === "closed") return [];
+  const items: ReviewItem[] = [];
+  for (const pending of pendingItemsOf(session)) {
+    if (pending.kind !== "review") continue;
+    const runId = pending.workflow_run_id;
+    const key = pending.key;
+    if (runId === undefined || runId === null || key === undefined || key === null) continue;
+    items.push({
+      sessionId: session.session_id,
+      workflowRunId: runId,
+      key,
+      ask: oneLine(pending.ask) || "Review",
+      preview: pending.preview ?? "",
+      since: pending.since,
+      age: ageText(pending.since, now),
+    });
+  }
+  return items.sort((a, b) => (a.since < b.since ? -1 : a.since > b.since ? 1 : 0));
 }

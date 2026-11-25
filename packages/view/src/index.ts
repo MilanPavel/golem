@@ -240,6 +240,8 @@ export {
   inboxHelperAskWords,
   inboxHelperCountWords,
   inboxItems,
+  reviewItemsOf,
+  type ReviewItem,
   pendingItemsOf,
   type InboxGroup,
   type InboxHelper,

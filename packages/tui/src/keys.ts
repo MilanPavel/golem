@@ -104,6 +104,10 @@ export type KeyPlace = {
   useHelpersCheaper?: boolean;
   /** Two or more questions wait, so Tab moves to the next. */
   askPages?: boolean;
+  /** A workflow review waits (answered with y, r or n). */
+  review?: boolean;
+  /** Its draft is open in the editor. */
+  reviewEdit?: boolean;
 };
 
 export type ScrollToward = "up" | "down" | "start" | "end";
@@ -140,6 +144,9 @@ export type KeyEffect =
   | { kind: "edit-args" }
   | { kind: "checks"; on: boolean }
   | { kind: "args"; key: ArgsKey }
+  | { kind: "review"; verdict: "approve" | "reject" }
+  | { kind: "review-edit" }
+  | { kind: "review-args"; key: ArgsKey }
   | { kind: "insert"; text: string }
   | { kind: "ignore" };
 
@@ -169,6 +176,8 @@ type KeyWhen = {
   useHelpers?: boolean;
   useHelpersCheaper?: boolean;
   askPages?: boolean;
+  review?: boolean;
+  reviewEdit?: boolean;
 };
 
 export type KeyBinding = {
@@ -233,6 +242,7 @@ export const KEYS: readonly KeyBinding[] = [
     run: () => ({ kind: "close-overlay" }),
   },
   ...argsEditKeys(),
+  ...reviewKeys(),
   ...helperAskKeys(),
   ...useHelpersKeys(),
   ...approvalKeys(),
@@ -683,6 +693,33 @@ function consentKeys(): KeyBinding[] {
   ];
 }
 
+/** The keys of a workflow review under the composer: y approves, r opens the draft in the editor, n rejects. */
+function reviewKeys(): KeyBinding[] {
+  const answer = (id: string, description: string, input: string, effect: KeyEffect): KeyBinding => ({
+    id,
+    label: input,
+    contexts: ["approval"],
+    description,
+    when: { input, overlay: false, switcher: false, review: true, reviewEdit: false, draftEmpty: true },
+    run: () => effect,
+  });
+  const edit = (id: string, label: string, description: string, name: PressName, run: ArgsKey): KeyBinding => ({
+    id,
+    label,
+    contexts: ["approval"],
+    description,
+    when: { name, overlay: false, switcher: false, review: true, reviewEdit: true },
+    run: () => ({ kind: "review-args", key: run }),
+  });
+  return [
+    answer("review-approve", "While a workflow review waits: approves the draft as it is.", "y", { kind: "review", verdict: "approve" }),
+    answer("review-edit", "While a workflow review waits: opens the draft to reply with edits.", "r", { kind: "review-edit" }),
+    answer("review-reject", "While a workflow review waits: rejects the draft.", "n", { kind: "review", verdict: "reject" }),
+    edit("review-edit-submit", "Enter", "While editing a review's draft, sends the edit.", "return", { kind: "submit" }),
+    edit("review-edit-cancel", "Esc", "While editing a review's draft, goes back to the question.", "escape", { kind: "cancel" }),
+  ];
+}
+
 function argsEditKeys(): KeyBinding[] {
   const key = (id: string, label: string, description: string, name: PressName, run: ArgsKey): KeyBinding => ({
     id,
@@ -791,6 +828,10 @@ export function pressKey(place: KeyPlace, press: Press): KeyEffect {
   }
   if (place.approvalEdit === true && !place.overlay) {
     return argsPress(place, press);
+  }
+  if (place.reviewEdit === true && !place.overlay) {
+    const effect = argsPress(place, press);
+    return effect.kind === "args" ? { kind: "review-args", key: effect.key } : effect;
   }
   if (
     press.input.length > 0 &&
@@ -985,6 +1026,12 @@ function whenMatches(when: KeyWhen, place: KeyPlace, press: Press): boolean {
     return false;
   }
   if (when.askPages !== undefined && when.askPages !== (place.askPages === true)) {
+    return false;
+  }
+  if (when.review !== undefined && when.review !== (place.review === true)) {
+    return false;
+  }
+  if (when.reviewEdit !== undefined && when.reviewEdit !== (place.reviewEdit === true)) {
     return false;
   }
   if (when.approvalEdit !== undefined && when.approvalEdit !== (place.approvalEdit === true)) {

@@ -200,6 +200,7 @@ import {
   type TryRun,
   isUseHelpersQuestion,
   consentShowable,
+  reviewItemsOf,
 } from "@golem/view";
 import { compactWaiting, runCompact } from "./compact.ts";
 import { contextKeyLine, contextRowForPress, readContextActions } from "./context-actions.ts";
@@ -343,6 +344,19 @@ import {
   parseArgs,
   startArgsEdit,
 } from "./approval-edit.ts";
+import {
+  liveReviewEdit,
+  REVIEW_EDIT_ROWS,
+  openReviewEdit,
+  submitReviewAnswer,
+  reviewEditLines,
+  reviewLines,
+  reviewPager,
+  reviewRows,
+  startReviewEdit,
+  type ReviewEdit,
+  type ReviewVerdict,
+} from "./review.ts";
 import { moveDiffOffset } from "./diff-view.ts";
 import { newestArtifact, showInPager } from "./pager.ts";
 import {
@@ -789,6 +803,7 @@ export function App({
   const [keysOffset, setKeysOffset] = useState(0);
   const [diffScroll, setDiffScroll] = useState({ callId: "", offset: 0 });
   const [argsEditState, setArgsEdit] = useState<ArgsEdit | null>(null);
+  const [reviewEditState, setReviewEdit] = useState<ReviewEdit | null>(null);
   const [suggestDismissed, setSuggestDismissed] = useState(false);
   const [suggestPick, setSuggestPick] = useState({ draft: "", index: 0 });
   const [historyCursor, setHistoryCursor] = useState<HistoryCursor | null>(null);
@@ -1031,6 +1046,18 @@ export function App({
   approvalRef.current = shownApproval;
   consentRef.current = shownConsent;
   consentSessionRef.current = ownShown ? null : (helperConsent?.sessionId ?? null);
+  // A workflow review of this session (its run's headless session) shows when nothing else asks; the oldest first.
+  const reviews = reviewItemsOf(
+    sessions.find((summary) => summary.session_id === sessionId) ?? { session_id: "", status: "closed" },
+    Date.now(),
+  );
+  const shownReview = ownShown && !helperBand && shownApproval === null && shownConsent === null ? (reviews[0] ?? null) : null;
+  const reviewEdit = liveReviewEdit(reviewEditState, shownReview);
+  const reviewPagerText = reviewPager(0, reviews.length);
+  const reviewRef = useRef(shownReview);
+  reviewRef.current = shownReview;
+  const reviewEditRef = useRef(reviewEdit);
+  reviewEditRef.current = reviewEdit;
 
   const unreadNotice = chat.unreadCall ? unreadCallNotice("tui") : null;
   const planNotice = planOffered() && panel === null ? PLAN_KEYS : null;
@@ -1077,8 +1104,8 @@ export function App({
   const budget = frameBudget({
     rows,
     columns,
-    draft: argsEdit !== null ? argsEdit.draft.text : composerText,
-    busy: chat.busy && argsEdit === null,
+    draft: argsEdit !== null ? argsEdit.draft.text : reviewEdit !== null ? reviewEdit.draft.text : composerText,
+    busy: chat.busy && argsEdit === null && reviewEdit === null,
     banner: (banner !== null && banner.length > 0) || hintText !== null,
     debug: debug.open,
     suggestions: suggestMatches.length,
@@ -1091,10 +1118,14 @@ export function App({
           ? argsEdit !== null
             ? APPROVAL_ROWS
             : approvalRows(shownApproval, rows)
-          : undoBand !== null
-            ? undoRows(undoBand, rows)
-            : 0,
-    composerMax: argsEdit !== null ? ARGS_EDIT_ROWS : undefined,
+          : shownReview !== null
+            ? reviewEdit !== null
+              ? APPROVAL_ROWS
+              : reviewRows(shownReview, columns, reviewPagerText)
+            : undoBand !== null
+              ? undoRows(undoBand, rows)
+              : 0,
+    composerMax: argsEdit !== null ? ARGS_EDIT_ROWS : reviewEdit !== null ? REVIEW_EDIT_ROWS : undefined,
     todos: showTodos ? todoRows(chat.todos) : 0,
     install: install === null ? 0 : installRows(install.state),
     checks: checksOffer === null ? 0 : 1,
@@ -5392,6 +5423,8 @@ export function App({
       askPages: (dockRef.current?.items.length ?? 0) > 1,
       approvalDiff: approvalRef.current !== null && approvalRef.current.diff !== null,
       approvalEdit: argsEditRef.current !== null,
+      review: reviewRef.current !== null,
+      reviewEdit: reviewEditRef.current !== null,
       question: chatRef.current.checks.allowed === null && chatRef.current.checks.offered !== null,
       consent: consentRef.current !== null,
       consentShow: consentShowRef.current.showable,
@@ -5493,6 +5526,21 @@ export function App({
         return;
       case "args":
         onArgsKey(effect.key);
+        return;
+      case "review":
+        answerReview(effect.verdict);
+        return;
+      case "review-edit":
+        if (reviewRef.current !== null) {
+          const item = reviewRef.current;
+          setReviewEdit(startReviewEdit(item));
+          void openReviewEdit(client, item).then((opened) =>
+            setReviewEdit((state) => (state !== null && state.workflowRunId === opened.workflowRunId && state.key === opened.key && state.loading ? opened : state)),
+          );
+        }
+        return;
+      case "review-args":
+        onReviewKey(effect.key);
         return;
       case "scroll-diff": {
         const pending = approvalRef.current;
@@ -5605,6 +5653,44 @@ export function App({
     void client.answerConsent(current, pending.runId, answer).catch((error: unknown) => {
       setChat((state) => ({ ...state, error: messageOf(error) }));
     });
+  }
+
+  /** y or n on a workflow review: the answer goes to `workflow.review.answer` with the item's run and key. */
+  function answerReview(verdict: ReviewVerdict, text?: string): Promise<unknown> | null {
+    const item = reviewRef.current;
+    if (item === null) return null;
+    const sent = submitReviewAnswer(client, item, verdict, text);
+    void sent.catch((error: unknown) => {
+      setChat((state) => ({ ...state, error: messageOf(error) }));
+    });
+    return sent;
+  }
+
+  /** A key while a review's draft is open in the editor. */
+  function onReviewKey(key: ArgsKey): void {
+    const current = reviewEditRef.current;
+    if (current === null || current.submitting) return;
+    if (key.kind === "cancel") {
+      setReviewEdit(null);
+      return;
+    }
+    if (current.loading) return;
+    if (key.kind === "edit" || key.kind === "insert") {
+      const draft = key.kind === "edit" ? edit(current.draft, key.op) : insertText(current.draft, key.text);
+      setReviewEdit({ ...current, draft, error: null });
+      return;
+    }
+    const text = current.draft.text.trim();
+    if (text === "") {
+      setReviewEdit({ ...current, error: "Write the reply, or press Esc to go back" });
+      return;
+    }
+    setReviewEdit({ ...current, submitting: true, error: null });
+    const sent = submitReviewAnswer(client, current, "edit", current.draft.text);
+    void sent.then(
+      () => setReviewEdit(null),
+      (error: unknown) => setReviewEdit((state) => (state === null ? null : { ...state, submitting: false, error: messageOf(error) })),
+    );
   }
 
   function onArgsKey(key: ArgsKey): void {
@@ -6029,7 +6115,9 @@ export function App({
   const composer =
     argsEdit !== null
       ? layoutComposer(argsEdit.draft.text, argsEdit.draft.cursor, columns, budget.composer, false)
-      : layoutComposer(draft.text, draft.cursor, columns, budget.composer, chat.busy, placeholder);
+      : reviewEdit !== null
+        ? layoutComposer(reviewEdit.draft.text, reviewEdit.draft.cursor, columns, budget.composer, false)
+        : layoutComposer(draft.text, draft.cursor, columns, budget.composer, chat.busy, placeholder);
   const debugLayout = layoutDebug({
     debug,
     rows: budget.debug,
@@ -6363,6 +6451,12 @@ export function App({
           height={budget.approval}
           offset={diffOffset}
           pager={pager}
+        />
+      ) : budget.approval > 0 && shownReview !== null ? (
+        <HelperAskBand
+          lines={reviewEdit === null ? reviewLines(shownReview, columns, reviewPagerText) : reviewEditLines(shownReview, reviewEdit, columns)}
+          columns={columns}
+          height={budget.approval}
         />
       ) : budget.approval > 0 && undoBand !== null ? (
         <UndoBand band={undoBand} columns={columns} height={budget.approval} />
