@@ -20,6 +20,23 @@ export const CONSENT_LABELS: Readonly<Record<ConsentChoice, string>> = {
   local: "Stay local",
 };
 
+/** The `local` answer of a reviewer's paid question. */
+export const CONSENT_REVIEW_LOCALLY = "Review locally";
+
+/** The label of one answer for this question: a reviewer's `local` is "Review locally", the rest keep their words. */
+export function consentAnswerLabel(consent: Pick<PendingConsent, "agent">, answer: ConsentChoice): string {
+  return answer === "local" && consent.agent === "reviewer" ? CONSENT_REVIEW_LOCALLY : CONSENT_LABELS[answer];
+}
+
+/** What a helper's paid question can show behind "Show": its brief and the artifact of its diff. Null when it has neither. */
+export function consentShowable(
+  consent: Pick<PendingConsent, "brief" | "diffArtifactId">,
+): { brief: string | null; diffArtifactId: string | null } | null {
+  const brief = consent.brief === undefined || consent.brief === null || consent.brief.trim() === "" ? null : consent.brief;
+  const diffArtifactId = consent.diffArtifactId ?? null;
+  return brief === null && diffArtifactId === null ? null : { brief, diffArtifactId };
+}
+
 /** The answers a question offers, in the order the buttons show them. */
 export function consentAnswers(consent: PendingConsent): ConsentChoice[] {
   const order: ConsentChoice[] = ["session", "once", "local"];

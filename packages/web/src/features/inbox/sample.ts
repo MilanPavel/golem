@@ -74,6 +74,7 @@ export const SAMPLE_HELPER_CONSENT: InboxItem = inboxItems(
           since: "2026-11-16T09:55:00Z",
           sent: ["the brief"],
           not_sent: ["this chat"],
+          brief: "Read the changelog of httpx 0.28 and list the breaking changes that touch our client.\n\nReturn a short list, one line each.",
           helper: { session_id: "h3", agent: "researcher", label: "read the changelog", index: 2 },
         },
       ],

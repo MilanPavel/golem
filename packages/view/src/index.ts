@@ -61,7 +61,7 @@ export {
   type TurnSource,
 } from "./sources.ts";
 export { groupByTime, type TimeGroup, type TimeGroupLabel } from "./time-groups.ts";
-export { CONSENT_LABELS, CONSENT_TITLE, consentAnswers, consentCapsLine, consentLine, consentNotSentLine, consentReason, consentSentLine } from "./consent.ts";
+export { CONSENT_LABELS, CONSENT_REVIEW_LOCALLY, CONSENT_TITLE, consentAnswerLabel, consentAnswers, consentShowable, consentCapsLine, consentLine, consentNotSentLine, consentReason, consentSentLine } from "./consent.ts";
 export { approvalQuestion, DETAILS, displayToolName, isDetail, stepCount, stepFailed, stepMark, summarizeSteps, writingLabel, type Detail, type StepMark } from "./activity.ts";
 export {
   COMPACTING,

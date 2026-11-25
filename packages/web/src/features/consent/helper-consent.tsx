@@ -4,6 +4,7 @@ import { sendErrorText } from "../../store/errors.ts";
 import { usePageActions, useSession } from "../../store/page-context.tsx";
 import { Button } from "../../ui/button.tsx";
 import { ConsentBar } from "./consent-bar.tsx";
+import { ShowBrief } from "./show-brief.tsx";
 
 /**
  * The paid question of a helper, in the lead's dock. The question is the helper's own consent item, so the card
@@ -29,6 +30,7 @@ export function HelperConsent({ item, onOpen }: { item: InboxItem; onOpen: (item
               {line}
             </p>
           ))}
+        <ShowBrief brief={item.brief} diffArtifactId={item.diffArtifactId} sessionId={helperId} />
         <div className="mt-2">
           <Button
             kind="ghost"
@@ -46,6 +48,7 @@ export function HelperConsent({ item, onOpen }: { item: InboxItem; onOpen: (item
     <ConsentBar
       key={consent.runId}
       consent={consent}
+      sessionId={helperId}
       sending={sent === consent.runId}
       error={failed}
       onAnswer={(choice: ConsentChoice) => {

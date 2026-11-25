@@ -62,6 +62,12 @@ export type PendingConsent = {
   sent: readonly string[];
   /** For a helper's question: what does not go, such as "this chat". */
   notSent: readonly string[];
+  /** For a helper's question: the agent type (`reviewer`, `worker`); null for the session's own. */
+  agent?: string | null;
+  /** For a helper's question: its brief, to show behind "Show". The daemon marks a cut. Null when it sends none. */
+  brief?: string | null;
+  /** For a helper's question: the artifact that holds the diff, read with `artifact.read`. Null when there is none. */
+  diffArtifactId?: string | null;
 };
 
 /** How a question about a tool call was answered. */
@@ -828,6 +834,9 @@ function reduceChatEvent(state: ChatState, event: ChatEvent): ChatState {
           helper: consentHelperName(event.data.agent, event.data.label),
           sent: event.data.sent ?? [],
           notSent: event.data.not_sent ?? [],
+          agent: event.data.agent ?? null,
+          brief: event.data.brief ?? null,
+          diffArtifactId: event.data.diff_artifact_id ?? null,
           caps:
             caps === null
               ? null

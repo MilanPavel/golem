@@ -33,6 +33,7 @@ export function DockedConsent({ sessionId }: { sessionId: string }) {
       key={consent.runId}
       consent={consent}
       id={CONSENT_CARD_ID}
+      sessionId={sessionId}
       sending={sent === consent.runId}
       error={failed !== null && failed.run === consent.runId ? failed.text : null}
       onAnswer={answer}

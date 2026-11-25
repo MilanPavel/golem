@@ -199,6 +199,7 @@ import {
   loadingLine,
   type TryRun,
   isUseHelpersQuestion,
+  consentShowable,
 } from "@golem/view";
 import { compactWaiting, runCompact } from "./compact.ts";
 import { contextKeyLine, contextRowForPress, readContextActions } from "./context-actions.ts";
@@ -316,7 +317,10 @@ import {
   type UndoBand as UndoBandState,
 } from "./undo.ts";
 import { ConsentBand } from "./consent-band.tsx";
-import { consentRows } from "./consent.ts";
+import { consentRows, type ConsentDiff, type ConsentShow } from "./consent.ts";
+
+/** How many characters of a helper's diff the band reads; it shows the first lines. */
+const BRIEF_DIFF_CHARS = 4_000;
 import { HelperAskBand } from "./helper-ask-band.tsx";
 import {
   helperAskAnswer,
@@ -874,6 +878,9 @@ export function App({
   const consentRef = useRef(chat.consent);
   consentRef.current = chat.consent;
   const dockRef = useRef<ReturnType<typeof helperDock>>(null);
+  /** The paid question the band shows, and whether it has a brief or diff to show; the artifact whose diff was read. */
+  const consentShowRef = useRef<{ runId: string | null; showable: boolean }>({ runId: null, showable: false });
+  const briefDiffFetched = useRef<string | null>(null);
   /** The helper session whose paid question the band shows; null for the chat's own. */
   const consentSessionRef = useRef<string | null>(null);
   const argsEdit = liveArgsEdit(argsEditState, chat.approval);
@@ -995,6 +1002,31 @@ export function App({
   const shownApproval = ownShown ? chat.approval : null;
   const shownConsent = ownShown ? chat.consent : (helperConsent?.consent ?? null);
   const helperBand = !ownShown && shownConsent === null && dock !== null;
+  // "Show" on a helper's paid question: the brief, and the first page of its diff, read once when it opens.
+  const [briefShownRun, setBriefShownRun] = useState<string | null>(null);
+  const [briefDiff, setBriefDiff] = useState<{ id: string; diff: ConsentDiff } | null>(null);
+  const briefOpen = shownConsent !== null && briefShownRun === shownConsent.runId;
+  const briefDiffId = shownConsent?.diffArtifactId ?? null;
+  const briefDiffSession = helperConsent?.sessionId ?? sessionId;
+  useEffect(() => {
+    if (!briefOpen || briefDiffId === null || briefDiffSession === null) return;
+    if (briefDiffFetched.current === `${briefDiffSession}:${briefDiffId}`) return;
+    briefDiffFetched.current = `${briefDiffSession}:${briefDiffId}`;
+    setBriefDiff({ id: briefDiffId, diff: { state: "loading" } });
+    client
+      .readArtifact(briefDiffSession, briefDiffId, 0, BRIEF_DIFF_CHARS)
+      .then((result) => {
+        setBriefDiff({ id: briefDiffId, diff: { state: "ready", text: result.text, size: result.size } });
+      })
+      .catch(() => {
+        setBriefDiff({ id: briefDiffId, diff: { state: "error" } });
+      });
+  }, [briefOpen, briefDiffId, briefDiffSession, client]);
+  const consentShow: ConsentShow = {
+    open: briefOpen,
+    diff: briefDiff !== null && briefDiff.id === briefDiffId ? briefDiff.diff : { state: "none" },
+  };
+  consentShowRef.current = { runId: shownConsent?.runId ?? null, showable: shownConsent !== null && consentShowable(shownConsent) !== null };
   const pager = pagerText(dock);
   approvalRef.current = shownApproval;
   consentRef.current = shownConsent;
@@ -1054,7 +1086,7 @@ export function App({
       helperBand && dock !== null
         ? helperAskRows(dock)
         : shownConsent !== null
-        ? consentRows(shownConsent)
+        ? consentRows(shownConsent, consentShow, columns)
         : shownApproval !== null
           ? argsEdit !== null
             ? APPROVAL_ROWS
@@ -5362,6 +5394,7 @@ export function App({
       approvalEdit: argsEditRef.current !== null,
       question: chatRef.current.checks.allowed === null && chatRef.current.checks.offered !== null,
       consent: consentRef.current !== null,
+      consentShow: consentShowRef.current.showable,
     };
   }
 
@@ -5439,6 +5472,11 @@ export function App({
       case "consent":
         answerConsent(effect.answer);
         return;
+      case "consent-show": {
+        const run = consentShowRef.current.runId;
+        if (run !== null) setBriefShownRun((current) => (current === run ? null : run));
+        return;
+      }
       case "helper-ask":
         answerHelperAsk(effect.answer);
         return;
@@ -6316,7 +6354,7 @@ export function App({
       {budget.approval > 0 && helperBand && dock !== null ? (
         <HelperAskBand lines={helperAskLines(dock, columns)} columns={columns} height={budget.approval} />
       ) : budget.approval > 0 && shownConsent !== null ? (
-        <ConsentBand consent={shownConsent} columns={columns} height={budget.approval} pager={pager} />
+        <ConsentBand consent={shownConsent} columns={columns} height={budget.approval} pager={pager} show={consentShow} />
       ) : budget.approval > 0 && shownApproval !== null ? (
         <ApprovalBand
           approval={shownApproval}
