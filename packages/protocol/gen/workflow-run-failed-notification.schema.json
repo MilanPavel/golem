@@ -1,0 +1,136 @@
+{
+  "$defs": {
+    "WorkflowRunEvent": {
+      "additionalProperties": false,
+      "description": "The params of ``workflow.run.started|waiting|resumed|done|failed|cancelled``.\n\nThe method names the change, ``status`` is the run's state after it. ``error`` is set for\n``workflow.run.failed``. The name is ``workflow.run.*``, never ``run.*`` (ADR-050).",
+      "properties": {
+        "error": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Error"
+        },
+        "finished_at": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Finished At"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "session_id": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Session Id"
+        },
+        "started_at": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Started At"
+        },
+        "status": {
+          "enum": [
+            "pending",
+            "running",
+            "waiting",
+            "done",
+            "failed",
+            "cancelled"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "trigger": {
+          "anyOf": [
+            {
+              "enum": [
+                "manual",
+                "schedule",
+                "file",
+                "chat",
+                "try"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Trigger"
+        },
+        "workflow_id": {
+          "minLength": 1,
+          "title": "Workflow Id",
+          "type": "string"
+        },
+        "workflow_run_id": {
+          "minLength": 1,
+          "title": "Workflow Run Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workflow_run_id",
+        "workflow_id",
+        "name",
+        "status"
+      ],
+      "title": "WorkflowRunEvent",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Server → every connection: ``workflow.run.failed``. Not stored.",
+  "properties": {
+    "jsonrpc": {
+      "const": "2.0",
+      "default": "2.0",
+      "title": "Jsonrpc",
+      "type": "string"
+    },
+    "method": {
+      "const": "workflow.run.failed",
+      "default": "workflow.run.failed",
+      "title": "Method",
+      "type": "string"
+    },
+    "params": {
+      "$ref": "#/$defs/WorkflowRunEvent"
+    }
+  },
+  "required": [
+    "params"
+  ],
+  "title": "WorkflowRunFailedNotification",
+  "type": "object"
+}

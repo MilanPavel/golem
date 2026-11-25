@@ -167,6 +167,11 @@ public enum MethodAccess {
         "skill.write",
         "trace.get",
         "trace.span",
+        "workflow.cancel",
+        "workflow.get",
+        "workflow.list",
+        "workflow.start",
+        "workflow.status",
     ]
 
     public static let localOnly: Set<String> = [

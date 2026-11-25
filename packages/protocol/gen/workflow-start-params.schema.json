@@ -1,0 +1,31 @@
+{
+  "additionalProperties": false,
+  "description": "``workflow.start``. Start a run of the workflow ``id`` with ``inputs``.\n\n``trigger`` says what asked for it. A person pressing Run is ``manual``.",
+  "properties": {
+    "id": {
+      "minLength": 1,
+      "title": "Id",
+      "type": "string"
+    },
+    "inputs": {
+      "additionalProperties": true,
+      "title": "Inputs",
+      "type": "object"
+    },
+    "trigger": {
+      "default": "manual",
+      "enum": [
+        "manual",
+        "try",
+        "chat"
+      ],
+      "title": "Trigger",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id"
+  ],
+  "title": "WorkflowStartParams",
+  "type": "object"
+}

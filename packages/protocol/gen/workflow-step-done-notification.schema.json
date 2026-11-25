@@ -1,0 +1,150 @@
+{
+  "$defs": {
+    "WorkflowStepEvent": {
+      "additionalProperties": false,
+      "description": "The params of ``workflow.step.started|done|failed|waiting|in_doubt``.\n\nThe method names the change, ``status`` is the step's state after it. ``key`` is the step\nkey, ``group`` the key of its group, ``attempts`` the number of starts so far.",
+      "properties": {
+        "attempts": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Attempts",
+          "type": "integer"
+        },
+        "child_session_id": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Child Session Id"
+        },
+        "error": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Error"
+        },
+        "finished_at": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Finished At"
+        },
+        "group": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Group"
+        },
+        "key": {
+          "minLength": 1,
+          "title": "Key",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "step",
+            "agent",
+            "review",
+            "notify",
+            "llm",
+            "tool",
+            "skill"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "started_at": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Started At"
+        },
+        "status": {
+          "enum": [
+            "pending",
+            "running",
+            "waiting",
+            "done",
+            "failed",
+            "skipped",
+            "in_doubt"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        },
+        "workflow_run_id": {
+          "minLength": 1,
+          "title": "Workflow Run Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workflow_run_id",
+        "key",
+        "kind",
+        "title",
+        "status"
+      ],
+      "title": "WorkflowStepEvent",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Server → every connection: ``workflow.step.done``. Not stored.",
+  "properties": {
+    "jsonrpc": {
+      "const": "2.0",
+      "default": "2.0",
+      "title": "Jsonrpc",
+      "type": "string"
+    },
+    "method": {
+      "const": "workflow.step.done",
+      "default": "workflow.step.done",
+      "title": "Method",
+      "type": "string"
+    },
+    "params": {
+      "$ref": "#/$defs/WorkflowStepEvent"
+    }
+  },
+  "required": [
+    "params"
+  ],
+  "title": "WorkflowStepDoneNotification",
+  "type": "object"
+}

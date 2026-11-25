@@ -1,0 +1,15 @@
+{
+  "additionalProperties": false,
+  "description": "``cancelled`` is false when the run had already ended.",
+  "properties": {
+    "cancelled": {
+      "title": "Cancelled",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "cancelled"
+  ],
+  "title": "WorkflowCancelResult",
+  "type": "object"
+}

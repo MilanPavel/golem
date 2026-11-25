@@ -64,6 +64,18 @@ from golem_protocol.commands import (
     TraceContextPart,
     TraceSpanResult,
     WishResolution,
+    WorkflowCancelParams,
+    WorkflowEntryInfo,
+    WorkflowGetResult,
+    WorkflowOutlineStep,
+    WorkflowRunEvent,
+    WorkflowRunInfo,
+    WorkflowStartParams,
+    WorkflowStartResult,
+    WorkflowStatusParams,
+    WorkflowStatusResult,
+    WorkflowStepEvent,
+    WorkflowStepInfo,
 )
 from golem_protocol.events import Ping
 from golem_protocol.rpc import (
@@ -77,6 +89,9 @@ from golem_protocol.rpc import (
     RpcFailure,
     RpcRequest,
     RpcSuccess,
+    WorkflowRunDoneNotification,
+    WorkflowRunResumedNotification,
+    WorkflowStepInDoubtNotification,
 )
 
 
@@ -731,3 +746,65 @@ def test_use_helpers_setting_values() -> None:
     assert AgentsKeepValues.model_validate_json(never.model_dump_json()) == never
     result = AgentsKeepResult(ok=True, values=never)
     assert AgentsKeepResult.model_validate_json(result.model_dump_json()) == result
+
+
+def test_workflow_commands_name_the_run_workflow_run_id() -> None:
+    assert WorkflowStartParams(id="/w/a.py::pr_digest").trigger == "manual"
+    assert WorkflowStartResult(workflow_run_id="wr1").workflow_run_id == "wr1"
+    for model in (WorkflowStatusParams, WorkflowCancelParams):
+        assert model(workflow_run_id="wr1").workflow_run_id == "wr1"
+        with pytest.raises(ValidationError):
+            model.model_validate({"run_id": "wr1"})
+    with pytest.raises(ValidationError):
+        WorkflowStartParams.model_validate({"id": "x", "trigger": "file"})
+
+
+def test_workflow_status_round_trips_with_its_steps() -> None:
+    run = WorkflowRunInfo(
+        workflow_run_id="wr1", workflow_id="a::b", name="b", status="waiting", trigger="manual"
+    )
+    step = WorkflowStepInfo(
+        key="review#1", kind="review", title="Open these?", status="in_doubt", attempts=2
+    )
+    result = WorkflowStatusResult(run=run, steps=[step])
+    assert WorkflowStatusResult.model_validate_json(result.model_dump_json()) == result
+    with pytest.raises(ValidationError):
+        WorkflowRunInfo.model_validate({**run.model_dump(), "status": "queued"})
+    with pytest.raises(ValidationError):
+        WorkflowStepInfo.model_validate({**step.model_dump(), "kind": "shell"})
+
+
+def test_workflow_get_carries_the_outline() -> None:
+    entry = WorkflowEntryInfo(id="p::b", name="b", path="p", state="broken", error="Traceback")
+    outline = WorkflowOutlineStep(
+        id="s1", kind="agent", title="Review", agent="reviewer", lines=(3, 5)
+    )
+    result = WorkflowGetResult(workflow=entry, steps=[outline])
+    again = WorkflowGetResult.model_validate_json(result.model_dump_json())
+    assert again.steps[0].lines == (3, 5)
+    assert again.workflow.inputs == []
+
+
+def test_workflow_events_never_use_the_run_words() -> None:
+    done = WorkflowRunDoneNotification(
+        params=WorkflowRunEvent(workflow_run_id="wr1", workflow_id="a::b", name="b", status="done")
+    )
+    assert done.method == "workflow.run.done"
+    assert (
+        "run_id" not in done.model_dump()["params"]
+        or "workflow_run_id" in done.model_dump()["params"]
+    )
+    assert WorkflowRunResumedNotification.model_fields["method"].default == "workflow.run.resumed"
+    doubt = WorkflowStepInDoubtNotification(
+        params=WorkflowStepEvent(
+            workflow_run_id="wr1",
+            key="k",
+            kind="tool",
+            title="Open PR",
+            status="in_doubt",
+            group="g",
+            attempts=1,
+        )
+    )
+    assert doubt.method == "workflow.step.in_doubt"
+    assert doubt.params.child_session_id is None

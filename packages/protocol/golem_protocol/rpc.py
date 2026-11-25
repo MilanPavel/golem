@@ -34,6 +34,8 @@ from golem_protocol.commands import (
     RuntimeInstallOutput,
     SessionSummary,
     SkillRegistryChanged,
+    WorkflowRunEvent,
+    WorkflowStepEvent,
 )
 from golem_protocol.events import ChatEvent
 
@@ -368,6 +370,116 @@ class DevicePairChangedNotification(BaseModel):
     params: DevicePairChanged
 
 
+class WorkflowRunStartedNotification(BaseModel):
+    """Server → every connection: ``workflow.run.started``. Not stored."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    jsonrpc: Literal["2.0"] = "2.0"
+    method: Literal["workflow.run.started"] = "workflow.run.started"
+    params: WorkflowRunEvent
+
+
+class WorkflowRunWaitingNotification(BaseModel):
+    """Server → every connection: ``workflow.run.waiting``. Not stored."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    jsonrpc: Literal["2.0"] = "2.0"
+    method: Literal["workflow.run.waiting"] = "workflow.run.waiting"
+    params: WorkflowRunEvent
+
+
+class WorkflowRunResumedNotification(BaseModel):
+    """Server → every connection: ``workflow.run.resumed``. Not stored."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    jsonrpc: Literal["2.0"] = "2.0"
+    method: Literal["workflow.run.resumed"] = "workflow.run.resumed"
+    params: WorkflowRunEvent
+
+
+class WorkflowRunDoneNotification(BaseModel):
+    """Server → every connection: ``workflow.run.done``. Not stored."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    jsonrpc: Literal["2.0"] = "2.0"
+    method: Literal["workflow.run.done"] = "workflow.run.done"
+    params: WorkflowRunEvent
+
+
+class WorkflowRunFailedNotification(BaseModel):
+    """Server → every connection: ``workflow.run.failed``. Not stored."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    jsonrpc: Literal["2.0"] = "2.0"
+    method: Literal["workflow.run.failed"] = "workflow.run.failed"
+    params: WorkflowRunEvent
+
+
+class WorkflowRunCancelledNotification(BaseModel):
+    """Server → every connection: ``workflow.run.cancelled``. Not stored."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    jsonrpc: Literal["2.0"] = "2.0"
+    method: Literal["workflow.run.cancelled"] = "workflow.run.cancelled"
+    params: WorkflowRunEvent
+
+
+class WorkflowStepStartedNotification(BaseModel):
+    """Server → every connection: ``workflow.step.started``. Not stored."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    jsonrpc: Literal["2.0"] = "2.0"
+    method: Literal["workflow.step.started"] = "workflow.step.started"
+    params: WorkflowStepEvent
+
+
+class WorkflowStepDoneNotification(BaseModel):
+    """Server → every connection: ``workflow.step.done``. Not stored."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    jsonrpc: Literal["2.0"] = "2.0"
+    method: Literal["workflow.step.done"] = "workflow.step.done"
+    params: WorkflowStepEvent
+
+
+class WorkflowStepFailedNotification(BaseModel):
+    """Server → every connection: ``workflow.step.failed``. Not stored."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    jsonrpc: Literal["2.0"] = "2.0"
+    method: Literal["workflow.step.failed"] = "workflow.step.failed"
+    params: WorkflowStepEvent
+
+
+class WorkflowStepWaitingNotification(BaseModel):
+    """Server → every connection: ``workflow.step.waiting``. Not stored."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    jsonrpc: Literal["2.0"] = "2.0"
+    method: Literal["workflow.step.waiting"] = "workflow.step.waiting"
+    params: WorkflowStepEvent
+
+
+class WorkflowStepInDoubtNotification(BaseModel):
+    """Server → every connection: ``workflow.step.in_doubt``. Not stored."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    jsonrpc: Literal["2.0"] = "2.0"
+    method: Literal["workflow.step.in_doubt"] = "workflow.step.in_doubt"
+    params: WorkflowStepEvent
+
+
 __all__ = [
     "AgentRegistryChangedNotification",
     "DeviceChangedNotification",
@@ -402,6 +514,17 @@ __all__ = [
     "RuntimeInstallOutputNotification",
     "SessionSummaryNotification",
     "SkillRegistryChangedNotification",
+    "WorkflowRunCancelledNotification",
+    "WorkflowRunDoneNotification",
+    "WorkflowRunFailedNotification",
+    "WorkflowRunResumedNotification",
+    "WorkflowRunStartedNotification",
+    "WorkflowRunWaitingNotification",
+    "WorkflowStepDoneNotification",
+    "WorkflowStepFailedNotification",
+    "WorkflowStepInDoubtNotification",
+    "WorkflowStepStartedNotification",
+    "WorkflowStepWaitingNotification",
 ]
 
 

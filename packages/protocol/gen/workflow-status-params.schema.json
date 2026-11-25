@@ -1,0 +1,16 @@
+{
+  "additionalProperties": false,
+  "description": "``workflow.status``. A run and its steps.",
+  "properties": {
+    "workflow_run_id": {
+      "minLength": 1,
+      "title": "Workflow Run Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "workflow_run_id"
+  ],
+  "title": "WorkflowStatusParams",
+  "type": "object"
+}

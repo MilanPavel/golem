@@ -1,0 +1,44 @@
+{
+  "additionalProperties": false,
+  "description": "What starts a workflow. ``expr`` is for ``schedule``, ``path`` for ``on_file``.",
+  "properties": {
+    "expr": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Expr"
+    },
+    "kind": {
+      "enum": [
+        "manual",
+        "schedule",
+        "on_file"
+      ],
+      "title": "Kind",
+      "type": "string"
+    },
+    "path": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Path"
+    }
+  },
+  "required": [
+    "kind"
+  ],
+  "title": "WorkflowTriggerInfo",
+  "type": "object"
+}

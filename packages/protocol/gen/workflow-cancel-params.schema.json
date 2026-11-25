@@ -1,0 +1,16 @@
+{
+  "additionalProperties": false,
+  "description": "``workflow.cancel``. Stop a run. A run that already ended is left as it is.",
+  "properties": {
+    "workflow_run_id": {
+      "minLength": 1,
+      "title": "Workflow Run Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "workflow_run_id"
+  ],
+  "title": "WorkflowCancelParams",
+  "type": "object"
+}

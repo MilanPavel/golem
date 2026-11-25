@@ -1,0 +1,15 @@
+{
+  "additionalProperties": false,
+  "description": "``workflow.list``. The workflows of the user's folder and of ``folders``.\n\nA project folder that is not trusted lists its files as ``untrusted`` and never imports them.",
+  "properties": {
+    "folders": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Folders",
+      "type": "array"
+    }
+  },
+  "title": "WorkflowListParams",
+  "type": "object"
+}

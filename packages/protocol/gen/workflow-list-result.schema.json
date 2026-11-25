@@ -1,0 +1,188 @@
+{
+  "$defs": {
+    "WorkflowEntryInfo": {
+      "additionalProperties": false,
+      "description": "One workflow the daemon found (ADR-062).\n\n``id`` is ``<path>::<name>``, or the path for a file with no workflow. ``project`` is the\nproject folder, null for the user's folder. ``error`` is the traceback tail of a ``broken``\nfile. ``trigger`` is null for a workflow with none.",
+      "properties": {
+        "description": {
+          "default": "",
+          "title": "Description",
+          "type": "string"
+        },
+        "error": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Error"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "inputs": {
+          "items": {
+            "$ref": "#/$defs/WorkflowInputInfo"
+          },
+          "title": "Inputs",
+          "type": "array"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "path": {
+          "minLength": 1,
+          "title": "Path",
+          "type": "string"
+        },
+        "project": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Project"
+        },
+        "state": {
+          "enum": [
+            "ok",
+            "broken",
+            "untrusted"
+          ],
+          "title": "State",
+          "type": "string"
+        },
+        "trigger": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/WorkflowTriggerInfo"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "path",
+        "state"
+      ],
+      "title": "WorkflowEntryInfo",
+      "type": "object"
+    },
+    "WorkflowInputInfo": {
+      "additionalProperties": false,
+      "description": "One declared input: its name, its type name and the default as written, if any.",
+      "properties": {
+        "default": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Default"
+        },
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "type": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Type"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "WorkflowInputInfo",
+      "type": "object"
+    },
+    "WorkflowTriggerInfo": {
+      "additionalProperties": false,
+      "description": "What starts a workflow. ``expr`` is for ``schedule``, ``path`` for ``on_file``.",
+      "properties": {
+        "expr": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Expr"
+        },
+        "kind": {
+          "enum": [
+            "manual",
+            "schedule",
+            "on_file"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Path"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "title": "WorkflowTriggerInfo",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "The workflows, user ones first, each group in file order.",
+  "properties": {
+    "workflows": {
+      "items": {
+        "$ref": "#/$defs/WorkflowEntryInfo"
+      },
+      "title": "Workflows",
+      "type": "array"
+    }
+  },
+  "required": [
+    "workflows"
+  ],
+  "title": "WorkflowListResult",
+  "type": "object"
+}
