@@ -468,6 +468,7 @@ class DaemonApp:
                     create_session=lambda origin, cwd: sessions.create(
                         None, cwd=cwd, origin=origin
                     ),
+                    notify=self.state.notifier.tell,
                 )
                 devices = DeviceStore(database)
                 devices.on_change = self._devices_changed

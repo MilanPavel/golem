@@ -50,6 +50,7 @@ class WorkflowService:
         trusted: Callable[[Path], bool],
         broadcast: Callable[[BaseModel], None],
         create_session: Callable[[str, str | None], Awaitable[str]] | None = None,
+        notify: Callable[[str, str, str | None], Awaitable[None]] | None = None,
     ) -> None:
         self.runs = runs
         self._broadcast = broadcast
@@ -60,7 +61,17 @@ class WorkflowService:
         self.registry = WorkflowRegistry(
             user_dir=user_dir, projects=self._projects, trusted=trusted
         )
-        self.engine = WorkflowEngine(runs, self._emit)
+        self._tell = notify
+        self.engine = WorkflowEngine(runs, self._emit, self._notify if notify else None)
+
+    async def _notify(self, title: str | None, text: str, run_id: str) -> None:
+        """Adapt a ``run.notify`` to the Notifier: the click opens the run's session."""
+        if self._tell is None:
+            return
+        record = await self.runs.get_run(run_id)
+        name = record.name if record is not None else "workflow"
+        session_id = record.session_id if record is not None else None
+        await self._tell(title or name, text, session_id)
 
     def _projects(self) -> list[Path]:
         """The folders asked for in ``workflow.list`` and the user's trusted folders."""

@@ -139,6 +139,14 @@ await run.step("fetch", fetch_page, url, retries=2, backoff=5)
 
 `retries=2` runs the function up to 3 times, waiting `backoff` seconds before each new try. The step's `attempts` counts them. When the last try fails, the step and the run fail, and the run's error names the step and its error.
 
+### Telling you something
+
+```python
+await run.notify("Release 1.4 is out", title="Release")
+```
+
+`run.notify(text, title=None, key=None)` sends a banner through the Notifier and is saved as a step of kind `notify`, so a run that is executed again does not send it twice. The step key is `key` or `notify:<text>`; inside a loop, give each notice its own `key=`. A click on the banner opens the run's session (when the run has none, the banner has no open hint). Without a notifier the step still completes.
+
 ## Broken and untrusted files
 
 | Case | What you see | What runs |
@@ -154,10 +162,10 @@ A broken file never disappears from the list. Fix it and it loads again.
 
 | Piece | What it adds | Ticket |
 |---|---|---|
-| `run.review`, `run.notify` | Wait for your answer. Tell you something through the Notifier | 3.4 (#14) |
+| `run.review` | Wait for your answer | 3.4 (#14) |
 | `run.agent` | Start a helper for a step, with a brief and a budget | 3.6 (#16) |
 | `run.llm`, `run.tool`, `run.skill` | One model call, one tool, or one skill, with no agent loop | 3.8 (#740) |
 | Workflows page | List workflows and see each run's steps in the web UI | 3.9 (#741) |
 | Editor | Edit a workflow, check it without a model, and try it from a step | 3.11 (#1225) |
 
-Until these land, a workflow can run code, run steps in parallel, save results and use `key=`.
+Until these land, a workflow can run code, run steps in parallel, save results, use `key=` and tell you things.
