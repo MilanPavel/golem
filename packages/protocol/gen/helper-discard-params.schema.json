@@ -1,0 +1,22 @@
+{
+  "additionalProperties": false,
+  "description": "``helper.discard``. Drop a worker's diff and remove its copy.\n\nThe lead's log gets ``helper.discarded``.",
+  "properties": {
+    "helper_id": {
+      "minLength": 1,
+      "title": "Helper Id",
+      "type": "string"
+    },
+    "session_id": {
+      "minLength": 1,
+      "title": "Session Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "session_id",
+    "helper_id"
+  ],
+  "title": "HelperDiscardParams",
+  "type": "object"
+}

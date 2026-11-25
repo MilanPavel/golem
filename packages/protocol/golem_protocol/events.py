@@ -1388,6 +1388,28 @@ class HelperWaitData(BaseModel):
     helper_ids: list[str] = Field(default_factory=list[str])
 
 
+WorkerFileStatus = Literal["created", "modified", "deleted"]
+"""What a worker did to one file in its copy of the project."""
+
+WorkerChecks = Literal["passed", "failed", "none"]
+"""How the project's checks ended in a worker's copy. ``none`` means they did not run; the reason is
+``checks_note``."""
+
+
+class WorkerFile(BaseModel):
+    """One file a worker changed in its copy of the project (ADR-059).
+
+    ``added`` and ``removed`` count the lines of the file's diff.
+    """
+
+    model_config = _CONFIG
+
+    path: str = Field(min_length=1)
+    status: WorkerFileStatus
+    added: int = Field(ge=0)
+    removed: int = Field(ge=0)
+
+
 class HelperEndedData(BaseModel):
     """A helper's run ended.
 
@@ -1396,6 +1418,15 @@ class HelperEndedData(BaseModel):
     model), because the lead's footer sums its own log. ``duration_ms`` is the whole time
     since it started and ``working_ms`` is the part that was not spent waiting for you, a
     slot or a provider.
+
+    The last seven fields describe a worker, a helper that works in its own copy of the project,
+    and are all ``None`` for a helper without a copy. ``diff_artifact_id`` is the worker's diff as
+    an artifact, of the same kind as the reviewer's diff; a client reads it with ``artifact.read``.
+    ``files`` lists what changed, and ``added`` and ``removed`` are the lines over all of them.
+    ``checks`` says how the project's checks ended in the copy. ``checks_failed`` names the
+    failing checks ("tests", "lint"), and ``checks_note`` says why ``checks`` is ``none``
+    ("no checks found", "timed out after 10m"). The command ``helper.apply`` takes the diff into
+    the project and ``helper.discard`` drops it.
     """
 
     model_config = _CONFIG
@@ -1409,6 +1440,34 @@ class HelperEndedData(BaseModel):
     cost_usd: float = Field(ge=0)
     duration_ms: int = Field(ge=0)
     working_ms: int = Field(ge=0)
+    diff_artifact_id: str | None = Field(default=None, min_length=1)
+    files: list[WorkerFile] | None = None
+    added: int | None = Field(default=None, ge=0)
+    removed: int | None = Field(default=None, ge=0)
+    checks: WorkerChecks | None = None
+    checks_failed: list[str] | None = None
+    checks_note: str | None = None
+
+
+class HelperAppliedData(BaseModel):
+    """A worker's diff was taken into the project by ``helper.apply``.
+
+    On the lead's log, so a reload shows the state. ``change_ids`` are the changes it wrote, which
+    ``changes.diff`` and ``changes.revert`` take.
+    """
+
+    model_config = _CONFIG
+
+    helper_id: str = Field(min_length=1)
+    change_ids: list[str]
+
+
+class HelperDiscardedData(BaseModel):
+    """A worker's diff was dropped by ``helper.discard``. On the lead's log."""
+
+    model_config = _CONFIG
+
+    helper_id: str = Field(min_length=1)
 
 
 class HelperStartedEvent(BaseModel):
@@ -1525,6 +1584,32 @@ class HelperEndedEvent(BaseModel):
     ts: str = Field(min_length=1)
     type: Literal["helper.ended"]
     data: HelperEndedData
+
+
+class HelperAppliedEvent(BaseModel):
+    """A worker's diff was taken into the project. A summary on the lead's log."""
+
+    model_config = _CONFIG
+
+    seq: int = Field(ge=1)
+    session_id: str = Field(min_length=1)
+    run_id: str | None = Field(default=None, min_length=1)
+    ts: str = Field(min_length=1)
+    type: Literal["helper.applied"]
+    data: HelperAppliedData
+
+
+class HelperDiscardedEvent(BaseModel):
+    """A worker's diff was dropped. A summary on the lead's log."""
+
+    model_config = _CONFIG
+
+    seq: int = Field(ge=1)
+    session_id: str = Field(min_length=1)
+    run_id: str | None = Field(default=None, min_length=1)
+    ts: str = Field(min_length=1)
+    type: Literal["helper.discarded"]
+    data: HelperDiscardedData
 
 
 class MessageStartedEvent(BaseModel):
@@ -1939,6 +2024,8 @@ EventType = Literal[
     "helper.state",
     "helper.wait",
     "helper.ended",
+    "helper.applied",
+    "helper.discarded",
     "session.trimmed",
     "branch.changed",
 ]
@@ -1993,6 +2080,8 @@ ChatEvent = Annotated[
     | HelperStateEvent
     | HelperWaitEvent
     | HelperEndedEvent
+    | HelperAppliedEvent
+    | HelperDiscardedEvent
     | SessionTrimmedEvent
     | BranchChangedEvent,
     Field(discriminator="type"),
@@ -2032,6 +2121,10 @@ __all__ = [
     "FileChangedData",
     "FileChangedEvent",
     "ForkedFrom",
+    "HelperAppliedData",
+    "HelperAppliedEvent",
+    "HelperDiscardedData",
+    "HelperDiscardedEvent",
     "HelperEndedData",
     "HelperEndedEvent",
     "HelperModelData",
@@ -2129,4 +2222,7 @@ __all__ = [
     "ToolStartedEvent",
     "ToolWritingData",
     "ToolWritingEvent",
+    "WorkerChecks",
+    "WorkerFile",
+    "WorkerFileStatus",
 ]

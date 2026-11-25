@@ -52,6 +52,8 @@ NOT_A_REPO = -32025
 """``session.create`` with a ``branch`` for a folder that is not in a git repository."""
 BRANCH_SWITCH_FAILED = -32026
 """``session.create`` with a ``branch`` that git could not switch to."""
+HELPER_CONFLICT = -32027
+"""``helper.apply`` for a file that changed since the worker copied it; ``data.path`` names it."""
 
 DRAIN_TIMEOUT_SECONDS = 5.0
 REVOKED_FLUSH_SECONDS = 1.0

@@ -277,12 +277,19 @@
     },
     {
       "data": {
+        "added": null,
         "answer_tokens": 8,
         "call_id": "call_1",
+        "checks": null,
+        "checks_failed": null,
+        "checks_note": null,
         "cost_usd": 0.0,
+        "diff_artifact_id": null,
         "duration_ms": 0,
+        "files": null,
         "index": 0,
         "model_calls": 2,
+        "removed": null,
         "stopped": "done",
         "tokens": 240,
         "working_ms": 0
@@ -740,12 +747,19 @@
     },
     {
       "data": {
+        "added": null,
         "answer_tokens": 8,
         "call_id": "call_1",
+        "checks": null,
+        "checks_failed": null,
+        "checks_note": null,
         "cost_usd": 0.0,
+        "diff_artifact_id": null,
         "duration_ms": 0,
+        "files": null,
         "index": 0,
         "model_calls": 2,
+        "removed": null,
         "stopped": "done",
         "tokens": 240,
         "working_ms": 0

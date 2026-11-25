@@ -1,0 +1,16 @@
+{
+  "additionalProperties": false,
+  "description": "A worker's diff was dropped by ``helper.discard``. On the lead's log.",
+  "properties": {
+    "helper_id": {
+      "minLength": 1,
+      "title": "Helper Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "helper_id"
+  ],
+  "title": "HelperDiscardedData",
+  "type": "object"
+}

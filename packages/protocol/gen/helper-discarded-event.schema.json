@@ -1,0 +1,69 @@
+{
+  "$defs": {
+    "HelperDiscardedData": {
+      "additionalProperties": false,
+      "description": "A worker's diff was dropped by ``helper.discard``. On the lead's log.",
+      "properties": {
+        "helper_id": {
+          "minLength": 1,
+          "title": "Helper Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "helper_id"
+      ],
+      "title": "HelperDiscardedData",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "A worker's diff was dropped. A summary on the lead's log.",
+  "properties": {
+    "data": {
+      "$ref": "#/$defs/HelperDiscardedData"
+    },
+    "run_id": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Run Id"
+    },
+    "seq": {
+      "minimum": 1,
+      "title": "Seq",
+      "type": "integer"
+    },
+    "session_id": {
+      "minLength": 1,
+      "title": "Session Id",
+      "type": "string"
+    },
+    "ts": {
+      "minLength": 1,
+      "title": "Ts",
+      "type": "string"
+    },
+    "type": {
+      "const": "helper.discarded",
+      "title": "Type",
+      "type": "string"
+    }
+  },
+  "required": [
+    "seq",
+    "session_id",
+    "ts",
+    "type",
+    "data"
+  ],
+  "title": "HelperDiscardedEvent",
+  "type": "object"
+}

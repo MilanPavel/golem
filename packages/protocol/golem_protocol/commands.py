@@ -2503,6 +2503,69 @@ class HelperStopResult(BaseModel):
     stopped: bool
 
 
+class HelperApplyParams(BaseModel):
+    """``helper.apply``. Take a worker's diff into the project.
+
+    ``session_id`` is the lead's session and ``helper_id`` the worker's. The result lists the
+    changes it wrote, and the lead's log gets ``helper.applied``. When a file changed in the
+    project since the worker copied it, nothing is written and the call fails with the error
+    code ``HELPER_CONFLICT`` (-32027), whose ``data`` names the ``path`` of the first file.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    session_id: str = Field(min_length=1)
+    helper_id: str = Field(min_length=1)
+
+
+class HelperApplyResult(BaseModel):
+    """The changes the diff wrote, in the order they were made."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    change_ids: list[str]
+
+
+class HelperDiscardParams(BaseModel):
+    """``helper.discard``. Drop a worker's diff and remove its copy.
+
+    The lead's log gets ``helper.discarded``.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    session_id: str = Field(min_length=1)
+    helper_id: str = Field(min_length=1)
+
+
+class HelperDiscardResult(BaseModel):
+    """Nothing to report: the diff is gone."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+
+class HelperRetryParams(BaseModel):
+    """``helper.retry``. Run a worker's brief again on a stronger model ("Try again, stronger").
+
+    The new helper is a sibling of the old one in the same ``delegate`` call. ``model`` has one
+    value for now, ``stronger``: the daemon picks the model.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    session_id: str = Field(min_length=1)
+    helper_id: str = Field(min_length=1)
+    model: Literal["stronger"]
+
+
+class HelperRetryResult(BaseModel):
+    """``helper_id`` is the session id of the new helper."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    helper_id: str = Field(min_length=1)
+
+
 DeviceId = Annotated[str, Field(pattern=r"^[0-9a-f]{32}$")]
 """A device id: the first 16 bytes of the SHA-256 of its public key, in 32 lowercase hex."""
 
@@ -6454,6 +6517,12 @@ __all__ = [
     "GitWorktree",
     "HelloParams",
     "HelloResult",
+    "HelperApplyParams",
+    "HelperApplyResult",
+    "HelperDiscardParams",
+    "HelperDiscardResult",
+    "HelperRetryParams",
+    "HelperRetryResult",
     "HelperStopParams",
     "HelperStopResult",
     "InspectMessage",

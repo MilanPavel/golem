@@ -23,6 +23,12 @@ from golem_protocol.commands import (
     DaemonStatus,
     HelloParams,
     HelloResult,
+    HelperApplyParams,
+    HelperApplyResult,
+    HelperDiscardParams,
+    HelperDiscardResult,
+    HelperRetryParams,
+    HelperRetryResult,
     HelpersRespondParams,
     HelpersRespondResult,
     HelperStopParams,
@@ -335,6 +341,31 @@ def test_helper_stop_round_trips_and_refuses_bad_input() -> None:
         HelperStopParams.model_validate({"session_id": "h1", "extra": 1})
     with pytest.raises(ValidationError):
         HelperStopResult.model_validate({})
+
+
+def test_helper_apply_discard_retry_round_trip_and_refuse_bad_input() -> None:
+    both = {"session_id": "s1", "helper_id": "h1"}
+    for model in (HelperApplyParams, HelperDiscardParams):
+        value = model.model_validate(both)
+        assert model.model_validate_json(value.model_dump_json()) == value
+        for bad in ({**both, "helper_id": ""}, {"session_id": "s1"}, {**both, "extra": 1}):
+            with pytest.raises(ValidationError):
+                model.model_validate(bad)
+    applied = HelperApplyResult(change_ids=["c1", "c2"])
+    assert HelperApplyResult.model_validate_json(applied.model_dump_json()) == applied
+    assert HelperApplyResult(change_ids=[]).change_ids == []
+    assert HelperDiscardResult.model_validate({}) == HelperDiscardResult()
+    with pytest.raises(ValidationError):
+        HelperDiscardResult.model_validate({"extra": 1})
+    retry = HelperRetryParams.model_validate({**both, "model": "stronger"})
+    assert HelperRetryParams.model_validate_json(retry.model_dump_json()) == retry
+    for bad in ({**both, "model": "weaker"}, both):
+        with pytest.raises(ValidationError):
+            HelperRetryParams.model_validate(bad)
+    result = HelperRetryResult(helper_id="h2")
+    assert HelperRetryResult.model_validate_json(result.model_dump_json()) == result
+    with pytest.raises(ValidationError):
+        HelperRetryResult.model_validate({"helper_id": ""})
 
 
 def test_pending_item_refuses_unknown_fields_and_negative_counts() -> None:

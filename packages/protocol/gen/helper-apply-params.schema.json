@@ -1,0 +1,22 @@
+{
+  "additionalProperties": false,
+  "description": "``helper.apply``. Take a worker's diff into the project.\n\n``session_id`` is the lead's session and ``helper_id`` the worker's. The result lists the\nchanges it wrote, and the lead's log gets ``helper.applied``. When a file changed in the\nproject since the worker copied it, nothing is written and the call fails with the error\ncode ``HELPER_CONFLICT`` (-32027), whose ``data`` names the ``path`` of the first file.",
+  "properties": {
+    "helper_id": {
+      "minLength": 1,
+      "title": "Helper Id",
+      "type": "string"
+    },
+    "session_id": {
+      "minLength": 1,
+      "title": "Session Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "session_id",
+    "helper_id"
+  ],
+  "title": "HelperApplyParams",
+  "type": "object"
+}

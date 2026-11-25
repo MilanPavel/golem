@@ -1,0 +1,18 @@
+{
+  "additionalProperties": false,
+  "description": "The changes the diff wrote, in the order they were made.",
+  "properties": {
+    "change_ids": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Change Ids",
+      "type": "array"
+    }
+  },
+  "required": [
+    "change_ids"
+  ],
+  "title": "HelperApplyResult",
+  "type": "object"
+}

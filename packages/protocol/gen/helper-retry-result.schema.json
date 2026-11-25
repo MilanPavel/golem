@@ -1,0 +1,16 @@
+{
+  "additionalProperties": false,
+  "description": "``helper_id`` is the session id of the new helper.",
+  "properties": {
+    "helper_id": {
+      "minLength": 1,
+      "title": "Helper Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "helper_id"
+  ],
+  "title": "HelperRetryResult",
+  "type": "object"
+}

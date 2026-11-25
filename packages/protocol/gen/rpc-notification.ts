@@ -50,6 +50,8 @@ export type Params =
   | HelperStateEvent
   | HelperWaitEvent
   | HelperEndedEvent
+  | HelperAppliedEvent
+  | HelperDiscardedEvent
   | SessionTrimmedEvent
   | BranchChangedEvent;
 export type Asks = boolean;
@@ -928,12 +930,23 @@ export type Seq45 = number;
 export type SessionId47 = string;
 export type Ts45 = string;
 export type Type45 = 'helper.wait';
+export type Added1 = number | null;
 export type AnswerTokens = number;
 export type CallId16 = string;
+export type Checks1 = ('passed' | 'failed' | 'none') | null;
+export type ChecksFailed = string[] | null;
+export type ChecksNote = string | null;
 export type CostUsd1 = number;
+export type DiffArtifactId1 = string | null;
 export type DurationMs3 = number;
+export type Files1 = WorkerFile[] | null;
+export type Added2 = number;
+export type Path3 = string;
+export type Removed1 = number;
+export type Status5 = 'created' | 'modified' | 'deleted';
 export type Index7 = number;
 export type ModelCalls = number;
+export type Removed2 = number | null;
 export type Stopped = 'done' | 'calls' | 'time' | 'cost' | 'budget' | 'tokens' | 'cancelled' | 'failed';
 export type Tokens = number;
 export type WorkingMs = number;
@@ -942,20 +955,33 @@ export type Seq46 = number;
 export type SessionId48 = string;
 export type Ts46 = string;
 export type Type46 = 'helper.ended';
-export type Removed1 = number;
-export type RunId48 = null;
+export type ChangeIds = string[];
+export type HelperId3 = string;
+export type RunId48 = string | null;
 export type Seq47 = number;
 export type SessionId49 = string;
 export type Ts47 = string;
-export type Type47 = 'session.trimmed';
-export type FromBranch = string;
-export type PathsCount = number | null;
-export type ToBranch = string;
+export type Type47 = 'helper.applied';
+export type HelperId4 = string;
 export type RunId49 = string | null;
 export type Seq48 = number;
 export type SessionId50 = string;
 export type Ts48 = string;
-export type Type48 = 'branch.changed';
+export type Type48 = 'helper.discarded';
+export type Removed3 = number;
+export type RunId50 = null;
+export type Seq49 = number;
+export type SessionId51 = string;
+export type Ts49 = string;
+export type Type49 = 'session.trimmed';
+export type FromBranch = string;
+export type PathsCount = number | null;
+export type ToBranch = string;
+export type RunId51 = string | null;
+export type Seq50 = number;
+export type SessionId52 = string;
+export type Ts50 = string;
+export type Type50 = 'branch.changed';
 
 /**
  * Server → client event. No ``id``; this is not a response to a request.
@@ -2742,19 +2768,99 @@ export interface HelperEndedEvent {
  * since it started and ``working_ms`` is the part that was not spent waiting for you, a
  * slot or a provider.
  *
+ * The last seven fields describe a worker, a helper that works in its own copy of the project,
+ * and are all ``None`` for a helper without a copy. ``diff_artifact_id`` is the worker's diff as
+ * an artifact, of the same kind as the reviewer's diff; a client reads it with ``artifact.read``.
+ * ``files`` lists what changed, and ``added`` and ``removed`` are the lines over all of them.
+ * ``checks`` says how the project's checks ended in the copy. ``checks_failed`` names the
+ * failing checks ("tests", "lint"), and ``checks_note`` says why ``checks`` is ``none``
+ * ("no checks found", "timed out after 10m"). The command ``helper.apply`` takes the diff into
+ * the project and ``helper.discard`` drops it.
+ *
  * This interface was referenced by `RpcNotification`'s JSON-Schema
  * via the `definition` "HelperEndedData".
  */
 export interface HelperEndedData {
+  added?: Added1;
   answer_tokens: AnswerTokens;
   call_id: CallId16;
+  checks?: Checks1;
+  checks_failed?: ChecksFailed;
+  checks_note?: ChecksNote;
   cost_usd: CostUsd1;
+  diff_artifact_id?: DiffArtifactId1;
   duration_ms: DurationMs3;
+  files?: Files1;
   index: Index7;
   model_calls: ModelCalls;
+  removed?: Removed2;
   stopped: Stopped;
   tokens: Tokens;
   working_ms: WorkingMs;
+}
+/**
+ * One file a worker changed in its copy of the project (ADR-059).
+ *
+ * ``added`` and ``removed`` count the lines of the file's diff.
+ *
+ * This interface was referenced by `RpcNotification`'s JSON-Schema
+ * via the `definition` "WorkerFile".
+ */
+export interface WorkerFile {
+  added: Added2;
+  path: Path3;
+  removed: Removed1;
+  status: Status5;
+}
+/**
+ * A worker's diff was taken into the project. A summary on the lead's log.
+ *
+ * This interface was referenced by `RpcNotification`'s JSON-Schema
+ * via the `definition` "HelperAppliedEvent".
+ */
+export interface HelperAppliedEvent {
+  data: HelperAppliedData;
+  run_id?: RunId48;
+  seq: Seq47;
+  session_id: SessionId49;
+  ts: Ts47;
+  type: Type47;
+}
+/**
+ * A worker's diff was taken into the project by ``helper.apply``.
+ *
+ * On the lead's log, so a reload shows the state. ``change_ids`` are the changes it wrote, which
+ * ``changes.diff`` and ``changes.revert`` take.
+ *
+ * This interface was referenced by `RpcNotification`'s JSON-Schema
+ * via the `definition` "HelperAppliedData".
+ */
+export interface HelperAppliedData {
+  change_ids: ChangeIds;
+  helper_id: HelperId3;
+}
+/**
+ * A worker's diff was dropped. A summary on the lead's log.
+ *
+ * This interface was referenced by `RpcNotification`'s JSON-Schema
+ * via the `definition` "HelperDiscardedEvent".
+ */
+export interface HelperDiscardedEvent {
+  data: HelperDiscardedData;
+  run_id?: RunId49;
+  seq: Seq48;
+  session_id: SessionId50;
+  ts: Ts48;
+  type: Type48;
+}
+/**
+ * A worker's diff was dropped by ``helper.discard``. On the lead's log.
+ *
+ * This interface was referenced by `RpcNotification`'s JSON-Schema
+ * via the `definition` "HelperDiscardedData".
+ */
+export interface HelperDiscardedData {
+  helper_id: HelperId4;
 }
 /**
  * A helper's log was cut to its receipt. ``run_id`` is null: no run owns the change.
@@ -2764,11 +2870,11 @@ export interface HelperEndedData {
  */
 export interface SessionTrimmedEvent {
   data: SessionTrimmedData;
-  run_id?: RunId48;
-  seq: Seq47;
-  session_id: SessionId49;
-  ts: Ts47;
-  type: Type47;
+  run_id?: RunId50;
+  seq: Seq49;
+  session_id: SessionId51;
+  ts: Ts49;
+  type: Type49;
 }
 /**
  * A finished helper's steps were removed and a receipt kept (ADR-059, section 9).
@@ -2780,7 +2886,7 @@ export interface SessionTrimmedEvent {
  * via the `definition` "SessionTrimmedData".
  */
 export interface SessionTrimmedData {
-  removed: Removed1;
+  removed: Removed3;
 }
 /**
  * The folder's branch changed under the session, before the run's first model call.
@@ -2790,11 +2896,11 @@ export interface SessionTrimmedData {
  */
 export interface BranchChangedEvent {
   data: BranchChangedData;
-  run_id?: RunId49;
-  seq: Seq48;
-  session_id: SessionId50;
-  ts: Ts48;
-  type: Type48;
+  run_id?: RunId51;
+  seq: Seq50;
+  session_id: SessionId52;
+  ts: Ts50;
+  type: Type50;
 }
 /**
  * The branch of a session's folder is not the one its model last heard of.

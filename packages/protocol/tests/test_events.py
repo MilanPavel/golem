@@ -16,6 +16,10 @@ from golem_protocol.events import (
     ChatEvent,
     EmptyEventData,
     EventType,
+    HelperAppliedData,
+    HelperAppliedEvent,
+    HelperDiscardedData,
+    HelperDiscardedEvent,
     HelperEndedData,
     HelperEndedEvent,
     HelperModelData,
@@ -54,6 +58,7 @@ from golem_protocol.events import (
     ToolRequestedEvent,
     ToolWritingData,
     ToolWritingEvent,
+    WorkerFile,
 )
 from golem_protocol.rpc import RpcNotification
 
@@ -458,6 +463,40 @@ def test_the_six_helper_events_round_trip() -> None:
                 working_ms=7000,
             ),
         ),
+        _helper_event(
+            HelperEndedEvent,
+            "helper.ended",
+            HelperEndedData(
+                call_id="call_1",
+                index=0,
+                stopped="done",
+                model_calls=3,
+                tokens=1200,
+                answer_tokens=80,
+                cost_usd=0.0,
+                duration_ms=9000,
+                working_ms=7000,
+                diff_artifact_id="art_1",
+                files=[
+                    WorkerFile(path="a.py", status="modified", added=3, removed=1),
+                    WorkerFile(path="b.py", status="created", added=10, removed=0),
+                ],
+                added=13,
+                removed=1,
+                checks="failed",
+                checks_failed=["tests"],
+            ),
+        ),
+        _helper_event(
+            HelperAppliedEvent,
+            "helper.applied",
+            HelperAppliedData(helper_id="s_helper", change_ids=["ch_1", "ch_2"]),
+        ),
+        _helper_event(
+            HelperDiscardedEvent,
+            "helper.discarded",
+            HelperDiscardedData(helper_id="s_helper"),
+        ),
     ]
     for event in events:
         assert _ADAPTER.validate_python(event.model_dump()) == event  # type: ignore[attr-defined]
@@ -565,6 +604,30 @@ def test_helper_events_refuse_values_outside_their_lists() -> None:
         HelperEndedData.model_validate({**ended, "stopped": "tired"})
     with pytest.raises(ValidationError):
         HelperEndedData.model_validate({**ended, "working_ms": -1})
+    bare = HelperEndedData.model_validate(ended)
+    assert (bare.diff_artifact_id, bare.files, bare.added, bare.removed) == (None, None, None, None)
+    assert (bare.checks, bare.checks_failed, bare.checks_note) == (None, None, None)
+    for checks in ("passed", "failed", "none"):
+        assert HelperEndedData.model_validate({**ended, "checks": checks}).checks == checks
+    noted = HelperEndedData.model_validate(
+        {**ended, "checks": "none", "checks_note": "no checks found"}
+    )
+    assert HelperEndedData.model_validate_json(noted.model_dump_json()) == noted
+    with pytest.raises(ValidationError):
+        HelperEndedData.model_validate({**ended, "checks": "maybe"})
+    with pytest.raises(ValidationError):
+        HelperEndedData.model_validate({**ended, "added": -1})
+    file = {"path": "a.py", "status": "modified", "added": 1, "removed": 0}
+    for status in ("created", "modified", "deleted"):
+        assert WorkerFile.model_validate({**file, "status": status}).status == status
+    with pytest.raises(ValidationError):
+        WorkerFile.model_validate({**file, "status": "renamed"})
+    with pytest.raises(ValidationError):
+        WorkerFile.model_validate({**file, "removed": -1})
+    with pytest.raises(ValidationError):
+        HelperAppliedData.model_validate({"helper_id": "", "change_ids": []})
+    with pytest.raises(ValidationError):
+        HelperDiscardedData.model_validate({"helper_id": "h", "extra": 1})
 
 
 def _consent_data(**extra: object) -> dict[str, object]:

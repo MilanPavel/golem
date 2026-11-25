@@ -201,6 +201,8 @@ const EVENT_TYPES = new Set([
   "session.trimmed",
   "branch.changed",
   "helper.ended",
+  "helper.applied",
+  "helper.discarded",
 ]);
 
 export function isRecord(value: unknown): value is Record<string, unknown> {

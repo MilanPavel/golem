@@ -1,7 +1,60 @@
 {
+  "$defs": {
+    "WorkerFile": {
+      "additionalProperties": false,
+      "description": "One file a worker changed in its copy of the project (ADR-059).\n\n``added`` and ``removed`` count the lines of the file's diff.",
+      "properties": {
+        "added": {
+          "minimum": 0,
+          "title": "Added",
+          "type": "integer"
+        },
+        "path": {
+          "minLength": 1,
+          "title": "Path",
+          "type": "string"
+        },
+        "removed": {
+          "minimum": 0,
+          "title": "Removed",
+          "type": "integer"
+        },
+        "status": {
+          "enum": [
+            "created",
+            "modified",
+            "deleted"
+          ],
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "status",
+        "added",
+        "removed"
+      ],
+      "title": "WorkerFile",
+      "type": "object"
+    }
+  },
   "additionalProperties": false,
-  "description": "A helper's run ended.\n\n``stopped`` says why. ``model_calls`` and ``tokens`` count what the helper used, and\n``answer_tokens`` is the size of its answer. ``cost_usd`` is what it cost (0 on a local\nmodel), because the lead's footer sums its own log. ``duration_ms`` is the whole time\nsince it started and ``working_ms`` is the part that was not spent waiting for you, a\nslot or a provider.",
+  "description": "A helper's run ended.\n\n``stopped`` says why. ``model_calls`` and ``tokens`` count what the helper used, and\n``answer_tokens`` is the size of its answer. ``cost_usd`` is what it cost (0 on a local\nmodel), because the lead's footer sums its own log. ``duration_ms`` is the whole time\nsince it started and ``working_ms`` is the part that was not spent waiting for you, a\nslot or a provider.\n\nThe last seven fields describe a worker, a helper that works in its own copy of the project,\nand are all ``None`` for a helper without a copy. ``diff_artifact_id`` is the worker's diff as\nan artifact, of the same kind as the reviewer's diff; a client reads it with ``artifact.read``.\n``files`` lists what changed, and ``added`` and ``removed`` are the lines over all of them.\n``checks`` says how the project's checks ended in the copy. ``checks_failed`` names the\nfailing checks (\"tests\", \"lint\"), and ``checks_note`` says why ``checks`` is ``none``\n(\"no checks found\", \"timed out after 10m\"). The command ``helper.apply`` takes the diff into\nthe project and ``helper.discard`` drops it.",
   "properties": {
+    "added": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Added"
+    },
     "answer_tokens": {
       "minimum": 0,
       "title": "Answer Tokens",
@@ -12,15 +65,87 @@
       "title": "Call Id",
       "type": "string"
     },
+    "checks": {
+      "anyOf": [
+        {
+          "enum": [
+            "passed",
+            "failed",
+            "none"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Checks"
+    },
+    "checks_failed": {
+      "anyOf": [
+        {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Checks Failed"
+    },
+    "checks_note": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Checks Note"
+    },
     "cost_usd": {
       "minimum": 0,
       "title": "Cost Usd",
       "type": "number"
     },
+    "diff_artifact_id": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Diff Artifact Id"
+    },
     "duration_ms": {
       "minimum": 0,
       "title": "Duration Ms",
       "type": "integer"
+    },
+    "files": {
+      "anyOf": [
+        {
+          "items": {
+            "$ref": "#/$defs/WorkerFile"
+          },
+          "type": "array"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Files"
     },
     "index": {
       "minimum": 0,
@@ -31,6 +156,19 @@
       "minimum": 0,
       "title": "Model Calls",
       "type": "integer"
+    },
+    "removed": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Removed"
     },
     "stopped": {
       "enum": [
