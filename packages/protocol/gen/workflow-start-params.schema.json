@@ -16,8 +16,8 @@
       "default": "manual",
       "enum": [
         "manual",
-        "schedule",
-        "on_file"
+        "try",
+        "chat"
       ],
       "title": "Trigger",
       "type": "string"

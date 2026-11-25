@@ -756,7 +756,7 @@ def test_workflow_commands_name_the_run_workflow_run_id() -> None:
         with pytest.raises(ValidationError):
             model.model_validate({"run_id": "wr1"})
     with pytest.raises(ValidationError):
-        WorkflowStartParams.model_validate({"id": "x", "trigger": "hook"})
+        WorkflowStartParams.model_validate({"id": "x", "trigger": "file"})
 
 
 def test_workflow_status_round_trips_with_its_steps() -> None:

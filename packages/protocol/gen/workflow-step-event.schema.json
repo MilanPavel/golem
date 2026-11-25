@@ -21,18 +21,6 @@
       "default": null,
       "title": "Child Session Id"
     },
-    "ended_at": {
-      "anyOf": [
-        {
-          "type": "string"
-        },
-        {
-          "type": "null"
-        }
-      ],
-      "default": null,
-      "title": "Ended At"
-    },
     "error": {
       "anyOf": [
         {
@@ -44,6 +32,18 @@
       ],
       "default": null,
       "title": "Error"
+    },
+    "finished_at": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Finished At"
     },
     "group": {
       "anyOf": [

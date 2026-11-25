@@ -18434,7 +18434,7 @@ public struct RoutineFiredNotificationParams: Codable {
     public let routineRunID: String
     public let scope: String
     public let sessionID: String
-    public let trigger: Trigger
+    public let trigger: RoutineFiredTrigger
 
     public enum CodingKeys: String, CodingKey {
         case routine = "routine"
@@ -18444,7 +18444,7 @@ public struct RoutineFiredNotificationParams: Codable {
         case trigger = "trigger"
     }
 
-    public init(routine: String, routineRunID: String, scope: String, sessionID: String, trigger: Trigger) {
+    public init(routine: String, routineRunID: String, scope: String, sessionID: String, trigger: RoutineFiredTrigger) {
         self.routine = routine
         self.routineRunID = routineRunID
         self.scope = scope
@@ -18453,7 +18453,7 @@ public struct RoutineFiredNotificationParams: Codable {
     }
 }
 
-public enum Trigger: String, Codable {
+public enum RoutineFiredTrigger: String, Codable {
     case hook = "hook"
     case manual = "manual"
     case schedule = "schedule"
@@ -18467,7 +18467,7 @@ public struct RoutineFired: Codable {
     public let routineRunID: String
     public let scope: String
     public let sessionID: String
-    public let trigger: Trigger
+    public let trigger: RoutineFiredTrigger
 
     public enum CodingKeys: String, CodingKey {
         case routine = "routine"
@@ -18477,7 +18477,7 @@ public struct RoutineFired: Codable {
         case trigger = "trigger"
     }
 
-    public init(routine: String, routineRunID: String, scope: String, sessionID: String, trigger: Trigger) {
+    public init(routine: String, routineRunID: String, scope: String, sessionID: String, trigger: RoutineFiredTrigger) {
         self.routine = routine
         self.routineRunID = routineRunID
         self.scope = scope
@@ -18650,7 +18650,7 @@ public struct RoutineRunSummaryElement: Codable {
     public let startedAt: String?
     public let status: RoutineFinishedStatus
     public let summary: String?
-    public let trigger: Trigger
+    public let trigger: RoutineFiredTrigger
     public let watchPath: String?
 
     public enum CodingKeys: String, CodingKey {
@@ -18668,7 +18668,7 @@ public struct RoutineRunSummaryElement: Codable {
         case watchPath = "watch_path"
     }
 
-    public init(dueAt: String?, endedAt: String?, reason: String?, routine: String, routineRunID: String, scope: String, sessionID: String?, startedAt: String?, status: RoutineFinishedStatus, summary: String?, trigger: Trigger, watchPath: String?) {
+    public init(dueAt: String?, endedAt: String?, reason: String?, routine: String, routineRunID: String, scope: String, sessionID: String?, startedAt: String?, status: RoutineFinishedStatus, summary: String?, trigger: RoutineFiredTrigger, watchPath: String?) {
         self.dueAt = dueAt
         self.endedAt = endedAt
         self.reason = reason
@@ -18814,7 +18814,7 @@ public struct RoutineInfoRoutineRunSummary: Codable {
     public let startedAt: String?
     public let status: RoutineFinishedStatus
     public let summary: String?
-    public let trigger: Trigger
+    public let trigger: RoutineFiredTrigger
     public let watchPath: String?
 
     public enum CodingKeys: String, CodingKey {
@@ -18832,7 +18832,7 @@ public struct RoutineInfoRoutineRunSummary: Codable {
         case watchPath = "watch_path"
     }
 
-    public init(dueAt: String?, endedAt: String?, reason: String?, routine: String, routineRunID: String, scope: String, sessionID: String?, startedAt: String?, status: RoutineFinishedStatus, summary: String?, trigger: Trigger, watchPath: String?) {
+    public init(dueAt: String?, endedAt: String?, reason: String?, routine: String, routineRunID: String, scope: String, sessionID: String?, startedAt: String?, status: RoutineFinishedStatus, summary: String?, trigger: RoutineFiredTrigger, watchPath: String?) {
         self.dueAt = dueAt
         self.endedAt = endedAt
         self.reason = reason
@@ -19053,7 +19053,7 @@ public struct PurpleRoutineRunSummary: Codable {
     public let startedAt: String?
     public let status: RoutineFinishedStatus
     public let summary: String?
-    public let trigger: Trigger
+    public let trigger: RoutineFiredTrigger
     public let watchPath: String?
 
     public enum CodingKeys: String, CodingKey {
@@ -19071,7 +19071,7 @@ public struct PurpleRoutineRunSummary: Codable {
         case watchPath = "watch_path"
     }
 
-    public init(dueAt: String?, endedAt: String?, reason: String?, routine: String, routineRunID: String, scope: String, sessionID: String?, startedAt: String?, status: RoutineFinishedStatus, summary: String?, trigger: Trigger, watchPath: String?) {
+    public init(dueAt: String?, endedAt: String?, reason: String?, routine: String, routineRunID: String, scope: String, sessionID: String?, startedAt: String?, status: RoutineFinishedStatus, summary: String?, trigger: RoutineFiredTrigger, watchPath: String?) {
         self.dueAt = dueAt
         self.endedAt = endedAt
         self.reason = reason
@@ -19206,7 +19206,7 @@ public struct RoutineRunSummary: Codable {
     public let startedAt: String?
     public let status: RoutineFinishedStatus
     public let summary: String?
-    public let trigger: Trigger
+    public let trigger: RoutineFiredTrigger
     public let watchPath: String?
 
     public enum CodingKeys: String, CodingKey {
@@ -19224,7 +19224,7 @@ public struct RoutineRunSummary: Codable {
         case watchPath = "watch_path"
     }
 
-    public init(dueAt: String?, endedAt: String?, reason: String?, routine: String, routineRunID: String, scope: String, sessionID: String?, startedAt: String?, status: RoutineFinishedStatus, summary: String?, trigger: Trigger, watchPath: String?) {
+    public init(dueAt: String?, endedAt: String?, reason: String?, routine: String, routineRunID: String, scope: String, sessionID: String?, startedAt: String?, status: RoutineFinishedStatus, summary: String?, trigger: RoutineFiredTrigger, watchPath: String?) {
         self.dueAt = dueAt
         self.endedAt = endedAt
         self.reason = reason
@@ -19412,7 +19412,7 @@ public struct FluffyRoutineRunSummary: Codable {
     public let startedAt: String?
     public let status: RoutineFinishedStatus
     public let summary: String?
-    public let trigger: Trigger
+    public let trigger: RoutineFiredTrigger
     public let watchPath: String?
 
     public enum CodingKeys: String, CodingKey {
@@ -19430,7 +19430,7 @@ public struct FluffyRoutineRunSummary: Codable {
         case watchPath = "watch_path"
     }
 
-    public init(dueAt: String?, endedAt: String?, reason: String?, routine: String, routineRunID: String, scope: String, sessionID: String?, startedAt: String?, status: RoutineFinishedStatus, summary: String?, trigger: Trigger, watchPath: String?) {
+    public init(dueAt: String?, endedAt: String?, reason: String?, routine: String, routineRunID: String, scope: String, sessionID: String?, startedAt: String?, status: RoutineFinishedStatus, summary: String?, trigger: RoutineFiredTrigger, watchPath: String?) {
         self.dueAt = dueAt
         self.endedAt = endedAt
         self.reason = reason
@@ -22252,7 +22252,7 @@ public struct RunInfo: Codable {
     public let status: RoutineFinishedStatus
     public let steps: Int?
     public let summary: String?
-    public let trigger: Trigger?
+    public let trigger: RoutineFiredTrigger?
     public let watchPath: String?
 
     public enum CodingKeys: String, CodingKey {
@@ -22273,7 +22273,7 @@ public struct RunInfo: Codable {
         case watchPath = "watch_path"
     }
 
-    public init(approvals: Int?, endedAt: String?, folder: String?, kind: RunInfoKind, origin: String, reason: String?, routine: String?, routineRunID: String?, sessionID: String, startedAt: String?, status: RoutineFinishedStatus, steps: Int?, summary: String?, trigger: Trigger?, watchPath: String?) {
+    public init(approvals: Int?, endedAt: String?, folder: String?, kind: RunInfoKind, origin: String, reason: String?, routine: String?, routineRunID: String?, sessionID: String, startedAt: String?, status: RoutineFinishedStatus, steps: Int?, summary: String?, trigger: RoutineFiredTrigger?, watchPath: String?) {
         self.approvals = approvals
         self.endedAt = endedAt
         self.folder = folder
@@ -22361,7 +22361,7 @@ public struct RunElement: Codable {
     public let status: RoutineFinishedStatus
     public let steps: Int?
     public let summary: String?
-    public let trigger: Trigger?
+    public let trigger: RoutineFiredTrigger?
     public let watchPath: String?
 
     public enum CodingKeys: String, CodingKey {
@@ -22382,7 +22382,7 @@ public struct RunElement: Codable {
         case watchPath = "watch_path"
     }
 
-    public init(approvals: Int?, endedAt: String?, folder: String?, kind: RunInfoKind, origin: String, reason: String?, routine: String?, routineRunID: String?, sessionID: String, startedAt: String?, status: RoutineFinishedStatus, steps: Int?, summary: String?, trigger: Trigger?, watchPath: String?) {
+    public init(approvals: Int?, endedAt: String?, folder: String?, kind: RunInfoKind, origin: String, reason: String?, routine: String?, routineRunID: String?, sessionID: String, startedAt: String?, status: RoutineFinishedStatus, steps: Int?, summary: String?, trigger: RoutineFiredTrigger?, watchPath: String?) {
         self.approvals = approvals
         self.endedAt = endedAt
         self.folder = folder
@@ -29442,7 +29442,7 @@ public enum WorkflowEntryInfoState: String, Codable {
 // MARK: - WorkflowEntryInfoWorkflowTriggerInfo
 public struct WorkflowEntryInfoWorkflowTriggerInfo: Codable {
     public let expr: String?
-    public let kind: Kind
+    public let kind: WorkflowTriggerInfoKind
     public let path: String?
 
     public enum CodingKeys: String, CodingKey {
@@ -29451,14 +29451,14 @@ public struct WorkflowEntryInfoWorkflowTriggerInfo: Codable {
         case path = "path"
     }
 
-    public init(expr: String?, kind: Kind, path: String?) {
+    public init(expr: String?, kind: WorkflowTriggerInfoKind, path: String?) {
         self.expr = expr
         self.kind = kind
         self.path = path
     }
 }
 
-public enum Kind: String, Codable {
+public enum WorkflowTriggerInfoKind: String, Codable {
     case manual = "manual"
     case onFile = "on_file"
     case schedule = "schedule"
@@ -29621,7 +29621,7 @@ public struct PurpleWorkflowInputInfo: Codable {
 // MARK: - PurpleWorkflowTriggerInfo
 public struct PurpleWorkflowTriggerInfo: Codable {
     public let expr: String?
-    public let kind: Kind
+    public let kind: WorkflowTriggerInfoKind
     public let path: String?
 
     public enum CodingKeys: String, CodingKey {
@@ -29630,7 +29630,7 @@ public struct PurpleWorkflowTriggerInfo: Codable {
         case path = "path"
     }
 
-    public init(expr: String?, kind: Kind, path: String?) {
+    public init(expr: String?, kind: WorkflowTriggerInfoKind, path: String?) {
         self.expr = expr
         self.kind = kind
         self.path = path
@@ -29755,7 +29755,7 @@ public struct FluffyWorkflowInputInfo: Codable {
 // MARK: - FluffyWorkflowTriggerInfo
 public struct FluffyWorkflowTriggerInfo: Codable {
     public let expr: String?
-    public let kind: Kind
+    public let kind: WorkflowTriggerInfoKind
     public let path: String?
 
     public enum CodingKeys: String, CodingKey {
@@ -29764,7 +29764,7 @@ public struct FluffyWorkflowTriggerInfo: Codable {
         case path = "path"
     }
 
-    public init(expr: String?, kind: Kind, path: String?) {
+    public init(expr: String?, kind: WorkflowTriggerInfoKind, path: String?) {
         self.expr = expr
         self.kind = kind
         self.path = path
@@ -29860,19 +29860,19 @@ public enum WorkflowRunCancelledNotificationMethod: String, Codable {
 /// ``workflow.run.failed``. The name is ``workflow.run.*``, never ``run.*`` (ADR-050).
 // MARK: - WorkflowRunCancelledNotificationParams
 public struct WorkflowRunCancelledNotificationParams: Codable {
-    public let endedAt: String?
     public let error: String?
+    public let finishedAt: String?
     public let name: String
     public let sessionID: String?
     public let startedAt: String?
     public let status: WorkflowRunEventStatus
-    public let trigger: Kind?
+    public let trigger: WorkflowRunEventTrigger?
     public let workflowID: String
     public let workflowRunID: String
 
     public enum CodingKeys: String, CodingKey {
-        case endedAt = "ended_at"
         case error = "error"
+        case finishedAt = "finished_at"
         case name = "name"
         case sessionID = "session_id"
         case startedAt = "started_at"
@@ -29882,9 +29882,9 @@ public struct WorkflowRunCancelledNotificationParams: Codable {
         case workflowRunID = "workflow_run_id"
     }
 
-    public init(endedAt: String?, error: String?, name: String, sessionID: String?, startedAt: String?, status: WorkflowRunEventStatus, trigger: Kind?, workflowID: String, workflowRunID: String) {
-        self.endedAt = endedAt
+    public init(error: String?, finishedAt: String?, name: String, sessionID: String?, startedAt: String?, status: WorkflowRunEventStatus, trigger: WorkflowRunEventTrigger?, workflowID: String, workflowRunID: String) {
         self.error = error
+        self.finishedAt = finishedAt
         self.name = name
         self.sessionID = sessionID
         self.startedAt = startedAt
@@ -29902,6 +29902,14 @@ public enum WorkflowRunEventStatus: String, Codable {
     case pending = "pending"
     case running = "running"
     case waiting = "waiting"
+}
+
+public enum WorkflowRunEventTrigger: String, Codable {
+    case chat = "chat"
+    case file = "file"
+    case manual = "manual"
+    case schedule = "schedule"
+    case triggerTry = "try"
 }
 
 /// Server → every connection: ``workflow.run.done``. Not stored.
@@ -29934,19 +29942,19 @@ public enum WorkflowRunDoneNotificationMethod: String, Codable {
 /// ``workflow.run.failed``. The name is ``workflow.run.*``, never ``run.*`` (ADR-050).
 // MARK: - WorkflowRunDoneNotificationParams
 public struct WorkflowRunDoneNotificationParams: Codable {
-    public let endedAt: String?
     public let error: String?
+    public let finishedAt: String?
     public let name: String
     public let sessionID: String?
     public let startedAt: String?
     public let status: WorkflowRunEventStatus
-    public let trigger: Kind?
+    public let trigger: WorkflowRunEventTrigger?
     public let workflowID: String
     public let workflowRunID: String
 
     public enum CodingKeys: String, CodingKey {
-        case endedAt = "ended_at"
         case error = "error"
+        case finishedAt = "finished_at"
         case name = "name"
         case sessionID = "session_id"
         case startedAt = "started_at"
@@ -29956,9 +29964,9 @@ public struct WorkflowRunDoneNotificationParams: Codable {
         case workflowRunID = "workflow_run_id"
     }
 
-    public init(endedAt: String?, error: String?, name: String, sessionID: String?, startedAt: String?, status: WorkflowRunEventStatus, trigger: Kind?, workflowID: String, workflowRunID: String) {
-        self.endedAt = endedAt
+    public init(error: String?, finishedAt: String?, name: String, sessionID: String?, startedAt: String?, status: WorkflowRunEventStatus, trigger: WorkflowRunEventTrigger?, workflowID: String, workflowRunID: String) {
         self.error = error
+        self.finishedAt = finishedAt
         self.name = name
         self.sessionID = sessionID
         self.startedAt = startedAt
@@ -29975,19 +29983,19 @@ public struct WorkflowRunDoneNotificationParams: Codable {
 /// ``workflow.run.failed``. The name is ``workflow.run.*``, never ``run.*`` (ADR-050).
 // MARK: - WorkflowRunEvent
 public struct WorkflowRunEvent: Codable {
-    public let endedAt: String?
     public let error: String?
+    public let finishedAt: String?
     public let name: String
     public let sessionID: String?
     public let startedAt: String?
     public let status: WorkflowRunEventStatus
-    public let trigger: Kind?
+    public let trigger: WorkflowRunEventTrigger?
     public let workflowID: String
     public let workflowRunID: String
 
     public enum CodingKeys: String, CodingKey {
-        case endedAt = "ended_at"
         case error = "error"
+        case finishedAt = "finished_at"
         case name = "name"
         case sessionID = "session_id"
         case startedAt = "started_at"
@@ -29997,9 +30005,9 @@ public struct WorkflowRunEvent: Codable {
         case workflowRunID = "workflow_run_id"
     }
 
-    public init(endedAt: String?, error: String?, name: String, sessionID: String?, startedAt: String?, status: WorkflowRunEventStatus, trigger: Kind?, workflowID: String, workflowRunID: String) {
-        self.endedAt = endedAt
+    public init(error: String?, finishedAt: String?, name: String, sessionID: String?, startedAt: String?, status: WorkflowRunEventStatus, trigger: WorkflowRunEventTrigger?, workflowID: String, workflowRunID: String) {
         self.error = error
+        self.finishedAt = finishedAt
         self.name = name
         self.sessionID = sessionID
         self.startedAt = startedAt
@@ -30040,19 +30048,19 @@ public enum WorkflowRunFailedNotificationMethod: String, Codable {
 /// ``workflow.run.failed``. The name is ``workflow.run.*``, never ``run.*`` (ADR-050).
 // MARK: - WorkflowRunFailedNotificationParams
 public struct WorkflowRunFailedNotificationParams: Codable {
-    public let endedAt: String?
     public let error: String?
+    public let finishedAt: String?
     public let name: String
     public let sessionID: String?
     public let startedAt: String?
     public let status: WorkflowRunEventStatus
-    public let trigger: Kind?
+    public let trigger: WorkflowRunEventTrigger?
     public let workflowID: String
     public let workflowRunID: String
 
     public enum CodingKeys: String, CodingKey {
-        case endedAt = "ended_at"
         case error = "error"
+        case finishedAt = "finished_at"
         case name = "name"
         case sessionID = "session_id"
         case startedAt = "started_at"
@@ -30062,9 +30070,9 @@ public struct WorkflowRunFailedNotificationParams: Codable {
         case workflowRunID = "workflow_run_id"
     }
 
-    public init(endedAt: String?, error: String?, name: String, sessionID: String?, startedAt: String?, status: WorkflowRunEventStatus, trigger: Kind?, workflowID: String, workflowRunID: String) {
-        self.endedAt = endedAt
+    public init(error: String?, finishedAt: String?, name: String, sessionID: String?, startedAt: String?, status: WorkflowRunEventStatus, trigger: WorkflowRunEventTrigger?, workflowID: String, workflowRunID: String) {
         self.error = error
+        self.finishedAt = finishedAt
         self.name = name
         self.sessionID = sessionID
         self.startedAt = startedAt
@@ -30081,20 +30089,20 @@ public struct WorkflowRunFailedNotificationParams: Codable {
 /// ``error`` says why a ``failed`` run failed.
 // MARK: - WorkflowRunInfo
 public struct WorkflowRunInfo: Codable {
-    public let endedAt: String?
     public let error: String?
+    public let finishedAt: String?
     public let inputs: [String: JSONAny]?
     public let name: String
     public let sessionID: String?
     public let startedAt: String?
     public let status: WorkflowRunEventStatus
-    public let trigger: Kind
+    public let trigger: WorkflowRunEventTrigger
     public let workflowID: String
     public let workflowRunID: String
 
     public enum CodingKeys: String, CodingKey {
-        case endedAt = "ended_at"
         case error = "error"
+        case finishedAt = "finished_at"
         case inputs = "inputs"
         case name = "name"
         case sessionID = "session_id"
@@ -30105,9 +30113,9 @@ public struct WorkflowRunInfo: Codable {
         case workflowRunID = "workflow_run_id"
     }
 
-    public init(endedAt: String?, error: String?, inputs: [String: JSONAny]?, name: String, sessionID: String?, startedAt: String?, status: WorkflowRunEventStatus, trigger: Kind, workflowID: String, workflowRunID: String) {
-        self.endedAt = endedAt
+    public init(error: String?, finishedAt: String?, inputs: [String: JSONAny]?, name: String, sessionID: String?, startedAt: String?, status: WorkflowRunEventStatus, trigger: WorkflowRunEventTrigger, workflowID: String, workflowRunID: String) {
         self.error = error
+        self.finishedAt = finishedAt
         self.inputs = inputs
         self.name = name
         self.sessionID = sessionID
@@ -30149,19 +30157,19 @@ public enum WorkflowRunResumedNotificationMethod: String, Codable {
 /// ``workflow.run.failed``. The name is ``workflow.run.*``, never ``run.*`` (ADR-050).
 // MARK: - WorkflowRunResumedNotificationParams
 public struct WorkflowRunResumedNotificationParams: Codable {
-    public let endedAt: String?
     public let error: String?
+    public let finishedAt: String?
     public let name: String
     public let sessionID: String?
     public let startedAt: String?
     public let status: WorkflowRunEventStatus
-    public let trigger: Kind?
+    public let trigger: WorkflowRunEventTrigger?
     public let workflowID: String
     public let workflowRunID: String
 
     public enum CodingKeys: String, CodingKey {
-        case endedAt = "ended_at"
         case error = "error"
+        case finishedAt = "finished_at"
         case name = "name"
         case sessionID = "session_id"
         case startedAt = "started_at"
@@ -30171,9 +30179,9 @@ public struct WorkflowRunResumedNotificationParams: Codable {
         case workflowRunID = "workflow_run_id"
     }
 
-    public init(endedAt: String?, error: String?, name: String, sessionID: String?, startedAt: String?, status: WorkflowRunEventStatus, trigger: Kind?, workflowID: String, workflowRunID: String) {
-        self.endedAt = endedAt
+    public init(error: String?, finishedAt: String?, name: String, sessionID: String?, startedAt: String?, status: WorkflowRunEventStatus, trigger: WorkflowRunEventTrigger?, workflowID: String, workflowRunID: String) {
         self.error = error
+        self.finishedAt = finishedAt
         self.name = name
         self.sessionID = sessionID
         self.startedAt = startedAt
@@ -30214,19 +30222,19 @@ public enum WorkflowRunStartedNotificationMethod: String, Codable {
 /// ``workflow.run.failed``. The name is ``workflow.run.*``, never ``run.*`` (ADR-050).
 // MARK: - WorkflowRunStartedNotificationParams
 public struct WorkflowRunStartedNotificationParams: Codable {
-    public let endedAt: String?
     public let error: String?
+    public let finishedAt: String?
     public let name: String
     public let sessionID: String?
     public let startedAt: String?
     public let status: WorkflowRunEventStatus
-    public let trigger: Kind?
+    public let trigger: WorkflowRunEventTrigger?
     public let workflowID: String
     public let workflowRunID: String
 
     public enum CodingKeys: String, CodingKey {
-        case endedAt = "ended_at"
         case error = "error"
+        case finishedAt = "finished_at"
         case name = "name"
         case sessionID = "session_id"
         case startedAt = "started_at"
@@ -30236,9 +30244,9 @@ public struct WorkflowRunStartedNotificationParams: Codable {
         case workflowRunID = "workflow_run_id"
     }
 
-    public init(endedAt: String?, error: String?, name: String, sessionID: String?, startedAt: String?, status: WorkflowRunEventStatus, trigger: Kind?, workflowID: String, workflowRunID: String) {
-        self.endedAt = endedAt
+    public init(error: String?, finishedAt: String?, name: String, sessionID: String?, startedAt: String?, status: WorkflowRunEventStatus, trigger: WorkflowRunEventTrigger?, workflowID: String, workflowRunID: String) {
         self.error = error
+        self.finishedAt = finishedAt
         self.name = name
         self.sessionID = sessionID
         self.startedAt = startedAt
@@ -30279,19 +30287,19 @@ public enum WorkflowRunWaitingNotificationMethod: String, Codable {
 /// ``workflow.run.failed``. The name is ``workflow.run.*``, never ``run.*`` (ADR-050).
 // MARK: - WorkflowRunWaitingNotificationParams
 public struct WorkflowRunWaitingNotificationParams: Codable {
-    public let endedAt: String?
     public let error: String?
+    public let finishedAt: String?
     public let name: String
     public let sessionID: String?
     public let startedAt: String?
     public let status: WorkflowRunEventStatus
-    public let trigger: Kind?
+    public let trigger: WorkflowRunEventTrigger?
     public let workflowID: String
     public let workflowRunID: String
 
     public enum CodingKeys: String, CodingKey {
-        case endedAt = "ended_at"
         case error = "error"
+        case finishedAt = "finished_at"
         case name = "name"
         case sessionID = "session_id"
         case startedAt = "started_at"
@@ -30301,9 +30309,9 @@ public struct WorkflowRunWaitingNotificationParams: Codable {
         case workflowRunID = "workflow_run_id"
     }
 
-    public init(endedAt: String?, error: String?, name: String, sessionID: String?, startedAt: String?, status: WorkflowRunEventStatus, trigger: Kind?, workflowID: String, workflowRunID: String) {
-        self.endedAt = endedAt
+    public init(error: String?, finishedAt: String?, name: String, sessionID: String?, startedAt: String?, status: WorkflowRunEventStatus, trigger: WorkflowRunEventTrigger?, workflowID: String, workflowRunID: String) {
         self.error = error
+        self.finishedAt = finishedAt
         self.name = name
         self.sessionID = sessionID
         self.startedAt = startedAt
@@ -30321,7 +30329,7 @@ public struct WorkflowRunWaitingNotificationParams: Codable {
 public struct WorkflowStartParams: Codable {
     public let id: String
     public let inputs: [String: JSONAny]?
-    public let trigger: Kind?
+    public let trigger: WorkflowStartParamsTrigger?
 
     public enum CodingKeys: String, CodingKey {
         case id = "id"
@@ -30329,11 +30337,17 @@ public struct WorkflowStartParams: Codable {
         case trigger = "trigger"
     }
 
-    public init(id: String, inputs: [String: JSONAny]?, trigger: Kind?) {
+    public init(id: String, inputs: [String: JSONAny]?, trigger: WorkflowStartParamsTrigger?) {
         self.id = id
         self.inputs = inputs
         self.trigger = trigger
     }
+}
+
+public enum WorkflowStartParamsTrigger: String, Codable {
+    case chat = "chat"
+    case manual = "manual"
+    case triggerTry = "try"
 }
 
 /// The run ``workflow.start`` made.
@@ -30387,20 +30401,20 @@ public struct WorkflowStatusResult: Codable {
 /// ``error`` says why a ``failed`` run failed.
 // MARK: - WorkflowStatusResultRun
 public struct WorkflowStatusResultRun: Codable {
-    public let endedAt: String?
     public let error: String?
+    public let finishedAt: String?
     public let inputs: [String: JSONAny]?
     public let name: String
     public let sessionID: String?
     public let startedAt: String?
     public let status: WorkflowRunEventStatus
-    public let trigger: Kind
+    public let trigger: WorkflowRunEventTrigger
     public let workflowID: String
     public let workflowRunID: String
 
     public enum CodingKeys: String, CodingKey {
-        case endedAt = "ended_at"
         case error = "error"
+        case finishedAt = "finished_at"
         case inputs = "inputs"
         case name = "name"
         case sessionID = "session_id"
@@ -30411,9 +30425,9 @@ public struct WorkflowStatusResultRun: Codable {
         case workflowRunID = "workflow_run_id"
     }
 
-    public init(endedAt: String?, error: String?, inputs: [String: JSONAny]?, name: String, sessionID: String?, startedAt: String?, status: WorkflowRunEventStatus, trigger: Kind, workflowID: String, workflowRunID: String) {
-        self.endedAt = endedAt
+    public init(error: String?, finishedAt: String?, inputs: [String: JSONAny]?, name: String, sessionID: String?, startedAt: String?, status: WorkflowRunEventStatus, trigger: WorkflowRunEventTrigger, workflowID: String, workflowRunID: String) {
         self.error = error
+        self.finishedAt = finishedAt
         self.inputs = inputs
         self.name = name
         self.sessionID = sessionID
@@ -30436,8 +30450,8 @@ public struct WorkflowStatusResultRun: Codable {
 public struct WorkflowStatusResultStep: Codable {
     public let attempts: Int?
     public let childSessionID: String?
-    public let endedAt: String?
     public let error: String?
+    public let finishedAt: String?
     public let group: String?
     public let key: String
     public let kind: StepKind
@@ -30448,8 +30462,8 @@ public struct WorkflowStatusResultStep: Codable {
     public enum CodingKeys: String, CodingKey {
         case attempts = "attempts"
         case childSessionID = "child_session_id"
-        case endedAt = "ended_at"
         case error = "error"
+        case finishedAt = "finished_at"
         case group = "group"
         case key = "key"
         case kind = "kind"
@@ -30458,11 +30472,11 @@ public struct WorkflowStatusResultStep: Codable {
         case title = "title"
     }
 
-    public init(attempts: Int?, childSessionID: String?, endedAt: String?, error: String?, group: String?, key: String, kind: StepKind, startedAt: String?, status: StepStatus, title: String) {
+    public init(attempts: Int?, childSessionID: String?, error: String?, finishedAt: String?, group: String?, key: String, kind: StepKind, startedAt: String?, status: StepStatus, title: String) {
         self.attempts = attempts
         self.childSessionID = childSessionID
-        self.endedAt = endedAt
         self.error = error
+        self.finishedAt = finishedAt
         self.group = group
         self.key = key
         self.kind = kind
@@ -30524,8 +30538,8 @@ public enum WorkflowStepDoneNotificationMethod: String, Codable {
 public struct WorkflowStepDoneNotificationParams: Codable {
     public let attempts: Int?
     public let childSessionID: String?
-    public let endedAt: String?
     public let error: String?
+    public let finishedAt: String?
     public let group: String?
     public let key: String
     public let kind: StepKind
@@ -30537,8 +30551,8 @@ public struct WorkflowStepDoneNotificationParams: Codable {
     public enum CodingKeys: String, CodingKey {
         case attempts = "attempts"
         case childSessionID = "child_session_id"
-        case endedAt = "ended_at"
         case error = "error"
+        case finishedAt = "finished_at"
         case group = "group"
         case key = "key"
         case kind = "kind"
@@ -30548,11 +30562,11 @@ public struct WorkflowStepDoneNotificationParams: Codable {
         case workflowRunID = "workflow_run_id"
     }
 
-    public init(attempts: Int?, childSessionID: String?, endedAt: String?, error: String?, group: String?, key: String, kind: StepKind, startedAt: String?, status: StepStatus, title: String, workflowRunID: String) {
+    public init(attempts: Int?, childSessionID: String?, error: String?, finishedAt: String?, group: String?, key: String, kind: StepKind, startedAt: String?, status: StepStatus, title: String, workflowRunID: String) {
         self.attempts = attempts
         self.childSessionID = childSessionID
-        self.endedAt = endedAt
         self.error = error
+        self.finishedAt = finishedAt
         self.group = group
         self.key = key
         self.kind = kind
@@ -30571,8 +30585,8 @@ public struct WorkflowStepDoneNotificationParams: Codable {
 public struct WorkflowStepEvent: Codable {
     public let attempts: Int?
     public let childSessionID: String?
-    public let endedAt: String?
     public let error: String?
+    public let finishedAt: String?
     public let group: String?
     public let key: String
     public let kind: StepKind
@@ -30584,8 +30598,8 @@ public struct WorkflowStepEvent: Codable {
     public enum CodingKeys: String, CodingKey {
         case attempts = "attempts"
         case childSessionID = "child_session_id"
-        case endedAt = "ended_at"
         case error = "error"
+        case finishedAt = "finished_at"
         case group = "group"
         case key = "key"
         case kind = "kind"
@@ -30595,11 +30609,11 @@ public struct WorkflowStepEvent: Codable {
         case workflowRunID = "workflow_run_id"
     }
 
-    public init(attempts: Int?, childSessionID: String?, endedAt: String?, error: String?, group: String?, key: String, kind: StepKind, startedAt: String?, status: StepStatus, title: String, workflowRunID: String) {
+    public init(attempts: Int?, childSessionID: String?, error: String?, finishedAt: String?, group: String?, key: String, kind: StepKind, startedAt: String?, status: StepStatus, title: String, workflowRunID: String) {
         self.attempts = attempts
         self.childSessionID = childSessionID
-        self.endedAt = endedAt
         self.error = error
+        self.finishedAt = finishedAt
         self.group = group
         self.key = key
         self.kind = kind
@@ -30642,8 +30656,8 @@ public enum WorkflowStepFailedNotificationMethod: String, Codable {
 public struct WorkflowStepFailedNotificationParams: Codable {
     public let attempts: Int?
     public let childSessionID: String?
-    public let endedAt: String?
     public let error: String?
+    public let finishedAt: String?
     public let group: String?
     public let key: String
     public let kind: StepKind
@@ -30655,8 +30669,8 @@ public struct WorkflowStepFailedNotificationParams: Codable {
     public enum CodingKeys: String, CodingKey {
         case attempts = "attempts"
         case childSessionID = "child_session_id"
-        case endedAt = "ended_at"
         case error = "error"
+        case finishedAt = "finished_at"
         case group = "group"
         case key = "key"
         case kind = "kind"
@@ -30666,11 +30680,11 @@ public struct WorkflowStepFailedNotificationParams: Codable {
         case workflowRunID = "workflow_run_id"
     }
 
-    public init(attempts: Int?, childSessionID: String?, endedAt: String?, error: String?, group: String?, key: String, kind: StepKind, startedAt: String?, status: StepStatus, title: String, workflowRunID: String) {
+    public init(attempts: Int?, childSessionID: String?, error: String?, finishedAt: String?, group: String?, key: String, kind: StepKind, startedAt: String?, status: StepStatus, title: String, workflowRunID: String) {
         self.attempts = attempts
         self.childSessionID = childSessionID
-        self.endedAt = endedAt
         self.error = error
+        self.finishedAt = finishedAt
         self.group = group
         self.key = key
         self.kind = kind
@@ -30713,8 +30727,8 @@ public enum WorkflowStepInDoubtNotificationMethod: String, Codable {
 public struct WorkflowStepInDoubtNotificationParams: Codable {
     public let attempts: Int?
     public let childSessionID: String?
-    public let endedAt: String?
     public let error: String?
+    public let finishedAt: String?
     public let group: String?
     public let key: String
     public let kind: StepKind
@@ -30726,8 +30740,8 @@ public struct WorkflowStepInDoubtNotificationParams: Codable {
     public enum CodingKeys: String, CodingKey {
         case attempts = "attempts"
         case childSessionID = "child_session_id"
-        case endedAt = "ended_at"
         case error = "error"
+        case finishedAt = "finished_at"
         case group = "group"
         case key = "key"
         case kind = "kind"
@@ -30737,11 +30751,11 @@ public struct WorkflowStepInDoubtNotificationParams: Codable {
         case workflowRunID = "workflow_run_id"
     }
 
-    public init(attempts: Int?, childSessionID: String?, endedAt: String?, error: String?, group: String?, key: String, kind: StepKind, startedAt: String?, status: StepStatus, title: String, workflowRunID: String) {
+    public init(attempts: Int?, childSessionID: String?, error: String?, finishedAt: String?, group: String?, key: String, kind: StepKind, startedAt: String?, status: StepStatus, title: String, workflowRunID: String) {
         self.attempts = attempts
         self.childSessionID = childSessionID
-        self.endedAt = endedAt
         self.error = error
+        self.finishedAt = finishedAt
         self.group = group
         self.key = key
         self.kind = kind
@@ -30763,8 +30777,8 @@ public struct WorkflowStepInDoubtNotificationParams: Codable {
 public struct WorkflowStepInfo: Codable {
     public let attempts: Int?
     public let childSessionID: String?
-    public let endedAt: String?
     public let error: String?
+    public let finishedAt: String?
     public let group: String?
     public let key: String
     public let kind: StepKind
@@ -30775,8 +30789,8 @@ public struct WorkflowStepInfo: Codable {
     public enum CodingKeys: String, CodingKey {
         case attempts = "attempts"
         case childSessionID = "child_session_id"
-        case endedAt = "ended_at"
         case error = "error"
+        case finishedAt = "finished_at"
         case group = "group"
         case key = "key"
         case kind = "kind"
@@ -30785,11 +30799,11 @@ public struct WorkflowStepInfo: Codable {
         case title = "title"
     }
 
-    public init(attempts: Int?, childSessionID: String?, endedAt: String?, error: String?, group: String?, key: String, kind: StepKind, startedAt: String?, status: StepStatus, title: String) {
+    public init(attempts: Int?, childSessionID: String?, error: String?, finishedAt: String?, group: String?, key: String, kind: StepKind, startedAt: String?, status: StepStatus, title: String) {
         self.attempts = attempts
         self.childSessionID = childSessionID
-        self.endedAt = endedAt
         self.error = error
+        self.finishedAt = finishedAt
         self.group = group
         self.key = key
         self.kind = kind
@@ -30831,8 +30845,8 @@ public enum WorkflowStepStartedNotificationMethod: String, Codable {
 public struct WorkflowStepStartedNotificationParams: Codable {
     public let attempts: Int?
     public let childSessionID: String?
-    public let endedAt: String?
     public let error: String?
+    public let finishedAt: String?
     public let group: String?
     public let key: String
     public let kind: StepKind
@@ -30844,8 +30858,8 @@ public struct WorkflowStepStartedNotificationParams: Codable {
     public enum CodingKeys: String, CodingKey {
         case attempts = "attempts"
         case childSessionID = "child_session_id"
-        case endedAt = "ended_at"
         case error = "error"
+        case finishedAt = "finished_at"
         case group = "group"
         case key = "key"
         case kind = "kind"
@@ -30855,11 +30869,11 @@ public struct WorkflowStepStartedNotificationParams: Codable {
         case workflowRunID = "workflow_run_id"
     }
 
-    public init(attempts: Int?, childSessionID: String?, endedAt: String?, error: String?, group: String?, key: String, kind: StepKind, startedAt: String?, status: StepStatus, title: String, workflowRunID: String) {
+    public init(attempts: Int?, childSessionID: String?, error: String?, finishedAt: String?, group: String?, key: String, kind: StepKind, startedAt: String?, status: StepStatus, title: String, workflowRunID: String) {
         self.attempts = attempts
         self.childSessionID = childSessionID
-        self.endedAt = endedAt
         self.error = error
+        self.finishedAt = finishedAt
         self.group = group
         self.key = key
         self.kind = kind
@@ -30902,8 +30916,8 @@ public enum WorkflowStepWaitingNotificationMethod: String, Codable {
 public struct WorkflowStepWaitingNotificationParams: Codable {
     public let attempts: Int?
     public let childSessionID: String?
-    public let endedAt: String?
     public let error: String?
+    public let finishedAt: String?
     public let group: String?
     public let key: String
     public let kind: StepKind
@@ -30915,8 +30929,8 @@ public struct WorkflowStepWaitingNotificationParams: Codable {
     public enum CodingKeys: String, CodingKey {
         case attempts = "attempts"
         case childSessionID = "child_session_id"
-        case endedAt = "ended_at"
         case error = "error"
+        case finishedAt = "finished_at"
         case group = "group"
         case key = "key"
         case kind = "kind"
@@ -30926,11 +30940,11 @@ public struct WorkflowStepWaitingNotificationParams: Codable {
         case workflowRunID = "workflow_run_id"
     }
 
-    public init(attempts: Int?, childSessionID: String?, endedAt: String?, error: String?, group: String?, key: String, kind: StepKind, startedAt: String?, status: StepStatus, title: String, workflowRunID: String) {
+    public init(attempts: Int?, childSessionID: String?, error: String?, finishedAt: String?, group: String?, key: String, kind: StepKind, startedAt: String?, status: StepStatus, title: String, workflowRunID: String) {
         self.attempts = attempts
         self.childSessionID = childSessionID
-        self.endedAt = endedAt
         self.error = error
+        self.finishedAt = finishedAt
         self.group = group
         self.key = key
         self.kind = kind
@@ -30945,7 +30959,7 @@ public struct WorkflowStepWaitingNotificationParams: Codable {
 // MARK: - WorkflowTriggerInfo
 public struct WorkflowTriggerInfo: Codable {
     public let expr: String?
-    public let kind: Kind
+    public let kind: WorkflowTriggerInfoKind
     public let path: String?
 
     public enum CodingKeys: String, CodingKey {
@@ -30954,7 +30968,7 @@ public struct WorkflowTriggerInfo: Codable {
         case path = "path"
     }
 
-    public init(expr: String?, kind: Kind, path: String?) {
+    public init(expr: String?, kind: WorkflowTriggerInfoKind, path: String?) {
         self.expr = expr
         self.kind = kind
         self.path = path

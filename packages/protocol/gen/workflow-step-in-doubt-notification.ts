@@ -4,8 +4,8 @@ export type Jsonrpc = '2.0';
 export type Method = 'workflow.step.in_doubt';
 export type Attempts = number;
 export type ChildSessionId = string | null;
-export type EndedAt = string | null;
 export type Error = string | null;
+export type FinishedAt = string | null;
 export type Group = string | null;
 export type Key = string;
 export type Kind = 'step' | 'agent' | 'review' | 'notify' | 'llm' | 'tool' | 'skill';
@@ -34,8 +34,8 @@ export interface WorkflowStepInDoubtNotification {
 export interface WorkflowStepEvent {
   attempts?: Attempts;
   child_session_id?: ChildSessionId;
-  ended_at?: EndedAt;
   error?: Error;
+  finished_at?: FinishedAt;
   group?: Group;
   key: Key;
   kind: Kind;

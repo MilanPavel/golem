@@ -4,18 +4,6 @@
       "additionalProperties": false,
       "description": "The params of ``workflow.run.started|waiting|resumed|done|failed|cancelled``.\n\nThe method names the change, ``status`` is the run's state after it. ``error`` is set for\n``workflow.run.failed``. The name is ``workflow.run.*``, never ``run.*`` (ADR-050).",
       "properties": {
-        "ended_at": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Ended At"
-        },
         "error": {
           "anyOf": [
             {
@@ -27,6 +15,18 @@
           ],
           "default": null,
           "title": "Error"
+        },
+        "finished_at": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Finished At"
         },
         "name": {
           "title": "Name",
@@ -75,7 +75,9 @@
               "enum": [
                 "manual",
                 "schedule",
-                "on_file"
+                "file",
+                "chat",
+                "try"
               ],
               "type": "string"
             },

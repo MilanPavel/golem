@@ -2,13 +2,13 @@
 
 export type Jsonrpc = '2.0';
 export type Method = 'workflow.run.failed';
-export type EndedAt = string | null;
 export type Error = string | null;
+export type FinishedAt = string | null;
 export type Name = string;
 export type SessionId = string | null;
 export type StartedAt = string | null;
 export type Status = 'pending' | 'running' | 'waiting' | 'done' | 'failed' | 'cancelled';
-export type Trigger = ('manual' | 'schedule' | 'on_file') | null;
+export type Trigger = ('manual' | 'schedule' | 'file' | 'chat' | 'try') | null;
 export type WorkflowId = string;
 export type WorkflowRunId = string;
 
@@ -30,8 +30,8 @@ export interface WorkflowRunFailedNotification {
  * via the `definition` "WorkflowRunEvent".
  */
 export interface WorkflowRunEvent {
-  ended_at?: EndedAt;
   error?: Error;
+  finished_at?: FinishedAt;
   name: Name;
   session_id?: SessionId;
   started_at?: StartedAt;

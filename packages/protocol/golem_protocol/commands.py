@@ -5930,6 +5930,10 @@ WorkflowStepStatus = Literal[
 ]
 WorkflowStepKind = Literal["step", "agent", "review", "notify", "llm", "tool", "skill"]
 WorkflowTriggerKind = Literal["manual", "schedule", "on_file"]
+WorkflowRunTrigger = Literal["manual", "schedule", "file", "chat", "try"]
+"""What started a run, as ``workflow_runs.trigger`` stores it."""
+WorkflowStartTrigger = Literal["manual", "try", "chat"]
+"""What a client may start a run with. The daemon starts ``schedule`` and ``file`` runs itself."""
 
 
 class WorkflowTriggerInfo(BaseModel):
@@ -6046,7 +6050,7 @@ class WorkflowStartParams(BaseModel):
 
     id: str = Field(min_length=1)
     inputs: dict[str, Any] = Field(default_factory=dict[str, Any])
-    trigger: WorkflowTriggerKind = "manual"
+    trigger: WorkflowStartTrigger = "manual"
 
 
 class WorkflowStartResult(BaseModel):
@@ -6070,11 +6074,11 @@ class WorkflowRunInfo(BaseModel):
     workflow_id: str = Field(min_length=1)
     name: str
     status: WorkflowRunStatus
-    trigger: WorkflowTriggerKind
+    trigger: WorkflowRunTrigger
     inputs: dict[str, Any] = Field(default_factory=dict[str, Any])
     session_id: str | None = Field(default=None, min_length=1)
     started_at: str | None = None
-    ended_at: str | None = None
+    finished_at: str | None = None
     error: str | None = None
 
 
@@ -6097,7 +6101,7 @@ class WorkflowStepInfo(BaseModel):
     error: str | None = None
     child_session_id: str | None = Field(default=None, min_length=1)
     started_at: str | None = None
-    ended_at: str | None = None
+    finished_at: str | None = None
 
 
 class WorkflowStatusParams(BaseModel):
@@ -6146,10 +6150,10 @@ class WorkflowRunEvent(BaseModel):
     workflow_id: str = Field(min_length=1)
     name: str
     status: WorkflowRunStatus
-    trigger: WorkflowTriggerKind | None = None
+    trigger: WorkflowRunTrigger | None = None
     session_id: str | None = Field(default=None, min_length=1)
     started_at: str | None = None
-    ended_at: str | None = None
+    finished_at: str | None = None
     error: str | None = None
 
 
@@ -6172,7 +6176,7 @@ class WorkflowStepEvent(BaseModel):
     error: str | None = None
     child_session_id: str | None = Field(default=None, min_length=1)
     started_at: str | None = None
-    ended_at: str | None = None
+    finished_at: str | None = None
 
 
 __all__ = [
@@ -6603,8 +6607,10 @@ __all__ = [
     "WorkflowRunEvent",
     "WorkflowRunInfo",
     "WorkflowRunStatus",
+    "WorkflowRunTrigger",
     "WorkflowStartParams",
     "WorkflowStartResult",
+    "WorkflowStartTrigger",
     "WorkflowState",
     "WorkflowStatusParams",
     "WorkflowStatusResult",
