@@ -10,6 +10,8 @@ export type SessionView = {
   changes: ChangesState;
   /** The context of the latest model call that reported its input tokens. */
   context: LiveContextState;
+  /** The helper events that make the worker blocks of the Changes tab, as they came: started, ended, applied, discarded. */
+  workerLog: readonly ChatEvent[];
   title: string | null;
   cwd: string | null;
   model: SessionModel | null;
@@ -40,6 +42,7 @@ export const initialSessionView: SessionView = {
   chat: emptyChat,
   changes: noChanges,
   context: emptyLiveContext,
+  workerLog: [],
   title: null,
   cwd: null,
   model: null,
@@ -67,10 +70,13 @@ function connectDevtools(name: string | undefined): DevtoolsConnection | undefin
   }
 }
 
+const WORKER_EVENTS: ReadonlySet<string> = new Set(["helper.started", "helper.ended", "helper.applied", "helper.discarded"]);
+
 function fold(view: SessionView, event: ChatEvent): SessionView {
   const chat = reduceChat(view.chat, event);
   const changes = reduceChanges(view.changes, event);
   const context = foldLiveContext(view.context, event);
+  const workerLog = WORKER_EVENTS.has(event.type) ? [...view.workerLog, event] : view.workerLog;
   let { title, cwd, model } = view;
   if (event.type === "session.created") {
     cwd = event.data.cwd ?? null;
@@ -90,10 +96,10 @@ function fold(view: SessionView, event: ChatEvent): SessionView {
       cwd = event.data.cwd;
     }
   }
-  if (chat === view.chat && changes === view.changes && context === view.context && title === view.title && cwd === view.cwd && model === view.model) {
+  if (chat === view.chat && changes === view.changes && context === view.context && workerLog === view.workerLog && title === view.title && cwd === view.cwd && model === view.model) {
     return view;
   }
-  return { ...view, chat, changes, context, title, cwd, model };
+  return { ...view, chat, changes, context, workerLog, title, cwd, model };
 }
 
 /**

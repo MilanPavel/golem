@@ -178,6 +178,8 @@ import type { SessionSetOptionsResult } from "../../protocol/gen/session-set-opt
 import type { SessionSetModelResult } from "../../protocol/gen/session-set-model-result.ts";
 import type { Params as ChatEvent } from "../../protocol/gen/rpc-notification.ts";
 import type { RunCancelResult } from "../../protocol/gen/run-cancel-result.ts";
+import type { HelperApplyResult } from "../../protocol/gen/helper-apply-result.ts";
+import type { HelperRetryResult } from "../../protocol/gen/helper-retry-result.ts";
 import type { HelperStopResult } from "../../protocol/gen/helper-stop-result.ts";
 import type { HelpersRespondResult } from "../../protocol/gen/helpers-respond-result.ts";
 import type { SessionAttachResult } from "../../protocol/gen/session-attach-result.ts";
@@ -338,6 +340,8 @@ import {
   isRecord,
   isRunCancelResult,
   isHelperStopResult,
+  isHelperApplyResult,
+  isHelperRetryResult,
   isHelpersRespondResult,
   isSessionAttachResult,
   isSessionCloseResult,
@@ -370,6 +374,8 @@ import { eventFrame, flat, outgoingDetail, resultDetail, shownParams, summaryFra
 const PROTOCOL_MISMATCH = -32001;
 export const SESSION_NOT_FOUND = -32003;
 export const SESSION_BUSY = -32004;
+/** `helper.apply` when a file of the worker's diff changed in the project since the worker copied it. `data.path` names the first. */
+export const HELPER_CONFLICT = -32027;
 export const MODEL_NOT_CONFIGURED = -32005;
 /** `session.create` with a `branch` in a folder that is not a git repo. */
 export const NOT_A_REPO = -32025;
@@ -490,6 +496,12 @@ export interface GolemClient {
   stopHelper(sessionId: string): Promise<HelperStopResult>;
   /** `helpers.respond`: answer "start these helpers?" (a `batch` pending item) for the `delegate` call `callId`. `run` false tells the model to do the work in the chat. `cheaper` (with `run`) starts them on the item's cheaper model. */
   respondHelpers(sessionId: string, callId: string, run: boolean, cheaper?: boolean): Promise<HelpersRespondResult>;
+  /** `helper.apply`: take a worker's diff into the project. Rejects with `HELPER_CONFLICT` when a file changed since the worker copied it. */
+  applyHelper(sessionId: string, helperId: string): Promise<HelperApplyResult>;
+  /** `helper.discard`: drop a worker's diff. */
+  discardHelper(sessionId: string, helperId: string): Promise<void>;
+  /** `helper.retry`: start the worker again on a stronger model. Resolves with the new helper's id. */
+  retryHelper(sessionId: string, helperId: string): Promise<HelperRetryResult>;
   inspectSession(sessionId: string): Promise<SessionInspectResult>;
   /** A session's runs as a tree: run, then model call, then tool call. Oldest run first. */
   /** What model calls cost: today, the week, and with a session id that session. */
@@ -1836,6 +1848,26 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       const result = await call("helpers.respond", { session_id: sessionId, call_id: callId, run, ...(cheaper === true ? { cheaper: true } : {}) });
       if (!isHelpersRespondResult(result)) {
         throw new Error("invalid helpers.respond result");
+      }
+      return result;
+    },
+    async applyHelper(sessionId: string, helperId: string): Promise<HelperApplyResult> {
+      await ready;
+      const result = await call("helper.apply", { session_id: sessionId, helper_id: helperId });
+      if (!isHelperApplyResult(result)) {
+        throw new Error("invalid helper.apply result");
+      }
+      return result;
+    },
+    async discardHelper(sessionId: string, helperId: string): Promise<void> {
+      await ready;
+      await call("helper.discard", { session_id: sessionId, helper_id: helperId });
+    },
+    async retryHelper(sessionId: string, helperId: string): Promise<HelperRetryResult> {
+      await ready;
+      const result = await call("helper.retry", { session_id: sessionId, helper_id: helperId, model: "stronger" });
+      if (!isHelperRetryResult(result)) {
+        throw new Error("invalid helper.retry result");
       }
       return result;
     },

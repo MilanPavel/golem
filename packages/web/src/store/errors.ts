@@ -1,4 +1,4 @@
-import { BRANCH_SWITCH_FAILED, MODEL_NOT_CONFIGURED, NOT_A_REPO, RpcError, SESSION_BUSY } from "@golem/client";
+import { BRANCH_SWITCH_FAILED, HELPER_CONFLICT, MODEL_NOT_CONFIGURED, NOT_A_REPO, RpcError, SESSION_BUSY } from "@golem/client";
 import { NO_MODEL_NOTICE, noModelChosen } from "@golem/view";
 
 const INVALID_PARAMS = -32602;
@@ -62,4 +62,11 @@ export function sendErrorText(error: unknown): string {
 /** One short line for a session action (rename, fork, close) the daemon refused or could not reach. */
 export function actionErrorText(error: unknown, fallback: string): string {
   return error instanceof Error && error.message !== "" ? error.message : fallback;
+}
+
+/** `helper.apply` found a file that changed in the project since the worker copied it. Its path, or "" when the daemon names none. Null for any other error. */
+export function helperConflictPath(error: unknown): string | null {
+  if (!(error instanceof RpcError) || error.code !== HELPER_CONFLICT) return null;
+  const path = error.data?.["path"];
+  return typeof path === "string" ? path : "";
 }

@@ -183,6 +183,9 @@ export type PageClient = Pick<
   | "onOllamaInstall"
   | "respondApproval"
   | "respondHelpers"
+  | "applyHelper"
+  | "discardHelper"
+  | "retryHelper"
   | "answerConsent"
   | "checkNow"
   | "close"
@@ -282,6 +285,12 @@ export type PageActions = {
   respond(sessionId: string, callId: string, decision: ApprovalChoice, args?: Readonly<Record<string, unknown>>, scope?: "batch"): Promise<void>;
   /** Answers "start these helpers?" (`helpers.respond`) for the `delegate` call `callId`. `run` false tells the model to do the work in the chat. */
   respondHelpers(sessionId: string, callId: string, run: boolean, cheaper?: boolean): Promise<void>;
+  /** Takes a worker's diff into the project. Rejects with an `RpcError` of `HELPER_CONFLICT` when a file changed since the worker copied it. */
+  applyHelper(sessionId: string, helperId: string): Promise<void>;
+  /** Drops a worker's diff. */
+  discardHelper(sessionId: string, helperId: string): Promise<void>;
+  /** Starts a worker again on a stronger model. */
+  retryHelper(sessionId: string, helperId: string): Promise<void>;
   /** Answers the paid step-up question the session's run waits on. The run goes on in its events. */
   answerConsent(sessionId: string, runId: string, answer: ConsentChoice): Promise<void>;
   /** Switches the session's model. The chip changes from the daemon's `model.selected` event. */
@@ -828,6 +837,15 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
       async respondHelpers(sessionId, callId, run, cheaper) {
         if (cheaper === true) await client.respondHelpers(sessionId, callId, run, true);
         else await client.respondHelpers(sessionId, callId, run);
+      },
+      async applyHelper(sessionId, helperId) {
+        await client.applyHelper(sessionId, helperId);
+      },
+      async discardHelper(sessionId, helperId) {
+        await client.discardHelper(sessionId, helperId);
+      },
+      async retryHelper(sessionId, helperId) {
+        await client.retryHelper(sessionId, helperId);
       },
       async answerConsent(sessionId, runId, answer) {
         await client.answerConsent(sessionId, runId, answer);
