@@ -454,6 +454,8 @@ async def ask_consent(
             label=consent.label,
             sent=None if consent.sent is None else list(consent.sent),
             not_sent=None if consent.not_sent is None else list(consent.not_sent),
+            brief=consent.brief,
+            diff_artifact_id=consent.diff_artifact_id,
         ),
     )
     # A helper asks you; a lead's own question is the one about its budget (ADR-060).
