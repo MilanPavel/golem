@@ -37,7 +37,7 @@ from golem.graphs.tools_node import (
     HELPER_AGENTS_KEY,
     HELPER_COUNT_KEY,
     Answer,
-    _advised_this_turn,
+    advised_this_turn,
 )
 from golem.sessions.helpers import unavailable_reason
 from golem.store.database import Database
@@ -94,8 +94,8 @@ def test_advisors_are_counted_from_the_results_since_the_last_user_message() -> 
         name="delegate",
         additional_kwargs={HELPER_COUNT_KEY: 1, HELPER_AGENTS_KEY: ["advisor"]},
     )
-    assert _advised_this_turn([HumanMessage(content="go"), AIMessage(content=""), done]) == 1
-    assert _advised_this_turn([done, HumanMessage(content="next")]) == 0
+    assert advised_this_turn([HumanMessage(content="go"), AIMessage(content=""), done]) == 1
+    assert advised_this_turn([done, HumanMessage(content="next")]) == 0
 
 
 async def test_with_max_per_message_two_a_second_advisor_is_allowed(tmp_path: Path) -> None:

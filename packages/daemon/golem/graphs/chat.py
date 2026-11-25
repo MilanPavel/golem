@@ -87,6 +87,7 @@ from golem.graphs.tools_node import (
     ChildScope,
     EnableMcp,
     HelperHost,
+    advised_this_turn,
     cancelled_results,
     child_of,
     memory_of,
@@ -239,6 +240,9 @@ class ChatRuntime:
         """The tier of a profile's model, or None when the profile does not resolve. No I/O."""
         self.helper_prices = helper_prices
         """What a profile's model and the helpers it could start cost, for the prompt. No I/O."""
+        self.advisor_ready: Callable[[str | None], bool] | None = None
+        """Whether a session in this folder may ask the ``advisor`` now: the agent is usable and
+        ``delegate`` is offered. None: no advisor, so a struggle is never nudged."""
         self.note_speed: Callable[..., object] | None = None
         """Told the profile and server timings of each finished call, for the speed book."""
         self.enable_mcp: EnableMcp | None = None
@@ -1198,7 +1202,8 @@ def open_chat(
     def route_after_step_up(state: AgentState) -> Literal["call_model", "end"]:
         # No stronger model on a plain reply: the run ends as it would have.
         last = state["messages"][-1] if state["messages"] else None
-        stepped = (state.get("last_call") or {}).get("stepped") is True
+        call = state.get("last_call") or {}
+        stepped = call.get("stepped") is True or call.get("nudged") is True
         plain = isinstance(last, AIMessage) and not last.tool_calls
         return "end" if plain and not stepped else "call_model"
 
@@ -1217,6 +1222,8 @@ def open_chat(
             if found is None:
                 return {}
             signal, detail = found.signal, f"{found.detail} on {old}"
+            if _may_nudge(state, config, runtime[0] if runtime else None):
+                return _nudge(state, found, call)
         ask = runtime[0].next_model if runtime else None
         stepped: StepUp | StepAsk | None = None
         session_id = state.get("session_id", "")
@@ -1346,6 +1353,50 @@ def open_chat(
 def _may_step_up(state: AgentState) -> bool:
     """Whether the run is on route ``auto`` and has not stepped up yet."""
     return state.get("can_step_up") is True and state.get("stepped_up") is not True
+
+
+NUDGE = (
+    "You seem stuck ({detail}). Before anything else, ask the advisor one question: call "
+    "`delegate` with agent `advisor` and a brief that holds the question and everything it "
+    "needs (the goal, what you tried, what went wrong, the text it must see). The advisor has "
+    "no tools and cannot look anything up. Then go on with its answer."
+)
+"""The note a stuck lead gets once per user message, before the paid step-up is offered."""
+
+
+def _may_nudge(state: AgentState, config: RunnableConfig, rt: ChatRuntime | None) -> bool:
+    """Whether the lead gets the one nudge to ask the advisor before the step-up.
+
+    Once per user message, like the advisor limit it spends: the flag resets each turn. Not in a
+    helper, not when the advisor cannot start (agent unusable, ``delegate`` left out by
+    ``use_helpers = "never"``) and not when the message's advisor limit is already spent.
+    """
+    if rt is None or rt.advisor_ready is None or state.get("nudged") is True:
+        return False
+    configurable = cast(Mapping[str, object], config.get("configurable", {}))
+    if configurable.get(CHILD_KEY) is not None:
+        return False
+    if advised_this_turn(state["messages"]) >= rt.router.agent_settings().advisor.max_per_message:
+        return False
+    return rt.advisor_ready(_cwd(config))
+
+
+def _nudge(state: AgentState, found: Struggle, call: dict[str, object]) -> dict[str, object]:
+    """Tell the lead to ask the advisor, and go back to the model. The step-up stays the second
+    offer: a struggle after this goes to it."""
+    result: dict[str, object] = {
+        "nudged": True,
+        "messages": [note(NUDGE.format(detail=found.detail))],
+        "last_call": {**call, "nudged": True},
+    }
+    last = state["messages"][-1] if state["messages"] else None
+    if found.signal == "empty_reply" and last is not None and last.id:
+        # An empty reply is no history a provider takes before a note.
+        result["messages"] = [
+            RemoveMessage(id=last.id),
+            *cast(list[BaseMessage], result["messages"]),
+        ]
+    return result
 
 
 def _struggles(state: AgentState) -> Struggle | None:
@@ -1994,6 +2045,7 @@ def _turn_input(
     fresh: dict[str, object] = {
         "can_step_up": step_up,
         "stepped_up": False,
+        "nudged": False,
         "fallbacks": 0,
         "last_call": {},
     }

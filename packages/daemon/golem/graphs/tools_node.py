@@ -338,7 +338,7 @@ def tools_node(
         parking = host is not None and not helper and bool(session_id)
         parked: list[str] = []
         delegated = _delegated_this_turn(state["messages"])
-        advised = _advised_this_turn(state["messages"])
+        advised = advised_this_turn(state["messages"])
         asked = _asked(config)
         ids = [call_id_of(call) for call in last.tool_calls]
         last_asked = max(
@@ -756,7 +756,7 @@ def _delegated_this_turn(messages: Sequence[BaseMessage]) -> int:
     return found
 
 
-def _advised_this_turn(messages: Sequence[BaseMessage]) -> int:
+def advised_this_turn(messages: Sequence[BaseMessage]) -> int:
     """How many advisors ``delegate`` calls started since the last message of the user."""
     found = 0
     for message in reversed(messages):
