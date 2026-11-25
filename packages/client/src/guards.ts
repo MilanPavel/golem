@@ -78,6 +78,12 @@ import type { RoutineInfo, RoutineListResult } from "../../protocol/gen/routine-
 import type { RoutinePreviewResult } from "../../protocol/gen/routine-preview-result.ts";
 import type { RoutineRemoveResult } from "../../protocol/gen/routine-remove-result.ts";
 import type { RoutineRunResult } from "../../protocol/gen/routine-run-result.ts";
+import type { WorkflowCancelResult } from "../../protocol/gen/workflow-cancel-result.ts";
+import type { WorkflowListResult } from "../../protocol/gen/workflow-list-result.ts";
+import type { WorkflowRunEvent } from "../../protocol/gen/workflow-run-event.ts";
+import type { WorkflowStartResult } from "../../protocol/gen/workflow-start-result.ts";
+import type { WorkflowStatusResult } from "../../protocol/gen/workflow-status-result.ts";
+import type { WorkflowStepEvent } from "../../protocol/gen/workflow-step-event.ts";
 import type { RunListResult } from "../../protocol/gen/run-list-result.ts";
 import type { SkillCreateResult } from "../../protocol/gen/skill-create-result.ts";
 import type { SkillReadResult } from "../../protocol/gen/skill-read-result.ts";
@@ -333,6 +339,31 @@ export function isRoutineGetResult(value: unknown): value is RoutineGetResult {
 
 export function isRoutineRunResult(value: unknown): value is RoutineRunResult {
   return isRecord(value) && typeof value["routine_run_id"] === "string" && typeof value["session_id"] === "string";
+}
+
+export function isWorkflowListResult(value: unknown): value is WorkflowListResult {
+  return isRecord(value) && Array.isArray(value["workflows"]);
+}
+
+export function isWorkflowStartResult(value: unknown): value is WorkflowStartResult {
+  return isRecord(value) && typeof value["workflow_run_id"] === "string";
+}
+
+export function isWorkflowStatusResult(value: unknown): value is WorkflowStatusResult {
+  const run = isRecord(value) ? value["run"] : null;
+  return isRecord(value) && isRecord(run) && typeof run["workflow_run_id"] === "string" && Array.isArray(value["steps"]);
+}
+
+export function isWorkflowCancelResult(value: unknown): value is WorkflowCancelResult {
+  return isRecord(value) && typeof value["cancelled"] === "boolean";
+}
+
+export function isWorkflowRunEvent(value: unknown): value is WorkflowRunEvent {
+  return isRecord(value) && typeof value["workflow_run_id"] === "string" && typeof value["status"] === "string";
+}
+
+export function isWorkflowStepEvent(value: unknown): value is WorkflowStepEvent {
+  return isRecord(value) && typeof value["workflow_run_id"] === "string" && typeof value["key"] === "string" && typeof value["status"] === "string";
 }
 
 export function isRoutinePreviewResult(value: unknown): value is RoutinePreviewResult {

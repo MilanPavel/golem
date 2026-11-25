@@ -44,6 +44,7 @@ from golem.store.artifacts import ArtifactStore
 from golem.store.devices import DeviceStore
 from golem.store.routine_runs import RoutineRuns
 from golem.tools.registry import ToolRegistry
+from golem.workflows.service import WorkflowService
 
 
 @dataclass
@@ -60,6 +61,8 @@ class DaemonState:
     watcher: FileWatcher | None = None
     """The file watcher of the ``on`` routines, once the daemon serves."""
     routine_runs: RoutineRuns | None = None
+    workflows: WorkflowService | None = None
+    """Workflow files, the engine and the runs in flight (``workflow.*``)."""
     devices: DeviceStore | None = None
     """The device registry, once the database is open."""
     pairing: PairingManager | None = None

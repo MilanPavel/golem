@@ -83,6 +83,17 @@ import type { RoutineListResult } from "../../protocol/gen/routine-list-result.t
 import type { RoutinePreviewResult } from "../../protocol/gen/routine-preview-result.ts";
 import type { RoutineRemoveResult } from "../../protocol/gen/routine-remove-result.ts";
 import type { RoutineRunResult } from "../../protocol/gen/routine-run-result.ts";
+import type { WorkflowCancelResult } from "../../protocol/gen/workflow-cancel-result.ts";
+import type { WorkflowListResult } from "../../protocol/gen/workflow-list-result.ts";
+import type { WorkflowRunEvent } from "../../protocol/gen/workflow-run-event.ts";
+import type { WorkflowStartResult } from "../../protocol/gen/workflow-start-result.ts";
+import type { WorkflowStatusResult } from "../../protocol/gen/workflow-status-result.ts";
+import type { WorkflowStepEvent } from "../../protocol/gen/workflow-step-event.ts";
+
+/** A `workflow.run.*` or `workflow.step.*` notification: `method` names the change, `params` is the state after it. */
+export type WorkflowNotice =
+  | { kind: "run"; method: string; params: WorkflowRunEvent }
+  | { kind: "step"; method: string; params: WorkflowStepEvent };
 import type { RunListResult } from "../../protocol/gen/run-list-result.ts";
 import type { SkillCall } from "../../protocol/gen/skill-call.ts";
 import type { SkillCreateResult } from "../../protocol/gen/skill-create-result.ts";
@@ -287,6 +298,12 @@ import {
   isRoutinePreviewResult,
   isRoutineRemoveResult,
   isRoutineRunResult,
+  isWorkflowCancelResult,
+  isWorkflowListResult,
+  isWorkflowRunEvent,
+  isWorkflowStartResult,
+  isWorkflowStatusResult,
+  isWorkflowStepEvent,
   isRunListResult,
   isSkillCreateResult,
   isAgentsListResult,
@@ -818,6 +835,16 @@ export interface GolemClient {
    * a list or a history read before is stale. The listener is told which one arrived.
    */
   onRoutinesChanged(listener: (kind: "changed" | "fired" | "finished") => void): () => void;
+  /** `workflow.list`: the user's workflows and those of `folders`; a broken or untrusted file is listed with its state. */
+  listWorkflows(folders?: string[]): Promise<WorkflowListResult>;
+  /** `workflow.start`: start a run of the workflow `id`. It returns at once; the steps arrive on `onWorkflowEvent`. */
+  startWorkflow(id: string, inputs?: Record<string, unknown>): Promise<WorkflowStartResult>;
+  /** `workflow.status`: a run and its steps. */
+  workflowStatus(workflowRunId: string): Promise<WorkflowStatusResult>;
+  /** `workflow.cancel`: stop a run. `cancelled` is false when it had already ended. */
+  cancelWorkflow(workflowRunId: string): Promise<WorkflowCancelResult>;
+  /** `workflow.run.*` and `workflow.step.*`: a run or one of its steps changed. */
+  onWorkflowEvent(listener: (notice: WorkflowNotice) => void): () => void;
   /** `memory.list`: memories, filtered and paged, with counts and the `[memory]` settings. */
   listMemories(params?: MemoryListParams): Promise<MemoryListResult>;
   /** `memory.get`: one memory with its sources. */
@@ -918,6 +945,7 @@ export function connectGolem(options: ConnectOptions): GolemClient {
   const logListeners = new Set<(log: McpServerLog) => void>();
   const skillListeners = new Set<(root: string | null) => void>();
   const agentListeners = new Set<(root: string | null) => void>();
+  const workflowListeners = new Set<(notice: WorkflowNotice) => void>();
   const routineListeners = new Set<(kind: "changed" | "fired" | "finished") => void>();
   const memoryListeners = new Set<(change: MemoryChanged) => void>();
   const pairListeners = new Set<(change: DevicePairChanged) => void>();
@@ -1342,6 +1370,27 @@ export function connectGolem(options: ConnectOptions): GolemClient {
         }
       }
       return;
+    }
+    if (isRecord(message) && typeof message["method"] === "string" && message["method"].startsWith("workflow.")) {
+      const method = message["method"];
+      const params = message["params"];
+      const notice: WorkflowNotice | null =
+        method.startsWith("workflow.run.") && isWorkflowRunEvent(params)
+          ? { kind: "run", method, params }
+          : method.startsWith("workflow.step.") && isWorkflowStepEvent(params)
+            ? { kind: "step", method, params }
+            : null;
+      if (notice !== null) {
+        record({ direction: "in", kind: method, detail: notice.params.workflow_run_id, json: line });
+        for (const listener of workflowListeners) {
+          try {
+            listener(notice);
+          } catch {
+            // A listener must not tear the socket down.
+          }
+        }
+        return;
+      }
     }
     if (isRecord(message) && message["method"] === "device.pair.changed") {
       const params = message["params"];
@@ -2904,6 +2953,44 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       routineListeners.add(listener);
       return () => {
         routineListeners.delete(listener);
+      };
+    },
+    async listWorkflows(folders?: string[]): Promise<WorkflowListResult> {
+      await ready;
+      const result = await call("workflow.list", folders === undefined ? {} : { folders });
+      if (!isWorkflowListResult(result)) {
+        throw new Error("invalid workflow.list result");
+      }
+      return result;
+    },
+    async startWorkflow(id: string, inputs?: Record<string, unknown>): Promise<WorkflowStartResult> {
+      await ready;
+      const result = await call("workflow.start", inputs === undefined ? { id } : { id, inputs });
+      if (!isWorkflowStartResult(result)) {
+        throw new Error("invalid workflow.start result");
+      }
+      return result;
+    },
+    async workflowStatus(workflowRunId: string): Promise<WorkflowStatusResult> {
+      await ready;
+      const result = await call("workflow.status", { workflow_run_id: workflowRunId });
+      if (!isWorkflowStatusResult(result)) {
+        throw new Error("invalid workflow.status result");
+      }
+      return result;
+    },
+    async cancelWorkflow(workflowRunId: string): Promise<WorkflowCancelResult> {
+      await ready;
+      const result = await call("workflow.cancel", { workflow_run_id: workflowRunId });
+      if (!isWorkflowCancelResult(result)) {
+        throw new Error("invalid workflow.cancel result");
+      }
+      return result;
+    },
+    onWorkflowEvent(listener: (notice: WorkflowNotice) => void): () => void {
+      workflowListeners.add(listener);
+      return () => {
+        workflowListeners.delete(listener);
       };
     },
     async listMemories(params?: MemoryListParams): Promise<MemoryListResult> {

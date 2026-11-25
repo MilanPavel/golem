@@ -105,8 +105,10 @@ from golem.store.events import EventLog
 from golem.store.records import RunRecords, SessionRecords
 from golem.store.routine_runs import RoutineRuns
 from golem.store.suggestions import SuggestionStore
+from golem.store.workflow_runs import WorkflowRuns
 from golem.tools import default_registry
 from golem.tools.registry import ToolRegistry, ToolScope
+from golem.workflows.service import WorkflowService
 from golem_protocol.commands import (
     AgentRegistryChanged,
     KeychainWait,
@@ -457,6 +459,13 @@ class DaemonApp:
                     self.paths.home,
                 )
                 self.state.routine_runs = RoutineRuns(database)
+                self.state.workflows = WorkflowService(
+                    runs=WorkflowRuns(database),
+                    user_dir=self.paths.workflows_dir,
+                    user_file=self.paths.config_file,
+                    trusted=policy.trusted,
+                    broadcast=self._broadcast,
+                )
                 devices = DeviceStore(database)
                 devices.on_change = self._devices_changed
                 self.state.devices = devices
@@ -551,6 +560,7 @@ class DaemonApp:
                     self.state.skills.start()
                     self.state.agents.start()
                     routines.start()
+                    self.state.workflows.start()
                     self._trimmer = sessions.helper_trimmer(
                         lambda: load_settings(home=home, project_dir=home).agents,
                         lambda: self.state.clock(),
@@ -624,6 +634,9 @@ class DaemonApp:
             self.state.notifier = None
             self.state.routines = None
             self.state.watcher = None
+            if self.state.workflows is not None:
+                await self.state.workflows.aclose()
+            self.state.workflows = None
             self.state.routine_runs = None
             if self.state.pairing is not None:
                 self.state.pairing.close()
