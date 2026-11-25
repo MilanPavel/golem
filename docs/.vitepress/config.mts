@@ -123,6 +123,7 @@ const sidebar: DefaultTheme.Sidebar = [
       { text: "Memory", link: "/guide/memory" },
       { text: "Helpers and Measure", link: "/guide/helpers" },
       { text: "Routines", link: "/guide/routines" },
+      { text: "Workflows", link: "/guide/workflows" },
       { text: "The web UI", link: "/guide/web" },
       { text: "Settings", link: "/guide/settings" },
       { text: "Run your own relay", link: "/guide/relay" },
