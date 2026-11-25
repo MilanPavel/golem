@@ -60,6 +60,8 @@ class AgentState(MessagesState):
     """Model calls the lead made since the last user message. Reset each turn."""
     wrap_noted: NotRequired[bool]
     """The lead was told its calls are nearly spent, once. Reset each turn."""
+    fill_nudged: NotRequired[bool]
+    """The lead was told to hand its reading to a helper once in this run. Reset each turn."""
     fallbacks: NotRequired[int]
     """Times this run left a failing provider for another model. At most two. Reset each turn."""
     last_call: NotRequired[dict[str, object]]

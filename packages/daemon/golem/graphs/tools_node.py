@@ -756,6 +756,10 @@ def _delegated_this_turn(messages: Sequence[BaseMessage]) -> int:
     return found
 
 
+delegated_this_turn = _delegated_this_turn
+"""Public name of :func:`_delegated_this_turn`, for the fill nudge of the chat graph."""
+
+
 def advised_this_turn(messages: Sequence[BaseMessage]) -> int:
     """How many advisors ``delegate`` calls started since the last message of the user."""
     found = 0
