@@ -1128,6 +1128,8 @@ function HelperDockDemo() {
             helper: SAMPLE_HELPER_CONSENT.helper?.name ?? null,
             sent: SAMPLE_HELPER_CONSENT.sent,
             notSent: SAMPLE_HELPER_CONSENT.notSent,
+            agent: "reviewer",
+            brief: SAMPLE_HELPER_CONSENT.brief,
           }}
           onAnswer={() => {}}
         />,

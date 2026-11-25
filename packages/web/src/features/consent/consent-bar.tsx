@@ -1,7 +1,8 @@
 import {
-  CONSENT_LABELS,
   CONSENT_TITLE,
+  consentAnswerLabel,
   consentAnswers,
+  consentShowable,
   consentCapsLine,
   consentLine,
   consentNotSentLine,
@@ -13,6 +14,7 @@ import {
 import { Button } from "../../ui/button.tsx";
 import { Code } from "../../ui/code.tsx";
 import { Seal } from "../approval/approval-bar.tsx";
+import { ShowBrief } from "./show-brief.tsx";
 
 /**
  * The paid step-up question, docked above the composer in the style of the approval card: what golem
@@ -23,6 +25,7 @@ export function ConsentBar({
   sending = false,
   error = null,
   id,
+  sessionId = null,
   onAnswer,
 }: {
   consent: PendingConsent;
@@ -30,10 +33,13 @@ export function ConsentBar({
   error?: string | null;
   /** The element id, so the Inbox can scroll to the card. */
   id?: string;
+  /** The session that asked, to read the diff of a helper's question from. */
+  sessionId?: string | null;
   onAnswer: (answer: ConsentChoice) => void;
 }) {
   const caps = consentCapsLine(consent);
   const answers = consentAnswers(consent);
+  const showable = consentShowable(consent);
   const sentLines = [consentSentLine(consent), consentNotSentLine(consent)].filter((line) => line !== "");
   return (
     <section id={id} role="group" aria-label="Paid model" data-consent-bar="" className="overflow-hidden rounded-lg border border-line-strong bg-surface shadow-soft">
@@ -55,6 +61,7 @@ export function ConsentBar({
               {line}
             </p>
           ))}
+          {showable === null ? null : <ShowBrief brief={showable.brief} diffArtifactId={showable.diffArtifactId} sessionId={sessionId} />}
           {caps === "" ? null : <p className="mt-0.5 text-meta leading-snug text-faint wrap-anywhere">{caps}</p>}
         </div>
       </div>
@@ -69,7 +76,7 @@ export function ConsentBar({
               onAnswer(answer);
             }}
           >
-            {CONSENT_LABELS[answer]}
+            {consentAnswerLabel(consent, answer)}
           </Button>
         ))}
       </div>

@@ -44,6 +44,9 @@ test("route.consent.needed opens the question on the run, and the answer closes 
     helper: null,
     sent: [],
     notSent: [],
+    agent: null,
+    brief: null,
+    diffArtifactId: null,
     caps: { sessionUsd: 0.5, dailyUsd: 2.0, spentSession: 0.1, spentToday: 0.42 },
   });
   state = reduceChat(state, ev("route.consent.answered", { answer: "once" }));

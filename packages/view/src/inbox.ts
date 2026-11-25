@@ -25,6 +25,9 @@ export interface InboxPending extends HelperEstimateFields {
   /** For a helper's paid question: what goes to the paid model, and what does not. */
   sent?: readonly string[] | null;
   not_sent?: readonly string[] | null;
+  /** For a helper's paid question: its brief, and the artifact that holds its diff. */
+  brief?: string | null;
+  diff_artifact_id?: string | null;
   /** For a `batch`: how many helpers it starts, and their agent type names. */
   helper_count?: number | null;
   agents?: readonly string[] | null;
@@ -75,6 +78,10 @@ export interface InboxItem {
   sent: string[];
   /** For a paid question: what does not go ("this chat"). */
   notSent: string[];
+  /** For a helper's paid question: its brief, to show behind "Show"; null when none. */
+  brief: string | null;
+  /** For a helper's paid question: the artifact that holds its diff; null when none. */
+  diffArtifactId: string | null;
   /** For a batch: one agent type name per helper it starts; empty otherwise. */
   agents: string[];
   /** For a batch with an estimate (a paid model, above the amount you set); null otherwise. */
@@ -225,6 +232,8 @@ export function inboxItems(sessions: readonly InboxSession[], now: number): Inbo
         answerSessionId: helper === null ? session.session_id : helper.sessionId,
         sent: approval || batch ? [] : [...(pending.sent ?? [])],
         notSent: approval || batch ? [] : [...(pending.not_sent ?? [])],
+        brief: approval || batch ? null : (pending.brief ?? null),
+        diffArtifactId: approval || batch ? null : (pending.diff_artifact_id ?? null),
         agents: batch ? [...(pending.agents ?? [])] : [],
         estimate: batch ? helperEstimateOf(pending) : null,
       });

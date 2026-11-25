@@ -94,6 +94,8 @@ export type KeyPlace = {
   question?: boolean;
   /** The run waits for an answer about a paid model. */
   consent?: boolean;
+  /** That question is a helper's, with a brief or a diff the `s` key shows. */
+  consentShow?: boolean;
   /** The question shown is a helper's tool call (ADR-059), answered for once, this helper, or all helpers. */
   helperAsk?: boolean;
   /** The question shown is "start these helpers?" (Use helpers: Ask me first): Run or do it in the chat. */
@@ -130,6 +132,7 @@ export type KeyEffect =
   | { kind: "restart-service" }
   | { kind: "approve"; decision: "allow" | "allow_session" | "allow_always" | "deny" }
   | { kind: "consent"; answer: "session" | "once" | "local" }
+  | { kind: "consent-show" }
   | { kind: "helper-ask"; answer: HelperAskAnswer }
   | { kind: "helpers-run"; run: boolean; cheaper?: boolean }
   | { kind: "ask-next" }
@@ -161,6 +164,7 @@ type KeyWhen = {
   approvalEdit?: boolean;
   question?: boolean;
   consent?: boolean;
+  consentShow?: boolean;
   helperAsk?: boolean;
   useHelpers?: boolean;
   useHelpersCheaper?: boolean;
@@ -668,6 +672,14 @@ function consentKeys(): KeyBinding[] {
     answer("consent-session", "Allows a paid model for the rest of the session.", "a", "session"),
     answer("consent-once", "Allows a paid model for this turn only.", "o", "once"),
     answer("consent-local", "Stays on a local model for this turn.", "l", "local"),
+    {
+      id: "consent-show",
+      label: "s",
+      contexts: ["approval"],
+      description: "Shows or hides the brief and the diff of a helper's paid question.",
+      when: { input: "s", overlay: false, switcher: false, consent: true, consentShow: true },
+      run: () => ({ kind: "consent-show" }),
+    },
   ];
 }
 
@@ -958,6 +970,9 @@ function whenMatches(when: KeyWhen, place: KeyPlace, press: Press): boolean {
     return false;
   }
   if (when.consent !== undefined && when.consent !== (place.consent === true)) {
+    return false;
+  }
+  if (when.consentShow !== undefined && when.consentShow !== (place.consentShow === true)) {
     return false;
   }
   if (when.helperAsk !== undefined && when.helperAsk !== (place.helperAsk === true)) {
