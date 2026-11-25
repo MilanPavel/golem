@@ -147,13 +147,14 @@ class WorkflowRuns:
         """Move a run to ``status``.
 
         ``at`` stamps ``started_at`` (the first time the run is ``running``) or
-        ``finished_at`` (``done``, ``failed`` or ``cancelled``).
+        ``finished_at`` (``done``, ``failed`` or ``cancelled``). Any other status clears
+        ``finished_at``, so a resumed run does not keep the time it stopped.
         """
         finished = status in ("done", "failed", "cancelled")
         await self._write(
             "UPDATE workflow_runs SET status = ?, error = ?,"
             " started_at = CASE WHEN ? AND started_at IS NULL THEN ? ELSE started_at END,"
-            " finished_at = CASE WHEN ? THEN ? ELSE finished_at END"
+            " finished_at = CASE WHEN ? THEN ? ELSE NULL END"
             " WHERE workflow_run_id = ?",
             (status, error, status == "running", at, finished, at, run_id),
         )
