@@ -23,6 +23,7 @@ from golem.graphs.child import ChildLimits
 from golem.graphs.state import AgentState
 from golem.graphs.tools_node import NO_MORE_HELPERS, Answer, tools_node
 from golem.permissions.policy import Policy
+from golem.sessions.helper_estimate import EstimateCard
 from golem.tools.delegate import DELEGATE, HelperOutcome, HelperSpec
 from golem.tools.registry import Tool, ToolContext, ToolError, ToolRegistry, ToolResult
 
@@ -50,12 +51,19 @@ class _Host:
         config: RunnableConfig,
         call_id: str,
         helpers: Sequence[HelperSpec],
+        cheaper: bool = False,
     ) -> None:
-        del state, config
+        del state, config, cheaper
         self.start_calls += 1
         if self.refuse is not None:
             raise ToolError(self.refuse)
         self.started.setdefault(call_id, list(helpers))
+
+    async def estimate_helpers(
+        self, *, state: AgentState, config: RunnableConfig, helpers: Sequence[HelperSpec]
+    ) -> EstimateCard | None:
+        del state, config, helpers
+        return None
 
     async def helpers_ended(self, session_id: str, call_id: str) -> bool:
         del session_id

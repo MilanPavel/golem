@@ -156,10 +156,15 @@ class _Chat:
         saver: InMemorySaver | None = None,
         log: SessionLog | None = None,
         with_home: bool = False,
+        agents_extra: dict[str, Any] | None = None,
     ) -> None:
         self.setup = setup
         self.database, self.project, self.home = database, project, home
-        agents = AgentSettings(use_helpers=use_helpers, at_once=at_once)  # type: ignore[arg-type]
+        agents = AgentSettings(
+            use_helpers=use_helpers,  # type: ignore[arg-type]
+            at_once=at_once,
+            **(agents_extra or {}),
+        )
         self.model = _Model(replies=replies)
         self.saver = saver or InMemorySaver()
         self.router = _Router(

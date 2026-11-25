@@ -69,6 +69,7 @@ from golem.sessions.approvals import pending_approval, pending_consent
 from golem.sessions.bus import EventTarget, SummaryTarget
 from golem.sessions.context import context_breakdown
 from golem.sessions.helper_clock import clock_paused, working_ms
+from golem.sessions.helper_estimate import EstimateCard, HelperPlan, estimate_batch
 from golem.sessions.helper_limits import Used, covered_line, reached, used_of
 from golem.sessions.helpers import (
     DEFAULT_PROMPT,
@@ -1922,22 +1923,16 @@ class SessionManager:
             overridden_by=wish if override else None,
         )
 
-    async def start_helpers(
-        self,
-        *,
-        state: AgentState,
-        config: RunnableConfig,
-        call_id: str,
-        helpers: Sequence[HelperSpec],
-    ) -> None:
-        """Start the helpers of the ``delegate`` call ``call_id``, or find them again.
+    async def _plan_helpers(
+        self, state: AgentState, config: RunnableConfig, helpers: Sequence[HelperSpec]
+    ) -> tuple[str | None, list[tuple[AgentSnapshot, str]]]:
+        """The folder of a ``delegate`` call and, for each spec, its agent and system prompt.
 
         Each agent is the file of that name as the folder of the call sees it: a project agent
         only in a trusted folder. Its tools are the ones its lead may use too, and its limits are
         resolved from ``config.toml`` and the file. Only an agent whose
-        tools all read can run now. Every spec is checked before any helper starts. Raises
-        :class:`~golem.tools.registry.ToolError` for an agent that is unknown, held back or
-        not available yet, and as :meth:`start_helper` does.
+        tools all read can run now. Raises :class:`~golem.tools.registry.ToolError` for an
+        agent that is unknown, held back or not available yet.
         """
         configurable = cast(Mapping[str, object], config.get("configurable", {}))
         raw = configurable.get(CWD_KEY)
@@ -1972,6 +1967,34 @@ class SessionManager:
             tools = [name for name in agent.tools if name in offered or name == "delegate"]
             snapshot = snapshot_of(agent, source, tools, self._runtime.router.agent_settings())
             chosen.append((snapshot, agent.body))
+        return cwd, chosen
+
+    async def start_helpers(
+        self,
+        *,
+        state: AgentState,
+        config: RunnableConfig,
+        call_id: str,
+        helpers: Sequence[HelperSpec],
+        cheaper: bool = False,
+    ) -> None:
+        """Start the helpers of the ``delegate`` call ``call_id``, or find them again.
+
+        Every spec is checked (:meth:`_plan_helpers`) before any helper starts. Raises
+        :class:`~golem.tools.registry.ToolError` for an agent that is unknown, held back or
+        not available yet, and as :meth:`start_helper` does.
+
+        ``cheaper`` is the answer "Use a cheaper model" to the estimate: every helper starts on
+        the model :meth:`_cheaper_model` gives, as if its spec had named that model. Without
+        one the helpers start as planned.
+        """
+        cwd, chosen = await self._plan_helpers(state, config, helpers)
+        named: str | None = None
+        if cheaper:
+            async with self._lock:
+                lead = await self._resolve(state["session_id"])
+                local_only = self.local_only(cwd) or lead.route == "local"
+                named = await self._cheaper_model(lead, state["model_profile"], local_only)
         for index, (spec, (snapshot, prompt)) in enumerate(zip(helpers, chosen, strict=True)):
             await self.start_helper(
                 state["session_id"],
@@ -1983,8 +2006,93 @@ class SessionManager:
                 cwd,
                 label=spec.label,
                 prompt=prompt,
-                asked_model=spec.model,
+                asked_model=named or spec.model,
             )
+
+    async def estimate_helpers(
+        self, *, state: AgentState, config: RunnableConfig, helpers: Sequence[HelperSpec]
+    ) -> EstimateCard | None:
+        """What the batch of a ``delegate`` call is estimated to cost, None when there is no
+        estimate to show (step 15.6.5, ADR-059 section 5).
+
+        The helpers' models are picked as :meth:`start_helper` will pick them (the same
+        :meth:`_helper_model`, which reads cached facts and changes nothing). None for:
+
+        - a batch of local helpers only, which costs nothing;
+        - a batch where a helper's pick asks the paid question (a local lead, a paid helper):
+          that question is asked anyway, and the estimate does not come on top of it;
+        - a paid model with no known price (the batch cannot be called large);
+        - a spec that does not resolve: :meth:`start_helpers` refuses it with its own message.
+        """
+        try:
+            cwd, chosen = await self._plan_helpers(state, config, helpers)
+        except ToolError:
+            return None
+        async with self._lock:
+            lead = await self._resolve(state["session_id"])
+            local_only = self.local_only(cwd) or lead.route == "local"
+            plans: list[HelperPlan] = []
+            for spec, (snapshot, _prompt) in zip(helpers, chosen, strict=True):
+                picked = await self._helper_model(
+                    lead,
+                    state["model_profile"],
+                    snapshot,
+                    local_only,
+                    brief=spec.brief,
+                    asked=spec.model,
+                )
+                if picked.ask is not None:
+                    return None
+                if picked.choice is None or picked.choice.model is None:
+                    return None  # no model facts: the tier and the price are not known
+                facts = picked.choice.model
+                plans.append(
+                    HelperPlan(
+                        model=picked.profile,
+                        brief=spec.brief,
+                        local=facts.tier == "local",
+                        price=facts.price,
+                        max_tokens=snapshot.limits.max_tokens,
+                    )
+                )
+            batch = estimate_batch(plans)
+            if batch is None:
+                return None
+            settings = self._runtime.router.agent_settings()
+            return EstimateCard(
+                estimate_usd=batch.total_usd,
+                allowed_usd=settings.per_message_cost,
+                ask_over_usd=settings.estimate_over,
+                model=batch.model,
+                cheaper_model=await self._cheaper_model(
+                    lead, state["model_profile"], local_only, than=batch.model
+                ),
+            )
+
+    async def _cheaper_model(
+        self, lead: _LiveSession, model_profile: str, local_only: bool, than: str | None = None
+    ) -> str | None:
+        """The model "Use a cheaper model" starts helpers on: the pick for the wish ``cheapest``.
+
+        None when it is the model the helpers run on already (``than``, else the lead's) or the
+        lead's own, when the pick would ask the paid question, and without model facts. With the
+        manager's lock held.
+        """
+        setup = await self._helper_setup(
+            "cheapest",
+            model_profile,
+            lead.options,
+            lead.session_id,
+            interactive=not lead.origin.startswith("routine:"),
+            local_only=local_only,
+            chat_paid=lead.paid_ok,
+        )
+        if setup is None:
+            return None
+        pick = pick_helper("cheapest", setup.own, setup.candidates, setup.traits, setup.held)
+        if pick.needs_consent or pick.model.profile in (than or model_profile, model_profile):
+            return None
+        return pick.model.profile
 
     def unavailable_reason(self, agent: Agent) -> str | None:
         """Why ``agent`` cannot be started now (the text ``delegate`` refuses with), or None."""
@@ -3287,12 +3395,19 @@ class SessionManager:
             return await self._respond_one(session_id, call_id, decision, args, device)
 
     async def respond_helpers(
-        self, session_id: str, call_id: str, run: bool, *, device: str | None = None
+        self,
+        session_id: str,
+        call_id: str,
+        run: bool,
+        *,
+        cheaper: bool = False,
+        device: str | None = None,
     ) -> str:
         """Answer "start these helpers?" (``[agents] use_helpers = "ask"``) and go on.
 
         ``run`` starts the helpers of the ``delegate`` call. Without it the call gets a result
-        that tells the model to do the work in the chat. Returns the run's id once
+        that tells the model to do the work in the chat. ``cheaper``, with ``run``, starts them on
+        the cheaper model of the estimate (see :meth:`start_helpers`). Returns the run's id once
         ``approval.resolved`` is in the log.
 
         Raises :class:`ApprovalNotFoundError` when the run waits on no such question,
@@ -3306,7 +3421,12 @@ class SessionManager:
                 if found is None or found.call_id != call_id or found.source != HELPERS_ASK_SOURCE:
                     raise ApprovalNotFoundError(call_id)
             return await self._respond_one(
-                session_id, call_id, "allow" if run else "deny", None, device
+                session_id,
+                call_id,
+                "allow" if run else "deny",
+                None,
+                device,
+                cheaper=run and cheaper,
             )
 
     async def _respond_batch(
@@ -3372,6 +3492,8 @@ class SessionManager:
         decision: ApprovalDecision,
         args: dict[str, object] | None,
         device: str | None,
+        *,
+        cheaper: bool = False,
     ) -> str:
         """The answer to one session's run, with the manager's lock held."""
         session = await self._resolve(session_id)
@@ -3422,6 +3544,7 @@ class SessionManager:
             device=device,
             diff=pending.diff,
             args=args,
+            cheaper=cheaper,
             mcp_servers=tuple(sorted(session.mcp_servers)),
             pinned=tuple(session.skills),
             pinned_folders=self._pinned_folders(session),

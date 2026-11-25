@@ -60,6 +60,7 @@ from golem.memory.service import MemoryAccess
 from golem.models.tiers import Tier
 from golem.permissions.engine import Allowance, session_allows
 from golem.permissions.policy import Policy, describe, explain
+from golem.sessions.helper_estimate import EstimateCard
 from golem.skills.registry import SkillRegistry
 from golem.tools.delegate import (
     DelegateArgs,
@@ -156,12 +157,21 @@ class HelperHost(Protocol):
         config: RunnableConfig,
         call_id: str,
         helpers: Sequence[HelperSpec],
+        cheaper: bool = False,
     ) -> None:
         """Start the helpers of the ``delegate`` call ``call_id``, or find them again.
 
         Idempotent for one call. Refuses what the manager refuses, such as a helper of a helper,
-        by raising :class:`ToolError` with a message the model can read.
+        by raising :class:`ToolError` with a message the model can read. ``cheaper`` starts each
+        on the cheaper model of the estimate (the answer "Use a cheaper model").
         """
+        ...
+
+    async def estimate_helpers(
+        self, *, state: AgentState, config: RunnableConfig, helpers: Sequence[HelperSpec]
+    ) -> EstimateCard | None:
+        """The estimate of the batch, None when it has none to show (local helpers only, a
+        paid question asked anyway, no price)."""
         ...
 
     async def helpers_ended(self, session_id: str, call_id: str) -> bool:
@@ -224,6 +234,8 @@ class _Verdict:
     kind: ErrorKind = "tool_error"
     approved_diff: str | None = None
     args: dict[str, object] | None = None
+    cheaper: bool = False
+    """The helpers of a ``delegate`` call start on the cheaper model of the estimate."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -237,9 +249,16 @@ class Answer:
     decision: str
     diff: str | None = None
     args: dict[str, object] | None = None
+    cheaper: bool = False
+    """With ``use_helpers``: start the helpers on the cheaper model of the estimate."""
 
     def to_resume(self) -> dict[str, object]:
-        return {"decision": self.decision, "diff": self.diff, "args": self.args}
+        return {
+            "decision": self.decision,
+            "diff": self.diff,
+            "args": self.args,
+            "cheaper": self.cheaper,
+        }
 
     @staticmethod
     def helpers_done() -> Answer:
@@ -256,6 +275,7 @@ class Answer:
             decision=decision if isinstance(decision, str) else "deny",
             diff=diff if isinstance(diff, str) else None,
             args=dict(cast(dict[str, object], args)) if isinstance(args, dict) else None,
+            cheaper=value.get("cheaper") is True,
         )
 
 
@@ -336,18 +356,21 @@ def tools_node(
                 verdicts.append(_Verdict(run=False, message=message, kind="denied"))
                 continue
             helpers_ask = False
-            if (
-                parking
-                and call["name"] == "delegate"
-                and (ids[index] in asked or (index > last_asked and helpers_setting() == "ask"))
-            ):
-                # "Ask me first": the question comes only for a call that would start helpers.
+            estimate: EstimateCard | None = None
+            if parking and call["name"] == "delegate":
+                # The question "start these helpers?" comes for a call that would start helpers:
+                # with "Ask me first", and for a batch whose estimate is over ``estimate_over``.
                 assert host is not None
-                refusal = _delegate_refusal(call, delegated, host.child_limits.max_per_turn)
-                if refusal is not None:
-                    verdicts.append(refusal)
-                    continue
-                helpers_ask = True
+                fresh = ids[index] not in asked and index > last_asked
+                ask_first = ids[index] in asked or (fresh and helpers_setting() == "ask")
+                if ask_first or fresh:
+                    refusal = _delegate_refusal(call, delegated, host.child_limits.max_per_turn)
+                    if refusal is not None:
+                        verdicts.append(refusal)
+                        continue
+                    if fresh:
+                        estimate = await _estimate(host, state, config, call)
+                    helpers_ask = ask_first or (estimate is not None and estimate.over)
             preview = await _preview(session_tools, call, replace(base, planned=dict(planned)))
             verdict = _decide(
                 session_tools,
@@ -362,6 +385,7 @@ def tools_node(
                 before_last_asked=index < last_asked,
                 never_ask=never_ask,
                 helpers_ask=helpers_ask,
+                estimate=estimate,
             )
             if verdict.run and verdict.args is not None:
                 edited = cast(ToolCall, {**call, "args": verdict.args})
@@ -379,7 +403,11 @@ def tools_node(
                     if over is not None:
                         raise ToolError(over)
                     await host.start_helpers(
-                        state=state, config=config, call_id=ids[index], helpers=specs
+                        state=state,
+                        config=config,
+                        call_id=ids[index],
+                        helpers=specs,
+                        cheaper=verdict.cheaper,
                     )
                 except InvalidArguments as exc:
                     verdict = _Verdict(run=False, message=str(exc), kind="invalid_args")
@@ -519,6 +547,7 @@ def _decide(
     before_last_asked: bool,
     never_ask: bool = False,
     helpers_ask: bool = False,
+    estimate: EstimateCard | None = None,
 ) -> _Verdict:
     """``preview`` is what the call would change, or why it cannot, or None.
 
@@ -554,13 +583,14 @@ def _decide(
                 "source": HELPERS_ASK_SOURCE if helpers_ask else decision.source,
                 "subject": subject,
                 "diff": preview.diff if isinstance(preview, Preview) else None,
+                **({} if not helpers_ask or estimate is None else _estimate_fields(estimate)),
             }
         )
     )
     if helpers_ask:
         if answer.decision == "deny":
             return _Verdict(run=False, message=HELPERS_DECLINED, kind="denied")
-        return _Verdict(run=True)
+        return _Verdict(run=True, cheaper=answer.cheaper)
     if decision.action == "deny" and answer.decision != "deny":
         log.info("tool %s denied by %s after it was approved", name, decision.source)
         return _Verdict(run=False, message=explain(decision, name), kind="denied")
@@ -572,6 +602,17 @@ def _decide(
     if answer.decision in ("allow", "allow_always"):
         return _Verdict(run=True, approved_diff=answer.diff)
     return _Verdict(run=False, message=DENIED_RESULT, kind="denied")
+
+
+def _estimate_fields(card: EstimateCard) -> dict[str, object]:
+    """The estimate on the question "start these helpers?" (``approval.needed``)."""
+    return {
+        "estimate_usd": card.estimate_usd,
+        "allowed_usd": card.allowed_usd,
+        "ask_over_usd": card.ask_over_usd,
+        "model": card.model,
+        "cheaper_model": card.cheaper_model,
+    }
 
 
 async def _preview(
@@ -719,6 +760,17 @@ def _over_limit(asked: int, delegated: int, limit: int) -> str | None:
             "or fewer"
         )
     return None
+
+
+async def _estimate(
+    host: ChildHost, state: AgentState, config: RunnableConfig, call: ToolCall
+) -> EstimateCard | None:
+    """The estimate of the batch of a ``delegate`` call, None when it has none to show."""
+    try:
+        specs = _specs(call)
+    except InvalidArguments:
+        return None  # the call is refused with its own message when it runs
+    return await host.estimate_helpers(state=state, config=config, helpers=specs)
 
 
 def _delegate_refusal(call: ToolCall, delegated: int, limit: int) -> _Verdict | None:

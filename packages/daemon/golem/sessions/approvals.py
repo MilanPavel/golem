@@ -40,6 +40,12 @@ class Pending:
     prompt: str | None
     open_calls: tuple[str, ...]
     asked: tuple[str, ...]
+    estimate_usd: float | None = None
+    allowed_usd: float | None = None
+    ask_over_usd: float | None = None
+    model: str | None = None
+    cheaper_model: str | None = None
+    """The estimate of a batch of helpers, from the ``approval.needed`` of ``use_helpers``."""
 
 
 def pending_approval(events: list[ChatEvent]) -> Pending | None:
@@ -71,6 +77,11 @@ def pending_approval(events: list[ChatEvent]) -> Pending | None:
         prompt=prompt,
         open_calls=tuple(turn.open_calls),
         asked=tuple(asked),
+        estimate_usd=waiting.data.estimate_usd,
+        allowed_usd=waiting.data.allowed_usd,
+        ask_over_usd=waiting.data.ask_over_usd,
+        model=waiting.data.model,
+        cheaper_model=waiting.data.cheaper_model,
     )
 
 
@@ -171,6 +182,11 @@ def pending_entry(events: list[ChatEvent]) -> tuple[PendingItem, PendingKey] | N
             call_id=approval.call_id,
             helper_count=len(agents),
             agents=agents,
+            estimate_usd=approval.estimate_usd,
+            allowed_usd=approval.allowed_usd,
+            ask_over_usd=approval.ask_over_usd,
+            model=approval.model,
+            cheaper_model=approval.cheaper_model,
         )
         return item, ("batch", None, None)
     if approval is not None:

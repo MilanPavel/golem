@@ -203,6 +203,8 @@ class Resume:
     """The paired phone that answered, for ``approval.resolved``. None for any other client."""
     diff: str | None = None
     args: dict[str, object] | None = None
+    cheaper: bool = False
+    """The answer to the estimate of a batch: start its helpers on the cheaper model."""
     mcp_servers: tuple[str, ...] = ()
     pinned: tuple[str, ...] = ()
     pinned_folders: tuple[str, ...] = ()
@@ -574,7 +576,12 @@ async def resume_turn(
                     device=resume.device,
                 ),
             )
-            answer = Answer(decision=resume.decision, diff=resume.diff, args=resume.args)
+            answer = Answer(
+                decision=resume.decision,
+                diff=resume.diff,
+                args=resume.args,
+                cheaper=resume.cheaper,
+            )
         else:
             answer = Answer(decision=resume.consent)
         stream = runtime.resume(
@@ -969,6 +976,11 @@ async def _apply(
                 source=fact.source,
                 subject=fact.subject,
                 diff=fact.diff,
+                estimate_usd=fact.estimate_usd,
+                allowed_usd=fact.allowed_usd,
+                ask_over_usd=fact.ask_over_usd,
+                model=fact.model,
+                cheaper_model=fact.cheaper_model,
             ),
         )
         await _run_wait(emit, fact.message_id or progress.user_message_id, "you")

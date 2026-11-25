@@ -120,6 +120,7 @@ from golem.models.window import ContextWindow, WindowOf
 from golem.models.window_plan import spilled
 from golem.permissions.engine import Allowance
 from golem.permissions.policy import Policy
+from golem.sessions.helper_estimate import EstimateCard
 from golem.sessions.ids import new_id
 from golem.skills.registry import SkillRegistry
 from golem.tools import default_registry
@@ -564,9 +565,19 @@ class ChatRuntime:
         config: RunnableConfig,
         call_id: str,
         helpers: Sequence[HelperSpec],
+        cheaper: bool = False,
     ) -> None:
         await self._helper_host().start_helpers(
-            state=state, config=config, call_id=call_id, helpers=helpers
+            state=state, config=config, call_id=call_id, helpers=helpers, cheaper=cheaper
+        )
+
+    async def estimate_helpers(
+        self, *, state: AgentState, config: RunnableConfig, helpers: Sequence[HelperSpec]
+    ) -> EstimateCard | None:
+        if self.helpers is None:
+            return None  # the refusal comes from start_helpers, with its message
+        return await self._helper_host().estimate_helpers(
+            state=state, config=config, helpers=helpers
         )
 
     async def helpers_ended(self, session_id: str, call_id: str) -> bool:
