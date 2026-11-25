@@ -154,12 +154,24 @@ found = await run.agent("explorer", "List the TODOs in src/", model="cheapest")
 print(found["answer"])
 ```
 
-`run.agent(type, brief, model=None, key=None)` runs one agent of that type (the same agents `delegate` uses) as a helper of the run's session, with golem's permissions. It returns `{"status", "answer", "session_id"}`; open `session_id` to see everything the agent did. The step has kind `agent` and the key `key` or `agent:<type>`; give two agents of one type their own `key=`.
+`run.agent(type, brief, model=None, key=None, gets=(), budget=None)` runs one agent of that type (the same agents `delegate` uses) as a helper of the run's session, with golem's permissions. It returns `{"status", "answer", "session_id"}`; open `session_id` to see everything the agent did. The step has kind `agent` and the key `key` or `agent:<type>`; give two agents of one type their own `key=`.
 
 - `model=` is a wish (`cheapest`, `same`, `stronger`, `local`, `budget`, `frontier`), never a model name. Without it the agent's own wish is used. A local-only folder keeps the agent local.
 - An approval the agent needs shows on the run's session, so the run shows "needs you".
 - An agent that fails or is stopped fails the step, and the error says why.
 - After a restart the run continues and waits for the same agent. It never starts a second one.
+- `gets=["diff"]` hands the agent what `delegate` hands a helper whose file says `gets`: the run's diff, as a file it can read. It is added to what the agent's own file asks for. Other values fail the step.
+- `budget="$0.50"` (or `budget=0.5`) caps what this one agent may cost. An agent that reaches it stops with `cost` and fails the step, and the error says so. If the agent's file or `[agents] max_cost` has a lower cap, the lower one wins. A local model has no price, so the cap never fires for it.
+
+#### Agents at once
+
+```python
+reports = await run.parallel(
+    [run.agent("explorer", f"Check {pkg}", key=f"check-{pkg}", budget="$0.20") for pkg in packages]
+)
+```
+
+The agents inside one `run.parallel` start as one batch, like several helpers of one `delegate`: they share one call (`wf:parallel-N`), and each has its place in the list. The helper limit `[agents] at_once` applies to the whole batch, so with a limit of 2 the first two run and the rest wait their turn (the run's session shows why they wait). Each agent still has its own step, key and `child_session_id`. After a restart each agent is found again by its place, and none starts twice. An agent on its own, outside `run.parallel`, is a batch of one.
 
 ### Asking a model one question
 

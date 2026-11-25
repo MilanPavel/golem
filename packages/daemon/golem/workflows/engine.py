@@ -45,8 +45,22 @@ Emit = Callable[[str, dict[str, Any]], None]
 Notify = Callable[[str | None, str, str], Awaitable[None]]
 """Tells the person: title (or None), text, and the workflow run id the text is about."""
 AgentStarted = Callable[[str], Awaitable[None]]
-AgentRunner = Callable[[str, str, str, str, str | None, AgentStarted], Awaitable[dict[str, Any]]]
-"""Runs an agent step: workflow run id, step key, agent type, brief, model wish and a callback
+AgentRunner = Callable[
+    [
+        str,
+        str,
+        str,
+        str,
+        str | None,
+        tuple[str, int] | None,
+        tuple[str, ...],
+        float | None,
+        AgentStarted,
+    ],
+    Awaitable[dict[str, Any]],
+]
+"""Runs an agent step: workflow run id, step key, agent type, brief, model wish, the batch
+(group key and position, or None), ``gets``, the cost cap in dollars and a callback
 for the helper's session id. Returns the step's result. ``workflows/agents.py`` is behind it."""
 
 SkillRunner = Callable[[str, str, str, str, AgentStarted], Awaitable[dict[str, Any]]]
@@ -109,7 +123,15 @@ class WorkflowEngine:
         await self._notify(title, text, workflow_run_id)
 
     async def run_agent(
-        self, workflow_run_id: str, key: str, agent_type: str, brief: str, model: str | None
+        self,
+        workflow_run_id: str,
+        key: str,
+        agent_type: str,
+        brief: str,
+        model: str | None,
+        batch: tuple[str, int] | None = None,
+        gets: tuple[str, ...] = (),
+        budget: float | None = None,
     ) -> dict[str, Any]:
         """Run an agent step's helper; its session id is saved on the step as soon as it exists."""
         if self._agent is None:
@@ -119,7 +141,9 @@ class WorkflowEngine:
             await self._store.set_step_child_session(workflow_run_id, key, session_id)
             await self.step_event("workflow.step.started", workflow_run_id, key)
 
-        return await self._agent(workflow_run_id, key, agent_type, brief, model, started)
+        return await self._agent(
+            workflow_run_id, key, agent_type, brief, model, batch, gets, budget, started
+        )
 
     async def run_skill(
         self, workflow_run_id: str, key: str, name: str, args: str
@@ -416,7 +440,11 @@ class _Journal:
         brief: str,
         model: str | None,
         group_key: str | None,
+        position: int | None = None,
+        gets: tuple[str, ...] = (),
+        budget: float | None = None,
     ) -> dict[str, Any]:
+        batch = None if group_key is None or position is None else (group_key, position)
         return await self.run_step(
             workflow_run_id,
             key,
@@ -424,7 +452,7 @@ class _Journal:
             agent_type,
             group_key,
             self._engine.run_agent,
-            (workflow_run_id, key, agent_type, brief, model),
+            (workflow_run_id, key, agent_type, brief, model, batch, gets, budget),
             {},
         )
 

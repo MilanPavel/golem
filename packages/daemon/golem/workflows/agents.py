@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Sequence
 from pathlib import Path
 from typing import Any
 
@@ -45,6 +45,14 @@ Started = Callable[[str], Awaitable[None]]
 def call_id_of(key: str) -> str:
     """The ``delegate`` call id the helper of the step ``key`` is stored under."""
     return f"wf:{key}"
+
+
+def place_of(key: str, batch: tuple[str, int] | None) -> tuple[str, int]:
+    """The call id and index of a step's helper: its place in its ``run.parallel`` group, or
+    ``wf:<key>`` and 0 for an agent on its own."""
+    if batch is None:
+        return call_id_of(key), 0
+    return call_id_of(batch[0]), batch[1]
 
 
 class WorkflowAgents:
@@ -84,12 +92,21 @@ class WorkflowAgents:
         brief: str,
         model: str | None,
         started: Started,
+        batch: tuple[str, int] | None = None,
+        gets: Sequence[str] = (),
+        budget: float | None = None,
     ) -> dict[str, Any]:
         """Run one agent as a helper of ``session_id`` and return its outcome.
 
         Returns ``{"status", "answer", "session_id"}``. Raises :class:`WorkflowError` for an
         unknown or unavailable agent type, a model wish that is not one, a helper that cannot
         start, and a helper that failed or was stopped.
+
+        ``batch`` is the group key and position of an agent inside ``run.parallel``: the agents
+        of one group are the helpers of one ``delegate`` call, so the helper cap, the queue and
+        the wait reasons apply to them together. ``gets`` is added to what the agent's file
+        asks for, and ``budget`` (dollars) caps the helper's cost, the lower of it and the
+        file's own ``max_cost``.
         """
         if model is not None and model not in WISHES:
             raise WorkflowError(
@@ -106,6 +123,12 @@ class WorkflowAgents:
             raise WorkflowError(reason)
         origin: AgentOrigin = next(e.origin for e in view.listed if e.agent is agent)
         snapshot = snapshot_of(agent, origin, agent.tools, self._settings())
+        if budget is not None:
+            have = snapshot.limits.max_cost_usd
+            cap = budget if have is None else min(have, budget)
+            snapshot = snapshot.model_copy(
+                update={"limits": snapshot.limits.model_copy(update={"max_cost_usd": cap})}
+            )
         outcome, child = await self._helper(
             session_id,
             cwd,
@@ -115,7 +138,8 @@ class WorkflowAgents:
             started,
             prompt=agent.body,
             asked_model=model,
-            gets=agent.gets,
+            gets=tuple(dict.fromkeys((*agent.gets, *gets))),
+            batch=batch,
         )
         if outcome.stopped != "done":
             detail = f": {outcome.covered}" if outcome.covered else ""
@@ -166,7 +190,7 @@ class WorkflowAgents:
             wish=skill.model or "cheapest",
             tools=tuple(tools),
         )
-        reason = self._sessions.unavailable_reason(agent)
+        reason = self._sessions.unavailable_reason(agent, cwd)
         if reason is not None:
             raise WorkflowError(reason)
         snapshot = snapshot_of(agent, call.source, agent.tools, self._settings())
@@ -180,6 +204,7 @@ class WorkflowAgents:
             prompt=SKILL_PROMPT,
             asked_model=None,
             gets=(),
+            batch=None,
         )
         if outcome.stopped != "done":
             detail = f": {outcome.covered}" if outcome.covered else ""
@@ -198,14 +223,19 @@ class WorkflowAgents:
         prompt: str,
         asked_model: str | None,
         gets: tuple[str, ...],
+        batch: tuple[str, int] | None,
     ) -> tuple[Any, str]:
-        """Start the helper of step ``key`` once, wait for it, and return its outcome and id."""
-        call_id = call_id_of(key)
+        """Start the helper of step ``key`` once, wait for it, and return its outcome and id.
+
+        The helper is stored under ``(call id, index)``: ``wf:<key>`` and 0 on its own, or
+        ``wf:<group key>`` and its position in the group, so a restart finds it again.
+        """
+        call_id, index = place_of(key, batch)
         try:
             ref = await self._sessions.start_helper(
                 session_id,
                 call_id,
-                0,
+                index,
                 snapshot,
                 brief,
                 await self._sessions.model_profile(session_id),
@@ -218,19 +248,22 @@ class WorkflowAgents:
         except ToolError as exc:
             raise WorkflowError(str(exc)) from exc
         await started(ref.session_id)
-        await self._wait(session_id, call_id)
-        (outcome,) = await self._sessions.helper_results(session_id, call_id)
+        await self._wait(session_id, call_id, index)
+        (outcome,) = await self._sessions.helper_results(session_id, call_id, index)
         return outcome, ref.session_id
 
-    async def _wait(self, session_id: str, call_id: str) -> None:
-        """Wait until the helper has ended: ``helper.ended`` wakes this, nothing polls."""
+    async def _wait(self, session_id: str, call_id: str, index: int) -> None:
+        """Wait until the helper at ``index`` of the call has ended.
+
+        ``helper.ended`` wakes this, nothing polls.
+        """
         waiter = asyncio.Event()
         waiters = self._waiters.setdefault(session_id, set())
         waiters.add(waiter)
         try:
             while True:
                 waiter.clear()
-                if await self._sessions.helpers_ended(session_id, call_id):
+                if await self._sessions.helpers_ended(session_id, call_id, index):
                     return
                 try:
                     await asyncio.wait_for(waiter.wait(), RECHECK_SECONDS)
