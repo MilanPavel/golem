@@ -101,7 +101,7 @@ class WorkflowAgents:
         if agent is None:
             names = ", ".join(a.name for a in view.usable())
             raise WorkflowError(f"unknown agent type {agent_type!r}; the agents are {names}")
-        reason = self._sessions.unavailable_reason(agent)
+        reason = self._sessions.unavailable_reason(agent, cwd)
         if reason is not None:
             raise WorkflowError(reason)
         origin: AgentOrigin = next(e.origin for e in view.listed if e.agent is agent)

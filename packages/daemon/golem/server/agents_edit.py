@@ -145,7 +145,7 @@ async def agent_infos(ctx: RequestContext, cwd: str | None) -> list[tuple[AgentI
             text=text,
             prompt=agent.body if trusted else None,
             changing_tools=sessions.changing_tools(agent) if sessions is not None else [],
-            unavailable=sessions.unavailable_reason(agent) if usable and sessions else None,
+            unavailable=sessions.unavailable_reason(agent, cwd) if usable and sessions else None,
             stopped=None if counts is None else (0 if count is None else count.stopped),
             cost_usd=None if count is None else count.cost_usd,
         ), agent

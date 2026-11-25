@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from fakes import make_checkout
 from langchain_core.callbacks import CallbackManagerForLLMRun
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, ToolMessage
@@ -44,9 +45,10 @@ from golem.sessions.manager import NotAHelperBatchError, SessionManager
 from golem.store.database import Database
 from golem.store.events import EventLog
 from golem.store.records import RunRecords, SessionRecords
+from golem.tools import sandbox
 from golem_protocol.events import ApprovalNeededEvent, ChatEvent
 
-WRITE = {"path": "new.txt", "content": "x"}
+WRITE = {"command": "printf x > new.txt"}
 
 
 class _Model(BaseChatModel):
@@ -167,6 +169,14 @@ class _Rig:
     async def asks(self, session_id: str) -> int:
         return sum(isinstance(e, ApprovalNeededEvent) for e in await self.stored(session_id))
 
+    async def wrote(self, session_id: str) -> str | None:
+        """What the helper's command wrote to ``new.txt`` in its copy, None when nothing."""
+        found = await self.records.copy_of(session_id)
+        target = None if found is None else Path(found[0]) / "new.txt"
+        return (
+            target.read_text(encoding="utf-8") if target is not None and target.exists() else None
+        )
+
     async def allowed(self, session_id: str) -> list[tuple[str, str | None]]:
         return list(await self.manager.allowances(session_id))
 
@@ -183,11 +193,12 @@ async def _settled(database: Database) -> AsyncIterator[None]:
 
 
 @pytest.fixture
-def project(tmp_path: Path) -> Path:
+def project(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    monkeypatch.setenv("GOLEM_HOME", str(tmp_path / "golem-home"))
     root = tmp_path / "project"
     root.mkdir()
     (root / "a.py").write_text("def a():\n    return 1\n", encoding="utf-8")
-    return root
+    return make_checkout(root)
 
 
 async def _until(check: Callable[[], Awaitable[bool]]) -> None:
@@ -196,7 +207,7 @@ async def _until(check: Callable[[], Awaitable[bool]]) -> None:
             await asyncio.sleep(0.01)
 
 
-def _model(*briefs: str, call: tuple[str, dict[str, Any]] = ("write_file", WRITE)) -> _Model:
+def _model(*briefs: str, call: tuple[str, dict[str, Any]] = ("shell", WRITE)) -> _Model:
     return _Model(calls={brief: call for brief in briefs})
 
 
@@ -223,7 +234,8 @@ async def test_a_batch_answer_for_one_workers_call_answers_all_five(
     for helper in helpers:
         await _done(rig, helper)
         assert await rig.asks(helper) == 1
-    assert (project / "new.txt").read_text(encoding="utf-8") == "x"
+    if sandbox.available():  # the command runs only where there is a sandbox
+        assert await rig.wrote(helpers[0]) == "x"
     # The lead holds nothing a helper was given.
     assert await rig.allowed(lead) == []
     record = await rig.records.get(lead)
@@ -249,10 +261,11 @@ async def test_a_helper_that_asks_later_is_not_asked(
     await _done(rig, later)
 
     assert await rig.asks(later) == 0
-    assert (project / "new.txt").exists()
+    if sandbox.available():
+        assert await rig.wrote(now) == "x"
     # It is held in the helper's session, in its log too, so a restart keeps it.
     (pair,) = await rig.allowed(later)
-    assert pair[0] == "write_file"
+    assert pair[0] == "shell"
     record = await rig.records.get(later)
     assert record is not None and record.allowed_tools == (pair,)
 
@@ -293,7 +306,7 @@ async def test_batch_deny_denies_those_waiting_and_not_the_ones_who_have_not_ask
     for helper in (one, two):
         events = await _done_events(rig, helper)
         assert [e.data.message for e in events if e.type == "tool.failed"]
-    assert not (project / "new.txt").exists()
+    assert await rig.wrote(one) is None
     assert await rig.allowed(later) == []
 
     # A deny answers a question that was asked: the helper that had not asked is still asked.
@@ -369,7 +382,7 @@ async def test_allow_session_in_a_helper_is_that_helpers_and_ends_with_it(
     await _done(rig, one)
 
     (pair,) = await rig.allowed(one)
-    assert pair[0] == "write_file"
+    assert pair[0] == "shell"
     # The other helper still waits for its own answer, and the lead holds nothing.
     assert await rig.allowed(two) == []
     assert await rig.allowed(lead) == []
@@ -413,12 +426,17 @@ async def test_a_helper_starts_with_its_leads_allowances_cut_to_its_tools(
     lead = await rig.lead(project)
     live = await rig.manager._resolve(lead)
     live.allowed_tools.update(
-        {("write_file", "new.txt"), ("edit_file", "a.py"), ("web_fetch", None), ("delegate", None)}
+        {
+            ("shell", "printf x > new.txt"),
+            ("edit_file", "a.py"),
+            ("web_fetch", None),
+            ("delegate", None),
+        }
     )
     helper = await rig.worker(lead, project, "one")
 
     # The worker has read_file, write_file and shell: the rest is cut, and delegate never is.
-    assert await rig.allowed(helper) == [("write_file", "new.txt")]
+    assert await rig.allowed(helper) == [("shell", "printf x > new.txt")]
     assert len(await rig.allowed(lead)) == 4
     # The allowance the lead gave covers the call: the helper does not ask for it.
     await _done(rig, helper)
@@ -428,16 +446,16 @@ async def test_a_helper_starts_with_its_leads_allowances_cut_to_its_tools(
 async def test_the_leads_deny_rule_wins_inside_a_helper(
     database: Database, project: Path, tmp_path: Path
 ) -> None:
-    rules = '[[rule]]\ntool = "write_file"\naction = "deny"\n'
+    rules = '[[rule]]\ntool = "shell"\naction = "deny"\n'
     rig = _Rig(database, _model("one", "two"), tmp_path, rules=rules)
     lead = await rig.lead(project)
     live = await rig.manager._resolve(lead)
-    live.allowed_tools.add(("write_file", "new.txt"))
+    live.allowed_tools.add(("shell", "printf x > new.txt"))
     one = await rig.worker(lead, project, "one", index=0)
     events = await _done_events(rig, one)
     failed = [e for e in events if e.type == "tool.failed"]
     assert len(failed) == 1 and await rig.asks(one) == 0
-    assert not (project / "new.txt").exists()
+    assert await rig.wrote(one) is None
 
     # A batch yes does not get past it either: the helper that has not asked is denied too.
     gate = threading.Event()
@@ -448,7 +466,7 @@ async def test_the_leads_deny_rule_wins_inside_a_helper(
     for helper in (two, other):
         await _done(rig, helper)
         assert await rig.asks(helper) == 0
-    assert not (project / "new.txt").exists()
+    assert await rig.wrote(two) is None
 
 
 # --- local models only, cloud models only -------------------------------------------------------

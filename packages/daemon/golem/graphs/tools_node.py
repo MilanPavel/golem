@@ -145,6 +145,12 @@ class ChildScope:
     spent: Callable[[], Awaitable[bool]] | None = field(default=None, compare=False)
     """Whether the helper has reached its cost or token limit, read from its stored events
     before each model call. When it has, the call is the last one: it answers without tools."""
+    copy: Path | None = field(default=None, compare=False)
+    """The git copy of the lead's folder that a helper with writing tools works in (15.10.2).
+    It is the helper's root: file tools and the shell work there, and a write inside it needs
+    no question."""
+    lead_folder: Path | None = field(default=None, compare=False)
+    """The lead's folder, which a helper with a ``copy`` may read and never writes."""
 
 
 class HelperHost(Protocol):
@@ -392,6 +398,7 @@ def tools_node(
                 never_ask=never_ask,
                 helpers_ask=helpers_ask,
                 estimate=estimate,
+                in_copy=child is not None and child.copy is not None,
             )
             if verdict.run and verdict.args is not None:
                 edited = cast(ToolCall, {**call, "args": verdict.args})
@@ -557,6 +564,7 @@ def _decide(
     never_ask: bool = False,
     helpers_ask: bool = False,
     estimate: EstimateCard | None = None,
+    in_copy: bool = False,
 ) -> _Verdict:
     """``preview`` is what the call would change, or why it cannot, or None.
 
@@ -569,6 +577,9 @@ def _decide(
     helpers_ask = helpers_ask and decision.allowed
     if not asked and not helpers_ask:
         if decision.allowed:
+            return _Verdict(run=True)
+        if in_copy and decision.action != "deny" and _writes_in(name, preview, ctx.root):
+            # A worker's copy holds its writes until the lead applies them: nothing to ask.
             return _Verdict(run=True)
         if decision.action == "deny":
             log.info("tool %s denied by %s", name, decision.source)
@@ -611,6 +622,18 @@ def _decide(
     if answer.decision in ("allow", "allow_always"):
         return _Verdict(run=True, approved_diff=answer.diff)
     return _Verdict(run=False, message=DENIED_RESULT, kind="denied")
+
+
+COPY_WRITES = frozenset({"write_file", "edit_file"})
+"""The tools whose change inside a worker's copy needs no question."""
+
+
+def _writes_in(name: str, preview: Preview | str | None, root: Path | None) -> bool:
+    """Whether ``name`` is a file write whose previewed path is inside ``root``."""
+    if name not in COPY_WRITES or root is None or not isinstance(preview, Preview):
+        return False
+    base = root.resolve()
+    return preview.path == base or base in preview.path.parents
 
 
 def _estimate_fields(card: EstimateCard) -> dict[str, object]:
@@ -967,6 +990,9 @@ def scope_of(config: RunnableConfig) -> ToolScope:
 
 def _root(config: RunnableConfig) -> Path | None:
     configurable = cast(Mapping[str, object], config.get("configurable", {}))
+    child = child_of(config)
+    if child is not None and child.copy is not None:
+        return child.copy
     raw = configurable.get(CWD_KEY)
     return Path(raw) if isinstance(raw, str) and raw != "" else None
 
@@ -978,7 +1004,9 @@ def _read_roots(state: AgentState, config: RunnableConfig) -> tuple[Path, ...]:
     pinned = (
         [f for f in cast(list[object], raw) if isinstance(f, str)] if isinstance(raw, list) else []
     )
-    folders = [*(state.get("skill_folders") or []), *pinned]
+    child = child_of(config)
+    lead = [] if child is None or child.lead_folder is None else [str(child.lead_folder)]
+    folders = [*lead, *(state.get("skill_folders") or []), *pinned]
     return tuple(Path(folder) for folder in dict.fromkeys(folders))
 
 

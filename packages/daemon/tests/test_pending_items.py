@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from fakes import FixedFacts
+from fakes import FixedFacts, make_checkout
 from test_helper_consent import _agent, _helper, _lead  # pyright: ignore
 from test_helper_model import (  # pyright: ignore
     BIG,
@@ -32,6 +32,7 @@ from golem.store.database import Database
 from golem_protocol.commands import PendingItem, SessionSummary
 
 LOCK = ("shell", {"command": "uv lock"})
+HWRITE = ("shell", {"command": "printf x > new.txt"})
 WRITE = ("write_file", {"path": "new.txt", "content": "x"})
 
 
@@ -44,11 +45,12 @@ async def _settled(database: Database) -> AsyncIterator[None]:
 
 
 @pytest.fixture
-def project(tmp_path: Path) -> Path:
+def project(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    monkeypatch.setenv("GOLEM_HOME", str(tmp_path / "golem-home"))
     root = tmp_path / "project"
     root.mkdir()
     (root / "a.py").write_text("def a():\n    return 1\n", encoding="utf-8")
-    return root
+    return make_checkout(root)
 
 
 class _Watch:
@@ -185,7 +187,7 @@ async def test_the_same_tool_with_another_subject_is_another_item(
 async def test_two_different_questions_are_two_items_oldest_first(
     database: Database, project: Path, tmp_path: Path
 ) -> None:
-    chat, watch = _chat(database, tmp_path, [[WRITE], [LOCK], [WRITE]], _local_setup())
+    chat, watch = _chat(database, tmp_path, [[HWRITE], [LOCK], [HWRITE]], _local_setup())
     lead = await _careful(chat, project)
     helpers = await _workers(chat, watch, lead, project, 3)
 
@@ -193,7 +195,7 @@ async def test_two_different_questions_are_two_items_oldest_first(
     kinds = [
         (i.name, i.count, i.helper.session_id if i.helper else None) for i in summary.pending_items
     ]
-    assert kinds == [("write_file", 2, helpers[0]), ("shell", None, helpers[1])]
+    assert kinds == [("shell", 2, helpers[0]), ("shell", None, helpers[1])]
     assert summary.pending_items[0].since <= summary.pending_items[1].since
     assert summary.pending == summary.pending_items[0]
 
@@ -228,12 +230,12 @@ async def _waiting(chat: _Chat, session_id: str) -> bool:
 async def test_answering_one_clears_it_from_the_lead_and_the_lead_is_told(
     database: Database, project: Path, tmp_path: Path
 ) -> None:
-    chat, watch = _chat(database, tmp_path, [[WRITE], [LOCK], "done"], _local_setup())
+    chat, watch = _chat(database, tmp_path, [[HWRITE], [LOCK], "done"], _local_setup())
     lead = await _careful(chat, project)
     one, two = await _workers(chat, watch, lead, project, 2)
     # The lead's summary went out with each helper's question as it appeared.
     sent = [[i.name for i in s.pending_items] for s in watch.of(lead)]
-    assert ["write_file"] in sent and ["write_file", "shell"] in sent
+    assert ["shell"] in sent and ["shell", "shell"] in sent
 
     call = next(e for e in await chat.stored(one) if e.type == "approval.needed").data.call_id  # type: ignore[union-attr]
     await chat.manager.respond(one, call, "deny")

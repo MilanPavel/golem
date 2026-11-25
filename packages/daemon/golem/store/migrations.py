@@ -325,4 +325,8 @@ MIGRATIONS: tuple[tuple[str, ...], ...] = (
         " WHERE answered_at IS NULL",
     ),
     ("ALTER TABLE workflow_steps ADD COLUMN model TEXT",),
+    (
+        "ALTER TABLE sessions ADD COLUMN copy_path TEXT",
+        "ALTER TABLE sessions ADD COLUMN copy_baseline TEXT",
+    ),
 )

@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from fakes import FixedFacts, ToolCallingChatModel, model_facts
+from fakes import FixedFacts, ToolCallingChatModel, make_checkout, model_facts
 from langgraph.checkpoint.memory import InMemorySaver
 from pydantic import BaseModel
 
@@ -26,7 +26,7 @@ from golem.sessions.summaries import summarize
 from golem.store.database import Database
 from golem.store.events import EventLog
 from golem.store.records import RunRecords, SessionRecords
-from golem.tools import default_registry
+from golem.tools import default_registry, sandbox
 from golem.tools.registry import Tool, ToolContext, ToolError, ToolRegistry, ToolResult
 from golem_protocol.events import (
     AgentSnapshot,
@@ -144,11 +144,12 @@ class _Chat:
 
 
 @pytest.fixture
-def project(tmp_path: Path) -> Path:
+def project(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    monkeypatch.setenv("GOLEM_HOME", str(tmp_path / "golem-home"))
     root = tmp_path / "project"
     root.mkdir()
     (root / "a.py").write_text("def a():\n    return 1\n", encoding="utf-8")
-    return root
+    return make_checkout(root)
 
 
 async def test_starting_twice_with_one_key_returns_one_session(
@@ -351,7 +352,7 @@ async def test_a_helper_sees_only_the_tools_of_its_agent(
 async def test_an_agent_that_never_asks_gets_a_refusal_where_another_would_ask(
     database: Database, project: Path, tmp_path: Path
 ) -> None:
-    write = [("write_file", {"path": "new.txt", "content": "x"})]
+    write = [("shell", {"command": "printf x > new.txt"})]
     chat = _Chat(database, [write, "gave up", write], home=tmp_path)
     lead = await chat.manager.create(None, cwd=str(project))
     await chat.manager.set_mode(lead, "careful")
@@ -360,19 +361,18 @@ async def test_an_agent_that_never_asks_gets_a_refusal_where_another_would_ask(
     events = await chat.until(quiet, "session.completed")
     failed = [e for e in events if e.type == "tool.failed"]
     assert [e.data.message for e in failed] == [NO_ASK_REFUSAL]
-    assert not (project / "new.txt").exists()
 
     asking = await chat.helper(lead, project, WORKER, call_id="call-2")
     events = await chat.until(asking, "approval.needed")
     needed = next(e for e in events if e.type == "approval.needed")
-    assert needed.data.name == "write_file"
+    assert needed.data.name == "shell"
 
 
 async def test_the_scope_is_read_again_from_the_record_after_a_restart(
     database: Database, project: Path, tmp_path: Path
 ) -> None:
     saver = InMemorySaver()
-    write = [("write_file", {"path": "new.txt", "content": "x"})]
+    write = [("shell", {"command": "printf x > new.txt"})]
     before = _Chat(database, [write], saver=saver, home=tmp_path)
     lead = await before.manager.create(None, cwd=str(project))
     await before.manager.set_mode(lead, "careful")
@@ -388,13 +388,16 @@ async def test_the_scope_is_read_again_from_the_record_after_a_restart(
     assert (child.tools, child.asks) == (frozenset({"read_file", "write_file", "shell"}), True)
     await after.manager.respond(helper, call_id, "allow")
     await after.until(helper, "session.completed")
-    assert (project / "new.txt").read_text(encoding="utf-8") == "x"
+    found = await after.records.copy_of(helper)
+    assert found is not None  # the copy is read again from the record
+    if sandbox.available():  # the command runs only where there is a sandbox
+        assert (Path(found[0]) / "new.txt").read_text(encoding="utf-8") == "x"
 
 
 async def test_closing_the_lead_cancels_and_closes_its_helpers(
     database: Database, project: Path, tmp_path: Path
 ) -> None:
-    write = [("write_file", {"path": "new.txt", "content": "x"})]
+    write = [("shell", {"command": "printf x > new.txt"})]
     chat = _Chat(database, [write, write], home=tmp_path)
     lead = await chat.manager.create(None, cwd=str(project))
     await chat.manager.set_mode(lead, "careful")
@@ -413,7 +416,6 @@ async def test_closing_the_lead_cancels_and_closes_its_helpers(
         assert "run.cancelled" in kinds
         assert kinds[-1] == "session.closed"
     assert await chat.records.open_helpers(lead) == []
-    assert not (project / "new.txt").exists()
 
 
 _TIERS: dict[str, Tier] = {"anthropic/big": "frontier", "deepseek/chat": "budget"}
