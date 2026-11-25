@@ -18,7 +18,7 @@ from pydantic import BaseModel
 
 from golem.config import GolemSettings, ModelPrice
 from golem.graphs.adapter import ModelRequested
-from golem.graphs.chat import MAX_MODEL_CALLS, ChatRuntime, open_chat
+from golem.graphs.chat import MAX_MODEL_CALLS, STOP_LINE, ChatRuntime, open_chat
 from golem.graphs.tools_node import CANCELLED_RESULT
 from golem.models.router import ModelIdentity, ModelRouter
 from golem.permissions.policy import Policy
@@ -316,7 +316,7 @@ async def test_a_session_without_a_folder_says_so(database: Database) -> None:
     assert "no project folder" in failed[0].data.message
 
 
-async def test_a_model_that_never_stops_calling_tools_fails_the_run(
+async def test_a_model_that_never_stops_calling_tools_ends_at_the_limit_with_a_stop_line(
     database: Database, project: Path
 ) -> None:
     calls: list[str | list[tuple[str, dict[str, Any]]]] = [
@@ -325,9 +325,9 @@ async def test_a_model_that_never_stops_calling_tools_fails_the_run(
     chat = _chat(database, ToolCallingChatModel(replies=calls))
     session_id = await chat.manager.create(None, cwd=str(project))
     events = await chat.finished(await chat.manager.send(session_id, "loop"))
-    failed = events[-1]
-    assert isinstance(failed, RunFailedEvent)
-    assert failed.data.message == f"the run stopped after {MAX_MODEL_CALLS} model calls"
+    assert not any(isinstance(e, RunFailedEvent) for e in events)
+    completed = [e for e in events if isinstance(e, MessageCompletedEvent)]
+    assert completed[-1].data.text == STOP_LINE.format(limit=MAX_MODEL_CALLS)
 
 
 class _SlowArgs(BaseModel):

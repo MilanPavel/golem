@@ -509,12 +509,14 @@ class ChatSettings(BaseModel):
     ``instructions`` are your lines on how golem should answer. The model reads them on
     every call, so a change shows on the next call. ``plan_first`` says whether a new
     session starts in plan first. A session that is already open is not changed.
+    ``max_model_calls`` is the most model calls one message may make before the lead must answer.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     instructions: list[str] = Field(default_factory=list[str])
     plan_first: bool = False
+    max_model_calls: int = Field(default=25, ge=5, le=200)
 
     @field_validator("instructions")
     @classmethod
