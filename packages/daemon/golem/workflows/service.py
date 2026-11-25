@@ -21,7 +21,9 @@ from pydantic import BaseModel
 
 from golem.routine_scheduler import trusted_folders
 from golem.store.workflow_runs import WorkflowReviewRecord, WorkflowRunRecord, WorkflowRuns
-from golem.workflows.engine import WorkflowEngine, restart_policy
+from golem.workflow import WorkflowError
+from golem.workflows.agents import WorkflowAgents
+from golem.workflows.engine import AgentStarted, WorkflowEngine, restart_policy
 from golem.workflows.registry import WorkflowEntry, WorkflowRegistry
 from golem_protocol import rpc
 from golem_protocol.commands import PendingItem, WorkflowRunEvent, WorkflowStepEvent
@@ -88,8 +90,10 @@ class WorkflowService:
         create_session: Callable[[str, str | None], Awaitable[str]] | None = None,
         notify: Callable[[str, str, str | None], Awaitable[None]] | None = None,
         touch_session: Callable[[str], Awaitable[None]] | None = None,
+        agents: WorkflowAgents | None = None,
     ) -> None:
         self.runs = runs
+        self._agents = agents
         self._touch_session = touch_session
         self._touches: set[asyncio.Task[None]] = set()
         self._broadcast = broadcast
@@ -102,7 +106,32 @@ class WorkflowService:
             user_dir=user_dir, projects=self._projects, trusted=trusted
         )
         self._tell = notify
-        self.engine = WorkflowEngine(runs, self._emit, self._notify if notify else None)
+        self.engine = WorkflowEngine(
+            runs, self._emit, self._notify if notify else None, self._agent if agents else None
+        )
+
+    async def _agent(
+        self,
+        run_id: str,
+        key: str,
+        agent_type: str,
+        brief: str,
+        model: str | None,
+        started: AgentStarted,
+    ) -> dict[str, Any]:
+        """Adapt a ``run.agent`` to the seam: the helper belongs to the run's session."""
+        record = await self.runs.get_run(run_id)
+        if self._agents is None or record is None or record.session_id is None:
+            raise WorkflowError("run.agent needs the run's session, and this run has none")
+        return await self._agents.run(
+            session_id=record.session_id,
+            cwd=record.project,
+            key=key,
+            agent_type=agent_type,
+            brief=brief,
+            model=model,
+            started=started,
+        )
 
     async def _notify(self, title: str | None, text: str, run_id: str) -> None:
         """Adapt a ``run.notify`` to the Notifier: the click opens the run's session."""

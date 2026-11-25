@@ -108,6 +108,7 @@ from golem.store.suggestions import SuggestionStore
 from golem.store.workflow_runs import WorkflowRuns
 from golem.tools import default_registry
 from golem.tools.registry import ToolRegistry, ToolScope
+from golem.workflows.agents import WorkflowAgents
 from golem.workflows.service import WorkflowService
 from golem_protocol.commands import (
     AgentRegistryChanged,
@@ -470,6 +471,12 @@ class DaemonApp:
                     ),
                     notify=self.state.notifier.tell,
                     touch_session=sessions.touch,
+                    agents=WorkflowAgents(
+                        sessions=sessions,
+                        agents=self.state.agents,
+                        bus=bus,
+                        settings=router.agent_settings,
+                    ),
                 )
                 sessions.review_items = self.state.workflows.pending_items
                 devices = DeviceStore(database)

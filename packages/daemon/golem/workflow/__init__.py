@@ -121,6 +121,18 @@ class StepBackend(Protocol):
         draft: Any,
     ) -> Any: ...
 
+    async def agent(
+        self,
+        workflow_run_id: str,
+        key: str,
+        agent_type: str,
+        brief: str,
+        model: str | None,
+        group_key: str | None,
+    ) -> dict[str, Any]:
+        """Run an agent as a helper of the run's session (the ``agent`` step)."""
+        ...
+
 
 _group: ContextVar[str | None] = ContextVar("golem_workflow_group", default=None)
 IDEMPOTENCY_KEY: ContextVar[str | None] = ContextVar("golem_workflow_key", default=None)
@@ -264,8 +276,23 @@ class Run:
             {},
         )
 
-    async def agent(self, *args: Any, **kwargs: Any) -> Any:
-        raise NotImplementedError("run.agent arrives with 3.5 (#16)")
+    async def agent(
+        self, type: str, brief: str, model: str | None = None, key: str | None = None
+    ) -> dict[str, Any]:
+        """Run an agent of this ``type`` on ``brief``.
+
+        Returns ``{"status", "answer", "session_id"}``.
+        The agent is a helper of the run's session, with golem's permissions, and ``session_id``
+        is its session. ``model`` is a wish (``cheapest``, ``stronger``, ...), never a model
+        name. A helper that fails or is stopped fails the step. A step of kind ``agent`` keyed
+        ``key or f"agent:{type}"``: each key may be used once per run, so two agents of one type
+        need their own ``key=``. After a restart the same agent is waited for, not started again.
+        """
+        step_key = key or f"agent:{type}"
+        self._use_key(step_key, f"agent {type}")
+        return await self._backend.agent(
+            self.workflow_run_id, step_key, type, brief, model, _group.get()
+        )
 
     async def llm(self, *args: Any, **kwargs: Any) -> Any:
         raise NotImplementedError("run.llm arrives with 3.6 (#740)")
