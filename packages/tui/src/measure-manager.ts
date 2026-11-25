@@ -440,11 +440,11 @@ function runsLines(m: EvalMeasurement, run: MeasureRunView, width: number, room:
   return [...head, ...body.slice(start, start + space)];
 }
 
-function runLines(data: MeasureData, state: MeasureState, run: MeasureRunView, width: number, room: number): { lines: McpManagerLine[]; hint: string; trail: string } {
+function runLines(data: MeasureData, state: MeasureState, run: MeasureRunView, width: number, room: number, now: Date): { lines: McpManagerLine[]; hint: string; trail: string } {
   const m = data.measurement !== null && data.measurement.id === run.id ? data.measurement : null;
   const out: McpManagerLine[] = [];
   const summary = (data.list ?? []).find((item) => item.id === run.id);
-  const when = summary === undefined ? run.id : measureList([summary])[0]?.when ?? run.id;
+  const when = summary === undefined ? run.id : measureList([summary], now)[0]?.when ?? run.id;
   if (data.error !== null) out.push({ text: data.error, mark: { text: "✘", tone: "bad" } }, { text: "" });
   if (m === null) {
     out.push({ text: "reading the measurement…", dim: true });
@@ -549,7 +549,7 @@ export function layoutMeasure(input: { state: MeasureState; data: MeasureData; c
     const start = Math.min(Math.max(0, at - Math.floor(room / 2)), Math.max(0, body.length - room));
     body = body.length > room ? body.slice(start, start + room) : body;
   } else {
-    const shown = runLines(data, state, run, width, room);
+    const shown = runLines(data, state, run, width, room, now);
     body = shown.lines.slice(0, room);
     trail = shown.trail;
     hint = run.confirm === true ? "Delete this measurement? y to delete · any other key to cancel" : shown.hint;
