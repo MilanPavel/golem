@@ -176,6 +176,13 @@ from golem.server.skills_edit import (
     skill_write,
     skill_write_protected,
 )
+from golem.server.workflows import (
+    workflow_cancel,
+    workflow_get,
+    workflow_list,
+    workflow_start,
+    workflow_status,
+)
 from golem.sessions.manager import (
     ApprovalNotFoundError,
     BlankTitleError,
@@ -463,6 +470,11 @@ from golem_protocol.commands import (
     TraceGetResult,
     TraceSpanParams,
     TraceSpanResult,
+    WorkflowCancelParams,
+    WorkflowGetParams,
+    WorkflowListParams,
+    WorkflowStartParams,
+    WorkflowStatusParams,
 )
 from golem_protocol.events import FileChangedData, Ping
 from golem_protocol.rpc import ModelOptionsSavedNotification
@@ -2376,6 +2388,11 @@ def standard_methods() -> dict[str, Method]:
         "routine.remove": Method("routine.remove", RoutineRemoveParams, True, routine_remove),
         "routine.run": Method("routine.run", RoutineRunParams, True, routine_run),
         "routine.preview": Method("routine.preview", RoutinePreviewParams, True, routine_preview),
+        "workflow.list": Method("workflow.list", WorkflowListParams, True, workflow_list),
+        "workflow.get": Method("workflow.get", WorkflowGetParams, True, workflow_get),
+        "workflow.start": Method("workflow.start", WorkflowStartParams, True, workflow_start),
+        "workflow.status": Method("workflow.status", WorkflowStatusParams, True, workflow_status),
+        "workflow.cancel": Method("workflow.cancel", WorkflowCancelParams, True, workflow_cancel),
         "run.list": Method("run.list", RunListParams, True, run_list),
         "session.set_skills": Method(
             "session.set_skills", SessionSetSkillsParams, True, _session_set_skills

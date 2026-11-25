@@ -57,6 +57,7 @@ import {
   type RoutinesDeps,
 } from "./routines-run.ts";
 import { parseSkillsNew, runSkillsEdit, runSkillsNew } from "./skills-run.ts";
+import { parseWorkflowArgs, runWorkflowList, runWorkflowRun, runWorkflowStatus, WORKFLOW_USAGE, type WorkflowDeps } from "./workflows-run.ts";
 import { readChoice } from "./read-choice.ts";
 import { readSecret } from "./read-secret.ts";
 import { type Gate, gateService, type SessionDaemon } from "./service-gate.ts";
@@ -104,6 +105,7 @@ const USAGE =
   "       golem config show [--resolved] | golem config edit [--project] | golem skills [list] | golem skills check <path>\n" +
   "       golem skills new <name> [--project] [--description \"…\"] | golem skills edit <name>\n" +
   "       golem routines [list] | golem routines run <name> [--folder <dir>] [--wait] | golem routines pause <name> | golem routines resume <name> | golem routines edit\n" +
+  "       golem workflow [list] | golem workflow run <name|id> [--input k=v]… | golem workflow status <workflow_run_id>\n" +
   "       golem coding bench <profile-or-model> [--task <name>]\n" +
   "       golem web [--port N] [--no-open] [--json] (the same as golem) | golem web serve [--port N]\n" +
   "       golem web install [--port N] | golem web uninstall | golem web logout";
@@ -236,6 +238,9 @@ async function run(args: string[]): Promise<number> {
   if (command === "routines") {
     return runRoutines(rest);
   }
+  if (command === "workflow") {
+    return runWorkflow(rest);
+  }
   if (command === "ask") {
     return runAskCommand(rest);
   }
@@ -361,6 +366,44 @@ async function runRoutines(given: string[]): Promise<number> {
         return runRoutinesPause(client, parsed.name, parsed.kind === "pause", deps);
       case "edit":
         return runRoutinesEdit(client, deps);
+    }
+  });
+}
+
+function workflowDeps(): WorkflowDeps {
+  return {
+    cwd: process.cwd(),
+    write: (line: string): void => {
+      process.stdout.write(`${line}\n`);
+    },
+    error: (line: string): void => {
+      process.stderr.write(`${line}\n`);
+    },
+    onInterrupt: (handler: () => void) => {
+      process.on("SIGINT", handler);
+      return () => {
+        process.off("SIGINT", handler);
+      };
+    },
+  };
+}
+
+/** `golem workflow [list]|run|status`: the workflows golem found, started from a shell with their steps shown live. */
+async function runWorkflow(given: string[]): Promise<number> {
+  const parsed = parseWorkflowArgs(given);
+  if (parsed.kind === "error") {
+    process.stderr.write(`${parsed.message === WORKFLOW_USAGE ? USAGE : parsed.message}\n`);
+    return 1;
+  }
+  const deps = workflowDeps();
+  return runWithClient((client) => {
+    switch (parsed.kind) {
+      case "list":
+        return runWorkflowList(client, deps);
+      case "run":
+        return runWorkflowRun(client, parsed, deps);
+      case "status":
+        return runWorkflowStatus(client, parsed.runId, deps);
     }
   });
 }

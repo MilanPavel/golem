@@ -128,6 +128,11 @@ class WorkflowEngine:
             },
         )
 
+    async def mark_cancelled(self, workflow_run_id: str) -> None:
+        """Set a run that never began to ``cancelled`` and send ``workflow.run.cancelled``."""
+        await self._store.set_run_status(workflow_run_id, "cancelled", _now())
+        await self._run_event("workflow.run.cancelled", workflow_run_id)
+
     async def execute(self, workflow_run_id: str) -> None:
         """Run the workflow function from the top; finished steps return their saved result."""
         record = await self._store.get_run(workflow_run_id)

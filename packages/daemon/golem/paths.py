@@ -40,6 +40,10 @@ class GolemPaths:
         return self.home / "agents"
 
     @property
+    def workflows_dir(self) -> Path:
+        return self.home / "workflows"
+
+    @property
     def flows_dir(self) -> Path:
         return self.home / "flows"
 

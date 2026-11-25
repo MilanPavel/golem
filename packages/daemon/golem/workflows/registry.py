@@ -19,6 +19,7 @@ import json
 import logging
 import subprocess
 import sys
+import threading
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from pathlib import Path
@@ -167,12 +168,20 @@ class WorkflowRegistry:
         self._cache: dict[Path, tuple[Stamp, bool, list[WorkflowEntry]]] = {}
         self._entries: list[WorkflowEntry] = []
         self._task: asyncio.Task[None] | None = None
+        self._scan = threading.Lock()
 
     def entries(self) -> list[WorkflowEntry]:
         return list(self._entries)
 
     def refresh(self) -> bool:
-        """Rescan; reload the files that changed. True when the list changed."""
+        """Rescan; reload the files that changed. True when the list changed.
+
+        Callers (the watch loop and handlers) run in threads; one scan at a time.
+        """
+        with self._scan:
+            return self._refresh()
+
+    def _refresh(self) -> bool:
         sources: list[tuple[Path, Path | None]] = [(f, None) for f in _files(self._user_dir)]
         for project in self._projects():
             sources.extend((f, project) for f in _files(project / PROJECT_DIR))
