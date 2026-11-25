@@ -115,6 +115,13 @@ class WorkflowRuns:
         )
         return None if row is None else _run(row)
 
+    async def by_session(self, session_id: str) -> WorkflowRunRecord | None:
+        """The run that owns the headless ``session_id``, if any."""
+        row = await self._database.fetch_one(
+            "SELECT * FROM workflow_runs WHERE session_id = ?", (session_id,)
+        )
+        return None if row is None else _run(row)
+
     async def list_runs(
         self, workflow_id: str | None = None, status: str | None = None, limit: int = 50
     ) -> list[WorkflowRunRecord]:

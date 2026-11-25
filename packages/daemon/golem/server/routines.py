@@ -38,6 +38,7 @@ from golem.routine_scheduler import RoutineBlockedError, RoutineBusyError, Routi
 from golem.routines import ScheduleError, next_after, parse_schedule
 from golem.server.dispatcher import INTERNAL_ERROR, INVALID_PARAMS, RequestContext, RpcCallError
 from golem.store.routine_runs import HeadlessRun, RoutineRunRecord
+from golem.store.workflow_runs import WorkflowRuns
 from golem_protocol.commands import (
     PendingItem,
     RoutineChanged,
@@ -209,8 +210,32 @@ async def run_list(ctx: RequestContext, params: RunListParams) -> RunListResult:
     shown: list[RunInfo] = []
     for row in await runs.headless(params.limit, params.session_id):
         pending = await sessions.pending_of(row.session_id) if row.status == "waiting" else None
-        shown.append(run_info(row, pending))
+        info = run_info(row, pending)
+        if info.kind == "workflow" and ctx.state.workflows is not None:
+            info = await _workflow_row(ctx.state.workflows.runs, row, info)
+        shown.append(info)
     return RunListResult(runs=shown)
+
+
+_WORKFLOW_STATUS = {"pending": "queued", "done": "succeeded"}
+
+
+async def _workflow_row(runs: WorkflowRuns, row: HeadlessRun, info: RunInfo) -> RunInfo:
+    """A workflow run's row: its status, times and error come from its ``workflow_runs`` row."""
+    run = await runs.by_session(row.session_id)
+    if run is None:
+        return info
+    steps = await runs.list_steps(run.workflow_run_id)
+    return info.model_copy(
+        update={
+            "status": _WORKFLOW_STATUS.get(run.status, run.status),
+            "started_at": run.started_at or run.created_at,
+            "ended_at": run.finished_at,
+            "summary": run.error if run.status == "failed" else None,
+            "reason": run.error if run.status == "failed" else None,
+            "steps": len(steps),
+        }
+    )
 
 
 def _question(pending: PendingItem) -> str:
@@ -233,7 +258,11 @@ def run_info(row: HeadlessRun, pending: PendingItem | None) -> RunInfo:
     return RunInfo.model_validate(
         {
             "session_id": row.session_id,
-            "kind": "routine" if row.routine_run_id is not None else "ask",
+            "kind": "routine"
+            if row.routine_run_id is not None
+            else "workflow"
+            if row.origin.startswith("workflow:")
+            else "ask",
             "origin": row.origin,
             "routine": row.routine,
             "folder": folder,

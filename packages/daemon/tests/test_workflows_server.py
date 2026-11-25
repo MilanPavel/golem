@@ -149,6 +149,8 @@ async def test_each_run_gets_its_headless_session_before_the_first_event(
         runs = cast(Rows, rpc_result(await client.call("run.list", {}))["runs"])
         row = next(r for r in runs if r["session_id"] == session_id)
         assert row["origin"] == "workflow:adder"
+        assert (row["kind"], row["status"], row["steps"]) == ("workflow", "succeeded", 2)
+        assert row["ended_at"] is not None and row["routine"] is None
     finally:
         await client.close()
         await stop_daemon(app, task)
