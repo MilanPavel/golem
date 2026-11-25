@@ -127,6 +127,9 @@ class WorkflowService:
         agent_type: str,
         brief: str,
         model: str | None,
+        batch: tuple[str, int] | None,
+        gets: tuple[str, ...],
+        budget: float | None,
         started: AgentStarted,
     ) -> dict[str, Any]:
         """Adapt a ``run.agent`` to the seam: the helper belongs to the run's session."""
@@ -140,6 +143,9 @@ class WorkflowService:
             agent_type=agent_type,
             brief=brief,
             model=model,
+            batch=batch,
+            gets=gets,
+            budget=budget,
             started=started,
         )
 

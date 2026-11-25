@@ -130,8 +130,15 @@ class StepBackend(Protocol):
         brief: str,
         model: str | None,
         group_key: str | None,
+        position: int | None = None,
+        gets: tuple[str, ...] = (),
+        budget: float | None = None,
     ) -> dict[str, Any]:
-        """Run an agent as a helper of the run's session (the ``agent`` step)."""
+        """Run an agent as a helper of the run's session (the ``agent`` step).
+
+        ``group_key`` and ``position`` say which ``run.parallel`` group the agent is in and its
+        place there: the agents of one group start as one batch.
+        """
         ...
 
     async def skill(
@@ -166,6 +173,7 @@ class StepBackend(Protocol):
 
 
 _group: ContextVar[str | None] = ContextVar("golem_workflow_group", default=None)
+_position: ContextVar[int | None] = ContextVar("golem_workflow_position", default=None)
 IDEMPOTENCY_KEY: ContextVar[str | None] = ContextVar("golem_workflow_key", default=None)
 MAY_HAVE_RUN: ContextVar[bool] = ContextVar("golem_workflow_may_have_run", default=False)
 
@@ -250,11 +258,14 @@ class Run:
         self._groups += 1
         group = f"parallel-{self._groups}"
 
-        async def member(aw: Awaitable[Any]) -> Any:
+        async def member(position: int, aw: Awaitable[Any]) -> Any:
             _group.set(group)
+            _position.set(position)
             return await aw
 
-        outcomes = await asyncio.gather(*(member(aw) for aw in aws), return_exceptions=True)
+        outcomes = await asyncio.gather(
+            *(member(position, aw) for position, aw in enumerate(aws)), return_exceptions=True
+        )
         waiting: BaseException | None = None
         for outcome in outcomes:
             if isinstance(outcome, WorkflowWaiting):
@@ -308,7 +319,13 @@ class Run:
         )
 
     async def agent(
-        self, type: str, brief: str, model: str | None = None, key: str | None = None
+        self,
+        type: str,
+        brief: str,
+        model: str | None = None,
+        key: str | None = None,
+        gets: Iterable[str] = (),
+        budget: str | float | None = None,
     ) -> dict[str, Any]:
         """Run an agent of this ``type`` on ``brief``.
 
@@ -318,11 +335,31 @@ class Run:
         name. A helper that fails or is stopped fails the step. A step of kind ``agent`` keyed
         ``key or f"agent:{type}"``: each key may be used once per run, so two agents of one type
         need their own ``key=``. After a restart the same agent is waited for, not started again.
+
+        Agents inside one ``run.parallel`` start as one batch, like several helpers of one
+        ``delegate``: the same helper cap, queue and wait reasons apply. ``gets=["diff"]`` hands
+        the agent what ``delegate`` hands a helper whose file says ``gets``. ``budget="$0.50"``
+        (or a number of dollars) caps this agent's cost: a helper that reaches it stops and
+        fails the step.
         """
         step_key = key or f"agent:{type}"
         self._use_key(step_key, f"agent {type}")
+        wanted = _gets_of(gets)
+        cap = _budget_of(budget)
+        # Only the first agent of a parallel member takes the member's place in the batch; a
+        # second agent in the same member would otherwise find the first one's helper again.
+        position = _position.get()
+        _position.set(None)
         return await self._backend.agent(
-            self.workflow_run_id, step_key, type, brief, model, _group.get()
+            self.workflow_run_id,
+            step_key,
+            type,
+            brief,
+            model,
+            _group.get(),
+            position,
+            wanted,
+            cap,
         )
 
     async def llm(
@@ -398,6 +435,34 @@ class Run:
         self._use_key(step_key, f"skill {name}")
         found = await self._backend.skill(self.workflow_run_id, step_key, name, args, _group.get())
         return found["answer"]
+
+
+def _gets_of(gets: Iterable[str]) -> tuple[str, ...]:
+    from golem.agents.model import GETS
+
+    if isinstance(gets, str):
+        gets = (gets,)
+    found = tuple(dict.fromkeys(gets))
+    for item in found:
+        if item not in GETS:
+            raise WorkflowError(f"run.agent gets= is a list of {', '.join(GETS)}; got {item!r}")
+    return found
+
+
+def _budget_of(budget: str | float | None) -> float | None:
+    """``"$0.50"``, ``"0.5"`` or ``0.5`` as dollars. Raises for text that is not a price."""
+    if budget is None:
+        return None
+    message = f"run.agent budget= is dollars, such as '$0.50'; got {budget!r}"
+    if isinstance(budget, bool):
+        raise WorkflowError(message)
+    try:
+        usd = float(budget.strip().removeprefix("$")) if isinstance(budget, str) else float(budget)
+    except ValueError:
+        raise WorkflowError(message) from None
+    if not 0 < usd < float("inf"):
+        raise WorkflowError(f"run.agent budget= must be more than $0; got {budget!r}")
+    return usd
 
 
 def _type_name(t: object) -> str:

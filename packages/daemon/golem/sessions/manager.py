@@ -2298,12 +2298,15 @@ class SessionManager:
         tiers = [*(["local"] if local else []), *(["budget", "frontier"] if hosted else [])]
         return [*tiers, *local, *(name for _, name in sorted(hosted))]
 
-    async def helpers_ended(self, session_id: str, call_id: str) -> bool:
+    async def helpers_ended(self, session_id: str, call_id: str, index: int | None = None) -> bool:
         """Whether every helper of the call has ended: its last run is over, or it was closed.
 
         A helper whose first send failed is closed and has no run: it counts as ended.
+        ``index`` limits the check to the helper at that place in the call.
         """
         for helper in await self._records.helpers_of(session_id, call_id):
+            if index is not None and helper.helper_index != index:
+                continue
             if helper.closed_at is not None:
                 continue
             run = await self._run_records.latest(helper.session_id)
@@ -2311,8 +2314,13 @@ class SessionManager:
                 return False
         return True
 
-    async def helper_results(self, session_id: str, call_id: str) -> list[HelperOutcome]:
-        """How each helper of the call ended, in the order of the call."""
+    async def helper_results(
+        self, session_id: str, call_id: str, index: int | None = None
+    ) -> list[HelperOutcome]:
+        """How each helper of the call ended, in the order of the call.
+
+        ``index`` limits the list to the helper at that place in the call.
+        """
         labels = {
             e.data.helper_id: e.data.label
             for e in await self._events.stored(session_id)
@@ -2326,6 +2334,8 @@ class SessionManager:
             if isinstance(e, HelperEndedEvent) and e.data.call_id == call_id
         }
         for helper in await self._records.helpers_of(session_id, call_id):
+            if index is not None and helper.helper_index != index:
+                continue
             run = await self._run_records.latest(helper.session_id)
             answer = ""
             run_events = [] if run is None else await self._events.for_run(run.run_id)
