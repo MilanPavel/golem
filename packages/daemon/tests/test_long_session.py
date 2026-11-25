@@ -50,6 +50,8 @@ class _Chat:
         records = SessionRecords(database)
         log = SessionLog(self.events, EventBus(), records)
         self.manager = SessionManager(runtime, log, records, self.runs)
+        # These tests measure clearing and summarising alone, so no fill note (#1805) joins them.
+        runtime.reader_ready = None
         self.session_id = ""
 
     async def turn(self, text: str, cwd: str, session_id: str | None = None) -> list[ChatEvent]:

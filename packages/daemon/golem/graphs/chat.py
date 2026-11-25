@@ -1249,17 +1249,8 @@ def open_chat(
         # A reply with tool calls goes to the tools first: its calls need their results.
         return "step_up" if _struggles(state) is not None else "end"
 
-    def route_after_tools(state: AgentState) -> Literal["fill_nudge", "step_up"]:
-        return "step_up" if _struggles(state) is not None else "fill_nudge"
-
-    async def fill_nudge(state: AgentState, config: RunnableConfig) -> dict[str, object]:
-        found = _fill_note(state, config, runtime[0] if runtime else None, profile_of(state))
-        if found is None:
-            return {}
-        return {"fill_nudged": True, "messages": [note(found)]}
-
-    def profile_of(state: AgentState) -> str:
-        return state["model_profile"]
+    def route_after_tools(state: AgentState) -> Literal["call_model", "step_up"]:
+        return "step_up" if _struggles(state) is not None else "call_model"
 
     def route_after_step_up(state: AgentState) -> Literal["call_model", "end"]:
         # No stronger model on a plain reply: the run ends as it would have.
@@ -1360,32 +1351,39 @@ def open_chat(
     builder = cast(_GraphBuilder, StateGraph(AgentState))
     builder.add_node("call_model", call_model)
     runtime: list[ChatRuntime] = []
-    builder.add_node(
-        "tools",
-        tools_node(
-            registry,
-            rules,
-            artifacts,
-            lambda: runtime[0].enable_mcp if runtime else None,
-            lambda: runtime[0].skills if runtime else None,
-            _budget_by_window(window_of),
-            lambda: runtime[0] if runtime else None,
-            tier_of,
-            lambda: router.agent_settings().use_helpers,
-        ),
+    run_tools = tools_node(
+        registry,
+        rules,
+        artifacts,
+        lambda: runtime[0].enable_mcp if runtime else None,
+        lambda: runtime[0].skills if runtime else None,
+        _budget_by_window(window_of),
+        lambda: runtime[0] if runtime else None,
+        tier_of,
+        lambda: router.agent_settings().use_helpers,
     )
+
+    async def tools_and_fill(state: AgentState, config: RunnableConfig) -> Mapping[str, object]:
+        # The fill check runs inside the tools step, so a tool round is still one graph step.
+        result = await run_tools(state, config)
+        added = cast("list[BaseMessage]", result.get("messages") or [])
+        seen = cast(AgentState, {**state, "messages": [*state["messages"], *added]})
+        text = _fill_note(seen, config, runtime[0] if runtime else None, state["model_profile"])
+        if text is None:
+            return result
+        return {**result, "fill_nudged": True, "messages": [*added, note(text)]}
+
+    builder.add_node("tools", tools_and_fill)
     builder.add_edge(START, "call_model")
     builder.add_node("checks", checks_node(rules, artifacts))
     builder.add_node("step_up", step_up)
-    builder.add_node("fill_nudge", fill_nudge)
-    builder.add_edge("fill_nudge", "call_model")
     builder.add_conditional_edges(
         "call_model",
         route,
         {"call_model": "call_model", "tools": "tools", "step_up": "step_up", "end": "checks"},
     )
     builder.add_conditional_edges(
-        "tools", route_after_tools, {"fill_nudge": "fill_nudge", "step_up": "step_up"}
+        "tools", route_after_tools, {"call_model": "call_model", "step_up": "step_up"}
     )
     builder.add_conditional_edges(
         "step_up", route_after_step_up, {"call_model": "call_model", "end": "checks"}
