@@ -8,6 +8,7 @@ that was interrupted continues where it stopped and no finished step runs twice.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import hashlib
 import importlib.util
 import inspect
@@ -19,11 +20,20 @@ from pathlib import Path
 from typing import Any
 
 from golem.store.workflow_runs import WorkflowRuns
-from golem.workflow import SPEC_ATTR, Run, WorkflowError, WorkflowSpec
+from golem.workflow import (
+    IDEMPOTENCY_KEY,
+    MAY_HAVE_RUN,
+    SPEC_ATTR,
+    Run,
+    WorkflowError,
+    WorkflowSpec,
+)
 
 __all__ = ["WorkflowEngine"]
 
 log = logging.getLogger(__name__)
+
+_STEP_ATTR = "__golem_step__"
 
 Emit = Callable[[str, dict[str, Any]], None]
 
@@ -152,6 +162,9 @@ class WorkflowEngine:
             raise
         except Exception as exc:
             error = f"{type(exc).__name__}: {exc}"
+            failed_step = getattr(exc, _STEP_ATTR, None)
+            if failed_step is not None:
+                error = f"step {failed_step!r} failed: {error}"
             await self._store.set_run_status(workflow_run_id, "failed", _now(), error)
             await self._run_event("workflow.run.failed", workflow_run_id)
             return
@@ -175,33 +188,67 @@ class _Journal:
         fn: Callable[..., Any],
         args: tuple[Any, ...],
         kwargs: dict[str, Any],
+        keyed: bool = False,
+        retries: int = 0,
+        backoff: float = 0.0,
     ) -> Any:
         store = self._engine.store
         event = self._engine.step_event
+        before = await store.get_step(workflow_run_id, key)
+        doubt = before is not None and before.status in ("running", "in_doubt") and keyed
+        if doubt and before is not None and before.status == "running":
+            # The daemon died while a keyed step ran: it may have done its action.
+            await store.mark_in_doubt(workflow_run_id, key, _now())
+            await event("workflow.step.in_doubt", workflow_run_id, key)
         row = await store.begin_step(workflow_run_id, key, kind, title, group_key, _now())
         if row.status == "done":
             return json.loads(row.result_json) if row.result_json is not None else None
 
         await event("workflow.step.started", workflow_run_id, key)
+        key_token = IDEMPOTENCY_KEY.set(key if keyed else None)
+        doubt_token = MAY_HAVE_RUN.set(doubt)
+        result: Any = None
+        encoded = "null"
         try:
-            if inspect.iscoroutinefunction(fn):
-                result = await fn(*args, **kwargs)
-            else:
-                result = await asyncio.to_thread(fn, *args, **kwargs)
-                if inspect.isawaitable(result):
-                    result = await result
-            try:
-                encoded = json.dumps(result)
-            except (TypeError, ValueError) as exc:
-                raise WorkflowError(
-                    f"step {key!r} returned a value that is not JSON ({exc}); return numbers,"
-                    " strings, lists and dicts"
-                ) from exc
+            for attempt in range(retries + 1):
+                try:
+                    result = await _call(fn, args, kwargs)
+                    try:
+                        encoded = json.dumps(result)
+                    except (TypeError, ValueError) as exc:
+                        raise WorkflowError(
+                            f"step {key!r} returned a value that is not JSON ({exc}); return"
+                            " numbers, strings, lists and dicts"
+                        ) from exc
+                except WorkflowError:
+                    raise
+                except Exception:
+                    if attempt >= retries:
+                        raise
+                    if backoff:
+                        await asyncio.sleep(backoff)
+                    await store.begin_step(workflow_run_id, key, kind, title, group_key, _now())
+                    continue
+                break
         except Exception as exc:
             error = f"{type(exc).__name__}: {exc}"
+            with contextlib.suppress(AttributeError):
+                setattr(exc, _STEP_ATTR, key)
             await store.fail_step(workflow_run_id, key, error, _now())
             await event("workflow.step.failed", workflow_run_id, key)
             raise
+        finally:
+            IDEMPOTENCY_KEY.reset(key_token)
+            MAY_HAVE_RUN.reset(doubt_token)
         await store.finish_step(workflow_run_id, key, encoded, _now())
         await event("workflow.step.done", workflow_run_id, key)
         return result
+
+
+async def _call(fn: Callable[..., Any], args: tuple[Any, ...], kwargs: dict[str, Any]) -> Any:
+    if inspect.iscoroutinefunction(fn):
+        return await fn(*args, **kwargs)
+    result = await asyncio.to_thread(fn, *args, **kwargs)
+    if inspect.isawaitable(result):
+        result = await result
+    return result
