@@ -29,7 +29,7 @@ from golem.workflow import (
     WorkflowSpec,
 )
 
-__all__ = ["WorkflowEngine"]
+__all__ = ["WorkflowEngine", "restart_policy"]
 
 log = logging.getLogger(__name__)
 
@@ -61,6 +61,12 @@ def _find(path: Path, name: str) -> Callable[..., Any]:
     raise WorkflowError(f"{path} has no workflow named {name!r}")
 
 
+def restart_policy(path: Path, name: str) -> str:
+    """The ``on_restart`` of the workflow ``name`` in ``path``. Loads the file, like ``execute``."""
+    spec = getattr(_find(path, name), SPEC_ATTR)
+    return spec.on_restart if isinstance(spec, WorkflowSpec) else "resume"
+
+
 class WorkflowEngine:
     def __init__(
         self, store: WorkflowRuns, emit: Emit | None = None, notify: Notify | None = None
@@ -68,6 +74,8 @@ class WorkflowEngine:
         self._store = store
         self._emit: Emit = emit or _no_emit
         self._notify = notify
+        self.stopping = False
+        """True while the daemon shuts down: a cancelled run stays ``running`` and resumes later."""
 
     async def notify(self, workflow_run_id: str, title: str | None, text: str) -> None:
         """Send a ``run.notify`` text. Without a notifier the step still completes."""
@@ -155,6 +163,16 @@ class WorkflowEngine:
         await self._store.set_run_status(workflow_run_id, "cancelled", _now())
         await self._run_event("workflow.run.cancelled", workflow_run_id)
 
+    async def mark_failed(self, workflow_run_id: str, error: str) -> None:
+        """Set a run that will not continue to ``failed`` and send ``workflow.run.failed``."""
+        await self._store.set_run_status(workflow_run_id, "failed", _now(), error)
+        await self._run_event("workflow.run.failed", workflow_run_id)
+
+    async def mark_waiting(self, workflow_run_id: str) -> None:
+        """Set a run to ``waiting`` and send ``workflow.run.waiting``."""
+        await self._store.set_run_status(workflow_run_id, "waiting", _now())
+        await self._run_event("workflow.run.waiting", workflow_run_id)
+
     async def execute(self, workflow_run_id: str) -> None:
         """Run the workflow function from the top; finished steps return their saved result."""
         record = await self._store.get_run(workflow_run_id)
@@ -169,8 +187,9 @@ class WorkflowEngine:
             kwargs = {k: v for k, v in inputs.items() if k in names}
             await fn(Run(_Journal(self), workflow_run_id, inputs), **kwargs)
         except asyncio.CancelledError:
-            await self._store.set_run_status(workflow_run_id, "cancelled", _now())
-            await self._run_event("workflow.run.cancelled", workflow_run_id)
+            if not self.stopping:
+                await self._store.set_run_status(workflow_run_id, "cancelled", _now())
+                await self._run_event("workflow.run.cancelled", workflow_run_id)
             raise
         except Exception as exc:
             error = f"{type(exc).__name__}: {exc}"

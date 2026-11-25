@@ -115,6 +115,7 @@ METHOD_ACCESS: Final[Mapping[str, Access]] = {
     "workflow.start": "browser",
     "workflow.status": "browser",
     "workflow.cancel": "browser",
+    "workflow.resume": "browser",
     "session.set_skills": "browser",
     "model.probe": "browser",
     "hf.search": "browser",

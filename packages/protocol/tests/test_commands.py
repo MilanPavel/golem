@@ -68,6 +68,7 @@ from golem_protocol.commands import (
     WorkflowEntryInfo,
     WorkflowGetResult,
     WorkflowOutlineStep,
+    WorkflowResumeParams,
     WorkflowRunEvent,
     WorkflowRunInfo,
     WorkflowStartParams,
@@ -751,7 +752,7 @@ def test_use_helpers_setting_values() -> None:
 def test_workflow_commands_name_the_run_workflow_run_id() -> None:
     assert WorkflowStartParams(id="/w/a.py::pr_digest").trigger == "manual"
     assert WorkflowStartResult(workflow_run_id="wr1").workflow_run_id == "wr1"
-    for model in (WorkflowStatusParams, WorkflowCancelParams):
+    for model in (WorkflowStatusParams, WorkflowCancelParams, WorkflowResumeParams):
         assert model(workflow_run_id="wr1").workflow_run_id == "wr1"
         with pytest.raises(ValidationError):
             model.model_validate({"run_id": "wr1"})

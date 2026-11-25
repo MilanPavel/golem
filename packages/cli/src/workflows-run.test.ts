@@ -10,6 +10,7 @@ import {
   parseWorkflowArgs,
   pickWorkflow,
   runWorkflowList,
+  runWorkflowResume,
   runWorkflowRun,
   runWorkflowStatus,
   type WorkflowClient,
@@ -74,6 +75,12 @@ function fake(script: WorkflowNotice[], entries: WorkflowEntryInfo[] = [ok, brok
         steps: [{ key: "first", kind: "step", title: "first", status: "done", started_at: T0, finished_at: T1 }],
       };
     },
+    resumeWorkflow: async (id) => {
+      calls.push(`resume ${id}`);
+      if (script[0] !== undefined) listener(script[0]);
+      setTimeout(() => script.slice(1).forEach((notice) => listener(notice)), 0);
+      return { run: { workflow_run_id: id, workflow_id: ok.id, name: "adder", status: "running", trigger: "manual", inputs: {} } };
+    },
     cancelWorkflow: async (id) => {
       calls.push(`cancel ${id}`);
       setTimeout(() => listener(runNotice("workflow.run.cancelled", "cancelled")), 0);
@@ -108,6 +115,9 @@ test("the arguments parse, and the ones that do not fit are errors", () => {
   assert.deepEqual(parseWorkflowArgs(["run", "adder"]), { kind: "run", name: "adder", inputs: {} });
   assert.deepEqual(parseWorkflowArgs(["run", "adder", "--input", "n=3", "--input", "tag=a=b"]), { kind: "run", name: "adder", inputs: { n: "3", tag: "a=b" } });
   assert.deepEqual(parseWorkflowArgs(["status", "wr1"]), { kind: "status", runId: "wr1" });
+  assert.deepEqual(parseWorkflowArgs(["resume", "wr1"]), { kind: "resume", runId: "wr1" });
+  assert.equal(parseWorkflowArgs(["resume"]).kind, "error");
+  assert.equal(parseWorkflowArgs(["resume", "wr1", "x"]).kind, "error");
   assert.equal(parseWorkflowArgs(["run"]).kind, "error");
   assert.equal(parseWorkflowArgs(["run", "a", "b"]).kind, "error");
   assert.equal(parseWorkflowArgs(["run", "a", "--input", "nokey"]).kind, "error");
@@ -211,4 +221,28 @@ test("durations are short", () => {
   assert.equal(duration(T0, T1), "1.5s");
   assert.equal(duration(T0, "2026-11-25T10:02:05+00:00"), "2m05s");
   assert.equal(duration(null, T1), "");
+});
+
+test("resume continues the run by id and prints its steps like run", async () => {
+  const { client, calls } = fake([
+    runNotice("workflow.run.started", "running"),
+    stepNotice("workflow.step.started", "third", "running"),
+    stepNotice("workflow.step.done", "third", "done"),
+    runNotice("workflow.run.done", "done"),
+  ]);
+  const { deps, out, err } = setup();
+  assert.equal(await runWorkflowResume(client, "wr1", deps), 0);
+  assert.deepEqual(calls, ["resume wr1"]);
+  assert.deepEqual(out, ["  started  third", "  done     third 1.5s", "adder done in 1.5s"]);
+  assert.deepEqual(err, ["run: wr1"]);
+});
+
+test("resume reports a refusal from the daemon and exits 1", async () => {
+  const { client } = fake([]);
+  client.resumeWorkflow = async () => {
+    throw new Error("workflow run wr1 is already running");
+  };
+  const { deps, err } = setup();
+  assert.equal(await runWorkflowResume(client, "wr1", deps), 1);
+  assert.deepEqual(err, ["workflow run wr1 is already running"]);
 });

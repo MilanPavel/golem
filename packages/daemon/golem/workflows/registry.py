@@ -25,7 +25,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal, cast
 
-from golem.workflow import Manual, OnFile, Schedule, Trigger, WorkflowSpec
+from golem.workflow import Manual, OnFile, OnRestart, Schedule, Trigger, WorkflowSpec
 
 log = logging.getLogger(__name__)
 
@@ -87,6 +87,10 @@ def _trigger(value: object) -> Trigger | None:
     return None
 
 
+def _restart(value: object) -> OnRestart:
+    return "fail" if value == "fail" else "ask" if value == "ask" else "resume"
+
+
 def _spec(raw: dict[str, object]) -> WorkflowSpec:
     listed: object = raw.get("inputs") or []
     if not isinstance(listed, list):
@@ -98,6 +102,7 @@ def _spec(raw: dict[str, object]) -> WorkflowSpec:
         inputs=tuple((str(pair[0]), str(pair[1])) for pair in inputs),
         description=str(raw.get("description") or ""),
         line=int(str(raw.get("line") or 0)),
+        on_restart=_restart(raw.get("on_restart")),
     )
 
 
