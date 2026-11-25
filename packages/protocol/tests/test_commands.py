@@ -808,3 +808,31 @@ def test_workflow_events_never_use_the_run_words() -> None:
     )
     assert doubt.method == "workflow.step.in_doubt"
     assert doubt.params.child_session_id is None
+
+def test_batch_estimate_fields_are_optional_and_round_trip() -> None:
+    plain = PendingItem(kind="batch", since="t", call_id="c1", helper_count=5)
+    assert plain.estimate_usd is None and plain.cheaper_model is None
+    card = PendingItem(
+        kind="batch",
+        since="t",
+        call_id="c1",
+        helper_count=5,
+        estimate_usd=0.6,
+        allowed_usd=2.0,
+        ask_over_usd=0.5,
+        model="claude-sonnet",
+        cheaper_model="claude-haiku",
+    )
+    assert PendingItem.model_validate_json(card.model_dump_json()) == card
+    with pytest.raises(ValidationError):
+        PendingItem.model_validate({"kind": "batch", "since": "t", "estimate_usd": -1})
+    with pytest.raises(ValidationError):
+        PendingItem.model_validate({"kind": "batch", "since": "t", "model": ""})
+
+
+def test_helpers_respond_cheaper_needs_run() -> None:
+    assert HelpersRespondParams(session_id="s", call_id="c", run=True).cheaper is False
+    cheaper = HelpersRespondParams(session_id="s", call_id="c", run=True, cheaper=True)
+    assert HelpersRespondParams.model_validate_json(cheaper.model_dump_json()) == cheaper
+    with pytest.raises(ValidationError):
+        HelpersRespondParams(session_id="s", call_id="c", run=False, cheaper=True)

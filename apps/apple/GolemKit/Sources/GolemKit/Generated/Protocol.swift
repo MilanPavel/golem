@@ -1949,31 +1949,50 @@ public struct AgentsSetWishResultWishResolution: Codable {
 /// ``subject`` is what rules match for this tool, such as the shell command.
 /// ``diff`` is the change a file tool would make, as a unified diff, when it
 /// has one. Approving the call approves that change and no other.
+/// With ``source`` ``use_helpers`` the question is "start these helpers?", and
+/// ``estimate_usd``, ``allowed_usd``, ``ask_over_usd``, ``model`` and ``cheaper_model``
+/// carry
+/// the estimate as on ``PendingItem``.
 // MARK: - ApprovalNeededData
 public struct ApprovalNeededData: Codable {
+    public let allowedUsd: Double?
     public let args: [String: JSONAny]
+    public let askOverUsd: Double?
     public let callID: String
+    public let cheaperModel: String?
     public let diff: String?
+    public let estimateUsd: Double?
     public let messageID: String?
+    public let model: String?
     public let name: String
     public let source: String
     public let subject: String?
 
     public enum CodingKeys: String, CodingKey {
+        case allowedUsd = "allowed_usd"
         case args = "args"
+        case askOverUsd = "ask_over_usd"
         case callID = "call_id"
+        case cheaperModel = "cheaper_model"
         case diff = "diff"
+        case estimateUsd = "estimate_usd"
         case messageID = "message_id"
+        case model = "model"
         case name = "name"
         case source = "source"
         case subject = "subject"
     }
 
-    public init(args: [String: JSONAny], callID: String, diff: String?, messageID: String?, name: String, source: String, subject: String?) {
+    public init(allowedUsd: Double?, args: [String: JSONAny], askOverUsd: Double?, callID: String, cheaperModel: String?, diff: String?, estimateUsd: Double?, messageID: String?, model: String?, name: String, source: String, subject: String?) {
+        self.allowedUsd = allowedUsd
         self.args = args
+        self.askOverUsd = askOverUsd
         self.callID = callID
+        self.cheaperModel = cheaperModel
         self.diff = diff
+        self.estimateUsd = estimateUsd
         self.messageID = messageID
+        self.model = model
         self.name = name
         self.source = source
         self.subject = subject
@@ -2015,31 +2034,50 @@ public struct ApprovalNeededEvent: Codable {
 /// ``subject`` is what rules match for this tool, such as the shell command.
 /// ``diff`` is the change a file tool would make, as a unified diff, when it
 /// has one. Approving the call approves that change and no other.
+/// With ``source`` ``use_helpers`` the question is "start these helpers?", and
+/// ``estimate_usd``, ``allowed_usd``, ``ask_over_usd``, ``model`` and ``cheaper_model``
+/// carry
+/// the estimate as on ``PendingItem``.
 // MARK: - DataClass
 public struct DataClass: Codable {
+    public let allowedUsd: Double?
     public let args: [String: JSONAny]
+    public let askOverUsd: Double?
     public let callID: String
+    public let cheaperModel: String?
     public let diff: String?
+    public let estimateUsd: Double?
     public let messageID: String?
+    public let model: String?
     public let name: String
     public let source: String
     public let subject: String?
 
     public enum CodingKeys: String, CodingKey {
+        case allowedUsd = "allowed_usd"
         case args = "args"
+        case askOverUsd = "ask_over_usd"
         case callID = "call_id"
+        case cheaperModel = "cheaper_model"
         case diff = "diff"
+        case estimateUsd = "estimate_usd"
         case messageID = "message_id"
+        case model = "model"
         case name = "name"
         case source = "source"
         case subject = "subject"
     }
 
-    public init(args: [String: JSONAny], callID: String, diff: String?, messageID: String?, name: String, source: String, subject: String?) {
+    public init(allowedUsd: Double?, args: [String: JSONAny], askOverUsd: Double?, callID: String, cheaperModel: String?, diff: String?, estimateUsd: Double?, messageID: String?, model: String?, name: String, source: String, subject: String?) {
+        self.allowedUsd = allowedUsd
         self.args = args
+        self.askOverUsd = askOverUsd
         self.callID = callID
+        self.cheaperModel = cheaperModel
         self.diff = diff
+        self.estimateUsd = estimateUsd
         self.messageID = messageID
+        self.model = model
         self.name = name
         self.source = source
         self.subject = subject
@@ -8582,20 +8620,26 @@ public enum HelperWaitEventType: String, Codable {
 /// ``use_helpers`` and the tool ``delegate``, and the answer as ``approval.resolved``
 /// (``allow`` or ``deny``); an older client may answer it with ``approval.respond``, where a
 /// yes of any kind runs the helpers and writes no rule.
+///
+/// ``cheaper`` true, with ``run`` true, starts the helpers on the item's ``cheaper_model``
+/// ("Use a cheaper model"). ``cheaper`` with ``run`` false is refused.
 // MARK: - HelpersRespondParams
 public struct HelpersRespondParams: Codable {
     public let callID: String
+    public let cheaper: Bool?
     public let run: Bool
     public let sessionID: String
 
     public enum CodingKeys: String, CodingKey {
         case callID = "call_id"
+        case cheaper = "cheaper"
         case run = "run"
         case sessionID = "session_id"
     }
 
-    public init(callID: String, run: Bool, sessionID: String) {
+    public init(callID: String, cheaper: Bool?, run: Bool, sessionID: String) {
         self.callID = callID
+        self.cheaper = cheaper
         self.run = run
         self.sessionID = sessionID
     }
@@ -20869,6 +20913,10 @@ public struct Params: Codable {
 /// ``subject`` is what rules match for this tool, such as the shell command.
 /// ``diff`` is the change a file tool would make, as a unified diff, when it
 /// has one. Approving the call approves that change and no other.
+/// With ``source`` ``use_helpers`` the question is "start these helpers?", and
+/// ``estimate_usd``, ``allowed_usd``, ``ask_over_usd``, ``model`` and ``cheaper_model``
+/// carry
+/// the estimate as on ``PendingItem``.
 ///
 /// The user answered.
 ///
@@ -21111,6 +21159,10 @@ public struct ParamsData: Codable {
     public let preview: String?
     public let sources: [PurpleToolSource]?
     public let truncated: Bool?
+    public let allowedUsd: Double?
+    public let askOverUsd: Double?
+    public let cheaperModel: String?
+    public let estimateUsd: Double?
     public let source: String?
     public let subject: String?
     public let decision: Decision?
@@ -21256,6 +21308,10 @@ public struct ParamsData: Codable {
         case preview = "preview"
         case sources = "sources"
         case truncated = "truncated"
+        case allowedUsd = "allowed_usd"
+        case askOverUsd = "ask_over_usd"
+        case cheaperModel = "cheaper_model"
+        case estimateUsd = "estimate_usd"
         case source = "source"
         case subject = "subject"
         case decision = "decision"
@@ -21304,7 +21360,7 @@ public struct ParamsData: Codable {
         case toBranch = "to_branch"
     }
 
-    public init(agent: Agent?, cwd: String?, forkedFrom: PurpleForkedFrom?, modelName: String?, modelProfile: String?, modelProvider: String?, origin: String?, parent: PurpleSessionParent?, route: RouteEnum?, allowedTools: [PurpleSessionAllowance]?, mcpServers: [String]?, paidOk: Bool?, title: String?, runID: String?, status: PurpleStatus?, summary: String?, reason: String?, detail: String?, model: String?, provider: String?, rejected: [FluffyModelRejection]?, replacesModel: String?, tier: Tier?, options: [String: Option]?, mode: DefaultPermissionModeEnum?, on: Bool?, messageID: String?, role: MessageCompletedDataRole?, text: String?, interrupted: Bool?, skill: FluffySkillCall?, thinking: String?, thinkingMS: Int?, clearedIDS: [String]?, contextWindow: Int?, estimatedTokens: Int?, index: Int?, messageBytes: [Int]?, messageChars: [Int]?, messageIDS: [String]?, numCtx: Int?, parentCallID: String?, profile: String?, summaryChars: Int?, systemBytes: Int?, systemChars: Int?, systemPromptSHA: String?, systemSections: [TentacledPromptSectionInfo]?, toolsBytes: Int?, toolsChars: Int?, toolsSHA: String?, windowEstimated: Bool?, windowPlanned: Bool?, costUsd: Double?, failed: Bool?, firstTokenMS: Int?, latencyMS: Int?, loadMS: Int?, price: FluffyCallPrice?, promptMS: Int?, replyMS: Int?, stopReason: String?, textToolCalls: TextToolCalls?, usage: FluffyTokenUsage?, waitedMS: Int?, action: ContextChangedDataAction?, afterTokens: Int?, beforeTokens: Int?, count: Int?, reloadMS: Int?, room: Int?, windowFrom: Int?, windowTo: Int?, code: Code?, hint: String?, message: String?, args: [String: JSONAny]?, callID: String?, name: String?, chars: Int?, lines: Int?, path: String?, holder: String?, line: String?, position: Int?, retryInMS: Int?, scope: ModelWaitingDataScope?, silentMS: Int?, waiting: Bool?, willRetry: Bool?, window: Int?, artifactID: String?, diff: String?, durationMS: Int?, preview: String?, sources: [PurpleToolSource]?, truncated: Bool?, source: String?, subject: String?, decision: Decision?, device: String?, rule: String?, alternatives: [Answer]?, caps: FluffyConsentCaps?, estimatedUsd: Double?, helperID: String?, label: String?, notSent: [String]?, sent: [String]?, signal: String?, why: String?, answer: Answer?, todos: [PurpleTodo]?, planID: String?, steps: [FluffyPlanStep]?, added: Int?, changeID: String?, removed: Int?, reverts: String?, hash: String?, how: How?, checks: [FluffyCheckInfo]?, checkID: String?, command: String?, round: Int?, exitCode: Int?, output: String?, pickReason: String?, wish: String?, calls: Int?, stepID: String?, capUsd: Double?, spentUsd: Double?, state: PurpleState?, helperIDS: [String]?, answerTokens: Int?, modelCalls: Int?, stopped: Stopped?, tokens: Int?, workingMS: Int?, fromBranch: String?, pathsCount: Int?, toBranch: String?) {
+    public init(agent: Agent?, cwd: String?, forkedFrom: PurpleForkedFrom?, modelName: String?, modelProfile: String?, modelProvider: String?, origin: String?, parent: PurpleSessionParent?, route: RouteEnum?, allowedTools: [PurpleSessionAllowance]?, mcpServers: [String]?, paidOk: Bool?, title: String?, runID: String?, status: PurpleStatus?, summary: String?, reason: String?, detail: String?, model: String?, provider: String?, rejected: [FluffyModelRejection]?, replacesModel: String?, tier: Tier?, options: [String: Option]?, mode: DefaultPermissionModeEnum?, on: Bool?, messageID: String?, role: MessageCompletedDataRole?, text: String?, interrupted: Bool?, skill: FluffySkillCall?, thinking: String?, thinkingMS: Int?, clearedIDS: [String]?, contextWindow: Int?, estimatedTokens: Int?, index: Int?, messageBytes: [Int]?, messageChars: [Int]?, messageIDS: [String]?, numCtx: Int?, parentCallID: String?, profile: String?, summaryChars: Int?, systemBytes: Int?, systemChars: Int?, systemPromptSHA: String?, systemSections: [TentacledPromptSectionInfo]?, toolsBytes: Int?, toolsChars: Int?, toolsSHA: String?, windowEstimated: Bool?, windowPlanned: Bool?, costUsd: Double?, failed: Bool?, firstTokenMS: Int?, latencyMS: Int?, loadMS: Int?, price: FluffyCallPrice?, promptMS: Int?, replyMS: Int?, stopReason: String?, textToolCalls: TextToolCalls?, usage: FluffyTokenUsage?, waitedMS: Int?, action: ContextChangedDataAction?, afterTokens: Int?, beforeTokens: Int?, count: Int?, reloadMS: Int?, room: Int?, windowFrom: Int?, windowTo: Int?, code: Code?, hint: String?, message: String?, args: [String: JSONAny]?, callID: String?, name: String?, chars: Int?, lines: Int?, path: String?, holder: String?, line: String?, position: Int?, retryInMS: Int?, scope: ModelWaitingDataScope?, silentMS: Int?, waiting: Bool?, willRetry: Bool?, window: Int?, artifactID: String?, diff: String?, durationMS: Int?, preview: String?, sources: [PurpleToolSource]?, truncated: Bool?, allowedUsd: Double?, askOverUsd: Double?, cheaperModel: String?, estimateUsd: Double?, source: String?, subject: String?, decision: Decision?, device: String?, rule: String?, alternatives: [Answer]?, caps: FluffyConsentCaps?, estimatedUsd: Double?, helperID: String?, label: String?, notSent: [String]?, sent: [String]?, signal: String?, why: String?, answer: Answer?, todos: [PurpleTodo]?, planID: String?, steps: [FluffyPlanStep]?, added: Int?, changeID: String?, removed: Int?, reverts: String?, hash: String?, how: How?, checks: [FluffyCheckInfo]?, checkID: String?, command: String?, round: Int?, exitCode: Int?, output: String?, pickReason: String?, wish: String?, calls: Int?, stepID: String?, capUsd: Double?, spentUsd: Double?, state: PurpleState?, helperIDS: [String]?, answerTokens: Int?, modelCalls: Int?, stopped: Stopped?, tokens: Int?, workingMS: Int?, fromBranch: String?, pathsCount: Int?, toBranch: String?) {
         self.agent = agent
         self.cwd = cwd
         self.forkedFrom = forkedFrom
@@ -21402,6 +21458,10 @@ public struct ParamsData: Codable {
         self.preview = preview
         self.sources = sources
         self.truncated = truncated
+        self.allowedUsd = allowedUsd
+        self.askOverUsd = askOverUsd
+        self.cheaperModel = cheaperModel
+        self.estimateUsd = estimateUsd
         self.source = source
         self.subject = subject
         self.decision = decision
@@ -23720,19 +23780,34 @@ public struct SessionElement: Codable {
 /// type names, one for each helper, in the order of the call. It is only ever in
 /// ``SessionSummary.pending_items``: ``SessionSummary.pending`` never holds one, because an
 /// older client reads that field and knows only ``approval`` and ``consent``.
+///
+/// A ``batch`` item with ``estimate_usd`` is the estimate card: ``estimate_usd`` is what the
+/// batch is estimated to cost, ``allowed_usd`` the ``[agents] per_message_cost`` the user
+/// allows
+/// per message, ``ask_over_usd`` the ``[agents] estimate_over`` amount above which it asks,
+/// ``model`` the model the helpers would run on (the first helper's when they differ) and
+/// ``cheaper_model`` the model "Use a cheaper model" would use (null hides that answer). The
+/// card may appear even when ``use_helpers`` is not ``ask``. It is answered by
+/// ``helpers.respond``. These five fields mean something only for a ``batch`` item; an older
+/// daemon leaves them out.
 // MARK: - SessionPendingItem
 public struct SessionPendingItem: Codable {
     public let added: Int?
     public let agent: String?
     public let agents: [String]?
+    public let allowedUsd: Double?
     public let alternatives: Int?
+    public let askOverUsd: Double?
     public let callID: String?
+    public let cheaperModel: String?
     public let count: Int?
+    public let estimateUsd: Double?
     public let helper: PurplePendingHelper?
     public let helperCount: Int?
     public let helperID: String?
     public let kind: PendingItemKind
     public let label: String?
+    public let model: String?
     public let name: String?
     public let notSent: [String]?
     public let removed: Int?
@@ -23745,14 +23820,19 @@ public struct SessionPendingItem: Codable {
         case added = "added"
         case agent = "agent"
         case agents = "agents"
+        case allowedUsd = "allowed_usd"
         case alternatives = "alternatives"
+        case askOverUsd = "ask_over_usd"
         case callID = "call_id"
+        case cheaperModel = "cheaper_model"
         case count = "count"
+        case estimateUsd = "estimate_usd"
         case helper = "helper"
         case helperCount = "helper_count"
         case helperID = "helper_id"
         case kind = "kind"
         case label = "label"
+        case model = "model"
         case name = "name"
         case notSent = "not_sent"
         case removed = "removed"
@@ -23762,18 +23842,23 @@ public struct SessionPendingItem: Codable {
         case subject = "subject"
     }
 
-    public init(added: Int?, agent: String?, agents: [String]?, alternatives: Int?, callID: String?, count: Int?, helper: PurplePendingHelper?, helperCount: Int?, helperID: String?, kind: PendingItemKind, label: String?, name: String?, notSent: [String]?, removed: Int?, sent: [String]?, since: String, source: String?, subject: String?) {
+    public init(added: Int?, agent: String?, agents: [String]?, allowedUsd: Double?, alternatives: Int?, askOverUsd: Double?, callID: String?, cheaperModel: String?, count: Int?, estimateUsd: Double?, helper: PurplePendingHelper?, helperCount: Int?, helperID: String?, kind: PendingItemKind, label: String?, model: String?, name: String?, notSent: [String]?, removed: Int?, sent: [String]?, since: String, source: String?, subject: String?) {
         self.added = added
         self.agent = agent
         self.agents = agents
+        self.allowedUsd = allowedUsd
         self.alternatives = alternatives
+        self.askOverUsd = askOverUsd
         self.callID = callID
+        self.cheaperModel = cheaperModel
         self.count = count
+        self.estimateUsd = estimateUsd
         self.helper = helper
         self.helperCount = helperCount
         self.helperID = helperID
         self.kind = kind
         self.label = label
+        self.model = model
         self.name = name
         self.notSent = notSent
         self.removed = removed
@@ -24513,19 +24598,34 @@ public struct SessionSummaryNotificationParams: Codable {
 /// type names, one for each helper, in the order of the call. It is only ever in
 /// ``SessionSummary.pending_items``: ``SessionSummary.pending`` never holds one, because an
 /// older client reads that field and knows only ``approval`` and ``consent``.
+///
+/// A ``batch`` item with ``estimate_usd`` is the estimate card: ``estimate_usd`` is what the
+/// batch is estimated to cost, ``allowed_usd`` the ``[agents] per_message_cost`` the user
+/// allows
+/// per message, ``ask_over_usd`` the ``[agents] estimate_over`` amount above which it asks,
+/// ``model`` the model the helpers would run on (the first helper's when they differ) and
+/// ``cheaper_model`` the model "Use a cheaper model" would use (null hides that answer). The
+/// card may appear even when ``use_helpers`` is not ``ask``. It is answered by
+/// ``helpers.respond``. These five fields mean something only for a ``batch`` item; an older
+/// daemon leaves them out.
 // MARK: - ParamsPendingItem
 public struct ParamsPendingItem: Codable {
     public let added: Int?
     public let agent: String?
     public let agents: [String]?
+    public let allowedUsd: Double?
     public let alternatives: Int?
+    public let askOverUsd: Double?
     public let callID: String?
+    public let cheaperModel: String?
     public let count: Int?
+    public let estimateUsd: Double?
     public let helper: FluffyPendingHelper?
     public let helperCount: Int?
     public let helperID: String?
     public let kind: PendingItemKind
     public let label: String?
+    public let model: String?
     public let name: String?
     public let notSent: [String]?
     public let removed: Int?
@@ -24538,14 +24638,19 @@ public struct ParamsPendingItem: Codable {
         case added = "added"
         case agent = "agent"
         case agents = "agents"
+        case allowedUsd = "allowed_usd"
         case alternatives = "alternatives"
+        case askOverUsd = "ask_over_usd"
         case callID = "call_id"
+        case cheaperModel = "cheaper_model"
         case count = "count"
+        case estimateUsd = "estimate_usd"
         case helper = "helper"
         case helperCount = "helper_count"
         case helperID = "helper_id"
         case kind = "kind"
         case label = "label"
+        case model = "model"
         case name = "name"
         case notSent = "not_sent"
         case removed = "removed"
@@ -24555,18 +24660,23 @@ public struct ParamsPendingItem: Codable {
         case subject = "subject"
     }
 
-    public init(added: Int?, agent: String?, agents: [String]?, alternatives: Int?, callID: String?, count: Int?, helper: FluffyPendingHelper?, helperCount: Int?, helperID: String?, kind: PendingItemKind, label: String?, name: String?, notSent: [String]?, removed: Int?, sent: [String]?, since: String, source: String?, subject: String?) {
+    public init(added: Int?, agent: String?, agents: [String]?, allowedUsd: Double?, alternatives: Int?, askOverUsd: Double?, callID: String?, cheaperModel: String?, count: Int?, estimateUsd: Double?, helper: FluffyPendingHelper?, helperCount: Int?, helperID: String?, kind: PendingItemKind, label: String?, model: String?, name: String?, notSent: [String]?, removed: Int?, sent: [String]?, since: String, source: String?, subject: String?) {
         self.added = added
         self.agent = agent
         self.agents = agents
+        self.allowedUsd = allowedUsd
         self.alternatives = alternatives
+        self.askOverUsd = askOverUsd
         self.callID = callID
+        self.cheaperModel = cheaperModel
         self.count = count
+        self.estimateUsd = estimateUsd
         self.helper = helper
         self.helperCount = helperCount
         self.helperID = helperID
         self.kind = kind
         self.label = label
+        self.model = model
         self.name = name
         self.notSent = notSent
         self.removed = removed
@@ -24759,19 +24869,34 @@ public struct SessionSummary: Codable {
 /// type names, one for each helper, in the order of the call. It is only ever in
 /// ``SessionSummary.pending_items``: ``SessionSummary.pending`` never holds one, because an
 /// older client reads that field and knows only ``approval`` and ``consent``.
+///
+/// A ``batch`` item with ``estimate_usd`` is the estimate card: ``estimate_usd`` is what the
+/// batch is estimated to cost, ``allowed_usd`` the ``[agents] per_message_cost`` the user
+/// allows
+/// per message, ``ask_over_usd`` the ``[agents] estimate_over`` amount above which it asks,
+/// ``model`` the model the helpers would run on (the first helper's when they differ) and
+/// ``cheaper_model`` the model "Use a cheaper model" would use (null hides that answer). The
+/// card may appear even when ``use_helpers`` is not ``ask``. It is answered by
+/// ``helpers.respond``. These five fields mean something only for a ``batch`` item; an older
+/// daemon leaves them out.
 // MARK: - SessionSummaryPendingItem
 public struct SessionSummaryPendingItem: Codable {
     public let added: Int?
     public let agent: String?
     public let agents: [String]?
+    public let allowedUsd: Double?
     public let alternatives: Int?
+    public let askOverUsd: Double?
     public let callID: String?
+    public let cheaperModel: String?
     public let count: Int?
+    public let estimateUsd: Double?
     public let helper: TentacledPendingHelper?
     public let helperCount: Int?
     public let helperID: String?
     public let kind: PendingItemKind
     public let label: String?
+    public let model: String?
     public let name: String?
     public let notSent: [String]?
     public let removed: Int?
@@ -24784,14 +24909,19 @@ public struct SessionSummaryPendingItem: Codable {
         case added = "added"
         case agent = "agent"
         case agents = "agents"
+        case allowedUsd = "allowed_usd"
         case alternatives = "alternatives"
+        case askOverUsd = "ask_over_usd"
         case callID = "call_id"
+        case cheaperModel = "cheaper_model"
         case count = "count"
+        case estimateUsd = "estimate_usd"
         case helper = "helper"
         case helperCount = "helper_count"
         case helperID = "helper_id"
         case kind = "kind"
         case label = "label"
+        case model = "model"
         case name = "name"
         case notSent = "not_sent"
         case removed = "removed"
@@ -24801,18 +24931,23 @@ public struct SessionSummaryPendingItem: Codable {
         case subject = "subject"
     }
 
-    public init(added: Int?, agent: String?, agents: [String]?, alternatives: Int?, callID: String?, count: Int?, helper: TentacledPendingHelper?, helperCount: Int?, helperID: String?, kind: PendingItemKind, label: String?, name: String?, notSent: [String]?, removed: Int?, sent: [String]?, since: String, source: String?, subject: String?) {
+    public init(added: Int?, agent: String?, agents: [String]?, allowedUsd: Double?, alternatives: Int?, askOverUsd: Double?, callID: String?, cheaperModel: String?, count: Int?, estimateUsd: Double?, helper: TentacledPendingHelper?, helperCount: Int?, helperID: String?, kind: PendingItemKind, label: String?, model: String?, name: String?, notSent: [String]?, removed: Int?, sent: [String]?, since: String, source: String?, subject: String?) {
         self.added = added
         self.agent = agent
         self.agents = agents
+        self.allowedUsd = allowedUsd
         self.alternatives = alternatives
+        self.askOverUsd = askOverUsd
         self.callID = callID
+        self.cheaperModel = cheaperModel
         self.count = count
+        self.estimateUsd = estimateUsd
         self.helper = helper
         self.helperCount = helperCount
         self.helperID = helperID
         self.kind = kind
         self.label = label
+        self.model = model
         self.name = name
         self.notSent = notSent
         self.removed = removed
