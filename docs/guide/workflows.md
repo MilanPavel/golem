@@ -114,8 +114,30 @@ await run.step(f"PR {pkg}", open_pull_request, pkg, key=f"pr:{pkg}:{version}")
 ```
 
 - A keyed step that finished never runs again, across retries and restarts.
-- A crash after the action but before golem saves its result leaves the step **may have run**. On retry, golem passes the key to the receiver as an idempotency key. A receiver that understands it drops the second copy.
+- A crash after the action but before golem saves its result leaves the step **may have run** (`in_doubt`). golem then runs it again and tells the function so.
 - Use a key that is stable and specific, such as the package and version, not a random value.
+- A step without `key=` that was running when golem stopped just runs again, so keep plain steps safe to repeat.
+
+Inside the step function, pass the key to the receiver and check whether this is a second try:
+
+```python
+from golem.workflow import idempotency_key, may_have_run
+
+def open_pull_request(pkg):
+    if may_have_run() and branch_exists(pkg):   # the first try may have got through
+        return existing_pr(pkg)
+    return github.create_pr(pkg, headers={"Idempotency-Key": idempotency_key()})
+```
+
+`idempotency_key()` is the step's `key=` (None outside a keyed step). `may_have_run()` is true only on the run after a crash. A receiver that understands the key drops the second copy.
+
+### Retries
+
+```python
+await run.step("fetch", fetch_page, url, retries=2, backoff=5)
+```
+
+`retries=2` runs the function up to 3 times, waiting `backoff` seconds before each new try. The step's `attempts` counts them. When the last try fails, the step and the run fail, and the run's error names the step and its error.
 
 ## Broken and untrusted files
 

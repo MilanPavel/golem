@@ -89,10 +89,29 @@ class StepBackend(Protocol):
         fn: Callable[..., Any],
         args: tuple[Any, ...],
         kwargs: dict[str, Any],
+        keyed: bool = False,
+        retries: int = 0,
+        backoff: float = 0.0,
     ) -> Any: ...
 
 
 _group: ContextVar[str | None] = ContextVar("golem_workflow_group", default=None)
+IDEMPOTENCY_KEY: ContextVar[str | None] = ContextVar("golem_workflow_key", default=None)
+MAY_HAVE_RUN: ContextVar[bool] = ContextVar("golem_workflow_may_have_run", default=False)
+
+
+def idempotency_key() -> str | None:
+    """The key of the step that is running, or None outside a step.
+
+    Pass it to the receiver (an ``Idempotency-Key`` header, a branch name) so a second try
+    after a crash does not repeat the action.
+    """
+    return IDEMPOTENCY_KEY.get()
+
+
+def may_have_run() -> bool:
+    """True when this is a second try of a keyed step that was running when golem stopped."""
+    return MAY_HAVE_RUN.get()
 
 
 class Run:
@@ -112,11 +131,22 @@ class Run:
         self._groups = 0
 
     async def step(
-        self, name: str, fn: Callable[..., Any], *args: Any, key: str | None = None, **kwargs: Any
+        self,
+        name: str,
+        fn: Callable[..., Any],
+        *args: Any,
+        key: str | None = None,
+        retries: int = 0,
+        backoff: float = 0.0,
+        **kwargs: Any,
     ) -> Any:
         """Run ``fn(*args, **kwargs)`` once and keep its JSON result under ``key or name``.
 
         Each key may be used once per run; inside a loop pass distinct names or keys.
+        An explicit ``key=`` marks a step that changes something outside golem: if golem
+        stops during it, the step is ``in_doubt`` and runs again with ``may_have_run()`` true.
+        ``retries=N`` runs the function up to N more times after an exception, waiting
+        ``backoff`` seconds before each.
         """
         step_key = key or name
         if step_key in self._keys:
@@ -126,7 +156,17 @@ class Run:
             )
         self._keys.add(step_key)
         return await self._backend.run_step(
-            self.workflow_run_id, step_key, "step", name, _group.get(), fn, args, kwargs
+            self.workflow_run_id,
+            step_key,
+            "step",
+            name,
+            _group.get(),
+            fn,
+            args,
+            kwargs,
+            keyed=key is not None,
+            retries=max(0, retries),
+            backoff=max(0.0, backoff),
         )
 
     async def parallel(self, aws: Iterable[Awaitable[Any]]) -> list[Any]:
@@ -202,7 +242,9 @@ __all__ = [
     "Trigger",
     "WorkflowError",
     "WorkflowSpec",
+    "idempotency_key",
     "manual",
+    "may_have_run",
     "on_file",
     "schedule",
     "workflow",
