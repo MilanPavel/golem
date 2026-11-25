@@ -170,12 +170,17 @@
     },
     {
       "data": {
+        "allowed_usd": null,
         "args": {
           "path": "notes.txt"
         },
+        "ask_over_usd": null,
         "call_id": "call_1",
+        "cheaper_model": null,
         "diff": null,
+        "estimate_usd": null,
         "message_id": "id-4",
+        "model": null,
         "name": "read_file",
         "source": "/tmp/golem-golden/config.toml rule 1",
         "subject": null
@@ -555,12 +560,17 @@
     },
     {
       "data": {
+        "allowed_usd": null,
         "args": {
           "path": "notes.txt"
         },
+        "ask_over_usd": null,
         "call_id": "call_1",
+        "cheaper_model": null,
         "diff": null,
+        "estimate_usd": null,
         "message_id": "id-4",
+        "model": null,
         "name": "read_file",
         "source": "/tmp/golem-golden/config.toml rule 1",
         "subject": null
