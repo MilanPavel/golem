@@ -147,6 +147,20 @@ await run.notify("Release 1.4 is out", title="Release")
 
 `run.notify(text, title=None, key=None)` sends a banner through the Notifier and is saved as a step of kind `notify`, so a run that is executed again does not send it twice. The step key is `key` or `notify:<text>`; inside a loop, give each notice its own `key=`. A click on the banner opens the run's session (when the run has none, the banner has no open hint). Without a notifier the step still completes.
 
+### Asking an agent
+
+```python
+found = await run.agent("explorer", "List the TODOs in src/", model="cheapest")
+print(found["answer"])
+```
+
+`run.agent(type, brief, model=None, key=None)` runs one agent of that type (the same agents `delegate` uses) as a helper of the run's session, with golem's permissions. It returns `{"status", "answer", "session_id"}`; open `session_id` to see everything the agent did. The step has kind `agent` and the key `key` or `agent:<type>`; give two agents of one type their own `key=`.
+
+- `model=` is a wish (`cheapest`, `same`, `stronger`, `local`, `budget`, `frontier`), never a model name. Without it the agent's own wish is used. A local-only folder keeps the agent local.
+- An approval the agent needs shows on the run's session, so the run shows "needs you".
+- An agent that fails or is stopped fails the step, and the error says why.
+- After a restart the run continues and waits for the same agent. It never starts a second one.
+
 ## Waiting for you
 
 ```python
@@ -195,9 +209,8 @@ A broken file never disappears from the list. Fix it and it loads again.
 
 | Piece | What it adds | Ticket |
 |---|---|---|
-| `run.agent` | Start a helper for a step, with a brief and a budget | 3.6 (#16) |
 | `run.llm`, `run.tool`, `run.skill` | One model call, one tool, or one skill, with no agent loop | 3.8 (#740) |
 | Workflows page | List workflows and see each run's steps in the web UI | 3.9 (#741) |
 | Editor | Edit a workflow, check it without a model, and try it from a step | 3.11 (#1225) |
 
-Until these land, a workflow can run code, run steps in parallel, save results, use `key=`, tell you things and wait for your review.
+Until these land, a workflow can run code, run steps in parallel, save results, use `key=`, tell you things, ask an agent and wait for your review.

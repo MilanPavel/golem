@@ -39,6 +39,10 @@ _STEP_ATTR = "__golem_step__"
 Emit = Callable[[str, dict[str, Any]], None]
 Notify = Callable[[str | None, str, str], Awaitable[None]]
 """Tells the person: title (or None), text, and the workflow run id the text is about."""
+AgentStarted = Callable[[str], Awaitable[None]]
+AgentRunner = Callable[[str, str, str, str, str | None, AgentStarted], Awaitable[dict[str, Any]]]
+"""Runs an agent step: workflow run id, step key, agent type, brief, model wish and a callback
+for the helper's session id. Returns the step's result. ``workflows/agents.py`` is behind it."""
 
 
 def _no_emit(name: str, payload: dict[str, Any]) -> None:
@@ -70,11 +74,16 @@ def restart_policy(path: Path, name: str) -> str:
 
 class WorkflowEngine:
     def __init__(
-        self, store: WorkflowRuns, emit: Emit | None = None, notify: Notify | None = None
+        self,
+        store: WorkflowRuns,
+        emit: Emit | None = None,
+        notify: Notify | None = None,
+        agent: AgentRunner | None = None,
     ) -> None:
         self._store = store
         self._emit: Emit = emit or _no_emit
         self._notify = notify
+        self._agent = agent
         self.stopping = False
         """True while the daemon shuts down: a cancelled run stays ``running`` and resumes later."""
 
@@ -84,6 +93,19 @@ class WorkflowEngine:
             log.debug("workflow run %s notify (no notifier): %s", workflow_run_id, text)
             return
         await self._notify(title, text, workflow_run_id)
+
+    async def run_agent(
+        self, workflow_run_id: str, key: str, agent_type: str, brief: str, model: str | None
+    ) -> dict[str, Any]:
+        """Run an agent step's helper; its session id is saved on the step as soon as it exists."""
+        if self._agent is None:
+            raise WorkflowError("run.agent is not available: this daemon has no agents")
+
+        async def started(session_id: str) -> None:
+            await self._store.set_step_child_session(workflow_run_id, key, session_id)
+            await self.step_event("workflow.step.started", workflow_run_id, key)
+
+        return await self._agent(workflow_run_id, key, agent_type, brief, model, started)
 
     def send(self, name: str, payload: dict[str, Any]) -> None:
         try:
@@ -282,6 +304,26 @@ class _Journal:
         await store.finish_step(workflow_run_id, key, encoded, _now())
         await event("workflow.step.done", workflow_run_id, key)
         return result
+
+    async def agent(
+        self,
+        workflow_run_id: str,
+        key: str,
+        agent_type: str,
+        brief: str,
+        model: str | None,
+        group_key: str | None,
+    ) -> dict[str, Any]:
+        return await self.run_step(
+            workflow_run_id,
+            key,
+            "agent",
+            agent_type,
+            group_key,
+            self._engine.run_agent,
+            (workflow_run_id, key, agent_type, brief, model),
+            {},
+        )
 
     async def review(
         self,
