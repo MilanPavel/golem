@@ -9,6 +9,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import logging
 from collections.abc import Awaitable, Callable
 from pathlib import Path
@@ -17,8 +18,8 @@ from typing import Any
 from pydantic import BaseModel
 
 from golem.routine_scheduler import trusted_folders
-from golem.store.workflow_runs import WorkflowRuns
-from golem.workflows.engine import WorkflowEngine
+from golem.store.workflow_runs import WorkflowRunRecord, WorkflowRuns
+from golem.workflows.engine import WorkflowEngine, restart_policy
 from golem.workflows.registry import WorkflowEntry, WorkflowRegistry
 from golem_protocol import rpc
 from golem_protocol.commands import WorkflowRunEvent, WorkflowStepEvent
@@ -40,6 +41,14 @@ _NOTIFICATIONS: dict[str, type[BaseModel]] = {
 }
 
 
+STOPPED = "the daemon stopped during the run"
+RESUMABLE = ("running", "waiting", "failed")
+
+
+class ResumeError(Exception):
+    """A run cannot be continued: it is unknown, in flight, or ended."""
+
+
 class WorkflowService:
     def __init__(
         self,
@@ -57,6 +66,7 @@ class WorkflowService:
         self._create_session = create_session
         self._folders: set[Path] = set()
         self._tasks: dict[str, asyncio.Task[None]] = {}
+        self._recovery: asyncio.Task[None] | None = None
         self._user_file = user_file
         self.registry = WorkflowRegistry(
             user_dir=user_dir, projects=self._projects, trusted=trusted
@@ -85,7 +95,59 @@ class WorkflowService:
         self._broadcast(model(params=params.model_validate(payload)))
 
     def start(self) -> None:
+        """Start the registry, and deal with the runs the last daemon left ``running``."""
         self.registry.start()
+        loop = asyncio.get_running_loop()
+        self._recovery = loop.create_task(self._recover(), name="golem-workflow-recovery")
+
+    async def _recover(self) -> None:
+        """Apply each ``running`` run's ``on_restart`` policy. ``waiting`` runs stay waiting."""
+        try:
+            found = await self.runs.steps_for_recovery()
+        except Exception:
+            log.exception("workflow runs could not be listed for recovery")
+            return
+        for run, _steps in found:
+            if run.status != "running" or run.workflow_run_id in self._tasks:
+                continue
+            try:
+                await self._apply_policy(run)
+            except Exception:
+                log.exception("workflow run %s could not be recovered", run.workflow_run_id)
+
+    async def _policy(self, run: WorkflowRunRecord) -> str:
+        """The run's ``on_restart``, read from the workflow file the run started from.
+
+        The file is loaded the way ``execute`` loads it, so a file that cannot be loaded gives
+        ``resume`` and the run then fails with the real error.
+        """
+        try:
+            return await asyncio.to_thread(restart_policy, Path(run.path), run.name)
+        except Exception:
+            return "resume"
+
+    async def _apply_policy(self, run: WorkflowRunRecord) -> None:
+        run_id = run.workflow_run_id
+        policy = await self._policy(run)
+        log.info("workflow run %s was running at restart: on_restart=%s", run_id, policy)
+        if policy == "fail":
+            await self.engine.mark_failed(run_id, STOPPED)
+        elif policy == "ask":
+            await self.engine.mark_waiting(run_id)
+        else:
+            self.launch(run_id)
+
+    async def resume(self, run_id: str) -> WorkflowRunRecord:
+        """Continue a ``running`` (orphaned), ``waiting`` or ``failed`` run; done steps are kept."""
+        run = await self.runs.get_run(run_id)
+        if run is None:
+            raise ResumeError(f"no workflow run {run_id}")
+        if run_id in self._tasks:
+            raise ResumeError(f"workflow run {run_id} is already running")
+        if run.status not in RESUMABLE:
+            raise ResumeError(f"workflow run {run_id} is {run.status}; only a stopped run resumes")
+        self.launch(run_id)
+        return run
 
     async def refresh(self, folders: list[Path]) -> list[WorkflowEntry]:
         self._folders.update(folders)
@@ -93,6 +155,8 @@ class WorkflowService:
         return self.registry.entries()
 
     def launch(self, run_id: str) -> None:
+        if run_id in self._tasks:
+            return
         loop = asyncio.get_running_loop()
         task = loop.create_task(self._run(run_id), name=f"golem-workflow-{run_id}")
         self._tasks[run_id] = task
@@ -111,13 +175,26 @@ class WorkflowService:
         except Exception:
             log.exception("workflow run %s got no session", run_id)
 
+    async def _warn_if_changed(self, run_id: str) -> None:
+        """Log when the workflow file is not the one the run started with (versions: #17)."""
+        record = await self.runs.get_run(run_id)
+        if record is None or record.source_hash is None:
+            return
+        try:
+            data = await asyncio.to_thread(Path(record.path).read_bytes)
+        except OSError:
+            return
+        if hashlib.sha256(data).hexdigest() != record.source_hash:
+            log.warning("workflow run %s: %s changed since the run started", run_id, record.path)
+
     async def _run(self, run_id: str) -> None:
         try:
+            await self._warn_if_changed(run_id)
             await self._ensure_session(run_id)
             await self.engine.execute(run_id)
         except asyncio.CancelledError:
             record = await self.runs.get_run(run_id)
-            if record is not None and record.status == "pending":
+            if record is not None and record.status == "pending" and not self.engine.stopping:
                 # Cancelled before the engine began: the engine never set the status.
                 await self.engine.mark_cancelled(run_id)
         except Exception:
@@ -133,11 +210,17 @@ class WorkflowService:
 
     async def aclose(self) -> None:
         await self.registry.aclose()
+        # A run stopped by shutdown is not cancelled: it stays `running` and the next start
+        # applies its on_restart policy.
+        self.engine.stopping = True
         tasks = list(self._tasks.values())
+        if self._recovery is not None:
+            tasks.append(self._recovery)
+            self._recovery = None
         for task in tasks:
             task.cancel()
         await asyncio.gather(*tasks, return_exceptions=True)
         self._tasks.clear()
 
 
-__all__ = ["WorkflowService"]
+__all__ = ["ResumeError", "WorkflowService"]

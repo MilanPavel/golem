@@ -204,6 +204,31 @@ async def test_cancel_stops_a_slow_run(short_home: Path) -> None:
         await stop_daemon(app, task)
 
 
+async def test_resume_refuses_a_run_in_flight_cancelled_or_unknown(short_home: Path) -> None:
+    path = _write(short_home / "workflows", "slow.py", SLOW)
+    app, task = await start_daemon(short_home)
+    client = await RpcClient.connect(app.paths.socket_path)
+    try:
+        await client.call("hello", HELLO)
+        await client.call("workflow.list", {}, timeout=20)
+        run_id = str(
+            rpc_result(await client.call("workflow.start", {"id": f"{path}::slow"}))[
+                "workflow_run_id"
+            ]
+        )
+        await _until(client, run_id, "running")
+        params = {"workflow_run_id": run_id}
+        assert error_code(await client.call("workflow.resume", params)) == INVALID_PARAMS
+        await client.call("workflow.cancel", params)
+        await _until(client, run_id, "cancelled")
+        assert error_code(await client.call("workflow.resume", params)) == INVALID_PARAMS
+        unknown = {"workflow_run_id": "wr_nope"}
+        assert error_code(await client.call("workflow.resume", unknown)) == INVALID_PARAMS
+    finally:
+        await client.close()
+        await stop_daemon(app, task)
+
+
 async def test_get_returns_the_outline_and_tolerates_a_bad_file(short_home: Path) -> None:
     good = _write(short_home / "workflows", "adder.py", TWO_STEPS)
     bad = _write(short_home / "workflows", "bad.py", "def (:\n")

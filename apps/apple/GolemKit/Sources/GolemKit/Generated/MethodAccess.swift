@@ -170,6 +170,7 @@ public enum MethodAccess {
         "workflow.cancel",
         "workflow.get",
         "workflow.list",
+        "workflow.resume",
         "workflow.start",
         "workflow.status",
     ]

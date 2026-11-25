@@ -1,7 +1,7 @@
 import type { GolemClient, WorkflowEntryInfo, WorkflowNotice, WorkflowStatusResult } from "@golem/client";
 
 /** What `golem workflow` needs from the daemon: a fake stands in for it in the tests. */
-export type WorkflowClient = Pick<GolemClient, "listWorkflows" | "startWorkflow" | "workflowStatus" | "cancelWorkflow" | "onWorkflowEvent">;
+export type WorkflowClient = Pick<GolemClient, "listWorkflows" | "startWorkflow" | "workflowStatus" | "cancelWorkflow" | "resumeWorkflow" | "onWorkflowEvent">;
 
 /** What the commands need from outside: the folder, the terminal, and Ctrl-C. */
 export interface WorkflowDeps {
@@ -13,12 +13,13 @@ export interface WorkflowDeps {
   onInterrupt(handler: () => void): () => void;
 }
 
-export const WORKFLOW_USAGE = "usage: golem workflow [list] | golem workflow run <name|id> [--input k=v]… | golem workflow status <workflow_run_id>";
+export const WORKFLOW_USAGE = "usage: golem workflow [list] | golem workflow run <name|id> [--input k=v]… | golem workflow status <workflow_run_id> | golem workflow resume <workflow_run_id>";
 
 export type WorkflowParse =
   | { kind: "list" }
   | { kind: "run"; name: string; inputs: Record<string, string> }
   | { kind: "status"; runId: string }
+  | { kind: "resume"; runId: string }
   | { kind: "error"; message: string };
 
 /** The words after `golem workflow`. */
@@ -26,9 +27,9 @@ export function parseWorkflowArgs(given: readonly string[]): WorkflowParse {
   const fail = (message: string = WORKFLOW_USAGE): WorkflowParse => ({ kind: "error", message });
   const [sub, ...rest] = given;
   if (sub === undefined || sub === "list") return rest.length === 0 ? { kind: "list" } : fail();
-  if (sub === "status") {
+  if (sub === "status" || sub === "resume") {
     const [runId, ...extra] = rest;
-    return runId === undefined || runId.startsWith("-") || extra.length > 0 ? fail() : { kind: "status", runId };
+    return runId === undefined || runId.startsWith("-") || extra.length > 0 ? fail() : { kind: sub, runId };
   }
   if (sub === "run") {
     let name: string | undefined;
@@ -128,10 +129,11 @@ export function pickWorkflow(entries: readonly WorkflowEntryInfo[], given: strin
 }
 
 /**
- * `golem workflow run <name|id> [--input k=v]…`: starts the run and prints each step as it starts and ends,
- * until the run finishes. 0 when it is done, 1 when it failed or was refused, 130 after Ctrl-C stopped it.
+ * Prints each step of a run as it starts and ends, until the run finishes. `begin` starts (or continues) the run
+ * and gives its id; the listener is already attached, as the first events can arrive before it answers.
+ * 0 when the run is done, 1 when it failed, 130 after Ctrl-C stopped it.
  */
-export async function runWorkflowRun(client: WorkflowClient, args: { name: string; inputs: Record<string, string> }, deps: WorkflowDeps): Promise<number> {
+async function follow(client: WorkflowClient, label: () => string, begin: () => Promise<string | null>, deps: WorkflowDeps): Promise<number> {
   const buffered: WorkflowNotice[] = [];
   let runId: string | null = null;
   let finish: (notice: Extract<WorkflowNotice, { kind: "run" }>) => void = () => undefined;
@@ -146,26 +148,15 @@ export async function runWorkflowRun(client: WorkflowClient, args: { name: strin
       finish(notice);
     }
   };
-  // Listen before starting: the first events can arrive before `workflow.start` answers.
   const stop = client.onWorkflowEvent((notice) => {
     if (runId === null) buffered.push(notice);
     else show(notice);
   });
   let release: () => void = () => undefined;
   try {
-    const listed = await client.listWorkflows([deps.cwd]);
-    const picked = pickWorkflow(listed.workflows, args.name);
-    if (typeof picked === "string") {
-      deps.error(picked);
-      return 1;
-    }
-    if (picked.state !== "ok") {
-      const why = errorLine(picked.error);
-      deps.error(`${picked.name} is ${picked.state}${why === "" ? "" : `: ${why}`}`);
-      return 1;
-    }
-    const started = await client.startWorkflow(picked.id, args.inputs);
-    runId = started.workflow_run_id;
+    const started = await begin();
+    if (started === null) return 1;
+    runId = started;
     deps.error(`run: ${runId}`);
     for (const notice of buffered.splice(0)) show(notice);
     let interrupted = false;
@@ -173,20 +164,20 @@ export async function runWorkflowRun(client: WorkflowClient, args: { name: strin
       if (interrupted) return;
       interrupted = true;
       deps.error("stopping the run…");
-      client.cancelWorkflow(started.workflow_run_id).catch((error: unknown) => deps.error(message(error)));
+      client.cancelWorkflow(started).catch((error: unknown) => deps.error(message(error)));
     });
     const last = await ended;
     const run = last.params;
     const took = duration(run.started_at, run.finished_at);
     if (last.method === "workflow.run.done") {
-      deps.write(`${picked.name} done${took === "" ? "" : ` in ${took}`}`);
+      deps.write(`${label()} done${took === "" ? "" : ` in ${took}`}`);
       return 0;
     }
     if (last.method === "workflow.run.cancelled") {
-      deps.error(`${picked.name} cancelled`);
+      deps.error(`${label()} cancelled`);
       return 130;
     }
-    deps.error(`${picked.name} failed${run.error === undefined || run.error === null ? "" : `: ${errorLine(run.error)}`}`);
+    deps.error(`${label()} failed${run.error === undefined || run.error === null ? "" : `: ${errorLine(run.error)}`}`);
     return 1;
   } catch (error) {
     deps.error(message(error));
@@ -195,6 +186,49 @@ export async function runWorkflowRun(client: WorkflowClient, args: { name: strin
     release();
     stop();
   }
+}
+
+/**
+ * `golem workflow run <name|id> [--input k=v]…`: starts the run and prints each step as it starts and ends,
+ * until the run finishes. 0 when it is done, 1 when it failed or was refused, 130 after Ctrl-C stopped it.
+ */
+export async function runWorkflowRun(client: WorkflowClient, args: { name: string; inputs: Record<string, string> }, deps: WorkflowDeps): Promise<number> {
+  let label = args.name;
+  return follow(
+    client,
+    () => label,
+    async () => {
+      const listed = await client.listWorkflows([deps.cwd]);
+      const picked = pickWorkflow(listed.workflows, args.name);
+      if (typeof picked === "string") {
+        deps.error(picked);
+        return null;
+      }
+      if (picked.state !== "ok") {
+        const why = errorLine(picked.error);
+        deps.error(`${picked.name} is ${picked.state}${why === "" ? "" : `: ${why}`}`);
+        return null;
+      }
+      label = picked.name;
+      return (await client.startWorkflow(picked.id, args.inputs)).workflow_run_id;
+    },
+    deps,
+  );
+}
+
+/** `golem workflow resume <workflow_run_id>`: continues a stopped run, printing its steps like `run`. */
+export async function runWorkflowResume(client: WorkflowClient, runId: string, deps: WorkflowDeps): Promise<number> {
+  let label = runId;
+  return follow(
+    client,
+    () => label,
+    async () => {
+      const resumed = (await client.resumeWorkflow(runId)).run;
+      label = resumed.name;
+      return resumed.workflow_run_id;
+    },
+    deps,
+  );
 }
 
 /** `golem workflow status <workflow_run_id>`: the run and its steps, as they are stored. */

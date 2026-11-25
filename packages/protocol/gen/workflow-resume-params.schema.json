@@ -1,0 +1,16 @@
+{
+  "additionalProperties": false,
+  "description": "``workflow.resume``. Continue a run that stopped: ``running`` (left by a restart),\n``waiting`` (``on_restart=\"ask\"``) or ``failed``. Finished steps are not run again.",
+  "properties": {
+    "workflow_run_id": {
+      "minLength": 1,
+      "title": "Workflow Run Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "workflow_run_id"
+  ],
+  "title": "WorkflowResumeParams",
+  "type": "object"
+}

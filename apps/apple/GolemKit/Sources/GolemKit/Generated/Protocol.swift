@@ -29972,6 +29972,96 @@ public struct WorkflowOutlineStep: Codable {
     }
 }
 
+/// ``workflow.resume``. Continue a run that stopped: ``running`` (left by a restart),
+/// ``waiting`` (``on_restart="ask"``) or ``failed``. Finished steps are not run again.
+// MARK: - WorkflowResumeParams
+public struct WorkflowResumeParams: Codable {
+    public let workflowRunID: String
+
+    public enum CodingKeys: String, CodingKey {
+        case workflowRunID = "workflow_run_id"
+    }
+
+    public init(workflowRunID: String) {
+        self.workflowRunID = workflowRunID
+    }
+}
+
+/// The run as it was when it was continued; its steps arrive as ``workflow.step.*``.
+// MARK: - WorkflowResumeResult
+public struct WorkflowResumeResult: Codable {
+    public let run: WorkflowResumeResultRun
+
+    public enum CodingKeys: String, CodingKey {
+        case run = "run"
+    }
+
+    public init(run: WorkflowResumeResultRun) {
+        self.run = run
+    }
+}
+
+/// One run of a workflow, from its ``workflow_runs`` row.
+///
+/// The times are ISO 8601 with an offset. ``session_id`` is the run's headless session.
+/// ``error`` says why a ``failed`` run failed.
+// MARK: - WorkflowResumeResultRun
+public struct WorkflowResumeResultRun: Codable {
+    public let error: String?
+    public let finishedAt: String?
+    public let inputs: [String: JSONAny]?
+    public let name: String
+    public let sessionID: String?
+    public let startedAt: String?
+    public let status: WorkflowRunEventStatus
+    public let trigger: WorkflowRunEventTrigger
+    public let workflowID: String
+    public let workflowRunID: String
+
+    public enum CodingKeys: String, CodingKey {
+        case error = "error"
+        case finishedAt = "finished_at"
+        case inputs = "inputs"
+        case name = "name"
+        case sessionID = "session_id"
+        case startedAt = "started_at"
+        case status = "status"
+        case trigger = "trigger"
+        case workflowID = "workflow_id"
+        case workflowRunID = "workflow_run_id"
+    }
+
+    public init(error: String?, finishedAt: String?, inputs: [String: JSONAny]?, name: String, sessionID: String?, startedAt: String?, status: WorkflowRunEventStatus, trigger: WorkflowRunEventTrigger, workflowID: String, workflowRunID: String) {
+        self.error = error
+        self.finishedAt = finishedAt
+        self.inputs = inputs
+        self.name = name
+        self.sessionID = sessionID
+        self.startedAt = startedAt
+        self.status = status
+        self.trigger = trigger
+        self.workflowID = workflowID
+        self.workflowRunID = workflowRunID
+    }
+}
+
+public enum WorkflowRunEventStatus: String, Codable {
+    case cancelled = "cancelled"
+    case done = "done"
+    case failed = "failed"
+    case pending = "pending"
+    case running = "running"
+    case waiting = "waiting"
+}
+
+public enum WorkflowRunEventTrigger: String, Codable {
+    case chat = "chat"
+    case file = "file"
+    case manual = "manual"
+    case schedule = "schedule"
+    case triggerTry = "try"
+}
+
 /// Server → every connection: ``workflow.run.cancelled``. Not stored.
 // MARK: - WorkflowRunCancelledNotification
 public struct WorkflowRunCancelledNotification: Codable {
@@ -30035,23 +30125,6 @@ public struct WorkflowRunCancelledNotificationParams: Codable {
         self.workflowID = workflowID
         self.workflowRunID = workflowRunID
     }
-}
-
-public enum WorkflowRunEventStatus: String, Codable {
-    case cancelled = "cancelled"
-    case done = "done"
-    case failed = "failed"
-    case pending = "pending"
-    case running = "running"
-    case waiting = "waiting"
-}
-
-public enum WorkflowRunEventTrigger: String, Codable {
-    case chat = "chat"
-    case file = "file"
-    case manual = "manual"
-    case schedule = "schedule"
-    case triggerTry = "try"
 }
 
 /// Server → every connection: ``workflow.run.done``. Not stored.

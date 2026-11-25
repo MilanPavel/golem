@@ -83,7 +83,7 @@ The outline (the plain-words list of steps) is built from the file by fixed AST 
 | Kind | Names |
 |---|---|
 | Id | `workflow_run_id` |
-| Commands | `workflow.list`, `workflow.get`, `workflow.start`, `workflow.status`, `workflow.cancel` |
+| Commands | `workflow.list`, `workflow.get`, `workflow.start`, `workflow.status`, `workflow.cancel`, `workflow.resume` |
 | Events | `workflow.run.*`, `workflow.step.*` |
 
 Later tickets add `workflow.resume`, `workflow.review.answer`, `workflow.check` and `workflow.outline`. Each ticket takes the next minor protocol version just before it ships.

@@ -146,6 +146,7 @@ export const BROWSER_METHODS: ReadonlySet<string> = new Set([
   "workflow.cancel",
   "workflow.get",
   "workflow.list",
+  "workflow.resume",
   "workflow.start",
   "workflow.status",
 ]);

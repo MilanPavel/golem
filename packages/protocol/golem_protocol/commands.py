@@ -6164,6 +6164,23 @@ class WorkflowCancelResult(BaseModel):
     cancelled: bool
 
 
+class WorkflowResumeParams(BaseModel):
+    """``workflow.resume``. Continue a run that stopped: ``running`` (left by a restart),
+    ``waiting`` (``on_restart="ask"``) or ``failed``. Finished steps are not run again."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    workflow_run_id: str = Field(min_length=1)
+
+
+class WorkflowResumeResult(BaseModel):
+    """The run as it was when it was continued; its steps arrive as ``workflow.step.*``."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    run: WorkflowRunInfo
+
+
 class WorkflowRunEvent(BaseModel):
     """The params of ``workflow.run.started|waiting|resumed|done|failed|cancelled``.
 
@@ -6631,6 +6648,8 @@ __all__ = [
     "WorkflowListParams",
     "WorkflowListResult",
     "WorkflowOutlineStep",
+    "WorkflowResumeParams",
+    "WorkflowResumeResult",
     "WorkflowRunEvent",
     "WorkflowRunInfo",
     "WorkflowRunStatus",

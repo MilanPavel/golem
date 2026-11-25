@@ -84,6 +84,7 @@ import type { RoutinePreviewResult } from "../../protocol/gen/routine-preview-re
 import type { RoutineRemoveResult } from "../../protocol/gen/routine-remove-result.ts";
 import type { RoutineRunResult } from "../../protocol/gen/routine-run-result.ts";
 import type { WorkflowCancelResult } from "../../protocol/gen/workflow-cancel-result.ts";
+import type { WorkflowResumeResult } from "../../protocol/gen/workflow-resume-result.ts";
 import type { WorkflowListResult } from "../../protocol/gen/workflow-list-result.ts";
 import type { WorkflowRunEvent } from "../../protocol/gen/workflow-run-event.ts";
 import type { WorkflowStartResult } from "../../protocol/gen/workflow-start-result.ts";
@@ -299,6 +300,7 @@ import {
   isRoutineRemoveResult,
   isRoutineRunResult,
   isWorkflowCancelResult,
+  isWorkflowResumeResult,
   isWorkflowListResult,
   isWorkflowRunEvent,
   isWorkflowStartResult,
@@ -843,6 +845,8 @@ export interface GolemClient {
   workflowStatus(workflowRunId: string): Promise<WorkflowStatusResult>;
   /** `workflow.cancel`: stop a run. `cancelled` is false when it had already ended. */
   cancelWorkflow(workflowRunId: string): Promise<WorkflowCancelResult>;
+  /** `workflow.resume`: continue a stopped (`running`, `waiting` or `failed`) run; finished steps are not run again. */
+  resumeWorkflow(workflowRunId: string): Promise<WorkflowResumeResult>;
   /** `workflow.run.*` and `workflow.step.*`: a run or one of its steps changed. */
   onWorkflowEvent(listener: (notice: WorkflowNotice) => void): () => void;
   /** `memory.list`: memories, filtered and paged, with counts and the `[memory]` settings. */
@@ -2976,6 +2980,14 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       const result = await call("workflow.status", { workflow_run_id: workflowRunId });
       if (!isWorkflowStatusResult(result)) {
         throw new Error("invalid workflow.status result");
+      }
+      return result;
+    },
+    async resumeWorkflow(workflowRunId: string): Promise<WorkflowResumeResult> {
+      await ready;
+      const result = await call("workflow.resume", { workflow_run_id: workflowRunId });
+      if (!isWorkflowResumeResult(result)) {
+        throw new Error("invalid workflow.resume result");
       }
       return result;
     },

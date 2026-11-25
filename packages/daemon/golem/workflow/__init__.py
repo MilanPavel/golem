@@ -61,6 +61,10 @@ def manual() -> Manual:
     return Manual()
 
 
+OnRestart = Literal["resume", "fail", "ask"]
+RESTART_POLICIES: tuple[str, ...] = ("resume", "fail", "ask")
+
+
 @dataclass(frozen=True, slots=True)
 class WorkflowSpec:
     name: str
@@ -70,6 +74,8 @@ class WorkflowSpec:
     description: str
     line: int
     """Line of the function in its file."""
+    on_restart: OnRestart = "resume"
+    """What the daemon does with a run it finds ``running`` after a restart."""
 
 
 class WorkflowError(Exception):
@@ -240,8 +246,18 @@ def workflow(
     trigger: Trigger | None = None,
     inputs: Mapping[str, object] | None = None,
     description: str | None = None,
+    on_restart: OnRestart = "resume",
 ) -> Callable[[F], F]:
-    """Mark a function as a workflow."""
+    """Mark a function as a workflow.
+
+    ``on_restart`` says what happens to a run the daemon stopped in the middle of: ``"resume"``
+    continues it (finished steps are not run again), ``"fail"`` fails it, ``"ask"`` leaves it
+    ``waiting`` until a person runs ``golem workflow resume``.
+    """
+    if on_restart not in RESTART_POLICIES:
+        raise ValueError(
+            f"on_restart must be one of {', '.join(RESTART_POLICIES)}, not {on_restart!r}"
+        )
 
     def mark(fn: F) -> F:
         doc = (fn.__doc__ or "").strip()
@@ -252,6 +268,7 @@ def workflow(
             inputs=tuple((k, _type_name(v)) for k, v in (inputs or {}).items()),
             description=description if description is not None else doc,
             line=code.co_firstlineno if code is not None else 0,
+            on_restart=on_restart,
         )
         setattr(fn, SPEC_ATTR, spec)
         return fn
@@ -262,6 +279,7 @@ def workflow(
 __all__ = [
     "Manual",
     "OnFile",
+    "OnRestart",
     "Run",
     "Schedule",
     "StepBackend",

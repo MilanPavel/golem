@@ -134,7 +134,7 @@ Names on the wire never use `run.*` (ADR-050). The id is `workflow_run_id`.
 
 | Kind | Name | Ticket |
 |---|---|---|
-| Command | `workflow.list`, `workflow.get`, `workflow.start`, `workflow.status`, `workflow.cancel` | A.1 |
+| Command | `workflow.list`, `workflow.get`, `workflow.start`, `workflow.status`, `workflow.cancel`, `workflow.resume` | A.1 |
 | Command | `workflow.resume`, `workflow.review.answer` | B |
 | Command | `workflow.check`, `workflow.outline` | E |
 | Event | `workflow.run.started`, `workflow.run.waiting`, `workflow.run.done`, `workflow.run.failed`, `workflow.run.cancelled` | A.1 |
