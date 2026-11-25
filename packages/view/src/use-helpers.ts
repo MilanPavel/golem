@@ -23,7 +23,7 @@ export const USE_HELPERS_POSITIONS: readonly UseHelpersPosition[] = [
   {
     value: "when_needed",
     label: "When needed",
-    explain: "golem starts a helper by itself when one of the reasons below holds.",
+    explain: "The lead is told these reasons and decides when to start a helper. golem reminds it when the window passes the \"already full\" share.",
   },
   {
     value: "ask",

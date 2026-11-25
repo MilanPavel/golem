@@ -26,7 +26,7 @@ function setting(use_helpers: "when_needed" | "ask" | "never" | undefined, colum
 test("the list shows Use helpers in each position, with what it does", () => {
   const when = setting("when_needed", 200);
   assert.ok(when.includes("use helpers: When needed (u changes)"));
-  assert.ok(when.some((line) => line.startsWith("  When needed: golem starts a helper by itself")));
+  assert.ok(when.some((line) => line.startsWith("  When needed: The lead is told these reasons")));
   assert.ok(setting("ask", 200).includes("  Ask me first: golem asks before it starts a helper."));
   assert.ok(setting("never", 200).includes("  Never: golem works alone."));
   assert.ok(setting(undefined).includes("use helpers: When needed (u changes)"));

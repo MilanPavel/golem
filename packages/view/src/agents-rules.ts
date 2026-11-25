@@ -94,7 +94,7 @@ export function reasonTiles(delegate: DelegateNumbers): ReasonTile[] {
         { text: " full." },
       ],
       then: "A helper reads it in its own window and brings back the answer.",
-      note: "Any model",
+      note: "Any model. The \"already full\" share is checked during the chat.",
       bars: [
         { label: "one read", parts: [share(delegate.read_share.value)] },
         { label: "window full", parts: [share(delegate.fill_share.value)] },
