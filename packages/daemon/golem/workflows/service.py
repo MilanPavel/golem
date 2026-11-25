@@ -11,7 +11,6 @@ from __future__ import annotations
 import asyncio
 import logging
 from collections.abc import Callable
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -39,10 +38,6 @@ _NOTIFICATIONS: dict[str, type[BaseModel]] = {
     "workflow.step.waiting": rpc.WorkflowStepWaitingNotification,
     "workflow.step.in_doubt": rpc.WorkflowStepInDoubtNotification,
 }
-
-
-def _now() -> str:
-    return datetime.now(UTC).isoformat()
 
 
 class WorkflowService:
