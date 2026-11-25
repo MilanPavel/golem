@@ -43,7 +43,7 @@
     },
     "PendingItem": {
       "additionalProperties": false,
-      "description": "What a waiting session waits for, in a form a client can list without opening it.\n\n``kind`` is ``approval`` for a tool call that needs a yes, and ``consent`` for the paid\nstep-up question. ``since`` is the ``ts`` of the event that asked\n(``approval.needed`` or ``route.consent.needed``). For an approval, ``call_id``, ``name``,\n``subject`` and ``source`` are those of the ``approval.needed`` event, and ``added`` and\n``removed`` count the lines its diff adds and removes (null when the call has no diff).\nFor a consent, ``alternatives`` is the number of answers the user may give. A helper's\nconsent also carries ``helper_id``, ``agent``, ``label``, ``sent`` and ``not_sent`` of its\n``route.consent.needed`` event. The full diff\nstays in the session's events: a summary goes to every watcher on every event, so it\ncarries counts only. An older daemon leaves ``pending`` out of the summary.\n\nIn ``SessionSummary.pending_items`` an item of a lead's helper also carries ``helper``\n(the helper's ``session_id``, ``agent``, ``label`` and ``index``). ``count`` is the number\nof helpers that ask this same question (the same ``kind``, ``name`` and ``subject``), which\nthe lead lists once; null for a single item. An older daemon leaves both out.\n\nA ``batch`` item is the card that asks the user to confirm a ``delegate`` batch before its\nhelpers start (\"Use helpers: Ask me first\"). ``call_id`` is the ``delegate`` call, the id an\nanswer names. ``helper_count`` is how many helpers the batch starts and ``agents`` their agent\ntype names, one for each helper, in the order of the call. It is only ever in\n``SessionSummary.pending_items``: ``SessionSummary.pending`` never holds one, because an\nolder client reads that field and knows only ``approval`` and ``consent``.\n\nA ``batch`` item with ``estimate_usd`` is the estimate card: ``estimate_usd`` is what the\nbatch is estimated to cost, ``allowed_usd`` the ``[agents] per_message_cost`` the user allows\nper message, ``ask_over_usd`` the ``[agents] estimate_over`` amount above which it asks,\n``model`` the model the helpers would run on (the first helper's when they differ) and\n``cheaper_model`` the model \"Use a cheaper model\" would use (null hides that answer). The\ncard may appear even when ``use_helpers`` is not ``ask``. It is answered by\n``helpers.respond``. These five fields mean something only for a ``batch`` item; an older\ndaemon leaves them out.",
+      "description": "What a waiting session waits for, in a form a client can list without opening it.\n\n``kind`` is ``approval`` for a tool call that needs a yes, and ``consent`` for the paid\nstep-up question. ``since`` is the ``ts`` of the event that asked\n(``approval.needed`` or ``route.consent.needed``). For an approval, ``call_id``, ``name``,\n``subject`` and ``source`` are those of the ``approval.needed`` event, and ``added`` and\n``removed`` count the lines its diff adds and removes (null when the call has no diff).\nFor a consent, ``alternatives`` is the number of answers the user may give. A helper's\nconsent also carries ``helper_id``, ``agent``, ``label``, ``sent``, ``not_sent``, ``brief``\nand ``diff_artifact_id`` of its ``route.consent.needed`` event. The full diff\nstays in the session's events: a summary goes to every watcher on every event, so it\ncarries counts only. An older daemon leaves ``pending`` out of the summary.\n\nIn ``SessionSummary.pending_items`` an item of a lead's helper also carries ``helper``\n(the helper's ``session_id``, ``agent``, ``label`` and ``index``). ``count`` is the number\nof helpers that ask this same question (the same ``kind``, ``name`` and ``subject``), which\nthe lead lists once; null for a single item. An older daemon leaves both out.\n\nA ``batch`` item is the card that asks the user to confirm a ``delegate`` batch before its\nhelpers start (\"Use helpers: Ask me first\"). ``call_id`` is the ``delegate`` call, the id an\nanswer names. ``helper_count`` is how many helpers the batch starts and ``agents`` their agent\ntype names, one for each helper, in the order of the call. It is only ever in\n``SessionSummary.pending_items``: ``SessionSummary.pending`` never holds one, because an\nolder client reads that field and knows only ``approval`` and ``consent``.\n\nA ``batch`` item with ``estimate_usd`` is the estimate card: ``estimate_usd`` is what the\nbatch is estimated to cost, ``allowed_usd`` the ``[agents] per_message_cost`` the user allows\nper message, ``ask_over_usd`` the ``[agents] estimate_over`` amount above which it asks,\n``model`` the model the helpers would run on (the first helper's when they differ) and\n``cheaper_model`` the model \"Use a cheaper model\" would use (null hides that answer). The\ncard may appear even when ``use_helpers`` is not ``ask``. It is answered by\n``helpers.respond``. These five fields mean something only for a ``batch`` item; an older\ndaemon leaves them out.",
       "properties": {
         "added": {
           "anyOf": [
@@ -126,6 +126,19 @@
           "default": null,
           "title": "Ask Over Usd"
         },
+        "brief": {
+          "anyOf": [
+            {
+              "maxLength": 8000,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Brief"
+        },
         "call_id": {
           "anyOf": [
             {
@@ -164,6 +177,19 @@
           ],
           "default": null,
           "title": "Count"
+        },
+        "diff_artifact_id": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Diff Artifact Id"
         },
         "estimate_usd": {
           "anyOf": [

@@ -837,3 +837,17 @@ def test_helpers_respond_cheaper_needs_run() -> None:
     assert HelpersRespondParams.model_validate_json(cheaper.model_dump_json()) == cheaper
     with pytest.raises(ValidationError):
         HelpersRespondParams(session_id="s", call_id="c", run=False, cheaper=True)
+
+
+def test_pending_consent_item_brief_and_diff_round_trip() -> None:
+    plain = PendingItem(kind="consent", since="t")
+    assert plain.brief is None and plain.diff_artifact_id is None
+    item = PendingItem(
+        kind="consent", since="t", helper_id="h1", brief="Review.", diff_artifact_id="art-1"
+    )
+    assert PendingItem.model_validate_json(item.model_dump_json()) == item
+    assert PendingItem.model_validate_json(plain.model_dump_json(exclude_none=True)) == plain
+    with pytest.raises(ValidationError):
+        PendingItem(kind="consent", since="t", brief="x" * 8001)
+    with pytest.raises(ValidationError):
+        PendingItem(kind="consent", since="t", diff_artifact_id="")

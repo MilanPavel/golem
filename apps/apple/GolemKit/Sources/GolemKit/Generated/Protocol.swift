@@ -18003,11 +18003,23 @@ public enum RouteConsentAnsweredEventType: String, Codable {
 /// what goes to the paid model ("the brief", "the diff, 212 lines") and what does not ("this
 /// chat"). All five are null or empty for a lead's own question. An older daemon leaves them
 /// out.
+///
+/// ``brief`` is the helper's brief, so a client can show it behind "show". The daemon cuts a
+/// brief longer than ``HELPER_BRIEF_MAX_CHARS`` and marks the cut in the text.
+/// ``diff_artifact_id``
+/// is the id of the diff artifact of a reviewer helper; the client reads it with
+/// ``artifact.read``. Both are set only for a helper's question, like ``helper_id``, and are
+/// null
+/// otherwise. "Review locally" is the client's wording for the existing ``local`` answer
+/// when the
+/// agent is a reviewer; it is not a new answer.
 // MARK: - RouteConsentNeededData
 public struct RouteConsentNeededData: Codable {
     public let agent: String?
     public let alternatives: [Answer]
+    public let brief: String?
     public let caps: RouteConsentNeededDataConsentCaps?
+    public let diffArtifactID: String?
     public let estimatedUsd: Double?
     public let helperID: String?
     public let label: String?
@@ -18024,7 +18036,9 @@ public struct RouteConsentNeededData: Codable {
     public enum CodingKeys: String, CodingKey {
         case agent = "agent"
         case alternatives = "alternatives"
+        case brief = "brief"
         case caps = "caps"
+        case diffArtifactID = "diff_artifact_id"
         case estimatedUsd = "estimated_usd"
         case helperID = "helper_id"
         case label = "label"
@@ -18039,10 +18053,12 @@ public struct RouteConsentNeededData: Codable {
         case why = "why"
     }
 
-    public init(agent: String?, alternatives: [Answer], caps: RouteConsentNeededDataConsentCaps?, estimatedUsd: Double?, helperID: String?, label: String?, model: String?, modelProfile: String, notSent: [String]?, provider: String?, replacesModel: String?, sent: [String]?, signal: String?, tier: Tier, why: String) {
+    public init(agent: String?, alternatives: [Answer], brief: String?, caps: RouteConsentNeededDataConsentCaps?, diffArtifactID: String?, estimatedUsd: Double?, helperID: String?, label: String?, model: String?, modelProfile: String, notSent: [String]?, provider: String?, replacesModel: String?, sent: [String]?, signal: String?, tier: Tier, why: String) {
         self.agent = agent
         self.alternatives = alternatives
+        self.brief = brief
         self.caps = caps
+        self.diffArtifactID = diffArtifactID
         self.estimatedUsd = estimatedUsd
         self.helperID = helperID
         self.label = label
@@ -18131,11 +18147,23 @@ public struct RouteConsentNeededEvent: Codable {
 /// what goes to the paid model ("the brief", "the diff, 212 lines") and what does not ("this
 /// chat"). All five are null or empty for a lead's own question. An older daemon leaves them
 /// out.
+///
+/// ``brief`` is the helper's brief, so a client can show it behind "show". The daemon cuts a
+/// brief longer than ``HELPER_BRIEF_MAX_CHARS`` and marks the cut in the text.
+/// ``diff_artifact_id``
+/// is the id of the diff artifact of a reviewer helper; the client reads it with
+/// ``artifact.read``. Both are set only for a helper's question, like ``helper_id``, and are
+/// null
+/// otherwise. "Review locally" is the client's wording for the existing ``local`` answer
+/// when the
+/// agent is a reviewer; it is not a new answer.
 // MARK: - RouteConsentNeededEventData
 public struct RouteConsentNeededEventData: Codable {
     public let agent: String?
     public let alternatives: [Answer]
+    public let brief: String?
     public let caps: PurpleConsentCaps?
+    public let diffArtifactID: String?
     public let estimatedUsd: Double?
     public let helperID: String?
     public let label: String?
@@ -18152,7 +18180,9 @@ public struct RouteConsentNeededEventData: Codable {
     public enum CodingKeys: String, CodingKey {
         case agent = "agent"
         case alternatives = "alternatives"
+        case brief = "brief"
         case caps = "caps"
+        case diffArtifactID = "diff_artifact_id"
         case estimatedUsd = "estimated_usd"
         case helperID = "helper_id"
         case label = "label"
@@ -18167,10 +18197,12 @@ public struct RouteConsentNeededEventData: Codable {
         case why = "why"
     }
 
-    public init(agent: String?, alternatives: [Answer], caps: PurpleConsentCaps?, estimatedUsd: Double?, helperID: String?, label: String?, model: String?, modelProfile: String, notSent: [String]?, provider: String?, replacesModel: String?, sent: [String]?, signal: String?, tier: Tier, why: String) {
+    public init(agent: String?, alternatives: [Answer], brief: String?, caps: PurpleConsentCaps?, diffArtifactID: String?, estimatedUsd: Double?, helperID: String?, label: String?, model: String?, modelProfile: String, notSent: [String]?, provider: String?, replacesModel: String?, sent: [String]?, signal: String?, tier: Tier, why: String) {
         self.agent = agent
         self.alternatives = alternatives
+        self.brief = brief
         self.caps = caps
+        self.diffArtifactID = diffArtifactID
         self.estimatedUsd = estimatedUsd
         self.helperID = helperID
         self.label = label
@@ -20948,6 +20980,16 @@ public struct Params: Codable {
 /// chat"). All five are null or empty for a lead's own question. An older daemon leaves them
 /// out.
 ///
+/// ``brief`` is the helper's brief, so a client can show it behind "show". The daemon cuts a
+/// brief longer than ``HELPER_BRIEF_MAX_CHARS`` and marks the cut in the text.
+/// ``diff_artifact_id``
+/// is the id of the diff artifact of a reviewer helper; the client reads it with
+/// ``artifact.read``. Both are set only for a helper's question, like ``helper_id``, and are
+/// null
+/// otherwise. "Review locally" is the client's wording for the existing ``local`` answer
+/// when the
+/// agent is a reviewer; it is not a new answer.
+///
 /// The user answered the paid step-up question, and the run goes on.
 ///
 /// The agent's todo list, whole, after ``todo_write`` replaced it.
@@ -21169,7 +21211,9 @@ public struct ParamsData: Codable {
     public let device: String?
     public let rule: String?
     public let alternatives: [Answer]?
+    public let brief: String?
     public let caps: FluffyConsentCaps?
+    public let diffArtifactID: String?
     public let estimatedUsd: Double?
     public let helperID: String?
     public let label: String?
@@ -21318,7 +21362,9 @@ public struct ParamsData: Codable {
         case device = "device"
         case rule = "rule"
         case alternatives = "alternatives"
+        case brief = "brief"
         case caps = "caps"
+        case diffArtifactID = "diff_artifact_id"
         case estimatedUsd = "estimated_usd"
         case helperID = "helper_id"
         case label = "label"
@@ -21360,7 +21406,7 @@ public struct ParamsData: Codable {
         case toBranch = "to_branch"
     }
 
-    public init(agent: Agent?, cwd: String?, forkedFrom: PurpleForkedFrom?, modelName: String?, modelProfile: String?, modelProvider: String?, origin: String?, parent: PurpleSessionParent?, route: RouteEnum?, allowedTools: [PurpleSessionAllowance]?, mcpServers: [String]?, paidOk: Bool?, title: String?, runID: String?, status: PurpleStatus?, summary: String?, reason: String?, detail: String?, model: String?, provider: String?, rejected: [FluffyModelRejection]?, replacesModel: String?, tier: Tier?, options: [String: Option]?, mode: DefaultPermissionModeEnum?, on: Bool?, messageID: String?, role: MessageCompletedDataRole?, text: String?, interrupted: Bool?, skill: FluffySkillCall?, thinking: String?, thinkingMS: Int?, clearedIDS: [String]?, contextWindow: Int?, estimatedTokens: Int?, index: Int?, messageBytes: [Int]?, messageChars: [Int]?, messageIDS: [String]?, numCtx: Int?, parentCallID: String?, profile: String?, summaryChars: Int?, systemBytes: Int?, systemChars: Int?, systemPromptSHA: String?, systemSections: [TentacledPromptSectionInfo]?, toolsBytes: Int?, toolsChars: Int?, toolsSHA: String?, windowEstimated: Bool?, windowPlanned: Bool?, costUsd: Double?, failed: Bool?, firstTokenMS: Int?, latencyMS: Int?, loadMS: Int?, price: FluffyCallPrice?, promptMS: Int?, replyMS: Int?, stopReason: String?, textToolCalls: TextToolCalls?, usage: FluffyTokenUsage?, waitedMS: Int?, action: ContextChangedDataAction?, afterTokens: Int?, beforeTokens: Int?, count: Int?, reloadMS: Int?, room: Int?, windowFrom: Int?, windowTo: Int?, code: Code?, hint: String?, message: String?, args: [String: JSONAny]?, callID: String?, name: String?, chars: Int?, lines: Int?, path: String?, holder: String?, line: String?, position: Int?, retryInMS: Int?, scope: ModelWaitingDataScope?, silentMS: Int?, waiting: Bool?, willRetry: Bool?, window: Int?, artifactID: String?, diff: String?, durationMS: Int?, preview: String?, sources: [PurpleToolSource]?, truncated: Bool?, allowedUsd: Double?, askOverUsd: Double?, cheaperModel: String?, estimateUsd: Double?, source: String?, subject: String?, decision: Decision?, device: String?, rule: String?, alternatives: [Answer]?, caps: FluffyConsentCaps?, estimatedUsd: Double?, helperID: String?, label: String?, notSent: [String]?, sent: [String]?, signal: String?, why: String?, answer: Answer?, todos: [PurpleTodo]?, planID: String?, steps: [FluffyPlanStep]?, added: Int?, changeID: String?, removed: Int?, reverts: String?, hash: String?, how: How?, checks: [FluffyCheckInfo]?, checkID: String?, command: String?, round: Int?, exitCode: Int?, output: String?, pickReason: String?, wish: String?, calls: Int?, stepID: String?, capUsd: Double?, spentUsd: Double?, state: PurpleState?, helperIDS: [String]?, answerTokens: Int?, modelCalls: Int?, stopped: Stopped?, tokens: Int?, workingMS: Int?, fromBranch: String?, pathsCount: Int?, toBranch: String?) {
+    public init(agent: Agent?, cwd: String?, forkedFrom: PurpleForkedFrom?, modelName: String?, modelProfile: String?, modelProvider: String?, origin: String?, parent: PurpleSessionParent?, route: RouteEnum?, allowedTools: [PurpleSessionAllowance]?, mcpServers: [String]?, paidOk: Bool?, title: String?, runID: String?, status: PurpleStatus?, summary: String?, reason: String?, detail: String?, model: String?, provider: String?, rejected: [FluffyModelRejection]?, replacesModel: String?, tier: Tier?, options: [String: Option]?, mode: DefaultPermissionModeEnum?, on: Bool?, messageID: String?, role: MessageCompletedDataRole?, text: String?, interrupted: Bool?, skill: FluffySkillCall?, thinking: String?, thinkingMS: Int?, clearedIDS: [String]?, contextWindow: Int?, estimatedTokens: Int?, index: Int?, messageBytes: [Int]?, messageChars: [Int]?, messageIDS: [String]?, numCtx: Int?, parentCallID: String?, profile: String?, summaryChars: Int?, systemBytes: Int?, systemChars: Int?, systemPromptSHA: String?, systemSections: [TentacledPromptSectionInfo]?, toolsBytes: Int?, toolsChars: Int?, toolsSHA: String?, windowEstimated: Bool?, windowPlanned: Bool?, costUsd: Double?, failed: Bool?, firstTokenMS: Int?, latencyMS: Int?, loadMS: Int?, price: FluffyCallPrice?, promptMS: Int?, replyMS: Int?, stopReason: String?, textToolCalls: TextToolCalls?, usage: FluffyTokenUsage?, waitedMS: Int?, action: ContextChangedDataAction?, afterTokens: Int?, beforeTokens: Int?, count: Int?, reloadMS: Int?, room: Int?, windowFrom: Int?, windowTo: Int?, code: Code?, hint: String?, message: String?, args: [String: JSONAny]?, callID: String?, name: String?, chars: Int?, lines: Int?, path: String?, holder: String?, line: String?, position: Int?, retryInMS: Int?, scope: ModelWaitingDataScope?, silentMS: Int?, waiting: Bool?, willRetry: Bool?, window: Int?, artifactID: String?, diff: String?, durationMS: Int?, preview: String?, sources: [PurpleToolSource]?, truncated: Bool?, allowedUsd: Double?, askOverUsd: Double?, cheaperModel: String?, estimateUsd: Double?, source: String?, subject: String?, decision: Decision?, device: String?, rule: String?, alternatives: [Answer]?, brief: String?, caps: FluffyConsentCaps?, diffArtifactID: String?, estimatedUsd: Double?, helperID: String?, label: String?, notSent: [String]?, sent: [String]?, signal: String?, why: String?, answer: Answer?, todos: [PurpleTodo]?, planID: String?, steps: [FluffyPlanStep]?, added: Int?, changeID: String?, removed: Int?, reverts: String?, hash: String?, how: How?, checks: [FluffyCheckInfo]?, checkID: String?, command: String?, round: Int?, exitCode: Int?, output: String?, pickReason: String?, wish: String?, calls: Int?, stepID: String?, capUsd: Double?, spentUsd: Double?, state: PurpleState?, helperIDS: [String]?, answerTokens: Int?, modelCalls: Int?, stopped: Stopped?, tokens: Int?, workingMS: Int?, fromBranch: String?, pathsCount: Int?, toBranch: String?) {
         self.agent = agent
         self.cwd = cwd
         self.forkedFrom = forkedFrom
@@ -21468,7 +21514,9 @@ public struct ParamsData: Codable {
         self.device = device
         self.rule = rule
         self.alternatives = alternatives
+        self.brief = brief
         self.caps = caps
+        self.diffArtifactID = diffArtifactID
         self.estimatedUsd = estimatedUsd
         self.helperID = helperID
         self.label = label
@@ -23765,9 +23813,9 @@ public struct SessionElement: Codable {
 /// ``subject`` and ``source`` are those of the ``approval.needed`` event, and ``added`` and
 /// ``removed`` count the lines its diff adds and removes (null when the call has no diff).
 /// For a consent, ``alternatives`` is the number of answers the user may give. A helper's
-/// consent also carries ``helper_id``, ``agent``, ``label``, ``sent`` and ``not_sent`` of
-/// its
-/// ``route.consent.needed`` event. The full diff
+/// consent also carries ``helper_id``, ``agent``, ``label``, ``sent``, ``not_sent``,
+/// ``brief``
+/// and ``diff_artifact_id`` of its ``route.consent.needed`` event. The full diff
 /// stays in the session's events: a summary goes to every watcher on every event, so it
 /// carries counts only. An older daemon leaves ``pending`` out of the summary.
 ///
@@ -23805,9 +23853,11 @@ public struct SessionPendingItem: Codable {
     public let allowedUsd: Double?
     public let alternatives: Int?
     public let askOverUsd: Double?
+    public let brief: String?
     public let callID: String?
     public let cheaperModel: String?
     public let count: Int?
+    public let diffArtifactID: String?
     public let estimateUsd: Double?
     public let helper: PurplePendingHelper?
     public let helperCount: Int?
@@ -23830,9 +23880,11 @@ public struct SessionPendingItem: Codable {
         case allowedUsd = "allowed_usd"
         case alternatives = "alternatives"
         case askOverUsd = "ask_over_usd"
+        case brief = "brief"
         case callID = "call_id"
         case cheaperModel = "cheaper_model"
         case count = "count"
+        case diffArtifactID = "diff_artifact_id"
         case estimateUsd = "estimate_usd"
         case helper = "helper"
         case helperCount = "helper_count"
@@ -23849,16 +23901,18 @@ public struct SessionPendingItem: Codable {
         case subject = "subject"
     }
 
-    public init(added: Int?, agent: String?, agents: [String]?, allowedUsd: Double?, alternatives: Int?, askOverUsd: Double?, callID: String?, cheaperModel: String?, count: Int?, estimateUsd: Double?, helper: PurplePendingHelper?, helperCount: Int?, helperID: String?, kind: PendingItemKind, label: String?, model: String?, name: String?, notSent: [String]?, removed: Int?, sent: [String]?, since: String, source: String?, subject: String?) {
+    public init(added: Int?, agent: String?, agents: [String]?, allowedUsd: Double?, alternatives: Int?, askOverUsd: Double?, brief: String?, callID: String?, cheaperModel: String?, count: Int?, diffArtifactID: String?, estimateUsd: Double?, helper: PurplePendingHelper?, helperCount: Int?, helperID: String?, kind: PendingItemKind, label: String?, model: String?, name: String?, notSent: [String]?, removed: Int?, sent: [String]?, since: String, source: String?, subject: String?) {
         self.added = added
         self.agent = agent
         self.agents = agents
         self.allowedUsd = allowedUsd
         self.alternatives = alternatives
         self.askOverUsd = askOverUsd
+        self.brief = brief
         self.callID = callID
         self.cheaperModel = cheaperModel
         self.count = count
+        self.diffArtifactID = diffArtifactID
         self.estimateUsd = estimateUsd
         self.helper = helper
         self.helperCount = helperCount
@@ -24583,9 +24637,9 @@ public struct SessionSummaryNotificationParams: Codable {
 /// ``subject`` and ``source`` are those of the ``approval.needed`` event, and ``added`` and
 /// ``removed`` count the lines its diff adds and removes (null when the call has no diff).
 /// For a consent, ``alternatives`` is the number of answers the user may give. A helper's
-/// consent also carries ``helper_id``, ``agent``, ``label``, ``sent`` and ``not_sent`` of
-/// its
-/// ``route.consent.needed`` event. The full diff
+/// consent also carries ``helper_id``, ``agent``, ``label``, ``sent``, ``not_sent``,
+/// ``brief``
+/// and ``diff_artifact_id`` of its ``route.consent.needed`` event. The full diff
 /// stays in the session's events: a summary goes to every watcher on every event, so it
 /// carries counts only. An older daemon leaves ``pending`` out of the summary.
 ///
@@ -24623,9 +24677,11 @@ public struct ParamsPendingItem: Codable {
     public let allowedUsd: Double?
     public let alternatives: Int?
     public let askOverUsd: Double?
+    public let brief: String?
     public let callID: String?
     public let cheaperModel: String?
     public let count: Int?
+    public let diffArtifactID: String?
     public let estimateUsd: Double?
     public let helper: FluffyPendingHelper?
     public let helperCount: Int?
@@ -24648,9 +24704,11 @@ public struct ParamsPendingItem: Codable {
         case allowedUsd = "allowed_usd"
         case alternatives = "alternatives"
         case askOverUsd = "ask_over_usd"
+        case brief = "brief"
         case callID = "call_id"
         case cheaperModel = "cheaper_model"
         case count = "count"
+        case diffArtifactID = "diff_artifact_id"
         case estimateUsd = "estimate_usd"
         case helper = "helper"
         case helperCount = "helper_count"
@@ -24667,16 +24725,18 @@ public struct ParamsPendingItem: Codable {
         case subject = "subject"
     }
 
-    public init(added: Int?, agent: String?, agents: [String]?, allowedUsd: Double?, alternatives: Int?, askOverUsd: Double?, callID: String?, cheaperModel: String?, count: Int?, estimateUsd: Double?, helper: FluffyPendingHelper?, helperCount: Int?, helperID: String?, kind: PendingItemKind, label: String?, model: String?, name: String?, notSent: [String]?, removed: Int?, sent: [String]?, since: String, source: String?, subject: String?) {
+    public init(added: Int?, agent: String?, agents: [String]?, allowedUsd: Double?, alternatives: Int?, askOverUsd: Double?, brief: String?, callID: String?, cheaperModel: String?, count: Int?, diffArtifactID: String?, estimateUsd: Double?, helper: FluffyPendingHelper?, helperCount: Int?, helperID: String?, kind: PendingItemKind, label: String?, model: String?, name: String?, notSent: [String]?, removed: Int?, sent: [String]?, since: String, source: String?, subject: String?) {
         self.added = added
         self.agent = agent
         self.agents = agents
         self.allowedUsd = allowedUsd
         self.alternatives = alternatives
         self.askOverUsd = askOverUsd
+        self.brief = brief
         self.callID = callID
         self.cheaperModel = cheaperModel
         self.count = count
+        self.diffArtifactID = diffArtifactID
         self.estimateUsd = estimateUsd
         self.helper = helper
         self.helperCount = helperCount
@@ -24854,9 +24914,9 @@ public struct SessionSummary: Codable {
 /// ``subject`` and ``source`` are those of the ``approval.needed`` event, and ``added`` and
 /// ``removed`` count the lines its diff adds and removes (null when the call has no diff).
 /// For a consent, ``alternatives`` is the number of answers the user may give. A helper's
-/// consent also carries ``helper_id``, ``agent``, ``label``, ``sent`` and ``not_sent`` of
-/// its
-/// ``route.consent.needed`` event. The full diff
+/// consent also carries ``helper_id``, ``agent``, ``label``, ``sent``, ``not_sent``,
+/// ``brief``
+/// and ``diff_artifact_id`` of its ``route.consent.needed`` event. The full diff
 /// stays in the session's events: a summary goes to every watcher on every event, so it
 /// carries counts only. An older daemon leaves ``pending`` out of the summary.
 ///
@@ -24894,9 +24954,11 @@ public struct SessionSummaryPendingItem: Codable {
     public let allowedUsd: Double?
     public let alternatives: Int?
     public let askOverUsd: Double?
+    public let brief: String?
     public let callID: String?
     public let cheaperModel: String?
     public let count: Int?
+    public let diffArtifactID: String?
     public let estimateUsd: Double?
     public let helper: TentacledPendingHelper?
     public let helperCount: Int?
@@ -24919,9 +24981,11 @@ public struct SessionSummaryPendingItem: Codable {
         case allowedUsd = "allowed_usd"
         case alternatives = "alternatives"
         case askOverUsd = "ask_over_usd"
+        case brief = "brief"
         case callID = "call_id"
         case cheaperModel = "cheaper_model"
         case count = "count"
+        case diffArtifactID = "diff_artifact_id"
         case estimateUsd = "estimate_usd"
         case helper = "helper"
         case helperCount = "helper_count"
@@ -24938,16 +25002,18 @@ public struct SessionSummaryPendingItem: Codable {
         case subject = "subject"
     }
 
-    public init(added: Int?, agent: String?, agents: [String]?, allowedUsd: Double?, alternatives: Int?, askOverUsd: Double?, callID: String?, cheaperModel: String?, count: Int?, estimateUsd: Double?, helper: TentacledPendingHelper?, helperCount: Int?, helperID: String?, kind: PendingItemKind, label: String?, model: String?, name: String?, notSent: [String]?, removed: Int?, sent: [String]?, since: String, source: String?, subject: String?) {
+    public init(added: Int?, agent: String?, agents: [String]?, allowedUsd: Double?, alternatives: Int?, askOverUsd: Double?, brief: String?, callID: String?, cheaperModel: String?, count: Int?, diffArtifactID: String?, estimateUsd: Double?, helper: TentacledPendingHelper?, helperCount: Int?, helperID: String?, kind: PendingItemKind, label: String?, model: String?, name: String?, notSent: [String]?, removed: Int?, sent: [String]?, since: String, source: String?, subject: String?) {
         self.added = added
         self.agent = agent
         self.agents = agents
         self.allowedUsd = allowedUsd
         self.alternatives = alternatives
         self.askOverUsd = askOverUsd
+        self.brief = brief
         self.callID = callID
         self.cheaperModel = cheaperModel
         self.count = count
+        self.diffArtifactID = diffArtifactID
         self.estimateUsd = estimateUsd
         self.helper = helper
         self.helperCount = helperCount

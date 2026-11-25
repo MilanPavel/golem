@@ -50,7 +50,7 @@
     }
   },
   "additionalProperties": false,
-  "description": "The run waits for the user's yes to a paid model. It is paused until\n``route.consent.answer``.\n\n``model_profile``, ``provider``, ``model`` and ``tier`` name the paid model that would\nrun. ``why`` is one plain sentence on why golem asks. ``estimated_usd`` is golem's\nestimate for this turn, null when the price is unknown. ``caps`` is set when a cap is.\n``alternatives`` are the answers the user may give: a spent cap leaves out ``session``.\n``signal`` is set when the question comes in the middle of a run, because the model\nstruggled (a struggle signal of the daemon); ``why`` then says how. It is null before a turn.\n``replaces_model`` is set when the question is for a turn the user asked to run on a\nstronger model; the turn's ``model.routed`` then carries it too.\n\nFor a helper's question (ADR-059) the event is on the helper's own log and three optional\nfields say who asks: ``helper_id`` is the helper's session id, ``agent`` its agent type and\n``label`` the short name the card shows. ``sent`` and ``not_sent`` are short lists that say\nwhat goes to the paid model (\"the brief\", \"the diff, 212 lines\") and what does not (\"this\nchat\"). All five are null or empty for a lead's own question. An older daemon leaves them out.",
+  "description": "The run waits for the user's yes to a paid model. It is paused until\n``route.consent.answer``.\n\n``model_profile``, ``provider``, ``model`` and ``tier`` name the paid model that would\nrun. ``why`` is one plain sentence on why golem asks. ``estimated_usd`` is golem's\nestimate for this turn, null when the price is unknown. ``caps`` is set when a cap is.\n``alternatives`` are the answers the user may give: a spent cap leaves out ``session``.\n``signal`` is set when the question comes in the middle of a run, because the model\nstruggled (a struggle signal of the daemon); ``why`` then says how. It is null before a turn.\n``replaces_model`` is set when the question is for a turn the user asked to run on a\nstronger model; the turn's ``model.routed`` then carries it too.\n\nFor a helper's question (ADR-059) the event is on the helper's own log and three optional\nfields say who asks: ``helper_id`` is the helper's session id, ``agent`` its agent type and\n``label`` the short name the card shows. ``sent`` and ``not_sent`` are short lists that say\nwhat goes to the paid model (\"the brief\", \"the diff, 212 lines\") and what does not (\"this\nchat\"). All five are null or empty for a lead's own question. An older daemon leaves them out.\n\n``brief`` is the helper's brief, so a client can show it behind \"show\". The daemon cuts a\nbrief longer than ``HELPER_BRIEF_MAX_CHARS`` and marks the cut in the text. ``diff_artifact_id``\nis the id of the diff artifact of a reviewer helper; the client reads it with\n``artifact.read``. Both are set only for a helper's question, like ``helper_id``, and are null\notherwise. \"Review locally\" is the client's wording for the existing ``local`` answer when the\nagent is a reviewer; it is not a new answer.",
   "properties": {
     "agent": {
       "anyOf": [
@@ -77,6 +77,19 @@
       "title": "Alternatives",
       "type": "array"
     },
+    "brief": {
+      "anyOf": [
+        {
+          "maxLength": 8000,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Brief"
+    },
     "caps": {
       "anyOf": [
         {
@@ -87,6 +100,19 @@
         }
       ],
       "default": null
+    },
+    "diff_artifact_id": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Diff Artifact Id"
     },
     "estimated_usd": {
       "anyOf": [

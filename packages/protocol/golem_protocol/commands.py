@@ -8,6 +8,7 @@ from typing import Annotated, Any, Literal, Self
 from pydantic import BaseModel, ConfigDict, Field, SecretStr, model_validator
 
 from golem_protocol.events import (
+    HELPER_BRIEF_MAX_CHARS,
     AgentLimits,
     AgentOrigin,
     ConsentAnswer,
@@ -242,8 +243,8 @@ class PendingItem(BaseModel):
     ``subject`` and ``source`` are those of the ``approval.needed`` event, and ``added`` and
     ``removed`` count the lines its diff adds and removes (null when the call has no diff).
     For a consent, ``alternatives`` is the number of answers the user may give. A helper's
-    consent also carries ``helper_id``, ``agent``, ``label``, ``sent`` and ``not_sent`` of its
-    ``route.consent.needed`` event. The full diff
+    consent also carries ``helper_id``, ``agent``, ``label``, ``sent``, ``not_sent``, ``brief``
+    and ``diff_artifact_id`` of its ``route.consent.needed`` event. The full diff
     stays in the session's events: a summary goes to every watcher on every event, so it
     carries counts only. An older daemon leaves ``pending`` out of the summary.
 
@@ -285,6 +286,8 @@ class PendingItem(BaseModel):
     label: str | None = Field(default=None, max_length=120)
     sent: list[ShortText] | None = Field(default=None, max_length=10)
     not_sent: list[ShortText] | None = Field(default=None, max_length=10)
+    brief: str | None = Field(default=None, max_length=HELPER_BRIEF_MAX_CHARS)
+    diff_artifact_id: str | None = Field(default=None, min_length=1)
     helper: PendingHelper | None = None
     count: int | None = Field(default=None, ge=2)
     helper_count: int | None = Field(default=None, ge=1, le=100)
