@@ -275,6 +275,7 @@ class ChatRuntime:
             timeout_s=float(settings.explorer.timeout_seconds),
             answer_chars=settings.explorer.answer_chars or defaults.answer_chars,
             max_per_turn=settings.batch_limit,
+            advisors_per_message=settings.advisor.max_per_message,
         )
 
     @child_limits.setter

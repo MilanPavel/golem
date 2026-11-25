@@ -135,6 +135,7 @@ def helper_mode(agent: AgentSnapshot, lead: PermissionMode) -> PermissionMode:
 
 
 EXPLORER = "explorer"
+ADVISOR = "advisor"
 """The agent type that the ``explore`` role (and its model) is for."""
 
 DEFAULT_PROMPT = "You are a helper. Answer the brief. Do not ask questions."
@@ -176,6 +177,11 @@ def unavailable_reason(agent: Agent, is_read_only: Callable[[str], bool]) -> str
 
     ``delegate`` refuses with this text, and the agents list shows it.
     """
+    if agent.name == ADVISOR and agent.tools:
+        return (
+            f"agent {agent.name} is not available: the advisor has no tools "
+            f"({', '.join(agent.tools)} listed), so remove the tools line"
+        )
     writes = writing_tools(agent, is_read_only)
     if not writes:
         return None

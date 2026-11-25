@@ -214,6 +214,10 @@ MEMORY_IDS_KEY = "golem_memory_ids"
 """``additional_kwargs`` key on a ``recall`` result: the ids of the memories it shows, in order."""
 HELPER_COUNT_KEY = "golem_helper_count"
 """On a ``delegate`` result: how many helpers the call started, for the per-message limit."""
+HELPER_AGENTS_KEY = "golem_helper_agents"
+"""On a ``delegate`` result: the agent type of each helper the call started."""
+
+ADVISOR = "advisor"
 
 ErrorKind = Literal["invalid_args", "unknown_tool", "tool_error", "denied", "cancelled"]
 
@@ -334,6 +338,7 @@ def tools_node(
         parking = host is not None and not helper and bool(session_id)
         parked: list[str] = []
         delegated = _delegated_this_turn(state["messages"])
+        advised = _advised_this_turn(state["messages"])
         asked = _asked(config)
         ids = [call_id_of(call) for call in last.tool_calls]
         last_asked = max(
@@ -342,6 +347,7 @@ def tools_node(
         planned: dict[Path, str] = {}
         verdicts: list[_Verdict] = []
         helper_counts: dict[str, int] = {}
+        helper_agents: dict[str, list[str]] = {}
         for index, call in enumerate(last.tool_calls):
             if session_tools.get(call["name"]) is None:
                 verdicts.append(
@@ -364,7 +370,7 @@ def tools_node(
                 fresh = ids[index] not in asked and index > last_asked
                 ask_first = ids[index] in asked or (fresh and helpers_setting() == "ask")
                 if ask_first or fresh:
-                    refusal = _delegate_refusal(call, delegated, host.child_limits.max_per_turn)
+                    refusal = _delegate_refusal(call, delegated, advised, host.child_limits)
                     if refusal is not None:
                         verdicts.append(refusal)
                         continue
@@ -399,7 +405,7 @@ def tools_node(
                 assert host is not None
                 try:
                     specs = _specs(call if verdict.args is None else {**call, "args": verdict.args})
-                    over = _over_limit(len(specs), delegated, host.child_limits.max_per_turn)
+                    over = _refusal(specs, delegated, advised, host.child_limits)
                     if over is not None:
                         raise ToolError(over)
                     await host.start_helpers(
@@ -416,6 +422,8 @@ def tools_node(
                     verdict = _Verdict(run=False, message=message, kind="denied")
                 else:
                     delegated += len(specs)
+                    advised += _advisors_in(specs)
+                    helper_agents[ids[index]] = [s.agent for s in specs]
                     helper_counts[ids[index]] = len(specs)
                     parked.append(ids[index])
             verdicts.append(verdict)
@@ -513,6 +521,7 @@ def tools_node(
                     output,
                     memory_ids=result.memory_ids,
                     helpers=helper_counts.get(call_id),
+                    helper_agents=helper_agents.get(call_id),
                 )
             )
             changed = {k: v for k, v in (result.update or {}).items() if k in STATE_KEYS}
@@ -710,12 +719,15 @@ def _result(
     error: ErrorKind | None = None,
     memory_ids: tuple[str, ...] | None = None,
     helpers: int | None = None,
+    helper_agents: list[str] | None = None,
 ) -> ToolMessage:
     extra: dict[str, object] = {} if error is None else {ERROR_KEY: error}
     if memory_ids is not None:
         extra[MEMORY_IDS_KEY] = list(memory_ids)
     if helpers is not None:
         extra[HELPER_COUNT_KEY] = helpers
+    if helper_agents is not None:
+        extra[HELPER_AGENTS_KEY] = helper_agents
     return ToolMessage(
         content=content,
         tool_call_id=call_id,
@@ -742,6 +754,41 @@ def _delegated_this_turn(messages: Sequence[BaseMessage]) -> int:
             count = message.additional_kwargs.get(HELPER_COUNT_KEY)
             found += count if isinstance(count, int) else 1
     return found
+
+
+def _advised_this_turn(messages: Sequence[BaseMessage]) -> int:
+    """How many advisors ``delegate`` calls started since the last message of the user."""
+    found = 0
+    for message in reversed(messages):
+        if isinstance(message, HumanMessage) and not is_note(message):
+            break
+        if isinstance(message, ToolMessage) and message.name == "delegate":
+            agents = message.additional_kwargs.get(HELPER_AGENTS_KEY)
+            if isinstance(agents, list):
+                found += sum(1 for a in cast(list[object], agents) if a == ADVISOR)
+    return found
+
+
+def _advisors_in(specs: Sequence[HelperSpec]) -> int:
+    return sum(1 for spec in specs if spec.agent == ADVISOR)
+
+
+def _refusal(
+    specs: Sequence[HelperSpec], delegated: int, advised: int, limits: ChildLimits
+) -> str | None:
+    """Why the helpers of one ``delegate`` call may not start, or None."""
+    over = _over_limit(len(specs), delegated, limits.max_per_turn)
+    if over is not None:
+        return over
+    asked = _advisors_in(specs)
+    allowed = limits.advisors_per_message
+    if asked and advised + asked > allowed:
+        return (
+            f"one advisor call per message is the limit ([agents.advisor] max_per_message = "
+            f"{allowed}); {advised} already started and this call asks for {asked}. "
+            "Decide with what the advisor already said, or ask again in the next message"
+        )
+    return None
 
 
 def _over_limit(asked: int, delegated: int, limit: int) -> str | None:
@@ -773,13 +820,15 @@ async def _estimate(
     return await host.estimate_helpers(state=state, config=config, helpers=specs)
 
 
-def _delegate_refusal(call: ToolCall, delegated: int, limit: int) -> _Verdict | None:
+def _delegate_refusal(
+    call: ToolCall, delegated: int, advised: int, limits: ChildLimits
+) -> _Verdict | None:
     """Why a ``delegate`` call starts no helper, before the user is asked about it, or None."""
     try:
         specs = _specs(call)
     except InvalidArguments as exc:
         return _Verdict(run=False, message=str(exc), kind="invalid_args")
-    over = _over_limit(len(specs), delegated, limit)
+    over = _refusal(specs, delegated, advised, limits)
     if over is not None:
         return _Verdict(run=False, message=over, kind="denied")
     return None
