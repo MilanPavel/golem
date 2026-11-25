@@ -211,6 +211,8 @@ def _step_info(step: WorkflowStepRecord) -> WorkflowStepInfo:
             "attempts": step.attempts,
             "error": step.error,
             "child_session_id": step.child_session_id,
+            "model": step.model,
+            "cost_usd": step.cost_usd,
             "started_at": step.started_at,
             "finished_at": step.finished_at,
         }

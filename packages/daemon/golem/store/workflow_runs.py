@@ -50,6 +50,7 @@ class WorkflowStepRecord:
     error: str | None
     child_session_id: str | None
     cost_usd: float | None
+    model: str | None
     started_at: str | None
     finished_at: str | None
     seq: int
@@ -254,6 +255,12 @@ class WorkflowRuns:
             (at, run_id, key),
         )
         return changed > 0
+
+    async def set_step_model(
+        self, run_id: str, key: str, model: str | None, cost_usd: float | None
+    ) -> None:
+        """Keep the model that answered an ``llm`` step and what the call cost."""
+        await self._step_update(run_id, key, "model = ?, cost_usd = ?", (model, cost_usd))
 
     async def set_step_child_session(self, run_id: str, key: str, session_id: str) -> None:
         await self._step_update(run_id, key, "child_session_id = ?", (session_id,))

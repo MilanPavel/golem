@@ -9,6 +9,7 @@ workflow.
 from __future__ import annotations
 
 import asyncio
+import hashlib
 from collections.abc import Awaitable, Callable, Iterable, Mapping
 from contextvars import ContextVar
 from dataclasses import dataclass
@@ -131,6 +132,18 @@ class StepBackend(Protocol):
         group_key: str | None,
     ) -> dict[str, Any]:
         """Run an agent as a helper of the run's session (the ``agent`` step)."""
+        ...
+
+    async def llm(
+        self,
+        workflow_run_id: str,
+        key: str,
+        prompt: str,
+        schema: dict[str, Any] | None,
+        wish: str | None,
+        check: Callable[[dict[str, Any]], dict[str, Any]] | None,
+    ) -> Any:
+        """One model call; saves the model and the cost on the step ``key``."""
         ...
 
 
@@ -294,8 +307,46 @@ class Run:
             self.workflow_run_id, step_key, type, brief, model, _group.get()
         )
 
-    async def llm(self, *args: Any, **kwargs: Any) -> Any:
-        raise NotImplementedError("run.llm arrives with 3.6 (#740)")
+    async def llm(
+        self,
+        prompt: str,
+        schema: Any = None,
+        model: str | None = None,
+        key: str | None = None,
+    ) -> Any:
+        """Ask a model one question, with no tools, as one step.
+
+        Without ``schema`` the answer is the text. ``schema`` is a Pydantic model class or a
+        JSON-schema dict; the answer is then a dict that follows it. ``model`` is a wish
+        (``cheapest``, ``same``, ``stronger``, ``local``, ...), never a model name:
+        routing picks the model, and a local-only folder only ever gets a local one. The step
+        saves the model and the cost; a run that is executed again does not ask again. The
+        step key is ``key`` or ``llm:<short hash of the prompt>``, once per run.
+        """
+        step_key = key or f"llm:{hashlib.sha256(prompt.encode()).hexdigest()[:8]}"
+        self._use_key(step_key, "llm")
+        schema_dict: dict[str, Any] | None = None
+        check: Callable[[dict[str, Any]], dict[str, Any]] | None = None
+        if schema is not None:
+            validate = getattr(schema, "model_validate", None)
+            if validate is not None:
+                schema_dict = schema.model_json_schema()
+                check = lambda value: validate(value).model_dump(mode="json")  # noqa: E731
+            elif isinstance(schema, dict):
+                schema_dict = dict(schema)  # pyright: ignore[reportUnknownArgumentType]
+            else:
+                raise WorkflowError("run.llm: schema must be a Pydantic model class or a dict")
+        title = " ".join(prompt.split())
+        return await self._backend.run_step(
+            self.workflow_run_id,
+            step_key,
+            "llm",
+            title if len(title) <= 60 else title[:59] + "\u2026",
+            _group.get(),
+            self._backend.llm,
+            (self.workflow_run_id, step_key, prompt, schema_dict, model, check),
+            {},
+        )
 
     async def tool(self, *args: Any, **kwargs: Any) -> Any:
         raise NotImplementedError("run.tool arrives with 3.6 (#740)")

@@ -29,6 +29,7 @@ from golem.workflow import (
     WorkflowSpec,
     WorkflowWaiting,
 )
+from golem.workflows.llm import Llm, parse_object
 
 __all__ = ["WorkflowEngine", "restart_policy"]
 
@@ -79,8 +80,10 @@ class WorkflowEngine:
         emit: Emit | None = None,
         notify: Notify | None = None,
         agent: AgentRunner | None = None,
+        llm: Llm | None = None,
     ) -> None:
         self._store = store
+        self._llm = llm
         self._emit: Emit = emit or _no_emit
         self._notify = notify
         self._agent = agent
@@ -106,6 +109,31 @@ class WorkflowEngine:
             await self.step_event("workflow.step.started", workflow_run_id, key)
 
         return await self._agent(workflow_run_id, key, agent_type, brief, model, started)
+
+    async def llm(
+        self,
+        workflow_run_id: str,
+        key: str,
+        prompt: str,
+        schema: dict[str, Any] | None,
+        wish: str | None,
+        check: Callable[[dict[str, Any]], dict[str, Any]] | None,
+    ) -> Any:
+        """The ``run.llm`` call: ask once, keep the model and cost on the step."""
+        if self._llm is None:
+            raise WorkflowError("run.llm needs a model, and this daemon has none set up")
+        record = await self._store.get_run(workflow_run_id)
+        answer = await self._llm(prompt, schema, wish, record.project if record else None)
+        await self._store.set_step_model(workflow_run_id, key, answer.model, answer.cost_usd)
+        if schema is None:
+            return answer.text
+        value = parse_object(answer.text)
+        if check is not None:
+            try:
+                value = check(value)
+            except Exception as exc:
+                raise WorkflowError(f"run.llm: the answer does not fit the schema ({exc})") from exc
+        return value
 
     def send(self, name: str, payload: dict[str, Any]) -> None:
         try:
@@ -176,6 +204,8 @@ class WorkflowEngine:
                 "attempts": step.attempts,
                 "error": step.error,
                 "child_session_id": step.child_session_id,
+                "model": step.model,
+                "cost_usd": step.cost_usd,
                 "started_at": step.started_at,
                 "finished_at": step.finished_at,
             },
@@ -238,6 +268,17 @@ class _Journal:
 
     async def notify(self, workflow_run_id: str, title: str | None, text: str) -> None:
         await self._engine.notify(workflow_run_id, title, text)
+
+    async def llm(
+        self,
+        workflow_run_id: str,
+        key: str,
+        prompt: str,
+        schema: dict[str, Any] | None,
+        wish: str | None,
+        check: Callable[[dict[str, Any]], dict[str, Any]] | None,
+    ) -> Any:
+        return await self._engine.llm(workflow_run_id, key, prompt, schema, wish, check)
 
     async def run_step(
         self,
