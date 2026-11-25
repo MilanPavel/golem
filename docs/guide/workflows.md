@@ -171,7 +171,7 @@ facts = await run.llm(text, schema=Facts, model="stronger")
 `run.llm(prompt, schema=None, model=None, key=None)` makes one model call, with no tools and no agent loop, and saves it as a step of kind `llm`.
 
 - Without `schema` it returns the text. With `schema` (a Pydantic model class or a JSON-schema dict) the model is asked for a JSON object and the call returns it as a dict. An answer that does not fit fails the step.
-- `model=` is a wish (`cheapest`, `same`, `stronger`, `local`), never a model name you can rely on. Routing picks the model. The default is the cheapest model that is ready.
+- `model=` is a wish (`cheapest`, `same`, `stronger`, `local`, `budget`, `frontier`), never a model name; a name fails the step. Routing picks the model. The default is the cheapest model that is ready.
 - In a local-only folder the call always uses a local model, whatever the wish says. If there is none, the step fails. On a laptop with only cloud models, the same file works.
 - The call takes a slot from the dispatcher, like a title, so it waits behind a chat on the same local model.
 - The step saves the model that answered and what the call cost (`workflow.status` shows both on the step). A run that is executed again does not ask again.

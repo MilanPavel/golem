@@ -486,6 +486,7 @@ class DaemonApp:
                         budget_refs=models.budget_refs,
                         price_of=lambda profile: _price_of(router, models, profile),
                         paid_ok=budget.paid_ok,
+                        usage=usage,
                     ),
                 )
                 sessions.review_items = self.state.workflows.pending_items

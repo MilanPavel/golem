@@ -22,6 +22,7 @@ from golem.models.tiers import Tier
 from golem.server.workflows import _step_info
 from golem.store.database import Database
 from golem.store.workflow_runs import WorkflowRuns
+from golem.workflow import WorkflowError
 from golem.workflows.engine import WorkflowEngine
 from golem.workflows.llm import WorkflowLlm
 
@@ -233,9 +234,9 @@ async def test_cloud_only_a_wish_picks_by_tier_and_never_needs_a_local_model(
     llm = _llm(router)
     assert (await llm("p", None, None, None)).model == "deepseek/cheap"
     assert (await llm("p", None, "stronger", None)).model == "anthropic/big"
-    # A name is a wish too.
-    assert (await llm("p", None, "deepseek/cheap", None)).model == "deepseek/cheap"
     assert router.asked(LOCAL) == 0
+    with pytest.raises(WorkflowError, match="is a wish"):
+        await llm("p", None, "deepseek/cheap", None)
 
 
 async def test_local_only_forces_a_local_model_whatever_the_wish(
@@ -244,7 +245,7 @@ async def test_local_only_forces_a_local_model_whatever_the_wish(
     router = _Router(LOCAL)
     router.replies = ["a", "b", "c"]
     llm = _llm(router, local_only=True)
-    for wish in (None, "stronger", "anthropic/big"):
+    for wish in (None, "stronger", "frontier"):
         assert (await llm("p", None, wish, "/work")).model == "ollama/small"
     assert router.asked(BIG) == 0 and router.asked(CHEAP) == 0
 
