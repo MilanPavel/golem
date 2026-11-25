@@ -67,6 +67,8 @@ class SessionLog:
         """Told of each event once it is stored and published, outside the session's lock.
 
         The session manager uses it to put a helper's tool calls into its lead's log."""
+        self.reviews: Callable[[str], Awaitable[list[PendingItem]]] | None = None
+        """The open reviews of a workflow run's session, as ``review`` pending items."""
         self._seq: dict[str, int] = {}
         self._locks: dict[str, asyncio.Lock] = {}
         self._waits: dict[str, tuple[WaitReason, str]] = {}
@@ -103,6 +105,8 @@ class SessionLog:
         their number.
         """
         items = [] if own is None else [own]
+        if self.reviews is not None and activity.session.origin.startswith("workflow:"):
+            items += await self.reviews(activity.session.session_id)
         if helpers is None or helpers[1] == 0:
             return items
         # approvals reaches this module through recovery, so it is imported here.
@@ -153,6 +157,15 @@ class SessionLog:
             if (last is not None and now - last < STEP_EVERY) or not self._bus.watched:
                 return
             self._step_pushed[session_id] = now
+            activity = await self._records.activity(session_id)
+            if activity is not None:
+                self._bus.publish_summary(await self._summary(activity, await self.wait(activity)))
+
+    async def touch(self, session_id: str) -> None:
+        """Send the session's summary again, for a change that is not an event of its log."""
+        if not self._bus.watched:
+            return
+        async with self._lock(session_id):
             activity = await self._records.activity(session_id)
             if activity is not None:
                 self._bus.publish_summary(await self._summary(activity, await self.wait(activity)))

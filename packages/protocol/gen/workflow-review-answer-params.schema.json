@@ -1,0 +1,44 @@
+{
+  "additionalProperties": false,
+  "description": "``workflow.review.answer``. Answer the review ``key`` of a waiting run.\n\n``verdict`` is ``approve`` (the draft as it is), ``edit`` (``text`` replaces it, so it is\nrequired) or ``reject``. ``text`` is the answer's text; for ``approve`` it defaults to the\ndraft. The answer is saved, then the run continues once none of its reviews waits. A\n``reject`` goes back to the workflow code, which decides what it means.",
+  "properties": {
+    "key": {
+      "minLength": 1,
+      "title": "Key",
+      "type": "string"
+    },
+    "text": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Text"
+    },
+    "verdict": {
+      "enum": [
+        "approve",
+        "edit",
+        "reject"
+      ],
+      "title": "Verdict",
+      "type": "string"
+    },
+    "workflow_run_id": {
+      "minLength": 1,
+      "title": "Workflow Run Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "workflow_run_id",
+    "key",
+    "verdict"
+  ],
+  "title": "WorkflowReviewAnswerParams",
+  "type": "object"
+}

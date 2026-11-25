@@ -105,6 +105,7 @@ export type { WorkflowCancelResult } from "../../protocol/gen/workflow-cancel-re
 export type { WorkflowEntryInfo } from "../../protocol/gen/workflow-entry-info.ts";
 export type { WorkflowListResult } from "../../protocol/gen/workflow-list-result.ts";
 export type { WorkflowResumeResult } from "../../protocol/gen/workflow-resume-result.ts";
+export type { WorkflowReviewAnswerResult } from "../../protocol/gen/workflow-review-answer-result.ts";
 export type { WorkflowRunEvent } from "../../protocol/gen/workflow-run-event.ts";
 export type { WorkflowStartResult } from "../../protocol/gen/workflow-start-result.ts";
 export type { WorkflowStatusResult } from "../../protocol/gen/workflow-status-result.ts";

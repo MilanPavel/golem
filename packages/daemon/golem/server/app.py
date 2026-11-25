@@ -469,7 +469,9 @@ class DaemonApp:
                         None, cwd=cwd, origin=origin
                     ),
                     notify=self.state.notifier.tell,
+                    touch_session=sessions.touch,
                 )
+                sessions.review_items = self.state.workflows.pending_items
                 devices = DeviceStore(database)
                 devices.on_change = self._devices_changed
                 self.state.devices = devices

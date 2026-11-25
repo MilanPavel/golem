@@ -44,7 +44,7 @@ async def upgrade_dependencies(run: Run) -> None: ...
 | `run.step(name, fn, *args, key=)` | A plain function. The result is saved. |
 | `run.parallel(...)` | Several steps or agents at once. |
 | `run.agent(type, brief=, gets=, worktree=, budget=)` | A helper, as an agent file says. |
-| `run.review(items, notes, ask=)` | Waits for you. |
+| `run.review(draft, ask=)` | Waits for you. |
 | `run.notify(text)` | Tells you through the Notifier. |
 | `run.llm(...)` | One model call, no tools. |
 | `run.tool(...)` | One tool, through the permission engine. |

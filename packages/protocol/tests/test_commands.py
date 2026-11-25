@@ -69,6 +69,7 @@ from golem_protocol.commands import (
     WorkflowGetResult,
     WorkflowOutlineStep,
     WorkflowResumeParams,
+    WorkflowReviewAnswerParams,
     WorkflowRunEvent,
     WorkflowRunInfo,
     WorkflowStartParams,
@@ -758,6 +759,22 @@ def test_workflow_commands_name_the_run_workflow_run_id() -> None:
             model.model_validate({"run_id": "wr1"})
     with pytest.raises(ValidationError):
         WorkflowStartParams.model_validate({"id": "x", "trigger": "file"})
+
+
+def test_workflow_review_answer_names_the_run_and_the_key() -> None:
+    edit = WorkflowReviewAnswerParams(
+        workflow_run_id="wr1", key="review:Send?", verdict="edit", text="shorter"
+    )
+    assert (edit.key, edit.verdict, edit.text) == ("review:Send?", "edit", "shorter")
+    assert WorkflowReviewAnswerParams(workflow_run_id="wr1", key="k", verdict="reject").text is None
+    with pytest.raises(ValidationError):
+        WorkflowReviewAnswerParams.model_validate(
+            {"workflow_run_id": "wr1", "key": "k", "verdict": "maybe"}
+        )
+    item = PendingItem(
+        kind="review", since="t", ask="Send?", preview="Hi", workflow_run_id="wr1", key="k"
+    )
+    assert item.kind == "review"
 
 
 def test_workflow_status_round_trips_with_its_steps() -> None:

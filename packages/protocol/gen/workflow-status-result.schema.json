@@ -1,5 +1,40 @@
 {
   "$defs": {
+    "WorkflowReviewInfo": {
+      "additionalProperties": false,
+      "description": "A review a run waits on, with its whole draft (the pending item's ``preview`` is cut).\n\n``draft`` is the JSON ``run.review`` was given. ``key`` is the step key that\n``workflow.review.answer`` names. ``answered`` is false for every review\n``WorkflowStatusResult.reviews`` lists.",
+      "properties": {
+        "answered": {
+          "default": false,
+          "title": "Answered",
+          "type": "boolean"
+        },
+        "ask": {
+          "title": "Ask",
+          "type": "string"
+        },
+        "created_at": {
+          "title": "Created At",
+          "type": "string"
+        },
+        "draft": {
+          "default": null,
+          "title": "Draft"
+        },
+        "key": {
+          "minLength": 1,
+          "title": "Key",
+          "type": "string"
+        }
+      },
+      "required": [
+        "key",
+        "ask",
+        "created_at"
+      ],
+      "title": "WorkflowReviewInfo",
+      "type": "object"
+    },
     "WorkflowRunInfo": {
       "additionalProperties": false,
       "description": "One run of a workflow, from its ``workflow_runs`` row.\n\nThe times are ISO 8601 with an offset. ``session_id`` is the run's headless session.\n``error`` says why a ``failed`` run failed.",
@@ -224,8 +259,15 @@
     }
   },
   "additionalProperties": false,
-  "description": "The run and its steps, in the order they started.",
+  "description": "The run and its steps, in the order they started.\n\n``reviews`` are the run's open reviews (those without an answer), oldest first, with their\nfull drafts. An older daemon leaves it out.",
   "properties": {
+    "reviews": {
+      "items": {
+        "$ref": "#/$defs/WorkflowReviewInfo"
+      },
+      "title": "Reviews",
+      "type": "array"
+    },
     "run": {
       "$ref": "#/$defs/WorkflowRunInfo"
     },

@@ -82,6 +82,14 @@ class WorkflowError(Exception):
     """A workflow broke a rule of the engine, for example it used a step key twice."""
 
 
+class WorkflowWaiting(BaseException):
+    """Raised by ``run.review`` when the run must stop and wait for a person.
+
+    A ``BaseException``, so a workflow's own ``except Exception`` does not swallow it. The
+    engine catches it, sets the run ``waiting`` and ends the task; nothing is held meanwhile.
+    """
+
+
 class StepBackend(Protocol):
     """What :class:`Run` needs from the engine. The engine implements it."""
 
@@ -103,6 +111,15 @@ class StepBackend(Protocol):
     async def notify(self, workflow_run_id: str, title: str | None, text: str) -> None:
         """Tell the person ``text`` (through the Notifier, when the engine has one)."""
         ...
+
+    async def review(
+        self,
+        workflow_run_id: str,
+        key: str,
+        ask: str,
+        group_key: str | None,
+        draft: Any,
+    ) -> Any: ...
 
 
 _group: ContextVar[str | None] = ContextVar("golem_workflow_group", default=None)
@@ -159,12 +176,7 @@ class Run:
         ``backoff`` seconds before each.
         """
         step_key = key or name
-        if step_key in self._keys:
-            raise WorkflowError(
-                f"step key {step_key!r} used twice in one run; give each step in a loop its own"
-                f" name or key=, for example f'{name}-{{item}}'"
-            )
-        self._keys.add(step_key)
+        self._use_key(step_key, name)
         return await self._backend.run_step(
             self.workflow_run_id,
             step_key,
@@ -179,6 +191,14 @@ class Run:
             backoff=max(0.0, backoff),
         )
 
+    def _use_key(self, step_key: str, name: str) -> None:
+        if step_key in self._keys:
+            raise WorkflowError(
+                f"step key {step_key!r} used twice in one run; give each step in a loop its own"
+                f" name or key=, for example f'{name}-{{item}}'"
+            )
+        self._keys.add(step_key)
+
     async def parallel(self, aws: Iterable[Awaitable[Any]]) -> list[Any]:
         """Run the awaitables (usually ``run.step(...)``) together; results keep their order.
 
@@ -192,13 +212,32 @@ class Run:
             return await aw
 
         outcomes = await asyncio.gather(*(member(aw) for aw in aws), return_exceptions=True)
+        waiting: BaseException | None = None
         for outcome in outcomes:
-            if isinstance(outcome, BaseException):
+            if isinstance(outcome, WorkflowWaiting):
+                waiting = waiting or outcome
+            elif isinstance(outcome, BaseException):
                 raise outcome
+        if waiting is not None:
+            # Every member finished and each review has its row; now the run waits.
+            raise waiting
         return list(outcomes)
 
-    async def review(self, *args: Any, **kwargs: Any) -> Any:
-        raise NotImplementedError("run.review arrives with 3.4 (#14)")
+    async def review(
+        self, draft: Any, ask: str = "Review this", key: str | None = None
+    ) -> dict[str, str]:
+        """Stop and wait for a person to look at ``draft``; return ``{"verdict", "text"}``.
+
+        The first time the run is ``waiting`` (it holds no task), and the question is in the
+        Inbox. After the answer (``golem workflow answer``) the workflow runs again from the top
+        and this call returns the answer: ``verdict`` is ``approve``, ``edit`` (``text`` is the
+        person's version) or ``reject`` (the workflow decides what that means). ``draft`` must be
+        JSON. The step key is ``key`` or ``review:<ask>``; use ``key=`` for two reviews with the
+        same ask.
+        """
+        step_key = key or f"review:{ask}"
+        self._use_key(step_key, ask)
+        return await self._backend.review(self.workflow_run_id, step_key, ask, _group.get(), draft)
 
     async def notify(self, text: str, title: str | None = None, key: str | None = None) -> None:
         """Tell you ``text`` through the Notifier, once per run.
@@ -286,6 +325,7 @@ __all__ = [
     "Trigger",
     "WorkflowError",
     "WorkflowSpec",
+    "WorkflowWaiting",
     "idempotency_key",
     "manual",
     "may_have_run",

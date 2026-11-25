@@ -8,8 +8,10 @@ import { helperCardOf, helperEstimateOf, type HelperEstimate, type HelperEstimat
 
 /** What a session waits for, as its summary carries it. */
 export interface InboxPending extends HelperEstimateFields {
-  /** `batch` is the card that confirms a batch of helpers ("Use helpers: Ask me first"); a kind the Inbox does not know is skipped. */
-  kind: "approval" | "consent" | "batch";
+  /** `batch` is the card that confirms a batch of helpers ("Use helpers: Ask me first"). `review` is a workflow run waiting for an answer (`ask`, `preview`); the Inbox skips it until its card arrives (#1786), as it skips a kind it does not know. */
+  kind: "approval" | "consent" | "batch" | "review";
+  ask?: string | null;
+  preview?: string | null;
   since: string;
   call_id?: string | null;
   name?: string | null;

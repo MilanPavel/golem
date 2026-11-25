@@ -27,6 +27,7 @@ from golem.workflow import (
     Run,
     WorkflowError,
     WorkflowSpec,
+    WorkflowWaiting,
 )
 
 __all__ = ["WorkflowEngine", "restart_policy"]
@@ -186,6 +187,10 @@ class WorkflowEngine:
             names = list(inspect.signature(fn).parameters)[1:]
             kwargs = {k: v for k, v in inputs.items() if k in names}
             await fn(Run(_Journal(self), workflow_run_id, inputs), **kwargs)
+        except WorkflowWaiting:
+            # A review is out: end the task, hold nothing. The answer runs the workflow again.
+            await self.mark_waiting(workflow_run_id)
+            return
         except asyncio.CancelledError:
             if not self.stopping:
                 await self._store.set_run_status(workflow_run_id, "cancelled", _now())
@@ -277,6 +282,41 @@ class _Journal:
         await store.finish_step(workflow_run_id, key, encoded, _now())
         await event("workflow.step.done", workflow_run_id, key)
         return result
+
+    async def review(
+        self,
+        workflow_run_id: str,
+        key: str,
+        ask: str,
+        group_key: str | None,
+        draft: Any,
+    ) -> Any:
+        """The ``run.review`` step: return the answer, or write the review row and stop the run."""
+        store = self._engine.store
+        event = self._engine.step_event
+        before = await store.get_step(workflow_run_id, key)
+        if before is not None and before.status == "done":
+            return json.loads(before.result_json) if before.result_json is not None else None
+        review = await store.get_review(workflow_run_id, key)
+        if review is not None and review.answer_json is not None:
+            await store.begin_step(workflow_run_id, key, "review", ask, group_key, _now())
+            await store.finish_step(workflow_run_id, key, review.answer_json, _now())
+            await event("workflow.step.done", workflow_run_id, key)
+            return json.loads(review.answer_json)
+        if review is None:
+            try:
+                pending = json.dumps({"ask": ask, "draft": draft})
+            except (TypeError, ValueError) as exc:
+                raise WorkflowError(
+                    f"review {key!r} got a draft that is not JSON ({exc}); pass a string, a list"
+                    " or a dict"
+                ) from exc
+            await store.begin_step(workflow_run_id, key, "review", ask, group_key, _now())
+            await event("workflow.step.started", workflow_run_id, key)
+            await store.create_review(workflow_run_id, key, pending, _now())
+        await store.set_step_status(workflow_run_id, key, "waiting")
+        await event("workflow.step.waiting", workflow_run_id, key)
+        raise WorkflowWaiting
 
 
 async def _call(fn: Callable[..., Any], args: tuple[Any, ...], kwargs: dict[str, Any]) -> Any:

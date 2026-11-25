@@ -147,6 +147,39 @@ await run.notify("Release 1.4 is out", title="Release")
 
 `run.notify(text, title=None, key=None)` sends a banner through the Notifier and is saved as a step of kind `notify`, so a run that is executed again does not send it twice. The step key is `key` or `notify:<text>`; inside a loop, give each notice its own `key=`. A click on the banner opens the run's session (when the run has none, the banner has no open hint). Without a notifier the step still completes.
 
+## Waiting for you
+
+```python
+@workflow()
+async def weekly_mail(run: Run):
+    draft = await run.step("write", write_mail)
+    answer = await run.review(draft, ask="Send this to the team?")
+    if answer["verdict"] == "reject":
+        return "dropped"
+    await run.step("send", send_mail, answer["text"], key="send")
+```
+
+`run.review(draft, ask="Review this", key=None)` stops the run and waits for you, for minutes or days. While it waits the run is `waiting` and holds no task, slot or model. Your answer comes back as `{"verdict": "approve" | "edit" | "reject", "text": str}`:
+
+| Verdict | `text` |
+|---|---|
+| `approve` | The draft, as it was |
+| `edit` | Your version |
+| `reject` | What you typed, or empty. The workflow decides what a reject means; it does not fail the run |
+
+`draft` must be JSON (a string, a list or a dict). The step key is `key` or `review:<ask>`; two reviews with the same ask need distinct `key=` values. Inside `run.parallel`, every member finishes first, and each review is a separate question, so several can wait at once.
+
+The question shows in your Inbox as a `review` item for the run's session (`golem runs` lists the run as `waiting`, with the ask). Answer it from a shell:
+
+```bash
+golem workflow answer wr_123                       # approve
+golem workflow answer wr_123 --edit "Hi team, ..." # use your text
+golem workflow answer wr_123 --reject
+golem workflow answer wr_123 --key send-mail       # when the run waits on several reviews
+```
+
+Without `--key` the run must wait on exactly one review. The command then follows the run's steps like `resume`. The run continues once none of its reviews waits; an answered review is not asked again, even after a restart. A review answered twice is refused.
+
 ## Broken and untrusted files
 
 | Case | What you see | What runs |
@@ -162,10 +195,9 @@ A broken file never disappears from the list. Fix it and it loads again.
 
 | Piece | What it adds | Ticket |
 |---|---|---|
-| `run.review` | Wait for your answer | 3.4 (#14) |
 | `run.agent` | Start a helper for a step, with a brief and a budget | 3.6 (#16) |
 | `run.llm`, `run.tool`, `run.skill` | One model call, one tool, or one skill, with no agent loop | 3.8 (#740) |
 | Workflows page | List workflows and see each run's steps in the web UI | 3.9 (#741) |
 | Editor | Edit a workflow, check it without a model, and try it from a step | 3.11 (#1225) |
 
-Until these land, a workflow can run code, run steps in parallel, save results, use `key=` and tell you things.
+Until these land, a workflow can run code, run steps in parallel, save results, use `key=`, tell you things and wait for your review.

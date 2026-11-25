@@ -268,11 +268,18 @@ class PendingItem(BaseModel):
     card may appear even when ``use_helpers`` is not ``ask``. It is answered by
     ``helpers.respond``. These five fields mean something only for a ``batch`` item; an older
     daemon leaves them out.
+
+    A ``review`` item is a workflow run waiting for your answer (``run.review``). ``ask`` is
+    its question, ``preview`` the first characters of the draft, ``workflow_run_id`` the run
+    and ``key`` the review's step key; ``workflow.review.answer`` names the last two. ``since``
+    is when the review was asked. Like ``batch``, a ``review`` is only ever in
+    ``SessionSummary.pending_items``, never in ``pending``. A client that does not know the
+    kind shows ``ask`` or ignores the item.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    kind: Literal["approval", "consent", "batch"]
+    kind: Literal["approval", "consent", "batch", "review"]
     since: str = Field(min_length=1)
     call_id: str | None = Field(default=None, min_length=1)
     name: str | None = Field(default=None, min_length=1)
@@ -297,6 +304,10 @@ class PendingItem(BaseModel):
     model: str | None = Field(default=None, min_length=1)
     cheaper_model: str | None = Field(default=None, min_length=1)
     agents: list[str] | None = Field(default=None, max_length=100)
+    ask: str | None = Field(default=None, max_length=500)
+    preview: str | None = Field(default=None, max_length=500)
+    workflow_run_id: str | None = Field(default=None, min_length=1)
+    key: str | None = Field(default=None, min_length=1)
 
 
 class SessionSummary(BaseModel):
@@ -6142,13 +6153,35 @@ class WorkflowStatusParams(BaseModel):
     workflow_run_id: str = Field(min_length=1)
 
 
+class WorkflowReviewInfo(BaseModel):
+    """A review a run waits on, with its whole draft (the pending item's ``preview`` is cut).
+
+    ``draft`` is the JSON ``run.review`` was given. ``key`` is the step key that
+    ``workflow.review.answer`` names. ``answered`` is false for every review
+    ``WorkflowStatusResult.reviews`` lists.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    key: str = Field(min_length=1)
+    ask: str
+    draft: Any = None
+    created_at: str
+    answered: bool = False
+
+
 class WorkflowStatusResult(BaseModel):
-    """The run and its steps, in the order they started."""
+    """The run and its steps, in the order they started.
+
+    ``reviews`` are the run's open reviews (those without an answer), oldest first, with their
+    full drafts. An older daemon leaves it out.
+    """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     run: WorkflowRunInfo
     steps: list[WorkflowStepInfo] = Field(default_factory=list[WorkflowStepInfo])
+    reviews: list[WorkflowReviewInfo] = Field(default_factory=list[WorkflowReviewInfo])
 
 
 class WorkflowCancelParams(BaseModel):
@@ -6178,6 +6211,34 @@ class WorkflowResumeParams(BaseModel):
 
 class WorkflowResumeResult(BaseModel):
     """The run as it was when it was continued; its steps arrive as ``workflow.step.*``."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    run: WorkflowRunInfo
+
+
+WorkflowReviewVerdict = Literal["approve", "edit", "reject"]
+
+
+class WorkflowReviewAnswerParams(BaseModel):
+    """``workflow.review.answer``. Answer the review ``key`` of a waiting run.
+
+    ``verdict`` is ``approve`` (the draft as it is), ``edit`` (``text`` replaces it, so it is
+    required) or ``reject``. ``text`` is the answer's text; for ``approve`` it defaults to the
+    draft. The answer is saved, then the run continues once none of its reviews waits. A
+    ``reject`` goes back to the workflow code, which decides what it means.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    workflow_run_id: str = Field(min_length=1)
+    key: str = Field(min_length=1)
+    verdict: WorkflowReviewVerdict
+    text: str | None = None
+
+
+class WorkflowReviewAnswerResult(BaseModel):
+    """The run as it was when the answer was saved; its steps arrive as ``workflow.step.*``."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -6653,6 +6714,10 @@ __all__ = [
     "WorkflowOutlineStep",
     "WorkflowResumeParams",
     "WorkflowResumeResult",
+    "WorkflowReviewAnswerParams",
+    "WorkflowReviewAnswerResult",
+    "WorkflowReviewInfo",
+    "WorkflowReviewVerdict",
     "WorkflowRunEvent",
     "WorkflowRunInfo",
     "WorkflowRunStatus",

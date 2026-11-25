@@ -10,19 +10,21 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import json
 import logging
 from collections.abc import Awaitable, Callable
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 from pydantic import BaseModel
 
 from golem.routine_scheduler import trusted_folders
-from golem.store.workflow_runs import WorkflowRunRecord, WorkflowRuns
+from golem.store.workflow_runs import WorkflowReviewRecord, WorkflowRunRecord, WorkflowRuns
 from golem.workflows.engine import WorkflowEngine, restart_policy
 from golem.workflows.registry import WorkflowEntry, WorkflowRegistry
 from golem_protocol import rpc
-from golem_protocol.commands import WorkflowRunEvent, WorkflowStepEvent
+from golem_protocol.commands import PendingItem, WorkflowRunEvent, WorkflowStepEvent
 
 log = logging.getLogger("golem.server")
 
@@ -49,6 +51,31 @@ class ResumeError(Exception):
     """A run cannot be continued: it is unknown, in flight, or ended."""
 
 
+class ReviewError(Exception):
+    """A review cannot be answered: the run or review is unknown, or it was answered already."""
+
+
+PREVIEW_CHARS = 200
+"""How much of a review's draft its pending item carries."""
+
+_TOUCHING = ("workflow.run.started", "workflow.run.waiting", "workflow.step.waiting")
+"""Events after which the run's session summary may carry a different review list."""
+
+
+def review_text(draft: object) -> str:
+    """A review's draft as text: a string as it is, anything else as JSON."""
+    return draft if isinstance(draft, str) else json.dumps(draft, indent=2)
+
+
+def _now() -> str:
+    return datetime.now(UTC).isoformat()
+
+
+def _cut(text: str, size: int) -> str:
+    one = " ".join(text.split())
+    return one if len(one) <= size else one[: size - 1].rstrip() + "\u2026"
+
+
 class WorkflowService:
     def __init__(
         self,
@@ -60,8 +87,11 @@ class WorkflowService:
         broadcast: Callable[[BaseModel], None],
         create_session: Callable[[str, str | None], Awaitable[str]] | None = None,
         notify: Callable[[str, str, str | None], Awaitable[None]] | None = None,
+        touch_session: Callable[[str], Awaitable[None]] | None = None,
     ) -> None:
         self.runs = runs
+        self._touch_session = touch_session
+        self._touches: set[asyncio.Task[None]] = set()
         self._broadcast = broadcast
         self._create_session = create_session
         self._folders: set[Path] = set()
@@ -91,8 +121,27 @@ class WorkflowService:
         model = _NOTIFICATIONS.get(name)
         if model is None:
             return
+        session_id = payload.get("session_id")
+        if name in _TOUCHING and isinstance(session_id, str) and self._touch_session is not None:
+            self._touch(session_id)
         params = WorkflowRunEvent if name.startswith("workflow.run.") else WorkflowStepEvent
         self._broadcast(model(params=params.model_validate(payload)))
+
+    def _touch(self, session_id: str) -> None:
+        """Have the session's summary sent again: its list of reviews may have changed."""
+        touch = self._touch_session
+        if touch is None:
+            return
+
+        async def push() -> None:
+            try:
+                await touch(session_id)
+            except Exception:
+                log.exception("the summary of session %s was not sent", session_id)
+
+        task = asyncio.get_running_loop().create_task(push(), name="golem-workflow-touch")
+        self._touches.add(task)
+        task.add_done_callback(self._touches.discard)
 
     def start(self) -> None:
         """Start the registry, and deal with the runs the last daemon left ``running``."""
@@ -148,6 +197,56 @@ class WorkflowService:
             raise ResumeError(f"workflow run {run_id} is {run.status}; only a stopped run resumes")
         self.launch(run_id)
         return run
+
+    async def answer_review(
+        self, run_id: str, key: str, verdict: str, text: str | None
+    ) -> WorkflowRunRecord:
+        """Save the answer to a review, then continue the run once none of its reviews waits.
+
+        ``approve`` without ``text`` answers with the draft itself. Raises :class:`ReviewError`.
+        """
+        run = await self.runs.get_run(run_id)
+        if run is None:
+            raise ReviewError(f"no workflow run {run_id}")
+        review = await self.runs.get_review(run_id, key)
+        if review is None:
+            raise ReviewError(f"workflow run {run_id} has no review {key!r}")
+        if review.answer_json is not None:
+            raise ReviewError(f"review {key!r} of workflow run {run_id} is answered already")
+        if verdict == "edit" and not text:
+            raise ReviewError("an edit needs text: what you would send instead")
+        if verdict == "approve" and not text:
+            text = review_text(json.loads(review.pending_json).get("draft"))
+        answer = json.dumps({"verdict": verdict, "text": text or ""})
+        if not await self.runs.answer_review(run_id, key, answer, _now()):
+            raise ReviewError(f"review {key!r} of workflow run {run_id} is answered already")
+        self._touch_run(run)
+        if not await self.runs.list_open_reviews(run_id):
+            await self._continue(run_id)
+        return run
+
+    def _touch_run(self, run: WorkflowRunRecord) -> None:
+        if run.session_id is not None:
+            self._touch(run.session_id)
+
+    async def _continue(self, run_id: str) -> None:
+        """Run the workflow again after an answer. A task that is still ending is awaited first."""
+        task = self._tasks.get(run_id)
+        if task is not None:
+            await asyncio.gather(task, return_exceptions=True)
+        run = await self.runs.get_run(run_id)
+        if run is not None and run.status == "waiting":
+            self.launch(run_id)
+
+    async def pending_items(self, session_id: str) -> list[PendingItem]:
+        """The open reviews of the run that owns ``session_id``, oldest first."""
+        run = await self.runs.by_session(session_id)
+        if run is None or run.status != "waiting":
+            return []
+        return [
+            review_item(run.workflow_run_id, r)
+            for r in await self.runs.list_open_reviews(run.workflow_run_id)
+        ]
 
     async def refresh(self, folders: list[Path]) -> list[WorkflowEntry]:
         self._folders.update(folders)
@@ -223,4 +322,17 @@ class WorkflowService:
         self._tasks.clear()
 
 
-__all__ = ["ResumeError", "WorkflowService"]
+def review_item(run_id: str, review: WorkflowReviewRecord) -> PendingItem:
+    """The ``review`` pending item of an open review row."""
+    pending = json.loads(review.pending_json)
+    return PendingItem(
+        kind="review",
+        since=review.created_at,
+        ask=_cut(str(pending.get("ask") or "Review this"), 500),
+        preview=_cut(review_text(pending.get("draft")), PREVIEW_CHARS),
+        workflow_run_id=run_id,
+        key=review.step_key,
+    )
+
+
+__all__ = ["ResumeError", "ReviewError", "WorkflowService", "review_item", "review_text"]
