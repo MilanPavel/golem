@@ -190,5 +190,7 @@ def test_the_four_bundled_files_are_valid_and_match_the_adr_table() -> None:
     }
     assert {name for name, agent in agents.items() if agent.asks} == {"worker"}
     assert agents["advisor"].tools == ()
-    assert set(agents["reviewer"].tools) == EXPLORER_TOOLS - {"read_artifact"}
+    # `gets: diff` adds read_artifact, which is how the reviewer reads the diff it is handed.
+    assert set(agents["reviewer"].tools) == EXPLORER_TOOLS
+    assert agents["reviewer"].gets == ("diff",)
     assert {"write_file", "edit_file", "shell"} <= set(agents["worker"].tools)
