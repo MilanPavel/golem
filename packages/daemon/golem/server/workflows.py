@@ -1,4 +1,4 @@
-"""Handlers for ``workflow.list|get|start|status|cancel|resume`` (ADR-062).
+"""Handlers for ``workflow.list|get|start|status|cancel|resume|review.answer`` (ADR-062).
 
 ``workflow.start`` writes the run row, starts the engine as a background task of the
 :class:`~golem.workflows.service.WorkflowService` and returns the id at once; the steps reach
@@ -19,7 +19,7 @@ from golem.server.dispatcher import INTERNAL_ERROR, INVALID_PARAMS, RequestConte
 from golem.store.workflow_runs import WorkflowRunRecord, WorkflowStepRecord
 from golem.workflows.outline import OutlineError, WorkflowOutline, outline
 from golem.workflows.registry import WorkflowEntry
-from golem.workflows.service import ResumeError, WorkflowService
+from golem.workflows.service import ResumeError, ReviewError, WorkflowService
 from golem_protocol.commands import (
     WorkflowCancelParams,
     WorkflowCancelResult,
@@ -32,6 +32,8 @@ from golem_protocol.commands import (
     WorkflowOutlineStep,
     WorkflowResumeParams,
     WorkflowResumeResult,
+    WorkflowReviewAnswerParams,
+    WorkflowReviewAnswerResult,
     WorkflowRunInfo,
     WorkflowStartParams,
     WorkflowStartResult,
@@ -245,11 +247,24 @@ async def workflow_resume(
     return WorkflowResumeResult(run=_run_info(run))
 
 
+async def workflow_review_answer(
+    ctx: RequestContext, params: WorkflowReviewAnswerParams
+) -> WorkflowReviewAnswerResult:
+    try:
+        run = await _service(ctx).answer_review(
+            params.workflow_run_id, params.key, params.verdict, params.text
+        )
+    except ReviewError as exc:
+        raise RpcCallError(INVALID_PARAMS, str(exc)) from exc
+    return WorkflowReviewAnswerResult(run=_run_info(run))
+
+
 __all__ = [
     "workflow_cancel",
     "workflow_get",
     "workflow_list",
     "workflow_resume",
+    "workflow_review_answer",
     "workflow_start",
     "workflow_status",
 ]

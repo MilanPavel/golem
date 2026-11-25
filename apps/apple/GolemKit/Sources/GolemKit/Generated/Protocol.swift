@@ -23845,6 +23845,14 @@ public struct SessionElement: Codable {
 /// card may appear even when ``use_helpers`` is not ``ask``. It is answered by
 /// ``helpers.respond``. These five fields mean something only for a ``batch`` item; an older
 /// daemon leaves them out.
+///
+/// A ``review`` item is a workflow run waiting for your answer (``run.review``). ``ask`` is
+/// its question, ``preview`` the first characters of the draft, ``workflow_run_id`` the run
+/// and ``key`` the review's step key; ``workflow.review.answer`` names the last two.
+/// ``since``
+/// is when the review was asked. Like ``batch``, a ``review`` is only ever in
+/// ``SessionSummary.pending_items``, never in ``pending``. A client that does not know the
+/// kind shows ``ask`` or ignores the item.
 // MARK: - SessionPendingItem
 public struct SessionPendingItem: Codable {
     public let added: Int?
@@ -23852,6 +23860,7 @@ public struct SessionPendingItem: Codable {
     public let agents: [String]?
     public let allowedUsd: Double?
     public let alternatives: Int?
+    public let ask: String?
     public let askOverUsd: Double?
     public let brief: String?
     public let callID: String?
@@ -23862,16 +23871,19 @@ public struct SessionPendingItem: Codable {
     public let helper: PurplePendingHelper?
     public let helperCount: Int?
     public let helperID: String?
+    public let key: String?
     public let kind: PendingItemKind
     public let label: String?
     public let model: String?
     public let name: String?
     public let notSent: [String]?
+    public let preview: String?
     public let removed: Int?
     public let sent: [String]?
     public let since: String
     public let source: String?
     public let subject: String?
+    public let workflowRunID: String?
 
     public enum CodingKeys: String, CodingKey {
         case added = "added"
@@ -23879,6 +23891,7 @@ public struct SessionPendingItem: Codable {
         case agents = "agents"
         case allowedUsd = "allowed_usd"
         case alternatives = "alternatives"
+        case ask = "ask"
         case askOverUsd = "ask_over_usd"
         case brief = "brief"
         case callID = "call_id"
@@ -23889,24 +23902,28 @@ public struct SessionPendingItem: Codable {
         case helper = "helper"
         case helperCount = "helper_count"
         case helperID = "helper_id"
+        case key = "key"
         case kind = "kind"
         case label = "label"
         case model = "model"
         case name = "name"
         case notSent = "not_sent"
+        case preview = "preview"
         case removed = "removed"
         case sent = "sent"
         case since = "since"
         case source = "source"
         case subject = "subject"
+        case workflowRunID = "workflow_run_id"
     }
 
-    public init(added: Int?, agent: String?, agents: [String]?, allowedUsd: Double?, alternatives: Int?, askOverUsd: Double?, brief: String?, callID: String?, cheaperModel: String?, count: Int?, diffArtifactID: String?, estimateUsd: Double?, helper: PurplePendingHelper?, helperCount: Int?, helperID: String?, kind: PendingItemKind, label: String?, model: String?, name: String?, notSent: [String]?, removed: Int?, sent: [String]?, since: String, source: String?, subject: String?) {
+    public init(added: Int?, agent: String?, agents: [String]?, allowedUsd: Double?, alternatives: Int?, ask: String?, askOverUsd: Double?, brief: String?, callID: String?, cheaperModel: String?, count: Int?, diffArtifactID: String?, estimateUsd: Double?, helper: PurplePendingHelper?, helperCount: Int?, helperID: String?, key: String?, kind: PendingItemKind, label: String?, model: String?, name: String?, notSent: [String]?, preview: String?, removed: Int?, sent: [String]?, since: String, source: String?, subject: String?, workflowRunID: String?) {
         self.added = added
         self.agent = agent
         self.agents = agents
         self.allowedUsd = allowedUsd
         self.alternatives = alternatives
+        self.ask = ask
         self.askOverUsd = askOverUsd
         self.brief = brief
         self.callID = callID
@@ -23917,16 +23934,19 @@ public struct SessionPendingItem: Codable {
         self.helper = helper
         self.helperCount = helperCount
         self.helperID = helperID
+        self.key = key
         self.kind = kind
         self.label = label
         self.model = model
         self.name = name
         self.notSent = notSent
+        self.preview = preview
         self.removed = removed
         self.sent = sent
         self.since = since
         self.source = source
         self.subject = subject
+        self.workflowRunID = workflowRunID
     }
 }
 
@@ -23960,6 +23980,7 @@ public enum PendingItemKind: String, Codable {
     case approval = "approval"
     case batch = "batch"
     case consent = "consent"
+    case review = "review"
 }
 
 public enum SessionStatus: String, Codable {
@@ -24669,6 +24690,14 @@ public struct SessionSummaryNotificationParams: Codable {
 /// card may appear even when ``use_helpers`` is not ``ask``. It is answered by
 /// ``helpers.respond``. These five fields mean something only for a ``batch`` item; an older
 /// daemon leaves them out.
+///
+/// A ``review`` item is a workflow run waiting for your answer (``run.review``). ``ask`` is
+/// its question, ``preview`` the first characters of the draft, ``workflow_run_id`` the run
+/// and ``key`` the review's step key; ``workflow.review.answer`` names the last two.
+/// ``since``
+/// is when the review was asked. Like ``batch``, a ``review`` is only ever in
+/// ``SessionSummary.pending_items``, never in ``pending``. A client that does not know the
+/// kind shows ``ask`` or ignores the item.
 // MARK: - ParamsPendingItem
 public struct ParamsPendingItem: Codable {
     public let added: Int?
@@ -24676,6 +24705,7 @@ public struct ParamsPendingItem: Codable {
     public let agents: [String]?
     public let allowedUsd: Double?
     public let alternatives: Int?
+    public let ask: String?
     public let askOverUsd: Double?
     public let brief: String?
     public let callID: String?
@@ -24686,16 +24716,19 @@ public struct ParamsPendingItem: Codable {
     public let helper: FluffyPendingHelper?
     public let helperCount: Int?
     public let helperID: String?
+    public let key: String?
     public let kind: PendingItemKind
     public let label: String?
     public let model: String?
     public let name: String?
     public let notSent: [String]?
+    public let preview: String?
     public let removed: Int?
     public let sent: [String]?
     public let since: String
     public let source: String?
     public let subject: String?
+    public let workflowRunID: String?
 
     public enum CodingKeys: String, CodingKey {
         case added = "added"
@@ -24703,6 +24736,7 @@ public struct ParamsPendingItem: Codable {
         case agents = "agents"
         case allowedUsd = "allowed_usd"
         case alternatives = "alternatives"
+        case ask = "ask"
         case askOverUsd = "ask_over_usd"
         case brief = "brief"
         case callID = "call_id"
@@ -24713,24 +24747,28 @@ public struct ParamsPendingItem: Codable {
         case helper = "helper"
         case helperCount = "helper_count"
         case helperID = "helper_id"
+        case key = "key"
         case kind = "kind"
         case label = "label"
         case model = "model"
         case name = "name"
         case notSent = "not_sent"
+        case preview = "preview"
         case removed = "removed"
         case sent = "sent"
         case since = "since"
         case source = "source"
         case subject = "subject"
+        case workflowRunID = "workflow_run_id"
     }
 
-    public init(added: Int?, agent: String?, agents: [String]?, allowedUsd: Double?, alternatives: Int?, askOverUsd: Double?, brief: String?, callID: String?, cheaperModel: String?, count: Int?, diffArtifactID: String?, estimateUsd: Double?, helper: FluffyPendingHelper?, helperCount: Int?, helperID: String?, kind: PendingItemKind, label: String?, model: String?, name: String?, notSent: [String]?, removed: Int?, sent: [String]?, since: String, source: String?, subject: String?) {
+    public init(added: Int?, agent: String?, agents: [String]?, allowedUsd: Double?, alternatives: Int?, ask: String?, askOverUsd: Double?, brief: String?, callID: String?, cheaperModel: String?, count: Int?, diffArtifactID: String?, estimateUsd: Double?, helper: FluffyPendingHelper?, helperCount: Int?, helperID: String?, key: String?, kind: PendingItemKind, label: String?, model: String?, name: String?, notSent: [String]?, preview: String?, removed: Int?, sent: [String]?, since: String, source: String?, subject: String?, workflowRunID: String?) {
         self.added = added
         self.agent = agent
         self.agents = agents
         self.allowedUsd = allowedUsd
         self.alternatives = alternatives
+        self.ask = ask
         self.askOverUsd = askOverUsd
         self.brief = brief
         self.callID = callID
@@ -24741,16 +24779,19 @@ public struct ParamsPendingItem: Codable {
         self.helper = helper
         self.helperCount = helperCount
         self.helperID = helperID
+        self.key = key
         self.kind = kind
         self.label = label
         self.model = model
         self.name = name
         self.notSent = notSent
+        self.preview = preview
         self.removed = removed
         self.sent = sent
         self.since = since
         self.source = source
         self.subject = subject
+        self.workflowRunID = workflowRunID
     }
 }
 
@@ -24946,6 +24987,14 @@ public struct SessionSummary: Codable {
 /// card may appear even when ``use_helpers`` is not ``ask``. It is answered by
 /// ``helpers.respond``. These five fields mean something only for a ``batch`` item; an older
 /// daemon leaves them out.
+///
+/// A ``review`` item is a workflow run waiting for your answer (``run.review``). ``ask`` is
+/// its question, ``preview`` the first characters of the draft, ``workflow_run_id`` the run
+/// and ``key`` the review's step key; ``workflow.review.answer`` names the last two.
+/// ``since``
+/// is when the review was asked. Like ``batch``, a ``review`` is only ever in
+/// ``SessionSummary.pending_items``, never in ``pending``. A client that does not know the
+/// kind shows ``ask`` or ignores the item.
 // MARK: - SessionSummaryPendingItem
 public struct SessionSummaryPendingItem: Codable {
     public let added: Int?
@@ -24953,6 +25002,7 @@ public struct SessionSummaryPendingItem: Codable {
     public let agents: [String]?
     public let allowedUsd: Double?
     public let alternatives: Int?
+    public let ask: String?
     public let askOverUsd: Double?
     public let brief: String?
     public let callID: String?
@@ -24963,16 +25013,19 @@ public struct SessionSummaryPendingItem: Codable {
     public let helper: TentacledPendingHelper?
     public let helperCount: Int?
     public let helperID: String?
+    public let key: String?
     public let kind: PendingItemKind
     public let label: String?
     public let model: String?
     public let name: String?
     public let notSent: [String]?
+    public let preview: String?
     public let removed: Int?
     public let sent: [String]?
     public let since: String
     public let source: String?
     public let subject: String?
+    public let workflowRunID: String?
 
     public enum CodingKeys: String, CodingKey {
         case added = "added"
@@ -24980,6 +25033,7 @@ public struct SessionSummaryPendingItem: Codable {
         case agents = "agents"
         case allowedUsd = "allowed_usd"
         case alternatives = "alternatives"
+        case ask = "ask"
         case askOverUsd = "ask_over_usd"
         case brief = "brief"
         case callID = "call_id"
@@ -24990,24 +25044,28 @@ public struct SessionSummaryPendingItem: Codable {
         case helper = "helper"
         case helperCount = "helper_count"
         case helperID = "helper_id"
+        case key = "key"
         case kind = "kind"
         case label = "label"
         case model = "model"
         case name = "name"
         case notSent = "not_sent"
+        case preview = "preview"
         case removed = "removed"
         case sent = "sent"
         case since = "since"
         case source = "source"
         case subject = "subject"
+        case workflowRunID = "workflow_run_id"
     }
 
-    public init(added: Int?, agent: String?, agents: [String]?, allowedUsd: Double?, alternatives: Int?, askOverUsd: Double?, brief: String?, callID: String?, cheaperModel: String?, count: Int?, diffArtifactID: String?, estimateUsd: Double?, helper: TentacledPendingHelper?, helperCount: Int?, helperID: String?, kind: PendingItemKind, label: String?, model: String?, name: String?, notSent: [String]?, removed: Int?, sent: [String]?, since: String, source: String?, subject: String?) {
+    public init(added: Int?, agent: String?, agents: [String]?, allowedUsd: Double?, alternatives: Int?, ask: String?, askOverUsd: Double?, brief: String?, callID: String?, cheaperModel: String?, count: Int?, diffArtifactID: String?, estimateUsd: Double?, helper: TentacledPendingHelper?, helperCount: Int?, helperID: String?, key: String?, kind: PendingItemKind, label: String?, model: String?, name: String?, notSent: [String]?, preview: String?, removed: Int?, sent: [String]?, since: String, source: String?, subject: String?, workflowRunID: String?) {
         self.added = added
         self.agent = agent
         self.agents = agents
         self.allowedUsd = allowedUsd
         self.alternatives = alternatives
+        self.ask = ask
         self.askOverUsd = askOverUsd
         self.brief = brief
         self.callID = callID
@@ -25018,16 +25076,19 @@ public struct SessionSummaryPendingItem: Codable {
         self.helper = helper
         self.helperCount = helperCount
         self.helperID = helperID
+        self.key = key
         self.kind = kind
         self.label = label
         self.model = model
         self.name = name
         self.notSent = notSent
+        self.preview = preview
         self.removed = removed
         self.sent = sent
         self.since = since
         self.source = source
         self.subject = subject
+        self.workflowRunID = workflowRunID
     }
 }
 
@@ -30126,6 +30187,99 @@ public enum WorkflowRunEventTrigger: String, Codable {
     case manual = "manual"
     case schedule = "schedule"
     case triggerTry = "try"
+}
+
+/// ``workflow.review.answer``. Answer the review ``key`` of a waiting run.
+///
+/// ``verdict`` is ``approve`` (the draft as it is), ``edit`` (``text`` replaces it, so it is
+/// required) or ``reject``. ``text`` is the answer's text; for ``approve`` it defaults to
+/// the
+/// draft. The answer is saved, then the run continues once none of its reviews waits. A
+/// ``reject`` goes back to the workflow code, which decides what it means.
+// MARK: - WorkflowReviewAnswerParams
+public struct WorkflowReviewAnswerParams: Codable {
+    public let key: String
+    public let text: String?
+    public let verdict: WorkflowReviewAnswerParamsVerdict
+    public let workflowRunID: String
+
+    public enum CodingKeys: String, CodingKey {
+        case key = "key"
+        case text = "text"
+        case verdict = "verdict"
+        case workflowRunID = "workflow_run_id"
+    }
+
+    public init(key: String, text: String?, verdict: WorkflowReviewAnswerParamsVerdict, workflowRunID: String) {
+        self.key = key
+        self.text = text
+        self.verdict = verdict
+        self.workflowRunID = workflowRunID
+    }
+}
+
+public enum WorkflowReviewAnswerParamsVerdict: String, Codable {
+    case approve = "approve"
+    case edit = "edit"
+    case reject = "reject"
+}
+
+/// The run as it was when the answer was saved; its steps arrive as ``workflow.step.*``.
+// MARK: - WorkflowReviewAnswerResult
+public struct WorkflowReviewAnswerResult: Codable {
+    public let run: WorkflowReviewAnswerResultRun
+
+    public enum CodingKeys: String, CodingKey {
+        case run = "run"
+    }
+
+    public init(run: WorkflowReviewAnswerResultRun) {
+        self.run = run
+    }
+}
+
+/// One run of a workflow, from its ``workflow_runs`` row.
+///
+/// The times are ISO 8601 with an offset. ``session_id`` is the run's headless session.
+/// ``error`` says why a ``failed`` run failed.
+// MARK: - WorkflowReviewAnswerResultRun
+public struct WorkflowReviewAnswerResultRun: Codable {
+    public let error: String?
+    public let finishedAt: String?
+    public let inputs: [String: JSONAny]?
+    public let name: String
+    public let sessionID: String?
+    public let startedAt: String?
+    public let status: WorkflowRunEventStatus
+    public let trigger: WorkflowRunEventTrigger
+    public let workflowID: String
+    public let workflowRunID: String
+
+    public enum CodingKeys: String, CodingKey {
+        case error = "error"
+        case finishedAt = "finished_at"
+        case inputs = "inputs"
+        case name = "name"
+        case sessionID = "session_id"
+        case startedAt = "started_at"
+        case status = "status"
+        case trigger = "trigger"
+        case workflowID = "workflow_id"
+        case workflowRunID = "workflow_run_id"
+    }
+
+    public init(error: String?, finishedAt: String?, inputs: [String: JSONAny]?, name: String, sessionID: String?, startedAt: String?, status: WorkflowRunEventStatus, trigger: WorkflowRunEventTrigger, workflowID: String, workflowRunID: String) {
+        self.error = error
+        self.finishedAt = finishedAt
+        self.inputs = inputs
+        self.name = name
+        self.sessionID = sessionID
+        self.startedAt = startedAt
+        self.status = status
+        self.trigger = trigger
+        self.workflowID = workflowID
+        self.workflowRunID = workflowRunID
+    }
 }
 
 /// Server → every connection: ``workflow.run.cancelled``. Not stored.

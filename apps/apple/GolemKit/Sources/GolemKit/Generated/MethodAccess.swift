@@ -171,6 +171,7 @@ public enum MethodAccess {
         "workflow.get",
         "workflow.list",
         "workflow.resume",
+        "workflow.review.answer",
         "workflow.start",
         "workflow.status",
     ]

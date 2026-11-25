@@ -792,6 +792,19 @@ class SessionManager:
         """Everything the session waits for, oldest first: its own and its helpers' (ADR-059)."""
         return await self._events.pending_items(activity, own, helpers)
 
+    @property
+    def review_items(self) -> Callable[[str], Awaitable[list[PendingItem]]] | None:
+        """Where a workflow run's open reviews come from, for its session's pending list."""
+        return self._events.reviews
+
+    @review_items.setter
+    def review_items(self, source: Callable[[str], Awaitable[list[PendingItem]]] | None) -> None:
+        self._events.reviews = source
+
+    async def touch(self, session_id: str) -> None:
+        """Send the session's summary to the watchers again."""
+        await self._events.touch(session_id)
+
     def step(self, session_id: str) -> str | None:
         """A helper's newest step, as one line."""
         return self._events.step(session_id)

@@ -1,7 +1,7 @@
 import type { GolemClient, WorkflowEntryInfo, WorkflowNotice, WorkflowStatusResult } from "@golem/client";
 
 /** What `golem workflow` needs from the daemon: a fake stands in for it in the tests. */
-export type WorkflowClient = Pick<GolemClient, "listWorkflows" | "startWorkflow" | "workflowStatus" | "cancelWorkflow" | "resumeWorkflow" | "onWorkflowEvent">;
+export type WorkflowClient = Pick<GolemClient, "listWorkflows" | "startWorkflow" | "workflowStatus" | "cancelWorkflow" | "resumeWorkflow" | "answerWorkflowReview" | "onWorkflowEvent">;
 
 /** What the commands need from outside: the folder, the terminal, and Ctrl-C. */
 export interface WorkflowDeps {
@@ -13,13 +13,14 @@ export interface WorkflowDeps {
   onInterrupt(handler: () => void): () => void;
 }
 
-export const WORKFLOW_USAGE = "usage: golem workflow [list] | golem workflow run <name|id> [--input k=v]… | golem workflow status <workflow_run_id> | golem workflow resume <workflow_run_id>";
+export const WORKFLOW_USAGE = "usage: golem workflow [list] | golem workflow run <name|id> [--input k=v]… | golem workflow status <workflow_run_id> | golem workflow resume <workflow_run_id> | golem workflow answer <workflow_run_id> [--key K] [--edit TEXT | --reject]";
 
 export type WorkflowParse =
   | { kind: "list" }
   | { kind: "run"; name: string; inputs: Record<string, string> }
   | { kind: "status"; runId: string }
   | { kind: "resume"; runId: string }
+  | { kind: "answer"; runId: string; key: string | null; verdict: "approve" | "edit" | "reject"; text: string | null }
   | { kind: "error"; message: string };
 
 /** The words after `golem workflow`. */
@@ -30,6 +31,38 @@ export function parseWorkflowArgs(given: readonly string[]): WorkflowParse {
   if (sub === "status" || sub === "resume") {
     const [runId, ...extra] = rest;
     return runId === undefined || runId.startsWith("-") || extra.length > 0 ? fail() : { kind: sub, runId };
+  }
+  if (sub === "answer") {
+    let runId: string | undefined;
+    let key: string | null = null;
+    let verdict: "approve" | "edit" | "reject" = "approve";
+    let text: string | null = null;
+    let chosen = false;
+    for (let i = 0; i < rest.length; i += 1) {
+      const arg = rest[i] as string;
+      if (arg === "--key") {
+        const value = rest[i + 1];
+        if (value === undefined || value === "") return fail("--key takes the review's key, as `golem workflow status` shows it");
+        key = value;
+        i += 1;
+      } else if (arg === "--edit") {
+        const value = rest[i + 1];
+        if (value === undefined || value === "" || chosen) return fail("--edit takes the text to use instead, and goes without --reject");
+        verdict = "edit";
+        text = value;
+        chosen = true;
+        i += 1;
+      } else if (arg === "--reject") {
+        if (chosen) return fail("--reject goes without --edit");
+        verdict = "reject";
+        chosen = true;
+      } else if (arg.startsWith("-") || runId !== undefined) {
+        return fail();
+      } else {
+        runId = arg;
+      }
+    }
+    return runId === undefined ? fail() : { kind: "answer", runId, key, verdict, text };
   }
   if (sub === "run") {
     let name: string | undefined;
@@ -143,7 +176,9 @@ async function follow(client: WorkflowClient, label: () => string, begin: () => 
   const show = (notice: WorkflowNotice): void => {
     if (notice.params.workflow_run_id !== runId) return;
     if (notice.kind === "step") {
-      if (notice.method !== "workflow.step.waiting") deps.write(stepLine(notice));
+      deps.write(stepLine(notice));
+    } else if (notice.method === "workflow.run.waiting") {
+      deps.error(`waiting for you: golem workflow answer ${runId}`);
     } else if (FINAL.has(notice.method)) {
       finish(notice);
     }
@@ -226,6 +261,42 @@ export async function runWorkflowResume(client: WorkflowClient, runId: string, d
       const resumed = (await client.resumeWorkflow(runId)).run;
       label = resumed.name;
       return resumed.workflow_run_id;
+    },
+    deps,
+  );
+}
+
+/**
+ * `golem workflow answer <workflow_run_id> [--key K] [--edit TEXT | --reject]`: answers a review the run waits on
+ * (approve unless told otherwise), then prints the run's steps like `resume`. Without `--key` the run must have
+ * exactly one review open.
+ */
+export async function runWorkflowAnswer(
+  client: WorkflowClient,
+  args: { runId: string; key: string | null; verdict: "approve" | "edit" | "reject"; text: string | null },
+  deps: WorkflowDeps,
+): Promise<number> {
+  let label = args.runId;
+  return follow(
+    client,
+    () => label,
+    async () => {
+      let key = args.key;
+      if (key === null) {
+        const open = ((await client.workflowStatus(args.runId)).steps ?? []).filter((step) => step.kind === "review" && step.status === "waiting");
+        if (open.length !== 1) {
+          deps.error(
+            open.length === 0
+              ? `workflow run ${args.runId} waits for no review`
+              : `workflow run ${args.runId} waits for ${open.length} reviews; pick one with --key:\n${open.map((step) => `  ${step.key}  ${step.title}`).join("\n")}`,
+          );
+          return null;
+        }
+        key = (open[0] as { key: string }).key;
+      }
+      const answered = (await client.answerWorkflowReview(args.runId, key, args.verdict, args.text ?? undefined)).run;
+      label = answered.name;
+      return answered.workflow_run_id;
     },
     deps,
   );

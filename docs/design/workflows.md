@@ -36,7 +36,7 @@ The only module user code imports is `golem.workflow` (`D/workflow/__init__.py`)
 | `run.step(name, fn, *args, key=)` | A plain function. The result is saved. |
 | `run.parallel(...)` | Steps or agents at once. |
 | `run.agent(type, brief=, gets=, worktree=, budget=)` | A helper. |
-| `run.review(items, notes, ask=)` | Waits for you. Returns what you approved. |
+| `run.review(draft, ask=)` | Waits for you. Returns what you approved. |
 | `run.notify(text)` | Tells you. |
 | `run.llm(...)` | One model call through a dispatcher `job` slot. |
 | `run.tool(...)` | One tool, through the permission engine. |

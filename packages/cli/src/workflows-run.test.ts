@@ -9,6 +9,7 @@ import {
   formatWorkflows,
   parseWorkflowArgs,
   pickWorkflow,
+  runWorkflowAnswer,
   runWorkflowList,
   runWorkflowResume,
   runWorkflowRun,
@@ -77,6 +78,12 @@ function fake(script: WorkflowNotice[], entries: WorkflowEntryInfo[] = [ok, brok
     },
     resumeWorkflow: async (id) => {
       calls.push(`resume ${id}`);
+      if (script[0] !== undefined) listener(script[0]);
+      setTimeout(() => script.slice(1).forEach((notice) => listener(notice)), 0);
+      return { run: { workflow_run_id: id, workflow_id: ok.id, name: "adder", status: "running", trigger: "manual", inputs: {} } };
+    },
+    answerWorkflowReview: async (id, key, verdict, text) => {
+      calls.push(`answer ${id} ${key} ${verdict}${text === undefined ? "" : ` ${text}`}`);
       if (script[0] !== undefined) listener(script[0]);
       setTimeout(() => script.slice(1).forEach((notice) => listener(notice)), 0);
       return { run: { workflow_run_id: id, workflow_id: ok.id, name: "adder", status: "running", trigger: "manual", inputs: {} } };
@@ -245,4 +252,70 @@ test("resume reports a refusal from the daemon and exits 1", async () => {
   const { deps, err } = setup();
   assert.equal(await runWorkflowResume(client, "wr1", deps), 1);
   assert.deepEqual(err, ["workflow run wr1 is already running"]);
+});
+
+const waitingStep = (key: string) => ({ key, kind: "review" as const, title: `Ask ${key}`, status: "waiting" as const });
+
+function withReviews(client: WorkflowClient, keys: string[]): void {
+  client.workflowStatus = async (id) => ({
+    run: { workflow_run_id: id, workflow_id: ok.id, name: "adder", status: "waiting", trigger: "manual", inputs: {} },
+    steps: [{ key: "first", kind: "step", title: "first", status: "done" }, ...keys.map(waitingStep)],
+  });
+}
+
+test("answer parses its run id, key and verdict", () => {
+  assert.deepEqual(parseWorkflowArgs(["answer", "wr1"]), { kind: "answer", runId: "wr1", key: null, verdict: "approve", text: null });
+  assert.deepEqual(parseWorkflowArgs(["answer", "wr1", "--key", "k", "--edit", "new text"]), { kind: "answer", runId: "wr1", key: "k", verdict: "edit", text: "new text" });
+  assert.deepEqual(parseWorkflowArgs(["answer", "wr1", "--reject"]), { kind: "answer", runId: "wr1", key: null, verdict: "reject", text: null });
+  assert.equal(parseWorkflowArgs(["answer"]).kind, "error");
+  assert.equal(parseWorkflowArgs(["answer", "wr1", "--edit"]).kind, "error");
+  assert.equal(parseWorkflowArgs(["answer", "wr1", "--edit", "x", "--reject"]).kind, "error");
+  assert.equal(parseWorkflowArgs(["answer", "wr1", "--key"]).kind, "error");
+});
+
+test("answer approves the one open review and follows the run to its end", async () => {
+  const { client, calls } = fake([
+    runNotice("workflow.run.started", "running"),
+    stepNotice("workflow.step.done", "review:Send?", "done"),
+    runNotice("workflow.run.done", "done"),
+  ]);
+  withReviews(client, ["review:Send?"]);
+  const { deps, out, err } = setup();
+  assert.equal(await runWorkflowAnswer(client, { runId: "wr1", key: null, verdict: "approve", text: null }, deps), 0);
+  assert.deepEqual(calls, ["answer wr1 review:Send? approve"]);
+  assert.deepEqual(out, ["  done     review:Send? 1.5s", "adder done in 1.5s"]);
+  assert.deepEqual(err, ["run: wr1"]);
+});
+
+test("answer --edit sends the text, and --key picks one of several reviews", async () => {
+  const { client, calls } = fake([runNotice("workflow.run.done", "done")]);
+  withReviews(client, ["one", "two"]);
+  const { deps } = setup();
+  assert.equal(await runWorkflowAnswer(client, { runId: "wr1", key: "two", verdict: "edit", text: "better" }, deps), 0);
+  assert.deepEqual(calls, ["answer wr1 two edit better"]);
+});
+
+test("answer without --key refuses when several reviews or none wait", async () => {
+  const several = fake([]);
+  withReviews(several.client, ["one", "two"]);
+  const first = setup();
+  assert.equal(await runWorkflowAnswer(several.client, { runId: "wr1", key: null, verdict: "reject", text: null }, first.deps), 1);
+  assert.match(first.err.join("\n"), /waits for 2 reviews; pick one with --key:\n {2}one {2}Ask one\n {2}two {2}Ask two/);
+  assert.deepEqual(several.calls, []);
+
+  const none = fake([]);
+  withReviews(none.client, []);
+  const second = setup();
+  assert.equal(await runWorkflowAnswer(none.client, { runId: "wr1", key: null, verdict: "approve", text: null }, second.deps), 1);
+  assert.deepEqual(second.err, ["workflow run wr1 waits for no review"]);
+});
+
+test("answer reports a refusal from the daemon and exits 1", async () => {
+  const { client } = fake([]);
+  client.answerWorkflowReview = async () => {
+    throw new Error("review 'k' of workflow run wr1 is answered already");
+  };
+  const { deps, err } = setup();
+  assert.equal(await runWorkflowAnswer(client, { runId: "wr1", key: "k", verdict: "approve", text: null }, deps), 1);
+  assert.deepEqual(err, ["review 'k' of workflow run wr1 is answered already"]);
 });

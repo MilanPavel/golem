@@ -17,6 +17,7 @@ export type Agent1 = string | null;
 export type Agents = string[] | null;
 export type AllowedUsd = number | null;
 export type Alternatives = number | null;
+export type Ask = string | null;
 export type AskOverUsd = number | null;
 export type Brief = string | null;
 export type CallId = string | null;
@@ -30,7 +31,8 @@ export type Label = string | null;
 export type SessionId = string;
 export type HelperCount = number | null;
 export type HelperId = string | null;
-export type Kind = 'approval' | 'consent' | 'batch';
+export type Key = string | null;
+export type Kind = 'approval' | 'consent' | 'batch' | 'review';
 export type Label1 = string | null;
 export type Model = string | null;
 export type Name = string | null;
@@ -47,6 +49,7 @@ export type NotSent =
   | [string, string, string, string, string, string, string, string, string]
   | [string, string, string, string, string, string, string, string, string, string]
   | null;
+export type Preview = string | null;
 export type Removed = number | null;
 export type Sent =
   | []
@@ -64,6 +67,7 @@ export type Sent =
 export type Since = string;
 export type Source = string | null;
 export type Subject = string | null;
+export type WorkflowRunId = string | null;
 /**
  * @maxItems 200
  */
@@ -180,6 +184,13 @@ export interface SessionSummary {
  * ``helpers.respond``. These five fields mean something only for a ``batch`` item; an older
  * daemon leaves them out.
  *
+ * A ``review`` item is a workflow run waiting for your answer (``run.review``). ``ask`` is
+ * its question, ``preview`` the first characters of the draft, ``workflow_run_id`` the run
+ * and ``key`` the review's step key; ``workflow.review.answer`` names the last two. ``since``
+ * is when the review was asked. Like ``batch``, a ``review`` is only ever in
+ * ``SessionSummary.pending_items``, never in ``pending``. A client that does not know the
+ * kind shows ``ask`` or ignores the item.
+ *
  * This interface was referenced by `SessionSummary`'s JSON-Schema
  * via the `definition` "PendingItem".
  */
@@ -189,6 +200,7 @@ export interface PendingItem {
   agents?: Agents;
   allowed_usd?: AllowedUsd;
   alternatives?: Alternatives;
+  ask?: Ask;
   ask_over_usd?: AskOverUsd;
   brief?: Brief;
   call_id?: CallId;
@@ -199,16 +211,19 @@ export interface PendingItem {
   helper?: PendingHelper | null;
   helper_count?: HelperCount;
   helper_id?: HelperId;
+  key?: Key;
   kind: Kind;
   label?: Label1;
   model?: Model;
   name?: Name;
   not_sent?: NotSent;
+  preview?: Preview;
   removed?: Removed;
   sent?: Sent;
   since: Since;
   source?: Source;
   subject?: Subject;
+  workflow_run_id?: WorkflowRunId;
 }
 /**
  * The helper a pending item belongs to: its session, its agent type, its label and its

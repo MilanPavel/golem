@@ -39,6 +39,7 @@ from golem.routines import ScheduleError, next_after, parse_schedule
 from golem.server.dispatcher import INTERNAL_ERROR, INVALID_PARAMS, RequestContext, RpcCallError
 from golem.store.routine_runs import HeadlessRun, RoutineRunRecord
 from golem.store.workflow_runs import WorkflowRuns
+from golem.workflows.service import review_item
 from golem_protocol.commands import (
     PendingItem,
     RoutineChanged,
@@ -226,14 +227,19 @@ async def _workflow_row(runs: WorkflowRuns, row: HeadlessRun, info: RunInfo) -> 
     if run is None:
         return info
     steps = await runs.list_steps(run.workflow_run_id)
+    asked = await runs.list_open_reviews(run.workflow_run_id) if run.status == "waiting" else []
+    summary = run.error if run.status == "failed" else None
+    if asked:
+        summary = review_item(run.workflow_run_id, asked[0]).ask
     return info.model_copy(
         update={
             "status": _WORKFLOW_STATUS.get(run.status, run.status),
             "started_at": run.started_at or run.created_at,
             "ended_at": run.finished_at,
-            "summary": run.error if run.status == "failed" else None,
+            "summary": summary,
             "reason": run.error if run.status == "failed" else None,
             "steps": len(steps),
+            "approvals": len(asked),
         }
     )
 
