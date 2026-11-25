@@ -74,6 +74,34 @@ def diff_line(artifact_id: str, diff: str) -> str:
     )
 
 
+def worker_line(
+    *,
+    files: int,
+    added: int,
+    removed: int,
+    checks: str | None,
+    failed: Sequence[str] = (),
+    note: str | None = None,
+    artifact_id: str | None = None,
+) -> str:
+    """The line the lead reads about a worker's change: ``+38 -12 in 3 files, checks pass``."""
+    if files == 0:
+        return "The worker changed no file."
+    noun = "file" if files == 1 else "files"
+    parts = [f"+{added} \u2212{removed} in {files} {noun}"]
+    if checks == "passed":
+        parts.append("checks pass")
+    elif checks == "failed":
+        parts.append("checks failed: " + ", ".join(failed) if failed else "checks failed")
+    elif note:
+        parts.append(f"checks not run ({note})")
+    if note and checks != "none":
+        parts.append(note)
+    if artifact_id is not None:
+        parts.append(f"diff in artifact {artifact_id}")
+    return " \u00b7 ".join(parts)
+
+
 def wish_of(agent: Agent | AgentSnapshot, roles: RoleSettings) -> str:
     """What the helper of ``agent`` wishes for its model (ADR-059, section 5).
 
@@ -387,6 +415,7 @@ __all__ = [
     "tokens_over",
     "unavailable_reason",
     "wish_of",
+    "worker_line",
     "writing_tools",
 ]
 

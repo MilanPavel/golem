@@ -132,6 +132,9 @@ class HelperOutcome:
     covered: str = ""
     """What the helper covered when it did not simply answer, such as
     ``stopped at 25 calls, read 5 of 7 files``. Empty when it answered."""
+    changes: str = ""
+    """The line on a worker's diff and checks, such as ``+38 -12 in 3 files``. Empty for a
+    helper that works in no copy."""
 
 
 def _section(done: HelperOutcome) -> str:
@@ -143,6 +146,8 @@ def _section(done: HelperOutcome) -> str:
         )
         answer = f"{answer}\n{note}" if answer else note
     answer = answer or "(the helper gave no answer)"
+    if done.changes:
+        answer = f"{answer}\n\n{done.changes}"
     if done.stopped == "done":
         return answer
     lead = f"{done.covered}\n\n" if done.covered else ""
