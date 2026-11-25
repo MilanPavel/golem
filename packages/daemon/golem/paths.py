@@ -53,6 +53,11 @@ class GolemPaths:
         return self.home / "evals"
 
     @property
+    def copies_dir(self) -> Path:
+        """One git copy of a folder for each helper that edits files (``coding/copies.py``)."""
+        return self.home / "copies"
+
+    @property
     def logs_dir(self) -> Path:
         return self.home / "logs"
 
