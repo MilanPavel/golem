@@ -7364,6 +7364,7 @@ public struct FileChangedData: Codable {
 }
 
 public enum FileChangedDataSource: String, Codable {
+    case helper = "helper"
     case revert = "revert"
     case shell = "shell"
     case tool = "tool"

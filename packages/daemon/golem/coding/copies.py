@@ -190,3 +190,21 @@ async def diff_since_baseline(copy: Copy) -> str:
     await _git(copy.path, "add", "-A")
     _, out = await _git(copy.path, "diff", "--binary", "--no-ext-diff", copy.baseline_sha)
     return out.decode("utf-8", errors="replace")
+
+
+async def changed_paths(copy: Copy) -> list[str]:
+    """The files the worker changed since the baseline, with ``/``, sorted.
+
+    A rename counts as one deleted file and one created file.
+    """
+    await _git(copy.path, "add", "-A")
+    _, out = await _git(
+        copy.path, "diff", "--name-only", "-z", "--no-renames", "--no-ext-diff", copy.baseline_sha
+    )
+    return sorted(os.fsdecode(raw) for raw in out.split(b"\0") if raw)
+
+
+async def baseline_bytes(copy: Copy, path: str) -> bytes | None:
+    """The file as the lead's folder had it when the copy was made. None: there was none."""
+    code, out = await _git(copy.path, "show", f"{copy.baseline_sha}:{path}", check=False)
+    return out if code == 0 else None

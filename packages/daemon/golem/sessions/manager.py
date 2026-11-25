@@ -35,8 +35,8 @@ from langchain_core.runnables import RunnableConfig
 from golem.agents.bundled import bundled_agents_dir
 from golem.agents.model import Agent
 from golem.agents.registry import AgentRegistry
-from golem.coding import copies, worker_result
-from golem.coding.changes import session_diff
+from golem.coding import apply_worker, copies, worker_result
+from golem.coding.changes import session_diff, status_of
 from golem.config import AgentSettings, ChatSettings, ModelPrice, PermissionMode, RouteMode
 from golem.evals.whatif import build_report, session_model
 from golem.graphs.adapter import PlainMessage, plain_messages, trace_messages
@@ -163,6 +163,8 @@ from golem_protocol.events import (
     EmptyEventData,
     FileChangedData,
     ForkedFrom,
+    HelperAppliedData,
+    HelperDiscardedData,
     HelperEndedData,
     HelperEndedEvent,
     HelperModelData,
@@ -293,6 +295,19 @@ class NotAHelperError(Exception):
 
     def __init__(self) -> None:
         super().__init__("This session is not a helper: only a helper can be stopped here.")
+
+
+class HelperCopyError(Exception):
+    """``helper.apply``, ``helper.discard`` or ``helper.retry`` cannot work on this helper. The
+    message says why in plain words."""
+
+
+class HelperConflictError(Exception):
+    """A file of a worker's diff changed in the project since the worker's copy was made."""
+
+    def __init__(self, path: str) -> None:
+        super().__init__(f"{path} changed in the project since the worker started")
+        self.path = path
 
 
 class NotAHelperBatchError(Exception):
@@ -2826,6 +2841,170 @@ class SessionManager:
             return False
         return await self._cancel_run(run.run_id)
 
+    async def _worker_copy(self, lead_id: str, helper_id: str) -> tuple[copies.Copy, str, int]:
+        """The copy, call id and index of an ended worker of ``lead_id``.
+
+        Raises :class:`SessionNotFoundError` and :class:`HelperCopyError`.
+        """
+        record = await self._records.get(helper_id)
+        if record is None or await self._records.get(lead_id) is None:
+            raise SessionNotFoundError(helper_id)
+        if (
+            record.parent_session_id != lead_id
+            or record.parent_call_id is None
+            or record.helper_index is None
+        ):
+            raise HelperCopyError("this is not a helper of this session")
+        call_id, index = record.parent_call_id, record.helper_index
+        stored = await self._events.stored(lead_id)
+        if not any(
+            isinstance(e, HelperEndedEvent) and e.data.call_id == call_id and e.data.index == index
+            for e in stored
+        ):
+            raise HelperCopyError("the worker is still working: wait for it to finish")
+        found = await self._records.copy_of(helper_id)
+        if found is None:
+            raise HelperCopyError(
+                "this worker has no diff: it was applied or discarded, or it only read"
+            )
+        return copies.Copy(Path(found[0]), found[1]), call_id, index
+
+    async def _forget_copy(self, helper_id: str, copy: copies.Copy) -> None:
+        """Remove the copy and clear it from the helper's record and its live session."""
+        await asyncio.shield(copies.remove(copy.path))
+        await self._records.clear_copy(helper_id)
+        live = self._sessions.get(helper_id)
+        if live is not None:
+            live.copy_path = live.copy_baseline = None
+
+    async def apply_helper(self, lead_id: str, helper_id: str) -> list[str]:
+        """Take the diff of a worker into the lead's folder, through the change set.
+
+        Every file is checked first: the project's file must be what the copy started from.
+        Then each file is written and recorded as a change with source ``helper``, all under one
+        fresh run id, so one ``changes.revert`` of that run restores the folder. Stores
+        ``file.changed`` for each and ``helper.applied``, and removes the copy. Returns the
+        change ids. A file that is not UTF-8 text is written but cannot be recorded, so an undo
+        leaves it.
+
+        Raises :class:`SessionNotFoundError`, :class:`SessionBusyError` (the lead has a run),
+        :class:`HelperCopyError` and :class:`HelperConflictError`.
+        """
+        changes = self._runtime.changes
+        async with self.idle(lead_id) as folder:
+            if folder is None or changes is None:
+                raise HelperCopyError("this session has no folder to apply to")
+            copy, _call, _index = await self._worker_copy(lead_id, helper_id)
+            try:
+                planned = await apply_worker.plan(copy, Path(folder))
+            except apply_worker.ApplyConflict as exc:
+                raise HelperConflictError(exc.path) from exc
+            except (ToolError, copies.CopyError, OSError) as exc:
+                raise HelperCopyError(str(exc)) from exc
+            run_id = new_id("r")
+            ids: list[str] = []
+            for item in planned:
+                try:
+                    await asyncio.to_thread(apply_worker.write, item)
+                except ToolError as exc:
+                    raise HelperCopyError(str(exc)) from exc
+                try:
+                    before = apply_worker.text_of(item.before)
+                    after = apply_worker.text_of(item.after)
+                except UnicodeDecodeError:
+                    continue
+                change = await changes.record(
+                    session_id=lead_id,
+                    run_id=run_id,
+                    call_id=None,
+                    path=item.path,
+                    before=before,
+                    after=after,
+                    source="helper",
+                )
+                ids.append(change.change_id)
+                await self._events.emit(
+                    lead_id,
+                    run_id,
+                    "file.changed",
+                    FileChangedData(
+                        change_id=change.change_id,
+                        path=item.path,
+                        status=status_of(change.before_sha, change.after_sha),
+                        added=change.added,
+                        removed=change.removed,
+                        source="helper",
+                    ),
+                )
+            await self._events.emit(
+                lead_id,
+                run_id,
+                "helper.applied",
+                HelperAppliedData(helper_id=helper_id, change_ids=ids),
+            )
+            await self._forget_copy(helper_id, copy)
+            return ids
+
+    async def discard_helper(self, lead_id: str, helper_id: str) -> None:
+        """Drop the diff of a worker: store ``helper.discarded`` and remove its copy.
+
+        Raises :class:`SessionNotFoundError` and :class:`HelperCopyError`.
+        """
+        copy, _call, _index = await self._worker_copy(lead_id, helper_id)
+        await self._events.emit(
+            lead_id, None, "helper.discarded", HelperDiscardedData(helper_id=helper_id)
+        )
+        await self._forget_copy(helper_id, copy)
+
+    async def retry_helper(self, lead_id: str, helper_id: str) -> str:
+        """Run a worker's brief again on a stronger model, in a fresh copy of the folder.
+
+        The new helper is a sibling in the same ``delegate`` call (the next index): the call
+        has returned, so it does not wait for it. The old copy is discarded. Returns the new
+        helper's session id.
+
+        Raises :class:`SessionNotFoundError`, :class:`HelperCopyError`, and as
+        :meth:`start_helper` does.
+        """
+        _copy, call_id, _index = await self._worker_copy(lead_id, helper_id)
+        async with self._lock:
+            old = await self._resolve(helper_id)
+            lead = await self._resolve(lead_id)
+            agent = old.agent
+            if agent is None or lead.cwd is None:
+                raise HelperCopyError("this worker cannot be started again")
+            prompt = old.prompt or self._prompt_of(agent, old)
+            model, cwd = lead.model_profile, lead.cwd
+        stored = await self._events.stored(lead_id)
+        label = next(
+            (
+                e.data.label
+                for e in stored
+                if isinstance(e, HelperStartedEvent) and e.data.helper_id == helper_id
+            ),
+            "",
+        )
+        brief = next(
+            (m.text for m in (await self.inspect(helper_id)).messages if m.role == "user"), ""
+        )
+        if brief == "":
+            raise HelperCopyError("the worker's brief could not be read")
+        index = len(await self._records.helpers_of(lead_id, call_id))
+        ref = await self.start_helper(
+            lead_id,
+            call_id,
+            index,
+            agent,
+            brief,
+            model,
+            cwd,
+            label=label,
+            prompt=prompt,
+            asked_model="stronger",
+        )
+        await self.discard_helper(lead_id, helper_id)
+        return ref.session_id
+
     async def cancel_helpers(self, lead_id: str) -> None:
         """End the runs of the helpers of ``lead_id`` that are still open."""
         await self._cancel_helpers(lead_id)
@@ -4455,6 +4634,8 @@ def _report(task: asyncio.Task[None], message: str) -> None:
 __all__ = [
     "ApprovalNotFoundError",
     "BlankTitleError",
+    "HelperConflictError",
+    "HelperCopyError",
     "InvalidToolArgsError",
     "MessageNotFoundError",
     "RuleWriteError",

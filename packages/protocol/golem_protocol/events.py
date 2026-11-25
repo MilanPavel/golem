@@ -983,7 +983,7 @@ class FileChangedData(BaseModel):
     status: Literal["created", "modified", "deleted"]
     added: int = Field(ge=0)
     removed: int = Field(ge=0)
-    source: Literal["tool", "shell", "revert"]
+    source: Literal["tool", "shell", "revert", "helper"]
     reverts: str | None = Field(default=None, min_length=1)
 
 

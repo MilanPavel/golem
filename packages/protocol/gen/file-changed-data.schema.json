@@ -52,7 +52,8 @@
       "enum": [
         "tool",
         "shell",
-        "revert"
+        "revert",
+        "helper"
       ],
       "title": "Source",
       "type": "string"

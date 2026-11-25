@@ -152,6 +152,14 @@ class SessionRecords:
                 (path, baseline_sha, session_id),
             )
 
+    async def clear_copy(self, session_id: str) -> None:
+        """Forget the copy of a helper, once it is removed."""
+        async with self._database.transaction() as tx:
+            await tx.execute(
+                "UPDATE sessions SET copy_path = NULL, copy_baseline = NULL WHERE session_id = ?",
+                (session_id,),
+            )
+
     async def copy_of(self, session_id: str) -> tuple[str, str] | None:
         """``(path, baseline sha)`` of the copy of a helper session, None when it has none."""
         row = await self._database.fetch_one(

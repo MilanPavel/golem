@@ -17,7 +17,7 @@ from golem.store.blobs import BlobStore
 from golem.store.database import Database
 from golem.tools.write import DIFF_CONTEXT, diff_counts, diff_text, split_lines
 
-Source = Literal["tool", "shell", "revert"]
+Source = Literal["tool", "shell", "revert", "helper"]
 Status = Literal["created", "modified", "deleted"]
 
 _COLUMNS = (
