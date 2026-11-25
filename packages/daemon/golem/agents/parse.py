@@ -13,6 +13,8 @@ Frontmatter fields:
 - ``tools``: names of golem's tools, as text or a list. Left out means none.
 - ``max-calls``, ``max-seconds``, ``max-cost-usd``, ``max-tokens``, ``max-answer-chars``: limits.
 - ``asks``: true when the helper may ask you a question. Default false.
+- ``gets``: what golem hands the helper as an artifact, as text or a list. Only ``diff`` (the
+  lead's change set) for now. The helper gets ``read_artifact`` with it.
 - ``line``: optional; what the lead's system prompt says this type is for, a few words
   (``reads many files and returns the paths that matter``). Left out, the first sentence of
   ``description`` is used.
@@ -26,7 +28,7 @@ import re
 from pathlib import Path
 from typing import Any, cast
 
-from golem.agents.model import AGENT_SUFFIX, WISHES, Agent, AgentLimits
+from golem.agents.model import AGENT_SUFFIX, GETS, WISHES, Agent, AgentLimits
 from golem.skills.parse import (
     MAX_DESCRIPTION,
     MAX_FRONTMATTER_BYTES,
@@ -55,6 +57,7 @@ KNOWN = frozenset(
         "max-tokens",
         "max-answer-chars",
         "asks",
+        "gets",
         "line",
     }
 )
@@ -113,6 +116,9 @@ def parse_agent(path: Path, *, known_tools: frozenset[str] | None = None) -> Age
         errors.append(f"`description` is {len(description)} characters, over {MAX_DESCRIPTION}")
     wish = _wish(fields, errors)
     tools = _tools(fields, known_tools or builtin_tool_names(), errors)
+    gets = _gets(fields, errors)
+    if gets and "read_artifact" not in tools:
+        tools = (*tools, "read_artifact")
     limits = AgentLimits(
         max_calls=_count(fields, "max-calls", errors),
         max_seconds=_count(fields, "max-seconds", errors),
@@ -137,6 +143,7 @@ def parse_agent(path: Path, *, known_tools: frozenset[str] | None = None) -> Age
         tools=tools,
         limits=limits,
         asks=asks,
+        gets=gets,
         line=line,
         body=body,
         extras={key: value for key, value in fields.items() if key not in KNOWN},
@@ -189,6 +196,28 @@ def _tools(fields: dict[str, Any], known: frozenset[str], errors: list[str]) -> 
             f"{', '.join(unknown)} (known: {', '.join(sorted(known))})"
         )
     return tuple(dict.fromkeys(names))
+
+
+def _gets(fields: dict[str, Any], errors: list[str]) -> tuple[str, ...]:
+    value = fields.get("gets")
+    if value is None:
+        return ()
+    if isinstance(value, str):
+        names = split_tools(value)
+    elif isinstance(value, list) and all(
+        isinstance(item, str) for item in cast(list[object], value)
+    ):
+        names = [item.strip() for item in cast(list[str], value) if item.strip()]
+    else:
+        errors.append("`gets` must be text or a list, such as `gets: diff`")
+        return ()
+    unknown = [name for name in names if name not in GETS]
+    if unknown:
+        errors.append(
+            f"`gets` has values golem does not know: {', '.join(unknown)} "
+            f"(known: {', '.join(GETS)})"
+        )
+    return tuple(name for name in dict.fromkeys(names) if name in GETS)
 
 
 def _count(fields: dict[str, Any], key: str, errors: list[str]) -> int | None:

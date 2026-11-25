@@ -35,6 +35,7 @@ from langchain_core.runnables import RunnableConfig
 from golem.agents.bundled import bundled_agents_dir
 from golem.agents.model import Agent
 from golem.agents.registry import AgentRegistry
+from golem.coding.changes import session_diff
 from golem.config import AgentSettings, ChatSettings, ModelPrice, PermissionMode, RouteMode
 from golem.evals.whatif import build_report, session_model
 from golem.graphs.adapter import PlainMessage, plain_messages, trace_messages
@@ -73,12 +74,14 @@ from golem.sessions.helper_estimate import EstimateCard, HelperPlan, estimate_ba
 from golem.sessions.helper_limits import Used, covered_line, reached, used_of
 from golem.sessions.helpers import (
     DEFAULT_PROMPT,
+    NO_DIFF,
     NO_NESTED,
     NO_SEND,
     ORIGIN_PREFIX,
     HelperRef,
     check_agent,
     cut_allowances,
+    diff_line,
     files_named,
     helper_mode,
     origin_of,
@@ -399,6 +402,10 @@ class _LiveSession:
     restart the question is in the helper's log."""
     lead_model: str | None = None
     """The model the lead's run used when it started this helper. In memory only."""
+    diff_artifact_id: str | None = None
+    """The artifact that holds the lead's diff, for a helper of an agent with ``gets: diff`` and
+    a lead that changed something. Owned by the helper, so its ``read_artifact`` reads it. The
+    paid question carries it (step 15.9.4). In memory only: the brief in the log names it."""
     asked_model: str | None = None
     """The model the lead named for this helper in its ``delegate`` call. It is the helper's wish
     again when the paid question is answered. In memory only."""
@@ -1485,6 +1492,7 @@ class SessionManager:
         label: str = "",
         prompt: str = "",
         asked_model: str | None = None,
+        gets: Sequence[str] = (),
     ) -> HelperRef:
         """Start the helper of the ``delegate`` call ``call_id`` of ``parent`` at ``index``, once.
 
@@ -1500,6 +1508,8 @@ class SessionManager:
         ``model_profile`` is the model the lead's run uses. The helper's model is what
         ``pick_helper`` makes of the agent's wish (see :meth:`_helper_model`), or of
         ``asked_model``, the model the lead named for this one helper, when there is one.
+        ``gets`` is the agent file's ``gets``: for ``diff``, golem writes the lead's diff as an
+        artifact of the helper and adds one line naming it to the brief (:meth:`_hand_diff`).
         The helper is pinned to it, and its first run writes the pick as ``model.routed``.
 
         Raises :class:`~golem.tools.registry.ToolError` for a helper of a helper, an agent with
@@ -1541,6 +1551,8 @@ class SessionManager:
             )
             await self._announce(helper)
             sid = helper.session_id
+            if "diff" in gets:
+                brief = await self._hand_diff(helper, parent, brief)
             if allowed:
                 items = [SessionAllowance(tool=name, subject=item) for name, item in allowed]
                 await self._events.emit(
@@ -1617,6 +1629,25 @@ class SessionManager:
                 self._sessions.pop(sid, None)
                 raise
             return HelperRef(sid, picked.profile, True)
+
+    async def _hand_diff(self, helper: _LiveSession, lead_id: str, brief: str) -> str:
+        """``brief`` with a line on the lead's diff, which is stored as an artifact of ``helper``.
+
+        The artifact belongs to the helper, not the lead: ``read_artifact`` reads the artifacts
+        of the session that calls it (and of the helpers of that session), so a helper cannot
+        read its lead's. No change, or no store to keep it in: no artifact, and the line says so.
+        """
+        changes, artifacts = self._runtime.changes, self._runtime.artifacts
+        diff = "" if changes is None else await session_diff(changes, lead_id)
+        if diff == "" or artifacts is None:
+            return f"{brief}\n\n{NO_DIFF}"
+        helper.diff_artifact_id = await artifacts.put(helper.session_id, None, "diff", diff)
+        return f"{brief}\n\n{diff_line(helper.diff_artifact_id, diff)}"
+
+    def diff_artifact_of(self, helper_id: str) -> str | None:
+        """The artifact with the lead's diff that ``helper_id`` was started with, if any."""
+        live = self._sessions.get(helper_id)
+        return None if live is None else live.diff_artifact_id
 
     def _busy_helpers(self, lead_id: str) -> int:
         """How many helpers of ``lead_id`` hold a turn now: a live run that is not parked."""
@@ -1995,7 +2026,9 @@ class SessionManager:
                 lead = await self._resolve(state["session_id"])
                 local_only = self.local_only(cwd) or lead.route == "local"
                 named = await self._cheaper_model(lead, state["model_profile"], local_only)
+        view = self._agents.view(None if cwd is None else Path(cwd))
         for index, (spec, (snapshot, prompt)) in enumerate(zip(helpers, chosen, strict=True)):
+            agent = view.get(snapshot.name)
             await self.start_helper(
                 state["session_id"],
                 call_id,
@@ -2007,6 +2040,7 @@ class SessionManager:
                 label=spec.label,
                 prompt=prompt,
                 asked_model=named or spec.model,
+                gets=() if agent is None else agent.gets,
             )
 
     async def estimate_helpers(

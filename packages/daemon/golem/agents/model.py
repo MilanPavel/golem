@@ -9,6 +9,9 @@ from typing import Any
 
 AGENT_SUFFIX = ".md"
 
+GETS = ("diff",)
+"""What golem may hand a helper of this agent as a file, for ``gets``."""
+
 WISHES = ("cheapest", "same", "stronger", "local", "budget", "frontier")
 """The words a model wish may be. Any other text is a model name."""
 
@@ -50,6 +53,8 @@ class Agent:
     limits: AgentLimits = field(default_factory=AgentLimits)
     asks: bool = False
     """Whether the helper may ask you a question."""
+    gets: tuple[str, ...] = ()
+    """What golem hands each helper as an artifact when it starts: values of :data:`GETS`."""
     line: str = ""
     """What the lead's prompt says this type is for, a few words. Empty: use ``description``."""
     body: str = ""
@@ -64,4 +69,4 @@ class Agent:
         return not self.errors
 
 
-__all__ = ["AGENT_SUFFIX", "WISHES", "Agent", "AgentLimits"]
+__all__ = ["AGENT_SUFFIX", "GETS", "WISHES", "Agent", "AgentLimits"]

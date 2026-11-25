@@ -247,6 +247,8 @@ class ChatRuntime:
         """The skills sessions see, for the model's ``load_skill``."""
         self.changes: ChangeStore | None = None
         """Where each file a tool writes is recorded. None: not recorded."""
+        self.artifacts: Artifacts | None = None
+        """Where big output is kept. A helper that gets the diff reads it from here."""
         self.until_pulled: Callable[[str], Awaitable[None]] | None = None
         """Waits until a model's download ends, given its ref. Raises with the download's error."""
         self.context: ContextSettings | None = None
@@ -1337,6 +1339,7 @@ def open_chat(
     runtime[0].budget_refs = budget_refs
     runtime[0].next_model = next_model
     runtime[0].helper_prices = helper_prices
+    runtime[0].artifacts = artifacts
     return runtime[0]
 
 

@@ -58,6 +58,19 @@ class HelperRef:
     created: bool
 
 
+NO_DIFF = "There is no change to review: the lead has changed no file, so there is no diff."
+"""The line a brief gets for ``gets: diff`` when the lead's change set is empty."""
+
+
+def diff_line(artifact_id: str, diff: str) -> str:
+    """The line a brief gets when its diff is in artifact ``artifact_id``."""
+    lines = diff.count("\n") + (0 if diff.endswith("\n") else 1)
+    return (
+        f"The diff of the change is in artifact {artifact_id} ({lines} lines); "
+        "read it with read_artifact."
+    )
+
+
 def wish_of(agent: Agent | AgentSnapshot, roles: RoleSettings) -> str:
     """What the helper of ``agent`` wishes for its model (ADR-059, section 5).
 
@@ -336,6 +349,7 @@ __all__ = [
     "DEFAULT_PROMPT",
     "EXPLORER",
     "NO_DELEGATE",
+    "NO_DIFF",
     "NO_NESTED",
     "NO_SEND",
     "ORIGIN_PREFIX",
@@ -344,6 +358,7 @@ __all__ = [
     "RunSummary",
     "check_agent",
     "cut_allowances",
+    "diff_line",
     "files_named",
     "helper_mode",
     "origin_of",

@@ -189,6 +189,19 @@ def net_files(changes: Sequence[FileChange]) -> list[NetFile]:
     return files
 
 
+async def session_diff(store: ChangeStore, session_id: str) -> str:
+    """One unified diff of the session's net change, a file after another: what Changes shows.
+
+    Empty when the session changed no file, or changed them back.
+    """
+    parts: list[str] = []
+    for net in net_files(await store.list(session_id)):
+        parts.append(
+            diff_text(net.path, await store.text(net.before_sha), await store.text(net.after_sha))
+        )
+    return "".join(parts)
+
+
 def before_run(changes: Sequence[FileChange], run_id: str) -> dict[str, str | None]:
     """For each path changed in ``run_id`` or in a later change: the sha it had just before
     the first change of ``run_id``.
@@ -233,5 +246,6 @@ __all__ = [
     "before_run",
     "net_files",
     "revert_hunk",
+    "session_diff",
     "status_of",
 ]
