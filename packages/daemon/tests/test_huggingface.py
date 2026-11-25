@@ -222,6 +222,11 @@ async def test_a_missing_or_gated_repo_and_a_server_error_say_so() -> None:
         ("model-bf16.gguf", "BF16"),
         ("Q5_K_M/model-00001-of-00003.gguf", "Q5_K_M"),
         ("model-Q4_K_M-00002-of-00003.gguf", "Q4_K_M"),
+        ("TwIL-8B-Q4_K_M-balanced.gguf", "Q4_K_M-balanced"),
+        ("TwIL-8B-q8_0-Verbose.gguf", "Q8_0-Verbose"),
+        ("TwIL-8B-F16-verbose.gguf", "F16-verbose"),
+        ("m-Q4_K_M-balanced-00001-of-00003.gguf", "Q4_K_M-balanced"),
+        ("Q5_K_M/model-balanced-00001-of-00003.gguf", "Q5_K_M"),
         ("mmproj-F16.gguf", None),
         ("README.md", None),
         ("Qwen3-8B.gguf", None),
@@ -317,3 +322,45 @@ async def test_a_missing_manifest_leaves_sizes_unmarked() -> None:
     # FakeHub has the tree but answers 404 to a manifest, so nothing is known about the config.
     sizes = await _hub(FakeHub()).sizes("bartowski/Qwen3-8B-GGUF")
     assert {s["problem"] for s in sizes} == {None}
+
+
+TWIL = [
+    _file("TwIL-8B-Q4_K_M-balanced.gguf", 5.0),
+    _file("TwIL-8B-Q4_K_M-verbose.gguf", 5.1),
+    _file("TwIL-8B-Q8_0-verbose.gguf", 8.7),
+    _file("TwIL-8B-F16-verbose.gguf", 16.4),
+]
+
+
+def _twil_hub(manifest_status: dict[str, int]) -> HuggingFace:
+    async def handler(request: httpx.Request) -> httpx.Response:
+        path = request.url.path
+        if path == "/api/models/webAI-Official/TwIL-8B/tree/main":
+            return httpx.Response(200, json=TWIL)
+        if "/manifests/" in path:
+            tag = path.rsplit("/", 1)[1]
+            return httpx.Response(manifest_status.get(tag, 404), json={"error": "x"})
+        return httpx.Response(404)
+
+    return HuggingFace(transport=httpx.MockTransport(handler), ram_gb=32.0)
+
+
+async def test_suffixed_files_make_one_row_each() -> None:
+    sizes = await _twil_hub({}).sizes("webAI-Official/TwIL-8B")
+    assert [s["quant"] for s in sizes] == [
+        "Q4_K_M-balanced",
+        "Q4_K_M-verbose",
+        "Q8_0-verbose",
+        "F16-verbose",
+    ]
+    assert [s["quant"] for s in sizes if s["recommended"]] == ["Q4_K_M-balanced"]
+
+
+async def test_a_manifest_answering_400_marks_the_size_as_a_problem() -> None:
+    sizes = await _twil_hub({"Q4_K_M-balanced": 400, "Q8_0-verbose": 500}).sizes(
+        "webAI-Official/TwIL-8B"
+    )
+    problems = {s["quant"]: s["problem"] for s in sizes}
+    assert problems["Q4_K_M-balanced"] == MISSING_FILE
+    assert problems["Q8_0-verbose"] is None
+    assert problems["Q4_K_M-verbose"] is None
