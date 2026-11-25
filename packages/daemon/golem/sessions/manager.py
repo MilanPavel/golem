@@ -87,6 +87,7 @@ from golem.sessions.helpers import (
     origin_of,
     parked_calls,
     pick_local,
+    question_brief,
     routed_of,
     scope_of_agent,
     snapshot_of,
@@ -406,6 +407,8 @@ class _LiveSession:
     """The artifact that holds the lead's diff, for a helper of an agent with ``gets: diff`` and
     a lead that changed something. Owned by the helper, so its ``read_artifact`` reads it. The
     paid question carries it (step 15.9.4). In memory only: the brief in the log names it."""
+    diff_lines: int | None = None
+    """The lines of that diff. In memory only."""
     asked_model: str | None = None
     """The model the lead named for this helper in its ``delegate`` call. It is the helper's wish
     again when the paid question is answered. In memory only."""
@@ -1572,7 +1575,7 @@ class SessionManager:
                     ModelOptionsChangedData(options=dict(helper.options)),
                 )
             if picked.ask is not None:
-                sent, not_sent = what_is_sent(agent, brief, cwd)
+                sent, not_sent = what_is_sent(agent, brief, cwd, helper.diff_lines)
                 helper.helper_ask = replace(
                     picked.ask,
                     helper_id=sid,
@@ -1580,6 +1583,8 @@ class SessionManager:
                     label=label[:120] or None,
                     sent=sent,
                     not_sent=not_sent,
+                    brief=question_brief(brief),
+                    diff_artifact_id=helper.diff_artifact_id,
                 )
             self._sessions[sid] = helper
             # A helper is named where it shows (a card, a panel, the Inbox), never untitled.
@@ -1642,6 +1647,7 @@ class SessionManager:
         if diff == "" or artifacts is None:
             return f"{brief}\n\n{NO_DIFF}"
         helper.diff_artifact_id = await artifacts.put(helper.session_id, None, "diff", diff)
+        helper.diff_lines = diff.count("\n") + (0 if diff.endswith("\n") else 1)
         return f"{brief}\n\n{diff_line(helper.diff_artifact_id, diff)}"
 
     def diff_artifact_of(self, helper_id: str) -> str | None:

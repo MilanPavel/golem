@@ -49,6 +49,10 @@ class Consent:
     """What goes to the paid model, in a few short lines. Set with ``helper_id``."""
     not_sent: tuple[str, ...] | None = None
     """What does not go to it."""
+    brief: str | None = None
+    """The helper's brief, cut to the limit of the event, for the client's "Show"."""
+    diff_artifact_id: str | None = None
+    """The artifact with the lead's diff, for a reviewer. Set with ``helper_id``."""
 
 
 @dataclass(frozen=True, slots=True)

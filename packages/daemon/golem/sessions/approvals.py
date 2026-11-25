@@ -104,6 +104,8 @@ class PendingConsent:
     label: str | None = None
     sent: tuple[str, ...] | None = None
     not_sent: tuple[str, ...] | None = None
+    brief: str | None = None
+    diff_artifact_id: str | None = None
     model_profile: str | None = None
     """The paid model that would run, which is what two questions have in common."""
 
@@ -134,6 +136,8 @@ def pending_consent(events: list[ChatEvent]) -> PendingConsent | None:
         label=asked.data.label,
         sent=None if asked.data.sent is None else tuple(asked.data.sent),
         not_sent=None if asked.data.not_sent is None else tuple(asked.data.not_sent),
+        brief=asked.data.brief,
+        diff_artifact_id=asked.data.diff_artifact_id,
         model_profile=asked.data.model_profile,
     )
 
@@ -213,6 +217,8 @@ def pending_entry(events: list[ChatEvent]) -> tuple[PendingItem, PendingKey] | N
             label=consent.label,
             sent=None if consent.sent is None else list(consent.sent),
             not_sent=None if consent.not_sent is None else list(consent.not_sent),
+            brief=consent.brief,
+            diff_artifact_id=consent.diff_artifact_id,
         )
         return item, ("consent", consent.model_profile, None)
     return None

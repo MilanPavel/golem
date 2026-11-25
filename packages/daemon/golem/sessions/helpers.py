@@ -24,6 +24,7 @@ from golem.permissions.engine import Allowance
 from golem.sessions.helper_limits import Used, before_last_call, reached, used_of
 from golem.tools.registry import ToolError
 from golem_protocol.events import (
+    HELPER_BRIEF_MAX_CHARS,
     AgentLimits,
     AgentOrigin,
     AgentSnapshot,
@@ -364,6 +365,7 @@ __all__ = [
     "origin_of",
     "parked_calls",
     "pick_local",
+    "question_brief",
     "routed_of",
     "scope_of_agent",
     "snapshot_of",
@@ -436,19 +438,34 @@ def files_named(brief: str, cwd: str | None) -> list[str]:
     return [path for path in paths_in(brief, cwd) if (root / path).is_file()]
 
 
+BRIEF_CUT = "\n[… cut]"
+"""What ends a brief that the paid question had to cut."""
+
+
+def question_brief(brief: str) -> str:
+    """``brief`` as the paid question shows it: whole, or cut to ``HELPER_BRIEF_MAX_CHARS``
+    with a visible mark at the end."""
+    if len(brief) <= HELPER_BRIEF_MAX_CHARS:
+        return brief
+    return brief[: HELPER_BRIEF_MAX_CHARS - len(BRIEF_CUT)] + BRIEF_CUT
+
+
 def what_is_sent(
-    agent: AgentSnapshot, brief: str, cwd: str | None = None
+    agent: AgentSnapshot, brief: str, cwd: str | None = None, diff_lines: int | None = None
 ) -> tuple[tuple[str, ...], tuple[str, ...]]:
     """The two lists of a helper's paid question: ``(sent, not_sent)`` (ADR-059, section 5).
 
     The first call of a helper carries the agent's instructions and the brief, and nothing
-    else: no chat, no memory, no diff. What it reads later, with its tools, is not known yet.
+    else: no chat, no memory. A reviewer's diff (``diff_lines``) is the one thing it reads at once,
+    so it is listed. What it reads later, with its tools, is not known yet.
     The brief's size is in words. The paths it names that exist under ``cwd`` are listed, at
     most :data:`PATHS_SHOWN`. Every line fits :data:`LINE_MAX`, each list :data:`LINES_MAX`.
     """
     words = len(brief.split())
     sent = [f"the brief, {words} {'word' if words == 1 else 'words'}"]
     sent.append(_cut(f"the instructions of the {agent.name} agent"))
+    if diff_lines is not None:
+        sent.append(f"the diff of the lead's change, {diff_lines} lines")
     paths = paths_in(brief, cwd)
     sent.extend(_cut(f"named in the brief: {path}") for path in paths[:PATHS_SHOWN])
     if len(paths) > PATHS_SHOWN:
