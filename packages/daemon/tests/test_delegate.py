@@ -1062,7 +1062,7 @@ def test_the_schema_lists_agent_first_and_the_batch_beside_it() -> None:
         DelegateArgs.model_validate({"brief": "look"})
 
 
-async def test_the_worker_is_listed_but_not_available_yet(
+async def test_the_worker_is_listed_but_refused_in_a_folder_that_is_not_git(
     database: Database, project: Path, tmp_path: Path
 ) -> None:
     model = _Recording(
@@ -1075,8 +1075,7 @@ async def test_the_worker_is_listed_but_not_available_yet(
     _, _, events = await chat.run(project)
 
     result = _result_of(events, "call_1")
-    assert result.startswith("agent worker is not available yet")
-    assert "write_file" in result
+    assert result.startswith("agent worker is not available: workers need a git folder")
     assert await chat.helper_ids(events) == []
     tool = chat.runtime.tools.scoped(ToolScope(root=project)).get("delegate")
     assert tool is not None
@@ -1097,7 +1096,7 @@ async def test_the_agents_list_says_why_the_worker_cannot_run_in_the_words_deleg
     state.sessions = chat.manager
     infos = {
         info.name: info
-        for info, _ in await agent_infos(RequestContext(state, cast(Any, None)), None)
+        for info, _ in await agent_infos(RequestContext(state, cast(Any, None)), str(project))
     }
 
     assert infos["worker"].unavailable == refused

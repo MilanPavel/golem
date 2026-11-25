@@ -144,6 +144,23 @@ class SessionRecords:
         )
         return None if row is None else _session(row)
 
+    async def set_copy(self, session_id: str, path: str, baseline_sha: str) -> None:
+        """Keep the git copy a helper works in (15.10.1) and the commit it started from."""
+        async with self._database.transaction() as tx:
+            await tx.execute(
+                "UPDATE sessions SET copy_path = ?, copy_baseline = ? WHERE session_id = ?",
+                (path, baseline_sha, session_id),
+            )
+
+    async def copy_of(self, session_id: str) -> tuple[str, str] | None:
+        """``(path, baseline sha)`` of the copy of a helper session, None when it has none."""
+        row = await self._database.fetch_one(
+            "SELECT copy_path, copy_baseline FROM sessions"
+            " WHERE session_id = ? AND copy_path IS NOT NULL",
+            (session_id,),
+        )
+        return None if row is None else (str(row["copy_path"]), str(row["copy_baseline"] or ""))
+
     async def helper(
         self, parent_session_id: str, call_id: str, index: int
     ) -> SessionRecord | None:

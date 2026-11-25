@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Any, cast
 
 import pytest
-from fakes import ToolCallingChatModel
+from fakes import ToolCallingChatModel, make_checkout
 from langchain_core.messages import BaseMessage, HumanMessage, ToolMessage
 from langchain_core.outputs import ChatResult
 from langgraph.checkpoint.memory import InMemorySaver
@@ -47,7 +47,7 @@ WORKER = AgentSnapshot(
     wish="cheapest",
     asks=True,
 )
-WRITE = [("write_file", {"path": "new.txt", "content": "x"})]
+WRITE = [("shell", {"command": "printf x > new.txt"})]
 
 
 class _Model(ToolCallingChatModel):
@@ -189,12 +189,13 @@ async def _until(check: Callable[[], bool | Awaitable[bool]], timeout: float = 5
 
 
 @pytest.fixture
-def project(tmp_path: Path) -> Path:
+def project(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    monkeypatch.setenv("GOLEM_HOME", str(tmp_path / "golem-home"))
     root = tmp_path / "project"
     root.mkdir()
     (root / "a.py").write_text("def a():\n    return 1\n", encoding="utf-8")
     (root / "b.py").write_text("def b():\n    return 2\n", encoding="utf-8")
-    return root
+    return make_checkout(root)
 
 
 def _last(chat: _Chat, session_id: str) -> SessionSummary:
@@ -292,7 +293,6 @@ async def test_a_helper_parked_on_an_approval_is_stopped_too(
     assert run is not None and run.status == "cancelled"
     ended = [e for e in await chat.stored(lead) if e.type == "helper.ended"]
     assert [e.data.stopped for e in ended] == ["cancelled"]
-    assert not (project / "new.txt").exists()
 
 
 # --- the counts on a lead ---------------------------------------------------------------------

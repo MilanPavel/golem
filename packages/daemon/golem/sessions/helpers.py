@@ -14,6 +14,7 @@ from pathlib import Path
 
 from golem.agents.limits import resolve_limits
 from golem.agents.model import Agent
+from golem.coding.copies import NOT_GIT_MESSAGE
 from golem.config import AgentSettings, PermissionMode, RoleSettings
 from golem.graphs.child import ChildLimits
 from golem.graphs.tools_node import ChildScope
@@ -23,6 +24,7 @@ from golem.models.pick_helper import HelperChoice, pick_helper
 from golem.permissions.engine import Allowance
 from golem.sessions.helper_limits import Used, before_last_call, reached, used_of
 from golem.tools.registry import ToolError
+from golem.tools.sandbox import git_dirs
 from golem_protocol.events import (
     HELPER_BRIEF_MAX_CHARS,
     AgentLimits,
@@ -186,10 +188,15 @@ def writing_tools(agent: Agent, is_read_only: Callable[[str], bool]) -> list[str
     return [name for name in agent.tools if not is_read_only(name)]
 
 
-def unavailable_reason(agent: Agent, is_read_only: Callable[[str], bool]) -> str | None:
+def unavailable_reason(
+    agent: Agent, is_read_only: Callable[[str], bool], lead_folder: str | Path | None = None
+) -> str | None:
     """Why ``agent`` cannot be started now, or ``None`` when it can.
 
-    ``delegate`` refuses with this text, and the agents list shows it.
+    ``delegate`` refuses with this text, and the agents list shows it. An agent with tools that
+    change things runs only in a git copy of ``lead_folder`` (ADR-059), so it is unavailable
+    when the lead has no folder or the folder is not a git checkout. The check is cheap and
+    does not run git; making the copy checks again.
     """
     if agent.name == ADVISOR and agent.tools:
         return (
@@ -199,10 +206,14 @@ def unavailable_reason(agent: Agent, is_read_only: Callable[[str], bool]) -> str
     writes = writing_tools(agent, is_read_only)
     if not writes:
         return None
-    return (
-        f"agent {agent.name} is not available yet: it has tools that change things "
-        f"({', '.join(writes)}), and only agents that read can run now"
-    )
+    if lead_folder is None or str(lead_folder) == "":
+        return (
+            f"agent {agent.name} is not available: it has tools that change things "
+            f"({', '.join(writes)}) and works in a copy of the folder, and this chat has no folder"
+        )
+    if not git_dirs(Path(lead_folder)):
+        return f"agent {agent.name} is not available: {NOT_GIT_MESSAGE}"
+    return None
 
 
 @dataclass(frozen=True, slots=True)

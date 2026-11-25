@@ -35,6 +35,7 @@ from langchain_core.runnables import RunnableConfig
 from golem.agents.bundled import bundled_agents_dir
 from golem.agents.model import Agent
 from golem.agents.registry import AgentRegistry
+from golem.coding import copies
 from golem.coding.changes import session_diff
 from golem.config import AgentSettings, ChatSettings, ModelPrice, PermissionMode, RouteMode
 from golem.evals.whatif import build_report, session_model
@@ -414,6 +415,11 @@ class _LiveSession:
     asked_model: str | None = None
     """The model the lead named for this helper in its ``delegate`` call. It is the helper's wish
     again when the paid question is answered. In memory only."""
+    copy_path: Path | None = None
+    """The git copy of the lead's folder a helper with writing tools works in (15.10.1). Stored
+    in ``sessions.copy_path``; read again after a restart."""
+    copy_baseline: str | None = None
+    """The commit that holds the lead's state when the copy was made. Stored with the copy."""
 
 
 def _schemas(text: str | None) -> list[dict[str, object]] | None:
@@ -1553,8 +1559,10 @@ class SessionManager:
             except ModelConfigError as exc:
                 raise ToolError(str(exc)) from exc
             allowed = cut_allowances(lead.allowed_tools, agent)
+            helper_id = new_id("s")
+            copy = await self._copy_for(agent, cwd, helper_id)
             helper = _LiveSession(
-                session_id=new_id("s"),
+                session_id=helper_id,
                 model_profile=picked.profile,
                 schema_version=SCHEMA_VERSION,
                 cwd=cwd,
@@ -1568,8 +1576,17 @@ class SessionManager:
                 lead_model=model_profile,
                 asked_model=asked_model,
                 permission_mode=helper_mode(agent, self._effective_mode(lead)),
+                copy_path=None if copy is None else copy.path,
+                copy_baseline=None if copy is None else copy.baseline_sha,
             )
-            await self._announce(helper)
+            try:
+                await self._announce(helper)
+                if copy is not None:
+                    await self._records.set_copy(helper_id, str(copy.path), copy.baseline_sha)
+            except BaseException:
+                if copy is not None:
+                    await asyncio.shield(copies.remove(copy.path))
+                raise
             sid = helper.session_id
             if "diff" in gets:
                 brief = await self._hand_diff(helper, parent, brief)
@@ -1654,6 +1671,26 @@ class SessionManager:
                 self._sessions.pop(sid, None)
                 raise
             return HelperRef(sid, picked.profile, True)
+
+    async def _copy_for(
+        self, agent: AgentSnapshot, cwd: str | None, helper_id: str
+    ) -> copies.Copy | None:
+        """The git copy a helper of ``agent`` works in, None for an agent that only reads.
+
+        Raises :class:`~golem.tools.registry.ToolError` with the reason when it cannot be made,
+        so the ``delegate`` call fails with it.
+        """
+        if all(self._is_read_only(name) for name in agent.tools):
+            return None
+        if cwd is None:
+            raise ToolError(
+                f"agent {agent.name} is not available: it works in a copy of the folder, "
+                "and this chat has no folder"
+            )
+        try:
+            return await copies.create(cwd, helper_id)
+        except copies.CopyError as exc:
+            raise ToolError(f"agent {agent.name} is not available: {exc}") from exc
 
     async def _hand_diff(self, helper: _LiveSession, lead_id: str, brief: str) -> str:
         """``brief`` with a line on the lead's diff, which is stored as an artifact of ``helper``.
@@ -2027,7 +2064,7 @@ class SessionManager:
                     )
                 names = ", ".join(a.name for a in view.usable())
                 raise ToolError(f"unknown agent {spec.agent}; the agents are {names}")
-            reason = unavailable_reason(agent, self._is_read_only)
+            reason = unavailable_reason(agent, self._is_read_only, cwd)
             if reason is not None:
                 raise ToolError(reason)
             source: AgentOrigin = next(e.origin for e in view.listed if e.agent is agent)
@@ -2164,9 +2201,12 @@ class SessionManager:
             return None
         return pick.model.profile
 
-    def unavailable_reason(self, agent: Agent) -> str | None:
-        """Why ``agent`` cannot be started now (the text ``delegate`` refuses with), or None."""
-        return unavailable_reason(agent, self._is_read_only)
+    def unavailable_reason(self, agent: Agent, cwd: str | None = None) -> str | None:
+        """Why ``agent`` cannot be started now (the text ``delegate`` refuses with), or None.
+
+        ``cwd`` is the lead's folder: an agent that changes files needs it to be a git checkout.
+        """
+        return unavailable_reason(agent, self._is_read_only, cwd)
 
     def changing_tools(self, agent: Agent) -> list[str]:
         """The tools of ``agent`` that are not read-only."""
@@ -2182,7 +2222,7 @@ class SessionManager:
         if self._runtime.router.agent_settings().use_helpers == "never":
             return False
         agent = self._agents.view(Path(cwd) if cwd else None).get("advisor")
-        return agent is not None and unavailable_reason(agent, self._is_read_only) is None
+        return agent is not None and unavailable_reason(agent, self._is_read_only, cwd) is None
 
     def _reader_ready(self, cwd: str | None) -> bool:
         """Whether a lead in this folder can hand reading to a helper: ``use_helpers`` is
@@ -2190,7 +2230,7 @@ class SessionManager:
         if self._runtime.router.agent_settings().use_helpers != "when_needed":
             return False
         agent = self._agents.view(Path(cwd) if cwd else None).get("explorer")
-        return agent is not None and unavailable_reason(agent, self._is_read_only) is None
+        return agent is not None and unavailable_reason(agent, self._is_read_only, cwd) is None
 
     def _delegate_text(self, root: Path | None) -> str:
         """The description of ``delegate`` for a folder: the agent types its sessions see."""
@@ -4137,6 +4177,9 @@ class SessionManager:
             if event.type == "session.created":
                 session.parent = event.data.parent
                 session.agent = event.data.agent
+                found = await self._records.copy_of(session.session_id)
+                if found is not None:
+                    session.copy_path, session.copy_baseline = Path(found[0]), found[1]
                 return
 
     def _child_of(self, session: _LiveSession) -> ChildScope | None:
@@ -4148,7 +4191,13 @@ class SessionManager:
         )
         # The helper's allowances are read live: a batch answer reaches a helper still running.
         return replace(
-            scope, granted=lambda: tuple(session.allowed_tools), spent=self._spent_of(session)
+            scope,
+            granted=lambda: tuple(session.allowed_tools),
+            spent=self._spent_of(session),
+            copy=session.copy_path,
+            lead_folder=None
+            if session.copy_path is None or session.cwd is None
+            else Path(session.cwd),
         )
 
     def _spent_of(self, session: _LiveSession) -> Callable[[], Awaitable[bool]] | None:

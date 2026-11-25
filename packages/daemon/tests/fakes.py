@@ -6,6 +6,7 @@ import asyncio
 import json
 from collections.abc import AsyncIterator, Callable, Iterator, Mapping, Sequence
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 from langchain_core.callbacks import AsyncCallbackManagerForLLMRun, CallbackManagerForLLMRun
@@ -358,3 +359,16 @@ class FixedFacts:
     ) -> list[ModelFacts]:
         del refs, overrides
         return list(self.models)
+
+
+def make_checkout(root: Path) -> Path:
+    """Make ``root`` a git checkout with one commit, so a helper that edits files may run."""
+    import subprocess
+
+    for args in (
+        ["init", "-q", "-b", "main"],
+        ["add", "-A"],
+        ["-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "--allow-empty", "-m", "x"],
+    ):
+        subprocess.run(["git", *args], cwd=root, check=True, capture_output=True)
+    return root
