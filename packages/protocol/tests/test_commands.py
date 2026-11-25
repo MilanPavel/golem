@@ -809,6 +809,7 @@ def test_workflow_events_never_use_the_run_words() -> None:
     assert doubt.method == "workflow.step.in_doubt"
     assert doubt.params.child_session_id is None
 
+
 def test_batch_estimate_fields_are_optional_and_round_trip() -> None:
     plain = PendingItem(kind="batch", since="t", call_id="c1", helper_count=5)
     assert plain.estimate_usd is None and plain.cheaper_model is None
