@@ -26,6 +26,7 @@ from golem.workflows.agents import WorkflowAgents
 from golem.workflows.engine import AgentStarted, WorkflowEngine, restart_policy
 from golem.workflows.llm import Llm
 from golem.workflows.registry import WorkflowEntry, WorkflowRegistry
+from golem.workflows.tools import WorkflowTools
 from golem_protocol import rpc
 from golem_protocol.commands import PendingItem, WorkflowRunEvent, WorkflowStepEvent
 
@@ -93,6 +94,7 @@ class WorkflowService:
         touch_session: Callable[[str], Awaitable[None]] | None = None,
         agents: WorkflowAgents | None = None,
         llm: Llm | None = None,
+        tools: WorkflowTools | None = None,
     ) -> None:
         self.runs = runs
         self._agents = agents
@@ -114,6 +116,7 @@ class WorkflowService:
             self._notify if notify else None,
             agent=self._agent if agents else None,
             llm=llm,
+            tools=tools,
         )
 
     async def _agent(

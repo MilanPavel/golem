@@ -286,7 +286,6 @@ async def test_events_come_in_order(store: WorkflowRuns, calls: Any, tmp_path: P
 @pytest.mark.parametrize(
     ("name", "ticket"),
     [
-        ("tool", "#740"),
         ("skill", "#740"),
     ],
 )

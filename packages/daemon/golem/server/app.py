@@ -111,6 +111,7 @@ from golem.tools.registry import ToolRegistry, ToolScope
 from golem.workflows.agents import WorkflowAgents
 from golem.workflows.llm import WorkflowLlm
 from golem.workflows.service import WorkflowService
+from golem.workflows.tools import WorkflowTools
 from golem_protocol.commands import (
     AgentRegistryChanged,
     KeychainWait,
@@ -472,6 +473,11 @@ class DaemonApp:
                     ),
                     notify=self.state.notifier.tell,
                     touch_session=sessions.touch,
+                    tools=WorkflowTools(
+                        registry=self.state.tools,
+                        policy=policy,
+                        artifacts=self.state.artifacts,
+                    ),
                     agents=WorkflowAgents(
                         sessions=sessions,
                         agents=self.state.agents,

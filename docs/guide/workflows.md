@@ -177,6 +177,27 @@ facts = await run.llm(text, schema=Facts, model="stronger")
 - The step saves the model that answered and what the call cost (`workflow.status` shows both on the step). A run that is executed again does not ask again.
 - The step key is `key` or `llm:<short hash of the prompt>`. Two calls with the same prompt in one run need their own `key=`.
 
+### Calling a tool
+
+```python
+prs = await run.tool("mcp__github__list_pull_requests", repo="golem")
+await run.tool("mcp__github__create_issue", key="file-bug", title="Build is red")
+```
+
+`run.tool(name, key=None, **args)` calls one golem tool or MCP tool (`mcp__<server>__<tool>`) with no HTTP code. It returns the tool's output as text (an MCP tool's text without the data note around it). The step has kind `tool` and the key `key` or `tool:<name>`; give two calls of one tool their own `key=`. A tool argument can not be called `key`.
+
+The rules are the chat's, so a tool is allowed, denied or asked in the same cases:
+
+| Rule says | What happens |
+|---|---|
+| allow | The tool runs |
+| deny | The step fails, and the error is the rule's reason (for example `mcp__github__delete_repo is denied by config.toml`) |
+| ask | The run is `waiting` and holds nothing, like `run.review`. The question `Run <tool>?` shows in your Inbox as a `review` item with the tool and its arguments. `golem workflow answer` approves it (the tool runs and the workflow goes on) or `--reject`s it (the step fails). An `--edit` counts as a no |
+
+- An explicit `key=` marks the call as a real-world action, as in `run.step`: `idempotency_key()` works inside the tool, and a tool that has an `idempotency_key` argument gets it filled in.
+- Output over 4 KB is stored as an artifact of the run's session. The step keeps a one-line summary and the artifact id; `run.tool` still returns all of it, also after a restart.
+- A tool that is unknown, or called with arguments that do not fit, fails the step.
+
 ## Waiting for you
 
 ```python
@@ -225,8 +246,8 @@ A broken file never disappears from the list. Fix it and it loads again.
 
 | Piece | What it adds | Ticket |
 |---|---|---|
-| `run.tool`, `run.skill` | One tool or one skill, with no agent loop | 3.8 (#740) |
+| `run.skill` | One skill, with no agent loop | 3.8 (#740) |
 | Workflows page | List workflows and see each run's steps in the web UI | 3.9 (#741) |
 | Editor | Edit a workflow, check it without a model, and try it from a step | 3.11 (#1225) |
 
-Until these land, a workflow can run code, run steps in parallel, save results, use `key=`, ask a model one question, tell you things, ask an agent and wait for your review.
+Until these land, a workflow can run code, run steps in parallel, save results, use `key=`, ask a model one question, tell you things, ask an agent, call a tool and wait for your review.
