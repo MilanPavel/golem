@@ -4,6 +4,7 @@ import { noChecks, reduceChecks, type ChecksState } from "./checks.ts";
 import { emptyPlan, reducePlan, type PlanState } from "./plan.ts";
 import { branchChangedNote, contextChangedNote, emptyLiveContext, foldLiveContext, type ContextChangeData, type LiveContextState } from "./context.ts";
 import { emptyBatch, reduceBatch, type HelperBatch } from "./helper-card.ts";
+import { helperEstimateOf, type HelperEstimate } from "./use-helpers.ts";
 import { emptyRoute, foldRoute, type RouteState } from "./route.ts";
 import { replyWasCut } from "./stop.ts";
 import { reduceTimes, type BatchTimes } from "./steps-list.ts";
@@ -12,6 +13,12 @@ import type { WaitReason, WaitScope, WaitState } from "./wait.ts";
 import type { TodoItem } from "./todos.ts";
 
 export type ToolStatus = "requested" | "waiting" | "running" | "done" | "failed";
+
+/** The estimate of an `approval.needed`, as a spread: nothing when it has none, so an ordinary approval is unchanged. */
+function estimateOf(data: Parameters<typeof helperEstimateOf>[0]): { estimate?: HelperEstimate } {
+  const estimate = helperEstimateOf(data);
+  return estimate === null ? {} : { estimate };
+}
 
 /** The tool call the run waits on, from `approval.needed`. */
 export type PendingApproval = {
@@ -22,6 +29,8 @@ export type PendingApproval = {
   source: string;
   /** The change a file tool would make, as a unified diff. */
   diff: string | null;
+  /** The cost estimate of a large batch of helpers (`use_helpers` with an estimate); null otherwise. */
+  estimate?: HelperEstimate | null;
 };
 
 /** The caps of `[budget]` and what is spent, for the line under the paid question. A cap not set is null. */
@@ -59,7 +68,7 @@ export type PendingConsent = {
 export type ApprovalAnswer = { decision: ApprovalChoice; rule: string | null; edited: boolean };
 
 /** The question asked about a tool call, and the answer once there is one. */
-export type ToolApproval = { source: string; subject: string | null; answer?: ApprovalAnswer };
+export type ToolApproval = { source: string; subject: string | null; answer?: ApprovalAnswer; estimate?: HelperEstimate | null };
 
 /** One tool call, drawn under the assistant message that asked for it. */
 export type ToolBlock = {
@@ -784,7 +793,7 @@ function reduceChatEvent(state: ChatState, event: ChatEvent): ChatState {
       const waiting = updateTool(state, event.data.call_id, (tool) => ({
         ...tool,
         status: "waiting",
-        approval: { source: event.data.source, subject: event.data.subject ?? null },
+        approval: { source: event.data.source, subject: event.data.subject ?? null, ...estimateOf(event.data) },
         ...(event.data.diff ? { diff: event.data.diff } : {}),
       }));
       return {
@@ -797,6 +806,7 @@ function reduceChatEvent(state: ChatState, event: ChatEvent): ChatState {
           args: event.data.args,
           source: event.data.source,
           diff: event.data.diff ?? null,
+          ...estimateOf(event.data),
         },
       };
     }

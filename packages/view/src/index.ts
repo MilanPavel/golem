@@ -249,6 +249,11 @@ export {
 } from "./inbox.ts";
 export {
   helperCardOf,
+  helperEstimateOf,
+  helperEstimateLine,
+  helperEstimateActions,
+  type HelperEstimate,
+  type HelperEstimateFields,
   helperBatchHead,
   helperJobsOf,
   HELPER_CARD_ACTIONS,

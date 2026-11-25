@@ -22,7 +22,7 @@ const MANY = {
   ],
 };
 
-async function setup(args: Record<string, unknown>, source = "use_helpers") {
+async function setup(args: Record<string, unknown>, source = "use_helpers", extra: Record<string, unknown> = {}) {
   const fake = fakeClient();
   const doc = new EventTarget() as unknown as Document;
   (doc as { visibilityState: string }).visibilityState = "visible";
@@ -34,7 +34,7 @@ async function setup(args: Record<string, unknown>, source = "use_helpers") {
     send("message.started", { message_id: "m1", role: "assistant" });
     send("message.completed", { message_id: "m1", role: "assistant", text: "" });
     send("tool.requested", { call_id: "c1", message_id: "m1", name: "delegate", args });
-    send("approval.needed", { call_id: "c1", name: "delegate", args, source });
+    send("approval.needed", { call_id: "c1", name: "delegate", args, source, ...extra });
     return {} as never;
   });
   const page = createPage(fake.client, { frame: fakeFrame(), doc });
@@ -118,4 +118,41 @@ test("the card passes axe", async () => {
   const { container } = await setup(MANY);
   const results = await axe.run(container, { rules: { "color-contrast": { enabled: false } } });
   expect(results.violations).toEqual([]);
+});
+
+const ESTIMATE = { estimate_usd: 0.6, allowed_usd: 2, ask_over_usd: 0.5, model: "claude-sonnet", cheaper_model: "claude-haiku" };
+
+test("an estimate: the line, the model in the head and three answers", async () => {
+  await setup(SINGLE, "use_helpers", ESTIMATE);
+  const card = screen.getByRole("group", { name: "Start helpers" });
+  expect(within(card).getByText("1 helper · explorer · claude-sonnet")).toBeTruthy();
+  expect(within(card).getByText("About $0.60 of the $2.00 you allow per message.")).toBeTruthy();
+  expect(within(card).getAllByRole("button").map((b) => b.textContent)).toEqual(["Start↵", "Use a cheaper model", "Do it in the chat"]);
+});
+
+test("Start, Use a cheaper model and Do it in the chat send the right params", async () => {
+  const start = await setup(SINGLE, "use_helpers", ESTIMATE);
+  await start.user.click(screen.getByRole("button", { name: /^Start/ }));
+  expect(start.fake.raw.respondHelpers).toHaveBeenCalledExactlyOnceWith("s1", "c1", true);
+  start.unmount();
+  const cheaper = await setup(SINGLE, "use_helpers", ESTIMATE);
+  await cheaper.user.click(screen.getByRole("button", { name: "Use a cheaper model" }));
+  expect(cheaper.fake.raw.respondHelpers).toHaveBeenCalledExactlyOnceWith("s1", "c1", true, true);
+  cheaper.unmount();
+  const chat = await setup(SINGLE, "use_helpers", ESTIMATE);
+  await chat.user.click(screen.getByRole("button", { name: "Do it in the chat" }));
+  expect(chat.fake.raw.respondHelpers).toHaveBeenCalledExactlyOnceWith("s1", "c1", false);
+});
+
+test("without a cheaper model the card has two answers; Enter still starts", async () => {
+  const { fake } = await setup(SINGLE, "use_helpers", { ...ESTIMATE, cheaper_model: null });
+  expect(screen.queryByRole("button", { name: "Use a cheaper model" })).toBeNull();
+  fireEvent.keyDown(document.body, { key: "Enter" });
+  expect(fake.raw.respondHelpers).toHaveBeenCalledExactlyOnceWith("s1", "c1", true);
+});
+
+test("a batch without an estimate reads as before: Run, no line", async () => {
+  await setup(SINGLE);
+  expect(document.querySelector("[data-helper-estimate]")).toBeNull();
+  expect(screen.queryByRole("button", { name: "Use a cheaper model" })).toBeNull();
 });

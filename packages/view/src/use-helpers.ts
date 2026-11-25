@@ -3,6 +3,8 @@
  * the same words. Nothing here knows how a screen draws them.
  */
 
+import { formatCost } from "./cost.ts";
+
 /** `[agents] use_helpers`, as the daemon spells it. */
 export type UseHelpersValue = "when_needed" | "ask" | "never";
 
@@ -56,11 +58,13 @@ export interface HelperCardJob {
   label: string | null;
 }
 
-/** An answer of the card. `run` is what goes to `helpers.respond`. */
+/** An answer of the card. `run` and `cheaper` are what go to `helpers.respond`. */
 export interface HelperCardAction {
-  id: "run" | "chat";
+  id: "run" | "cheaper" | "chat";
   label: string;
   run: boolean;
+  /** True only for "Use a cheaper model": `run` is true with it. */
+  cheaper: boolean;
   /** The key that answers: Enter runs. */
   key: "enter" | null;
   primary: boolean;
@@ -73,13 +77,65 @@ export interface HelperCardModel {
   count: number;
   jobs: HelperCardJob[];
   actions: readonly HelperCardAction[];
+  /** The estimate card's line, `About $0.60 of the $2.00 you allow per message.`; null without an estimate. */
+  line: string | null;
+  /** What the batch would cost and on which model; null without an estimate. */
+  estimate: HelperEstimate | null;
+}
+
+/** What a large batch would cost, from a `batch` item or an `approval.needed` of `use_helpers`. */
+export interface HelperEstimate {
+  estimateUsd: number;
+  allowedUsd: number | null;
+  askOverUsd: number | null;
+  model: string | null;
+  cheaperModel: string | null;
+}
+
+/** The wire fields of an estimate. They are all optional: a local batch carries none. */
+export interface HelperEstimateFields {
+  estimate_usd?: number | null;
+  allowed_usd?: number | null;
+  ask_over_usd?: number | null;
+  model?: string | null;
+  cheaper_model?: string | null;
+}
+
+/** The estimate of a wire item, or null when it has no `estimate_usd` (a local batch, an older daemon). */
+export function helperEstimateOf(fields: HelperEstimateFields | null | undefined): HelperEstimate | null {
+  if (fields === null || fields === undefined || typeof fields.estimate_usd !== "number") return null;
+  const name = (value: string | null | undefined): string | null => (typeof value === "string" && value.trim() !== "" ? value.trim() : null);
+  return {
+    estimateUsd: fields.estimate_usd,
+    allowedUsd: typeof fields.allowed_usd === "number" ? fields.allowed_usd : null,
+    askOverUsd: typeof fields.ask_over_usd === "number" ? fields.ask_over_usd : null,
+    model: name(fields.model),
+    cheaperModel: name(fields.cheaper_model),
+  };
+}
+
+/** `About $0.60 of the $2.00 you allow per message.`, or `About $0.60.` when no amount is allowed. */
+export function helperEstimateLine(estimate: HelperEstimate): string {
+  const cost = formatCost(estimate.estimateUsd);
+  return estimate.allowedUsd === null ? `About ${cost}.` : `About ${cost} of the ${formatCost(estimate.allowedUsd)} you allow per message.`;
 }
 
 /** "Run" and "Do it in the chat". Neither has a "for this session" form. */
 export const HELPER_CARD_ACTIONS: readonly HelperCardAction[] = [
-  { id: "run", label: "Run", run: true, key: "enter", primary: true },
-  { id: "chat", label: "Do it in the chat", run: false, key: null, primary: false },
+  { id: "run", label: "Run", run: true, cheaper: false, key: "enter", primary: true },
+  { id: "chat", label: "Do it in the chat", run: false, cheaper: false, key: null, primary: false },
 ];
+
+/** The answers of the estimate card: Start, "Use a cheaper model" (only when a cheaper model exists), "Do it in the chat". */
+export function helperEstimateActions(estimate: HelperEstimate): readonly HelperCardAction[] {
+  const cheaper: HelperCardAction[] =
+    estimate.cheaperModel === null ? [] : [{ id: "cheaper", label: "Use a cheaper model", run: true, cheaper: true, key: null, primary: false }];
+  return [
+    { id: "run", label: "Start", run: true, cheaper: false, key: "enter", primary: true },
+    ...cheaper,
+    { id: "chat", label: "Do it in the chat", run: false, cheaper: false, key: null, primary: false },
+  ];
+}
 
 /** `1 helper` or `3 helpers`. */
 function helperWords(count: number): string {
@@ -132,11 +188,22 @@ export function helperCardOf(input: {
   args?: Readonly<Record<string, unknown>> | null;
   helperCount?: number | null;
   agents?: readonly string[] | null;
+  estimate?: HelperEstimate | null;
 }): HelperCardModel {
   const jobs = helperJobsOf(input.args);
   const agents = jobs.length > 0 ? jobs.map((job) => job.agent) : [...(input.agents ?? [])];
   const count = jobs.length > 0 ? jobs.length : agents.length > 0 ? agents.length : Math.max(1, input.helperCount ?? 1);
-  return { head: helperBatchHead(agents, count), count, jobs, actions: HELPER_CARD_ACTIONS };
+  const estimate = input.estimate ?? null;
+  const head = helperBatchHead(agents, count);
+  if (estimate === null) return { head, count, jobs, actions: HELPER_CARD_ACTIONS, line: null, estimate: null };
+  return {
+    head: estimate.model === null ? head : `${head} · ${estimate.model}`,
+    count,
+    jobs,
+    actions: helperEstimateActions(estimate),
+    line: helperEstimateLine(estimate),
+    estimate,
+  };
 }
 
 /** Whether an `approval.needed` is this question: the tool `delegate` asked by the setting. */

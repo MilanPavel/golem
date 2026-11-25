@@ -61,6 +61,11 @@ function fit(text: string, width: number): string {
 
 /** The keys of the batch question: `Enter run · d do it in the chat`. No "for this session" choice. */
 export const HELPERS_KEYS = "Enter run · d do it in the chat · Esc the same";
+/** The keys of the estimate card: Start, then "Use a cheaper model" when there is one, then "Do it in the chat". */
+export function helpersEstimateKeys(cheaper: boolean): string {
+  return cheaper ? "Enter start · c cheaper model · d do it in the chat · Esc the same" : "Enter start · d do it in the chat · Esc the same";
+}
+
 /** Why the question is asked: the setting, in the words of Settings. */
 export const HELPERS_WHY = 'Use helpers is set to "Ask me first".';
 
@@ -69,7 +74,8 @@ export const HELPERS_WHY = 'Use helpers is set to "Ask me first".';
  * cut to the width), and the two answers. When the jobs do not fit in `rows`, the last row says how many more.
  */
 export function helpersQuestionLines(approval: PendingApproval, width: number, rows: number = APPROVAL_ROWS, pager: string | null = null): ApprovalLine[] {
-  const card = helperCardOf({ args: approval.args });
+  const card = helperCardOf({ args: approval.args, estimate: approval.estimate ?? null });
+  const keys = card.estimate === null ? HELPERS_KEYS : helpersEstimateKeys(card.estimate.cheaperModel !== null);
   const room = Math.max(1, rows - APPROVAL_ROWS);
   const jobs = card.jobs.length > room ? card.jobs.slice(0, Math.max(0, room - 1)) : card.jobs;
   const hidden = card.jobs.length - jobs.length;
@@ -80,7 +86,7 @@ export function helpersQuestionLines(approval: PendingApproval, width: number, r
       return { text: fit(job.brief === "" ? `  ${who}` : `  ${who} — ${job.brief.replace(/\s+/g, " ")}`, width) };
     }),
     ...(hidden > 0 ? [{ text: fit(`  … and ${String(hidden)} more`, width), dim: true }] : []),
-    { text: fit(HELPERS_WHY, width), dim: true },
-    { text: fit(pager === null ? HELPERS_KEYS : `${HELPERS_KEYS} · ${pager}`, width) },
+    { text: fit(card.line ?? HELPERS_WHY, width), dim: true },
+    { text: fit(pager === null ? keys : `${keys} · ${pager}`, width) },
   ];
 }

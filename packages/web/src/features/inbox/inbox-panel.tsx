@@ -1,9 +1,9 @@
-import { helperCardOf, inboxAnswerOptions, inboxHelperAskWords, type ApprovalAnswerOption, type ApprovalChoice, type InboxGroup, type InboxItem } from "@golem/view";
+import { helperCardOf, helperEstimateLine, inboxAnswerOptions, inboxHelperAskWords, type ApprovalAnswerOption, type ApprovalChoice, type InboxGroup, type InboxItem } from "@golem/view";
 import { Button } from "../../ui/button.tsx";
 import { inboxKey, type InboxChoice } from "../../store/inbox.ts";
 import { Headline } from "./headline.tsx";
 
-type OnAnswer = (item: InboxItem, choice: ApprovalChoice, scope?: "batch") => void;
+type OnAnswer = (item: InboxItem, choice: ApprovalChoice, scope?: "batch", cheaper?: boolean) => void;
 
 const ANSWERS: readonly { choice: InboxChoice; label: string }[] = [
   { choice: "allow", label: "Allow once" },
@@ -42,6 +42,11 @@ function InboxCard({
         <span className="min-w-0 truncate">{item.sessionTitle}</span>
         {item.age === "" ? null : <span className="flex-none text-faint">{item.age}</span>}
       </p>
+      {item.estimate === null ? null : (
+        <p className="mt-0.5 text-xs text-muted wrap-anywhere" data-helper-estimate="">
+          {helperEstimateLine(item.estimate)}
+        </p>
+      )}
       {item.source === null ? null : <p className="mt-0.5 text-meta text-faint wrap-anywhere">{item.source}</p>}
       <div className="mt-2 flex flex-wrap items-center gap-1.5">
         {options.map((option) => (
@@ -61,7 +66,7 @@ function InboxCard({
           </Button>
         ))}
         {item.kind === "batch" && item.callId !== null
-          ? helperCardOf({ helperCount: item.agents.length, agents: item.agents }).actions.map((action) => (
+          ? helperCardOf({ helperCount: item.agents.length, agents: item.agents, estimate: item.estimate }).actions.map((action) => (
               <Button
                 key={action.id}
                 size="sm"
@@ -70,7 +75,8 @@ function InboxCard({
                 data-helper-answer={action.id}
                 aria-label={`${action.label}, ${item.sessionTitle}`}
                 onClick={() => {
-                  onAnswer(item, action.run ? "allow" : "deny");
+                  if (action.cheaper) onAnswer(item, "allow", undefined, true);
+                  else onAnswer(item, action.run ? "allow" : "deny");
                 }}
               >
                 {action.label}

@@ -484,8 +484,8 @@ export interface GolemClient {
   cancelRun(runId: string): Promise<RunCancelResult>;
   /** `helper.stop`: cancel the run of a helper session. The lead goes on with `stopped: cancelled` as its result. */
   stopHelper(sessionId: string): Promise<HelperStopResult>;
-  /** `helpers.respond`: answer "start these helpers?" (a `batch` pending item) for the `delegate` call `callId`. `run` false tells the model to do the work in the chat. */
-  respondHelpers(sessionId: string, callId: string, run: boolean): Promise<HelpersRespondResult>;
+  /** `helpers.respond`: answer "start these helpers?" (a `batch` pending item) for the `delegate` call `callId`. `run` false tells the model to do the work in the chat. `cheaper` (with `run`) starts them on the item's cheaper model. */
+  respondHelpers(sessionId: string, callId: string, run: boolean, cheaper?: boolean): Promise<HelpersRespondResult>;
   inspectSession(sessionId: string): Promise<SessionInspectResult>;
   /** A session's runs as a tree: run, then model call, then tool call. Oldest run first. */
   /** What model calls cost: today, the week, and with a session id that session. */
@@ -1823,9 +1823,9 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       }
       return result;
     },
-    async respondHelpers(sessionId: string, callId: string, run: boolean): Promise<HelpersRespondResult> {
+    async respondHelpers(sessionId: string, callId: string, run: boolean, cheaper?: boolean): Promise<HelpersRespondResult> {
       await ready;
-      const result = await call("helpers.respond", { session_id: sessionId, call_id: callId, run });
+      const result = await call("helpers.respond", { session_id: sessionId, call_id: callId, run, ...(cheaper === true ? { cheaper: true } : {}) });
       if (!isHelpersRespondResult(result)) {
         throw new Error("invalid helpers.respond result");
       }
