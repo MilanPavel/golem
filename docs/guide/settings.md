@@ -294,6 +294,7 @@ The defaults for every new chat. A chat that is already open keeps what it has.
 |---|---|---|
 | `instructions` | `[]` | Your lines on how golem should answer, such as "Keep answers short" or "Explain it plainly". At most 30 lines, each 1 to 300 characters after trimming. Blank lines are dropped. The model reads them on every call, so a change shows on the next call with no restart. A helper chat does not get them |
 | `plan_first` | `false` | Whether a new chat starts in plan first. A chat that sets plan first itself wins |
+| `max_model_calls` | `25` | The most model calls one message may make (5 to 200). With 3 calls left the model is told to finish, and the last call is made without tools, so the run ends with an answer and a line saying it stopped at the limit. Read on every message, so a change needs no restart. A helper keeps the `max_calls` of its agent type |
 
 Settings › Chat in the web UI writes these keys ([the web page](./web.md#settings-›-chat)). `chat.get` and `chat.set` read and write these keys for the web page. `chat.get` also returns `mode`, which is `[permissions] mode` and is read only there.
 

@@ -154,17 +154,39 @@ class Growth:
 
 
 MAX_MODEL_CALLS = 25
+"""The default of ``[chat] max_model_calls``: model calls of one message. Each tool round is one."""
 MAX_FALLBACKS = 2
-"""Model calls in one run before it stops. Each tool round is one more."""
 
-_RECURSION_LIMIT = 2 * MAX_MODEL_CALLS
+WRAP_UP_AT = 3
+"""The lead is told to finish when this many model calls are left."""
+
+WRAP_UP_NOTE = (
+    f"{WRAP_UP_AT} model calls left: finish, then answer with what you found. "
+    "The last call has no tools."
+)
+LEAD_FINAL_REQUEST = (
+    "You have used all your model calls. Answer the user now from what you found. "
+    "Do not call tools."
+)
+"""Sent after the history, for the last call of the lead. Not stored."""
+STOP_LINE = "Stopped at {limit} model calls; ask me to go on."
+
+_MAX_MODEL_CALLS_KEY = "golem_max_model_calls"
+_RECURSION_SLACK = 20
+
+
+def _recursion_limit(max_calls: int) -> int:
+    """A graph step limit above what ``max_calls`` can use, so the wrap-up ends the run first.
+
+    A tool round is two steps, and a step-up, a nudge or a check adds a few more."""
+    return 4 * max_calls + _RECURSION_SLACK
 
 
 class TooManyStepsError(Exception):
-    """The run kept calling tools past :data:`MAX_MODEL_CALLS`."""
+    """The graph kept looping past the wrap-up. A guard: the wrap-up ends a run first."""
 
     def __init__(self) -> None:
-        super().__init__(f"the run stopped after {MAX_MODEL_CALLS} model calls")
+        super().__init__("the run stopped: the graph kept looping past its model-call limit")
 
 
 class _Checkpoint(Protocol):
@@ -406,11 +428,12 @@ class ChatRuntime:
         routine firing adds for its own session. ``pinned`` are the
         skills pinned in the session, for the system prompt, and
         ``pinned_folders`` their folders, which the read tools may read. Raises
-        :class:`TooManyStepsError` when the model keeps calling tools.
+        :class:`TooManyStepsError` only if the graph loops past the wrap-up.
 
         Close the generator (``contextlib.aclosing``) when you stop early, so
         the graph run ends before the checkpoint is touched again.
         """
+        max_calls = self.router.chat_settings().max_model_calls
         config: RunnableConfig = {
             "configurable": {
                 "thread_id": session_id,
@@ -426,11 +449,12 @@ class ChatRuntime:
                 CHECKS_KEY: checks,
                 PLAN_KEY: plan_first,
                 LOCAL_ONLY_KEY: local_only,
+                _MAX_MODEL_CALLS_KEY: max_calls,
                 GROWTH_KEY: growth,
                 **({} if child is None else {CHILD_KEY: child}),
                 **({} if memory is None else {MEMORY_KEY: memory}),
             },
-            "recursion_limit": _RECURSION_LIMIT,
+            "recursion_limit": _recursion_limit(max_calls),
         }
         await self.answer_dangling(session_id)
         existing = await self.values(session_id)
@@ -481,6 +505,7 @@ class ChatRuntime:
 
         Close the generator when you stop early, as with :meth:`stream`.
         """
+        max_calls = self.router.chat_settings().max_model_calls
         config: RunnableConfig = {
             "configurable": {
                 "thread_id": session_id,
@@ -496,10 +521,11 @@ class ChatRuntime:
                 CHECKS_KEY: checks,
                 PLAN_KEY: plan_first,
                 LOCAL_ONLY_KEY: local_only,
+                _MAX_MODEL_CALLS_KEY: max_calls,
                 **({} if child is None else {CHILD_KEY: child}),
                 **({} if memory is None else {MEMORY_KEY: memory}),
             },
-            "recursion_limit": _RECURSION_LIMIT,
+            "recursion_limit": _recursion_limit(max_calls),
         }
         command: Command[object] = Command(resume=answer.to_resume())
         async with aclosing(self._parts(command, config)) as parts:
@@ -528,6 +554,7 @@ class ChatRuntime:
         For a run that stopped between two steps, such as a helper after a restart. Close the
         generator when you stop early, as with :meth:`stream`.
         """
+        max_calls = self.router.chat_settings().max_model_calls
         config: RunnableConfig = {
             "configurable": {
                 "thread_id": session_id,
@@ -542,10 +569,11 @@ class ChatRuntime:
                 CHECKS_KEY: checks,
                 PLAN_KEY: plan_first,
                 LOCAL_ONLY_KEY: local_only,
+                _MAX_MODEL_CALLS_KEY: max_calls,
                 **({} if child is None else {CHILD_KEY: child}),
                 **({} if memory is None else {MEMORY_KEY: memory}),
             },
-            "recursion_limit": _RECURSION_LIMIT,
+            "recursion_limit": _recursion_limit(max_calls),
         }
         async with aclosing(self._parts(None, config)) as parts:
             async for part in parts:
@@ -833,6 +861,15 @@ def open_chat(
 
     async def call_model(state: AgentState, config: RunnableConfig) -> dict[str, object]:
         messages = list(state["messages"])
+        # The lead's calls are counted per user message. With 3 left it gets one note, and the
+        # last call is made without tools so that the run ends with an answer.
+        limit = _max_model_calls(config)
+        made = state.get("model_calls", 0)
+        wrap = child_of(config) is None
+        wrap_note: HumanMessage | None = None
+        if wrap and made == limit - WRAP_UP_AT and state.get("wrap_noted") is not True:
+            wrap_note = note(WRAP_UP_NOTE)
+            messages.append(wrap_note)
         profile = state["model_profile"]
         paid = tier_of is not None and tier_of(profile) not in (None, "local")
         if paid_ok is not None and paid and not await paid_ok(state.get("session_id")):
@@ -849,9 +886,13 @@ def open_chat(
         child = child_of(config)
         # A helper that used its calls, or reached its cost or token limit, makes one more,
         # without tools, to give its answer.
-        final = child is not None and (
-            sum(isinstance(m, AIMessage) for m in messages) >= child.max_calls
-            or (child.spent is not None and await child.spent())
+        last = wrap and made >= limit - 1
+        final = last or (
+            child is not None
+            and (
+                sum(isinstance(m, AIMessage) for m in messages) >= child.max_calls
+                or (child.spent is not None and await child.spent())
+            )
         )
         overrides = _options(config)
         local_only = _local_only(config)
@@ -895,7 +936,7 @@ def open_chat(
             text = "\n\n".join(t for _, t in parts)
             system = SystemMessage(content=text) if text else None
             # The system message is sent, never returned, so it stays out of the checkpoint.
-            sent = _outgoing(system, history, final)
+            sent = _outgoing(system, history, final, lead=child is None)
             current = state.get("context_view")
             original = current
             system_chars = 0 if system is None else len(message_text(system))
@@ -968,7 +1009,7 @@ def open_chat(
                     get_stream_writer()(change)
             if current is not original:
                 history = view(plain, current)
-                sent = _outgoing(system, history, final)
+                sent = _outgoing(system, history, final, lead=child is None)
             request: dict[str, object] = {STREAM_KEY: "model.request", "message_id": message_id}
             request["profile"] = profile
             request["message_ids"] = [m.id for m in history if m.id]
@@ -1132,7 +1173,14 @@ def open_chat(
                     "reload_ms": timings.get("load_ms"),
                 }
             )
-        result: dict[str, object] = {"messages": [response.model_copy(update=update)]}
+        reply = response.model_copy(update=update)
+        if last:
+            reply = _with_stop_line(reply, limit)
+        result: dict[str, object] = {"messages": [*([wrap_note] if wrap_note else []), reply]}
+        if wrap:
+            result["model_calls"] = made + 1
+            if wrap_note is not None:
+                result["wrap_noted"] = True
         result["last_call"] = {
             "stop_reason": stop_reason_of(response),
             "text_tool_calls": text_tool_calls,
@@ -1960,7 +2008,7 @@ def _options(config: RunnableConfig) -> dict[str, float | str]:
 
 
 def _outgoing(
-    system: SystemMessage | None, history: Sequence[BaseMessage], final: bool
+    system: SystemMessage | None, history: Sequence[BaseMessage], final: bool, *, lead: bool
 ) -> list[BaseMessage]:
     """What a call sends: the system message, the history, and for a last call a request to answer.
 
@@ -1969,7 +2017,7 @@ def _outgoing(
     sent: list[BaseMessage] = [] if system is None else [system]
     sent.extend(history)
     if final:
-        sent.append(HumanMessage(content=FINAL_REQUEST))
+        sent.append(HumanMessage(content=LEAD_FINAL_REQUEST if lead else FINAL_REQUEST))
     return sent
 
 
@@ -1994,6 +2042,19 @@ def _growth(config: RunnableConfig) -> Growth | None:
     """The turn's window growth that no call has reported yet."""
     raw = cast(Mapping[str, object], config.get("configurable", {})).get(GROWTH_KEY)
     return raw if isinstance(raw, Growth) and not raw.reported else None
+
+
+def _max_model_calls(config: RunnableConfig) -> int:
+    """``[chat] max_model_calls`` as this run read it."""
+    raw = cast(Mapping[str, object], config.get("configurable", {})).get(_MAX_MODEL_CALLS_KEY)
+    return raw if isinstance(raw, int) else MAX_MODEL_CALLS
+
+
+def _with_stop_line(reply: AIMessage, limit: int) -> AIMessage:
+    """``reply`` followed by a line saying the run stopped at its limit."""
+    line = STOP_LINE.format(limit=limit)
+    text = message_text(reply).rstrip()
+    return reply.model_copy(update={"content": f"{text}\n\n{line}" if text else line})
 
 
 def _plan(config: RunnableConfig) -> bool:
@@ -2046,6 +2107,8 @@ def _turn_input(
         "can_step_up": step_up,
         "stepped_up": False,
         "nudged": False,
+        "model_calls": 0,
+        "wrap_noted": False,
         "fallbacks": 0,
         "last_call": {},
     }
