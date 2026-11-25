@@ -1368,6 +1368,10 @@ def open_chat(
         result = await run_tools(state, config)
         added = cast("list[BaseMessage]", result.get("messages") or [])
         seen = cast(AgentState, {**state, "messages": [*state["messages"], *added]})
+        # Never together with the wrap-up: a small model gets "delegate" or "answer now", not both.
+        made = state.get("model_calls", 0)
+        if state.get("wrap_noted") is True or _max_model_calls(config) - made <= WRAP_UP_AT:
+            return result
         text = _fill_note(seen, config, runtime[0] if runtime else None, state["model_profile"])
         if text is None:
             return result

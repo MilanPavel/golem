@@ -26,7 +26,7 @@ from test_step_up import (
 )
 
 from golem.agents.bundled import bundled_agents_dir
-from golem.config import AgentSettings, DelegateSettings, GolemSettings, ModelSettings
+from golem.config import AgentSettings, ChatSettings, DelegateSettings, GolemSettings, ModelSettings
 from golem.models.facts import ModelFacts
 
 READ: Calls = [("read_file", {"path": "big.txt"})]
@@ -37,7 +37,9 @@ LEAD = "lead"
 HOSTED = "hosted"
 
 
-def _settings(share: float = 0.1, use: str = "when_needed") -> GolemSettings:
+def _settings(
+    share: float = 0.1, use: str = "when_needed", calls: int | None = None
+) -> GolemSettings:
     agents = AgentSettings.model_validate(
         {"use_helpers": use, "delegate": DelegateSettings(fill_share=share)}
     )
@@ -45,7 +47,8 @@ def _settings(share: float = 0.1, use: str = "when_needed") -> GolemSettings:
         LEAD: ModelSettings(model=LOCAL, ctx=64000),
         HOSTED: ModelSettings(model=CHEAP, ctx=200000),
     }
-    return GolemSettings(agents=agents, models=models)
+    chat = ChatSettings() if calls is None else ChatSettings(max_model_calls=calls)
+    return GolemSettings(agents=agents, models=models, chat=chat)
 
 
 def _big(folder: Path) -> None:
@@ -153,3 +156,17 @@ async def test_a_helper_is_never_nudged(short_home: Path) -> None:
     notes, started = await _run(short_home, router, LEAD, _facts(LOCAL, "local", 64000))
     assert not notes
     assert len(started) == 1
+
+
+async def test_no_note_in_the_wrap_up_zone(short_home: Path) -> None:
+    # Five calls: the big read is call 3, so 2 are left, within the wrap-up margin of 3.
+    (short_home / "small.txt").write_text("tiny\n")
+    small: Calls = [("read_file", {"path": "small.txt"})]
+    router = _Router(
+        _settings(calls=5),
+        ollama__small=[small, small, READ, "done"],
+        deepseek__cheap=[],
+    )
+    notes, started = await _run(short_home, router, LEAD, _facts(LOCAL, "local", 64000))
+    assert not notes
+    assert started == []
