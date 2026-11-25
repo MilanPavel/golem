@@ -534,6 +534,7 @@ class SessionManager:
         self._run_records = runs
         self._titles = titles
         events.local_only = self.local_only
+        runtime.advisor_ready = self._advisor_ready
         runtime.next_model = self._next_model
         runtime.helpers = self
         events.after_emit = self._relay_step
@@ -2173,6 +2174,14 @@ class SessionManager:
     def _is_read_only(self, name: str) -> bool:
         tool = self._runtime.tools.get(name)
         return tool is not None and tool.read_only
+
+    def _advisor_ready(self, cwd: str | None) -> bool:
+        """Whether a lead in this folder can ask the advisor: ``delegate`` is offered and the
+        agent is usable."""
+        if self._runtime.router.agent_settings().use_helpers == "never":
+            return False
+        agent = self._agents.view(Path(cwd) if cwd else None).get("advisor")
+        return agent is not None and unavailable_reason(agent, self._is_read_only) is None
 
     def _delegate_text(self, root: Path | None) -> str:
         """The description of ``delegate`` for a folder: the agent types its sessions see."""
