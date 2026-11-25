@@ -192,7 +192,7 @@ The rules are the chat's, so a tool is allowed, denied or asked in the same case
 |---|---|
 | allow | The tool runs |
 | deny | The step fails, and the error is the rule's reason (for example `mcp__github__delete_repo is denied by config.toml`) |
-| ask | The run is `waiting` and holds nothing, like `run.review`. The question "Run <tool>?" shows in your Inbox as a `review` item with the tool and its arguments. `golem workflow answer` approves it (the tool runs and the workflow goes on) or `--reject`s it (the step fails). An `--edit` counts as a no |
+| ask | The run is `waiting` and holds nothing, like `run.review`. The question `Run <tool>?` shows in your Inbox as a `review` item with the tool and its arguments. `golem workflow answer` approves it (the tool runs and the workflow goes on) or `--reject`s it (the step fails). An `--edit` counts as a no |
 
 - An explicit `key=` marks the call as a real-world action, as in `run.step`: `idempotency_key()` works inside the tool, and a tool that has an `idempotency_key` argument gets it filled in.
 - Output over 4 KB is stored as an artifact of the run's session. The step keeps a one-line summary and the artifact id; `run.tool` still returns all of it, also after a restart.
