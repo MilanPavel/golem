@@ -465,6 +465,9 @@ class DaemonApp:
                     user_file=self.paths.config_file,
                     trusted=policy.trusted,
                     broadcast=self._broadcast,
+                    create_session=lambda origin, cwd: sessions.create(
+                        None, cwd=cwd, origin=origin
+                    ),
                 )
                 devices = DeviceStore(database)
                 devices.on_change = self._devices_changed
