@@ -109,6 +109,7 @@ class WorkflowEngine:
             await self.step_event("workflow.step.started", workflow_run_id, key)
 
         return await self._agent(workflow_run_id, key, agent_type, brief, model, started)
+
     async def llm(
         self,
         workflow_run_id: str,

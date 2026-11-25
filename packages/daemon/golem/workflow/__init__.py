@@ -318,7 +318,7 @@ class Run:
 
         Without ``schema`` the answer is the text. ``schema`` is a Pydantic model class or a
         JSON-schema dict; the answer is then a dict that follows it. ``model`` is a wish
-        (``cheapest``, ``same``, ``stronger``, ``local``), never a model name golem must use:
+        (``cheapest``, ``same``, ``stronger``, ``local``, ...), never a model name:
         routing picks the model, and a local-only folder only ever gets a local one. The step
         saves the model and the cost; a run that is executed again does not ask again. The
         step key is ``key`` or ``llm:<short hash of the prompt>``, once per run.
