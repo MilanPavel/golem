@@ -125,6 +125,8 @@ async def test_cloud_only_a_budget_lead_asks_a_frontier_advisor_with_no_question
     )
     client = await RpcClient.connect(app.paths.socket_path)
     try:
+        # The lead's own turn on a hosted model on route auto asks once at its start, unless the
+        # session already said yes (paid_ok). The helper never asks: the chat is paid already.
         session_id = await _session(client, CHEAP, app.state)
         await _send(client, session_id)
         await _ended(client)
