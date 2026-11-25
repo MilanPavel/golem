@@ -14,6 +14,7 @@ from typing import cast
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from golem.tools.registry import Tool, ToolContext, ToolError, ToolResult
+from golem_protocol.events import HelperEndedData
 
 MODEL_MAX = 100
 """The longest ``model`` a call may name."""
@@ -135,6 +136,9 @@ class HelperOutcome:
     changes: str = ""
     """The line on a worker's diff and checks, such as ``+38 -12 in 3 files``. Empty for a
     helper that works in no copy."""
+    worker: HelperEndedData | None = None
+    """The ``helper.ended`` data of the helper: its diff artifact, files and checks when it worked
+    in a copy. None while no ``helper.ended`` is stored."""
 
 
 def _section(done: HelperOutcome) -> str:

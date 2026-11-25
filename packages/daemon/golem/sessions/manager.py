@@ -2350,6 +2350,7 @@ class SessionManager:
                     label=labels.get(helper.session_id, ""),
                     covered=await self._covered(helper.session_id, stopped),
                     changes=_changes_line(ended.get(helper.helper_index or 0)),
+                    worker=ended.get(helper.helper_index or 0),
                 )
             )
         return found
