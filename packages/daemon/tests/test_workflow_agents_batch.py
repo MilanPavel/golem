@@ -234,7 +234,7 @@ async def test_a_second_agent_in_one_parallel_member_gets_its_own_helper(
 
     run = await w.store.get_run(run_id)
     assert run is not None and run.session_id is not None
-    children = set()
+    children: set[str | None] = set()
     for key in ("look-0", "look-1", "again-0", "again-1"):
         step = await w.store.get_step(run_id, key)
         assert step is not None and step.status == "done"
