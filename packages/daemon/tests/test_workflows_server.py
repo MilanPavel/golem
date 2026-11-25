@@ -127,6 +127,35 @@ async def test_start_sends_the_steps_in_order_and_the_run_is_done(short_home: Pa
         await stop_daemon(app, task)
 
 
+async def test_each_run_gets_its_headless_session_before_the_first_event(
+    short_home: Path,
+) -> None:
+    path = _write(short_home / "workflows", "adder.py", TWO_STEPS)
+    app, task = await start_daemon(short_home)
+    client = await RpcClient.connect(app.paths.socket_path)
+    try:
+        await client.call("hello", HELLO)
+        await client.call("workflow.list", {}, timeout=20)
+        started = rpc_result(await client.call("workflow.start", {"id": f"{path}::adder"}))
+        run_id = str(started["workflow_run_id"])
+        got = await _until(client, run_id, "done")
+        session_id = cast(dict[str, object], got["run"])["session_id"]
+        assert isinstance(session_id, str) and session_id
+
+        await client.take_events()
+        first = next(n for n in client.notices if n["method"] == "workflow.run.started")
+        assert cast(dict[str, object], first["params"])["session_id"] == session_id
+
+        runs = cast(Rows, rpc_result(await client.call("run.list", {}))["runs"])
+        row = next(r for r in runs if r["session_id"] == session_id)
+        assert row["origin"] == "workflow:adder"
+        assert (row["kind"], row["status"], row["steps"]) == ("workflow", "succeeded", 2)
+        assert row["ended_at"] is not None and row["routine"] is None
+    finally:
+        await client.close()
+        await stop_daemon(app, task)
+
+
 async def test_start_refuses_broken_unknown_and_bad_inputs(short_home: Path) -> None:
     good = _write(short_home / "workflows", "adder.py", TWO_STEPS)
     bad = _write(short_home / "workflows", "bad.py", "def (:\n")

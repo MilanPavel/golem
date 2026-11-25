@@ -2963,18 +2963,21 @@ class RoutineFinished(BaseModel):
     summary: str | None = None
 
 
-RunKind = Literal["routine", "ask"]
-"""What a Runs row is. ``workflow`` joins with 3.9. A client never infers it from an id."""
+RunKind = Literal["routine", "ask", "workflow"]
+"""What a Runs row is: a routine's firing, a detached ask, or a workflow run. A client never
+infers it from an id."""
 
 
 class RunInfo(BaseModel):
     """One row of the Runs list: a headless session and how its run is going (ADR-050).
 
     One row for each session whose origin is not ``user``. ``kind`` is ``routine`` for a
-    routine's firing and ``ask`` for ``golem ask --detach``. ``routine`` is the routine's
-    name, null for ``ask``. ``folder`` is the project folder of a project routine, null for a
-    user routine, so ``routine.get(routine, folder)`` finds it. ``routine_run_id`` and
-    ``trigger`` are null for ``ask``. ``status`` is read as ``RoutineRunSummary.status`` is:
+    routine's firing, ``ask`` for ``golem ask --detach`` and ``workflow`` for a workflow run
+    (``routine`` stays null; the name is in ``origin``, after ``workflow:``).
+    ``routine`` is the routine's name, null for ``ask``. ``folder`` is the project folder of a
+    project routine, null for a user routine, so ``routine.get(routine, folder)`` finds it.
+    ``routine_run_id`` and ``trigger`` are null for ``ask``.
+    ``status`` is read as ``RoutineRunSummary.status`` is:
     ``waiting`` is a session that waits for an answer, and an ``ask`` that is not open reads
     ``succeeded``, ``failed`` or ``cancelled`` from its last agent run. ``summary`` is one line:
     the question while ``waiting`` (``Allow <tool>``, with the subject), the last reply once

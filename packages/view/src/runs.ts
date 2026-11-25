@@ -18,8 +18,10 @@ import { lastResultText, runWhenText, type RoutineRunLike } from "./routines.ts"
 /** The parts of a `RunInfo` these words read. Missing and null mean the same: not known. */
 export type RunLike = {
   session_id: string;
-  /** `routine`, `ask`, and later `workflow`. */
+  /** `routine`, `ask` or `workflow`. */
   kind?: string;
+  /** `workflow:<name>` for a workflow run. */
+  origin?: string;
   routine?: string | null;
   trigger?: "schedule" | "watch" | "manual" | "hook" | null;
   status: RoutineRunLike["status"];
@@ -116,8 +118,9 @@ export function runGroupHeading(group: Pick<RunGroup<unknown>, "label" | "items"
   return `${group.label} (${group.items.length})`;
 }
 
-/** The row's name: the routine's, or `golem ask` for a detached ask. */
+/** The row's name: the routine's, the workflow's, or `golem ask` for a detached ask. */
 export function runName(run: RunLike): string {
+  if (run.kind === "workflow" && run.origin?.startsWith("workflow:")) return run.origin.slice("workflow:".length);
   return run.routine ?? ASK_NAME;
 }
 

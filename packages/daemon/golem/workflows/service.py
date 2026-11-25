@@ -2,15 +2,15 @@
 
 ``launch`` runs the engine as a background task the service tracks, so shutdown and
 ``workflow.cancel`` can stop it. The engine's events go out as ``workflow.run.*`` and
-``workflow.step.*`` notifications. A run's headless session is not made yet (``session_id``
-stays null until agent steps need it).
+``workflow.step.*`` notifications. Each run gets one headless session (``origin`` is
+``workflow:<name>``) before its first step event; it only holds the run, no turn starts.
 """
 
 from __future__ import annotations
 
 import asyncio
 import logging
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from pathlib import Path
 from typing import Any
 
@@ -49,9 +49,11 @@ class WorkflowService:
         user_file: Path,
         trusted: Callable[[Path], bool],
         broadcast: Callable[[BaseModel], None],
+        create_session: Callable[[str, str | None], Awaitable[str]] | None = None,
     ) -> None:
         self.runs = runs
         self._broadcast = broadcast
+        self._create_session = create_session
         self._folders: set[Path] = set()
         self._tasks: dict[str, asyncio.Task[None]] = {}
         self._user_file = user_file
@@ -85,8 +87,22 @@ class WorkflowService:
         self._tasks[run_id] = task
         task.add_done_callback(lambda _t: self._tasks.pop(run_id, None))
 
+    async def _ensure_session(self, run_id: str) -> None:
+        """Give the run its headless session, so ``workflow.run.started`` carries its id."""
+        if self._create_session is None:
+            return
+        record = await self.runs.get_run(run_id)
+        if record is None or record.session_id is not None:
+            return
+        try:
+            session_id = await self._create_session(f"workflow:{record.name}", record.project)
+            await self.runs.set_run_session(run_id, session_id)
+        except Exception:
+            log.exception("workflow run %s got no session", run_id)
+
     async def _run(self, run_id: str) -> None:
         try:
+            await self._ensure_session(run_id)
             await self.engine.execute(run_id)
         except asyncio.CancelledError:
             record = await self.runs.get_run(run_id)

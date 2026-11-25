@@ -1,6 +1,6 @@
 {
   "additionalProperties": false,
-  "description": "One row of the Runs list: a headless session and how its run is going (ADR-050).\n\nOne row for each session whose origin is not ``user``. ``kind`` is ``routine`` for a\nroutine's firing and ``ask`` for ``golem ask --detach``. ``routine`` is the routine's\nname, null for ``ask``. ``folder`` is the project folder of a project routine, null for a\nuser routine, so ``routine.get(routine, folder)`` finds it. ``routine_run_id`` and\n``trigger`` are null for ``ask``. ``status`` is read as ``RoutineRunSummary.status`` is:\n``waiting`` is a session that waits for an answer, and an ``ask`` that is not open reads\n``succeeded``, ``failed`` or ``cancelled`` from its last agent run. ``summary`` is one line:\nthe question while ``waiting`` (``Allow <tool>``, with the subject), the last reply once\nfinished. ``reason`` says why a firing failed or was skipped. ``approvals`` counts the\napprovals the session waits for. ``watch_path`` is the file a ``watch`` firing is for.\n``steps`` is the number of steps of a workflow run, null for the other kinds. The times\nare ISO 8601 with an offset.",
+  "description": "One row of the Runs list: a headless session and how its run is going (ADR-050).\n\nOne row for each session whose origin is not ``user``. ``kind`` is ``routine`` for a\nroutine's firing, ``ask`` for ``golem ask --detach`` and ``workflow`` for a workflow run\n(``routine`` stays null; the name is in ``origin``, after ``workflow:``).\n``routine`` is the routine's name, null for ``ask``. ``folder`` is the project folder of a\nproject routine, null for a user routine, so ``routine.get(routine, folder)`` finds it.\n``routine_run_id`` and ``trigger`` are null for ``ask``.\n``status`` is read as ``RoutineRunSummary.status`` is:\n``waiting`` is a session that waits for an answer, and an ``ask`` that is not open reads\n``succeeded``, ``failed`` or ``cancelled`` from its last agent run. ``summary`` is one line:\nthe question while ``waiting`` (``Allow <tool>``, with the subject), the last reply once\nfinished. ``reason`` says why a firing failed or was skipped. ``approvals`` counts the\napprovals the session waits for. ``watch_path`` is the file a ``watch`` firing is for.\n``steps`` is the number of steps of a workflow run, null for the other kinds. The times\nare ISO 8601 with an offset.",
   "properties": {
     "approvals": {
       "default": 0,
@@ -36,7 +36,8 @@
     "kind": {
       "enum": [
         "routine",
-        "ask"
+        "ask",
+        "workflow"
       ],
       "title": "Kind",
       "type": "string"
