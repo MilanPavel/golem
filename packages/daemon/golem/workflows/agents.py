@@ -13,20 +13,27 @@ from collections.abc import Awaitable, Callable
 from pathlib import Path
 from typing import Any
 
-from golem.agents.model import WISHES
+from golem.agents.model import WISHES, Agent
 from golem.agents.registry import AgentRegistry
 from golem.config import AgentSettings
 from golem.sessions.bus import EventBus
 from golem.sessions.helpers import snapshot_of
 from golem.sessions.manager import SessionManager
+from golem.skills.invoke import SkillInvokeError, invoke
+from golem.skills.registry import SkillRegistry
 from golem.tools.registry import ToolError
 from golem.workflow import WorkflowError
-from golem_protocol.events import AgentOrigin, ChatEvent
+from golem_protocol.events import AgentOrigin, AgentSnapshot, ChatEvent, SkillCall
 
 log = logging.getLogger(__name__)
 
 RECHECK_SECONDS = 60.0
 """The wait is woken by ``helper.ended``; this is only a safety net against a missed event."""
+
+SKILL_PROMPT = (
+    "You run one skill as a short turn. Follow the instructions you are given, use only your"
+    " tools, and finish with the result as your answer."
+)
 
 Started = Callable[[str], Awaitable[None]]
 """Called with the helper's session id as soon as the helper exists."""
@@ -45,12 +52,18 @@ class WorkflowAgents:
         agents: AgentRegistry,
         bus: EventBus,
         settings: Callable[[], AgentSettings],
+        skills: SkillRegistry | None = None,
     ) -> None:
+        self._skills = skills
         self._sessions = sessions
         self._agents = agents
         self._settings = settings
         self._waiters: dict[str, set[asyncio.Event]] = {}
         bus.observe(self._seen)
+
+    @property
+    def has_skills(self) -> bool:
+        return self._skills is not None
 
     def _seen(self, event: ChatEvent) -> None:
         if event.type != "helper.ended":
@@ -90,6 +103,95 @@ class WorkflowAgents:
             raise WorkflowError(reason)
         origin: AgentOrigin = next(e.origin for e in view.listed if e.agent is agent)
         snapshot = snapshot_of(agent, origin, agent.tools, self._settings())
+        outcome, child = await self._helper(
+            session_id,
+            cwd,
+            key,
+            snapshot,
+            brief,
+            started,
+            prompt=agent.body,
+            asked_model=model,
+            gets=agent.gets,
+        )
+        if outcome.stopped != "done":
+            detail = f": {outcome.covered}" if outcome.covered else ""
+            raise WorkflowError(f"agent {agent_type} stopped ({outcome.stopped}){detail}")
+        return {"status": "done", "answer": outcome.text, "session_id": child}
+
+    async def run_skill(
+        self,
+        *,
+        session_id: str,
+        cwd: str | None,
+        key: str,
+        name: str,
+        args: str,
+        started: Started,
+    ) -> dict[str, Any]:
+        """Run the skill ``name`` as one short turn of a helper of ``session_id``.
+
+        The helper's brief is the skill's body with ``args`` filled in, and its tools are the
+        skill's ``allowed-tools``. Returns ``{"status", "answer", "session_id"}``. Raises
+        :class:`WorkflowError` for a skill the run's folder does not see (the message lists the
+        ones it does), a skill that cannot run, and a helper that cannot start or did not finish.
+        """
+        if self._skills is None:
+            raise WorkflowError("run.skill is not available: this daemon has no skills")
+        view = self._skills.view(None if cwd is None else Path(cwd))
+        if not any(e.skill.name == name for e in view.listed):
+            known = ", ".join(s.name for s in view.usable()) or "none"
+            raise WorkflowError(f"unknown skill {name!r}; the skills are {known}")
+        try:
+            call = invoke(view, SkillCall(name=name, args=args), session_id=session_id)
+        except SkillInvokeError as exc:
+            raise WorkflowError(str(exc)) from exc
+        skill = view.get(name)
+        assert skill is not None
+        tools = sorted({t.split("(")[0].strip() for t in skill.allowed_tools} - {"", "delegate"})
+        agent = Agent(
+            name=f"skill-{name}",
+            description=skill.description,
+            path=skill.path,
+            real_path=skill.real_path,
+            hash=skill.hash,
+            wish=skill.model or "cheapest",
+            tools=tuple(tools),
+        )
+        reason = self._sessions.unavailable_reason(agent)
+        if reason is not None:
+            raise WorkflowError(reason)
+        snapshot = snapshot_of(agent, call.source, agent.tools, self._settings())
+        outcome, child = await self._helper(
+            session_id,
+            cwd,
+            key,
+            snapshot,
+            call.text,
+            started,
+            prompt=SKILL_PROMPT,
+            asked_model=None,
+            gets=(),
+        )
+        if outcome.stopped != "done":
+            detail = f": {outcome.covered}" if outcome.covered else ""
+            raise WorkflowError(f"skill {name} stopped ({outcome.stopped}){detail}")
+        return {"status": "done", "answer": outcome.text, "session_id": child}
+
+    async def _helper(
+        self,
+        session_id: str,
+        cwd: str | None,
+        key: str,
+        snapshot: AgentSnapshot,
+        brief: str,
+        started: Started,
+        *,
+        prompt: str,
+        asked_model: str | None,
+        gets: tuple[str, ...],
+    ) -> tuple[Any, str]:
+        """Start the helper of step ``key`` once, wait for it, and return its outcome and id."""
         call_id = call_id_of(key)
         try:
             ref = await self._sessions.start_helper(
@@ -101,19 +203,16 @@ class WorkflowAgents:
                 await self._sessions.model_profile(session_id),
                 cwd,
                 label=key,
-                prompt=agent.body,
-                asked_model=model,
-                gets=agent.gets,
+                prompt=prompt,
+                asked_model=asked_model,
+                gets=gets,
             )
         except ToolError as exc:
             raise WorkflowError(str(exc)) from exc
         await started(ref.session_id)
         await self._wait(session_id, call_id)
         (outcome,) = await self._sessions.helper_results(session_id, call_id)
-        if outcome.stopped != "done":
-            detail = f": {outcome.covered}" if outcome.covered else ""
-            raise WorkflowError(f"agent {agent_type} stopped ({outcome.stopped}){detail}")
-        return {"status": "done", "answer": outcome.text, "session_id": ref.session_id}
+        return outcome, ref.session_id
 
     async def _wait(self, session_id: str, call_id: str) -> None:
         """Wait until the helper has ended: ``helper.ended`` wakes this, nothing polls."""

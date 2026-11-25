@@ -134,6 +134,12 @@ class StepBackend(Protocol):
         """Run an agent as a helper of the run's session (the ``agent`` step)."""
         ...
 
+    async def skill(
+        self, workflow_run_id: str, key: str, name: str, args: str, group_key: str | None
+    ) -> dict[str, Any]:
+        """Run a skill as a helper of the run's session (the ``skill`` step)."""
+        ...
+
     async def llm(
         self,
         workflow_run_id: str,
@@ -378,8 +384,20 @@ class Run:
             self.workflow_run_id, step_key, name, args, _group.get(), key is not None
         )
 
-    async def skill(self, *args: Any, **kwargs: Any) -> Any:
-        raise NotImplementedError("run.skill arrives with 3.6 (#740)")
+    async def skill(self, name: str, args: str = "", key: str | None = None) -> str:
+        """Run the skill ``name`` with ``args`` as one short agent turn and return its answer.
+
+        The skill's body, with the arguments filled in, is the brief of a helper of the run's
+        session. The helper gets the skill's own tools and golem's permissions, so it has a
+        thread you can open, and ``child_session_id`` is set on the step. An unknown skill fails
+        the step and names the known ones. A step of kind ``skill`` keyed
+        ``key or f"skill:{name}"``: each key may be used once per run. After a restart the same
+        helper is waited for, not started again.
+        """
+        step_key = key or f"skill:{name}"
+        self._use_key(step_key, f"skill {name}")
+        found = await self._backend.skill(self.workflow_run_id, step_key, name, args, _group.get())
+        return found["answer"]
 
 
 def _type_name(t: object) -> str:

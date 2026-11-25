@@ -483,6 +483,7 @@ class DaemonApp:
                         agents=self.state.agents,
                         bus=bus,
                         settings=router.agent_settings,
+                        skills=self.state.skills,
                     ),
                     llm=WorkflowLlm(
                         router,

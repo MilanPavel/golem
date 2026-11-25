@@ -14,7 +14,6 @@ import pytest
 
 from golem.store.database import Database
 from golem.store.workflow_runs import WorkflowRuns
-from golem.workflow import Run
 from golem.workflows.engine import WorkflowEngine
 
 HEADER = "from golem.workflow import workflow, Run\nimport calls\n"
@@ -281,18 +280,6 @@ async def test_events_come_in_order(store: WorkflowRuns, calls: Any, tmp_path: P
         "finished_at",
         "error",
     }
-
-
-@pytest.mark.parametrize(
-    ("name", "ticket"),
-    [
-        ("skill", "#740"),
-    ],
-)
-async def test_stubs_name_their_ticket(name: str, ticket: str) -> None:
-    run = Run(None, "r")  # type: ignore[arg-type]
-    with pytest.raises(NotImplementedError, match=ticket):
-        await getattr(run, name)()
 
 
 async def test_top_level_code_does_not_block_the_loop(

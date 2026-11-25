@@ -115,6 +115,7 @@ class WorkflowService:
             self._emit,
             self._notify if notify else None,
             agent=self._agent if agents else None,
+            skill=self._skill if agents and agents.has_skills else None,
             llm=llm,
             tools=tools,
         )
@@ -139,6 +140,22 @@ class WorkflowService:
             agent_type=agent_type,
             brief=brief,
             model=model,
+            started=started,
+        )
+
+    async def _skill(
+        self, run_id: str, key: str, name: str, args: str, started: AgentStarted
+    ) -> dict[str, Any]:
+        """Adapt a ``run.skill`` to the seam: the helper belongs to the run's session."""
+        record = await self.runs.get_run(run_id)
+        if self._agents is None or record is None or record.session_id is None:
+            raise WorkflowError("run.skill needs the run's session, and this run has none")
+        return await self._agents.run_skill(
+            session_id=record.session_id,
+            cwd=record.project,
+            key=key,
+            name=name,
+            args=args,
             started=started,
         )
 

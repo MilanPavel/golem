@@ -49,6 +49,9 @@ AgentRunner = Callable[[str, str, str, str, str | None, AgentStarted], Awaitable
 """Runs an agent step: workflow run id, step key, agent type, brief, model wish and a callback
 for the helper's session id. Returns the step's result. ``workflows/agents.py`` is behind it."""
 
+SkillRunner = Callable[[str, str, str, str, AgentStarted], Awaitable[dict[str, Any]]]
+"""Runs a skill step: workflow run id, step key, skill name, arguments and the same callback."""
+
 
 def _no_emit(name: str, payload: dict[str, Any]) -> None:
     pass
@@ -86,7 +89,9 @@ class WorkflowEngine:
         agent: AgentRunner | None = None,
         llm: Llm | None = None,
         tools: WorkflowTools | None = None,
+        skill: SkillRunner | None = None,
     ) -> None:
+        self._skill = skill
         self._store = store
         self._llm = llm
         self._tools = tools
@@ -115,6 +120,19 @@ class WorkflowEngine:
             await self.step_event("workflow.step.started", workflow_run_id, key)
 
         return await self._agent(workflow_run_id, key, agent_type, brief, model, started)
+
+    async def run_skill(
+        self, workflow_run_id: str, key: str, name: str, args: str
+    ) -> dict[str, Any]:
+        """Run a skill step's helper; its session id is saved on the step as soon as it exists."""
+        if self._skill is None:
+            raise WorkflowError("run.skill is not available: this daemon has no skills")
+
+        async def started(session_id: str) -> None:
+            await self._store.set_step_child_session(workflow_run_id, key, session_id)
+            await self.step_event("workflow.step.started", workflow_run_id, key)
+
+        return await self._skill(workflow_run_id, key, name, args, started)
 
     async def llm(
         self,
@@ -407,6 +425,20 @@ class _Journal:
             group_key,
             self._engine.run_agent,
             (workflow_run_id, key, agent_type, brief, model),
+            {},
+        )
+
+    async def skill(
+        self, workflow_run_id: str, key: str, name: str, args: str, group_key: str | None
+    ) -> dict[str, Any]:
+        return await self.run_step(
+            workflow_run_id,
+            key,
+            "skill",
+            name,
+            group_key,
+            self._engine.run_skill,
+            (workflow_run_id, key, name, args),
             {},
         )
 
