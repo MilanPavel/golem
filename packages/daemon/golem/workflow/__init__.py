@@ -8,9 +8,11 @@ workflow.
 
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping
+import asyncio
+from collections.abc import Awaitable, Callable, Iterable, Mapping
+from contextvars import ContextVar
 from dataclasses import dataclass
-from typing import Any, Literal, TypeVar
+from typing import Any, Literal, Protocol, TypeVar
 
 from golem.routines import parse_schedule
 
@@ -70,11 +72,98 @@ class WorkflowSpec:
     """Line of the function in its file."""
 
 
+class WorkflowError(Exception):
+    """A workflow broke a rule of the engine, for example it used a step key twice."""
+
+
+class StepBackend(Protocol):
+    """What :class:`Run` needs from the engine. The engine implements it."""
+
+    async def run_step(
+        self,
+        workflow_run_id: str,
+        key: str,
+        kind: str,
+        title: str,
+        group_key: str | None,
+        fn: Callable[..., Any],
+        args: tuple[Any, ...],
+        kwargs: dict[str, Any],
+    ) -> Any: ...
+
+
+_group: ContextVar[str | None] = ContextVar("golem_workflow_group", default=None)
+
+
 class Run:
     """The handle a workflow function receives.
 
-    Placeholder: 3.1.1 (#1758) adds ``run.step`` and ``run.parallel``.
+    A workflow is run again from the top after a restart. ``run.step`` returns the saved
+    result of a step that finished, so its function is not called twice.
     """
+
+    def __init__(
+        self, backend: StepBackend, workflow_run_id: str, inputs: Mapping[str, Any] | None = None
+    ) -> None:
+        self._backend = backend
+        self.workflow_run_id = workflow_run_id
+        self.inputs: dict[str, Any] = dict(inputs or {})
+        self._keys: set[str] = set()
+        self._groups = 0
+
+    async def step(
+        self, name: str, fn: Callable[..., Any], *args: Any, key: str | None = None, **kwargs: Any
+    ) -> Any:
+        """Run ``fn(*args, **kwargs)`` once and keep its JSON result under ``key or name``.
+
+        Each key may be used once per run; inside a loop pass distinct names or keys.
+        """
+        step_key = key or name
+        if step_key in self._keys:
+            raise WorkflowError(
+                f"step key {step_key!r} used twice in one run; give each step in a loop its own"
+                f" name or key=, for example f'{name}-{{item}}'"
+            )
+        self._keys.add(step_key)
+        return await self._backend.run_step(
+            self.workflow_run_id, step_key, "step", name, _group.get(), fn, args, kwargs
+        )
+
+    async def parallel(self, aws: Iterable[Awaitable[Any]]) -> list[Any]:
+        """Run the awaitables (usually ``run.step(...)``) together; results keep their order.
+
+        When one fails the others finish and keep their results, then the first error is raised.
+        """
+        self._groups += 1
+        group = f"parallel-{self._groups}"
+
+        async def member(aw: Awaitable[Any]) -> Any:
+            _group.set(group)
+            return await aw
+
+        outcomes = await asyncio.gather(*(member(aw) for aw in aws), return_exceptions=True)
+        for outcome in outcomes:
+            if isinstance(outcome, BaseException):
+                raise outcome
+        return list(outcomes)
+
+    async def review(self, *args: Any, **kwargs: Any) -> Any:
+        raise NotImplementedError("run.review arrives with 3.4 (#14)")
+
+    async def notify(self, *args: Any, **kwargs: Any) -> Any:
+        raise NotImplementedError("run.notify arrives with 3.4 (#14)")
+
+    async def agent(self, *args: Any, **kwargs: Any) -> Any:
+        raise NotImplementedError("run.agent arrives with 3.5 (#16)")
+
+    async def llm(self, *args: Any, **kwargs: Any) -> Any:
+        raise NotImplementedError("run.llm arrives with 3.6 (#740)")
+
+    async def tool(self, *args: Any, **kwargs: Any) -> Any:
+        raise NotImplementedError("run.tool arrives with 3.6 (#740)")
+
+    async def skill(self, *args: Any, **kwargs: Any) -> Any:
+        raise NotImplementedError("run.skill arrives with 3.6 (#740)")
 
 
 def _type_name(t: object) -> str:
@@ -109,7 +198,9 @@ __all__ = [
     "OnFile",
     "Run",
     "Schedule",
+    "StepBackend",
     "Trigger",
+    "WorkflowError",
     "WorkflowSpec",
     "manual",
     "on_file",
