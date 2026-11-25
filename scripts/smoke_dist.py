@@ -2,8 +2,9 @@
 """Start a built daemon against a stub model and check one chat.
 
 Standard library only. ``just smoke-dist`` runs this. After one untimed start,
-the fastest of five starts must open the socket within 1.5 seconds, and the
-assistant's ``message.completed`` text is ``smoke-ok``.
+the fastest of five starts must open the socket within 1.5 seconds; if none does,
+five more starts are timed and the fastest of all ten is judged. The assistant's
+``message.completed`` text is ``smoke-ok``.
 """
 
 from __future__ import annotations
@@ -32,7 +33,9 @@ from typing import cast
 REPLY = "smoke-ok"
 # A start takes about 0.5s on a quiet Mac. Shared CI Macs vary from 0.5s to
 # 1.4s for the same build, so the budget leaves room for that and still
-# catches a start that doubles.
+# catches a start that doubles. If the fastest of five misses it, five more
+# starts are timed and the fastest of all ten decides, so one slow runner
+# does not fail the build.
 START_LIMIT_S = 1.5
 TIMED_STARTS = 5
 FIRST_START_LIMIT_S = 30.0
@@ -92,16 +95,20 @@ def main() -> int:
         # A shared CI machine sometimes stalls one start, so the budget is
         # checked against the fastest of a few. Every start must still succeed.
         times: list[float] = []
-        for attempt in range(1, TIMED_STARTS + 1):
-            body = check_chat if attempt == 1 else None
-            elapsed = run_daemon(daemon, env, home, f"start {attempt}", FIRST_START_LIMIT_S, body)
-            if elapsed is None:
-                return 1
-            times.append(elapsed)
-        if min(times) >= START_LIMIT_S:
-            fastest = min(times)
-            print(f"no start was under {START_LIMIT_S:g}s (fastest {fastest:.3f}s)", file=sys.stderr)
+        if not time_starts(daemon, env, home, times, 1, TIMED_STARTS, check_chat):
             return 1
+        if min(times) >= START_LIMIT_S:
+            print(f"slow runner? fastest {min(times):.3f}s, timing {TIMED_STARTS} more starts")
+            if not time_starts(daemon, env, home, times, TIMED_STARTS + 1, TIMED_STARTS):
+                return 1
+            if min(times) >= START_LIMIT_S:
+                fastest = min(times)
+                print(
+                    f"no start was under {START_LIMIT_S:g}s "
+                    f"(fastest of {len(times)}: {fastest:.3f}s)",
+                    file=sys.stderr,
+                )
+                return 1
         if not check_memory_db(home):
             return 1
 
@@ -120,6 +127,34 @@ def main() -> int:
     finally:
         server.shutdown()
     return 0
+
+
+def time_starts(
+    daemon: Path,
+    env: dict[str, str],
+    home: Path,
+    times: list[float],
+    first: int,
+    count: int,
+    body: Callable[[], bool] | None = None,
+) -> bool:
+    """Run ``count`` timed starts numbered from ``first``, appending each time to ``times``.
+
+    ``body`` runs only after the first of them. Returns False if any start fails.
+    """
+    for attempt in range(first, first + count):
+        elapsed = run_daemon(
+            daemon,
+            env,
+            home,
+            f"start {attempt}",
+            FIRST_START_LIMIT_S,
+            body if attempt == first else None,
+        )
+        if elapsed is None:
+            return False
+        times.append(elapsed)
+    return True
 
 
 def check_memory_db(home: Path) -> bool:
