@@ -163,8 +163,9 @@ class HuggingFace:
         """Set ``problem`` on a size whose config file Hugging Face definitely does not have.
 
         Ollama asks the repo for the config file named in each size's manifest after it has
-        fetched every layer, and a 404 there fails a download of many gigabytes. Only that 404
-        marks a size: a slow answer, an error, or any other status leaves it unmarked.
+        fetched every layer, and a 404 there fails a download of many gigabytes. A manifest that
+        answers 400 means the tag is not in the repo at all. Only those two mark a size: a slow
+        answer, an error, or any other status leaves it unmarked.
         """
         if not rows:
             return
@@ -180,7 +181,7 @@ class HuggingFace:
                 row["problem"] = MISSING_FILE
 
     async def _config_missing(self, repo: str, quant: str) -> bool:
-        """True only when the config file of this size's manifest answers 404."""
+        """True when the manifest answers 400 (no such tag) or its config file answers 404."""
         client = self._http()
         try:
             response = await client.get(
@@ -188,6 +189,8 @@ class HuggingFace:
                 headers={"Accept": _MANIFEST_TYPES},
                 follow_redirects=True,
             )
+            if response.status_code == 400:
+                return True
             if response.status_code != 200:
                 return False
             body = response.json()
@@ -216,21 +219,36 @@ def repo_of(query: str) -> str:
 
 
 def quant_of(path: str) -> str | None:
-    """``Q4_K_M`` from ``dir/Model-8B-Q4_K_M-00001-of-00003.gguf``; None for other files."""
+    """The pull tag of a file: the quant and whatever follows it in the name, or None.
+
+    ``Q4_K_M`` from ``dir/Model-8B-Q4_K_M-00001-of-00003.gguf``, and ``Q4_K_M-balanced`` from
+    ``TwIL-8B-Q4_K_M-balanced.gguf``, because Hugging Face serves each of those as its own tag.
+    The quant part is uppercased and the suffix is kept as written. A quant that is only in the
+    folder name gives just the quant.
+    """
     folder, _, base = path.rpartition("/")
     if not base.lower().endswith(".gguf") or "mmproj" in base.lower():
         return None
     stem = _SPLIT.sub("", base[: -len(".gguf")])
-    found = _QUANT.findall(stem) or _QUANT.findall(folder)
-    return found[-1].upper() if found else None
+    found = list(_QUANT.finditer(stem))
+    if found:
+        last = found[-1]
+        return last[0].upper() + stem[last.end() :]
+    in_folder = _QUANT.findall(folder)
+    return in_folder[-1].upper() if in_folder else None
 
 
 def _recommend(rows: list[dict[str, Any]]) -> None:
-    """Mark ``Q4_K_M`` when it fits, else the largest size that fits. Rows are smallest first."""
+    """Mark ``Q4_K_M`` when it fits, else a ``Q4_K_M-...`` one, else the largest size that fits.
+
+    Rows are smallest first.
+    """
     fitting = [row for row in rows if row["fit"] == "fits"]
     if not fitting:
         return
-    preferred = [row for row in fitting if row["quant"] == PREFERRED_QUANT]
+    preferred = [row for row in fitting if row["quant"] == PREFERRED_QUANT] or [
+        row for row in fitting if row["quant"].startswith(f"{PREFERRED_QUANT}-")
+    ]
     (preferred or fitting[-1:])[0]["recommended"] = True
 
 
