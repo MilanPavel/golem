@@ -839,7 +839,11 @@ async def _helpers_respond(
 ) -> HelpersRespondResult:
     try:
         run_id = await _sessions(ctx).respond_helpers(
-            params.session_id, params.call_id, params.run, device=ctx.connection.device
+            params.session_id,
+            params.call_id,
+            params.run,
+            cheaper=params.cheaper,
+            device=ctx.connection.device,
         )
     except ApprovalNotFoundError as exc:
         raise RpcCallError(APPROVAL_NOT_FOUND, "no run waits on this question") from exc

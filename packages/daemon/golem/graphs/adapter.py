@@ -280,6 +280,12 @@ class ApprovalAsked:
     message_id: str | None = None
     subject: str | None = None
     diff: str | None = None
+    estimate_usd: float | None = None
+    """The estimate of a batch of helpers, asked as "start these helpers?" (ADR-059)."""
+    allowed_usd: float | None = None
+    ask_over_usd: float | None = None
+    model: str | None = None
+    cheaper_model: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -874,8 +880,17 @@ def _approval(paused: object) -> ApprovalAsked | None:
             message_id=message_id if isinstance(message_id, str) else None,
             subject=subject if isinstance(subject, str) else None,
             diff=diff if isinstance(diff, str) else None,
+            estimate_usd=_number(raw.get("estimate_usd")),
+            allowed_usd=_number(raw.get("allowed_usd")),
+            ask_over_usd=_number(raw.get("ask_over_usd")),
+            model=_text(raw.get("model")),
+            cheaper_model=_text(raw.get("cheaper_model")),
         )
     return None
+
+
+def _number(raw: object) -> float | None:
+    return float(raw) if isinstance(raw, int | float) and not isinstance(raw, bool) else None
 
 
 def _sources(raw: object) -> tuple[dict[str, str], ...]:
