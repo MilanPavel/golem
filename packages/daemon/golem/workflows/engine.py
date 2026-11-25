@@ -14,7 +14,7 @@ import importlib.util
 import inspect
 import json
 import logging
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -36,6 +36,8 @@ log = logging.getLogger(__name__)
 _STEP_ATTR = "__golem_step__"
 
 Emit = Callable[[str, dict[str, Any]], None]
+Notify = Callable[[str | None, str, str], Awaitable[None]]
+"""Tells the person: title (or None), text, and the workflow run id the text is about."""
 
 
 def _no_emit(name: str, payload: dict[str, Any]) -> None:
@@ -60,9 +62,19 @@ def _find(path: Path, name: str) -> Callable[..., Any]:
 
 
 class WorkflowEngine:
-    def __init__(self, store: WorkflowRuns, emit: Emit | None = None) -> None:
+    def __init__(
+        self, store: WorkflowRuns, emit: Emit | None = None, notify: Notify | None = None
+    ) -> None:
         self._store = store
         self._emit: Emit = emit or _no_emit
+        self._notify = notify
+
+    async def notify(self, workflow_run_id: str, title: str | None, text: str) -> None:
+        """Send a ``run.notify`` text. Without a notifier the step still completes."""
+        if self._notify is None:
+            log.debug("workflow run %s notify (no notifier): %s", workflow_run_id, text)
+            return
+        await self._notify(title, text, workflow_run_id)
 
     def send(self, name: str, payload: dict[str, Any]) -> None:
         try:
@@ -177,6 +189,9 @@ class _Journal:
 
     def __init__(self, engine: WorkflowEngine) -> None:
         self._engine = engine
+
+    async def notify(self, workflow_run_id: str, title: str | None, text: str) -> None:
+        await self._engine.notify(workflow_run_id, title, text)
 
     async def run_step(
         self,

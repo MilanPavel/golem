@@ -94,6 +94,10 @@ class StepBackend(Protocol):
         backoff: float = 0.0,
     ) -> Any: ...
 
+    async def notify(self, workflow_run_id: str, title: str | None, text: str) -> None:
+        """Tell the person ``text`` (through the Notifier, when the engine has one)."""
+        ...
+
 
 _group: ContextVar[str | None] = ContextVar("golem_workflow_group", default=None)
 IDEMPOTENCY_KEY: ContextVar[str | None] = ContextVar("golem_workflow_key", default=None)
@@ -190,8 +194,30 @@ class Run:
     async def review(self, *args: Any, **kwargs: Any) -> Any:
         raise NotImplementedError("run.review arrives with 3.4 (#14)")
 
-    async def notify(self, *args: Any, **kwargs: Any) -> Any:
-        raise NotImplementedError("run.notify arrives with 3.4 (#14)")
+    async def notify(self, text: str, title: str | None = None, key: str | None = None) -> None:
+        """Tell you ``text`` through the Notifier, once per run.
+
+        A step of kind ``notify`` keyed ``key or f"notify:{text}"``: a run that is executed
+        again does not send it twice. Each key may be used once per run, so a notice inside a
+        loop needs its own ``key=``. The click on the banner opens the run's session.
+        """
+        step_key = key or f"notify:{text}"
+        if step_key in self._keys:
+            raise WorkflowError(
+                f"step key {step_key!r} used twice in one run; give each notify in a loop its"
+                " own key="
+            )
+        self._keys.add(step_key)
+        await self._backend.run_step(
+            self.workflow_run_id,
+            step_key,
+            "notify",
+            title or text,
+            _group.get(),
+            self._backend.notify,
+            (self.workflow_run_id, title, text),
+            {},
+        )
 
     async def agent(self, *args: Any, **kwargs: Any) -> Any:
         raise NotImplementedError("run.agent arrives with 3.5 (#16)")
