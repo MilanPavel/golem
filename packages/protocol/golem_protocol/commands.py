@@ -258,6 +258,15 @@ class PendingItem(BaseModel):
     type names, one for each helper, in the order of the call. It is only ever in
     ``SessionSummary.pending_items``: ``SessionSummary.pending`` never holds one, because an
     older client reads that field and knows only ``approval`` and ``consent``.
+
+    A ``batch`` item with ``estimate_usd`` is the estimate card: ``estimate_usd`` is what the
+    batch is estimated to cost, ``allowed_usd`` the ``[agents] per_message_cost`` the user allows
+    per message, ``ask_over_usd`` the ``[agents] estimate_over`` amount above which it asks,
+    ``model`` the model the helpers would run on (the first helper's when they differ) and
+    ``cheaper_model`` the model "Use a cheaper model" would use (null hides that answer). The
+    card may appear even when ``use_helpers`` is not ``ask``. It is answered by
+    ``helpers.respond``. These five fields mean something only for a ``batch`` item; an older
+    daemon leaves them out.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -279,6 +288,11 @@ class PendingItem(BaseModel):
     helper: PendingHelper | None = None
     count: int | None = Field(default=None, ge=2)
     helper_count: int | None = Field(default=None, ge=1, le=100)
+    estimate_usd: float | None = Field(default=None, ge=0)
+    allowed_usd: float | None = Field(default=None, ge=0)
+    ask_over_usd: float | None = Field(default=None, ge=0)
+    model: str | None = Field(default=None, min_length=1)
+    cheaper_model: str | None = Field(default=None, min_length=1)
     agents: list[str] | None = Field(default=None, max_length=100)
 
 
@@ -5055,6 +5069,9 @@ class HelpersRespondParams(BaseModel):
     ``use_helpers`` and the tool ``delegate``, and the answer as ``approval.resolved``
     (``allow`` or ``deny``); an older client may answer it with ``approval.respond``, where a
     yes of any kind runs the helpers and writes no rule.
+
+    ``cheaper`` true, with ``run`` true, starts the helpers on the item's ``cheaper_model``
+    ("Use a cheaper model"). ``cheaper`` with ``run`` false is refused.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -5062,6 +5079,13 @@ class HelpersRespondParams(BaseModel):
     session_id: str = Field(min_length=1)
     call_id: str = Field(min_length=1)
     run: bool
+    cheaper: bool = False
+
+    @model_validator(mode="after")
+    def _cheaper_needs_run(self) -> Self:
+        if self.cheaper and not self.run:
+            raise ValueError("cheaper needs run: true")
+        return self
 
 
 class HelpersRespondResult(BaseModel):

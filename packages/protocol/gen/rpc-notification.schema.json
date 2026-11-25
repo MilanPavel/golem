@@ -122,17 +122,56 @@
     },
     "ApprovalNeededData": {
       "additionalProperties": false,
-      "description": "A tool call waits for the user. The run is paused until ``approval.respond``.\n\n``source`` is the rule that asked, such as ``built-in default``.\n``subject`` is what rules match for this tool, such as the shell command.\n``diff`` is the change a file tool would make, as a unified diff, when it\nhas one. Approving the call approves that change and no other.",
+      "description": "A tool call waits for the user. The run is paused until ``approval.respond``.\n\n``source`` is the rule that asked, such as ``built-in default``.\n``subject`` is what rules match for this tool, such as the shell command.\n``diff`` is the change a file tool would make, as a unified diff, when it\nhas one. Approving the call approves that change and no other.\nWith ``source`` ``use_helpers`` the question is \"start these helpers?\", and\n``estimate_usd``, ``allowed_usd``, ``ask_over_usd``, ``model`` and ``cheaper_model`` carry\nthe estimate as on ``PendingItem``.",
       "properties": {
+        "allowed_usd": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Allowed Usd"
+        },
         "args": {
           "additionalProperties": true,
           "title": "Args",
           "type": "object"
         },
+        "ask_over_usd": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Ask Over Usd"
+        },
         "call_id": {
           "minLength": 1,
           "title": "Call Id",
           "type": "string"
+        },
+        "cheaper_model": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cheaper Model"
         },
         "diff": {
           "anyOf": [
@@ -146,6 +185,19 @@
           "default": null,
           "title": "Diff"
         },
+        "estimate_usd": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Estimate Usd"
+        },
         "message_id": {
           "anyOf": [
             {
@@ -158,6 +210,19 @@
           ],
           "default": null,
           "title": "Message Id"
+        },
+        "model": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Model"
         },
         "name": {
           "minLength": 1,

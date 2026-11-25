@@ -17,9 +17,13 @@ export type ParentSessionId = string | null;
 export type Added = number | null;
 export type Agent1 = string | null;
 export type Agents = string[] | null;
+export type AllowedUsd = number | null;
 export type Alternatives = number | null;
+export type AskOverUsd = number | null;
 export type CallId = string | null;
+export type CheaperModel = string | null;
 export type Count = number | null;
+export type EstimateUsd = number | null;
 export type Agent2 = string;
 export type Index = number;
 export type Label = string | null;
@@ -28,6 +32,7 @@ export type HelperCount = number | null;
 export type HelperId = string | null;
 export type Kind = 'approval' | 'consent' | 'batch';
 export type Label1 = string | null;
+export type Model = string | null;
 export type Name = string | null;
 export type NotSent =
   | []
@@ -180,6 +185,15 @@ export interface SessionSummary {
  * ``SessionSummary.pending_items``: ``SessionSummary.pending`` never holds one, because an
  * older client reads that field and knows only ``approval`` and ``consent``.
  *
+ * A ``batch`` item with ``estimate_usd`` is the estimate card: ``estimate_usd`` is what the
+ * batch is estimated to cost, ``allowed_usd`` the ``[agents] per_message_cost`` the user allows
+ * per message, ``ask_over_usd`` the ``[agents] estimate_over`` amount above which it asks,
+ * ``model`` the model the helpers would run on (the first helper's when they differ) and
+ * ``cheaper_model`` the model "Use a cheaper model" would use (null hides that answer). The
+ * card may appear even when ``use_helpers`` is not ``ask``. It is answered by
+ * ``helpers.respond``. These five fields mean something only for a ``batch`` item; an older
+ * daemon leaves them out.
+ *
  * This interface was referenced by `SessionSummaryNotification`'s JSON-Schema
  * via the `definition` "PendingItem".
  */
@@ -187,14 +201,19 @@ export interface PendingItem {
   added?: Added;
   agent?: Agent1;
   agents?: Agents;
+  allowed_usd?: AllowedUsd;
   alternatives?: Alternatives;
+  ask_over_usd?: AskOverUsd;
   call_id?: CallId;
+  cheaper_model?: CheaperModel;
   count?: Count;
+  estimate_usd?: EstimateUsd;
   helper?: PendingHelper | null;
   helper_count?: HelperCount;
   helper_id?: HelperId;
   kind: Kind;
   label?: Label1;
+  model?: Model;
   name?: Name;
   not_sent?: NotSent;
   removed?: Removed;

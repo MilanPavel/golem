@@ -384,9 +384,14 @@ export type Seq27 = number;
 export type SessionId29 = string;
 export type Ts27 = string;
 export type Type27 = 'tool.failed';
+export type AllowedUsd = number | null;
+export type AskOverUsd = number | null;
 export type CallId6 = string;
+export type CheaperModel = string | null;
 export type Diff1 = string | null;
+export type EstimateUsd = number | null;
 export type MessageId10 = string | null;
+export type Model3 = string | null;
 export type Name5 = string;
 export type Source1 = string;
 export type Subject1 = string | null;
@@ -418,7 +423,7 @@ export type SpentToday = number;
 export type EstimatedUsd = number | null;
 export type HelperId = string | null;
 export type Label = string | null;
-export type Model3 = string | null;
+export type Model4 = string | null;
 export type ModelProfile3 = string;
 export type NotSent =
   | []
@@ -868,7 +873,7 @@ export type CallId11 = string;
 export type HelperId1 = string;
 export type Index3 = number;
 export type Label1 = string;
-export type Model4 = string;
+export type Model5 = string;
 export type PickReason = string;
 export type Wish1 = string;
 export type RunId42 = string | null;
@@ -879,7 +884,7 @@ export type Type41 = 'helper.started';
 export type CallId12 = string;
 export type HelperId2 = string;
 export type Index4 = number;
-export type Model5 = string;
+export type Model6 = string;
 export type PickReason1 = string;
 export type RunId43 = string | null;
 export type Seq42 = number;
@@ -2075,15 +2080,23 @@ export interface ApprovalNeededEvent {
  * ``subject`` is what rules match for this tool, such as the shell command.
  * ``diff`` is the change a file tool would make, as a unified diff, when it
  * has one. Approving the call approves that change and no other.
+ * With ``source`` ``use_helpers`` the question is "start these helpers?", and
+ * ``estimate_usd``, ``allowed_usd``, ``ask_over_usd``, ``model`` and ``cheaper_model`` carry
+ * the estimate as on ``PendingItem``.
  *
  * This interface was referenced by `RpcNotification`'s JSON-Schema
  * via the `definition` "ApprovalNeededData".
  */
 export interface ApprovalNeededData {
+  allowed_usd?: AllowedUsd;
   args: Args2;
+  ask_over_usd?: AskOverUsd;
   call_id: CallId6;
+  cheaper_model?: CheaperModel;
   diff?: Diff1;
+  estimate_usd?: EstimateUsd;
   message_id?: MessageId10;
+  model?: Model3;
   name: Name5;
   source: Source1;
   subject?: Subject1;
@@ -2169,7 +2182,7 @@ export interface RouteConsentNeededData {
   estimated_usd?: EstimatedUsd;
   helper_id?: HelperId;
   label?: Label;
-  model?: Model3;
+  model?: Model4;
   model_profile: ModelProfile3;
   not_sent?: NotSent;
   provider?: Provider3;
@@ -2549,7 +2562,7 @@ export interface HelperStartedData {
   helper_id: HelperId1;
   index: Index3;
   label: Label1;
-  model: Model4;
+  model: Model5;
   pick_reason: PickReason;
   wish: Wish1;
 }
@@ -2582,7 +2595,7 @@ export interface HelperModelData {
   call_id: CallId12;
   helper_id: HelperId2;
   index: Index4;
-  model: Model5;
+  model: Model6;
   pick_reason: PickReason1;
 }
 /**

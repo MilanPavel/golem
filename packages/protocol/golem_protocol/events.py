@@ -1026,6 +1026,9 @@ class ApprovalNeededData(BaseModel):
     ``subject`` is what rules match for this tool, such as the shell command.
     ``diff`` is the change a file tool would make, as a unified diff, when it
     has one. Approving the call approves that change and no other.
+    With ``source`` ``use_helpers`` the question is "start these helpers?", and
+    ``estimate_usd``, ``allowed_usd``, ``ask_over_usd``, ``model`` and ``cheaper_model`` carry
+    the estimate as on ``PendingItem``.
     """
 
     model_config = _CONFIG
@@ -1037,6 +1040,11 @@ class ApprovalNeededData(BaseModel):
     source: str = Field(min_length=1)
     subject: str | None = None
     diff: str | None = None
+    estimate_usd: float | None = Field(default=None, ge=0)
+    allowed_usd: float | None = Field(default=None, ge=0)
+    ask_over_usd: float | None = Field(default=None, ge=0)
+    model: str | None = Field(default=None, min_length=1)
+    cheaper_model: str | None = Field(default=None, min_length=1)
 
 
 class ApprovalResolvedData(BaseModel):

@@ -1,11 +1,16 @@
 {
   "additionalProperties": false,
-  "description": "``helpers.respond``. Answer the question \"start these helpers?\" a lead waits on.\n\nThe lead asks it when ``[agents] use_helpers`` is ``ask``: its pending list holds a\n``batch`` item whose ``call_id`` is the ``delegate`` call. ``run`` true starts the helpers\nas usual. ``run`` false starts none, and the model gets a result that tells it to do the\nwork in the chat. The question is also on the log as ``approval.needed`` with the source\n``use_helpers`` and the tool ``delegate``, and the answer as ``approval.resolved``\n(``allow`` or ``deny``); an older client may answer it with ``approval.respond``, where a\nyes of any kind runs the helpers and writes no rule.",
+  "description": "``helpers.respond``. Answer the question \"start these helpers?\" a lead waits on.\n\nThe lead asks it when ``[agents] use_helpers`` is ``ask``: its pending list holds a\n``batch`` item whose ``call_id`` is the ``delegate`` call. ``run`` true starts the helpers\nas usual. ``run`` false starts none, and the model gets a result that tells it to do the\nwork in the chat. The question is also on the log as ``approval.needed`` with the source\n``use_helpers`` and the tool ``delegate``, and the answer as ``approval.resolved``\n(``allow`` or ``deny``); an older client may answer it with ``approval.respond``, where a\nyes of any kind runs the helpers and writes no rule.\n\n``cheaper`` true, with ``run`` true, starts the helpers on the item's ``cheaper_model``\n(\"Use a cheaper model\"). ``cheaper`` with ``run`` false is refused.",
   "properties": {
     "call_id": {
       "minLength": 1,
       "title": "Call Id",
       "type": "string"
+    },
+    "cheaper": {
+      "default": false,
+      "title": "Cheaper",
+      "type": "boolean"
     },
     "run": {
       "title": "Run",
