@@ -22287,7 +22287,8 @@ public enum RunFailedEventType: String, Codable {
 /// One row for each session whose origin is not ``user``. ``kind`` is ``routine`` for a
 /// routine's firing, ``ask`` for ``golem ask --detach`` and ``workflow`` for a workflow run
 /// (``routine`` stays null; the name is in ``origin``, after ``workflow:``).
-/// ``routine`` is the routine's name, null for ``ask``. ``folder`` is the project folder of a
+/// ``routine`` is the routine's name, null for ``ask``. ``folder`` is the project folder of
+/// a
 /// project routine, null for a user routine, so ``routine.get(routine, folder)`` finds it.
 /// ``routine_run_id`` and ``trigger`` are null for ``ask``.
 /// ``status`` is read as ``RoutineRunSummary.status`` is:
@@ -22399,7 +22400,8 @@ public struct RunListResult: Codable {
 /// One row for each session whose origin is not ``user``. ``kind`` is ``routine`` for a
 /// routine's firing, ``ask`` for ``golem ask --detach`` and ``workflow`` for a workflow run
 /// (``routine`` stays null; the name is in ``origin``, after ``workflow:``).
-/// ``routine`` is the routine's name, null for ``ask``. ``folder`` is the project folder of a
+/// ``routine`` is the routine's name, null for ``ask``. ``folder`` is the project folder of
+/// a
 /// project routine, null for a user routine, so ``routine.get(routine, folder)`` finds it.
 /// ``routine_run_id`` and ``trigger`` are null for ``ask``.
 /// ``status`` is read as ``RoutineRunSummary.status`` is:
