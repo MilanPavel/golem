@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import asyncio
+import threading
 from pathlib import Path
 from typing import cast
 
 from test_server import HELLO, RpcClient, error_code, rpc_result, start_daemon, stop_daemon
 
 from golem.server.dispatcher import INVALID_PARAMS
+from golem.workflows.registry import WorkflowRegistry
 
 TWO_STEPS = """\
 from golem.workflow import workflow, Run, manual
@@ -26,6 +28,7 @@ async def adder(run: Run, n: int = 1):
 
 SLOW = """\
 import asyncio
+import threading
 from golem.workflow import workflow, Run
 
 
@@ -189,3 +192,26 @@ async def test_get_returns_the_outline_and_tolerates_a_bad_file(short_home: Path
     finally:
         await client.close()
         await stop_daemon(app, task)
+
+
+def test_two_threads_can_refresh_the_registry_together(tmp_path: Path) -> None:
+    folder = tmp_path / "wf"
+    for i in range(20):
+        _write(folder, f"w{i}.py", TWO_STEPS.replace("adder", f"w{i}"))
+    registry = WorkflowRegistry(user_dir=folder, projects=lambda: [], trusted=lambda _p: True)
+    errors: list[BaseException] = []
+
+    def work() -> None:
+        try:
+            for _ in range(3):
+                registry.refresh()
+        except BaseException as exc:
+            errors.append(exc)
+
+    threads = [threading.Thread(target=work) for _ in range(2)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    assert errors == []
+    assert sorted(e.name for e in registry.entries()) == sorted(f"w{i}" for i in range(20))

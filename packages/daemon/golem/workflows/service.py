@@ -59,7 +59,6 @@ class WorkflowService:
         self._broadcast = broadcast
         self._folders: set[Path] = set()
         self._tasks: dict[str, asyncio.Task[None]] = {}
-        self._lock = asyncio.Lock()
         self._user_file = user_file
         self.registry = WorkflowRegistry(
             user_dir=user_dir, projects=self._projects, trusted=trusted
@@ -82,8 +81,7 @@ class WorkflowService:
 
     async def refresh(self, folders: list[Path]) -> list[WorkflowEntry]:
         self._folders.update(folders)
-        async with self._lock:
-            await asyncio.to_thread(self.registry.refresh)
+        await asyncio.to_thread(self.registry.refresh)
         return self.registry.entries()
 
     def launch(self, run_id: str) -> None:
@@ -99,8 +97,7 @@ class WorkflowService:
             record = await self.runs.get_run(run_id)
             if record is not None and record.status == "pending":
                 # Cancelled before the engine began: the engine never set the status.
-                await self.runs.set_run_status(run_id, "cancelled", _now())
-                await self.engine._run_event("workflow.run.cancelled", run_id)  # pyright: ignore[reportPrivateUsage]
+                await self.engine.mark_cancelled(run_id)
         except Exception:
             log.exception("workflow run %s broke", run_id)
 
