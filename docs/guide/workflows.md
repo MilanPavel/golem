@@ -198,6 +198,28 @@ The rules are the chat's, so a tool is allowed, denied or asked in the same case
 - Output over 4 KB is stored as an artifact of the run's session. The step keeps a one-line summary and the artifact id; `run.tool` still returns all of it, also after a restart.
 - A tool that is unknown, or called with arguments that do not fit, fails the step.
 
+### Running a skill
+
+```python
+notes = await run.skill("release-notes", args="v1.4", key="notes")
+```
+
+`run.skill(name, args="", key=None)` runs one skill as one short agent turn and returns the final answer as text. The skill's body, with `args` filled in as `/name args` does in the chat, is the brief of a helper of the run's session. The helper gets the explorer agent's read-only tools plus the ones the skill's `allowed-tools` names, with golem's permissions. A skill that names tools that change things (`edit_file`, `shell`, ...) fails the step until helpers can work in copies. It has its own thread, so the step shows `child_session_id` and you can open it. The step has kind `skill` and the key `key` or `skill:<name>`; give two runs of one skill their own `key=`.
+
+- A skill that is unknown, disabled, or broken fails the step. For an unknown name the error lists the skills the run's folder sees.
+- A helper that fails or is stopped fails the step, and the error says why.
+- After a restart the run waits for the same helper. It never starts a second one.
+
+### Example: a PR digest
+
+`examples/workflows/pr_digest.py` lists the open pull requests with `run.tool`, has a model write one line for each (all at once, in `run.parallel`), asks you to look over the notes with `run.review`, and ends with `run.notify`. The tool name and the repo are inputs, so it works with any MCP server that can list pull requests:
+
+```
+golem workflow run pr_digest --input tool=mcp__github__list_pull_requests --input repo=golem
+```
+
+Steps: `tool:<name>`, `summarise #<n>` for each PR, `review:...`, `notify:...`. A `deny` rule on the tool fails the first step with the rule's reason, and nothing else runs. To have a skill write the notes instead of you, replace the review with `await run.skill("pr-notes", args=digest)`.
+
 ## Waiting for you
 
 ```python
@@ -246,8 +268,7 @@ A broken file never disappears from the list. Fix it and it loads again.
 
 | Piece | What it adds | Ticket |
 |---|---|---|
-| `run.skill` | One skill, with no agent loop | 3.8 (#740) |
 | Workflows page | List workflows and see each run's steps in the web UI | 3.9 (#741) |
 | Editor | Edit a workflow, check it without a model, and try it from a step | 3.11 (#1225) |
 
-Until these land, a workflow can run code, run steps in parallel, save results, use `key=`, ask a model one question, tell you things, ask an agent, call a tool and wait for your review.
+Until these land, a workflow can run code, run steps in parallel, save results, use `key=`, ask a model one question, tell you things, ask an agent, run a skill, call a tool and wait for your review.
