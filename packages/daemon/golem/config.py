@@ -600,6 +600,13 @@ class ExplorerSettings(AgentModelSettings):
         return {**table, "timeout_seconds": value, "working_seconds": value}
 
 
+class AdvisorSettings(AgentModelSettings):
+    """``[agents.advisor]``. The keys of every bundled type, and ``max_per_message``: how many
+    advisors one message of the lead may start, counting every ``delegate`` call in it."""
+
+    max_per_message: int = Field(default=1, ge=1, le=10)
+
+
 BUNDLED_TYPES = ("explorer", "worker", "reviewer", "advisor")
 """The agent types that ship with golem: the names ``[agents.<name>]`` may set."""
 
@@ -668,7 +675,7 @@ class AgentSettings(BaseModel):
     explorer: ExplorerSettings = Field(default_factory=ExplorerSettings)
     worker: AgentModelSettings = Field(default_factory=AgentModelSettings)
     reviewer: AgentModelSettings = Field(default_factory=AgentModelSettings)
-    advisor: AgentModelSettings = Field(default_factory=AgentModelSettings)
+    advisor: AdvisorSettings = Field(default_factory=AdvisorSettings)
 
     @model_validator(mode="after")
     def _one_batch_limit(self) -> Self:

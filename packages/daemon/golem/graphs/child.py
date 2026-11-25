@@ -26,6 +26,8 @@ class ChildLimits:
     answer_chars: int = 6_000
     max_per_turn: int = 3
     """How many helpers one run of the parent may start."""
+    advisors_per_message: int = 1
+    """How many advisors one message may start (``[agents.advisor] max_per_message``)."""
 
 
 def child_thread(session_id: str, call_id: str) -> str:
