@@ -2,7 +2,7 @@
 """Start a built daemon against a stub model and check one chat.
 
 Standard library only. ``just smoke-dist`` runs this. After one untimed start,
-the fastest of five starts must open the socket within 1.5 seconds; if none does,
+the fastest of five starts must open the socket within 2 seconds; if none does,
 five more starts are timed and the fastest of all ten is judged. The assistant's
 ``message.completed`` text is ``smoke-ok``.
 """
@@ -31,12 +31,13 @@ from pathlib import Path
 from typing import cast
 
 REPLY = "smoke-ok"
-# A start takes about 0.5s on a quiet Mac. Shared CI Macs vary from 0.5s to
-# 1.4s for the same build, so the budget leaves room for that and still
-# catches a start that doubles. If the fastest of five misses it, five more
-# starts are timed and the fastest of all ten decides, so one slow runner
-# does not fail the build.
-START_LIMIT_S = 1.5
+# Measured for the same build: normal CI Macs start in 1.1-1.4s, and slow CI
+# Macs take 1.7-1.9s, with every start on a slow machine slow (slowness is
+# per machine, so retries do not help). 2.0s covers both and still catches a
+# start that doubles from about 1.1s. If the fastest of five misses it, five
+# more starts are timed and the fastest of all ten decides, for borderline
+# runners.
+START_LIMIT_S = 2.0
 TIMED_STARTS = 5
 FIRST_START_LIMIT_S = 30.0
 CHAT_TIMEOUT_S = 60.0
