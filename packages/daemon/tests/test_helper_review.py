@@ -128,17 +128,18 @@ class _Daemon:
             raise AssertionError(f"no {kind} in {kinds}") from None
         return await self.stored(session_id)
 
-    async def lead(self, project: Path) -> str:
+    async def lead(self, project: Path, *, after: str = "def a():\n    return 2\n") -> str:
         lead = await self.manager.create(self.lead_model, cwd=str(project))
-        await self.changes.record(
-            session_id=lead,
-            run_id=None,
-            call_id=None,
-            path="a.py",
-            before="def a():\n    return 1\n",
-            after="def a():\n    return 2\n",
-            source="tool",
-        )
+        if after:
+            await self.changes.record(
+                session_id=lead,
+                run_id=None,
+                call_id=None,
+                path="a.py",
+                before="def a():\n    return 1\n",
+                after=after,
+                source="tool",
+            )
         await self.manager.send(lead, "go")
         return lead
 
@@ -224,6 +225,24 @@ async def test_a_local_lead_gets_a_paid_review_of_its_diff_after_one_question(
     assert any(text.startswith(real) for text in await daemon.tool_results())
     assert _last_text(events).startswith("LEAD GOT:")
     assert "+    return 2" in _last_text(events)
+
+
+async def test_the_estimate_of_the_paid_question_counts_the_diff_the_reviewer_reads(
+    database: Database, project: Path, tmp_path: Path, _settled: list[_Daemon]
+) -> None:
+    estimates: list[float | None] = []
+    for after in ("", "def a():\n" + "    return 2\n" * 2000):
+        daemon = _Daemon(database, _mixed_setup(), LOCAL, project, tmp_path)
+        _settled.append(daemon)
+        lead = await daemon.lead(project, after=after)
+        helper = await daemon.helper_of(lead)
+        own = await daemon.until(helper, "route.consent.needed")
+        asked = next(e for e in own if isinstance(e, RouteConsentNeededEvent)).data
+        estimates.append(asked.estimated_usd)
+
+    without, with_diff = estimates
+    assert without is not None and with_diff is not None
+    assert with_diff > without + 0.005  # 24k characters at 1 USD per million tokens, and more
 
 
 async def test_a_local_only_folder_refuses_the_paid_reviewer_and_reviews_locally(

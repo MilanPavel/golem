@@ -409,6 +409,8 @@ class _LiveSession:
     paid question carries it (step 15.9.4). In memory only: the brief in the log names it."""
     diff_lines: int | None = None
     """The lines of that diff. In memory only."""
+    diff_chars: int = 0
+    """The size of that diff in characters, for the paid question's estimate. In memory only."""
     asked_model: str | None = None
     """The model the lead named for this helper in its ``delegate`` call. It is the helper's wish
     again when the paid question is answered. In memory only."""
@@ -1585,6 +1587,9 @@ class SessionManager:
                     not_sent=not_sent,
                     brief=question_brief(brief),
                     diff_artifact_id=helper.diff_artifact_id,
+                    estimated_usd=self._with_diff(
+                        picked.ask.estimated_usd, picked.profile, helper.diff_chars
+                    ),
                 )
             self._sessions[sid] = helper
             # A helper is named where it shows (a card, a panel, the Inbox), never untitled.
@@ -1647,8 +1652,18 @@ class SessionManager:
         if diff == "" or artifacts is None:
             return f"{brief}\n\n{NO_DIFF}"
         helper.diff_artifact_id = await artifacts.put(helper.session_id, None, "diff", diff)
+        helper.diff_chars = len(diff)
         helper.diff_lines = diff.count("\n") + (0 if diff.endswith("\n") else 1)
         return f"{brief}\n\n{diff_line(helper.diff_artifact_id, diff)}"
+
+    def _with_diff(self, estimate: float | None, profile: str, chars: int) -> float | None:
+        """``estimate`` plus the input cost of a diff of ``chars`` characters, which the reviewer
+        reads: the same four characters to the token as the brief's estimate."""
+        price = None if self._runtime.price_of is None else self._runtime.price_of(profile)
+        extra = cost_usd({"input": chars // 4, "output": 0}, price) if chars else 0.0
+        if estimate is None or extra is None:
+            return estimate
+        return estimate + extra
 
     def diff_artifact_of(self, helper_id: str) -> str | None:
         """The artifact with the lead's diff that ``helper_id`` was started with, if any."""
