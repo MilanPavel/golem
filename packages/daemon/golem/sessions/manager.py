@@ -24,10 +24,10 @@ from collections.abc import (
     Sequence,
 )
 from contextlib import asynccontextmanager
-from dataclasses import dataclass, field, replace
+from dataclasses import asdict, dataclass, field, replace
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Literal, cast
+from typing import Any, Literal, cast
 
 from langchain_core.messages import BaseMessage
 from langchain_core.runnables import RunnableConfig
@@ -35,7 +35,7 @@ from langchain_core.runnables import RunnableConfig
 from golem.agents.bundled import bundled_agents_dir
 from golem.agents.model import Agent
 from golem.agents.registry import AgentRegistry
-from golem.coding import copies
+from golem.coding import copies, worker_result
 from golem.coding.changes import session_diff
 from golem.config import AgentSettings, ChatSettings, ModelPrice, PermissionMode, RouteMode
 from golem.evals.whatif import build_report, session_model
@@ -98,6 +98,7 @@ from golem.sessions.helpers import (
     unavailable_reason,
     what_is_sent,
     wish_of,
+    worker_line,
     writing_tools,
 )
 from golem.sessions.ids import new_id
@@ -201,6 +202,7 @@ from golem_protocol.events import (
     ToolStartedData,
     ToolStartedEvent,
     WaitReason,
+    WorkerFile,
 )
 
 NOT_APPROVED = "cancelled before it was approved"
@@ -340,6 +342,22 @@ class SchemaMismatchError(Exception):
     def __init__(self, found: object) -> None:
         super().__init__(f"unsupported schema_version {found}")
         self.found = found
+
+
+def _changes_line(ended: HelperEndedData | None) -> str:
+    """The line on a worker's change for the lead, from its ``helper.ended``. Empty for a helper
+    without a copy."""
+    if ended is None or ended.files is None:
+        return ""
+    return worker_line(
+        files=len(ended.files),
+        added=ended.added or 0,
+        removed=ended.removed or 0,
+        checks=ended.checks,
+        failed=ended.checks_failed or (),
+        note=ended.checks_note,
+        artifact_id=ended.diff_artifact_id,
+    )
 
 
 @dataclass
@@ -588,6 +606,8 @@ class SessionManager:
         self.recheck_seconds: float = 60.0
         """Seconds between those looks, replaceable in tests."""
         self._ended_helpers: set[str] = set()
+        self.check_runner: worker_result.CheckRunner | None = None
+        """Runs a worker's checks in its copy. None: the shell sandbox (tests put a fake here)."""
         """Helpers whose ``helper.ended`` is stored, which no longer hold a turn."""
         self._lock = asyncio.Lock()
         self.clock: Callable[[], float] = time.monotonic
@@ -2300,6 +2320,11 @@ class SessionManager:
         }
         limit = self._runtime.child_limits.answer_chars
         found: list[HelperOutcome] = []
+        ended = {
+            e.data.index: e.data
+            for e in await self._events.stored(session_id)
+            if isinstance(e, HelperEndedEvent) and e.data.call_id == call_id
+        }
         for helper in await self._records.helpers_of(session_id, call_id):
             run = await self._run_records.latest(helper.session_id)
             answer = ""
@@ -2314,6 +2339,7 @@ class SessionManager:
                     text=answer[:limit],
                     label=labels.get(helper.session_id, ""),
                     covered=await self._covered(helper.session_id, stopped),
+                    changes=_changes_line(ended.get(helper.helper_index or 0)),
                 )
             )
         return found
@@ -2399,14 +2425,24 @@ class SessionManager:
             run = None if run_id is None else await self._run_records.get(run_id)
             run_events = [] if run_id is None else await self._events.for_run(run_id)
             summary = summarize_run(run_events)
+            stopped_now = stopped or await self._stopped(session_id, run, run_events)
+            cut: asyncio.CancelledError | None = None
+            worker: dict[str, Any]
+            try:
+                worker = await self._worker_result(session_id)
+            except asyncio.CancelledError as exc:
+                # A Stop during the checks: say so, then let the cancellation go on.
+                cut = exc
+                worker = {"checks": "none", "checks_note": worker_result.STOPPED}
             await self._events.emit(
                 lead,
                 None if started is None else started.run_id,
                 "helper.ended",
                 HelperEndedData(
+                    **worker,
                     call_id=call_id,
                     index=index,
-                    stopped=stopped or await self._stopped(session_id, run, run_events),
+                    stopped=stopped_now,
                     model_calls=summary.model_calls,
                     tokens=summary.tokens,
                     answer_tokens=len(summary.answer) // 4,
@@ -2415,7 +2451,52 @@ class SessionManager:
                     working_ms=summary.working_ms,
                 ),
             )
+            if cut is not None:
+                raise cut
         self._spawn_wake(lead)
+
+    async def _worker_result(self, helper_id: str) -> dict[str, Any]:
+        """The ``helper.ended`` fields of a helper with a copy: its diff and its checks.
+
+        Empty for a helper without a copy. The diff is stored as an artifact of the helper, as
+        the reviewer's is. The copy is kept. The checks run in the copy, after the helper's run
+        and before ``helper.ended``, and are skipped for an empty diff.
+        """
+        live = self._sessions.get(helper_id)
+        if live is not None and live.copy_path is not None and live.copy_baseline is not None:
+            copy = copies.Copy(live.copy_path, live.copy_baseline)
+        else:
+            found = await self._records.copy_of(helper_id)
+            if found is None:
+                return {}
+            copy = copies.Copy(Path(found[0]), found[1])
+        try:
+            diff = await copies.diff_since_baseline(copy)
+        except copies.CopyError as exc:
+            return {"checks": "none", "checks_note": f"the copy could not be read: {exc}"}
+        files = worker_result.files_of(diff)
+        artifacts = self._runtime.artifacts
+        artifact_id = None
+        if diff != "" and artifacts is not None:
+            artifact_id = await artifacts.put(helper_id, None, "diff", diff)
+        fields: dict[str, Any] = {
+            "diff_artifact_id": artifact_id,
+            "files": [WorkerFile(**asdict(f)) for f in files],
+            "added": sum(f.added for f in files),
+            "removed": sum(f.removed for f in files),
+        }
+        if diff == "":
+            return {**fields, "checks": "none", "checks_note": worker_result.NO_CHANGES}
+        policy = self._runtime.policy
+        done = await worker_result.run_checks(
+            copy.path, policy.coding(), self.check_runner, policy.shell()
+        )
+        return {
+            **fields,
+            "checks": done.checks,
+            "checks_failed": done.failed or None,
+            "checks_note": done.note,
+        }
 
     async def _relay_wait(self, event: ModelWaitingEvent) -> None:
         """Tell the lead when a helper's model call waits in the dispatcher, and when it stops.
