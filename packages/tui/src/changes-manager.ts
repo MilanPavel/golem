@@ -1,8 +1,9 @@
 import type { ChangedFile, ChangesRevertTarget } from "@golem/client";
-import { numberDiff, parseDiff, shellTrackingNote, type DiffLine, type DiffTone, type NumberedLine, type ReviewNote, type ShellTracking } from "@golem/view";
+import { numberDiff, parseDiff, shellTrackingNote, type DiffLine, type DiffTone, type NumberedLine, type ReviewNote, type ShellTracking, type WorkerBlock } from "@golem/view";
 
 import { layoutCommitBand, type CommitBand } from "./commit-band.ts";
 import type { Press } from "./keys.ts";
+import { emptyWorkerPane, layoutWorkerBlocks, layoutWorkerDiff, WORKER_HINT, WORKER_VIEW_HINT, type WorkerPane, type WorkerRow } from "./worker-changes.ts";
 
 /**
  * `/changes`: the files this session changed on the left, the diff of the
@@ -26,6 +27,8 @@ export type ChangesManagerState = {
   confirm: ChangesRevertTarget | null;
   /** A line that replaces the hint until the next key. */
   message: string | null;
+  /** The worker blocks' keys and notes. Left out, nothing is selected. */
+  workers?: WorkerPane;
 };
 
 /** Where a note is being written: the row, as `addNote` wants it, and the text so far. */
@@ -43,6 +46,8 @@ export type ChangesData = {
   failed?: Readonly<Record<string, string>>;
   /** How shell changes are found, from `changes.list`. Left out, they are. */
   shell?: ShellTracking;
+  /** The worker blocks above the files, and the folder the footer names. Left out or empty, nothing is drawn. */
+  workers?: { blocks: readonly WorkerBlock[]; folder: string };
 };
 
 export type ChangesKey =
@@ -419,12 +424,21 @@ export function layoutChanges(
           (row): ChangesLine => ({ left: null, text: row.text, tone: row.tone === "del" ? "del" : "plain", bold: row.bold === true, dim: row.dim === true }),
         );
   // The band takes the rows of the key hint and more.
-  const room = Math.max(0, rows - 1 - (band === null ? 1 : band.length));
+  const space = Math.max(0, rows - 1 - (band === null ? 1 : band.length));
+  const pane = state.workers ?? emptyWorkerPane;
+  const blocks = data.workers?.blocks ?? [];
+  const view = blocks.length > 0 && pane.focus ? pane.view : null;
+  const workerRows =
+    view !== null || data.workers === undefined ? [] : layoutWorkerBlocks(blocks, pane, data.workers.folder, width).map((row) => workerLine(row));
+  const room = Math.max(0, space - workerRows.length);
   let title = "changes";
   let body: ChangesLine[];
   let hint = BARE_HINT;
   const asked = state.confirm;
-  if (data.error !== null) {
+  if (view !== null) {
+    title = `changes · ${view.label}`;
+    body = layoutWorkerDiff(view, space, width).map((row) => workerLine(row));
+  } else if (data.error !== null) {
     body = [plain(data.error)];
   } else if (files === null) {
     body = [plain("asking the daemon…", { dim: true })];
@@ -432,7 +446,8 @@ export function layoutChanges(
     body = [plain("No changes yet."), ...noteLines];
   } else {
     title = titleOf(files);
-    hint = hintFor(width, state.note === undefined || state.note === null ? "" : state.note);
+    const lead = [...(state.note === undefined || state.note === null ? [] : [state.note]), ...(blocks.length > 0 ? ["tab workers"] : [])];
+    hint = hintFor(width, lead.join(" · "));
     const file = clamp(state.file, files.length);
     const chosen = files[file];
     const path = chosen?.path ?? "";
@@ -458,6 +473,13 @@ export function layoutChanges(
       body.push({ left: left[index]?.text ?? "", leftSelected: left[index]?.selected === true, text: "", tone: "plain" });
     }
   }
+  if (view !== null) {
+    hint = WORKER_VIEW_HINT;
+  } else if (blocks.length > 0 && pane.focus) {
+    hint = WORKER_HINT;
+  } else if (blocks.length > 0 && hint === BARE_HINT) {
+    hint = `tab workers · ${BARE_HINT}`;
+  }
   if (asked !== null) {
     hint = confirmText(asked);
   } else if (state.input !== null) {
@@ -467,11 +489,16 @@ export function layoutChanges(
   }
   const lines = [
     plain(title, { bold: true }),
-    ...body.slice(0, room),
-    ...Array.from({ length: Math.max(0, room - body.length) }, () => plain("")),
+    ...workerRows,
+    ...body.slice(0, view === null ? room : space),
+    ...Array.from({ length: Math.max(0, (view === null ? room : space) - body.length) }, () => plain("")),
     ...(band ?? [plain(hint, { dim: true })]),
   ];
   return lines.slice(0, Math.max(0, rows));
+}
+
+function workerLine(row: WorkerRow): ChangesLine {
+  return { left: null, text: row.text, tone: row.tone, bold: row.bold === true, dim: row.dim === true };
 }
 
 /** The file column from the top, scrolled so the selected file shows. */

@@ -201,6 +201,7 @@ import {
   isUseHelpersQuestion,
   consentShowable,
   reviewItemsOf,
+  workerBlocks,
 } from "@golem/view";
 import { compactWaiting, runCompact } from "./compact.ts";
 import { contextKeyLine, contextRowForPress, readContextActions } from "./context-actions.ts";
@@ -404,6 +405,7 @@ import {
   type ChangesLine,
   type ChangesManagerState,
 } from "./changes-manager.ts";
+import { emptyWorkerPane, pressWorker, runWorkerCall, workerDone, workerKeyOf, type WorkerCall } from "./worker-changes.ts";
 import {
   commitErrored,
   commitKeyOf,
@@ -780,6 +782,12 @@ export function App({
   /** Sessions whose "needs you" banner Esc put away, until they stop waiting. */
   const [dismissedRuns, setDismissedRuns] = useState<ReadonlySet<string>>(new Set());
   const [changesManager, setChangesManager] = useState<ChangesManagerState>(closedChangesManager);
+  /** The agent types that change files: a running helper of one is a worker. Read when `/changes` opens. */
+  const [writingAgents, setWritingAgents] = useState<ReadonlySet<string>>(new Set());
+  const writingAgentsRef = useRef(writingAgents);
+  writingAgentsRef.current = writingAgents;
+  /** Bumped on a `helper.*` event while `/changes` is open, so the worker blocks are drawn again. */
+  const [, setHelperTick] = useState(0);
   const changesManagerRef = useRef(changesManager);
   changesManagerRef.current = changesManager;
   // What each turn changed and asked, folded from every event, for /undo.
@@ -1561,6 +1569,9 @@ export function App({
       }
       if (event.type.startsWith("helper.")) {
         helperEventsRef.current = [...helperEventsRef.current, event].slice(-HELPER_EVENTS_KEPT);
+        if (changesManagerRef.current.open) {
+          setHelperTick((tick) => tick + 1);
+        }
       }
       changesFold.current = reduceChanges(changesFold.current, event);
       promptsFold.current = foldPrompts(promptsFold.current, event);
@@ -2513,6 +2524,7 @@ export function App({
       setSwitcher(closedSwitcher);
       showChangesManager(openChangesManager());
       loadChanges(id, null);
+      loadWriters();
       return;
     }
     if (outcome.kind === "commit") {
@@ -2526,6 +2538,7 @@ export function App({
       setSwitcher(closedSwitcher);
       showChangesManager(openChangesManager());
       loadChanges(id, null);
+      loadWriters();
       openCommit(id);
       return;
     }
@@ -4631,6 +4644,41 @@ export function App({
     return { ...changesRef.current, notes: notesOf(sessionRef.current).notes };
   }
 
+  /** The agent types that change files, so a running helper of one shows as a worker. */
+  function loadWriters(): void {
+    client.listAgents(skillsFolder()).then(
+      (listed) => {
+        setWritingAgents(new Set(listed.agents.filter((info) => (info.changing_tools ?? []).length > 0).map((info) => info.name)));
+      },
+      () => undefined,
+    );
+  }
+
+  function currentWorkerBlocks() {
+    return workerBlocks(helperEventsRef.current, { writes: (agent) => writingAgentsRef.current.has(agent) });
+  }
+
+  function changesWorkers(): { blocks: ReturnType<typeof currentWorkerBlocks>; folder: string } {
+    return { blocks: currentWorkerBlocks(), folder: shortCwd(sessionCwdRef.current ?? process.cwd(), homedir()) };
+  }
+
+  function runWorker(call: WorkerCall): void {
+    const id = sessionRef.current;
+    if (id === null) {
+      return;
+    }
+    void runWorkerCall(client, id, call).then((result) => {
+      const current = changesManagerRef.current;
+      if (!current.open) {
+        return;
+      }
+      showChangesManager({ ...current, workers: workerDone(current.workers ?? emptyWorkerPane, result) });
+      if (call.kind === "apply" || call.kind === "apply-green") {
+        loadChanges(id, null);
+      }
+    });
+  }
+
   function runChangesAction(action: ChangesAction): void {
     const id = sessionRef.current;
     if (action.kind === "add-note" && id !== null) {
@@ -4682,7 +4730,20 @@ export function App({
       runChangesAction(typed.action);
       return;
     }
-    const key = changesKeyOf(press);
+    const pane = changesManagerRef.current.workers ?? emptyWorkerPane;
+    const workerKey = changesManagerRef.current.confirm === null ? workerKeyOf(press) : null;
+    if (workerKey !== null) {
+      const worked = pressWorker(pane, currentWorkerBlocks(), workerKey);
+      if (!worked.pass) {
+        showChangesManager({ ...changesManagerRef.current, workers: worked.pane });
+        if (worked.call !== null) {
+          runWorker(worked.call);
+        }
+        return;
+      }
+    }
+    // With the workers focused, the keys of the files wait: `x` would remove a note, `u` undo a hunk.
+    const key = pane.focus && changesManagerRef.current.confirm === null && press.name !== "escape" ? null : changesKeyOf(press);
     if (key === null) {
       return;
     }
@@ -6299,7 +6360,7 @@ export function App({
         />
       ) : changesManager.open ? (
         <Box flexDirection="column" width={columns} height={budget.body} flexShrink={0} overflow="hidden">
-          {layoutChanges(changesManager, { ...changes, notes: notesOf(sessionId).notes }, columns, budget.body).map((line, index) => (
+          {layoutChanges(changesManager, { ...changes, notes: notesOf(sessionId).notes, workers: changesWorkers() }, columns, budget.body).map((line, index) => (
             <ChangesRow key={index} line={line} />
           ))}
         </Box>
