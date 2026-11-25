@@ -604,3 +604,19 @@ def test_consent_needed_refuses_long_lists_and_strings() -> None:
     ):
         with pytest.raises(ValidationError):
             RouteConsentNeededData.model_validate(_consent_data(**bad))
+
+
+def test_consent_needed_brief_and_diff_round_trip() -> None:
+    plain = RouteConsentNeededData.model_validate(_consent_data())
+    assert plain.brief is None and plain.diff_artifact_id is None
+    helper = RouteConsentNeededData.model_validate(
+        _consent_data(helper_id="h1", brief="Review the diff.", diff_artifact_id="art-1")
+    )
+    assert RouteConsentNeededData.model_validate_json(helper.model_dump_json()) == helper
+    assert helper.diff_artifact_id == "art-1"
+    # An old event without the fields still parses.
+    old = RouteConsentNeededData.model_validate_json(plain.model_dump_json(exclude_none=True))
+    assert old == plain
+    for bad in ({"brief": "x" * 8001}, {"diff_artifact_id": ""}):
+        with pytest.raises(ValidationError):
+            RouteConsentNeededData.model_validate(_consent_data(**bad))

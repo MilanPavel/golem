@@ -424,6 +424,9 @@ class ConsentCaps(BaseModel):
 
 
 ShortText = Annotated[str, Field(min_length=1, max_length=120)]
+
+# The longest brief a helper's consent question carries; the daemon cuts a longer one.
+HELPER_BRIEF_MAX_CHARS = 8000
 """One short line of the paid question: what is sent, or what is not."""
 
 
@@ -445,6 +448,13 @@ class RouteConsentNeededData(BaseModel):
     ``label`` the short name the card shows. ``sent`` and ``not_sent`` are short lists that say
     what goes to the paid model ("the brief", "the diff, 212 lines") and what does not ("this
     chat"). All five are null or empty for a lead's own question. An older daemon leaves them out.
+
+    ``brief`` is the helper's brief, so a client can show it behind "show". The daemon cuts a
+    brief longer than ``HELPER_BRIEF_MAX_CHARS`` and marks the cut in the text. ``diff_artifact_id``
+    is the id of the diff artifact of a reviewer helper; the client reads it with
+    ``artifact.read``. Both are set only for a helper's question, like ``helper_id``, and are null
+    otherwise. "Review locally" is the client's wording for the existing ``local`` answer when the
+    agent is a reviewer; it is not a new answer.
     """
 
     model_config = _CONFIG
@@ -464,6 +474,8 @@ class RouteConsentNeededData(BaseModel):
     label: str | None = Field(default=None, max_length=120)
     sent: list[ShortText] | None = Field(default=None, max_length=10)
     not_sent: list[ShortText] | None = Field(default=None, max_length=10)
+    brief: str | None = Field(default=None, max_length=HELPER_BRIEF_MAX_CHARS)
+    diff_artifact_id: str | None = Field(default=None, min_length=1)
 
 
 class RouteConsentAnsweredData(BaseModel):

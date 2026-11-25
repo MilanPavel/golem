@@ -2,10 +2,12 @@
 
 export type Agent = string | null;
 export type Alternatives = ('session' | 'once' | 'local')[];
+export type Brief = string | null;
 export type DailyUsd = number | null;
 export type SessionUsd = number | null;
 export type SpentSession = number;
 export type SpentToday = number;
+export type DiffArtifactId = string | null;
 export type EstimatedUsd = number | null;
 export type HelperId = string | null;
 export type Label = string | null;
@@ -61,11 +63,20 @@ export type Why = string;
  * ``label`` the short name the card shows. ``sent`` and ``not_sent`` are short lists that say
  * what goes to the paid model ("the brief", "the diff, 212 lines") and what does not ("this
  * chat"). All five are null or empty for a lead's own question. An older daemon leaves them out.
+ *
+ * ``brief`` is the helper's brief, so a client can show it behind "show". The daemon cuts a
+ * brief longer than ``HELPER_BRIEF_MAX_CHARS`` and marks the cut in the text. ``diff_artifact_id``
+ * is the id of the diff artifact of a reviewer helper; the client reads it with
+ * ``artifact.read``. Both are set only for a helper's question, like ``helper_id``, and are null
+ * otherwise. "Review locally" is the client's wording for the existing ``local`` answer when the
+ * agent is a reviewer; it is not a new answer.
  */
 export interface RouteConsentNeededData {
   agent?: Agent;
   alternatives: Alternatives;
+  brief?: Brief;
   caps?: ConsentCaps | null;
+  diff_artifact_id?: DiffArtifactId;
   estimated_usd?: EstimatedUsd;
   helper_id?: HelperId;
   label?: Label;

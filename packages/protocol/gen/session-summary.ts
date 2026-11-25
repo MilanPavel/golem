@@ -18,9 +18,11 @@ export type Agents = string[] | null;
 export type AllowedUsd = number | null;
 export type Alternatives = number | null;
 export type AskOverUsd = number | null;
+export type Brief = string | null;
 export type CallId = string | null;
 export type CheaperModel = string | null;
 export type Count = number | null;
+export type DiffArtifactId = string | null;
 export type EstimateUsd = number | null;
 export type Agent2 = string;
 export type Index = number;
@@ -152,8 +154,8 @@ export interface SessionSummary {
  * ``subject`` and ``source`` are those of the ``approval.needed`` event, and ``added`` and
  * ``removed`` count the lines its diff adds and removes (null when the call has no diff).
  * For a consent, ``alternatives`` is the number of answers the user may give. A helper's
- * consent also carries ``helper_id``, ``agent``, ``label``, ``sent`` and ``not_sent`` of its
- * ``route.consent.needed`` event. The full diff
+ * consent also carries ``helper_id``, ``agent``, ``label``, ``sent``, ``not_sent``, ``brief``
+ * and ``diff_artifact_id`` of its ``route.consent.needed`` event. The full diff
  * stays in the session's events: a summary goes to every watcher on every event, so it
  * carries counts only. An older daemon leaves ``pending`` out of the summary.
  *
@@ -188,9 +190,11 @@ export interface PendingItem {
   allowed_usd?: AllowedUsd;
   alternatives?: Alternatives;
   ask_over_usd?: AskOverUsd;
+  brief?: Brief;
   call_id?: CallId;
   cheaper_model?: CheaperModel;
   count?: Count;
+  diff_artifact_id?: DiffArtifactId;
   estimate_usd?: EstimateUsd;
   helper?: PendingHelper | null;
   helper_count?: HelperCount;
