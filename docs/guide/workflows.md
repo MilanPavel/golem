@@ -204,7 +204,7 @@ The rules are the chat's, so a tool is allowed, denied or asked in the same case
 notes = await run.skill("release-notes", args="v1.4", key="notes")
 ```
 
-`run.skill(name, args="", key=None)` runs one skill as one short agent turn and returns the final answer as text. The skill's body, with `args` filled in as `/name args` does in the chat, is the brief of a helper of the run's session. The helper gets the skill's own `allowed-tools` and golem's permissions. It has its own thread, so the step shows `child_session_id` and you can open it. The step has kind `skill` and the key `key` or `skill:<name>`; give two runs of one skill their own `key=`.
+`run.skill(name, args="", key=None)` runs one skill as one short agent turn and returns the final answer as text. The skill's body, with `args` filled in as `/name args` does in the chat, is the brief of a helper of the run's session. The helper gets the explorer agent's read-only tools plus the ones the skill's `allowed-tools` names, with golem's permissions. A skill that names tools that change things (`edit_file`, `shell`, ...) fails the step until helpers can work in copies. It has its own thread, so the step shows `child_session_id` and you can open it. The step has kind `skill` and the key `key` or `skill:<name>`; give two runs of one skill their own `key=`.
 
 - A skill that is unknown, disabled, or broken fails the step. For an unknown name the error lists the skills the run's folder sees.
 - A helper that fails or is stopped fails the step, and the error says why.

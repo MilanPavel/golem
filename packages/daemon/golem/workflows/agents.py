@@ -30,6 +30,9 @@ log = logging.getLogger(__name__)
 RECHECK_SECONDS = 60.0
 """The wait is woken by ``helper.ended``; this is only a safety net against a missed event."""
 
+SKILL_BASE_AGENT = "explorer"
+"""The agent whose tools a skill's helper gets, besides the skill's ``allowed-tools``."""
+
 SKILL_PROMPT = (
     "You run one skill as a short turn. Follow the instructions you are given, use only your"
     " tools, and finish with the result as your answer."
@@ -148,7 +151,12 @@ class WorkflowAgents:
             raise WorkflowError(str(exc)) from exc
         skill = view.get(name)
         assert skill is not None
-        tools = sorted({t.split("(")[0].strip() for t in skill.allowed_tools} - {"", "delegate"})
+        # In a chat a skill keeps the lead's tools; ``allowed-tools`` only skips the asking.
+        # A skill's helper gets the explorer's read-only tools plus the ones the skill names.
+        # Helpers that change things wait for copies (15.10), so such a skill is refused.
+        base = self._agents.view(None if cwd is None else Path(cwd)).get(SKILL_BASE_AGENT)
+        named = {t.split("(")[0].strip() for t in skill.allowed_tools}
+        tools = sorted((named | set(base.tools if base else ())) - {"", "delegate"})
         agent = Agent(
             name=f"skill-{name}",
             description=skill.description,
