@@ -346,6 +346,10 @@ class Run:
         self._use_key(step_key, f"agent {type}")
         wanted = _gets_of(gets)
         cap = _budget_of(budget)
+        # Only the first agent of a parallel member takes the member's place in the batch; a
+        # second agent in the same member would otherwise find the first one's helper again.
+        position = _position.get()
+        _position.set(None)
         return await self._backend.agent(
             self.workflow_run_id,
             step_key,
@@ -353,7 +357,7 @@ class Run:
             brief,
             model,
             _group.get(),
-            _position.get(),
+            position,
             wanted,
             cap,
         )

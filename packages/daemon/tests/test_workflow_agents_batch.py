@@ -213,3 +213,31 @@ def test_budget_text_forms() -> None:
     assert _budget_of(None) is None
     with pytest.raises(WorkflowError):
         _budget_of("$")
+
+
+TWO_IN_A_MEMBER = """
+    @workflow()
+    async def flow(run: Run):
+        async def both(n):
+            first = await run.agent("explorer", f"look at {n}", key=f"look-{n}")
+            again = await run.agent("explorer", f"look again at {n}", key=f"again-{n}")
+            return [first["session_id"], again["session_id"]]
+        return await run.parallel([both(n) for n in range(2)])
+"""
+
+
+async def test_a_second_agent_in_one_parallel_member_gets_its_own_helper(
+    world: Callable[..., World], project: Path
+) -> None:
+    w = world(["a", "b", "c", "d"])
+    run_id = await _run(w, TWO_IN_A_MEMBER, project)
+
+    run = await w.store.get_run(run_id)
+    assert run is not None and run.session_id is not None
+    children = set()
+    for key in ("look-0", "look-1", "again-0", "again-1"):
+        step = await w.store.get_step(run_id, key)
+        assert step is not None and step.status == "done"
+        children.add(step.child_session_id)
+    assert len(children) == 4
+    assert [h.helper_index for h in await w.records.helpers_of(run.session_id, CALL)] == [0, 1]
