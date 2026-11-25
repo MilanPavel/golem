@@ -1,0 +1,77 @@
+{
+  "$defs": {
+    "HelperAppliedData": {
+      "additionalProperties": false,
+      "description": "A worker's diff was taken into the project by ``helper.apply``.\n\nOn the lead's log, so a reload shows the state. ``change_ids`` are the changes it wrote, which\n``changes.diff`` and ``changes.revert`` take.",
+      "properties": {
+        "change_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Change Ids",
+          "type": "array"
+        },
+        "helper_id": {
+          "minLength": 1,
+          "title": "Helper Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "helper_id",
+        "change_ids"
+      ],
+      "title": "HelperAppliedData",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "A worker's diff was taken into the project. A summary on the lead's log.",
+  "properties": {
+    "data": {
+      "$ref": "#/$defs/HelperAppliedData"
+    },
+    "run_id": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Run Id"
+    },
+    "seq": {
+      "minimum": 1,
+      "title": "Seq",
+      "type": "integer"
+    },
+    "session_id": {
+      "minLength": 1,
+      "title": "Session Id",
+      "type": "string"
+    },
+    "ts": {
+      "minLength": 1,
+      "title": "Ts",
+      "type": "string"
+    },
+    "type": {
+      "const": "helper.applied",
+      "title": "Type",
+      "type": "string"
+    }
+  },
+  "required": [
+    "seq",
+    "session_id",
+    "ts",
+    "type",
+    "data"
+  ],
+  "title": "HelperAppliedEvent",
+  "type": "object"
+}

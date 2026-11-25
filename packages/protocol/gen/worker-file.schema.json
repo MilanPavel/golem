@@ -1,0 +1,38 @@
+{
+  "additionalProperties": false,
+  "description": "One file a worker changed in its copy of the project (ADR-059).\n\n``added`` and ``removed`` count the lines of the file's diff.",
+  "properties": {
+    "added": {
+      "minimum": 0,
+      "title": "Added",
+      "type": "integer"
+    },
+    "path": {
+      "minLength": 1,
+      "title": "Path",
+      "type": "string"
+    },
+    "removed": {
+      "minimum": 0,
+      "title": "Removed",
+      "type": "integer"
+    },
+    "status": {
+      "enum": [
+        "created",
+        "modified",
+        "deleted"
+      ],
+      "title": "Status",
+      "type": "string"
+    }
+  },
+  "required": [
+    "path",
+    "status",
+    "added",
+    "removed"
+  ],
+  "title": "WorkerFile",
+  "type": "object"
+}

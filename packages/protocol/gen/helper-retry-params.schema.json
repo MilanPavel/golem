@@ -1,0 +1,28 @@
+{
+  "additionalProperties": false,
+  "description": "``helper.retry``. Run a worker's brief again on a stronger model (\"Try again, stronger\").\n\nThe new helper is a sibling of the old one in the same ``delegate`` call. ``model`` has one\nvalue for now, ``stronger``: the daemon picks the model.",
+  "properties": {
+    "helper_id": {
+      "minLength": 1,
+      "title": "Helper Id",
+      "type": "string"
+    },
+    "model": {
+      "const": "stronger",
+      "title": "Model",
+      "type": "string"
+    },
+    "session_id": {
+      "minLength": 1,
+      "title": "Session Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "session_id",
+    "helper_id",
+    "model"
+  ],
+  "title": "HelperRetryParams",
+  "type": "object"
+}

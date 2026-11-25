@@ -1,0 +1,7 @@
+{
+  "additionalProperties": false,
+  "description": "Nothing to report: the diff is gone.",
+  "properties": {},
+  "title": "HelperDiscardResult",
+  "type": "object"
+}

@@ -1,0 +1,24 @@
+{
+  "additionalProperties": false,
+  "description": "A worker's diff was taken into the project by ``helper.apply``.\n\nOn the lead's log, so a reload shows the state. ``change_ids`` are the changes it wrote, which\n``changes.diff`` and ``changes.revert`` take.",
+  "properties": {
+    "change_ids": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Change Ids",
+      "type": "array"
+    },
+    "helper_id": {
+      "minLength": 1,
+      "title": "Helper Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "helper_id",
+    "change_ids"
+  ],
+  "title": "HelperAppliedData",
+  "type": "object"
+}

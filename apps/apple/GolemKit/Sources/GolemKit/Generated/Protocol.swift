@@ -3466,20 +3466,20 @@ public struct CheckOfferedEvent: Codable {
 /// Sent once per session. Nothing ran. ``session.set_checks`` answers it.
 // MARK: - CheckOfferedEventData
 public struct CheckOfferedEventData: Codable {
-    public let checks: [PurpleCheckInfo]
+    public let checks: [DataCheck]
 
     public enum CodingKeys: String, CodingKey {
         case checks = "checks"
     }
 
-    public init(checks: [PurpleCheckInfo]) {
+    public init(checks: [DataCheck]) {
         self.checks = checks
     }
 }
 
 /// One check: its name and the shell command it runs.
-// MARK: - PurpleCheckInfo
-public struct PurpleCheckInfo: Codable {
+// MARK: - DataCheck
+public struct DataCheck: Codable {
     public let command: String
     public let name: String
 
@@ -7880,6 +7880,205 @@ public struct HelloResult: Codable {
     }
 }
 
+/// A worker's diff was taken into the project by ``helper.apply``.
+///
+/// On the lead's log, so a reload shows the state. ``change_ids`` are the changes it wrote,
+/// which
+/// ``changes.diff`` and ``changes.revert`` take.
+// MARK: - HelperAppliedData
+public struct HelperAppliedData: Codable {
+    public let changeIDS: [String]
+    public let helperID: String
+
+    public enum CodingKeys: String, CodingKey {
+        case changeIDS = "change_ids"
+        case helperID = "helper_id"
+    }
+
+    public init(changeIDS: [String], helperID: String) {
+        self.changeIDS = changeIDS
+        self.helperID = helperID
+    }
+}
+
+/// A worker's diff was taken into the project. A summary on the lead's log.
+// MARK: - HelperAppliedEvent
+public struct HelperAppliedEvent: Codable {
+    public let data: HelperAppliedEventData
+    public let runID: String?
+    public let seq: Int
+    public let sessionID: String
+    public let ts: String
+    public let type: HelperAppliedEventType
+
+    public enum CodingKeys: String, CodingKey {
+        case data = "data"
+        case runID = "run_id"
+        case seq = "seq"
+        case sessionID = "session_id"
+        case ts = "ts"
+        case type = "type"
+    }
+
+    public init(data: HelperAppliedEventData, runID: String?, seq: Int, sessionID: String, ts: String, type: HelperAppliedEventType) {
+        self.data = data
+        self.runID = runID
+        self.seq = seq
+        self.sessionID = sessionID
+        self.ts = ts
+        self.type = type
+    }
+}
+
+/// A worker's diff was taken into the project by ``helper.apply``.
+///
+/// On the lead's log, so a reload shows the state. ``change_ids`` are the changes it wrote,
+/// which
+/// ``changes.diff`` and ``changes.revert`` take.
+// MARK: - HelperAppliedEventData
+public struct HelperAppliedEventData: Codable {
+    public let changeIDS: [String]
+    public let helperID: String
+
+    public enum CodingKeys: String, CodingKey {
+        case changeIDS = "change_ids"
+        case helperID = "helper_id"
+    }
+
+    public init(changeIDS: [String], helperID: String) {
+        self.changeIDS = changeIDS
+        self.helperID = helperID
+    }
+}
+
+public enum HelperAppliedEventType: String, Codable {
+    case helperApplied = "helper.applied"
+}
+
+/// ``helper.apply``. Take a worker's diff into the project.
+///
+/// ``session_id`` is the lead's session and ``helper_id`` the worker's. The result lists the
+/// changes it wrote, and the lead's log gets ``helper.applied``. When a file changed in the
+/// project since the worker copied it, nothing is written and the call fails with the error
+/// code ``HELPER_CONFLICT`` (-32027), whose ``data`` names the ``path`` of the first file.
+// MARK: - HelperApplyParams
+public struct HelperApplyParams: Codable {
+    public let helperID: String
+    public let sessionID: String
+
+    public enum CodingKeys: String, CodingKey {
+        case helperID = "helper_id"
+        case sessionID = "session_id"
+    }
+
+    public init(helperID: String, sessionID: String) {
+        self.helperID = helperID
+        self.sessionID = sessionID
+    }
+}
+
+/// The changes the diff wrote, in the order they were made.
+// MARK: - HelperApplyResult
+public struct HelperApplyResult: Codable {
+    public let changeIDS: [String]
+
+    public enum CodingKeys: String, CodingKey {
+        case changeIDS = "change_ids"
+    }
+
+    public init(changeIDS: [String]) {
+        self.changeIDS = changeIDS
+    }
+}
+
+/// ``helper.discard``. Drop a worker's diff and remove its copy.
+///
+/// The lead's log gets ``helper.discarded``.
+// MARK: - HelperDiscardParams
+public struct HelperDiscardParams: Codable {
+    public let helperID: String
+    public let sessionID: String
+
+    public enum CodingKeys: String, CodingKey {
+        case helperID = "helper_id"
+        case sessionID = "session_id"
+    }
+
+    public init(helperID: String, sessionID: String) {
+        self.helperID = helperID
+        self.sessionID = sessionID
+    }
+}
+
+/// Nothing to report: the diff is gone.
+// MARK: - HelperDiscardResult
+public struct HelperDiscardResult: Codable {
+
+    public init() {
+    }
+}
+
+/// A worker's diff was dropped by ``helper.discard``. On the lead's log.
+// MARK: - HelperDiscardedData
+public struct HelperDiscardedData: Codable {
+    public let helperID: String
+
+    public enum CodingKeys: String, CodingKey {
+        case helperID = "helper_id"
+    }
+
+    public init(helperID: String) {
+        self.helperID = helperID
+    }
+}
+
+/// A worker's diff was dropped. A summary on the lead's log.
+// MARK: - HelperDiscardedEvent
+public struct HelperDiscardedEvent: Codable {
+    public let data: HelperDiscardedEventData
+    public let runID: String?
+    public let seq: Int
+    public let sessionID: String
+    public let ts: String
+    public let type: HelperDiscardedEventType
+
+    public enum CodingKeys: String, CodingKey {
+        case data = "data"
+        case runID = "run_id"
+        case seq = "seq"
+        case sessionID = "session_id"
+        case ts = "ts"
+        case type = "type"
+    }
+
+    public init(data: HelperDiscardedEventData, runID: String?, seq: Int, sessionID: String, ts: String, type: HelperDiscardedEventType) {
+        self.data = data
+        self.runID = runID
+        self.seq = seq
+        self.sessionID = sessionID
+        self.ts = ts
+        self.type = type
+    }
+}
+
+/// A worker's diff was dropped by ``helper.discard``. On the lead's log.
+// MARK: - HelperDiscardedEventData
+public struct HelperDiscardedEventData: Codable {
+    public let helperID: String
+
+    public enum CodingKeys: String, CodingKey {
+        case helperID = "helper_id"
+    }
+
+    public init(helperID: String) {
+        self.helperID = helperID
+    }
+}
+
+public enum HelperDiscardedEventType: String, Codable {
+    case helperDiscarded = "helper.discarded"
+}
+
 /// A helper's run ended.
 ///
 /// ``stopped`` says why. ``model_calls`` and ``tokens`` count what the helper used, and
@@ -7887,40 +8086,106 @@ public struct HelloResult: Codable {
 /// model), because the lead's footer sums its own log. ``duration_ms`` is the whole time
 /// since it started and ``working_ms`` is the part that was not spent waiting for you, a
 /// slot or a provider.
+///
+/// The last seven fields describe a worker, a helper that works in its own copy of the
+/// project,
+/// and are all ``None`` for a helper without a copy. ``diff_artifact_id`` is the worker's
+/// diff as
+/// an artifact, of the same kind as the reviewer's diff; a client reads it with
+/// ``artifact.read``.
+/// ``files`` lists what changed, and ``added`` and ``removed`` are the lines over all of
+/// them.
+/// ``checks`` says how the project's checks ended in the copy. ``checks_failed`` names the
+/// failing checks ("tests", "lint"), and ``checks_note`` says why ``checks`` is ``none``
+/// ("no checks found", "timed out after 10m"). The command ``helper.apply`` takes the diff
+/// into
+/// the project and ``helper.discard`` drops it.
 // MARK: - HelperEndedData
 public struct HelperEndedData: Codable {
+    public let added: Int?
     public let answerTokens: Int
     public let callID: String
+    public let checks: ChecksEnum?
+    public let checksFailed: [String]?
+    public let checksNote: String?
     public let costUsd: Double
+    public let diffArtifactID: String?
     public let durationMS: Int
+    public let files: [PurpleWorkerFile]?
     public let index: Int
     public let modelCalls: Int
+    public let removed: Int?
     public let stopped: Stopped
     public let tokens: Int
     public let workingMS: Int
 
     public enum CodingKeys: String, CodingKey {
+        case added = "added"
         case answerTokens = "answer_tokens"
         case callID = "call_id"
+        case checks = "checks"
+        case checksFailed = "checks_failed"
+        case checksNote = "checks_note"
         case costUsd = "cost_usd"
+        case diffArtifactID = "diff_artifact_id"
         case durationMS = "duration_ms"
+        case files = "files"
         case index = "index"
         case modelCalls = "model_calls"
+        case removed = "removed"
         case stopped = "stopped"
         case tokens = "tokens"
         case workingMS = "working_ms"
     }
 
-    public init(answerTokens: Int, callID: String, costUsd: Double, durationMS: Int, index: Int, modelCalls: Int, stopped: Stopped, tokens: Int, workingMS: Int) {
+    public init(added: Int?, answerTokens: Int, callID: String, checks: ChecksEnum?, checksFailed: [String]?, checksNote: String?, costUsd: Double, diffArtifactID: String?, durationMS: Int, files: [PurpleWorkerFile]?, index: Int, modelCalls: Int, removed: Int?, stopped: Stopped, tokens: Int, workingMS: Int) {
+        self.added = added
         self.answerTokens = answerTokens
         self.callID = callID
+        self.checks = checks
+        self.checksFailed = checksFailed
+        self.checksNote = checksNote
         self.costUsd = costUsd
+        self.diffArtifactID = diffArtifactID
         self.durationMS = durationMS
+        self.files = files
         self.index = index
         self.modelCalls = modelCalls
+        self.removed = removed
         self.stopped = stopped
         self.tokens = tokens
         self.workingMS = workingMS
+    }
+}
+
+public enum ChecksEnum: String, Codable {
+    case failed = "failed"
+    case none = "none"
+    case passed = "passed"
+}
+
+/// One file a worker changed in its copy of the project (ADR-059).
+///
+/// ``added`` and ``removed`` count the lines of the file's diff.
+// MARK: - PurpleWorkerFile
+public struct PurpleWorkerFile: Codable {
+    public let added: Int
+    public let path: String
+    public let removed: Int
+    public let status: ChangedFileStatus
+
+    public enum CodingKeys: String, CodingKey {
+        case added = "added"
+        case path = "path"
+        case removed = "removed"
+        case status = "status"
+    }
+
+    public init(added: Int, path: String, removed: Int, status: ChangedFileStatus) {
+        self.added = added
+        self.path = path
+        self.removed = removed
+        self.status = status
     }
 }
 
@@ -7971,40 +8236,100 @@ public struct HelperEndedEvent: Codable {
 /// model), because the lead's footer sums its own log. ``duration_ms`` is the whole time
 /// since it started and ``working_ms`` is the part that was not spent waiting for you, a
 /// slot or a provider.
+///
+/// The last seven fields describe a worker, a helper that works in its own copy of the
+/// project,
+/// and are all ``None`` for a helper without a copy. ``diff_artifact_id`` is the worker's
+/// diff as
+/// an artifact, of the same kind as the reviewer's diff; a client reads it with
+/// ``artifact.read``.
+/// ``files`` lists what changed, and ``added`` and ``removed`` are the lines over all of
+/// them.
+/// ``checks`` says how the project's checks ended in the copy. ``checks_failed`` names the
+/// failing checks ("tests", "lint"), and ``checks_note`` says why ``checks`` is ``none``
+/// ("no checks found", "timed out after 10m"). The command ``helper.apply`` takes the diff
+/// into
+/// the project and ``helper.discard`` drops it.
 // MARK: - HelperEndedEventData
 public struct HelperEndedEventData: Codable {
+    public let added: Int?
     public let answerTokens: Int
     public let callID: String
+    public let checks: ChecksEnum?
+    public let checksFailed: [String]?
+    public let checksNote: String?
     public let costUsd: Double
+    public let diffArtifactID: String?
     public let durationMS: Int
+    public let files: [FluffyWorkerFile]?
     public let index: Int
     public let modelCalls: Int
+    public let removed: Int?
     public let stopped: Stopped
     public let tokens: Int
     public let workingMS: Int
 
     public enum CodingKeys: String, CodingKey {
+        case added = "added"
         case answerTokens = "answer_tokens"
         case callID = "call_id"
+        case checks = "checks"
+        case checksFailed = "checks_failed"
+        case checksNote = "checks_note"
         case costUsd = "cost_usd"
+        case diffArtifactID = "diff_artifact_id"
         case durationMS = "duration_ms"
+        case files = "files"
         case index = "index"
         case modelCalls = "model_calls"
+        case removed = "removed"
         case stopped = "stopped"
         case tokens = "tokens"
         case workingMS = "working_ms"
     }
 
-    public init(answerTokens: Int, callID: String, costUsd: Double, durationMS: Int, index: Int, modelCalls: Int, stopped: Stopped, tokens: Int, workingMS: Int) {
+    public init(added: Int?, answerTokens: Int, callID: String, checks: ChecksEnum?, checksFailed: [String]?, checksNote: String?, costUsd: Double, diffArtifactID: String?, durationMS: Int, files: [FluffyWorkerFile]?, index: Int, modelCalls: Int, removed: Int?, stopped: Stopped, tokens: Int, workingMS: Int) {
+        self.added = added
         self.answerTokens = answerTokens
         self.callID = callID
+        self.checks = checks
+        self.checksFailed = checksFailed
+        self.checksNote = checksNote
         self.costUsd = costUsd
+        self.diffArtifactID = diffArtifactID
         self.durationMS = durationMS
+        self.files = files
         self.index = index
         self.modelCalls = modelCalls
+        self.removed = removed
         self.stopped = stopped
         self.tokens = tokens
         self.workingMS = workingMS
+    }
+}
+
+/// One file a worker changed in its copy of the project (ADR-059).
+///
+/// ``added`` and ``removed`` count the lines of the file's diff.
+// MARK: - FluffyWorkerFile
+public struct FluffyWorkerFile: Codable {
+    public let added: Int
+    public let path: String
+    public let removed: Int
+    public let status: ChangedFileStatus
+
+    public enum CodingKeys: String, CodingKey {
+        case added = "added"
+        case path = "path"
+        case removed = "removed"
+        case status = "status"
+    }
+
+    public init(added: Int, path: String, removed: Int, status: ChangedFileStatus) {
+        self.added = added
+        self.path = path
+        self.removed = removed
+        self.status = status
     }
 }
 
@@ -8105,6 +8430,49 @@ public struct HelperModelEventData: Codable {
 
 public enum HelperModelEventType: String, Codable {
     case helperModel = "helper.model"
+}
+
+/// ``helper.retry``. Run a worker's brief again on a stronger model ("Try again,
+/// stronger").
+///
+/// The new helper is a sibling of the old one in the same ``delegate`` call. ``model`` has
+/// one
+/// value for now, ``stronger``: the daemon picks the model.
+// MARK: - HelperRetryParams
+public struct HelperRetryParams: Codable {
+    public let helperID: String
+    public let model: Model
+    public let sessionID: String
+
+    public enum CodingKeys: String, CodingKey {
+        case helperID = "helper_id"
+        case model = "model"
+        case sessionID = "session_id"
+    }
+
+    public init(helperID: String, model: Model, sessionID: String) {
+        self.helperID = helperID
+        self.model = model
+        self.sessionID = sessionID
+    }
+}
+
+public enum Model: String, Codable {
+    case stronger = "stronger"
+}
+
+/// ``helper_id`` is the session id of the new helper.
+// MARK: - HelperRetryResult
+public struct HelperRetryResult: Codable {
+    public let helperID: String
+
+    public enum CodingKeys: String, CodingKey {
+        case helperID = "helper_id"
+    }
+
+    public init(helperID: String) {
+        self.helperID = helperID
+    }
 }
 
 /// A helper session was made for one ``delegate`` call.
@@ -20652,6 +21020,10 @@ public enum RPCNotificationMethod: String, Codable {
 ///
 /// A helper's run ended.
 ///
+/// A worker's diff was taken into the project. A summary on the lead's log.
+///
+/// A worker's diff was dropped. A summary on the lead's log.
+///
 /// A helper's log was cut to its receipt. ``run_id`` is null: no run owns the change.
 ///
 /// The folder's branch changed under the session, before the run's first model call.
@@ -21092,6 +21464,28 @@ public struct Params: Codable {
 /// since it started and ``working_ms`` is the part that was not spent waiting for you, a
 /// slot or a provider.
 ///
+/// The last seven fields describe a worker, a helper that works in its own copy of the
+/// project,
+/// and are all ``None`` for a helper without a copy. ``diff_artifact_id`` is the worker's
+/// diff as
+/// an artifact, of the same kind as the reviewer's diff; a client reads it with
+/// ``artifact.read``.
+/// ``files`` lists what changed, and ``added`` and ``removed`` are the lines over all of
+/// them.
+/// ``checks`` says how the project's checks ended in the copy. ``checks_failed`` names the
+/// failing checks ("tests", "lint"), and ``checks_note`` says why ``checks`` is ``none``
+/// ("no checks found", "timed out after 10m"). The command ``helper.apply`` takes the diff
+/// into
+/// the project and ``helper.discard`` drops it.
+///
+/// A worker's diff was taken into the project by ``helper.apply``.
+///
+/// On the lead's log, so a reload shows the state. ``change_ids`` are the changes it wrote,
+/// which
+/// ``changes.diff`` and ``changes.revert`` take.
+///
+/// A worker's diff was dropped by ``helper.discard``. On the lead's log.
+///
 /// A finished helper's steps were removed and a receipt kept (ADR-059, section 9).
 ///
 /// ``removed`` is how many events were removed from the helper's log. The brief, the final
@@ -21231,7 +21625,7 @@ public struct ParamsData: Codable {
     public let reverts: String?
     public let hash: String?
     public let how: How?
-    public let checks: [FluffyCheckInfo]?
+    public let checks: ChecksUnion?
     public let checkID: String?
     public let command: String?
     public let round: Int?
@@ -21246,10 +21640,14 @@ public struct ParamsData: Codable {
     public let state: PurpleState?
     public let helperIDS: [String]?
     public let answerTokens: Int?
+    public let checksFailed: [String]?
+    public let checksNote: String?
+    public let files: [TentacledWorkerFile]?
     public let modelCalls: Int?
     public let stopped: Stopped?
     public let tokens: Int?
     public let workingMS: Int?
+    public let changeIDS: [String]?
     public let fromBranch: String?
     public let pathsCount: Int?
     public let toBranch: String?
@@ -21397,16 +21795,20 @@ public struct ParamsData: Codable {
         case state = "state"
         case helperIDS = "helper_ids"
         case answerTokens = "answer_tokens"
+        case checksFailed = "checks_failed"
+        case checksNote = "checks_note"
+        case files = "files"
         case modelCalls = "model_calls"
         case stopped = "stopped"
         case tokens = "tokens"
         case workingMS = "working_ms"
+        case changeIDS = "change_ids"
         case fromBranch = "from_branch"
         case pathsCount = "paths_count"
         case toBranch = "to_branch"
     }
 
-    public init(agent: Agent?, cwd: String?, forkedFrom: PurpleForkedFrom?, modelName: String?, modelProfile: String?, modelProvider: String?, origin: String?, parent: PurpleSessionParent?, route: RouteEnum?, allowedTools: [PurpleSessionAllowance]?, mcpServers: [String]?, paidOk: Bool?, title: String?, runID: String?, status: PurpleStatus?, summary: String?, reason: String?, detail: String?, model: String?, provider: String?, rejected: [FluffyModelRejection]?, replacesModel: String?, tier: Tier?, options: [String: Option]?, mode: DefaultPermissionModeEnum?, on: Bool?, messageID: String?, role: MessageCompletedDataRole?, text: String?, interrupted: Bool?, skill: FluffySkillCall?, thinking: String?, thinkingMS: Int?, clearedIDS: [String]?, contextWindow: Int?, estimatedTokens: Int?, index: Int?, messageBytes: [Int]?, messageChars: [Int]?, messageIDS: [String]?, numCtx: Int?, parentCallID: String?, profile: String?, summaryChars: Int?, systemBytes: Int?, systemChars: Int?, systemPromptSHA: String?, systemSections: [TentacledPromptSectionInfo]?, toolsBytes: Int?, toolsChars: Int?, toolsSHA: String?, windowEstimated: Bool?, windowPlanned: Bool?, costUsd: Double?, failed: Bool?, firstTokenMS: Int?, latencyMS: Int?, loadMS: Int?, price: FluffyCallPrice?, promptMS: Int?, replyMS: Int?, stopReason: String?, textToolCalls: TextToolCalls?, usage: FluffyTokenUsage?, waitedMS: Int?, action: ContextChangedDataAction?, afterTokens: Int?, beforeTokens: Int?, count: Int?, reloadMS: Int?, room: Int?, windowFrom: Int?, windowTo: Int?, code: Code?, hint: String?, message: String?, args: [String: JSONAny]?, callID: String?, name: String?, chars: Int?, lines: Int?, path: String?, holder: String?, line: String?, position: Int?, retryInMS: Int?, scope: ModelWaitingDataScope?, silentMS: Int?, waiting: Bool?, willRetry: Bool?, window: Int?, artifactID: String?, diff: String?, durationMS: Int?, preview: String?, sources: [PurpleToolSource]?, truncated: Bool?, allowedUsd: Double?, askOverUsd: Double?, cheaperModel: String?, estimateUsd: Double?, source: String?, subject: String?, decision: Decision?, device: String?, rule: String?, alternatives: [Answer]?, brief: String?, caps: FluffyConsentCaps?, diffArtifactID: String?, estimatedUsd: Double?, helperID: String?, label: String?, notSent: [String]?, sent: [String]?, signal: String?, why: String?, answer: Answer?, todos: [PurpleTodo]?, planID: String?, steps: [FluffyPlanStep]?, added: Int?, changeID: String?, removed: Int?, reverts: String?, hash: String?, how: How?, checks: [FluffyCheckInfo]?, checkID: String?, command: String?, round: Int?, exitCode: Int?, output: String?, pickReason: String?, wish: String?, calls: Int?, stepID: String?, capUsd: Double?, spentUsd: Double?, state: PurpleState?, helperIDS: [String]?, answerTokens: Int?, modelCalls: Int?, stopped: Stopped?, tokens: Int?, workingMS: Int?, fromBranch: String?, pathsCount: Int?, toBranch: String?) {
+    public init(agent: Agent?, cwd: String?, forkedFrom: PurpleForkedFrom?, modelName: String?, modelProfile: String?, modelProvider: String?, origin: String?, parent: PurpleSessionParent?, route: RouteEnum?, allowedTools: [PurpleSessionAllowance]?, mcpServers: [String]?, paidOk: Bool?, title: String?, runID: String?, status: PurpleStatus?, summary: String?, reason: String?, detail: String?, model: String?, provider: String?, rejected: [FluffyModelRejection]?, replacesModel: String?, tier: Tier?, options: [String: Option]?, mode: DefaultPermissionModeEnum?, on: Bool?, messageID: String?, role: MessageCompletedDataRole?, text: String?, interrupted: Bool?, skill: FluffySkillCall?, thinking: String?, thinkingMS: Int?, clearedIDS: [String]?, contextWindow: Int?, estimatedTokens: Int?, index: Int?, messageBytes: [Int]?, messageChars: [Int]?, messageIDS: [String]?, numCtx: Int?, parentCallID: String?, profile: String?, summaryChars: Int?, systemBytes: Int?, systemChars: Int?, systemPromptSHA: String?, systemSections: [TentacledPromptSectionInfo]?, toolsBytes: Int?, toolsChars: Int?, toolsSHA: String?, windowEstimated: Bool?, windowPlanned: Bool?, costUsd: Double?, failed: Bool?, firstTokenMS: Int?, latencyMS: Int?, loadMS: Int?, price: FluffyCallPrice?, promptMS: Int?, replyMS: Int?, stopReason: String?, textToolCalls: TextToolCalls?, usage: FluffyTokenUsage?, waitedMS: Int?, action: ContextChangedDataAction?, afterTokens: Int?, beforeTokens: Int?, count: Int?, reloadMS: Int?, room: Int?, windowFrom: Int?, windowTo: Int?, code: Code?, hint: String?, message: String?, args: [String: JSONAny]?, callID: String?, name: String?, chars: Int?, lines: Int?, path: String?, holder: String?, line: String?, position: Int?, retryInMS: Int?, scope: ModelWaitingDataScope?, silentMS: Int?, waiting: Bool?, willRetry: Bool?, window: Int?, artifactID: String?, diff: String?, durationMS: Int?, preview: String?, sources: [PurpleToolSource]?, truncated: Bool?, allowedUsd: Double?, askOverUsd: Double?, cheaperModel: String?, estimateUsd: Double?, source: String?, subject: String?, decision: Decision?, device: String?, rule: String?, alternatives: [Answer]?, brief: String?, caps: FluffyConsentCaps?, diffArtifactID: String?, estimatedUsd: Double?, helperID: String?, label: String?, notSent: [String]?, sent: [String]?, signal: String?, why: String?, answer: Answer?, todos: [PurpleTodo]?, planID: String?, steps: [FluffyPlanStep]?, added: Int?, changeID: String?, removed: Int?, reverts: String?, hash: String?, how: How?, checks: ChecksUnion?, checkID: String?, command: String?, round: Int?, exitCode: Int?, output: String?, pickReason: String?, wish: String?, calls: Int?, stepID: String?, capUsd: Double?, spentUsd: Double?, state: PurpleState?, helperIDS: [String]?, answerTokens: Int?, checksFailed: [String]?, checksNote: String?, files: [TentacledWorkerFile]?, modelCalls: Int?, stopped: Stopped?, tokens: Int?, workingMS: Int?, changeIDS: [String]?, fromBranch: String?, pathsCount: Int?, toBranch: String?) {
         self.agent = agent
         self.cwd = cwd
         self.forkedFrom = forkedFrom
@@ -21549,10 +21951,14 @@ public struct ParamsData: Codable {
         self.state = state
         self.helperIDS = helperIDS
         self.answerTokens = answerTokens
+        self.checksFailed = checksFailed
+        self.checksNote = checksNote
+        self.files = files
         self.modelCalls = modelCalls
         self.stopped = stopped
         self.tokens = tokens
         self.workingMS = workingMS
+        self.changeIDS = changeIDS
         self.fromBranch = fromBranch
         self.pathsCount = pathsCount
         self.toBranch = toBranch
@@ -21697,9 +22103,44 @@ public struct FluffyConsentCaps: Codable {
     }
 }
 
+public enum ChecksUnion: Codable {
+    case checkElementArray([CheckElement])
+    case enumeration(ChecksEnum)
+    case null
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        if let x = try? container.decode([CheckElement].self) {
+            self = .checkElementArray(x)
+            return
+        }
+        if let x = try? container.decode(ChecksEnum.self) {
+            self = .enumeration(x)
+            return
+        }
+        if container.decodeNil() {
+            self = .null
+            return
+        }
+        throw DecodingError.typeMismatch(ChecksUnion.self, DecodingError.Context(codingPath: decoder.codingPath, debugDescription: "Wrong type for ChecksUnion"))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        switch self {
+        case .checkElementArray(let x):
+            try container.encode(x)
+        case .enumeration(let x):
+            try container.encode(x)
+        case .null:
+            try container.encodeNil()
+        }
+    }
+}
+
 /// One check: its name and the shell command it runs.
-// MARK: - FluffyCheckInfo
-public struct FluffyCheckInfo: Codable {
+// MARK: - CheckElement
+public struct CheckElement: Codable {
     public let command: String
     public let name: String
 
@@ -21723,6 +22164,31 @@ public enum Code: String, Codable {
     case noCredit = "no_credit"
     case notInstalled = "not_installed"
     case rateLimited = "rate_limited"
+}
+
+/// One file a worker changed in its copy of the project (ADR-059).
+///
+/// ``added`` and ``removed`` count the lines of the file's diff.
+// MARK: - TentacledWorkerFile
+public struct TentacledWorkerFile: Codable {
+    public let added: Int
+    public let path: String
+    public let removed: Int
+    public let status: ChangedFileStatus
+
+    public enum CodingKeys: String, CodingKey {
+        case added = "added"
+        case path = "path"
+        case removed = "removed"
+        case status = "status"
+    }
+
+    public init(added: Int, path: String, removed: Int, status: ChangedFileStatus) {
+        self.added = added
+        self.path = path
+        self.removed = removed
+        self.status = status
+    }
 }
 
 /// The session and message a fork was copied from.
@@ -21977,6 +22443,8 @@ public enum ParamsType: String, Codable {
     case checkStarted = "check.started"
     case contextChanged = "context.changed"
     case fileChanged = "file.changed"
+    case helperApplied = "helper.applied"
+    case helperDiscarded = "helper.discarded"
     case helperEnded = "helper.ended"
     case helperModel = "helper.model"
     case helperStarted = "helper.started"
@@ -29607,6 +30075,31 @@ public struct WishResolution: Codable {
         self.model = model
         self.reason = reason
         self.tier = tier
+    }
+}
+
+/// One file a worker changed in its copy of the project (ADR-059).
+///
+/// ``added`` and ``removed`` count the lines of the file's diff.
+// MARK: - WorkerFile
+public struct WorkerFile: Codable {
+    public let added: Int
+    public let path: String
+    public let removed: Int
+    public let status: ChangedFileStatus
+
+    public enum CodingKeys: String, CodingKey {
+        case added = "added"
+        case path = "path"
+        case removed = "removed"
+        case status = "status"
+    }
+
+    public init(added: Int, path: String, removed: Int, status: ChangedFileStatus) {
+        self.added = added
+        self.path = path
+        self.removed = removed
+        self.status = status
     }
 }
 
