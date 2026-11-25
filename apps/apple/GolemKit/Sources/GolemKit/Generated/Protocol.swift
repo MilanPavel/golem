@@ -30282,6 +30282,36 @@ public struct WorkflowReviewAnswerResultRun: Codable {
     }
 }
 
+/// A review a run waits on, with its whole draft (the pending item's ``preview`` is cut).
+///
+/// ``draft`` is the JSON ``run.review`` was given. ``key`` is the step key that
+/// ``workflow.review.answer`` names. ``answered`` is false for every review
+/// ``WorkflowStatusResult.reviews`` lists.
+// MARK: - WorkflowReviewInfo
+public struct WorkflowReviewInfo: Codable {
+    public let answered: Bool?
+    public let ask: String
+    public let createdAt: String
+    public let draft: JSONAny?
+    public let key: String
+
+    public enum CodingKeys: String, CodingKey {
+        case answered = "answered"
+        case ask = "ask"
+        case createdAt = "created_at"
+        case draft = "draft"
+        case key = "key"
+    }
+
+    public init(answered: Bool?, ask: String, createdAt: String, draft: JSONAny?, key: String) {
+        self.answered = answered
+        self.ask = ask
+        self.createdAt = createdAt
+        self.draft = draft
+        self.key = key
+    }
+}
+
 /// Server → every connection: ``workflow.run.cancelled``. Not stored.
 // MARK: - WorkflowRunCancelledNotification
 public struct WorkflowRunCancelledNotification: Codable {
@@ -30814,19 +30844,56 @@ public struct WorkflowStatusParams: Codable {
 }
 
 /// The run and its steps, in the order they started.
+///
+/// ``reviews`` are the run's open reviews (those without an answer), oldest first, with
+/// their
+/// full drafts. An older daemon leaves it out.
 // MARK: - WorkflowStatusResult
 public struct WorkflowStatusResult: Codable {
+    public let reviews: [ReviewElement]?
     public let run: WorkflowStatusResultRun
     public let steps: [WorkflowStatusResultStep]?
 
     public enum CodingKeys: String, CodingKey {
+        case reviews = "reviews"
         case run = "run"
         case steps = "steps"
     }
 
-    public init(run: WorkflowStatusResultRun, steps: [WorkflowStatusResultStep]?) {
+    public init(reviews: [ReviewElement]?, run: WorkflowStatusResultRun, steps: [WorkflowStatusResultStep]?) {
+        self.reviews = reviews
         self.run = run
         self.steps = steps
+    }
+}
+
+/// A review a run waits on, with its whole draft (the pending item's ``preview`` is cut).
+///
+/// ``draft`` is the JSON ``run.review`` was given. ``key`` is the step key that
+/// ``workflow.review.answer`` names. ``answered`` is false for every review
+/// ``WorkflowStatusResult.reviews`` lists.
+// MARK: - ReviewElement
+public struct ReviewElement: Codable {
+    public let answered: Bool?
+    public let ask: String
+    public let createdAt: String
+    public let draft: JSONAny?
+    public let key: String
+
+    public enum CodingKeys: String, CodingKey {
+        case answered = "answered"
+        case ask = "ask"
+        case createdAt = "created_at"
+        case draft = "draft"
+        case key = "key"
+    }
+
+    public init(answered: Bool?, ask: String, createdAt: String, draft: JSONAny?, key: String) {
+        self.answered = answered
+        self.ask = ask
+        self.createdAt = createdAt
+        self.draft = draft
+        self.key = key
     }
 }
 

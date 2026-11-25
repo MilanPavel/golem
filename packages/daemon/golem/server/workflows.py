@@ -34,6 +34,7 @@ from golem_protocol.commands import (
     WorkflowResumeResult,
     WorkflowReviewAnswerParams,
     WorkflowReviewAnswerResult,
+    WorkflowReviewInfo,
     WorkflowRunInfo,
     WorkflowStartParams,
     WorkflowStartResult,
@@ -224,7 +225,18 @@ async def workflow_status(
     if run is None:
         raise RpcCallError(INVALID_PARAMS, f"no workflow run {params.workflow_run_id}")
     steps = await runs.list_steps(params.workflow_run_id)
-    return WorkflowStatusResult(run=_run_info(run), steps=[_step_info(s) for s in steps])
+    reviews = [
+        WorkflowReviewInfo(
+            key=r.step_key,
+            ask=json.loads(r.pending_json).get("ask") or "",
+            draft=json.loads(r.pending_json).get("draft"),
+            created_at=r.created_at,
+        )
+        for r in await runs.list_open_reviews(params.workflow_run_id)
+    ]
+    return WorkflowStatusResult(
+        run=_run_info(run), steps=[_step_info(s) for s in steps], reviews=reviews
+    )
 
 
 async def workflow_cancel(

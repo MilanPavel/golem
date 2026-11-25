@@ -1,0 +1,35 @@
+{
+  "additionalProperties": false,
+  "description": "A review a run waits on, with its whole draft (the pending item's ``preview`` is cut).\n\n``draft`` is the JSON ``run.review`` was given. ``key`` is the step key that\n``workflow.review.answer`` names. ``answered`` is false for every review\n``WorkflowStatusResult.reviews`` lists.",
+  "properties": {
+    "answered": {
+      "default": false,
+      "title": "Answered",
+      "type": "boolean"
+    },
+    "ask": {
+      "title": "Ask",
+      "type": "string"
+    },
+    "created_at": {
+      "title": "Created At",
+      "type": "string"
+    },
+    "draft": {
+      "default": null,
+      "title": "Draft"
+    },
+    "key": {
+      "minLength": 1,
+      "title": "Key",
+      "type": "string"
+    }
+  },
+  "required": [
+    "key",
+    "ask",
+    "created_at"
+  ],
+  "title": "WorkflowReviewInfo",
+  "type": "object"
+}

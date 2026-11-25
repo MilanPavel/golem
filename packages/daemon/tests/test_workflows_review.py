@@ -298,3 +298,30 @@ async def test_run_list_shows_the_waiting_run_with_its_ask(
     assert info.approvals == 2
     run = await store.get_run(run_id)
     assert run is not None and cast(str, run.session_id) == "s_wf"
+
+
+async def test_workflow_status_carries_the_whole_draft_of_an_open_review(
+    tmp_path: Path, store: WorkflowRuns, calls: Any
+) -> None:
+    from types import SimpleNamespace
+
+    from golem.server.workflows import workflow_status
+    from golem_protocol.commands import WorkflowStatusParams
+
+    long_draft = "word " * 100
+    body = ONE.replace('"Dear Ann, hello"', repr(long_draft))
+    run_id = await waiting_run(tmp_path, store, body, Sent())
+    svc = service(tmp_path, store)
+    ctx = SimpleNamespace(state=SimpleNamespace(workflows=svc))
+    result = await workflow_status(cast(Any, ctx), WorkflowStatusParams(workflow_run_id=run_id))
+    assert len(long_draft) > 200
+    assert [(r.key, r.ask, r.draft, r.answered) for r in result.reviews] == [
+        ("review:Send this?", "Send this?", long_draft, False)
+    ]
+    items = await svc.pending_items("s_wf")
+    assert len(items[0].preview or "") <= 200
+    await svc.answer_review(run_id, "review:Send this?", "approve", None)
+    await until(store, run_id, "done")
+    await svc.aclose()
+    done = await workflow_status(cast(Any, ctx), WorkflowStatusParams(workflow_run_id=run_id))
+    assert done.reviews == []

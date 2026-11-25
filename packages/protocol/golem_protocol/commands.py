@@ -6153,13 +6153,35 @@ class WorkflowStatusParams(BaseModel):
     workflow_run_id: str = Field(min_length=1)
 
 
+class WorkflowReviewInfo(BaseModel):
+    """A review a run waits on, with its whole draft (the pending item's ``preview`` is cut).
+
+    ``draft`` is the JSON ``run.review`` was given. ``key`` is the step key that
+    ``workflow.review.answer`` names. ``answered`` is false for every review
+    ``WorkflowStatusResult.reviews`` lists.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    key: str = Field(min_length=1)
+    ask: str
+    draft: Any = None
+    created_at: str
+    answered: bool = False
+
+
 class WorkflowStatusResult(BaseModel):
-    """The run and its steps, in the order they started."""
+    """The run and its steps, in the order they started.
+
+    ``reviews`` are the run's open reviews (those without an answer), oldest first, with their
+    full drafts. An older daemon leaves it out.
+    """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     run: WorkflowRunInfo
     steps: list[WorkflowStepInfo] = Field(default_factory=list[WorkflowStepInfo])
+    reviews: list[WorkflowReviewInfo] = Field(default_factory=list[WorkflowReviewInfo])
 
 
 class WorkflowCancelParams(BaseModel):
@@ -6694,6 +6716,7 @@ __all__ = [
     "WorkflowResumeResult",
     "WorkflowReviewAnswerParams",
     "WorkflowReviewAnswerResult",
+    "WorkflowReviewInfo",
     "WorkflowReviewVerdict",
     "WorkflowRunEvent",
     "WorkflowRunInfo",
