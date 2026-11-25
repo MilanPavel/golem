@@ -58,7 +58,7 @@ from golem.graphs.context_view import (
     used_tokens,
     view,
 )
-from golem.graphs.delegate_policy import Prices
+from golem.graphs.delegate_policy import JobEstimate, Prices, should_delegate
 from golem.graphs.estimate import TokenRatios
 from golem.graphs.fit import Fitted, fit_prompt, num_predict_of, prompt_estimate, reply_reserve
 from golem.graphs.memory_stub import stub_local_notes
@@ -90,6 +90,7 @@ from golem.graphs.tools_node import (
     advised_this_turn,
     cancelled_results,
     child_of,
+    delegated_this_turn,
     memory_of,
     scope_of,
     tools_node,
@@ -265,6 +266,9 @@ class ChatRuntime:
         self.advisor_ready: Callable[[str | None], bool] | None = None
         """Whether a session in this folder may ask the ``advisor`` now: the agent is usable and
         ``delegate`` is offered. None: no advisor, so a struggle is never nudged."""
+        self.reader_ready: Callable[[str | None], bool] | None = None
+        """Whether a session in this folder may hand reading to a helper now: ``use_helpers`` is
+        ``when_needed``, ``delegate`` is offered and a reading agent is usable. None: never."""
         self.note_speed: Callable[..., object] | None = None
         """Told the profile and server timings of each finished call, for the speed book."""
         self.enable_mcp: EnableMcp | None = None
@@ -1184,6 +1188,7 @@ def open_chat(
         result["last_call"] = {
             "stop_reason": stop_reason_of(response),
             "text_tool_calls": text_tool_calls,
+            "fill": {"used": request["estimated_tokens"], "window": window.window},
         }
         if current is not original:
             result["context_view"] = current
@@ -1244,8 +1249,17 @@ def open_chat(
         # A reply with tool calls goes to the tools first: its calls need their results.
         return "step_up" if _struggles(state) is not None else "end"
 
-    def route_after_tools(state: AgentState) -> Literal["call_model", "step_up"]:
-        return "step_up" if _struggles(state) is not None else "call_model"
+    def route_after_tools(state: AgentState) -> Literal["fill_nudge", "step_up"]:
+        return "step_up" if _struggles(state) is not None else "fill_nudge"
+
+    async def fill_nudge(state: AgentState, config: RunnableConfig) -> dict[str, object]:
+        found = _fill_note(state, config, runtime[0] if runtime else None, profile_of(state))
+        if found is None:
+            return {}
+        return {"fill_nudged": True, "messages": [note(found)]}
+
+    def profile_of(state: AgentState) -> str:
+        return state["model_profile"]
 
     def route_after_step_up(state: AgentState) -> Literal["call_model", "end"]:
         # No stronger model on a plain reply: the run ends as it would have.
@@ -1363,13 +1377,15 @@ def open_chat(
     builder.add_edge(START, "call_model")
     builder.add_node("checks", checks_node(rules, artifacts))
     builder.add_node("step_up", step_up)
+    builder.add_node("fill_nudge", fill_nudge)
+    builder.add_edge("fill_nudge", "call_model")
     builder.add_conditional_edges(
         "call_model",
         route,
         {"call_model": "call_model", "tools": "tools", "step_up": "step_up", "end": "checks"},
     )
     builder.add_conditional_edges(
-        "tools", route_after_tools, {"call_model": "call_model", "step_up": "step_up"}
+        "tools", route_after_tools, {"fill_nudge": "fill_nudge", "step_up": "step_up"}
     )
     builder.add_conditional_edges(
         "step_up", route_after_step_up, {"call_model": "call_model", "end": "checks"}
@@ -1427,6 +1443,69 @@ def _may_nudge(state: AgentState, config: RunnableConfig, rt: ChatRuntime | None
     if advised_this_turn(state["messages"]) >= rt.router.agent_settings().advisor.max_per_message:
         return False
     return rt.advisor_ready(_cwd(config))
+
+
+FILL_NUDGE = (
+    "Your window is {percent}% full ({used} of {window} tokens), past the {share}% in "
+    "[agents.delegate] fill_share. Hand the rest of the reading to a helper: call `delegate` "
+    "with agent `explorer` and a brief that says what to find and where to look. It reads in "
+    "its own window and returns the paths and lines that matter; keep the answer here."
+)
+"""The note a lead gets once per user message when its window is already full of reading."""
+
+READ_TOOLS = frozenset({"read_file", "grep", "glob", "list_dir"})
+
+
+def _read_this_round(messages: Sequence[BaseMessage]) -> bool:
+    """Whether the tool round that just ended read or searched."""
+    for message in reversed(messages):
+        if not isinstance(message, ToolMessage):
+            return False
+        if message.name in READ_TOOLS:
+            return True
+    return False
+
+
+def _fill_note(
+    state: AgentState, config: RunnableConfig, rt: ChatRuntime | None, profile: str
+) -> str | None:
+    """The fill nudge text when the lead is reading and its window is past ``fill_share``.
+
+    Once per user message. Not in a helper, not when a helper already started in this message
+    (which also covers the per-message limit) and not unless a reading agent is usable. The share
+    is read each time and the rule is :func:`should_delegate` with no extra reading.
+    """
+    if rt is None or rt.reader_ready is None or state.get("fill_nudged") is True:
+        return None
+    configurable = cast(Mapping[str, object], config.get("configurable", {}))
+    if configurable.get(CHILD_KEY) is not None:
+        return None
+    messages = state["messages"]
+    if not _read_this_round(messages) or delegated_this_turn(messages) > 0:
+        return None
+    fill = cast("dict[str, object] | None", (state.get("last_call") or {}).get("fill"))
+    if not isinstance(fill, dict):
+        return None
+    window, used = _count(fill.get("window")), _count(fill.get("used"))
+    if not window or used is None:
+        return None
+    # What the tool round added since that call was sent.
+    last = max((i for i, m in enumerate(messages) if isinstance(m, AIMessage)), default=-1)
+    used += sum(len(message_text(m)) for m in messages[last + 1 :]) // 4
+    settings = rt.router.agent_settings()
+    share = settings.delegate
+    tier = rt.tier_of(profile) if rt.tier_of is not None else None
+    decision = should_delegate(
+        window, used, JobEstimate(0), Prices(), tier or "local", 1, settings.use_helpers, share
+    )
+    if decision.reason != "window" or not rt.reader_ready(_cwd(config)):
+        return None
+    return FILL_NUDGE.format(
+        percent=round(100 * used / window),
+        used=used,
+        window=window,
+        share=round(100 * share.fill_share),
+    )
 
 
 def _nudge(state: AgentState, found: Struggle, call: dict[str, object]) -> dict[str, object]:
@@ -2109,6 +2188,7 @@ def _turn_input(
         "nudged": False,
         "model_calls": 0,
         "wrap_noted": False,
+        "fill_nudged": False,
         "fallbacks": 0,
         "last_call": {},
     }
