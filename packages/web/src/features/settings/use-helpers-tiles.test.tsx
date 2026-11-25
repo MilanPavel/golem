@@ -15,6 +15,7 @@ test("the three blocks show the default numbers as When and Then lines", () => {
   expect(within(tile("fit")).getByText("Too much to read")).toBeTruthy();
   expect(tile("fit").textContent).toContain("A job needs to read more than 30% of the context window, or the window is already 85% full.");
   expect(tile("fit").textContent).toContain("A helper reads it in its own window and brings back the answer.");
+  expect(tile("fit").textContent).toContain("The \"already full\" share is checked during the chat.");
   expect(tile("parallel").textContent).toContain("each needs at least 10% of the window.");
   expect(tile("parallel").textContent).toContain("One helper per job, all at once.");
   expect(tile("model").textContent).toContain("a model at least 3× cheaper");

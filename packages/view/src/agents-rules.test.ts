@@ -29,7 +29,7 @@ test("default numbers give three blocks with a When line, a Then line and a note
   );
   assert.deepEqual(
     tiles.map((t) => t.note),
-    ["Any model", "Cloud models. Local helpers take turns.", "Needs a second model that is ready"],
+    ["Any model. The \"already full\" share is checked during the chat.", "Cloud models. Local helpers take turns.", "Needs a second model that is ready"],
   );
   assert.ok(tiles.every((t) => t.when.every((p) => !p.changed && p.tag === undefined)));
 });

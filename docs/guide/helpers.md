@@ -5,11 +5,11 @@ description: When golem starts a helper, what the four numbers mean, and how to 
 
 # Helpers and Measure
 
-A **helper** is a second agent that golem starts for one job and that gives back one answer. golem does the work in the chat by default. It starts a helper for one of three reasons, and says which one applied:
+A **helper** is a second agent that golem starts for one job and that gives back one answer. golem does the work in the chat by default. The lead is told three reasons a helper can fit and decides for itself when to start one; golem reminds it when the window passes the "already full" share. It says which reason applied:
 
 | Reason | Means |
 |---|---|
-| **It would not fit** | The reading is too big for the window, or would crowd out the task |
+| **It would not fit** | The reading is too big for the window, or would crowd out the task. The "already full" share is checked during the chat |
 | **Jobs that can run at once** | Several independent jobs, each big enough to be worth its own helper |
 | **A cheaper model** | A large read goes to a model that costs much less |
 

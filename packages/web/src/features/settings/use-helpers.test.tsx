@@ -8,7 +8,7 @@ import { fakeClient, fakeFrame } from "../../store/test-support.ts";
 import { UseHelpers, UseHelpersSection } from "./use-helpers-setting.tsx";
 
 const LINES = {
-  when_needed: "golem starts a helper by itself when one of the reasons below holds.",
+  when_needed: "The lead is told these reasons and decides when to start a helper. golem reminds it when the window passes the \"already full\" share.",
   ask: "golem asks before it starts a helper.",
   never: "golem works alone.",
 } as const;
