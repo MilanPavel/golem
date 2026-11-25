@@ -262,6 +262,8 @@ async def test_events_come_in_order(store: WorkflowRuns, calls: Any, tmp_path: P
         "attempts",
         "error",
         "child_session_id",
+        "model",
+        "cost_usd",
         "started_at",
         "finished_at",
     }
@@ -284,7 +286,6 @@ async def test_events_come_in_order(store: WorkflowRuns, calls: Any, tmp_path: P
 @pytest.mark.parametrize(
     ("name", "ticket"),
     [
-        ("llm", "#740"),
         ("tool", "#740"),
         ("skill", "#740"),
     ],

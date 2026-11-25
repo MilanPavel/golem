@@ -324,4 +324,5 @@ MIGRATIONS: tuple[tuple[str, ...], ...] = (
         "CREATE INDEX workflow_reviews_open ON workflow_reviews (created_at)"
         " WHERE answered_at IS NULL",
     ),
+    ("ALTER TABLE workflow_steps ADD COLUMN model TEXT",),
 )

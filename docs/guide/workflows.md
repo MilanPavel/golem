@@ -161,6 +161,22 @@ print(found["answer"])
 - An agent that fails or is stopped fails the step, and the error says why.
 - After a restart the run continues and waits for the same agent. It never starts a second one.
 
+### Asking a model one question
+
+```python
+summary = await run.llm(f"Summarise in one line:\n{text}")
+facts = await run.llm(text, schema=Facts, model="stronger")
+```
+
+`run.llm(prompt, schema=None, model=None, key=None)` makes one model call, with no tools and no agent loop, and saves it as a step of kind `llm`.
+
+- Without `schema` it returns the text. With `schema` (a Pydantic model class or a JSON-schema dict) the model is asked for a JSON object and the call returns it as a dict. An answer that does not fit fails the step.
+- `model=` is a wish (`cheapest`, `same`, `stronger`, `local`), never a model name you can rely on. Routing picks the model. The default is the cheapest model that is ready.
+- In a local-only folder the call always uses a local model, whatever the wish says. If there is none, the step fails. On a laptop with only cloud models, the same file works.
+- The call takes a slot from the dispatcher, like a title, so it waits behind a chat on the same local model.
+- The step saves the model that answered and what the call cost (`workflow.status` shows both on the step). A run that is executed again does not ask again.
+- The step key is `key` or `llm:<short hash of the prompt>`. Two calls with the same prompt in one run need their own `key=`.
+
 ## Waiting for you
 
 ```python
@@ -209,8 +225,8 @@ A broken file never disappears from the list. Fix it and it loads again.
 
 | Piece | What it adds | Ticket |
 |---|---|---|
-| `run.llm`, `run.tool`, `run.skill` | One model call, one tool, or one skill, with no agent loop | 3.8 (#740) |
+| `run.tool`, `run.skill` | One tool or one skill, with no agent loop | 3.8 (#740) |
 | Workflows page | List workflows and see each run's steps in the web UI | 3.9 (#741) |
 | Editor | Edit a workflow, check it without a model, and try it from a step | 3.11 (#1225) |
 
-Until these land, a workflow can run code, run steps in parallel, save results, use `key=`, tell you things, ask an agent and wait for your review.
+Until these land, a workflow can run code, run steps in parallel, save results, use `key=`, ask a model one question, tell you things, ask an agent and wait for your review.

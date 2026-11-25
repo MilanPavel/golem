@@ -6141,6 +6141,10 @@ class WorkflowStepInfo(BaseModel):
     attempts: int = Field(default=0, ge=0)
     error: str | None = None
     child_session_id: str | None = Field(default=None, min_length=1)
+    model: str | None = None
+    """The model that answered an ``llm`` step, as ``provider/name``."""
+    cost_usd: float | None = Field(default=None, ge=0)
+    """What the call of an ``llm`` step cost, or None when it was not priced."""
     started_at: str | None = None
     finished_at: str | None = None
 
@@ -6283,6 +6287,10 @@ class WorkflowStepEvent(BaseModel):
     attempts: int = Field(default=0, ge=0)
     error: str | None = None
     child_session_id: str | None = Field(default=None, min_length=1)
+    model: str | None = None
+    """The model that answered an ``llm`` step, as ``provider/name``."""
+    cost_usd: float | None = Field(default=None, ge=0)
+    """What the call of an ``llm`` step cost, or None when it was not priced."""
     started_at: str | None = None
     finished_at: str | None = None
 

@@ -16,11 +16,13 @@ export type WorkflowId = string;
 export type WorkflowRunId = string;
 export type Attempts = number;
 export type ChildSessionId = string | null;
+export type CostUsd = number | null;
 export type Error1 = string | null;
 export type FinishedAt1 = string | null;
 export type Group = string | null;
 export type Key1 = string;
 export type Kind = 'step' | 'agent' | 'review' | 'notify' | 'llm' | 'tool' | 'skill';
+export type Model = string | null;
 export type StartedAt1 = string | null;
 export type Status1 = 'pending' | 'running' | 'waiting' | 'done' | 'failed' | 'skipped' | 'in_doubt';
 export type Title = string;
@@ -94,11 +96,13 @@ export interface Inputs {
 export interface WorkflowStepInfo {
   attempts?: Attempts;
   child_session_id?: ChildSessionId;
+  cost_usd?: CostUsd;
   error?: Error1;
   finished_at?: FinishedAt1;
   group?: Group;
   key: Key1;
   kind: Kind;
+  model?: Model;
   started_at?: StartedAt1;
   status: Status1;
   title: Title;

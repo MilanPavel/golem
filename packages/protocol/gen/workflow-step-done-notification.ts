@@ -4,11 +4,13 @@ export type Jsonrpc = '2.0';
 export type Method = 'workflow.step.done';
 export type Attempts = number;
 export type ChildSessionId = string | null;
+export type CostUsd = number | null;
 export type Error = string | null;
 export type FinishedAt = string | null;
 export type Group = string | null;
 export type Key = string;
 export type Kind = 'step' | 'agent' | 'review' | 'notify' | 'llm' | 'tool' | 'skill';
+export type Model = string | null;
 export type StartedAt = string | null;
 export type Status = 'pending' | 'running' | 'waiting' | 'done' | 'failed' | 'skipped' | 'in_doubt';
 export type Title = string;
@@ -34,11 +36,13 @@ export interface WorkflowStepDoneNotification {
 export interface WorkflowStepEvent {
   attempts?: Attempts;
   child_session_id?: ChildSessionId;
+  cost_usd?: CostUsd;
   error?: Error;
   finished_at?: FinishedAt;
   group?: Group;
   key: Key;
   kind: Kind;
+  model?: Model;
   started_at?: StartedAt;
   status: Status;
   title: Title;

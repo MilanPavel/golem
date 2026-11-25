@@ -24,6 +24,8 @@ from golem.store.workflow_runs import WorkflowReviewRecord, WorkflowRunRecord, W
 from golem.workflow import WorkflowError
 from golem.workflows.agents import WorkflowAgents
 from golem.workflows.engine import AgentStarted, WorkflowEngine, restart_policy
+from golem.workflows.engine import WorkflowEngine, restart_policy
+from golem.workflows.llm import Llm
 from golem.workflows.registry import WorkflowEntry, WorkflowRegistry
 from golem_protocol import rpc
 from golem_protocol.commands import PendingItem, WorkflowRunEvent, WorkflowStepEvent
@@ -91,6 +93,7 @@ class WorkflowService:
         notify: Callable[[str, str, str | None], Awaitable[None]] | None = None,
         touch_session: Callable[[str], Awaitable[None]] | None = None,
         agents: WorkflowAgents | None = None,
+        llm: Llm | None = None,
     ) -> None:
         self.runs = runs
         self._agents = agents
@@ -132,6 +135,7 @@ class WorkflowService:
             model=model,
             started=started,
         )
+        self.engine = WorkflowEngine(runs, self._emit, self._notify if notify else None, llm)
 
     async def _notify(self, title: str | None, text: str, run_id: str) -> None:
         """Adapt a ``run.notify`` to the Notifier: the click opens the run's session."""

@@ -109,6 +109,7 @@ from golem.store.workflow_runs import WorkflowRuns
 from golem.tools import default_registry
 from golem.tools.registry import ToolRegistry, ToolScope
 from golem.workflows.agents import WorkflowAgents
+from golem.workflows.llm import WorkflowLlm
 from golem.workflows.service import WorkflowService
 from golem_protocol.commands import (
     AgentRegistryChanged,
@@ -476,6 +477,15 @@ class DaemonApp:
                         agents=self.state.agents,
                         bus=bus,
                         settings=router.agent_settings,
+                    ),
+                    llm=WorkflowLlm(
+                        router,
+                        dispatch,
+                        local_only=sessions.local_only,
+                        tier_of_profile=lambda profile: _tier_of(router, models, profile),
+                        budget_refs=models.budget_refs,
+                        price_of=lambda profile: _price_of(router, models, profile),
+                        paid_ok=budget.paid_ok,
                     ),
                 )
                 sessions.review_items = self.state.workflows.pending_items

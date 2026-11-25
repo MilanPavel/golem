@@ -30952,11 +30952,13 @@ public struct WorkflowStatusResultRun: Codable {
 public struct WorkflowStatusResultStep: Codable {
     public let attempts: Int?
     public let childSessionID: String?
+    public let costUsd: Double?
     public let error: String?
     public let finishedAt: String?
     public let group: String?
     public let key: String
     public let kind: StepKind
+    public let model: String?
     public let startedAt: String?
     public let status: StepStatus
     public let title: String
@@ -30964,24 +30966,28 @@ public struct WorkflowStatusResultStep: Codable {
     public enum CodingKeys: String, CodingKey {
         case attempts = "attempts"
         case childSessionID = "child_session_id"
+        case costUsd = "cost_usd"
         case error = "error"
         case finishedAt = "finished_at"
         case group = "group"
         case key = "key"
         case kind = "kind"
+        case model = "model"
         case startedAt = "started_at"
         case status = "status"
         case title = "title"
     }
 
-    public init(attempts: Int?, childSessionID: String?, error: String?, finishedAt: String?, group: String?, key: String, kind: StepKind, startedAt: String?, status: StepStatus, title: String) {
+    public init(attempts: Int?, childSessionID: String?, costUsd: Double?, error: String?, finishedAt: String?, group: String?, key: String, kind: StepKind, model: String?, startedAt: String?, status: StepStatus, title: String) {
         self.attempts = attempts
         self.childSessionID = childSessionID
+        self.costUsd = costUsd
         self.error = error
         self.finishedAt = finishedAt
         self.group = group
         self.key = key
         self.kind = kind
+        self.model = model
         self.startedAt = startedAt
         self.status = status
         self.title = title
@@ -31040,11 +31046,13 @@ public enum WorkflowStepDoneNotificationMethod: String, Codable {
 public struct WorkflowStepDoneNotificationParams: Codable {
     public let attempts: Int?
     public let childSessionID: String?
+    public let costUsd: Double?
     public let error: String?
     public let finishedAt: String?
     public let group: String?
     public let key: String
     public let kind: StepKind
+    public let model: String?
     public let startedAt: String?
     public let status: StepStatus
     public let title: String
@@ -31053,25 +31061,29 @@ public struct WorkflowStepDoneNotificationParams: Codable {
     public enum CodingKeys: String, CodingKey {
         case attempts = "attempts"
         case childSessionID = "child_session_id"
+        case costUsd = "cost_usd"
         case error = "error"
         case finishedAt = "finished_at"
         case group = "group"
         case key = "key"
         case kind = "kind"
+        case model = "model"
         case startedAt = "started_at"
         case status = "status"
         case title = "title"
         case workflowRunID = "workflow_run_id"
     }
 
-    public init(attempts: Int?, childSessionID: String?, error: String?, finishedAt: String?, group: String?, key: String, kind: StepKind, startedAt: String?, status: StepStatus, title: String, workflowRunID: String) {
+    public init(attempts: Int?, childSessionID: String?, costUsd: Double?, error: String?, finishedAt: String?, group: String?, key: String, kind: StepKind, model: String?, startedAt: String?, status: StepStatus, title: String, workflowRunID: String) {
         self.attempts = attempts
         self.childSessionID = childSessionID
+        self.costUsd = costUsd
         self.error = error
         self.finishedAt = finishedAt
         self.group = group
         self.key = key
         self.kind = kind
+        self.model = model
         self.startedAt = startedAt
         self.status = status
         self.title = title
@@ -31087,11 +31099,13 @@ public struct WorkflowStepDoneNotificationParams: Codable {
 public struct WorkflowStepEvent: Codable {
     public let attempts: Int?
     public let childSessionID: String?
+    public let costUsd: Double?
     public let error: String?
     public let finishedAt: String?
     public let group: String?
     public let key: String
     public let kind: StepKind
+    public let model: String?
     public let startedAt: String?
     public let status: StepStatus
     public let title: String
@@ -31100,25 +31114,29 @@ public struct WorkflowStepEvent: Codable {
     public enum CodingKeys: String, CodingKey {
         case attempts = "attempts"
         case childSessionID = "child_session_id"
+        case costUsd = "cost_usd"
         case error = "error"
         case finishedAt = "finished_at"
         case group = "group"
         case key = "key"
         case kind = "kind"
+        case model = "model"
         case startedAt = "started_at"
         case status = "status"
         case title = "title"
         case workflowRunID = "workflow_run_id"
     }
 
-    public init(attempts: Int?, childSessionID: String?, error: String?, finishedAt: String?, group: String?, key: String, kind: StepKind, startedAt: String?, status: StepStatus, title: String, workflowRunID: String) {
+    public init(attempts: Int?, childSessionID: String?, costUsd: Double?, error: String?, finishedAt: String?, group: String?, key: String, kind: StepKind, model: String?, startedAt: String?, status: StepStatus, title: String, workflowRunID: String) {
         self.attempts = attempts
         self.childSessionID = childSessionID
+        self.costUsd = costUsd
         self.error = error
         self.finishedAt = finishedAt
         self.group = group
         self.key = key
         self.kind = kind
+        self.model = model
         self.startedAt = startedAt
         self.status = status
         self.title = title
@@ -31158,11 +31176,13 @@ public enum WorkflowStepFailedNotificationMethod: String, Codable {
 public struct WorkflowStepFailedNotificationParams: Codable {
     public let attempts: Int?
     public let childSessionID: String?
+    public let costUsd: Double?
     public let error: String?
     public let finishedAt: String?
     public let group: String?
     public let key: String
     public let kind: StepKind
+    public let model: String?
     public let startedAt: String?
     public let status: StepStatus
     public let title: String
@@ -31171,25 +31191,29 @@ public struct WorkflowStepFailedNotificationParams: Codable {
     public enum CodingKeys: String, CodingKey {
         case attempts = "attempts"
         case childSessionID = "child_session_id"
+        case costUsd = "cost_usd"
         case error = "error"
         case finishedAt = "finished_at"
         case group = "group"
         case key = "key"
         case kind = "kind"
+        case model = "model"
         case startedAt = "started_at"
         case status = "status"
         case title = "title"
         case workflowRunID = "workflow_run_id"
     }
 
-    public init(attempts: Int?, childSessionID: String?, error: String?, finishedAt: String?, group: String?, key: String, kind: StepKind, startedAt: String?, status: StepStatus, title: String, workflowRunID: String) {
+    public init(attempts: Int?, childSessionID: String?, costUsd: Double?, error: String?, finishedAt: String?, group: String?, key: String, kind: StepKind, model: String?, startedAt: String?, status: StepStatus, title: String, workflowRunID: String) {
         self.attempts = attempts
         self.childSessionID = childSessionID
+        self.costUsd = costUsd
         self.error = error
         self.finishedAt = finishedAt
         self.group = group
         self.key = key
         self.kind = kind
+        self.model = model
         self.startedAt = startedAt
         self.status = status
         self.title = title
@@ -31229,11 +31253,13 @@ public enum WorkflowStepInDoubtNotificationMethod: String, Codable {
 public struct WorkflowStepInDoubtNotificationParams: Codable {
     public let attempts: Int?
     public let childSessionID: String?
+    public let costUsd: Double?
     public let error: String?
     public let finishedAt: String?
     public let group: String?
     public let key: String
     public let kind: StepKind
+    public let model: String?
     public let startedAt: String?
     public let status: StepStatus
     public let title: String
@@ -31242,25 +31268,29 @@ public struct WorkflowStepInDoubtNotificationParams: Codable {
     public enum CodingKeys: String, CodingKey {
         case attempts = "attempts"
         case childSessionID = "child_session_id"
+        case costUsd = "cost_usd"
         case error = "error"
         case finishedAt = "finished_at"
         case group = "group"
         case key = "key"
         case kind = "kind"
+        case model = "model"
         case startedAt = "started_at"
         case status = "status"
         case title = "title"
         case workflowRunID = "workflow_run_id"
     }
 
-    public init(attempts: Int?, childSessionID: String?, error: String?, finishedAt: String?, group: String?, key: String, kind: StepKind, startedAt: String?, status: StepStatus, title: String, workflowRunID: String) {
+    public init(attempts: Int?, childSessionID: String?, costUsd: Double?, error: String?, finishedAt: String?, group: String?, key: String, kind: StepKind, model: String?, startedAt: String?, status: StepStatus, title: String, workflowRunID: String) {
         self.attempts = attempts
         self.childSessionID = childSessionID
+        self.costUsd = costUsd
         self.error = error
         self.finishedAt = finishedAt
         self.group = group
         self.key = key
         self.kind = kind
+        self.model = model
         self.startedAt = startedAt
         self.status = status
         self.title = title
@@ -31279,11 +31309,13 @@ public struct WorkflowStepInDoubtNotificationParams: Codable {
 public struct WorkflowStepInfo: Codable {
     public let attempts: Int?
     public let childSessionID: String?
+    public let costUsd: Double?
     public let error: String?
     public let finishedAt: String?
     public let group: String?
     public let key: String
     public let kind: StepKind
+    public let model: String?
     public let startedAt: String?
     public let status: StepStatus
     public let title: String
@@ -31291,24 +31323,28 @@ public struct WorkflowStepInfo: Codable {
     public enum CodingKeys: String, CodingKey {
         case attempts = "attempts"
         case childSessionID = "child_session_id"
+        case costUsd = "cost_usd"
         case error = "error"
         case finishedAt = "finished_at"
         case group = "group"
         case key = "key"
         case kind = "kind"
+        case model = "model"
         case startedAt = "started_at"
         case status = "status"
         case title = "title"
     }
 
-    public init(attempts: Int?, childSessionID: String?, error: String?, finishedAt: String?, group: String?, key: String, kind: StepKind, startedAt: String?, status: StepStatus, title: String) {
+    public init(attempts: Int?, childSessionID: String?, costUsd: Double?, error: String?, finishedAt: String?, group: String?, key: String, kind: StepKind, model: String?, startedAt: String?, status: StepStatus, title: String) {
         self.attempts = attempts
         self.childSessionID = childSessionID
+        self.costUsd = costUsd
         self.error = error
         self.finishedAt = finishedAt
         self.group = group
         self.key = key
         self.kind = kind
+        self.model = model
         self.startedAt = startedAt
         self.status = status
         self.title = title
@@ -31347,11 +31383,13 @@ public enum WorkflowStepStartedNotificationMethod: String, Codable {
 public struct WorkflowStepStartedNotificationParams: Codable {
     public let attempts: Int?
     public let childSessionID: String?
+    public let costUsd: Double?
     public let error: String?
     public let finishedAt: String?
     public let group: String?
     public let key: String
     public let kind: StepKind
+    public let model: String?
     public let startedAt: String?
     public let status: StepStatus
     public let title: String
@@ -31360,25 +31398,29 @@ public struct WorkflowStepStartedNotificationParams: Codable {
     public enum CodingKeys: String, CodingKey {
         case attempts = "attempts"
         case childSessionID = "child_session_id"
+        case costUsd = "cost_usd"
         case error = "error"
         case finishedAt = "finished_at"
         case group = "group"
         case key = "key"
         case kind = "kind"
+        case model = "model"
         case startedAt = "started_at"
         case status = "status"
         case title = "title"
         case workflowRunID = "workflow_run_id"
     }
 
-    public init(attempts: Int?, childSessionID: String?, error: String?, finishedAt: String?, group: String?, key: String, kind: StepKind, startedAt: String?, status: StepStatus, title: String, workflowRunID: String) {
+    public init(attempts: Int?, childSessionID: String?, costUsd: Double?, error: String?, finishedAt: String?, group: String?, key: String, kind: StepKind, model: String?, startedAt: String?, status: StepStatus, title: String, workflowRunID: String) {
         self.attempts = attempts
         self.childSessionID = childSessionID
+        self.costUsd = costUsd
         self.error = error
         self.finishedAt = finishedAt
         self.group = group
         self.key = key
         self.kind = kind
+        self.model = model
         self.startedAt = startedAt
         self.status = status
         self.title = title
@@ -31418,11 +31460,13 @@ public enum WorkflowStepWaitingNotificationMethod: String, Codable {
 public struct WorkflowStepWaitingNotificationParams: Codable {
     public let attempts: Int?
     public let childSessionID: String?
+    public let costUsd: Double?
     public let error: String?
     public let finishedAt: String?
     public let group: String?
     public let key: String
     public let kind: StepKind
+    public let model: String?
     public let startedAt: String?
     public let status: StepStatus
     public let title: String
@@ -31431,25 +31475,29 @@ public struct WorkflowStepWaitingNotificationParams: Codable {
     public enum CodingKeys: String, CodingKey {
         case attempts = "attempts"
         case childSessionID = "child_session_id"
+        case costUsd = "cost_usd"
         case error = "error"
         case finishedAt = "finished_at"
         case group = "group"
         case key = "key"
         case kind = "kind"
+        case model = "model"
         case startedAt = "started_at"
         case status = "status"
         case title = "title"
         case workflowRunID = "workflow_run_id"
     }
 
-    public init(attempts: Int?, childSessionID: String?, error: String?, finishedAt: String?, group: String?, key: String, kind: StepKind, startedAt: String?, status: StepStatus, title: String, workflowRunID: String) {
+    public init(attempts: Int?, childSessionID: String?, costUsd: Double?, error: String?, finishedAt: String?, group: String?, key: String, kind: StepKind, model: String?, startedAt: String?, status: StepStatus, title: String, workflowRunID: String) {
         self.attempts = attempts
         self.childSessionID = childSessionID
+        self.costUsd = costUsd
         self.error = error
         self.finishedAt = finishedAt
         self.group = group
         self.key = key
         self.kind = kind
+        self.model = model
         self.startedAt = startedAt
         self.status = status
         self.title = title

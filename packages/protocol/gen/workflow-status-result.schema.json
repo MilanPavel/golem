@@ -164,6 +164,19 @@
           "default": null,
           "title": "Child Session Id"
         },
+        "cost_usd": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cost Usd"
+        },
         "error": {
           "anyOf": [
             {
@@ -217,6 +230,18 @@
           ],
           "title": "Kind",
           "type": "string"
+        },
+        "model": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Model"
         },
         "started_at": {
           "anyOf": [
