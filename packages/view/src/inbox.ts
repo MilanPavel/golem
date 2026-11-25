@@ -4,10 +4,10 @@
  * summary has it, so this file does not depend on the generated types.
  */
 
-import { helperCardOf } from "./use-helpers.ts";
+import { helperCardOf, helperEstimateOf, type HelperEstimate, type HelperEstimateFields } from "./use-helpers.ts";
 
 /** What a session waits for, as its summary carries it. */
-export interface InboxPending {
+export interface InboxPending extends HelperEstimateFields {
   /** `batch` is the card that confirms a batch of helpers ("Use helpers: Ask me first"); a kind the Inbox does not know is skipped. */
   kind: "approval" | "consent" | "batch";
   since: string;
@@ -77,6 +77,8 @@ export interface InboxItem {
   notSent: string[];
   /** For a batch: one agent type name per helper it starts; empty otherwise. */
   agents: string[];
+  /** For a batch with an estimate (a paid model, above the amount you set); null otherwise. */
+  estimate: HelperEstimate | null;
 }
 
 /** The helper behind an item, with the words that name it. */
@@ -139,7 +141,7 @@ function headline(pending: InboxPending): string {
     return "Use a paid model for this message?";
   }
   if (pending.kind === "batch") {
-    return helperCardOf({ helperCount: pending.helper_count, agents: pending.agents }).head;
+    return helperCardOf({ helperCount: pending.helper_count, agents: pending.agents, estimate: helperEstimateOf(pending) }).head;
   }
   const name = pending.name ?? "";
   const subject = oneLine(pending.subject);
@@ -224,6 +226,7 @@ export function inboxItems(sessions: readonly InboxSession[], now: number): Inbo
         sent: approval || batch ? [] : [...(pending.sent ?? [])],
         notSent: approval || batch ? [] : [...(pending.not_sent ?? [])],
         agents: batch ? [...(pending.agents ?? [])] : [],
+        estimate: batch ? helperEstimateOf(pending) : null,
       });
     }
   }

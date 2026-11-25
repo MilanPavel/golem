@@ -1,5 +1,5 @@
 import { helperCardOf, isUseHelpersQuestion, type ApprovalChoice, type ToolBlock } from "@golem/view";
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { useDraftReader, usePageActions, useSession } from "../../store/page-context.tsx";
 import { approvalCardId } from "../../store/inbox.ts";
 import { ApprovalBar } from "./approval-bar.tsx";
@@ -33,10 +33,14 @@ export function DockedApproval({ sessionId }: { sessionId: string }) {
   const { respond, respondHelpers } = usePageActions();
   const callId = tool?.callId ?? null;
   const batch = tool !== null && isUseHelpersQuestion({ name: tool.name, source: tool.approval?.source });
+  // "Use a cheaper model" is an allow that also says `cheaper`; the one flag is set just before the answer.
+  const cheaper = useRef(false);
   const send = useCallback(
     (call: string, decision: ApprovalChoice, args?: Args) =>
       batch
-        ? respondHelpers(sessionId, call, decision !== "deny")
+        ? cheaper.current && decision !== "deny"
+          ? respondHelpers(sessionId, call, true, true)
+          : respondHelpers(sessionId, call, decision !== "deny")
         : args === undefined
           ? respond(sessionId, call, decision)
           : respond(sessionId, call, decision, args),
@@ -58,7 +62,10 @@ export function DockedApproval({ sessionId }: { sessionId: string }) {
     canAnswer: () => readDraft() === "" && !editing,
     onAnswer: (call, decision) => {
       // The batch card has one key: Enter runs.
-      if (!batch || decision === "allow") answer(call, decision);
+      if (!batch || decision === "allow") {
+        cheaper.current = false;
+        answer(call, decision);
+      }
     },
     onEdit: () => {
       if (!batch) onEdit(true);
@@ -69,11 +76,12 @@ export function DockedApproval({ sessionId }: { sessionId: string }) {
     return (
       <HelperBatchCard
         key={callId}
-        model={helperCardOf({ args: tool.args })}
+        model={helperCardOf({ args: tool.args, estimate: tool.approval?.estimate ?? null })}
         id={approvalCardId(callId)}
         sending={sendingId === callId}
         error={error}
-        onAnswer={(run) => {
+        onAnswer={(run, useCheaper) => {
+          cheaper.current = useCheaper;
           answer(callId, run ? "allow" : "deny");
         }}
       />

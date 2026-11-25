@@ -5356,6 +5356,7 @@ export function App({
       approval: approvalRef.current !== null,
       helperAsk: isHelperApproval(dockRef.current),
       useHelpers: isUseHelpersQuestion(approvalRef.current),
+      useHelpersCheaper: isUseHelpersQuestion(approvalRef.current) && (approvalRef.current?.estimate?.cheaperModel ?? null) !== null,
       askPages: (dockRef.current?.items.length ?? 0) > 1,
       approvalDiff: approvalRef.current !== null && approvalRef.current.diff !== null,
       approvalEdit: argsEditRef.current !== null,
@@ -5442,7 +5443,7 @@ export function App({
         answerHelperAsk(effect.answer);
         return;
       case "helpers-run":
-        answerHelpers(effect.run);
+        answerHelpers(effect.run, effect.cheaper === true);
         return;
       case "ask-next":
         if (dockRef.current !== null) setAskPick(nextAskKey(dockRef.current));
@@ -5530,13 +5531,14 @@ export function App({
   }
 
   /** A key on "start these helpers?": `helpers.respond` with the lead's session and the `delegate` call. */
-  function answerHelpers(run: boolean): void {
+  function answerHelpers(run: boolean, cheaper = false): void {
     const pending = approvalRef.current;
     const current = sessionRef.current;
     if (pending === null || current === null || !isUseHelpersQuestion(pending)) {
       return;
     }
-    void client.respondHelpers(current, pending.callId, run).catch((error: unknown) => {
+    const sent = cheaper ? client.respondHelpers(current, pending.callId, true, true) : client.respondHelpers(current, pending.callId, run);
+    void sent.catch((error: unknown) => {
       setChat((state) => ({ ...state, error: messageOf(error) }));
     });
   }

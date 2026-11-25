@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { helperCardOf, helperBatchHead, helperJobsOf, isUseHelpersQuestion, USE_HELPERS_POSITIONS, useHelpersExplain, useHelpersPosition } from "./use-helpers.ts";
+import { helperEstimateOf, helperCardOf, helperBatchHead, helperJobsOf, isUseHelpersQuestion, USE_HELPERS_POSITIONS, useHelpersExplain, useHelpersPosition } from "./use-helpers.ts";
 
 test("three positions with their labels and one line each", () => {
   assert.deepEqual(
@@ -65,4 +65,30 @@ test("only delegate asked by use_helpers is this question", () => {
   assert.equal(isUseHelpersQuestion({ name: "delegate", source: "rule" }), false);
   assert.equal(isUseHelpersQuestion({ name: "shell", source: "use_helpers" }), false);
   assert.equal(isUseHelpersQuestion(null), false);
+});
+
+test("an estimate words the head, the line and three answers; without one the card is as before", () => {
+  const estimate = helperEstimateOf({ estimate_usd: 0.6, allowed_usd: 2, ask_over_usd: 0.5, model: "claude-sonnet", cheaper_model: "claude-haiku" });
+  assert.ok(estimate);
+  const card = helperCardOf({ agents: ["worker", "worker", "worker", "worker", "worker"], estimate });
+  assert.equal(card.head, "5 helpers · worker ×5 · claude-sonnet");
+  assert.equal(card.line, "About $0.60 of the $2.00 you allow per message.");
+  assert.deepEqual(
+    card.actions.map((a) => [a.id, a.label, a.run, a.cheaper]),
+    [["run", "Start", true, false], ["cheaper", "Use a cheaper model", true, true], ["chat", "Do it in the chat", false, false]],
+  );
+  const plain = helperCardOf({ agents: ["worker"] });
+  assert.equal(plain.line, null);
+  assert.deepEqual(plain.actions.map((a) => a.label), ["Run", "Do it in the chat"]);
+});
+
+test("no cheaper model hides that answer; no allowed amount drops the second half of the line", () => {
+  const estimate = helperEstimateOf({ estimate_usd: 0.6, allowed_usd: null, cheaper_model: null, model: null });
+  assert.ok(estimate);
+  const card = helperCardOf({ agents: ["worker"], estimate });
+  assert.equal(card.line, "About $0.60.");
+  assert.equal(card.head, "1 helper · worker");
+  assert.deepEqual(card.actions.map((a) => a.id), ["run", "chat"]);
+  assert.equal(helperEstimateOf({}), null);
+  assert.equal(helperEstimateOf({ estimate_usd: null }), null);
 });

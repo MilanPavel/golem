@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import type { PendingApproval } from "@golem/view";
+import { helperEstimateOf, type PendingApproval } from "@golem/view";
 
 import { approvalLines, approvalRows, APPROVAL_ROWS } from "./approval.ts";
 import { layoutAgentsManager, nextUseHelpers, openAgentsManager, pressAgentsManager, useHelpersFailed, USE_HELPERS_UNKNOWN } from "./agents-manager.ts";
@@ -130,5 +130,47 @@ test("a batch item in the inbox reads as the card head and has no empty row", ()
   assert.deepEqual(
     helperAskLines(dock, 80).map((line) => line.text),
     ["Start 3 helpers · explorer ×2, worker? · 1 of 2 · tab next", 'Use helpers is set to "Ask me first".', "Enter run · d do it in the chat · Esc the same"],
+  );
+});
+
+test("the estimate card words the cost and the keys; c starts on the cheaper model only when there is one", () => {
+  const estimate = { estimate_usd: 0.6, allowed_usd: 2, ask_over_usd: 0.5, model: "claude-sonnet", cheaper_model: "claude-haiku" };
+  const withEstimate = { ...question({ agent: "worker", brief: "Look" }), estimate: helperEstimateOf(estimate) };
+  const lines = approvalLines(withEstimate, 100, approvalRows(withEstimate, 40)).map((line) => line.text);
+  assert.equal(lines[0], "Start 1 helper · worker · claude-sonnet?");
+  assert.equal(lines.at(-2), "About $0.60 of the $2.00 you allow per message.");
+  assert.equal(lines.at(-1), "Enter start · c cheaper model · d do it in the chat · Esc the same");
+  const none = { ...withEstimate, estimate: helperEstimateOf({ ...estimate, cheaper_model: null }) };
+  assert.equal(approvalLines(none, 100, approvalRows(none, 40)).at(-1)?.text, "Enter start · d do it in the chat · Esc the same");
+  const press = (where: KeyPlace, input: string) => pressKey(where, { name: null, input, ctrl: false, meta: false });
+  assert.deepEqual(press(place({ approval: true, useHelpers: true, useHelpersCheaper: true }), "c"), { kind: "helpers-run", run: true, cheaper: true });
+  assert.notEqual(press(place({ approval: true, useHelpers: true }), "c")?.kind, "helpers-run");
+});
+
+test("a batch item with an estimate shows the estimate line in the dock", () => {
+  const summary = {
+    session_id: "lead",
+    title: "Lead",
+    status: "waiting" as const,
+    pending: null,
+    pending_items: [
+      { kind: "batch" as const, since: "2026-11-16T09:50:00Z", call_id: "c1", helper_count: 2, agents: ["worker", "worker"], count: 1, estimate_usd: 0.6, allowed_usd: 2, model: "claude-sonnet", cheaper_model: null },
+      {
+        kind: "approval" as const,
+        since: "2026-11-16T09:51:00Z",
+        call_id: "c2",
+        name: "shell",
+        subject: "uv lock",
+        source: "built-in default",
+        helper: { session_id: "h1", agent: "worker", label: "up", index: 1 },
+        count: 1,
+      },
+    ],
+  };
+  const dock = helperDock(summary, null, Date.parse("2026-11-16T10:00:00Z"));
+  assert.ok(dock);
+  assert.deepEqual(
+    helperAskLines(dock, 100).map((line) => line.text),
+    ["Start 2 helpers · worker ×2 · claude-sonnet? · 1 of 2 · tab next", "About $0.60 of the $2.00 you allow per message.", "Enter start · d do it in the chat · Esc the same"],
   );
 });

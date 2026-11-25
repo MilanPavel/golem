@@ -281,7 +281,7 @@ export type PageActions = {
   /** `scope: "batch"` answers for all the helpers of one delegate call; it does not go with `args`. */
   respond(sessionId: string, callId: string, decision: ApprovalChoice, args?: Readonly<Record<string, unknown>>, scope?: "batch"): Promise<void>;
   /** Answers "start these helpers?" (`helpers.respond`) for the `delegate` call `callId`. `run` false tells the model to do the work in the chat. */
-  respondHelpers(sessionId: string, callId: string, run: boolean): Promise<void>;
+  respondHelpers(sessionId: string, callId: string, run: boolean, cheaper?: boolean): Promise<void>;
   /** Answers the paid step-up question the session's run waits on. The run goes on in its events. */
   answerConsent(sessionId: string, runId: string, answer: ConsentChoice): Promise<void>;
   /** Switches the session's model. The chip changes from the daemon's `model.selected` event. */
@@ -825,8 +825,9 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
         else if (args === undefined) await client.respondApproval(sessionId, callId, decision);
         else await client.respondApproval(sessionId, callId, decision, args);
       },
-      async respondHelpers(sessionId, callId, run) {
-        await client.respondHelpers(sessionId, callId, run);
+      async respondHelpers(sessionId, callId, run, cheaper) {
+        if (cheaper === true) await client.respondHelpers(sessionId, callId, run, true);
+        else await client.respondHelpers(sessionId, callId, run);
       },
       async answerConsent(sessionId, runId, answer) {
         await client.answerConsent(sessionId, runId, answer);
