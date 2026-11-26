@@ -1,7 +1,7 @@
-import type { GolemClient, WorkflowEntryInfo, WorkflowNotice, WorkflowStatusResult } from "@golem/client";
+import type { GolemClient, WorkflowEntryInfo, WorkflowNotice, WorkflowProblem, WorkflowStatusResult } from "@golem/client";
 
 /** What `golem workflow` needs from the daemon: a fake stands in for it in the tests. */
-export type WorkflowClient = Pick<GolemClient, "listWorkflows" | "startWorkflow" | "workflowStatus" | "cancelWorkflow" | "resumeWorkflow" | "answerWorkflowReview" | "onWorkflowEvent">;
+export type WorkflowClient = Pick<GolemClient, "listWorkflows" | "checkWorkflow" | "startWorkflow" | "workflowStatus" | "cancelWorkflow" | "resumeWorkflow" | "answerWorkflowReview" | "onWorkflowEvent">;
 
 /** What the commands need from outside: the folder, the terminal, and Ctrl-C. */
 export interface WorkflowDeps {
@@ -13,10 +13,11 @@ export interface WorkflowDeps {
   onInterrupt(handler: () => void): () => void;
 }
 
-export const WORKFLOW_USAGE = "usage: golem workflow [list] | golem workflow run <name|id> [--input k=v]… | golem workflow status <workflow_run_id> | golem workflow resume <workflow_run_id> | golem workflow answer <workflow_run_id> [--key K] [--edit TEXT | --reject]";
+export const WORKFLOW_USAGE = "usage: golem workflow [list] | golem workflow check <name|id> | golem workflow run <name|id> [--input k=v]… | golem workflow status <workflow_run_id> | golem workflow resume <workflow_run_id> | golem workflow answer <workflow_run_id> [--key K] [--edit TEXT | --reject]";
 
 export type WorkflowParse =
   | { kind: "list" }
+  | { kind: "check"; name: string }
   | { kind: "run"; name: string; inputs: Record<string, string> }
   | { kind: "status"; runId: string }
   | { kind: "resume"; runId: string }
@@ -63,6 +64,10 @@ export function parseWorkflowArgs(given: readonly string[]): WorkflowParse {
       }
     }
     return runId === undefined ? fail() : { kind: "answer", runId, key, verdict, text };
+  }
+  if (sub === "check") {
+    const [name, ...extra] = rest;
+    return name === undefined || name.startsWith("-") || extra.length > 0 ? fail() : { kind: "check", name };
   }
   if (sub === "run") {
     let name: string | undefined;
@@ -117,6 +122,34 @@ export function formatWorkflows(entries: readonly WorkflowEntryInfo[], cwd: stri
   const widths = head.map((title, col) => Math.max(title.length, ...rows.map((row) => (row[col] as string).length)));
   const line = (cells: readonly string[]): string => cells.map((cell, col) => (col === cells.length - 1 ? cell : cell.padEnd(widths[col] as number))).join("  ").trimEnd();
   return [line(head), ...rows.map(line)].join("\n");
+}
+
+/** One problem as `line N · step S · message`; the step is left out for a problem of the header. */
+export function problemLine(problem: WorkflowProblem): string {
+  const where = problem.step_id === undefined || problem.step_id === null ? "" : ` \u00b7 step ${problem.step_id}`;
+  const mark = problem.severity === "warning" ? "warning: " : "";
+  const fix = problem.fix === undefined || problem.fix === null ? "" : ` (fix: ${problem.fix})`;
+  return `line ${problem.line}${where} \u00b7 ${mark}${problem.message}${fix}`;
+}
+
+/** `golem workflow check <name|id>`: prints the problems of the saved file. 1 when one is an error, else 0. */
+export async function runWorkflowCheck(client: WorkflowClient, args: { name: string }, deps: WorkflowDeps): Promise<number> {
+  try {
+    const listed = await client.listWorkflows([deps.cwd]);
+    const picked = pickWorkflow(listed.workflows, args.name);
+    if (typeof picked === "string") {
+      deps.error(picked);
+      return 1;
+    }
+    const result = await client.checkWorkflow(picked.id);
+    const problems = result.problems ?? [];
+    for (const problem of problems) deps.write(problemLine(problem));
+    if (problems.length === 0) deps.write(`${picked.name}: no problems`);
+    return problems.some((problem) => problem.severity === "error") ? 1 : 0;
+  } catch (error) {
+    deps.error(message(error));
+    return 1;
+  }
 }
 
 /** `golem workflow [list]`. */

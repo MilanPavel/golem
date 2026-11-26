@@ -92,7 +92,9 @@ import type { RoutineRunResult } from "../../protocol/gen/routine-run-result.ts"
 import type { WorkflowCancelResult } from "../../protocol/gen/workflow-cancel-result.ts";
 import type { WorkflowResumeResult } from "../../protocol/gen/workflow-resume-result.ts";
 import type { WorkflowReviewAnswerResult } from "../../protocol/gen/workflow-review-answer-result.ts";
+import type { WorkflowCheckResult } from "../../protocol/gen/workflow-check-result.ts";
 import type { WorkflowGetResult } from "../../protocol/gen/workflow-get-result.ts";
+import type { WorkflowSaveResult } from "../../protocol/gen/workflow-save-result.ts";
 import type { WorkflowListResult } from "../../protocol/gen/workflow-list-result.ts";
 import type { WorkflowRunEvent } from "../../protocol/gen/workflow-run-event.ts";
 import type { WorkflowStartResult } from "../../protocol/gen/workflow-start-result.ts";
@@ -365,6 +367,14 @@ export function isWorkflowListResult(value: unknown): value is WorkflowListResul
 
 export function isWorkflowGetResult(value: unknown): value is WorkflowGetResult {
   return isRecord(value) && isRecord(value["workflow"]) && typeof value["workflow"]["id"] === "string" && Array.isArray(value["steps"]);
+}
+
+export function isWorkflowCheckResult(value: unknown): value is WorkflowCheckResult {
+  return isRecord(value) && Array.isArray(value["problems"]) && Array.isArray(value["steps"]);
+}
+
+export function isWorkflowSaveResult(value: unknown): value is WorkflowSaveResult {
+  return isRecord(value) && isRecord(value["workflow"]) && typeof value["code_hash"] === "string" && Array.isArray(value["problems"]);
 }
 
 export function isWorkflowStartResult(value: unknown): value is WorkflowStartResult {

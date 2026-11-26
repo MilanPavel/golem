@@ -328,6 +328,31 @@ See [Routines](routines.md) for schedules and file watching.
 
 A broken file never disappears from the list. Fix it and it loads again.
 
+## Check
+
+golem can tell you what is wrong with a workflow file before it runs. The check reads the text only: it does not import the file and does not ask a model, so it works on a broken or untrusted file too.
+
+```
+$ golem workflow check digest
+line 12 · step agent:explorr · unknown agent 'explorr'; the agents here are explorer, worker (fix: explorer)
+line 15 · step llm:ask · warning: the wish 'stronger' would use a paid model, and this folder is local-only: a run would stop at this step
+```
+
+Each line says the line of the file, the step (from the outline) and the problem. The command exits 1 when there is an **error**, and 0 for warnings only.
+
+| Check | Level |
+|---|---|
+| The file parses and the outline reads | error |
+| `run.*` calls: unknown method or keyword argument | error |
+| `budget=` is money text such as `"$0.50"` | error |
+| `model=` is a wish (`cheapest`, `same`, `stronger`, `local`, `budget`, `frontier`), never a model name | error |
+| The agent named in `run.agent` exists for the folder (the message lists the known ones) | error |
+| `schedule(...)` and `on_file(...)` are valid, with the same parser routines use | error |
+| A wish that would use a paid model in a local-only folder | warning: a run would stop at that step |
+| A wish that does not resolve with your models | warning |
+
+The editor uses the same check while you type (`workflow.check` with the text), and saves with `workflow.save`. A save is refused when the text has an error, when the file changed on disk since you opened it, and for a folder that is not trusted.
+
 ## Coming next
 
 | Piece | What it adds | Ticket |

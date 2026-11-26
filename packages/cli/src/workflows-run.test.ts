@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import type { WorkflowEntryInfo, WorkflowNotice } from "@golem/client";
+import type { WorkflowEntryInfo, WorkflowNotice, WorkflowProblem } from "@golem/client";
 
 import {
   duration,
@@ -10,6 +10,7 @@ import {
   parseWorkflowArgs,
   pickWorkflow,
   runWorkflowAnswer,
+  runWorkflowCheck,
   runWorkflowList,
   runWorkflowResume,
   runWorkflowRun,
@@ -54,13 +55,17 @@ function stepNotice(method: string, key: string, status: string, rest: Record<st
 }
 
 /** A daemon whose run sends `script` once it is started, and records what it was asked. */
-function fake(script: WorkflowNotice[], entries: WorkflowEntryInfo[] = [ok, broken]) {
+function fake(script: WorkflowNotice[], entries: WorkflowEntryInfo[] = [ok, broken], problems: WorkflowProblem[] = []) {
   const calls: string[] = [];
   let listener: (notice: WorkflowNotice) => void = () => undefined;
   const client: WorkflowClient = {
     listWorkflows: async (folders) => {
       calls.push(`list ${JSON.stringify(folders)}`);
       return { workflows: entries };
+    },
+    checkWorkflow: async (id) => {
+      calls.push(`check ${id}`);
+      return { problems, steps: [] };
     },
     startWorkflow: async (id, inputs) => {
       calls.push(`start ${id} ${JSON.stringify(inputs)}`);
@@ -123,6 +128,9 @@ test("the arguments parse, and the ones that do not fit are errors", () => {
   assert.deepEqual(parseWorkflowArgs(["run", "adder", "--input", "n=3", "--input", "tag=a=b"]), { kind: "run", name: "adder", inputs: { n: "3", tag: "a=b" } });
   assert.deepEqual(parseWorkflowArgs(["status", "wr1"]), { kind: "status", runId: "wr1" });
   assert.deepEqual(parseWorkflowArgs(["resume", "wr1"]), { kind: "resume", runId: "wr1" });
+  assert.deepEqual(parseWorkflowArgs(["check", "adder"]), { kind: "check", name: "adder" });
+  assert.equal(parseWorkflowArgs(["check"]).kind, "error");
+  assert.equal(parseWorkflowArgs(["check", "a", "b"]).kind, "error");
   assert.equal(parseWorkflowArgs(["resume"]).kind, "error");
   assert.equal(parseWorkflowArgs(["resume", "wr1", "x"]).kind, "error");
   assert.equal(parseWorkflowArgs(["run"]).kind, "error");
@@ -318,4 +326,26 @@ test("answer reports a refusal from the daemon and exits 1", async () => {
   const { deps, err } = setup();
   assert.equal(await runWorkflowAnswer(client, { runId: "wr1", key: "k", verdict: "approve", text: null }, deps), 1);
   assert.deepEqual(err, ["review 'k' of workflow run wr1 is answered already"]);
+});
+
+test("check prints line, step and message, and exits 1 only for an error", async () => {
+  const warning: WorkflowProblem = { severity: "warning", line: 9, step_id: "llm:ask", message: "a run would stop at this step" };
+  const error: WorkflowProblem = { severity: "error", line: 4, message: "unknown agent 'x'; the agents here are explorer", fix: "explorer" };
+  const bad = fake([], [ok], [error, warning]);
+  const first = setup();
+  assert.equal(await runWorkflowCheck(bad.client, { name: "adder" }, first.deps), 1);
+  assert.deepEqual(first.out, [
+    "line 4 \u00b7 unknown agent 'x'; the agents here are explorer (fix: explorer)",
+    "line 9 \u00b7 step llm:ask \u00b7 warning: a run would stop at this step",
+  ]);
+  assert.deepEqual(bad.calls, ['list ["/work/proj"]', `check ${ok.id}`]);
+  const soft = fake([], [ok], [warning]);
+  assert.equal(await runWorkflowCheck(soft.client, { name: "adder" }, setup().deps), 0);
+  const clean = fake([], [ok]);
+  const third = setup();
+  assert.equal(await runWorkflowCheck(clean.client, { name: "adder" }, third.deps), 0);
+  assert.deepEqual(third.out, ["adder: no problems"]);
+  const missing = setup();
+  assert.equal(await runWorkflowCheck(clean.client, { name: "nope" }, missing.deps), 1);
+  assert.match(missing.err[0] as string, /no workflow called nope/);
 });

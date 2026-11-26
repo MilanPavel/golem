@@ -498,12 +498,16 @@ class DaemonApp:
                     ),
                     llm=wf_llm,
                     check_env=CheckEnv(
-                        agents=lambda folder: {
-                            a.name: a.wish
-                            for a in self.state.agents.view(
-                                Path(folder) if folder else None
-                            ).usable()
-                        },
+                        agents=lambda folder: (
+                            {}
+                            if self.state.agents is None
+                            else {
+                                a.name: a.wish
+                                for a in self.state.agents.view(
+                                    Path(folder) if folder else None
+                                ).usable()
+                            }
+                        ),
                         local_only=sessions.local_only,
                         tier_of_wish=lambda wish, local_only: _tier_of(
                             router, models, wf_llm.profile_for(wish, local_only)
