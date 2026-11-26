@@ -70,6 +70,7 @@ export function WorkflowScreen({ id }: { id: string }) {
         codeHash={codeHash ?? null}
         onCheck={(text) => actions.checkWorkflow(workflow.id, text)}
         onSave={(text, base) => actions.saveWorkflow(workflow.id, text, base)}
+        onPropose={(text, ask, previous) => actions.proposeWorkflow(workflow.id, text, ask, previous)}
         runs={workflowRuns(runs.data?.runs ?? [], workflow.name)}
         routines={routinesStarting(routines.data?.routines ?? [], workflow.name)}
         now={now}

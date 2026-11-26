@@ -105,7 +105,7 @@ import { LeadRun, RunBanner, RunsList, RunsPanel, WorkflowRunView } from "../fea
 import { SAMPLE_RUN_CANCELLED, SAMPLE_RUN_DONE, SAMPLE_RUN_FAILED, SAMPLE_RUN_REVIEW, SAMPLE_RUN_RUNNING, SAMPLE_RUN_TOOL_ASK, WORKFLOW_RUN_NOW } from "../features/runs/workflow-sample.ts";
 import { DataGallery } from "./gallery-data.tsx";
 import { RunForm, WorkflowDetail, WorkflowsPanel } from "../features/workflows/index.ts";
-import { SAMPLE_BROKEN, SAMPLE_PR_DIGEST, SAMPLE_PR_DIGEST_CODE, SAMPLE_PR_DIGEST_EDITED_CODE, SAMPLE_PR_DIGEST_EDITED_STEPS, SAMPLE_PR_DIGEST_HASH, SAMPLE_PR_DIGEST_PROBLEMS, SAMPLE_PR_DIGEST_STEPS, SAMPLE_SAVE_CONFLICT, SAMPLE_ROUTINE_WORKFLOW_RUN, SAMPLE_UNTRUSTED, SAMPLE_WORKFLOW_LIST, SAMPLE_WORKFLOW_LIST_TWO_PROJECTS, SAMPLE_WORKFLOW_RUNS, WORKFLOWS_NOW } from "../features/workflows/sample.ts";
+import { SAMPLE_BROKEN, SAMPLE_PR_DIGEST, SAMPLE_PR_DIGEST_CODE, SAMPLE_PR_DIGEST_EDITED_CODE, SAMPLE_PR_DIGEST_EDITED_STEPS, SAMPLE_PR_DIGEST_HASH, SAMPLE_PR_DIGEST_PROBLEMS, SAMPLE_PR_DIGEST_PROPOSAL, SAMPLE_PR_DIGEST_PROPOSAL_PROBLEM, SAMPLE_PR_DIGEST_STEPS, SAMPLE_SAVE_CONFLICT, SAMPLE_ROUTINE_WORKFLOW_RUN, SAMPLE_UNTRUSTED, SAMPLE_WORKFLOW_LIST, SAMPLE_WORKFLOW_LIST_TWO_PROJECTS, SAMPLE_WORKFLOW_RUNS, WORKFLOWS_NOW } from "../features/workflows/sample.ts";
 import { RUNS_NOW, SAMPLE_RUN_LIST, SAMPLE_WAITING_RUN } from "../features/runs/sample.ts";
 import { HelperRowCardBody, Rail, SessionsPanel, SidebarPanel, WaitingChip } from "../features/sidebar/index.ts";
 import { ConnectionStrip } from "../features/connection/index.ts";
@@ -2406,6 +2406,33 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
               onNavigate={() => {}}
               onReveal={() => Promise.resolve()}
               onSave={() => Promise.reject(new Error(SAMPLE_SAVE_CONFLICT))}
+              initialEditor={initialEditor}
+              initialTab="code"
+            />
+          </div>
+        ))}
+        {(
+          [
+            ["Workflow editor, ask golem, asking", { problems: [], ask: "add a step after 1" }],
+            ["Workflow editor, ask golem, writing", { problems: [], ask: "", writing: true }],
+            ["Workflow editor, ask golem, proposal with checks passing", { problems: [], proposal: SAMPLE_PR_DIGEST_PROPOSAL }],
+            ["Workflow editor, ask golem, proposal with a problem", { problems: [], proposal: SAMPLE_PR_DIGEST_PROPOSAL_PROBLEM }],
+            ["Workflow editor, ask golem, refine", { problems: [], proposal: SAMPLE_PR_DIGEST_PROPOSAL, ask: "and skip pull requests from bots" }],
+            ["Workflow editor, ask golem, no model", { problems: [], proposeError: "No model is available for this folder." }],
+          ] as const
+        ).map(([title, initialEditor]) => (
+          <div key={title} className="mt-4 rounded-lg border border-line bg-bg p-5" role="region" aria-label={`${title}, ${theme}`}>
+            <WorkflowDetail
+              workflow={SAMPLE_PR_DIGEST}
+              steps={SAMPLE_PR_DIGEST_STEPS}
+              code={SAMPLE_PR_DIGEST_CODE}
+              codeHash={SAMPLE_PR_DIGEST_HASH}
+              runs={[]}
+              now={WORKFLOWS_NOW}
+              onNavigate={() => {}}
+              onReveal={() => Promise.resolve()}
+              onSave={() => Promise.reject(new Error(SAMPLE_SAVE_CONFLICT))}
+              onPropose={() => new Promise(() => {})}
               initialEditor={initialEditor}
               initialTab="code"
             />

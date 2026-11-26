@@ -70,6 +70,15 @@ test("the gallery's Workflow editor stories show each state, in both themes", ()
     expect(story("Workflow editor, selected step").getByRole("group", { name: "Selected step" }).textContent).toContain("Summarise each pull request");
     expect(story("Workflow editor, outline only").queryByRole("textbox")).toBeNull();
     expect(story("Workflow editor, broken file").getByRole("alert").textContent).toContain("ImportError");
+    const ask = (name: string) => story(`Workflow editor, ask golem, ${name}`);
+    expect((ask("asking").getByRole("textbox", { name: "Ask golem to change this workflow" }) as HTMLInputElement).value).toBe("add a step after 1");
+    expect(ask("writing").getByText(/golem is writing/)).toBeTruthy();
+    expect(ask("proposal with checks passing").getByText("✓ checks pass on the proposal")).toBeTruthy();
+    expect(within(ask("proposal with checks passing").getByRole("list", { name: "Outline" })).getAllByRole("listitem")).toHaveLength(5);
+    expect(ask("proposal with checks passing").getByRole("list", { name: "Diff" }).textContent).toContain("Leave out drafts");
+    expect(ask("proposal with a problem").getByRole("list", { name: "Problems" }).textContent).toContain('no agent "upgrader"');
+    expect(ask("refine").getByRole("textbox", { name: "One more sentence on the proposal" })).toBeTruthy();
+    expect(ask("no model").getByRole("alert").textContent).toContain("No model is available");
     expect((story("Workflow editor, untrusted, read only").getByRole("textbox", { name: "Code of deploy" }) as HTMLTextAreaElement).readOnly).toBe(true);
     unmount();
   }

@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { actionErrorText } from "../../store/errors.ts";
-import type { WorkflowCheckResult, WorkflowEntryInfo, WorkflowOutlineStep, WorkflowProblem, WorkflowSaveResult } from "../../store/workflows.ts";
+import type { WorkflowCheckResult, WorkflowEntryInfo, WorkflowOutlineStep, WorkflowProblem, WorkflowProposeResult, WorkflowSaveResult } from "../../store/workflows.ts";
 import { Badge } from "../../ui/badge.tsx";
 import { Button } from "../../ui/button.tsx";
 import { Code } from "../../ui/code.tsx";
+import { Input } from "../../ui/input.tsx";
 import { cn } from "../../ui/cn.ts";
 import { CodeEditor } from "../settings/config/code-editor.tsx";
-import { changedLines, problemCounts, stepAtLine, stepNotes, stepNumberLines, stepRange } from "./text.ts";
+import { changedLines, compareSteps, lineDiff, problemCounts, stepAtLine, stepNotes, stepNumberLines, stepRange, type StepChange } from "./text.ts";
 
 /** How long the code rests before it is checked. */
 export const CHECK_DELAY_MS = 600;
@@ -31,12 +32,14 @@ export type WorkflowEditorProps = {
   onCheck?: (code: string) => Promise<WorkflowCheckResult>;
   /** Writes the text. Rejects with the daemon's reason. Without it, the code is read only. */
   onSave?: (code: string, baseHash: string) => Promise<WorkflowSaveResult>;
+  /** Asks golem for a change to `code` (workflow.propose), with the last proposal and its note for a refine. Rejects with the daemon's reason. Without it, the ask box is not offered. */
+  onPropose?: (code: string, ask: string, previous?: { code: string; note: string }) => Promise<WorkflowProposeResult>;
   /** Opens the file's folder in Finder. Without it, the action is not offered. */
   onReveal?: (path: string) => Promise<void>;
   /** Told whenever the text differs from the saved one, or stops doing so. */
   onDirtyChange?: (dirty: boolean) => void;
   /** A state to start in, for the gallery and tests. */
-  initial?: { text?: string; steps?: readonly WorkflowOutlineStep[]; problems?: readonly WorkflowProblem[]; selected?: string; view?: EditorView; saveError?: string };
+  initial?: { text?: string; steps?: readonly WorkflowOutlineStep[]; problems?: readonly WorkflowProblem[]; selected?: string; view?: EditorView; saveError?: string; ask?: string; proposal?: WorkflowProposeResult; writing?: boolean; proposeError?: string };
 };
 
 function ProblemMark({ problem }: { problem: WorkflowProblem }) {
@@ -48,7 +51,7 @@ function whereText(problem: WorkflowProblem, steps: readonly WorkflowOutlineStep
   return at < 0 ? `line ${problem.line}` : `line ${problem.line} · step ${at + 1}`;
 }
 
-function StepCard({ step, number, selected, problems, onSelect }: { step: WorkflowOutlineStep; number: number; selected: boolean; problems: readonly WorkflowProblem[]; onSelect: () => void }) {
+function StepCard({ step, number, selected, problems, change, onSelect }: { step: WorkflowOutlineStep; number: number; selected: boolean; problems: readonly WorkflowProblem[]; change?: StepChange; onSelect: () => void }) {
   return (
     <button
       type="button"
@@ -56,12 +59,13 @@ function StepCard({ step, number, selected, problems, onSelect }: { step: Workfl
       onClick={onSelect}
       className={cn(
         "flex w-full flex-col gap-0.5 rounded-lg border bg-surface px-2.5 py-2 text-left outline-offset-2 outline-clay focus-visible:outline-2",
-        selected ? "border-clay bg-clay-soft" : "border-line hover:border-line-strong",
+        selected ? "border-clay bg-clay-soft" : change === "new" ? "border-dashed border-allow bg-allow-soft" : change === "changed" ? "border-clay" : "border-line hover:border-line-strong",
       )}
     >
       <span className="flex items-baseline gap-2 text-sm font-medium">
         <span className={cn("w-5 shrink-0 text-right text-meta", selected ? "text-clay-ink" : "text-faint")}>{number}</span>
         <span className="min-w-0 flex-1 wrap-anywhere">{step.title}</span>
+        {change === undefined ? null : <span className={cn("shrink-0 text-meta", change === "new" ? "text-allow" : "text-clay-ink")}>{change}</span>}
       </span>
       <span className="pl-7 text-meta text-muted wrap-anywhere">{stepNotes(step).join(" · ")}</span>
       {problems.map((problem, at) => (
@@ -73,7 +77,7 @@ function StepCard({ step, number, selected, problems, onSelect }: { step: Workfl
   );
 }
 
-function Outline({ steps, selected, problemsOf, onSelect }: { steps: readonly WorkflowOutlineStep[]; selected: string | null; problemsOf: (step: WorkflowOutlineStep) => WorkflowProblem[]; onSelect: (step: WorkflowOutlineStep) => void }) {
+function Outline({ steps, selected, problemsOf, changes, onSelect }: { steps: readonly WorkflowOutlineStep[]; selected: string | null; problemsOf: (step: WorkflowOutlineStep) => WorkflowProblem[]; changes?: ReadonlyMap<string, StepChange>; onSelect: (step: WorkflowOutlineStep) => void }) {
   if (steps.length === 0) return <p className="text-sm text-muted">No steps found in the code.</p>;
   return (
     <ol aria-label="Outline" className="flex flex-col gap-1.5">
@@ -84,7 +88,7 @@ function Outline({ steps, selected, problemsOf, onSelect }: { steps: readonly Wo
           <li key={step.id} className="flex flex-col gap-1.5">
             {group !== null && group !== before ? <span className="pt-1 text-meta font-medium text-faint">{group}</span> : null}
             <div className={cn(group !== null && "border-l-2 border-line pl-2")}>
-              <StepCard step={step} number={at + 1} selected={selected === step.id} problems={problemsOf(step)} onSelect={() => onSelect(step)} />
+              <StepCard step={step} number={at + 1} selected={selected === step.id} problems={problemsOf(step)} change={changes?.get(step.id)} onSelect={() => onSelect(step)} />
             </div>
           </li>
         );
@@ -137,12 +141,70 @@ function StepPane({ step, number, lines, text }: { step: WorkflowOutlineStep | n
   );
 }
 
+/** The proposal as a line diff against the text in the editor: green lines are added, red are removed, long runs of unchanged lines fold. */
+function DiffView({ before, after, name }: { before: string; after: string; name: string }) {
+  const { rows } = lineDiff(before, after);
+  return (
+    <div className="flex min-h-96 min-w-0 flex-1 flex-col gap-2">
+      <h2 className="text-meta font-medium text-faint">Diff, {name}</h2>
+      <ol aria-label="Diff" className="overflow-x-auto rounded-lg border border-line bg-surface py-1 text-code">
+        {rows.map((row, at) => (
+          <li key={at} className={cn("flex gap-2 whitespace-pre px-2", row.kind === "add" && "bg-allow-soft text-allow", row.kind === "del" && "bg-deny-soft text-deny", row.kind === "skip" && "text-faint")}>
+            <span aria-hidden="true" className="w-8 shrink-0 text-right text-faint">
+              {row.line ?? ""}
+            </span>
+            {row.kind === "skip" ? (
+              <span>
+                {row.skipped} unchanged {row.skipped === 1 ? "line" : "lines"}
+              </span>
+            ) : (
+              <>
+                <span aria-hidden="true" className="w-3 shrink-0">
+                  {row.kind === "add" ? "+" : row.kind === "del" ? "−" : ""}
+                </span>
+                <span className="sr-only">{row.kind === "add" ? "Added: " : row.kind === "del" ? "Removed: " : ""}</span>
+                <Code tone="inherit">{row.text}</Code>
+              </>
+            )}
+          </li>
+        ))}
+      </ol>
+    </div>
+  );
+}
+
+/** The ask box under the editor: chips, one line, and a button. With a proposal on the screen the same box refines it. */
+function AskBox({ value, onChange, onAsk, chips, refining, working, inputRef }: { value: string; onChange: (value: string) => void; onAsk: () => void; chips: readonly string[]; refining: boolean; working: boolean; inputRef: React.RefObject<HTMLInputElement | null> }) {
+  return (
+    <form
+      className="flex flex-wrap items-center gap-2 rounded-lg border border-line bg-bg p-2"
+      onSubmit={(event) => {
+        event.preventDefault();
+        onAsk();
+      }}
+    >
+      <span className="text-meta text-faint">{refining ? "refine" : "ask golem"} ⌘K</span>
+      {refining
+        ? null
+        : chips.map((chip) => (
+            <button key={chip} type="button" disabled={working} onClick={() => onChange(chip)} className="rounded-full border border-line bg-surface px-2.5 py-1 text-meta text-muted outline-offset-2 outline-clay hover:text-ink focus-visible:outline-2">
+              {chip}
+            </button>
+          ))}
+      <Input ref={inputRef} aria-label={refining ? "One more sentence on the proposal" : "Ask golem to change this workflow"} placeholder={refining ? "One more sentence on top of this proposal" : "Say what to change, in a sentence"} value={value} disabled={working} onChange={(event) => onChange(event.target.value)} className="min-w-48 flex-1" />
+      <Button kind="primary" size="sm" type="submit" disabled={working || value.trim() === ""}>
+        {refining ? "Refine" : "Ask"}
+      </Button>
+    </form>
+  );
+}
+
 /**
  * The Code tab of a workflow: the outline read from the code, the code with the step numbers in its margin,
  * and the selected step. Typing redraws the outline and the problems after a pause (`workflow.check`); Save
  * (or ⌘S) writes the file (`workflow.save`) against the hash the editor started from.
  */
-export function WorkflowEditor({ workflow, steps: savedSteps, code, codeHash, onCheck, onSave, onReveal, onDirtyChange, initial }: WorkflowEditorProps) {
+export function WorkflowEditor({ workflow, steps: savedSteps, code, codeHash, onCheck, onSave, onPropose, onReveal, onDirtyChange, initial }: WorkflowEditorProps) {
   const readOnly = workflow.state !== "ok" || onSave === undefined || codeHash === null;
   const [text, setText] = useState(initial?.text ?? code);
   const [saved, setSaved] = useState(code);
@@ -159,6 +221,12 @@ export function WorkflowEditor({ workflow, steps: savedSteps, code, codeHash, on
   const [selectedId, setSelectedId] = useState<string | null>(initial?.selected ?? null);
   const [reveal, setReveal] = useState<{ line: number; nonce: number } | undefined>(undefined);
   const [revealError, setRevealError] = useState<string | null>(null);
+  const [ask, setAsk] = useState(initial?.ask ?? "");
+  const [proposal, setProposal] = useState<WorkflowProposeResult | null>(initial?.proposal ?? null);
+  const [writing, setWriting] = useState(initial?.writing ?? false);
+  const [proposeError, setProposeError] = useState<string | null>(initial?.proposeError ?? null);
+  const asking = useRef(0);
+  const askBox = useRef<HTMLInputElement>(null);
   const asked = useRef<string | null>(initial?.problems !== undefined ? text : null);
   const turn = useRef(0);
   const check = useRef(onCheck);
@@ -206,6 +274,15 @@ export function WorkflowEditor({ workflow, steps: savedSteps, code, codeHash, on
     return () => clearTimeout(timer);
   }, [text, readOnly]);
 
+  // A proposal that leaves the file as it is is an answer: the note is all there is to show.
+  const answerOnly = proposal !== null && proposal.code === text;
+  const proposing = proposal !== null && !answerOnly;
+  const shownSteps = proposing ? (proposal.steps ?? []) : steps;
+  const shownProblems = proposing ? (proposal.problems ?? []) : problems;
+  const changes = proposing ? compareSteps(steps, proposal.steps ?? []) : undefined;
+  const diff = proposing ? lineDiff(text, proposal.code) : null;
+  const added = [...(changes?.values() ?? [])].filter((change) => change === "new").length;
+  const changedSteps = (changes?.size ?? 0) - added;
   const numbers = stepNumberLines(steps);
   const marked = new Set(numbers.keys());
   const selected = steps.find((step) => step.id === selectedId) ?? null;
@@ -216,12 +293,62 @@ export function WorkflowEditor({ workflow, steps: savedSteps, code, codeHash, on
   if (range !== null) bands.push({ from: range[0], to: range[1], kind: "step" });
   for (const problem of problems) if (problem.severity === "error") bands.push({ from: problem.line, to: problem.line, kind: "problem" });
   const problemLines = new Set(problems.map((problem) => problem.line));
-  const problemsOf = (step: WorkflowOutlineStep) => problems.filter((problem) => problem.step_id === step.id);
+  const problemsOf = (step: WorkflowOutlineStep) => shownProblems.filter((problem) => problem.step_id === step.id);
 
   function pick(step: WorkflowOutlineStep): void {
     setSelectedId(step.id);
     const start = stepRange(step);
     if (start !== null) setReveal({ line: start[0], nonce: (reveal?.nonce ?? 0) + 1 });
+  }
+
+  function askGolem(): void {
+    const sentence = ask.trim();
+    if (onPropose === undefined || sentence === "" || writing) return;
+    asking.current += 1;
+    const mine = asking.current;
+    setWriting(true);
+    setProposeError(null);
+    onPropose(text, sentence, proposal === null || answerOnly ? undefined : { code: proposal.code, note: proposal.note }).then(
+      (result) => {
+        if (mine !== asking.current) return;
+        setProposal(result);
+        setAsk("");
+        setWriting(false);
+      },
+      (error: unknown) => {
+        if (mine !== asking.current) return;
+        setProposeError(actionErrorText(error, "golem could not write a proposal."));
+        setWriting(false);
+      },
+    );
+  }
+
+  function cancelAsk(): void {
+    asking.current += 1;
+    setWriting(false);
+  }
+
+  function discard(): void {
+    asking.current += 1;
+    setProposal(null);
+    setProposeError(null);
+    setWriting(false);
+  }
+
+  /** The proposed text becomes an edit that is not saved yet: the Save above writes it. */
+  function accept(): void {
+    if (proposal === null) return;
+    setText(proposal.code);
+    setSteps(proposal.steps ?? []);
+    setProblems(proposal.problems ?? []);
+    setChecked(true);
+    setCheckError(null);
+    setSaveError(null);
+    setJustSaved(false);
+    asked.current = proposal.code;
+    turn.current += 1;
+    setChecking(false);
+    setProposal(null);
   }
 
   function onCursor(line: number): void {
@@ -254,28 +381,33 @@ export function WorkflowEditor({ workflow, steps: savedSteps, code, codeHash, on
   }
 
   function onKeyDown(event: KeyboardEvent<HTMLDivElement>): void {
+    if ((event.metaKey || event.ctrlKey) && event.key === "k" && onPropose !== undefined && !readOnly) {
+      event.preventDefault();
+      askBox.current?.focus();
+      return;
+    }
     if ((event.metaKey || event.ctrlKey) && event.key === "s") {
       event.preventDefault();
       void save();
     }
   }
 
-  const counts = problemCounts(problems);
-  const hasErrors = problems.some((problem) => problem.severity === "error");
-  const status = checking ? (
+  const counts = problemCounts(shownProblems);
+  const hasErrors = shownProblems.some((problem) => problem.severity === "error");
+  const status = checking && !proposing ? (
     <Badge>Checking…</Badge>
-  ) : checkError !== null ? (
+  ) : checkError !== null && !proposing ? (
     <Badge tone="wait">Could not check</Badge>
-  ) : !checked ? null : hasErrors ? (
+  ) : !checked && !proposing ? null : hasErrors ? (
     <Badge tone="deny">✕ {counts}</Badge>
-  ) : problems.length > 0 ? (
+  ) : shownProblems.length > 0 ? (
     <Badge tone="wait">! {counts}</Badge>
   ) : (
-    <Badge tone="allow">✓ checks pass</Badge>
+    <Badge tone="allow">{proposing ? "✓ checks pass on the proposal" : "✓ checks pass"}</Badge>
   );
   const showCode = view !== "outline";
   const showOutline = view !== "code";
-  const showStep = view !== "code";
+  const showStep = view !== "code" && !proposing;
 
   return (
     // The wrapper only catches ⌘S from the editor inside it.
@@ -299,7 +431,7 @@ export function WorkflowEditor({ workflow, steps: savedSteps, code, codeHash, on
         </span>
         <span className="min-w-0 flex-1" />
         {dirty ? <span className="text-meta text-muted">{changedLines(saved, text) === 1 ? "1 change not saved" : `${changedLines(saved, text)} changes not saved`}</span> : justSaved ? <span className="text-meta text-allow">Saved.</span> : null}
-        {readOnly ? null : (
+        {readOnly || proposing ? null : (
           <>
             {dirty ? (
               <Button
@@ -344,14 +476,61 @@ export function WorkflowEditor({ workflow, steps: savedSteps, code, codeHash, on
           Not saved. {saveError}
         </p>
       )}
+      {proposeError === null ? null : (
+        <p role="alert" className="rounded-lg border border-deny bg-deny-soft px-3 py-2 text-sm text-deny wrap-anywhere">
+          {proposeError}
+        </p>
+      )}
+      {writing ? (
+        <p role="status" className="flex items-center gap-3 text-sm text-muted">
+          golem is writing…
+          <Button size="sm" onClick={cancelAsk}>
+            Cancel
+          </Button>
+        </p>
+      ) : null}
+      {proposing ? (
+        <div role="group" aria-label="Proposal" className="flex flex-col gap-2 rounded-lg border border-allow bg-allow-soft px-3 py-2">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+            <span className="text-sm font-medium text-ink">
+              golem proposes · {added === 1 ? "1 step added" : `${added} steps added`}, {changedSteps} changed · +{diff?.added ?? 0} −{diff?.removed ?? 0}
+            </span>
+            <span className="min-w-0 flex-1" />
+            <Button size="sm" onClick={discard}>
+              Discard
+            </Button>
+            <Button size="sm" onClick={() => askBox.current?.focus()}>
+              Refine…
+            </Button>
+            <Button kind="primary" size="sm" onClick={accept}>
+              Accept
+            </Button>
+          </div>
+          {proposal.note === "" ? null : (
+            <p className="text-sm wrap-anywhere">
+              <b>golem:</b> {proposal.note}
+            </p>
+          )}
+        </div>
+      ) : null}
+      {answerOnly ? (
+        <div role="group" aria-label="Answer" className="flex flex-wrap items-start gap-3 rounded-lg border border-line bg-bg px-3 py-2">
+          <p className="min-w-0 flex-1 text-sm wrap-anywhere">
+            <b>golem:</b> {proposal.note === "" ? "I would leave the file as it is." : proposal.note}
+          </p>
+          <Button size="sm" onClick={discard}>
+            Dismiss
+          </Button>
+        </div>
+      ) : null}
       {checkError === null ? null : (
         <p role="alert" className="text-sm text-deny wrap-anywhere">
           {checkError}
         </p>
       )}
-      {problems.length === 0 ? null : (
+      {shownProblems.length === 0 ? null : (
         <ul aria-label="Problems" className="flex flex-col gap-1.5 rounded-lg border border-line bg-bg p-3 text-sm">
-          {problems.map((problem, at) => (
+          {shownProblems.map((problem, at) => (
             <li key={at} className="flex gap-2">
               <span className={cn("shrink-0", problem.severity === "error" ? "text-deny" : "text-wait")}>
                 <ProblemMark problem={problem} />
@@ -363,7 +542,7 @@ export function WorkflowEditor({ workflow, steps: savedSteps, code, codeHash, on
                   onClick={() => setReveal({ line: problem.line, nonce: (reveal?.nonce ?? 0) + 1 })}
                   className="font-medium underline underline-offset-2 outline-offset-2 outline-clay focus-visible:outline-2"
                 >
-                  {whereText(problem, steps)}
+                  {whereText(problem, shownSteps)}
                 </button>
                 {" · "}
                 {problem.message}
@@ -377,10 +556,12 @@ export function WorkflowEditor({ workflow, steps: savedSteps, code, codeHash, on
         {showOutline ? (
           <div className="flex min-w-0 flex-col gap-2 lg:w-72 lg:shrink-0">
             <h2 className="text-meta font-medium text-faint">Outline, read from the code</h2>
-            <Outline steps={steps} selected={selectedId} problemsOf={problemsOf} onSelect={pick} />
+            <Outline steps={shownSteps} selected={proposing ? null : selectedId} problemsOf={problemsOf} changes={changes} onSelect={proposing ? () => undefined : pick} />
           </div>
         ) : null}
-        {showCode ? (
+        {showCode && diff !== null ? (
+          <DiffView before={text} after={proposal?.code ?? text} name={workflow.name} />
+        ) : showCode ? (
           <div className="flex min-h-96 min-w-0 flex-1 flex-col gap-2">
             <CodeEditor
               value={text}
@@ -412,6 +593,9 @@ export function WorkflowEditor({ workflow, steps: savedSteps, code, codeHash, on
           </div>
         ) : null}
       </div>
+      {onPropose === undefined || readOnly ? null : (
+        <AskBox value={ask} onChange={setAsk} onAsk={askGolem} chips={["explain this workflow", "make it cheaper", `add a step after ${selectedAt > 0 ? selectedAt : Math.max(1, steps.length)}`]} refining={proposing} working={writing} inputRef={askBox} />
+      )}
     </div>
   );
 }

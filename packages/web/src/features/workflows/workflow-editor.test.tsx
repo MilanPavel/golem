@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import axe from "axe-core";
 import { afterEach, expect, test, vi } from "vitest";
 import type { WorkflowCheckResult, WorkflowSaveResult } from "../../store/workflows.ts";
-import { SAMPLE_PR_DIGEST, SAMPLE_PR_DIGEST_CODE, SAMPLE_PR_DIGEST_EDITED_STEPS, SAMPLE_PR_DIGEST_HASH, SAMPLE_PR_DIGEST_PROBLEMS, SAMPLE_PR_DIGEST_STEPS, SAMPLE_UNTRUSTED, WORKFLOWS_NOW } from "./sample.ts";
+import { SAMPLE_PR_DIGEST, SAMPLE_PR_DIGEST_CODE, SAMPLE_PR_DIGEST_EDITED_STEPS, SAMPLE_PR_DIGEST_HASH, SAMPLE_PR_DIGEST_PROBLEMS, SAMPLE_PR_DIGEST_PROPOSAL, SAMPLE_PR_DIGEST_PROPOSAL_PROBLEM, SAMPLE_PR_DIGEST_STEPS, SAMPLE_UNTRUSTED, WORKFLOWS_NOW } from "./sample.ts";
 import { WorkflowDetail } from "./workflow-detail.tsx";
 import { WorkflowEditor, type WorkflowEditorProps } from "./workflow-editor.tsx";
 
@@ -160,4 +160,124 @@ test("leaving with code not saved asks first, and an edit survives a look at ano
   expect(onNavigate).toHaveBeenCalledTimes(1);
   await user.click(screen.getByRole("tab", { name: "Code" }));
   expect((screen.getByRole("textbox", { name: "Code of pr_digest" }) as HTMLTextAreaElement).value.endsWith("#")).toBe(true);
+});
+
+type ProposeFn = NonNullable<WorkflowEditorProps["onPropose"]>;
+
+test("asking golem shows the proposal as new steps and a diff, and writes nothing", async () => {
+  const user = userEvent.setup();
+  const onSave = vi.fn<SaveFn>(async () => saved("h2"));
+  const onPropose = vi.fn<ProposeFn>(async () => SAMPLE_PR_DIGEST_PROPOSAL);
+  render(editor({ onPropose, onSave }));
+  await user.click(screen.getByRole("button", { name: "make it cheaper" }));
+  expect((screen.getByRole("textbox", { name: "Ask golem to change this workflow" }) as HTMLInputElement).value).toBe("make it cheaper");
+  await user.click(screen.getByRole("button", { name: "Ask" }));
+  await screen.findByRole("group", { name: "Proposal" });
+  expect(onPropose).toHaveBeenCalledWith(SAMPLE_PR_DIGEST_CODE, "make it cheaper", undefined);
+  const proposal = within(screen.getByRole("group", { name: "Proposal" }));
+  expect(proposal.getByText(/1 step added, 1 changed/)).toBeTruthy();
+  expect(proposal.getByText(/capped each summary/)).toBeTruthy();
+  const items = within(screen.getByRole("list", { name: "Outline" })).getAllByRole("listitem");
+  expect(items).toHaveLength(5);
+  expect(items[1]!.textContent).toContain("Leave out drafts");
+  expect(items[1]!.textContent).toContain("new");
+  expect(items[2]!.textContent).toContain("changed");
+  const diff = within(screen.getByRole("list", { name: "Diff" }));
+  expect(diff.getByText(/Leave out drafts/).closest("li")!.textContent).toContain("+");
+  expect(screen.getByText("✓ checks pass on the proposal")).toBeTruthy();
+  expect(screen.queryByRole("textbox", { name: "Code of pr_digest" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "Save" })).toBeNull();
+  expect(onSave).not.toHaveBeenCalled();
+});
+
+test("Accept puts the proposal into the editor as an unsaved edit, and Save writes it", async () => {
+  const user = userEvent.setup();
+  const onSave = vi.fn<SaveFn>(async () => saved("h2"));
+  render(editor({ onPropose: async () => SAMPLE_PR_DIGEST_PROPOSAL, onSave, initial: { problems: [], ask: "drop drafts" } }));
+  await user.click(screen.getByRole("button", { name: "Ask" }));
+  await user.click(await screen.findByRole("button", { name: "Accept" }));
+  const box = screen.getByRole("textbox", { name: "Code of pr_digest" }) as HTMLTextAreaElement;
+  expect(box.value).toBe(SAMPLE_PR_DIGEST_PROPOSAL.code);
+  expect(screen.getByText(/changes? not saved/)).toBeTruthy();
+  expect(screen.queryByRole("group", { name: "Proposal" })).toBeNull();
+  expect(onSave).not.toHaveBeenCalled();
+  await user.click(screen.getByRole("button", { name: "Save" }));
+  await waitFor(() => expect(onSave).toHaveBeenCalledWith(SAMPLE_PR_DIGEST_PROPOSAL.code, SAMPLE_PR_DIGEST_HASH));
+});
+
+test("Discard leaves the code as it was", async () => {
+  const user = userEvent.setup();
+  render(editor({ onSave: async () => saved("h2"), onPropose: async () => SAMPLE_PR_DIGEST_PROPOSAL, initial: { problems: [], proposal: SAMPLE_PR_DIGEST_PROPOSAL } }));
+  await user.click(screen.getByRole("button", { name: "Discard" }));
+  expect((screen.getByRole("textbox", { name: "Code of pr_digest" }) as HTMLTextAreaElement).value).toBe(SAMPLE_PR_DIGEST_CODE);
+  expect(screen.queryByText(/changes? not saved/)).toBeNull();
+  expect(within(screen.getByRole("list", { name: "Outline" })).getAllByRole("listitem")).toHaveLength(4);
+});
+
+test("Refine sends one more sentence with the proposal and its note", async () => {
+  const user = userEvent.setup();
+  const onPropose = vi.fn<ProposeFn>(async () => ({ ...SAMPLE_PR_DIGEST_PROPOSAL, note: "Also skipped bots." }));
+  render(editor({ onSave: async () => saved("h2"), onPropose, initial: { problems: [], proposal: SAMPLE_PR_DIGEST_PROPOSAL } }));
+  await user.click(screen.getByRole("button", { name: "Refine…" }));
+  expect(document.activeElement).toBe(screen.getByRole("textbox", { name: "One more sentence on the proposal" }));
+  await user.type(screen.getByRole("textbox", { name: "One more sentence on the proposal" }), "skip bots");
+  await user.click(screen.getByRole("button", { name: "Refine" }));
+  await screen.findByText(/Also skipped bots/);
+  expect(onPropose).toHaveBeenCalledWith(SAMPLE_PR_DIGEST_CODE, "skip bots", { code: SAMPLE_PR_DIGEST_PROPOSAL.code, note: SAMPLE_PR_DIGEST_PROPOSAL.note });
+});
+
+test("while golem writes there is a Cancel, and a cancelled answer is dropped", async () => {
+  const user = userEvent.setup();
+  let answer: (result: typeof SAMPLE_PR_DIGEST_PROPOSAL) => void = () => undefined;
+  const onPropose = vi.fn<ProposeFn>(() => new Promise((resolve) => (answer = resolve)));
+  render(editor({ onSave: async () => saved("h2"), onPropose, initial: { problems: [], ask: "x" } }));
+  await user.click(screen.getByRole("button", { name: "Ask" }));
+  expect(screen.getByText(/golem is writing/)).toBeTruthy();
+  await user.click(screen.getByRole("button", { name: "Cancel" }));
+  answer(SAMPLE_PR_DIGEST_PROPOSAL);
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  expect(screen.queryByRole("group", { name: "Proposal" })).toBeNull();
+  expect(screen.queryByText(/golem is writing/)).toBeNull();
+});
+
+test("a proposal with a problem shows the problem", async () => {
+  const user = userEvent.setup();
+  const { container } = render(editor({ onSave: async () => saved("h2"), onPropose: async () => SAMPLE_PR_DIGEST_PROPOSAL_PROBLEM, initial: { problems: [], ask: "x" } }));
+  await user.click(screen.getByRole("button", { name: "Ask" }));
+  await screen.findByRole("group", { name: "Proposal" });
+  expect(screen.getByRole("list", { name: "Problems" }).textContent).toContain('no agent "upgrader"');
+  expect(screen.getByText("✕ 1 problem")).toBeTruthy();
+  expect((await axe.run(container, noContrast)).violations).toEqual([]);
+});
+
+test("a proposal that leaves the file as it is is shown as an answer", async () => {
+  const user = userEvent.setup();
+  const onPropose = vi.fn<ProposeFn>(async () => ({ code: SAMPLE_PR_DIGEST_CODE, note: "It lists pull requests and sends a digest.", steps: SAMPLE_PR_DIGEST_STEPS, problems: [], model: "m" }));
+  render(editor({ onSave: async () => saved("h2"), onPropose, initial: { problems: [], ask: "explain this workflow" } }));
+  await user.click(screen.getByRole("button", { name: "Ask" }));
+  const answer = await screen.findByRole("group", { name: "Answer" });
+  expect(answer.textContent).toContain("It lists pull requests");
+  expect(screen.queryByRole("button", { name: "Accept" })).toBeNull();
+  await user.click(within(answer).getByRole("button", { name: "Dismiss" }));
+  expect(screen.queryByRole("group", { name: "Answer" })).toBeNull();
+});
+
+test("a refused ask shows the daemon's words", async () => {
+  const user = userEvent.setup();
+  render(editor({ onSave: async () => saved("h2"), onPropose: () => Promise.reject(new Error("No model is available for this folder.")), initial: { problems: [], ask: "x" } }));
+  await user.click(screen.getByRole("button", { name: "Ask" }));
+  expect((await screen.findByRole("alert")).textContent).toBe("No model is available for this folder.");
+});
+
+test("an untrusted folder has no ask box", () => {
+  render(editor({ workflow: SAMPLE_UNTRUSTED, onPropose: async () => SAMPLE_PR_DIGEST_PROPOSAL, onSave: async () => saved("h2") }));
+  expect(screen.queryByRole("textbox", { name: "Ask golem to change this workflow" })).toBeNull();
+});
+
+test("⌘K focuses the ask box", async () => {
+  const user = userEvent.setup();
+  render(editor({ onSave: async () => saved("h2"), onPropose: async () => SAMPLE_PR_DIGEST_PROPOSAL,  }));
+  await user.click(screen.getByRole("textbox", { name: "Code of pr_digest" }));
+  await user.keyboard("{Meta>}k{/Meta}");
+  expect(document.activeElement).toBe(screen.getByRole("textbox", { name: "Ask golem to change this workflow" }));
 });

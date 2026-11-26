@@ -31,6 +31,8 @@ export type WorkflowDetailProps = {
   onCheck?: (code: string) => Promise<WorkflowCheckResult>;
   /** Writes the code. Rejects with the daemon's reason. Without it the code is read only. */
   onSave?: (code: string, baseHash: string) => Promise<WorkflowSaveResult>;
+  /** Asks golem for a change to the code (workflow.propose). Without it, the ask box is not offered. */
+  onPropose?: WorkflowEditorProps["onPropose"];
   /** The editor's state to start in. For the gallery and tests. */
   initialEditor?: WorkflowEditorProps["initial"];
   /** The routines whose `workflow` is this one, for the Triggers tab. */
@@ -148,7 +150,7 @@ function Overview({ workflow, steps }: { workflow: WorkflowEntryInfo; steps: rea
   );
 }
 
-function CodeTab({ workflow, steps, code, codeHash, onCheck, onSave, onReveal, onDirtyChange, initialEditor }: Pick<WorkflowDetailProps, "workflow" | "steps" | "code" | "codeHash" | "onCheck" | "onSave" | "onReveal" | "initialEditor"> & { onDirtyChange: (dirty: boolean) => void }) {
+function CodeTab({ workflow, steps, code, codeHash, onCheck, onSave, onPropose, onReveal, onDirtyChange, initialEditor }: Pick<WorkflowDetailProps, "workflow" | "steps" | "code" | "codeHash" | "onCheck" | "onSave" | "onPropose" | "onReveal" | "initialEditor"> & { onDirtyChange: (dirty: boolean) => void }) {
   if (code === null) {
     return (
       <div className="flex flex-col gap-2">
@@ -167,6 +169,7 @@ function CodeTab({ workflow, steps, code, codeHash, onCheck, onSave, onReveal, o
       codeHash={codeHash ?? null}
       onCheck={onCheck}
       onSave={onSave}
+      onPropose={onPropose}
       onReveal={onReveal}
       onDirtyChange={onDirtyChange}
       initial={initialEditor}
@@ -233,7 +236,7 @@ function TriggersTab({ routines, now, onNavigate }: { routines: readonly Routine
 }
 
 /** One workflow in the main area: its state, Run…, and the Overview, Code, Runs and Triggers tabs. */
-export function WorkflowDetail({ workflow, steps, code, runs, routines = [], codeHash, onCheck, onSave, initialEditor, now, onNavigate: navigateTo, onReveal, onStart, onChooseFolder, initialRunOpen = false, initialTab = "overview" }: WorkflowDetailProps) {
+export function WorkflowDetail({ workflow, steps, code, runs, routines = [], codeHash, onCheck, onSave, onPropose, initialEditor, now, onNavigate: navigateTo, onReveal, onStart, onChooseFolder, initialRunOpen = false, initialTab = "overview" }: WorkflowDetailProps) {
   const [tab, setTab] = useState<Tab>(initialTab);
   const [runOpen, setRunOpen] = useState(initialRunOpen);
   const [dirty, setDirty] = useState(false);
@@ -289,7 +292,7 @@ export function WorkflowDetail({ workflow, steps, code, runs, routines = [], cod
         </TabsContent>
         {/* Kept mounted, so an edit survives a look at another tab. */}
         <TabsContent value="code" forceMount hidden={tab !== "code"}>
-          <CodeTab workflow={workflow} steps={steps} code={code} codeHash={codeHash} onCheck={onCheck} onSave={onSave} onReveal={onReveal} onDirtyChange={onDirtyChange} initialEditor={initialEditor} />
+          <CodeTab workflow={workflow} steps={steps} code={code} codeHash={codeHash} onCheck={onCheck} onSave={onSave} onPropose={onPropose} onReveal={onReveal} onDirtyChange={onDirtyChange} initialEditor={initialEditor} />
         </TabsContent>
         <TabsContent value="runs">
           <RunsTab runs={runs} now={now} onNavigate={onNavigate} />

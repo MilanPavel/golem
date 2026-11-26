@@ -1,5 +1,5 @@
 import type { RunInfo } from "../../store/runs.ts";
-import type { WorkflowEntryInfo, WorkflowGetResult, WorkflowListResult, WorkflowOutlineStep, WorkflowProblem } from "../../store/workflows.ts";
+import type { WorkflowEntryInfo, WorkflowGetResult, WorkflowListResult, WorkflowOutlineStep, WorkflowProblem, WorkflowProposeResult } from "../../store/workflows.ts";
 
 /** "Now" for the samples: a Tuesday evening. Run times are placed relative to it, so Today and Earlier hold in any time zone. */
 export const WORKFLOWS_NOW = new Date(2026, 10, 17, 18, 30).getTime();
@@ -83,6 +83,29 @@ export const SAMPLE_PR_DIGEST_PROBLEMS: WorkflowProblem[] = [
   { line: 15, severity: "error", message: 'no agent "upgrader". Known: explorer, worker, reviewer, advisor.', step_id: "s2", fix: "worker" },
   { line: 16, severity: "warning", message: "claude-opus is paid, and this folder is local-only (Settings › Routing). A run would stop at this step.", step_id: "s2" },
 ];
+
+/** What golem proposes for "leave out draft pull requests, and summarise on a cheap model": a new code step, and the summary step with a budget. */
+export const SAMPLE_PR_DIGEST_PROPOSED_CODE = SAMPLE_PR_DIGEST_CODE.replace("    pulls = json.loads(listing)\n", '    pulls = json.loads(listing)\n    pulls = await run.step("Leave out drafts", lambda: [pr for pr in pulls if not pr.get("draft")])\n').replace("key=f\"summarise #{i}\")", 'key=f"summarise #{i}", budget="$0.10")');
+
+export const SAMPLE_PR_DIGEST_PROPOSAL: WorkflowProposeResult = {
+  code: SAMPLE_PR_DIGEST_PROPOSED_CODE,
+  note: "I added a step that leaves draft pull requests out before they are summarised, and capped each summary at ten cents.",
+  steps: [
+    SAMPLE_PR_DIGEST_STEPS[0]!,
+    step("s2", "code", "Leave out drafts", 14, 14),
+    step("s3", "llm", "Summarise each pull request", 16, 18, { for_each: "pulls", budget: "$0.10" }),
+    step("s4", "review", "Check the digest", 21, 21),
+    step("s5", "notify", "Tell you", 24, 24, { condition: 'reviewed["verdict"] != "reject"' }),
+  ],
+  problems: [],
+  model: "ollama/qwen3:14b",
+};
+
+/** The same proposal with a step that names an agent the folder does not have. */
+export const SAMPLE_PR_DIGEST_PROPOSAL_PROBLEM: WorkflowProposeResult = {
+  ...SAMPLE_PR_DIGEST_PROPOSAL,
+  problems: [{ line: 14, severity: "error", message: 'no agent "upgrader". Known: explorer, worker, reviewer, advisor.', step_id: "s2", fix: "worker" }],
+};
 
 /** What `workflow.save` says when the file was written by something else since the editor opened it. */
 export const SAMPLE_SAVE_CONFLICT = "The file changed on disk since you opened it. Copy your changes, then reload the workflow.";

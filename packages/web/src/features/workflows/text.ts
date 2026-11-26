@@ -77,6 +77,87 @@ export function changedLines(saved: string, text: string): number {
   return Math.max(1, before.length - head - tail, after.length - head - tail);
 }
 
+/** What a proposal does to a step: it is not in the saved outline (`new`), or it is but reads differently (`changed`). */
+export type StepChange = "new" | "changed";
+
+function stepSignature(step: WorkflowOutlineStep): string {
+  return JSON.stringify([step.agent ?? null, step.group ?? null, step.for_each ?? null, step.condition ?? null, step.key ?? null, step.gets ?? null, step.budget ?? null]);
+}
+
+/** Step id to `new` or `changed` for the steps of a proposal, against the saved ones. A step is matched by its kind and title, each saved step once; an unchanged step is not in the map. */
+export function compareSteps(before: readonly WorkflowOutlineStep[], after: readonly WorkflowOutlineStep[]): Map<string, StepChange> {
+  const left = [...before];
+  const found = new Map<string, StepChange>();
+  for (const step of after) {
+    const at = left.findIndex((old) => old.kind === step.kind && old.title === step.title);
+    if (at < 0) {
+      found.set(step.id, "new");
+      continue;
+    }
+    const [old] = left.splice(at, 1);
+    if (old !== undefined && stepSignature(old) !== stepSignature(step)) found.set(step.id, "changed");
+  }
+  return found;
+}
+
+/** One row of a line diff. `line` is the line number in the proposed text (from 1), null for a removed line. `skipped` is the count of unchanged lines a `skip` row stands for. */
+export type DiffRow = { kind: "same" | "add" | "del" | "skip"; text: string; line: number | null; skipped?: number };
+
+/** A line diff of two texts, with `context` unchanged lines kept around each change and the rest folded into `skip` rows. */
+export function lineDiff(before: string, after: string, context = 2): { rows: DiffRow[]; added: number; removed: number } {
+  const a = before.split("\n");
+  const b = after.split("\n");
+  let head = 0;
+  while (head < a.length && head < b.length && a[head] === b[head]) head += 1;
+  let tail = 0;
+  while (tail < a.length - head && tail < b.length - head && a[a.length - 1 - tail] === b[b.length - 1 - tail]) tail += 1;
+  const x = a.slice(head, a.length - tail);
+  const y = b.slice(head, b.length - tail);
+  // The longest common run of what is left between the shared head and tail, by dynamic programming.
+  const width = y.length + 1;
+  const table = new Uint32Array((x.length + 1) * width);
+  for (let i = x.length - 1; i >= 0; i -= 1) {
+    for (let j = y.length - 1; j >= 0; j -= 1) {
+      table[i * width + j] = x[i] === y[j] ? (table[(i + 1) * width + j + 1] ?? 0) + 1 : Math.max(table[(i + 1) * width + j] ?? 0, table[i * width + j + 1] ?? 0);
+    }
+  }
+  const all: DiffRow[] = a.slice(0, head).map((text, at) => ({ kind: "same", text, line: at + 1 }));
+  let i = 0;
+  let j = 0;
+  let line = head;
+  while (i < x.length || j < y.length) {
+    if (i < x.length && j < y.length && x[i] === y[j]) {
+      line += 1;
+      all.push({ kind: "same", text: y[j] ?? "", line });
+      i += 1;
+      j += 1;
+    } else if (j < y.length && (i >= x.length || (table[i * width + j + 1] ?? 0) >= (table[(i + 1) * width + j] ?? 0))) {
+      line += 1;
+      all.push({ kind: "add", text: y[j] ?? "", line });
+      j += 1;
+    } else {
+      all.push({ kind: "del", text: x[i] ?? "", line: null });
+      i += 1;
+    }
+  }
+  for (let k = a.length - tail; k < a.length; k += 1) {
+    line += 1;
+    all.push({ kind: "same", text: a[k] ?? "", line });
+  }
+  const changed = all.map((row) => row.kind !== "same");
+  const rows: DiffRow[] = [];
+  let hidden = 0;
+  all.forEach((row, at) => {
+    if (changed.slice(Math.max(0, at - context), at + context + 1).some(Boolean)) {
+      if (hidden > 0) rows.push({ kind: "skip", text: "", line: null, skipped: hidden });
+      hidden = 0;
+      rows.push(row);
+    } else hidden += 1;
+  });
+  if (hidden > 0) rows.push({ kind: "skip", text: "", line: null, skipped: hidden });
+  return { rows, added: all.filter((row) => row.kind === "add").length, removed: all.filter((row) => row.kind === "del").length };
+}
+
 /** "2 problems, 1 warning", or "" for none. */
 export function problemCounts(problems: readonly WorkflowProblem[]): string {
   const errors = problems.filter((problem) => problem.severity === "error").length;
