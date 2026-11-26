@@ -925,6 +925,10 @@ class ToolCompletedData(BaseModel):
     ``sources`` are the web pages a ``web_search`` or ``web_fetch`` call found or read, for
     the screen's source chips. None for any other call. The model does not get them.
 
+    ``rows_withheld`` is true when ``preview`` shows rows of a data source that the model of this
+    call did not get: it got a line with the row count and the columns instead. A client can
+    say so beside the rows.
+
     ``parent_call_id`` is legacy. Old logs set it on an event of a child run: the id of
     the ``delegate`` call that started it. The event is in the parent's run, and a client
     that does not know child runs ignores it. None for the run's own events. A new helper
@@ -943,6 +947,7 @@ class ToolCompletedData(BaseModel):
     duration_ms: int | None = Field(default=None, ge=0)
     diff: str | None = None
     sources: list[ToolSource] | None = None
+    rows_withheld: bool = False
     parent_call_id: str | None = Field(default=None, min_length=1)
 
 

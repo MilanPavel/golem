@@ -273,6 +273,7 @@
         "failed": false,
         "parent_call_id": null,
         "preview": "     1|the answer is 42",
+        "rows_withheld": false,
         "sources": null,
         "summary": "1 line",
         "truncated": false
@@ -671,6 +672,7 @@
         "failed": false,
         "parent_call_id": null,
         "preview": "     1|the answer is 42",
+        "rows_withheld": false,
         "sources": null,
         "summary": "1 line",
         "truncated": false

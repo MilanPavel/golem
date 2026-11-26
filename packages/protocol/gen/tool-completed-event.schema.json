@@ -2,7 +2,7 @@
   "$defs": {
     "ToolCompletedData": {
       "additionalProperties": false,
-      "description": "A tool call finished.\n\n``summary`` is one short line, such as ``42 lines``. ``preview`` is the\nstart of the output, cut at a few kilobytes, and ``truncated`` says\nwhether it was cut. Output too long for the model is stored whole in the\nartifact ``artifact_id``, which ``artifact.read`` reads.\n\n``failed`` is true when the call ran but what it ran did not succeed,\nsuch as a shell command that exited non-zero or timed out. The model\nstill gets the output.\n\n``duration_ms`` is how long the tool ran, from ``tool.started`` to its\nresult, without the wait for an approval. None means it was not measured.\n\n``diff`` is the change a file tool made, as a unified diff.\n\n``sources`` are the web pages a ``web_search`` or ``web_fetch`` call found or read, for\nthe screen's source chips. None for any other call. The model does not get them.\n\n``parent_call_id`` is legacy. Old logs set it on an event of a child run: the id of\nthe ``delegate`` call that started it. The event is in the parent's run, and a client\nthat does not know child runs ignores it. None for the run's own events. A new helper\nwrites none, because it has its own session and ``helper.*`` events. The field stays,\nsince removing it would break old logs.",
+      "description": "A tool call finished.\n\n``summary`` is one short line, such as ``42 lines``. ``preview`` is the\nstart of the output, cut at a few kilobytes, and ``truncated`` says\nwhether it was cut. Output too long for the model is stored whole in the\nartifact ``artifact_id``, which ``artifact.read`` reads.\n\n``failed`` is true when the call ran but what it ran did not succeed,\nsuch as a shell command that exited non-zero or timed out. The model\nstill gets the output.\n\n``duration_ms`` is how long the tool ran, from ``tool.started`` to its\nresult, without the wait for an approval. None means it was not measured.\n\n``diff`` is the change a file tool made, as a unified diff.\n\n``sources`` are the web pages a ``web_search`` or ``web_fetch`` call found or read, for\nthe screen's source chips. None for any other call. The model does not get them.\n\n``rows_withheld`` is true when ``preview`` shows rows of a data source that the model of this\ncall did not get: it got a line with the row count and the columns instead. A client can\nsay so beside the rows.\n\n``parent_call_id`` is legacy. Old logs set it on an event of a child run: the id of\nthe ``delegate`` call that started it. The event is in the parent's run, and a client\nthat does not know child runs ignores it. None for the run's own events. A new helper\nwrites none, because it has its own session and ``helper.*`` events. The field stays,\nsince removing it would break old logs.",
       "properties": {
         "artifact_id": {
           "anyOf": [
@@ -68,6 +68,11 @@
         "preview": {
           "title": "Preview",
           "type": "string"
+        },
+        "rows_withheld": {
+          "default": false,
+          "title": "Rows Withheld",
+          "type": "boolean"
         },
         "sources": {
           "anyOf": [

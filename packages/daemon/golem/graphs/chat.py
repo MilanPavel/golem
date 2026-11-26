@@ -59,6 +59,7 @@ from golem.graphs.context_view import (
     used_tokens,
     view,
 )
+from golem.graphs.data_stub import stub_local_rows
 from golem.graphs.delegate_policy import JobEstimate, Prices, should_delegate
 from golem.graphs.estimate import TokenRatios
 from golem.graphs.fit import Fitted, fit_prompt, num_predict_of, prompt_estimate, reply_reserve
@@ -719,7 +720,7 @@ class ChatRuntime:
             done = await summarise_now(
                 self.summariser,
                 # No run is live, so no access: every note a recall result holds is stubbed.
-                await stub_local_notes(messages, None),
+                stub_local_rows(await stub_local_notes(messages, None)),
                 ctx,
                 keep_turns=settings.keep_turns,
                 focus=focus,
@@ -935,6 +936,11 @@ def open_chat(
         if tier_of is None or tier_of(profile) != "local":
             # A hosted model never reads a local note. Only the copy sent changes.
             plain = await stub_local_notes(plain, memory_of(config))
+            # The same for the rows of a private data source.
+            access = memory_of(config)
+            plain = stub_local_rows(
+                plain, None if access is None else replace(access.chat, model_local=False)
+            )
         history = view(plain, state.get("context_view"))
         async with _held(router, local, profile):
             if learn_window is not None:
@@ -1756,7 +1762,7 @@ async def _summarise_old(
     """
     if summariser is None:
         return None
-    messages = await stub_local_notes(messages, access)
+    messages = stub_local_rows(await stub_local_notes(messages, access))
     found = plan_summary(messages, current, keep_turns=settings.keep_turns)
     if found is None:
         return None

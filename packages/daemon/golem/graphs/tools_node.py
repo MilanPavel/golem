@@ -72,6 +72,7 @@ from golem.tools.delegate import (
 )
 from golem.tools.registry import (
     Artifacts,
+    DataRead,
     InvalidArguments,
     Preview,
     ToolContext,
@@ -219,6 +220,10 @@ ERROR_KEY = "golem_error"
 
 MEMORY_IDS_KEY = "golem_memory_ids"
 """``additional_kwargs`` key on a ``recall`` result: the ids of the memories it shows, in order."""
+
+DATA_KEY = "golem_data"
+"""``additional_kwargs`` key on a ``data_*`` result: the source, its level and the hosted text."""
+
 HELPER_COUNT_KEY = "golem_helper_count"
 """On a ``delegate`` result: how many helpers the call started, for the per-message limit."""
 HELPER_AGENTS_KEY = "golem_helper_agents"
@@ -504,14 +509,16 @@ def tools_node(
                         "source": edit.source,
                     }
                 )
-            preview = result.output[:PREVIEW_CHARS]
+            shown = result.output if result.shown is None else result.shown
+            preview = shown[:PREVIEW_CHARS]
             write(
                 {
                     STREAM_KEY: "tool.completed",
                     "call_id": call_id,
                     "summary": result.summary,
                     "preview": preview,
-                    "truncated": len(preview) < len(result.output),
+                    "truncated": len(preview) < len(shown),
+                    "rows_withheld": result.rows_withheld,
                     "artifact_id": artifact_id,
                     "failed": result.failed,
                     "duration_ms": duration_ms,
@@ -530,6 +537,7 @@ def tools_node(
                     call["name"],
                     output,
                     memory_ids=result.memory_ids,
+                    data=result.data,
                     helpers=helper_counts.get(call_id),
                     helper_agents=helper_agents.get(call_id),
                 )
@@ -744,12 +752,15 @@ def _result(
     *,
     error: ErrorKind | None = None,
     memory_ids: tuple[str, ...] | None = None,
+    data: DataRead | None = None,
     helpers: int | None = None,
     helper_agents: list[str] | None = None,
 ) -> ToolMessage:
     extra: dict[str, object] = {} if error is None else {ERROR_KEY: error}
     if memory_ids is not None:
         extra[MEMORY_IDS_KEY] = list(memory_ids)
+    if data is not None:
+        extra[DATA_KEY] = {"source": data.source, "privacy": data.privacy, "hosted": data.hosted}
     if helpers is not None:
         extra[HELPER_COUNT_KEY] = helpers
     if helper_agents is not None:
@@ -1021,6 +1032,7 @@ __all__ = [
     "CHANGED_RESULT",
     "CHILD_KEY",
     "CWD_KEY",
+    "DATA_KEY",
     "DENIED_RESULT",
     "ERROR_KEY",
     "HELPERS_ASK_SOURCE",

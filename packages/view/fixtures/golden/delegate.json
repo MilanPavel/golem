@@ -348,6 +348,7 @@
         "failed": false,
         "parent_call_id": null,
         "preview": "notes.txt says the answer is 42.",
+        "rows_withheld": false,
         "sources": null,
         "summary": "explorer finished",
         "truncated": false
@@ -826,6 +827,7 @@
         "failed": false,
         "parent_call_id": null,
         "preview": "notes.txt says the answer is 42.",
+        "rows_withheld": false,
         "sources": null,
         "summary": "explorer finished",
         "truncated": false

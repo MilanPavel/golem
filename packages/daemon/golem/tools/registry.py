@@ -132,6 +132,19 @@ class Source:
 
 
 @dataclass(frozen=True, slots=True)
+class DataRead:
+    """Which data source a result read and its level, so a hosted call can swap the result.
+
+    ``hosted`` is what a model that may not read the rows gets in place of ``output``: no
+    values. None when ``output`` already holds none.
+    """
+
+    source: str
+    privacy: str
+    hosted: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
 class ToolResult:
     """``output`` goes to the model. ``summary`` is one short line for the screen.
 
@@ -147,6 +160,10 @@ class ToolResult:
     ``sources`` are the web pages the call found or read, for the screen. Not sent to the model.
     ``memory_ids`` are the memories a ``recall`` result shows, one line each in this order, so a
     later call can tell which of them it may send. None for any other tool.
+
+    ``data`` says which data source a ``data_*`` result read. ``shown`` is what the screen
+    gets in place of ``output`` when the two differ, and ``rows_withheld`` says the model of
+    this call did not get the rows the screen shows.
     """
 
     output: str
@@ -157,6 +174,9 @@ class ToolResult:
     edits: tuple[FileEdit, ...] = ()
     sources: tuple[Source, ...] = ()
     memory_ids: tuple[str, ...] | None = None
+    data: DataRead | None = None
+    shown: str | None = None
+    rows_withheld: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -407,10 +427,7 @@ class ToolRegistry:
         result = await self._tool(name).call(raw, ctx)
         if len(result.output) > MAX_OUTPUT_CHARS:
             cut = result.output[:MAX_OUTPUT_CHARS]
-            return ToolResult(
-                output=f"{cut}\n[output cut at {MAX_OUTPUT_CHARS} characters]",
-                summary=result.summary,
-            )
+            return replace(result, output=f"{cut}\n[output cut at {MAX_OUTPUT_CHARS} characters]")
         return result
 
     def _tool(self, name: str) -> Tool[Any]:
@@ -437,6 +454,7 @@ __all__ = [
     "MAX_OUTPUT_CHARS",
     "ArtifactPage",
     "Artifacts",
+    "DataRead",
     "InvalidArguments",
     "Network",
     "Preview",

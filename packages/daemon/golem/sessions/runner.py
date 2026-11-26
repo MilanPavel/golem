@@ -870,6 +870,7 @@ async def _apply(
                 duration_ms=fact.duration_ms,
                 diff=fact.diff,
                 sources=[ToolSource.model_validate(row) for row in fact.sources] or None,
+                rows_withheld=fact.rows_withheld,
             ),
         )
     elif isinstance(fact, ToolErrored):

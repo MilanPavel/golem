@@ -241,6 +241,7 @@ class ToolFinished:
     duration_ms: int | None = None
     diff: str | None = None
     sources: tuple[dict[str, str], ...] = ()
+    rows_withheld: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -1029,6 +1030,7 @@ def _custom(data: object) -> Fact | None:
             _duration(item),
             diff if isinstance(diff, str) and diff else None,
             _sources(item.get("sources")),
+            item.get("rows_withheld") is True,
         )
     if kind == "todos.updated":
         todos = item.get("todos")
