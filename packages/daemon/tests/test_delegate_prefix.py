@@ -20,6 +20,7 @@ from langchain_core.messages import AIMessage, HumanMessage
 from golem.evals import usecases
 from golem.evals.usecases import InProcess, PlanModel, Turn
 from golem.graphs.chat import _without_signed_thinking
+from golem.graphs.prompt import PromptContext, SystemPrompt
 from golem.store.database import Database
 
 CALLS: list[dict[str, Any]] = []
@@ -105,3 +106,105 @@ def test_signed_thinking_parts_are_removed_and_the_text_kept() -> None:
     kept = _without_signed_thinking([HumanMessage(content="q"), reply])
     assert kept[1].content == [{"type": "text", "text": "hi"}]
     assert len(reply.content) == 3
+
+
+def test_current_turn_keeps_the_thinking_after_the_last_human_message() -> None:
+    def reply(tag: str) -> AIMessage:
+        return AIMessage(
+            content=[
+                {"type": "thinking", "thinking": "", "signature": tag},
+                {"type": "text", "text": tag},
+            ]
+        )
+
+    kept = _without_signed_thinking(
+        [HumanMessage(content="a"), reply("old"), HumanMessage(content="b"), reply("new")],
+        current_turn=True,
+    )
+    assert [len(m.content) for m in kept if isinstance(m, AIMessage)] == [1, 2]
+
+
+class Thinking(Recording):
+    """Signs a thinking part into every reply."""
+
+    def _generate(self, messages: Any, *args: Any, **kwargs: Any) -> Any:
+        result = super()._generate(messages, *args, **kwargs)
+        message = result.generations[0].message
+        text = message.content if isinstance(message.content, str) else ""
+        parts: list[Any] = [{"type": "thinking", "thinking": "", "signature": f"s{len(CALLS)}"}]
+        if text:
+            parts.append({"type": "text", "text": text})
+        message.content = parts
+        return result
+
+
+def _thinking(call: dict[str, Any]) -> list[str]:
+    return [
+        p["signature"]
+        for m in call["messages"]
+        if m["type"] == "ai" and isinstance(m["content"], list)
+        for p in m["content"]
+        if p.get("type") == "thinking"
+    ]
+
+
+def _system(call: dict[str, Any]) -> str:
+    first = call["messages"][0]
+    return str(first["content"]) if first["type"] == "system" else ""
+
+
+def _sequence(turn: Turn) -> Any:
+    if not turn.lead:
+        return "found"
+    return "done" if turn.tools else [("list_dir", {"path": "."})]
+
+
+async def _two_messages(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, flip_at: str
+) -> list[dict[str, Any]]:
+    """Two messages in one session. A live section of the system prompt changes ``within``
+    the first message (after its first call) or ``between`` the messages."""
+    CALLS.clear()
+    monkeypatch.setattr(usecases, "PlanModel", Thinking)
+    limit = 0 if flip_at == "within" else 1
+
+    def live(_context: PromptContext) -> str:
+        return f"Rows: {len(CALLS) if len(CALLS) > limit else 0}."
+
+    real = usecases.open_chat
+
+    def open_chat(*args: Any, **kwargs: Any) -> Any:
+        return real(*args, prompt=SystemPrompt((live,)), **kwargs)
+
+    monkeypatch.setattr(usecases, "open_chat", open_chat)
+    scenario = replace(usecases.SCENARIOS["broad-question"], plan=_sequence)
+    folder, home = tmp_path / "project", tmp_path / "home"
+    folder.mkdir()
+    home.mkdir()
+    scenario.build(folder)
+    with usecases._golem_home(home):
+        async with (
+            Database.open(tmp_path / "g.db") as db,
+            InProcess(scenario, "cloud-only", folder, home).open(db) as played,
+        ):
+            await played.send(scenario.request)
+            await played.send(scenario.request)
+    return list(CALLS)
+
+
+async def test_earlier_messages_signed_thinking_is_not_sent(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls = await _two_messages(tmp_path, monkeypatch, "between")
+    assert len(calls) == 3, len(calls)
+    assert _thinking(calls[1]) == ["s1"]  # the tool loop of the message keeps its thinking
+    assert _system(calls[2]) != _system(calls[0])  # the prompt changed between the messages
+    assert _thinking(calls[2]) == []  # the earlier message's thinking is not sent
+
+
+async def test_system_text_is_pinned_for_the_calls_of_one_message(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls = await _two_messages(tmp_path, monkeypatch, "within")
+    assert _system(calls[1]) == _system(calls[0])  # a live part changed; the first text is sent
+    assert _thinking(calls[1]) == ["s1"]

@@ -931,6 +931,9 @@ def open_chat(
         if reuse and pin is not None:
             prices = pin.prices
         plain = _portable(_without_thinking(messages), router.kind(profile))
+        # Only the reply of the current tool loop needs its signed thinking. An earlier
+        # message was signed for a system prompt that may have changed since (B.78).
+        plain = _without_signed_thinking(plain, current_turn=True)
         if made > 0 and not reuse:
             plain = _without_signed_thinking(plain)
         if tier_of is None or tier_of(profile) != "local":
@@ -972,8 +975,9 @@ def open_chat(
             if pin is None and not final and made == 0:
                 prefixes[thread] = _Prefix(profile, names, plan_first, schemas, prices, text)
             elif reuse and pin is not None and pin.text != text:
-                plain = _without_signed_thinking(plain)
-                history = view(plain, state.get("context_view"))
+                # Live parts of the prompt (such as the row counts of a data source) changed
+                # during the message. Send the first call's text, so the signatures hold (B.78).
+                text = pin.text
             system = SystemMessage(content=text) if text else None
             # The system message is sent, never returned, so it stays out of the checkpoint.
             sent = _outgoing(system, history, final, lead=child is None)
@@ -1899,14 +1903,26 @@ class _Prefix:
 _SIGNED = frozenset({"thinking", "redacted_thinking"})
 
 
-def _without_signed_thinking(messages: Sequence[BaseMessage]) -> list[BaseMessage]:
+def _without_signed_thinking(
+    messages: Sequence[BaseMessage], *, current_turn: bool = False
+) -> list[BaseMessage]:
     """``messages`` with Anthropic's signed ``thinking`` parts removed from every reply.
+
+    With ``current_turn``, the replies after the last human message keep theirs: only the
+    tool loop in progress needs them, and an earlier message was signed for a prompt that may
+    have changed.
 
     A signature is bound to the prefix it was made for, so a call whose system prompt or
     tools differ from that call's must not send them. The checkpoint keeps the parts.
     """
     kept: list[BaseMessage] = []
-    for message in messages:
+    start = len(messages)
+    if current_turn:
+        start = max((i for i, m in enumerate(messages) if isinstance(m, HumanMessage)), default=-1)
+    for i, message in enumerate(messages):
+        if current_turn and i > start:
+            kept.append(message)
+            continue
         if isinstance(message, AIMessage) and isinstance(message.content, list):
             parts = [
                 p for p in message.content if not (isinstance(p, dict) and p.get("type") in _SIGNED)
