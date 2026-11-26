@@ -907,9 +907,10 @@ def open_chat(
         tools = registry.scoped(scope)
         plan_first = _plan(config)
         schemas = [] if final else tools.schemas(plan_first=plan_first)
-        # Anthropic binds a signed thinking block to the system prompt and tools before it. What
-        # the call carries is kept from the first call of the message, unless the tools or the
-        # model changed. Model discovery, for one, may finish while helpers run.
+        # Anthropic binds a signed thinking block to the system prompt and tools before it. The
+        # tools and the helper prices (read from the model listing, which may finish while helpers
+        # run) are kept from the first call of the message. If the prompt still differs, or the
+        # tools or the model do, the signed thinking parts of earlier replies are not sent.
         thread = state.get("session_id")
         pin = prefixes.get(thread) if made > 0 else None
         names = tuple(_schema_name(item) for item in schemas)
@@ -922,6 +923,9 @@ def open_chat(
         )
         if reuse and pin is not None:
             schemas = pin.schemas
+        prices = None if helper_prices is None else helper_prices(profile)
+        if reuse and pin is not None:
+            prices = pin.prices
         plain = _portable(_without_thinking(messages), router.kind(profile))
         if made > 0 and not reuse:
             plain = _without_signed_thinking(plain)
@@ -950,16 +954,17 @@ def open_chat(
                 window=window.window,
                 memory=await _memory_block(memory_of(config), tier_of, profile),
                 tier=None if tier_of is None else tier_of(profile),
-                prices=None if helper_prices is None else helper_prices(profile),
+                prices=prices,
             )
             parts = (
                 [("helper", child.prompt)] if child is not None else system_prompt.parts(context)
             )
             text = "\n\n".join(t for _, t in parts)
-            if reuse and pin is not None:
-                text = pin.text
-            elif not final:
-                prefixes[thread] = _Prefix(profile, names, plan_first, schemas, text)
+            if pin is None and not final and made == 0:
+                prefixes[thread] = _Prefix(profile, names, plan_first, schemas, prices, text)
+            elif reuse and pin is not None and pin.text != text:
+                plain = _without_signed_thinking(plain)
+                history = view(plain, state.get("context_view"))
             system = SystemMessage(content=text) if text else None
             # The system message is sent, never returned, so it stays out of the checkpoint.
             sent = _outgoing(system, history, final, lead=child is None)
@@ -1877,6 +1882,7 @@ class _Prefix:
     names: tuple[str, ...]
     plan_first: bool
     schemas: list[dict[str, object]]
+    prices: Prices | None
     text: str
 
 
