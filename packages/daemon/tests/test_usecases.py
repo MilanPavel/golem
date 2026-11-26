@@ -7,6 +7,7 @@ is broken on purpose must fail, and ``--live`` never starts on its own.
 from __future__ import annotations
 
 import json
+import tomllib
 from dataclasses import replace
 from pathlib import Path
 from typing import Any
@@ -102,3 +103,42 @@ def test_live_prints_its_cost_note_and_needs_a_named_model() -> None:
     agents = usecases.SCENARIOS["sweep"].agents
     config = usecases.live_config("local-only", "ollama/qwen3.5:9b", agents)
     assert "parallel = 1" in config and 'model = "same"' in config
+
+
+@pytest.mark.parametrize("case", CASES)
+@pytest.mark.parametrize("setup", SETUPS)
+def test_live_config_is_valid_toml(case: str, setup: Any) -> None:
+    """Every case writes a config the daemon can read: an unset limit is left out."""
+    config = usecases.live_config(setup, "ollama/qwen3.5:9b", usecases.SCENARIOS[case].agents)
+    parsed = tomllib.loads(config)
+    assert parsed["agents"]["at_once"] >= 1
+
+
+def test_every_case_has_a_helper_hint() -> None:
+    """``--ask-helpers`` adds each case's hint to the request, so every case needs one."""
+    assert all(usecases.SCENARIOS[case].hint for case in CASES)
+
+
+def test_a_profile_name_counts_as_its_model() -> None:
+    """A helper on the lead's model (``same``) names the profile; the check reads its model."""
+    event = {"type": "helper.started", "data": {"helper_id": "h", "model": "t"}}
+    trace = usecases.Trace([event], Path("."), profiles={"t": "ollama/qwen3.5:9b"})
+    assert usecases.models_used(trace) == {"ollama"}
+
+
+def test_cloud_key_env_takes_the_lead_alone(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The cloud setup hands the lead's key to the daemon; it has no other models."""
+    from types import SimpleNamespace
+
+    from golem.evals.helpers import key_env
+
+    arm: Any = SimpleNamespace(lead="anthropic/x", others=())
+    assert key_env(arm, lambda provider: "k") == {"ANTHROPIC_API_KEY": "k"}
+
+
+def test_cloud_helpers_stay_on_the_lead_model() -> None:
+    """A running Ollama is visible to the cloud daemon; pinned helpers never pick it."""
+    config = usecases.live_config("cloud-only", "anthropic/x", usecases.SCENARIOS["sweep"].agents)
+    parsed = tomllib.loads(config)
+    assert parsed["ollama"]["start"] is False
+    assert {parsed["agents"][n]["model"] for n in ("explorer", "worker", "advisor")} == {"same"}
