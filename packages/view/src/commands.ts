@@ -54,6 +54,8 @@ export type ComposerOutcome =
   | { kind: "routines" }
   /** `/runs`: everything automation did. */
   | { kind: "runs" }
+  /** `/workflows`: the workflows, each started with its inputs. */
+  | { kind: "workflows" }
   /** `/steps`: the helper batches of this chat, each opening its Steps. */
   | { kind: "steps" }
   /** `/skill new`: start the new-skill form. */
@@ -452,10 +454,17 @@ export const COMMANDS: readonly Command[] = [
     run: withoutArgs({ kind: "routines" }),
   },
   {
+    name: "/workflows",
+    group: "tools",
+    args: "",
+    description: "Lists your workflows and starts one with its inputs.",
+    run: withoutArgs({ kind: "workflows" }),
+  },
+  {
     name: "/runs",
     group: "tools",
     args: "",
-    description: "Lists what routines did: what needs you, what is running, and what finished.",
+    description: "Lists what routines and workflows did: what needs you, what runs, what finished.",
     run: withoutArgs({ kind: "runs" }),
   },
   {

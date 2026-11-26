@@ -92,6 +92,12 @@ hello  done
 
 The exact layout may differ slightly. The run also appears in `golem runs`.
 
+### In the chat
+
+Type `/workflows` in the terminal chat for the same list: workflows of this project first, then yours. A broken file shows its error, and one that is not trusted is marked `!`. `Enter` opens a small form with a field for each input. A field marked `*` is required, one with a default starts with it, and a number, a yes/no (`Space` flips it) or a choice (`←`/`→` picks) is checked before it is sent. `Enter` starts the run and opens it.
+
+`/runs` lists workflow runs with the routine runs, also the ones a routine started. `Enter` on one opens its steps, which follow the run live: a mark, the time and the result of each step. The selected step unfolds. An agent step shows its helper session (`Enter` opens its chat), and a worker step shows its copy, the files changed, `+added −removed` and its checks. When the run waits for a review the draft shows under the steps: `y` approves, `n` rejects, and `r` opens the run's chat to edit the draft in the review band. `c` cancels a run that has not ended (also from the `/runs` list), and `s` resumes one that failed. `Esc` goes back.
+
 ## The rules
 
 | Rule | Why it matters |

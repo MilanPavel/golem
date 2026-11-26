@@ -277,6 +277,26 @@ export {
   type ToolAsk,
   type WorkerResult,
 } from "./workflow-run.ts";
+export {
+  fieldProblem,
+  initialValues,
+  inputFields,
+  startInputs,
+  valuesFromInputs,
+  type InputField,
+  type InputKind,
+  type WorkflowInputInfo,
+} from "./workflow-inputs.ts";
+export {
+  errorLine,
+  triggerText,
+  workflowGroups,
+  workflowRowLine,
+  workflowRunWords,
+  type TriggerLike,
+  type WorkflowEntryLike,
+  type WorkflowGroup,
+} from "./workflow-list.ts";
 export { groupTurns, turnFooter, type Turn } from "./turns.ts";
 export {
   answerTarget,

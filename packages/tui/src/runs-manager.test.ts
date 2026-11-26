@@ -56,6 +56,37 @@ const old = info("dep-report", "skipped", { started_at: at(9, 0, 10), ended_at: 
 const RUNS = [old, brief, live, bad, triage];
 const LIST: RunList = { runs: RUNS, error: null };
 
+const wfRun = info("wf-7f3a", "waiting", { kind: "workflow", origin: "workflow:pr-digest", workflow_run_id: "wr_7f3a", routine: null, steps: 4 });
+const wfDone = info("wf-done", "succeeded", { kind: "routine", origin: "workflow:pr-digest", workflow_run_id: "wr_done" });
+
+test("Enter on a workflow run opens its steps, also when a routine started it; any other run opens its chat", () => {
+  const state = openRunsManager();
+  const runs = [wfRun, wfDone, brief];
+  assert.deepEqual(pressRunsManager(state, runs, "enter", NOW).action, { kind: "open-workflow", workflowRunId: "wr_7f3a" });
+  const second = pressRunsManager({ ...state, selected: 1 }, runs, "enter", NOW);
+  assert.equal(orderedRuns(runs, NOW)[1]?.session_id, second.action.kind === "open-workflow" ? "wf-done" : "x");
+  assert.deepEqual(pressRunsManager({ ...state, selected: 2 }, runs, "enter", NOW).action, { kind: "open", sessionId: "morning-brief" });
+});
+
+test("c cancels a workflow run that has not ended, and does nothing for another row", () => {
+  const runs = [wfRun, wfDone, brief, live];
+  assert.deepEqual(pressRunsManager(openRunsManager(), runs, "cancel", NOW).action, { kind: "cancel", workflowRunId: "wr_7f3a" });
+  const ended = orderedRuns(runs, NOW).findIndex((run) => run.session_id === "wf-done");
+  assert.deepEqual(pressRunsManager({ open: true, selected: ended }, runs, "cancel", NOW).action, { kind: "none" });
+  const routine = orderedRuns(runs, NOW).findIndex((run) => run.session_id === "receipts");
+  assert.deepEqual(pressRunsManager({ open: true, selected: routine }, runs, "cancel", NOW).action, { kind: "none" });
+});
+
+test("the hint offers c only while a cancellable workflow run is selected", () => {
+  const lines = (runs: RunInfo[], selected: number) => layoutRunsManager({ state: { open: true, selected }, list: { runs, error: null }, now: NOW, columns: 100, rows: 24 });
+  assert.equal(lines([wfRun, brief], 0).at(-1)?.text, "↑/↓ to navigate · Enter to open · c cancel the run · Esc to close");
+  assert.equal(lines([wfRun, brief], 1).at(-1)?.text, "↑/↓ to navigate · Enter to open · Esc to close");
+});
+
+test("the c key", () => {
+  assert.equal(runsManagerKeyOf({ name: null, input: "c", ctrl: false, meta: false }), "cancel");
+});
+
 function press(state: RunsManagerState, ...keys: RunsManagerKey[]) {
   let current = state;
   let action: ReturnType<typeof pressRunsManager>["action"] = { kind: "none" };

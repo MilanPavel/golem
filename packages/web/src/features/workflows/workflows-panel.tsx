@@ -33,7 +33,7 @@ function WorkflowRow({ workflow, selected, onNavigate }: { workflow: WorkflowEnt
   );
 }
 
-function Group({ group, selected, onNavigate }: { group: WorkflowGroup; selected: string | null; onNavigate: (path: string) => void }) {
+function Group({ group, selected, onNavigate }: { group: WorkflowGroup<WorkflowEntryInfo>; selected: string | null; onNavigate: (path: string) => void }) {
   const headingId = useId();
   return (
     <div>
