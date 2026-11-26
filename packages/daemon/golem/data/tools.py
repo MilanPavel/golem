@@ -17,6 +17,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 from golem.config import DataPrivacyLevel
+from golem.data.notes import CUT_NOTE
 from golem.data.privacy import may_use_rows
 from golem.data.results import wire_rows
 from golem.data.sources import (
@@ -201,6 +202,8 @@ def _describe_text(found: Description, source: str, *, stats: Detail, samples: b
         lines += ["", *describe_table(table, stats=stats)]
     if found.notes:
         lines += ["", "notes:", *(f"  {line}" for line in found.notes.strip().splitlines())]
+        if found.notes_cut:
+            lines.append(f"  {CUT_NOTE}")
     lines += ["", "saved queries: none"]
     if not samples:
         lines.append(

@@ -42,8 +42,8 @@ _MARKER = re.compile(r"^\s*(?:[-*•]+|\d+[.)])\s*")
 class DraftUnusable(Exception):
     """The model's reply held no line to keep. The message is for the person."""
 
-    def __init__(self) -> None:
-        super().__init__(UNUSABLE)
+    def __init__(self, message: str = UNUSABLE) -> None:
+        super().__init__(message)
 
 
 class NoLocalModel(Exception):
@@ -110,6 +110,23 @@ class ModelDrafts:
         Raises :class:`BudgetSpent` on a paid model with a cap spent, and
         :class:`DraftUnusable` when the reply holds no line.
         """
+        reply, label = await self.ask(
+            _INSTRUCTION, lambda _local: description, "an instruction draft"
+        )
+        lines = parse_lines(reply)
+        if not lines:
+            raise DraftUnusable
+        return lines, label
+
+    async def ask(
+        self, instruction: str, build: Callable[[bool], str], what: str
+    ) -> tuple[str, str]:
+        """The reply of the ``summarise`` model and its name, for a job ``what`` the person asked.
+
+        ``build`` gets True when that model is local and returns the text it reads, so the
+        text can hold private rows only for a model that may see them. Raises
+        :class:`BudgetSpent` on a paid model with a cap spent.
+        """
         session_profile = self._router.profile_name
         role = for_role(
             "summarise",
@@ -118,28 +135,27 @@ class ModelDrafts:
             tier_of_profile=self._tier_of_profile,
             budget_models=self._budget_refs(),
         )
+        tier = self._tier_of_profile(role.profile)
         ask = self._paid_ok
-        paid = self._tier_of_profile(role.profile) not in (None, "local")
+        paid = tier not in (None, "local")
         if ask is not None and paid and not await ask(None):
             raise BudgetSpent("a budget cap is spent, so there is no paid draft", hint=BUDGET_HINT)
         model = self._router.chat_model(role.profile)
         line = self._router.local_line(role.profile)
+        text = build(tier == "local")
         try:
-            async with job_slot(self._dispatcher, line, None, "an instruction draft"):
+            async with job_slot(self._dispatcher, line, None, what):
                 answer = await model.ainvoke(
-                    [SystemMessage(content=_INSTRUCTION), HumanMessage(content=description)]
+                    [SystemMessage(content=instruction), HumanMessage(content=text)]
                 )
         except Exception:
             await self._record(role.profile, None, failed=True)
             raise
         await self._record(role.profile, answer.usage_metadata)
-        lines = parse_lines(answer.text)
-        if not lines:
-            raise DraftUnusable
         identity = self._router.identity(role.profile)
         name = identity.name
         label = role.profile if name is None else f"{identity.provider}/{name}"
-        return lines, label
+        return answer.text, label
 
     def local_profile(self) -> str | None:
         """The profile of the ``summarise`` role when it is a local model, else None."""

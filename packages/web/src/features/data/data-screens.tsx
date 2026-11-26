@@ -31,7 +31,7 @@ export function LiveAddDialog({ open, onClose }: { open: boolean; onClose: () =>
       onAdd={actions.dataAdd}
       onAdded={(source: DataSource) => {
         onClose();
-        navigate(dataPath(source.name));
+        navigate(dataPath(source.name, "notes"));
       }}
       onCancel={onClose}
       onOpenMcp={() => {

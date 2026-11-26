@@ -38,6 +38,7 @@ golem has commands in two places: `golem …` in your shell, and `/…` inside t
 | `golem mcp remove <name>` | Removes the server from `config.toml`, stops it, and deletes its token |
 | `golem data [list] [--json]` | One line per data source: name, kind, scope, tables, rows, privacy, and status (with the error when a source cannot be read) |
 | `golem data describe <source> [<table>] [--json]` | The tables of a source with their columns and stats, its notes, and a few sample rows |
+| `golem data notes <source> [--edit]` | Prints the notes of a source, which the model reads before it writes SQL. `--edit` opens them in `$EDITOR` and saves what you leave |
 | `golem data query <source> <sql>` | Runs SQL and prints an aligned table, then the row count and time. Give the SQL on stdin with `-` or no word. `--limit N` caps the rows, and `--format csv` or `json` prints only the rows, for scripts. Ctrl-C stops the query and exits 130. `golem help data` shows the same |
 | `golem auth list` | Which providers have a key |
 | `golem models` | Every model you can use or download, with size, price, and context. `--refresh` asks the providers again |

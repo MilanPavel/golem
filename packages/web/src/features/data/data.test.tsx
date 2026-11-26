@@ -123,17 +123,62 @@ test("Settings changes the privacy, watches the folder, and Remove says what it 
   expect(onRemove).toHaveBeenCalled();
 });
 
-test("Notes: Draft again fills the editor and says it is not saved, Save sends the text", async () => {
+test("Notes: Edit opens the editor, Save sends the text and shows the notes again, Cancel changes nothing", async () => {
   const user = userEvent.setup();
-  const onSaveNotes = vi.fn().mockResolvedValue("~/.golem/data/bank.md");
+  const onSaveNotes = vi.fn().mockResolvedValue("~/.golem/data/bank/DATA.md");
   render(<SourcePage {...page({ tab: "notes", onSaveNotes })} />);
-  await user.click(screen.getByRole("button", { name: "Draft again" }));
-  expect((screen.getByRole("textbox", { name: "Notes of bank" }) as HTMLTextAreaElement).value).toBe("# drafted\n");
-  expect((await screen.findByRole("status")).textContent).toContain("not saved yet");
+  expect(screen.getByLabelText("Notes of bank").textContent).toBe("# bank\n");
+  await user.click(screen.getByRole("button", { name: "Edit" }));
+  await user.click(screen.getByRole("button", { name: "Cancel" }));
   expect(onSaveNotes).not.toHaveBeenCalled();
+  await user.click(screen.getByRole("button", { name: "Edit" }));
+  const box = screen.getByRole("textbox", { name: "Notes of bank" });
+  await user.click(box);
+  await user.keyboard("amount < 0 is money out");
   await user.click(screen.getByRole("button", { name: "Save" }));
+  expect(onSaveNotes).toHaveBeenCalledWith(expect.stringContaining("amount < 0 is money out"));
+  expect((await screen.findByRole("status")).textContent).toContain("Saved to ~/.golem/data/bank/DATA.md");
+  expect(screen.queryByRole("textbox", { name: "Notes of bank" })).toBeNull();
+});
+
+test("Notes: a draft is a proposal that is not saved until Accept, and Discard drops it", async () => {
+  const user = userEvent.setup();
+  const onSaveNotes = vi.fn().mockResolvedValue("~/.golem/data/bank/DATA.md");
+  render(<SourcePage {...page({ tab: "notes", onSaveNotes })} />);
+  await user.click(screen.getByRole("button", { name: "Draft with golem" }));
+  const proposal = await screen.findByRole("region", { name: "Drafted notes" });
+  expect(proposal.textContent).toContain("# drafted");
+  expect(proposal.textContent).toContain("not saved until you accept");
+  expect(onSaveNotes).not.toHaveBeenCalled();
+  await user.click(screen.getByRole("button", { name: "Discard" }));
+  expect(screen.queryByRole("region", { name: "Drafted notes" })).toBeNull();
+  expect(onSaveNotes).not.toHaveBeenCalled();
+  expect(screen.getByLabelText("Notes of bank").textContent).toBe("# bank\n");
+  await user.click(screen.getByRole("button", { name: "Draft with golem" }));
+  await screen.findByRole("region", { name: "Drafted notes" });
+  await user.click(screen.getByRole("button", { name: "Accept" }));
   expect(onSaveNotes).toHaveBeenCalledWith("# drafted\n");
-  expect((await screen.findByRole("status")).textContent).toContain("Saved to ~/.golem/data/bank.md");
+  expect((await screen.findByRole("status")).textContent).toContain("Saved to");
+  expect(screen.getByLabelText("Notes of bank").textContent).toBe("# drafted\n");
+});
+
+test("Notes: Edit first moves the proposal into the editor, and a source without notes offers Draft notes", async () => {
+  const user = userEvent.setup();
+  render(<SourcePage {...page({ tab: "notes", notes: { state: "ready", text: null, path: null } })} />);
+  expect(screen.getByText(/No notes yet/)).toBeTruthy();
+  await user.click(screen.getByRole("button", { name: "Draft notes" }));
+  await screen.findByRole("region", { name: "Drafted notes" });
+  await user.click(screen.getByRole("button", { name: "Edit first" }));
+  expect((screen.getByRole("textbox", { name: "Notes of bank" }) as HTMLTextAreaElement).value).toBe("# drafted\n");
+});
+
+test("Notes: a draft that fails says why and keeps the notes", async () => {
+  const user = userEvent.setup();
+  const onDraftNotes = vi.fn().mockRejectedValue(new Error("a budget cap is spent"));
+  render(<SourcePage {...page({ tab: "notes", onDraftNotes })} />);
+  await user.click(screen.getByRole("button", { name: "Draft with golem" }));
+  expect((await screen.findByRole("alert")).textContent).toContain("a budget cap is spent");
+  expect(screen.getByLabelText("Notes of bank").textContent).toBe("# bank\n");
 });
 
 test("Notes and Queries say what to do when the notes methods are missing or there are no queries", () => {

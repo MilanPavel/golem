@@ -19,7 +19,7 @@ test("the gallery's Data section shows the panel, each tab of a source, and the 
     expect(region("Source, rows local").getByText("Sample rows · you and local models")).toBeTruthy();
     expect(region("Source, schema only").getByRole("button", { name: "Show sample rows" })).toBeTruthy();
     expect(region("Source, not trusted").getAllByText(/trust this folder to use it/).length).toBeGreaterThan(0);
-    expect(region("Source, notes").getByRole("textbox", { name: "Notes of bank" })).toBeTruthy();
+    expect(region("Source, notes").getByLabelText("Notes of bank")).toBeTruthy();
     expect(region("Source, notes, not available yet").getByText("Notes come in a later version of golem.")).toBeTruthy();
     expect(region("Source, queries").getByRole("list", { name: "Saved queries" })).toBeTruthy();
     expect(region("Source, queries, none").getByText("Save a query from a chat result and it shows here.")).toBeTruthy();

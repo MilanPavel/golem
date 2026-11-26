@@ -89,6 +89,9 @@ from golem.server.data_rpc import (
     data_extension_install,
     data_inspect,
     data_list,
+    data_notes_draft,
+    data_notes_get,
+    data_notes_set,
     data_query,
     data_remove,
     data_result_page,
@@ -298,6 +301,9 @@ from golem_protocol.commands import (
     DataExtensionInstallParams,
     DataInspectParams,
     DataListParams,
+    DataNotesDraftParams,
+    DataNotesGetParams,
+    DataNotesSetParams,
     DataQueryParams,
     DataRemoveParams,
     DataResultPageParams,
@@ -2582,6 +2588,11 @@ def standard_methods() -> dict[str, Method]:
         "data.remove": Method("data.remove", DataRemoveParams, True, data_remove),
         "data.extension.install": Method(
             "data.extension.install", DataExtensionInstallParams, True, data_extension_install
+        ),
+        "data.notes.get": Method("data.notes.get", DataNotesGetParams, True, data_notes_get),
+        "data.notes.set": Method("data.notes.set", DataNotesSetParams, True, data_notes_set),
+        "data.notes.draft": Method(
+            "data.notes.draft", DataNotesDraftParams, True, data_notes_draft
         ),
         "data.result.page": Method(
             "data.result.page", DataResultPageParams, True, data_result_page
