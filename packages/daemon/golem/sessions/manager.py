@@ -73,7 +73,7 @@ from golem.sessions.bus import EventTarget, SummaryTarget
 from golem.sessions.context import context_breakdown
 from golem.sessions.helper_clock import clock_paused, working_ms
 from golem.sessions.helper_estimate import EstimateCard, HelperPlan, estimate_batch
-from golem.sessions.helper_limits import Used, covered_line, reached, used_of
+from golem.sessions.helper_limits import Used, covered_line, reached, soft_time_reached, used_of
 from golem.sessions.helpers import (
     DEFAULT_PROMPT,
     NO_DIFF,
@@ -4524,13 +4524,20 @@ class SessionManager:
     def _spent_of(self, session: _LiveSession) -> Callable[[], Awaitable[bool]] | None:
         """Whether the helper has reached its cost or token limit, from its stored events."""
         agent = session.agent
-        if agent is None or (agent.limits.max_cost_usd is None and agent.limits.max_tokens is None):
+        if agent is None or (
+            agent.limits.max_cost_usd is None
+            and agent.limits.max_tokens is None
+            and agent.limits.max_seconds is None
+        ):
             return None
         limits = agent.limits
 
         async def spent() -> bool:
-            used = used_of(await self._events.stored(session.session_id))
-            return reached(limits, Used(cost_usd=used.cost_usd, tokens=used.tokens)) is not None
+            stored = await self._events.stored(session.session_id)
+            used = used_of(stored)
+            if reached(limits, Used(cost_usd=used.cost_usd, tokens=used.tokens)) is not None:
+                return True
+            return soft_time_reached(limits, working_ms(stored, self.wall_clock()))
 
         return spent
 

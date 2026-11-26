@@ -460,7 +460,7 @@ async def test_past_the_call_limit_the_last_call_has_no_tools(
     assert last[-1].content == FINAL_REQUEST
     assert _delegate_result(events) == (
         "explorer finished: calls\n\n"
-        "stopped at 2 calls, read 1 file, listed 1 folder\n\n"
+        "stopped at 2 calls, read 1 file, listed 1 folder (a.py)\n\n"
         "what I know so far"
     )
     assert _ended(events).data.stopped == "calls"

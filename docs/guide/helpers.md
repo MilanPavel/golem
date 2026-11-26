@@ -152,7 +152,7 @@ Each helper has limits. When one is reached, the helper stops and writes what it
 | Reason | Means |
 |---|---|
 | `calls` | `max-calls` model calls were used. The default is 15. The helper makes one last call without tools to write its answer |
-| `time` | `max-seconds` of working time passed. Waiting for you, a slot or a provider does not count. This stop is hard: the run is cancelled |
+| `time` | `max-seconds` of working time passed. Waiting for you, a slot or a provider does not count. The stop is soft first: at 80% of `max-seconds` the helper's next model call is its last, without tools, so it writes its answer. If it is still running at the limit, the run is cancelled and gives no answer |
 | `cost` | The helper spent `max-cost-usd`. A local model has no price, so this never fires on one |
 | `tokens` | It used `max-tokens` (input and output), or its calls took in more than 8 times its model's window |
 | `budget` | A cap in `[budget]` was spent before one of its paid calls |
