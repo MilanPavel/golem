@@ -87,7 +87,7 @@ from golem.sessions.bus import EventBus
 from golem.sessions.drafts import ModelDrafts
 from golem.sessions.log import SessionLog
 from golem.sessions.manager import SessionManager
-from golem.sessions.recovery import recover_runs
+from golem.sessions.recovery import recover_runs, sweep_copies
 from golem.sessions.suggestions import ChatSuggestions
 from golem.sessions.titles import ModelTitles, TitleGenerator
 from golem.sessions.trim import HelperTrimmer
@@ -992,6 +992,10 @@ async def _open_sessions(
         agents=agents,
     )
     await recover_runs(runs, events, session_log, runtime, manager)
+    try:
+        await sweep_copies(records)
+    except Exception:
+        log.exception("could not sweep the copies of helpers")
     return manager
 
 

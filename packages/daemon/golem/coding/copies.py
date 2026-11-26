@@ -177,6 +177,13 @@ async def remove(path: str | Path) -> None:
         await _git(common, "worktree", "prune", check=False)
 
 
+async def prune(folder: str | Path) -> None:
+    """``git worktree prune`` in a lead's folder. A folder that is gone or not git is skipped."""
+    path = Path(folder)
+    if path.is_dir():
+        await _git(path, "worktree", "prune", check=False)
+
+
 def list_copies(*, copies_dir: Path | None = None) -> list[Path]:
     """The folders under ``copies_dir``, sorted. For the sweep of copies nobody owns."""
     root = copies_dir if copies_dir is not None else resolve_paths().copies_dir

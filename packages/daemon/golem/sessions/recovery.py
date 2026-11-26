@@ -15,13 +15,16 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Protocol
 
+from golem.coding import copies
 from golem.graphs.chat import ChatRuntime
+from golem.paths import resolve_paths
 from golem.sessions.interrupted import close_reply
 from golem.sessions.log import SessionLog
 from golem.store.events import EventLog
-from golem.store.records import RunRecord, RunRecords
+from golem.store.records import RunRecord, RunRecords, SessionRecords
 from golem_protocol.events import (
     ChatEvent,
     MessageCompletedEvent,
@@ -151,6 +154,47 @@ async def recover_runs(
     return closed
 
 
+async def sweep_copies(records: SessionRecords, *, copies_dir: Path | None = None) -> list[Path]:
+    """Remove the copies nobody owns any more. Returns the folders removed.
+
+    Each folder under ``copies_dir`` is removed when no helper record names it, or the lead of
+    the helper is closed or gone. A copy whose lead is open is kept, whether its helper is
+    running, ended with a diff waiting for apply or discard, or closed on its own: apply and
+    discard clear the record, so a record that is still there is a copy the user may need.
+    Records whose folder is gone are cleared. Then ``git worktree prune`` runs in each lead
+    folder seen. Nothing outside ``copies_dir`` is touched.
+    """
+    root = (copies_dir if copies_dir is not None else resolve_paths().copies_dir).resolve()
+    owners = {Path(o.path).resolve(): o for o in await records.all_copies()}
+    removed: list[Path] = []
+    leads: set[str] = set()
+    for folder in copies.list_copies(copies_dir=root):
+        owner = owners.pop(folder.resolve(), None)
+        if owner is not None and owner.lead_cwd is not None:
+            leads.add(owner.lead_cwd)
+        if owner is not None and owner.lead_open:
+            continue
+        try:
+            await copies.remove(folder)
+            if owner is not None:
+                await records.clear_copy(owner.helper_id)
+        except Exception:
+            log.exception("could not remove the copy %s", folder)
+            continue
+        removed.append(folder)
+    for path, owner in owners.items():
+        if not path.is_relative_to(root) or path.exists():
+            continue  # not ours to judge, or listed but not a folder
+        await records.clear_copy(owner.helper_id)
+        if owner.lead_cwd is not None:
+            leads.add(owner.lead_cwd)
+    for lead in sorted(leads):
+        await copies.prune(lead)
+    if removed:
+        log.info("removed %d copy folder(s) nobody owns", len(removed))
+    return removed
+
+
 async def end_run(
     run: RunRecord,
     found: list[ChatEvent],
@@ -205,4 +249,5 @@ __all__ = [
     "end_run",
     "open_turn",
     "recover_runs",
+    "sweep_copies",
 ]

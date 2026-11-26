@@ -65,6 +65,7 @@ from golem.models.project_privacy import project_local_only
 from golem.models.router import ModelConfigError, ModelIdentity, ModelRouter
 from golem.models.tiers import TIERS, Tier, blended
 from golem.models.window_plan import should_grow
+from golem.paths import resolve_paths
 from golem.permissions.engine import MCP_ENABLE, Allowance, server_grant
 from golem.permissions.policy import explain
 from golem.sessions.approvals import pending_approval, pending_consent
@@ -1145,9 +1146,27 @@ class SessionManager:
         """
         self._stopping.add(session_id)
         try:
-            return await self._close(session_id)
+            closed = await self._close(session_id)
+            await self._remove_copies_of(closed)
+            return closed
         finally:
             self._stopping.discard(session_id)
+
+    async def _remove_copies_of(self, lead_id: str) -> None:
+        """Remove every copy of the helpers of ``lead_id``, whether the helper is closed or not.
+
+        Only a lead's close gets here for a helper's copy: a helper closed on its own keeps its
+        copy, so its diff can still be applied. A close of the lead has closed its helpers
+        first. The folder is removed even if the record is gone (15.10.7).
+        """
+        root = resolve_paths().copies_dir.resolve()
+        for helper_id, path in await self._records.copies_of_helpers(lead_id):
+            if not Path(path).resolve().is_relative_to(root):
+                continue  # never touch anything outside the copies folder
+            try:
+                await self._forget_copy(helper_id, copies.Copy(Path(path), ""))
+            except Exception:
+                log.exception("could not remove the copy of helper %s", helper_id)
 
     async def _close(self, session_id: str) -> str:
         for helper in await self._records.open_helpers(session_id):
