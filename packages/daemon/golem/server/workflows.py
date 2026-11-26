@@ -108,16 +108,22 @@ async def workflow_list(ctx: RequestContext, params: WorkflowListParams) -> Work
     return WorkflowListResult(workflows=[_info(e) for e in shown])
 
 
-def _outline_steps(entry: WorkflowEntry) -> tuple[list[WorkflowOutlineStep], str | None]:
-    """The outline steps of the entry's workflow, or the reason they cannot be read."""
+def _outline_steps(
+    entry: WorkflowEntry,
+) -> tuple[list[WorkflowOutlineStep], str | None, str | None]:
+    """The outline steps and the text of the entry's file, or the reason they cannot be read."""
     try:
-        found: list[WorkflowOutline] = outline(entry.path.read_text(encoding="utf-8"))
-    except (OutlineError, OSError, UnicodeDecodeError) as exc:
-        return [], str(exc)
+        text = entry.path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError) as exc:
+        return [], str(exc), None
+    try:
+        found: list[WorkflowOutline] = outline(text)
+    except OutlineError as exc:
+        return [], str(exc), text
     for one in found:
         if one.name == entry.name:
-            return [WorkflowOutlineStep.model_validate(s.to_dict()) for s in one.steps], None
-    return [], None
+            return [WorkflowOutlineStep.model_validate(s.to_dict()) for s in one.steps], None, text
+    return [], None, text
 
 
 async def workflow_get(ctx: RequestContext, params: WorkflowGetParams) -> WorkflowGetResult:
@@ -126,10 +132,10 @@ async def workflow_get(ctx: RequestContext, params: WorkflowGetParams) -> Workfl
     info = _info(entry)
     if entry.state != "ok":
         return WorkflowGetResult(workflow=info)
-    steps, problem = await asyncio.to_thread(_outline_steps, entry)
+    steps, problem, code = await asyncio.to_thread(_outline_steps, entry)
     if problem is not None:
         info = info.model_copy(update={"error": f"the steps cannot be read: {problem}"})
-    return WorkflowGetResult(workflow=info, steps=steps)
+    return WorkflowGetResult(workflow=info, steps=steps, code=code)
 
 
 def _coerce(entry: WorkflowEntry, inputs: dict[str, Any]) -> dict[str, Any]:

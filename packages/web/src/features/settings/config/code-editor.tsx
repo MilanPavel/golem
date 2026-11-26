@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { cn } from "../../../ui/cn.ts";
 
 /** What the text is written in. */
-type Language = "toml" | "markdown";
+type Language = "toml" | "markdown" | "python";
 
 type Token = { content: string; color?: string | undefined; fontStyle?: number | undefined };
 
@@ -43,6 +43,7 @@ export function CodeEditor({
   label,
   language = "toml",
   readOnly = false,
+  markKind = "problem",
   className,
 }: {
   value: string;
@@ -52,6 +53,8 @@ export function CodeEditor({
   label: string;
   language?: Language;
   readOnly?: boolean;
+  /** What a marked line is: `problem` (a cross, in deny) or `step` (a dot, in clay: where a workflow step starts). */
+  markKind?: "problem" | "step";
   /** Replaces the default sizing: fills the free height of its parent, at least `min-h-72`. */
   className?: string;
 }) {
@@ -77,8 +80,8 @@ export function CodeEditor({
         className="code-editor-layer overflow-hidden border-r border-line text-right text-faint select-none"
       >
         {Array.from({ length: count }, (_, at) => (
-          <div key={at} className={cn(marked.has(at + 1) && "font-semibold text-deny")}>
-            {marked.has(at + 1) ? "✘" : ""}
+          <div key={at} className={cn(marked.has(at + 1) && (markKind === "step" ? "font-semibold text-clay-ink" : "font-semibold text-deny"))}>
+            {marked.has(at + 1) ? (markKind === "step" ? "●" : "✘") : ""}
             {at + 1}
           </div>
         ))}

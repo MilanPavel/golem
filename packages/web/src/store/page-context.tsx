@@ -22,6 +22,7 @@ import type { AuthListResult, FileListResult, CostGetResult, NotificationsValues
 import { isAgentsMissing } from "./agents.ts";
 import { ARTIFACT_PAGE, artifactKey, traceKey, traceSpanKey, type ArtifactReadResult, type TraceGetResult, type TraceSpanResult } from "./trace.ts";
 import { ROUTINE_LIST_KEY, routineGetKey, type RoutineGetResult, type RoutineListResult } from "./routines.ts";
+import { WORKFLOW_LIST_KEY, workflowGetKey, type WorkflowGetResult, type WorkflowListResult } from "./workflows.ts";
 import { RUN_LIST_KEY, sessionRunKey, type RunInfo, type RunListResult } from "./runs.ts";
 import { mcpCatalogKey, mcpListKey, mcpToolsKey, type McpCatalogResult, type McpToolsResult } from "./mcp.ts";
 import { turnCards, type NotesState, type Pastes, type ReviewNote, type ShellTracking, type TurnCard } from "@golem/view";
@@ -605,6 +606,19 @@ export function useRoutineList(): UseQueryResult<RoutineListResult> {
 export function useRoutine(name: string, folder: string | null): UseQueryResult<RoutineGetResult> {
   const { queries } = usePage();
   return useQuery({ queryKey: routineGetKey(name, folder), queryFn: () => queries.routineGet(name, folder), retry: false });
+}
+
+/** The workflows of the user and of the folders sessions have run in. A folder that is not trusted lists its files as `untrusted`. */
+export function useWorkflowList(): UseQueryResult<WorkflowListResult> {
+  const { queries } = usePage();
+  const folders = useKnownFolders();
+  return useQuery({ queryKey: [...WORKFLOW_LIST_KEY, folders], queryFn: () => queries.workflowList(folders), retry: false });
+}
+
+/** One workflow with its outline steps and the text of its file. */
+export function useWorkflow(id: string): UseQueryResult<WorkflowGetResult> {
+  const { queries } = usePage();
+  return useQuery({ queryKey: workflowGetKey(id), queryFn: () => queries.workflowGet(id), retry: false });
 }
 
 /** The runs, one per headless session, newest first. Marked stale when a routine fires or ends and when a headless session changes. */

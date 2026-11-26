@@ -10,7 +10,6 @@ import { PageProvider } from "../../store/page-context.tsx";
 import { fakeClient, fakeFrame, summary } from "../../store/test-support.ts";
 import { ConnectionStrip } from "../connection/index.ts";
 import { closePalette } from "../palette/index.ts";
-import { AUTOMATION_ROADMAP, WorkflowsInProgress } from "./in-progress.tsx";
 import { PANELS } from "./panels.tsx";
 import { SIDEBAR_ITEM_KEY, sidebarItemStore } from "./sidebar-item.ts";
 import { SIDEBAR_OPEN_KEY, sidebarOpenStore } from "./sidebar-open.ts";
@@ -177,16 +176,6 @@ test("the + in the Sessions panel starts a new session", async () => {
   await user.click(railButton("Sessions"));
   await user.click(within(panel()!).getByRole("button", { name: "Start new session" }));
   expect(location.pathname).toBe("/");
-});
-
-test("Workflows says it is in progress and links to the roadmap", () => {
-  for (const [Panel, name] of [[WorkflowsInProgress, "Workflows"]] as const) {
-    const { unmount } = render(<Panel />);
-    expect(screen.getByText(`${name} are in progress`)).toBeTruthy();
-    expect(screen.getByRole("link", { name: /Phase 4 \(#85\)/ }).getAttribute("href")).toBe(AUTOMATION_ROADMAP);
-    unmount();
-  }
-  expect(AUTOMATION_ROADMAP.endsWith("/issues/85")).toBe(true);
 });
 
 test("the connection strip: nothing when connected, the wait line while coming back", () => {

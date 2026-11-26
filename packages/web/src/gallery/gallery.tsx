@@ -101,6 +101,8 @@ import { ASKING_HELPER, DONE_HELPER, HELPER_NOW, RUNNING_HELPER, TRIMMED_AT, TRI
 import { RoutineDetail, RoutinesEmpty, RoutinesPanel } from "../features/routines/index.ts";
 import { SAMPLE_LIST, SAMPLE_MORNING_BRIEF, ROUTINES_NOW, SAMPLE_RUNS } from "../features/routines/sample.ts";
 import { LeadRun, RunBanner, RunsList, RunsPanel } from "../features/runs/index.ts";
+import { WorkflowDetail, WorkflowsPanel } from "../features/workflows/index.ts";
+import { SAMPLE_BROKEN, SAMPLE_PR_DIGEST, SAMPLE_PR_DIGEST_CODE, SAMPLE_PR_DIGEST_STEPS, SAMPLE_UNTRUSTED, SAMPLE_WORKFLOW_LIST, SAMPLE_WORKFLOW_LIST_TWO_PROJECTS, SAMPLE_WORKFLOW_RUNS, WORKFLOWS_NOW } from "../features/workflows/sample.ts";
 import { RUNS_NOW, SAMPLE_RUN_LIST, SAMPLE_WAITING_RUN } from "../features/runs/sample.ts";
 import { HelperRowCardBody, Rail, SessionsPanel, SidebarPanel, WaitingChip } from "../features/sidebar/index.ts";
 import { ConnectionStrip } from "../features/connection/index.ts";
@@ -2291,6 +2293,49 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
         <div className="mt-4 rounded-lg border border-line bg-bg p-5" role="region" aria-label={`Routines, nothing set up, ${theme}`}>
           <RoutinesEmpty onNavigate={() => {}} />
         </div>
+      </section>
+      </Only>
+
+      <Only id="workflows">
+      <section className="mt-6" id={anchor("Workflows")}>
+        <h3 className="mb-2 font-mono text-xs text-faint">Workflows</h3>
+        <div className="flex flex-wrap gap-4">
+          <div className="h-96 w-67 overflow-hidden rounded-lg border border-line">
+            <SidebarPanel title="Workflows" label={`Workflows, ${theme}`} onHide={() => {}}>
+              <WorkflowsPanel list={SAMPLE_WORKFLOW_LIST} selected={SAMPLE_PR_DIGEST.id} onNavigate={() => {}} />
+            </SidebarPanel>
+          </div>
+          <div className="h-96 w-67 overflow-hidden rounded-lg border border-line">
+            <SidebarPanel title="Workflows" label={`Workflows, two projects, ${theme}`} onHide={() => {}}>
+              <WorkflowsPanel list={SAMPLE_WORKFLOW_LIST_TWO_PROJECTS} selected={null} onNavigate={() => {}} />
+            </SidebarPanel>
+          </div>
+          <div className="h-96 w-67 overflow-hidden rounded-lg border border-line">
+            <SidebarPanel title="Workflows" label={`Workflows, empty, ${theme}`} onHide={() => {}}>
+              <WorkflowsPanel list={{ workflows: [] }} selected={null} onNavigate={() => {}} />
+            </SidebarPanel>
+          </div>
+          <div className="h-96 w-67 overflow-hidden rounded-lg border border-line">
+            <SidebarPanel title="Workflows" label={`Workflows, loading, ${theme}`} onHide={() => {}}>
+              <WorkflowsPanel list={null} selected={null} onNavigate={() => {}} />
+            </SidebarPanel>
+          </div>
+        </div>
+        {(
+          [
+            ["Workflow detail, Overview", "overview", SAMPLE_PR_DIGEST, SAMPLE_PR_DIGEST_STEPS, SAMPLE_PR_DIGEST_CODE, SAMPLE_WORKFLOW_RUNS],
+            ["Workflow detail, Code", "code", SAMPLE_PR_DIGEST, SAMPLE_PR_DIGEST_STEPS, SAMPLE_PR_DIGEST_CODE, SAMPLE_WORKFLOW_RUNS],
+            ["Workflow detail, Runs", "runs", SAMPLE_PR_DIGEST, SAMPLE_PR_DIGEST_STEPS, SAMPLE_PR_DIGEST_CODE, SAMPLE_WORKFLOW_RUNS],
+            ["Workflow detail, Runs, none yet", "runs", SAMPLE_PR_DIGEST, SAMPLE_PR_DIGEST_STEPS, SAMPLE_PR_DIGEST_CODE, []],
+            ["Workflow detail, Triggers", "triggers", SAMPLE_PR_DIGEST, SAMPLE_PR_DIGEST_STEPS, SAMPLE_PR_DIGEST_CODE, SAMPLE_WORKFLOW_RUNS],
+            ["Workflow detail, broken", "overview", SAMPLE_BROKEN, [], null, []],
+            ["Workflow detail, not trusted", "code", SAMPLE_UNTRUSTED, [], null, []],
+          ] as const
+        ).map(([title, tab, workflow, steps, code, runs]) => (
+          <div key={title} className="mt-4 rounded-lg border border-line bg-bg p-5" role="region" aria-label={`${title}, ${theme}`}>
+            <WorkflowDetail workflow={workflow} steps={steps} code={code} runs={runs} now={WORKFLOWS_NOW} onNavigate={() => {}} onReveal={() => Promise.resolve()} initialTab={tab} />
+          </div>
+        ))}
       </section>
       </Only>
 

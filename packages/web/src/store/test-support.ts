@@ -1,4 +1,4 @@
-import { OLLAMA_FAILED, RpcError, SESSION_BUSY, type ChatEvent, type ConnectionState, type OllamaInstallUpdate, type RuntimeInstallUpdate, type McpServerLog, type McpLoginDone, type ModelServerStatus, type MemoryChanged, type DevicePairChanged, type PullUpdate, type EvalUpdate, type SessionSummary } from "@golem/client";
+import { OLLAMA_FAILED, RpcError, SESSION_BUSY, type ChatEvent, type ConnectionState, type OllamaInstallUpdate, type RuntimeInstallUpdate, type McpServerLog, type McpLoginDone, type ModelServerStatus, type MemoryChanged, type DevicePairChanged, type PullUpdate, type EvalUpdate, type SessionSummary, type WorkflowNotice } from "@golem/client";
 import { vi } from "vitest";
 import type { ModelListResult } from "./models.ts";
 import type { PageClient } from "./page.ts";
@@ -83,6 +83,7 @@ export function fakeClient() {
   const devices = listeners<void>();
   const pairs = listeners<DevicePairChanged>();
   const routines = listeners<"changed" | "fired" | "finished">();
+  const workflows = listeners<WorkflowNotice>();
   const mcp = listeners<unknown>();
   const mcpLog = listeners<McpServerLog>();
   const mcpLogin = listeners<McpLoginDone>();
@@ -124,6 +125,13 @@ export function fakeClient() {
     deviceRename: vi.fn<PageClient["deviceRename"]>(async (device, name) => ({ device: { id: device, name, paired_at: "2026-11-21T10:00:00+01:00", last_seen: null, revoked_at: null, rules: 0 } })),
     deviceRevoke: vi.fn<PageClient["deviceRevoke"]>(async (device) => ({ device: { id: device, name: "iPhone 16", paired_at: "2026-11-21T10:00:00+01:00", last_seen: null, revoked_at: "2026-11-21T13:00:00+01:00", rules: 0 }, revoked: true, rules: [] })),
     onRoutinesChanged: routines.on,
+    onWorkflowEvent: workflows.on,
+    listWorkflows: vi.fn<PageClient["listWorkflows"]>(async () => ({ workflows: [] })),
+    getWorkflow: vi.fn<PageClient["getWorkflow"]>(async (id) => ({
+      workflow: { id, name: id, path: "/Users/me/.golem/workflows/x.py", state: "ok", inputs: [], description: "" },
+      steps: [],
+      code: "",
+    })),
     listRoutines: vi.fn<PageClient["listRoutines"]>(async () => ({ routines: [] })),
     listRuns: vi.fn<PageClient["listRuns"]>(async () => ({ runs: [] })),
     getRoutine: vi.fn<PageClient["getRoutine"]>(async (name) => ({ routine: { config: { name, prompt: "" }, path: "/Users/me/.golem/config.toml", source: "user" }, runs: [] })),
@@ -300,6 +308,7 @@ export function fakeClient() {
     emitAgents: (root: string | null = null) => {
       agents.emit(root);
     },
+    emitWorkflow: workflows.emit,
     emitRoutines: (kind: "changed" | "fired" | "finished" = "changed") => {
       routines.emit(kind);
     },

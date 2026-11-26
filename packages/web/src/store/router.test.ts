@@ -1,5 +1,5 @@
 import { afterEach, expect, test, vi } from "vitest";
-import { createRouter, helperPath, inspectPath, parseRoute, routineNewPath, routinePath, runsPath, sessionPath, settingsPath, tracePath, welcomePath } from "./router.ts";
+import { createRouter, helperPath, inspectPath, parseRoute, routineNewPath, routinePath, runsPath, workflowPath, sessionPath, settingsPath, tracePath, welcomePath } from "./router.ts";
 
 afterEach(() => {
   history.replaceState(null, "", "/");
@@ -67,6 +67,16 @@ test("parseRoute reads the routines page and one routine", () => {
 test("parseRoute reads the Runs page", () => {
   expect(parseRoute("/runs")).toEqual({ name: "runs" });
   expect(parseRoute(runsPath())).toEqual({ name: "runs" });
+});
+
+test("parseRoute reads the workflows page and one workflow, and workflowPath round-trips", () => {
+  expect(parseRoute("/workflows")).toEqual({ name: "workflows" });
+  const id = "/Users/me/.golem/workflows/pr_digest.py::pr_digest";
+  expect(workflowPath()).toBe("/workflows");
+  expect(parseRoute(workflowPath(id))).toEqual({ name: "workflow", id });
+  for (const bad of ["/workflows/", "/workflows/a/b", "/workflowsx"]) {
+    expect(parseRoute(bad)).toEqual({ name: "not-found" });
+  }
 });
 
 test("routinePath round-trips through parseRoute", () => {

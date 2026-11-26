@@ -86,6 +86,7 @@ import type { RoutineRunResult } from "../../protocol/gen/routine-run-result.ts"
 import type { WorkflowCancelResult } from "../../protocol/gen/workflow-cancel-result.ts";
 import type { WorkflowResumeResult } from "../../protocol/gen/workflow-resume-result.ts";
 import type { WorkflowReviewAnswerResult } from "../../protocol/gen/workflow-review-answer-result.ts";
+import type { WorkflowGetResult } from "../../protocol/gen/workflow-get-result.ts";
 import type { WorkflowListResult } from "../../protocol/gen/workflow-list-result.ts";
 import type { WorkflowRunEvent } from "../../protocol/gen/workflow-run-event.ts";
 import type { WorkflowStartResult } from "../../protocol/gen/workflow-start-result.ts";
@@ -305,6 +306,7 @@ import {
   isWorkflowCancelResult,
   isWorkflowResumeResult,
   isWorkflowReviewAnswerResult,
+  isWorkflowGetResult,
   isWorkflowListResult,
   isWorkflowRunEvent,
   isWorkflowStartResult,
@@ -853,6 +855,8 @@ export interface GolemClient {
   onRoutinesChanged(listener: (kind: "changed" | "fired" | "finished") => void): () => void;
   /** `workflow.list`: the user's workflows and those of `folders`; a broken or untrusted file is listed with its state. */
   listWorkflows(folders?: string[]): Promise<WorkflowListResult>;
+  /** `workflow.get`: one workflow with its outline steps and, for a trusted one, the text of its file. */
+  getWorkflow(id: string): Promise<WorkflowGetResult>;
   /** `workflow.start`: start a run of the workflow `id`. It returns at once; the steps arrive on `onWorkflowEvent`. */
   startWorkflow(id: string, inputs?: Record<string, unknown>): Promise<WorkflowStartResult>;
   /** `workflow.status`: a run and its steps. */
@@ -3000,6 +3004,14 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       const result = await call("workflow.list", folders === undefined ? {} : { folders });
       if (!isWorkflowListResult(result)) {
         throw new Error("invalid workflow.list result");
+      }
+      return result;
+    },
+    async getWorkflow(id: string): Promise<WorkflowGetResult> {
+      await ready;
+      const result = await call("workflow.get", { id });
+      if (!isWorkflowGetResult(result)) {
+        throw new Error("invalid workflow.get result");
       }
       return result;
     },

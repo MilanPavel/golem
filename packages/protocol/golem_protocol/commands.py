@@ -6136,12 +6136,17 @@ class WorkflowGetParams(BaseModel):
 
 
 class WorkflowGetResult(BaseModel):
-    """The workflow and its outline steps (empty for a ``broken`` or ``untrusted`` file)."""
+    """The workflow and its outline steps (empty for a ``broken`` or ``untrusted`` file).
+
+    ``code`` is the text of the file, for the Code tab. It is set only for a workflow the registry
+    lists as ``ok`` (a trusted one), and null when the file cannot be read.
+    """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     workflow: WorkflowEntryInfo
     steps: list[WorkflowOutlineStep] = Field(default_factory=list[WorkflowOutlineStep])
+    code: str | None = None
 
 
 class WorkflowStartParams(BaseModel):

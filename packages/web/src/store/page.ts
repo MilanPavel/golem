@@ -18,6 +18,7 @@ import { SKILL_LIST_KEY } from "./skills.ts";
 import { MEMORY_LIST_KEY, MEMORY_PAGE, type MemoryExportParams, type MemoryExportResult, type MemoryListRequest, type MemoryListResult, type MemoryPrivacy, type MemoryScope } from "./memory.ts";
 import { ROUTINE_GET_KEY, ROUTINE_LIST_KEY, type RoutineGetResult, type RoutineInfo, type RoutineListResult, type RoutineRunResult } from "./routines.ts";
 import { type RunListResult } from "./runs.ts";
+import type { WorkflowGetResult, WorkflowListResult } from "./workflows.ts";
 import { createPulls, type Pulls } from "./pulls.ts";
 import { createQueryClient, keepQueriesHonest } from "./query.ts";
 import { createRouter, type Router } from "./router.ts";
@@ -68,6 +69,9 @@ export type PageClient = Pick<
   | "memorySettings"
   | "onRoutinesChanged"
   | "listRoutines"
+  | "listWorkflows"
+  | "getWorkflow"
+  | "onWorkflowEvent"
   | "listRuns"
   | "getRoutine"
   | "runRoutine"
@@ -466,6 +470,10 @@ export type PageQueries = {
   deviceList(): Promise<DeviceListResult>;
   /** The routines, with each one's next and last run. */
   routineList(): Promise<RoutineListResult>;
+  /** The workflows of the user and of `folders`, each with its state. */
+  workflowList(folders: readonly string[]): Promise<WorkflowListResult>;
+  /** One workflow with its outline steps and the text of its file. */
+  workflowGet(id: string): Promise<WorkflowGetResult>;
   /** The runs, one per headless session, newest first. With `sessionId`, that session's row alone. */
   runList(sessionId: string | null): Promise<RunListResult>;
   /** One routine and its recent runs, newest first. `folder` is a project routine's project, null a user routine. */
@@ -609,6 +617,8 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
         client.listMemories({ scope, limit: MEMORY_PAGE, ...(query === "" ? {} : { query }), ...(after === null ? {} : { after }) }),
       deviceList: () => client.deviceList(),
       routineList: () => client.listRoutines(),
+      workflowList: (folders) => client.listWorkflows([...folders]),
+      workflowGet: (id) => client.getWorkflow(id),
       runList: (sessionId) => (sessionId === null ? client.listRuns() : client.listRuns({ sessionId })),
       routineGet: (name, folder) => (folder === null ? client.getRoutine(name) : client.getRoutine(name, folder)),
       config: (cwd, sessionId) => client.getConfig(cwd ?? undefined, sessionId ?? undefined),
