@@ -2460,7 +2460,6 @@ class SessionManager:
         ):
             return
         lead, call_id, index = record.parent_session_id, record.parent_call_id, record.helper_index
-        self._ended_helpers.add(session_id)
         self._steps.pop(session_id, None)
         self._step_counts.pop(session_id, None)
         self._dispatcher_waits.discard(session_id)
@@ -2507,8 +2506,12 @@ class SessionManager:
                     working_ms=summary.working_ms,
                 ),
             )
+            # The slot is freed only now: a helper that starts in it must come after this
+            # `helper.ended` in the lead's log, or the log shows more than `at_once` running.
+            self._ended_helpers.add(session_id)
             if cut is not None:
                 raise cut
+        self._ended_helpers.add(session_id)
         self._spawn_wake(lead)
 
     async def _worker_result(self, helper_id: str) -> dict[str, Any]:

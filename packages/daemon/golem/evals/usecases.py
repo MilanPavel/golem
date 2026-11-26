@@ -42,6 +42,7 @@ import sys
 import tempfile
 import time
 import tomllib
+import urllib.request
 from collections.abc import AsyncGenerator, Callable, Generator, Mapping, Sequence
 from contextlib import asynccontextmanager, contextmanager
 from dataclasses import dataclass, field, replace
@@ -1001,15 +1002,16 @@ LIVE_PROFILE = "t"
 def live_config(setup: SetupName, model: str, agents: AgentSettings) -> str:
     """The ``config.toml`` of a throwaway golem home: one model, and every helper on it.
 
-    Local: one slot. Cloud: golem starts no Ollama. The daemon still sees an Ollama that is
-    already running on this Mac, and ``cheapest`` would pick its free models, so the helpers
-    are pinned to the lead's model (``same``) in both setups.
+    Local: one slot, on the Ollama already running. Cloud: golem starts no Ollama. The daemon
+    still sees an Ollama that is already running on this Mac, and ``cheapest`` would pick its
+    free models, so the helpers are pinned to the lead's model (``same``) in both setups.
     """
     text = f'default_model = "{LIVE_PROFILE}"\n[models.{LIVE_PROFILE}]\nmodel = "{model}"\n'
     text += f"[agents]\nat_once = {agents.at_once}\n"
     if agents.max_per_batch is not None:
         text += f"max_per_batch = {agents.max_per_batch}\n"
-    text += "[ollama]\nparallel = 1\n" if setup == "local-only" else "[ollama]\nstart = false\n"
+    # Golem never starts its own Ollama here: under the fake HOME it would have no models.
+    text += "[ollama]\nstart = false\n" + ("parallel = 1\n" if setup == "local-only" else "")
     text += "".join(
         f'[agents.{name}]\nmodel = "same"\n' for name in ("explorer", "worker", "advisor")
     )
@@ -1097,6 +1099,19 @@ class Rpc:
         return sorted(p.name for p in root.iterdir()) if root.is_dir() else []
 
 
+OLLAMA_TAGS = "http://127.0.0.1:11434/api/tags"
+OLLAMA_MISSING = "--live local-only needs Ollama running (start the Ollama app or `ollama serve`)"
+
+
+def ollama_answers(timeout: float = 2.0) -> bool:
+    """Whether an Ollama answers on this Mac."""
+    try:
+        with urllib.request.urlopen(OLLAMA_TAGS, timeout=timeout) as reply:
+            return 200 <= reply.status < 300
+    except (OSError, ValueError):
+        return False
+
+
 async def run_live(
     case: str,
     setup: SetupName,
@@ -1110,6 +1125,8 @@ async def run_live(
     names the helpers (the scenario's ``hint``), instead of leaving the choice to the model."""
     from golem_protocol import PROTOCOL_MAJOR
 
+    if setup == "local-only" and not ollama_answers():
+        raise SystemExit(OLLAMA_MISSING)
     scenario = SCENARIOS[case]
     if ask_helpers:
         scenario = replace(scenario, request=f"{scenario.request} {scenario.hint}")
