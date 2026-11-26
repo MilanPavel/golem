@@ -1768,6 +1768,53 @@ test("data.* calls send their params, a password stays out of the wire view, and
   }
 });
 
+test("data.query sends its params and result_id, data.cancel sends the id, and a malformed query result is refused", async () => {
+  const result = {
+    result_id: "cli-1",
+    source: "golem",
+    columns: [{ name: "n", type: "BIGINT" }],
+    rows: [[3]],
+    total_rows: 3,
+    truncated: false,
+    elapsed_ms: 12,
+  };
+  const sent: Record<string, unknown>[] = [];
+  const server = await listen((socket) => {
+    attach(socket, {
+      answerPing: true,
+      results: { "data.query": result, "data.cancel": {} },
+      onRequest: (_socket, method, params) => {
+        if (method.startsWith("data.")) {
+          sent.push({ method, ...params });
+        }
+      },
+    });
+  });
+  const client = connectGolem({ socketPath: server.socketPath, clientName: "cli", reconnect: false, heartbeatMs: 60_000 });
+  try {
+    assert.deepEqual(await client.queryData({ source: "golem", sql: "select 3", limit: 5, result_id: "cli-1" }), result);
+    await client.cancelData("cli-1");
+    assert.deepEqual(sent, [
+      { method: "data.query", source: "golem", sql: "select 3", limit: 5, result_id: "cli-1" },
+      { method: "data.cancel", result_id: "cli-1" },
+    ]);
+  } finally {
+    client.close();
+    await server.close();
+  }
+  const bad = await listen((socket) => {
+    attach(socket, { answerPing: true, results: { "data.query": { rows: "no" }, "data.cancel": "no" } });
+  });
+  const other = connectGolem({ socketPath: bad.socketPath, clientName: "cli", reconnect: false, heartbeatMs: 60_000 });
+  try {
+    await assert.rejects(other.queryData({ source: "golem", sql: "select 1" }), /invalid data.query result/);
+    await assert.rejects(other.cancelData("x"), /invalid data.cancel result/);
+  } finally {
+    other.close();
+    await bad.close();
+  }
+});
+
 test("device.* calls send their params, and device.pair.changed and device.changed reach their listeners", async () => {
   const phone = { id: "a".repeat(32), name: "iPhone 16", paired_at: "2026-11-21T10:00:00+01:00", last_seen: null, revoked_at: null, rules: 1 };
   const sent: Record<string, unknown>[] = [];

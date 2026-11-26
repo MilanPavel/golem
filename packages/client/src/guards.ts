@@ -75,7 +75,9 @@ import type { EvalsStopResult } from "../../protocol/gen/evals-stop-result.ts";
 import type { MemoryChanged } from "../../protocol/gen/memory-changed.ts";
 import type { DataAddResult } from "../../protocol/gen/data-add-result.ts";
 import type { DataChanged } from "../../protocol/gen/data-changed.ts";
+import type { DataCancelResult } from "../../protocol/gen/data-cancel-result.ts";
 import type { DataDescribeResult } from "../../protocol/gen/data-describe-result.ts";
+import type { DataResult } from "../../protocol/gen/data-result.ts";
 import type { DataInspectResult } from "../../protocol/gen/data-inspect-result.ts";
 import type { DataListResult } from "../../protocol/gen/data-list-result.ts";
 import type { DataNotesDraftResult } from "../../protocol/gen/data-notes-draft-result.ts";
@@ -554,6 +556,22 @@ export function isDataListResult(value: unknown): value is DataListResult {
 
 export function isDataDescribeResult(value: unknown): value is DataDescribeResult {
   return isRecord(value) && isDataSource(value["source"]) && Array.isArray(value["tables"]) && isRecord(value["sample"]);
+}
+
+export function isDataQueryResult(value: unknown): value is DataResult {
+  return (
+    isRecord(value) &&
+    typeof value["result_id"] === "string" &&
+    Array.isArray(value["columns"]) &&
+    value["columns"].every((column) => isRecord(column) && typeof column["name"] === "string") &&
+    Array.isArray(value["rows"]) &&
+    value["rows"].every(Array.isArray) &&
+    typeof value["elapsed_ms"] === "number"
+  );
+}
+
+export function isDataCancelResult(value: unknown): value is DataCancelResult {
+  return isRecord(value);
 }
 
 export function isDataInspectResult(value: unknown): value is DataInspectResult {
