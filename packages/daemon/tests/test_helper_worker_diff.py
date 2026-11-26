@@ -7,6 +7,7 @@ sandbox. One test each for a setup with local models only and one with cloud mod
 # pyright: reportPrivateUsage=false
 from __future__ import annotations
 
+import asyncio
 from pathlib import Path
 from typing import Any
 
@@ -171,6 +172,30 @@ async def test_five_workers_return_five_diffs_with_their_check_results(
     text = "\n".join(daemon.results())
     assert "+1 \u22120 in 1 file \u00b7 checks pass \u00b7 diff in artifact" in text
     assert "checks failed: lint" in text
+    assert text.count("diff in artifact") == WORKERS
+
+
+@pytest.mark.parametrize("setup", SETUPS)
+async def test_a_slow_worker_check_does_not_drop_the_workers_line(
+    setup: _Setup,
+    database: Database,
+    lead: Path,
+    tmp_path: Path,
+    _home: Path,
+    _settled: list[_Daemon],
+) -> None:
+    daemon = _daemon(setup, database, lead, tmp_path, _settled)
+
+    async def slow(check: Check, root: Path) -> CheckOutcome:
+        if (root / "f2_0.txt").exists():
+            await asyncio.sleep(0.3)
+        return "passed"
+
+    daemon.manager.check_runner = slow
+
+    await daemon.run(lead)
+
+    text = "\n".join(daemon.results())
     assert text.count("diff in artifact") == WORKERS
 
 

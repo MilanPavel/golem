@@ -2299,11 +2299,20 @@ class SessionManager:
         return [*tiers, *local, *(name for _, name in sorted(hosted))]
 
     async def helpers_ended(self, session_id: str, call_id: str, index: int | None = None) -> bool:
-        """Whether every helper of the call has ended: its last run is over, or it was closed.
+        """Whether every helper of the call has ended: its last run is over and its
+        ``helper.ended`` is stored, or it was closed.
 
+        A run is over before a worker's diff and checks are done, and ``helper.ended`` carries
+        them: waiting for the event keeps the lead from reading a worker's line too early.
         A helper whose first send failed is closed and has no run: it counts as ended.
         ``index`` limits the check to the helper at that place in the call.
         """
+        stored = await self._events.stored(session_id)
+        done = {
+            e.data.index
+            for e in stored
+            if isinstance(e, HelperEndedEvent) and e.data.call_id == call_id
+        }
         for helper in await self._records.helpers_of(session_id, call_id):
             if index is not None and helper.helper_index != index:
                 continue
@@ -2311,6 +2320,8 @@ class SessionManager:
                 continue
             run = await self._run_records.latest(helper.session_id)
             if run is None or run.status in ("running", "waiting"):
+                return False
+            if helper.helper_index not in done:
                 return False
         return True
 
