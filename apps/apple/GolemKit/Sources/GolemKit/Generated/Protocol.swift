@@ -4589,6 +4589,1231 @@ public enum DaemonStatusState: String, Codable {
     case running = "running"
 }
 
+/// ``data.add``. ``password`` goes to the Keychain and is never written to a file.
+// MARK: - DataAddParams
+public struct DataAddParams: Codable {
+    public let kind: KindEnum?
+    public let location: String
+    public let name: String
+    public let password: String?
+    public let privacy: SuggestedPrivacyEnum
+    public let scope: Scope
+    public let sessionID: String?
+    public let watch: Bool?
+
+    public enum CodingKeys: String, CodingKey {
+        case kind = "kind"
+        case location = "location"
+        case name = "name"
+        case password = "password"
+        case privacy = "privacy"
+        case scope = "scope"
+        case sessionID = "session_id"
+        case watch = "watch"
+    }
+
+    public init(kind: KindEnum?, location: String, name: String, password: String?, privacy: SuggestedPrivacyEnum, scope: Scope, sessionID: String?, watch: Bool?) {
+        self.kind = kind
+        self.location = location
+        self.name = name
+        self.password = password
+        self.privacy = privacy
+        self.scope = scope
+        self.sessionID = sessionID
+        self.watch = watch
+    }
+}
+
+public enum KindEnum: String, Codable {
+    case builtin = "builtin"
+    case files = "files"
+    case mysql = "mysql"
+    case postgres = "postgres"
+    case sqlite = "sqlite"
+    case url = "url"
+}
+
+public enum SuggestedPrivacyEnum: String, Codable {
+    case local = "local"
+    case privacyOpen = "open"
+    case schema = "schema"
+}
+
+/// The new source.
+// MARK: - DataAddResult
+public struct DataAddResult: Codable {
+    public let source: DataAddResultSource
+
+    public enum CodingKeys: String, CodingKey {
+        case source = "source"
+    }
+
+    public init(source: DataAddResultSource) {
+        self.source = source
+    }
+}
+
+/// One data source. ``location`` is for display and never holds a password.
+// MARK: - DataAddResultSource
+public struct DataAddResultSource: Codable {
+    public let error: String?
+    public let kind: KindEnum
+    public let location: String
+    public let name: String
+    public let notesPath: String?
+    public let privacy: SuggestedPrivacyEnum
+    public let privacyReason: String?
+    public let project: String?
+    public let rows: Int?
+    public let scope: SourceScope
+    public let status: SourceStatus
+    public let tables: Int?
+    public let watch: Bool?
+
+    public enum CodingKeys: String, CodingKey {
+        case error = "error"
+        case kind = "kind"
+        case location = "location"
+        case name = "name"
+        case notesPath = "notes_path"
+        case privacy = "privacy"
+        case privacyReason = "privacy_reason"
+        case project = "project"
+        case rows = "rows"
+        case scope = "scope"
+        case status = "status"
+        case tables = "tables"
+        case watch = "watch"
+    }
+
+    public init(error: String?, kind: KindEnum, location: String, name: String, notesPath: String?, privacy: SuggestedPrivacyEnum, privacyReason: String?, project: String?, rows: Int?, scope: SourceScope, status: SourceStatus, tables: Int?, watch: Bool?) {
+        self.error = error
+        self.kind = kind
+        self.location = location
+        self.name = name
+        self.notesPath = notesPath
+        self.privacy = privacy
+        self.privacyReason = privacyReason
+        self.project = project
+        self.rows = rows
+        self.scope = scope
+        self.status = status
+        self.tables = tables
+        self.watch = watch
+    }
+}
+
+public enum SourceScope: String, Codable {
+    case builtin = "builtin"
+    case project = "project"
+    case user = "user"
+}
+
+public enum SourceStatus: String, Codable {
+    case error = "error"
+    case reading = "reading"
+    case ready = "ready"
+    case untrusted = "untrusted"
+}
+
+/// ``data.cancel``. Stop a query that is still running.
+// MARK: - DataCancelParams
+public struct DataCancelParams: Codable {
+    public let resultID: String
+
+    public enum CodingKeys: String, CodingKey {
+        case resultID = "result_id"
+    }
+
+    public init(resultID: String) {
+        self.resultID = resultID
+    }
+}
+
+/// Empty.
+// MARK: - DataCancelResult
+public struct DataCancelResult: Codable {
+
+    public init() {
+    }
+}
+
+/// Server → every connection: a data source or the list of them changed. Not stored.
+// MARK: - DataChangedNotification
+public struct DataChangedNotification: Codable {
+    public let jsonrpc: Jsonrpc?
+    public let method: DataChangedNotificationMethod?
+    public let params: DataChangedNotificationParams
+
+    public enum CodingKeys: String, CodingKey {
+        case jsonrpc = "jsonrpc"
+        case method = "method"
+        case params = "params"
+    }
+
+    public init(jsonrpc: Jsonrpc?, method: DataChangedNotificationMethod?, params: DataChangedNotificationParams) {
+        self.jsonrpc = jsonrpc
+        self.method = method
+        self.params = params
+    }
+}
+
+public enum DataChangedNotificationMethod: String, Codable {
+    case dataChanged = "data.changed"
+}
+
+/// A source or the list changed. List again. ``source`` is null when the list itself changed.
+// MARK: - DataChangedNotificationParams
+public struct DataChangedNotificationParams: Codable {
+    public let reason: DataChangedReason
+    public let source: String?
+
+    public enum CodingKeys: String, CodingKey {
+        case reason = "reason"
+        case source = "source"
+    }
+
+    public init(reason: DataChangedReason, source: String?) {
+        self.reason = reason
+        self.source = source
+    }
+}
+
+public enum DataChangedReason: String, Codable {
+    case added = "added"
+    case files = "files"
+    case notes = "notes"
+    case queries = "queries"
+    case removed = "removed"
+    case updated = "updated"
+}
+
+/// A source or the list changed. List again. ``source`` is null when the list itself changed.
+// MARK: - DataChanged
+public struct DataChanged: Codable {
+    public let reason: DataChangedReason
+    public let source: String?
+
+    public enum CodingKeys: String, CodingKey {
+        case reason = "reason"
+        case source = "source"
+    }
+
+    public init(reason: DataChangedReason, source: String?) {
+        self.reason = reason
+        self.source = source
+    }
+}
+
+/// One column. The stats are null when unknown or hidden.
+// MARK: - DataColumn
+public struct DataColumn: Codable {
+    public let distinct: Int?
+    public let max: String?
+    public let min: String?
+    public let name: String
+    public let nullFraction: Double?
+    public let type: String
+
+    public enum CodingKeys: String, CodingKey {
+        case distinct = "distinct"
+        case max = "max"
+        case min = "min"
+        case name = "name"
+        case nullFraction = "null_fraction"
+        case type = "type"
+    }
+
+    public init(distinct: Int?, max: String?, min: String?, name: String, nullFraction: Double?, type: String) {
+        self.distinct = distinct
+        self.max = max
+        self.min = min
+        self.name = name
+        self.nullFraction = nullFraction
+        self.type = type
+    }
+}
+
+/// ``data.describe``. A source, or one table of it.
+// MARK: - DataDescribeParams
+public struct DataDescribeParams: Codable {
+    public let sessionID: String?
+    public let source: String
+    public let table: String?
+
+    public enum CodingKeys: String, CodingKey {
+        case sessionID = "session_id"
+        case source = "source"
+        case table = "table"
+    }
+
+    public init(sessionID: String?, source: String, table: String?) {
+        self.sessionID = sessionID
+        self.source = source
+        self.table = table
+    }
+}
+
+/// The source with its tables, a sample, its notes and saved queries.
+// MARK: - DataDescribeResult
+public struct DataDescribeResult: Codable {
+    public let notes: String?
+    public let queries: [QueryElement]?
+    public let sample: [String: [[Row]]]
+    public let source: DataDescribeResultSource
+    public let tables: [DataDescribeResultTable]
+
+    public enum CodingKeys: String, CodingKey {
+        case notes = "notes"
+        case queries = "queries"
+        case sample = "sample"
+        case source = "source"
+        case tables = "tables"
+    }
+
+    public init(notes: String?, queries: [QueryElement]?, sample: [String: [[Row]]], source: DataDescribeResultSource, tables: [DataDescribeResultTable]) {
+        self.notes = notes
+        self.queries = queries
+        self.sample = sample
+        self.source = source
+        self.tables = tables
+    }
+}
+
+/// A query saved with a source.
+// MARK: - QueryElement
+public struct QueryElement: Codable {
+    public let description: String?
+    public let lastRunAt: String?
+    public let name: String
+    public let sql: String
+
+    public enum CodingKeys: String, CodingKey {
+        case description = "description"
+        case lastRunAt = "last_run_at"
+        case name = "name"
+        case sql = "sql"
+    }
+
+    public init(description: String?, lastRunAt: String?, name: String, sql: String) {
+        self.description = description
+        self.lastRunAt = lastRunAt
+        self.name = name
+        self.sql = sql
+    }
+}
+
+public enum Row: Codable {
+    case bool(Bool)
+    case double(Double)
+    case integer(Int)
+    case string(String)
+    case null
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        if let x = try? container.decode(Bool.self) {
+            self = .bool(x)
+            return
+        }
+        if let x = try? container.decode(Int.self) {
+            self = .integer(x)
+            return
+        }
+        if let x = try? container.decode(Double.self) {
+            self = .double(x)
+            return
+        }
+        if let x = try? container.decode(String.self) {
+            self = .string(x)
+            return
+        }
+        if container.decodeNil() {
+            self = .null
+            return
+        }
+        throw DecodingError.typeMismatch(Row.self, DecodingError.Context(codingPath: decoder.codingPath, debugDescription: "Wrong type for Row"))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        switch self {
+        case .bool(let x):
+            try container.encode(x)
+        case .double(let x):
+            try container.encode(x)
+        case .integer(let x):
+            try container.encode(x)
+        case .string(let x):
+            try container.encode(x)
+        case .null:
+            try container.encodeNil()
+        }
+    }
+}
+
+/// One data source. ``location`` is for display and never holds a password.
+// MARK: - DataDescribeResultSource
+public struct DataDescribeResultSource: Codable {
+    public let error: String?
+    public let kind: KindEnum
+    public let location: String
+    public let name: String
+    public let notesPath: String?
+    public let privacy: SuggestedPrivacyEnum
+    public let privacyReason: String?
+    public let project: String?
+    public let rows: Int?
+    public let scope: SourceScope
+    public let status: SourceStatus
+    public let tables: Int?
+    public let watch: Bool?
+
+    public enum CodingKeys: String, CodingKey {
+        case error = "error"
+        case kind = "kind"
+        case location = "location"
+        case name = "name"
+        case notesPath = "notes_path"
+        case privacy = "privacy"
+        case privacyReason = "privacy_reason"
+        case project = "project"
+        case rows = "rows"
+        case scope = "scope"
+        case status = "status"
+        case tables = "tables"
+        case watch = "watch"
+    }
+
+    public init(error: String?, kind: KindEnum, location: String, name: String, notesPath: String?, privacy: SuggestedPrivacyEnum, privacyReason: String?, project: String?, rows: Int?, scope: SourceScope, status: SourceStatus, tables: Int?, watch: Bool?) {
+        self.error = error
+        self.kind = kind
+        self.location = location
+        self.name = name
+        self.notesPath = notesPath
+        self.privacy = privacy
+        self.privacyReason = privacyReason
+        self.project = project
+        self.rows = rows
+        self.scope = scope
+        self.status = status
+        self.tables = tables
+        self.watch = watch
+    }
+}
+
+/// One table. ``rows`` is null when unknown or hidden.
+// MARK: - DataDescribeResultTable
+public struct DataDescribeResultTable: Codable {
+    public let columns: [PurpleDataColumn]?
+    public let name: String
+    public let rows: Int?
+
+    public enum CodingKeys: String, CodingKey {
+        case columns = "columns"
+        case name = "name"
+        case rows = "rows"
+    }
+
+    public init(columns: [PurpleDataColumn]?, name: String, rows: Int?) {
+        self.columns = columns
+        self.name = name
+        self.rows = rows
+    }
+}
+
+/// One column. The stats are null when unknown or hidden.
+// MARK: - PurpleDataColumn
+public struct PurpleDataColumn: Codable {
+    public let distinct: Int?
+    public let max: String?
+    public let min: String?
+    public let name: String
+    public let nullFraction: Double?
+    public let type: String
+
+    public enum CodingKeys: String, CodingKey {
+        case distinct = "distinct"
+        case max = "max"
+        case min = "min"
+        case name = "name"
+        case nullFraction = "null_fraction"
+        case type = "type"
+    }
+
+    public init(distinct: Int?, max: String?, min: String?, name: String, nullFraction: Double?, type: String) {
+        self.distinct = distinct
+        self.max = max
+        self.min = min
+        self.name = name
+        self.nullFraction = nullFraction
+        self.type = type
+    }
+}
+
+/// ``data.export``. Write a kept result to a file.
+// MARK: - DataExportParams
+public struct DataExportParams: Codable {
+    public let format: DataExportParamsFormat
+    public let path: String
+    public let resultID: String
+
+    public enum CodingKeys: String, CodingKey {
+        case format = "format"
+        case path = "path"
+        case resultID = "result_id"
+    }
+
+    public init(format: DataExportParamsFormat, path: String, resultID: String) {
+        self.format = format
+        self.path = path
+        self.resultID = resultID
+    }
+}
+
+public enum DataExportParamsFormat: String, Codable {
+    case csv = "csv"
+    case json = "json"
+    case parquet = "parquet"
+    case xlsx = "xlsx"
+}
+
+/// The file written.
+// MARK: - DataExportResult
+public struct DataExportResult: Codable {
+    public let path: String
+    public let rows: Int
+
+    public enum CodingKeys: String, CodingKey {
+        case path = "path"
+        case rows = "rows"
+    }
+
+    public init(path: String, rows: Int) {
+        self.path = path
+        self.rows = rows
+    }
+}
+
+/// ``data.inspect``. Look at a location before it is added.
+// MARK: - DataInspectParams
+public struct DataInspectParams: Codable {
+    public let location: String
+    public let sessionID: String?
+
+    public enum CodingKeys: String, CodingKey {
+        case location = "location"
+        case sessionID = "session_id"
+    }
+
+    public init(location: String, sessionID: String?) {
+        self.location = location
+        self.sessionID = sessionID
+    }
+}
+
+/// What a location holds. ``notes`` are plain-language guesses. ``sample``: 20 rows a table.
+// MARK: - DataInspectResult
+public struct DataInspectResult: Codable {
+    public let files: Int?
+    public let kind: KindEnum
+    public let notes: [String]?
+    public let privacyReason: String?
+    public let sample: [String: [[Row]]]
+    public let suggestedName: String
+    public let suggestedPrivacy: SuggestedPrivacyEnum
+    public let tables: [DataInspectResultTable]
+
+    public enum CodingKeys: String, CodingKey {
+        case files = "files"
+        case kind = "kind"
+        case notes = "notes"
+        case privacyReason = "privacy_reason"
+        case sample = "sample"
+        case suggestedName = "suggested_name"
+        case suggestedPrivacy = "suggested_privacy"
+        case tables = "tables"
+    }
+
+    public init(files: Int?, kind: KindEnum, notes: [String]?, privacyReason: String?, sample: [String: [[Row]]], suggestedName: String, suggestedPrivacy: SuggestedPrivacyEnum, tables: [DataInspectResultTable]) {
+        self.files = files
+        self.kind = kind
+        self.notes = notes
+        self.privacyReason = privacyReason
+        self.sample = sample
+        self.suggestedName = suggestedName
+        self.suggestedPrivacy = suggestedPrivacy
+        self.tables = tables
+    }
+}
+
+/// One table. ``rows`` is null when unknown or hidden.
+// MARK: - DataInspectResultTable
+public struct DataInspectResultTable: Codable {
+    public let columns: [FluffyDataColumn]?
+    public let name: String
+    public let rows: Int?
+
+    public enum CodingKeys: String, CodingKey {
+        case columns = "columns"
+        case name = "name"
+        case rows = "rows"
+    }
+
+    public init(columns: [FluffyDataColumn]?, name: String, rows: Int?) {
+        self.columns = columns
+        self.name = name
+        self.rows = rows
+    }
+}
+
+/// One column. The stats are null when unknown or hidden.
+// MARK: - FluffyDataColumn
+public struct FluffyDataColumn: Codable {
+    public let distinct: Int?
+    public let max: String?
+    public let min: String?
+    public let name: String
+    public let nullFraction: Double?
+    public let type: String
+
+    public enum CodingKeys: String, CodingKey {
+        case distinct = "distinct"
+        case max = "max"
+        case min = "min"
+        case name = "name"
+        case nullFraction = "null_fraction"
+        case type = "type"
+    }
+
+    public init(distinct: Int?, max: String?, min: String?, name: String, nullFraction: Double?, type: String) {
+        self.distinct = distinct
+        self.max = max
+        self.min = min
+        self.name = name
+        self.nullFraction = nullFraction
+        self.type = type
+    }
+}
+
+/// ``data.list``. Every source the user can see.
+// MARK: - DataListParams
+public struct DataListParams: Codable {
+    public let sessionID: String?
+
+    public enum CodingKeys: String, CodingKey {
+        case sessionID = "session_id"
+    }
+
+    public init(sessionID: String?) {
+        self.sessionID = sessionID
+    }
+}
+
+/// The sources.
+// MARK: - DataListResult
+public struct DataListResult: Codable {
+    public let sources: [SourceElement]
+
+    public enum CodingKeys: String, CodingKey {
+        case sources = "sources"
+    }
+
+    public init(sources: [SourceElement]) {
+        self.sources = sources
+    }
+}
+
+/// One data source. ``location`` is for display and never holds a password.
+// MARK: - SourceElement
+public struct SourceElement: Codable {
+    public let error: String?
+    public let kind: KindEnum
+    public let location: String
+    public let name: String
+    public let notesPath: String?
+    public let privacy: SuggestedPrivacyEnum
+    public let privacyReason: String?
+    public let project: String?
+    public let rows: Int?
+    public let scope: SourceScope
+    public let status: SourceStatus
+    public let tables: Int?
+    public let watch: Bool?
+
+    public enum CodingKeys: String, CodingKey {
+        case error = "error"
+        case kind = "kind"
+        case location = "location"
+        case name = "name"
+        case notesPath = "notes_path"
+        case privacy = "privacy"
+        case privacyReason = "privacy_reason"
+        case project = "project"
+        case rows = "rows"
+        case scope = "scope"
+        case status = "status"
+        case tables = "tables"
+        case watch = "watch"
+    }
+
+    public init(error: String?, kind: KindEnum, location: String, name: String, notesPath: String?, privacy: SuggestedPrivacyEnum, privacyReason: String?, project: String?, rows: Int?, scope: SourceScope, status: SourceStatus, tables: Int?, watch: Bool?) {
+        self.error = error
+        self.kind = kind
+        self.location = location
+        self.name = name
+        self.notesPath = notesPath
+        self.privacy = privacy
+        self.privacyReason = privacyReason
+        self.project = project
+        self.rows = rows
+        self.scope = scope
+        self.status = status
+        self.tables = tables
+        self.watch = watch
+    }
+}
+
+/// ``data.notes.draft``. Ask for a proposal.
+// MARK: - DataNotesDraftParams
+public struct DataNotesDraftParams: Codable {
+    public let sessionID: String?
+    public let source: String
+
+    public enum CodingKeys: String, CodingKey {
+        case sessionID = "session_id"
+        case source = "source"
+    }
+
+    public init(sessionID: String?, source: String) {
+        self.sessionID = sessionID
+        self.source = source
+    }
+}
+
+/// A proposal. It is not saved.
+// MARK: - DataNotesDraftResult
+public struct DataNotesDraftResult: Codable {
+    public let text: String
+
+    public enum CodingKeys: String, CodingKey {
+        case text = "text"
+    }
+
+    public init(text: String) {
+        self.text = text
+    }
+}
+
+/// ``data.notes.get``.
+// MARK: - DataNotesGetParams
+public struct DataNotesGetParams: Codable {
+    public let sessionID: String?
+    public let source: String
+
+    public enum CodingKeys: String, CodingKey {
+        case sessionID = "session_id"
+        case source = "source"
+    }
+
+    public init(sessionID: String?, source: String) {
+        self.sessionID = sessionID
+        self.source = source
+    }
+}
+
+/// The notes, null when there are none.
+// MARK: - DataNotesGetResult
+public struct DataNotesGetResult: Codable {
+    public let path: String?
+    public let text: String?
+
+    public enum CodingKeys: String, CodingKey {
+        case path = "path"
+        case text = "text"
+    }
+
+    public init(path: String?, text: String?) {
+        self.path = path
+        self.text = text
+    }
+}
+
+/// ``data.notes.set``.
+// MARK: - DataNotesSetParams
+public struct DataNotesSetParams: Codable {
+    public let sessionID: String?
+    public let source: String
+    public let text: String
+
+    public enum CodingKeys: String, CodingKey {
+        case sessionID = "session_id"
+        case source = "source"
+        case text = "text"
+    }
+
+    public init(sessionID: String?, source: String, text: String) {
+        self.sessionID = sessionID
+        self.source = source
+        self.text = text
+    }
+}
+
+/// Where the notes were saved.
+// MARK: - DataNotesSetResult
+public struct DataNotesSetResult: Codable {
+    public let path: String
+
+    public enum CodingKeys: String, CodingKey {
+        case path = "path"
+    }
+
+    public init(path: String) {
+        self.path = path
+    }
+}
+
+/// ``data.queries.remove``.
+// MARK: - DataQueriesRemoveParams
+public struct DataQueriesRemoveParams: Codable {
+    public let name: String
+    public let sessionID: String?
+    public let source: String
+
+    public enum CodingKeys: String, CodingKey {
+        case name = "name"
+        case sessionID = "session_id"
+        case source = "source"
+    }
+
+    public init(name: String, sessionID: String?, source: String) {
+        self.name = name
+        self.sessionID = sessionID
+        self.source = source
+    }
+}
+
+/// Empty.
+// MARK: - DataQueriesRemoveResult
+public struct DataQueriesRemoveResult: Codable {
+
+    public init() {
+    }
+}
+
+/// ``data.queries.save``.
+// MARK: - DataQueriesSaveParams
+public struct DataQueriesSaveParams: Codable {
+    public let description: String?
+    public let name: String
+    public let sessionID: String?
+    public let source: String
+    public let sql: String
+
+    public enum CodingKeys: String, CodingKey {
+        case description = "description"
+        case name = "name"
+        case sessionID = "session_id"
+        case source = "source"
+        case sql = "sql"
+    }
+
+    public init(description: String?, name: String, sessionID: String?, source: String, sql: String) {
+        self.description = description
+        self.name = name
+        self.sessionID = sessionID
+        self.source = source
+        self.sql = sql
+    }
+}
+
+/// The saved query.
+// MARK: - DataQueriesSaveResult
+public struct DataQueriesSaveResult: Codable {
+    public let query: DataQueriesSaveResultQuery
+
+    public enum CodingKeys: String, CodingKey {
+        case query = "query"
+    }
+
+    public init(query: DataQueriesSaveResultQuery) {
+        self.query = query
+    }
+}
+
+/// A query saved with a source.
+// MARK: - DataQueriesSaveResultQuery
+public struct DataQueriesSaveResultQuery: Codable {
+    public let description: String?
+    public let lastRunAt: String?
+    public let name: String
+    public let sql: String
+
+    public enum CodingKeys: String, CodingKey {
+        case description = "description"
+        case lastRunAt = "last_run_at"
+        case name = "name"
+        case sql = "sql"
+    }
+
+    public init(description: String?, lastRunAt: String?, name: String, sql: String) {
+        self.description = description
+        self.lastRunAt = lastRunAt
+        self.name = name
+        self.sql = sql
+    }
+}
+
+/// ``data.query``. Run SQL on one source.
+// MARK: - DataQueryParams
+public struct DataQueryParams: Codable {
+    public let limit: Int?
+    public let sessionID: String?
+    public let source: String
+    public let sql: String
+
+    public enum CodingKeys: String, CodingKey {
+        case limit = "limit"
+        case sessionID = "session_id"
+        case source = "source"
+        case sql = "sql"
+    }
+
+    public init(limit: Int?, sessionID: String?, source: String, sql: String) {
+        self.limit = limit
+        self.sessionID = sessionID
+        self.source = source
+        self.sql = sql
+    }
+}
+
+/// ``data.remove``.
+// MARK: - DataRemoveParams
+public struct DataRemoveParams: Codable {
+    public let name: String
+    public let sessionID: String?
+
+    public enum CodingKeys: String, CodingKey {
+        case name = "name"
+        case sessionID = "session_id"
+    }
+
+    public init(name: String, sessionID: String?) {
+        self.name = name
+        self.sessionID = sessionID
+    }
+}
+
+/// Empty.
+// MARK: - DataRemoveResult
+public struct DataRemoveResult: Codable {
+
+    public init() {
+    }
+}
+
+/// ``data.result.page``. One page of a kept result, sorted if asked.
+// MARK: - DataResultPageParams
+public struct DataResultPageParams: Codable {
+    public let limit: Int?
+    public let offset: Int?
+    public let resultID: String
+    public let sortColumn: String?
+    public let sortDesc: Bool?
+
+    public enum CodingKeys: String, CodingKey {
+        case limit = "limit"
+        case offset = "offset"
+        case resultID = "result_id"
+        case sortColumn = "sort_column"
+        case sortDesc = "sort_desc"
+    }
+
+    public init(limit: Int?, offset: Int?, resultID: String, sortColumn: String?, sortDesc: Bool?) {
+        self.limit = limit
+        self.offset = offset
+        self.resultID = resultID
+        self.sortColumn = sortColumn
+        self.sortDesc = sortDesc
+    }
+}
+
+/// Rows of a query, or one page of them. ``total_rows`` is null while unknown.
+// MARK: - DataResult
+public struct DataResult: Codable {
+    public let columns: [DataResultColumn]
+    public let elapsedMS: Int
+    public let resultID: String
+    public let rows: [[Row]]
+    public let source: String
+    public let totalRows: Int?
+    public let truncated: Bool?
+
+    public enum CodingKeys: String, CodingKey {
+        case columns = "columns"
+        case elapsedMS = "elapsed_ms"
+        case resultID = "result_id"
+        case rows = "rows"
+        case source = "source"
+        case totalRows = "total_rows"
+        case truncated = "truncated"
+    }
+
+    public init(columns: [DataResultColumn], elapsedMS: Int, resultID: String, rows: [[Row]], source: String, totalRows: Int?, truncated: Bool?) {
+        self.columns = columns
+        self.elapsedMS = elapsedMS
+        self.resultID = resultID
+        self.rows = rows
+        self.source = source
+        self.totalRows = totalRows
+        self.truncated = truncated
+    }
+}
+
+/// One column. The stats are null when unknown or hidden.
+// MARK: - DataResultColumn
+public struct DataResultColumn: Codable {
+    public let distinct: Int?
+    public let max: String?
+    public let min: String?
+    public let name: String
+    public let nullFraction: Double?
+    public let type: String
+
+    public enum CodingKeys: String, CodingKey {
+        case distinct = "distinct"
+        case max = "max"
+        case min = "min"
+        case name = "name"
+        case nullFraction = "null_fraction"
+        case type = "type"
+    }
+
+    public init(distinct: Int?, max: String?, min: String?, name: String, nullFraction: Double?, type: String) {
+        self.distinct = distinct
+        self.max = max
+        self.min = min
+        self.name = name
+        self.nullFraction = nullFraction
+        self.type = type
+    }
+}
+
+/// A query saved with a source.
+// MARK: - DataSavedQuery
+public struct DataSavedQuery: Codable {
+    public let description: String?
+    public let lastRunAt: String?
+    public let name: String
+    public let sql: String
+
+    public enum CodingKeys: String, CodingKey {
+        case description = "description"
+        case lastRunAt = "last_run_at"
+        case name = "name"
+        case sql = "sql"
+    }
+
+    public init(description: String?, lastRunAt: String?, name: String, sql: String) {
+        self.description = description
+        self.lastRunAt = lastRunAt
+        self.name = name
+        self.sql = sql
+    }
+}
+
+/// One data source. ``location`` is for display and never holds a password.
+// MARK: - DataSource
+public struct DataSource: Codable {
+    public let error: String?
+    public let kind: KindEnum
+    public let location: String
+    public let name: String
+    public let notesPath: String?
+    public let privacy: SuggestedPrivacyEnum
+    public let privacyReason: String?
+    public let project: String?
+    public let rows: Int?
+    public let scope: SourceScope
+    public let status: SourceStatus
+    public let tables: Int?
+    public let watch: Bool?
+
+    public enum CodingKeys: String, CodingKey {
+        case error = "error"
+        case kind = "kind"
+        case location = "location"
+        case name = "name"
+        case notesPath = "notes_path"
+        case privacy = "privacy"
+        case privacyReason = "privacy_reason"
+        case project = "project"
+        case rows = "rows"
+        case scope = "scope"
+        case status = "status"
+        case tables = "tables"
+        case watch = "watch"
+    }
+
+    public init(error: String?, kind: KindEnum, location: String, name: String, notesPath: String?, privacy: SuggestedPrivacyEnum, privacyReason: String?, project: String?, rows: Int?, scope: SourceScope, status: SourceStatus, tables: Int?, watch: Bool?) {
+        self.error = error
+        self.kind = kind
+        self.location = location
+        self.name = name
+        self.notesPath = notesPath
+        self.privacy = privacy
+        self.privacyReason = privacyReason
+        self.project = project
+        self.rows = rows
+        self.scope = scope
+        self.status = status
+        self.tables = tables
+        self.watch = watch
+    }
+}
+
+/// One table. ``rows`` is null when unknown or hidden.
+// MARK: - DataTable
+public struct DataTable: Codable {
+    public let columns: [DataTableColumn]?
+    public let name: String
+    public let rows: Int?
+
+    public enum CodingKeys: String, CodingKey {
+        case columns = "columns"
+        case name = "name"
+        case rows = "rows"
+    }
+
+    public init(columns: [DataTableColumn]?, name: String, rows: Int?) {
+        self.columns = columns
+        self.name = name
+        self.rows = rows
+    }
+}
+
+/// One column. The stats are null when unknown or hidden.
+// MARK: - DataTableColumn
+public struct DataTableColumn: Codable {
+    public let distinct: Int?
+    public let max: String?
+    public let min: String?
+    public let name: String
+    public let nullFraction: Double?
+    public let type: String
+
+    public enum CodingKeys: String, CodingKey {
+        case distinct = "distinct"
+        case max = "max"
+        case min = "min"
+        case name = "name"
+        case nullFraction = "null_fraction"
+        case type = "type"
+    }
+
+    public init(distinct: Int?, max: String?, min: String?, name: String, nullFraction: Double?, type: String) {
+        self.distinct = distinct
+        self.max = max
+        self.min = min
+        self.name = name
+        self.nullFraction = nullFraction
+        self.type = type
+    }
+}
+
+/// ``data.update``. Only the fields that are set change.
+// MARK: - DataUpdateParams
+public struct DataUpdateParams: Codable {
+    public let exclude: [String]?
+    public let include: [String]?
+    public let name: String
+    public let privacy: SuggestedPrivacyEnum?
+    public let sessionID: String?
+    public let watch: Bool?
+
+    public enum CodingKeys: String, CodingKey {
+        case exclude = "exclude"
+        case include = "include"
+        case name = "name"
+        case privacy = "privacy"
+        case sessionID = "session_id"
+        case watch = "watch"
+    }
+
+    public init(exclude: [String]?, include: [String]?, name: String, privacy: SuggestedPrivacyEnum?, sessionID: String?, watch: Bool?) {
+        self.exclude = exclude
+        self.include = include
+        self.name = name
+        self.privacy = privacy
+        self.sessionID = sessionID
+        self.watch = watch
+    }
+}
+
+/// The source after the change.
+// MARK: - DataUpdateResult
+public struct DataUpdateResult: Codable {
+    public let source: DataUpdateResultSource
+
+    public enum CodingKeys: String, CodingKey {
+        case source = "source"
+    }
+
+    public init(source: DataUpdateResultSource) {
+        self.source = source
+    }
+}
+
+/// One data source. ``location`` is for display and never holds a password.
+// MARK: - DataUpdateResultSource
+public struct DataUpdateResultSource: Codable {
+    public let error: String?
+    public let kind: KindEnum
+    public let location: String
+    public let name: String
+    public let notesPath: String?
+    public let privacy: SuggestedPrivacyEnum
+    public let privacyReason: String?
+    public let project: String?
+    public let rows: Int?
+    public let scope: SourceScope
+    public let status: SourceStatus
+    public let tables: Int?
+    public let watch: Bool?
+
+    public enum CodingKeys: String, CodingKey {
+        case error = "error"
+        case kind = "kind"
+        case location = "location"
+        case name = "name"
+        case notesPath = "notes_path"
+        case privacy = "privacy"
+        case privacyReason = "privacy_reason"
+        case project = "project"
+        case rows = "rows"
+        case scope = "scope"
+        case status = "status"
+        case tables = "tables"
+        case watch = "watch"
+    }
+
+    public init(error: String?, kind: KindEnum, location: String, name: String, notesPath: String?, privacy: SuggestedPrivacyEnum, privacyReason: String?, project: String?, rows: Int?, scope: SourceScope, status: SourceStatus, tables: Int?, watch: Bool?) {
+        self.error = error
+        self.kind = kind
+        self.location = location
+        self.name = name
+        self.notesPath = notesPath
+        self.privacy = privacy
+        self.privacyReason = privacyReason
+        self.project = project
+        self.rows = rows
+        self.scope = scope
+        self.status = status
+        self.tables = tables
+        self.watch = watch
+    }
+}
+
 /// Server → every connection: the device registry changed. Not stored.
 ///
 /// The gateway calls ``device.sync`` again (ADR-051).
@@ -10548,14 +11773,14 @@ public struct MCPImportScanParams: Codable {
 // MARK: - MCPImportScanResult
 public struct MCPImportScanResult: Codable {
     public let scanID: String
-    public let sources: [SourceElement]
+    public let sources: [SourceClass]
 
     public enum CodingKeys: String, CodingKey {
         case scanID = "scan_id"
         case sources = "sources"
     }
 
-    public init(scanID: String, sources: [SourceElement]) {
+    public init(scanID: String, sources: [SourceClass]) {
         self.scanID = scanID
         self.sources = sources
     }
@@ -10565,8 +11790,8 @@ public struct MCPImportScanResult: Codable {
 ///
 /// ``skipped`` lists servers that could not be turned into a golem server, with
 /// the reason. ``error`` is set when the file could not be read.
-// MARK: - SourceElement
-public struct SourceElement: Codable {
+// MARK: - SourceClass
+public struct SourceClass: Codable {
     public let candidates: [SourceCandidate]?
     public let error: String?
     public let id: String
@@ -12601,7 +13826,7 @@ public struct MemoryDeleteResult: Codable {
 // MARK: - MemoryExportParams
 public struct MemoryExportParams: Codable {
     public let folder: String?
-    public let format: Format
+    public let format: MemoryExportParamsFormat
     public let scope: ParamsScope?
 
     public enum CodingKeys: String, CodingKey {
@@ -12610,14 +13835,14 @@ public struct MemoryExportParams: Codable {
         case scope = "scope"
     }
 
-    public init(folder: String?, format: Format, scope: ParamsScope?) {
+    public init(folder: String?, format: MemoryExportParamsFormat, scope: ParamsScope?) {
         self.folder = folder
         self.format = format
         self.scope = scope
     }
 }
 
-public enum Format: String, Codable {
+public enum MemoryExportParamsFormat: String, Codable {
     case json = "json"
     case markdown = "markdown"
 }
@@ -12626,7 +13851,7 @@ public enum Format: String, Codable {
 // MARK: - MemoryExportResult
 public struct MemoryExportResult: Codable {
     public let count: Int
-    public let format: Format
+    public let format: MemoryExportParamsFormat
     public let text: String
 
     public enum CodingKeys: String, CodingKey {
@@ -12635,7 +13860,7 @@ public struct MemoryExportResult: Codable {
         case text = "text"
     }
 
-    public init(count: Int, format: Format, text: String) {
+    public init(count: Int, format: MemoryExportParamsFormat, text: String) {
         self.count = count
         self.format = format
         self.text = text
@@ -12684,7 +13909,7 @@ public struct MemoryGetResultItem: Codable {
     public let id: String
     public let keptBy: KeptBy?
     public let lastUsedAt: String?
-    public let privacy: Privacy?
+    public let privacy: HistoryEnum?
     public let scope: ParamsScope
     public let sessionID: String?
     public let sources: [PurpleMemorySource]?
@@ -12717,7 +13942,7 @@ public struct MemoryGetResultItem: Codable {
         case uses = "uses"
     }
 
-    public init(agent: String?, always: Bool?, author: Author, callID: String?, createdAt: String, folder: String?, id: String, keptBy: KeptBy?, lastUsedAt: String?, privacy: Privacy?, scope: ParamsScope, sessionID: String?, sources: [PurpleMemorySource]?, state: StateEnum, text: String, title: String, updatedAt: String, usable: Bool?, uses: Int?) {
+    public init(agent: String?, always: Bool?, author: Author, callID: String?, createdAt: String, folder: String?, id: String, keptBy: KeptBy?, lastUsedAt: String?, privacy: HistoryEnum?, scope: ParamsScope, sessionID: String?, sources: [PurpleMemorySource]?, state: StateEnum, text: String, title: String, updatedAt: String, usable: Bool?, uses: Int?) {
         self.agent = agent
         self.always = always
         self.author = author
@@ -12751,7 +13976,7 @@ public enum KeptBy: String, Codable {
     case you = "you"
 }
 
-public enum Privacy: String, Codable {
+public enum HistoryEnum: String, Codable {
     case chat = "chat"
     case local = "local"
 }
@@ -12803,7 +14028,7 @@ public struct MemoryItem: Codable {
     public let id: String
     public let keptBy: KeptBy?
     public let lastUsedAt: String?
-    public let privacy: Privacy?
+    public let privacy: HistoryEnum?
     public let scope: ParamsScope
     public let sessionID: String?
     public let sources: [MemoryItemSource]?
@@ -12836,7 +14061,7 @@ public struct MemoryItem: Codable {
         case uses = "uses"
     }
 
-    public init(agent: String?, always: Bool?, author: Author, callID: String?, createdAt: String, folder: String?, id: String, keptBy: KeptBy?, lastUsedAt: String?, privacy: Privacy?, scope: ParamsScope, sessionID: String?, sources: [MemoryItemSource]?, state: StateEnum, text: String, title: String, updatedAt: String, usable: Bool?, uses: Int?) {
+    public init(agent: String?, always: Bool?, author: Author, callID: String?, createdAt: String, folder: String?, id: String, keptBy: KeptBy?, lastUsedAt: String?, privacy: HistoryEnum?, scope: ParamsScope, sessionID: String?, sources: [MemoryItemSource]?, state: StateEnum, text: String, title: String, updatedAt: String, usable: Bool?, uses: Int?) {
         self.agent = agent
         self.always = always
         self.author = author
@@ -12984,7 +14209,7 @@ public struct ItemElement: Codable {
     public let id: String
     public let keptBy: KeptBy?
     public let lastUsedAt: String?
-    public let privacy: Privacy?
+    public let privacy: HistoryEnum?
     public let scope: ParamsScope
     public let sessionID: String?
     public let sources: [FluffyMemorySource]?
@@ -13017,7 +14242,7 @@ public struct ItemElement: Codable {
         case uses = "uses"
     }
 
-    public init(agent: String?, always: Bool?, author: Author, callID: String?, createdAt: String, folder: String?, id: String, keptBy: KeptBy?, lastUsedAt: String?, privacy: Privacy?, scope: ParamsScope, sessionID: String?, sources: [FluffyMemorySource]?, state: StateEnum, text: String, title: String, updatedAt: String, usable: Bool?, uses: Int?) {
+    public init(agent: String?, always: Bool?, author: Author, callID: String?, createdAt: String, folder: String?, id: String, keptBy: KeptBy?, lastUsedAt: String?, privacy: HistoryEnum?, scope: ParamsScope, sessionID: String?, sources: [FluffyMemorySource]?, state: StateEnum, text: String, title: String, updatedAt: String, usable: Bool?, uses: Int?) {
         self.agent = agent
         self.always = always
         self.author = author
@@ -13074,12 +14299,12 @@ public struct FluffyMemorySource: Codable {
 // MARK: - MemoryListResultSettings
 public struct MemoryListResultSettings: Codable {
     public let autoKeep: [String]?
-    public let history: Privacy?
+    public let history: HistoryEnum?
     public let maxTokens: Int?
     public let minTokens: Int?
-    public let projects: Privacy?
+    public let projects: HistoryEnum?
     public let share: Double?
-    public let you: Privacy?
+    public let you: HistoryEnum?
 
     public enum CodingKeys: String, CodingKey {
         case autoKeep = "auto_keep"
@@ -13091,7 +14316,7 @@ public struct MemoryListResultSettings: Codable {
         case you = "you"
     }
 
-    public init(autoKeep: [String]?, history: Privacy?, maxTokens: Int?, minTokens: Int?, projects: Privacy?, share: Double?, you: Privacy?) {
+    public init(autoKeep: [String]?, history: HistoryEnum?, maxTokens: Int?, minTokens: Int?, projects: HistoryEnum?, share: Double?, you: HistoryEnum?) {
         self.autoKeep = autoKeep
         self.history = history
         self.maxTokens = maxTokens
@@ -13107,7 +14332,7 @@ public struct MemoryListResultSettings: Codable {
 /// ``scope`` and ``privacy`` come together, or neither. ``auto_keep`` cannot be set here.
 // MARK: - MemorySettingsParams
 public struct MemorySettingsParams: Codable {
-    public let privacy: Privacy?
+    public let privacy: HistoryEnum?
     public let scope: ParamsScope?
 
     public enum CodingKeys: String, CodingKey {
@@ -13115,7 +14340,7 @@ public struct MemorySettingsParams: Codable {
         case scope = "scope"
     }
 
-    public init(privacy: Privacy?, scope: ParamsScope?) {
+    public init(privacy: HistoryEnum?, scope: ParamsScope?) {
         self.privacy = privacy
         self.scope = scope
     }
@@ -13142,12 +14367,12 @@ public struct MemorySettingsResult: Codable {
 // MARK: - MemorySettingsResultSettings
 public struct MemorySettingsResultSettings: Codable {
     public let autoKeep: [String]?
-    public let history: Privacy?
+    public let history: HistoryEnum?
     public let maxTokens: Int?
     public let minTokens: Int?
-    public let projects: Privacy?
+    public let projects: HistoryEnum?
     public let share: Double?
-    public let you: Privacy?
+    public let you: HistoryEnum?
 
     public enum CodingKeys: String, CodingKey {
         case autoKeep = "auto_keep"
@@ -13159,7 +14384,7 @@ public struct MemorySettingsResultSettings: Codable {
         case you = "you"
     }
 
-    public init(autoKeep: [String]?, history: Privacy?, maxTokens: Int?, minTokens: Int?, projects: Privacy?, share: Double?, you: Privacy?) {
+    public init(autoKeep: [String]?, history: HistoryEnum?, maxTokens: Int?, minTokens: Int?, projects: HistoryEnum?, share: Double?, you: HistoryEnum?) {
         self.autoKeep = autoKeep
         self.history = history
         self.maxTokens = maxTokens
@@ -13178,12 +14403,12 @@ public struct MemorySettingsResultSettings: Codable {
 // MARK: - MemorySettings
 public struct MemorySettings: Codable {
     public let autoKeep: [String]?
-    public let history: Privacy?
+    public let history: HistoryEnum?
     public let maxTokens: Int?
     public let minTokens: Int?
-    public let projects: Privacy?
+    public let projects: HistoryEnum?
     public let share: Double?
-    public let you: Privacy?
+    public let you: HistoryEnum?
 
     public enum CodingKeys: String, CodingKey {
         case autoKeep = "auto_keep"
@@ -13195,7 +14420,7 @@ public struct MemorySettings: Codable {
         case you = "you"
     }
 
-    public init(autoKeep: [String]?, history: Privacy?, maxTokens: Int?, minTokens: Int?, projects: Privacy?, share: Double?, you: Privacy?) {
+    public init(autoKeep: [String]?, history: HistoryEnum?, maxTokens: Int?, minTokens: Int?, projects: HistoryEnum?, share: Double?, you: HistoryEnum?) {
         self.autoKeep = autoKeep
         self.history = history
         self.maxTokens = maxTokens
@@ -13242,7 +14467,7 @@ public struct MemoryUpdateParams: Codable {
     public let always: Bool?
     public let folder: String?
     public let id: String
-    public let privacy: Privacy?
+    public let privacy: HistoryEnum?
     public let text: String?
     public let title: String?
 
@@ -13256,7 +14481,7 @@ public struct MemoryUpdateParams: Codable {
         case title = "title"
     }
 
-    public init(acceptSources: Bool?, always: Bool?, folder: String?, id: String, privacy: Privacy?, text: String?, title: String?) {
+    public init(acceptSources: Bool?, always: Bool?, folder: String?, id: String, privacy: HistoryEnum?, text: String?, title: String?) {
         self.acceptSources = acceptSources
         self.always = always
         self.folder = folder
@@ -13295,7 +14520,7 @@ public struct MemoryUpdateResultItem: Codable {
     public let id: String
     public let keptBy: KeptBy?
     public let lastUsedAt: String?
-    public let privacy: Privacy?
+    public let privacy: HistoryEnum?
     public let scope: ParamsScope
     public let sessionID: String?
     public let sources: [TentacledMemorySource]?
@@ -13328,7 +14553,7 @@ public struct MemoryUpdateResultItem: Codable {
         case uses = "uses"
     }
 
-    public init(agent: String?, always: Bool?, author: Author, callID: String?, createdAt: String, folder: String?, id: String, keptBy: KeptBy?, lastUsedAt: String?, privacy: Privacy?, scope: ParamsScope, sessionID: String?, sources: [TentacledMemorySource]?, state: StateEnum, text: String, title: String, updatedAt: String, usable: Bool?, uses: Int?) {
+    public init(agent: String?, always: Bool?, author: Author, callID: String?, createdAt: String, folder: String?, id: String, keptBy: KeptBy?, lastUsedAt: String?, privacy: HistoryEnum?, scope: ParamsScope, sessionID: String?, sources: [TentacledMemorySource]?, state: StateEnum, text: String, title: String, updatedAt: String, usable: Bool?, uses: Int?) {
         self.agent = agent
         self.always = always
         self.author = author
@@ -13386,7 +14611,7 @@ public struct TentacledMemorySource: Codable {
 public struct MemoryWriteParams: Codable {
     public let always: Bool?
     public let folder: String?
-    public let privacy: Privacy?
+    public let privacy: HistoryEnum?
     public let scope: MemoryWriteParamsScope
     public let sources: [String]?
     public let text: String
@@ -13402,7 +14627,7 @@ public struct MemoryWriteParams: Codable {
         case title = "title"
     }
 
-    public init(always: Bool?, folder: String?, privacy: Privacy?, scope: MemoryWriteParamsScope, sources: [String]?, text: String, title: String?) {
+    public init(always: Bool?, folder: String?, privacy: HistoryEnum?, scope: MemoryWriteParamsScope, sources: [String]?, text: String, title: String?) {
         self.always = always
         self.folder = folder
         self.privacy = privacy
@@ -13446,7 +14671,7 @@ public struct MemoryWriteResultItem: Codable {
     public let id: String
     public let keptBy: KeptBy?
     public let lastUsedAt: String?
-    public let privacy: Privacy?
+    public let privacy: HistoryEnum?
     public let scope: ParamsScope
     public let sessionID: String?
     public let sources: [StickyMemorySource]?
@@ -13479,7 +14704,7 @@ public struct MemoryWriteResultItem: Codable {
         case uses = "uses"
     }
 
-    public init(agent: String?, always: Bool?, author: Author, callID: String?, createdAt: String, folder: String?, id: String, keptBy: KeptBy?, lastUsedAt: String?, privacy: Privacy?, scope: ParamsScope, sessionID: String?, sources: [StickyMemorySource]?, state: StateEnum, text: String, title: String, updatedAt: String, usable: Bool?, uses: Int?) {
+    public init(agent: String?, always: Bool?, author: Author, callID: String?, createdAt: String, folder: String?, id: String, keptBy: KeptBy?, lastUsedAt: String?, privacy: HistoryEnum?, scope: ParamsScope, sessionID: String?, sources: [StickyMemorySource]?, state: StateEnum, text: String, title: String, updatedAt: String, usable: Bool?, uses: Int?) {
         self.agent = agent
         self.always = always
         self.author = author

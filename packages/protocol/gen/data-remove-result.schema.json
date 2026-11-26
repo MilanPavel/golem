@@ -1,0 +1,7 @@
+{
+  "additionalProperties": false,
+  "description": "Empty.",
+  "properties": {},
+  "title": "DataRemoveResult",
+  "type": "object"
+}

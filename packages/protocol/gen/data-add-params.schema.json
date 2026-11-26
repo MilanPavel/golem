@@ -1,0 +1,93 @@
+{
+  "additionalProperties": false,
+  "description": "``data.add``. ``password`` goes to the Keychain and is never written to a file.",
+  "properties": {
+    "kind": {
+      "anyOf": [
+        {
+          "enum": [
+            "builtin",
+            "files",
+            "sqlite",
+            "postgres",
+            "mysql",
+            "url"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Kind"
+    },
+    "location": {
+      "minLength": 1,
+      "title": "Location",
+      "type": "string"
+    },
+    "name": {
+      "minLength": 1,
+      "title": "Name",
+      "type": "string"
+    },
+    "password": {
+      "anyOf": [
+        {
+          "format": "password",
+          "type": "string",
+          "writeOnly": true
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Password"
+    },
+    "privacy": {
+      "enum": [
+        "open",
+        "local",
+        "schema"
+      ],
+      "title": "Privacy",
+      "type": "string"
+    },
+    "scope": {
+      "enum": [
+        "user",
+        "project"
+      ],
+      "title": "Scope",
+      "type": "string"
+    },
+    "session_id": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Session Id"
+    },
+    "watch": {
+      "default": false,
+      "title": "Watch",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "name",
+    "location",
+    "privacy",
+    "scope"
+  ],
+  "title": "DataAddParams",
+  "type": "object"
+}

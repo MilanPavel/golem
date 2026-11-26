@@ -1,0 +1,63 @@
+{
+  "$defs": {
+    "DataChanged": {
+      "additionalProperties": false,
+      "description": "A source or the list changed. List again. ``source`` is null when the list itself changed.",
+      "properties": {
+        "reason": {
+          "enum": [
+            "added",
+            "updated",
+            "removed",
+            "files",
+            "notes",
+            "queries"
+          ],
+          "title": "Reason",
+          "type": "string"
+        },
+        "source": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source"
+        }
+      },
+      "required": [
+        "reason"
+      ],
+      "title": "DataChanged",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Server → every connection: a data source or the list of them changed. Not stored.",
+  "properties": {
+    "jsonrpc": {
+      "const": "2.0",
+      "default": "2.0",
+      "title": "Jsonrpc",
+      "type": "string"
+    },
+    "method": {
+      "const": "data.changed",
+      "default": "data.changed",
+      "title": "Method",
+      "type": "string"
+    },
+    "params": {
+      "$ref": "#/$defs/DataChanged"
+    }
+  },
+  "required": [
+    "params"
+  ],
+  "title": "DataChangedNotification",
+  "type": "object"
+}

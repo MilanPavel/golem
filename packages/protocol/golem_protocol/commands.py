@@ -6381,6 +6381,359 @@ class WorkflowStepEvent(BaseModel):
     finished_at: str | None = None
 
 
+DataPrivacy = Literal["open", "local", "schema"]
+"""What may leave the machine: ``open`` anything, ``local`` local models, ``schema`` names."""
+
+DataSourceKind = Literal["builtin", "files", "sqlite", "postgres", "mysql", "url"]
+DataScope = Literal["builtin", "user", "project"]
+DataSourceStatus = Literal["ready", "reading", "untrusted", "error"]
+DataValue = str | int | float | bool | None
+"""One cell on the wire. Dates and times are ISO strings, decimals are numbers."""
+
+
+class DataColumn(BaseModel):
+    """One column. The stats are null when unknown or hidden."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    name: str = Field(min_length=1)
+    type: str
+    min: str | None = None
+    max: str | None = None
+    distinct: int | None = Field(default=None, ge=0)
+    null_fraction: float | None = Field(default=None, ge=0, le=1)
+
+
+class DataTable(BaseModel):
+    """One table. ``rows`` is null when unknown or hidden."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    name: str = Field(min_length=1)
+    rows: int | None = Field(default=None, ge=0)
+    columns: list[DataColumn] = Field(default_factory=list[DataColumn])
+
+
+class DataSource(BaseModel):
+    """One data source. ``location`` is for display and never holds a password."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    name: str = Field(min_length=1)
+    kind: DataSourceKind
+    scope: DataScope
+    project: str | None = None
+    location: str
+    privacy: DataPrivacy
+    privacy_reason: str | None = None
+    status: DataSourceStatus
+    error: str | None = None
+    tables: int | None = Field(default=None, ge=0)
+    rows: int | None = Field(default=None, ge=0)
+    watch: bool = False
+    notes_path: str | None = None
+
+
+class DataSavedQuery(BaseModel):
+    """A query saved with a source."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    name: str = Field(min_length=1)
+    sql: str
+    description: str | None = None
+    last_run_at: str | None = None
+
+
+class DataResult(BaseModel):
+    """Rows of a query, or one page of them. ``total_rows`` is null while unknown."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    result_id: str = Field(min_length=1)
+    source: str
+    columns: list[DataColumn]
+    rows: list[list[DataValue]]
+    total_rows: int | None = Field(default=None, ge=0)
+    truncated: bool = False
+    elapsed_ms: int = Field(ge=0)
+
+
+class DataListParams(BaseModel):
+    """``data.list``. Every source the user can see."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    session_id: str | None = Field(default=None, min_length=1)
+
+
+class DataListResult(BaseModel):
+    """The sources."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    sources: list[DataSource]
+
+
+class DataInspectParams(BaseModel):
+    """``data.inspect``. Look at a location before it is added."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    location: str = Field(min_length=1)
+    session_id: str | None = Field(default=None, min_length=1)
+
+
+class DataInspectResult(BaseModel):
+    """What a location holds. ``notes`` are plain-language guesses. ``sample``: 20 rows a table."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    kind: DataSourceKind
+    files: int | None = Field(default=None, ge=0)
+    tables: list[DataTable]
+    sample: dict[str, list[list[DataValue]]]
+    suggested_name: str
+    suggested_privacy: DataPrivacy
+    privacy_reason: str | None = None
+    notes: list[str] = Field(default_factory=list[str])
+
+
+class DataAddParams(BaseModel):
+    """``data.add``. ``password`` goes to the Keychain and is never written to a file."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    name: str = Field(min_length=1)
+    location: str = Field(min_length=1)
+    kind: DataSourceKind | None = None
+    privacy: DataPrivacy
+    scope: Literal["user", "project"]
+    watch: bool = False
+    password: SecretStr | None = None
+    session_id: str | None = Field(default=None, min_length=1)
+
+
+class DataAddResult(BaseModel):
+    """The new source."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    source: DataSource
+
+
+class DataUpdateParams(BaseModel):
+    """``data.update``. Only the fields that are set change."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    name: str = Field(min_length=1)
+    privacy: DataPrivacy | None = None
+    watch: bool | None = None
+    include: list[str] | None = None
+    exclude: list[str] | None = None
+    session_id: str | None = Field(default=None, min_length=1)
+
+
+class DataUpdateResult(BaseModel):
+    """The source after the change."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    source: DataSource
+
+
+class DataRemoveParams(BaseModel):
+    """``data.remove``."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    name: str = Field(min_length=1)
+    session_id: str | None = Field(default=None, min_length=1)
+
+
+class DataRemoveResult(BaseModel):
+    """Empty."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+
+class DataDescribeParams(BaseModel):
+    """``data.describe``. A source, or one table of it."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    source: str = Field(min_length=1)
+    table: str | None = Field(default=None, min_length=1)
+    session_id: str | None = Field(default=None, min_length=1)
+
+
+class DataDescribeResult(BaseModel):
+    """The source with its tables, a sample, its notes and saved queries."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    source: DataSource
+    tables: list[DataTable]
+    sample: dict[str, list[list[DataValue]]]
+    notes: str | None = None
+    queries: list[DataSavedQuery] = Field(default_factory=list[DataSavedQuery])
+
+
+class DataQueryParams(BaseModel):
+    """``data.query``. Run SQL on one source."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    source: str = Field(min_length=1)
+    sql: str = Field(min_length=1)
+    limit: int | None = Field(default=None, ge=1)
+    session_id: str | None = Field(default=None, min_length=1)
+
+
+class DataResultPageParams(BaseModel):
+    """``data.result.page``. One page of a kept result, sorted if asked."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    result_id: str = Field(min_length=1)
+    offset: int = Field(default=0, ge=0)
+    limit: int = Field(default=200, ge=1, le=1000)
+    sort_column: str | None = None
+    sort_desc: bool = False
+
+
+class DataExportParams(BaseModel):
+    """``data.export``. Write a kept result to a file."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    result_id: str = Field(min_length=1)
+    path: str = Field(min_length=1)
+    format: Literal["csv", "parquet", "json", "xlsx"]
+
+
+class DataExportResult(BaseModel):
+    """The file written."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    path: str
+    rows: int = Field(ge=0)
+
+
+class DataCancelParams(BaseModel):
+    """``data.cancel``. Stop a query that is still running."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    result_id: str = Field(min_length=1)
+
+
+class DataCancelResult(BaseModel):
+    """Empty."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+
+class DataNotesGetParams(BaseModel):
+    """``data.notes.get``."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    source: str = Field(min_length=1)
+    session_id: str | None = Field(default=None, min_length=1)
+
+
+class DataNotesGetResult(BaseModel):
+    """The notes, null when there are none."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    text: str | None = None
+    path: str | None = None
+
+
+class DataNotesSetParams(BaseModel):
+    """``data.notes.set``."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    source: str = Field(min_length=1)
+    text: str
+    session_id: str | None = Field(default=None, min_length=1)
+
+
+class DataNotesSetResult(BaseModel):
+    """Where the notes were saved."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    path: str
+
+
+class DataNotesDraftParams(BaseModel):
+    """``data.notes.draft``. Ask for a proposal."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    source: str = Field(min_length=1)
+    session_id: str | None = Field(default=None, min_length=1)
+
+
+class DataNotesDraftResult(BaseModel):
+    """A proposal. It is not saved."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    text: str
+
+
+class DataQueriesSaveParams(BaseModel):
+    """``data.queries.save``."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    source: str = Field(min_length=1)
+    name: str = Field(min_length=1)
+    sql: str = Field(min_length=1)
+    description: str | None = None
+    session_id: str | None = Field(default=None, min_length=1)
+
+
+class DataQueriesSaveResult(BaseModel):
+    """The saved query."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    query: DataSavedQuery
+
+
+class DataQueriesRemoveParams(BaseModel):
+    """``data.queries.remove``."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    source: str = Field(min_length=1)
+    name: str = Field(min_length=1)
+    session_id: str | None = Field(default=None, min_length=1)
+
+
+class DataQueriesRemoveResult(BaseModel):
+    """Empty."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+
+class DataChanged(BaseModel):
+    """A source or the list changed. List again. ``source`` is null when the list itself changed."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    source: str | None = None
+    reason: Literal["added", "updated", "removed", "files", "notes", "queries"]
+
+
 __all__ = [
     "AgentInfo",
     "AgentLimitKey",
@@ -6461,6 +6814,45 @@ __all__ = [
     "CostRoleRow",
     "CostTotals",
     "DaemonStatus",
+    "DataAddParams",
+    "DataAddResult",
+    "DataCancelParams",
+    "DataCancelResult",
+    "DataChanged",
+    "DataColumn",
+    "DataDescribeParams",
+    "DataDescribeResult",
+    "DataExportParams",
+    "DataExportResult",
+    "DataInspectParams",
+    "DataInspectResult",
+    "DataListParams",
+    "DataListResult",
+    "DataNotesDraftParams",
+    "DataNotesDraftResult",
+    "DataNotesGetParams",
+    "DataNotesGetResult",
+    "DataNotesSetParams",
+    "DataNotesSetResult",
+    "DataPrivacy",
+    "DataQueriesRemoveParams",
+    "DataQueriesRemoveResult",
+    "DataQueriesSaveParams",
+    "DataQueriesSaveResult",
+    "DataQueryParams",
+    "DataRemoveParams",
+    "DataRemoveResult",
+    "DataResult",
+    "DataResultPageParams",
+    "DataSavedQuery",
+    "DataScope",
+    "DataSource",
+    "DataSourceKind",
+    "DataSourceStatus",
+    "DataTable",
+    "DataUpdateParams",
+    "DataUpdateResult",
+    "DataValue",
     "DeviceChanged",
     "DeviceId",
     "DeviceInfo",

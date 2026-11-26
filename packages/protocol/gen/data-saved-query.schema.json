@@ -1,0 +1,45 @@
+{
+  "additionalProperties": false,
+  "description": "A query saved with a source.",
+  "properties": {
+    "description": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Description"
+    },
+    "last_run_at": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Last Run At"
+    },
+    "name": {
+      "minLength": 1,
+      "title": "Name",
+      "type": "string"
+    },
+    "sql": {
+      "title": "Sql",
+      "type": "string"
+    }
+  },
+  "required": [
+    "name",
+    "sql"
+  ],
+  "title": "DataSavedQuery",
+  "type": "object"
+}

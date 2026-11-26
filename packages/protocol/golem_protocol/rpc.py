@@ -6,6 +6,7 @@ from pydantic import BaseModel, BeforeValidator, ConfigDict, Field
 
 from golem_protocol.commands import (
     AgentRegistryChanged,
+    DataChanged,
     DeviceChanged,
     DevicePairChanged,
     EvalEnded,
@@ -314,6 +315,16 @@ class MemoryChangedNotification(BaseModel):
     params: MemoryChanged
 
 
+class DataChangedNotification(BaseModel):
+    """Server → every connection: a data source or the list of them changed. Not stored."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    jsonrpc: Literal["2.0"] = "2.0"
+    method: Literal["data.changed"] = "data.changed"
+    params: DataChanged
+
+
 class EvalStartedNotification(BaseModel):
     """Server → every connection: a measurement of the helper rules began. Not stored."""
 
@@ -482,6 +493,7 @@ class WorkflowStepInDoubtNotification(BaseModel):
 
 __all__ = [
     "AgentRegistryChangedNotification",
+    "DataChangedNotification",
     "DeviceChangedNotification",
     "DevicePairChangedNotification",
     "EvalEndedNotification",

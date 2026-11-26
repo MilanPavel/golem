@@ -1,0 +1,29 @@
+{
+  "additionalProperties": false,
+  "description": "``data.inspect``. Look at a location before it is added.",
+  "properties": {
+    "location": {
+      "minLength": 1,
+      "title": "Location",
+      "type": "string"
+    },
+    "session_id": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Session Id"
+    }
+  },
+  "required": [
+    "location"
+  ],
+  "title": "DataInspectParams",
+  "type": "object"
+}

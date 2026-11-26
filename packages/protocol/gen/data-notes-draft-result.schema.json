@@ -1,0 +1,15 @@
+{
+  "additionalProperties": false,
+  "description": "A proposal. It is not saved.",
+  "properties": {
+    "text": {
+      "title": "Text",
+      "type": "string"
+    }
+  },
+  "required": [
+    "text"
+  ],
+  "title": "DataNotesDraftResult",
+  "type": "object"
+}

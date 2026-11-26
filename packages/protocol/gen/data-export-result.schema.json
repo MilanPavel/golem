@@ -1,0 +1,21 @@
+{
+  "additionalProperties": false,
+  "description": "The file written.",
+  "properties": {
+    "path": {
+      "title": "Path",
+      "type": "string"
+    },
+    "rows": {
+      "minimum": 0,
+      "title": "Rows",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "path",
+    "rows"
+  ],
+  "title": "DataExportResult",
+  "type": "object"
+}
