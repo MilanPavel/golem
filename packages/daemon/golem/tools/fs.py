@@ -8,6 +8,8 @@ thread so a large folder does not stall the event loop.
 from __future__ import annotations
 
 import asyncio
+import base64
+import binascii
 import os
 import re
 from collections.abc import Iterator
@@ -16,7 +18,14 @@ from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from golem.tools.paths import Readable, in_secret_dir, is_secret_tree, readable, secret_folders
+from golem.tools.paths import (
+    Readable,
+    in_secret_dir,
+    is_secret_tree,
+    readable,
+    secret_folders,
+    session_root,
+)
 from golem.tools.registry import Tool, ToolContext, ToolError, ToolResult
 
 SKIPPED_DIRS = frozenset(
@@ -97,11 +106,50 @@ async def _list_dir(args: ListDirArgs, ctx: ToolContext) -> ToolResult:
 
 
 async def _glob(args: GlobArgs, ctx: ToolContext) -> ToolResult:
-    return await asyncio.to_thread(glob_files, readable(ctx), args)
+    where = readable(ctx)
+    ignored = await _git_ignored(ctx, where.resolve(args.path))
+    return await asyncio.to_thread(glob_files, where, args, ignored)
 
 
 async def _grep(args: GrepArgs, ctx: ToolContext) -> ToolResult:
-    return await asyncio.to_thread(grep, readable(ctx), args)
+    where = readable(ctx)
+    ignored = await _git_ignored(ctx, where.resolve(args.path))
+    return await asyncio.to_thread(grep, where, args, ignored)
+
+
+# Untracked files git ignores under the folder in "$1", ignored folders collapsed to one entry.
+# Base64 keeps every file name intact; the final ``E`` shows git finished (it is absent outside
+# a checkout).
+_IGNORED = (
+    '{ git -C "$1" ls-files -z --others --ignored --exclude-standard --directory '
+    '&& printf E; } | base64 | tr -d "\\n"'
+)
+
+
+async def _git_ignored(ctx: ToolContext, base: Path) -> frozenset[str] | None:
+    """What git ignores under ``base``, as paths relative to it (a folder ends in ``/``).
+
+    None outside a git checkout, or when git cannot run: the caller then walks everything.
+    """
+    from golem.tools import sandbox, shell  # shell imports this module through coding
+
+    if not base.is_dir() or not sandbox.available():
+        return None
+    try:
+        run = shell.git_runner(ctx, session_root(ctx))
+        output = await run(_IGNORED, (str(base),))
+    except ToolError:
+        return None
+    if not output:
+        return None
+    try:
+        raw = base64.b64decode(output.strip(), validate=True)
+    except (binascii.Error, ValueError):
+        return None
+    if not raw.endswith(b"E"):
+        return None
+    names = raw[:-1].decode("utf-8", errors="replace").split("\0")
+    return frozenset(name for name in names if name)
 
 
 def read_file(where: Readable, args: ReadFileArgs) -> ToolResult:
@@ -145,14 +193,16 @@ def list_dir(where: Readable, args: ListDirArgs) -> ToolResult:
     return ToolResult(output=output, summary=_count(len(names), "entry", "entries"))
 
 
-def glob_files(where: Readable, args: GlobArgs) -> ToolResult:
+def glob_files(
+    where: Readable, args: GlobArgs, ignored: frozenset[str] | None = None
+) -> ToolResult:
     base = where.resolve(args.path)
     if not base.is_dir():
         raise ToolError(f"{args.path} is not a folder")
     if Path(args.pattern).is_absolute() or ".." in Path(args.pattern).parts:
         raise ToolError("the pattern must be relative and stay under path")
     found: list[str] = []
-    for match in sorted(base.glob(args.pattern)):
+    for match in _glob_matches(base, args.pattern, ignored):
         if not match.is_file() or in_skipped_dir(match.relative_to(base)):
             continue
         try:
@@ -169,7 +219,46 @@ def glob_files(where: Readable, args: GlobArgs) -> ToolResult:
     return ToolResult(output=output, summary=_count(len(shown), "file"))
 
 
-def grep(where: Readable, args: GrepArgs) -> ToolResult:
+def _glob_matches(base: Path, pattern: str, ignored: frozenset[str] | None) -> Iterator[Path]:
+    """Paths under ``base`` that match ``pattern``, never walking into what git ignores."""
+    if not ignored:
+        yield from sorted(base.glob(pattern))
+        return
+    regex = _glob_regex(pattern)
+    for path in walk_files(base, ignored=ignored):
+        if regex.fullmatch(path.relative_to(base).as_posix()):
+            yield path
+
+
+def _glob_regex(pattern: str) -> re.Pattern[str]:
+    """``pattern`` as a regex: ``**/`` is any folders, ``*`` and ``?`` stay in one name."""
+    out: list[str] = []
+    i = 0
+    while i < len(pattern):
+        if pattern.startswith("**/", i):
+            out.append("(?:.*/)?")
+            i += 3
+        elif pattern.startswith("**", i):
+            out.append(".*")
+            i += 2
+        elif pattern[i] == "*":
+            out.append("[^/]*")
+            i += 1
+        elif pattern[i] == "?":
+            out.append("[^/]")
+            i += 1
+        elif pattern[i] == "[" and (end := pattern.find("]", i + 2)) != -1:
+            body = pattern[i + 1 : end]
+            body = "^" + body[1:] if body[:1] == "!" else body
+            out.append("[" + body.replace("\\", "\\\\") + "]")
+            i = end + 1
+        else:
+            out.append(re.escape(pattern[i]))
+            i += 1
+    return re.compile("".join(out))
+
+
+def grep(where: Readable, args: GrepArgs, ignored: frozenset[str] | None = None) -> ToolResult:
     base = where.resolve(args.path)
     try:
         regex = re.compile(args.pattern, re.IGNORECASE if args.ignore_case else 0)
@@ -178,7 +267,7 @@ def grep(where: Readable, args: GrepArgs) -> ToolResult:
     if base.is_file():
         files: Iterator[Path] = iter([base])
     elif base.is_dir():
-        files = walk_files(base, where.home)
+        files = walk_files(base, where.home, ignored=ignored)
     else:
         raise ToolError(f"{args.path} does not exist")
     matches: list[str] = []
@@ -222,23 +311,34 @@ def _grep_file(where: Readable, path: Path, regex: re.Pattern[str]) -> list[str]
     return hits
 
 
-def walk_files(base: Path, home: Path | None = None, *, hidden: bool = True) -> Iterator[Path]:
+def walk_files(
+    base: Path,
+    home: Path | None = None,
+    *,
+    hidden: bool = True,
+    ignored: frozenset[str] | None = None,
+) -> Iterator[Path]:
     """Files under ``base``, less :data:`SKIPPED_DIRS` and the credentials folders of ``home``.
 
-    With ``hidden`` false, dot folders and dot files are left out too.
+    With ``hidden`` false, dot folders and dot files are left out too. ``ignored`` is what git
+    ignores under ``base`` (see ``_git_ignored``); those files and folders are left out as well.
     """
     secret = secret_folders(home)
     for folder, dirs, names in os.walk(base):
         here = Path(folder)
+        prefix = "" if here == base else here.relative_to(base).as_posix() + "/"
         dirs[:] = sorted(
             name
             for name in dirs
             if name not in SKIPPED_DIRS
             and (hidden or not name.startswith("."))
+            and not (ignored and f"{prefix}{name}/" in ignored)
             and not is_secret_tree((here / name).resolve(), home, secret)
         )
         for name in sorted(names):
             if not hidden and name.startswith("."):
+                continue
+            if ignored and f"{prefix}{name}" in ignored:
                 continue
             path = here / name
             if not in_secret_dir(path, home, secret):

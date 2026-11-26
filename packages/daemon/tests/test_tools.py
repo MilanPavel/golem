@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+import subprocess
 from pathlib import Path
 
 import pytest
 
-from golem.tools import default_registry
+from golem.tools import default_registry, sandbox
 from golem.tools.fs import ReadFileArgs
 from golem.tools.paths import NO_FOLDER, inside
 from golem.tools.registry import (
@@ -172,3 +173,45 @@ async def test_an_empty_path_is_the_project_folder(project: Path) -> None:
     assert listed.summary == "3 entries"
     found = await _call(project, "grep", pattern="hello", path="")
     assert found.summary == "2 matches in 2 files"
+
+
+needs_sandbox = pytest.mark.skipif(not sandbox.available(), reason="needs macOS sandbox-exec")
+
+
+def _git_project(tmp_path: Path) -> Path:
+    root = tmp_path / "repo"
+    root.mkdir()
+    subprocess.run(["git", "init", "-q"], cwd=root, check=True)
+    (root / ".gitignore").write_text("ignored_dir/\n*.log\n", encoding="utf-8")
+    (root / ".git" / "info" / "exclude").write_text("worktrees/\n", encoding="utf-8")
+    for name in ("kept.py", "ignored_dir/a.py", "worktrees/copy/a.py", "new.py", "x.log"):
+        (root / name).parent.mkdir(parents=True, exist_ok=True)
+        (root / name).write_text("needle\n", encoding="utf-8")
+    subprocess.run(["git", "add", "kept.py", ".gitignore"], cwd=root, check=True)
+    return root
+
+
+@needs_sandbox
+async def test_grep_and_glob_skip_what_git_ignores(tmp_path: Path) -> None:
+    root = _git_project(tmp_path)
+    found = await _call(root, "grep", pattern="needle")
+    assert found.output.splitlines() == ["kept.py:1: needle", "new.py:1: needle"]
+    listed = await _call(root, "glob", pattern="**/*.py")
+    assert listed.output.splitlines() == ["kept.py", "new.py"]
+
+
+@needs_sandbox
+async def test_an_untracked_file_git_does_not_ignore_is_found(tmp_path: Path) -> None:
+    root = _git_project(tmp_path)
+    result = await _call(root, "grep", pattern="needle", include="new.py")
+    assert result.output == "new.py:1: needle"
+
+
+async def test_a_folder_that_is_not_a_checkout_is_walked_as_before(tmp_path: Path) -> None:
+    root = tmp_path / "plain"
+    (root / "worktrees").mkdir(parents=True)
+    (root / ".gitignore").write_text("worktrees/\n", encoding="utf-8")
+    (root / "worktrees" / "a.py").write_text("needle\n", encoding="utf-8")
+    result = await _call(root, "grep", pattern="needle")
+    assert result.output == "worktrees/a.py:1: needle"
+    assert (await _call(root, "glob", pattern="**/*.py")).output == "worktrees/a.py"
