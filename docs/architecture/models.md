@@ -119,6 +119,7 @@ For contributors: the reference for the router, keys, the local server, download
 |---|---|
 | `provider/<name>` | A model provider's key, stored with the provider name alone as the account |
 | `mcp/<server>` | An MCP server's token |
+| `data/<source>` | A database source's password |
 | `hook/<name>` | A hook endpoint's token |
 
 A setting that needs a secret names it as `keychain:<name>` and the daemon resolves it when it uses it.

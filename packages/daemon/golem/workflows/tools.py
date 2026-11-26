@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal
 
+from golem.data.sources import DataSources
 from golem.permissions.policy import Policy, explain
 from golem.tools.registry import Artifacts, ToolContext, ToolError, ToolRegistry, ToolScope
 from golem.workflow import WorkflowError, idempotency_key
@@ -34,11 +35,17 @@ class ToolVerdict:
 
 class WorkflowTools:
     def __init__(
-        self, *, registry: ToolRegistry, policy: Policy, artifacts: Artifacts | None = None
+        self,
+        *,
+        registry: ToolRegistry,
+        policy: Policy,
+        artifacts: Artifacts | None = None,
+        data: DataSources | None = None,
     ) -> None:
         self._registry = registry
         self._policy = policy
         self._artifacts = artifacts
+        self._data = data
 
     async def _view(self, cwd: str | None) -> tuple[ToolRegistry, Path | None]:
         root = None if cwd is None else Path(cwd)
@@ -82,6 +89,7 @@ class WorkflowTools:
             web=self._policy.web(),
             session_id=session_id,
             artifacts=self._artifacts,
+            data=None if self._data is None else self._data.access(root),
         )
         try:
             result = await view.call(name, given, ctx)

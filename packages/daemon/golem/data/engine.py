@@ -43,6 +43,8 @@ _READERS = {
     "json": "read_json({files}, filename=true)",
 }
 _WILDCARDS = re.compile(r"[*?\[]")
+_TABLE_NAME = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
+_COLUMN_TYPES = frozenset({"VARCHAR", "BIGINT", "DOUBLE", "BOOLEAN", "DATE", "TIMESTAMP"})
 _NO_SQLITE = (
     "SQLite files need a one-time download of DuckDB's sqlite extension. "
     "golem could not reach extensions.duckdb.org."
@@ -145,6 +147,38 @@ class Source:
         ]
         return {"table": table, "rows": int(count[0]) if count else 0, "columns": columns}
 
+    def load_table(
+        self, table: str, columns: list[dict[str, str]], rows: list[list[Any]], replace: bool
+    ) -> int:
+        """Put ``rows`` in an in-memory table of a ``builtin`` source. Only the daemon calls this.
+
+        ``replace`` drops the table first, so a reload starts clean and a later batch of the same
+        load (``replace`` false) adds to it. Returns the number of rows in the table.
+        """
+        if self.spec.kind != "builtin":
+            raise DataError("Only the built-in source takes rows from the daemon.")
+        if not _TABLE_NAME.match(table):
+            raise DataError(f"{table!r} is not a table name.")
+        if not columns:
+            raise DataError("A table needs at least one column.")
+        definitions: list[str] = []
+        for column in columns:
+            name, kind = str(column.get("name", "")), str(column.get("type", "")).upper()
+            if not _TABLE_NAME.match(name) or kind not in _COLUMN_TYPES:
+                raise DataError(f"{name!r} {kind} is not a column golem can load.")
+            definitions.append(f"{_ident(name)} {kind}")
+        con = self._connection
+        marks = ", ".join("?" for _ in columns)
+        try:
+            if replace:
+                con.execute(f"create or replace table {_ident(table)} ({', '.join(definitions)})")
+            if rows:
+                con.executemany(f"insert into {_ident(table)} values ({marks})", rows)
+            count = con.execute(f"select count(*) from {_ident(table)}").fetchone()
+        except duckdb.Error as exc:
+            raise DataError(f"Cannot load {table}: {_message(exc)}") from exc
+        return int(count[0]) if count else 0
+
     def query(self, sql: str, limit: int, cursor: Any | None = None) -> dict[str, Any]:
         reason = guard.refusal(sql)
         if reason is not None:
@@ -187,7 +221,12 @@ class Source:
             limits.temp_dir.mkdir(parents=True, exist_ok=True)
             con.execute("set temp_directory = ?", [str(limits.temp_dir)])
         spec = self.spec
-        allowed = self._files(spec) if spec.kind == "files" else self._database(spec, limits)
+        if spec.kind == "files":
+            allowed = self._files(spec)
+        elif spec.kind == "builtin":
+            allowed = []
+        else:
+            allowed = self._database(spec, limits)
         con.execute("set allowed_paths = ?", [allowed])
         con.execute("set enable_external_access = false")
         con.execute("set lock_configuration = true")

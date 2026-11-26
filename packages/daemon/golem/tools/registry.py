@@ -17,6 +17,7 @@ import httpx
 from pydantic import BaseModel, ValidationError
 
 from golem.config import PERMISSION_MODES, PermissionMode, ShellSettings, WebSettings
+from golem.data.sources import DataAccess
 from golem.memory.privacy import Target
 from golem.memory.service import MemoryAccess
 from golem.skills.registry import SkillView
@@ -102,6 +103,8 @@ class ToolContext:
     """What the run may use of memory, for ``recall`` and ``remember``. None: memory is off."""
     memory_target: Target | None = None
     """The model of this call, for the privacy check of ``recall``."""
+    data: DataAccess | None = None
+    """The data sources of the session's folder, for the ``data_*`` tools. None: not available."""
 
 
 @dataclass(frozen=True, slots=True)

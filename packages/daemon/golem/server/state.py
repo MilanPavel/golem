@@ -12,6 +12,7 @@ from pydantic import BaseModel
 
 from golem.agents.registry import AgentRegistry
 from golem.coding.changes import ChangeStore
+from golem.data.sources import DataSources
 from golem.evals.job import EvalJobs
 from golem.mcp import McpSupervisor
 from golem.mcp.importer import ScanStore
@@ -94,6 +95,8 @@ class DaemonState:
     """Counts of helpers per agent type. None until the database is open."""
     memory: MemoryService | None = None
     """The memory service. None when ``[memory] enabled = false``."""
+    data: DataSources | None = None
+    """The data sources and the worker that opens them. None until the daemon serves."""
     local_servers: LocalServers | None = None
     apply_ollama: Callable[[], None] = field(default=lambda: None)
     """Hands the saved ``[ollama]`` table to the server manager and the call dispatcher."""

@@ -15,6 +15,19 @@
       "default": null,
       "title": "Limit"
     },
+    "result_id": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Result Id"
+    },
     "session_id": {
       "anyOf": [
         {

@@ -77,6 +77,9 @@ from langgraph.checkpoint.memory import InMemorySaver
 from golem.agents.bundled import bundled_agents_dir
 from golem.agents.registry import AgentRegistry
 from golem.config import AgentSettings, DelegateSettings, GolemSettings, ModelPrice
+from golem.data.client import DataWorker
+from golem.data.section import data_section
+from golem.data.sources import DataSources
 from golem.graphs.chat import open_chat
 from golem.graphs.delegate_prompt import delegate_prompt, prices_of
 from golem.graphs.prompt import SystemPrompt
@@ -85,6 +88,7 @@ from golem.models.hardware import OVERHEAD_GB, Fit, fit, kv_gb, total_ram_gb
 from golem.models.router import PRESETS, ModelRouter
 from golem.models.tiers import Tier, blended
 from golem.models.window import ContextWindow
+from golem.paths import GolemPaths
 from golem.permissions.policy import Policy
 from golem.sessions.bus import EventBus
 from golem.sessions.log import SessionLog
@@ -657,6 +661,7 @@ class ScriptedDriver:
             return found.tier if found is not None else arm.tier
 
         started = time.monotonic()
+        data = DataSources(DataWorker(settings.data, GolemPaths(home)), GolemPaths(home))
         async with Database.open(scratch / "golem.db") as database:
             runtime = open_chat(
                 router,
@@ -665,6 +670,7 @@ class ScriptedDriver:
                 Policy(config, home=home),
                 prompt=SystemPrompt(
                     sections=(
+                        data_section(data),
                         delegate_prompt(
                             lambda root: agents.view(root).usable(),
                             writes,
@@ -678,6 +684,7 @@ class ScriptedDriver:
                 helper_prices=lambda _profile: prices,
                 budget_refs=lambda: [m.ref for m in listed if m.tier == "budget"],
             )
+            runtime.data = data
             events = EventLog(database)
             runs = RunRecords(database)
             records = SessionRecords(database)
@@ -700,6 +707,7 @@ class ScriptedDriver:
             seconds = time.monotonic() - started
             log = await events.for_run(run_id)
             plain = [json.loads(e.model_dump_json()) for e in log]
+        await data.close()
         return measure(plain, arm, ask, mode, seconds, end)
 
 

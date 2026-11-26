@@ -6390,7 +6390,7 @@ class WorkflowStepEvent(BaseModel):
 DataPrivacy = Literal["open", "local", "schema"]
 """What may leave the machine: ``open`` anything, ``local`` local models, ``schema`` names."""
 
-DataSourceKind = Literal["builtin", "files", "sqlite", "postgres", "mysql", "url"]
+DataSourceKind = Literal["builtin", "files", "sqlite", "duckdb", "postgres", "mysql", "url"]
 DataScope = Literal["builtin", "user", "project"]
 DataSourceStatus = Literal["ready", "reading", "untrusted", "error"]
 DataValue = str | int | float | bool | None
@@ -6594,6 +6594,8 @@ class DataQueryParams(BaseModel):
     source: str = Field(min_length=1)
     sql: str = Field(min_length=1)
     limit: int | None = Field(default=None, ge=1)
+    result_id: str | None = Field(default=None, min_length=1)
+    """An id the client picks, so it can ``data.cancel`` the query by it. None: the daemon picks."""
     session_id: str | None = Field(default=None, min_length=1)
 
 

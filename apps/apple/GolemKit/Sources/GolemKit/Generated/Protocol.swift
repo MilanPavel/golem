@@ -4626,6 +4626,7 @@ public struct DataAddParams: Codable {
 
 public enum KindEnum: String, Codable {
     case builtin = "builtin"
+    case duckdb = "duckdb"
     case files = "files"
     case mysql = "mysql"
     case postgres = "postgres"
@@ -5468,19 +5469,22 @@ public struct DataQueriesSaveResultQuery: Codable {
 // MARK: - DataQueryParams
 public struct DataQueryParams: Codable {
     public let limit: Int?
+    public let resultID: String?
     public let sessionID: String?
     public let source: String
     public let sql: String
 
     public enum CodingKeys: String, CodingKey {
         case limit = "limit"
+        case resultID = "result_id"
         case sessionID = "session_id"
         case source = "source"
         case sql = "sql"
     }
 
-    public init(limit: Int?, sessionID: String?, source: String, sql: String) {
+    public init(limit: Int?, resultID: String?, sessionID: String?, source: String, sql: String) {
         self.limit = limit
+        self.resultID = resultID
         self.sessionID = sessionID
         self.source = source
         self.sql = sql

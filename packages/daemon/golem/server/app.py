@@ -19,6 +19,9 @@ from golem.agents.bundled import bundled_agents_dir
 from golem.agents.registry import AgentRegistry
 from golem.coding.changes import ChangeStore
 from golem.config import DelegateSettings, MemorySettings, ModelPrice, load_settings
+from golem.data.client import DataWorker
+from golem.data.section import data_section
+from golem.data.sources import DataSources
 from golem.evals.job import EvalJobs, EvalParts
 from golem.graphs.chat import ChatRuntime, open_chat
 from golem.graphs.cite_prompt import CITE_PROMPT
@@ -339,6 +342,10 @@ class DaemonApp:
                 self.state.memory = memory
                 self.state.policy = policy
                 self.state.tools = default_registry(mcp, policy.web())
+                data = DataSources(
+                    DataWorker(settings.data, self.paths), self.paths, trusted=policy.trusted
+                )
+                self.state.data = data
                 self.state.artifacts = ArtifactStore(database)
                 self.state.changes = ChangeStore(database, BlobStore(database))
                 usage = Usage(database)
@@ -400,6 +407,7 @@ class DaemonApp:
                             pinned_section(self.state.skills),
                             index_section(self.state.skills),
                             memory_section(),
+                            data_section(data),
                             mcp_section(mcp),
                             delegate_prompt(
                                 lambda root: (
@@ -477,6 +485,7 @@ class DaemonApp:
                         registry=self.state.tools,
                         policy=policy,
                         artifacts=self.state.artifacts,
+                        data=data,
                     ),
                     agents=WorkflowAgents(
                         sessions=sessions,
@@ -526,6 +535,7 @@ class DaemonApp:
 
                 chat.enable_mcp = enable_mcp
                 chat.skills = self.state.skills
+                chat.data = data
                 chat.changes = self.state.changes
                 if self._pulls is None:
                     pulls = PullManager(router, ram_gb=models.ram_gb)
@@ -623,6 +633,9 @@ class DaemonApp:
             if self.state.mcp is not None:
                 await self.state.mcp.aclose()
             self.state.mcp = None
+            if self.state.data is not None:
+                await self.state.data.close()
+            self.state.data = None
             if self.state.skills is not None:
                 await self.state.skills.aclose()
             self.state.skills = None

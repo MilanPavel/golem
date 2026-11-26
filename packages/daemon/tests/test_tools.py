@@ -159,6 +159,9 @@ def test_schemas_use_the_function_format() -> None:
         "delegate",
         "todo_write",
         "load_skill",
+        "data_sources",
+        "data_describe",
+        "data_query",
     ]
     first = schemas[0]["function"]  # type: ignore[index]
     assert first["parameters"]["required"] == ["path"]  # type: ignore[index]
