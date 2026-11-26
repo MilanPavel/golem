@@ -116,6 +116,9 @@ COST_FACTOR = 1.5
 """A helper run may cost this many times the run that folds and still count as a win."""
 QUALITY_MARGIN = 0.05
 """Quality must be this much higher (of 1.0) for a run to beat another on quality."""
+WORK_WINDOW = DelegateSettings().work_window
+"""The working window the shares of a run are of (the default of ``work_window``)."""
+
 LEFT_MARGIN = 0.10
 """The window left (share of the window) must be this much more for a run to beat another."""
 WIN_RATE = 0.6
@@ -408,8 +411,9 @@ class Run:
 
     @property
     def read_share(self) -> float:
-        """The job's reading as a share of the lead's window: what the thresholds compare."""
-        return self.read_tokens / self.window if self.window else 0.0
+        """The job's reading as a share of the working window: what the thresholds compare."""
+        work = min(self.window, WORK_WINDOW) if WORK_WINDOW > 0 else self.window
+        return self.read_tokens / work if work else 0.0
 
     @property
     def lead_price(self) -> float | None:

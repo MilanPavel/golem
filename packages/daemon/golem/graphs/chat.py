@@ -60,7 +60,7 @@ from golem.graphs.context_view import (
     view,
 )
 from golem.graphs.data_stub import stub_local_rows
-from golem.graphs.delegate_policy import JobEstimate, Prices, should_delegate
+from golem.graphs.delegate_policy import JobEstimate, Prices, should_delegate, working_window
 from golem.graphs.estimate import TokenRatios
 from golem.graphs.fit import Fitted, fit_prompt, num_predict_of, prompt_estimate, reply_reserve
 from golem.graphs.memory_stub import stub_local_notes
@@ -1485,7 +1485,7 @@ def _may_nudge(state: AgentState, config: RunnableConfig, rt: ChatRuntime | None
 
 
 FILL_NUDGE = (
-    "Your window is {percent}% full ({used} of {window} tokens), past the {share}% in "
+    "Your{working} window is {percent}% full ({used} of {window} tokens), past the {share}% in "
     "[agents.delegate] fill_share. Hand the rest of the reading to a helper: call `delegate` "
     "with agent `explorer` and a brief that says what to find and where to look. It reads in "
     "its own window and returns the paths and lines that matter; keep the answer here."
@@ -1539,10 +1539,12 @@ def _fill_note(
     )
     if decision.reason != "window" or not rt.reader_ready(_cwd(config)):
         return None
+    work = working_window(window, share)
     return FILL_NUDGE.format(
-        percent=round(100 * used / window),
+        working=" working" if work < window else "",
+        percent=round(100 * used / work),
         used=used,
-        window=window,
+        window=work,
         share=round(100 * share.fill_share),
     )
 

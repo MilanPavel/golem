@@ -776,6 +776,11 @@ class DelegateSettings(BaseModel):
     not fit. ``job_share``: the least a job reads, as a share of the window, to be worth its own
     helper (reasons 2 and 3). ``price_ratio``: how many times dearer the lead must be than the
     helper's model before a large read moves there.
+
+    ``work_window``: the shares above are shares of the first ``work_window`` tokens of the
+    window, not of all of it, so a 1M window acts like a 128K one. Every later message pays for
+    the reading again, and answers get worse long before a big window is full. A window smaller
+    than this counts in full. 0 turns it off: the shares are of the whole window.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -784,6 +789,7 @@ class DelegateSettings(BaseModel):
     fill_share: float = Field(default=0.85, gt=0, le=1)
     job_share: float = Field(default=0.1, gt=0, le=1)
     price_ratio: float = Field(default=3.0, gt=1)
+    work_window: int = Field(default=128_000, ge=0)
 
 
 class AgentSettings(BaseModel):

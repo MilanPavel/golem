@@ -18,7 +18,7 @@ from typing import TYPE_CHECKING
 
 from golem.agents.model import Agent
 from golem.config import DelegateSettings
-from golem.graphs.delegate_policy import JobEstimate, Prices, should_delegate
+from golem.graphs.delegate_policy import JobEstimate, Prices, should_delegate, working_window
 from golem.graphs.prompt import PromptContext, Section
 from golem.models.tiers import TIERS, Tier, blended
 
@@ -60,10 +60,11 @@ def reasons_for(
     def reason(estimate: JobEstimate) -> str | None:
         return should_delegate(window, 0, estimate, prices, tier, 2, "when_needed", cfg).reason
 
-    each = math.ceil(cfg.job_share * window)
+    work = working_window(window, cfg)
+    each = math.ceil(cfg.job_share * work)
     return Reasons(
         window=(tier != "local" or window <= SMALL_WINDOW)
-        and reason(JobEstimate(math.ceil(cfg.read_share * window))) == "window",
+        and reason(JobEstimate(math.ceil(cfg.read_share * work))) == "window",
         at_once=reason(JobEstimate(2 * each, jobs=2)) == "at_once",
         hard=reason(JobEstimate(0, hard=True)) == "model",
         cheaper=reason(JobEstimate(each)) == "model",

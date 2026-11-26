@@ -2,7 +2,7 @@
 
 The answer is to fold, to do the work in the chat, unless one reason holds. There is no model
 call and no classifier: the lead's window, what it has used, an estimate of the job and the
-prices decide. Thresholds are shares of the window and a price ratio (``DelegateSettings``).
+prices decide. Thresholds are shares of the working window and a price ratio (``DelegateSettings``).
 """
 
 from __future__ import annotations
@@ -43,8 +43,15 @@ class Decision:
     ask: bool = False  # the setting is "ask": put the question to the user first
 
 
+def working_window(window: int, cfg: DelegateSettings) -> int:
+    """The part of ``window`` the shares are of: at most ``work_window`` tokens, all of a smaller
+    window, and the whole window when ``work_window`` is 0."""
+    return min(window, cfg.work_window) if cfg.work_window > 0 else window
+
+
 def _fits_badly(window: int, used: int, read: int, cfg: DelegateSettings) -> bool:
-    return read >= cfg.read_share * window or used + read >= cfg.fill_share * window
+    work = working_window(window, cfg)
+    return read >= cfg.read_share * work or used + read >= cfg.fill_share * work
 
 
 def _cheaper(prices: Prices, cfg: DelegateSettings) -> bool:
@@ -67,7 +74,7 @@ def _reason(
     if tier == "local":  # several helpers on one local model take turns; nothing is cheaper
         return None
     each = estimate.read_tokens / max(estimate.jobs, 1)
-    big = each >= cfg.job_share * window
+    big = each >= cfg.job_share * working_window(window, cfg)
     if estimate.jobs >= 2 and big:
         return "at_once"
     if big and _cheaper(prices, cfg):

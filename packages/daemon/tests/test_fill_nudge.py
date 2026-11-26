@@ -118,7 +118,8 @@ async def test_a_hosted_lead_with_a_large_window_is_told_past_the_share(short_ho
     )
     notes, started = await _run(short_home, router, HOSTED, _facts(CHEAP, "budget", 200000, 0.5))
     assert len(notes) == 1
-    assert "of 200000 tokens" in notes[0]
+    assert "of 128000 tokens" in notes[0]
+    assert "working window" in notes[0]
     assert [s["agent"] for s in started] == ["explorer"]
 
 

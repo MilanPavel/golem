@@ -78,19 +78,19 @@ def test_a_local_lead_asks_a_stronger_model_only_when_one_is_ready() -> None:
 
 @pytest.mark.parametrize("arm", [BUDGET, FRONTIER], ids=["budget", "frontier"])
 def test_cloud_only_independent_jobs_run_at_once(arm: Arm) -> None:
-    got = run(arm, JobEstimate(read_tokens=arm[0] * 24 // 100, jobs=2))  # 12% each
+    got = run(arm, JobEstimate(read_tokens=min(arm[0], 128_000) * 24 // 100, jobs=2))  # 12% each
     assert got == Decision("at_once", "batch")
 
 
 def test_cloud_only_model_reason_goes_by_price() -> None:
-    big = JobEstimate(read_tokens=FRONTIER[0] // 5)
+    big = JobEstimate(read_tokens=128_000 // 5)
     assert run(FRONTIER, big).reason == "model"  # 9.0 against 0.4
     close: Arm = (FRONTIER[0], "frontier", Prices(lead=9.0, cheaper=5.0))
     assert run(close, big).reason is None
     # Budget: 0.4 against 0.1 is 4x, so a large read moves to the cheaper model too.
-    assert run(BUDGET, JobEstimate(read_tokens=BUDGET[0] // 5)).reason == "model"
+    assert run(BUDGET, JobEstimate(read_tokens=128_000 // 5)).reason == "model"
     thin: Arm = (BUDGET[0], "budget", Prices(lead=0.4, cheaper=0.3))
-    assert run(thin, JobEstimate(read_tokens=BUDGET[0] // 5)).reason is None
+    assert run(thin, JobEstimate(read_tokens=128_000 // 5)).reason is None
 
 
 def test_a_hard_question_goes_to_a_stronger_model_unless_frontier() -> None:
@@ -124,3 +124,69 @@ def test_one_slot_cannot_run_a_batch_at_once() -> None:
     est = JobEstimate(read_tokens=BUDGET[0] // 2, jobs=3)
     assert run(BUDGET, est, slots=1).shape == "one after the other"
     assert run(BUDGET, JobEstimate(read_tokens=BUDGET[0] // 2), slots=1).shape == "single"
+
+
+# The working window: the shares are of the first 128K of the window (step 15.17).
+
+CLOUD = Prices(lead=9.0, cheaper=0.4)
+OFF = DelegateSettings(work_window=0)
+
+
+def decide(
+    window: int,
+    read: int,
+    *,
+    jobs: int = 1,
+    cfg: DelegateSettings | None = None,
+    tier: Tier = "frontier",
+    used: int = 2_000,
+) -> Decision:
+    prices = Prices() if tier == "local" else CLOUD
+    estimate = JobEstimate(read_tokens=read, jobs=jobs)
+    return should_delegate(window, used, estimate, prices, tier, 3, "when_needed", cfg)
+
+
+def test_the_working_window_defaults_to_128k() -> None:
+    assert DelegateSettings().work_window == 128_000
+
+
+@pytest.mark.parametrize("window", [32_768, 65_536])
+def test_small_windows_are_as_before(window: int) -> None:
+    just_under, just_over = int(0.3 * window) - 10, int(0.3 * window) + 10
+    for cfg in (None, OFF):
+        assert decide(window, just_under, tier="local", cfg=cfg).reason is None
+        assert decide(window, just_over, tier="local", cfg=cfg).reason == "window"
+        full = int(0.85 * window) + 10
+        assert decide(window, 0, tier="local", used=full, cfg=cfg).reason == "window"
+
+
+def test_a_40k_read_on_a_1m_window_does_not_fit() -> None:
+    assert decide(1_000_000, 40_000).reason == "window"
+    assert decide(1_000_000, 40_000, cfg=OFF) == Decision(None, "fold")
+
+
+def test_a_200k_window_counts_the_first_128k() -> None:
+    assert decide(200_000, 40_000).reason == "window"
+    assert decide(200_000, 40_000, cfg=OFF, tier="local").reason is None
+    assert decide(200_000, 60_000, cfg=OFF, tier="local").reason == "window"
+
+
+def test_two_15k_jobs_on_a_1m_window_run_at_once() -> None:
+    assert decide(1_000_000, 30_000, jobs=2) == Decision("at_once", "batch")
+    assert decide(1_000_000, 30_000, jobs=2, cfg=OFF) == Decision(None, "fold")
+
+
+def test_the_fill_share_is_of_the_working_window() -> None:
+    assert decide(1_000_000, 0, used=120_000).reason == "window"
+    assert decide(1_000_000, 0, used=120_000, cfg=OFF).reason is None
+
+
+def test_work_window_of_zero_restores_the_whole_window() -> None:
+    assert decide(1_000_000, 299_000, cfg=OFF, tier="local").reason is None
+    assert decide(1_000_000, 301_000, cfg=OFF, tier="local").reason == "window"
+
+
+def test_a_bad_work_window_is_refused() -> None:
+    with pytest.raises(ValueError):
+        DelegateSettings(work_window=-1)
+    assert DelegateSettings(work_window=0).work_window == 0
