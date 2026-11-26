@@ -7,7 +7,7 @@ request, and ``cancel`` (``args.id``) can interrupt it. A request that fails ans
 its error and the worker stays up. The worker ends when stdin closes.
 
 Ops: ``ping``, ``attach``, ``detach``, ``tables``, ``describe``, ``query``,
-``install_extension``, ``load_table``, ``cancel``.
+``install_extension``, ``load_table``, ``result_page``, ``cancel``.
 """
 
 from __future__ import annotations
@@ -16,11 +16,13 @@ import contextlib
 import json
 import sys
 import threading
+from functools import partial
 from pathlib import Path
 from typing import IO, Any, cast
 
 import duckdb
 
+from golem.data import parquet
 from golem.data.engine import Limits, Source, install_extension
 from golem.data.types import DataError, SourceSpec
 
@@ -79,6 +81,14 @@ class Worker:
         if op == "install_extension":
             install_extension(Path(str(args["extension_dir"])), str(args["name"]))
             return {}
+        if op == "result_page":
+            return parquet.page(
+                Path(str(args["path"])),
+                int(args.get("offset", 0)),
+                int(args.get("limit", 200)),
+                None if args.get("sort_column") is None else str(args["sort_column"]),
+                bool(args.get("sort_desc", False)),
+            )
         source = self._source(args)
         if op == "tables":
             return {"tables": source.tables()}
@@ -129,7 +139,14 @@ class Worker:
                 raise DataError("The query was cancelled.")
             self._running[ident] = cursor
         try:
-            return source.query(str(args.get("sql", "")), int(args.get("limit", 1000)), cursor)
+            store = args.get("store")
+            keep = None
+            if store:
+                meta = {"source": str(args.get("source", "")), "sql": str(args.get("sql", ""))}
+                keep = partial(parquet.write, Path(str(store)), meta=meta)
+            return source.query(
+                str(args.get("sql", "")), int(args.get("limit", 1000)), cursor, keep
+            )
         finally:
             with self._lock:
                 self._running.pop(ident, None)

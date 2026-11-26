@@ -72,7 +72,7 @@
       "data": {
         "cleared_ids": [],
         "context_window": null,
-        "estimated_tokens": 4807,
+        "estimated_tokens": 4872,
         "index": 1,
         "message_bytes": [
           10
@@ -104,9 +104,9 @@
           }
         ],
         "tier": null,
-        "tools_bytes": 15532,
-        "tools_chars": 15532,
-        "tools_sha": "c165402bce4cbff8b16db092282ac1d6703f8a43c58eafaba15d620a9284111e",
+        "tools_bytes": 15747,
+        "tools_chars": 15747,
+        "tools_sha": "a1706f7e39bca1c6a1261db4f99baad2d5703e6789498b1ada4950b9d17fcb9a",
         "window_estimated": false,
         "window_planned": false
       },
@@ -351,6 +351,7 @@
         "rows_withheld": false,
         "sources": null,
         "summary": "explorer finished",
+        "table": null,
         "truncated": false
       },
       "run_id": "id-2",
@@ -374,7 +375,7 @@
       "data": {
         "cleared_ids": [],
         "context_window": null,
-        "estimated_tokens": 2436,
+        "estimated_tokens": 2468,
         "index": 2,
         "message_bytes": [
           10,
@@ -412,9 +413,9 @@
           }
         ],
         "tier": null,
-        "tools_bytes": 15532,
-        "tools_chars": 15532,
-        "tools_sha": "c165402bce4cbff8b16db092282ac1d6703f8a43c58eafaba15d620a9284111e",
+        "tools_bytes": 15747,
+        "tools_chars": 15747,
+        "tools_sha": "a1706f7e39bca1c6a1261db4f99baad2d5703e6789498b1ada4950b9d17fcb9a",
         "window_estimated": false,
         "window_planned": false
       },
@@ -551,7 +552,7 @@
       "data": {
         "cleared_ids": [],
         "context_window": null,
-        "estimated_tokens": 4807,
+        "estimated_tokens": 4872,
         "index": 1,
         "message_bytes": [
           10
@@ -583,9 +584,9 @@
           }
         ],
         "tier": null,
-        "tools_bytes": 15532,
-        "tools_chars": 15532,
-        "tools_sha": "c165402bce4cbff8b16db092282ac1d6703f8a43c58eafaba15d620a9284111e",
+        "tools_bytes": 15747,
+        "tools_chars": 15747,
+        "tools_sha": "a1706f7e39bca1c6a1261db4f99baad2d5703e6789498b1ada4950b9d17fcb9a",
         "window_estimated": false,
         "window_planned": false
       },
@@ -830,6 +831,7 @@
         "rows_withheld": false,
         "sources": null,
         "summary": "explorer finished",
+        "table": null,
         "truncated": false
       },
       "run_id": "id-2",
@@ -853,7 +855,7 @@
       "data": {
         "cleared_ids": [],
         "context_window": null,
-        "estimated_tokens": 2436,
+        "estimated_tokens": 2468,
         "index": 2,
         "message_bytes": [
           10,
@@ -891,9 +893,9 @@
           }
         ],
         "tier": null,
-        "tools_bytes": 15532,
-        "tools_chars": 15532,
-        "tools_sha": "c165402bce4cbff8b16db092282ac1d6703f8a43c58eafaba15d620a9284111e",
+        "tools_bytes": 15747,
+        "tools_chars": 15747,
+        "tools_sha": "a1706f7e39bca1c6a1261db4f99baad2d5703e6789498b1ada4950b9d17fcb9a",
         "window_estimated": false,
         "window_planned": false
       },

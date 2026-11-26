@@ -365,6 +365,8 @@ async def test_data_query_returns_an_aligned_table_inside_a_data_wrapper(make: M
         "tier    n",
         "hosted  3",
         "local   1",
+        "",
+        "n: min 1 · max 3 · sum 4",
         "</data_rows>",
     ]
     assert result.summary == "2 rows from golem"
@@ -378,11 +380,13 @@ async def test_a_cell_that_gives_orders_stays_inside_the_wrapper(make: Make) -> 
     assert result.output.index(SECRET) < result.output.index("</data_rows>")
 
 
-async def test_data_query_marks_a_cut_result(make: Make) -> None:
+async def test_data_query_limit_is_how_many_rows_the_model_reads(make: Make) -> None:
     result = await DATA_QUERY.call(
         {"source": "golem", "sql": "select * from usage", "limit": 2}, _ctx(make())
     )
-    assert "2 rows · truncated: yes" in result.output and "more rows" in result.output
+    assert result.output.startswith("4 rows · truncated: no")
+    assert "… 2 more rows" in result.output and "Showing the first 2." in result.output
+    assert result.table is not None and result.table.total_rows == 4
 
 
 async def test_a_refused_statement_is_a_tool_error_the_model_can_read(make: Make) -> None:

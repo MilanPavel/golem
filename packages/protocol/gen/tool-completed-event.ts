@@ -14,12 +14,20 @@ export type Snippet = string;
 export type Title = string;
 export type Url = string;
 export type Summary = string;
+export type Name = string;
+export type Type = string;
+export type Columns = ToolTableColumn[];
+export type ResultId = string;
+export type Rows = (string | number | boolean | null)[][];
+export type Source = string;
+export type TotalRows = number;
 export type Truncated = boolean;
+export type Truncated1 = boolean;
 export type RunId = string;
 export type Seq = number;
 export type SessionId = string;
 export type Ts = string;
-export type Type = 'tool.completed';
+export type Type1 = 'tool.completed';
 
 /**
  * The tool call finished, and its result went back to the model.
@@ -30,7 +38,7 @@ export interface ToolCompletedEvent {
   seq: Seq;
   session_id: SessionId;
   ts: Ts;
-  type: Type;
+  type: Type1;
 }
 /**
  * A tool call finished.
@@ -56,6 +64,9 @@ export interface ToolCompletedEvent {
  * call did not get: it got a line with the row count and the columns instead. A client can
  * say so beside the rows.
  *
+ * ``table`` is the kept result of a ``data_query`` call: its columns, the first page and
+ * the row count. None for any other call.
+ *
  * ``parent_call_id`` is legacy. Old logs set it on an event of a child run: the id of
  * the ``delegate`` call that started it. The event is in the parent's run, and a client
  * that does not know child runs ignores it. None for the run's own events. A new helper
@@ -76,7 +87,8 @@ export interface ToolCompletedData {
   rows_withheld?: RowsWithheld;
   sources?: Sources;
   summary: Summary;
-  truncated?: Truncated;
+  table?: ToolTable | null;
+  truncated?: Truncated1;
 }
 /**
  * A web page a tool call found or read.
@@ -92,4 +104,32 @@ export interface ToolSource {
   snippet: Snippet;
   title: Title;
   url: Url;
+}
+/**
+ * A query result a ``data_query`` call kept, so a client can show it and page it.
+ *
+ * ``rows`` is the first page. The rest is read with ``data.result.page`` by ``result_id``.
+ * ``total_rows`` is how many rows were kept, and ``truncated`` says the query had more.
+ * Dates and times are ISO strings, other values are text, numbers or booleans.
+ *
+ * This interface was referenced by `ToolCompletedEvent`'s JSON-Schema
+ * via the `definition` "ToolTable".
+ */
+export interface ToolTable {
+  columns: Columns;
+  result_id: ResultId;
+  rows: Rows;
+  source: Source;
+  total_rows: TotalRows;
+  truncated?: Truncated;
+}
+/**
+ * One column of a kept query result.
+ *
+ * This interface was referenced by `ToolCompletedEvent`'s JSON-Schema
+ * via the `definition` "ToolTableColumn".
+ */
+export interface ToolTableColumn {
+  name: Name;
+  type: Type;
 }

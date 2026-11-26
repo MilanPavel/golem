@@ -8,7 +8,6 @@ a ``schema`` one. ``session_id`` picks the folder whose project sources count.
 from __future__ import annotations
 
 import asyncio
-import json
 import re
 from pathlib import Path
 from typing import Any
@@ -28,6 +27,7 @@ from golem.config_edit import (
     remove_data_source,
     update_data_source,
 )
+from golem.data.results import KIND, table_record, wire_rows
 from golem.data.sources import DataSources, SourceInfo, TableInfo
 from golem.data.types import DataError
 from golem.server.dispatcher import INTERNAL_ERROR, INVALID_PARAMS, RequestContext, RpcCallError
@@ -52,6 +52,7 @@ from golem_protocol.commands import (
     DataRemoveParams,
     DataRemoveResult,
     DataResult,
+    DataResultPageParams,
     DataSource,
     DataTable,
     DataUpdateParams,
@@ -117,12 +118,7 @@ def wire_table(table: TableInfo) -> DataTable:
     )
 
 
-def _rows(rows: list[list[Any]]) -> list[list[Any]]:
-    """Rows with a list or a struct as JSON text: a cell on the wire is a scalar."""
-    return [
-        [json.dumps(v, ensure_ascii=False) if isinstance(v, list | dict) else v for v in row]
-        for row in rows
-    ]
+_rows = wire_rows
 
 
 async def data_list(ctx: RequestContext, params: DataListParams) -> DataListResult:
@@ -158,13 +154,48 @@ async def data_query(ctx: RequestContext, params: DataQueryParams) -> DataResult
         )
     except DataError as exc:
         raise RpcCallError(INVALID_PARAMS, str(exc)) from exc
+    if result.stored and params.session_id is not None and ctx.state.artifacts is not None:
+        # The result belongs to the session, so closing the session removes its file.
+        await ctx.state.artifacts.put(
+            params.session_id,
+            None,
+            KIND,
+            table_record(
+                result_id=result.result_id,
+                source=result.source,
+                sql=result.sql,
+                columns=result.columns,
+                rows=len(result.rows),
+                truncated=result.truncated,
+            ),
+        )
     return DataResult(
         result_id=result.result_id,
         source=result.source,
         columns=[DataColumn(name=c["name"], type=c["type"]) for c in result.columns],
         rows=_rows(result.rows),
+        total_rows=len(result.rows),
         truncated=result.truncated,
         elapsed_ms=result.elapsed_ms,
+    )
+
+
+async def data_result_page(ctx: RequestContext, params: DataResultPageParams) -> DataResult:
+    """One page of a kept result. It is you reading your own data, so any source's rows."""
+    try:
+        found = await _sources(ctx).page(
+            params.result_id, params.offset, params.limit, params.sort_column, params.sort_desc
+        )
+    except DataError as exc:
+        raise RpcCallError(INVALID_PARAMS, str(exc)) from exc
+    return DataResult(
+        result_id=found.result_id,
+        source=found.source,
+        columns=[DataColumn(name=c["name"], type=c["type"]) for c in found.columns],
+        rows=_rows(found.rows),
+        total_rows=found.total_rows,
+        truncated=False,
+        elapsed_ms=0,
     )
 
 

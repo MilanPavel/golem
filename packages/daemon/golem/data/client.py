@@ -21,6 +21,7 @@ import sys
 import time
 from collections import deque
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 from golem.config import DataSettings
@@ -119,17 +120,44 @@ class DataWorker:
         return await self.request("describe", {"source": source, "table": table}, timeout=timeout)
 
     async def query(
-        self, source: str, sql: str, limit: int | None = None, *, result_id: str | None = None
+        self,
+        source: str,
+        sql: str,
+        limit: int | None = None,
+        *,
+        result_id: str | None = None,
+        store: Path | None = None,
     ) -> dict[str, Any]:
         """Run ``sql`` over ``source``: columns, rows, ``truncated`` and ``elapsed_ms``.
 
-        With ``result_id`` the query can be stopped by :meth:`cancel` while it runs.
+        With ``result_id`` the query can be stopped by :meth:`cancel` while it runs. With
+        ``store`` the rows are also written to that Parquet file.
         """
         rows = min(limit or self._settings.max_rows, self._settings.max_rows)
-        args = {"source": source, "sql": sql, "limit": rows}
+        args: dict[str, Any] = {"source": source, "sql": sql, "limit": rows}
+        if store is not None:
+            args["store"] = str(store)
         return await self.request(
             "query", args, timeout=self._settings.query_timeout_seconds, tag=result_id
         )
+
+    async def result_page(
+        self,
+        path: Path,
+        offset: int,
+        limit: int,
+        sort_column: str | None = None,
+        sort_desc: bool = False,
+    ) -> dict[str, Any]:
+        """``limit`` rows from ``offset`` of a kept result file: columns, rows, ``total_rows``."""
+        args = {
+            "path": str(path),
+            "offset": offset,
+            "limit": limit,
+            "sort_column": sort_column,
+            "sort_desc": sort_desc,
+        }
+        return await self.request("result_page", args, timeout=self._settings.query_timeout_seconds)
 
     async def load_table(
         self,

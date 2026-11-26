@@ -68,6 +68,11 @@ class GolemPaths:
         return self.data_dir / "extensions"
 
     @property
+    def data_results_dir(self) -> Path:
+        """One ``<result_id>.parquet`` for each query result the data tools kept."""
+        return self.data_dir / "results"
+
+    @property
     def data_temp_dir(self) -> Path:
         """Where a query that outgrows its memory limit spills."""
         return self.data_dir / "tmp"

@@ -242,6 +242,8 @@ class ToolFinished:
     diff: str | None = None
     sources: tuple[dict[str, str], ...] = ()
     rows_withheld: bool = False
+    table: dict[str, object] | None = None
+    """The kept result of a ``data_query``, as the ``table`` of the event."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -1020,6 +1022,7 @@ def _custom(data: object) -> Fact | None:
         preview = item.get("preview")
         artifact_id = item.get("artifact_id")
         diff = item.get("diff")
+        table = item.get("table")
         return ToolFinished(
             call_id,
             summary if isinstance(summary, str) else "",
@@ -1031,6 +1034,9 @@ def _custom(data: object) -> Fact | None:
             diff if isinstance(diff, str) and diff else None,
             _sources(item.get("sources")),
             item.get("rows_withheld") is True,
+            cast(dict[str, object], table)
+            if isinstance(table := item.get("table"), dict)
+            else None,
         )
     if kind == "todos.updated":
         todos = item.get("todos")

@@ -1148,9 +1148,20 @@ class SessionManager:
         try:
             closed = await self._close(session_id)
             await self._remove_copies_of(closed)
+            await self._forget_results(closed)
             return closed
         finally:
             self._stopping.discard(session_id)
+
+    async def _forget_results(self, session_id: str) -> None:
+        """Delete the query results a closed session kept."""
+        data = self._runtime.data
+        if data is None:
+            return
+        try:
+            await data.results.forget_session(session_id)
+        except Exception:
+            log.exception("could not remove the query results of session %s", session_id)
 
     async def _remove_copies_of(self, lead_id: str) -> None:
         """Remove every copy of the helpers of ``lead_id``, whether the helper is closed or not.
