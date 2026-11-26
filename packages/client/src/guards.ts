@@ -75,6 +75,7 @@ import type { EvalsStopResult } from "../../protocol/gen/evals-stop-result.ts";
 import type { MemoryChanged } from "../../protocol/gen/memory-changed.ts";
 import type { DataAddResult } from "../../protocol/gen/data-add-result.ts";
 import type { DataChanged } from "../../protocol/gen/data-changed.ts";
+import type { DataExtensionInstallResult } from "../../protocol/gen/data-extension-install-result.ts";
 import type { DataCancelResult } from "../../protocol/gen/data-cancel-result.ts";
 import type { DataDescribeResult } from "../../protocol/gen/data-describe-result.ts";
 import type { DataResult } from "../../protocol/gen/data-result.ts";
@@ -581,6 +582,10 @@ export function isDataQueryResult(value: unknown): value is DataResult {
 }
 
 export function isDataCancelResult(value: unknown): value is DataCancelResult {
+  return isRecord(value);
+}
+
+export function isDataExtensionInstallResult(value: unknown): value is DataExtensionInstallResult {
   return isRecord(value);
 }
 

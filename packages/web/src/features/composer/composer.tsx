@@ -36,6 +36,8 @@ export type ComposerProps = {
   onSend: (text: string) => Promise<unknown>;
   /** The slash commands. With them, `/` at the start of the draft suggests them. */
   commands?: readonly SuggestCommand[];
+  /** What `@` can name, such as the data sources. With them, a word that starts with `@` at the end of the draft suggests them. */
+  mentions?: readonly string[];
   /** The person changed the draft: typed, pasted, or recalled an older text. */
   onEdit?: () => void;
   /** "at-once" clears the draft when it is sent; "on-success" keeps it on screen until the send worked. */
@@ -92,6 +94,7 @@ export function Composer({
   history,
   onSend,
   commands,
+  mentions,
   onEdit,
   clear = "at-once",
   pending = false,
@@ -173,10 +176,10 @@ export function Composer({
 
   const items = useMemo(
     () =>
-      commands === undefined || busy || browsing || pending || disabled || dismissed === text
+      busy || browsing || pending || disabled || dismissed === text
         ? []
-        : suggest(text, commands),
-    [commands, busy, browsing, pending, disabled, dismissed, text],
+        : suggest(text, commands ?? [], mentions ?? []),
+    [commands, mentions, busy, browsing, pending, disabled, dismissed, text],
   );
   const open = items.length > 0;
   const selected = pick.draft === text ? Math.min(pick.index, items.length - 1) : 0;
@@ -340,12 +343,13 @@ export function Composer({
         <SuggestionList
           id={listId}
           optionId={optionId}
+          label={text.startsWith("/") ? "Commands" : "Data sources"}
           items={items}
           selected={selected}
           onPick={(index) => complete(index, "tab")}
         />
       ) : null}
-      {commands === undefined ? null : (
+      {commands === undefined && mentions === undefined ? null : (
         <div aria-live="polite" className="sr-only">
           {count}
         </div>
@@ -369,7 +373,7 @@ export function Composer({
             aria-busy={pending ? "true" : undefined}
             aria-label={label}
             aria-describedby={describedBy}
-            {...(commands === undefined
+            {...(commands === undefined && mentions === undefined
               ? {}
               : {
                   "aria-autocomplete": "list" as const,

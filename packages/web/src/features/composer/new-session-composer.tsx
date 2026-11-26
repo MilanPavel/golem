@@ -5,6 +5,7 @@ import { Composer } from "./composer.tsx";
 import { browserHistory } from "./history.ts";
 import { NoticeLine } from "./notice-line.tsx";
 import { NEW_DRAFT_KEY, type useStartSession } from "./start-session.ts";
+import { useMentions } from "./use-mentions.ts";
 import { useCommands } from "./use-commands.tsx";
 
 /** The large composer of the empty screen, with `barLeft` (the model, the folder and the branch) in its row, and `note` under it. Its draft is kept under "new". */
@@ -13,6 +14,7 @@ export function NewSessionComposer({ start, barLeft, note }: { start: ReturnType
   const [text, setText] = useDraft(NEW_DRAFT_KEY);
   const [pastes, setPastes] = useDraftPastes(NEW_DRAFT_KEY);
   const [folder] = useNewSessionFolder();
+  const mentions = useMentions(text.includes("@"));
   const commands = useCommands({ session: null, cwd: folder, typing: text.startsWith("/"), send: start.send });
   const error = commands.error ?? start.error;
   return (
@@ -30,6 +32,7 @@ export function NewSessionComposer({ start, barLeft, note }: { start: ReturnType
         history={browserHistory}
         onSend={commands.run}
         commands={commands.registry}
+        mentions={mentions}
         onEdit={commands.clear}
         clear="on-success"
         pending={start.pending}

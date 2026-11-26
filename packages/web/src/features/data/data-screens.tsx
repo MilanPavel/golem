@@ -28,6 +28,7 @@ export function LiveAddDialog({ open, onClose }: { open: boolean; onClose: () =>
       open={open}
       folder={folder}
       onInspect={actions.dataInspect}
+      onInstallExtension={actions.dataInstallExtension}
       onAdd={actions.dataAdd}
       onAdded={(source: DataSource) => {
         onClose();
@@ -162,6 +163,7 @@ export function DataSourceScreen({ name, tab }: { name: string; tab: DataTab }) 
         onWatch={async (watch) => {
           await actions.dataUpdate({ name, watch });
         }}
+        onInstallExtension={actions.dataInstallExtension}
         onRemove={async () => {
           await actions.dataRemove(name);
           navigate("/data");

@@ -591,6 +591,18 @@ test("/memory opens the Memory section of Settings", async () => {
   expect(screen.getByRole("heading", { level: 2, name: "Memory" })).toBeTruthy();
 });
 
+test("/data opens the Data list", async () => {
+  const { user } = await session();
+  await say(user, "/data");
+  expect(location.pathname).toBe("/data");
+});
+
+test("/data name opens that source's page", async () => {
+  const { user } = await session();
+  await say(user, "/data bank");
+  expect(location.pathname).toBe("/data/bank");
+});
+
 test("/mcp opens the MCP servers section of Settings", async () => {
   const { user } = await session();
   await say(user, "/mcp");

@@ -8,12 +8,14 @@ import { Code } from "../../ui/code.tsx";
 export function SuggestionList({
   id,
   optionId,
+  label = "Commands",
   items,
   selected,
   onPick,
 }: {
   id: string;
   optionId: (index: number) => string;
+  label?: string;
   items: readonly Suggestion[];
   selected: number;
   onPick: (index: number) => void;
@@ -22,7 +24,7 @@ export function SuggestionList({
     <div
       id={id}
       role="listbox"
-      aria-label="Commands"
+      aria-label={label}
       className="absolute inset-x-0 bottom-full z-10 mb-2 flex max-h-72 flex-col gap-0.5 overflow-y-auto rounded-lg border border-line bg-surface p-1.5 shadow-soft"
     >
       {items.map((item, index) => (

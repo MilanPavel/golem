@@ -19,7 +19,7 @@ import { MEMORY_LIST_KEY, MEMORY_PAGE, type MemoryExportParams, type MemoryExpor
 import { ROUTINE_GET_KEY, ROUTINE_LIST_KEY, type RoutineGetResult, type RoutineInfo, type RoutineListResult, type RoutineRunResult } from "./routines.ts";
 import { RUN_LIST_KEY, type RunListResult } from "./runs.ts";
 import { WORKFLOW_LIST_KEY, WORKFLOW_STATUS_KEY, workflowGetKey, type ReviewVerdict, type WorkflowCancelResult, type WorkflowCheckResult, type WorkflowProposeResult, type WorkflowSaveResult, type WorkflowGetResult, type WorkflowListResult, type WorkflowResumeResult, type WorkflowStatusResult, type WorkflowEditStepResult } from "./workflows.ts";
-import { DATA_DESCRIBE_KEY, DATA_LIST_KEY, DATA_NOTES_KEY, dataAnswer, type DataAddParams, type DataAnswer, type DataDescribeResult, type DataInspectResult, type DataListResult, type DataNotesGetResult, type DataSource, type DataUpdateParams } from "./data.ts";
+import { DATA_DESCRIBE_KEY, DATA_LIST_KEY, DATA_NOTES_KEY, dataAnswer, type DataAddParams, type DataAnswer, type DataExtensionName, type DataResult, type DataResultPageParams, type DataDescribeResult, type DataInspectResult, type DataListResult, type DataNotesGetResult, type DataSource, type DataUpdateParams } from "./data.ts";
 import { createPulls, type Pulls } from "./pulls.ts";
 import { createQueryClient, keepQueriesHonest } from "./query.ts";
 import { createRouter, type Router } from "./router.ts";
@@ -74,6 +74,8 @@ export type PageClient = Pick<
   | "listData"
   | "describeData"
   | "inspectData"
+  | "pageDataResult"
+  | "installDataExtension"
   | "addData"
   | "updateData"
   | "removeData"
@@ -418,6 +420,10 @@ export type PageActions = {
   runRoutine(name: string, folder: string | null): Promise<RoutineRunResult>;
   /** Looks at a location before it is added. Nothing is saved. Rejects with the daemon's reason. */
   dataInspect(location: string): Promise<DataInspectResult>;
+  /** One page of a kept query result. Rejects with the daemon's reason, such as a result that is no longer kept. */
+  dataResultPage(params: DataResultPageParams): Promise<DataResult>;
+  /** Downloads the Excel or SQLite add-on, once. The sources are read again. Rejects with the reason, such as no network. */
+  dataInstallExtension(name: DataExtensionName): Promise<void>;
   /** Adds a source. The list is read again. Rejects with the daemon's reason. */
   dataAdd(params: DataAddParams): Promise<DataSource>;
   /** Changes the privacy or the watch of a source. The list is read again. */
@@ -980,6 +986,15 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
         }
       },
       dataInspect: (location) => client.inspectData(location),
+      dataResultPage: (params) => client.pageDataResult(params.result_id, params.offset, params.limit),
+      async dataInstallExtension(name) {
+        try {
+          await client.installDataExtension(name);
+        } finally {
+          await queryClient.invalidateQueries({ queryKey: DATA_LIST_KEY });
+          await queryClient.invalidateQueries({ queryKey: DATA_DESCRIBE_KEY });
+        }
+      },
       async dataAdd(params) {
         try {
           return (await client.addData(params)).source;

@@ -15,6 +15,7 @@ import { SessionFolder } from "./folder-bar-chip.tsx";
 import { WaitHint } from "./wait-hint.tsx";
 import { ContextBanner } from "./context-banner.tsx";
 import { ContextChip } from "./context-chip.tsx";
+import { useMentions } from "./use-mentions.ts";
 import { useCommands } from "./use-commands.tsx";
 import { DockView } from "./dock.tsx";
 import { browserHistory } from "./history.ts";
@@ -70,6 +71,7 @@ export function SessionDock({ sessionId }: { sessionId: string }) {
     mutationFn: ({ text: message, skill }: { text: string; skill?: { name: string; args: string } }) =>
       actions.send(sessionId, message, skill),
   });
+  const mentions = useMentions(text.includes("@"));
   const commands = useCommands({
     session: { id: sessionId, active },
     cwd,
@@ -154,6 +156,7 @@ export function SessionDock({ sessionId }: { sessionId: string }) {
             sendLabel={hasNotes ? "Send with notes" : "Send"}
             allowEmpty={hasNotes}
             commands={commands.registry}
+            mentions={mentions}
             onEdit={commands.clear}
             busy={run.busy}
             onStop={run.runId === null ? undefined : () => stop.mutate()}

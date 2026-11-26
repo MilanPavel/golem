@@ -1,6 +1,6 @@
-import { RpcError, type DataAddParams, type DataAddResult, type DataChanged, type DataColumn, type DataDescribeResult, type DataInspectResult, type DataListResult, type DataNotesGetResult, type DataSavedQuery, type DataSource, type DataTable, type DataUpdateParams } from "@golem/client";
+import { RpcError, type DataAddParams, type DataAddResult, type DataChanged, type DataColumn, type DataDescribeResult, type DataInspectResult, type DataListResult, type DataNotesGetResult, type DataResult, type DataSavedQuery, type DataSource, type DataTable, type DataUpdateParams, type ToolTable } from "@golem/client";
 
-export type { DataAddParams, DataAddResult, DataChanged, DataColumn, DataDescribeResult, DataInspectResult, DataListResult, DataNotesGetResult, DataSavedQuery, DataSource, DataTable, DataUpdateParams };
+export type { DataAddParams, DataAddResult, DataChanged, DataColumn, DataDescribeResult, DataInspectResult, DataListResult, DataNotesGetResult, DataResult, DataSavedQuery, DataSource, DataTable, DataUpdateParams, ToolTable };
 
 /** The query key of `data.list`. A pushed `data.changed` and every action below mark it stale. */
 export const DATA_LIST_KEY = ["data.list"] as const;
@@ -48,6 +48,11 @@ export function dataErrorText(error: unknown, fallback: string): string {
   if (isDataMissing(error)) return "This version of golem cannot do that yet. Update golem.";
   return error instanceof Error && error.message !== "" ? error.message : fallback;
 }
+
+export type { DataExtensionName } from "@golem/view";
+
+/** What a page of a kept result is asked by. */
+export type DataResultPageParams = { result_id: string; offset: number; limit: number };
 
 /** The sample rows of one table. */
 export type DataSampleRows = readonly (readonly (string | number | boolean | null)[])[];

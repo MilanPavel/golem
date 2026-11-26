@@ -43,7 +43,8 @@ import { writeClipboard } from "../../ui/clipboard.ts";
 import { downloadText } from "./copy-text.ts";
 import { CommandsDialog } from "./help-dialog.tsx";
 import type { CommandNotice } from "./notice-line.tsx";
-import { settingsPath, tracePath, welcomePath } from "../../store/router.ts";
+import { sidebarItemStore } from "../sidebar/sidebar-item.ts";
+import { dataPath, settingsPath, tracePath, welcomePath } from "../../store/router.ts";
 import { requestConfig } from "../settings/config-request.ts";
 import { requestMcpAdd } from "../settings/mcp-add-request.ts";
 import { NEEDS_SESSION, NOT_YET } from "./terminal-only.ts";
@@ -204,6 +205,10 @@ export function useCommands({ session, cwd, typing, send }: UseCommandsOptions):
             return "handled";
           case "setup":
             navigate(settingsPath("info"));
+            return "handled";
+          case "data":
+            if (found.name === null) sidebarItemStore.set("data");
+            navigate(found.name === null ? dataPath() : dataPath(found.name));
             return "handled";
           case "sessions":
             return say(NOT_YET.sessions);

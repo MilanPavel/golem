@@ -93,6 +93,8 @@ export type { DataNotesDraftResult } from "../../protocol/gen/data-notes-draft-r
 export type { DataNotesGetResult } from "../../protocol/gen/data-notes-get-result.ts";
 export type { DataNotesSetResult } from "../../protocol/gen/data-notes-set-result.ts";
 export type { DataQueryParams } from "../../protocol/gen/data-query-params.ts";
+export type { ToolTable, ToolTableColumn } from "../../protocol/gen/tool-completed-data.ts";
+export type { DataExtensionInstallResult } from "../../protocol/gen/data-extension-install-result.ts";
 export type { DataResult } from "../../protocol/gen/data-result.ts";
 export type { DataRemoveResult } from "../../protocol/gen/data-remove-result.ts";
 export type { DataSavedQuery } from "../../protocol/gen/data-saved-query.ts";
