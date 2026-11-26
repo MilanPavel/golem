@@ -466,8 +466,32 @@ import {
   pressRunsManager,
   runsManagerKeyOf,
   type RunList,
+  type RunsManagerAction,
   type RunsManagerState,
 } from "./runs-manager.ts";
+import {
+  closedWorkflowsManager,
+  failedWorkflowStart,
+  layoutWorkflowsManager,
+  openWorkflowsManager,
+  pressWorkflowsManager,
+  workflowsManagerKeyOf,
+  workflowsManagerTyping,
+  type WorkflowList,
+  type WorkflowsAction,
+  type WorkflowsManagerState,
+} from "./workflows-manager.ts";
+import {
+  applyStepNotice,
+  closedWorkflowRun,
+  layoutWorkflowRun,
+  openWorkflowRun,
+  pressWorkflowRun,
+  workflowRunKeyOf,
+  type WorkflowRunAction,
+  type WorkflowRunData,
+  type WorkflowRunManagerState,
+} from "./workflow-run-manager.ts";
 import {
   closedMemoryManager,
   emptyMemoryList,
@@ -760,6 +784,18 @@ export function App({
   const [runsManager, setRunsManager] = useState<RunsManagerState>(closedRunsManager);
   const runsManagerRef = useRef(runsManager);
   runsManagerRef.current = runsManager;
+  const [workflowsManager, setWorkflowsManager] = useState<WorkflowsManagerState>(closedWorkflowsManager);
+  const workflowsManagerRef = useRef(workflowsManager);
+  workflowsManagerRef.current = workflowsManager;
+  const [workflowList, setWorkflowList] = useState<WorkflowList>({ workflows: null, error: null });
+  const workflowListRef = useRef(workflowList);
+  workflowListRef.current = workflowList;
+  const [workflowRun, setWorkflowRun] = useState<WorkflowRunManagerState>(closedWorkflowRun);
+  const workflowRunRef = useRef(workflowRun);
+  workflowRunRef.current = workflowRun;
+  const [workflowRunData, setWorkflowRunData] = useState<WorkflowRunData>({ status: null, error: null });
+  const workflowRunDataRef = useRef(workflowRunData);
+  workflowRunDataRef.current = workflowRunData;
   const [stepsManager, setStepsManager] = useState<StepsManagerState>(closedStepsManager);
   const stepsManagerRef = useRef(stepsManager);
   stepsManagerRef.current = stepsManager;
@@ -1087,6 +1123,8 @@ export function App({
     agentsManager.open ||
     routinesManager.open ||
     runsManager.open ||
+    workflowsManager.open ||
+    workflowRun.open ||
     stepsManager.open ||
     memoryManager.open ||
     changesManager.open ||
@@ -1677,6 +1715,21 @@ export function App({
     }
   }, [client, connection.status]);
 
+  useEffect(() => {
+    // The open workflow run follows its own notifications: a step is folded in at once, and the run is read again.
+    return client.onWorkflowEvent((notice) => {
+      const open = workflowRunRef.current;
+      loadRuns();
+      if (!open.open || notice.params.workflow_run_id !== open.workflowRunId) {
+        return;
+      }
+      if (notice.kind === "step") {
+        setWorkflowRunData((current) => applyStepNotice(current, notice.params));
+      }
+      loadWorkflowRun(open.workflowRunId);
+    });
+  }, [client]);
+
   // A session that stopped waiting is forgotten, so it can show again when it waits again.
   useEffect(() => {
     setDismissedRuns((current) => pruneDismissed(current, runList.runs));
@@ -2233,6 +2286,44 @@ export function App({
     );
   }
 
+  /** Ask for the workflows of the user and of this folder's project. `/workflows` reads them. */
+  function loadWorkflows(): void {
+    client.listWorkflows([skillsFolder()]).then(
+      (listed) => setWorkflowList({ workflows: listed.workflows, error: null }),
+      (error: unknown) => setWorkflowList({ workflows: null, error: messageOf(error) }),
+    );
+  }
+
+  /** Read one workflow run with its steps and the reviews that wait. */
+  function loadWorkflowRun(workflowRunId: string): void {
+    client.workflowStatus(workflowRunId).then(
+      (status) => {
+        if (workflowRunRef.current.open && workflowRunRef.current.workflowRunId === workflowRunId) {
+          setWorkflowRunData({ status, error: null });
+        }
+      },
+      (error: unknown) => {
+        if (workflowRunRef.current.open && workflowRunRef.current.workflowRunId === workflowRunId) {
+          setWorkflowRunData((current) => (current.status === null ? { status: null, error: messageOf(error) } : current));
+        }
+      },
+    );
+  }
+
+  /** Open the steps of a workflow run, from `/runs` or from a workflow that was just started. */
+  function showWorkflowRun(workflowRunId: string, from: WorkflowRunManagerState["from"]): void {
+    const next = openWorkflowRun(workflowRunId, from);
+    workflowRunRef.current = next;
+    setWorkflowRun(next);
+    setWorkflowRunData({ status: null, error: null });
+    loadWorkflowRun(workflowRunId);
+  }
+
+  function showWorkflowRunState(next: WorkflowRunManagerState): void {
+    workflowRunRef.current = next;
+    setWorkflowRun(next);
+  }
+
   /** Ask for the runs again. `/runs` reads them. */
   function loadRuns(): void {
     client.listRuns().then(
@@ -2588,6 +2679,14 @@ export function App({
       setKeysOpen(false);
       setSwitcher(closedSwitcher);
       showStepsManager(openStepsManager());
+      return;
+    }
+    if (outcome.kind === "workflows") {
+      setDraft(draftAt(""));
+      setKeysOpen(false);
+      setSwitcher(closedSwitcher);
+      showWorkflowsManager(openWorkflowsManager());
+      loadWorkflows();
       return;
     }
     if (outcome.kind === "runs") {
@@ -4765,10 +4864,99 @@ export function App({
     }
     const pressed = pressRunsManager(runsManagerRef.current, runListRef.current.runs ?? [], key, Date.now());
     showRunsManager(pressed.state);
-    if (pressed.action.kind === "open") {
+    runRunsAction(pressed.action);
+  }
+
+  function runRunsAction(action: RunsManagerAction): void {
+    if (action.kind === "open") {
       // The chat replays the run's events, so a run that waits shows its approval band.
       showRunsManager(closedRunsManager);
-      session.switchTo(pressed.action.sessionId);
+      session.switchTo(action.sessionId);
+    } else if (action.kind === "open-workflow") {
+      showRunsManager(closedRunsManager);
+      showWorkflowRun(action.workflowRunId, "runs");
+    } else if (action.kind === "cancel") {
+      client.cancelWorkflow(action.workflowRunId).then(
+        (result) => {
+          setChat((state) => ({ ...state, notice: result.cancelled ? "the run is cancelled" : "the run had ended already" }));
+          loadRuns();
+        },
+        (error: unknown) => setChat((state) => ({ ...state, notice: messageOf(error) })),
+      );
+    }
+  }
+
+  function showWorkflowsManager(next: WorkflowsManagerState): void {
+    workflowsManagerRef.current = next;
+    setWorkflowsManager(next);
+  }
+
+  function onWorkflowsManagerPress(press: Press): void {
+    const key = workflowsManagerKeyOf(press, workflowsManagerTyping(workflowsManagerRef.current));
+    if (key === null) {
+      return;
+    }
+    const pressed = pressWorkflowsManager(workflowsManagerRef.current, workflowListRef.current.workflows ?? [], key);
+    showWorkflowsManager(pressed.state);
+    runWorkflowsAction(pressed.action);
+  }
+
+  function runWorkflowsAction(action: WorkflowsAction): void {
+    if (action.kind === "start") {
+      client.startWorkflow(action.id, action.inputs).then(
+        (started) => {
+          showWorkflowsManager(closedWorkflowsManager);
+          showWorkflowRun(started.workflow_run_id, "workflows");
+          loadRuns();
+        },
+        (error: unknown) => showWorkflowsManager(failedWorkflowStart(workflowsManagerRef.current, messageOf(error))),
+      );
+    }
+  }
+
+  function onWorkflowRunPress(press: Press): void {
+    const key = workflowRunKeyOf(press);
+    if (key === null) {
+      return;
+    }
+    const pressed = pressWorkflowRun(workflowRunRef.current, workflowRunDataRef.current, key);
+    showWorkflowRunState(pressed.state);
+    runWorkflowRunAction(pressed.action);
+  }
+
+  function runWorkflowRunAction(action: WorkflowRunAction): void {
+    const id = workflowRunRef.current.workflowRunId;
+    const said = (notice: string | null) => showWorkflowRunState({ ...workflowRunRef.current, notice });
+    if (action.kind === "close") {
+      setWorkflowRunData({ status: null, error: null });
+      if (action.from === "runs") {
+        showRunsManager(openRunsManager());
+        loadRuns();
+      } else if (action.from === "workflows") {
+        showWorkflowsManager(openWorkflowsManager());
+        loadWorkflows();
+      }
+    } else if (action.kind === "open-chat" || action.kind === "open-review") {
+      showWorkflowRunState(closedWorkflowRun);
+      session.switchTo(action.sessionId);
+    } else if (action.kind === "answer") {
+      client.answerWorkflowReview(id, action.key, action.verdict).then(
+        () => loadWorkflowRun(id),
+        (error: unknown) => said(messageOf(error)),
+      );
+    } else if (action.kind === "cancel") {
+      client.cancelWorkflow(id).then(
+        (result) => {
+          if (!result.cancelled) said("The run had ended already.");
+          loadWorkflowRun(id);
+        },
+        (error: unknown) => said(messageOf(error)),
+      );
+    } else if (action.kind === "resume") {
+      client.resumeWorkflow(id).then(
+        () => loadWorkflowRun(id),
+        (error: unknown) => said(messageOf(error)),
+      );
     }
   }
 
@@ -5914,6 +6102,14 @@ export function App({
       onRunsManagerPress(press);
       return;
     }
+    if (workflowsManagerRef.current.open && !keysOpenRef.current && press.name !== "f1" && press.name !== "ctrl-c") {
+      onWorkflowsManagerPress(press);
+      return;
+    }
+    if (workflowRunRef.current.open && !keysOpenRef.current && press.name !== "f1" && press.name !== "ctrl-c") {
+      onWorkflowRunPress(press);
+      return;
+    }
     if (memoryManagerRef.current.open && !keysOpenRef.current && press.name !== "f1" && press.name !== "ctrl-c") {
       onMemoryManagerPress(press);
       return;
@@ -6124,6 +6320,8 @@ export function App({
       agentsManagerRef.current.open ||
       routinesManagerRef.current.open ||
       runsManagerRef.current.open ||
+      workflowsManagerRef.current.open ||
+      workflowRunRef.current.open ||
       stepsManagerRef.current.open ||
       memoryManagerRef.current.open ||
       changesManagerRef.current.open ||
@@ -6171,7 +6369,7 @@ export function App({
     },
     all: transcript.all,
     pinned: transcript.pinned === null ? null : { row: budget.header, offset: transcript.pinned.offset },
-    shown: !keysOpen && !picker.open && !mcpManager.open && !skillsManager.open && !agentsManager.open && !routinesManager.open && !runsManager.open && !stepsManager.open && !memoryManager.open && !changesManager.open && !perms.open && !switcher.open,
+    shown: !keysOpen && !picker.open && !mcpManager.open && !skillsManager.open && !agentsManager.open && !routinesManager.open && !runsManager.open && !workflowsManager.open && !workflowRun.open && !stepsManager.open && !memoryManager.open && !changesManager.open && !perms.open && !switcher.open,
   };
   const composer =
     argsEdit !== null
@@ -6337,6 +6535,18 @@ export function App({
           columns={columns}
           height={budget.body}
         />
+      ) : workflowsManager.open ? (
+        <Box flexDirection="column" width={columns} height={budget.body} flexShrink={0} overflow="hidden">
+          {layoutWorkflowsManager({ state: workflowsManager, list: workflowList, columns, rows: budget.body }).map((line, index) => (
+            <McpManagerRow key={index} line={line} />
+          ))}
+        </Box>
+      ) : workflowRun.open ? (
+        <Box flexDirection="column" width={columns} height={budget.body} flexShrink={0} overflow="hidden">
+          {layoutWorkflowRun({ state: workflowRun, data: workflowRunData, now: Date.now(), columns, rows: budget.body }).map((line, index) => (
+            <McpManagerRow key={index} line={line} />
+          ))}
+        </Box>
       ) : runsManager.open ? (
         <Box flexDirection="column" width={columns} height={budget.body} flexShrink={0} overflow="hidden">
           {layoutRunsManager({ state: runsManager, list: runList, now: Date.now(), columns, rows: budget.body }).map(

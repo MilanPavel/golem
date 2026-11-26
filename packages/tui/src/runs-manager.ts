@@ -25,15 +25,30 @@ export type RunList = { runs: readonly RunInfo[] | null; error: string | null };
 
 export const closedRunsManager: RunsManagerState = { open: false, selected: 0 };
 
-export type RunsManagerKey = "up" | "down" | "enter" | "back";
+export type RunsManagerKey = "up" | "down" | "enter" | "back" | "cancel";
 
-export type RunsManagerAction = { kind: "none" } | { kind: "close" } | { kind: "open"; sessionId: string };
+export type RunsManagerAction =
+  | { kind: "none" }
+  | { kind: "close" }
+  | { kind: "open"; sessionId: string }
+  /** A workflow run (also one a routine started): its steps open, not its chat. */
+  | { kind: "open-workflow"; workflowRunId: string }
+  /** `c` on a workflow run that has not ended. */
+  | { kind: "cancel"; workflowRunId: string };
 
 /** The same row shape as the MCP manager, so one component draws both. */
 export type RunsManagerLine = McpManagerLine;
 
 const LIST_HINT = "↑/↓ to navigate · Enter to open · Esc to close";
+const CANCEL_HINT = "↑/↓ to navigate · Enter to open · c cancel the run · Esc to close";
 const NO_RUNS = "Nothing has run yet. Routines and golem ask --detach show up here.";
+
+/** A workflow run (also one a routine started) that has not ended, which `c` can stop. */
+export function cancellableWorkflowRun(run: RunInfo): string | null {
+  const id = run.workflow_run_id;
+  const live = run.status === "running" || run.status === "queued" || run.status === "waiting";
+  return id !== undefined && id !== null && id !== "" && live ? id : null;
+}
 
 export function openRunsManager(): RunsManagerState {
   return { open: true, selected: 0 };
@@ -46,7 +61,10 @@ export function runsManagerKeyOf(press: Press): RunsManagerKey | null {
   if (press.name === "return") {
     return "enter";
   }
-  return press.name === "escape" ? "back" : null;
+  if (press.name === "escape") {
+    return "back";
+  }
+  return press.name === null && !press.ctrl && !press.meta && press.input === "c" ? "cancel" : null;
 }
 
 /** Every run in the order of the screen: the groups one after the other. */
@@ -69,7 +87,16 @@ export function pressRunsManager(
     return { state: { ...state, selected: clamp(selected + (key === "up" ? -1 : 1), items.length) }, action: { kind: "none" } };
   }
   const run = items[selected];
-  return { state, action: run === undefined ? { kind: "none" } : { kind: "open", sessionId: run.session_id } };
+  if (run === undefined) {
+    return { state, action: { kind: "none" } };
+  }
+  const workflowRunId = run.workflow_run_id;
+  const isWorkflow = workflowRunId !== undefined && workflowRunId !== null && workflowRunId !== "";
+  if (key === "cancel") {
+    const cancellable = cancellableWorkflowRun(run);
+    return { state, action: cancellable === null ? { kind: "none" } : { kind: "cancel", workflowRunId: cancellable } };
+  }
+  return { state, action: isWorkflow ? { kind: "open-workflow", workflowRunId } : { kind: "open", sessionId: run.session_id } };
 }
 
 /** ! needs you, ● running, ✔ finished, ✘ failed, ○ skipped or stopped. */
@@ -108,7 +135,9 @@ export function layoutRunsManager(input: {
   } else {
     body = scrollToSelected(listLines(input.list.runs, input.state.selected, input.now), room);
   }
-  const lines = [...body.slice(0, room), { text: "" }, { text: LIST_HINT, dim: true }];
+  const picked = input.list.runs === null ? undefined : orderedRuns(input.list.runs, input.now)[clamp(input.state.selected, input.list.runs.length)];
+  const hint = picked !== undefined && cancellableWorkflowRun(picked) !== null ? CANCEL_HINT : LIST_HINT;
+  const lines = [...body.slice(0, room), { text: "" }, { text: hint, dim: true }];
   return lines.slice(0, Math.max(0, input.rows)).map((line) => {
     const used = (line.prefix?.length ?? 0) + (line.mark ? line.mark.text.length + 1 : 0);
     return { ...line, text: fit(line.text, Math.max(1, width - used)) };

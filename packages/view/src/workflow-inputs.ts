@@ -49,7 +49,9 @@ export function inputFields(inputs: readonly WorkflowInputInfo[] | undefined): I
 
 /** What each field shows when the dialog opens: its default, or nothing. */
 export function initialValues(fields: readonly InputField[]): Record<string, string> {
-  return Object.fromEntries(fields.map((field) => [field.name, field.default ?? (field.kind === "bool" ? "false" : "")]));
+  return Object.fromEntries(
+    fields.map((field) => [field.name, field.kind === "bool" ? String((field.default ?? "").toLowerCase() === "true") : (field.default ?? "")]),
+  );
 }
 
 /** The complaint for a field, or null. A field with a default may be left empty. */
