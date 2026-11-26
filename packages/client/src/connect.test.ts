@@ -1815,6 +1815,40 @@ test("data.query sends its params and result_id, data.cancel sends the id, and a
   }
 });
 
+test("data.result.page sends the id, offset and limit, and a malformed page is refused", async () => {
+  const page = { result_id: "r_1", source: "golem", columns: [{ name: "n", type: "BIGINT" }], rows: [[21], [22]], total_rows: 60, truncated: false, elapsed_ms: 0 };
+  const sent: Record<string, unknown>[] = [];
+  const server = await listen((socket) => {
+    attach(socket, {
+      answerPing: true,
+      results: { "data.result.page": page },
+      onRequest: (_socket, method, params) => {
+        if (method.startsWith("data.")) {
+          sent.push({ method, ...params });
+        }
+      },
+    });
+  });
+  const client = connectGolem({ socketPath: server.socketPath, clientName: "tui", reconnect: false, heartbeatMs: 60_000 });
+  try {
+    assert.deepEqual(await client.pageDataResult("r_1", 20, 20), page);
+    assert.deepEqual(sent, [{ method: "data.result.page", result_id: "r_1", offset: 20, limit: 20 }]);
+  } finally {
+    client.close();
+    await server.close();
+  }
+  const bad = await listen((socket) => {
+    attach(socket, { answerPing: true, results: { "data.result.page": { rows: "no" } } });
+  });
+  const other = connectGolem({ socketPath: bad.socketPath, clientName: "tui", reconnect: false, heartbeatMs: 60_000 });
+  try {
+    await assert.rejects(other.pageDataResult("r_1", 0, 5), /invalid data.result.page result/);
+  } finally {
+    other.close();
+    await bad.close();
+  }
+});
+
 test("device.* calls send their params, and device.pair.changed and device.changed reach their listeners", async () => {
   const phone = { id: "a".repeat(32), name: "iPhone 16", paired_at: "2026-11-21T10:00:00+01:00", last_seen: null, revoked_at: null, rules: 1 };
   const sent: Record<string, unknown>[] = [];

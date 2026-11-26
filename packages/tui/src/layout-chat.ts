@@ -41,6 +41,7 @@ import {
   type PlanStepView,
   type ToolBlock,
 } from "@golem/view";
+import { hasTable, resultLines, type DataPage } from "./data-table.ts";
 import { batchLines } from "./helper-tree.ts";
 import { formatMessageTime } from "./transcript.ts";
 
@@ -104,6 +105,8 @@ export type TranscriptOptions = {
   thinking?: boolean;
   /** How many diff rows an edit shows under its line: none, 10 or 30. Unset is `normal`. */
   detail?: Detail;
+  /** The page a data result was moved to, by call id. A result without one shows its first page. */
+  dataPages?: Readonly<Record<string, DataPage>>;
   /** The helper batch of each `delegate` call, by call id. A call with a batch is drawn as a tree; one without keeps its line. */
   batches?: Readonly<Record<string, HelperBatch>>;
   /** Whether a model runs on this machine, from the model list. Unset leaves each helper as its events said. */
@@ -193,7 +196,7 @@ export function layoutMessages(
       const rows =
         batch !== undefined && isDelegate(tool)
           ? batchLines(batch, width, options?.detail, options?.isLocal)
-          : toolLines(tool, width, options?.toolOutput === true, options?.detail);
+          : toolLines(tool, width, options?.toolOutput === true, options?.detail, options?.dataPages?.[tool.callId]);
       for (const spans of rows) {
         lines.push(wrappedLine(role, spans));
       }
@@ -365,7 +368,7 @@ function firstLine(text: string): string {
 export const UNSUCCESSFUL_MARK = "✗";
 
 /** `read_file src/a.ts ✓  12 lines`, then the output while Ctrl-O is on. */
-export function toolLines(tool: ToolBlock, width: number, expanded: boolean, detail: Detail = "normal"): Span[][] {
+export function toolLines(tool: ToolBlock, width: number, expanded: boolean, detail: Detail = "normal", page?: DataPage): Span[][] {
   const plan = tool.name === PROPOSE_PLAN_TOOL && tool.status !== "failed" ? planOfCall(tool.args) : null;
   if (plan !== null) {
     return planLines(plan, width);
@@ -397,6 +400,9 @@ export function toolLines(tool: ToolBlock, width: number, expanded: boolean, det
       lines.push(...wrapSpans([{ text: `  │ ${visibleText(row)}`, dim: true }], width));
     }
     return lines;
+  }
+  if (hasTable(tool)) {
+    return [...lines, ...resultLines(tool, width, expanded, page)];
   }
   if (!expanded || tool.status !== "done" || tool.preview === undefined) {
     return lines;

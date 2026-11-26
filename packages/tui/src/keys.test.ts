@@ -267,3 +267,14 @@ test("while the arguments are open, keys edit them and Enter or Esc leave", () =
   const asking = place({ busy: true, approval: true });
   assert.deepEqual(pressKey(asking, { name: null, input: "e", ctrl: false, meta: false }), { kind: "edit-args" });
 });
+
+test("with Ctrl-O on and a long data result, the Page keys page its rows and not the transcript", () => {
+  const press = (where: ReturnType<typeof place>, name: Parameters<typeof pressKey>[1]["name"]) =>
+    pressKey(where, { name, input: "", ctrl: false, meta: false });
+  const paging = place({ resultPages: true });
+  assert.deepEqual(press(paging, "page-down"), { kind: "result-page", toward: "down" });
+  assert.deepEqual(press(paging, "page-up"), { kind: "result-page", toward: "up" });
+  assert.deepEqual(press(place(), "page-up"), { kind: "scroll", target: "transcript", toward: "up" });
+  assert.deepEqual(press(place({ resultPages: true, debug: true }), "page-up"), { kind: "scroll", target: "debug", toward: "up" });
+  assert.equal(press(place({ resultPages: true, overlay: true }), "page-up").kind, "scroll-overlay");
+});
