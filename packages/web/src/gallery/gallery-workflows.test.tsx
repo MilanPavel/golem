@@ -64,3 +64,22 @@ test("the gallery's Run dialog stories show each state, in both themes", () => {
     unmount();
   }
 });
+
+test("the gallery's Workflow run section shows each state, in both themes", () => {
+  render(<Gallery />);
+  for (const theme of ["slip", "kiln"] as const) {
+    for (const title of [
+      "Workflow run, running",
+      "Workflow run, waiting for a review",
+      "Workflow run, tool ask and worker row",
+      "Workflow run, failed",
+      "Workflow run, cancelled",
+      "Workflow run, done, agent and worker rows",
+    ]) {
+      expect(screen.getByRole("region", { name: `${title}, ${theme}` }), title).toBeTruthy();
+    }
+    expect(within(screen.getByRole("region", { name: `Workflow run, waiting for a review, ${theme}` })).getByRole("region", { name: "Review, Send this digest?" })).toBeTruthy();
+    expect(within(screen.getByRole("region", { name: `Workflow run, tool ask and worker row, ${theme}` })).getByRole("region", { name: "Review, Run gh_pr_create?" })).toBeTruthy();
+    expect(within(screen.getByRole("region", { name: `Workflow run, failed, ${theme}` })).getByRole("button", { name: "Resume" })).toBeTruthy();
+  }
+});

@@ -22,7 +22,7 @@ import type { AuthListResult, FileListResult, CostGetResult, NotificationsValues
 import { isAgentsMissing } from "./agents.ts";
 import { ARTIFACT_PAGE, artifactKey, traceKey, traceSpanKey, type ArtifactReadResult, type TraceGetResult, type TraceSpanResult } from "./trace.ts";
 import { ROUTINE_LIST_KEY, routineGetKey, type RoutineGetResult, type RoutineListResult } from "./routines.ts";
-import { WORKFLOW_LIST_KEY, workflowGetKey, type WorkflowGetResult, type WorkflowListResult } from "./workflows.ts";
+import { WORKFLOW_LIST_KEY, workflowGetKey, workflowStatusKey, type WorkflowGetResult, type WorkflowListResult, type WorkflowStatusResult } from "./workflows.ts";
 import { RUN_LIST_KEY, sessionRunKey, type RunInfo, type RunListResult } from "./runs.ts";
 import { mcpCatalogKey, mcpListKey, mcpToolsKey, type McpCatalogResult, type McpToolsResult } from "./mcp.ts";
 import { turnCards, type NotesState, type Pastes, type ReviewNote, type ShellTracking, type TurnCard } from "@golem/view";
@@ -619,6 +619,12 @@ export function useWorkflowList(): UseQueryResult<WorkflowListResult> {
 export function useWorkflow(id: string): UseQueryResult<WorkflowGetResult> {
   const { queries } = usePage();
   return useQuery({ queryKey: workflowGetKey(id), queryFn: () => queries.workflowGet(id), retry: false });
+}
+
+/** One run of a workflow with its steps and open reviews. Marked stale by every `workflow.run.*` and `workflow.step.*` notification, so an open run view ticks along. */
+export function useWorkflowStatus(workflowRunId: string): UseQueryResult<WorkflowStatusResult> {
+  const { queries } = usePage();
+  return useQuery({ queryKey: workflowStatusKey(workflowRunId), queryFn: () => queries.workflowStatus(workflowRunId), retry: false });
 }
 
 /** The runs, one per headless session, newest first. Marked stale when a routine fires or ends and when a headless session changes. */

@@ -73,6 +73,8 @@ function listeners<A>() {
 }
 
 /** A client that records calls and lets a test push events. */
+const WORKFLOW_RUN = { workflow_id: "x::x", name: "x", status: "done", trigger: "manual", inputs: {}, session_id: null, started_at: null, finished_at: null, error: null } as const;
+
 export function fakeClient() {
   const state = listeners<ConnectionState>();
   const event = listeners<ChatEvent>();
@@ -133,7 +135,10 @@ export function fakeClient() {
       code: "",
     })),
     startWorkflow: vi.fn<PageClient["startWorkflow"]>(async () => ({ workflow_run_id: "wr_1" })),
-    workflowStatus: vi.fn<PageClient["workflowStatus"]>(async () => ({ run: { workflow_run_id: "wr_1", workflow_id: "x", name: "x", status: "running", trigger: "manual", inputs: {}, session_id: "s_wr" }, steps: [], reviews: [] }) as never),
+    workflowStatus: vi.fn<PageClient["workflowStatus"]>(async (id) => ({ run: { ...WORKFLOW_RUN, workflow_run_id: id }, steps: [], reviews: [] })),
+    cancelWorkflow: vi.fn<PageClient["cancelWorkflow"]>(async () => ({ cancelled: true })),
+    resumeWorkflow: vi.fn<PageClient["resumeWorkflow"]>(async (id) => ({ run: { ...WORKFLOW_RUN, workflow_run_id: id } })),
+    answerWorkflowReview: vi.fn<PageClient["answerWorkflowReview"]>(async (id) => ({ run: { ...WORKFLOW_RUN, workflow_run_id: id } })),
     listRoutines: vi.fn<PageClient["listRoutines"]>(async () => ({ routines: [] })),
     listRuns: vi.fn<PageClient["listRuns"]>(async () => ({ runs: [] })),
     getRoutine: vi.fn<PageClient["getRoutine"]>(async (name) => ({ routine: { config: { name, prompt: "" }, path: "/Users/me/.golem/config.toml", source: "user" }, runs: [] })),

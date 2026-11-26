@@ -18,7 +18,7 @@ import { SKILL_LIST_KEY } from "./skills.ts";
 import { MEMORY_LIST_KEY, MEMORY_PAGE, type MemoryExportParams, type MemoryExportResult, type MemoryListRequest, type MemoryListResult, type MemoryPrivacy, type MemoryScope } from "./memory.ts";
 import { ROUTINE_GET_KEY, ROUTINE_LIST_KEY, type RoutineGetResult, type RoutineInfo, type RoutineListResult, type RoutineRunResult } from "./routines.ts";
 import { RUN_LIST_KEY, type RunListResult } from "./runs.ts";
-import type { WorkflowGetResult, WorkflowListResult } from "./workflows.ts";
+import { WORKFLOW_STATUS_KEY, type ReviewVerdict, type WorkflowCancelResult, type WorkflowGetResult, type WorkflowListResult, type WorkflowResumeResult, type WorkflowStatusResult } from "./workflows.ts";
 import { createPulls, type Pulls } from "./pulls.ts";
 import { createQueryClient, keepQueriesHonest } from "./query.ts";
 import { createRouter, type Router } from "./router.ts";
@@ -73,6 +73,9 @@ export type PageClient = Pick<
   | "getWorkflow"
   | "startWorkflow"
   | "workflowStatus"
+  | "cancelWorkflow"
+  | "resumeWorkflow"
+  | "answerWorkflowReview"
   | "onWorkflowEvent"
   | "listRuns"
   | "getRoutine"
@@ -400,6 +403,12 @@ export type PageActions = {
   runRoutine(name: string, folder: string | null): Promise<RoutineRunResult>;
   /** Starts a run of the workflow `id` with `inputs`. Resolves with the workflow run id, which `/runs/:id` opens it by. */
   startWorkflow(id: string, inputs: Record<string, unknown>): Promise<string>;
+  /** Stops a workflow run. `cancelled` is false when it had ended already. */
+  cancelWorkflow(workflowRunId: string): Promise<WorkflowCancelResult>;
+  /** Continues a stopped run; the steps that finished are not run again. Resolves with the run as it is then. */
+  resumeWorkflow(workflowRunId: string): Promise<WorkflowResumeResult>;
+  /** Answers the review `key` of a waiting run. `text` is what an edit says. The run continues once none of its reviews waits. */
+  answerWorkflowReview(workflowRunId: string, key: string, verdict: ReviewVerdict, text?: string): Promise<void>;
   /** Deletes a user routine from config.toml. */
   removeRoutine(name: string): Promise<void>;
   /** Writes a user routine: merges `fields` into `name` (a null removes a key), or with `create` makes it. Rejects with the daemon's reason. */
@@ -480,6 +489,8 @@ export type PageQueries = {
   workflowList(folders: readonly string[]): Promise<WorkflowListResult>;
   /** One workflow with its outline steps and the text of its file. */
   workflowGet(id: string): Promise<WorkflowGetResult>;
+  /** One run of a workflow, with its steps and the reviews that wait. */
+  workflowStatus(workflowRunId: string): Promise<WorkflowStatusResult>;
   /** The runs, one per headless session, newest first. With `sessionId`, that session's row alone. */
   runList(sessionId: string | null): Promise<RunListResult>;
   /** One routine and its recent runs, newest first. `folder` is a project routine's project, null a user routine. */
@@ -625,6 +636,7 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
       routineList: () => client.listRoutines(),
       workflowList: (folders) => client.listWorkflows([...folders]),
       workflowGet: (id) => client.getWorkflow(id),
+      workflowStatus: (workflowRunId) => client.workflowStatus(workflowRunId),
       runList: (sessionId) => (sessionId === null ? client.listRuns() : client.listRuns({ sessionId })),
       routineGet: (name, folder) => (folder === null ? client.getRoutine(name) : client.getRoutine(name, folder)),
       config: (cwd, sessionId) => client.getConfig(cwd ?? undefined, sessionId ?? undefined),
@@ -934,6 +946,30 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
         } finally {
           await queryClient.invalidateQueries({ queryKey: ROUTINE_LIST_KEY });
           await queryClient.invalidateQueries({ queryKey: ROUTINE_GET_KEY });
+        }
+      },
+      async cancelWorkflow(workflowRunId) {
+        try {
+          return await client.cancelWorkflow(workflowRunId);
+        } finally {
+          await queryClient.invalidateQueries({ queryKey: WORKFLOW_STATUS_KEY });
+          await queryClient.invalidateQueries({ queryKey: RUN_LIST_KEY });
+        }
+      },
+      async resumeWorkflow(workflowRunId) {
+        try {
+          return await client.resumeWorkflow(workflowRunId);
+        } finally {
+          await queryClient.invalidateQueries({ queryKey: WORKFLOW_STATUS_KEY });
+          await queryClient.invalidateQueries({ queryKey: RUN_LIST_KEY });
+        }
+      },
+      async answerWorkflowReview(workflowRunId, key, verdict, text) {
+        try {
+          await client.answerWorkflowReview(workflowRunId, key, verdict, text);
+        } finally {
+          await queryClient.invalidateQueries({ queryKey: WORKFLOW_STATUS_KEY });
+          await queryClient.invalidateQueries({ queryKey: RUN_LIST_KEY });
         }
       },
       async saveRoutine(name, fields, create) {

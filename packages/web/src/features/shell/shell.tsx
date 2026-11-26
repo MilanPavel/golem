@@ -3,7 +3,7 @@ import { useNavigate, useRoute } from "../../store/page-context.tsx";
 import { PaletteHost } from "../palette/index.ts";
 import { MenuBar, SidebarShell } from "../sidebar/index.ts";
 import { RoutineNewScreen, RoutineScreen, RoutinesScreen } from "../routines/index.ts";
-import { RunsScreen } from "../runs/index.ts";
+import { RunsScreen, WorkflowRunScreen } from "../runs/index.ts";
 import { WorkflowScreen, WorkflowsScreen } from "../workflows/index.ts";
 import { HelperChat } from "../sessions/index.ts";
 import { SettingsScreen } from "../settings/index.ts";
@@ -62,6 +62,8 @@ function Content() {
       return <WorkflowScreen id={route.id} />;
     case "runs":
       return <RunsScreen />;
+    case "run":
+      return <WorkflowRunScreen id={route.id} />;
     case "welcome":
       return <WelcomeScreen step={route.step} from={route.from} />;
     case "not-found":
