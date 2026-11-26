@@ -64,9 +64,9 @@ export function stepLines(steps: readonly WorkflowOutlineStep[]): Set<number> {
   return found;
 }
 
-/** This workflow's runs, from the Runs list: a workflow run's `origin` is `workflow:<name>`. Newest first, as the list is. */
+/** This workflow's runs, from the Runs list, including the ones a routine started: their `origin` is `workflow:<name>`. Newest first, as the list is. */
 export function workflowRuns(runs: readonly RunInfo[], name: string): RunInfo[] {
-  return runs.filter((run) => run.kind === "workflow" && run.origin === `workflow:${name}`);
+  return runs.filter((run) => (run.kind === "workflow" || run.kind === "routine") && run.origin === `workflow:${name}`);
 }
 
 /** The routines whose `workflow` is this one, in the daemon's order. */

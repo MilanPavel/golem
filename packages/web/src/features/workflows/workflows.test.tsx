@@ -69,7 +69,7 @@ test("groups and run filtering are pure", () => {
   expect(stepLines(SAMPLE_PR_DIGEST_STEPS)).toEqual(new Set([12, 15, 20, 23]));
   const other = { ...SAMPLE_WORKFLOW_RUNS[0]!, session_id: "x", origin: "workflow:other" };
   const routine = { ...SAMPLE_WORKFLOW_RUNS[0]!, session_id: "y", kind: "routine" as const, origin: "workflow:pr_digest" };
-  expect(workflowRuns([...SAMPLE_WORKFLOW_RUNS, other, routine], "pr_digest")).toHaveLength(SAMPLE_WORKFLOW_RUNS.length);
+  expect(workflowRuns([...SAMPLE_WORKFLOW_RUNS, other, routine], "pr_digest")).toHaveLength(SAMPLE_WORKFLOW_RUNS.length + 1);
 });
 
 function detail(extra: Partial<Parameters<typeof WorkflowDetail>[0]> = {}) {
