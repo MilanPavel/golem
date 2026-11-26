@@ -72,7 +72,7 @@
       "data": {
         "cleared_ids": [],
         "context_window": null,
-        "estimated_tokens": 4231,
+        "estimated_tokens": 4807,
         "index": 1,
         "message_bytes": [
           10
@@ -90,19 +90,23 @@
         "profile": "remote",
         "provider": null,
         "summary_chars": null,
-        "system_bytes": 266,
-        "system_chars": 266,
-        "system_prompt_sha": "5c6cc2ee3df8bed2c0fb3c5e47f1a18ffabe9c196916e69fbc540b20f1063538",
+        "system_bytes": 474,
+        "system_chars": 473,
+        "system_prompt_sha": "ac1167f70482a9551bc94dafcbd09d604012f96f3509fee703b3c5aabbbd5659",
         "system_sections": [
+          {
+            "chars": 205,
+            "name": "data_sources"
+          },
           {
             "chars": 266,
             "name": "cite_sources"
           }
         ],
         "tier": null,
-        "tools_bytes": 13819,
-        "tools_chars": 13819,
-        "tools_sha": "b4bc238386a4147b822f85c9cbc8ae7a0f580a9f2a3ac5570541783d2a4ac4b5",
+        "tools_bytes": 15532,
+        "tools_chars": 15532,
+        "tools_sha": "c165402bce4cbff8b16db092282ac1d6703f8a43c58eafaba15d620a9284111e",
         "window_estimated": false,
         "window_planned": false
       },
@@ -213,7 +217,7 @@
       "data": {
         "cleared_ids": [],
         "context_window": null,
-        "estimated_tokens": 4272,
+        "estimated_tokens": 4848,
         "index": 2,
         "message_bytes": [
           10,
@@ -237,19 +241,23 @@
         "profile": "remote",
         "provider": null,
         "summary_chars": null,
-        "system_bytes": 266,
-        "system_chars": 266,
-        "system_prompt_sha": "5c6cc2ee3df8bed2c0fb3c5e47f1a18ffabe9c196916e69fbc540b20f1063538",
+        "system_bytes": 474,
+        "system_chars": 473,
+        "system_prompt_sha": "ac1167f70482a9551bc94dafcbd09d604012f96f3509fee703b3c5aabbbd5659",
         "system_sections": [
+          {
+            "chars": 205,
+            "name": "data_sources"
+          },
           {
             "chars": 266,
             "name": "cite_sources"
           }
         ],
         "tier": null,
-        "tools_bytes": 13819,
-        "tools_chars": 13819,
-        "tools_sha": "b4bc238386a4147b822f85c9cbc8ae7a0f580a9f2a3ac5570541783d2a4ac4b5",
+        "tools_bytes": 15532,
+        "tools_chars": 15532,
+        "tools_sha": "c165402bce4cbff8b16db092282ac1d6703f8a43c58eafaba15d620a9284111e",
         "window_estimated": false,
         "window_planned": false
       },
@@ -381,7 +389,7 @@
       "data": {
         "cleared_ids": [],
         "context_window": null,
-        "estimated_tokens": 4231,
+        "estimated_tokens": 4807,
         "index": 1,
         "message_bytes": [
           10
@@ -399,19 +407,23 @@
         "profile": "remote",
         "provider": null,
         "summary_chars": null,
-        "system_bytes": 266,
-        "system_chars": 266,
-        "system_prompt_sha": "5c6cc2ee3df8bed2c0fb3c5e47f1a18ffabe9c196916e69fbc540b20f1063538",
+        "system_bytes": 474,
+        "system_chars": 473,
+        "system_prompt_sha": "ac1167f70482a9551bc94dafcbd09d604012f96f3509fee703b3c5aabbbd5659",
         "system_sections": [
+          {
+            "chars": 205,
+            "name": "data_sources"
+          },
           {
             "chars": 266,
             "name": "cite_sources"
           }
         ],
         "tier": null,
-        "tools_bytes": 13819,
-        "tools_chars": 13819,
-        "tools_sha": "b4bc238386a4147b822f85c9cbc8ae7a0f580a9f2a3ac5570541783d2a4ac4b5",
+        "tools_bytes": 15532,
+        "tools_chars": 15532,
+        "tools_sha": "c165402bce4cbff8b16db092282ac1d6703f8a43c58eafaba15d620a9284111e",
         "window_estimated": false,
         "window_planned": false
       },
@@ -522,7 +534,7 @@
       "data": {
         "cleared_ids": [],
         "context_window": null,
-        "estimated_tokens": 4272,
+        "estimated_tokens": 4848,
         "index": 2,
         "message_bytes": [
           10,
@@ -546,19 +558,23 @@
         "profile": "remote",
         "provider": null,
         "summary_chars": null,
-        "system_bytes": 266,
-        "system_chars": 266,
-        "system_prompt_sha": "5c6cc2ee3df8bed2c0fb3c5e47f1a18ffabe9c196916e69fbc540b20f1063538",
+        "system_bytes": 474,
+        "system_chars": 473,
+        "system_prompt_sha": "ac1167f70482a9551bc94dafcbd09d604012f96f3509fee703b3c5aabbbd5659",
         "system_sections": [
+          {
+            "chars": 205,
+            "name": "data_sources"
+          },
           {
             "chars": 266,
             "name": "cite_sources"
           }
         ],
         "tier": null,
-        "tools_bytes": 13819,
-        "tools_chars": 13819,
-        "tools_sha": "b4bc238386a4147b822f85c9cbc8ae7a0f580a9f2a3ac5570541783d2a4ac4b5",
+        "tools_bytes": 15532,
+        "tools_chars": 15532,
+        "tools_sha": "c165402bce4cbff8b16db092282ac1d6703f8a43c58eafaba15d620a9284111e",
         "window_estimated": false,
         "window_planned": false
       },
