@@ -32,6 +32,7 @@ from golem.permissions.policy import Policy
 from golem.sessions.helpers import worker_line
 from golem.store.artifacts import ArtifactStore
 from golem.store.database import Database
+from golem.tools.delegate import IN_COPIES
 from golem_protocol.events import ChatEvent, HelperEndedData
 
 __all__ = ["_home", "_settled", "lead"]
@@ -173,6 +174,8 @@ async def test_five_workers_return_five_diffs_with_their_check_results(
     assert "+1 \u22120 in 1 file \u00b7 checks pass \u00b7 diff in artifact" in text
     assert "checks failed: lint" in text
     assert text.count("diff in artifact") == WORKERS
+    # It is told the changes wait in the copies, so it does not make them again.
+    assert text.count(IN_COPIES) == 1
 
 
 @pytest.mark.parametrize("setup", SETUPS)
@@ -267,6 +270,7 @@ async def test_a_read_only_helper_has_no_worker_fields(
     assert data.added is None and data.removed is None
     assert data.checks is None and data.checks_failed is None and data.checks_note is None
     assert "diff in artifact" not in "\n".join(daemon.results())
+    assert IN_COPIES not in "\n".join(daemon.results())
 
 
 def test_files_of_reads_status_counts_and_binary_files() -> None:

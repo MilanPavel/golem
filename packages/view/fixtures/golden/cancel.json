@@ -72,7 +72,7 @@
       "data": {
         "cleared_ids": [],
         "context_window": null,
-        "estimated_tokens": 4193,
+        "estimated_tokens": 4230,
         "index": 1,
         "message_bytes": [
           5
@@ -100,9 +100,9 @@
           }
         ],
         "tier": null,
-        "tools_bytes": 13697,
-        "tools_chars": 13697,
-        "tools_sha": "d70bc3a6f7aa34af7354bc72e7be03b742ef2ece7e4cacb1ff133b7faaf8df87",
+        "tools_bytes": 13819,
+        "tools_chars": 13819,
+        "tools_sha": "b4bc238386a4147b822f85c9cbc8ae7a0f580a9f2a3ac5570541783d2a4ac4b5",
         "window_estimated": false,
         "window_planned": false
       },
@@ -269,7 +269,7 @@
       "data": {
         "cleared_ids": [],
         "context_window": null,
-        "estimated_tokens": 4193,
+        "estimated_tokens": 4230,
         "index": 1,
         "message_bytes": [
           5
@@ -297,9 +297,9 @@
           }
         ],
         "tier": null,
-        "tools_bytes": 13697,
-        "tools_chars": 13697,
-        "tools_sha": "d70bc3a6f7aa34af7354bc72e7be03b742ef2ece7e4cacb1ff133b7faaf8df87",
+        "tools_bytes": 13819,
+        "tools_chars": 13819,
+        "tools_sha": "b4bc238386a4147b822f85c9cbc8ae7a0f580a9f2a3ac5570541783d2a4ac4b5",
         "window_estimated": false,
         "window_planned": false
       },

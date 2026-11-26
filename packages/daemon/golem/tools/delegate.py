@@ -158,14 +158,33 @@ def _section(done: HelperOutcome) -> str:
     return f"{done.agent} finished: {done.stopped}\n\n{lead}{answer}"
 
 
+IN_COPIES = (
+    "These changes are in the workers' own copies, not in this folder yet. The user reviews "
+    "each diff and applies it or not. Do not make the same changes yourself: tell the user "
+    "which changes are ready to apply."
+)
+"""The note after the sections when a worker changed files, so the lead does not redo them."""
+
+
+def _changed_files(done: HelperOutcome) -> bool:
+    return bool(done.worker is not None and done.worker.files) or (
+        bool(done.changes) and not done.changes.startswith("The worker changed no file")
+    )
+
+
 def results_text(ended: Sequence[HelperOutcome]) -> str:
-    """The tool result of a ``delegate`` call: one section per helper, in the order of the call."""
+    """The tool result of a ``delegate`` call: one section per helper, in the order of the call,
+    then :data:`IN_COPIES` when a worker changed files."""
     if len(ended) == 1:
-        return _section(ended[0])
-    parts = [
-        f"### {n}. {done.label or done.agent}\n{_section(done)}" for n, done in enumerate(ended, 1)
-    ]
-    return "\n\n".join(parts)
+        text = _section(ended[0])
+    else:
+        text = "\n\n".join(
+            f"### {n}. {done.label or done.agent}\n{_section(done)}"
+            for n, done in enumerate(ended, 1)
+        )
+    if any(_changed_files(done) for done in ended):
+        text = f"{text}\n\n{IN_COPIES}"
+    return text
 
 
 def results_summary(ended: Sequence[HelperOutcome]) -> str:
@@ -188,7 +207,8 @@ async def _delegate(args: DelegateArgs, ctx: ToolContext) -> ToolResult:
 DESCRIPTION = (
     "Hand a reading or searching job to a helper that starts with an empty context. "
     "Use it for wide questions about many files. It returns a short answer, not the files. "
-    "It cannot change anything. "
+    "A reading helper changes nothing. A helper that writes works in a copy of the folder: its "
+    "changes reach this folder only when the user applies them. "
     "For several independent jobs, give batch: a list of {agent, brief, label}. "
     "They run at the same time, and no order is promised."
 )
