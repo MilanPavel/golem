@@ -18,6 +18,7 @@ export const GALLERY_SECTIONS = [
   "helper-card",
   "routines",
   "workflows",
+  "data",
   "runs",
   "workflow-run",
   "rail",

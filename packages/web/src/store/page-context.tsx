@@ -23,6 +23,8 @@ import { isAgentsMissing } from "./agents.ts";
 import { ARTIFACT_PAGE, artifactKey, traceKey, traceSpanKey, type ArtifactReadResult, type TraceGetResult, type TraceSpanResult } from "./trace.ts";
 import { ROUTINE_LIST_KEY, routineGetKey, type RoutineGetResult, type RoutineListResult } from "./routines.ts";
 import { WORKFLOW_LIST_KEY, workflowGetKey, workflowStatusKey, type WorkflowGetResult, type WorkflowListResult, type WorkflowStatusResult } from "./workflows.ts";
+import { RpcError } from "@golem/client";
+import { DATA_LIST_KEY, dataDescribeKey, dataNotesKey, type DataAnswer, type DataDescribeResult, type DataListResult, type DataNotesGetResult, type DataSampleRows } from "./data.ts";
 import { RUN_LIST_KEY, sessionRunKey, type RunInfo, type RunListResult } from "./runs.ts";
 import { mcpCatalogKey, mcpListKey, mcpToolsKey, type McpCatalogResult, type McpToolsResult } from "./mcp.ts";
 import { turnCards, type NotesState, type Pastes, type ReviewNote, type ShellTracking, type TurnCard } from "@golem/view";
@@ -625,6 +627,34 @@ export function useWorkflow(id: string): UseQueryResult<WorkflowGetResult> {
 export function useWorkflowStatus(workflowRunId: string): UseQueryResult<WorkflowStatusResult> {
   const { queries } = usePage();
   return useQuery({ queryKey: workflowStatusKey(workflowRunId), queryFn: () => queries.workflowStatus(workflowRunId), retry: false });
+}
+
+/** The data sources, or the news that the daemon does not know them yet. Marked stale by `data.changed` and by every data action. */
+export function useDataList(): UseQueryResult<DataAnswer<DataListResult>> {
+  const { queries } = usePage();
+  return useQuery({ queryKey: [...DATA_LIST_KEY], queryFn: queries.dataList, retry: false });
+}
+
+/** One source with its tables, sample, notes and saved queries. `table` asks for that table's sample on its own; `enabled` false waits. */
+export function useDataDescribe(name: string, table: string | null = null, enabled = true): UseQueryResult<DataAnswer<DataDescribeResult>> {
+  const { queries } = usePage();
+  return useQuery({ queryKey: dataDescribeKey(name, table), queryFn: () => queries.dataDescribe(name, table), enabled, retry: false });
+}
+
+/** Reads the sample rows of one table of a source, on request. A missing method rejects with its error. */
+export function useDataSampleLoader(name: string): (table: string) => Promise<DataSampleRows> {
+  const { queries } = usePage();
+  return async (table) => {
+    const answer = await queries.dataDescribe(name, table);
+    if (answer.status === "missing") throw new RpcError(-32601, "method not found");
+    return answer.data.sample[table] ?? [];
+  };
+}
+
+/** The notes of a source. */
+export function useDataNotes(name: string): UseQueryResult<DataAnswer<DataNotesGetResult>> {
+  const { queries } = usePage();
+  return useQuery({ queryKey: dataNotesKey(name), queryFn: () => queries.dataNotes(name), retry: false });
 }
 
 /** The runs, one per headless session, newest first. Marked stale when a routine fires or ends and when a headless session changes. */

@@ -1,13 +1,13 @@
 import type { ComponentProps, ReactElement, ReactNode } from "react";
 import { cn } from "../../ui/cn.ts";
 import type { GolemState } from "../../ui/golem-state.ts";
-import { GearIcon, InboxIcon, PlusIcon, RoutinesIcon, RunsIcon, SearchIcon, SessionsIcon, WorkflowsIcon } from "../../ui/icons.tsx";
+import { DataIcon, GearIcon, InboxIcon, PlusIcon, RoutinesIcon, RunsIcon, SearchIcon, SessionsIcon, WorkflowsIcon } from "../../ui/icons.tsx";
 import { PixelGolem } from "../../ui/pixel-golem.tsx";
 import { isMac, modShortcut } from "../../ui/platform.ts";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../../ui/tooltip.tsx";
 
 /** What the rail can show in the panel beside it. */
-export type RailItem = "sessions" | "inbox" | "routines" | "workflows" | "runs";
+export type RailItem = "sessions" | "inbox" | "data" | "routines" | "workflows" | "runs";
 
 /** How the link to the daemon stands: it is up, it is coming back, or the daemon is not running. */
 export type RailConnection = "connected" | "reconnecting" | "offline";
@@ -86,6 +86,7 @@ function RailButton({ label, bar = false, on = false, hideTooltip = false, class
 const ITEMS = {
   sessions: ["Sessions", SessionsIcon],
   inbox: ["Inbox", InboxIcon],
+  data: ["Data", DataIcon],
   routines: ["Routines", RoutinesIcon],
   workflows: ["Workflows", WorkflowsIcon],
   runs: ["Runs", RunsIcon],
@@ -163,6 +164,7 @@ export function Rail({
       <Divider />
       {item("sessions")}
       {item("inbox")}
+      {item("data")}
       <Divider />
       {item("routines")}
       {item("workflows")}

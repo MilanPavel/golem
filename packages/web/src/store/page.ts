@@ -19,6 +19,7 @@ import { MEMORY_LIST_KEY, MEMORY_PAGE, type MemoryExportParams, type MemoryExpor
 import { ROUTINE_GET_KEY, ROUTINE_LIST_KEY, type RoutineGetResult, type RoutineInfo, type RoutineListResult, type RoutineRunResult } from "./routines.ts";
 import { RUN_LIST_KEY, type RunListResult } from "./runs.ts";
 import { WORKFLOW_STATUS_KEY, type ReviewVerdict, type WorkflowCancelResult, type WorkflowGetResult, type WorkflowListResult, type WorkflowResumeResult, type WorkflowStatusResult } from "./workflows.ts";
+import { DATA_DESCRIBE_KEY, DATA_LIST_KEY, DATA_NOTES_KEY, dataAnswer, type DataAddParams, type DataAnswer, type DataDescribeResult, type DataInspectResult, type DataListResult, type DataNotesGetResult, type DataSource, type DataUpdateParams } from "./data.ts";
 import { createPulls, type Pulls } from "./pulls.ts";
 import { createQueryClient, keepQueriesHonest } from "./query.ts";
 import { createRouter, type Router } from "./router.ts";
@@ -70,6 +71,16 @@ export type PageClient = Pick<
   | "onRoutinesChanged"
   | "listRoutines"
   | "listWorkflows"
+  | "listData"
+  | "describeData"
+  | "inspectData"
+  | "addData"
+  | "updateData"
+  | "removeData"
+  | "getDataNotes"
+  | "setDataNotes"
+  | "draftDataNotes"
+  | "onDataChanged"
   | "getWorkflow"
   | "startWorkflow"
   | "workflowStatus"
@@ -401,6 +412,18 @@ export type PageActions = {
   removeMcp(name: string): Promise<void>;
   /** Fires a routine now. Resolves with the run and the headless session it started; its History row arrives with `routine.fired`. */
   runRoutine(name: string, folder: string | null): Promise<RoutineRunResult>;
+  /** Looks at a location before it is added. Nothing is saved. Rejects with the daemon's reason. */
+  dataInspect(location: string): Promise<DataInspectResult>;
+  /** Adds a source. The list is read again. Rejects with the daemon's reason. */
+  dataAdd(params: DataAddParams): Promise<DataSource>;
+  /** Changes the privacy or the watch of a source. The list is read again. */
+  dataUpdate(params: DataUpdateParams): Promise<DataSource>;
+  /** Forgets a source. The list is read again. */
+  dataRemove(name: string): Promise<void>;
+  /** Saves the notes of a source. Resolves with the file they were saved to. */
+  dataNotesSet(name: string, text: string): Promise<string>;
+  /** A proposal for the notes of a source. It is not saved. */
+  dataNotesDraft(name: string): Promise<string>;
   /** Starts a run of the workflow `id` with `inputs`. Resolves with the workflow run id, which `/runs/:id` opens it by. */
   startWorkflow(id: string, inputs: Record<string, unknown>): Promise<string>;
   /** Stops a workflow run. `cancelled` is false when it had ended already. */
@@ -491,6 +514,12 @@ export type PageQueries = {
   workflowGet(id: string): Promise<WorkflowGetResult>;
   /** One run of a workflow, with its steps and the reviews that wait. */
   workflowStatus(workflowRunId: string): Promise<WorkflowStatusResult>;
+  /** Every data source the person can see, or the news that the daemon does not know `data.list`. */
+  dataList(): Promise<DataAnswer<DataListResult>>;
+  /** One source with its tables and sample. With `table`, that table's sample on its own. */
+  dataDescribe(name: string, table: string | null): Promise<DataAnswer<DataDescribeResult>>;
+  /** The notes of a source. */
+  dataNotes(name: string): Promise<DataAnswer<DataNotesGetResult>>;
   /** The runs, one per headless session, newest first. With `sessionId`, that session's row alone. */
   runList(sessionId: string | null): Promise<RunListResult>;
   /** One routine and its recent runs, newest first. `folder` is a project routine's project, null a user routine. */
@@ -637,6 +666,9 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
       workflowList: (folders) => client.listWorkflows([...folders]),
       workflowGet: (id) => client.getWorkflow(id),
       workflowStatus: (workflowRunId) => client.workflowStatus(workflowRunId),
+      dataList: () => dataAnswer(() => client.listData()),
+      dataDescribe: (name, table) => dataAnswer(() => (table === null ? client.describeData(name) : client.describeData(name, table))),
+      dataNotes: (name) => dataAnswer(() => client.getDataNotes(name)),
       runList: (sessionId) => (sessionId === null ? client.listRuns() : client.listRuns({ sessionId })),
       routineGet: (name, folder) => (folder === null ? client.getRoutine(name) : client.getRoutine(name, folder)),
       config: (cwd, sessionId) => client.getConfig(cwd ?? undefined, sessionId ?? undefined),
@@ -935,6 +967,35 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
           await queryClient.invalidateQueries({ queryKey: MCP_LIST_KEY });
         }
       },
+      dataInspect: (location) => client.inspectData(location),
+      async dataAdd(params) {
+        try {
+          return (await client.addData(params)).source;
+        } finally {
+          await queryClient.invalidateQueries({ queryKey: DATA_LIST_KEY });
+        }
+      },
+      async dataUpdate(params) {
+        try {
+          return (await client.updateData(params)).source;
+        } finally {
+          await queryClient.invalidateQueries({ queryKey: DATA_LIST_KEY });
+          await queryClient.invalidateQueries({ queryKey: [...DATA_DESCRIBE_KEY, params.name] });
+        }
+      },
+      async dataRemove(name) {
+        try {
+          await client.removeData(name);
+        } finally {
+          await queryClient.invalidateQueries({ queryKey: DATA_LIST_KEY });
+        }
+      },
+      async dataNotesSet(name, text) {
+        const saved = await client.setDataNotes(name, text);
+        await queryClient.invalidateQueries({ queryKey: [...DATA_NOTES_KEY, name] });
+        return saved.path;
+      },
+      dataNotesDraft: async (name) => (await client.draftDataNotes(name)).text,
       async startWorkflow(id, inputs) {
         const started = await client.startWorkflow(id, inputs);
         void queryClient.invalidateQueries({ queryKey: RUN_LIST_KEY });

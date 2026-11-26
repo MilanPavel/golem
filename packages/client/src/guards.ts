@@ -73,6 +73,17 @@ import type { EvalsResumeResult } from "../../protocol/gen/evals-resume-result.t
 import type { EvalsStartResult } from "../../protocol/gen/evals-start-result.ts";
 import type { EvalsStopResult } from "../../protocol/gen/evals-stop-result.ts";
 import type { MemoryChanged } from "../../protocol/gen/memory-changed.ts";
+import type { DataAddResult } from "../../protocol/gen/data-add-result.ts";
+import type { DataChanged } from "../../protocol/gen/data-changed.ts";
+import type { DataDescribeResult } from "../../protocol/gen/data-describe-result.ts";
+import type { DataInspectResult } from "../../protocol/gen/data-inspect-result.ts";
+import type { DataListResult } from "../../protocol/gen/data-list-result.ts";
+import type { DataNotesDraftResult } from "../../protocol/gen/data-notes-draft-result.ts";
+import type { DataNotesGetResult } from "../../protocol/gen/data-notes-get-result.ts";
+import type { DataNotesSetResult } from "../../protocol/gen/data-notes-set-result.ts";
+import type { DataRemoveResult } from "../../protocol/gen/data-remove-result.ts";
+import type { DataSource } from "../../protocol/gen/data-source.ts";
+import type { DataUpdateResult } from "../../protocol/gen/data-update-result.ts";
 import type { RoutineGetResult } from "../../protocol/gen/routine-get-result.ts";
 import type { RoutineInfo, RoutineListResult } from "../../protocol/gen/routine-list-result.ts";
 import type { RoutinePreviewResult } from "../../protocol/gen/routine-preview-result.ts";
@@ -515,6 +526,48 @@ export function isMemoryExportResult(value: unknown): value is MemoryExportResul
 
 export function isMemorySettingsResult(value: unknown): value is MemorySettingsResult {
   return isRecord(value) && isMemorySettings(value["settings"]);
+}
+
+const DATA_REASONS = ["added", "updated", "removed", "files", "notes", "queries"];
+
+export function isDataChanged(value: unknown): value is DataChanged {
+  return isRecord(value) && typeof value["reason"] === "string" && DATA_REASONS.includes(value["reason"]);
+}
+
+function isDataSource(value: unknown): value is DataSource {
+  return isRecord(value) && typeof value["name"] === "string" && typeof value["kind"] === "string" && typeof value["privacy"] === "string" && typeof value["status"] === "string";
+}
+
+export function isDataListResult(value: unknown): value is DataListResult {
+  return isRecord(value) && Array.isArray(value["sources"]) && value["sources"].every(isDataSource);
+}
+
+export function isDataDescribeResult(value: unknown): value is DataDescribeResult {
+  return isRecord(value) && isDataSource(value["source"]) && Array.isArray(value["tables"]) && isRecord(value["sample"]);
+}
+
+export function isDataInspectResult(value: unknown): value is DataInspectResult {
+  return isRecord(value) && typeof value["kind"] === "string" && Array.isArray(value["tables"]) && isRecord(value["sample"]) && typeof value["suggested_name"] === "string";
+}
+
+export function isDataSourceResult(value: unknown): value is DataAddResult | DataUpdateResult {
+  return isRecord(value) && isDataSource(value["source"]);
+}
+
+export function isDataRemoveResult(value: unknown): value is DataRemoveResult {
+  return isRecord(value);
+}
+
+export function isDataNotesGetResult(value: unknown): value is DataNotesGetResult {
+  return isRecord(value);
+}
+
+export function isDataNotesSetResult(value: unknown): value is DataNotesSetResult {
+  return isRecord(value) && typeof value["path"] === "string";
+}
+
+export function isDataNotesDraftResult(value: unknown): value is DataNotesDraftResult {
+  return isRecord(value) && typeof value["text"] === "string";
 }
 
 export function isMemoryChanged(value: unknown): value is MemoryChanged {

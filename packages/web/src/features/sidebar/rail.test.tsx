@@ -24,7 +24,7 @@ test("the rail is a landmark with the buttons in order", () => {
   setup();
   const nav = screen.getByRole("navigation", { name: "Sidebar rail" });
   const names = within(nav).getAllByRole("button").map((button) => button.getAttribute("aria-label"));
-  expect(names).toEqual(["New session", "Sessions", "Inbox", "Routines", "Workflows", "Runs", "Search Ctrl K", "Settings"]);
+  expect(names).toEqual(["New session", "Sessions", "Inbox", "Data", "Routines", "Workflows", "Runs", "Search Ctrl K", "Settings"]);
 });
 
 test("the picked item has a bar and aria-current, the others do not", () => {

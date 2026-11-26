@@ -1,4 +1,4 @@
-import { OLLAMA_FAILED, RpcError, SESSION_BUSY, type ChatEvent, type ConnectionState, type OllamaInstallUpdate, type RuntimeInstallUpdate, type McpServerLog, type McpLoginDone, type ModelServerStatus, type MemoryChanged, type DevicePairChanged, type PullUpdate, type EvalUpdate, type SessionSummary, type WorkflowNotice } from "@golem/client";
+import { OLLAMA_FAILED, RpcError, SESSION_BUSY, type ChatEvent, type ConnectionState, type OllamaInstallUpdate, type RuntimeInstallUpdate, type McpServerLog, type McpLoginDone, type ModelServerStatus, type MemoryChanged, type DevicePairChanged, type PullUpdate, type EvalUpdate, type SessionSummary, type WorkflowNotice, type DataChanged } from "@golem/client";
 import { vi } from "vitest";
 import type { ModelListResult } from "./models.ts";
 import type { PageClient } from "./page.ts";
@@ -86,6 +86,7 @@ export function fakeClient() {
   const pairs = listeners<DevicePairChanged>();
   const routines = listeners<"changed" | "fired" | "finished">();
   const workflows = listeners<WorkflowNotice>();
+  const data = listeners<DataChanged>();
   const mcp = listeners<unknown>();
   const mcpLog = listeners<McpServerLog>();
   const mcpLogin = listeners<McpLoginDone>();
@@ -128,6 +129,24 @@ export function fakeClient() {
     deviceRevoke: vi.fn<PageClient["deviceRevoke"]>(async (device) => ({ device: { id: device, name: "iPhone 16", paired_at: "2026-11-21T10:00:00+01:00", last_seen: null, revoked_at: "2026-11-21T13:00:00+01:00", rules: 0 }, revoked: true, rules: [] })),
     onRoutinesChanged: routines.on,
     onWorkflowEvent: workflows.on,
+    onDataChanged: data.on,
+    listData: vi.fn<PageClient["listData"]>(async () => ({ sources: [] })),
+    describeData: vi.fn<PageClient["describeData"]>(async (source) => ({
+      source: { name: source, kind: "files", scope: "user", location: "~/Documents/x/*.csv", privacy: "local", status: "ready" },
+      tables: [],
+      sample: {},
+    })),
+    inspectData: vi.fn<PageClient["inspectData"]>(async () => ({ kind: "files", tables: [], sample: {}, suggested_name: "x", suggested_privacy: "local" })),
+    addData: vi.fn<PageClient["addData"]>(async (params) => ({
+      source: { name: params.name, kind: params.kind ?? "files", scope: params.scope, location: params.location, privacy: params.privacy, status: "ready" },
+    })),
+    updateData: vi.fn<PageClient["updateData"]>(async (params) => ({
+      source: { name: params.name, kind: "files", scope: "user", location: "~/x", privacy: params.privacy ?? "local", status: "ready" },
+    })),
+    removeData: vi.fn<PageClient["removeData"]>(async () => ({})),
+    getDataNotes: vi.fn<PageClient["getDataNotes"]>(async () => ({ text: null })),
+    setDataNotes: vi.fn<PageClient["setDataNotes"]>(async () => ({ path: "~/.golem/data/x.md" })),
+    draftDataNotes: vi.fn<PageClient["draftDataNotes"]>(async () => ({ text: "# x\n" })),
     listWorkflows: vi.fn<PageClient["listWorkflows"]>(async () => ({ workflows: [] })),
     getWorkflow: vi.fn<PageClient["getWorkflow"]>(async (id) => ({
       workflow: { id, name: id, path: "/Users/me/.golem/workflows/x.py", state: "ok", inputs: [], description: "" },
@@ -316,6 +335,7 @@ export function fakeClient() {
       agents.emit(root);
     },
     emitWorkflow: workflows.emit,
+    emitData: data.emit,
     emitRoutines: (kind: "changed" | "fired" | "finished" = "changed") => {
       routines.emit(kind);
     },
