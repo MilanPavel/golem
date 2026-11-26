@@ -254,7 +254,7 @@ test("Run… is disabled for a broken workflow", () => {
   expect((screen.getByRole("button", { name: "Run…" }) as HTMLButtonElement).disabled).toBe(true);
 });
 
-test("/workflows/:id: Run starts the workflow and opens the run by its session", async () => {
+test("/workflows/:id: Run starts the workflow and opens the run by its id", async () => {
   const user = userEvent.setup();
   const fake = mount(`/workflows/${encodeURIComponent(SAMPLE_PR_DIGEST.id)}`, ({ raw }) => {
     raw.getWorkflow.mockResolvedValue(SAMPLE_PR_DIGEST_GET);
@@ -263,6 +263,6 @@ test("/workflows/:id: Run starts the workflow and opens the run by its session",
   await user.type(screen.getByLabelText(/^tool/), "gh");
   await user.type(screen.getByLabelText(/^repo/), "MilanPavel/golem");
   await user.click(screen.getByRole("button", { name: "Run" }));
-  await waitFor(() => expect(location.pathname).toBe("/runs/s_wr"));
+  await waitFor(() => expect(location.pathname).toBe("/runs/wr_1"));
   expect(fake.raw.startWorkflow).toHaveBeenCalledWith(SAMPLE_PR_DIGEST.id, { tool: "gh", repo: "MilanPavel/golem", since: "1d" });
 });

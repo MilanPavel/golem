@@ -398,7 +398,7 @@ export type PageActions = {
   removeMcp(name: string): Promise<void>;
   /** Fires a routine now. Resolves with the run and the headless session it started; its History row arrives with `routine.fired`. */
   runRoutine(name: string, folder: string | null): Promise<RoutineRunResult>;
-  /** Starts a run of the workflow `id` with `inputs`. Resolves with the id the Runs page opens it by: the run's session when it has one, else the workflow run's id. */
+  /** Starts a run of the workflow `id` with `inputs`. Resolves with the workflow run id, which `/runs/:id` opens it by. */
   startWorkflow(id: string, inputs: Record<string, unknown>): Promise<string>;
   /** Deletes a user routine from config.toml. */
   removeRoutine(name: string): Promise<void>;
@@ -924,11 +924,7 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
       async startWorkflow(id, inputs) {
         const started = await client.startWorkflow(id, inputs);
         void queryClient.invalidateQueries({ queryKey: RUN_LIST_KEY });
-        try {
-          return (await client.workflowStatus(started.workflow_run_id)).run.session_id ?? started.workflow_run_id;
-        } catch {
-          return started.workflow_run_id;
-        }
+        return started.workflow_run_id;
       },
       async runRoutine(name, folder) {
         try {
