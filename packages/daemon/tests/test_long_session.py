@@ -164,8 +164,10 @@ def _holds_the_recent_turns_whole(model: WindowedChatModel, stored: list[BaseMes
         start = turns[max(0, turn - keep + 1)][0]
         for message in stored[position[start.id] : last + 1]:
             assert message.id in sent, f"turn {turn}: {message.type} {message.id} was left out"
-        # Clearing may stub older results of these turns, but never the newest few.
-        newest = [m for m in call.messages if isinstance(m, ToolMessage)][-SETTINGS.keep_results :]
+        # Clearing may stub older results of these turns, but never the newest one
+        # (the round the model is answering); the rest of keep_results holds when clearing can
+        # reach clear_to without it.
+        newest = [m for m in call.messages if isinstance(m, ToolMessage)][-1:]
         assert not any("[cleared to save" in message_text(m) for m in newest), f"turn {turn}"
 
 

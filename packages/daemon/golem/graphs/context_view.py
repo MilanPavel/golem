@@ -186,6 +186,16 @@ def _saved_chars(message: BaseMessage) -> int:
     return size - len(stub_text(getattr(message, "name", None), size))
 
 
+def _round_size(messages: Sequence[BaseMessage]) -> int:
+    """The tool results at the end of ``messages``: the round the model has yet to answer."""
+    size = 0
+    for message in reversed(messages):
+        if not isinstance(message, ToolMessage):
+            break
+        size += 1
+    return size
+
+
 def plan_clear(
     messages: Sequence[BaseMessage],
     ctx: ContextView | None,
@@ -201,7 +211,8 @@ def plan_clear(
 
     None when ``used`` is under ``clear_at`` of ``room``, or when nothing can be
     freed. Results are cleared oldest first until ``used`` is down to ``clear_to``
-    of ``room``. The newest ``keep_results`` results that could be cleared stay.
+    of ``room``. The newest ``keep_results`` results that could be cleared stay, or only the
+    newest round when that is the only way down to ``clear_to``.
     ``cleared_before`` only moves forward.
     """
     if used < clear_at * room:
@@ -210,15 +221,24 @@ def plan_clear(
     start = _summary_start(messages, current) or 0
     before = _find(messages, current.get("cleared_before")) or 0
     found = [i for i in range(start, len(messages)) if _clearable(messages[i])]
-    older = found[: max(0, len(found) - keep_results)]
-    freed = 0.0
+    # Keep ``keep_results``. When that leaves too much to reach ``clear_to``, fall back to the
+    # current tool round alone: a clear that stops short is followed by another one on the next
+    # call, and each one moves a stub earlier in the prompt, so a local model re-reads it all.
     last: int | None = None
-    for i in older:
+    for keep in dict.fromkeys(
+        (keep_results, min(keep_results, _round_size(messages) or keep_results))
+    ):
+        older = found[: max(0, len(found) - keep)]
+        freed = 0.0
+        last = None
+        for i in older:
+            if used - freed <= clear_to * room:
+                break
+            if i >= before and _saved_chars(messages[i]) > 0:
+                freed += _saved_chars(messages[i]) * ratio
+                last = i
         if used - freed <= clear_to * room:
             break
-        if i >= before and _saved_chars(messages[i]) > 0:
-            freed += _saved_chars(messages[i]) * ratio
-            last = i
     if last is None or last + 1 >= len(messages):
         return None
     after = messages[last + 1].id

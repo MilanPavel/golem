@@ -406,3 +406,24 @@ def test_plan_summary_starts_where_the_last_summary_ended() -> None:
     # Too few turns are left after the summary.
     late: ContextView = {"summary": "earlier", "summarised_before": "h7"}
     assert plan_summary(messages, late, keep_turns=4) is None
+
+
+def test_a_clear_that_cannot_reach_the_target_falls_back_to_the_current_round() -> None:
+    # Six results, the newest just answered. Keeping four leaves only two to clear, which stops
+    # short of 40%; falling back to the round clears five, so the next calls are quiet.
+    messages = _long()[:-1]
+    planned = plan_clear(
+        messages,
+        None,
+        used=2_000,
+        ratio=0.25,
+        room=1000,
+        clear_at=0.7,
+        clear_to=0.4,
+        keep_results=4,
+    )
+    assert cleared_ids(messages, planned) == ["t_c1", "t_c2", "t_c3", "t_c4", "t_c5"]
+    kept = plan_clear(
+        messages, None, used=800, ratio=0.25, room=1000, clear_at=0.7, clear_to=0.4, keep_results=4
+    )
+    assert cleared_ids(messages, kept) == ["t_c1", "t_c2"]
