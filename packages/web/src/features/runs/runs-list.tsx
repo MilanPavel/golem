@@ -8,6 +8,11 @@ import { RunDot } from "../routines/index.ts";
 
 const TONE: Partial<Record<RunInfo["status"], string>> = { failed: "text-deny", waiting: "text-wait" };
 
+/** The small word after a run's name: its kind. A routine that starts a workflow says which, so `weekday-pr-digest` reads `workflow pr_digest`. */
+function kindWords(run: RunInfo): string {
+  return run.kind === "routine" && run.origin.startsWith("workflow:") ? `workflow ${run.origin.slice("workflow:".length)}` : run.kind;
+}
+
 /** One run: its mark, name and kind, how it began, and on the right how it went and how long it took. Opens the session. */
 export function RunRow({ run, now, onNavigate }: { run: RunInfo; now: number; onNavigate: (path: string) => void }) {
   const duration = runDuration(run, now);
@@ -24,7 +29,7 @@ export function RunRow({ run, now, onNavigate }: { run: RunInfo; now: number; on
         <span className="flex min-w-0 flex-1 flex-col gap-y-0.5">
           <span className="flex items-center gap-x-2">
             <span className="truncate text-sm font-medium">{runName(run)}</span>
-            <span className="text-meta text-faint">{run.kind}</span>
+            <span className="truncate text-meta text-faint">{kindWords(run)}</span>
           </span>
           <span className="truncate text-meta text-muted">{runRowLine(run, now)}</span>
         </span>

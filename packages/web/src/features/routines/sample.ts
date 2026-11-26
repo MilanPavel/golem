@@ -28,6 +28,24 @@ export const SAMPLE_MORNING_BRIEF: RoutineInfo = {
   source: "user",
 };
 
+/** A routine that starts a workflow: no prompt, folder, model or servers, but the workflow and its inputs. */
+export const SAMPLE_WORKFLOW_ROUTINE: RoutineInfo = {
+  config: { name: "weekday-pr-digest", schedule: "weekdays 09:00", workflow: "pr_digest", inputs: { repo: "MilanPavel/golem", since: "1d" } },
+  next_at: "2026-11-18T09:00:00+01:00",
+  last: null,
+  path: "/Users/you/.golem/config.toml",
+  source: "user",
+};
+
+/** A watch routine that starts a workflow: the new file's path is passed as the input `path`. */
+export const SAMPLE_WORKFLOW_WATCH_ROUTINE: RoutineInfo = {
+  config: { name: "receipts-to-sheet", on: { watch: "~/Downloads", glob: "*.pdf" }, workflow: "pr_digest", inputs: { repo: "MilanPavel/golem" } },
+  next_at: null,
+  last: null,
+  path: "/Users/you/.golem/config.toml",
+  source: "user",
+};
+
 export const SAMPLE_ROUTINES: RoutineInfo[] = [
   SAMPLE_MORNING_BRIEF,
   {

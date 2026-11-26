@@ -99,11 +99,11 @@ import { NO_OLLAMA_LISTING, OLLAMA_DOWN_LISTING, SAMPLE_LISTING, SAMPLE_PULLS, S
 import { CloseSessionDialog, HelperBannerBar, HelperPanelView, HelperReceiptCard, RenameField, type HelperView } from "../features/sessions/index.ts";
 import { ALL_CLOUD, ALL_LOCAL, askingBatchChat, cloudBatchChat, localBatchChat } from "../features/chat/helper-card-sample.ts";
 import { ASKING_HELPER, DONE_HELPER, HELPER_NOW, RUNNING_HELPER, TRIMMED_AT, TRIMMED_HELPER } from "../features/sessions/helper-sample.ts";
-import { RoutineDetail, RoutinesEmpty, RoutinesPanel } from "../features/routines/index.ts";
-import { SAMPLE_LIST, SAMPLE_MORNING_BRIEF, ROUTINES_NOW, SAMPLE_RUNS } from "../features/routines/sample.ts";
+import { RoutineDetail, RoutineEditor, RoutinesEmpty, RoutinesPanel } from "../features/routines/index.ts";
+import { SAMPLE_LIST, SAMPLE_MORNING_BRIEF, SAMPLE_WORKFLOW_ROUTINE, SAMPLE_WORKFLOW_WATCH_ROUTINE, ROUTINES_NOW, SAMPLE_RUNS } from "../features/routines/sample.ts";
 import { LeadRun, RunBanner, RunsList, RunsPanel } from "../features/runs/index.ts";
 import { RunForm, WorkflowDetail, WorkflowsPanel } from "../features/workflows/index.ts";
-import { SAMPLE_BROKEN, SAMPLE_PR_DIGEST, SAMPLE_PR_DIGEST_CODE, SAMPLE_PR_DIGEST_STEPS, SAMPLE_UNTRUSTED, SAMPLE_WORKFLOW_LIST, SAMPLE_WORKFLOW_LIST_TWO_PROJECTS, SAMPLE_WORKFLOW_RUNS, WORKFLOWS_NOW } from "../features/workflows/sample.ts";
+import { SAMPLE_BROKEN, SAMPLE_PR_DIGEST, SAMPLE_PR_DIGEST_CODE, SAMPLE_PR_DIGEST_STEPS, SAMPLE_ROUTINE_WORKFLOW_RUN, SAMPLE_UNTRUSTED, SAMPLE_WORKFLOW_LIST, SAMPLE_WORKFLOW_LIST_TWO_PROJECTS, SAMPLE_WORKFLOW_RUNS, WORKFLOWS_NOW } from "../features/workflows/sample.ts";
 import { RUNS_NOW, SAMPLE_RUN_LIST, SAMPLE_WAITING_RUN } from "../features/runs/sample.ts";
 import { HelperRowCardBody, Rail, SessionsPanel, SidebarPanel, WaitingChip } from "../features/sidebar/index.ts";
 import { ConnectionStrip } from "../features/connection/index.ts";
@@ -2303,6 +2303,37 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
             onRemove={() => Promise.resolve()}
           />
         </div>
+        <div className="mt-4 rounded-lg border border-line bg-bg p-5" role="region" aria-label={`Routine detail, workflow, ${theme}`}>
+          <RoutineDetail routine={SAMPLE_WORKFLOW_ROUTINE} runs={[]} now={ROUTINES_NOW} onNavigate={() => {}} onRun={() => Promise.resolve({ routine_run_id: "rr_6", session_id: "s_6" })} />
+        </div>
+        {(
+          [
+            ["Routine editor, workflow, inputs filled", SAMPLE_WORKFLOW_ROUTINE.config, undefined],
+            ["Routine editor, workflow, required input missing", { ...SAMPLE_WORKFLOW_ROUTINE.config, inputs: { since: "1d" } }, { inputsTouched: true, errors: { inputs: "Fill in the inputs marked required." } }],
+            ["Routine editor, workflow, daemon problems", SAMPLE_WORKFLOW_ROUTINE.config, { problems: ["input since is not one of the workflow's inputs", "input repo is required"] }],
+            ["Routine editor, workflow, watch folder", SAMPLE_WORKFLOW_WATCH_ROUTINE.config, undefined],
+            ["Routine editor, workflow, none picked", { name: "new-one" }, { workflowMode: true, errors: { workflow: "Pick the workflow to run." } }],
+            ["Routine editor, prompt", SAMPLE_MORNING_BRIEF.config, undefined],
+          ] satisfies [string, ComponentProps<typeof RoutineEditor>["draft"], ComponentProps<typeof RoutineEditor>["initial"]][]
+        ).map(([title, draft, initial]) => (
+          <div key={title} className="mt-4 max-w-3xl rounded-lg border border-line bg-bg p-5" role="region" aria-label={`${title}, ${theme}`}>
+            <h2 className="sr-only">{title}</h2>
+            <RoutineEditor
+              create={false}
+              draft={{ ...draft, name: `${draft.name ?? "routine"} ${title.split(", ").slice(1).join(" ")}` }}
+              now={ROUTINES_NOW}
+              skills={[]}
+              servers={["github", "linear"]}
+              workflows={SAMPLE_WORKFLOW_LIST.workflows}
+              folderBrowser={() => <p className="p-3 text-sm text-muted">Folder browser</p>}
+              modelPick={({ value }) => <span className="text-meta">{value ?? "Default"}</span>}
+              onPreview={() => Promise.resolve(["2026-11-18T09:00:00+01:00", "2026-11-19T09:00:00+01:00", "2026-11-20T09:00:00+01:00"])}
+              onSave={() => Promise.resolve()}
+              onCancel={() => {}}
+              initial={initial}
+            />
+          </div>
+        ))}
         <div className="mt-4 rounded-lg border border-line bg-bg p-5" role="region" aria-label={`Routines, nothing set up, ${theme}`}>
           <RoutinesEmpty onNavigate={() => {}} />
         </div>
@@ -2340,13 +2371,14 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
             ["Workflow detail, Code", "code", SAMPLE_PR_DIGEST, SAMPLE_PR_DIGEST_STEPS, SAMPLE_PR_DIGEST_CODE, SAMPLE_WORKFLOW_RUNS],
             ["Workflow detail, Runs", "runs", SAMPLE_PR_DIGEST, SAMPLE_PR_DIGEST_STEPS, SAMPLE_PR_DIGEST_CODE, SAMPLE_WORKFLOW_RUNS],
             ["Workflow detail, Runs, none yet", "runs", SAMPLE_PR_DIGEST, SAMPLE_PR_DIGEST_STEPS, SAMPLE_PR_DIGEST_CODE, []],
-            ["Workflow detail, Triggers", "triggers", SAMPLE_PR_DIGEST, SAMPLE_PR_DIGEST_STEPS, SAMPLE_PR_DIGEST_CODE, SAMPLE_WORKFLOW_RUNS],
+            ["Workflow detail, Triggers", "triggers", SAMPLE_PR_DIGEST, SAMPLE_PR_DIGEST_STEPS, SAMPLE_PR_DIGEST_CODE, SAMPLE_WORKFLOW_RUNS, [SAMPLE_WORKFLOW_ROUTINE, SAMPLE_WORKFLOW_WATCH_ROUTINE]],
+            ["Workflow detail, Triggers, none", "triggers", SAMPLE_PR_DIGEST, SAMPLE_PR_DIGEST_STEPS, SAMPLE_PR_DIGEST_CODE, SAMPLE_WORKFLOW_RUNS, []],
             ["Workflow detail, broken", "overview", SAMPLE_BROKEN, [], null, []],
             ["Workflow detail, not trusted", "code", SAMPLE_UNTRUSTED, [], null, []],
           ] as const
-        ).map(([title, tab, workflow, steps, code, runs]) => (
+        ).map(([title, tab, workflow, steps, code, runs, routines]) => (
           <div key={title} className="mt-4 rounded-lg border border-line bg-bg p-5" role="region" aria-label={`${title}, ${theme}`}>
-            <WorkflowDetail workflow={workflow} steps={steps} code={code} runs={runs} now={WORKFLOWS_NOW} onNavigate={() => {}} onReveal={() => Promise.resolve()} initialTab={tab} />
+            <WorkflowDetail workflow={workflow} steps={steps} code={code} runs={runs} routines={routines} now={WORKFLOWS_NOW} onNavigate={() => {}} onReveal={() => Promise.resolve()} initialTab={tab} />
           </div>
         ))}
         <div className="mt-4 flex flex-wrap items-start gap-4">
@@ -2385,6 +2417,9 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
         </div>
         <div className="mt-4 rounded-lg border border-line bg-bg p-5" role="region" aria-label={`Runs list, ${theme}`}>
           <RunsList runs={SAMPLE_RUN_LIST} now={RUNS_NOW} onNavigate={() => {}} />
+        </div>
+        <div className="mt-4 rounded-lg border border-line bg-bg p-5" role="region" aria-label={`Runs list, routine workflow run, ${theme}`}>
+          <RunsList runs={[SAMPLE_ROUTINE_WORKFLOW_RUN]} now={WORKFLOWS_NOW} onNavigate={() => {}} />
         </div>
         <div className="mt-4 flex flex-col gap-3 overflow-hidden rounded-lg border border-line bg-bg" role="region" aria-label={`Routine banners, ${theme}`}>
           <RunBanner run={SAMPLE_WAITING_RUN} label="Routine run, schedule" now={RUNS_NOW} onNavigate={() => {}} />

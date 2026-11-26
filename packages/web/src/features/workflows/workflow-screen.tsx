@@ -1,9 +1,9 @@
 import type { ReactNode } from "react";
 import { actionErrorText, folderDialogErrorText, revealErrorText } from "../../store/errors.ts";
-import { useFolderDialog, useNavigate, usePageActions, useRunList, useWorkflow, useWorkflowList } from "../../store/page-context.tsx";
+import { useFolderDialog, useNavigate, usePageActions, useRoutineList, useRunList, useWorkflow, useWorkflowList } from "../../store/page-context.tsx";
 import { useNow } from "../sessions/use-now.ts";
 import { WorkflowDetail } from "./workflow-detail.tsx";
-import { workflowRuns } from "./text.ts";
+import { routinesStarting, workflowRuns } from "./text.ts";
 
 function Frame({ children }: { children: ReactNode }) {
   return (
@@ -47,6 +47,7 @@ export function WorkflowsScreen() {
 export function WorkflowScreen({ id }: { id: string }) {
   const query = useWorkflow(id);
   const runs = useRunList();
+  const routines = useRoutineList();
   const actions = usePageActions();
   const dialog = useFolderDialog();
   const navigate = useNavigate();
@@ -67,6 +68,7 @@ export function WorkflowScreen({ id }: { id: string }) {
         steps={steps ?? []}
         code={code ?? null}
         runs={workflowRuns(runs.data?.runs ?? [], workflow.name)}
+        routines={routinesStarting(routines.data?.routines ?? [], workflow.name)}
         now={now}
         onNavigate={navigate}
         onStart={async (inputs) => {

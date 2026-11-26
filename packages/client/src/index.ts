@@ -29,6 +29,7 @@ export {
   type ConsentChoice,
   type ChangesDiffTarget,
   type ChangesRevertTarget,
+  type RoutinePreviewCheck,
   type SendOptions,
   type ChatEvent,
   type ConnectionState,

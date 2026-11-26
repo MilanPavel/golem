@@ -1,9 +1,9 @@
 import { useCallback } from "react";
-import { useMcpList, useModelList, usePageActions, usePulls, useSkillList } from "../../store/page-context.tsx";
+import { useMcpList, useModelList, usePageActions, usePulls, useSkillList, useWorkflowList } from "../../store/page-context.tsx";
 import { FolderBrowser } from "../shell/folder-browser.tsx";
 import { ModelPick } from "../settings/routing-model-pick.tsx";
 import { usableModels } from "../settings/routing-derive.ts";
-import { RoutineEditor, type RoutineDraft } from "./routine-editor.tsx";
+import { RoutineEditor, type RoutineCheck, type RoutineDraft } from "./routine-editor.tsx";
 
 export type LiveRoutineEditorProps = {
   /** True to make a routine, false to change the one `draft` names. */
@@ -23,6 +23,8 @@ export function LiveRoutineEditor({ create, draft, now, onSaved, onCancel }: Liv
   const models = useModelList();
   const pulls = usePulls();
   const onPreview = useCallback((schedule: string) => actions.previewRoutine(schedule), [actions]);
+  const onCheck = useCallback((check: RoutineCheck) => actions.checkRoutine(check), [actions]);
+  const workflows = useWorkflowList();
   const listing = models.data ?? null;
   return (
     <RoutineEditor
@@ -36,6 +38,8 @@ export function LiveRoutineEditor({ create, draft, now, onSaved, onCancel }: Liv
         <ModelPick label="Model" value={value} listing={listing} models={usableModels(listing)} pulls={pulls} emptyText="Default" onPick={onPick} className="text-meta" />
       )}
       onPreview={onPreview}
+      onCheck={onCheck}
+      workflows={workflows.data?.workflows ?? []}
       onSave={async (name, fields) => {
         await actions.saveRoutine(name, fields, create);
         onSaved(name);

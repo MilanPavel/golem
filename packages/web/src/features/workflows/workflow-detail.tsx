@@ -1,13 +1,18 @@
 import { useState, type ReactNode } from "react";
+import { nextRunText, routineState, triggerWords } from "@golem/view";
 import { actionErrorText } from "../../store/errors.ts";
+import { routineNewPath, routinePath } from "../../store/router.ts";
+import type { RoutineInfo } from "../../store/routines.ts";
 import type { RunInfo } from "../../store/runs.ts";
 import type { WorkflowEntryInfo, WorkflowOutlineStep } from "../../store/workflows.ts";
 import { Badge } from "../../ui/badge.tsx";
 import { Button } from "../../ui/button.tsx";
 import { Code } from "../../ui/code.tsx";
+import { Link } from "../../ui/link.tsx";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../ui/tabs.tsx";
 import { RunRow } from "../runs/index.ts";
 import { PendingButton } from "../routines/routine-detail.tsx";
+import { RoutineDot } from "../routines/routine-dot.tsx";
 import { CodeEditor } from "../settings/config/code-editor.tsx";
 import { RunDialog } from "./run-dialog.tsx";
 import { WorkflowDot } from "./workflow-dot.tsx";
@@ -21,6 +26,8 @@ export type WorkflowDetailProps = {
   code: string | null;
   /** This workflow's runs, newest first. */
   runs: readonly RunInfo[];
+  /** The routines whose `workflow` is this one, for the Triggers tab. */
+  routines?: readonly RoutineInfo[];
   now: number;
   onNavigate: (path: string) => void;
   /** Opens the file's folder in Finder. Without it, the action is not offered. */
@@ -185,8 +192,55 @@ function RunsTab({ runs, now, onNavigate }: Pick<WorkflowDetailProps, "runs" | "
   );
 }
 
+const LINK = "text-clay-ink underline underline-offset-2 outline-offset-2 outline-clay focus-visible:outline-2";
+
+/** The inputs a routine gives the workflow: `repo=MilanPavel/golem, since=1d`. Empty for none. */
+function inputsText(routine: RoutineInfo): string {
+  return Object.entries(routine.config.inputs ?? {})
+    .map(([key, value]) => `${key}=${String(value)}`)
+    .join(", ");
+}
+
+function TriggersTab({ routines, now, onNavigate }: { routines: readonly RoutineInfo[]; now: number; onNavigate: (path: string) => void }) {
+  return (
+    <div className="flex max-w-3xl flex-col gap-3">
+      <p className="text-sm text-muted">Everything that can start this workflow. A workflow has no trigger of its own; routines hold the &quot;when&quot;, so this tab lists the routines that point here.</p>
+      <Section title="Routines that start it">
+        {routines.length === 0 ? (
+          <p className="text-sm text-muted">
+            No routine starts this workflow. Make one in{" "}
+            <Link href={routineNewPath()} onNavigate={onNavigate} className={LINK}>
+              Routines
+            </Link>
+            : choose &quot;A workflow&quot; under Run, then pick this one.
+          </p>
+        ) : (
+          <ul aria-label="Routines that start it" className="flex flex-col gap-2">
+            {routines.map((routine) => {
+              const inputs = inputsText(routine);
+              return (
+                <li key={`${routine.config.name}/${routine.folder ?? ""}`} className="flex flex-col gap-1 rounded-lg border border-line bg-surface p-3">
+                  <div className="flex items-center gap-2">
+                    <RoutineDot state={routineState(routine)} />
+                    <span className="min-w-0 truncate text-sm font-medium">{routine.config.name}</span>
+                    <span className="text-meta text-faint">{routine.config.enabled === false ? "off" : nextRunText(routine.next_at, now)}</span>
+                    <Link href={routinePath(routine.config.name, routine.folder)} onNavigate={onNavigate} className={`ml-auto shrink-0 whitespace-nowrap text-sm ${LINK}`}>
+                      Open routine<span aria-hidden="true"> ›</span>
+                    </Link>
+                  </div>
+                  <p className="pl-5.5 text-meta text-muted wrap-anywhere">{[triggerWords(routine.config), inputs].filter((part) => part !== "").join(" · ")}</p>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </Section>
+    </div>
+  );
+}
+
 /** One workflow in the main area: its state, Run…, and the Overview, Code, Runs and Triggers tabs. */
-export function WorkflowDetail({ workflow, steps, code, runs, now, onNavigate, onReveal, onStart, onChooseFolder, initialRunOpen = false, initialTab = "overview" }: WorkflowDetailProps) {
+export function WorkflowDetail({ workflow, steps, code, runs, routines = [], now, onNavigate, onReveal, onStart, onChooseFolder, initialRunOpen = false, initialTab = "overview" }: WorkflowDetailProps) {
   const [tab, setTab] = useState<Tab>(initialTab);
   const [runOpen, setRunOpen] = useState(initialRunOpen);
   return (
@@ -240,7 +294,7 @@ export function WorkflowDetail({ workflow, steps, code, runs, now, onNavigate, o
           <RunsTab runs={runs} now={now} onNavigate={onNavigate} />
         </TabsContent>
         <TabsContent value="triggers">
-          <p className="max-w-2xl text-sm text-muted">Routines that start this workflow come with 4.8.2. Until then, start it by hand or from the CLI.</p>
+          <TriggersTab routines={routines} now={now} onNavigate={onNavigate} />
         </TabsContent>
       </Tabs>
     </div>

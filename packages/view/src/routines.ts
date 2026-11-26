@@ -133,9 +133,10 @@ function globKind(glob: string | undefined): string {
  * The preview line of a watch routine in the editor: `Runs /receipt-to-csv for each new PDF in ~/Downloads`.
  * A prompt that is not a /skill is "Runs the prompt". Empty until a folder is picked.
  */
-export function watchPreviewText(watch: string, glob: string | undefined, prompt: string): string {
+export function watchPreviewText(watch: string, glob: string | undefined, prompt: string, workflow?: string): string {
   const folder = watch.trim();
   if (folder === "") return "";
+  if (workflow !== undefined) return `Runs the workflow ${workflow === "" ? "you pick" : workflow} for each new ${globKind(glob)} in ${folder}`;
   const skill = /^\/\S+/.exec(prompt.trim())?.[0];
   return `Runs ${skill ?? "the prompt"} for each new ${globKind(glob)} in ${folder}`;
 }

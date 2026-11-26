@@ -55,7 +55,10 @@ export type ApprovalChoice = "allow" | "allow_session" | "allow_always" | "deny"
 export type ConsentChoice = "session" | "once" | "local";
 
 /** `cwd` is the sender's folder. `skill` runs a skill once by name. `stronger` runs the turn one tier up. */
-export type SendOptions = { cwd?: string; skill?: SkillCall; stronger?: boolean };
+/** What `routine.preview` checks besides the schedule: a workflow routine's workflow and inputs. `onWatch` says the routine watches a folder, which passes `path`. */
+export type RoutinePreviewCheck = { workflow?: string; inputs?: Record<string, string | number | boolean>; onWatch?: boolean; folder?: string | null };
+
+export type SendOptions ={ cwd?: string; skill?: SkillCall; stronger?: boolean };
 import type { DaemonStatus } from "../../protocol/gen/daemon-status.ts";
 import type { McpListResult } from "../../protocol/gen/mcp-list-result.ts";
 import type { McpServer } from "../../protocol/gen/mcp-server.ts";
@@ -791,8 +794,11 @@ export interface GolemClient {
   runRoutine(name: string, folder?: string): Promise<RoutineRunResult>;
   /** `routine.update`: merge `fields` into the user's routine `name` in `config.toml`; a field set to null is removed. */
   updateRoutine(name: string, fields: Record<string, unknown>, options?: { create?: boolean }): Promise<RoutineUpdateResult>;
-  /** `routine.preview`: the next three times a schedule fires, as ISO times. Rejects with the daemon's reason for a schedule that does not parse. */
-  previewRoutine(schedule: string): Promise<RoutinePreviewResult>;
+  /**
+   * `routine.preview`: the next three times a schedule fires, as ISO times. Rejects with the daemon's reason for a schedule that does not parse.
+   * With `workflow` and `inputs` the result's `problems` say what is wrong with them. A null schedule leaves `next` empty.
+   */
+  previewRoutine(schedule: string | null, check?: RoutinePreviewCheck): Promise<RoutinePreviewResult>;
   /** `skill.set_disabled`: turn a skill off, or on again, in `config.toml`. */
   setSkillDisabled(name: string, disabled: boolean): Promise<SkillSetDisabledResult>;
   /**
@@ -2812,9 +2818,15 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       }
       return result;
     },
-    async previewRoutine(schedule: string): Promise<RoutinePreviewResult> {
+    async previewRoutine(schedule: string | null, check?: RoutinePreviewCheck): Promise<RoutinePreviewResult> {
       await ready;
-      const result = await call("routine.preview", { schedule });
+      const params: Record<string, unknown> = {};
+      if (schedule !== null) params["schedule"] = schedule;
+      if (check?.workflow !== undefined) params["workflow"] = check.workflow;
+      if (check?.inputs !== undefined) params["inputs"] = check.inputs;
+      if (check?.onWatch === true) params["on_watch"] = true;
+      if (check?.folder !== undefined && check.folder !== null) params["folder"] = check.folder;
+      const result = await call("routine.preview", params);
       if (!isRoutinePreviewResult(result)) {
         throw new Error("invalid routine.preview result");
       }

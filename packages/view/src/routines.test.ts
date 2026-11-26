@@ -63,6 +63,8 @@ test("the preview line of a watch routine", () => {
   assert.equal(watchPreviewText("~/logs", undefined, "/summarise"), "Runs /summarise for each new file in ~/logs");
   assert.equal(watchPreviewText("~/logs", "report-*.csv", "/x"), "Runs /x for each new file matching report-*.csv in ~/logs");
   assert.equal(watchPreviewText("  ", "*.pdf", "/x"), "");
+  assert.equal(watchPreviewText("~/Downloads", "*.pdf", "", "receipts"), "Runs the workflow receipts for each new PDF in ~/Downloads");
+  assert.equal(watchPreviewText("~/Downloads", "*.pdf", "", ""), "Runs the workflow you pick for each new PDF in ~/Downloads");
 });
 
 test("a watch routine saves a folder and a glob, and no schedule", () => {

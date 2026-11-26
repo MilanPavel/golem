@@ -10,7 +10,8 @@ import { PageProvider } from "../../store/page-context.tsx";
 import { fakeClient, fakeFrame } from "../../store/test-support.ts";
 import { sidebarItemStore } from "../sidebar/sidebar-item.ts";
 import { SAMPLE_BROKEN, SAMPLE_PR_DIGEST, SAMPLE_PR_DIGEST_CODE, SAMPLE_PR_DIGEST_GET, SAMPLE_PR_DIGEST_STEPS, SAMPLE_UNTRUSTED, SAMPLE_WORKFLOW_LIST, SAMPLE_WORKFLOW_LIST_TWO_PROJECTS, SAMPLE_WORKFLOW_RUNS, WORKFLOWS_NOW } from "./sample.ts";
-import { stepLines, workflowGroups, workflowRuns } from "./text.ts";
+import { SAMPLE_MORNING_BRIEF, SAMPLE_WORKFLOW_ROUTINE, SAMPLE_WORKFLOW_WATCH_ROUTINE } from "../routines/sample.ts";
+import { routinesStarting, stepLines, workflowGroups, workflowRuns } from "./text.ts";
 import { WorkflowDetail } from "./workflow-detail.tsx";
 import { WorkflowsPanel } from "./workflows-panel.tsx";
 
@@ -68,7 +69,7 @@ test("groups and run filtering are pure", () => {
   expect(stepLines(SAMPLE_PR_DIGEST_STEPS)).toEqual(new Set([12, 15, 20, 23]));
   const other = { ...SAMPLE_WORKFLOW_RUNS[0]!, session_id: "x", origin: "workflow:other" };
   const routine = { ...SAMPLE_WORKFLOW_RUNS[0]!, session_id: "y", kind: "routine" as const, origin: "workflow:pr_digest" };
-  expect(workflowRuns([...SAMPLE_WORKFLOW_RUNS, other, routine], "pr_digest")).toHaveLength(SAMPLE_WORKFLOW_RUNS.length);
+  expect(workflowRuns([...SAMPLE_WORKFLOW_RUNS, other, routine], "pr_digest")).toHaveLength(SAMPLE_WORKFLOW_RUNS.length + 1);
 });
 
 function detail(extra: Partial<Parameters<typeof WorkflowDetail>[0]> = {}) {
@@ -131,13 +132,41 @@ test("the Runs tab lists this workflow's runs, each opening its session", async 
   expect((await axe.run(container, noContrast)).violations).toEqual([]);
 });
 
-test("the Runs tab says so when there are none, and the Triggers tab waits for 4.8.2", async () => {
+test("the Runs tab says so when there are none", async () => {
   const user = userEvent.setup();
   render(detail({ runs: [] }));
   await user.click(screen.getByRole("tab", { name: "Runs" }));
   expect(screen.getByText("No runs yet.")).toBeTruthy();
+});
+
+test("the Triggers tab lists the routines that start the workflow, each with its schedule or watch and a link", async () => {
+  const user = userEvent.setup();
+  const onNavigate = vi.fn();
+  const { container } = render(detail({ routines: [SAMPLE_WORKFLOW_ROUTINE, SAMPLE_WORKFLOW_WATCH_ROUTINE], onNavigate }));
   await user.click(screen.getByRole("tab", { name: "Triggers" }));
-  expect(screen.getByText(/come with 4\.8\.2/)).toBeTruthy();
+  const rows = within(screen.getByRole("list", { name: "Routines that start it" })).getAllByRole("listitem");
+  expect(rows).toHaveLength(2);
+  expect(rows[0]?.textContent).toContain("weekday-pr-digest");
+  expect(rows[0]?.textContent).toContain("Weekdays at 09:00 · repo=MilanPavel/golem, since=1d");
+  expect(rows[1]?.textContent).toContain("New *.pdf in ~/Downloads · repo=MilanPavel/golem");
+  const link = within(rows[0]!).getByRole("link", { name: /Open routine/ });
+  expect(link.getAttribute("href")).toBe("/routines/weekday-pr-digest");
+  await user.click(link);
+  expect(onNavigate).toHaveBeenCalledWith("/routines/weekday-pr-digest");
+  expect((await axe.run(container, noContrast)).violations).toEqual([]);
+});
+
+test("the Triggers tab says no routine starts the workflow, with a way to make one", async () => {
+  const user = userEvent.setup();
+  render(detail({ routines: [] }));
+  await user.click(screen.getByRole("tab", { name: "Triggers" }));
+  expect(screen.getByText(/No routine starts this workflow/)).toBeTruthy();
+  expect(screen.getByRole("link", { name: "Routines" }).getAttribute("href")).toBe("/routines?new");
+});
+
+test("routinesStarting picks the routines whose workflow is this one", () => {
+  expect(routinesStarting([SAMPLE_WORKFLOW_ROUTINE, SAMPLE_WORKFLOW_WATCH_ROUTINE, SAMPLE_MORNING_BRIEF], "pr_digest")).toHaveLength(2);
+  expect(routinesStarting([SAMPLE_MORNING_BRIEF], "pr_digest")).toEqual([]);
 });
 
 test("a broken workflow shows its traceback, does not show code, and cannot run", async () => {

@@ -54,6 +54,16 @@ export function fieldProblem(field: InputField, value: string): string | null {
   return null;
 }
 
+/** What a routine's `inputs` table gives each field, as the text a person would type. A field the table does not name is left out. */
+export function valuesFromInputs(fields: readonly InputField[], inputs: Readonly<Record<string, string | number | boolean>> | null | undefined): Record<string, string> {
+  const given: Record<string, string> = {};
+  for (const field of fields) {
+    const value = inputs?.[field.name];
+    if (value !== undefined) given[field.name] = String(value);
+  }
+  return given;
+}
+
 /** The `inputs` of `workflow.start`. An empty field with a default is left out, so the workflow's own default applies. */
 export function startInputs(fields: readonly InputField[], values: Readonly<Record<string, string>>): Record<string, unknown> {
   const inputs: Record<string, unknown> = {};

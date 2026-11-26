@@ -136,3 +136,14 @@ export const SAMPLE_WORKFLOW_RUNS: RunInfo[] = [
   run("w_fail", { status: "failed", started_at: at(1, 9, 0), ended_at: at(1, 9, 0, 21), reason: "tool mcp__github__list_pull_requests: needs sign-in" }),
   run("w_old", { started_at: at(3, 9, 0), ended_at: at(3, 9, 1, 2), summary: "9 pull requests" }),
 ];
+
+/** A run of `pr_digest` that the routine `weekday-pr-digest` started: a routine row (it has a routine run id and a trigger) whose session is a workflow's. */
+export const SAMPLE_ROUTINE_WORKFLOW_RUN: RunInfo = run("w_routine", {
+  kind: "routine",
+  routine: "weekday-pr-digest",
+  routine_run_id: "rr_20",
+  trigger: "schedule",
+  started_at: at(0, 9, 0),
+  ended_at: at(0, 9, 1, 8),
+  summary: "12 pull requests",
+});
