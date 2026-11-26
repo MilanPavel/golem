@@ -23,6 +23,7 @@ Rules, in short:
 from __future__ import annotations
 
 import ast
+import io
 import re
 from dataclasses import dataclass, field, replace
 from typing import Any
@@ -36,6 +37,21 @@ _PURE_BUILTINS = frozenset(
     }
 )
 _TITLE_MAX = 80
+PARAMS: dict[str, tuple[str, ...]] = {
+    "step": ("name", "fn"),
+    "agent": ("type", "brief", "model", "key", "gets", "budget", "worktree"),
+    "review": ("draft", "ask", "key"),
+    "notify": ("text", "title", "key"),
+    "llm": ("prompt", "schema", "model", "key"),
+    "tool": ("name",),
+    "skill": ("name", "args", "key"),
+}
+"""The positional parameter names of each ``run.*`` method, for naming a positional argument."""
+KEYWORD_ONLY: dict[str, tuple[str, ...]] = {
+    "step": ("key", "retries", "backoff"),
+    "tool": ("key",),
+}
+"""The keyword-only parameters that ``PARAMS`` does not list."""
 
 
 class OutlineError(ValueError):
@@ -58,6 +74,37 @@ class WorkflowInput:
 
 
 @dataclass(frozen=True)
+class OutlineArg:
+    """One argument of a ``run.*`` call, with its exact place in the source.
+
+    ``line`` and ``end_line`` count from 1, ``col`` and ``end_col`` are character offsets from 0
+    (``end_col`` is just after the last character). ``value`` is the text of a plain literal (the
+    string itself, or a number or bool as written), else None.
+    """
+
+    name: str
+    source: str
+    literal: bool
+    line: int
+    col: int
+    end_line: int
+    end_col: int
+    value: str | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "name": self.name,
+            "source": self.source,
+            "literal": self.literal,
+            "value": self.value,
+            "line": self.line,
+            "col": self.col,
+            "end_line": self.end_line,
+            "end_col": self.end_col,
+        }
+
+
+@dataclass(frozen=True)
 class OutlineStep:
     id: str
     kind: str
@@ -73,6 +120,7 @@ class OutlineStep:
     brief_line: int | None = None
     budget_line: int | None = None
     after: tuple[str, ...] = ()
+    args: tuple[OutlineArg, ...] = ()
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -90,6 +138,7 @@ class OutlineStep:
             "brief_line": self.brief_line,
             "budget_line": self.budget_line,
             "after": list(self.after),
+            "args": [a.to_dict() for a in self.args],
         }
 
 
@@ -119,8 +168,18 @@ def _seg(source: str, node: ast.expr) -> str:
     return seg if seg and "\n" not in seg else ast.unparse(node)
 
 
+def _seg_any(source: str, node: ast.expr) -> str:
+    """The source text of ``node``, however many lines it spans."""
+    return ast.get_source_segment(source, node) or ast.unparse(node)
+
+
 def outline(source: str) -> list[WorkflowOutline]:
     """One outline per ``@workflow`` function in ``source``."""
+    return [b.build() for b in builders(source)]
+
+
+def builders(source: str) -> list[Builder]:
+    """One builder per ``@workflow`` function; ``nodes`` maps step ids to calls."""
     try:
         tree = ast.parse(source)
     except SyntaxError as e:
@@ -128,10 +187,20 @@ def outline(source: str) -> list[WorkflowOutline]:
     except ValueError as e:  # null bytes
         raise OutlineError(str(e)) from e
     return [
-        _Builder(node, source).build()
+        Builder(node, source)
         for node in tree.body
         if isinstance(node, ast.AsyncFunctionDef | ast.FunctionDef) and _workflow_deco(node)
     ]
+
+
+def literal_text(node: ast.expr) -> str | None:
+    """The value of a plain literal (a str, int, float or bool, or an f-string with no
+    expressions) as text, else None."""
+    if isinstance(node, ast.Constant) and isinstance(node.value, str | int | float | bool):
+        return str(node.value) if not isinstance(node.value, str) else node.value
+    if isinstance(node, ast.JoinedStr) and all(isinstance(p, ast.Constant) for p in node.values):
+        return "".join(str(p.value) for p in node.values if isinstance(p, ast.Constant))
+    return None
 
 
 # ---- decorator and header ----
@@ -206,7 +275,7 @@ class _Ctx:
     fixed: tuple[int, int] | None = None  # whole statement, inside a comprehension
 
 
-class _Builder:
+class Builder:
     def __init__(self, fn: ast.AsyncFunctionDef | ast.FunctionDef, source: str) -> None:
         self.fn = fn
         self.source = source
@@ -219,6 +288,38 @@ class _Builder:
         self.counts: dict[str, int] = {}
         self.groups = 0
         self.stmt: ast.stmt = fn
+        self.nodes: dict[str, ast.Call] = {}
+        self.raw = io.StringIO(source, newline="").readlines()
+
+    def char_col(self, line: int, col: int) -> int:
+        """The character offset of the UTF-8 byte offset ``col`` on ``line`` (from 1)."""
+        text = self.raw[line - 1] if 0 < line <= len(self.raw) else ""
+        return len(text.encode("utf-8")[:col].decode("utf-8", errors="ignore"))
+
+    def arg_of(self, name: str, node: ast.expr) -> OutlineArg:
+        end_line = node.end_lineno or node.lineno
+        end_col = node.end_col_offset or node.col_offset
+        value = literal_text(node)
+        return OutlineArg(
+            name=name,
+            source=_seg_any(self.source, node),
+            literal=value is not None,
+            value=value,
+            line=node.lineno,
+            col=self.char_col(node.lineno, node.col_offset),
+            end_line=end_line,
+            end_col=self.char_col(end_line, end_col),
+        )
+
+    def args_of(self, call: ast.Call, kind: str) -> tuple[OutlineArg, ...]:
+        names = PARAMS.get(kind, ())
+        found = [
+            self.arg_of(names[i], a)
+            for i, a in enumerate(call.args)
+            if i < len(names) and not isinstance(a, ast.Starred)
+        ]
+        found += [self.arg_of(k.arg, k.value) for k in call.keywords if k.arg]
+        return tuple(sorted(found, key=lambda a: (a.line, a.col)))
 
     def seg(self, node: ast.expr) -> str:
         return _seg(self.source, node)
@@ -508,7 +609,9 @@ class _Builder:
             budget_line=budget_node.lineno if budget_node is not None else None,
             extra_deps=deps,
             node=call,
+            args=self.args_of(call, kind),
         )
+        self.nodes[sid] = call
         return [sid]
 
     @staticmethod
@@ -534,6 +637,7 @@ class _Builder:
         budget_line: int | None = None,
         extra_deps: frozenset[str] = frozenset(),
         node: ast.AST | None = None,
+        args: tuple[OutlineArg, ...] = (),
     ) -> str:
         sid = self.make_id(kind, key_literal, slug)
         reads: frozenset[str] = ctx.deps | extra_deps
@@ -556,6 +660,7 @@ class _Builder:
                 brief_line=brief_line,
                 budget_line=budget_line,
                 after=after,
+                args=args,
             )
         )
         return sid

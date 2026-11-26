@@ -147,6 +147,13 @@
           "default": null,
           "title": "Agent"
         },
+        "args": {
+          "items": {
+            "$ref": "#/$defs/WorkflowStepArg"
+          },
+          "title": "Args",
+          "type": "array"
+        },
         "brief_line": {
           "anyOf": [
             {
@@ -281,6 +288,68 @@
         "lines"
       ],
       "title": "WorkflowOutlineStep",
+      "type": "object"
+    },
+    "WorkflowStepArg": {
+      "additionalProperties": false,
+      "description": "One argument of a ``run.*`` call, with its exact place in the source.\n\n``line`` and ``end_line`` count from 1; ``col`` and ``end_col`` are character offsets from 0,\n``end_col`` just after the last character. ``literal`` is true for a plain string, number or\nbool, or an f-string with no expressions; ``value`` is then its text. A value the code\ncomputes has ``literal`` false: it is shown, and set in the code.",
+      "properties": {
+        "col": {
+          "minimum": 0,
+          "title": "Col",
+          "type": "integer"
+        },
+        "end_col": {
+          "minimum": 0,
+          "title": "End Col",
+          "type": "integer"
+        },
+        "end_line": {
+          "minimum": 1,
+          "title": "End Line",
+          "type": "integer"
+        },
+        "line": {
+          "minimum": 1,
+          "title": "Line",
+          "type": "integer"
+        },
+        "literal": {
+          "title": "Literal",
+          "type": "boolean"
+        },
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "source": {
+          "title": "Source",
+          "type": "string"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Value"
+        }
+      },
+      "required": [
+        "name",
+        "source",
+        "literal",
+        "line",
+        "col",
+        "end_line",
+        "end_col"
+      ],
+      "title": "WorkflowStepArg",
       "type": "object"
     },
     "WorkflowTriggerInfo": {

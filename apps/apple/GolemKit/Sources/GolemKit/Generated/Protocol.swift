@@ -31794,6 +31794,7 @@ public enum Severity: String, Codable {
 public struct WorkflowCheckResultStep: Codable {
     public let after: [String]?
     public let agent: String?
+    public let args: [PurpleWorkflowStepArg]?
     public let briefLine: Int?
     public let budget: String?
     public let budgetLine: Int?
@@ -31810,6 +31811,7 @@ public struct WorkflowCheckResultStep: Codable {
     public enum CodingKeys: String, CodingKey {
         case after = "after"
         case agent = "agent"
+        case args = "args"
         case briefLine = "brief_line"
         case budget = "budget"
         case budgetLine = "budget_line"
@@ -31824,9 +31826,10 @@ public struct WorkflowCheckResultStep: Codable {
         case title = "title"
     }
 
-    public init(after: [String]?, agent: String?, briefLine: Int?, budget: String?, budgetLine: Int?, condition: String?, forEach: String?, gets: String?, group: String?, id: String, key: String?, kind: String, lines: [Int], title: String) {
+    public init(after: [String]?, agent: String?, args: [PurpleWorkflowStepArg]?, briefLine: Int?, budget: String?, budgetLine: Int?, condition: String?, forEach: String?, gets: String?, group: String?, id: String, key: String?, kind: String, lines: [Int], title: String) {
         self.after = after
         self.agent = agent
+        self.args = args
         self.briefLine = briefLine
         self.budget = budget
         self.budgetLine = budgetLine
@@ -31839,6 +31842,271 @@ public struct WorkflowCheckResultStep: Codable {
         self.kind = kind
         self.lines = lines
         self.title = title
+    }
+}
+
+/// One argument of a ``run.*`` call, with its exact place in the source.
+///
+/// ``line`` and ``end_line`` count from 1; ``col`` and ``end_col`` are character offsets
+/// from 0,
+/// ``end_col`` just after the last character. ``literal`` is true for a plain string, number
+/// or
+/// bool, or an f-string with no expressions; ``value`` is then its text. A value the code
+/// computes has ``literal`` false: it is shown, and set in the code.
+// MARK: - PurpleWorkflowStepArg
+public struct PurpleWorkflowStepArg: Codable {
+    public let col: Int
+    public let endCol: Int
+    public let endLine: Int
+    public let line: Int
+    public let literal: Bool
+    public let name: String
+    public let source: String
+    public let value: String?
+
+    public enum CodingKeys: String, CodingKey {
+        case col = "col"
+        case endCol = "end_col"
+        case endLine = "end_line"
+        case line = "line"
+        case literal = "literal"
+        case name = "name"
+        case source = "source"
+        case value = "value"
+    }
+
+    public init(col: Int, endCol: Int, endLine: Int, line: Int, literal: Bool, name: String, source: String, value: String?) {
+        self.col = col
+        self.endCol = endCol
+        self.endLine = endLine
+        self.line = line
+        self.literal = literal
+        self.name = name
+        self.source = source
+        self.value = value
+    }
+}
+
+/// ``workflow.edit_step``. Set one argument of one step in ``code`` (the text the editor
+/// holds).
+///
+/// ``name`` is the argument (``type``, ``brief``, ``model``, ``budget``, ``key``, ...) and
+/// ``value`` its new literal. Only that argument's source span is replaced, or
+/// ``name=value`` is
+/// added when the call lacks it. Refused for a code step, an argument the code computes and
+/// a
+/// value that is not valid for it.
+// MARK: - WorkflowEditStepParams
+public struct WorkflowEditStepParams: Codable {
+    public let code: String
+    public let id: String
+    public let name: String
+    public let stepID: String
+    public let value: Value
+
+    public enum CodingKeys: String, CodingKey {
+        case code = "code"
+        case id = "id"
+        case name = "name"
+        case stepID = "step_id"
+        case value = "value"
+    }
+
+    public init(code: String, id: String, name: String, stepID: String, value: Value) {
+        self.code = code
+        self.id = id
+        self.name = name
+        self.stepID = stepID
+        self.value = value
+    }
+}
+
+public enum Value: Codable {
+    case bool(Bool)
+    case double(Double)
+    case string(String)
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        if let x = try? container.decode(Bool.self) {
+            self = .bool(x)
+            return
+        }
+        if let x = try? container.decode(Double.self) {
+            self = .double(x)
+            return
+        }
+        if let x = try? container.decode(String.self) {
+            self = .string(x)
+            return
+        }
+        throw DecodingError.typeMismatch(Value.self, DecodingError.Context(codingPath: decoder.codingPath, debugDescription: "Wrong type for Value"))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        switch self {
+        case .bool(let x):
+            try container.encode(x)
+        case .double(let x):
+            try container.encode(x)
+        case .string(let x):
+            try container.encode(x)
+        }
+    }
+}
+
+/// The new text, its outline and its problems. Nothing is written; the editor holds the
+/// text as an unsaved edit.
+// MARK: - WorkflowEditStepResult
+public struct WorkflowEditStepResult: Codable {
+    public let code: String
+    public let problems: [WorkflowEditStepResultProblem]?
+    public let steps: [WorkflowEditStepResultStep]?
+
+    public enum CodingKeys: String, CodingKey {
+        case code = "code"
+        case problems = "problems"
+        case steps = "steps"
+    }
+
+    public init(code: String, problems: [WorkflowEditStepResultProblem]?, steps: [WorkflowEditStepResultStep]?) {
+        self.code = code
+        self.problems = problems
+        self.steps = steps
+    }
+}
+
+/// One finding of ``workflow.check``, with the line it is on and the outline step it belongs
+/// to (null for the header or the whole file). ``fix`` is a short replacement text or the
+/// name
+/// of an action.
+// MARK: - WorkflowEditStepResultProblem
+public struct WorkflowEditStepResultProblem: Codable {
+    public let fix: String?
+    public let line: Int
+    public let message: String
+    public let severity: Severity
+    public let stepID: String?
+
+    public enum CodingKeys: String, CodingKey {
+        case fix = "fix"
+        case line = "line"
+        case message = "message"
+        case severity = "severity"
+        case stepID = "step_id"
+    }
+
+    public init(fix: String?, line: Int, message: String, severity: Severity, stepID: String?) {
+        self.fix = fix
+        self.line = line
+        self.message = message
+        self.severity = severity
+        self.stepID = stepID
+    }
+}
+
+/// One step read from the source, without running it.
+///
+/// ``lines`` is the first and last line in the file (from 1). ``key`` and ``group`` are the
+/// step's key and the group it belongs to, when the source says them. ``for_each`` and
+/// ``condition`` are the source text of the loop and the guard. ``after`` lists the ids of
+/// the
+/// steps this one follows.
+// MARK: - WorkflowEditStepResultStep
+public struct WorkflowEditStepResultStep: Codable {
+    public let after: [String]?
+    public let agent: String?
+    public let args: [FluffyWorkflowStepArg]?
+    public let briefLine: Int?
+    public let budget: String?
+    public let budgetLine: Int?
+    public let condition: String?
+    public let forEach: String?
+    public let gets: String?
+    public let group: String?
+    public let id: String
+    public let key: String?
+    public let kind: String
+    public let lines: [Int]
+    public let title: String
+
+    public enum CodingKeys: String, CodingKey {
+        case after = "after"
+        case agent = "agent"
+        case args = "args"
+        case briefLine = "brief_line"
+        case budget = "budget"
+        case budgetLine = "budget_line"
+        case condition = "condition"
+        case forEach = "for_each"
+        case gets = "gets"
+        case group = "group"
+        case id = "id"
+        case key = "key"
+        case kind = "kind"
+        case lines = "lines"
+        case title = "title"
+    }
+
+    public init(after: [String]?, agent: String?, args: [FluffyWorkflowStepArg]?, briefLine: Int?, budget: String?, budgetLine: Int?, condition: String?, forEach: String?, gets: String?, group: String?, id: String, key: String?, kind: String, lines: [Int], title: String) {
+        self.after = after
+        self.agent = agent
+        self.args = args
+        self.briefLine = briefLine
+        self.budget = budget
+        self.budgetLine = budgetLine
+        self.condition = condition
+        self.forEach = forEach
+        self.gets = gets
+        self.group = group
+        self.id = id
+        self.key = key
+        self.kind = kind
+        self.lines = lines
+        self.title = title
+    }
+}
+
+/// One argument of a ``run.*`` call, with its exact place in the source.
+///
+/// ``line`` and ``end_line`` count from 1; ``col`` and ``end_col`` are character offsets
+/// from 0,
+/// ``end_col`` just after the last character. ``literal`` is true for a plain string, number
+/// or
+/// bool, or an f-string with no expressions; ``value`` is then its text. A value the code
+/// computes has ``literal`` false: it is shown, and set in the code.
+// MARK: - FluffyWorkflowStepArg
+public struct FluffyWorkflowStepArg: Codable {
+    public let col: Int
+    public let endCol: Int
+    public let endLine: Int
+    public let line: Int
+    public let literal: Bool
+    public let name: String
+    public let source: String
+    public let value: String?
+
+    public enum CodingKeys: String, CodingKey {
+        case col = "col"
+        case endCol = "end_col"
+        case endLine = "end_line"
+        case line = "line"
+        case literal = "literal"
+        case name = "name"
+        case source = "source"
+        case value = "value"
+    }
+
+    public init(col: Int, endCol: Int, endLine: Int, line: Int, literal: Bool, name: String, source: String, value: String?) {
+        self.col = col
+        self.endCol = endCol
+        self.endLine = endLine
+        self.line = line
+        self.literal = literal
+        self.name = name
+        self.source = source
+        self.value = value
     }
 }
 
@@ -31989,6 +32257,7 @@ public struct WorkflowGetResult: Codable {
 public struct WorkflowGetResultStep: Codable {
     public let after: [String]?
     public let agent: String?
+    public let args: [TentacledWorkflowStepArg]?
     public let briefLine: Int?
     public let budget: String?
     public let budgetLine: Int?
@@ -32005,6 +32274,7 @@ public struct WorkflowGetResultStep: Codable {
     public enum CodingKeys: String, CodingKey {
         case after = "after"
         case agent = "agent"
+        case args = "args"
         case briefLine = "brief_line"
         case budget = "budget"
         case budgetLine = "budget_line"
@@ -32019,9 +32289,10 @@ public struct WorkflowGetResultStep: Codable {
         case title = "title"
     }
 
-    public init(after: [String]?, agent: String?, briefLine: Int?, budget: String?, budgetLine: Int?, condition: String?, forEach: String?, gets: String?, group: String?, id: String, key: String?, kind: String, lines: [Int], title: String) {
+    public init(after: [String]?, agent: String?, args: [TentacledWorkflowStepArg]?, briefLine: Int?, budget: String?, budgetLine: Int?, condition: String?, forEach: String?, gets: String?, group: String?, id: String, key: String?, kind: String, lines: [Int], title: String) {
         self.after = after
         self.agent = agent
+        self.args = args
         self.briefLine = briefLine
         self.budget = budget
         self.budgetLine = budgetLine
@@ -32034,6 +32305,48 @@ public struct WorkflowGetResultStep: Codable {
         self.kind = kind
         self.lines = lines
         self.title = title
+    }
+}
+
+/// One argument of a ``run.*`` call, with its exact place in the source.
+///
+/// ``line`` and ``end_line`` count from 1; ``col`` and ``end_col`` are character offsets
+/// from 0,
+/// ``end_col`` just after the last character. ``literal`` is true for a plain string, number
+/// or
+/// bool, or an f-string with no expressions; ``value`` is then its text. A value the code
+/// computes has ``literal`` false: it is shown, and set in the code.
+// MARK: - TentacledWorkflowStepArg
+public struct TentacledWorkflowStepArg: Codable {
+    public let col: Int
+    public let endCol: Int
+    public let endLine: Int
+    public let line: Int
+    public let literal: Bool
+    public let name: String
+    public let source: String
+    public let value: String?
+
+    public enum CodingKeys: String, CodingKey {
+        case col = "col"
+        case endCol = "end_col"
+        case endLine = "end_line"
+        case line = "line"
+        case literal = "literal"
+        case name = "name"
+        case source = "source"
+        case value = "value"
+    }
+
+    public init(col: Int, endCol: Int, endLine: Int, line: Int, literal: Bool, name: String, source: String, value: String?) {
+        self.col = col
+        self.endCol = endCol
+        self.endLine = endLine
+        self.line = line
+        self.literal = literal
+        self.name = name
+        self.source = source
+        self.value = value
     }
 }
 
@@ -32265,6 +32578,7 @@ public struct FluffyWorkflowTriggerInfo: Codable {
 public struct WorkflowOutlineStep: Codable {
     public let after: [String]?
     public let agent: String?
+    public let args: [WorkflowOutlineStepArg]?
     public let briefLine: Int?
     public let budget: String?
     public let budgetLine: Int?
@@ -32281,6 +32595,7 @@ public struct WorkflowOutlineStep: Codable {
     public enum CodingKeys: String, CodingKey {
         case after = "after"
         case agent = "agent"
+        case args = "args"
         case briefLine = "brief_line"
         case budget = "budget"
         case budgetLine = "budget_line"
@@ -32295,9 +32610,10 @@ public struct WorkflowOutlineStep: Codable {
         case title = "title"
     }
 
-    public init(after: [String]?, agent: String?, briefLine: Int?, budget: String?, budgetLine: Int?, condition: String?, forEach: String?, gets: String?, group: String?, id: String, key: String?, kind: String, lines: [Int], title: String) {
+    public init(after: [String]?, agent: String?, args: [WorkflowOutlineStepArg]?, briefLine: Int?, budget: String?, budgetLine: Int?, condition: String?, forEach: String?, gets: String?, group: String?, id: String, key: String?, kind: String, lines: [Int], title: String) {
         self.after = after
         self.agent = agent
+        self.args = args
         self.briefLine = briefLine
         self.budget = budget
         self.budgetLine = budgetLine
@@ -32310,6 +32626,48 @@ public struct WorkflowOutlineStep: Codable {
         self.kind = kind
         self.lines = lines
         self.title = title
+    }
+}
+
+/// One argument of a ``run.*`` call, with its exact place in the source.
+///
+/// ``line`` and ``end_line`` count from 1; ``col`` and ``end_col`` are character offsets
+/// from 0,
+/// ``end_col`` just after the last character. ``literal`` is true for a plain string, number
+/// or
+/// bool, or an f-string with no expressions; ``value`` is then its text. A value the code
+/// computes has ``literal`` false: it is shown, and set in the code.
+// MARK: - WorkflowOutlineStepArg
+public struct WorkflowOutlineStepArg: Codable {
+    public let col: Int
+    public let endCol: Int
+    public let endLine: Int
+    public let line: Int
+    public let literal: Bool
+    public let name: String
+    public let source: String
+    public let value: String?
+
+    public enum CodingKeys: String, CodingKey {
+        case col = "col"
+        case endCol = "end_col"
+        case endLine = "end_line"
+        case line = "line"
+        case literal = "literal"
+        case name = "name"
+        case source = "source"
+        case value = "value"
+    }
+
+    public init(col: Int, endCol: Int, endLine: Int, line: Int, literal: Bool, name: String, source: String, value: String?) {
+        self.col = col
+        self.endCol = endCol
+        self.endLine = endLine
+        self.line = line
+        self.literal = literal
+        self.name = name
+        self.source = source
+        self.value = value
     }
 }
 
@@ -33254,6 +33612,7 @@ public struct WorkflowSaveResultProblem: Codable {
 public struct WorkflowSaveResultStep: Codable {
     public let after: [String]?
     public let agent: String?
+    public let args: [StickyWorkflowStepArg]?
     public let briefLine: Int?
     public let budget: String?
     public let budgetLine: Int?
@@ -33270,6 +33629,7 @@ public struct WorkflowSaveResultStep: Codable {
     public enum CodingKeys: String, CodingKey {
         case after = "after"
         case agent = "agent"
+        case args = "args"
         case briefLine = "brief_line"
         case budget = "budget"
         case budgetLine = "budget_line"
@@ -33284,9 +33644,10 @@ public struct WorkflowSaveResultStep: Codable {
         case title = "title"
     }
 
-    public init(after: [String]?, agent: String?, briefLine: Int?, budget: String?, budgetLine: Int?, condition: String?, forEach: String?, gets: String?, group: String?, id: String, key: String?, kind: String, lines: [Int], title: String) {
+    public init(after: [String]?, agent: String?, args: [StickyWorkflowStepArg]?, briefLine: Int?, budget: String?, budgetLine: Int?, condition: String?, forEach: String?, gets: String?, group: String?, id: String, key: String?, kind: String, lines: [Int], title: String) {
         self.after = after
         self.agent = agent
+        self.args = args
         self.briefLine = briefLine
         self.budget = budget
         self.budgetLine = budgetLine
@@ -33299,6 +33660,48 @@ public struct WorkflowSaveResultStep: Codable {
         self.kind = kind
         self.lines = lines
         self.title = title
+    }
+}
+
+/// One argument of a ``run.*`` call, with its exact place in the source.
+///
+/// ``line`` and ``end_line`` count from 1; ``col`` and ``end_col`` are character offsets
+/// from 0,
+/// ``end_col`` just after the last character. ``literal`` is true for a plain string, number
+/// or
+/// bool, or an f-string with no expressions; ``value`` is then its text. A value the code
+/// computes has ``literal`` false: it is shown, and set in the code.
+// MARK: - StickyWorkflowStepArg
+public struct StickyWorkflowStepArg: Codable {
+    public let col: Int
+    public let endCol: Int
+    public let endLine: Int
+    public let line: Int
+    public let literal: Bool
+    public let name: String
+    public let source: String
+    public let value: String?
+
+    public enum CodingKeys: String, CodingKey {
+        case col = "col"
+        case endCol = "end_col"
+        case endLine = "end_line"
+        case line = "line"
+        case literal = "literal"
+        case name = "name"
+        case source = "source"
+        case value = "value"
+    }
+
+    public init(col: Int, endCol: Int, endLine: Int, line: Int, literal: Bool, name: String, source: String, value: String?) {
+        self.col = col
+        self.endCol = endCol
+        self.endLine = endLine
+        self.line = line
+        self.literal = literal
+        self.name = name
+        self.source = source
+        self.value = value
     }
 }
 
@@ -33614,6 +34017,48 @@ public enum StepStatus: String, Codable {
     case running = "running"
     case skipped = "skipped"
     case waiting = "waiting"
+}
+
+/// One argument of a ``run.*`` call, with its exact place in the source.
+///
+/// ``line`` and ``end_line`` count from 1; ``col`` and ``end_col`` are character offsets
+/// from 0,
+/// ``end_col`` just after the last character. ``literal`` is true for a plain string, number
+/// or
+/// bool, or an f-string with no expressions; ``value`` is then its text. A value the code
+/// computes has ``literal`` false: it is shown, and set in the code.
+// MARK: - WorkflowStepArg
+public struct WorkflowStepArg: Codable {
+    public let col: Int
+    public let endCol: Int
+    public let endLine: Int
+    public let line: Int
+    public let literal: Bool
+    public let name: String
+    public let source: String
+    public let value: String?
+
+    public enum CodingKeys: String, CodingKey {
+        case col = "col"
+        case endCol = "end_col"
+        case endLine = "end_line"
+        case line = "line"
+        case literal = "literal"
+        case name = "name"
+        case source = "source"
+        case value = "value"
+    }
+
+    public init(col: Int, endCol: Int, endLine: Int, line: Int, literal: Bool, name: String, source: String, value: String?) {
+        self.col = col
+        self.endCol = endCol
+        self.endLine = endLine
+        self.line = line
+        self.literal = literal
+        self.name = name
+        self.source = source
+        self.value = value
+    }
 }
 
 /// Server → every connection: ``workflow.step.done``. Not stored.

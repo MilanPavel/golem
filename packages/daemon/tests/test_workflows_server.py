@@ -324,6 +324,30 @@ async def test_check_and_save(short_home: Path, tmp_path: Path) -> None:
         await stop_daemon(app, task)
 
 
+async def test_edit_step_returns_new_code_and_writes_nothing(
+    short_home: Path,
+) -> None:
+    good = _write(short_home / "workflows", "adder.py", TWO_STEPS)
+    app, task = await start_daemon(short_home)
+    client = await RpcClient.connect(app.paths.socket_path)
+    try:
+        await client.call("hello", HELLO)
+        await client.call("workflow.list", {}, timeout=20)
+        ident = f"{good}::adder"
+        step = cast(Rows, rpc_result(await client.call("workflow.get", {"id": ident}))["steps"])[0]
+        assert [a["name"] for a in cast(Rows, step["args"])][:1] == ["name"]
+        edit = {"id": ident, "code": TWO_STEPS, "step_id": step["id"], "name": "key", "value": "k"}
+        done = rpc_result(await client.call("workflow.edit_step", edit))
+        assert done["code"] == TWO_STEPS.replace("n, 1)", 'n, 1, key="k")')
+        assert cast(Rows, done["steps"])[0]["key"] == "k"
+        assert good.read_text(encoding="utf-8") == TWO_STEPS
+        refused = await client.call("workflow.edit_step", {**edit, "name": "model"})
+        assert error_code(refused) == INVALID_PARAMS
+    finally:
+        await client.close()
+        await stop_daemon(app, task)
+
+
 def _sha(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 

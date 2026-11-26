@@ -17,6 +17,7 @@ from typing import Any
 from golem.server.dispatcher import INTERNAL_ERROR, INVALID_PARAMS, RequestContext, RpcCallError
 from golem.store.workflow_runs import WorkflowRunRecord, WorkflowStepRecord
 from golem.workflows.check import Problem
+from golem.workflows.edit import EditError, set_argument
 from golem.workflows.outline import OutlineError, WorkflowOutline, outline
 from golem.workflows.propose import ProposeError
 from golem.workflows.registry import WorkflowEntry
@@ -26,6 +27,8 @@ from golem_protocol.commands import (
     WorkflowCancelResult,
     WorkflowCheckParams,
     WorkflowCheckResult,
+    WorkflowEditStepParams,
+    WorkflowEditStepResult,
     WorkflowEntryInfo,
     WorkflowGetParams,
     WorkflowGetResult,
@@ -183,6 +186,23 @@ async def workflow_check(ctx: RequestContext, params: WorkflowCheckParams) -> Wo
             raise RpcCallError(INVALID_PARAMS, f"the file cannot be read: {exc}") from exc
     problems, steps = await asyncio.to_thread(_checked, service, entry, code)
     return WorkflowCheckResult(problems=problems, steps=steps)
+
+
+async def workflow_edit_step(
+    ctx: RequestContext, params: WorkflowEditStepParams
+) -> WorkflowEditStepResult:
+    """Set one argument of one step in ``code`` and return the new text with its outline and
+    problems. Nothing is written: the editor keeps the text as an unsaved edit."""
+    service = _service(ctx)
+    entry = _find(await service.refresh([]), params.id)
+    try:
+        code = await asyncio.to_thread(
+            set_argument, params.code, params.step_id, params.name, params.value, entry.name
+        )
+    except EditError as exc:
+        raise RpcCallError(INVALID_PARAMS, str(exc)) from exc
+    problems, steps = await asyncio.to_thread(_checked, service, entry, code)
+    return WorkflowEditStepResult(code=code, steps=steps, problems=problems)
 
 
 async def workflow_save(ctx: RequestContext, params: WorkflowSaveParams) -> WorkflowSaveResult:
