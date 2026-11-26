@@ -76,6 +76,9 @@ export type ApprovalAnswer = { decision: ApprovalChoice; rule: string | null; ed
 /** The question asked about a tool call, and the answer once there is one. */
 export type ToolApproval = { source: string; subject: string | null; answer?: ApprovalAnswer; estimate?: HelperEstimate | null };
 
+/** The kept result of a `data_query` call: its columns, the first page and the row count. */
+export type ToolTable = NonNullable<Extract<ChatEvent, { type: "tool.completed" }>["data"]["table"]>;
+
 /** One tool call, drawn under the assistant message that asked for it. */
 export type ToolBlock = {
   callId: string;
@@ -101,6 +104,12 @@ export type ToolBlock = {
   sourcesAt?: string;
   /** The change a file tool would make, as a unified diff, from `approval.needed`. */
   diff?: string;
+  /** The rows a `data_query` call kept, from `tool.completed`. */
+  table?: ToolTable;
+  /** The rows in `preview` were not given to the model of the call, from `tool.completed`. */
+  rowsWithheld?: boolean;
+  /** How long the tool ran, from `tool.completed`. */
+  durationMs?: number;
   /** The question the run asked about this call, from `approval.needed` and `approval.resolved`. */
   approval?: ToolApproval;
   /** What the helper of a `delegate` call did, from the events that name this call as `parent_call_id`. */
@@ -470,6 +479,9 @@ function foldTool(tool: ToolBlock, event: ChatEvent): ToolBlock {
         ...(event.data.failed === true ? { unsuccessful: true } : {}),
         ...(event.data.diff ? { diff: event.data.diff } : {}),
         ...(event.data.sources?.length ? { sources: event.data.sources, sourcesAt: event.ts } : {}),
+        ...(event.data.table ? { table: event.data.table } : {}),
+        ...(event.data.rows_withheld === true ? { rowsWithheld: true } : {}),
+        ...(event.data.duration_ms == null ? {} : { durationMs: event.data.duration_ms }),
       };
     case "tool.failed":
       return { ...withoutOutput(tool), status: "failed", error: event.data.message };

@@ -535,6 +535,27 @@ test("tool events draw blocks under the reply that asked", () => {
   assert.equal(tools[0]?.unsuccessful, undefined);
 });
 
+test("a finished data query keeps its table, the withheld flag and how long it ran", () => {
+  const base = { session_id: "s", run_id: "r", ts: "t" } as const;
+  const table = { result_id: "r_1", source: "bank", columns: [{ name: "n", type: "BIGINT" }], rows: [[1], [2]], total_rows: 2, truncated: false };
+  const events: ChatEvent[] = [
+    { ...base, seq: 1, type: "message.started", data: { message_id: "a", role: "assistant" } },
+    { ...base, seq: 2, type: "message.completed", data: { message_id: "a", role: "assistant", text: "" } },
+    { ...base, seq: 3, type: "tool.requested", data: { call_id: "q", message_id: "a", name: "data_query", args: { source: "bank" } } },
+    { ...base, seq: 4, type: "tool.started", data: { call_id: "q" } },
+    {
+      ...base,
+      seq: 5,
+      type: "tool.completed",
+      data: { call_id: "q", summary: "2 rows", preview: "2 rows", rows_withheld: true, duration_ms: 38, table },
+    },
+  ];
+  const tool = events.reduce(reduceChat, emptyChat).messages[0]?.tools?.[0];
+  assert.deepEqual(tool?.table, table);
+  assert.equal(tool?.rowsWithheld, true);
+  assert.equal(tool?.durationMs, 38);
+});
+
 test("a call that ran but failed is done and unsuccessful", () => {
   const base = { session_id: "s", run_id: "r", ts: "t" } as const;
   const events: ChatEvent[] = [

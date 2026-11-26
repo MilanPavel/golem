@@ -394,6 +394,7 @@ export {
   type PendingConsent,
   type ToolApproval,
   type ToolBlock,
+  type ToolTable,
   type ToolStatus,
   type WritingBlock,
 } from "./chat-state.ts";

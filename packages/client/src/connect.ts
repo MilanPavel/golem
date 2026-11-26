@@ -939,6 +939,8 @@ export interface GolemClient {
   describeData(source: string, table?: string): Promise<DataDescribeResult>;
   /** `data.query`: run SQL on one source. Pass `result_id` to be able to cancel it with `cancelData`. */
   queryData(params: DataQueryParams): Promise<DataResult>;
+  /** `data.result.page`: one page of a kept result, by its `result_id`. */
+  pageDataResult(resultId: string, offset: number, limit: number): Promise<DataResult>;
   /** `data.cancel`: stop a query that is still running, by its `result_id`. */
   cancelData(resultId: string): Promise<DataCancelResult>;
   /** `data.inspect`: look at a location before it is added. Nothing is saved. */
@@ -3306,6 +3308,14 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       const result = await call("data.query", { ...params });
       if (!isDataQueryResult(result)) {
         throw new Error("invalid data.query result");
+      }
+      return result;
+    },
+    async pageDataResult(resultId: string, offset: number, limit: number): Promise<DataResult> {
+      await ready;
+      const result = await call("data.result.page", { result_id: resultId, offset, limit });
+      if (!isDataQueryResult(result)) {
+        throw new Error("invalid data.result.page result");
       }
       return result;
     },

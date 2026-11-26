@@ -25,9 +25,9 @@ export type Suggestion = {
  * names after `/skill run`. Prefix matches come before substring matches.
  * `//` is a message, so it never suggests.
  */
-export function suggest(draft: string, registry: readonly SuggestCommand[]): Suggestion[] {
+export function suggest(draft: string, registry: readonly SuggestCommand[], sources: readonly string[] = []): Suggestion[] {
   if (!draft.startsWith("/") || draft.startsWith("//")) {
-    return [];
+    return sourceSuggestions(draft, sources);
   }
   const space = draft.search(/\s/);
   if (space === -1) {
@@ -53,6 +53,28 @@ export function suggest(draft: string, registry: readonly SuggestCommand[]): Sug
     description: command.description,
     completion: `${name} ${choice}`,
     partial: rest.length > 0 && rest !== choice,
+  }));
+}
+
+/** The word being typed at the end of the draft, when it starts with `@` at the start of a word. */
+const SOURCE_WORD = /(^|\s)@([\w.-]*)$/;
+
+/**
+ * Data source names for an `@word` at the end of a message. The message is sent as typed: Tab or Enter
+ * only finish the name, and a name typed in full needs no completion, so Enter sends.
+ */
+function sourceSuggestions(draft: string, sources: readonly string[]): Suggestion[] {
+  const found = SOURCE_WORD.exec(draft);
+  if (found === null || sources.length === 0) {
+    return [];
+  }
+  const word = found[2] ?? "";
+  const before = draft.slice(0, found.index + (found[1]?.length ?? 0));
+  return rank(sources, (name) => name, word).map((name) => ({
+    label: `@${name}`,
+    description: "data source",
+    completion: `${before}@${name} `,
+    partial: word !== name,
   }));
 }
 

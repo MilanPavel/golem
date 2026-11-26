@@ -241,6 +241,19 @@ import {
   type PullState,
 } from "./model-picker.ts";
 import { ModelPickerView } from "./model-picker.tsx";
+import {
+  closedDataManager,
+  dataFailed,
+  dataManagerKeyOf,
+  layoutDataManager,
+  openDataManager,
+  pressDataManager,
+  type DataDetail,
+  type DataList,
+  type DataManagerAction,
+  type DataManagerState,
+} from "./data-manager.ts";
+import { pageableResult, pageOffset, PAGE_ROWS, type DataPage } from "./data-table.ts";
 import { setupHint, setupKeyOf, type SetupKey, type SetupScreen } from "./setup-frame.ts";
 import {
   newToolsUi,
@@ -697,6 +710,8 @@ export function App({
   const permsRef = useRef(perms);
   permsRef.current = perms;
   const [toolOutput, setToolOutput] = useState(false);
+  const toolOutputRef = useRef(toolOutput);
+  toolOutputRef.current = toolOutput;
   const sessionModelRef = useRef(sessionModel);
   sessionModelRef.current = sessionModel;
   const [daemonModel, setDaemonModel] = useState<ModelInfo | null>(null);
@@ -784,6 +799,22 @@ export function App({
   routineListRef.current = routineList;
   /** The last runs of the routine whose detail is open, and which routine they are for. */
   const [routineRuns, setRoutineRuns] = useState<{ name: string; folder: string | null; runs: RoutineRunSummary[] } | null>(null);
+  const [dataManager, setDataManager] = useState<DataManagerState>(closedDataManager);
+  const dataManagerRef = useRef(dataManager);
+  dataManagerRef.current = dataManager;
+  const [dataList, setDataList] = useState<DataList>({ sources: null, error: null });
+  const dataListRef = useRef(dataList);
+  dataListRef.current = dataList;
+  const [dataDetail, setDataDetail] = useState<DataDetail | null>(null);
+  const dataDetailRef = useRef(dataDetail);
+  dataDetailRef.current = dataDetail;
+  /** The page of rows each data result was moved to, by call id. */
+  const [dataPages, setDataPages] = useState<Readonly<Record<string, DataPage>>>({});
+  const dataPagesRef = useRef(dataPages);
+  dataPagesRef.current = dataPages;
+  /** The names `@` completes to, read when a draft first ends in an `@word`. Null until then. */
+  const [dataNames, setDataNames] = useState<readonly string[] | null>(null);
+  const dataNamesAsked = useRef(false);
   const [runsManager, setRunsManager] = useState<RunsManagerState>(closedRunsManager);
   const runsManagerRef = useRef(runsManager);
   runsManagerRef.current = runsManager;
@@ -1127,6 +1158,7 @@ export function App({
     agentsManager.open ||
     routinesManager.open ||
     runsManager.open ||
+    dataManager.open ||
     workflowsManager.open ||
     workflowRun.open ||
     stepsManager.open ||
@@ -1145,6 +1177,7 @@ export function App({
             invocableSkills(skillList.skills ?? []),
             { pinnable: pinnableSkills(skillList.skills ?? []), active: chat.activeSkills },
           ),
+          dataNames ?? [],
         );
   const composerText = draft.text;
   const suggestSelected =
@@ -1248,6 +1281,7 @@ export function App({
     times: showTimes,
     now,
     toolOutput,
+    dataPages,
     thinking: showThinking,
     writingSeconds,
     checks: chat.checks,
@@ -1696,6 +1730,31 @@ export function App({
       loadMcp();
     }
   }, [client, connection.status, sessionId]);
+
+  useEffect(() => {
+    if (dataNamesAsked.current || connection.status !== "connected" || !/(^|\s)@[\w.-]*$/.test(draft.text)) {
+      return;
+    }
+    dataNamesAsked.current = true;
+    client.listData().then(
+      (listed) => setDataNames(listed.sources.map((source) => source.name)),
+      () => setDataNames([]),
+    );
+  }, [client, connection.status, draft.text]);
+
+  useEffect(() => {
+    return client.onDataChanged(() => {
+      dataNamesAsked.current = false;
+      setDataNames(null);
+      if (dataManagerRef.current.open) {
+        loadData();
+        const view = dataManagerRef.current.view;
+        if (view.kind === "detail") {
+          loadDataDetail(view.name);
+        }
+      }
+    });
+  }, [client]);
 
   useEffect(() => {
     if (connection.status === "connected") {
@@ -2367,6 +2426,43 @@ export function App({
     setWorkflowRun(next);
   }
 
+  /** Ask for the data sources again. `/data` reads them. */
+  function loadData(): void {
+    client.listData().then(
+      (listed) => setDataList({ sources: listed.sources, error: null }),
+      (error: unknown) => setDataList({ sources: null, error: dataFailed(error) }),
+    );
+  }
+
+  /** Ask for one source with its tables, sample and notes. */
+  function loadDataDetail(name: string): void {
+    client.describeData(name).then(
+      (result) => setDataDetail({ name, result, error: null }),
+      (error: unknown) => setDataDetail({ name, result: null, error: dataFailed(error) }),
+    );
+  }
+
+  /** Move the newest long data result to another page of rows. Page one is the rows the event carried. */
+  function pageResult(toward: "up" | "down"): void {
+    const target = pageableResult(chatRef.current.messages);
+    if (target === null) {
+      return;
+    }
+    const current = dataPagesRef.current[target.callId]?.offset ?? 0;
+    const offset = pageOffset(target.table, current, toward);
+    if (offset === null) {
+      return;
+    }
+    if (offset === 0) {
+      setDataPages((pages) => ({ ...pages, [target.callId]: { offset: 0, rows: target.table.rows.slice(0, PAGE_ROWS) } }));
+      return;
+    }
+    client.pageDataResult(target.table.result_id, offset, PAGE_ROWS).then(
+      (page) => setDataPages((pages) => ({ ...pages, [target.callId]: { offset, rows: page.rows } })),
+      (error: unknown) => setChat((state) => ({ ...state, notice: dataFailed(error) })),
+    );
+  }
+
   /** Ask for the runs again. `/runs` reads them. */
   function loadRuns(): void {
     client.listRuns().then(
@@ -2731,6 +2827,19 @@ export function App({
       showWorkflowsManager(openWorkflowsManager());
       loadWorkflows();
       loadRuns();
+      return;
+    }
+    if (outcome.kind === "data") {
+      setDraft(draftAt(""));
+      setKeysOpen(false);
+      setSwitcher(closedSwitcher);
+      showDataManager(openDataManager(outcome.name));
+      setDataList({ sources: null, error: null });
+      loadData();
+      if (outcome.name !== null) {
+        setDataDetail(null);
+        loadDataDetail(outcome.name);
+      }
       return;
     }
     if (outcome.kind === "runs") {
@@ -5031,6 +5140,32 @@ export function App({
     }
   }
 
+  function showDataManager(next: DataManagerState): void {
+    dataManagerRef.current = next;
+    setDataManager(next);
+  }
+
+  function dataScreen() {
+    return { list: dataListRef.current, detail: dataDetailRef.current, folder: skillsFolder(), columns: stepsSizeRef.current.columns, rows: stepsSizeRef.current.rows };
+  }
+
+  function onDataManagerPress(press: Press): void {
+    const key = dataManagerKeyOf(press);
+    if (key === null) {
+      return;
+    }
+    const pressed = pressDataManager(dataManagerRef.current, dataScreen(), key);
+    showDataManager(pressed.state);
+    runDataAction(pressed.action);
+  }
+
+  function runDataAction(action: DataManagerAction): void {
+    if (action.kind === "open") {
+      setDataDetail(null);
+      loadDataDetail(action.name);
+    }
+  }
+
   function showRunsManager(next: RunsManagerState): void {
     runsManagerRef.current = next;
     setRunsManager(next);
@@ -5742,6 +5877,7 @@ export function App({
       useHelpersCheaper: isUseHelpersQuestion(approvalRef.current) && (approvalRef.current?.estimate?.cheaperModel ?? null) !== null,
       askPages: (dockRef.current?.items.length ?? 0) > 1,
       approvalDiff: approvalRef.current !== null && approvalRef.current.diff !== null,
+      resultPages: toolOutputRef.current && pageableResult(chatRef.current.messages) !== null,
       approvalEdit: argsEditRef.current !== null,
       review: reviewRef.current !== null,
       reviewEdit: reviewEditRef.current !== null,
@@ -5861,6 +5997,9 @@ export function App({
         return;
       case "review-args":
         onReviewKey(effect.key);
+        return;
+      case "result-page":
+        pageResult(effect.toward);
         return;
       case "scroll-diff": {
         const pending = approvalRef.current;
@@ -6173,6 +6312,10 @@ export function App({
       onRunsManagerPress(press);
       return;
     }
+    if (dataManagerRef.current.open && !keysOpenRef.current && press.name !== "f1" && press.name !== "ctrl-c") {
+      onDataManagerPress(press);
+      return;
+    }
     if (workflowsManagerRef.current.open && !keysOpenRef.current && press.name !== "f1" && press.name !== "ctrl-c") {
       onWorkflowsManagerPress(press);
       return;
@@ -6440,7 +6583,7 @@ export function App({
     },
     all: transcript.all,
     pinned: transcript.pinned === null ? null : { row: budget.header, offset: transcript.pinned.offset },
-    shown: !keysOpen && !picker.open && !mcpManager.open && !skillsManager.open && !agentsManager.open && !routinesManager.open && !runsManager.open && !workflowsManager.open && !workflowRun.open && !stepsManager.open && !memoryManager.open && !changesManager.open && !perms.open && !switcher.open,
+    shown: !keysOpen && !picker.open && !mcpManager.open && !skillsManager.open && !agentsManager.open && !routinesManager.open && !runsManager.open && !dataManager.open && !workflowsManager.open && !workflowRun.open && !stepsManager.open && !memoryManager.open && !changesManager.open && !perms.open && !switcher.open,
   };
   const composer =
     argsEdit !== null
@@ -6615,6 +6758,12 @@ export function App({
       ) : workflowRun.open ? (
         <Box flexDirection="column" width={columns} height={budget.body} flexShrink={0} overflow="hidden">
           {layoutWorkflowRun({ state: workflowRun, data: workflowRunData, now: Date.now(), columns, rows: budget.body }).map((line, index) => (
+            <McpManagerRow key={index} line={line} />
+          ))}
+        </Box>
+      ) : dataManager.open ? (
+        <Box flexDirection="column" width={columns} height={budget.body} flexShrink={0} overflow="hidden">
+          {layoutDataManager({ state: dataManager, screen: { ...dataScreen(), columns, rows: budget.body } }).map((line, index) => (
             <McpManagerRow key={index} line={line} />
           ))}
         </Box>

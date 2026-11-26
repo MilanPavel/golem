@@ -90,6 +90,8 @@ export type KeyPlace = {
   approvalDiff?: boolean;
   /** Its arguments are open in the editor. */
   approvalEdit?: boolean;
+  /** Ctrl-O is on and a data result in the transcript has more rows than one page, which the Page keys move through. */
+  resultPages?: boolean;
   /** The question about running checks waits for an answer. */
   question?: boolean;
   /** The run waits for an answer about a paid model. */
@@ -141,6 +143,7 @@ export type KeyEffect =
   | { kind: "helpers-run"; run: boolean; cheaper?: boolean }
   | { kind: "ask-next" }
   | { kind: "scroll-diff"; toward: ScrollToward; line: boolean }
+  | { kind: "result-page"; toward: "up" | "down" }
   | { kind: "edit-args" }
   | { kind: "checks"; on: boolean }
   | { kind: "args"; key: ArgsKey }
@@ -169,6 +172,7 @@ type KeyWhen = {
   approval?: boolean;
   approvalDiff?: boolean;
   approvalEdit?: boolean;
+  resultPages?: boolean;
   question?: boolean;
   consent?: boolean;
   consentShow?: boolean;
@@ -336,6 +340,22 @@ export const KEYS: readonly KeyBinding[] = [
     description: "Restores the draft from before you recalled a message.",
     when: { name: "escape", overlay: false, history: true },
     run: () => ({ kind: "history", key: "close" }),
+  },
+  {
+    id: "result-page-up",
+    label: "Page Up",
+    contexts: ["transcript"],
+    description: "With Ctrl-O on, shows the previous 20 rows of the newest data result that has more.",
+    when: { name: "page-up", overlay: false, switcher: false, debug: false, resultPages: true },
+    run: () => ({ kind: "result-page", toward: "up" }),
+  },
+  {
+    id: "result-page-down",
+    label: "Page Down",
+    contexts: ["transcript"],
+    description: "With Ctrl-O on, shows the next 20 rows of that result.",
+    when: { name: "page-down", overlay: false, switcher: false, debug: false, resultPages: true },
+    run: () => ({ kind: "result-page", toward: "down" }),
   },
   {
     id: "page-up",
@@ -1008,6 +1028,9 @@ function whenMatches(when: KeyWhen, place: KeyPlace, press: Press): boolean {
     return false;
   }
   if (when.approvalDiff !== undefined && when.approvalDiff !== (place.approvalDiff === true)) {
+    return false;
+  }
+  if (when.resultPages !== undefined && when.resultPages !== (place.resultPages === true)) {
     return false;
   }
   if (when.consent !== undefined && when.consent !== (place.consent === true)) {

@@ -54,6 +54,8 @@ export type ComposerOutcome =
   | { kind: "routines" }
   /** `/runs`: everything automation did. */
   | { kind: "runs" }
+  /** `/data`: the data sources. With a name, that source opens. */
+  | { kind: "data"; name: string | null }
   /** `/workflows`: the workflows, each started with its inputs. */
   | { kind: "workflows" }
   /** `/steps`: the helper batches of this chat, each opening its Steps. */
@@ -459,6 +461,13 @@ export const COMMANDS: readonly Command[] = [
     args: "",
     description: "Lists your workflows and starts one with its inputs.",
     run: withoutArgs({ kind: "workflows" }),
+  },
+  {
+    name: "/data",
+    group: "tools",
+    args: "[name]",
+    description: "Lists your data sources with their tables. A name opens that source.",
+    run: (_debug, args) => (args.length > 1 ? unknown() : { kind: "data", name: args[0] ?? null }),
   },
   {
     name: "/runs",

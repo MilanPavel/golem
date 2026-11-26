@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { COMMANDS, withModelChoices, withSkillChoices, type SkillChoice } from "./commands.ts";
+import { applyComposer, closedDebug, COMMANDS, withModelChoices, withSkillChoices, type SkillChoice } from "./commands.ts";
 import { applySuggestion, suggest, type SuggestCommand } from "./suggest.ts";
 
 const registry: readonly SuggestCommand[] = [
@@ -137,4 +137,42 @@ test("/skill pin suggests skills not pinned yet, and /skill unpin the pinned one
     suggest("/skill unpin ", registry).map((item) => item.completion),
     ["/skill unpin facts "],
   );
+});
+
+test("@ at the start of a word suggests data source names, prefix matches first", () => {
+  const sources = ["bank", "shop_prod", "golem", "logs"];
+  assert.deepEqual(
+    suggest("@", [], sources).map((item) => item.label),
+    ["@bank", "@shop_prod", "@golem", "@logs"],
+  );
+  assert.deepEqual(
+    suggest("what did @b", [], sources).map((item) => item.completion),
+    ["what did @bank "],
+  );
+  assert.deepEqual(
+    suggest("@l", [], sources).map((item) => item.label),
+    ["@logs", "@golem"],
+  );
+});
+
+test("an @ source name suggests nothing inside a word, with no sources, or when nothing matches", () => {
+  assert.deepEqual(suggest("mail me@bank", [], ["bank"]), []);
+  assert.deepEqual(suggest("@bank", [], []), []);
+  assert.deepEqual(suggest("@zzz", [], ["bank"]), []);
+  assert.deepEqual(suggest("@bank and", [], ["bank"]), []);
+});
+
+test("a source name typed in full is sent as typed, a part of it is finished by Tab or Enter", () => {
+  const full = suggest("ask @bank", [], ["bank"]);
+  assert.equal(full[0]?.partial, false);
+  assert.deepEqual(applySuggestion("ask @bank", full, 0, "enter"), { draft: "ask @bank", submit: true });
+  const part = suggest("ask @ba", [], ["bank"]);
+  assert.deepEqual(applySuggestion("ask @ba", part, 0, "tab"), { draft: "ask @bank ", submit: false });
+  assert.deepEqual(applySuggestion("ask @ba", part, 0, "enter"), { draft: "ask @bank ", submit: false });
+});
+
+test("/data takes one optional source name", () => {
+  assert.deepEqual(applyComposer(closedDebug, "/data"), { kind: "data", name: null });
+  assert.deepEqual(applyComposer(closedDebug, "/data bank"), { kind: "data", name: "bank" });
+  assert.equal(applyComposer(closedDebug, "/data a b").kind, "unknown");
 });
