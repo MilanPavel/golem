@@ -57,7 +57,7 @@ import {
   type RoutinesDeps,
 } from "./routines-run.ts";
 import { parseSkillsNew, runSkillsEdit, runSkillsNew } from "./skills-run.ts";
-import { parseWorkflowArgs, runWorkflowList, runWorkflowAnswer, runWorkflowResume, runWorkflowRun, runWorkflowStatus, WORKFLOW_USAGE, type WorkflowDeps } from "./workflows-run.ts";
+import { parseWorkflowArgs, runWorkflowList, runWorkflowAnswer, runWorkflowCheck, runWorkflowResume, runWorkflowRun, runWorkflowStatus, WORKFLOW_USAGE, type WorkflowDeps } from "./workflows-run.ts";
 import { readChoice } from "./read-choice.ts";
 import { readSecret } from "./read-secret.ts";
 import { type Gate, gateService, type SessionDaemon } from "./service-gate.ts";
@@ -105,7 +105,7 @@ const USAGE =
   "       golem config show [--resolved] | golem config edit [--project] | golem skills [list] | golem skills check <path>\n" +
   "       golem skills new <name> [--project] [--description \"…\"] | golem skills edit <name>\n" +
   "       golem routines [list] | golem routines run <name> [--folder <dir>] [--wait] | golem routines pause <name> | golem routines resume <name> | golem routines edit\n" +
-  "       golem workflow [list] | golem workflow run <name|id> [--input k=v]… | golem workflow status <workflow_run_id> | golem workflow resume <workflow_run_id> | golem workflow answer <workflow_run_id> [--key K] [--edit TEXT | --reject]\n" +
+  "       golem workflow [list] | golem workflow check <name|id> | golem workflow run <name|id> [--input k=v]… | golem workflow status <workflow_run_id> | golem workflow resume <workflow_run_id> | golem workflow answer <workflow_run_id> [--key K] [--edit TEXT | --reject]\n" +
   "       golem coding bench <profile-or-model> [--task <name>]\n" +
   "       golem web [--port N] [--no-open] [--json] (the same as golem) | golem web serve [--port N]\n" +
   "       golem web install [--port N] | golem web uninstall | golem web logout";
@@ -400,6 +400,8 @@ async function runWorkflow(given: string[]): Promise<number> {
     switch (parsed.kind) {
       case "list":
         return runWorkflowList(client, deps);
+      case "check":
+        return runWorkflowCheck(client, parsed, deps);
       case "run":
         return runWorkflowRun(client, parsed, deps);
       case "status":

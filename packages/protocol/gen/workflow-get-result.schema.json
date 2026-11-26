@@ -343,6 +343,18 @@
       "default": null,
       "title": "Code"
     },
+    "code_hash": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Code Hash"
+    },
     "steps": {
       "items": {
         "$ref": "#/$defs/WorkflowOutlineStep"

@@ -1,4 +1,4 @@
-"""Handlers for ``workflow.list|get|start|status|cancel|resume|review.answer`` (ADR-062).
+"""Handlers for ``workflow.list|get|check|save|start|status|cancel|resume|review.answer`` (ADR-062).
 
 ``workflow.start`` writes the run row, starts the engine as a background task of the
 :class:`~golem.workflows.service.WorkflowService` and returns the id at once; the steps reach
@@ -9,18 +9,22 @@ is not made yet (``session_id`` stays null until agent steps need it).
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 from pathlib import Path
 from typing import Any
 
 from golem.server.dispatcher import INTERNAL_ERROR, INVALID_PARAMS, RequestContext, RpcCallError
 from golem.store.workflow_runs import WorkflowRunRecord, WorkflowStepRecord
+from golem.workflows.check import Problem
 from golem.workflows.outline import OutlineError, WorkflowOutline, outline
 from golem.workflows.registry import WorkflowEntry
-from golem.workflows.service import ResumeError, ReviewError, WorkflowService
+from golem.workflows.service import ResumeError, ReviewError, SaveError, WorkflowService
 from golem_protocol.commands import (
     WorkflowCancelParams,
     WorkflowCancelResult,
+    WorkflowCheckParams,
+    WorkflowCheckResult,
     WorkflowEntryInfo,
     WorkflowGetParams,
     WorkflowGetResult,
@@ -28,12 +32,15 @@ from golem_protocol.commands import (
     WorkflowListParams,
     WorkflowListResult,
     WorkflowOutlineStep,
+    WorkflowProblem,
     WorkflowResumeParams,
     WorkflowResumeResult,
     WorkflowReviewAnswerParams,
     WorkflowReviewAnswerResult,
     WorkflowReviewInfo,
     WorkflowRunInfo,
+    WorkflowSaveParams,
+    WorkflowSaveResult,
     WorkflowStartParams,
     WorkflowStartResult,
     WorkflowStatusParams,
@@ -102,6 +109,18 @@ async def workflow_list(ctx: RequestContext, params: WorkflowListParams) -> Work
     return WorkflowListResult(workflows=[_info(e) for e in shown])
 
 
+def _outline_of(text: str, name: str) -> tuple[list[WorkflowOutlineStep], str | None]:
+    """The outline steps of the workflow ``name`` in ``text``, or why they cannot be read."""
+    try:
+        found: list[WorkflowOutline] = outline(text)
+    except OutlineError as exc:
+        return [], str(exc)
+    for one in found:
+        if one.name == name:
+            return [WorkflowOutlineStep.model_validate(s.to_dict()) for s in one.steps], None
+    return [], None
+
+
 def _outline_steps(
     entry: WorkflowEntry,
 ) -> tuple[list[WorkflowOutlineStep], str | None, str | None]:
@@ -110,14 +129,15 @@ def _outline_steps(
         text = entry.path.read_text(encoding="utf-8")
     except (OSError, UnicodeDecodeError) as exc:
         return [], str(exc), None
+    steps, problem = _outline_of(text, entry.name)
+    return steps, problem, text
+
+
+def _hash_of(path: Path) -> str | None:
     try:
-        found: list[WorkflowOutline] = outline(text)
-    except OutlineError as exc:
-        return [], str(exc), text
-    for one in found:
-        if one.name == entry.name:
-            return [WorkflowOutlineStep.model_validate(s.to_dict()) for s in one.steps], None, text
-    return [], None, text
+        return hashlib.sha256(path.read_bytes()).hexdigest()
+    except OSError:
+        return None
 
 
 async def workflow_get(ctx: RequestContext, params: WorkflowGetParams) -> WorkflowGetResult:
@@ -129,7 +149,58 @@ async def workflow_get(ctx: RequestContext, params: WorkflowGetParams) -> Workfl
     steps, problem, code = await asyncio.to_thread(_outline_steps, entry)
     if problem is not None:
         info = info.model_copy(update={"error": f"the steps cannot be read: {problem}"})
-    return WorkflowGetResult(workflow=info, steps=steps, code=code)
+    digest = await asyncio.to_thread(_hash_of, entry.path) if code is not None else None
+    return WorkflowGetResult(workflow=info, steps=steps, code=code, code_hash=digest)
+
+
+def _problem(p: Problem) -> WorkflowProblem:
+    return WorkflowProblem(
+        severity=p.severity, line=p.line, step_id=p.step_id, message=p.message, fix=p.fix
+    )
+
+
+def _checked(
+    service: WorkflowService, entry: WorkflowEntry, code: str
+) -> tuple[list[WorkflowProblem], list[WorkflowOutlineStep]]:
+    problems = [_problem(p) for p in service.check_code(code, entry)]
+    steps, _ = _outline_of(code, entry.name)
+    return problems, steps
+
+
+async def workflow_check(ctx: RequestContext, params: WorkflowCheckParams) -> WorkflowCheckResult:
+    """Check the given ``code``, or the saved file. A broken or untrusted file is read as text
+    and never imported, so it can be checked too."""
+    service = _service(ctx)
+    entry = _find(await service.refresh([]), params.id)
+    code = params.code
+    if code is None:
+        try:
+            code = await asyncio.to_thread(entry.path.read_text, encoding="utf-8")
+        except (OSError, UnicodeDecodeError) as exc:
+            raise RpcCallError(INVALID_PARAMS, f"the file cannot be read: {exc}") from exc
+    problems, steps = await asyncio.to_thread(_checked, service, entry, code)
+    return WorkflowCheckResult(problems=problems, steps=steps)
+
+
+async def workflow_save(ctx: RequestContext, params: WorkflowSaveParams) -> WorkflowSaveResult:
+    service = _service(ctx)
+    entry = _find(await service.refresh([]), params.id)
+    try:
+        warnings = await asyncio.to_thread(service.save_code, entry, params.code, params.base_hash)
+    except SaveError as exc:
+        raise RpcCallError(INVALID_PARAMS, str(exc)) from exc
+    reloaded = [e for e in service.registry.entries() if e.path == entry.path]
+    saved = next((e for e in reloaded if e.name == entry.name), None) or (
+        reloaded[0] if reloaded else entry
+    )
+    steps, _ = _outline_of(params.code, saved.name)
+    digest = await asyncio.to_thread(_hash_of, entry.path)
+    return WorkflowSaveResult(
+        workflow=_info(saved),
+        steps=steps,
+        problems=[_problem(p) for p in warnings],
+        code_hash=digest or hashlib.sha256(params.code.encode("utf-8")).hexdigest(),
+    )
 
 
 def _coerce(entry: WorkflowEntry, inputs: dict[str, Any]) -> dict[str, Any]:
@@ -265,10 +336,12 @@ async def workflow_review_answer(
 
 __all__ = [
     "workflow_cancel",
+    "workflow_check",
     "workflow_get",
     "workflow_list",
     "workflow_resume",
     "workflow_review_answer",
+    "workflow_save",
     "workflow_start",
     "workflow_status",
 ]

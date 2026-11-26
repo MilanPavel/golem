@@ -101,7 +101,9 @@ import type { RoutineRunResult } from "../../protocol/gen/routine-run-result.ts"
 import type { WorkflowCancelResult } from "../../protocol/gen/workflow-cancel-result.ts";
 import type { WorkflowResumeResult } from "../../protocol/gen/workflow-resume-result.ts";
 import type { WorkflowReviewAnswerResult } from "../../protocol/gen/workflow-review-answer-result.ts";
+import type { WorkflowCheckResult } from "../../protocol/gen/workflow-check-result.ts";
 import type { WorkflowGetResult } from "../../protocol/gen/workflow-get-result.ts";
+import type { WorkflowSaveResult } from "../../protocol/gen/workflow-save-result.ts";
 import type { WorkflowListResult } from "../../protocol/gen/workflow-list-result.ts";
 import type { WorkflowRunEvent } from "../../protocol/gen/workflow-run-event.ts";
 import type { WorkflowStartResult } from "../../protocol/gen/workflow-start-result.ts";
@@ -330,7 +332,9 @@ import {
   isWorkflowCancelResult,
   isWorkflowResumeResult,
   isWorkflowReviewAnswerResult,
+  isWorkflowCheckResult,
   isWorkflowGetResult,
+  isWorkflowSaveResult,
   isWorkflowListResult,
   isWorkflowRunEvent,
   isWorkflowStartResult,
@@ -884,6 +888,10 @@ export interface GolemClient {
   listWorkflows(folders?: string[]): Promise<WorkflowListResult>;
   /** `workflow.get`: one workflow with its outline steps and, for a trusted one, the text of its file. */
   getWorkflow(id: string): Promise<WorkflowGetResult>;
+  /** `workflow.check`: the problems of the saved file, or of `code` when given (with the outline of that text). It imports nothing and asks no model. */
+  checkWorkflow(id: string, code?: string): Promise<WorkflowCheckResult>;
+  /** `workflow.save`: write `code` as the workflow's file. Refused for an error problem, a file that changed since `baseHash`, or an untrusted folder. */
+  saveWorkflow(id: string, code: string, baseHash: string): Promise<WorkflowSaveResult>;
   /** `workflow.start`: start a run of the workflow `id`. It returns at once; the steps arrive on `onWorkflowEvent`. */
   startWorkflow(id: string, inputs?: Record<string, unknown>): Promise<WorkflowStartResult>;
   /** `workflow.status`: a run and its steps. */
@@ -3080,6 +3088,22 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       const result = await call("workflow.get", { id });
       if (!isWorkflowGetResult(result)) {
         throw new Error("invalid workflow.get result");
+      }
+      return result;
+    },
+    async checkWorkflow(id: string, code?: string): Promise<WorkflowCheckResult> {
+      await ready;
+      const result = await call("workflow.check", code === undefined ? { id } : { id, code });
+      if (!isWorkflowCheckResult(result)) {
+        throw new Error("invalid workflow.check result");
+      }
+      return result;
+    },
+    async saveWorkflow(id: string, code: string, baseHash: string): Promise<WorkflowSaveResult> {
+      await ready;
+      const result = await call("workflow.save", { id, code, base_hash: baseHash });
+      if (!isWorkflowSaveResult(result)) {
+        throw new Error("invalid workflow.save result");
       }
       return result;
     },

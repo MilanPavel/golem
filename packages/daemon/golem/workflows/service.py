@@ -12,6 +12,7 @@ import asyncio
 import hashlib
 import json
 import logging
+import os
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
 from pathlib import Path
@@ -23,6 +24,7 @@ from golem.routine_scheduler import trusted_folders
 from golem.store.workflow_runs import WorkflowReviewRecord, WorkflowRunRecord, WorkflowRuns
 from golem.workflow import WorkflowError
 from golem.workflows.agents import WorkflowAgents
+from golem.workflows.check import CheckEnv, Problem, check
 from golem.workflows.engine import AgentStarted, WorkflowEngine, restart_policy
 from golem.workflows.llm import Llm
 from golem.workflows.registry import WorkflowEntry, WorkflowRegistry
@@ -57,6 +59,10 @@ class ResumeError(Exception):
 
 class ReviewError(Exception):
     """A review cannot be answered: the run or review is unknown, or it was answered already."""
+
+
+class SaveError(Exception):
+    """A ``workflow.save`` that was refused; the text says why."""
 
 
 class StartError(Exception):
@@ -128,8 +134,10 @@ class WorkflowService:
         agents: WorkflowAgents | None = None,
         llm: Llm | None = None,
         tools: WorkflowTools | None = None,
+        check_env: CheckEnv | None = None,
     ) -> None:
         self.runs = runs
+        self.check_env = check_env or CheckEnv()
         self._agents = agents
         self._touch_session = touch_session
         self._touches: set[asyncio.Task[None]] = set()
@@ -356,6 +364,46 @@ class WorkflowService:
         self._folders.update(folders)
         await asyncio.to_thread(self.registry.refresh)
         return self.registry.entries()
+
+    def check_code(self, code: str, entry: WorkflowEntry) -> list[Problem]:
+        """The problems of ``code`` as the file of ``entry`` (its folder decides the agents and
+        the local-only rule). Reads nothing, imports nothing and asks no model."""
+        folder = None if entry.project is None else str(entry.project)
+        return check(code, folder, self.check_env)
+
+    def save_code(self, entry: WorkflowEntry, code: str, base_hash: str) -> list[Problem]:
+        """Write ``code`` as the file of ``entry`` and reload the registry.
+
+        Raises :class:`SaveError` for an untrusted folder, a file that changed on disk since
+        ``base_hash`` and code with an ``error`` problem. Returns the warnings.
+        """
+        if entry.state == "untrusted":
+            raise SaveError(
+                f"{entry.name} is in a folder that is not trusted; add it to trusted_projects first"
+            )
+        problems = self.check_code(code, entry)
+        errors = [p for p in problems if p.severity == "error"]
+        if errors:
+            first = errors[0]
+            more = f" (and {len(errors) - 1} more)" if len(errors) > 1 else ""
+            raise SaveError(f"not saved: line {first.line}: {first.message}{more}")
+        try:
+            now = hashlib.sha256(entry.path.read_bytes()).hexdigest()
+        except OSError as exc:
+            raise SaveError(f"the file cannot be read: {exc}") from exc
+        if now != base_hash:
+            raise SaveError(
+                "the file changed on disk since you opened it; load it again before you save"
+            )
+        temp = entry.path.with_name(f".{entry.path.name}.{os.getpid()}.tmp")
+        try:
+            temp.write_bytes(code.encode("utf-8"))
+            temp.replace(entry.path)
+        except OSError as exc:
+            temp.unlink(missing_ok=True)
+            raise SaveError(f"the file cannot be written: {exc}") from exc
+        self.registry.refresh()
+        return problems
 
     async def run_status(self, workflow_run_id: str) -> tuple[str, str | None] | None:
         """The ``(status, error)`` of a run, None when there is no such run."""
