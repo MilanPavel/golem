@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Awaitable, Callable
+from itertools import pairwise
 from pathlib import Path
 from typing import Any, cast
 
@@ -260,3 +261,30 @@ async def test_the_trace_lists_each_change_with_the_call_right_after_it(
     )
     assert listed[0].call_id == after.data.message_id
     assert listed[0].run_id == changed[0].run_id
+
+
+async def test_clearing_comes_in_few_big_steps_and_the_prefix_holds_between_them(
+    database: Database, project: Path
+) -> None:
+    settings = ContextSettings(reply_reserve=2000)
+    model = _Counting(replies=[*_reads(13), "done"])
+    chat = _chat(database, model, settings)
+    events = await _run(chat, project)
+
+    room = WINDOW - settings.reply_reserve
+    changed = [e.data for e in events if isinstance(e, ContextChangedEvent)]
+    cleared = [c for c in changed if c.action == "cleared"]
+    assert 1 <= len(cleared) <= 2
+    for item in cleared:
+        assert item.after_tokens is not None and item.before_tokens is not None
+        assert item.after_tokens <= settings.clear_to * room + len(FILE) // 4
+        assert item.before_tokens >= settings.clear_at * room
+
+    # A call with no clear before it sends the same messages as the call before, plus new ones.
+    starts = [e.data for e in events if isinstance(e, ModelCallStartedEvent)]
+    quiet = 0
+    for before, after in pairwise(starts):
+        if before.cleared_ids == after.cleared_ids:
+            assert after.message_ids[: len(before.message_ids)] == before.message_ids
+            quiet += 1
+    assert quiet >= len(starts) - 1 - len(cleared)
