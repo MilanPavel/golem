@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 from dataclasses import replace
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -52,7 +53,7 @@ def test_a_local_only_trace_with_a_paid_model_fails() -> None:
 
 
 def test_a_cloud_only_trace_with_a_local_question_fails() -> None:
-    events = [
+    events: list[dict[str, Any]] = [
         {"type": "session.created", "data": {"model_provider": "anthropic"}},
         {"type": "route.consent.needed", "data": {}},
     ]
