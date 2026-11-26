@@ -19,6 +19,7 @@ export type Title = string;
  * ``key`` is the step key the engine journals by, ``group`` the key of the group it runs in.
  * ``attempts`` counts starts. ``child_session_id`` is the helper session of an ``agent`` step.
  * ``in_doubt`` is a step that may have had its effect before the daemon stopped.
+ * ``result`` is the step's saved JSON, parsed, or null while it has none.
  */
 export interface WorkflowStepInfo {
   attempts?: Attempts;
@@ -30,7 +31,11 @@ export interface WorkflowStepInfo {
   key: Key;
   kind: Kind;
   model?: Model;
+  result?: Result;
   started_at?: StartedAt;
   status: Status;
   title: Title;
+}
+export interface Result {
+  [k: string]: unknown;
 }

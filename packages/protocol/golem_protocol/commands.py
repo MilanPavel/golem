@@ -3087,6 +3087,8 @@ class RunInfo(BaseModel):
     approvals: int = Field(default=0, ge=0)
     watch_path: str | None = None
     steps: int | None = Field(default=None, ge=0)
+    workflow_run_id: str | None = Field(default=None, min_length=1)
+    """The run id of a workflow run's row, which ``workflow.status`` takes. Null for the others."""
 
 
 class RunListParams(BaseModel):
@@ -6215,6 +6217,7 @@ class WorkflowStepInfo(BaseModel):
     ``key`` is the step key the engine journals by, ``group`` the key of the group it runs in.
     ``attempts`` counts starts. ``child_session_id`` is the helper session of an ``agent`` step.
     ``in_doubt`` is a step that may have had its effect before the daemon stopped.
+    ``result`` is the step's saved JSON, parsed, or null while it has none.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -6233,6 +6236,7 @@ class WorkflowStepInfo(BaseModel):
     """What the call of an ``llm`` step cost, or None when it was not priced."""
     started_at: str | None = None
     finished_at: str | None = None
+    result: Any = None
 
 
 class WorkflowStatusParams(BaseModel):
@@ -6379,6 +6383,8 @@ class WorkflowStepEvent(BaseModel):
     """What the call of an ``llm`` step cost, or None when it was not priced."""
     started_at: str | None = None
     finished_at: str | None = None
+    result: Any = None
+    """The step's saved JSON, parsed."""
 
 
 DataPrivacy = Literal["open", "local", "schema"]

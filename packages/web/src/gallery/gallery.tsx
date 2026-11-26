@@ -101,7 +101,8 @@ import { ALL_CLOUD, ALL_LOCAL, askingBatchChat, cloudBatchChat, localBatchChat }
 import { ASKING_HELPER, DONE_HELPER, HELPER_NOW, RUNNING_HELPER, TRIMMED_AT, TRIMMED_HELPER } from "../features/sessions/helper-sample.ts";
 import { RoutineDetail, RoutineEditor, RoutinesEmpty, RoutinesPanel } from "../features/routines/index.ts";
 import { SAMPLE_LIST, SAMPLE_MORNING_BRIEF, SAMPLE_WORKFLOW_ROUTINE, SAMPLE_WORKFLOW_WATCH_ROUTINE, ROUTINES_NOW, SAMPLE_RUNS } from "../features/routines/sample.ts";
-import { LeadRun, RunBanner, RunsList, RunsPanel } from "../features/runs/index.ts";
+import { LeadRun, RunBanner, RunsList, RunsPanel, WorkflowRunView } from "../features/runs/index.ts";
+import { SAMPLE_RUN_CANCELLED, SAMPLE_RUN_DONE, SAMPLE_RUN_FAILED, SAMPLE_RUN_REVIEW, SAMPLE_RUN_RUNNING, SAMPLE_RUN_TOOL_ASK, WORKFLOW_RUN_NOW } from "../features/runs/workflow-sample.ts";
 import { RunForm, WorkflowDetail, WorkflowsPanel } from "../features/workflows/index.ts";
 import { SAMPLE_BROKEN, SAMPLE_PR_DIGEST, SAMPLE_PR_DIGEST_CODE, SAMPLE_PR_DIGEST_STEPS, SAMPLE_ROUTINE_WORKFLOW_RUN, SAMPLE_UNTRUSTED, SAMPLE_WORKFLOW_LIST, SAMPLE_WORKFLOW_LIST_TWO_PROJECTS, SAMPLE_WORKFLOW_RUNS, WORKFLOWS_NOW } from "../features/workflows/sample.ts";
 import { RUNS_NOW, SAMPLE_RUN_LIST, SAMPLE_WAITING_RUN } from "../features/runs/sample.ts";
@@ -2431,6 +2432,37 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
             onNavigate={() => {}}
           />
         </div>
+      </section>
+      </Only>
+
+      <Only id="workflow-run">
+      <section className="mt-6" id={anchor("Workflow run")}>
+        <h3 className="mb-2 font-mono text-xs text-faint">Workflow run</h3>
+        {(
+          [
+            ["Workflow run, running", SAMPLE_RUN_RUNNING],
+            ["Workflow run, waiting for a review", SAMPLE_RUN_REVIEW],
+            ["Workflow run, tool ask and worker row", SAMPLE_RUN_TOOL_ASK],
+            ["Workflow run, failed", SAMPLE_RUN_FAILED],
+            ["Workflow run, cancelled", SAMPLE_RUN_CANCELLED],
+            ["Workflow run, done, agent and worker rows", SAMPLE_RUN_DONE],
+          ] as const
+        ).map(([title, sample]) => (
+          <div key={title} className="mt-4 rounded-lg border border-line bg-bg p-5" role="region" aria-label={`${title}, ${theme}`}>
+            <WorkflowRunView
+              run={sample.run}
+              steps={sample.steps}
+              reviews={sample.reviews}
+              now={WORKFLOW_RUN_NOW}
+              chatPath={(child) => `/s/${child}?lead=${sample.run.session_id ?? ""}`}
+              onNavigate={() => {}}
+              onCancel={() => Promise.resolve()}
+              onResume={() => Promise.resolve()}
+              onAnswer={() => Promise.resolve()}
+              trace={<p className="m-auto p-5 text-sm text-muted">The trace of the run&apos;s session.</p>}
+            />
+          </div>
+        ))}
       </section>
       </Only>
 

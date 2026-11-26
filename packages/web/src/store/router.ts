@@ -11,6 +11,7 @@ export type Route =
   | { name: "workflows" }
   | { name: "workflow"; id: string }
   | { name: "runs" }
+  | { name: "run"; id: string }
   | { name: "welcome"; step: WelcomeStep; from: "send" | null }
   | { name: "not-found" };
 
@@ -39,7 +40,7 @@ export type Router = StoreSource<Route> & {
  * and `?folder=` in `search` names the project of a project routine. `/routines?new` is the form for a new routine,
  * and `?new=<starter>` fills it from a starter.
  * `/workflows` is the workflows page with none picked, and `/workflows/:id` one workflow (its id, `<path>::<name>`, decoded).
- * `/runs` is the Runs page: what needs you, what is running, and what ran.
+ * `/runs` is the Runs page: what needs you, what is running, and what ran. `/runs/:id` is one workflow run, by its `workflow_run_id` (decoded, not empty).
  * `/welcome` is first run: `?step=engine|model|tools|ready` (engine when missing or unknown) and `?from=send`.
  * On `/s/:id`, `?inspect` opens the inspector panel and `?inspect=<span>` opens it at that span.
  */
@@ -62,6 +63,15 @@ export function parseRoute(pathname: string, search = ""): Route {
   }
   if (pathname === "/runs") {
     return { name: "runs" };
+  }
+  const run = /^\/runs\/([^/]+)$/.exec(pathname)?.[1];
+  if (run !== undefined) {
+    try {
+      const id = decodeURIComponent(run);
+      if (id !== "") return { name: "run", id };
+    } catch {
+      // A malformed escape is not a run.
+    }
   }
   if (pathname === "/workflows") {
     return { name: "workflows" };
@@ -163,6 +173,11 @@ export function runsPath(): string {
   return "/runs";
 }
 
+/** The path of one workflow run, by its `workflow_run_id`. */
+export function runPath(workflowRunId: string): string {
+  return `/runs/${encodeURIComponent(workflowRunId)}`;
+}
+
 /** The path of the form for a new routine, filled from `starter` when given. */
 export function routineNewPath(starter?: string | null): string {
   return starter === undefined || starter === null ? "/routines?new" : `/routines?new=${encodeURIComponent(starter)}`;
@@ -184,6 +199,7 @@ function sameRoute(a: Route, b: Route): boolean {
   if (a.name === "trace") return b.name === "trace" && a.id === b.id && a.span === b.span;
   if (a.name === "welcome") return b.name === "welcome" && a.step === b.step && a.from === b.from;
   if (a.name === "routine-new") return b.name === "routine-new" && a.starter === b.starter;
+  if (a.name === "run") return b.name === "run" && a.id === b.id;
   if (a.name === "workflow") return b.name === "workflow" && a.id === b.id;
   if (a.name === "routine") return b.name === "routine" && a.routine === b.routine && a.folder === b.folder;
   if (a.name === "settings") return b.name === "settings" && a.section === b.section;

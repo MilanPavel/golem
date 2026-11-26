@@ -19,6 +19,7 @@ export const GALLERY_SECTIONS = [
   "routines",
   "workflows",
   "runs",
+  "workflow-run",
   "rail",
   "sessions-flyout",
   "inbox-panel",

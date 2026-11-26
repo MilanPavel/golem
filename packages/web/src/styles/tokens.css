@@ -234,6 +234,10 @@
 @utility cols-route-lead {
   grid-template-columns: auto 1fr;
 }
+/* A label column and its value: a worker step's copy, changes and checks. */
+@utility cols-label-value {
+  grid-template-columns: auto 1fr;
+}
 @utility cols-route-job {
   grid-template-columns: 1fr 12rem;
 }

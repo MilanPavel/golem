@@ -3,7 +3,7 @@ import { useSession } from "../../store/page-context.tsx";
 import { useNow } from "../sessions/use-now.ts";
 import { StepsView, type StepsBatch } from "./steps-list.tsx";
 
-export { barText, StepsView, type StepsBatch } from "./steps-list.tsx";
+export { barText, StepsView, type StepExtra, type StepsBatch } from "./steps-list.tsx";
 
 /** The helper sessions of each `delegate` call, by the id of the call. */
 function refsByCall(chat: Pick<ChatState, "messages">): Map<string, readonly HelperRef[]> {

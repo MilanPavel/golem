@@ -169,6 +169,19 @@
       ],
       "default": null,
       "title": "Watch Path"
+    },
+    "workflow_run_id": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Workflow Run Id"
     }
   },
   "required": [

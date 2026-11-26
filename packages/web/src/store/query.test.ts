@@ -66,6 +66,15 @@ test("session.updated and a summary mark only that session's inspect", () => {
   expect(stale()).toEqual(["session.inspect:a", "session.inspect:b"]);
 });
 
+test("a workflow notification marks run.list and workflow.status", () => {
+  const { fake, queryClient } = setup();
+  queryClient.setQueryData(["run.list"], 1);
+  queryClient.setQueryData(["workflow.status", "wr_1"], 1);
+  fake.emitWorkflow({ kind: "step", method: "workflow.step.done", params: {} as never });
+  expect(queryClient.getQueryState(["run.list"])?.isInvalidated).toBe(true);
+  expect(queryClient.getQueryState(["workflow.status", "wr_1"])?.isInvalidated).toBe(true);
+});
+
 test("the first connect marks nothing, a reconnect marks everything", () => {
   const { fake, stale } = setup();
   fake.setState({ status: "connected" });

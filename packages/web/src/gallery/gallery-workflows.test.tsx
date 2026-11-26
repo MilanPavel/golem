@@ -64,3 +64,28 @@ test("the gallery's Run dialog stories show each state, in both themes", () => {
     unmount();
   }
 });
+
+test("the gallery's Workflow run section shows each state, in both themes", () => {
+  const { container } = render(<Gallery />);
+  // A role query over the whole gallery is slow; the stories are named with aria-label, so a selector finds them at once.
+  const region = (name: string): HTMLElement => {
+    const found = container.querySelector<HTMLElement>(`[role="region"][aria-label="${name}"]`);
+    if (!found) throw new Error(`No region named ${name}`);
+    return found;
+  };
+  for (const theme of ["slip", "kiln"] as const) {
+    for (const title of [
+      "Workflow run, running",
+      "Workflow run, waiting for a review",
+      "Workflow run, tool ask and worker row",
+      "Workflow run, failed",
+      "Workflow run, cancelled",
+      "Workflow run, done, agent and worker rows",
+    ]) {
+      expect(region(`${title}, ${theme}`), title).toBeTruthy();
+    }
+    expect(within(region(`Workflow run, waiting for a review, ${theme}`)).getByRole("region", { name: "Review, Send this digest?" })).toBeTruthy();
+    expect(within(region(`Workflow run, tool ask and worker row, ${theme}`)).getByRole("region", { name: "Review, Run gh_pr_create?" })).toBeTruthy();
+    expect(within(region(`Workflow run, failed, ${theme}`)).getByRole("button", { name: "Resume" })).toBeTruthy();
+  }
+});

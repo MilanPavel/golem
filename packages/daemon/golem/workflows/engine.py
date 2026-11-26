@@ -297,6 +297,7 @@ class WorkflowEngine:
                 "cost_usd": step.cost_usd,
                 "started_at": step.started_at,
                 "finished_at": step.finished_at,
+                "result": json.loads(step.result_json) if step.result_json else None,
             },
         )
 

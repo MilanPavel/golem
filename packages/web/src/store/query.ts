@@ -62,6 +62,8 @@ export function keepQueriesHonest(client: QueryWiringClient, queryClient: QueryC
     client.onWorkflowEvent(() => {
       // A workflow run starts, waits or ends: its row in Runs changes.
       stale("run.list");
+      // The open run view follows its steps and reviews.
+      stale("workflow.status");
     }),
     client.onMcpStatus(() => {
       stale("mcp.list");

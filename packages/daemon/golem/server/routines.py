@@ -260,6 +260,7 @@ async def _workflow_row(runs: WorkflowRuns, row: HeadlessRun, info: RunInfo) -> 
             "reason": run.error if run.status == "failed" else None,
             "steps": len(steps),
             "approvals": len(asked),
+            "workflow_run_id": run.workflow_run_id,
         }
     )
 

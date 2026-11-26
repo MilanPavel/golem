@@ -222,6 +222,23 @@ export {
   type StepSpan,
   type StepsList,
 } from "./steps-list.ts";
+export {
+  reviewDraftText,
+  reviewTitle,
+  stepMetaLine,
+  stepOutputLine,
+  stepOutputText,
+  stepWords,
+  toolAsk,
+  workerLine,
+  workerResult,
+  workflowRunTook,
+  workflowStepsList,
+  workflowStepSpans,
+  type StepLike,
+  type ToolAsk,
+  type WorkerResult,
+} from "./workflow-run.ts";
 export { groupTurns, turnFooter, type Turn } from "./turns.ts";
 export {
   answerTarget,

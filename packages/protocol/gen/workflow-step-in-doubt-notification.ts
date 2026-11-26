@@ -43,8 +43,12 @@ export interface WorkflowStepEvent {
   key: Key;
   kind: Kind;
   model?: Model;
+  result?: Result;
   started_at?: StartedAt;
   status: Status;
   title: Title;
   workflow_run_id: WorkflowRunId;
+}
+export interface Result {
+  [k: string]: unknown;
 }

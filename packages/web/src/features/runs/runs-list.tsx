@@ -1,6 +1,6 @@
 import { useId } from "react";
 import { runDuration, runGroupHeading, runGroups, runName, runResultLine, runRowLine, runStatusWords, type RunGroup } from "@golem/view";
-import { sessionPath } from "../../store/router.ts";
+import { runPath, sessionPath } from "../../store/router.ts";
 import type { RunInfo } from "../../store/runs.ts";
 import { cn } from "../../ui/cn.ts";
 import { Link } from "../../ui/link.tsx";
@@ -13,13 +13,13 @@ function kindWords(run: RunInfo): string {
   return run.kind === "routine" && run.origin.startsWith("workflow:") ? `workflow ${run.origin.slice("workflow:".length)}` : run.kind;
 }
 
-/** One run: its mark, name and kind, how it began, and on the right how it went and how long it took. Opens the session. */
+/** One run: its mark, name and kind, how it began, and on the right how it went and how long it took. Opens the session, or for a workflow run its steps. */
 export function RunRow({ run, now, onNavigate }: { run: RunInfo; now: number; onNavigate: (path: string) => void }) {
   const duration = runDuration(run, now);
   return (
     <li>
       <Link
-        href={sessionPath(run.session_id)}
+        href={run.workflow_run_id != null ? runPath(run.workflow_run_id) : sessionPath(run.session_id)}
         onNavigate={onNavigate}
         className="flex items-start gap-3 rounded-lg border border-transparent px-3 py-2 text-left outline-offset-2 outline-clay hover:border-line hover:bg-surface focus-visible:outline-2"
       >

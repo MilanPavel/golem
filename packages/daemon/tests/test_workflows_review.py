@@ -296,6 +296,7 @@ async def test_run_list_shows_the_waiting_run_with_its_ask(
     assert info.status == "waiting"
     assert info.summary == "First?"
     assert info.approvals == 2
+    assert info.workflow_run_id == run_id
     run = await store.get_run(run_id)
     assert run is not None and cast(str, run.session_id) == "s_wf"
 
