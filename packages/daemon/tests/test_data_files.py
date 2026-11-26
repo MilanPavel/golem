@@ -247,11 +247,12 @@ async def test_a_source_line_shows_files_and_the_months_of_a_date_column(
     paths.config_file.write_text(f'[data.bank]\npath = "{bank}"\nprivacy = "local"\n')
     sources = make()
     (info,) = [i for i in await sources.list(None) if i.name == "bank"]
-    assert line(info) == "- bank  1 table · 3 files · 6 rows · 2026-01 … 2026-03 · rows local"
-    paths.config_file.write_text(f'[data.bank]\npath = "{bank}"\nprivacy = "schema"\n')
-    await sources.forget("bank")
-    (hidden,) = [i for i in await sources.list(None) if i.name == "bank"]
-    assert "2026-01" not in line(hidden)
+    assert line(info) == "- bank  1 table · 3 files · 6 rows · rows local"
+    for level in ("schema", "open"):
+        paths.config_file.write_text(f'[data.bank]\npath = "{bank}"\nprivacy = "{level}"\n')
+        await sources.forget("bank")
+        (other,) = [i for i in await sources.list(None) if i.name == "bank"]
+        assert ("2026-01 … 2026-03" in line(other)) == (level == "open")
 
 
 # -- watching --------------------------------------------------------------------------------

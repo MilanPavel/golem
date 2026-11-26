@@ -277,7 +277,7 @@ class DataSources:
             base,
             tables=self._visible(entry, opened.tables),
             files=opened.files,
-            dates=None if base.privacy == "schema" else opened.dates,
+            dates=opened.dates if base.privacy == "open" else None,
         )
 
     def _visible(self, entry: _Entry, tables: tuple[TableInfo, ...]) -> tuple[TableInfo, ...]:
