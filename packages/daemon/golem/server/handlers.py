@@ -100,6 +100,7 @@ from golem.server.dispatcher import (
     BRANCH_SWITCH_FAILED,
     BUDGET_SPENT,
     BUSY,
+    HELPER_CONFLICT,
     INTERNAL_ERROR,
     INVALID_PARAMS,
     INVALID_TOOL_ARGS,
@@ -191,6 +192,8 @@ from golem.sessions.manager import (
     BudgetSpentError,
     ConsentAnswerError,
     GrowRefusedError,
+    HelperConflictError,
+    HelperCopyError,
     HelperSessionError,
     HelperTrimmedError,
     InvalidToolArgsError,
@@ -306,6 +309,12 @@ from golem_protocol.commands import (
     GitInfoResult,
     HelloParams,
     HelloResult,
+    HelperApplyParams,
+    HelperApplyResult,
+    HelperDiscardParams,
+    HelperDiscardResult,
+    HelperRetryParams,
+    HelperRetryResult,
     HelpersRespondParams,
     HelpersRespondResult,
     HelperStopParams,
@@ -886,6 +895,46 @@ async def _helper_stop(ctx: RequestContext, params: HelperStopParams) -> HelperS
     except NotAHelperError as exc:
         raise RpcCallError(INVALID_PARAMS, str(exc)) from exc
     return HelperStopResult(stopped=stopped)
+
+
+async def _helper_apply(ctx: RequestContext, params: HelperApplyParams) -> HelperApplyResult:
+    try:
+        ids = await _sessions(ctx).apply_helper(params.session_id, params.helper_id)
+    except HelperConflictError as exc:
+        raise RpcCallError(HELPER_CONFLICT, str(exc), {"path": exc.path}) from exc
+    except HelperCopyError as exc:
+        raise RpcCallError(INVALID_PARAMS, str(exc)) from exc
+    except SessionNotFoundError as exc:
+        raise RpcCallError(SESSION_NOT_FOUND, "session not found") from exc
+    except SessionBusyError as exc:
+        raise RpcCallError(SESSION_BUSY, "session is busy") from exc
+    except SchemaMismatchError as exc:
+        raise RpcCallError(SESSION_NOT_FOUND, str(exc)) from exc
+    return HelperApplyResult(change_ids=ids)
+
+
+async def _helper_discard(ctx: RequestContext, params: HelperDiscardParams) -> HelperDiscardResult:
+    try:
+        await _sessions(ctx).discard_helper(params.session_id, params.helper_id)
+    except HelperCopyError as exc:
+        raise RpcCallError(INVALID_PARAMS, str(exc)) from exc
+    except SessionNotFoundError as exc:
+        raise RpcCallError(SESSION_NOT_FOUND, "session not found") from exc
+    except SchemaMismatchError as exc:
+        raise RpcCallError(SESSION_NOT_FOUND, str(exc)) from exc
+    return HelperDiscardResult()
+
+
+async def _helper_retry(ctx: RequestContext, params: HelperRetryParams) -> HelperRetryResult:
+    try:
+        helper_id = await _sessions(ctx).retry_helper(params.session_id, params.helper_id)
+    except (HelperCopyError, ToolError) as exc:
+        raise RpcCallError(INVALID_PARAMS, str(exc)) from exc
+    except SessionNotFoundError as exc:
+        raise RpcCallError(SESSION_NOT_FOUND, "session not found") from exc
+    except SchemaMismatchError as exc:
+        raise RpcCallError(SESSION_NOT_FOUND, str(exc)) from exc
+    return HelperRetryResult(helper_id=helper_id)
 
 
 async def _session_inspect(
@@ -2275,6 +2324,9 @@ def standard_methods() -> dict[str, Method]:
         ),
         "run.cancel": Method("run.cancel", RunCancelParams, True, _run_cancel),
         "helper.stop": Method("helper.stop", HelperStopParams, True, _helper_stop),
+        "helper.apply": Method("helper.apply", HelperApplyParams, True, _helper_apply),
+        "helper.discard": Method("helper.discard", HelperDiscardParams, True, _helper_discard),
+        "helper.retry": Method("helper.retry", HelperRetryParams, True, _helper_retry),
         "artifact.read": Method("artifact.read", ArtifactReadParams, True, _artifact_read),
         "changes.list": Method("changes.list", ChangesListParams, True, _changes_list),
         "changes.diff": Method("changes.diff", ChangesDiffParams, True, _changes_diff),

@@ -266,7 +266,7 @@ class FileChanged:
     path: str
     before: str | None
     after: str | None
-    source: Literal["tool", "shell", "revert"]
+    source: Literal["tool", "shell", "revert", "helper"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -1059,7 +1059,7 @@ def _custom(data: object) -> Fact | None:
         if not (after is None or isinstance(after, str)):
             return None
         source = item.get("source")
-        if source not in ("tool", "shell", "revert"):
+        if source not in ("tool", "shell", "revert", "helper"):
             return None
         return FileChanged(call_id or None, path, before, after, source)
     if kind == "tool.failed":

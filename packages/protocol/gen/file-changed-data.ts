@@ -6,7 +6,7 @@ export type ChangeId = string;
 export type Path = string;
 export type Removed = number;
 export type Reverts = string | null;
-export type Source = 'tool' | 'shell' | 'revert';
+export type Source = 'tool' | 'shell' | 'revert' | 'helper';
 export type Status = 'created' | 'modified' | 'deleted';
 
 /**
