@@ -158,6 +158,8 @@ One call returns at most 5 MB (`MAX_OUTPUT_CHARS`), and the rest is cut.
 
 ### `delegate` and the explorer
 
+> **Newer design.** A helper is now a session with a parent, started for any of four agents and able to wait, ask you and work in a copy of the folder. See [Helpers](./helpers.md). The text below describes the child run of ADR-058 that it replaced, and it is kept until this section is rewritten.
+
 `delegate(brief, agent = "explorer")` hands a wide reading or searching question to a helper that starts with an empty context ([ADR-058](../adr/058-child-runs.md)). The helper is a child run: the same chat graph on its own checkpoint thread, `<session_id>/c/<call_id>`, whose first message is the brief. It is not a session, and nothing lists it.
 
 - **Tools.** Only `read_file`, `list_dir`, `glob`, `grep`, `git_log`, `git_diff`, `git_status` and `read_artifact`. A call to anything else, `delegate` included, gets the "unknown tool" error, which the helper reads. A call the rules would ask about is refused with a message, because a helper never asks for approval and gets none of the session's allowances.
