@@ -32174,6 +32174,150 @@ public struct WorkflowProblem: Codable {
     }
 }
 
+/// ``workflow.propose``. Ask golem for a change to the workflow ``id``: ``code`` is the text
+/// in the editor and ``ask`` the sentence. ``previous_code`` and ``previous_note`` are the
+/// last
+/// proposal and its note, for a refine (one more sentence on top of it). Nothing is written.
+// MARK: - WorkflowProposeParams
+public struct WorkflowProposeParams: Codable {
+    public let ask: String
+    public let code: String
+    public let id: String
+    public let previousCode: String?
+    public let previousNote: String?
+
+    public enum CodingKeys: String, CodingKey {
+        case ask = "ask"
+        case code = "code"
+        case id = "id"
+        case previousCode = "previous_code"
+        case previousNote = "previous_note"
+    }
+
+    public init(ask: String, code: String, id: String, previousCode: String?, previousNote: String?) {
+        self.ask = ask
+        self.code = code
+        self.id = id
+        self.previousCode = previousCode
+        self.previousNote = previousNote
+    }
+}
+
+/// The proposed file, one or two sentences on what changed and why, its outline steps, the
+/// problems the check found in it and the model that wrote it. The proposal is never saved.
+// MARK: - WorkflowProposeResult
+public struct WorkflowProposeResult: Codable {
+    public let code: String
+    public let model: String
+    public let note: String
+    public let problems: [WorkflowProposeResultProblem]?
+    public let steps: [WorkflowProposeResultStep]?
+
+    public enum CodingKeys: String, CodingKey {
+        case code = "code"
+        case model = "model"
+        case note = "note"
+        case problems = "problems"
+        case steps = "steps"
+    }
+
+    public init(code: String, model: String, note: String, problems: [WorkflowProposeResultProblem]?, steps: [WorkflowProposeResultStep]?) {
+        self.code = code
+        self.model = model
+        self.note = note
+        self.problems = problems
+        self.steps = steps
+    }
+}
+
+/// One finding of ``workflow.check``, with the line it is on and the outline step it belongs
+/// to (null for the header or the whole file). ``fix`` is a short replacement text or the
+/// name
+/// of an action.
+// MARK: - WorkflowProposeResultProblem
+public struct WorkflowProposeResultProblem: Codable {
+    public let fix: String?
+    public let line: Int
+    public let message: String
+    public let severity: Severity
+    public let stepID: String?
+
+    public enum CodingKeys: String, CodingKey {
+        case fix = "fix"
+        case line = "line"
+        case message = "message"
+        case severity = "severity"
+        case stepID = "step_id"
+    }
+
+    public init(fix: String?, line: Int, message: String, severity: Severity, stepID: String?) {
+        self.fix = fix
+        self.line = line
+        self.message = message
+        self.severity = severity
+        self.stepID = stepID
+    }
+}
+
+/// One step read from the source, without running it.
+///
+/// ``lines`` is the first and last line in the file (from 1). ``key`` and ``group`` are the
+/// step's key and the group it belongs to, when the source says them. ``for_each`` and
+/// ``condition`` are the source text of the loop and the guard. ``after`` lists the ids of
+/// the
+/// steps this one follows.
+// MARK: - WorkflowProposeResultStep
+public struct WorkflowProposeResultStep: Codable {
+    public let after: [String]?
+    public let agent: String?
+    public let briefLine: Int?
+    public let budget: String?
+    public let budgetLine: Int?
+    public let condition: String?
+    public let forEach: String?
+    public let gets: String?
+    public let group: String?
+    public let id: String
+    public let key: String?
+    public let kind: String
+    public let lines: [Int]
+    public let title: String
+
+    public enum CodingKeys: String, CodingKey {
+        case after = "after"
+        case agent = "agent"
+        case briefLine = "brief_line"
+        case budget = "budget"
+        case budgetLine = "budget_line"
+        case condition = "condition"
+        case forEach = "for_each"
+        case gets = "gets"
+        case group = "group"
+        case id = "id"
+        case key = "key"
+        case kind = "kind"
+        case lines = "lines"
+        case title = "title"
+    }
+
+    public init(after: [String]?, agent: String?, briefLine: Int?, budget: String?, budgetLine: Int?, condition: String?, forEach: String?, gets: String?, group: String?, id: String, key: String?, kind: String, lines: [Int], title: String) {
+        self.after = after
+        self.agent = agent
+        self.briefLine = briefLine
+        self.budget = budget
+        self.budgetLine = budgetLine
+        self.condition = condition
+        self.forEach = forEach
+        self.gets = gets
+        self.group = group
+        self.id = id
+        self.key = key
+        self.kind = kind
+        self.lines = lines
+        self.title = title
+    }
+}
+
 /// ``workflow.resume``. Continue a run that stopped: ``running`` (left by a restart),
 /// ``waiting`` (``on_restart="ask"``) or ``failed``. Finished steps are not run again.
 // MARK: - WorkflowResumeParams

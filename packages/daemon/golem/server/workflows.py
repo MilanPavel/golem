@@ -18,6 +18,7 @@ from golem.server.dispatcher import INTERNAL_ERROR, INVALID_PARAMS, RequestConte
 from golem.store.workflow_runs import WorkflowRunRecord, WorkflowStepRecord
 from golem.workflows.check import Problem
 from golem.workflows.outline import OutlineError, WorkflowOutline, outline
+from golem.workflows.propose import ProposeError
 from golem.workflows.registry import WorkflowEntry
 from golem.workflows.service import ResumeError, ReviewError, SaveError, WorkflowService
 from golem_protocol.commands import (
@@ -33,6 +34,8 @@ from golem_protocol.commands import (
     WorkflowListResult,
     WorkflowOutlineStep,
     WorkflowProblem,
+    WorkflowProposeParams,
+    WorkflowProposeResult,
     WorkflowResumeParams,
     WorkflowResumeResult,
     WorkflowReviewAnswerParams,
@@ -203,6 +206,29 @@ async def workflow_save(ctx: RequestContext, params: WorkflowSaveParams) -> Work
     )
 
 
+async def workflow_propose(
+    ctx: RequestContext, params: WorkflowProposeParams
+) -> WorkflowProposeResult:
+    """Ask golem for a change to the given ``code``. One model call, checked, never saved."""
+    service = _service(ctx)
+    entry = _find(await service.refresh([]), params.id)
+    previous = (
+        None if params.previous_code is None else (params.previous_code, params.previous_note or "")
+    )
+    try:
+        made = await service.propose_code(entry, params.code, params.ask, previous)
+    except ProposeError as exc:
+        raise RpcCallError(INVALID_PARAMS, str(exc)) from exc
+    steps, _ = _outline_of(made.code, entry.name)
+    return WorkflowProposeResult(
+        code=made.code,
+        note=made.note,
+        steps=steps,
+        problems=[_problem(p) for p in made.problems],
+        model=made.model,
+    )
+
+
 def _coerce(entry: WorkflowEntry, inputs: dict[str, Any]) -> dict[str, Any]:
     """Turn text values (from a command line) into the type the input declares."""
     spec = entry.spec
@@ -339,6 +365,7 @@ __all__ = [
     "workflow_check",
     "workflow_get",
     "workflow_list",
+    "workflow_propose",
     "workflow_resume",
     "workflow_review_answer",
     "workflow_save",

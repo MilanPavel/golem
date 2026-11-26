@@ -361,6 +361,18 @@ Each line says the line of the file, the step (from the outline) and the problem
 
 The editor uses the same check while you type (`workflow.check` with the text), and saves with `workflow.save`. A save is refused when the text has an error, when the file changed on disk since you opened it, and for a folder that is not trusted.
 
+## Ask golem
+
+In the editor, the **ask golem** box (⌘K) under the code takes one sentence: "make it cheaper", "add a step after 2", "run the tests as a separate step". golem makes **one** model call and answers with a proposal. Nothing is written.
+
+- The call goes through the same routing as the chat, for the workflow's folder. A local-only folder uses a local model only. It takes a background slot like a title or a summary does, and its cost is counted against your budget caps.
+- The model sees the `run.*` methods, the agents known in that folder, the current code and your sentence. It answers with the whole new file and one or two sentences on what changed and why.
+- The answer goes through [Check](#check) before you see it. The outline marks new steps as **new** and changed ones as **changed**, the code pane shows a line diff, and the check result is for the proposal.
+- **Accept** puts the proposed code in the editor as an unsaved edit; **Save** then writes it, as for any edit. **Discard** drops it. **Refine…** takes one more sentence on top of the proposal.
+- A question ("explain this workflow") comes back as a note with the file unchanged.
+
+The call is `workflow.propose` with the text, the ask and, for a refine, the last proposal and its note. It fails with a clear message when no model is available for the folder.
+
 ## Coming next
 
 | Piece | What it adds | Ticket |

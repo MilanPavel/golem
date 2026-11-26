@@ -6205,6 +6205,33 @@ class WorkflowCheckResult(BaseModel):
     steps: list[WorkflowOutlineStep] = Field(default_factory=list[WorkflowOutlineStep])
 
 
+class WorkflowProposeParams(BaseModel):
+    """``workflow.propose``. Ask golem for a change to the workflow ``id``: ``code`` is the text
+    in the editor and ``ask`` the sentence. ``previous_code`` and ``previous_note`` are the last
+    proposal and its note, for a refine (one more sentence on top of it). Nothing is written."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    id: str = Field(min_length=1)
+    code: str
+    ask: str = Field(min_length=1)
+    previous_code: str | None = None
+    previous_note: str | None = None
+
+
+class WorkflowProposeResult(BaseModel):
+    """The proposed file, one or two sentences on what changed and why, its outline steps, the
+    problems the check found in it and the model that wrote it. The proposal is never saved."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    code: str
+    note: str
+    steps: list[WorkflowOutlineStep] = Field(default_factory=list[WorkflowOutlineStep])
+    problems: list[WorkflowProblem] = Field(default_factory=list[WorkflowProblem])
+    model: str
+
+
 class WorkflowSaveParams(BaseModel):
     """``workflow.save``. Write ``code`` as the file of the workflow ``id``.
 
@@ -7296,6 +7323,8 @@ __all__ = [
     "WorkflowListParams",
     "WorkflowListResult",
     "WorkflowOutlineStep",
+    "WorkflowProposeParams",
+    "WorkflowProposeResult",
     "WorkflowResumeParams",
     "WorkflowResumeResult",
     "WorkflowReviewAnswerParams",
