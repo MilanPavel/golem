@@ -59,7 +59,7 @@ export function WorkflowScreen({ id }: { id: string }) {
       </Frame>
     );
   }
-  const { workflow, steps, code } = query.data;
+  const { workflow, steps, code, code_hash: codeHash } = query.data;
   return (
     <Frame>
       <WorkflowDetail
@@ -67,6 +67,9 @@ export function WorkflowScreen({ id }: { id: string }) {
         workflow={workflow}
         steps={steps ?? []}
         code={code ?? null}
+        codeHash={codeHash ?? null}
+        onCheck={(text) => actions.checkWorkflow(workflow.id, text)}
+        onSave={(text, base) => actions.saveWorkflow(workflow.id, text, base)}
         runs={workflowRuns(runs.data?.runs ?? [], workflow.name)}
         routines={routinesStarting(routines.data?.routines ?? [], workflow.name)}
         now={now}

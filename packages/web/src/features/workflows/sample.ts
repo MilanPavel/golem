@@ -1,5 +1,5 @@
 import type { RunInfo } from "../../store/runs.ts";
-import type { WorkflowEntryInfo, WorkflowGetResult, WorkflowListResult, WorkflowOutlineStep } from "../../store/workflows.ts";
+import type { WorkflowEntryInfo, WorkflowGetResult, WorkflowListResult, WorkflowOutlineStep, WorkflowProblem } from "../../store/workflows.ts";
 
 /** "Now" for the samples: a Tuesday evening. Run times are placed relative to it, so Today and Earlier hold in any time zone. */
 export const WORKFLOWS_NOW = new Date(2026, 10, 17, 18, 30).getTime();
@@ -62,7 +62,30 @@ export const SAMPLE_PR_DIGEST_STEPS: WorkflowOutlineStep[] = [
   step("s4", "notify", "Tell you", 23, 23, { condition: 'reviewed["verdict"] != "reject"' }),
 ];
 
-export const SAMPLE_PR_DIGEST_GET: WorkflowGetResult = { workflow: SAMPLE_PR_DIGEST, steps: SAMPLE_PR_DIGEST_STEPS, code: SAMPLE_PR_DIGEST_CODE };
+/** The hash `workflow.get` gave for the sample code. */
+export const SAMPLE_PR_DIGEST_HASH = "9f2c1ab04e7d";
+
+export const SAMPLE_PR_DIGEST_GET: WorkflowGetResult = { workflow: SAMPLE_PR_DIGEST, steps: SAMPLE_PR_DIGEST_STEPS, code: SAMPLE_PR_DIGEST_CODE, code_hash: SAMPLE_PR_DIGEST_HASH };
+
+/** The sample code with its review step cut out, as after an edit that is not saved. */
+export const SAMPLE_PR_DIGEST_EDITED_CODE = SAMPLE_PR_DIGEST_CODE.replace('    reviewed = await run.review(digest, ask="Digest of open PRs")\n', "");
+
+/** The outline `workflow.check` gives for the edited code: the review step is gone, and the notice moved up a line. */
+export const SAMPLE_PR_DIGEST_EDITED_STEPS: WorkflowOutlineStep[] = [
+  SAMPLE_PR_DIGEST_STEPS[0]!,
+  SAMPLE_PR_DIGEST_STEPS[1]!,
+  step("s4", "notify", "Tell you", 22, 22, { condition: 'reviewed["verdict"] != "reject"' }),
+];
+
+/** What `workflow.check` finds in a text with a budget that is not text, an unknown agent, and a paid model in a local-only folder. */
+export const SAMPLE_PR_DIGEST_PROBLEMS: WorkflowProblem[] = [
+  { line: 12, severity: "error", message: 'budget takes money as text, like "$0.50".', step_id: "s1", fix: '"$0.50"' },
+  { line: 15, severity: "error", message: 'no agent "upgrader". Known: explorer, worker, reviewer, advisor.', step_id: "s2", fix: "worker" },
+  { line: 16, severity: "warning", message: "claude-opus is paid, and this folder is local-only (Settings › Routing). A run would stop at this step.", step_id: "s2" },
+];
+
+/** What `workflow.save` says when the file was written by something else since the editor opened it. */
+export const SAMPLE_SAVE_CONFLICT = "The file changed on disk since you opened it. Copy your changes, then reload the workflow.";
 
 export const SAMPLE_HELLO: WorkflowEntryInfo = {
   id: "/Users/you/repos/site/.golem/workflows/hello.py::hello",

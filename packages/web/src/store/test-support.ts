@@ -153,6 +153,13 @@ export function fakeClient() {
       steps: [],
       code: "",
     })),
+    checkWorkflow: vi.fn<PageClient["checkWorkflow"]>(async () => ({ problems: [], steps: [] })),
+    saveWorkflow: vi.fn<PageClient["saveWorkflow"]>(async (id) => ({
+      code_hash: "h2",
+      problems: [],
+      steps: [],
+      workflow: { id, name: id, path: "/Users/me/.golem/workflows/x.py", state: "ok", inputs: [], description: "" },
+    })),
     startWorkflow: vi.fn<PageClient["startWorkflow"]>(async () => ({ workflow_run_id: "wr_1" })),
     workflowStatus: vi.fn<PageClient["workflowStatus"]>(async (id) => ({ run: { ...WORKFLOW_RUN, workflow_run_id: id }, steps: [], reviews: [] })),
     cancelWorkflow: vi.fn<PageClient["cancelWorkflow"]>(async () => ({ cancelled: true })),

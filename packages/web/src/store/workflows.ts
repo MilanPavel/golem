@@ -1,6 +1,6 @@
-import type { WorkflowCancelResult, WorkflowEntryInfo, WorkflowGetResult, WorkflowInputInfo, WorkflowListResult, WorkflowOutlineStep, WorkflowResumeResult, WorkflowStatusResult, WorkflowTriggerInfo } from "@golem/client";
+import type { WorkflowCancelResult, WorkflowCheckResult, WorkflowEntryInfo, WorkflowGetResult, WorkflowInputInfo, WorkflowListResult, WorkflowOutlineStep, WorkflowProblem, WorkflowResumeResult, WorkflowSaveResult, WorkflowStatusResult, WorkflowTriggerInfo } from "@golem/client";
 
-export type { WorkflowCancelResult, WorkflowEntryInfo, WorkflowGetResult, WorkflowInputInfo, WorkflowListResult, WorkflowOutlineStep, WorkflowResumeResult, WorkflowStatusResult, WorkflowTriggerInfo };
+export type { WorkflowCancelResult, WorkflowCheckResult, WorkflowEntryInfo, WorkflowGetResult, WorkflowInputInfo, WorkflowListResult, WorkflowOutlineStep, WorkflowProblem, WorkflowResumeResult, WorkflowSaveResult, WorkflowStatusResult, WorkflowTriggerInfo };
 
 /** One run of a workflow, from `workflow.status`. */
 export type WorkflowRunInfo = WorkflowStatusResult["run"];
