@@ -2460,58 +2460,62 @@ class SessionManager:
         ):
             return
         lead, call_id, index = record.parent_session_id, record.parent_call_id, record.helper_index
-        self._steps.pop(session_id, None)
-        self._step_counts.pop(session_id, None)
-        self._dispatcher_waits.discard(session_id)
-        self._events.clear_step(session_id)
-        stored = await self._events.stored(lead)
-        if not any(
-            isinstance(e, HelperEndedEvent) and e.data.call_id == call_id and e.data.index == index
-            for e in stored
-        ):
-            started = next(
-                (
-                    e
-                    for e in stored
-                    if isinstance(e, HelperStartedEvent) and e.data.helper_id == session_id
-                ),
-                None,
-            )
-            run = None if run_id is None else await self._run_records.get(run_id)
-            run_events = [] if run_id is None else await self._events.for_run(run_id)
-            summary = summarize_run(run_events)
-            stopped_now = stopped or await self._stopped(session_id, run, run_events)
-            cut: asyncio.CancelledError | None = None
-            worker: dict[str, Any]
-            try:
-                worker = await self._worker_result(session_id)
-            except asyncio.CancelledError as exc:
-                # A Stop during the checks: say so, then let the cancellation go on.
-                cut = exc
-                worker = {"checks": "none", "checks_note": worker_result.STOPPED}
-            await self._events.emit(
-                lead,
-                None if started is None else started.run_id,
-                "helper.ended",
-                HelperEndedData(
-                    **worker,
-                    call_id=call_id,
-                    index=index,
-                    stopped=stopped_now,
-                    model_calls=summary.model_calls,
-                    tokens=summary.tokens,
-                    answer_tokens=len(summary.answer) // 4,
-                    cost_usd=summary.cost_usd,
-                    duration_ms=summary.duration_ms,
-                    working_ms=summary.working_ms,
-                ),
-            )
-            # The slot is freed only now: a helper that starts in it must come after this
-            # `helper.ended` in the lead's log, or the log shows more than `at_once` running.
+        try:
+            self._steps.pop(session_id, None)
+            self._step_counts.pop(session_id, None)
+            self._dispatcher_waits.discard(session_id)
+            self._events.clear_step(session_id)
+            stored = await self._events.stored(lead)
+            if not any(
+                isinstance(e, HelperEndedEvent)
+                and e.data.call_id == call_id
+                and e.data.index == index
+                for e in stored
+            ):
+                started = next(
+                    (
+                        e
+                        for e in stored
+                        if isinstance(e, HelperStartedEvent) and e.data.helper_id == session_id
+                    ),
+                    None,
+                )
+                run = None if run_id is None else await self._run_records.get(run_id)
+                run_events = [] if run_id is None else await self._events.for_run(run_id)
+                summary = summarize_run(run_events)
+                stopped_now = stopped or await self._stopped(session_id, run, run_events)
+                cut: asyncio.CancelledError | None = None
+                worker: dict[str, Any]
+                try:
+                    worker = await self._worker_result(session_id)
+                except asyncio.CancelledError as exc:
+                    # A Stop during the checks: say so, then let the cancellation go on.
+                    cut = exc
+                    worker = {"checks": "none", "checks_note": worker_result.STOPPED}
+                await self._events.emit(
+                    lead,
+                    None if started is None else started.run_id,
+                    "helper.ended",
+                    HelperEndedData(
+                        **worker,
+                        call_id=call_id,
+                        index=index,
+                        stopped=stopped_now,
+                        model_calls=summary.model_calls,
+                        tokens=summary.tokens,
+                        answer_tokens=len(summary.answer) // 4,
+                        cost_usd=summary.cost_usd,
+                        duration_ms=summary.duration_ms,
+                        working_ms=summary.working_ms,
+                    ),
+                )
+                if cut is not None:
+                    raise cut
+        finally:
+            # The slot is freed only after `helper.ended` is stored: a helper that starts in it
+            # must come after it in the lead's log, or the log shows more than `at_once`
+            # running. Freed also when storing fails, so a queued helper is never stuck.
             self._ended_helpers.add(session_id)
-            if cut is not None:
-                raise cut
-        self._ended_helpers.add(session_id)
         self._spawn_wake(lead)
 
     async def _worker_result(self, helper_id: str) -> dict[str, Any]:
