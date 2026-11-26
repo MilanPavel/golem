@@ -32796,6 +32796,7 @@ public struct WorkflowProposeResultProblem: Codable {
 public struct WorkflowProposeResultStep: Codable {
     public let after: [String]?
     public let agent: String?
+    public let args: [StickyWorkflowStepArg]?
     public let briefLine: Int?
     public let budget: String?
     public let budgetLine: Int?
@@ -32812,6 +32813,7 @@ public struct WorkflowProposeResultStep: Codable {
     public enum CodingKeys: String, CodingKey {
         case after = "after"
         case agent = "agent"
+        case args = "args"
         case briefLine = "brief_line"
         case budget = "budget"
         case budgetLine = "budget_line"
@@ -32826,9 +32828,10 @@ public struct WorkflowProposeResultStep: Codable {
         case title = "title"
     }
 
-    public init(after: [String]?, agent: String?, briefLine: Int?, budget: String?, budgetLine: Int?, condition: String?, forEach: String?, gets: String?, group: String?, id: String, key: String?, kind: String, lines: [Int], title: String) {
+    public init(after: [String]?, agent: String?, args: [StickyWorkflowStepArg]?, briefLine: Int?, budget: String?, budgetLine: Int?, condition: String?, forEach: String?, gets: String?, group: String?, id: String, key: String?, kind: String, lines: [Int], title: String) {
         self.after = after
         self.agent = agent
+        self.args = args
         self.briefLine = briefLine
         self.budget = budget
         self.budgetLine = budgetLine
@@ -32841,6 +32844,48 @@ public struct WorkflowProposeResultStep: Codable {
         self.kind = kind
         self.lines = lines
         self.title = title
+    }
+}
+
+/// One argument of a ``run.*`` call, with its exact place in the source.
+///
+/// ``line`` and ``end_line`` count from 1; ``col`` and ``end_col`` are character offsets
+/// from 0,
+/// ``end_col`` just after the last character. ``literal`` is true for a plain string, number
+/// or
+/// bool, or an f-string with no expressions; ``value`` is then its text. A value the code
+/// computes has ``literal`` false: it is shown, and set in the code.
+// MARK: - StickyWorkflowStepArg
+public struct StickyWorkflowStepArg: Codable {
+    public let col: Int
+    public let endCol: Int
+    public let endLine: Int
+    public let line: Int
+    public let literal: Bool
+    public let name: String
+    public let source: String
+    public let value: String?
+
+    public enum CodingKeys: String, CodingKey {
+        case col = "col"
+        case endCol = "end_col"
+        case endLine = "end_line"
+        case line = "line"
+        case literal = "literal"
+        case name = "name"
+        case source = "source"
+        case value = "value"
+    }
+
+    public init(col: Int, endCol: Int, endLine: Int, line: Int, literal: Bool, name: String, source: String, value: String?) {
+        self.col = col
+        self.endCol = endCol
+        self.endLine = endLine
+        self.line = line
+        self.literal = literal
+        self.name = name
+        self.source = source
+        self.value = value
     }
 }
 
@@ -33612,7 +33657,7 @@ public struct WorkflowSaveResultProblem: Codable {
 public struct WorkflowSaveResultStep: Codable {
     public let after: [String]?
     public let agent: String?
-    public let args: [StickyWorkflowStepArg]?
+    public let args: [IndigoWorkflowStepArg]?
     public let briefLine: Int?
     public let budget: String?
     public let budgetLine: Int?
@@ -33644,7 +33689,7 @@ public struct WorkflowSaveResultStep: Codable {
         case title = "title"
     }
 
-    public init(after: [String]?, agent: String?, args: [StickyWorkflowStepArg]?, briefLine: Int?, budget: String?, budgetLine: Int?, condition: String?, forEach: String?, gets: String?, group: String?, id: String, key: String?, kind: String, lines: [Int], title: String) {
+    public init(after: [String]?, agent: String?, args: [IndigoWorkflowStepArg]?, briefLine: Int?, budget: String?, budgetLine: Int?, condition: String?, forEach: String?, gets: String?, group: String?, id: String, key: String?, kind: String, lines: [Int], title: String) {
         self.after = after
         self.agent = agent
         self.args = args
@@ -33671,8 +33716,8 @@ public struct WorkflowSaveResultStep: Codable {
 /// or
 /// bool, or an f-string with no expressions; ``value`` is then its text. A value the code
 /// computes has ``literal`` false: it is shown, and set in the code.
-// MARK: - StickyWorkflowStepArg
-public struct StickyWorkflowStepArg: Codable {
+// MARK: - IndigoWorkflowStepArg
+public struct IndigoWorkflowStepArg: Codable {
     public let col: Int
     public let endCol: Int
     public let endLine: Int
