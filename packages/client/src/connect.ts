@@ -105,6 +105,7 @@ import type { WorkflowCancelResult } from "../../protocol/gen/workflow-cancel-re
 import type { WorkflowResumeResult } from "../../protocol/gen/workflow-resume-result.ts";
 import type { WorkflowReviewAnswerResult } from "../../protocol/gen/workflow-review-answer-result.ts";
 import type { WorkflowCheckResult } from "../../protocol/gen/workflow-check-result.ts";
+import type { WorkflowProposeResult } from "../../protocol/gen/workflow-propose-result.ts";
 import type { WorkflowGetResult } from "../../protocol/gen/workflow-get-result.ts";
 import type { WorkflowSaveResult } from "../../protocol/gen/workflow-save-result.ts";
 import type { WorkflowListResult } from "../../protocol/gen/workflow-list-result.ts";
@@ -338,6 +339,7 @@ import {
   isWorkflowResumeResult,
   isWorkflowReviewAnswerResult,
   isWorkflowCheckResult,
+  isWorkflowProposeResult,
   isWorkflowGetResult,
   isWorkflowSaveResult,
   isWorkflowListResult,
@@ -897,6 +899,8 @@ export interface GolemClient {
   checkWorkflow(id: string, code?: string): Promise<WorkflowCheckResult>;
   /** `workflow.save`: write `code` as the workflow's file. Refused for an error problem, a file that changed since `baseHash`, or an untrusted folder. */
   saveWorkflow(id: string, code: string, baseHash: string): Promise<WorkflowSaveResult>;
+  /** Asks golem for a change to `code` (workflow.propose): one model call, checked, never saved. `previous` is the last proposal and its note, for a refine. Rejects with the daemon's reason, such as no model for that folder. */
+  proposeWorkflow(id: string, code: string, ask: string, previous?: { code: string; note: string }): Promise<WorkflowProposeResult>;
   /** `workflow.start`: start a run of the workflow `id`. It returns at once; the steps arrive on `onWorkflowEvent`. */
   startWorkflow(id: string, inputs?: Record<string, unknown>): Promise<WorkflowStartResult>;
   /** `workflow.status`: a run and its steps. */
@@ -3105,6 +3109,15 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       const result = await call("workflow.check", code === undefined ? { id } : { id, code });
       if (!isWorkflowCheckResult(result)) {
         throw new Error("invalid workflow.check result");
+      }
+      return result;
+    },
+    async proposeWorkflow(id: string, code: string, ask: string, previous?: { code: string; note: string }): Promise<WorkflowProposeResult> {
+      await ready;
+      const params = previous === undefined ? { id, code, ask } : { id, code, ask, previous_code: previous.code, previous_note: previous.note };
+      const result = await call("workflow.propose", params);
+      if (!isWorkflowProposeResult(result)) {
+        throw new Error("invalid workflow.propose result");
       }
       return result;
     },

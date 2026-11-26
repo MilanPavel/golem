@@ -84,7 +84,9 @@ def build_prompt(
         "Agents known in this folder (only these may be named in run.agent):\n"
         + _agents_text(agents),
         "Rules: keep what the ask does not touch. model= is a wish (cheapest, same, stronger,"
-        " local ...), never a model name. Do not invent run.* methods or keyword arguments.",
+        " local ...), never a model name. Do not invent run.* methods or keyword arguments."
+        " If the ask is a question (such as an explanation), give the file back unchanged and"
+        " answer in the note.",
         f"The current file:\n```python\n{code}\n```",
     ]
     if previous is not None:
