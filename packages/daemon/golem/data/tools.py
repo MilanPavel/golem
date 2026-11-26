@@ -184,6 +184,14 @@ async def _describe(args: DataDescribeArgs, ctx: ToolContext) -> ToolResult:
 async def _query(args: DataQueryArgs, ctx: ToolContext) -> ToolResult:
     access = _access(ctx)
     try:
+        privacy = access.source(args.source).privacy
+    except DataError as exc:
+        raise ToolError(str(exc)) from exc
+    if privacy != "open":
+        raise ToolError(
+            f"Rows of {args.source} stay local; golem can't send them to the model yet."
+        )
+    try:
         result = await access.query(args.source, args.sql, args.limit)
     except DataError as exc:
         raise ToolError(await _explain(access, args.source, str(exc))) from exc

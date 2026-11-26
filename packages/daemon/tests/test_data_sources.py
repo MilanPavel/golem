@@ -507,3 +507,26 @@ async def test_the_section_fills_in_counts_after_the_first_call(
             break
     second = section(context)
     assert second is not None and "- shop  1 table · 3 rows · rows local" in second
+
+
+async def test_data_query_does_not_return_rows_of_a_source_that_is_not_open(
+    make: Make, paths: GolemPaths
+) -> None:
+    shop = _shop(paths.home.parent)
+    _config(
+        paths,
+        f'[data.shop]\npath = "{shop}/*.csv"\n'
+        f'[data.vault]\npath = "{shop}/*.csv"\nprivacy = "schema"\n'
+        f'[data.pub]\npath = "{shop}/*.csv"\nprivacy = "open"\n',
+    )
+    sources = make()
+    ctx = _ctx(sources)
+    for name in ("shop", "vault"):
+        with pytest.raises(ToolError, match=f"Rows of {name} stay local"):
+            await DATA_QUERY.call({"source": name, "sql": "select * from orders"}, ctx)
+    assert (
+        "32.5"
+        in (await DATA_QUERY.call({"source": "pub", "sql": "select * from orders"}, ctx)).output
+    )
+    # You may still query it yourself.
+    assert (await sources.query(None, "shop", "select count(*) from orders")).rows == [[3]]
