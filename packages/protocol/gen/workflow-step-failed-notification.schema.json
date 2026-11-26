@@ -102,6 +102,10 @@
           "default": null,
           "title": "Model"
         },
+        "result": {
+          "default": null,
+          "title": "Result"
+        },
         "started_at": {
           "anyOf": [
             {

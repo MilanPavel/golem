@@ -265,7 +265,10 @@ async def test_events_come_in_order(store: WorkflowRuns, calls: Any, tmp_path: P
         "cost_usd",
         "started_at",
         "finished_at",
+        "result",
     }
+    assert step["result"] is None
+    assert events.items[2][1]["result"] == 1
     done = events.items[3][1]
     assert done["status"] == "done"
     assert done["finished_at"]

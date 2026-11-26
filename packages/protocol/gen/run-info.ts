@@ -15,6 +15,7 @@ export type Steps = number | null;
 export type Summary = string | null;
 export type Trigger = ('schedule' | 'watch' | 'manual' | 'hook') | null;
 export type WatchPath = string | null;
+export type WorkflowRunId = string | null;
 
 /**
  * One row of the Runs list: a headless session and how its run is going (ADR-050).
@@ -50,4 +51,5 @@ export interface RunInfo {
   summary?: Summary;
   trigger?: Trigger;
   watch_path?: WatchPath;
+  workflow_run_id?: WorkflowRunId;
 }

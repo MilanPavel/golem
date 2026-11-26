@@ -155,6 +155,7 @@ async def test_a_text_answer_is_the_step_result_with_its_model_and_cost(
     assert step.cost_usd == 2.0
     info = _step_info(step)
     assert (info.model, info.cost_usd) == ("deepseek/cheap", 2.0)
+    assert info.result == "hi there"
 
 
 async def test_a_schema_answer_is_a_dict_and_a_wrong_one_fails_the_step(
@@ -224,6 +225,7 @@ async def test_step_events_carry_the_model_and_cost(store: WorkflowRuns, tmp_pat
     await engine.start(write(tmp_path, TEXT), "flow")
     done = [p for n, p in seen if n == "workflow.step.done" and p["kind"] == "llm"]
     assert done[0]["model"] == "deepseek/cheap" and done[0]["cost_usd"] == 2.0
+    assert done[0]["result"] == "hi"
 
 
 async def test_cloud_only_a_wish_picks_by_tier_and_never_needs_a_local_model(

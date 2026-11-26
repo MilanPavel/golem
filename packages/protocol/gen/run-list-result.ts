@@ -15,6 +15,7 @@ export type Steps = number | null;
 export type Summary = string | null;
 export type Trigger = ('schedule' | 'watch' | 'manual' | 'hook') | null;
 export type WatchPath = string | null;
+export type WorkflowRunId = string | null;
 export type Runs = RunInfo[];
 
 /**
@@ -60,4 +61,5 @@ export interface RunInfo {
   summary?: Summary;
   trigger?: Trigger;
   watch_path?: WatchPath;
+  workflow_run_id?: WorkflowRunId;
 }
