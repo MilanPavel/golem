@@ -15,11 +15,12 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from langchain_core.messages import AIMessage, HumanMessage
+from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 
 from golem.evals import usecases
 from golem.evals.usecases import InProcess, PlanModel, Turn
 from golem.graphs.chat import _without_signed_thinking
+from golem.graphs.notes import note
 from golem.graphs.prompt import PromptContext, SystemPrompt
 from golem.store.database import Database
 
@@ -122,6 +123,20 @@ def test_current_turn_keeps_the_thinking_after_the_last_human_message() -> None:
         current_turn=True,
     )
     assert [len(m.content) for m in kept if isinstance(m, AIMessage)] == [1, 2]
+
+
+def test_a_note_in_the_tool_loop_does_not_start_a_new_turn() -> None:
+    signed: list[str | dict[str, Any]] = [{"type": "thinking", "thinking": "", "signature": "s"}]
+    kept = _without_signed_thinking(
+        [
+            HumanMessage(content="q"),
+            AIMessage(content=signed, tool_calls=[{"name": "list_dir", "args": {}, "id": "c1"}]),
+            ToolMessage(content="x", tool_call_id="c1"),
+            note("fill the gaps"),
+        ],
+        current_turn=True,
+    )
+    assert kept[1].content == signed
 
 
 class Thinking(Recording):

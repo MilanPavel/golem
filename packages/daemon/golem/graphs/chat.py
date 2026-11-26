@@ -1908,7 +1908,7 @@ def _without_signed_thinking(
 ) -> list[BaseMessage]:
     """``messages`` with Anthropic's signed ``thinking`` parts removed from every reply.
 
-    With ``current_turn``, the replies after the last human message keep theirs: only the
+    With ``current_turn``, the replies after the user's last message keep theirs: only the
     tool loop in progress needs them, and an earlier message was signed for a prompt that may
     have changed.
 
@@ -1918,7 +1918,11 @@ def _without_signed_thinking(
     kept: list[BaseMessage] = []
     start = len(messages)
     if current_turn:
-        start = max((i for i, m in enumerate(messages) if isinstance(m, HumanMessage)), default=-1)
+        # A note from golem (a nudge, a check result) is not the user's message: the loop goes on.
+        start = max(
+            (i for i, m in enumerate(messages) if isinstance(m, HumanMessage) and not is_note(m)),
+            default=-1,
+        )
     for i, message in enumerate(messages):
         if current_turn and i > start:
             kept.append(message)
