@@ -97,7 +97,9 @@ class WorkflowTools:
             raise WorkflowError(f"{name}: {exc}") from exc
         if result.failed:
             raise WorkflowError(f"{name} failed: {result.output[:500]}")
-        return _bare(result.output) if tool.untrusted else result.output
+        # No model reads this: a script gets the rows of any source, as the user does.
+        output = result.output if result.shown is None else result.shown
+        return _bare(output) if tool.untrusted else output
 
     async def keep(self, session_id: str, key: str, text: str) -> str:
         """Store big output as an artifact of the run's session and return its id."""

@@ -22632,6 +22632,11 @@ public struct Params: Codable {
 /// ``sources`` are the web pages a ``web_search`` or ``web_fetch`` call found or read, for
 /// the screen's source chips. None for any other call. The model does not get them.
 ///
+/// ``rows_withheld`` is true when ``preview`` shows rows of a data source that the model of
+/// this
+/// call did not get: it got a line with the row count and the columns instead. A client can
+/// say so beside the rows.
+///
 /// ``parent_call_id`` is legacy. Old logs set it on an event of a child run: the id of
 /// the ``delegate`` call that started it. The event is in the parent's run, and a client
 /// that does not know child runs ignores it. None for the run's own events. A new helper
@@ -22931,6 +22936,7 @@ public struct ParamsData: Codable {
     public let diff: String?
     public let durationMS: Int?
     public let preview: String?
+    public let rowsWithheld: Bool?
     public let sources: [PurpleToolSource]?
     public let truncated: Bool?
     public let allowedUsd: Double?
@@ -23086,6 +23092,7 @@ public struct ParamsData: Codable {
         case diff = "diff"
         case durationMS = "duration_ms"
         case preview = "preview"
+        case rowsWithheld = "rows_withheld"
         case sources = "sources"
         case truncated = "truncated"
         case allowedUsd = "allowed_usd"
@@ -23146,7 +23153,7 @@ public struct ParamsData: Codable {
         case toBranch = "to_branch"
     }
 
-    public init(agent: Agent?, cwd: String?, forkedFrom: PurpleForkedFrom?, modelName: String?, modelProfile: String?, modelProvider: String?, origin: String?, parent: PurpleSessionParent?, route: RouteEnum?, allowedTools: [PurpleSessionAllowance]?, mcpServers: [String]?, paidOk: Bool?, title: String?, runID: String?, status: PurpleStatus?, summary: String?, reason: String?, detail: String?, model: String?, provider: String?, rejected: [FluffyModelRejection]?, replacesModel: String?, tier: Tier?, options: [String: Option]?, mode: DefaultPermissionModeEnum?, on: Bool?, messageID: String?, role: MessageCompletedDataRole?, text: String?, interrupted: Bool?, skill: FluffySkillCall?, thinking: String?, thinkingMS: Int?, clearedIDS: [String]?, contextWindow: Int?, estimatedTokens: Int?, index: Int?, messageBytes: [Int]?, messageChars: [Int]?, messageIDS: [String]?, numCtx: Int?, parentCallID: String?, profile: String?, summaryChars: Int?, systemBytes: Int?, systemChars: Int?, systemPromptSHA: String?, systemSections: [TentacledPromptSectionInfo]?, toolsBytes: Int?, toolsChars: Int?, toolsSHA: String?, windowEstimated: Bool?, windowPlanned: Bool?, costUsd: Double?, failed: Bool?, firstTokenMS: Int?, latencyMS: Int?, loadMS: Int?, price: FluffyCallPrice?, promptMS: Int?, replyMS: Int?, stopReason: String?, textToolCalls: TextToolCalls?, usage: FluffyTokenUsage?, waitedMS: Int?, action: ContextChangedDataAction?, afterTokens: Int?, beforeTokens: Int?, count: Int?, reloadMS: Int?, room: Int?, windowFrom: Int?, windowTo: Int?, code: Code?, hint: String?, message: String?, args: [String: JSONAny]?, callID: String?, name: String?, chars: Int?, lines: Int?, path: String?, holder: String?, line: String?, position: Int?, retryInMS: Int?, scope: ModelWaitingDataScope?, silentMS: Int?, waiting: Bool?, willRetry: Bool?, window: Int?, artifactID: String?, diff: String?, durationMS: Int?, preview: String?, sources: [PurpleToolSource]?, truncated: Bool?, allowedUsd: Double?, askOverUsd: Double?, cheaperModel: String?, estimateUsd: Double?, source: String?, subject: String?, decision: Decision?, device: String?, rule: String?, alternatives: [Answer]?, brief: String?, caps: FluffyConsentCaps?, diffArtifactID: String?, estimatedUsd: Double?, helperID: String?, label: String?, notSent: [String]?, sent: [String]?, signal: String?, why: String?, answer: Answer?, todos: [PurpleTodo]?, planID: String?, steps: [FluffyPlanStep]?, added: Int?, changeID: String?, removed: Int?, reverts: String?, hash: String?, how: How?, checks: ChecksUnion?, checkID: String?, command: String?, round: Int?, exitCode: Int?, output: String?, pickReason: String?, wish: String?, calls: Int?, stepID: String?, capUsd: Double?, spentUsd: Double?, state: PurpleState?, helperIDS: [String]?, answerTokens: Int?, checksFailed: [String]?, checksNote: String?, files: [TentacledWorkerFile]?, modelCalls: Int?, stopped: Stopped?, tokens: Int?, workingMS: Int?, changeIDS: [String]?, fromBranch: String?, pathsCount: Int?, toBranch: String?) {
+    public init(agent: Agent?, cwd: String?, forkedFrom: PurpleForkedFrom?, modelName: String?, modelProfile: String?, modelProvider: String?, origin: String?, parent: PurpleSessionParent?, route: RouteEnum?, allowedTools: [PurpleSessionAllowance]?, mcpServers: [String]?, paidOk: Bool?, title: String?, runID: String?, status: PurpleStatus?, summary: String?, reason: String?, detail: String?, model: String?, provider: String?, rejected: [FluffyModelRejection]?, replacesModel: String?, tier: Tier?, options: [String: Option]?, mode: DefaultPermissionModeEnum?, on: Bool?, messageID: String?, role: MessageCompletedDataRole?, text: String?, interrupted: Bool?, skill: FluffySkillCall?, thinking: String?, thinkingMS: Int?, clearedIDS: [String]?, contextWindow: Int?, estimatedTokens: Int?, index: Int?, messageBytes: [Int]?, messageChars: [Int]?, messageIDS: [String]?, numCtx: Int?, parentCallID: String?, profile: String?, summaryChars: Int?, systemBytes: Int?, systemChars: Int?, systemPromptSHA: String?, systemSections: [TentacledPromptSectionInfo]?, toolsBytes: Int?, toolsChars: Int?, toolsSHA: String?, windowEstimated: Bool?, windowPlanned: Bool?, costUsd: Double?, failed: Bool?, firstTokenMS: Int?, latencyMS: Int?, loadMS: Int?, price: FluffyCallPrice?, promptMS: Int?, replyMS: Int?, stopReason: String?, textToolCalls: TextToolCalls?, usage: FluffyTokenUsage?, waitedMS: Int?, action: ContextChangedDataAction?, afterTokens: Int?, beforeTokens: Int?, count: Int?, reloadMS: Int?, room: Int?, windowFrom: Int?, windowTo: Int?, code: Code?, hint: String?, message: String?, args: [String: JSONAny]?, callID: String?, name: String?, chars: Int?, lines: Int?, path: String?, holder: String?, line: String?, position: Int?, retryInMS: Int?, scope: ModelWaitingDataScope?, silentMS: Int?, waiting: Bool?, willRetry: Bool?, window: Int?, artifactID: String?, diff: String?, durationMS: Int?, preview: String?, rowsWithheld: Bool?, sources: [PurpleToolSource]?, truncated: Bool?, allowedUsd: Double?, askOverUsd: Double?, cheaperModel: String?, estimateUsd: Double?, source: String?, subject: String?, decision: Decision?, device: String?, rule: String?, alternatives: [Answer]?, brief: String?, caps: FluffyConsentCaps?, diffArtifactID: String?, estimatedUsd: Double?, helperID: String?, label: String?, notSent: [String]?, sent: [String]?, signal: String?, why: String?, answer: Answer?, todos: [PurpleTodo]?, planID: String?, steps: [FluffyPlanStep]?, added: Int?, changeID: String?, removed: Int?, reverts: String?, hash: String?, how: How?, checks: ChecksUnion?, checkID: String?, command: String?, round: Int?, exitCode: Int?, output: String?, pickReason: String?, wish: String?, calls: Int?, stepID: String?, capUsd: Double?, spentUsd: Double?, state: PurpleState?, helperIDS: [String]?, answerTokens: Int?, checksFailed: [String]?, checksNote: String?, files: [TentacledWorkerFile]?, modelCalls: Int?, stopped: Stopped?, tokens: Int?, workingMS: Int?, changeIDS: [String]?, fromBranch: String?, pathsCount: Int?, toBranch: String?) {
         self.agent = agent
         self.cwd = cwd
         self.forkedFrom = forkedFrom
@@ -23242,6 +23249,7 @@ public struct ParamsData: Codable {
         self.diff = diff
         self.durationMS = durationMS
         self.preview = preview
+        self.rowsWithheld = rowsWithheld
         self.sources = sources
         self.truncated = truncated
         self.allowedUsd = allowedUsd
@@ -28246,6 +28254,11 @@ public struct TokenUsage: Codable {
 /// ``sources`` are the web pages a ``web_search`` or ``web_fetch`` call found or read, for
 /// the screen's source chips. None for any other call. The model does not get them.
 ///
+/// ``rows_withheld`` is true when ``preview`` shows rows of a data source that the model of
+/// this
+/// call did not get: it got a line with the row count and the columns instead. A client can
+/// say so beside the rows.
+///
 /// ``parent_call_id`` is legacy. Old logs set it on an event of a child run: the id of
 /// the ``delegate`` call that started it. The event is in the parent's run, and a client
 /// that does not know child runs ignores it. None for the run's own events. A new helper
@@ -28260,6 +28273,7 @@ public struct ToolCompletedData: Codable {
     public let failed: Bool?
     public let parentCallID: String?
     public let preview: String
+    public let rowsWithheld: Bool?
     public let sources: [FluffyToolSource]?
     public let summary: String
     public let truncated: Bool?
@@ -28272,12 +28286,13 @@ public struct ToolCompletedData: Codable {
         case failed = "failed"
         case parentCallID = "parent_call_id"
         case preview = "preview"
+        case rowsWithheld = "rows_withheld"
         case sources = "sources"
         case summary = "summary"
         case truncated = "truncated"
     }
 
-    public init(artifactID: String?, callID: String, diff: String?, durationMS: Int?, failed: Bool?, parentCallID: String?, preview: String, sources: [FluffyToolSource]?, summary: String, truncated: Bool?) {
+    public init(artifactID: String?, callID: String, diff: String?, durationMS: Int?, failed: Bool?, parentCallID: String?, preview: String, rowsWithheld: Bool?, sources: [FluffyToolSource]?, summary: String, truncated: Bool?) {
         self.artifactID = artifactID
         self.callID = callID
         self.diff = diff
@@ -28285,6 +28300,7 @@ public struct ToolCompletedData: Codable {
         self.failed = failed
         self.parentCallID = parentCallID
         self.preview = preview
+        self.rowsWithheld = rowsWithheld
         self.sources = sources
         self.summary = summary
         self.truncated = truncated
@@ -28366,6 +28382,11 @@ public struct ToolCompletedEvent: Codable {
 /// ``sources`` are the web pages a ``web_search`` or ``web_fetch`` call found or read, for
 /// the screen's source chips. None for any other call. The model does not get them.
 ///
+/// ``rows_withheld`` is true when ``preview`` shows rows of a data source that the model of
+/// this
+/// call did not get: it got a line with the row count and the columns instead. A client can
+/// say so beside the rows.
+///
 /// ``parent_call_id`` is legacy. Old logs set it on an event of a child run: the id of
 /// the ``delegate`` call that started it. The event is in the parent's run, and a client
 /// that does not know child runs ignores it. None for the run's own events. A new helper
@@ -28380,6 +28401,7 @@ public struct ToolCompletedEventData: Codable {
     public let failed: Bool?
     public let parentCallID: String?
     public let preview: String
+    public let rowsWithheld: Bool?
     public let sources: [TentacledToolSource]?
     public let summary: String
     public let truncated: Bool?
@@ -28392,12 +28414,13 @@ public struct ToolCompletedEventData: Codable {
         case failed = "failed"
         case parentCallID = "parent_call_id"
         case preview = "preview"
+        case rowsWithheld = "rows_withheld"
         case sources = "sources"
         case summary = "summary"
         case truncated = "truncated"
     }
 
-    public init(artifactID: String?, callID: String, diff: String?, durationMS: Int?, failed: Bool?, parentCallID: String?, preview: String, sources: [TentacledToolSource]?, summary: String, truncated: Bool?) {
+    public init(artifactID: String?, callID: String, diff: String?, durationMS: Int?, failed: Bool?, parentCallID: String?, preview: String, rowsWithheld: Bool?, sources: [TentacledToolSource]?, summary: String, truncated: Bool?) {
         self.artifactID = artifactID
         self.callID = callID
         self.diff = diff
@@ -28405,6 +28428,7 @@ public struct ToolCompletedEventData: Codable {
         self.failed = failed
         self.parentCallID = parentCallID
         self.preview = preview
+        self.rowsWithheld = rowsWithheld
         self.sources = sources
         self.summary = summary
         self.truncated = truncated

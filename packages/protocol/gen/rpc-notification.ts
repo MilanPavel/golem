@@ -365,6 +365,7 @@ export type DurationMs = number | null;
 export type Failed1 = boolean;
 export type ParentCallId4 = string | null;
 export type Preview = string;
+export type RowsWithheld = boolean;
 export type Sources = ToolSource[] | null;
 export type Kind = 'search' | 'read';
 export type Snippet = string;
@@ -2016,6 +2017,10 @@ export interface ToolCompletedEvent {
  * ``sources`` are the web pages a ``web_search`` or ``web_fetch`` call found or read, for
  * the screen's source chips. None for any other call. The model does not get them.
  *
+ * ``rows_withheld`` is true when ``preview`` shows rows of a data source that the model of this
+ * call did not get: it got a line with the row count and the columns instead. A client can
+ * say so beside the rows.
+ *
  * ``parent_call_id`` is legacy. Old logs set it on an event of a child run: the id of
  * the ``delegate`` call that started it. The event is in the parent's run, and a client
  * that does not know child runs ignores it. None for the run's own events. A new helper
@@ -2033,6 +2038,7 @@ export interface ToolCompletedData {
   failed?: Failed1;
   parent_call_id?: ParentCallId4;
   preview: Preview;
+  rows_withheld?: RowsWithheld;
   sources?: Sources;
   summary: Summary1;
   truncated?: Truncated;

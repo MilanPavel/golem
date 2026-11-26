@@ -11,13 +11,23 @@ from __future__ import annotations
 import re
 from collections.abc import Mapping
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from golem.data.sources import ColumnInfo, DataAccess, SourceInfo, TableInfo
+from golem.config import DataPrivacyLevel
+from golem.data.privacy import may_use_rows
+from golem.data.sources import (
+    ColumnInfo,
+    DataAccess,
+    Description,
+    QueryResult,
+    SourceInfo,
+    TableInfo,
+)
 from golem.data.types import DataError
-from golem.tools.registry import Tool, ToolContext, ToolError, ToolResult
+from golem.memory.privacy import ChatPrivacy, Target
+from golem.tools.registry import DataRead, Tool, ToolContext, ToolError, ToolResult
 from golem.tools.untrusted import wrap
 
 NOT_HERE = "Data sources are not available here."
@@ -111,15 +121,21 @@ def _cell(value: Any) -> str:
     return text if len(text) <= MAX_CELL else text[: MAX_CELL - 1] + "…"
 
 
-def _stats(column: ColumnInfo, *, with_values: bool) -> str:
-    if not with_values:
+Detail = Literal["full", "counts", "none"]
+"""How much of a column's numbers a description shows: its range and counts, only how many are
+empty (no value of the data), or nothing."""
+
+
+def _stats(column: ColumnInfo, detail_level: Detail) -> str:
+    if detail_level == "none":
         return ""
     parts: list[str] = []
-    if column.min is not None and column.max is not None:
-        parts.append(f"{_cell(column.min)} … {_cell(column.max)}")
     detail: list[str] = []
-    if column.distinct is not None:
-        detail.append(f"{column.distinct} distinct")
+    if detail_level == "full":
+        if column.min is not None and column.max is not None:
+            parts.append(f"{_cell(column.min)} … {_cell(column.max)}")
+        if column.distinct is not None:
+            detail.append(f"{column.distinct} distinct")
     if column.null_fraction:
         detail.append(f"{round(column.null_fraction * 100)}% empty")
     if detail:
@@ -127,13 +143,13 @@ def _stats(column: ColumnInfo, *, with_values: bool) -> str:
     return "  ".join(parts)
 
 
-def describe_table(table: TableInfo, *, stats: bool) -> list[str]:
-    """A table and its columns, with a column's range and counts when ``stats``."""
+def describe_table(table: TableInfo, *, stats: Detail) -> list[str]:
+    """A table and its columns, with the numbers ``stats`` allows."""
     lines = [f"{table.name}  {count(table.rows, 'row')}"]
     width = max((len(c.name) for c in table.columns), default=0)
     kinds = max((len(c.type) for c in table.columns), default=0)
     for column in table.columns:
-        shown = _stats(column, with_values=stats)
+        shown = _stats(column, stats)
         lines.append(f"  {column.name.ljust(width)}  {column.type.ljust(kinds)}  {shown}".rstrip())
     return lines
 
@@ -148,50 +164,76 @@ async def _sources(args: DataSourcesArgs, ctx: ToolContext) -> ToolResult:
     return ToolResult(output="\n".join(lines), summary=count(len(found), "source"))
 
 
-async def _describe(args: DataDescribeArgs, ctx: ToolContext) -> ToolResult:
-    access = _access(ctx)
-    try:
-        info = access.source(args.source)
-        shows_rows = info.privacy == "open" and info.status == "ready"
-        found = await access.describe(
-            args.source, args.table, sample=SAMPLE_ROWS if shows_rows else 0
-        )
-    except DataError as exc:
-        raise ToolError(str(exc)) from exc
-    stats = found.source.privacy != "schema"
+def _target(ctx: ToolContext) -> Target:
+    return ctx.memory_target or Target(local=False)
+
+
+def _withheld(privacy: DataPrivacyLevel, ctx: ToolContext) -> bool:
+    """True when the model of this call may not read the rows of a source of this level."""
+    return not may_use_rows(privacy, ChatPrivacy(), _target(ctx)).allowed
+
+
+def _describe_text(found: Description, source: str, *, stats: Detail, samples: bool) -> str:
     lines = [source_line(found.source)]
     for table in found.tables:
         lines += ["", *describe_table(table, stats=stats)]
     if found.notes:
         lines += ["", "notes:", *(f"  {line}" for line in found.notes.strip().splitlines())]
     lines += ["", "saved queries: none"]
-    if not shows_rows:
+    if not samples:
         lines.append(
             f"sample rows: not shown, the source's rows are {privacy_text(found.source.privacy)}"
         )
+        return "\n".join(lines)
     for name, rows in found.sample.items():
         columns = [c.name for t in found.tables if t.name == name for c in t.columns]
         text = render_table(columns, rows) if columns else ""
         lines += [
             "",
             f"sample rows of {name}:",
-            wrap(text, tag="data_rows", note=ROWS_NOTE, source=args.source),
+            wrap(text, tag="data_rows", note=ROWS_NOTE, source=source),
         ]
+    return "\n".join(lines)
+
+
+async def _describe(args: DataDescribeArgs, ctx: ToolContext) -> ToolResult:
+    access = _access(ctx)
+    try:
+        info = access.source(args.source)
+        shows_rows = info.privacy != "schema" and info.status == "ready"
+        found = await access.describe(
+            args.source, args.table, sample=SAMPLE_ROWS if shows_rows else 0
+        )
+    except DataError as exc:
+        raise ToolError(str(exc)) from exc
+    privacy = found.source.privacy
+    full: Detail = "none" if privacy == "schema" else "full"
+    text = _describe_text(found, args.source, stats=full, samples=shows_rows)
+    hosted = None
+    if privacy != "schema":
+        hosted = _describe_text(found, args.source, stats="counts", samples=False)
     names = ", ".join(table.name for table in found.tables)
-    return ToolResult(output="\n".join(lines), summary=f"{args.source}: {names}"[:80])
+    return ToolResult(
+        output=text,
+        summary=f"{args.source}: {names}"[:80],
+        data=DataRead(source=args.source, privacy=privacy, hosted=hosted),
+        rows_withheld=_withheld(privacy, ctx),
+    )
+
+
+def withheld_text(result: QueryResult, source: str, *, to: str) -> str:
+    """What a model that may not read the rows gets: how many, and the columns, no values."""
+    head = f"{count(len(result.rows), 'row')} from {source}, shown to the user, not sent to {to}."
+    if result.truncated:
+        head += " More rows exist than were returned."
+    columns = ", ".join(f"{c['name']} {c.get('type', '')}".strip() for c in result.columns)
+    return f"{head} Columns: {columns}"
 
 
 async def _query(args: DataQueryArgs, ctx: ToolContext) -> ToolResult:
     access = _access(ctx)
     try:
         privacy = access.source(args.source).privacy
-    except DataError as exc:
-        raise ToolError(str(exc)) from exc
-    if privacy != "open":
-        raise ToolError(
-            f"Rows of {args.source} stay local; golem can't send them to the model yet."
-        )
-    try:
         result = await access.query(args.source, args.sql, args.limit)
     except DataError as exc:
         raise ToolError(await _explain(access, args.source, str(exc))) from exc
@@ -203,8 +245,23 @@ async def _query(args: DataQueryArgs, ctx: ToolContext) -> ToolResult:
     body = wrap(
         render_table(names, result.rows), tag="data_rows", note=ROWS_NOTE, source=args.source
     )
+    full = f"{head}\n{body}"
+    summary = f"{count(len(result.rows), 'row')} from {args.source}"
+    if privacy == "schema":
+        # The rows are for the user only: no model gets them, so the result holds none.
+        return ToolResult(
+            output=withheld_text(result, args.source, to="the model"),
+            summary=summary,
+            data=DataRead(source=args.source, privacy=privacy),
+            shown=full,
+            rows_withheld=True,
+        )
+    hosted = withheld_text(result, args.source, to="this model")
     return ToolResult(
-        output=f"{head}\n{body}", summary=f"{count(len(result.rows), 'row')} from {args.source}"
+        output=full,
+        summary=summary,
+        data=DataRead(source=args.source, privacy=privacy, hosted=hosted),
+        rows_withheld=_withheld(privacy, ctx),
     )
 
 
