@@ -25,6 +25,7 @@ from typing import Any, Literal
 from golem.config import DATA_RESERVED, DataSourceSettings, load_data_sources
 from golem.data import builtin
 from golem.data.client import DataWorker
+from golem.data.notes import MAX_BYTES, Notes, notes_file, read_notes
 from golem.data.privacy import guess_privacy
 from golem.data.results import ResultStore
 from golem.data.types import DataError, NeedsExtension, SourceSpec
@@ -107,6 +108,8 @@ class Description:
     source: SourceInfo
     tables: tuple[TableInfo, ...]
     notes: str | None = None
+    notes_cut: bool = False
+    """True when the notes file is longer than the model reads, so ``notes`` is its start."""
     sample: dict[str, list[list[Any]]] = field(default_factory=dict[str, list[list[Any]]])
 
 
@@ -642,8 +645,29 @@ class DataSources:
         if sample > 0:
             for item in described:
                 rows[item.name] = await self._sample(entry, item.name, sample)
-        notes = builtin.NOTES if entry.settings is None else None
-        return Description(self._info(entry), (*described, *rest), notes, rows)
+        found = await asyncio.to_thread(self._notes, entry)
+        notes = None if found is None else found.text
+        cut = found is not None and found.cut
+        return Description(self._info(entry), (*described, *rest), notes, cut, rows)
+
+    def notes_path(self, root: Path | None, name: str) -> Path:
+        """Where the notes of source ``name`` are kept, whether or not the file exists."""
+        return self._notes_path(self._entry(root, name))
+
+    def _notes_path(self, entry: _Entry) -> Path:
+        return notes_file(self._paths.data_dir, entry.project, entry.name)
+
+    def _notes(self, entry: _Entry, limit: int | None = MAX_BYTES) -> Notes | None:
+        """The notes file of ``entry``, read fresh. The built-in source falls back to its own."""
+        found = read_notes(self._notes_path(entry), limit)
+        if found is None and entry.settings is None:
+            return Notes(builtin.NOTES)
+        return found
+
+    async def read_notes(self, root: Path | None, name: str) -> Notes | None:
+        """The whole notes text of source ``name``, for a person to edit. Raises DataError."""
+        entry = self._entry(root, name)
+        return await asyncio.to_thread(self._notes, entry, None)
 
     async def _table(self, entry: _Entry, opened: _Open, table: TableInfo) -> TableInfo:
         cached = opened.described.get(table.name)

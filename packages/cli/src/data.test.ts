@@ -12,7 +12,7 @@ import {
   formatQueryTable,
   truncatedNote,
 } from "./data-format.ts";
-import { NO_DATA_METHODS, runDataDescribe, runDataList, runDataQuery, type DataDeps } from "./data-run.ts";
+import { NO_DATA_METHODS, runDataDescribe, runDataList, runDataNotes, runDataQuery, type DataDeps } from "./data-run.ts";
 import { explainDaemonDown } from "./daemon-down.ts";
 
 const GOLEM = { name: "golem", kind: "builtin", scope: "builtin", location: "golem", privacy: "open", status: "ready", tables: 2, rows: 1204 } as const;
@@ -163,7 +163,7 @@ function harness(options: { tty?: boolean; stdin?: string } = {}): Harness {
   };
 }
 
-function client(overrides: Partial<Record<"listData" | "describeData" | "queryData" | "cancelData", (...args: never[]) => unknown>> = {}) {
+function client(overrides: Partial<Record<"listData" | "describeData" | "queryData" | "cancelData" | "getDataNotes" | "setDataNotes", (...args: never[]) => unknown>> = {}) {
   return {
     listData: async () => ({ sources: [GOLEM] }),
     describeData: async () => ({ source: GOLEM, tables: [], sample: {} }),
@@ -279,6 +279,57 @@ test("the daemon's sentence reaches the caller, and a daemon without the methods
   });
   await assert.rejects(runDataList(old, false, run.deps), new RegExp(NO_DATA_METHODS));
   await assert.rejects(runDataQuery(old, { kind: "query", source: "golem", sql: "select 1", limit: null, format: "table" }, run.deps), new RegExp(NO_DATA_METHODS));
+});
+
+test("notes prints the notes, or says how to write some", async () => {
+  const seen = harness();
+  const fake = client({ getDataNotes: async () => ({ text: "amount < 0 is money out\n", path: "/h/data/bank/DATA.md" }) });
+  assert.equal(await runDataNotes(fake, "bank", false, seen.deps), 0);
+  assert.equal(seen.out.join(""), "amount < 0 is money out\n");
+  const none = harness();
+  const empty = client({ getDataNotes: async () => ({ text: null, path: "/h/data/bank/DATA.md" }) });
+  assert.equal(await runDataNotes(empty, "bank", false, none.deps), 0);
+  assert.match(none.out.join(""), /No notes for bank\. Write some with: golem data notes bank --edit/);
+});
+
+test("notes --edit saves what the editor returns, and leaves an unchanged file alone", async () => {
+  const saved: unknown[][] = [];
+  const fake = client({
+    getDataNotes: async () => ({ text: "old\n", path: "/h/data/bank/DATA.md" }),
+    setDataNotes: async (...args: unknown[]) => {
+      saved.push(args);
+      return { path: "/h/data/bank/DATA.md" };
+    },
+  });
+  const changed = harness();
+  changed.deps.edit = async (text, name) => {
+    assert.equal(name, "DATA.md");
+    return `${text}new line\n`;
+  };
+  assert.equal(await runDataNotes(fake, "bank", true, changed.deps), 0);
+  assert.deepEqual(saved, [["bank", "old\nnew line\n"]]);
+  assert.match(changed.out.join(""), /Saved to \/h\/data\/bank\/DATA\.md/);
+  const same = harness();
+  same.deps.edit = async (text) => text;
+  assert.equal(await runDataNotes(fake, "bank", true, same.deps), 0);
+  assert.equal(saved.length, 1);
+  const failed = harness();
+  failed.deps.edit = async () => null;
+  assert.equal(await runDataNotes(fake, "bank", true, failed.deps), 1);
+  assert.match(failed.err.join(""), /nothing was saved/);
+});
+
+test("notes parses a source and --edit, and a daemon without the methods is told to update", async () => {
+  assert.deepEqual(parseDataArgs(["notes", "bank"]), { kind: "notes", source: "bank", edit: false });
+  assert.deepEqual(parseDataArgs(["notes", "--edit", "bank"]), { kind: "notes", source: "bank", edit: true });
+  assert.equal(parseDataArgs(["notes"]).kind, "error");
+  assert.equal(parseDataArgs(["notes", "a", "b"]).kind, "error");
+  const old = client({
+    getDataNotes: async () => {
+      throw new RpcError(-32601, "Method not found");
+    },
+  });
+  await assert.rejects(runDataNotes(old, "bank", false, harness().deps), new RegExp(NO_DATA_METHODS));
 });
 
 test("a daemon that is not running gets the usual message", () => {

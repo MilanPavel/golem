@@ -27,10 +27,22 @@ from golem.config_edit import (
     remove_data_source,
     update_data_source,
 )
+from golem.data.draft import INSTRUCTION, UNUSABLE, build_prompt, clean
+from golem.data.draft import SAMPLE_ROWS as DRAFT_ROWS
+from golem.data.notes import MAX_BYTES, TOO_LONG, write_notes
 from golem.data.results import KIND, table_record, wire_rows
 from golem.data.sources import DataSources, SourceInfo, TableInfo
 from golem.data.types import DataError
-from golem.server.dispatcher import INTERNAL_ERROR, INVALID_PARAMS, RequestContext, RpcCallError
+from golem.models.errors import BudgetSpent, ModelUnreachable
+from golem.models.router import ModelConfigError
+from golem.server.dispatcher import (
+    BUDGET_SPENT,
+    INTERNAL_ERROR,
+    INVALID_PARAMS,
+    MODEL_NOT_CONFIGURED,
+    RequestContext,
+    RpcCallError,
+)
 from golem.server.mcp_edit import config_target, get_scope
 from golem.sessions.manager import SchemaMismatchError, SessionNotFoundError
 from golem_protocol.commands import (
@@ -48,6 +60,12 @@ from golem_protocol.commands import (
     DataInspectResult,
     DataListParams,
     DataListResult,
+    DataNotesDraftParams,
+    DataNotesDraftResult,
+    DataNotesGetParams,
+    DataNotesGetResult,
+    DataNotesSetParams,
+    DataNotesSetResult,
     DataQueryParams,
     DataRemoveParams,
     DataRemoveResult,
@@ -363,3 +381,68 @@ async def data_extension_install(
         raise RpcCallError(INVALID_PARAMS, str(exc)) from exc
     _announce(ctx, None, "updated")
     return DataExtensionInstallResult()
+
+
+# -- notes -------------------------------------------------------------------------------------
+
+
+async def data_notes_get(ctx: RequestContext, params: DataNotesGetParams) -> DataNotesGetResult:
+    """The notes of a source, null when there are none, and where they are kept."""
+    root = await _root(ctx, params.session_id)
+    sources = _sources(ctx)
+    try:
+        found = await sources.read_notes(root, params.source)
+        path = sources.notes_path(root, params.source)
+    except DataError as exc:
+        raise RpcCallError(INVALID_PARAMS, str(exc)) from exc
+    return DataNotesGetResult(text=None if found is None else found.text, path=str(path))
+
+
+async def data_notes_set(ctx: RequestContext, params: DataNotesSetParams) -> DataNotesSetResult:
+    """Save the notes. Empty text deletes the file, so the built-in source gets its own back."""
+    root = await _root(ctx, params.session_id)
+    sources = _sources(ctx)
+    info = next((i for i in sources.snapshot(root) if i.name == params.source), None)
+    if info is None:
+        raise RpcCallError(INVALID_PARAMS, f"There is no source called {params.source}.")
+    if info.scope == "project":
+        await config_target(ctx, "project", await get_scope(ctx, params.session_id))
+    if len(params.text.encode("utf-8")) > MAX_BYTES:
+        raise RpcCallError(INVALID_PARAMS, TOO_LONG)
+    path = sources.notes_path(root, params.source)
+    try:
+        await asyncio.to_thread(write_notes, path, params.text)
+    except OSError as exc:
+        raise RpcCallError(INTERNAL_ERROR, f"could not write {path}: {exc}") from exc
+    _announce(ctx, params.source, "notes")
+    return DataNotesSetResult(path=str(path))
+
+
+async def data_notes_draft(
+    ctx: RequestContext, params: DataNotesDraftParams
+) -> DataNotesDraftResult:
+    """A proposal for the notes, from the schema and, where allowed, sample rows. Not saved."""
+    drafts = ctx.state.drafts
+    if drafts is None:
+        raise RpcCallError(INTERNAL_ERROR, "the daemon is not ready to draft notes yet")
+    root = await _root(ctx, params.session_id)
+    sources = _sources(ctx)
+    try:
+        info = next((i for i in sources.snapshot(root) if i.name == params.source), None)
+        shows_rows = info is not None and info.privacy != "schema"
+        found = await sources.describe(root, params.source, sample=DRAFT_ROWS if shows_rows else 0)
+        reply, _model = await drafts.ask(
+            INSTRUCTION, lambda local: build_prompt(found, local=local), "a notes draft"
+        )
+    except DataError as exc:
+        raise RpcCallError(INVALID_PARAMS, str(exc)) from exc
+    except BudgetSpent as exc:
+        raise RpcCallError(BUDGET_SPENT, f"{exc}; {exc.hint}") from exc
+    except ModelConfigError as exc:
+        raise RpcCallError(MODEL_NOT_CONFIGURED, str(exc)) from exc
+    except ModelUnreachable as exc:
+        raise RpcCallError(INTERNAL_ERROR, f"{exc}; {exc.hint}") from exc
+    text = clean(reply)
+    if not text:
+        raise RpcCallError(INVALID_PARAMS, UNUSABLE)
+    return DataNotesDraftResult(text=text + "\n")

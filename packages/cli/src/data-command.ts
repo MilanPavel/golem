@@ -4,7 +4,7 @@ export const DATA_FORMATS = ["table", "csv", "json"] as const;
 export type DataFormat = (typeof DATA_FORMATS)[number];
 
 export const DATA_USAGE =
-  "usage: golem data [list] [--json] | golem data describe <source> [<table>] [--json] | golem data query <source> [<sql> | -] [--limit N] [--format table|csv|json]";
+  "usage: golem data [list] [--json] | golem data describe <source> [<table>] [--json] | golem data notes <source> [--edit] | golem data query <source> [<sql> | -] [--limit N] [--format table|csv|json]";
 
 /** The text of `golem data --help` and `golem help data`. */
 export const DATA_HELP = [
@@ -14,6 +14,8 @@ export const DATA_HELP = [
   "      One line per source: name, kind, scope, tables, rows, privacy and status.",
   "  golem data describe <source> [<table>] [--json]",
   "      The tables of a source with their columns and stats, its notes, and a few sample rows.",
+  "  golem data notes <source> [--edit]",
+  "      The notes of a source, which the model reads before it writes SQL. With --edit, opens them in $EDITOR and saves them.",
   "  golem data query <source> <sql> [--limit N] [--format table|csv|json]",
   "      Runs the SQL and prints the rows. Give the SQL as a word, or on stdin with - or no word:",
   '        golem data query golem "select model, sum(cost_usd) from usage group by model"',
@@ -27,6 +29,7 @@ export const DATA_HELP = [
 export type DataArgs =
   | { kind: "list"; json: boolean }
   | { kind: "describe"; source: string; table: string | null; json: boolean }
+  | { kind: "notes"; source: string; edit: boolean }
   /** `sql` is null when it comes from stdin. */
   | { kind: "query"; source: string; sql: string | null; limit: number | null; format: DataFormat }
   | { kind: "help" }
@@ -45,6 +48,7 @@ export function parseDataArgs(args: readonly string[]): DataArgs {
     return words.every((word) => word === "--json") && words.length <= 1 ? { kind: "list", json: words.length === 1 } : fail(DATA_USAGE);
   }
   if (first === "describe") return parseDescribe(rest);
+  if (first === "notes") return parseNotes(rest);
   if (first === "query") return parseQuery(rest);
   return fail(DATA_USAGE);
 }
@@ -57,6 +61,14 @@ function parseDescribe(args: readonly string[]): DataArgs {
     return fail("usage: golem data describe <source> [<table>] [--json]");
   }
   return { kind: "describe", source, table: table ?? null, json };
+}
+
+function parseNotes(args: readonly string[]): DataArgs {
+  const edit = args.includes("--edit");
+  const words = args.filter((word) => word !== "--edit");
+  const [source, ...extra] = words;
+  if (source === undefined || source.startsWith("-") || extra.length > 0) return fail("usage: golem data notes <source> [--edit]");
+  return { kind: "notes", source, edit };
 }
 
 function parseQuery(args: readonly string[]): DataArgs {

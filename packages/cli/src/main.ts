@@ -34,7 +34,7 @@ import { formatStatus } from "./format-status.ts";
 import { formatCliVersion } from "./format-version.ts";
 import { DEVICES_USAGE, parseDevicesArgs, runDevicesList, runDevicesPair, runDevicesRename, runDevicesRevoke, type DevicesDeps } from "./devices.ts";
 import { DATA_HELP, parseDataArgs } from "./data-command.ts";
-import { runDataDescribe, runDataList, runDataQuery, type DataDeps } from "./data-run.ts";
+import { runDataDescribe, runDataList, runDataNotes, runDataQuery, type DataDeps } from "./data-run.ts";
 import { parseMcpArgs, type McpArgs } from "./mcp-command.ts";
 import { planAdd } from "./add-plan.ts";
 import { exportServers } from "./mcp-export.ts";
@@ -48,7 +48,7 @@ import {
   formatTestStep,
 } from "./mcp-format.ts";
 import { LOGIN_TIMEOUT_MS, projectSession, runConfigEdit, runMcpEdit, runMcpImport, runMcpLogin, testAfterAdd } from "./mcp-run.ts";
-import { editFile } from "./external-editor.ts";
+import { editFile, editInEditor } from "./external-editor.ts";
 import {
   parseRoutinesArgs,
   ROUTINES_USAGE,
@@ -102,7 +102,7 @@ const USAGE =
   "       golem eval helpers [--arm <name>]… [--model <arm>=<model>]… [--allow-tight] [--own-risk] | golem eval helpers list|asks|show <id> [--ask <name>] [--verbose]|stop [<id>]|resume <id> [--allow-tight] [--own-risk]|apply <id>|delete <id>\n" +
   "       golem mcp add <name> -- <command…> [--token-env VAR] | golem mcp add <name> --url <url> [--token] [--env K=V] [--header K=V] [--cwd D] [--on-demand] [--project] [--timeout S] [--approval allow] | golem mcp add --catalog <id> [--input <id>=<value>] | golem mcp remove <name> | golem mcp export [--format claude|vscode] [--scope user|project]\n" +
   "       golem mcp list [--json] | show <name> [--json] | test <name> | test --catalog <id> | edit <name> [--project] | import [--from <app>|<file>] [--all] | logs <name> [-f] | enable <name> [--on-demand] | disable <name> | restart <name> | login <name> | logout <name> | tools <name> [--hide <glob>] [--show <glob>]\n" +
-  "       golem data [list] [--json] | golem data describe <source> [<table>] [--json] | golem data query <source> [<sql> | -] [--limit N] [--format table|csv|json] | golem help data\n" +
+  "       golem data [list] [--json] | golem data describe <source> [<table>] [--json] | golem data notes <source> [--edit] | golem data query <source> [<sql> | -] [--limit N] [--format table|csv|json] | golem help data\n" +
   "       golem devices [list] | golem devices pair [--link] | golem devices rename <phone> <name> | golem devices revoke <phone> [--yes]\n" +
   "       golem ask \"<prompt>\" [--folder <dir>] [--model <profile>] [--skill <name>] [--detach] | golem open <id> [--web | --notified]\n" +
   "       golem config show [--resolved] | golem config edit [--project] | golem skills [list] | golem skills check <path>\n" +
@@ -634,6 +634,7 @@ async function runData(given: string[]): Promise<number> {
       process.on("SIGINT", handler);
       return () => void process.off("SIGINT", handler);
     },
+    edit: (text, fileName) => editInEditor(text, fileName),
   };
   return runWithClient((client) => {
     switch (parsed.kind) {
@@ -641,6 +642,8 @@ async function runData(given: string[]): Promise<number> {
         return runDataList(client, parsed.json, deps);
       case "describe":
         return runDataDescribe(client, parsed.source, parsed.table, parsed.json, deps);
+      case "notes":
+        return runDataNotes(client, parsed.source, parsed.edit, deps);
       case "query":
         return runDataQuery(client, parsed, deps);
     }

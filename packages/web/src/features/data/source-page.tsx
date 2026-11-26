@@ -178,20 +178,25 @@ function NotesTab({
 }
 
 function NotesEditor({ source, initial, path, onSave, onDraft }: { source: DataSource; initial: string; path: string | null; onSave: (text: string) => Promise<string>; onDraft: () => Promise<string> }) {
-  const [text, setText] = useState(initial);
+  const [saved, setSaved] = useState(initial);
+  const [where, setWhere] = useState(path);
+  const [editing, setEditing] = useState<string | null>(null);
+  const [proposal, setProposal] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<"save" | "draft" | null>(null);
-  const [drafted, setDrafted] = useState(false);
+  const empty = saved.trim() === "";
 
-  function save(): void {
+  function save(text: string, then: () => void): void {
     setBusy("save");
     setError(null);
     onSave(text).then(
-      (where) => {
-        setDrafted(false);
-        setNotice(`Saved to ${where}.`);
+      (at) => {
+        setSaved(text.trim() === "" ? "" : text);
+        setWhere(at);
+        setNotice(text.trim() === "" ? "The notes are gone." : `Saved to ${at}.`);
         setBusy(null);
+        then();
       },
       (failure: unknown) => {
         setError(dataErrorText(failure, "Could not save the notes."));
@@ -203,11 +208,10 @@ function NotesEditor({ source, initial, path, onSave, onDraft }: { source: DataS
   function draft(): void {
     setBusy("draft");
     setError(null);
+    setNotice(null);
     onDraft().then(
-      (proposal) => {
-        setText(proposal);
-        setDrafted(true);
-        setNotice("golem drafted these from the schema. They are not saved yet. Correct what it got wrong, then Save.");
+      (text) => {
+        setProposal(text);
         setBusy(null);
       },
       (failure: unknown) => {
@@ -220,18 +224,65 @@ function NotesEditor({ source, initial, path, onSave, onDraft }: { source: DataS
   return (
     <div className="flex max-w-3xl flex-col gap-3">
       <div className="flex flex-wrap items-center gap-2">
-        <p className="min-w-0 flex-1 break-all text-meta text-faint">{path === null ? "Not saved yet" : <Code tone="muted">{path}</Code>}</p>
-        <Button size="sm" disabled={busy !== null} onClick={draft}>
-          {busy === "draft" ? "Drafting…" : "Draft again"}
-        </Button>
-        <Button size="sm" kind="primary" disabled={busy !== null} onClick={save}>
-          {busy === "save" ? "Saving…" : "Save"}
-        </Button>
+        <p className="min-w-0 flex-1 break-all text-meta text-faint">{where === null ? "Not saved yet" : <Code tone="muted">{where}</Code>}</p>
+        {editing === null && proposal === null ? (
+          <>
+            <Button size="sm" disabled={busy !== null} onClick={draft}>
+              {busy === "draft" ? "Drafting…" : empty ? "Draft notes" : "Draft with golem"}
+            </Button>
+            <Button size="sm" kind="primary" disabled={busy !== null} onClick={() => setEditing(saved)}>
+              Edit
+            </Button>
+          </>
+        ) : null}
       </div>
       <p className="text-sm text-muted">What the tables mean, in your words. The model reads this before it writes a query. Correct whatever golem got wrong.</p>
-      <CodeEditor value={text} onChange={setText} marked={new Set()} label={`Notes of ${source.name}`} language="markdown" />
-      {notice === null ? null : (
-        <p role="status" className={cn("text-sm", drafted ? "text-wait" : "text-muted")}>
+      {proposal !== null ? (
+        <section aria-label="Drafted notes" className="flex flex-col gap-2 rounded-lg border border-line bg-surface p-3">
+          <p role="status" className="text-sm text-wait">
+            golem drafted these from the schema. They are not saved until you accept.
+          </p>
+          <pre className="whitespace-pre-wrap break-words font-mono text-sm">{proposal}</pre>
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" kind="primary" disabled={busy !== null} onClick={() => save(proposal, () => setProposal(null))}>
+              {busy === "save" ? "Saving…" : "Accept"}
+            </Button>
+            <Button
+              size="sm"
+              disabled={busy !== null}
+              onClick={() => {
+                setEditing(proposal);
+                setProposal(null);
+              }}
+            >
+              Edit first
+            </Button>
+            <Button size="sm" disabled={busy !== null} onClick={() => setProposal(null)}>
+              Discard
+            </Button>
+          </div>
+        </section>
+      ) : editing !== null ? (
+        <>
+          <CodeEditor value={editing} onChange={setEditing} marked={new Set()} label={`Notes of ${source.name}`} language="markdown" />
+          <div className="flex gap-2">
+            <Button size="sm" kind="primary" disabled={busy !== null} onClick={() => save(editing, () => setEditing(null))}>
+              {busy === "save" ? "Saving…" : "Save"}
+            </Button>
+            <Button size="sm" disabled={busy !== null} onClick={() => setEditing(null)}>
+              Cancel
+            </Button>
+          </div>
+        </>
+      ) : empty ? (
+        <p className="text-sm text-muted">No notes yet. golem can draft them from the schema, and nothing is saved until you accept.</p>
+      ) : (
+        <pre aria-label={`Notes of ${source.name}`} className="whitespace-pre-wrap break-words rounded-lg border border-line bg-surface p-3 font-mono text-sm">
+          {saved}
+        </pre>
+      )}
+      {notice === null || proposal !== null ? null : (
+        <p role="status" className="text-sm text-muted">
           {notice}
         </p>
       )}

@@ -23,6 +23,8 @@ export interface DataDeps {
   readStdin: () => Promise<string>;
   /** Run `handler` on Ctrl-C. Returns the function that stops listening. */
   onInterrupt: (handler: () => void) => () => void;
+  /** Opens `text` in the person's editor and returns what they saved, or null when the editor failed. */
+  edit?: (text: string, fileName: string) => Promise<string | null>;
   /** A new id for a query, so it can be cancelled by it. */
   newId?: () => string;
 }
@@ -39,7 +41,7 @@ async function guarded<T>(body: () => Promise<T>): Promise<T> {
   }
 }
 
-type Client = Pick<GolemClient, "listData" | "describeData" | "queryData" | "cancelData">;
+type Client = Pick<GolemClient, "listData" | "describeData" | "queryData" | "cancelData" | "getDataNotes" | "setDataNotes">;
 
 /** `golem data list`. */
 export async function runDataList(client: Client, json: boolean, deps: DataDeps): Promise<number> {
@@ -52,6 +54,36 @@ export async function runDataList(client: Client, json: boolean, deps: DataDeps)
 export async function runDataDescribe(client: Client, source: string, table: string | null, json: boolean, deps: DataDeps): Promise<number> {
   const result: DataDescribeResult = await guarded(() => client.describeData(source, table ?? undefined));
   deps.write(`${json ? JSON.stringify(result, null, 2) : formatDataDescribe(result)}\n`);
+  return 0;
+}
+
+/** `golem data notes`: print the notes of a source, or with `--edit` change them in `$EDITOR`. */
+export async function runDataNotes(client: Client, source: string, edit: boolean, deps: DataDeps): Promise<number> {
+  const found = await guarded(() => client.getDataNotes(source));
+  const current = found.text ?? "";
+  if (!edit) {
+    if (found.text === null || found.text === undefined) {
+      deps.write(`No notes for ${source}. Write some with: golem data notes ${source} --edit\n`);
+    } else {
+      deps.write(found.text.endsWith("\n") ? found.text : `${found.text}\n`);
+    }
+    return 0;
+  }
+  if (deps.edit === undefined) {
+    deps.error("There is no editor to open.");
+    return 1;
+  }
+  const edited = await deps.edit(current, "DATA.md");
+  if (edited === null) {
+    deps.error("The editor did not finish, so nothing was saved.");
+    return 1;
+  }
+  if (edited === current) {
+    deps.write("No change.\n");
+    return 0;
+  }
+  const saved = await guarded(() => client.setDataNotes(source, edited));
+  deps.write(edited.trim() === "" ? `Removed the notes at ${saved.path}\n` : `Saved to ${saved.path}\n`);
   return 0;
 }
 
