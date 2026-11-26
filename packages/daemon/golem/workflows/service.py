@@ -59,6 +59,39 @@ class ReviewError(Exception):
     """A review cannot be answered: the run or review is unknown, or it was answered already."""
 
 
+class StartError(Exception):
+    """A workflow cannot start: not found, not trusted, broken, or wrong inputs."""
+
+
+_KINDS: dict[str, tuple[type, ...]] = {
+    "str": (str,),
+    "int": (int,),
+    "float": (int, float),
+    "bool": (bool,),
+}
+_ENDED = {
+    "workflow.run.done": "done",
+    "workflow.run.failed": "failed",
+    "workflow.run.cancelled": "cancelled",
+}
+
+
+def input_problem(entry: WorkflowEntry, inputs: dict[str, Any]) -> str | None:
+    """What is wrong with ``inputs`` for the workflow ``entry`` declares, or None."""
+    declared = {} if entry.spec is None else dict(entry.spec.inputs)
+    for key, value in inputs.items():
+        kind = declared.get(key)
+        if kind is None:
+            known = ", ".join(declared) or "none"
+            return f"{entry.name} has no input {key!r} (it takes: {known})"
+        types = _KINDS.get(kind)
+        if types is None:
+            continue
+        if (isinstance(value, bool) and kind != "bool") or not isinstance(value, types):
+            return f"input {key!r} of {entry.name} is a {kind}, not {value!r}"
+    return None
+
+
 PREVIEW_CHARS = 200
 """How much of a review's draft its pending item carries."""
 
@@ -110,6 +143,8 @@ class WorkflowService:
             user_dir=user_dir, projects=self._projects, trusted=trusted
         )
         self._tell = notify
+        self.on_ended: Callable[[str, str, str | None], None] | None = None
+        """Called with ``(run id, status, error)`` when a run is done, failed or cancelled."""
         self.engine = WorkflowEngine(
             runs,
             self._emit,
@@ -189,6 +224,12 @@ class WorkflowService:
             self._touch(session_id)
         params = WorkflowRunEvent if name.startswith("workflow.run.") else WorkflowStepEvent
         self._broadcast(model(params=params.model_validate(payload)))
+        ended = _ENDED.get(name)
+        if ended is not None and self.on_ended is not None:
+            try:
+                self.on_ended(str(payload["workflow_run_id"]), ended, payload.get("error"))
+            except Exception:
+                log.exception("the end of a workflow run was not passed on: %s", payload)
 
     def _touch(self, session_id: str) -> None:
         """Have the session's summary sent again: its list of reviews may have changed."""
@@ -316,6 +357,63 @@ class WorkflowService:
         await asyncio.to_thread(self.registry.refresh)
         return self.registry.entries()
 
+    async def run_status(self, workflow_run_id: str) -> tuple[str, str | None] | None:
+        """The ``(status, error)`` of a run, None when there is no such run."""
+        run = await self.runs.get_run(workflow_run_id)
+        return None if run is None else (run.status, run.error)
+
+    def find(self, name: str, project: Path | None = None) -> WorkflowEntry | None:
+        """The workflow called ``name``: the one of ``project`` first, then the user's own."""
+        found = [e for e in self.registry.entries() if e.name == name]
+        for scope in (project, None) if project is not None else (None,):
+            for entry in found:
+                if entry.project == scope:
+                    return entry
+        return None
+
+    def problem(self, name: str, project: Path | None, inputs: dict[str, Any]) -> str | None:
+        """Why ``name`` cannot start with ``inputs`` now, or None. Reads the registry as it is."""
+        entry = self.find(name, project)
+        if entry is None:
+            return f"there is no workflow called {name}"
+        if entry.state == "untrusted":
+            return f"{name} is in a folder that is not trusted"
+        if entry.state != "ok":
+            last = (entry.error or "it cannot be loaded").strip().splitlines()[-1:]
+            return f"{name} is broken: {''.join(last)}"
+        return input_problem(entry, inputs)
+
+    async def start_run(
+        self, entry: WorkflowEntry, inputs: dict[str, Any], trigger: str
+    ) -> tuple[str, str | None]:
+        """Write a run, give it its session, and launch it. Returns ``(run id, session id)``."""
+        digest = hashlib.sha256(await asyncio.to_thread(entry.path.read_bytes)).hexdigest()
+        run_id = await self.runs.create_run(
+            entry.id,
+            entry.name,
+            str(entry.path),
+            _now(),
+            project=None if entry.project is None else str(entry.project),
+            inputs_json=json.dumps(inputs),
+            trigger=trigger,
+            source_hash=digest,
+        )
+        await self._ensure_session(run_id)
+        self.launch(run_id)
+        record = await self.runs.get_run(run_id)
+        return run_id, None if record is None else record.session_id
+
+    async def start_named(
+        self, name: str, project: Path | None, inputs: dict[str, Any], trigger: str
+    ) -> tuple[str, str | None]:
+        """Start the workflow ``name`` (see :meth:`find`). Raises :class:`StartError`."""
+        await asyncio.to_thread(self.registry.refresh)
+        problem = self.problem(name, project, inputs)
+        entry = self.find(name, project)
+        if problem is not None or entry is None:
+            raise StartError(problem or f"there is no workflow called {name}")
+        return await self.start_run(entry, inputs, trigger)
+
     def launch(self, run_id: str) -> None:
         if run_id in self._tasks:
             return
@@ -398,4 +496,12 @@ def review_item(run_id: str, review: WorkflowReviewRecord) -> PendingItem:
     )
 
 
-__all__ = ["ResumeError", "ReviewError", "WorkflowService", "review_item", "review_text"]
+__all__ = [
+    "ResumeError",
+    "ReviewError",
+    "StartError",
+    "WorkflowService",
+    "input_problem",
+    "review_item",
+    "review_text",
+]

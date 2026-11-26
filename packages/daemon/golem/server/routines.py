@@ -34,7 +34,12 @@ from golem.routine_files import (
     read_project_routines,
     read_routines,
 )
-from golem.routine_scheduler import RoutineBlockedError, RoutineBusyError, RoutineNotFoundError
+from golem.routine_scheduler import (
+    RoutineBlockedError,
+    RoutineBusyError,
+    RoutineNotFoundError,
+    routine_problem,
+)
 from golem.routines import ScheduleError, next_after, parse_schedule
 from golem.server.dispatcher import INTERNAL_ERROR, INVALID_PARAMS, RequestContext, RpcCallError
 from golem.store.routine_runs import HeadlessRun, RoutineRunRecord
@@ -77,7 +82,7 @@ async def routine_list(ctx: RequestContext, params: RoutineListParams) -> Routin
     now = ctx.state.clock()
     folders = _folders(params.folders)
     routines, issues = await asyncio.to_thread(_collect, ctx, folders, now)
-    issues = [*issues, *_watch_problems(ctx, folders)]
+    issues = [*issues, *_watch_problems(ctx, folders), *_workflow_problems(ctx, routines)]
     shown: list[RoutineInfo] = []
     for info in routines:
         rows = await _rows(ctx, info, 1)
@@ -140,6 +145,7 @@ async def routine_update(ctx: RequestContext, params: RoutineUpdateParams) -> Ro
             else:
                 merged[key] = value
     checked = _check(merged)
+    await _refuse_workflow(ctx, checked)
     toggle = not params.create and set(params.fields) == {"enabled"} and "enabled" in merged
     try:
         if params.create:
@@ -170,16 +176,28 @@ async def routine_preview(
     ctx: RequestContext, params: RoutinePreviewParams
 ) -> RoutinePreviewResult:
     """The next three firings of a schedule, so the editor shows them before it saves."""
+    found: list[str] = []
     try:
-        schedule = parse_schedule(params.schedule)
-        found: list[str] = []
-        at = ctx.state.clock()
-        for _ in range(PREVIEW_COUNT):
-            at = next_after(schedule, at)
-            found.append(at.isoformat())
+        if params.schedule is not None:
+            schedule = parse_schedule(params.schedule)
+            at = ctx.state.clock()
+            for _ in range(PREVIEW_COUNT):
+                at = next_after(schedule, at)
+                found.append(at.isoformat())
     except ScheduleError as exc:
         raise RpcCallError(INVALID_PARAMS, str(exc)) from exc
-    return RoutinePreviewResult(next=found)
+    problems: list[str] = []
+    if params.workflow is not None:
+        service = ctx.state.workflows
+        if service is not None:
+            await service.refresh([])
+            folder = None if params.folder is None else _folders([params.folder])[0]
+            given: dict[str, Any] = dict(params.inputs)
+            if params.on_watch:
+                given.setdefault("path", "")
+            why = service.problem(params.workflow, folder, given)
+            problems = [] if why is None else [why]
+    return RoutinePreviewResult(next=found, problems=problems)
 
 
 async def routine_remove(ctx: RequestContext, params: RoutineRemoveParams) -> RoutineRemoveResult:
@@ -212,7 +230,9 @@ async def run_list(ctx: RequestContext, params: RunListParams) -> RunListResult:
     for row in await runs.headless(params.limit, params.session_id):
         pending = await sessions.pending_of(row.session_id) if row.status == "waiting" else None
         info = run_info(row, pending)
-        if info.kind == "workflow" and ctx.state.workflows is not None:
+        if (
+            info.kind == "workflow" or row.origin.startswith("workflow:")
+        ) and ctx.state.workflows is not None:
             info = await _workflow_row(ctx.state.workflows.runs, row, info)
         shown.append(info)
     return RunListResult(runs=shown)
@@ -310,6 +330,34 @@ def _summary(row: RoutineRunRecord) -> RoutineRunSummary:
             "watch_path": row.watch_path,
         }
     )
+
+
+async def _refuse_workflow(ctx: RequestContext, routine: RoutineSettings) -> None:
+    """Refuse a routine whose workflow is not there, or whose inputs it does not take."""
+    service = ctx.state.workflows
+    if routine.workflow is None or service is None:
+        return
+    await service.refresh([])
+    why = routine_problem(routine, None, service)
+    if why is not None:
+        raise RpcCallError(INVALID_PARAMS, why)
+
+
+def _workflow_problems(ctx: RequestContext, shown: list[RoutineInfo]) -> list[RoutineProblem]:
+    """The routines whose workflow is missing or broken, or whose inputs do not fit it."""
+    service = ctx.state.workflows
+    if service is None:
+        return []
+    found: list[RoutineProblem] = []
+    for info in shown:
+        if info.config.workflow is None or not info.config.enabled or info.blocked:
+            continue
+        folder = None if info.folder is None else Path(info.folder)
+        settings = RoutineSettings.model_validate(info.config.model_dump(mode="json"))
+        why = routine_problem(settings, folder, service)
+        if why is not None:
+            found.append(RoutineProblem(info.path, why))
+    return found
 
 
 def _check(table: dict[str, Any]) -> RoutineSettings:

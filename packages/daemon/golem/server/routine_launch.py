@@ -57,7 +57,7 @@ class SessionLauncher:
     async def send(
         self, routine: Planned, session_id: str, read_folders: tuple[str, ...] = ()
     ) -> None:
-        prompt = routine.settings.prompt
+        prompt = routine.settings.text
         await self._sessions.send(
             session_id, prompt, skill=skill_of(prompt), read_folders=read_folders
         )

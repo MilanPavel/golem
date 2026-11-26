@@ -17,9 +17,11 @@ __all__ = ["HeadlessRun", "RoutineRunRecord", "RoutineRuns", "WatchedFile"]
 
 _COLUMNS = (
     "r.routine_run_id, r.routine, r.scope, r.session_id, r.trigger, r.due_at, r.started_at,"
-    " r.ended_at, r.reason, r.summary, r.watch_path,"
-    " CASE WHEN r.status = 'running' AND EXISTS ("
+    " r.ended_at, r.reason, r.summary, r.watch_path, r.workflow_run_id,"
+    " CASE WHEN r.status = 'running' AND (EXISTS ("
     "SELECT 1 FROM runs WHERE runs.session_id = r.session_id AND runs.status = 'waiting')"
+    " OR EXISTS (SELECT 1 FROM workflow_runs w WHERE w.workflow_run_id = r.workflow_run_id"
+    " AND w.status = 'waiting'))"
     " THEN 'waiting' ELSE r.status END AS status"
 )
 
@@ -47,6 +49,8 @@ class RoutineRunRecord:
     reason: str | None
     summary: str | None
     watch_path: str | None = None
+    workflow_run_id: str | None = None
+    """The workflow run the firing started, for a routine that has a ``workflow``."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -76,7 +80,8 @@ _HEADLESS = (
     " r.status AS fired_status, r.started_at AS fired_at, r.ended_at AS fired_end, r.reason AS"
     " fired_reason, r.summary AS fired_summary, r.watch_path,"
     " EXISTS (SELECT 1 FROM runs WHERE runs.session_id = s.session_id"
-    " AND runs.status = 'waiting') AS waiting,"
+    " AND runs.status = 'waiting') OR EXISTS (SELECT 1 FROM workflow_runs w"
+    " WHERE w.session_id = s.session_id AND w.status = 'waiting') AS waiting,"
     " " + _LAST_RUN.format(col="status") + " AS last_status,"
     " " + _LAST_RUN.format(col="ended_at") + " AS last_end,"
     " " + _LAST_RUN.format(col="error") + " AS last_error,"
@@ -146,6 +151,7 @@ def _record(row: sqlite3.Row) -> RoutineRunRecord:
         reason=row["reason"],
         summary=row["summary"],
         watch_path=row["watch_path"],
+        workflow_run_id=row["workflow_run_id"],
     )
 
 
@@ -207,6 +213,20 @@ class RoutineRuns:
         await self._write(
             "UPDATE routine_runs SET session_id = ? WHERE routine_run_id = ?", (session_id, run_id)
         )
+
+    async def attach_workflow(self, run_id: str, workflow_run_id: str) -> None:
+        await self._write(
+            "UPDATE routine_runs SET workflow_run_id = ? WHERE routine_run_id = ?",
+            (workflow_run_id, run_id),
+        )
+
+    async def by_workflow(self, workflow_run_id: str) -> RoutineRunRecord | None:
+        """The firing that started this workflow run, if one did."""
+        row = await self._database.fetch_one(
+            f"SELECT {_COLUMNS} FROM routine_runs r WHERE r.workflow_run_id = ?",
+            (workflow_run_id,),
+        )
+        return None if row is None else _record(row)
 
     async def finish(
         self, run_id: str, status: str, at: str, summary: str | None, reason: str | None = None

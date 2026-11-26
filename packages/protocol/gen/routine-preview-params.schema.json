@@ -1,15 +1,71 @@
 {
   "additionalProperties": false,
-  "description": "``routine.preview``. The next three times a schedule fires, so the browser never parses cron.\n\n``schedule`` is cron or a plain form, as in ``RoutineConfig``. A schedule that does not parse\nis refused with the reason, in words for a person.",
+  "description": "``routine.preview``. The next three times a schedule fires, so the browser never parses cron.\n\n``schedule`` is cron or a plain form, as in ``RoutineConfig``. A schedule that does not parse\nis refused with the reason, in words for a person. ``workflow`` and ``inputs`` are checked\nagainst the workflow's declared inputs, so an editor shows a wrong one before it saves:\n``problems`` says what is wrong (empty when nothing is). ``on_watch`` says the routine\nwatches a folder, which passes ``path``. ``folder`` is the project the routine belongs to.\nWith no ``schedule``, ``next`` is empty.",
   "properties": {
+    "folder": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Folder"
+    },
+    "inputs": {
+      "additionalProperties": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "integer"
+          },
+          {
+            "type": "number"
+          },
+          {
+            "type": "boolean"
+          }
+        ]
+      },
+      "title": "Inputs",
+      "type": "object"
+    },
+    "on_watch": {
+      "default": false,
+      "title": "On Watch",
+      "type": "boolean"
+    },
     "schedule": {
-      "title": "Schedule",
-      "type": "string"
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Schedule"
+    },
+    "workflow": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Workflow"
     }
   },
-  "required": [
-    "schedule"
-  ],
   "title": "RoutinePreviewParams",
   "type": "object"
 }

@@ -23,7 +23,7 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta, tzinfo
 from pathlib import Path
-from typing import Literal, Protocol, cast
+from typing import Any, Literal, Protocol, cast
 
 from pydantic import BaseModel
 
@@ -46,6 +46,8 @@ __all__ = [
     "RoutineBusyError",
     "RoutineNotFoundError",
     "RoutineScheduler",
+    "WorkflowStarter",
+    "routine_problem",
     "trusted_folders",
 ]
 
@@ -56,6 +58,9 @@ MAX_NAP = 60.0
 
 GRACE = timedelta(seconds=120)
 """How late a due time may be and still count as on time. Later is a missed run."""
+
+_WORKFLOW_OUTCOMES = {"done": "succeeded", "failed": "failed", "cancelled": "cancelled"}
+"""A workflow run's end, as a firing's end."""
 
 _OUTCOMES = {"completed": "succeeded", "failed": "failed", "cancelled": "cancelled"}
 """A run's end, as a firing's end."""
@@ -112,6 +117,40 @@ class Launcher(Protocol):
         ...
 
 
+class WorkflowStarter(Protocol):
+    """What a routine that has a ``workflow`` needs from the workflow service."""
+
+    def problem(self, name: str, project: Path | None, inputs: dict[str, Any]) -> str | None:
+        """Why the workflow cannot start with these inputs now, or None."""
+        ...
+
+    async def start_named(
+        self, name: str, project: Path | None, inputs: dict[str, Any], trigger: str
+    ) -> tuple[str, str | None]:
+        """Start a run. Returns the workflow run id and its session id."""
+        ...
+
+    async def run_status(self, workflow_run_id: str) -> tuple[str, str | None] | None:
+        """The ``(status, error)`` of a workflow run, None when there is no such run."""
+        ...
+
+
+def routine_problem(
+    settings: RoutineSettings, folder: Path | None, workflows: WorkflowStarter | None
+) -> str | None:
+    """What is wrong with the workflow of a routine, or None.
+
+    A watch routine passes ``path``, so the workflow must declare that input.
+    """
+    if settings.workflow is None or workflows is None:
+        return None
+    given: dict[str, Any] = dict(settings.inputs)
+    if settings.on is not None:
+        given.setdefault("path", "")
+    found = workflows.problem(settings.workflow, folder, given)
+    return None if found is None else f"{settings.name}: {found}"
+
+
 @dataclass(slots=True)
 class _Plan:
     schedule: str
@@ -145,7 +184,9 @@ class RoutineScheduler:
         now: Callable[[], datetime] | None = None,
         sleep: Callable[[float], Awaitable[object]] = asyncio.sleep,
         zone: tzinfo | None = None,
+        workflows: WorkflowStarter | None = None,
     ) -> None:
+        self._workflows = workflows
         self._runs = runs
         self._launcher = launcher
         self._user_file = user_file
@@ -194,6 +235,14 @@ class RoutineScheduler:
             task = asyncio.create_task(self._session_ended(event), name="golem-routine-finished")
             self._tasks.add(task)
             task.add_done_callback(self._tasks.discard)
+
+    def on_workflow_ended(self, workflow_run_id: str, status: str, error: str | None) -> None:
+        """The workflow service calls this when a run ends. It ends the firing that started it."""
+        task = asyncio.create_task(
+            self._workflow_ended(workflow_run_id, status, error), name="golem-routine-workflow"
+        )
+        self._tasks.add(task)
+        task.add_done_callback(self._tasks.discard)
 
     async def tick(self) -> None:
         """One pass: re-read the routines, plan them, and fire what is due."""
@@ -263,18 +312,24 @@ class RoutineScheduler:
                 self._user_file
             ):
                 return False
-            filled = replace(
-                routine,
-                settings=routine.settings.model_copy(
-                    update={"prompt": fill_prompt(routine.settings.prompt, path)}
-                ),
-            )
+            if routine.settings.workflow is not None:
+                await self._fire(routine, "watch", None, watched=file, path=path)
+                return True
+            update = {"prompt": fill_prompt(routine.settings.text, path)}
+            filled = replace(routine, settings=routine.settings.model_copy(update=update))
             await self._fire(filled, "watch", None, watched=file, read_folders=(str(path.parent),))
             return True
 
     async def reconcile(self) -> None:
         """End the firings a stopped daemon left open, when their session has finished."""
         for row in await self._runs.open_runs():
+            if row.workflow_run_id is not None and self._workflows is not None:
+                found = await self._workflows.run_status(row.workflow_run_id)
+                if found is None:
+                    await self._end(row, "failed", None, "the workflow run is gone")
+                elif found[0] in _WORKFLOW_OUTCOMES:
+                    await self._end(row, _WORKFLOW_OUTCOMES[found[0]], None, found[1])
+                continue
             if row.session_id is None:
                 await self._end(row, "failed", None, "the daemon stopped before the session began")
                 continue
@@ -326,6 +381,11 @@ class RoutineScheduler:
             problems += read.problems
         for problem in problems:
             log.warning("routine not loaded: %s", problem)
+        for routine in found:
+            if routine.settings.enabled:
+                why = routine_problem(routine.settings, routine.folder, self._workflows)
+                if why is not None:
+                    log.warning("routine cannot start its workflow: %s", why)
         return found
 
     async def _plan_new(
@@ -382,6 +442,7 @@ class RoutineScheduler:
         manual: bool = False,
         watched: WatchedFile | None = None,
         read_folders: tuple[str, ...] = (),
+        path: Path | None = None,
     ) -> tuple[str, str] | None:
         """Start a run. Returns the row and session ids, or None when the firing was skipped."""
         if await self._runs.active(routine.name, routine.scope) is not None:
@@ -399,7 +460,10 @@ class RoutineScheduler:
             routine.name, routine.scope, trigger, _stamp(due), _stamp(at) or "", watched
         )
         try:
-            session_id = await self._launcher.create(routine)
+            if routine.settings.workflow is not None:
+                session_id = await self._start_workflow(run_id, routine, trigger, path)
+            else:
+                session_id = await self._launcher.create(routine)
             await self._runs.attach(run_id, session_id)
         except Exception as exc:
             await self._failed(run_id, routine, exc)
@@ -424,6 +488,8 @@ class RoutineScheduler:
                 )
             )
         )
+        if routine.settings.workflow is not None:
+            return run_id, session_id
         try:
             if read_folders:
                 await self._launcher.send(routine, session_id, read_folders)
@@ -432,6 +498,37 @@ class RoutineScheduler:
         except Exception as exc:
             await self._failed(run_id, routine, exc)
         return run_id, session_id
+
+    async def _start_workflow(
+        self, run_id: str, routine: Planned, trigger: Trigger, path: Path | None
+    ) -> str:
+        """Start the routine's workflow through the service. Returns the run's session id."""
+        settings = routine.settings
+        assert settings.workflow is not None
+        if self._workflows is None:
+            raise RuntimeError("this daemon cannot start workflows")
+        inputs: dict[str, Any] = dict(settings.inputs)
+        if path is not None:
+            inputs["path"] = str(path)
+        workflow_run_id, session_id = await self._workflows.start_named(
+            settings.workflow, routine.folder, inputs, f"routine:{settings.name}"
+        )
+        await self._runs.attach_workflow(run_id, workflow_run_id)
+        found = await self._workflows.run_status(workflow_run_id)
+        if found is not None and found[0] in _WORKFLOW_OUTCOMES:
+            await self._workflow_ended(workflow_run_id, found[0], found[1])  # ended already
+        if session_id is None:
+            raise RuntimeError(f"the run of {settings.workflow} got no session")
+        return session_id
+
+    async def _workflow_ended(self, workflow_run_id: str, status: str, error: str | None) -> None:
+        try:
+            row = await self._runs.by_workflow(workflow_run_id)
+            if row is None:
+                return
+            await self._end(row, _WORKFLOW_OUTCOMES[status], None, error)
+        except Exception:
+            log.exception("could not end the routine run of workflow run %s", workflow_run_id)
 
     async def _failed(self, run_id: str, routine: Planned, exc: Exception) -> None:
         log.warning(
@@ -458,7 +555,7 @@ class RoutineScheduler:
     async def _session_ended(self, event: SessionCompletedEvent) -> None:
         try:
             row = await self._runs.by_session(event.session_id)
-            if row is None:
+            if row is None or row.workflow_run_id is not None:
                 return
             status = _OUTCOMES[event.data.status]
             await self._end(row, status, event.data.summary, None)

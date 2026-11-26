@@ -69,7 +69,7 @@ class FakeLauncher:
     async def send(
         self, routine: Planned, session_id: str, read_folders: tuple[str, ...] = ()
     ) -> None:
-        self.sent.append((session_id, routine.settings.prompt))
+        self.sent.append((session_id, routine.settings.text))
         self.read_folders.append(read_folders)
 
 

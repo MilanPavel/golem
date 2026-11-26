@@ -329,4 +329,95 @@ MIGRATIONS: tuple[tuple[str, ...], ...] = (
         "ALTER TABLE sessions ADD COLUMN copy_path TEXT",
         "ALTER TABLE sessions ADD COLUMN copy_baseline TEXT",
     ),
+    (
+        # A routine starts a workflow: ``workflow_runs.trigger`` is ``routine:<name>``, which
+        # the old CHECK refuses. SQLite cannot drop a CHECK, and dropping a parent table with
+        # foreign keys on would cascade away its steps, so the three tables are saved, rebuilt
+        # and refilled. ``routine_runs`` gets the id of the workflow run it started.
+        "CREATE TABLE workflow_runs_save AS SELECT * FROM workflow_runs",
+        "CREATE TABLE workflow_steps_save AS SELECT * FROM workflow_steps",
+        "CREATE TABLE workflow_reviews_save AS SELECT * FROM workflow_reviews",
+        "DROP TABLE workflow_reviews",
+        "DROP TABLE workflow_steps",
+        "DROP TABLE workflow_runs",
+        """
+        CREATE TABLE workflow_runs (
+            workflow_run_id TEXT PRIMARY KEY,
+            workflow_id TEXT NOT NULL,
+            name TEXT NOT NULL,
+            path TEXT NOT NULL,
+            project TEXT,
+            session_id TEXT,
+            status TEXT NOT NULL DEFAULT 'pending' CHECK (
+                status IN ('pending', 'running', 'waiting', 'done', 'failed', 'cancelled')
+            ),
+            inputs_json TEXT,
+            trigger TEXT NOT NULL DEFAULT 'manual',
+            error TEXT,
+            created_at TEXT NOT NULL,
+            started_at TEXT,
+            finished_at TEXT,
+            source_hash TEXT
+        )
+        """,
+        "CREATE INDEX workflow_runs_status ON workflow_runs (status)",
+        "CREATE INDEX workflow_runs_workflow ON workflow_runs (workflow_id, created_at DESC)",
+        """
+        CREATE TABLE workflow_steps (
+            workflow_run_id TEXT NOT NULL REFERENCES workflow_runs (workflow_run_id)
+                ON DELETE CASCADE,
+            step_key TEXT NOT NULL,
+            kind TEXT NOT NULL CHECK (
+                kind IN ('step', 'agent', 'review', 'notify', 'llm', 'tool', 'skill')
+            ),
+            title TEXT,
+            group_key TEXT,
+            status TEXT NOT NULL DEFAULT 'pending' CHECK (
+                status IN ('pending', 'running', 'waiting', 'done', 'failed', 'skipped', 'in_doubt')
+            ),
+            attempts INTEGER NOT NULL DEFAULT 0,
+            result_json TEXT,
+            error TEXT,
+            child_session_id TEXT,
+            cost_usd REAL,
+            started_at TEXT,
+            finished_at TEXT,
+            seq INTEGER NOT NULL,
+            model TEXT,
+            PRIMARY KEY (workflow_run_id, step_key)
+        )
+        """,
+        """
+        CREATE TABLE workflow_reviews (
+            workflow_run_id TEXT NOT NULL REFERENCES workflow_runs (workflow_run_id)
+                ON DELETE CASCADE,
+            step_key TEXT NOT NULL,
+            pending_json TEXT NOT NULL,
+            answer_json TEXT,
+            created_at TEXT NOT NULL,
+            answered_at TEXT,
+            PRIMARY KEY (workflow_run_id, step_key)
+        )
+        """,
+        "CREATE INDEX workflow_reviews_open ON workflow_reviews (created_at)"
+        " WHERE answered_at IS NULL",
+        "INSERT INTO workflow_runs (workflow_run_id, workflow_id, name, path, project, session_id,"
+        " status, inputs_json, trigger, error, created_at, started_at, finished_at, source_hash)"
+        " SELECT workflow_run_id, workflow_id, name, path, project, session_id, status,"
+        " inputs_json, trigger, error, created_at, started_at, finished_at, source_hash"
+        " FROM workflow_runs_save",
+        "INSERT INTO workflow_steps (workflow_run_id, step_key, kind, title, group_key, status,"
+        " attempts, result_json, error, child_session_id, cost_usd, started_at, finished_at, seq,"
+        " model) SELECT workflow_run_id, step_key, kind, title, group_key, status, attempts,"
+        " result_json, error, child_session_id, cost_usd, started_at, finished_at, seq, model"
+        " FROM workflow_steps_save",
+        "INSERT INTO workflow_reviews (workflow_run_id, step_key, pending_json, answer_json,"
+        " created_at, answered_at) SELECT workflow_run_id, step_key, pending_json, answer_json,"
+        " created_at, answered_at FROM workflow_reviews_save",
+        "DROP TABLE workflow_reviews_save",
+        "DROP TABLE workflow_steps_save",
+        "DROP TABLE workflow_runs_save",
+        "ALTER TABLE routine_runs ADD COLUMN workflow_run_id TEXT",
+        "CREATE INDEX routine_runs_workflow ON routine_runs (workflow_run_id)",
+    ),
 )

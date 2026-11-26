@@ -72,13 +72,6 @@
         "trigger": {
           "anyOf": [
             {
-              "enum": [
-                "manual",
-                "schedule",
-                "file",
-                "chat",
-                "try"
-              ],
               "type": "string"
             },
             {

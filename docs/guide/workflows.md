@@ -289,6 +289,28 @@ golem workflow answer wr_123 --key send-mail       # when the run waits on sever
 
 Without `--key` the run must wait on exactly one review. The command then follows the run's steps like `resume`. The run continues once none of its reviews waits; an answered review is not asked again, even after a restart. A review answered twice is refused.
 
+## Run a workflow from a routine
+
+A `[[routine]]` can start a workflow instead of a prompt. Give it `workflow` (the workflow's name) and `inputs`, and leave `prompt` out: a routine has exactly one of the two.
+
+```toml
+[[routine]]
+name = "pr-digest-daily"
+schedule = "weekdays 08:30"
+workflow = "pr_digest"
+inputs = { tool = "mcp__github__list_pull_requests", repo = "acme/api" }
+```
+
+- The routine starts the run through the workflow service, so it gets its own headless session, survives a restart and stops at each `run.review` like any run. The run's trigger is `routine:<name>`, and the routine's history row points at the run.
+- The firing stays **running** while the run works and reads **waiting** while it waits for your review. Answer it as usual (`golem workflow answer`, the Inbox). The firing ends when the run is done, failed or cancelled.
+- Inputs are checked against the workflow's declared inputs: an unknown name or a value of the wrong type is a routine problem. `routine.list` shows it in its `issues`, `routine.update` refuses to save it, and a firing that cannot start is a `failed` history row that says why. A missing or broken workflow is handled the same way.
+- A project routine looks for the workflow in the project's `workflows/` folder first, then in your own.
+- A workflow routine takes no `folder`, `model` or `mcp`: the workflow chooses its own.
+- A routine with `on = { watch, glob }` passes the new file's absolute path as the input `path`, so the workflow must declare `path`.
+- `golem routines` shows `workflow: <name>` for such a routine.
+
+See [Routines](routines.md) for schedules and file watching.
+
 ## Broken and untrusted files
 
 | Case | What you see | What runs |

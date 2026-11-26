@@ -11,8 +11,9 @@ export type NotifyFailed = boolean | null;
 export type NotifyFinished = boolean | null;
 export type Glob = string;
 export type Watch = string;
-export type Prompt = string;
+export type Prompt = string | null;
 export type Schedule = string | null;
+export type Workflow = string | null;
 export type Folder1 = string | null;
 export type DueAt = string | null;
 export type EndedAt = string | null;
@@ -55,7 +56,9 @@ export interface RoutineInfo {
 /**
  * One ``[[routine]]`` as written. The daemon checks it when it loads.
  *
- * Exactly one of ``schedule`` and ``on`` is set. ``schedule`` is cron, or
+ * Exactly one of ``schedule`` and ``on`` is set, and exactly one of ``prompt`` and
+ * ``workflow``. ``workflow`` names a workflow to start, with ``inputs`` (a watch routine
+ * also passes ``path``); it takes no ``folder``, ``model`` or ``mcp``. ``schedule`` is cron, or
  * ``every 15m``, ``every 1h``, ``daily 08:30``, ``weekdays 08:30``, ``weekly mon 06:00``.
  * ``missed`` is what happens to a firing that came due while golem could not
  * run it: ``skip`` drops it, ``run_once`` fires it once, late.
@@ -68,6 +71,7 @@ export interface RoutineInfo {
 export interface RoutineConfig {
   enabled?: Enabled;
   folder?: Folder;
+  inputs?: Inputs;
   mcp?: Mcp;
   missed?: Missed;
   model?: Model;
@@ -75,8 +79,12 @@ export interface RoutineConfig {
   notify_failed?: NotifyFailed;
   notify_finished?: NotifyFinished;
   on?: RoutineWatchConfig | null;
-  prompt: Prompt;
+  prompt?: Prompt;
   schedule?: Schedule;
+  workflow?: Workflow;
+}
+export interface Inputs {
+  [k: string]: string | number | boolean;
 }
 /**
  * ``on = { watch, glob }``: a new file in ``watch`` that matches ``glob``.

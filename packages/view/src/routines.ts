@@ -7,7 +7,10 @@
 /** The parts of a routine's config these words read. */
 export type RoutineConfigLike = {
   name: string;
-  prompt: string;
+  /** The text or `/skill` of a prompt routine. A workflow routine has `workflow` instead. */
+  prompt?: string | null;
+  workflow?: string | null;
+  inputs?: Readonly<Record<string, string | number | boolean>>;
   schedule?: string | null;
   on?: { watch: string; glob?: string } | null;
   folder?: string | null;
@@ -264,7 +267,14 @@ export function routineToml(config: RoutineConfigLike): string {
   if (config.enabled === false) lines.push("enabled = false");
   if (config.notify_finished !== null && config.notify_finished !== undefined) lines.push(`notify_finished = ${config.notify_finished}`);
   if (config.notify_failed !== null && config.notify_failed !== undefined) lines.push(`notify_failed = ${config.notify_failed}`);
-  lines.push(config.prompt.includes("\n") ? `prompt = """\n${config.prompt.replaceAll("\\", "\\\\").replaceAll('"""', '\\"""')}\n"""` : `prompt = ${quote(config.prompt)}`);
+  if (config.workflow) {
+    lines.push(`workflow = ${quote(config.workflow)}`);
+    const inputs = Object.entries(config.inputs ?? {});
+    if (inputs.length > 0) lines.push(`inputs = { ${inputs.map(([key, value]) => `${key} = ${JSON.stringify(value)}`).join(", ")} }`);
+    return lines.join("\n");
+  }
+  const prompt = config.prompt ?? "";
+  lines.push(prompt.includes("\n") ? `prompt = """\n${prompt.replaceAll("\\", "\\\\").replaceAll('"""', '\\"""')}\n"""` : `prompt = ${quote(prompt)}`);
   return lines.join("\n");
 }
 

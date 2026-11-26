@@ -327,7 +327,9 @@ function detailLines(
     { text: "" },
     { prefix: label("Status"), mark: routineMark(routine), text: status },
     { text: `${label("Trigger")}${routineHeadline(routine, now)}` },
-    { text: `${label("Prompt")}${firstLine(config.prompt)}` },
+    config.workflow
+      ? { text: `${label("Workflow")}${config.workflow}${workflowInputs(config.inputs)}` }
+      : { text: `${label("Prompt")}${firstLine(config.prompt ?? "")}` },
   ];
   if (config.folder) lines.push({ text: `${label("Folder")}${shortPath(config.folder, home)}` });
   if (config.model) lines.push({ text: `${label("Model")}${config.model}` });
@@ -381,6 +383,11 @@ function scrollToSelected(lines: RoutinesManagerLine[], room: number): RoutinesM
 
 function shortPath(path: string, home: string): string {
   return home.length > 0 && path.startsWith(`${home}/`) ? `~${path.slice(home.length)}` : path;
+}
+
+function workflowInputs(inputs: Readonly<Record<string, string | number | boolean>> | undefined): string {
+  const given = Object.entries(inputs ?? {});
+  return given.length === 0 ? "" : ` (${given.map(([key, value]) => `${key}=${String(value)}`).join(", ")})`;
 }
 
 function firstLine(text: string): string {

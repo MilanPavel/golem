@@ -2867,7 +2867,9 @@ class RoutineWatchConfig(BaseModel):
 class RoutineConfig(BaseModel):
     """One ``[[routine]]`` as written. The daemon checks it when it loads.
 
-    Exactly one of ``schedule`` and ``on`` is set. ``schedule`` is cron, or
+    Exactly one of ``schedule`` and ``on`` is set, and exactly one of ``prompt`` and
+    ``workflow``. ``workflow`` names a workflow to start, with ``inputs`` (a watch routine
+    also passes ``path``); it takes no ``folder``, ``model`` or ``mcp``. ``schedule`` is cron, or
     ``every 15m``, ``every 1h``, ``daily 08:30``, ``weekdays 08:30``, ``weekly mon 06:00``.
     ``missed`` is what happens to a firing that came due while golem could not
     run it: ``skip`` drops it, ``run_once`` fires it once, late.
@@ -2880,7 +2882,11 @@ class RoutineConfig(BaseModel):
     name: str = Field(min_length=1)
     schedule: str | None = None
     on: RoutineWatchConfig | None = None
-    prompt: str = Field(min_length=1)
+    prompt: str | None = Field(default=None, min_length=1)
+    workflow: str | None = Field(default=None, min_length=1)
+    inputs: dict[str, str | int | float | bool] = Field(
+        default_factory=dict[str, str | int | float | bool]
+    )
     folder: str | None = None
     model: str | None = None
     mcp: list[str] = Field(default_factory=list[str])
@@ -3132,12 +3138,22 @@ class RoutinePreviewParams(BaseModel):
     """``routine.preview``. The next three times a schedule fires, so the browser never parses cron.
 
     ``schedule`` is cron or a plain form, as in ``RoutineConfig``. A schedule that does not parse
-    is refused with the reason, in words for a person.
+    is refused with the reason, in words for a person. ``workflow`` and ``inputs`` are checked
+    against the workflow's declared inputs, so an editor shows a wrong one before it saves:
+    ``problems`` says what is wrong (empty when nothing is). ``on_watch`` says the routine
+    watches a folder, which passes ``path``. ``folder`` is the project the routine belongs to.
+    With no ``schedule``, ``next`` is empty.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    schedule: str
+    schedule: str | None = None
+    workflow: str | None = Field(default=None, min_length=1)
+    inputs: dict[str, str | int | float | bool] = Field(
+        default_factory=dict[str, str | int | float | bool]
+    )
+    on_watch: bool = False
+    folder: str | None = Field(default=None, min_length=1)
 
 
 class RoutinePreviewResult(BaseModel):
@@ -3146,6 +3162,7 @@ class RoutinePreviewResult(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     next: list[str]
+    problems: list[str] = Field(default_factory=list[str])
 
 
 class RoutineRemoveParams(BaseModel):
@@ -6034,8 +6051,9 @@ WorkflowStepStatus = Literal[
 ]
 WorkflowStepKind = Literal["step", "agent", "review", "notify", "llm", "tool", "skill"]
 WorkflowTriggerKind = Literal["manual", "schedule", "on_file"]
-WorkflowRunTrigger = Literal["manual", "schedule", "file", "chat", "try"]
-"""What started a run, as ``workflow_runs.trigger`` stores it."""
+WorkflowRunTrigger = str
+"""What started a run, as ``workflow_runs.trigger`` stores it: ``manual``, ``schedule``, ``file``,
+``chat``, ``try``, or ``routine:<name>`` for a run a routine started."""
 WorkflowStartTrigger = Literal["manual", "try", "chat"]
 """What a client may start a run with. The daemon starts ``schedule`` and ``file`` runs itself."""
 
