@@ -2,6 +2,92 @@
 
 What changed in each release of golem, newest first. `just release` writes each section from the commit messages on `main` ([CONTRIBUTING.md](CONTRIBUTING.md)), and the release pull request is the place to edit it. The GitHub release shows the same section. How a release is made is in [docs/sre.md](docs/sre.md), section 5.
 
+## [0.21.0] - 2026-11-26
+
+### Features
+
+- **daemon:** delegate takes a batch of helpers ([#1351](https://github.com/MilanPavel/golem/pull/1351)) ([#1755](https://github.com/MilanPavel/golem/pull/1755))
+- **daemon:** workflow files are found, trusted and loaded in isolation ([#1759](https://github.com/MilanPavel/golem/pull/1759)) ([#1764](https://github.com/MilanPavel/golem/pull/1764))
+- **daemon:** wait reasons team and budget on helper.state ([#1338](https://github.com/MilanPavel/golem/pull/1338)) ([#1765](https://github.com/MilanPavel/golem/pull/1765))
+- **web:** batch card shows places in line and wait amounts, counts running helpers ([#1769](https://github.com/MilanPavel/golem/pull/1769))
+- **daemon:** a workflow's outline is read from its code by fixed rules ([#1762](https://github.com/MilanPavel/golem/pull/1762)) ([#1766](https://github.com/MilanPavel/golem/pull/1766))
+- **daemon:** a helper's slot or provider wait shows on its lead (#1352, #1356) ([#1771](https://github.com/MilanPavel/golem/pull/1771))
+- **daemon:** workflow runs, steps and reviews are stored ([#1757](https://github.com/MilanPavel/golem/pull/1757)) ([#1770](https://github.com/MilanPavel/golem/pull/1770))
+- **web:** running batch card shows at once count, status line shows helpers 2/5 ([#1773](https://github.com/MilanPavel/golem/pull/1773))
+- **daemon:** a workflow runs its steps and keeps each result ([#1758](https://github.com/MilanPavel/golem/pull/1758)) ([#1774](https://github.com/MilanPavel/golem/pull/1774))
+- **protocol:** workflow commands and events ([#1756](https://github.com/MilanPavel/golem/pull/1756)) ([#1772](https://github.com/MilanPavel/golem/pull/1772))
+- **daemon:** golem workflow list and run, with live steps ([#1760](https://github.com/MilanPavel/golem/pull/1760)) ([#1780](https://github.com/MilanPavel/golem/pull/1780))
+- **protocol:** the helpers batch question carries its cost estimate ([#1336](https://github.com/MilanPavel/golem/pull/1336)) ([#1778](https://github.com/MilanPavel/golem/pull/1778))
+- **daemon:** keyed workflow steps retry with their idempotency key ([#1782](https://github.com/MilanPavel/golem/pull/1782)) ([#1787](https://github.com/MilanPavel/golem/pull/1787))
+- **web:** the estimate card before a large batch of helpers ([#1777](https://github.com/MilanPavel/golem/pull/1777)) ([#1788](https://github.com/MilanPavel/golem/pull/1788))
+- **daemon:** each workflow run gets its headless session and shows in Runs ([#1781](https://github.com/MilanPavel/golem/pull/1781)) ([#1789](https://github.com/MilanPavel/golem/pull/1789))
+- **daemon:** a large batch of helpers asks first, with its cost estimate ([#1337](https://github.com/MilanPavel/golem/pull/1337)) ([#1792](https://github.com/MilanPavel/golem/pull/1792))
+- **daemon:** run.notify tells you through the Notifier ([#1784](https://github.com/MilanPavel/golem/pull/1784)) ([#1791](https://github.com/MilanPavel/golem/pull/1791))
+- **protocol:** the brief and the diff behind show ([#1795](https://github.com/MilanPavel/golem/pull/1795)) ([#1797](https://github.com/MilanPavel/golem/pull/1797))
+- **daemon:** workflow runs continue after a restart, golem workflow resume ([#1783](https://github.com/MilanPavel/golem/pull/1783)) ([#1793](https://github.com/MilanPavel/golem/pull/1793))
+- **daemon:** one advisor call per message, and an advisor with no tools ([#1358](https://github.com/MilanPavel/golem/pull/1358)) ([#1798](https://github.com/MilanPavel/golem/pull/1798))
+- **daemon:** the reviewer gets the lead's diff as an artifact ([#1357](https://github.com/MilanPavel/golem/pull/1357)) ([#1799](https://github.com/MilanPavel/golem/pull/1799))
+- **daemon:** run.review waits for your answer, in the Inbox ([#1785](https://github.com/MilanPavel/golem/pull/1785)) ([#1796](https://github.com/MilanPavel/golem/pull/1796))
+- **web:** show the helper's brief and diff on its paid question (#1361, #1362) ([#1800](https://github.com/MilanPavel/golem/pull/1800))
+- **daemon:** paid review end to end, and the local-only refusal ([#1360](https://github.com/MilanPavel/golem/pull/1360)) ([#1803](https://github.com/MilanPavel/golem/pull/1803))
+- **daemon:** a stuck lead is nudged once to ask the advisor ([#1359](https://github.com/MilanPavel/golem/pull/1359)) ([#1802](https://github.com/MilanPavel/golem/pull/1802))
+- **web:** Rules says the lead decides and golem reminds it ([#1806](https://github.com/MilanPavel/golem/pull/1806)) ([#1807](https://github.com/MilanPavel/golem/pull/1807))
+- **tui:** answer a workflow review from the band ([#1786](https://github.com/MilanPavel/golem/pull/1786)) ([#1801](https://github.com/MilanPavel/golem/pull/1801))
+- **daemon:** run.agent runs an agent step as a helper of the run's session ([#1810](https://github.com/MilanPavel/golem/pull/1810)) ([#1814](https://github.com/MilanPavel/golem/pull/1814))
+- **daemon:** a full window hands the rest of the reading to a helper ([#1805](https://github.com/MilanPavel/golem/pull/1805)) ([#1808](https://github.com/MilanPavel/golem/pull/1808))
+- **daemon:** run.llm makes one model call as a step, with its model and cost ([#1811](https://github.com/MilanPavel/golem/pull/1811)) ([#1815](https://github.com/MilanPavel/golem/pull/1815))
+- **daemon:** a helper can work in its own git copy of the folder ([#1363](https://github.com/MilanPavel/golem/pull/1363)) ([#1816](https://github.com/MilanPavel/golem/pull/1816))
+- **protocol:** a worker's diff and checks, and apply, discard, retry (#1365, #1367) ([#1818](https://github.com/MilanPavel/golem/pull/1818))
+- **daemon:** run.tool calls a golem or MCP tool as a step, through the permission engine ([#1812](https://github.com/MilanPavel/golem/pull/1812)) ([#1817](https://github.com/MilanPavel/golem/pull/1817))
+- **daemon:** run.skill runs a skill as a helper turn, and the PR digest example ([#1813](https://github.com/MilanPavel/golem/pull/1813)) ([#1819](https://github.com/MilanPavel/golem/pull/1819))
+- **daemon:** a worker helper writes only in its own git copy ([#1364](https://github.com/MilanPavel/golem/pull/1364)) ([#1820](https://github.com/MilanPavel/golem/pull/1820))
+- **web:** one Changes block per worker, with checks and apply actions ([#1370](https://github.com/MilanPavel/golem/pull/1370)) ([#1821](https://github.com/MilanPavel/golem/pull/1821))
+- **daemon:** a worker returns its diff and check result ([#1366](https://github.com/MilanPavel/golem/pull/1366)) ([#1822](https://github.com/MilanPavel/golem/pull/1822))
+- **web:** worker blocks in the Changes tab, with apply, retry and discard ([#1371](https://github.com/MilanPavel/golem/pull/1371)) ([#1823](https://github.com/MilanPavel/golem/pull/1823))
+- **daemon:** run.parallel runs a workflow's agents as one batch, with gets= and budget= ([#1824](https://github.com/MilanPavel/golem/pull/1824)) ([#1827](https://github.com/MilanPavel/golem/pull/1827))
+- **daemon:** a workflow's worker works in a copy and returns its diff ([#1825](https://github.com/MilanPavel/golem/pull/1825)) ([#1829](https://github.com/MilanPavel/golem/pull/1829))
+- **tui:** worker blocks in the Changes view with view, apply, retry and discard ([#1372](https://github.com/MilanPavel/golem/pull/1372)) ([#1828](https://github.com/MilanPavel/golem/pull/1828))
+- **daemon:** apply, discard and retry a worker's diff through the change set ([#1368](https://github.com/MilanPavel/golem/pull/1368)) ([#1830](https://github.com/MilanPavel/golem/pull/1830))
+- **web:** the Workflows list and detail, with Overview, Code and Runs ([#1833](https://github.com/MilanPavel/golem/pull/1833)) ([#1839](https://github.com/MilanPavel/golem/pull/1839))
+- **daemon:** remove helper copies on lead close and sweep orphans at startup ([#1840](https://github.com/MilanPavel/golem/pull/1840))
+- **daemon:** a routine can start a workflow with its inputs ([#1837](https://github.com/MilanPavel/golem/pull/1837)) ([#1841](https://github.com/MilanPavel/golem/pull/1841))
+- **web:** the Run… dialog starts a workflow with its inputs ([#1834](https://github.com/MilanPavel/golem/pull/1834)) ([#1844](https://github.com/MilanPavel/golem/pull/1844))
+- **daemon:** harness for the four sub-agent use cases, scripted and live ([#1842](https://github.com/MilanPavel/golem/pull/1842))
+- **web:** a routine can run a workflow, and the workflow's Triggers tab ([#1838](https://github.com/MilanPavel/golem/pull/1838)) ([#1848](https://github.com/MilanPavel/golem/pull/1848))
+- **protocol:** the data.* models and the data.changed notification ([#1850](https://github.com/MilanPavel/golem/pull/1850)) ([#1851](https://github.com/MilanPavel/golem/pull/1851))
+- **web:** a workflow run's steps, review card, cancel and resume ([#1835](https://github.com/MilanPavel/golem/pull/1835)) ([#1845](https://github.com/MilanPavel/golem/pull/1845))
+- **daemon:** a read-only data engine — DuckDB in a worker process ([#1849](https://github.com/MilanPavel/golem/pull/1849)) ([#1859](https://github.com/MilanPavel/golem/pull/1859))
+- **web:** the Data rail, the source page and the add dialog ([#1858](https://github.com/MilanPavel/golem/pull/1858)) ([#1860](https://github.com/MilanPavel/golem/pull/1860))
+- **tui:** /workflows with a start form, and workflow runs in /runs ([#1836](https://github.com/MilanPavel/golem/pull/1836)) ([#1863](https://github.com/MilanPavel/golem/pull/1863))
+- **daemon:** data sources, the built-in golem source and the data tools ([#1857](https://github.com/MilanPavel/golem/pull/1857)) ([#1864](https://github.com/MilanPavel/golem/pull/1864))
+- **daemon:** check and save a workflow without importing it ([#1867](https://github.com/MilanPavel/golem/pull/1867)) ([#1872](https://github.com/MilanPavel/golem/pull/1872))
+- **tui:** /workflows shows the outline, e edits in $EDITOR ([#1869](https://github.com/MilanPavel/golem/pull/1869)) ([#1871](https://github.com/MilanPavel/golem/pull/1871))
+- **cli:** golem data — list, describe and query ([#1874](https://github.com/MilanPavel/golem/pull/1874)) ([#1877](https://github.com/MilanPavel/golem/pull/1877))
+- **web:** the workflow editor, with outline, code, selected step, check and save ([#1868](https://github.com/MilanPavel/golem/pull/1868)) ([#1875](https://github.com/MilanPavel/golem/pull/1875))
+- **daemon:** rows of a local source stay with local models ([#1865](https://github.com/MilanPavel/golem/pull/1865)) ([#1876](https://github.com/MilanPavel/golem/pull/1876))
+- **daemon:** file sources — inspect, add and watch ([#1879](https://github.com/MilanPavel/golem/pull/1879)) ([#1880](https://github.com/MilanPavel/golem/pull/1880))
+- **web:** ask golem for a workflow change, shown as a proposal to accept ([#1881](https://github.com/MilanPavel/golem/pull/1881)) ([#1884](https://github.com/MilanPavel/golem/pull/1884))
+
+### Fixes
+
+- **tui:** the Measure run view uses the given time, so its test does not depend on the date ([#1776](https://github.com/MilanPavel/golem/pull/1776))
+- **ci:** smoke-dist allows 2 s, as slow CI Macs take 1.9 s for the same build ([#1779](https://github.com/MilanPavel/golem/pull/1779))
+- **models:** Hugging Face sizes keep the suffix after the quant (B.66) ([#1794](https://github.com/MilanPavel/golem/pull/1794))
+- **daemon:** a run at the model-call limit wraps up and answers ([#1804](https://github.com/MilanPavel/golem/pull/1804)) ([#1809](https://github.com/MilanPavel/golem/pull/1809))
+- **daemon:** the lead waits for each worker's helper.ended before reading its line ([#1832](https://github.com/MilanPavel/golem/pull/1832))
+- **daemon:** live use-case runs start, read profiles, and stay cloud-only ([#1852](https://github.com/MilanPavel/golem/pull/1852))
+- **daemon:** keep the prefix stable across a delegate wait ([#1855](https://github.com/MilanPavel/golem/pull/1855))
+- **daemon:** tell the lead its workers' changes wait in their copies ([#1862](https://github.com/MilanPavel/golem/pull/1862))
+- **daemon:** free a helper's slot after helper.ended, and local-only live needs Ollama ([#1870](https://github.com/MilanPavel/golem/pull/1870))
+- **daemon:** free a helper's slot even when storing helper.ended fails ([#1873](https://github.com/MilanPavel/golem/pull/1873))
+
+### Docs
+
+- ADR-062 and design doc for workflows ([#1767](https://github.com/MilanPavel/golem/pull/1767))
+- a guide page and an example workflow ([#1763](https://github.com/MilanPavel/golem/pull/1763)) ([#1775](https://github.com/MilanPavel/golem/pull/1775))
+- the helpers guide, Measure page and helpers architecture chapter ([#1843](https://github.com/MilanPavel/golem/pull/1843))
+- accept ADR-059 and align helper docs with the code ([#1846](https://github.com/MilanPavel/golem/pull/1846))
+
 ## [0.20.0] - 2026-11-24
 
 ### Features
