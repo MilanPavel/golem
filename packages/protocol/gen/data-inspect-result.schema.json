@@ -138,6 +138,22 @@
       "title": "Kind",
       "type": "string"
     },
+    "needs_extension": {
+      "anyOf": [
+        {
+          "enum": [
+            "excel",
+            "sqlite"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Needs Extension"
+    },
     "notes": {
       "items": {
         "type": "string"

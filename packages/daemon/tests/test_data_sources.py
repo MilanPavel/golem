@@ -314,7 +314,7 @@ async def test_data_sources_lists_one_line_each(make: Make, paths: GolemPaths) -
     result = await DATA_SOURCES.call({}, _ctx(make()))
     assert result.output.splitlines() == [
         "golem  builtin · 5 tables · 6 rows · rows open",
-        "shop  files · 1 table · 3 rows · rows local",
+        "shop  files · 1 table · 1 file · 3 rows · rows local",
     ]
 
 
@@ -506,4 +506,4 @@ async def test_the_section_fills_in_counts_after_the_first_call(
         if not sources._warming:  # pyright: ignore[reportPrivateUsage]
             break
     second = section(context)
-    assert second is not None and "- shop  1 table · 3 rows · rows local" in second
+    assert second is not None and "- shop  1 table · 1 file · 3 rows · rows local" in second

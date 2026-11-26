@@ -4661,6 +4661,7 @@ public struct DataAddResultSource: Codable {
     public let kind: KindEnum
     public let location: String
     public let name: String
+    public let needsExtension: NeedsExtensionEnum?
     public let notesPath: String?
     public let privacy: SuggestedPrivacyEnum
     public let privacyReason: String?
@@ -4676,6 +4677,7 @@ public struct DataAddResultSource: Codable {
         case kind = "kind"
         case location = "location"
         case name = "name"
+        case needsExtension = "needs_extension"
         case notesPath = "notes_path"
         case privacy = "privacy"
         case privacyReason = "privacy_reason"
@@ -4687,11 +4689,12 @@ public struct DataAddResultSource: Codable {
         case watch = "watch"
     }
 
-    public init(error: String?, kind: KindEnum, location: String, name: String, notesPath: String?, privacy: SuggestedPrivacyEnum, privacyReason: String?, project: String?, rows: Int?, scope: SourceScope, status: SourceStatus, tables: Int?, watch: Bool?) {
+    public init(error: String?, kind: KindEnum, location: String, name: String, needsExtension: NeedsExtensionEnum?, notesPath: String?, privacy: SuggestedPrivacyEnum, privacyReason: String?, project: String?, rows: Int?, scope: SourceScope, status: SourceStatus, tables: Int?, watch: Bool?) {
         self.error = error
         self.kind = kind
         self.location = location
         self.name = name
+        self.needsExtension = needsExtension
         self.notesPath = notesPath
         self.privacy = privacy
         self.privacyReason = privacyReason
@@ -4702,6 +4705,11 @@ public struct DataAddResultSource: Codable {
         self.tables = tables
         self.watch = watch
     }
+}
+
+public enum NeedsExtensionEnum: String, Codable {
+    case excel = "excel"
+    case sqlite = "sqlite"
 }
 
 public enum SourceScope: String, Codable {
@@ -4960,6 +4968,7 @@ public struct DataDescribeResultSource: Codable {
     public let kind: KindEnum
     public let location: String
     public let name: String
+    public let needsExtension: NeedsExtensionEnum?
     public let notesPath: String?
     public let privacy: SuggestedPrivacyEnum
     public let privacyReason: String?
@@ -4975,6 +4984,7 @@ public struct DataDescribeResultSource: Codable {
         case kind = "kind"
         case location = "location"
         case name = "name"
+        case needsExtension = "needs_extension"
         case notesPath = "notes_path"
         case privacy = "privacy"
         case privacyReason = "privacy_reason"
@@ -4986,11 +4996,12 @@ public struct DataDescribeResultSource: Codable {
         case watch = "watch"
     }
 
-    public init(error: String?, kind: KindEnum, location: String, name: String, notesPath: String?, privacy: SuggestedPrivacyEnum, privacyReason: String?, project: String?, rows: Int?, scope: SourceScope, status: SourceStatus, tables: Int?, watch: Bool?) {
+    public init(error: String?, kind: KindEnum, location: String, name: String, needsExtension: NeedsExtensionEnum?, notesPath: String?, privacy: SuggestedPrivacyEnum, privacyReason: String?, project: String?, rows: Int?, scope: SourceScope, status: SourceStatus, tables: Int?, watch: Bool?) {
         self.error = error
         self.kind = kind
         self.location = location
         self.name = name
+        self.needsExtension = needsExtension
         self.notesPath = notesPath
         self.privacy = privacy
         self.privacyReason = privacyReason
@@ -5096,6 +5107,28 @@ public struct DataExportResult: Codable {
     }
 }
 
+/// ``data.extension.install``. Download a DuckDB extension once, into golem's folder.
+// MARK: - DataExtensionInstallParams
+public struct DataExtensionInstallParams: Codable {
+    public let name: NeedsExtensionEnum
+
+    public enum CodingKeys: String, CodingKey {
+        case name = "name"
+    }
+
+    public init(name: NeedsExtensionEnum) {
+        self.name = name
+    }
+}
+
+/// Empty.
+// MARK: - DataExtensionInstallResult
+public struct DataExtensionInstallResult: Codable {
+
+    public init() {
+    }
+}
+
 /// ``data.inspect``. Look at a location before it is added.
 // MARK: - DataInspectParams
 public struct DataInspectParams: Codable {
@@ -5118,6 +5151,7 @@ public struct DataInspectParams: Codable {
 public struct DataInspectResult: Codable {
     public let files: Int?
     public let kind: KindEnum
+    public let needsExtension: NeedsExtensionEnum?
     public let notes: [String]?
     public let privacyReason: String?
     public let sample: [String: [[Row]]]
@@ -5128,6 +5162,7 @@ public struct DataInspectResult: Codable {
     public enum CodingKeys: String, CodingKey {
         case files = "files"
         case kind = "kind"
+        case needsExtension = "needs_extension"
         case notes = "notes"
         case privacyReason = "privacy_reason"
         case sample = "sample"
@@ -5136,9 +5171,10 @@ public struct DataInspectResult: Codable {
         case tables = "tables"
     }
 
-    public init(files: Int?, kind: KindEnum, notes: [String]?, privacyReason: String?, sample: [String: [[Row]]], suggestedName: String, suggestedPrivacy: SuggestedPrivacyEnum, tables: [DataInspectResultTable]) {
+    public init(files: Int?, kind: KindEnum, needsExtension: NeedsExtensionEnum?, notes: [String]?, privacyReason: String?, sample: [String: [[Row]]], suggestedName: String, suggestedPrivacy: SuggestedPrivacyEnum, tables: [DataInspectResultTable]) {
         self.files = files
         self.kind = kind
+        self.needsExtension = needsExtension
         self.notes = notes
         self.privacyReason = privacyReason
         self.sample = sample
@@ -5232,6 +5268,7 @@ public struct SourceElement: Codable {
     public let kind: KindEnum
     public let location: String
     public let name: String
+    public let needsExtension: NeedsExtensionEnum?
     public let notesPath: String?
     public let privacy: SuggestedPrivacyEnum
     public let privacyReason: String?
@@ -5247,6 +5284,7 @@ public struct SourceElement: Codable {
         case kind = "kind"
         case location = "location"
         case name = "name"
+        case needsExtension = "needs_extension"
         case notesPath = "notes_path"
         case privacy = "privacy"
         case privacyReason = "privacy_reason"
@@ -5258,11 +5296,12 @@ public struct SourceElement: Codable {
         case watch = "watch"
     }
 
-    public init(error: String?, kind: KindEnum, location: String, name: String, notesPath: String?, privacy: SuggestedPrivacyEnum, privacyReason: String?, project: String?, rows: Int?, scope: SourceScope, status: SourceStatus, tables: Int?, watch: Bool?) {
+    public init(error: String?, kind: KindEnum, location: String, name: String, needsExtension: NeedsExtensionEnum?, notesPath: String?, privacy: SuggestedPrivacyEnum, privacyReason: String?, project: String?, rows: Int?, scope: SourceScope, status: SourceStatus, tables: Int?, watch: Bool?) {
         self.error = error
         self.kind = kind
         self.location = location
         self.name = name
+        self.needsExtension = needsExtension
         self.notesPath = notesPath
         self.privacy = privacy
         self.privacyReason = privacyReason
@@ -5633,6 +5672,7 @@ public struct DataSource: Codable {
     public let kind: KindEnum
     public let location: String
     public let name: String
+    public let needsExtension: NeedsExtensionEnum?
     public let notesPath: String?
     public let privacy: SuggestedPrivacyEnum
     public let privacyReason: String?
@@ -5648,6 +5688,7 @@ public struct DataSource: Codable {
         case kind = "kind"
         case location = "location"
         case name = "name"
+        case needsExtension = "needs_extension"
         case notesPath = "notes_path"
         case privacy = "privacy"
         case privacyReason = "privacy_reason"
@@ -5659,11 +5700,12 @@ public struct DataSource: Codable {
         case watch = "watch"
     }
 
-    public init(error: String?, kind: KindEnum, location: String, name: String, notesPath: String?, privacy: SuggestedPrivacyEnum, privacyReason: String?, project: String?, rows: Int?, scope: SourceScope, status: SourceStatus, tables: Int?, watch: Bool?) {
+    public init(error: String?, kind: KindEnum, location: String, name: String, needsExtension: NeedsExtensionEnum?, notesPath: String?, privacy: SuggestedPrivacyEnum, privacyReason: String?, project: String?, rows: Int?, scope: SourceScope, status: SourceStatus, tables: Int?, watch: Bool?) {
         self.error = error
         self.kind = kind
         self.location = location
         self.name = name
+        self.needsExtension = needsExtension
         self.notesPath = notesPath
         self.privacy = privacy
         self.privacyReason = privacyReason
@@ -5775,6 +5817,7 @@ public struct DataUpdateResultSource: Codable {
     public let kind: KindEnum
     public let location: String
     public let name: String
+    public let needsExtension: NeedsExtensionEnum?
     public let notesPath: String?
     public let privacy: SuggestedPrivacyEnum
     public let privacyReason: String?
@@ -5790,6 +5833,7 @@ public struct DataUpdateResultSource: Codable {
         case kind = "kind"
         case location = "location"
         case name = "name"
+        case needsExtension = "needs_extension"
         case notesPath = "notes_path"
         case privacy = "privacy"
         case privacyReason = "privacy_reason"
@@ -5801,11 +5845,12 @@ public struct DataUpdateResultSource: Codable {
         case watch = "watch"
     }
 
-    public init(error: String?, kind: KindEnum, location: String, name: String, notesPath: String?, privacy: SuggestedPrivacyEnum, privacyReason: String?, project: String?, rows: Int?, scope: SourceScope, status: SourceStatus, tables: Int?, watch: Bool?) {
+    public init(error: String?, kind: KindEnum, location: String, name: String, needsExtension: NeedsExtensionEnum?, notesPath: String?, privacy: SuggestedPrivacyEnum, privacyReason: String?, project: String?, rows: Int?, scope: SourceScope, status: SourceStatus, tables: Int?, watch: Bool?) {
         self.error = error
         self.kind = kind
         self.location = location
         self.name = name
+        self.needsExtension = needsExtension
         self.notesPath = notesPath
         self.privacy = privacy
         self.privacyReason = privacyReason
@@ -13272,7 +13317,7 @@ public struct MCPTestResult: Codable {
     public let httpStatus: Int?
     public let ok: Bool
     public let protocolVersion: String?
-    public let runtime: Name?
+    public let runtime: RuntimeEnum?
     public let serverInfo: MCPImplementationClass?
     public let stderrTail: [String]?
     public let steps: [StepElement]
@@ -13292,7 +13337,7 @@ public struct MCPTestResult: Codable {
         case tools = "tools"
     }
 
-    public init(hint: String?, httpStatus: Int?, ok: Bool, protocolVersion: String?, runtime: Name?, serverInfo: MCPImplementationClass?, stderrTail: [String]?, steps: [StepElement], testID: String, tools: [MCPTestResultTool]?) {
+    public init(hint: String?, httpStatus: Int?, ok: Bool, protocolVersion: String?, runtime: RuntimeEnum?, serverInfo: MCPImplementationClass?, stderrTail: [String]?, steps: [StepElement], testID: String, tools: [MCPTestResultTool]?) {
         self.hint = hint
         self.httpStatus = httpStatus
         self.ok = ok
@@ -13306,7 +13351,7 @@ public struct MCPTestResult: Codable {
     }
 }
 
-public enum Name: String, Codable {
+public enum RuntimeEnum: String, Codable {
     case node = "node"
     case uv = "uv"
 }
@@ -24380,13 +24425,13 @@ public enum RunStartedEventType: String, Codable {
 /// ``runtime.install_cancel``. Stop a running install.
 // MARK: - RuntimeInstallCancelParams
 public struct RuntimeInstallCancelParams: Codable {
-    public let name: Name
+    public let name: RuntimeEnum
 
     public enum CodingKeys: String, CodingKey {
         case name = "name"
     }
 
-    public init(name: Name) {
+    public init(name: RuntimeEnum) {
         self.name = name
     }
 }
@@ -24395,14 +24440,14 @@ public struct RuntimeInstallCancelParams: Codable {
 // MARK: - RuntimeInstallCancelResult
 public struct RuntimeInstallCancelResult: Codable {
     public let cancelled: Bool
-    public let name: Name
+    public let name: RuntimeEnum
 
     public enum CodingKeys: String, CodingKey {
         case cancelled = "cancelled"
         case name = "name"
     }
 
-    public init(cancelled: Bool, name: Name) {
+    public init(cancelled: Bool, name: RuntimeEnum) {
         self.cancelled = cancelled
         self.name = name
     }
@@ -24436,7 +24481,7 @@ public enum RuntimeInstallDoneNotificationMethod: String, Codable {
 // MARK: - RuntimeInstallDoneNotificationParams
 public struct RuntimeInstallDoneNotificationParams: Codable {
     public let error: String?
-    public let name: Name
+    public let name: RuntimeEnum
     public let ok: Bool
 
     public enum CodingKeys: String, CodingKey {
@@ -24445,7 +24490,7 @@ public struct RuntimeInstallDoneNotificationParams: Codable {
         case ok = "ok"
     }
 
-    public init(error: String?, name: Name, ok: Bool) {
+    public init(error: String?, name: RuntimeEnum, ok: Bool) {
         self.error = error
         self.name = name
         self.ok = ok
@@ -24456,7 +24501,7 @@ public struct RuntimeInstallDoneNotificationParams: Codable {
 // MARK: - RuntimeInstallDone
 public struct RuntimeInstallDone: Codable {
     public let error: String?
-    public let name: Name
+    public let name: RuntimeEnum
     public let ok: Bool
 
     public enum CodingKeys: String, CodingKey {
@@ -24465,7 +24510,7 @@ public struct RuntimeInstallDone: Codable {
         case ok = "ok"
     }
 
-    public init(error: String?, name: Name, ok: Bool) {
+    public init(error: String?, name: RuntimeEnum, ok: Bool) {
         self.error = error
         self.name = name
         self.ok = ok
@@ -24499,7 +24544,7 @@ public enum RuntimeInstallOutputNotificationMethod: String, Codable {
 /// Output from ``brew install`` as it came, carriage returns included.
 // MARK: - RuntimeInstallOutputNotificationParams
 public struct RuntimeInstallOutputNotificationParams: Codable {
-    public let name: Name
+    public let name: RuntimeEnum
     public let text: String
 
     public enum CodingKeys: String, CodingKey {
@@ -24507,7 +24552,7 @@ public struct RuntimeInstallOutputNotificationParams: Codable {
         case text = "text"
     }
 
-    public init(name: Name, text: String) {
+    public init(name: RuntimeEnum, text: String) {
         self.name = name
         self.text = text
     }
@@ -24516,7 +24561,7 @@ public struct RuntimeInstallOutputNotificationParams: Codable {
 /// Output from ``brew install`` as it came, carriage returns included.
 // MARK: - RuntimeInstallOutput
 public struct RuntimeInstallOutput: Codable {
-    public let name: Name
+    public let name: RuntimeEnum
     public let text: String
 
     public enum CodingKeys: String, CodingKey {
@@ -24524,7 +24569,7 @@ public struct RuntimeInstallOutput: Codable {
         case text = "text"
     }
 
-    public init(name: Name, text: String) {
+    public init(name: RuntimeEnum, text: String) {
         self.name = name
         self.text = text
     }
@@ -24533,13 +24578,13 @@ public struct RuntimeInstallOutput: Codable {
 /// ``runtime.install``. Install Node or uv with Homebrew. Output: ``runtime.install.output``.
 // MARK: - RuntimeInstallParams
 public struct RuntimeInstallParams: Codable {
-    public let name: Name
+    public let name: RuntimeEnum
 
     public enum CodingKeys: String, CodingKey {
         case name = "name"
     }
 
-    public init(name: Name) {
+    public init(name: RuntimeEnum) {
         self.name = name
     }
 }
@@ -24547,7 +24592,7 @@ public struct RuntimeInstallParams: Codable {
 /// ``started`` is false when that install was already running.
 // MARK: - RuntimeInstallResult
 public struct RuntimeInstallResult: Codable {
-    public let name: Name
+    public let name: RuntimeEnum
     public let started: Bool
 
     public enum CodingKeys: String, CodingKey {
@@ -24555,7 +24600,7 @@ public struct RuntimeInstallResult: Codable {
         case started = "started"
     }
 
-    public init(name: Name, started: Bool) {
+    public init(name: RuntimeEnum, started: Bool) {
         self.name = name
         self.started = started
     }

@@ -10,6 +10,7 @@ export type Error = string | null;
 export type Kind = 'builtin' | 'files' | 'sqlite' | 'duckdb' | 'postgres' | 'mysql' | 'url';
 export type Location = string;
 export type Name1 = string;
+export type NeedsExtension = ('excel' | 'sqlite') | null;
 export type NotesPath = string | null;
 export type Privacy = 'open' | 'local' | 'schema';
 export type PrivacyReason = string | null;
@@ -66,6 +67,7 @@ export interface DataSource {
   kind: Kind;
   location: Location;
   name: Name1;
+  needs_extension?: NeedsExtension;
   notes_path?: NotesPath;
   privacy: Privacy;
   privacy_reason?: PrivacyReason;

@@ -10,7 +10,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from golem.data.sources import DataSources, SourceInfo
-from golem.data.tools import count, privacy_text
+from golem.data.tools import privacy_text, size_parts
 from golem.graphs.prompt import PromptContext, Section
 
 SECTION = "data_sources"
@@ -25,7 +25,7 @@ def line(info: SourceInfo) -> str:
     """``- bank  3 tables · 18 302 rows · rows local``."""
     parts: list[str] = []
     if info.tables is not None:
-        parts += [count(len(info.tables), "table"), count(info.rows, "row")]
+        parts += size_parts(info)
     elif info.description:
         parts.append(info.description)
     parts.append(privacy_text(info.privacy))

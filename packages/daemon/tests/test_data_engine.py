@@ -141,7 +141,7 @@ def test_the_guard_runs_before_the_engine(folder: Path) -> None:
 
 
 def test_no_files_and_a_missing_folder_are_plain_errors(tmp_path: Path) -> None:
-    with pytest.raises(DataError, match="No CSV, Parquet or JSON files"):
+    with pytest.raises(DataError, match="No CSV, TSV, Parquet, JSON or Excel files"):
         _source(tmp_path)
     with pytest.raises(DataError, match="There is no folder"):
         _source(tmp_path / "gone" / "*.csv")
@@ -259,7 +259,7 @@ def _sqlite_file(path: Path) -> None:
 def test_sqlite_without_the_extension_says_what_to_do(tmp_path: Path) -> None:
     db = tmp_path / "a.sqlite"
     _sqlite_file(db)
-    with pytest.raises(DataError, match="one-time download of DuckDB's sqlite extension"):
+    with pytest.raises(DataError, match="one-time download"):
         _source(db, kind="sqlite", limits=Limits(extension_dir=tmp_path / "no-extensions"))
 
 

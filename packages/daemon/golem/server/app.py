@@ -118,12 +118,14 @@ from golem.workflows.service import WorkflowService
 from golem.workflows.tools import WorkflowTools
 from golem_protocol.commands import (
     AgentRegistryChanged,
+    DataChanged,
     KeychainWait,
     MemoryChanged,
     ModelServerStatus,
 )
 from golem_protocol.rpc import (
     AgentRegistryChangedNotification,
+    DataChangedNotification,
     DeviceChangedNotification,
     KeychainWaitNotification,
     MemoryChangedNotification,
@@ -345,6 +347,11 @@ class DaemonApp:
                 self.state.tools = default_registry(mcp, policy.web())
                 data = DataSources(
                     DataWorker(settings.data, self.paths), self.paths, trusted=policy.trusted
+                )
+                data.changed = lambda name, reason: self._broadcast(
+                    DataChangedNotification(
+                        params=DataChanged(source=name, reason=reason)  # type: ignore[arg-type]
+                    )
                 )
                 self.state.data = data
                 self.state.artifacts = ArtifactStore(database)

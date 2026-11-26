@@ -31,6 +31,14 @@ class McpExistsError(ValueError):
     """The file already has an ``[mcp.<name>]`` table."""
 
 
+class DataTableError(ValueError):
+    """The file has no ``[data.<name>]`` table."""
+
+
+class DataExistsError(ValueError):
+    """The file already has a ``[data.<name>]`` table."""
+
+
 class RoutineTableError(ValueError):
     """The file has no ``[[routine]]`` with this name."""
 
@@ -212,6 +220,66 @@ def _mcp_table(table: dict[str, Any]) -> Table:
         else:
             added[key] = value
     return added
+
+
+def _data_sources(document: TOMLDocument, *, create: bool) -> Table | None:
+    found = cast(object, document.get("data"))  # pyright: ignore[reportUnknownMemberType]
+    if isinstance(found, Table):
+        return found
+    if not create:
+        return None
+    created = tomlkit.table(is_super_table=True)
+    document["data"] = created
+    return created
+
+
+def has_data_source(config_file: Path, name: str) -> bool:
+    """True when the file has a ``[data.<name>]`` table."""
+    sources = _data_sources(_read(config_file), create=False)
+    return sources is not None and isinstance(sources.get(name), Table)  # pyright: ignore[reportUnknownMemberType]
+
+
+def add_data_source(config_file: Path, name: str, table: dict[str, Any]) -> None:
+    """Add ``[data.<name>]`` with the keys of ``table``. Creates the file when it is missing."""
+    document = _read(config_file)
+    sources = _data_sources(document, create=True)
+    assert sources is not None
+    if name in sources:
+        raise DataExistsError(f"{config_file} already has [data.{name}]")
+    sources[name] = _mcp_table(table)
+    _write(config_file, document)
+
+
+def update_data_source(config_file: Path, name: str, changes: dict[str, Any]) -> None:
+    """Set keys of ``[data.<name>]``; a value of None removes the key. Comments stay."""
+    document = _read(config_file)
+    sources = _data_sources(document, create=False)
+    table = cast(object, sources.get(name)) if sources is not None else None  # pyright: ignore[reportUnknownMemberType]
+    if not isinstance(table, Table):
+        raise DataTableError(f"{config_file} has no [data.{name}]")
+    for key, value in changes.items():
+        if value is None:
+            if key in table:
+                del table[key]
+        elif isinstance(value, dict):
+            table[key] = _mcp_table({"x": value})["x"]
+        else:
+            table[key] = value
+    _write(config_file, document)
+
+
+def remove_data_source(config_file: Path, name: str) -> None:
+    """Delete ``[data.<name>]``, and ``[data]`` itself once it holds nothing else."""
+    document = _read(config_file)
+    sources = _data_sources(document, create=False)
+    if sources is None or not isinstance(sources.get(name), Table):  # pyright: ignore[reportUnknownMemberType]
+        raise DataTableError(f"{config_file} has no [data.{name}]")
+    del sources[name]
+    if len(sources) == 0:
+        del document["data"]
+        text = tomlkit.dumps(document).rstrip("\n")
+        document = tomlkit.parse(text + "\n" if text else "")
+    _write(config_file, document)
 
 
 def has_mcp_server(config_file: Path, name: str) -> bool:
