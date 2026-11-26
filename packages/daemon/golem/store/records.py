@@ -119,6 +119,16 @@ class RunRecord:
     """Why a ``waiting`` run waits, ``team`` for a lead parked for its helpers. None: for you."""
 
 
+@dataclass(frozen=True, slots=True)
+class CopyOwner:
+    """A helper session that names a copy, and whether its lead is still open."""
+
+    helper_id: str
+    path: str
+    lead_cwd: str | None
+    lead_open: bool
+
+
 class SessionRecords:
     def __init__(self, database: Database) -> None:
         self._database = database
@@ -168,6 +178,33 @@ class SessionRecords:
             (session_id,),
         )
         return None if row is None else (str(row["copy_path"]), str(row["copy_baseline"] or ""))
+
+    async def copies_of_helpers(self, lead_id: str) -> list[tuple[str, str]]:
+        """``(helper id, copy path)`` of every helper of ``lead_id`` that still has a copy."""
+        rows = await self._database.fetch_all(
+            "SELECT session_id, copy_path FROM sessions"
+            " WHERE parent_session_id = ? AND copy_path IS NOT NULL ORDER BY session_id",
+            (lead_id,),
+        )
+        return [(str(row["session_id"]), str(row["copy_path"])) for row in rows]
+
+    async def all_copies(self) -> list[CopyOwner]:
+        """Every session record that names a copy, with the state of its lead."""
+        rows = await self._database.fetch_all(
+            "SELECT s.session_id, s.copy_path, s.parent_session_id AS lead_id,"
+            " p.cwd AS lead_cwd, p.session_id AS lead_found, p.closed_at AS lead_closed_at"
+            " FROM sessions s LEFT JOIN sessions p ON p.session_id = s.parent_session_id"
+            " WHERE s.copy_path IS NOT NULL ORDER BY s.session_id"
+        )
+        return [
+            CopyOwner(
+                helper_id=str(row["session_id"]),
+                path=str(row["copy_path"]),
+                lead_cwd=None if row["lead_cwd"] is None else str(row["lead_cwd"]),
+                lead_open=row["lead_found"] is not None and row["lead_closed_at"] is None,
+            )
+            for row in rows
+        ]
 
     async def helper(
         self, parent_session_id: str, call_id: str, index: int
