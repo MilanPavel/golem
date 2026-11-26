@@ -1,0 +1,48 @@
+{
+  "additionalProperties": false,
+  "description": "``workflow.edit_step``. Set one argument of one step in ``code`` (the text the editor holds).\n\n``name`` is the argument (``type``, ``brief``, ``model``, ``budget``, ``key``, ...) and\n``value`` its new literal. Only that argument's source span is replaced, or ``name=value`` is\nadded when the call lacks it. Refused for a code step, an argument the code computes and a\nvalue that is not valid for it.",
+  "properties": {
+    "code": {
+      "title": "Code",
+      "type": "string"
+    },
+    "id": {
+      "minLength": 1,
+      "title": "Id",
+      "type": "string"
+    },
+    "name": {
+      "minLength": 1,
+      "title": "Name",
+      "type": "string"
+    },
+    "step_id": {
+      "minLength": 1,
+      "title": "Step Id",
+      "type": "string"
+    },
+    "value": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "number"
+        },
+        {
+          "type": "boolean"
+        }
+      ],
+      "title": "Value"
+    }
+  },
+  "required": [
+    "id",
+    "code",
+    "step_id",
+    "name",
+    "value"
+  ],
+  "title": "WorkflowEditStepParams",
+  "type": "object"
+}

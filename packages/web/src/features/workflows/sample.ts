@@ -1,5 +1,5 @@
 import type { RunInfo } from "../../store/runs.ts";
-import type { WorkflowEntryInfo, WorkflowGetResult, WorkflowListResult, WorkflowOutlineStep, WorkflowProblem, WorkflowProposeResult } from "../../store/workflows.ts";
+import type { WorkflowEntryInfo, WorkflowGetResult, WorkflowListResult, WorkflowOutlineStep, WorkflowProblem, WorkflowProposeResult, WorkflowStepArg } from "../../store/workflows.ts";
 
 /** "Now" for the samples: a Tuesday evening. Run times are placed relative to it, so Today and Earlier hold in any time zone. */
 export const WORKFLOWS_NOW = new Date(2026, 10, 17, 18, 30).getTime();
@@ -193,3 +193,53 @@ export const SAMPLE_ROUTINE_WORKFLOW_RUN: RunInfo = run("w_routine", {
   ended_at: at(0, 9, 1, 8),
   summary: "12 pull requests",
 });
+
+/** A workflow whose steps are agents: the sample of the step fields. */
+export const SAMPLE_UPGRADE: WorkflowEntryInfo = {
+  id: "/Users/you/.golem/workflows/upgrade.py::upgrade",
+  name: "upgrade",
+  path: "/Users/you/.golem/workflows/upgrade.py",
+  project: null,
+  state: "ok",
+  trigger: { kind: "manual" },
+  inputs: [{ name: "repo", type: "str" }],
+  description: "Upgrade one package, then have it checked.",
+};
+
+export const SAMPLE_UPGRADE_CODE = `from golem.workflow import Run, manual, workflow
+
+
+@workflow(trigger=manual(), inputs={"repo": str})
+async def upgrade(run: Run, repo: str) -> str:
+    outdated = list_outdated(repo)
+    fix = await run.agent("worker", brief="Upgrade httpx. Fix what breaks.", model="cheapest", budget="$0.50")
+    return await run.agent("reviewer", brief=f"Check {fix['answer']}")
+`;
+
+const argOn = (line: number, name: string, source: string, value?: string): WorkflowStepArg => {
+  const col = SAMPLE_UPGRADE_CODE.split("\n")[line - 1]!.indexOf(source);
+  return { name, source, literal: value !== undefined, ...(value === undefined ? {} : { value }), line, col, end_line: line, end_col: col + source.length };
+};
+
+export const SAMPLE_UPGRADE_STEPS: WorkflowOutlineStep[] = [
+  step("code-1", "code", "outdated = list_outdated(repo)", 6, 6),
+  step("agent:worker", "agent", "worker: Upgrade httpx. Fix what breaks.", 7, 7, {
+    agent: "worker",
+    budget: "$0.50",
+    brief_line: 7,
+    budget_line: 7,
+    args: [argOn(7, "type", '"worker"', "worker"), argOn(7, "brief", '"Upgrade httpx. Fix what breaks."', "Upgrade httpx. Fix what breaks."), argOn(7, "model", '"cheapest"', "cheapest"), argOn(7, "budget", '"$0.50"', "$0.50")],
+  }),
+  step("agent:reviewer", "agent", "reviewer: Check {fix['answer']}", 8, 8, {
+    agent: "reviewer",
+    brief_line: 8,
+    args: [argOn(8, "type", '"reviewer"', "reviewer"), argOn(8, "brief", `f"Check {fix['answer']}"`)],
+    after: ["agent:worker"],
+  }),
+];
+
+/** The agent types of the sample. */
+export const SAMPLE_UPGRADE_AGENTS = ["explorer", "worker", "reviewer", "advisor"] as const;
+
+/** What `workflow.edit_step` says to a value that is not a wish. */
+export const SAMPLE_FIELD_REFUSED = { name: "model", message: "model is a wish, one of cheapest, same, stronger, local, budget, frontier; got 'gpt-9'" } as const;

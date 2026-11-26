@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { actionErrorText, folderDialogErrorText, revealErrorText } from "../../store/errors.ts";
-import { useFolderDialog, useNavigate, usePageActions, useRoutineList, useRunList, useWorkflow, useWorkflowList } from "../../store/page-context.tsx";
+import { useAgentList, useFolderDialog, useNavigate, usePageActions, useRoutineList, useRunList, useWorkflow, useWorkflowList } from "../../store/page-context.tsx";
 import { useNow } from "../sessions/use-now.ts";
 import { WorkflowDetail } from "./workflow-detail.tsx";
 import { routinesStarting, workflowRuns } from "./text.ts";
@@ -52,6 +52,7 @@ export function WorkflowScreen({ id }: { id: string }) {
   const dialog = useFolderDialog();
   const navigate = useNavigate();
   const now = useNow();
+  const agents = useAgentList(query.data?.workflow.project ?? null, query.data !== undefined);
   if (query.data === undefined) {
     return (
       <Frame>
@@ -71,6 +72,8 @@ export function WorkflowScreen({ id }: { id: string }) {
         onCheck={(text) => actions.checkWorkflow(workflow.id, text)}
         onSave={(text, base) => actions.saveWorkflow(workflow.id, text, base)}
         onPropose={(text, ask, previous) => actions.proposeWorkflow(workflow.id, text, ask, previous)}
+        onEditStep={(text, stepId, name, value) => actions.editWorkflowStep(workflow.id, text, stepId, name, value)}
+        agents={agents.data?.agents.map((agent) => agent.name)}
         runs={workflowRuns(runs.data?.runs ?? [], workflow.name)}
         routines={routinesStarting(routines.data?.routines ?? [], workflow.name)}
         now={now}

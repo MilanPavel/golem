@@ -6101,6 +6101,27 @@ class WorkflowEntryInfo(BaseModel):
     description: str = ""
 
 
+class WorkflowStepArg(BaseModel):
+    """One argument of a ``run.*`` call, with its exact place in the source.
+
+    ``line`` and ``end_line`` count from 1; ``col`` and ``end_col`` are character offsets from 0,
+    ``end_col`` just after the last character. ``literal`` is true for a plain string, number or
+    bool, or an f-string with no expressions; ``value`` is then its text. A value the code
+    computes has ``literal`` false: it is shown, and set in the code.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    name: str = Field(min_length=1)
+    source: str
+    literal: bool
+    value: str | None = None
+    line: int = Field(ge=1)
+    col: int = Field(ge=0)
+    end_line: int = Field(ge=1)
+    end_col: int = Field(ge=0)
+
+
 class WorkflowOutlineStep(BaseModel):
     """One step read from the source, without running it.
 
@@ -6126,6 +6147,8 @@ class WorkflowOutlineStep(BaseModel):
     brief_line: int | None = Field(default=None, ge=1)
     budget_line: int | None = Field(default=None, ge=1)
     after: list[str] = Field(default_factory=list[str])
+    args: list[WorkflowStepArg] = Field(default_factory=list[WorkflowStepArg])
+    """The arguments of the step's ``run.*`` call, in source order. A code step has none."""
 
 
 class WorkflowListParams(BaseModel):
@@ -6230,6 +6253,35 @@ class WorkflowProposeResult(BaseModel):
     steps: list[WorkflowOutlineStep] = Field(default_factory=list[WorkflowOutlineStep])
     problems: list[WorkflowProblem] = Field(default_factory=list[WorkflowProblem])
     model: str
+
+
+class WorkflowEditStepParams(BaseModel):
+    """``workflow.edit_step``. Set one argument of one step in ``code`` (the text the editor holds).
+
+    ``name`` is the argument (``type``, ``brief``, ``model``, ``budget``, ``key``, ...) and
+    ``value`` its new literal. Only that argument's source span is replaced, or ``name=value`` is
+    added when the call lacks it. Refused for a code step, an argument the code computes and a
+    value that is not valid for it.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    id: str = Field(min_length=1)
+    code: str
+    step_id: str = Field(min_length=1)
+    name: str = Field(min_length=1)
+    value: str | float | bool
+
+
+class WorkflowEditStepResult(BaseModel):
+    """The new text, its outline and its problems. Nothing is written; the editor holds the
+    text as an unsaved edit."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    code: str
+    steps: list[WorkflowOutlineStep] = Field(default_factory=list[WorkflowOutlineStep])
+    problems: list[WorkflowProblem] = Field(default_factory=list[WorkflowProblem])
 
 
 class WorkflowSaveParams(BaseModel):
@@ -7316,6 +7368,8 @@ __all__ = [
     "WishResolution",
     "WorkflowCancelParams",
     "WorkflowCancelResult",
+    "WorkflowEditStepParams",
+    "WorkflowEditStepResult",
     "WorkflowEntryInfo",
     "WorkflowGetParams",
     "WorkflowGetResult",
@@ -7341,6 +7395,7 @@ __all__ = [
     "WorkflowState",
     "WorkflowStatusParams",
     "WorkflowStatusResult",
+    "WorkflowStepArg",
     "WorkflowStepEvent",
     "WorkflowStepInfo",
     "WorkflowStepKind",

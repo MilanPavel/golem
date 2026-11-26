@@ -97,6 +97,7 @@ import type { WorkflowReviewAnswerResult } from "../../protocol/gen/workflow-rev
 import type { WorkflowCheckResult } from "../../protocol/gen/workflow-check-result.ts";
 import type { WorkflowProposeResult } from "../../protocol/gen/workflow-propose-result.ts";
 import type { WorkflowGetResult } from "../../protocol/gen/workflow-get-result.ts";
+import type { WorkflowEditStepResult } from "../../protocol/gen/workflow-edit-step-result.ts";
 import type { WorkflowSaveResult } from "../../protocol/gen/workflow-save-result.ts";
 import type { WorkflowListResult } from "../../protocol/gen/workflow-list-result.ts";
 import type { WorkflowRunEvent } from "../../protocol/gen/workflow-run-event.ts";
@@ -378,6 +379,10 @@ export function isWorkflowCheckResult(value: unknown): value is WorkflowCheckRes
 
 export function isWorkflowProposeResult(value: unknown): value is WorkflowProposeResult {
   return isRecord(value) && typeof value["code"] === "string" && typeof value["note"] === "string" && Array.isArray(value["steps"]) && Array.isArray(value["problems"]);
+}
+
+export function isWorkflowEditStepResult(value: unknown): value is WorkflowEditStepResult {
+  return isRecord(value) && typeof value["code"] === "string" && Array.isArray(value["problems"]) && Array.isArray(value["steps"]);
 }
 
 export function isWorkflowSaveResult(value: unknown): value is WorkflowSaveResult {

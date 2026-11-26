@@ -107,6 +107,7 @@ import type { WorkflowReviewAnswerResult } from "../../protocol/gen/workflow-rev
 import type { WorkflowCheckResult } from "../../protocol/gen/workflow-check-result.ts";
 import type { WorkflowProposeResult } from "../../protocol/gen/workflow-propose-result.ts";
 import type { WorkflowGetResult } from "../../protocol/gen/workflow-get-result.ts";
+import type { WorkflowEditStepResult } from "../../protocol/gen/workflow-edit-step-result.ts";
 import type { WorkflowSaveResult } from "../../protocol/gen/workflow-save-result.ts";
 import type { WorkflowListResult } from "../../protocol/gen/workflow-list-result.ts";
 import type { WorkflowRunEvent } from "../../protocol/gen/workflow-run-event.ts";
@@ -341,6 +342,7 @@ import {
   isWorkflowCheckResult,
   isWorkflowProposeResult,
   isWorkflowGetResult,
+  isWorkflowEditStepResult,
   isWorkflowSaveResult,
   isWorkflowListResult,
   isWorkflowRunEvent,
@@ -897,6 +899,8 @@ export interface GolemClient {
   getWorkflow(id: string): Promise<WorkflowGetResult>;
   /** `workflow.check`: the problems of the saved file, or of `code` when given (with the outline of that text). It imports nothing and asks no model. */
   checkWorkflow(id: string, code?: string): Promise<WorkflowCheckResult>;
+  /** `workflow.edit_step`: set one argument of one step in `code`. Resolves to the new text, its outline and problems; nothing is written. Refused for a code step, a computed argument or an invalid value. */
+  editWorkflowStep(id: string, code: string, stepId: string, name: string, value: string | number | boolean): Promise<WorkflowEditStepResult>;
   /** `workflow.save`: write `code` as the workflow's file. Refused for an error problem, a file that changed since `baseHash`, or an untrusted folder. */
   saveWorkflow(id: string, code: string, baseHash: string): Promise<WorkflowSaveResult>;
   /** Asks golem for a change to `code` (workflow.propose): one model call, checked, never saved. `previous` is the last proposal and its note, for a refine. Rejects with the daemon's reason, such as no model for that folder. */
@@ -3118,6 +3122,14 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       const result = await call("workflow.propose", params);
       if (!isWorkflowProposeResult(result)) {
         throw new Error("invalid workflow.propose result");
+      }
+      return result;
+    },
+    async editWorkflowStep(id: string, code: string, stepId: string, name: string, value: string | number | boolean): Promise<WorkflowEditStepResult> {
+      await ready;
+      const result = await call("workflow.edit_step", { id, code, step_id: stepId, name, value });
+      if (!isWorkflowEditStepResult(result)) {
+        throw new Error("invalid workflow.edit_step result");
       }
       return result;
     },

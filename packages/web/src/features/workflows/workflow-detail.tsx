@@ -1,6 +1,6 @@
 import { useCallback, useState, type ReactNode } from "react";
 import { nextRunText, routineState, triggerWords } from "@golem/view";
-import { routineNewPath, routinePath } from "../../store/router.ts";
+import { routineNewPath, routinePath, settingsPath } from "../../store/router.ts";
 import type { RoutineInfo } from "../../store/routines.ts";
 import type { RunInfo } from "../../store/runs.ts";
 import type { WorkflowCheckResult, WorkflowEntryInfo, WorkflowOutlineStep, WorkflowSaveResult } from "../../store/workflows.ts";
@@ -29,6 +29,10 @@ export type WorkflowDetailProps = {
   codeHash?: string | null;
   /** Checks a text without writing it, for the editor. Without it the outline is not redrawn as you type. */
   onCheck?: (code: string) => Promise<WorkflowCheckResult>;
+  /** Sets one argument of one step in a text, for the fields of the selected step. Without it, the fields are only shown. */
+  onEditStep?: WorkflowEditorProps["onEditStep"];
+  /** The agent types a step may name. */
+  agents?: readonly string[];
   /** Writes the code. Rejects with the daemon's reason. Without it the code is read only. */
   onSave?: (code: string, baseHash: string) => Promise<WorkflowSaveResult>;
   /** Asks golem for a change to the code (workflow.propose). Without it, the ask box is not offered. */
@@ -150,7 +154,7 @@ function Overview({ workflow, steps }: { workflow: WorkflowEntryInfo; steps: rea
   );
 }
 
-function CodeTab({ workflow, steps, code, codeHash, onCheck, onSave, onPropose, onReveal, onDirtyChange, initialEditor }: Pick<WorkflowDetailProps, "workflow" | "steps" | "code" | "codeHash" | "onCheck" | "onSave" | "onPropose" | "onReveal" | "initialEditor"> & { onDirtyChange: (dirty: boolean) => void }) {
+function CodeTab({ workflow, steps, code, codeHash, onCheck, onSave, onPropose, onEditStep, agents, onOpenAgent, onReveal, onDirtyChange, initialEditor }: Pick<WorkflowDetailProps, "workflow" | "steps" | "code" | "codeHash" | "onCheck" | "onSave" | "onPropose" | "onEditStep" | "agents" | "onReveal" | "initialEditor"> & { onDirtyChange: (dirty: boolean) => void; onOpenAgent: (name: string) => void }) {
   if (code === null) {
     return (
       <div className="flex flex-col gap-2">
@@ -170,6 +174,9 @@ function CodeTab({ workflow, steps, code, codeHash, onCheck, onSave, onPropose, 
       onCheck={onCheck}
       onSave={onSave}
       onPropose={onPropose}
+      onEditStep={onEditStep}
+      agents={agents}
+      onOpenAgent={onOpenAgent}
       onReveal={onReveal}
       onDirtyChange={onDirtyChange}
       initial={initialEditor}
@@ -236,7 +243,7 @@ function TriggersTab({ routines, now, onNavigate }: { routines: readonly Routine
 }
 
 /** One workflow in the main area: its state, Run…, and the Overview, Code, Runs and Triggers tabs. */
-export function WorkflowDetail({ workflow, steps, code, runs, routines = [], codeHash, onCheck, onSave, onPropose, initialEditor, now, onNavigate: navigateTo, onReveal, onStart, onChooseFolder, initialRunOpen = false, initialTab = "overview" }: WorkflowDetailProps) {
+export function WorkflowDetail({ workflow, steps, code, runs, routines = [], codeHash, onCheck, onSave, onPropose, onEditStep, agents, initialEditor, now, onNavigate: navigateTo, onReveal, onStart, onChooseFolder, initialRunOpen = false, initialTab = "overview" }: WorkflowDetailProps) {
   const [tab, setTab] = useState<Tab>(initialTab);
   const [runOpen, setRunOpen] = useState(initialRunOpen);
   const [dirty, setDirty] = useState(false);
@@ -292,7 +299,7 @@ export function WorkflowDetail({ workflow, steps, code, runs, routines = [], cod
         </TabsContent>
         {/* Kept mounted, so an edit survives a look at another tab. */}
         <TabsContent value="code" forceMount hidden={tab !== "code"}>
-          <CodeTab workflow={workflow} steps={steps} code={code} codeHash={codeHash} onCheck={onCheck} onSave={onSave} onPropose={onPropose} onReveal={onReveal} onDirtyChange={onDirtyChange} initialEditor={initialEditor} />
+          <CodeTab workflow={workflow} steps={steps} code={code} codeHash={codeHash} onCheck={onCheck} onSave={onSave} onPropose={onPropose} onEditStep={onEditStep} agents={agents} onOpenAgent={() => onNavigate(settingsPath("agents"))} onReveal={onReveal} onDirtyChange={onDirtyChange} initialEditor={initialEditor} />
         </TabsContent>
         <TabsContent value="runs">
           <RunsTab runs={runs} now={now} onNavigate={onNavigate} />

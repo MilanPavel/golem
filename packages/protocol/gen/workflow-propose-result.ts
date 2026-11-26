@@ -11,6 +11,15 @@ export type StepId = string | null;
 export type Problems = WorkflowProblem[];
 export type After = string[];
 export type Agent = string | null;
+export type Col = number;
+export type EndCol = number;
+export type EndLine = number;
+export type Line1 = number;
+export type Literal = boolean;
+export type Name = string;
+export type Source = string;
+export type Value = string | null;
+export type Args = WorkflowStepArg[];
 export type BriefLine = number | null;
 export type Budget = string | null;
 export type BudgetLine = number | null;
@@ -69,6 +78,7 @@ export interface WorkflowProblem {
 export interface WorkflowOutlineStep {
   after?: After;
   agent?: Agent;
+  args?: Args;
   brief_line?: BriefLine;
   budget?: Budget;
   budget_line?: BudgetLine;
@@ -81,4 +91,25 @@ export interface WorkflowOutlineStep {
   kind: Kind;
   lines: Lines;
   title: Title;
+}
+/**
+ * One argument of a ``run.*`` call, with its exact place in the source.
+ *
+ * ``line`` and ``end_line`` count from 1; ``col`` and ``end_col`` are character offsets from 0,
+ * ``end_col`` just after the last character. ``literal`` is true for a plain string, number or
+ * bool, or an f-string with no expressions; ``value`` is then its text. A value the code
+ * computes has ``literal`` false: it is shown, and set in the code.
+ *
+ * This interface was referenced by `WorkflowProposeResult`'s JSON-Schema
+ * via the `definition` "WorkflowStepArg".
+ */
+export interface WorkflowStepArg {
+  col: Col;
+  end_col: EndCol;
+  end_line: EndLine;
+  line: Line1;
+  literal: Literal;
+  name: Name;
+  source: Source;
+  value?: Value;
 }

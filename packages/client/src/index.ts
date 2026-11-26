@@ -123,6 +123,8 @@ export type { RoutinePreviewResult } from "../../protocol/gen/routine-preview-re
 export type { RoutineRunResult } from "../../protocol/gen/routine-run-result.ts";
 export type { RoutineRunSummary } from "../../protocol/gen/routine-run-summary.ts";
 export type { WorkflowCancelResult } from "../../protocol/gen/workflow-cancel-result.ts";
+export type { WorkflowEditStepResult } from "../../protocol/gen/workflow-edit-step-result.ts";
+export type { WorkflowStepArg } from "../../protocol/gen/workflow-step-arg.ts";
 export type { WorkflowEntryInfo } from "../../protocol/gen/workflow-entry-info.ts";
 export type { WorkflowCheckResult } from "../../protocol/gen/workflow-check-result.ts";
 export type { WorkflowProposeResult } from "../../protocol/gen/workflow-propose-result.ts";

@@ -182,6 +182,7 @@ public enum MethodAccess {
         "trace.span",
         "workflow.cancel",
         "workflow.check",
+        "workflow.edit_step",
         "workflow.get",
         "workflow.list",
         "workflow.propose",

@@ -155,6 +155,7 @@ export function fakeClient() {
     })),
     checkWorkflow: vi.fn<PageClient["checkWorkflow"]>(async () => ({ problems: [], steps: [] })),
     proposeWorkflow: vi.fn<PageClient["proposeWorkflow"]>(async (_id, code) => ({ code, note: "", steps: [], problems: [], model: "fake/model" })),
+    editWorkflowStep: vi.fn<PageClient["editWorkflowStep"]>(async (_id, code) => ({ code, problems: [], steps: [] })),
     saveWorkflow: vi.fn<PageClient["saveWorkflow"]>(async (id) => ({
       code_hash: "h2",
       problems: [],

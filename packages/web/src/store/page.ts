@@ -18,7 +18,7 @@ import { SKILL_LIST_KEY } from "./skills.ts";
 import { MEMORY_LIST_KEY, MEMORY_PAGE, type MemoryExportParams, type MemoryExportResult, type MemoryListRequest, type MemoryListResult, type MemoryPrivacy, type MemoryScope } from "./memory.ts";
 import { ROUTINE_GET_KEY, ROUTINE_LIST_KEY, type RoutineGetResult, type RoutineInfo, type RoutineListResult, type RoutineRunResult } from "./routines.ts";
 import { RUN_LIST_KEY, type RunListResult } from "./runs.ts";
-import { WORKFLOW_LIST_KEY, WORKFLOW_STATUS_KEY, workflowGetKey, type ReviewVerdict, type WorkflowCancelResult, type WorkflowCheckResult, type WorkflowProposeResult, type WorkflowSaveResult, type WorkflowGetResult, type WorkflowListResult, type WorkflowResumeResult, type WorkflowStatusResult } from "./workflows.ts";
+import { WORKFLOW_LIST_KEY, WORKFLOW_STATUS_KEY, workflowGetKey, type ReviewVerdict, type WorkflowCancelResult, type WorkflowCheckResult, type WorkflowProposeResult, type WorkflowSaveResult, type WorkflowGetResult, type WorkflowListResult, type WorkflowResumeResult, type WorkflowStatusResult, type WorkflowEditStepResult } from "./workflows.ts";
 import { DATA_DESCRIBE_KEY, DATA_LIST_KEY, DATA_NOTES_KEY, dataAnswer, type DataAddParams, type DataAnswer, type DataDescribeResult, type DataInspectResult, type DataListResult, type DataNotesGetResult, type DataSource, type DataUpdateParams } from "./data.ts";
 import { createPulls, type Pulls } from "./pulls.ts";
 import { createQueryClient, keepQueriesHonest } from "./query.ts";
@@ -85,6 +85,7 @@ export type PageClient = Pick<
   | "checkWorkflow"
   | "saveWorkflow"
   | "proposeWorkflow"
+  | "editWorkflowStep"
   | "startWorkflow"
   | "workflowStatus"
   | "cancelWorkflow"
@@ -433,6 +434,8 @@ export type PageActions = {
   checkWorkflow(id: string, code: string): Promise<WorkflowCheckResult>;
   /** Asks golem for a change to `code`, the file of the workflow `id`: one model call, the answer checked, nothing written. `previous` is the last proposal and its note, for a refine. Rejects with the daemon's reason, such as no model for that folder. */
   proposeWorkflow(id: string, code: string, ask: string, previous?: { code: string; note: string }): Promise<WorkflowProposeResult>;
+  /** Sets one argument of one step in `code`: the new text with its outline and problems. Nothing is written. Rejects with the daemon's reason: a code step, an argument the code computes, a value that is not valid. */
+  editWorkflowStep(id: string, code: string, stepId: string, name: string, value: string | number | boolean): Promise<WorkflowEditStepResult>;
   /** Writes `code` as the file of the workflow `id`. `baseHash` is the `code_hash` the editor started from. Rejects with the daemon's reason: the file changed on disk, the code has errors, the folder is not trusted. */
   saveWorkflow(id: string, code: string, baseHash: string): Promise<WorkflowSaveResult>;
   /** Stops a workflow run. `cancelled` is false when it had ended already. */
@@ -1012,6 +1015,7 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
       },
       checkWorkflow: (id, code) => client.checkWorkflow(id, code),
       proposeWorkflow: (id, code, ask, previous) => client.proposeWorkflow(id, code, ask, previous),
+      editWorkflowStep: (id, code, stepId, name, value) => client.editWorkflowStep(id, code, stepId, name, value),
       async saveWorkflow(id, code, baseHash) {
         const saved = await client.saveWorkflow(id, code, baseHash);
         void queryClient.invalidateQueries({ queryKey: workflowGetKey(id) });

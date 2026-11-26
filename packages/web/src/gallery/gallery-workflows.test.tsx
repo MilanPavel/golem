@@ -80,6 +80,17 @@ test("the gallery's Workflow editor stories show each state, in both themes", ()
     expect(ask("refine").getByRole("textbox", { name: "One more sentence on the proposal" })).toBeTruthy();
     expect(ask("no model").getByRole("alert").textContent).toContain("No model is available");
     expect((story("Workflow editor, untrusted, read only").getByRole("textbox", { name: "Code of deploy" }) as HTMLTextAreaElement).readOnly).toBe(true);
+    const fields = story("Step fields, agent step").getByRole("group", { name: "Selected step" });
+    expect((within(fields).getByLabelText("brief") as HTMLTextAreaElement).value).toBe("Upgrade httpx. Fix what breaks.");
+    expect((within(fields).getByLabelText("agent") as HTMLSelectElement).value).toBe("worker");
+    expect((within(fields).getByLabelText("model") as HTMLSelectElement).value).toBe("cheapest");
+    expect((within(fields).getByLabelText("budget") as HTMLInputElement).value).toBe("$0.50");
+    expect((within(fields).getByLabelText("key") as HTMLInputElement).value).toBe("");
+    const computed = story("Step fields, a value the code computes").getByRole("group", { name: "Selected step" });
+    expect(computed.textContent).toContain("f\"Check {fix['answer']}\"");
+    expect(within(computed).getByRole("button", { name: "Set brief in code, line 8" })).toBeTruthy();
+    expect(story("Step fields, code step").getByRole("group", { name: "Selected step" }).textContent).toContain("A code step has no fields");
+    expect(story("Step fields, a field refused").getByRole("alert").textContent).toContain("model is a wish");
     unmount();
   }
 });
