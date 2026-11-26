@@ -55,13 +55,15 @@ AgentRunner = Callable[
         tuple[str, int] | None,
         tuple[str, ...],
         float | None,
+        str | None,
         AgentStarted,
     ],
     Awaitable[dict[str, Any]],
 ]
 """Runs an agent step: workflow run id, step key, agent type, brief, model wish, the batch
-(group key and position, or None), ``gets``, the cost cap in dollars and a callback
-for the helper's session id. Returns the step's result. ``workflows/agents.py`` is behind it."""
+(group key and position, or None), ``gets``, the cost cap in dollars, the name of the
+worker's copy (``worktree=``) and a callback for the helper's session id. Returns the step's
+result. ``workflows/agents.py`` is behind it."""
 
 SkillRunner = Callable[[str, str, str, str, AgentStarted], Awaitable[dict[str, Any]]]
 """Runs a skill step: workflow run id, step key, skill name, arguments and the same callback."""
@@ -132,6 +134,7 @@ class WorkflowEngine:
         batch: tuple[str, int] | None = None,
         gets: tuple[str, ...] = (),
         budget: float | None = None,
+        worktree: str | None = None,
     ) -> dict[str, Any]:
         """Run an agent step's helper; its session id is saved on the step as soon as it exists."""
         if self._agent is None:
@@ -142,7 +145,7 @@ class WorkflowEngine:
             await self.step_event("workflow.step.started", workflow_run_id, key)
 
         return await self._agent(
-            workflow_run_id, key, agent_type, brief, model, batch, gets, budget, started
+            workflow_run_id, key, agent_type, brief, model, batch, gets, budget, worktree, started
         )
 
     async def run_skill(
@@ -443,16 +446,17 @@ class _Journal:
         position: int | None = None,
         gets: tuple[str, ...] = (),
         budget: float | None = None,
+        worktree: str | None = None,
     ) -> dict[str, Any]:
         batch = None if group_key is None or position is None else (group_key, position)
         return await self.run_step(
             workflow_run_id,
             key,
             "agent",
-            agent_type,
+            agent_type if worktree is None else f"{agent_type} \u00b7 {worktree}",
             group_key,
             self._engine.run_agent,
-            (workflow_run_id, key, agent_type, brief, model, batch, gets, budget),
+            (workflow_run_id, key, agent_type, brief, model, batch, gets, budget, worktree),
             {},
         )
 

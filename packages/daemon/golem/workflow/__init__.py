@@ -133,6 +133,7 @@ class StepBackend(Protocol):
         position: int | None = None,
         gets: tuple[str, ...] = (),
         budget: float | None = None,
+        worktree: str | None = None,
     ) -> dict[str, Any]:
         """Run an agent as a helper of the run's session (the ``agent`` step).
 
@@ -326,10 +327,17 @@ class Run:
         key: str | None = None,
         gets: Iterable[str] = (),
         budget: str | float | None = None,
+        worktree: str | None = None,
     ) -> dict[str, Any]:
         """Run an agent of this ``type`` on ``brief``.
 
-        Returns ``{"status", "answer", "session_id"}``.
+        Returns ``{"status", "answer", "session_id"}``. An agent with tools that change files
+        (``worker``) works in its own git copy of the run's folder, and its result also has
+        ``worktree`` (the copy's name), ``diff`` (the artifact id of its diff, or None for no
+        change), ``files`` (``[{"path", "status", "added", "removed"}]``), ``added``,
+        ``removed``, ``checks`` (``passed``, ``failed`` or ``none``), ``checks_failed`` (the
+        failing checks) and ``checks_note``. ``worktree="upgrade/httpx"`` names the copy in the
+        step and the result; it fails the step for an agent that only reads.
         The agent is a helper of the run's session, with golem's permissions, and ``session_id``
         is its session. ``model`` is a wish (``cheapest``, ``stronger``, ...), never a model
         name. A helper that fails or is stopped fails the step. A step of kind ``agent`` keyed
@@ -346,6 +354,10 @@ class Run:
         self._use_key(step_key, f"agent {type}")
         wanted = _gets_of(gets)
         cap = _budget_of(budget)
+        if worktree is not None and not worktree.strip():
+            raise WorkflowError(
+                f"run.agent worktree= is a name such as 'upgrade/httpx'; got {worktree!r}"
+            )
         # Only the first agent of a parallel member takes the member's place in the batch; a
         # second agent in the same member would otherwise find the first one's helper again.
         position = _position.get()
@@ -360,6 +372,7 @@ class Run:
             position,
             wanted,
             cap,
+            worktree,
         )
 
     async def llm(

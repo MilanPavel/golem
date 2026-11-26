@@ -21,6 +21,7 @@ from golem.sessions.helpers import snapshot_of
 from golem.sessions.manager import SessionManager
 from golem.skills.invoke import SkillInvokeError, invoke
 from golem.skills.registry import SkillRegistry
+from golem.tools.delegate import HelperOutcome
 from golem.tools.registry import ToolError
 from golem.workflow import WorkflowError
 from golem_protocol.events import AgentOrigin, AgentSnapshot, ChatEvent, SkillCall
@@ -31,7 +32,11 @@ RECHECK_SECONDS = 60.0
 """The wait is woken by ``helper.ended``; this is only a safety net against a missed event."""
 
 SKILL_BASE_AGENT = "explorer"
-"""The agent whose tools a skill's helper gets, besides the skill's ``allowed-tools``."""
+"""The agent whose tools a read-only skill's helper gets, besides the skill's ``allowed-tools``."""
+
+SKILL_WORKER_AGENT = "worker"
+"""The agent whose tools a skill's helper gets when the skill's ``allowed-tools`` change files:
+it then works in a copy, like a ``worker``."""
 
 SKILL_PROMPT = (
     "You run one skill as a short turn. Follow the instructions you are given, use only your"
@@ -45,6 +50,24 @@ Started = Callable[[str], Awaitable[None]]
 def call_id_of(key: str) -> str:
     """The ``delegate`` call id the helper of the step ``key`` is stored under."""
     return f"wf:{key}"
+
+
+def worker_fields(outcome: HelperOutcome, worktree: str) -> dict[str, Any]:
+    """The keys a writing agent's result adds: its copy's name and what ``helper.ended`` says
+    of its diff and checks. Empty for a helper that worked in no copy."""
+    ended = outcome.worker
+    if ended is None or ended.files is None:
+        return {}
+    return {
+        "worktree": worktree,
+        "diff": ended.diff_artifact_id,
+        "files": [f.model_dump(mode="json") for f in ended.files],
+        "added": ended.added or 0,
+        "removed": ended.removed or 0,
+        "checks": ended.checks or "none",
+        "checks_failed": list(ended.checks_failed or ()),
+        "checks_note": ended.checks_note,
+    }
 
 
 def place_of(key: str, batch: tuple[str, int] | None) -> tuple[str, int]:
@@ -95,10 +118,14 @@ class WorkflowAgents:
         batch: tuple[str, int] | None = None,
         gets: Sequence[str] = (),
         budget: float | None = None,
+        worktree: str | None = None,
     ) -> dict[str, Any]:
         """Run one agent as a helper of ``session_id`` and return its outcome.
 
-        Returns ``{"status", "answer", "session_id"}``. Raises :class:`WorkflowError` for an
+        Returns ``{"status", "answer", "session_id"}``, and for an agent with tools that change
+        files (it works in a git copy of ``cwd``) also ``worktree``, ``diff``, ``files``,
+        ``added``, ``removed``, ``checks``, ``checks_failed`` and ``checks_note``. ``worktree``
+        names the copy; an agent that only reads refuses it. Raises :class:`WorkflowError` for an
         unknown or unavailable agent type, a model wish that is not one, a helper that cannot
         start, and a helper that failed or was stopped.
 
@@ -121,6 +148,12 @@ class WorkflowAgents:
         reason = self._sessions.unavailable_reason(agent, cwd)
         if reason is not None:
             raise WorkflowError(reason)
+        writes = bool(self._sessions.changing_tools(agent))
+        if worktree is not None and not writes:
+            raise WorkflowError(
+                f"run.agent worktree= is for an agent that changes files, and {agent_type} only"
+                " reads: it works in no copy"
+            )
         origin: AgentOrigin = next(e.origin for e in view.listed if e.agent is agent)
         snapshot = snapshot_of(agent, origin, agent.tools, self._settings())
         if budget is not None:
@@ -144,7 +177,10 @@ class WorkflowAgents:
         if outcome.stopped != "done":
             detail = f": {outcome.covered}" if outcome.covered else ""
             raise WorkflowError(f"agent {agent_type} stopped ({outcome.stopped}){detail}")
-        return {"status": "done", "answer": outcome.text, "session_id": child}
+        result: dict[str, Any] = {"status": "done", "answer": outcome.text, "session_id": child}
+        if writes:
+            result.update(worker_fields(outcome, worktree or key))
+        return result
 
     async def run_skill(
         self,
@@ -177,19 +213,27 @@ class WorkflowAgents:
         assert skill is not None
         # In a chat a skill keeps the lead's tools; ``allowed-tools`` only skips the asking.
         # A skill's helper gets the explorer's read-only tools plus the ones the skill names.
-        # Helpers that change things wait for copies (15.10), so such a skill is refused.
-        base = self._agents.view(None if cwd is None else Path(cwd)).get(SKILL_BASE_AGENT)
+        # A skill that names tools that change files runs as a worker in a copy (15.10): the
+        # worker's tools plus the skill's.
         named = {t.split("(")[0].strip() for t in skill.allowed_tools}
-        tools = sorted((named | set(base.tools if base else ())) - {"", "delegate"})
-        agent = Agent(
-            name=f"skill-{name}",
-            description=skill.description,
-            path=skill.path,
-            real_path=skill.real_path,
-            hash=skill.hash,
-            wish=skill.model or "cheapest",
-            tools=tuple(tools),
-        )
+        view_agents = self._agents.view(None if cwd is None else Path(cwd))
+
+        def make(base_name: str) -> Agent:
+            base = view_agents.get(base_name)
+            tools = sorted((named | set(base.tools if base else ())) - {"", "delegate"})
+            return Agent(
+                name=f"skill-{name}",
+                description=skill.description,
+                path=skill.path,
+                real_path=skill.real_path,
+                hash=skill.hash,
+                wish=skill.model or "cheapest",
+                tools=tuple(tools),
+            )
+
+        agent = make(SKILL_BASE_AGENT)
+        if self._sessions.changing_tools(agent):
+            agent = make(SKILL_WORKER_AGENT)
         reason = self._sessions.unavailable_reason(agent, cwd)
         if reason is not None:
             raise WorkflowError(reason)
@@ -209,7 +253,10 @@ class WorkflowAgents:
         if outcome.stopped != "done":
             detail = f": {outcome.covered}" if outcome.covered else ""
             raise WorkflowError(f"skill {name} stopped ({outcome.stopped}){detail}")
-        return {"status": "done", "answer": outcome.text, "session_id": child}
+        result: dict[str, Any] = {"status": "done", "answer": outcome.text, "session_id": child}
+        if self._sessions.changing_tools(agent):
+            result.update(worker_fields(outcome, key))
+        return result
 
     async def _helper(
         self,
@@ -224,7 +271,7 @@ class WorkflowAgents:
         asked_model: str | None,
         gets: tuple[str, ...],
         batch: tuple[str, int] | None,
-    ) -> tuple[Any, str]:
+    ) -> tuple[HelperOutcome, str]:
         """Start the helper of step ``key`` once, wait for it, and return its outcome and id.
 
         The helper is stored under ``(call id, index)``: ``wf:<key>`` and 0 on its own, or

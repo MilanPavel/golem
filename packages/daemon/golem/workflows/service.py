@@ -130,6 +130,7 @@ class WorkflowService:
         batch: tuple[str, int] | None,
         gets: tuple[str, ...],
         budget: float | None,
+        worktree: str | None,
         started: AgentStarted,
     ) -> dict[str, Any]:
         """Adapt a ``run.agent`` to the seam: the helper belongs to the run's session."""
@@ -146,6 +147,7 @@ class WorkflowService:
             batch=batch,
             gets=gets,
             budget=budget,
+            worktree=worktree,
             started=started,
         )
 

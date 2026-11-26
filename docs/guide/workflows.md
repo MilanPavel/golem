@@ -154,7 +154,7 @@ found = await run.agent("explorer", "List the TODOs in src/", model="cheapest")
 print(found["answer"])
 ```
 
-`run.agent(type, brief, model=None, key=None, gets=(), budget=None)` runs one agent of that type (the same agents `delegate` uses) as a helper of the run's session, with golem's permissions. It returns `{"status", "answer", "session_id"}`; open `session_id` to see everything the agent did. The step has kind `agent` and the key `key` or `agent:<type>`; give two agents of one type their own `key=`.
+`run.agent(type, brief, model=None, key=None, gets=(), budget=None, worktree=None)` runs one agent of that type (the same agents `delegate` uses) as a helper of the run's session, with golem's permissions. It returns `{"status", "answer", "session_id"}`; open `session_id` to see everything the agent did. The step has kind `agent` and the key `key` or `agent:<type>`; give two agents of one type their own `key=`.
 
 - `model=` is a wish (`cheapest`, `same`, `stronger`, `local`, `budget`, `frontier`), never a model name. Without it the agent's own wish is used. A local-only folder keeps the agent local.
 - An approval the agent needs shows on the run's session, so the run shows "needs you".
@@ -172,6 +172,30 @@ reports = await run.parallel(
 ```
 
 The agents inside one `run.parallel` start as one batch, like several helpers of one `delegate`: they share one call (`wf:parallel-N`), and each has its place in the list. The helper limit `[agents] at_once` applies to the whole batch, so with a limit of 2 the first two run and the rest wait their turn (the run's session shows why they wait). Each agent still has its own step, key and `child_session_id`. After a restart each agent is found again by its place, and none starts twice. An agent on its own, outside `run.parallel`, is a batch of one.
+
+### Workers in copies
+
+An agent with tools that change files (`worker`, or your own agent that lists `write_file`, `edit_file` or `shell`) never writes in your folder. golem makes a git copy of the run's folder for it, and the agent works there. The run's folder must be a git checkout; if it is not, the step fails with the reason. A read-only agent works in no copy.
+
+```python
+w = await run.agent("worker", "Upgrade httpx to 0.28 and fix what breaks", worktree="upgrade/httpx")
+```
+
+`worktree=` names the copy in the step and in its result. Without it the agent still works in a copy, and the name is the step key. It fails the step for an agent that only reads.
+
+When the worker ends, golem stores its diff and runs the project's checks in the copy. The step's result is the usual `status`, `answer` and `session_id` plus:
+
+| Key | Meaning |
+|---|---|
+| `worktree` | the name of the copy |
+| `diff` | the artifact id of the diff, or `None` when nothing changed |
+| `files` | the changed files: `path`, `status`, `added`, `removed` |
+| `added`, `removed` | lines added and removed over all files |
+| `checks` | `passed`, `failed` or `none` |
+| `checks_failed` | the names of the failing checks |
+| `checks_note` | why `checks` is `none`, such as `no checks found` |
+
+The result is saved as the step's JSON, so a run that is executed again gets it back without starting the worker. After a restart the same worker and the same copy are waited for. The copy is kept; apply the diff from the Changes tab of the worker's thread, or look at it first.
 
 ### Asking a model one question
 
@@ -216,7 +240,7 @@ The rules are the chat's, so a tool is allowed, denied or asked in the same case
 notes = await run.skill("release-notes", args="v1.4", key="notes")
 ```
 
-`run.skill(name, args="", key=None)` runs one skill as one short agent turn and returns the final answer as text. The skill's body, with `args` filled in as `/name args` does in the chat, is the brief of a helper of the run's session. The helper gets the explorer agent's read-only tools plus the ones the skill's `allowed-tools` names, with golem's permissions. A skill that names tools that change things (`edit_file`, `shell`, ...) fails the step until helpers can work in copies. It has its own thread, so the step shows `child_session_id` and you can open it. The step has kind `skill` and the key `key` or `skill:<name>`; give two runs of one skill their own `key=`.
+`run.skill(name, args="", key=None)` runs one skill as one short agent turn and returns the final answer as text. The skill's body, with `args` filled in as `/name args` does in the chat, is the brief of a helper of the run's session. The helper gets the explorer agent's read-only tools plus the ones the skill's `allowed-tools` names, with golem's permissions. A skill that names tools that change things (`edit_file`, `shell`, ...) runs as a worker in a copy instead (see [Workers in copies](#workers-in-copies)): it gets the `worker` agent's tools plus its own. It has its own thread, so the step shows `child_session_id` and you can open it. The step has kind `skill` and the key `key` or `skill:<name>`; give two runs of one skill their own `key=`.
 
 - A skill that is unknown, disabled, or broken fails the step. For an unknown name the error lists the skills the run's folder sees.
 - A helper that fails or is stopped fails the step, and the error says why.
