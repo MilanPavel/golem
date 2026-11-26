@@ -47,6 +47,8 @@ A chain of steps with a fixed order (find, then fix, then check) is not a reason
 
 How big is "too big" is set by four numbers that are shares of the window and a price ratio, never a count of tokens, so one setting fits a 32K local model and a 1M cloud one. They are in `[agents.delegate]` ([Settings](./settings.md#agentsdelegate)) and shape what golem suggests. They never decide whether a helper may run; "Use helpers" does that.
 
+The shares are of the first 128K of the window, the working window (`work_window`). A 1M window acts like a 128K one. The reason: every later message pays for the reading again, and answers get worse long before a big window is full. A 32K or 64K window counts in full. Set `work_window = 0` to use the whole window.
+
 golem also gives the lead two nudges, each once per message of yours, and only with "Use helpers" not set to Never:
 
 - **Fill nudge.** While the lead is reading and its window is past `fill_share` (85% by default), golem tells it to hand the rest of the reading to an `explorer`. With "Ask me first" there is no nudge, because every helper asks you anyway.

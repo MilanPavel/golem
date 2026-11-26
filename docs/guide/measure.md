@@ -18,6 +18,8 @@ Each number is a share of the window or a price ratio, never a count of tokens, 
 | `job_share` | 10% | The least a job reads, as a share of the window, to be worth its own helper |
 | `price_ratio` | 3× | How many times dearer your model must be than the helper's before a large read moves there |
 
+The shares are of the working window, the first 128K of the window (`work_window` in `[agents.delegate]`), so a run's reading share means the same on a 64K and a 1M lead.
+
 The numbers **shape what golem suggests to the model**. They do not decide whether a helper may run. "Use helpers" does that: with Never the model is not offered helpers at all, and with Ask me first every helper waits for your yes. The line under the tiles says where the numbers come from: "FIRST GUESS" (the ones golem ships, not measured), "CHANGED" (set in your config or by a measurement) or "MEASURED on a date with a model".
 
 ## Measure

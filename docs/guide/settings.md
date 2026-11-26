@@ -262,6 +262,7 @@ The four numbers behind the reasons for a helper. They shape what golem suggests
 | `fill_share` | `0.85` | The share of the window the chat would reach with the reading added. Past it the reading does not fit. Above 0, at most 1 |
 | `job_share` | `0.1` | The least a job reads, as a share of the window, to be worth its own helper. Above 0, at most 1 |
 | `price_ratio` | `3.0` | How many times dearer your model must be than the helper's before a large read moves there. Above 1 |
+| `work_window` | `128000` | The shares above are shares of this many tokens of the window, not of all of it. A smaller window counts in full. 0 turns it off, so the shares are of the whole window. At least 0 |
 
 ### `[routing.roles]`
 

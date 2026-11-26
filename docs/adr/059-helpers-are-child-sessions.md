@@ -231,3 +231,7 @@ A `worker` never writes to your folder. It works in a git copy, and its diff com
 - Helpers started before a later approval in the same message are wasted if you deny it. The order is the model's order.
 - A model may still delegate when it should not. 15.4 measures it.
 - Several helpers on one local model are slower than one, until Phase 18 sets slots (ADR-060).
+
+## Amendment (2026-11-26, 15.17)
+
+The shares of section 2 are of a working window, not of the whole window. `[agents.delegate] work_window` is 128000 tokens by default. The shares are of `min(window, work_window)`. A window of 128K or less counts in full, so 32K and 64K leads behave as before. A 1M lead needs a 40K read, not a 300K one, before the reading "does not fit". The reason: every later message pays for the reading again, and answers get worse long before a big window is full. 0 turns it off. The SMALL_WINDOW test for local leads stays on the real window. Measure reads a run's reading share over the working window too.
