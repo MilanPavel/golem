@@ -5,8 +5,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Literal
 
-SourceKind = Literal["files", "sqlite", "duckdb"]
-SOURCE_KINDS: tuple[SourceKind, ...] = ("files", "sqlite", "duckdb")
+SourceKind = Literal["files", "sqlite", "duckdb", "builtin"]
+SOURCE_KINDS: tuple[SourceKind, ...] = ("files", "sqlite", "duckdb", "builtin")
+"""``builtin`` is an empty in-memory database the daemon fills with ``load_table``."""
 
 EXTENSION_FILES = {
     "sqlite": "sqlite_scanner",

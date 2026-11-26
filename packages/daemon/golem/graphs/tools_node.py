@@ -43,6 +43,7 @@ from langgraph.types import interrupt
 from pydantic import ValidationError
 
 from golem.config import PERMISSION_MODES, PermissionMode
+from golem.data.sources import DataSources
 from golem.graphs.adapter import (
     APPROVAL_KIND,
     FILE_CHANGED_KIND,
@@ -299,6 +300,7 @@ def tools_node(
     children: Callable[[], ChildHost | None] = lambda: None,
     tier_of: Callable[[str], Tier | None] | None = None,
     helpers_setting: Callable[[], str] = lambda: "when_needed",
+    data: Callable[[], DataSources | None] = lambda: None,
 ) -> Callable[[AgentState, RunnableConfig], Awaitable[dict[str, object]]]:
     async def tools(state: AgentState, config: RunnableConfig) -> dict[str, object]:
         last = state["messages"][-1]
@@ -331,6 +333,7 @@ def tools_node(
             page_chars=budget.page_chars,
             memory=None if child_of(config) is not None else _memory_for(state, config, tier_of),
             memory_target=_target(state, tier_of),
+            data=None if (sources := data()) is None else sources.access(root),
         )
         allowed = _allowed(config)
         mode = _mode(config)

@@ -5,7 +5,7 @@
 
 export type DataPrivacy = "open" | "local" | "schema";
 export type DataScope = "builtin" | "user" | "project";
-export type DataKind = "builtin" | "files" | "sqlite" | "postgres" | "mysql" | "url";
+export type DataKind = "builtin" | "files" | "sqlite" | "duckdb" | "postgres" | "mysql" | "url";
 export type DataStatus = "ready" | "reading" | "untrusted" | "error";
 
 /** The part of a source the words need. */
@@ -96,6 +96,7 @@ export function kindWord(kind: DataKind): string {
   if (kind === "builtin") return "built in";
   if (kind === "files") return "files";
   if (kind === "sqlite") return "SQLite";
+  if (kind === "duckdb") return "DuckDB";
   if (kind === "postgres") return "PostgreSQL";
   if (kind === "mysql") return "MySQL";
   return "URL";

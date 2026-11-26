@@ -23,6 +23,9 @@ def default_registry(
     ``web_search`` is left out when ``web.search`` is ``"off"``. ``recall`` and ``remember`` are
     offered only to a run that carries memory (see :class:`ToolScope`).
     """
+    # Imported here: golem.data.tools imports golem.tools.registry, which runs this package first.
+    from golem.data.tools import DATA_TOOLS
+
     search = [] if web is not None and web.search == "off" else [WEB_SEARCH]
     return ToolRegistry(
         [
@@ -37,6 +40,7 @@ def default_registry(
             PROPOSE_PLAN,
             LOAD_SKILL,
             *MEMORY_TOOLS,
+            *DATA_TOOLS,
         ],
         source,
     )

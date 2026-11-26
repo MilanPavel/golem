@@ -7,7 +7,7 @@ request, and ``cancel`` (``args.id``) can interrupt it. A request that fails ans
 its error and the worker stays up. The worker ends when stdin closes.
 
 Ops: ``ping``, ``attach``, ``detach``, ``tables``, ``describe``, ``query``,
-``install_extension``, ``cancel``.
+``install_extension``, ``load_table``, ``cancel``.
 """
 
 from __future__ import annotations
@@ -86,6 +86,14 @@ class Worker:
             return source.describe(str(args.get("table", "")))
         if op == "query":
             return self._query(ident, source, args)
+        if op == "load_table":
+            rows = source.load_table(
+                str(args.get("table", "")),
+                list(args.get("columns") or []),
+                list(args.get("rows") or []),
+                bool(args.get("replace", True)),
+            )
+            return {"rows": rows}
         raise DataError(f"The data worker has no op called {op}.")
 
     def _attach(self, args: dict[str, Any]) -> dict[str, Any]:

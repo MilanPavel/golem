@@ -46,6 +46,9 @@ PLAN_TOOLS = [
     "todo_write",
     "propose_plan",
     "load_skill",
+    "data_sources",
+    "data_describe",
+    "data_query",
 ]
 
 

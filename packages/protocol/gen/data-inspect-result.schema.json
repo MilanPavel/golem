@@ -130,6 +130,7 @@
         "builtin",
         "files",
         "sqlite",
+        "duckdb",
         "postgres",
         "mysql",
         "url"

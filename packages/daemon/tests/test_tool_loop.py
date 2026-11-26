@@ -163,6 +163,9 @@ async def test_the_model_reads_a_file_then_answers(database: Database, project: 
         "delegate",
         "todo_write",
         "load_skill",
+        "data_sources",
+        "data_describe",
+        "data_query",
     ]
     tool_result = model.seen[1][-1]
     assert isinstance(tool_result, ToolMessage)

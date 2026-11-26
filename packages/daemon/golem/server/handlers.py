@@ -82,6 +82,7 @@ from golem.server.chat_edit import (
     chat_suggestion_dismiss,
     chat_suggestions,
 )
+from golem.server.data_rpc import data_cancel, data_describe, data_list, data_query
 from golem.server.device_rpc import (
     connection_identify,
     device_list,
@@ -276,6 +277,10 @@ from golem_protocol.commands import (
     CostRoleRow,
     CostTotals,
     DaemonStatus,
+    DataCancelParams,
+    DataDescribeParams,
+    DataListParams,
+    DataQueryParams,
     DeviceListParams,
     DevicePairBeginParams,
     DevicePairConfirmParams,
@@ -2534,6 +2539,10 @@ def standard_methods() -> dict[str, Method]:
         "memory.delete": Method("memory.delete", MemoryDeleteParams, True, memory_delete),
         "memory.export": Method("memory.export", MemoryExportParams, True, memory_export),
         "memory.settings": Method("memory.settings", MemorySettingsParams, True, memory_settings),
+        "data.list": Method("data.list", DataListParams, True, data_list),
+        "data.describe": Method("data.describe", DataDescribeParams, True, data_describe),
+        "data.query": Method("data.query", DataQueryParams, True, data_query),
+        "data.cancel": Method("data.cancel", DataCancelParams, True, data_cancel),
         "relay.sign": Method("relay.sign", RelaySignParams, True, relay_sign),
         "relay.dh": Method("relay.dh", RelayDhParams, True, relay_dh),
         "device.sync": Method("device.sync", DeviceSyncParams, True, device_sync),

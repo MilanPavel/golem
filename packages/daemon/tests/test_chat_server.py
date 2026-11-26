@@ -13,6 +13,7 @@ from langchain_core.language_models import BaseChatModel
 from test_server import HELLO, RpcClient, error_code, rpc_result, start_daemon, stop_daemon
 
 from golem.config import GolemSettings
+from golem.data.section import HEADING as DATA_HEADING
 from golem.graphs.cite_prompt import CITE_TEXT
 from golem.models.router import ModelRouter
 from golem.server.dispatcher import (
@@ -104,14 +105,19 @@ async def test_send_streams_deltas_then_completes(short_home: Path) -> None:
         await stop_daemon(app, task)
 
 
+def _is_prompt(text: str) -> bool:
+    """The system prompt every session has: the citation rule and the list of data sources."""
+    return text == CITE_TEXT or text.startswith(DATA_HEADING)
+
+
 def _without_cite(texts: list[str]) -> list[str]:
-    """The prompt texts without the web citation rule, which every session with web tools has."""
-    return [text for text in texts if text != CITE_TEXT]
+    """The prompt texts without the system prompt every session with web tools has."""
+    return [text for text in texts if not _is_prompt(text)]
 
 
 def _unprompted(messages: object) -> list[dict[str, str]]:
-    """Inspected messages without the web citation rule."""
-    return [m for m in cast(list[dict[str, str]], messages) if m["text"] != CITE_TEXT]
+    """Inspected messages without the system prompt."""
+    return [m for m in cast(list[dict[str, str]], messages) if not _is_prompt(m["text"])]
 
 
 async def test_inspect_reads_checkpoint_messages(short_home: Path) -> None:

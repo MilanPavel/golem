@@ -21,10 +21,13 @@ from golem.config import (
     PROTECTED_MEMORY_SETTINGS,
     PROTECTED_SETTINGS,
     PROTECTED_SKILL_SETTINGS,
+    DataSettings,
     GolemSettings,
     McpServers,
     McpServerSettings,
     RoutineSettings,
+    check_data_sources,
+    split_data_table,
 )
 
 READ_AT_START = frozenset(
@@ -121,14 +124,15 @@ def _settings_issues(text: str, data: dict[str, Any]) -> list[Issue]:
 def _project_issues(text: str, data: dict[str, Any]) -> list[Issue]:
     issues = [
         Issue(
-            f"{key} is not allowed in a project config.toml: it holds only [mcp.*] tables "
-            "and [[routine]]",
+            f"{key} is not allowed in a project config.toml: it holds only [mcp.*] tables, "
+            "[data.*] tables and [[routine]]",
             _line_of(text, [key]),
             path=key,
         )
         for key in data
-        if key not in ("mcp", "routine")
+        if key not in ("mcp", "routine", "data")
     ]
+    issues += _project_data_issues(text, data.get("data", {}))
     try:
         _MCP.validate_python(data.get("mcp", {}))
     except ValidationError as exc:
@@ -152,6 +156,26 @@ def _project_issues(text: str, data: dict[str, Any]) -> list[Issue]:
                     path="routine.name",
                 )
             )
+    return issues
+
+
+def _project_data_issues(text: str, table: object) -> list[Issue]:
+    if not isinstance(table, dict):
+        return [Issue("data must be a table", _line_of(text, ["data"]), path="data")]
+    limits, sources = split_data_table(cast(dict[str, Any], table))
+    issues = [
+        Issue(
+            f"data.{key} is not allowed in a project config.toml: it holds only [data.<name>] "
+            "sources",
+            _line_of(text, ["data", key]),
+            path=f"data.{key}",
+        )
+        for key in limits
+    ]
+    try:
+        check_data_sources(DataSettings.model_validate({"sources": sources}).sources)
+    except ValidationError as exc:
+        issues += _from_validation(text, exc, prefix=["data"])
     return issues
 
 
@@ -322,7 +346,22 @@ def _protected_issues(text: str, data: dict[str, Any], old: dict[str, Any]) -> l
     for key in sorted(PROTECTED_MEMORY_SETTINGS):
         if new_memory.get(key) != old_memory.get(key):
             issues.append(_refused(text, f"memory.{key}"))
+    if _data_sources(data.get("data")) != _data_sources(old.get("data")):
+        issues.append(
+            Issue(
+                "data sources can't be changed from a browser: a source gives golem a path or an "
+                "address to read. Change [data.<name>] in a terminal",
+                _line_of(text, ["data"]),
+                path="data",
+            )
+        )
     return issues
+
+
+def _data_sources(table: object) -> dict[str, Any]:
+    if not isinstance(table, dict):
+        return {}
+    return split_data_table(cast(dict[str, Any], table))[1]
 
 
 def _refused(text: str, path: str) -> Issue:

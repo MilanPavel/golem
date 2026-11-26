@@ -408,6 +408,20 @@ One MCP server ([MCP servers](./mcp.md)). The name may use letters, digits, and 
 
 A value in `env` or `headers` may name `keychain:mcp/<name>`, and a key that looks like a secret must.
 
+### `[data]` and `[data.<name>]`
+
+`[data]` holds the limits of the data engine: `query_timeout_seconds` (`15`), `max_rows` (`10000`), `worker_memory` (`"2GB"`) and `threads` (`4`). Each sub-table is one source: a named, read-only view of a file, a folder of files, or a database. The name uses letters, digits and `_`, starts with a letter, and is not `golem`, which is the built-in source of your own usage and runs. Your own file and a trusted project's `.golem/config.toml` may hold sources; a project source replaces yours of the same name in that folder. An untrusted project's sources are listed and never opened. The page cannot change them.
+
+| Key | Default | Meaning |
+|---|---|---|
+| `path` | none | A file, a folder or a glob. Use this or `url` |
+| `url` | none | A database address |
+| `kind` | from the path | `files`, `sqlite`, `duckdb`, `postgres`, `mysql` or `url` |
+| `privacy` | `"local"` | `"open"`: any model reads rows. `"local"`: only a local model does. `"schema"`: models read names and types only |
+| `watch` | `false` | Notice when files appear in the folder |
+| `password` | none | Only `keychain:data/<name>`, with the source's own name |
+| `tables` | none | `{ include = [...], exclude = [...] }`: the tables the lists show |
+
 ### Older keys
 
 `model_profile`, `model_provider`, `model_name`, and `model_base_url` are the settings from before profiles. They still load, as one profile named after `model_profile` (`remote` when unset), so older chats keep working. Use `default_model` and `[models.<name>]` instead.

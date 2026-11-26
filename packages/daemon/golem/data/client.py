@@ -32,6 +32,8 @@ log = logging.getLogger(__name__)
 MAX_LINE_BYTES = 64 * 1024 * 1024
 """The longest answer: 10000 rows of wide text fit well inside it."""
 STDERR_LINES = 200
+LOAD_BATCH = 5000
+"""Rows of one ``load_table`` request."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -74,6 +76,7 @@ class DataWorker:
         self._stderr_task: asyncio.Task[None] | None = None
         self._stderr: deque[str] = deque(maxlen=STDERR_LINES)
         self._pending: dict[int, asyncio.Future[Any]] = {}
+        self._tags: dict[str, int] = {}
         self._next_id = 0
         self._sources: dict[str, SourceSpec] = {}
         self._start_lock = asyncio.Lock()
@@ -115,11 +118,53 @@ class DataWorker:
         timeout = self._settings.query_timeout_seconds
         return await self.request("describe", {"source": source, "table": table}, timeout=timeout)
 
-    async def query(self, source: str, sql: str, limit: int | None = None) -> dict[str, Any]:
-        """Run ``sql`` over ``source``: columns, rows, ``truncated`` and ``elapsed_ms``."""
+    async def query(
+        self, source: str, sql: str, limit: int | None = None, *, result_id: str | None = None
+    ) -> dict[str, Any]:
+        """Run ``sql`` over ``source``: columns, rows, ``truncated`` and ``elapsed_ms``.
+
+        With ``result_id`` the query can be stopped by :meth:`cancel` while it runs.
+        """
         rows = min(limit or self._settings.max_rows, self._settings.max_rows)
         args = {"source": source, "sql": sql, "limit": rows}
-        return await self.request("query", args, timeout=self._settings.query_timeout_seconds)
+        return await self.request(
+            "query", args, timeout=self._settings.query_timeout_seconds, tag=result_id
+        )
+
+    async def load_table(
+        self,
+        source: str,
+        table: str,
+        columns: list[dict[str, str]],
+        rows: list[list[Any]],
+        *,
+        batch: int = LOAD_BATCH,
+    ) -> int:
+        """Fill ``table`` of the built-in source with ``rows``, replacing what it had.
+
+        Rows go in batches, so one request never nears the line limit. Returns the row count.
+        """
+        count = 0
+        for start in range(0, max(len(rows), 1), batch):
+            args = {
+                "source": source,
+                "table": table,
+                "columns": columns,
+                "rows": rows[start : start + batch],
+                "replace": start == 0,
+            }
+            answer = await self.request("load_table", args, timeout=60)
+            count = int(answer["rows"])
+        return count
+
+    async def cancel(self, result_id: str) -> bool:
+        """Stop the running query started with ``result_id``. False when none is running."""
+        ident = self._tags.get(result_id)
+        process = self._process
+        if ident is None or process is None or process.returncode is not None:
+            return False
+        await self._send(process, {"id": 0, "op": "cancel", "args": {"id": ident}})
+        return True
 
     async def ensure_extension(self, name: str) -> None:
         """Install DuckDB's extension ``name`` into golem's folder, once. Never at query time."""
@@ -136,13 +181,20 @@ class DataWorker:
             timeout=self._timing.install_seconds,
         )
 
-    async def request(self, op: str, args: dict[str, Any], timeout: float | None = None) -> Any:
-        """Send one request and wait for its answer. Raises :class:`DataError`."""
+    async def request(
+        self, op: str, args: dict[str, Any], timeout: float | None = None, *, tag: str | None = None
+    ) -> Any:
+        """Send one request and wait for its answer. Raises :class:`DataError`.
+
+        ``tag`` names the request, so :meth:`cancel` can stop it.
+        """
         process = await self._ensure_started()
         self._next_id += 1
         ident = self._next_id
         future: asyncio.Future[Any] = asyncio.get_running_loop().create_future()
         self._pending[ident] = future
+        if tag is not None:
+            self._tags[tag] = ident
         try:
             await self._send(process, {"id": ident, "op": op, "args": args})
             if timeout is None:
@@ -156,6 +208,8 @@ class DataWorker:
                 ) from None
         finally:
             self._pending.pop(ident, None)
+            if tag is not None and self._tags.get(tag) == ident:
+                del self._tags[tag]
 
     async def close(self) -> None:
         """Close stdin, then SIGTERM, then SIGKILL, as the stdio transport does."""

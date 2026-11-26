@@ -14,6 +14,7 @@ from __future__ import annotations
 import re
 import shlex
 import tomllib
+from collections.abc import Mapping
 from contextvars import ContextVar
 from dataclasses import dataclass
 from fnmatch import fnmatchcase
@@ -429,11 +430,106 @@ def _relay_url(value: str | None) -> str | None:
     return value
 
 
+DATA_SOURCE_NAME = r"^[A-Za-z][A-Za-z0-9_]{0,31}$"
+"""A source name: letters, digits and ``_``, starting with a letter. Tables of SQL use it."""
+DATA_RESERVED = frozenset({"golem"})
+"""Names a user's source may not take: ``golem`` is the built-in source."""
+DATA_SECRET = re.compile(r"^keychain:data/([A-Za-z0-9][A-Za-z0-9._-]*)$")
+
+DataPrivacyLevel = Literal["open", "local", "schema"]
+DataKind = Literal["files", "sqlite", "duckdb", "postgres", "mysql", "url"]
+
+
+class DataTableFilter(BaseModel):
+    """``tables = { include, exclude }`` of a source: which of its tables are shown."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    include: list[str] = Field(default_factory=list[str])
+    exclude: list[str] = Field(default_factory=list[str])
+
+
+class DataSourceSettings(BaseModel):
+    """``[data.<name>]``. A named, read-only view of some data.
+
+    ``path`` is a file, a folder or a glob, and ``url`` a database address. Exactly one is set.
+    ``kind`` is guessed from the path or the address when it is left out. ``privacy`` is what
+    a model may read: ``open`` anything, ``local`` only a local model, ``schema`` names and
+    types only. ``password`` is only ever ``keychain:data/<name>``.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    path: str | None = Field(default=None, min_length=1)
+    url: str | None = Field(default=None, min_length=1)
+    kind: DataKind | None = None
+    privacy: DataPrivacyLevel = "local"
+    watch: bool = False
+    password: str | None = None
+    tables: DataTableFilter = Field(default_factory=DataTableFilter)
+
+    @model_validator(mode="after")
+    def _one_place(self) -> DataSourceSettings:
+        if (self.path is None) == (self.url is None):
+            raise ValueError("a data source needs either path (files) or url (a database)")
+        if self.password is not None and DATA_SECRET.match(self.password) is None:
+            raise ValueError("password is only keychain:data/<name>, never the password itself")
+        return self
+
+    @property
+    def location(self) -> str:
+        return self.path or self.url or ""
+
+    @property
+    def resolved_kind(self) -> DataKind:
+        """``kind``, or what the path or the address says it is."""
+        if self.kind is not None:
+            return self.kind
+        if self.url is not None:
+            scheme = urlsplit(self.url).scheme.lower()
+            if scheme in ("postgres", "postgresql"):
+                return "postgres"
+            return "mysql" if scheme == "mysql" else "url"
+        suffix = Path(self.path or "").suffix.lower()
+        if suffix in (".sqlite", ".sqlite3", ".db"):
+            return "sqlite"
+        return "duckdb" if suffix in (".duckdb", ".ddb") else "files"
+
+
+DataSourceTables = dict[str, DataSourceSettings]
+
+
+def check_data_sources(sources: Mapping[str, DataSourceSettings]) -> None:
+    """Raise ``ValueError`` for a bad name, ``golem``, or a password of another source."""
+    for name, source in sources.items():
+        if re.match(DATA_SOURCE_NAME, name) is None:
+            raise ValueError(
+                f"{name!r} is not a source name: letters, digits and _, starting with a letter"
+            )
+        if name.lower() in DATA_RESERVED:
+            raise ValueError(f"{name} is the built-in source and cannot be redefined")
+        if source.password is not None:
+            found = DATA_SECRET.match(source.password)
+            if found is None or found.group(1) != name:
+                raise ValueError(f"{name}: password must be keychain:data/{name}")
+
+
+def split_data_table(table: Mapping[str, Any]) -> tuple[dict[str, Any], dict[str, Any]]:
+    """The limits and the sources of a ``[data]`` table: its sub-tables are sources."""
+    limits: dict[str, Any] = {}
+    sources: dict[str, Any] = {}
+    for key, value in table.items():
+        (sources if isinstance(value, dict) else limits)[key] = value
+    return limits, sources
+
+
 class DataSettings(BaseModel):
     """``[data]``. Limits for the data engine, which runs SQL over files and databases.
 
     A query is cut after ``query_timeout_seconds`` and returns at most ``max_rows`` rows.
     The worker process may use ``worker_memory`` (a size such as ``"2GB"``) and ``threads``.
+    A sub-table, ``[data.<name>]``, is a source (:class:`DataSourceSettings`), kept in
+    ``sources``.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -444,6 +540,40 @@ class DataSettings(BaseModel):
         default="2GB", pattern=r"^\d+(\.\d+)?\s?(B|KB|MB|GB|TB|KiB|MiB|GiB|TiB)$"
     )
     threads: int = Field(default=4, ge=1)
+    sources: dict[str, DataSourceSettings] = Field(default_factory=dict[str, DataSourceSettings])
+
+    @model_validator(mode="before")
+    @classmethod
+    def _sub_tables_are_sources(cls, data: Any) -> Any:
+        if not isinstance(data, dict) or "sources" in data:
+            return cast(object, data)
+        limits, sources = split_data_table(cast(dict[str, Any], data))
+        return {**limits, "sources": sources} if sources else limits
+
+    @model_validator(mode="after")
+    def _names_and_secrets(self) -> DataSettings:
+        check_data_sources(self.sources)
+        return self
+
+
+_DATA_SOURCES: TypeAdapter[DataSourceTables] = TypeAdapter(DataSourceTables)
+
+
+def load_data_sources(path: Path) -> DataSourceTables:
+    """The ``[data.<name>]`` tables of one TOML file, and nothing else of it.
+
+    A missing file has none. Raises ``ValueError`` when the file or a table does not validate.
+    """
+    try:
+        data = tomllib.loads(path.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        return {}
+    table = data.get("data", {})
+    if not isinstance(table, dict):
+        raise ValueError("data must be a table")
+    sources = _DATA_SOURCES.validate_python(split_data_table(cast(dict[str, Any], table))[1])
+    check_data_sources(sources)
+    return sources
 
 
 class RelaySettings(BaseModel):
@@ -1047,6 +1177,10 @@ class _ProjectToml(TomlConfigSettingsSource):
         data.pop("routine", None)
         data.pop("memory", None)
         data.pop("relay", None)
+        table = data.get("data")
+        if isinstance(table, dict):
+            # A project's sources are read by ``load_data_sources`` after the trust check.
+            data["data"] = split_data_table(cast(dict[str, Any], table))[0]
         routing = data.get("routing")
         if isinstance(routing, dict) and "local_only" in routing:
             data["routing"] = {k: v for k, v in routing.items() if k != "local_only"}  # pyright: ignore[reportUnknownVariableType]

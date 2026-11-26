@@ -40,6 +40,7 @@ from langgraph.types import Command, interrupt
 
 from golem.coding.changes import ChangeStore
 from golem.config import ContextSettings, ModelPrice, PermissionMode
+from golem.data.sources import DataSources
 from golem.graphs.adapter import CONSENT_KIND, STREAM_KEY, message_text, stop_reason_of
 from golem.graphs.checks_node import CHECKS_KEY, checks_node
 from golem.graphs.child import (
@@ -275,6 +276,8 @@ class ChatRuntime:
         """Turns on an on-demand MCP server for a session, for the model's ``mcp_enable``."""
         self.skills: SkillRegistry | None = None
         """The skills sessions see, for the model's ``load_skill``."""
+        self.data: DataSources | None = None
+        """The data sources sessions see, for the model's ``data_*`` tools."""
         self.changes: ChangeStore | None = None
         """Where each file a tool writes is recorded. None: not recorded."""
         self.artifacts: Artifacts | None = None
@@ -1388,6 +1391,7 @@ def open_chat(
         lambda: runtime[0] if runtime else None,
         tier_of,
         lambda: router.agent_settings().use_helpers,
+        lambda: runtime[0].data if runtime else None,
     )
 
     async def tools_and_fill(state: AgentState, config: RunnableConfig) -> Mapping[str, object]:
