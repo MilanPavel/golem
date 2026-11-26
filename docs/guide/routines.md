@@ -47,6 +47,10 @@ Drop a PDF in `~/Downloads` and one session starts for it.
 - A routine starts one file at a time. A file that settles while the previous run is still going waits, and fires when that run ends.
 - If the folder is missing or cannot be read, the routine shows in the `issues` of `routine.list` and the log says why. It starts working when the folder does.
 
+## Start a workflow
+
+Instead of a `prompt`, a routine can start a [workflow](workflows.md#run-a-workflow-from-a-routine) with `workflow = "name"` and `inputs = { ... }`. A routine has exactly one of `prompt` and `workflow`. The run has its own session and reviews, and the routine's run row points at it. A watch routine passes the file as the input `path`.
+
 ## In the web page
 
 Open **Routines** in the sidebar. **+ New routine** opens a form, and **Edit** on a routine opens the same form. Under **When**, pick Every day, Weekdays, Weekly, Every N hours or Cron, and the page shows the next three times, which the daemon works out, so a wrong cron line is clear before you save. Pick **On new file** to watch a folder instead: a folder (type it, or **Browse…**) and a pattern such as `*.pdf`, and the page says what it will do, for example "Runs /receipt-to-csv for each new PDF in ~/Downloads". The **{path}**, **{name}** and **{dir}** chips put the placeholders into the prompt. Changing a routine from one kind to the other removes the key of the one it leaves. The list and the routine page say "New *.pdf in ~/Downloads" in place of a next time, and **History** shows the file of each run. The **Watch a folder** starter on the empty page fills this in. **What** is the prompt, with a **/ Skill** picker. **Where and with what** is the folder, the model and the MCP servers. Save writes the `[[routine]]` table into your `config.toml`. A project's routine is shown but not edited here; use **Open config**.

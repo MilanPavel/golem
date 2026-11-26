@@ -9,9 +9,7 @@ is not made yet (``session_id`` stays null until agent steps need it).
 from __future__ import annotations
 
 import asyncio
-import hashlib
 import json
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -43,10 +41,6 @@ from golem_protocol.commands import (
     WorkflowStepInfo,
     WorkflowTriggerInfo,
 )
-
-
-def _now() -> str:
-    return datetime.now(UTC).isoformat()
 
 
 def _service(ctx: RequestContext) -> WorkflowService:
@@ -174,18 +168,7 @@ async def workflow_start(ctx: RequestContext, params: WorkflowStartParams) -> Wo
         last = (entry.error or "it cannot be loaded").strip().splitlines()[-1:]
         raise RpcCallError(INVALID_PARAMS, f"{entry.name} is broken: {''.join(last)}")
     inputs = _coerce(entry, params.inputs)
-    digest = hashlib.sha256(entry.path.read_bytes()).hexdigest()
-    run_id = await service.runs.create_run(
-        entry.id,
-        entry.name,
-        str(entry.path),
-        _now(),
-        project=None if entry.project is None else str(entry.project),
-        inputs_json=json.dumps(inputs),
-        trigger=params.trigger,
-        source_hash=digest,
-    )
-    service.launch(run_id)
+    run_id, _ = await service.start_run(entry, inputs, params.trigger)
     return WorkflowStartResult(workflow_run_id=run_id)
 
 

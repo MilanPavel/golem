@@ -73,13 +73,6 @@
       "type": "string"
     },
     "trigger": {
-      "enum": [
-        "manual",
-        "schedule",
-        "file",
-        "chat",
-        "try"
-      ],
       "title": "Trigger",
       "type": "string"
     },

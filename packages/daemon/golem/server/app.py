@@ -513,7 +513,9 @@ class DaemonApp:
                     user_file=self.paths.config_file,
                     broadcast=self._broadcast,
                     now=lambda: self.state.clock(),
+                    workflows=self.state.workflows,
                 )
+                self.state.workflows.on_ended = routines.on_workflow_ended
                 bus.observe(routines.on_event)
                 self.state.routines = routines
                 watcher = FileWatcher(routines)

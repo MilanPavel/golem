@@ -8,6 +8,13 @@
       },
       "title": "Next",
       "type": "array"
+    },
+    "problems": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Problems",
+      "type": "array"
     }
   },
   "required": [

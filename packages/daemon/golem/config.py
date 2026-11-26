@@ -901,7 +901,9 @@ class RoutineSettings(BaseModel):
     Exactly one of ``schedule`` (cron, or ``every 15m``, ``daily 08:30``,
     ``weekdays 08:30``, ``weekly mon 06:00``) and ``on`` sets the trigger. ``prompt``
     is the text or the ``/skill`` the session starts with, in ``folder`` with
-    ``model`` and the on-demand MCP servers in ``mcp``. ``missed`` says what happens
+    ``model`` and the on-demand MCP servers in ``mcp``. Instead of
+    ``prompt``, ``workflow`` names a workflow to start, with ``inputs`` (a watch routine
+    adds ``path``). ``missed`` says what happens
     to a firing that came due while the daemon was down or the Mac asleep:
     ``skip`` drops it, ``run_once`` fires it once, late. ``notify_finished`` and
     ``notify_failed`` override the notification settings for this routine.
@@ -914,7 +916,11 @@ class RoutineSettings(BaseModel):
     name: str = Field(pattern=ROUTINE_NAME)
     schedule: str | None = Field(default=None, min_length=1)
     on: RoutineWatch | None = None
-    prompt: str = Field(min_length=1)
+    prompt: str | None = Field(default=None, min_length=1)
+    workflow: str | None = Field(default=None, min_length=1)
+    inputs: dict[str, str | int | float | bool] = Field(
+        default_factory=dict[str, str | int | float | bool]
+    )
     folder: str | None = Field(default=None, min_length=1)
     model: str | None = Field(default=None, min_length=1)
     mcp: list[str] = Field(default_factory=list[str])
@@ -937,7 +943,20 @@ class RoutineSettings(BaseModel):
     def _one_trigger(self) -> RoutineSettings:
         if (self.schedule is None) == (self.on is None):
             raise ValueError("a routine needs exactly one of schedule and on")
+        if (self.prompt is None) == (self.workflow is None):
+            raise ValueError("a routine needs exactly one of prompt and workflow")
+        if self.workflow is None and self.inputs:
+            raise ValueError("inputs belong to a routine that starts a workflow")
+        if self.workflow is not None:
+            for name in ("folder", "model", "mcp"):
+                if getattr(self, name):
+                    raise ValueError(f"{name} is for a prompt routine: a workflow chooses its own")
         return self
+
+    @property
+    def text(self) -> str:
+        """The prompt of a prompt routine. Empty for a workflow routine."""
+        return self.prompt or ""
 
 
 PROTECTED_SETTINGS = frozenset(

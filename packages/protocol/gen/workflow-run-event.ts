@@ -6,7 +6,7 @@ export type Name = string;
 export type SessionId = string | null;
 export type StartedAt = string | null;
 export type Status = 'pending' | 'running' | 'waiting' | 'done' | 'failed' | 'cancelled';
-export type Trigger = ('manual' | 'schedule' | 'file' | 'chat' | 'try') | null;
+export type Trigger = string | null;
 export type WorkflowId = string;
 export type WorkflowRunId = string;
 
