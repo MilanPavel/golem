@@ -19910,7 +19910,10 @@ public struct RoutineChanged: Codable {
 
 /// One ``[[routine]]`` as written. The daemon checks it when it loads.
 ///
-/// Exactly one of ``schedule`` and ``on`` is set. ``schedule`` is cron, or
+/// Exactly one of ``schedule`` and ``on`` is set, and exactly one of ``prompt`` and
+/// ``workflow``. ``workflow`` names a workflow to start, with ``inputs`` (a watch routine
+/// also passes ``path``); it takes no ``folder``, ``model`` or ``mcp``. ``schedule`` is
+/// cron, or
 /// ``every 15m``, ``every 1h``, ``daily 08:30``, ``weekdays 08:30``, ``weekly mon 06:00``.
 /// ``missed`` is what happens to a firing that came due while golem could not
 /// run it: ``skip`` drops it, ``run_once`` fires it once, late.
@@ -19920,6 +19923,7 @@ public struct RoutineChanged: Codable {
 public struct RoutineConfig: Codable {
     public let enabled: Bool?
     public let folder: String?
+    public let inputs: [String: Input]?
     public let mcp: [String]?
     public let missed: Missed?
     public let model: String?
@@ -19927,12 +19931,14 @@ public struct RoutineConfig: Codable {
     public let notifyFailed: Bool?
     public let notifyFinished: Bool?
     public let on: RoutineConfigRoutineWatchConfig?
-    public let prompt: String
+    public let prompt: String?
     public let schedule: String?
+    public let workflow: String?
 
     public enum CodingKeys: String, CodingKey {
         case enabled = "enabled"
         case folder = "folder"
+        case inputs = "inputs"
         case mcp = "mcp"
         case missed = "missed"
         case model = "model"
@@ -19942,11 +19948,13 @@ public struct RoutineConfig: Codable {
         case on = "on"
         case prompt = "prompt"
         case schedule = "schedule"
+        case workflow = "workflow"
     }
 
-    public init(enabled: Bool?, folder: String?, mcp: [String]?, missed: Missed?, model: String?, name: String, notifyFailed: Bool?, notifyFinished: Bool?, on: RoutineConfigRoutineWatchConfig?, prompt: String, schedule: String?) {
+    public init(enabled: Bool?, folder: String?, inputs: [String: Input]?, mcp: [String]?, missed: Missed?, model: String?, name: String, notifyFailed: Bool?, notifyFinished: Bool?, on: RoutineConfigRoutineWatchConfig?, prompt: String?, schedule: String?, workflow: String?) {
         self.enabled = enabled
         self.folder = folder
+        self.inputs = inputs
         self.mcp = mcp
         self.missed = missed
         self.model = model
@@ -19956,6 +19964,49 @@ public struct RoutineConfig: Codable {
         self.on = on
         self.prompt = prompt
         self.schedule = schedule
+        self.workflow = workflow
+    }
+}
+
+public enum Input: Codable {
+    case bool(Bool)
+    case double(Double)
+    case integer(Int)
+    case string(String)
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        if let x = try? container.decode(Bool.self) {
+            self = .bool(x)
+            return
+        }
+        if let x = try? container.decode(Int.self) {
+            self = .integer(x)
+            return
+        }
+        if let x = try? container.decode(Double.self) {
+            self = .double(x)
+            return
+        }
+        if let x = try? container.decode(String.self) {
+            self = .string(x)
+            return
+        }
+        throw DecodingError.typeMismatch(Input.self, DecodingError.Context(codingPath: decoder.codingPath, debugDescription: "Wrong type for Input"))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        switch self {
+        case .bool(let x):
+            try container.encode(x)
+        case .double(let x):
+            try container.encode(x)
+        case .integer(let x):
+            try container.encode(x)
+        case .string(let x):
+            try container.encode(x)
+        }
     }
 }
 
@@ -20104,7 +20155,7 @@ public struct RoutineFiredNotificationParams: Codable {
     public let routineRunID: String
     public let scope: String
     public let sessionID: String
-    public let trigger: RoutineFiredTrigger
+    public let trigger: ParamsTrigger
 
     public enum CodingKeys: String, CodingKey {
         case routine = "routine"
@@ -20114,7 +20165,7 @@ public struct RoutineFiredNotificationParams: Codable {
         case trigger = "trigger"
     }
 
-    public init(routine: String, routineRunID: String, scope: String, sessionID: String, trigger: RoutineFiredTrigger) {
+    public init(routine: String, routineRunID: String, scope: String, sessionID: String, trigger: ParamsTrigger) {
         self.routine = routine
         self.routineRunID = routineRunID
         self.scope = scope
@@ -20123,7 +20174,7 @@ public struct RoutineFiredNotificationParams: Codable {
     }
 }
 
-public enum RoutineFiredTrigger: String, Codable {
+public enum ParamsTrigger: String, Codable {
     case hook = "hook"
     case manual = "manual"
     case schedule = "schedule"
@@ -20137,7 +20188,7 @@ public struct RoutineFired: Codable {
     public let routineRunID: String
     public let scope: String
     public let sessionID: String
-    public let trigger: RoutineFiredTrigger
+    public let trigger: ParamsTrigger
 
     public enum CodingKeys: String, CodingKey {
         case routine = "routine"
@@ -20147,7 +20198,7 @@ public struct RoutineFired: Codable {
         case trigger = "trigger"
     }
 
-    public init(routine: String, routineRunID: String, scope: String, sessionID: String, trigger: RoutineFiredTrigger) {
+    public init(routine: String, routineRunID: String, scope: String, sessionID: String, trigger: ParamsTrigger) {
         self.routine = routine
         self.routineRunID = routineRunID
         self.scope = scope
@@ -20235,7 +20286,10 @@ public struct RoutineGetResultRoutine: Codable {
 
 /// One ``[[routine]]`` as written. The daemon checks it when it loads.
 ///
-/// Exactly one of ``schedule`` and ``on`` is set. ``schedule`` is cron, or
+/// Exactly one of ``schedule`` and ``on`` is set, and exactly one of ``prompt`` and
+/// ``workflow``. ``workflow`` names a workflow to start, with ``inputs`` (a watch routine
+/// also passes ``path``); it takes no ``folder``, ``model`` or ``mcp``. ``schedule`` is
+/// cron, or
 /// ``every 15m``, ``every 1h``, ``daily 08:30``, ``weekdays 08:30``, ``weekly mon 06:00``.
 /// ``missed`` is what happens to a firing that came due while golem could not
 /// run it: ``skip`` drops it, ``run_once`` fires it once, late.
@@ -20245,6 +20299,7 @@ public struct RoutineGetResultRoutine: Codable {
 public struct PurpleRoutineConfig: Codable {
     public let enabled: Bool?
     public let folder: String?
+    public let inputs: [String: Input]?
     public let mcp: [String]?
     public let missed: Missed?
     public let model: String?
@@ -20252,12 +20307,14 @@ public struct PurpleRoutineConfig: Codable {
     public let notifyFailed: Bool?
     public let notifyFinished: Bool?
     public let on: PurpleRoutineWatchConfig?
-    public let prompt: String
+    public let prompt: String?
     public let schedule: String?
+    public let workflow: String?
 
     public enum CodingKeys: String, CodingKey {
         case enabled = "enabled"
         case folder = "folder"
+        case inputs = "inputs"
         case mcp = "mcp"
         case missed = "missed"
         case model = "model"
@@ -20267,11 +20324,13 @@ public struct PurpleRoutineConfig: Codable {
         case on = "on"
         case prompt = "prompt"
         case schedule = "schedule"
+        case workflow = "workflow"
     }
 
-    public init(enabled: Bool?, folder: String?, mcp: [String]?, missed: Missed?, model: String?, name: String, notifyFailed: Bool?, notifyFinished: Bool?, on: PurpleRoutineWatchConfig?, prompt: String, schedule: String?) {
+    public init(enabled: Bool?, folder: String?, inputs: [String: Input]?, mcp: [String]?, missed: Missed?, model: String?, name: String, notifyFailed: Bool?, notifyFinished: Bool?, on: PurpleRoutineWatchConfig?, prompt: String?, schedule: String?, workflow: String?) {
         self.enabled = enabled
         self.folder = folder
+        self.inputs = inputs
         self.mcp = mcp
         self.missed = missed
         self.model = model
@@ -20281,6 +20340,7 @@ public struct PurpleRoutineConfig: Codable {
         self.on = on
         self.prompt = prompt
         self.schedule = schedule
+        self.workflow = workflow
     }
 }
 
@@ -20320,7 +20380,7 @@ public struct RoutineRunSummaryElement: Codable {
     public let startedAt: String?
     public let status: RoutineFinishedStatus
     public let summary: String?
-    public let trigger: RoutineFiredTrigger
+    public let trigger: ParamsTrigger
     public let watchPath: String?
 
     public enum CodingKeys: String, CodingKey {
@@ -20338,7 +20398,7 @@ public struct RoutineRunSummaryElement: Codable {
         case watchPath = "watch_path"
     }
 
-    public init(dueAt: String?, endedAt: String?, reason: String?, routine: String, routineRunID: String, scope: String, sessionID: String?, startedAt: String?, status: RoutineFinishedStatus, summary: String?, trigger: RoutineFiredTrigger, watchPath: String?) {
+    public init(dueAt: String?, endedAt: String?, reason: String?, routine: String, routineRunID: String, scope: String, sessionID: String?, startedAt: String?, status: RoutineFinishedStatus, summary: String?, trigger: ParamsTrigger, watchPath: String?) {
         self.dueAt = dueAt
         self.endedAt = endedAt
         self.reason = reason
@@ -20399,7 +20459,10 @@ public struct RoutineInfo: Codable {
 
 /// One ``[[routine]]`` as written. The daemon checks it when it loads.
 ///
-/// Exactly one of ``schedule`` and ``on`` is set. ``schedule`` is cron, or
+/// Exactly one of ``schedule`` and ``on`` is set, and exactly one of ``prompt`` and
+/// ``workflow``. ``workflow`` names a workflow to start, with ``inputs`` (a watch routine
+/// also passes ``path``); it takes no ``folder``, ``model`` or ``mcp``. ``schedule`` is
+/// cron, or
 /// ``every 15m``, ``every 1h``, ``daily 08:30``, ``weekdays 08:30``, ``weekly mon 06:00``.
 /// ``missed`` is what happens to a firing that came due while golem could not
 /// run it: ``skip`` drops it, ``run_once`` fires it once, late.
@@ -20409,6 +20472,7 @@ public struct RoutineInfo: Codable {
 public struct RoutineInfoConfig: Codable {
     public let enabled: Bool?
     public let folder: String?
+    public let inputs: [String: Input]?
     public let mcp: [String]?
     public let missed: Missed?
     public let model: String?
@@ -20416,12 +20480,14 @@ public struct RoutineInfoConfig: Codable {
     public let notifyFailed: Bool?
     public let notifyFinished: Bool?
     public let on: FluffyRoutineWatchConfig?
-    public let prompt: String
+    public let prompt: String?
     public let schedule: String?
+    public let workflow: String?
 
     public enum CodingKeys: String, CodingKey {
         case enabled = "enabled"
         case folder = "folder"
+        case inputs = "inputs"
         case mcp = "mcp"
         case missed = "missed"
         case model = "model"
@@ -20431,11 +20497,13 @@ public struct RoutineInfoConfig: Codable {
         case on = "on"
         case prompt = "prompt"
         case schedule = "schedule"
+        case workflow = "workflow"
     }
 
-    public init(enabled: Bool?, folder: String?, mcp: [String]?, missed: Missed?, model: String?, name: String, notifyFailed: Bool?, notifyFinished: Bool?, on: FluffyRoutineWatchConfig?, prompt: String, schedule: String?) {
+    public init(enabled: Bool?, folder: String?, inputs: [String: Input]?, mcp: [String]?, missed: Missed?, model: String?, name: String, notifyFailed: Bool?, notifyFinished: Bool?, on: FluffyRoutineWatchConfig?, prompt: String?, schedule: String?, workflow: String?) {
         self.enabled = enabled
         self.folder = folder
+        self.inputs = inputs
         self.mcp = mcp
         self.missed = missed
         self.model = model
@@ -20445,6 +20513,7 @@ public struct RoutineInfoConfig: Codable {
         self.on = on
         self.prompt = prompt
         self.schedule = schedule
+        self.workflow = workflow
     }
 }
 
@@ -20484,7 +20553,7 @@ public struct RoutineInfoRoutineRunSummary: Codable {
     public let startedAt: String?
     public let status: RoutineFinishedStatus
     public let summary: String?
-    public let trigger: RoutineFiredTrigger
+    public let trigger: ParamsTrigger
     public let watchPath: String?
 
     public enum CodingKeys: String, CodingKey {
@@ -20502,7 +20571,7 @@ public struct RoutineInfoRoutineRunSummary: Codable {
         case watchPath = "watch_path"
     }
 
-    public init(dueAt: String?, endedAt: String?, reason: String?, routine: String, routineRunID: String, scope: String, sessionID: String?, startedAt: String?, status: RoutineFinishedStatus, summary: String?, trigger: RoutineFiredTrigger, watchPath: String?) {
+    public init(dueAt: String?, endedAt: String?, reason: String?, routine: String, routineRunID: String, scope: String, sessionID: String?, startedAt: String?, status: RoutineFinishedStatus, summary: String?, trigger: ParamsTrigger, watchPath: String?) {
         self.dueAt = dueAt
         self.endedAt = endedAt
         self.reason = reason
@@ -20638,7 +20707,10 @@ public struct RoutineElement: Codable {
 
 /// One ``[[routine]]`` as written. The daemon checks it when it loads.
 ///
-/// Exactly one of ``schedule`` and ``on`` is set. ``schedule`` is cron, or
+/// Exactly one of ``schedule`` and ``on`` is set, and exactly one of ``prompt`` and
+/// ``workflow``. ``workflow`` names a workflow to start, with ``inputs`` (a watch routine
+/// also passes ``path``); it takes no ``folder``, ``model`` or ``mcp``. ``schedule`` is
+/// cron, or
 /// ``every 15m``, ``every 1h``, ``daily 08:30``, ``weekdays 08:30``, ``weekly mon 06:00``.
 /// ``missed`` is what happens to a firing that came due while golem could not
 /// run it: ``skip`` drops it, ``run_once`` fires it once, late.
@@ -20648,6 +20720,7 @@ public struct RoutineElement: Codable {
 public struct FluffyRoutineConfig: Codable {
     public let enabled: Bool?
     public let folder: String?
+    public let inputs: [String: Input]?
     public let mcp: [String]?
     public let missed: Missed?
     public let model: String?
@@ -20655,12 +20728,14 @@ public struct FluffyRoutineConfig: Codable {
     public let notifyFailed: Bool?
     public let notifyFinished: Bool?
     public let on: TentacledRoutineWatchConfig?
-    public let prompt: String
+    public let prompt: String?
     public let schedule: String?
+    public let workflow: String?
 
     public enum CodingKeys: String, CodingKey {
         case enabled = "enabled"
         case folder = "folder"
+        case inputs = "inputs"
         case mcp = "mcp"
         case missed = "missed"
         case model = "model"
@@ -20670,11 +20745,13 @@ public struct FluffyRoutineConfig: Codable {
         case on = "on"
         case prompt = "prompt"
         case schedule = "schedule"
+        case workflow = "workflow"
     }
 
-    public init(enabled: Bool?, folder: String?, mcp: [String]?, missed: Missed?, model: String?, name: String, notifyFailed: Bool?, notifyFinished: Bool?, on: TentacledRoutineWatchConfig?, prompt: String, schedule: String?) {
+    public init(enabled: Bool?, folder: String?, inputs: [String: Input]?, mcp: [String]?, missed: Missed?, model: String?, name: String, notifyFailed: Bool?, notifyFinished: Bool?, on: TentacledRoutineWatchConfig?, prompt: String?, schedule: String?, workflow: String?) {
         self.enabled = enabled
         self.folder = folder
+        self.inputs = inputs
         self.mcp = mcp
         self.missed = missed
         self.model = model
@@ -20684,6 +20761,7 @@ public struct FluffyRoutineConfig: Codable {
         self.on = on
         self.prompt = prompt
         self.schedule = schedule
+        self.workflow = workflow
     }
 }
 
@@ -20723,7 +20801,7 @@ public struct PurpleRoutineRunSummary: Codable {
     public let startedAt: String?
     public let status: RoutineFinishedStatus
     public let summary: String?
-    public let trigger: RoutineFiredTrigger
+    public let trigger: ParamsTrigger
     public let watchPath: String?
 
     public enum CodingKeys: String, CodingKey {
@@ -20741,7 +20819,7 @@ public struct PurpleRoutineRunSummary: Codable {
         case watchPath = "watch_path"
     }
 
-    public init(dueAt: String?, endedAt: String?, reason: String?, routine: String, routineRunID: String, scope: String, sessionID: String?, startedAt: String?, status: RoutineFinishedStatus, summary: String?, trigger: RoutineFiredTrigger, watchPath: String?) {
+    public init(dueAt: String?, endedAt: String?, reason: String?, routine: String, routineRunID: String, scope: String, sessionID: String?, startedAt: String?, status: RoutineFinishedStatus, summary: String?, trigger: ParamsTrigger, watchPath: String?) {
         self.dueAt = dueAt
         self.endedAt = endedAt
         self.reason = reason
@@ -20762,17 +20840,35 @@ public struct PurpleRoutineRunSummary: Codable {
 ///
 /// ``schedule`` is cron or a plain form, as in ``RoutineConfig``. A schedule that does not
 /// parse
-/// is refused with the reason, in words for a person.
+/// is refused with the reason, in words for a person. ``workflow`` and ``inputs`` are
+/// checked
+/// against the workflow's declared inputs, so an editor shows a wrong one before it saves:
+/// ``problems`` says what is wrong (empty when nothing is). ``on_watch`` says the routine
+/// watches a folder, which passes ``path``. ``folder`` is the project the routine belongs
+/// to.
+/// With no ``schedule``, ``next`` is empty.
 // MARK: - RoutinePreviewParams
 public struct RoutinePreviewParams: Codable {
-    public let schedule: String
+    public let folder: String?
+    public let inputs: [String: Input]?
+    public let onWatch: Bool?
+    public let schedule: String?
+    public let workflow: String?
 
     public enum CodingKeys: String, CodingKey {
+        case folder = "folder"
+        case inputs = "inputs"
+        case onWatch = "on_watch"
         case schedule = "schedule"
+        case workflow = "workflow"
     }
 
-    public init(schedule: String) {
+    public init(folder: String?, inputs: [String: Input]?, onWatch: Bool?, schedule: String?, workflow: String?) {
+        self.folder = folder
+        self.inputs = inputs
+        self.onWatch = onWatch
         self.schedule = schedule
+        self.workflow = workflow
     }
 }
 
@@ -20780,13 +20876,16 @@ public struct RoutinePreviewParams: Codable {
 // MARK: - RoutinePreviewResult
 public struct RoutinePreviewResult: Codable {
     public let next: [String]
+    public let problems: [String]?
 
     public enum CodingKeys: String, CodingKey {
         case next = "next"
+        case problems = "problems"
     }
 
-    public init(next: [String]) {
+    public init(next: [String], problems: [String]?) {
         self.next = next
+        self.problems = problems
     }
 }
 
@@ -20876,7 +20975,7 @@ public struct RoutineRunSummary: Codable {
     public let startedAt: String?
     public let status: RoutineFinishedStatus
     public let summary: String?
-    public let trigger: RoutineFiredTrigger
+    public let trigger: ParamsTrigger
     public let watchPath: String?
 
     public enum CodingKeys: String, CodingKey {
@@ -20894,7 +20993,7 @@ public struct RoutineRunSummary: Codable {
         case watchPath = "watch_path"
     }
 
-    public init(dueAt: String?, endedAt: String?, reason: String?, routine: String, routineRunID: String, scope: String, sessionID: String?, startedAt: String?, status: RoutineFinishedStatus, summary: String?, trigger: RoutineFiredTrigger, watchPath: String?) {
+    public init(dueAt: String?, endedAt: String?, reason: String?, routine: String, routineRunID: String, scope: String, sessionID: String?, startedAt: String?, status: RoutineFinishedStatus, summary: String?, trigger: ParamsTrigger, watchPath: String?) {
         self.dueAt = dueAt
         self.endedAt = endedAt
         self.reason = reason
@@ -20997,7 +21096,10 @@ public struct RoutineUpdateResultRoutine: Codable {
 
 /// One ``[[routine]]`` as written. The daemon checks it when it loads.
 ///
-/// Exactly one of ``schedule`` and ``on`` is set. ``schedule`` is cron, or
+/// Exactly one of ``schedule`` and ``on`` is set, and exactly one of ``prompt`` and
+/// ``workflow``. ``workflow`` names a workflow to start, with ``inputs`` (a watch routine
+/// also passes ``path``); it takes no ``folder``, ``model`` or ``mcp``. ``schedule`` is
+/// cron, or
 /// ``every 15m``, ``every 1h``, ``daily 08:30``, ``weekdays 08:30``, ``weekly mon 06:00``.
 /// ``missed`` is what happens to a firing that came due while golem could not
 /// run it: ``skip`` drops it, ``run_once`` fires it once, late.
@@ -21007,6 +21109,7 @@ public struct RoutineUpdateResultRoutine: Codable {
 public struct TentacledRoutineConfig: Codable {
     public let enabled: Bool?
     public let folder: String?
+    public let inputs: [String: Input]?
     public let mcp: [String]?
     public let missed: Missed?
     public let model: String?
@@ -21014,12 +21117,14 @@ public struct TentacledRoutineConfig: Codable {
     public let notifyFailed: Bool?
     public let notifyFinished: Bool?
     public let on: StickyRoutineWatchConfig?
-    public let prompt: String
+    public let prompt: String?
     public let schedule: String?
+    public let workflow: String?
 
     public enum CodingKeys: String, CodingKey {
         case enabled = "enabled"
         case folder = "folder"
+        case inputs = "inputs"
         case mcp = "mcp"
         case missed = "missed"
         case model = "model"
@@ -21029,11 +21134,13 @@ public struct TentacledRoutineConfig: Codable {
         case on = "on"
         case prompt = "prompt"
         case schedule = "schedule"
+        case workflow = "workflow"
     }
 
-    public init(enabled: Bool?, folder: String?, mcp: [String]?, missed: Missed?, model: String?, name: String, notifyFailed: Bool?, notifyFinished: Bool?, on: StickyRoutineWatchConfig?, prompt: String, schedule: String?) {
+    public init(enabled: Bool?, folder: String?, inputs: [String: Input]?, mcp: [String]?, missed: Missed?, model: String?, name: String, notifyFailed: Bool?, notifyFinished: Bool?, on: StickyRoutineWatchConfig?, prompt: String?, schedule: String?, workflow: String?) {
         self.enabled = enabled
         self.folder = folder
+        self.inputs = inputs
         self.mcp = mcp
         self.missed = missed
         self.model = model
@@ -21043,6 +21150,7 @@ public struct TentacledRoutineConfig: Codable {
         self.on = on
         self.prompt = prompt
         self.schedule = schedule
+        self.workflow = workflow
     }
 }
 
@@ -21082,7 +21190,7 @@ public struct FluffyRoutineRunSummary: Codable {
     public let startedAt: String?
     public let status: RoutineFinishedStatus
     public let summary: String?
-    public let trigger: RoutineFiredTrigger
+    public let trigger: ParamsTrigger
     public let watchPath: String?
 
     public enum CodingKeys: String, CodingKey {
@@ -21100,7 +21208,7 @@ public struct FluffyRoutineRunSummary: Codable {
         case watchPath = "watch_path"
     }
 
-    public init(dueAt: String?, endedAt: String?, reason: String?, routine: String, routineRunID: String, scope: String, sessionID: String?, startedAt: String?, status: RoutineFinishedStatus, summary: String?, trigger: RoutineFiredTrigger, watchPath: String?) {
+    public init(dueAt: String?, endedAt: String?, reason: String?, routine: String, routineRunID: String, scope: String, sessionID: String?, startedAt: String?, status: RoutineFinishedStatus, summary: String?, trigger: ParamsTrigger, watchPath: String?) {
         self.dueAt = dueAt
         self.endedAt = endedAt
         self.reason = reason
@@ -24057,7 +24165,7 @@ public struct RunInfo: Codable {
     public let status: RoutineFinishedStatus
     public let steps: Int?
     public let summary: String?
-    public let trigger: RoutineFiredTrigger?
+    public let trigger: ParamsTrigger?
     public let watchPath: String?
     public let workflowRunID: String?
 
@@ -24080,7 +24188,7 @@ public struct RunInfo: Codable {
         case workflowRunID = "workflow_run_id"
     }
 
-    public init(approvals: Int?, endedAt: String?, folder: String?, kind: RunInfoKind, origin: String, reason: String?, routine: String?, routineRunID: String?, sessionID: String, startedAt: String?, status: RoutineFinishedStatus, steps: Int?, summary: String?, trigger: RoutineFiredTrigger?, watchPath: String?, workflowRunID: String?) {
+    public init(approvals: Int?, endedAt: String?, folder: String?, kind: RunInfoKind, origin: String, reason: String?, routine: String?, routineRunID: String?, sessionID: String, startedAt: String?, status: RoutineFinishedStatus, steps: Int?, summary: String?, trigger: ParamsTrigger?, watchPath: String?, workflowRunID: String?) {
         self.approvals = approvals
         self.endedAt = endedAt
         self.folder = folder
@@ -24173,7 +24281,7 @@ public struct RunElement: Codable {
     public let status: RoutineFinishedStatus
     public let steps: Int?
     public let summary: String?
-    public let trigger: RoutineFiredTrigger?
+    public let trigger: ParamsTrigger?
     public let watchPath: String?
     public let workflowRunID: String?
 
@@ -24196,7 +24304,7 @@ public struct RunElement: Codable {
         case workflowRunID = "workflow_run_id"
     }
 
-    public init(approvals: Int?, endedAt: String?, folder: String?, kind: RunInfoKind, origin: String, reason: String?, routine: String?, routineRunID: String?, sessionID: String, startedAt: String?, status: RoutineFinishedStatus, steps: Int?, summary: String?, trigger: RoutineFiredTrigger?, watchPath: String?, workflowRunID: String?) {
+    public init(approvals: Int?, endedAt: String?, folder: String?, kind: RunInfoKind, origin: String, reason: String?, routine: String?, routineRunID: String?, sessionID: String, startedAt: String?, status: RoutineFinishedStatus, steps: Int?, summary: String?, trigger: ParamsTrigger?, watchPath: String?, workflowRunID: String?) {
         self.approvals = approvals
         self.endedAt = endedAt
         self.folder = folder
@@ -31873,7 +31981,7 @@ public struct WorkflowResumeResultRun: Codable {
     public let sessionID: String?
     public let startedAt: String?
     public let status: WorkflowRunEventStatus
-    public let trigger: WorkflowRunEventTrigger
+    public let trigger: String
     public let workflowID: String
     public let workflowRunID: String
 
@@ -31890,7 +31998,7 @@ public struct WorkflowResumeResultRun: Codable {
         case workflowRunID = "workflow_run_id"
     }
 
-    public init(error: String?, finishedAt: String?, inputs: [String: JSONAny]?, name: String, sessionID: String?, startedAt: String?, status: WorkflowRunEventStatus, trigger: WorkflowRunEventTrigger, workflowID: String, workflowRunID: String) {
+    public init(error: String?, finishedAt: String?, inputs: [String: JSONAny]?, name: String, sessionID: String?, startedAt: String?, status: WorkflowRunEventStatus, trigger: String, workflowID: String, workflowRunID: String) {
         self.error = error
         self.finishedAt = finishedAt
         self.inputs = inputs
@@ -31911,14 +32019,6 @@ public enum WorkflowRunEventStatus: String, Codable {
     case pending = "pending"
     case running = "running"
     case waiting = "waiting"
-}
-
-public enum WorkflowRunEventTrigger: String, Codable {
-    case chat = "chat"
-    case file = "file"
-    case manual = "manual"
-    case schedule = "schedule"
-    case triggerTry = "try"
 }
 
 /// ``workflow.review.answer``. Answer the review ``key`` of a waiting run.
@@ -31983,7 +32083,7 @@ public struct WorkflowReviewAnswerResultRun: Codable {
     public let sessionID: String?
     public let startedAt: String?
     public let status: WorkflowRunEventStatus
-    public let trigger: WorkflowRunEventTrigger
+    public let trigger: String
     public let workflowID: String
     public let workflowRunID: String
 
@@ -32000,7 +32100,7 @@ public struct WorkflowReviewAnswerResultRun: Codable {
         case workflowRunID = "workflow_run_id"
     }
 
-    public init(error: String?, finishedAt: String?, inputs: [String: JSONAny]?, name: String, sessionID: String?, startedAt: String?, status: WorkflowRunEventStatus, trigger: WorkflowRunEventTrigger, workflowID: String, workflowRunID: String) {
+    public init(error: String?, finishedAt: String?, inputs: [String: JSONAny]?, name: String, sessionID: String?, startedAt: String?, status: WorkflowRunEventStatus, trigger: String, workflowID: String, workflowRunID: String) {
         self.error = error
         self.finishedAt = finishedAt
         self.inputs = inputs
@@ -32080,7 +32180,7 @@ public struct WorkflowRunCancelledNotificationParams: Codable {
     public let sessionID: String?
     public let startedAt: String?
     public let status: WorkflowRunEventStatus
-    public let trigger: WorkflowRunEventTrigger?
+    public let trigger: String?
     public let workflowID: String
     public let workflowRunID: String
 
@@ -32096,7 +32196,7 @@ public struct WorkflowRunCancelledNotificationParams: Codable {
         case workflowRunID = "workflow_run_id"
     }
 
-    public init(error: String?, finishedAt: String?, name: String, sessionID: String?, startedAt: String?, status: WorkflowRunEventStatus, trigger: WorkflowRunEventTrigger?, workflowID: String, workflowRunID: String) {
+    public init(error: String?, finishedAt: String?, name: String, sessionID: String?, startedAt: String?, status: WorkflowRunEventStatus, trigger: String?, workflowID: String, workflowRunID: String) {
         self.error = error
         self.finishedAt = finishedAt
         self.name = name
@@ -32145,7 +32245,7 @@ public struct WorkflowRunDoneNotificationParams: Codable {
     public let sessionID: String?
     public let startedAt: String?
     public let status: WorkflowRunEventStatus
-    public let trigger: WorkflowRunEventTrigger?
+    public let trigger: String?
     public let workflowID: String
     public let workflowRunID: String
 
@@ -32161,7 +32261,7 @@ public struct WorkflowRunDoneNotificationParams: Codable {
         case workflowRunID = "workflow_run_id"
     }
 
-    public init(error: String?, finishedAt: String?, name: String, sessionID: String?, startedAt: String?, status: WorkflowRunEventStatus, trigger: WorkflowRunEventTrigger?, workflowID: String, workflowRunID: String) {
+    public init(error: String?, finishedAt: String?, name: String, sessionID: String?, startedAt: String?, status: WorkflowRunEventStatus, trigger: String?, workflowID: String, workflowRunID: String) {
         self.error = error
         self.finishedAt = finishedAt
         self.name = name
@@ -32186,7 +32286,7 @@ public struct WorkflowRunEvent: Codable {
     public let sessionID: String?
     public let startedAt: String?
     public let status: WorkflowRunEventStatus
-    public let trigger: WorkflowRunEventTrigger?
+    public let trigger: String?
     public let workflowID: String
     public let workflowRunID: String
 
@@ -32202,7 +32302,7 @@ public struct WorkflowRunEvent: Codable {
         case workflowRunID = "workflow_run_id"
     }
 
-    public init(error: String?, finishedAt: String?, name: String, sessionID: String?, startedAt: String?, status: WorkflowRunEventStatus, trigger: WorkflowRunEventTrigger?, workflowID: String, workflowRunID: String) {
+    public init(error: String?, finishedAt: String?, name: String, sessionID: String?, startedAt: String?, status: WorkflowRunEventStatus, trigger: String?, workflowID: String, workflowRunID: String) {
         self.error = error
         self.finishedAt = finishedAt
         self.name = name
@@ -32251,7 +32351,7 @@ public struct WorkflowRunFailedNotificationParams: Codable {
     public let sessionID: String?
     public let startedAt: String?
     public let status: WorkflowRunEventStatus
-    public let trigger: WorkflowRunEventTrigger?
+    public let trigger: String?
     public let workflowID: String
     public let workflowRunID: String
 
@@ -32267,7 +32367,7 @@ public struct WorkflowRunFailedNotificationParams: Codable {
         case workflowRunID = "workflow_run_id"
     }
 
-    public init(error: String?, finishedAt: String?, name: String, sessionID: String?, startedAt: String?, status: WorkflowRunEventStatus, trigger: WorkflowRunEventTrigger?, workflowID: String, workflowRunID: String) {
+    public init(error: String?, finishedAt: String?, name: String, sessionID: String?, startedAt: String?, status: WorkflowRunEventStatus, trigger: String?, workflowID: String, workflowRunID: String) {
         self.error = error
         self.finishedAt = finishedAt
         self.name = name
@@ -32293,7 +32393,7 @@ public struct WorkflowRunInfo: Codable {
     public let sessionID: String?
     public let startedAt: String?
     public let status: WorkflowRunEventStatus
-    public let trigger: WorkflowRunEventTrigger
+    public let trigger: String
     public let workflowID: String
     public let workflowRunID: String
 
@@ -32310,7 +32410,7 @@ public struct WorkflowRunInfo: Codable {
         case workflowRunID = "workflow_run_id"
     }
 
-    public init(error: String?, finishedAt: String?, inputs: [String: JSONAny]?, name: String, sessionID: String?, startedAt: String?, status: WorkflowRunEventStatus, trigger: WorkflowRunEventTrigger, workflowID: String, workflowRunID: String) {
+    public init(error: String?, finishedAt: String?, inputs: [String: JSONAny]?, name: String, sessionID: String?, startedAt: String?, status: WorkflowRunEventStatus, trigger: String, workflowID: String, workflowRunID: String) {
         self.error = error
         self.finishedAt = finishedAt
         self.inputs = inputs
@@ -32360,7 +32460,7 @@ public struct WorkflowRunResumedNotificationParams: Codable {
     public let sessionID: String?
     public let startedAt: String?
     public let status: WorkflowRunEventStatus
-    public let trigger: WorkflowRunEventTrigger?
+    public let trigger: String?
     public let workflowID: String
     public let workflowRunID: String
 
@@ -32376,7 +32476,7 @@ public struct WorkflowRunResumedNotificationParams: Codable {
         case workflowRunID = "workflow_run_id"
     }
 
-    public init(error: String?, finishedAt: String?, name: String, sessionID: String?, startedAt: String?, status: WorkflowRunEventStatus, trigger: WorkflowRunEventTrigger?, workflowID: String, workflowRunID: String) {
+    public init(error: String?, finishedAt: String?, name: String, sessionID: String?, startedAt: String?, status: WorkflowRunEventStatus, trigger: String?, workflowID: String, workflowRunID: String) {
         self.error = error
         self.finishedAt = finishedAt
         self.name = name
@@ -32425,7 +32525,7 @@ public struct WorkflowRunStartedNotificationParams: Codable {
     public let sessionID: String?
     public let startedAt: String?
     public let status: WorkflowRunEventStatus
-    public let trigger: WorkflowRunEventTrigger?
+    public let trigger: String?
     public let workflowID: String
     public let workflowRunID: String
 
@@ -32441,7 +32541,7 @@ public struct WorkflowRunStartedNotificationParams: Codable {
         case workflowRunID = "workflow_run_id"
     }
 
-    public init(error: String?, finishedAt: String?, name: String, sessionID: String?, startedAt: String?, status: WorkflowRunEventStatus, trigger: WorkflowRunEventTrigger?, workflowID: String, workflowRunID: String) {
+    public init(error: String?, finishedAt: String?, name: String, sessionID: String?, startedAt: String?, status: WorkflowRunEventStatus, trigger: String?, workflowID: String, workflowRunID: String) {
         self.error = error
         self.finishedAt = finishedAt
         self.name = name
@@ -32490,7 +32590,7 @@ public struct WorkflowRunWaitingNotificationParams: Codable {
     public let sessionID: String?
     public let startedAt: String?
     public let status: WorkflowRunEventStatus
-    public let trigger: WorkflowRunEventTrigger?
+    public let trigger: String?
     public let workflowID: String
     public let workflowRunID: String
 
@@ -32506,7 +32606,7 @@ public struct WorkflowRunWaitingNotificationParams: Codable {
         case workflowRunID = "workflow_run_id"
     }
 
-    public init(error: String?, finishedAt: String?, name: String, sessionID: String?, startedAt: String?, status: WorkflowRunEventStatus, trigger: WorkflowRunEventTrigger?, workflowID: String, workflowRunID: String) {
+    public init(error: String?, finishedAt: String?, name: String, sessionID: String?, startedAt: String?, status: WorkflowRunEventStatus, trigger: String?, workflowID: String, workflowRunID: String) {
         self.error = error
         self.finishedAt = finishedAt
         self.name = name
@@ -32642,7 +32742,7 @@ public struct WorkflowStatusResultRun: Codable {
     public let sessionID: String?
     public let startedAt: String?
     public let status: WorkflowRunEventStatus
-    public let trigger: WorkflowRunEventTrigger
+    public let trigger: String
     public let workflowID: String
     public let workflowRunID: String
 
@@ -32659,7 +32759,7 @@ public struct WorkflowStatusResultRun: Codable {
         case workflowRunID = "workflow_run_id"
     }
 
-    public init(error: String?, finishedAt: String?, inputs: [String: JSONAny]?, name: String, sessionID: String?, startedAt: String?, status: WorkflowRunEventStatus, trigger: WorkflowRunEventTrigger, workflowID: String, workflowRunID: String) {
+    public init(error: String?, finishedAt: String?, inputs: [String: JSONAny]?, name: String, sessionID: String?, startedAt: String?, status: WorkflowRunEventStatus, trigger: String, workflowID: String, workflowRunID: String) {
         self.error = error
         self.finishedAt = finishedAt
         self.inputs = inputs
