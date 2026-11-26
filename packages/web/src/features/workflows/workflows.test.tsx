@@ -90,7 +90,7 @@ test("the Overview shows the description, the inputs, the steps with their lines
   expect(steps.getByText("line 15")).toBeTruthy();
   expect(steps.getByText("llm · for each pulls")).toBeTruthy();
   expect(screen.getByText("By hand")).toBeTruthy();
-  // Run… is there and disabled until the dialog exists.
+  // Without a way to start, Run… is there and disabled.
   expect((screen.getByRole("button", { name: "Run…" }) as HTMLButtonElement).disabled).toBe(true);
   expect((await axe.run(container, noContrast)).violations).toEqual([]);
 });
@@ -202,4 +202,67 @@ test("a workflow the daemon does not know says so", async () => {
     raw.getWorkflow.mockRejectedValue(new Error("no workflow nope"));
   });
   expect(await screen.findByText(/no workflow nope|There is no such workflow/)).toBeTruthy();
+});
+
+const GO = { ...SAMPLE_PR_DIGEST, inputs: [...(SAMPLE_PR_DIGEST.inputs ?? []), { name: "limit", type: "int", default: "5" }, { name: "dry", type: "bool", default: "False" }, { name: "mode", type: 'Literal["fast", "slow"]' }, { name: "where", type: "Path" }] };
+
+test("Run… opens a form from the inputs, marks the required ones and starts with what was typed", async () => {
+  const user = userEvent.setup();
+  const onStart = vi.fn(() => Promise.resolve());
+  const { baseElement } = render(detail({ workflow: GO, onStart, onChooseFolder: async () => "/Users/you/repos/golem" }));
+  await user.click(screen.getByRole("button", { name: "Run…" }));
+  const dialog = within(screen.getByRole("dialog", { name: "Run pr_digest" }));
+  expect((dialog.getByLabelText("since") as HTMLInputElement).value).toBe("1d");
+  expect((dialog.getByLabelText("limit") as HTMLInputElement).value).toBe("5");
+  expect(dialog.getByText("str · default 1d")).toBeTruthy();
+  // Nothing typed: the required fields complain, and nothing starts.
+  await user.click(dialog.getByRole("button", { name: "Run" }));
+  expect(dialog.getAllByText("Required.")).toHaveLength(4);
+  expect(onStart).not.toHaveBeenCalled();
+  await user.type(dialog.getByLabelText(/^tool/), "gh");
+  await user.type(dialog.getByLabelText(/^repo/), "MilanPavel/golem");
+  await user.selectOptions(dialog.getByLabelText(/^mode/), "fast");
+  await user.click(dialog.getByRole("button", { name: "Choose a folder for where" }));
+  await waitFor(() => expect((dialog.getByLabelText(/^where/) as HTMLInputElement).value).toBe("/Users/you/repos/golem"));
+  await user.clear(dialog.getByLabelText("limit"));
+  await user.type(dialog.getByLabelText("limit"), "x");
+  await user.click(dialog.getByRole("button", { name: "Run" }));
+  expect(dialog.getByText("Enter a number.")).toBeTruthy();
+  await user.clear(dialog.getByLabelText("limit"));
+  await user.type(dialog.getByLabelText("limit"), "7");
+  await user.click(dialog.getByLabelText("dry"));
+  expect((await axe.run(baseElement, noContrast)).violations).toEqual([]);
+  await user.click(dialog.getByRole("button", { name: "Run" }));
+  expect(onStart).toHaveBeenCalledWith({ tool: "gh", repo: "MilanPavel/golem", since: "1d", limit: 7, dry: true, mode: "fast", where: "/Users/you/repos/golem" });
+  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+});
+
+test("an error from the start stays in the dialog and Run works again", async () => {
+  const user = userEvent.setup();
+  const onStart = vi.fn(() => Promise.reject(new Error("The folder is not trusted.")));
+  render(detail({ workflow: { ...SAMPLE_PR_DIGEST, inputs: [{ name: "repo", type: "str", default: '"x"' }] }, onStart }));
+  await user.click(screen.getByRole("button", { name: "Run…" }));
+  await user.click(screen.getByRole("button", { name: "Run" }));
+  expect((await screen.findByRole("alert")).textContent).toBe("The folder is not trusted.");
+  expect((screen.getByRole("button", { name: "Run" }) as HTMLButtonElement).disabled).toBe(false);
+  await user.click(screen.getByRole("button", { name: "Cancel" }));
+  expect(screen.queryByRole("dialog")).toBeNull();
+});
+
+test("Run… is disabled for a broken workflow", () => {
+  render(detail({ workflow: SAMPLE_BROKEN, onStart: () => Promise.resolve() }));
+  expect((screen.getByRole("button", { name: "Run…" }) as HTMLButtonElement).disabled).toBe(true);
+});
+
+test("/workflows/:id: Run starts the workflow and opens the run by its id", async () => {
+  const user = userEvent.setup();
+  const fake = mount(`/workflows/${encodeURIComponent(SAMPLE_PR_DIGEST.id)}`, ({ raw }) => {
+    raw.getWorkflow.mockResolvedValue(SAMPLE_PR_DIGEST_GET);
+  });
+  await user.click(await screen.findByRole("button", { name: "Run…" }));
+  await user.type(screen.getByLabelText(/^tool/), "gh");
+  await user.type(screen.getByLabelText(/^repo/), "MilanPavel/golem");
+  await user.click(screen.getByRole("button", { name: "Run" }));
+  await waitFor(() => expect(location.pathname).toBe("/runs/wr_1"));
+  expect(fake.raw.startWorkflow).toHaveBeenCalledWith(SAMPLE_PR_DIGEST.id, { tool: "gh", repo: "MilanPavel/golem", since: "1d" });
 });

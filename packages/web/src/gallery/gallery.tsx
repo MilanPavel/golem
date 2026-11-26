@@ -1,6 +1,7 @@
 import { helperCardOf, agentRow, signInLine, type SignInLine, checksSummary, COMMANDS, mcpStatusWord, noPastes, pickerGroups, withModelChoices, withSkillChoices, type CheckRun, type ChecksState, type ReviewNote, type TodoItem, type TurnChecks, type TurnCard, type ChatMessage, type ChatState, type RewindPlan, ladderRows, NO_LOCAL_WINDOW, routeRows, spendRows, contextActions, bestActions, windowSourceOf, helperBanner, helperReceipt, type ContextActionsInput, type PermissionMode } from "@golem/view";
 import type { ListedModel } from "@golem/client";
-import { createContext, useContext, useEffect, useId, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useId, useState, type ComponentProps, type ReactNode } from "react";
+import type { WorkflowEntryInfo } from "../store/workflows.ts";
 import { Badge } from "../ui/badge.tsx";
 import { Button } from "../ui/button.tsx";
 import { Card } from "../ui/card.tsx";
@@ -101,7 +102,7 @@ import { ASKING_HELPER, DONE_HELPER, HELPER_NOW, RUNNING_HELPER, TRIMMED_AT, TRI
 import { RoutineDetail, RoutinesEmpty, RoutinesPanel } from "../features/routines/index.ts";
 import { SAMPLE_LIST, SAMPLE_MORNING_BRIEF, ROUTINES_NOW, SAMPLE_RUNS } from "../features/routines/sample.ts";
 import { LeadRun, RunBanner, RunsList, RunsPanel } from "../features/runs/index.ts";
-import { WorkflowDetail, WorkflowsPanel } from "../features/workflows/index.ts";
+import { RunForm, WorkflowDetail, WorkflowsPanel } from "../features/workflows/index.ts";
 import { SAMPLE_BROKEN, SAMPLE_PR_DIGEST, SAMPLE_PR_DIGEST_CODE, SAMPLE_PR_DIGEST_STEPS, SAMPLE_UNTRUSTED, SAMPLE_WORKFLOW_LIST, SAMPLE_WORKFLOW_LIST_TWO_PROJECTS, SAMPLE_WORKFLOW_RUNS, WORKFLOWS_NOW } from "../features/workflows/sample.ts";
 import { RUNS_NOW, SAMPLE_RUN_LIST, SAMPLE_WAITING_RUN } from "../features/runs/sample.ts";
 import { HelperRowCardBody, Rail, SessionsPanel, SidebarPanel, WaitingChip } from "../features/sidebar/index.ts";
@@ -2057,6 +2058,18 @@ function GalleryArtifact({ artifactId, open, onOpenChange }: { sessionId: string
   );
 }
 
+const RUN_ALL_TYPES: WorkflowEntryInfo = {
+  ...SAMPLE_PR_DIGEST,
+  inputs: [
+    { name: "tool", type: "str" },
+    { name: "repo", type: "str" },
+    { name: "limit", type: "int", default: "5" },
+    { name: "dry", type: "bool", default: "False" },
+    { name: "mode", type: 'Literal["fast", "slow"]' },
+    { name: "where", type: "Path" },
+  ],
+};
+
 function DetailDemo({ label, result }: { label: string; result: TraceSpanResult }) {
   return (
     <figure className="w-full">
@@ -2336,6 +2349,22 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
             <WorkflowDetail workflow={workflow} steps={steps} code={code} runs={runs} now={WORKFLOWS_NOW} onNavigate={() => {}} onReveal={() => Promise.resolve()} initialTab={tab} />
           </div>
         ))}
+        <div className="mt-4 flex flex-wrap items-start gap-4">
+          {(
+            [
+              ["Run dialog, defaults filled", SAMPLE_PR_DIGEST, undefined],
+              ["Run dialog, required missing", SAMPLE_PR_DIGEST, { touched: true }],
+              ["Run dialog, every input type", RUN_ALL_TYPES, { values: { tool: "gh", mode: "fast" } }],
+              ["Run dialog, bad number and error from the start", RUN_ALL_TYPES, { touched: true, values: { tool: "gh", repo: "x", mode: "fast", where: "/tmp", limit: "x" }, error: "The folder is not trusted. Trust it in Settings first." }],
+              ["Run dialog, starting", SAMPLE_PR_DIGEST, { values: { tool: "gh", repo: "MilanPavel/golem" }, starting: true }],
+              ["Run dialog, no inputs", { ...SAMPLE_PR_DIGEST, inputs: [] }, undefined],
+            ] satisfies [string, WorkflowEntryInfo, ComponentProps<typeof RunForm>["initial"]][]
+          ).map(([title, workflow, initial]) => (
+            <div key={title} role="region" aria-label={`${title}, ${theme}`} className="w-full max-w-md rounded-lg border border-line bg-surface p-5 text-ink shadow-soft">
+              <RunForm inline workflow={workflow} onStart={() => new Promise<void>(() => {})} onCancel={() => {}} onChooseFolder={() => Promise.resolve(null)} initial={initial} />
+            </div>
+          ))}
+        </div>
       </section>
       </Only>
 

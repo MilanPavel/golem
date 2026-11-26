@@ -24,3 +24,18 @@ test("the gallery's Workflows section shows the panels and a detail for each tab
   expect(within(screen.getByRole("region", { name: "Workflow detail, Runs, none yet, slip" })).getByText("No runs yet.")).toBeTruthy();
   expect(within(screen.getByRole("region", { name: "Workflow detail, broken, slip" })).getByRole("alert").textContent).toContain("ImportError");
 });
+
+test("the gallery's Run dialog stories show each state, in both themes", () => {
+  for (const theme of ["slip", "kiln"] as const) {
+    showTheme(theme);
+    const { unmount } = render(<Gallery />);
+    const story = (name: string) => within(screen.getByRole("region", { name: `${name}, ${theme}` }));
+    expect(story("Run dialog, defaults filled").getByRole("button", { name: "Run" })).toBeTruthy();
+    expect(story("Run dialog, required missing").getAllByText("Required.")).toHaveLength(2);
+    expect(story("Run dialog, every input type").getByLabelText("dry")).toBeTruthy();
+    expect(story("Run dialog, bad number and error from the start").getByText("Enter a number.")).toBeTruthy();
+    expect((story("Run dialog, starting").getByRole("button", { name: "Starting…" }) as HTMLButtonElement).disabled).toBe(true);
+    expect(story("Run dialog, no inputs").getByText(/takes no inputs/)).toBeTruthy();
+    unmount();
+  }
+});

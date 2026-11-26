@@ -2,3 +2,4 @@ export { LiveWorkflowsPanel, WorkflowsPanel, type WorkflowsPanelProps } from "./
 export { WorkflowDetail, type WorkflowDetailProps } from "./workflow-detail.tsx";
 export { WorkflowScreen, WorkflowsScreen } from "./workflow-screen.tsx";
 export { WorkflowDot } from "./workflow-dot.tsx";
+export { RunDialog, RunForm, type RunDialogProps, type RunFormProps } from "./run-dialog.tsx";
