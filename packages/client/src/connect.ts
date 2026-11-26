@@ -73,9 +73,12 @@ import type { MemoryChanged } from "../../protocol/gen/memory-changed.ts";
 import type { DataAddParams } from "../../protocol/gen/data-add-params.ts";
 import type { DataAddResult } from "../../protocol/gen/data-add-result.ts";
 import type { DataChanged } from "../../protocol/gen/data-changed.ts";
+import type { DataCancelResult } from "../../protocol/gen/data-cancel-result.ts";
 import type { DataDescribeResult } from "../../protocol/gen/data-describe-result.ts";
 import type { DataInspectResult } from "../../protocol/gen/data-inspect-result.ts";
 import type { DataListResult } from "../../protocol/gen/data-list-result.ts";
+import type { DataQueryParams } from "../../protocol/gen/data-query-params.ts";
+import type { DataResult } from "../../protocol/gen/data-result.ts";
 import type { DataNotesDraftResult } from "../../protocol/gen/data-notes-draft-result.ts";
 import type { DataNotesGetResult } from "../../protocol/gen/data-notes-get-result.ts";
 import type { DataNotesSetResult } from "../../protocol/gen/data-notes-set-result.ts";
@@ -306,12 +309,14 @@ import {
   isDeviceRenameResult,
   isDeviceRevokeResult,
   isDataChanged,
+  isDataCancelResult,
   isDataDescribeResult,
   isDataInspectResult,
   isDataListResult,
   isDataNotesDraftResult,
   isDataNotesGetResult,
   isDataNotesSetResult,
+  isDataQueryResult,
   isDataRemoveResult,
   isDataSourceResult,
   isMemoryChanged,
@@ -916,6 +921,10 @@ export interface GolemClient {
   listData(): Promise<DataListResult>;
   /** `data.describe`: one source with its tables, a sample, its notes and saved queries. */
   describeData(source: string, table?: string): Promise<DataDescribeResult>;
+  /** `data.query`: run SQL on one source. Pass `result_id` to be able to cancel it with `cancelData`. */
+  queryData(params: DataQueryParams): Promise<DataResult>;
+  /** `data.cancel`: stop a query that is still running, by its `result_id`. */
+  cancelData(resultId: string): Promise<DataCancelResult>;
   /** `data.inspect`: look at a location before it is added. Nothing is saved. */
   inspectData(location: string): Promise<DataInspectResult>;
   /** `data.add`: add a source. `password` goes to the Keychain and is never written to a file. */
@@ -3240,6 +3249,22 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       const result = await call("data.describe", table === undefined ? { source } : { source, table });
       if (!isDataDescribeResult(result)) {
         throw new Error("invalid data.describe result");
+      }
+      return result;
+    },
+    async queryData(params: DataQueryParams): Promise<DataResult> {
+      await ready;
+      const result = await call("data.query", { ...params });
+      if (!isDataQueryResult(result)) {
+        throw new Error("invalid data.query result");
+      }
+      return result;
+    },
+    async cancelData(resultId: string): Promise<DataCancelResult> {
+      await ready;
+      const result = await call("data.cancel", { result_id: resultId });
+      if (!isDataCancelResult(result)) {
+        throw new Error("invalid data.cancel result");
       }
       return result;
     },

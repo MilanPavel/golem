@@ -33,6 +33,8 @@ import { formatSkills } from "./format-skills.ts";
 import { formatStatus } from "./format-status.ts";
 import { formatCliVersion } from "./format-version.ts";
 import { DEVICES_USAGE, parseDevicesArgs, runDevicesList, runDevicesPair, runDevicesRename, runDevicesRevoke, type DevicesDeps } from "./devices.ts";
+import { DATA_HELP, parseDataArgs } from "./data-command.ts";
+import { runDataDescribe, runDataList, runDataQuery, type DataDeps } from "./data-run.ts";
 import { parseMcpArgs, type McpArgs } from "./mcp-command.ts";
 import { planAdd } from "./add-plan.ts";
 import { exportServers } from "./mcp-export.ts";
@@ -100,6 +102,7 @@ const USAGE =
   "       golem eval helpers [--arm <name>]… [--model <arm>=<model>]… [--allow-tight] [--own-risk] | golem eval helpers list|asks|show <id> [--ask <name>] [--verbose]|stop [<id>]|resume <id> [--allow-tight] [--own-risk]|apply <id>|delete <id>\n" +
   "       golem mcp add <name> -- <command…> [--token-env VAR] | golem mcp add <name> --url <url> [--token] [--env K=V] [--header K=V] [--cwd D] [--on-demand] [--project] [--timeout S] [--approval allow] | golem mcp add --catalog <id> [--input <id>=<value>] | golem mcp remove <name> | golem mcp export [--format claude|vscode] [--scope user|project]\n" +
   "       golem mcp list [--json] | show <name> [--json] | test <name> | test --catalog <id> | edit <name> [--project] | import [--from <app>|<file>] [--all] | logs <name> [-f] | enable <name> [--on-demand] | disable <name> | restart <name> | login <name> | logout <name> | tools <name> [--hide <glob>] [--show <glob>]\n" +
+  "       golem data [list] [--json] | golem data describe <source> [<table>] [--json] | golem data query <source> [<sql> | -] [--limit N] [--format table|csv|json] | golem help data\n" +
   "       golem devices [list] | golem devices pair [--link] | golem devices rename <phone> <name> | golem devices revoke <phone> [--yes]\n" +
   "       golem ask \"<prompt>\" [--folder <dir>] [--model <profile>] [--skill <name>] [--detach] | golem open <id> [--web | --notified]\n" +
   "       golem config show [--resolved] | golem config edit [--project] | golem skills [list] | golem skills check <path>\n" +
@@ -150,6 +153,13 @@ async function run(args: string[]): Promise<number> {
   }
   if (command === "mcp") {
     return runMcp(rest);
+  }
+  if (command === "data") {
+    return runData(rest);
+  }
+  if (command === "help" && rest[0] === "data" && rest.length === 1) {
+    process.stdout.write(`${DATA_HELP}\n`);
+    return 0;
   }
   if (command === "devices") {
     return runDevices(rest);
@@ -596,6 +606,43 @@ async function runEvalRouting(given: string[]): Promise<number> {
   } finally {
     client.close();
   }
+}
+
+/** `golem data list|describe|query`: the data sources, and SQL on them. */
+async function runData(given: string[]): Promise<number> {
+  const parsed = parseDataArgs(given);
+  if (parsed.kind === "help") {
+    process.stdout.write(`${DATA_HELP}\n`);
+    return 0;
+  }
+  if (parsed.kind === "error") {
+    process.stderr.write(`${parsed.message}\n`);
+    return 1;
+  }
+  const deps: DataDeps = {
+    write: (text) => process.stdout.write(text),
+    error: (line) => process.stderr.write(`${line}\n`),
+    stdinIsTty: process.stdin.isTTY === true,
+    readStdin: async () => {
+      const chunks: Buffer[] = [];
+      for await (const chunk of process.stdin) chunks.push(Buffer.from(chunk));
+      return Buffer.concat(chunks).toString("utf8");
+    },
+    onInterrupt(handler) {
+      process.on("SIGINT", handler);
+      return () => void process.off("SIGINT", handler);
+    },
+  };
+  return runWithClient((client) => {
+    switch (parsed.kind) {
+      case "list":
+        return runDataList(client, parsed.json, deps);
+      case "describe":
+        return runDataDescribe(client, parsed.source, parsed.table, parsed.json, deps);
+      case "query":
+        return runDataQuery(client, parsed, deps);
+    }
+  });
 }
 
 /** The helper rules measured in the service: the plan, a measurement with progress, and the kept ones. */
