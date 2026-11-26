@@ -9,7 +9,7 @@ from typing import Any
 
 import pytest
 from fakes import ToolCallingChatModel
-from langchain_core.messages import BaseMessage, HumanMessage
+from langchain_core.messages import BaseMessage, HumanMessage, ToolMessage
 from langchain_core.outputs import ChatResult
 from test_delegate import (  # pyright: ignore
     USAGE,
@@ -153,15 +153,15 @@ def test_the_covered_line_says_the_limit_and_how_far_it_got() -> None:
     named = ["a.py", "b.py"]
     assert (
         covered_line(limits, "calls", events, named)
-        == "stopped at 25 calls, read 1 of 2 files, ran 1 search"
+        == "stopped at 25 calls, read 1 of 2 files, ran 1 search (a.py, grep x)"
     )
     assert (
         covered_line(limits, "time", events)
-        == "stopped at 120 s of working time, read 1 file, ran 1 search"
+        == "stopped at 120 s of working time, read 1 file, ran 1 search (a.py, grep x)"
     )
     assert (
         covered_line(limits, "cost", events)
-        == "stopped at $0.50 of cost, read 1 file, ran 1 search"
+        == "stopped at $0.50 of cost, read 1 file, ran 1 search (a.py, grep x)"
     )
     assert covered_line(limits, "tokens", []) == "stopped at 50000 tokens, no tools used"
     assert covered_line(limits, "failed", []) == "stopped: a model call failed, no tools used"
@@ -248,7 +248,7 @@ async def test_calls_end_a_helper_with_its_last_call_and_the_result_says_how_far
 
     assert _delegate_result(events) == (
         "explorer finished: calls\n\n"
-        "stopped at 2 calls, read 1 of 2 files, listed 1 folder\n\n"
+        "stopped at 2 calls, read 1 of 2 files, listed 1 folder (a.py)\n\n"
         "what I know"
     )
     assert _ended(events).data.stopped == "calls"
@@ -286,6 +286,62 @@ async def test_the_time_limit_is_a_hard_stop_and_the_result_says_so(
     )
 
 
+def test_a_stopped_result_lists_at_most_twenty_paths_and_searches() -> None:
+    events: list[ChatEvent] = []
+    for i in range(22):
+        events += _tool(1 + 2 * i, f"r{i}", "read_file", {"path": f"f{i}.py"})
+    for i in range(3):
+        events += _tool(100 + 2 * i, f"g{i}", "grep", {"pattern": f"p{i}"})
+    limits = AgentLimits(max_calls=25)
+    line = covered_line(limits, "cancelled", events)
+    assert line.startswith("stopped: cancelled, read 22 files, ran 3 searches (f0.py, f1.py")
+    assert line.endswith("f19.py, and 5 more)")
+    assert "f20.py" not in line
+
+
+async def test_a_slow_helper_near_its_time_limit_writes_an_answer_and_ends_time(
+    database: Database, project: Path
+) -> None:
+    class _Slow(_Recording):
+        def _generate(
+            self,
+            messages: list[BaseMessage],
+            stop: Any = None,
+            run_manager: Any = None,
+            **kwargs: Any,
+        ) -> ChatResult:
+            helper = any(m.text == "slow, a.py" for m in messages if isinstance(m, HumanMessage))
+            if helper and not any(isinstance(m, ToolMessage) for m in messages):
+                time.sleep(1.7)  # 85% of the 2 s limit, in the helper's first call
+            return super()._generate(messages, stop, run_manager, **kwargs)
+
+    model = _Slow(
+        replies=[
+            _delegate("slow, a.py"),
+            [("read_file", {"path": "a.py"})],
+            "what I found",
+            "ok",
+        ]
+    )
+    settings = GolemSettings(
+        default_model="ollama/qwen3:8b",
+        agents=AgentSettings(explorer=ExplorerSettings(timeout_seconds=2)),
+    )
+    chat = _Chat(database, model, settings=settings)
+    _, _, events = await chat.run(project)
+
+    assert _ended(events).data.stopped == "time"
+    result = _delegate_result(events)
+    assert result.startswith("explorer finished: time\n\nstopped at 2 s of working time")
+    assert "(a.py)" in result
+    assert result.endswith("what I found")
+    # parent, helper (slow), helper (the last: no tools), parent.
+    assert len(model.seen) == 4
+    assert len(model.offered) == 3
+    last = model.seen[2]
+    assert isinstance(last[-1], HumanMessage) and last[-1].content == FINAL_REQUEST
+
+
 async def test_the_cost_limit_fires_on_a_scripted_price_cloud_only(
     database: Database, project: Path
 ) -> None:
@@ -313,7 +369,7 @@ async def test_the_cost_limit_fires_on_a_scripted_price_cloud_only(
     assert _ended(events).data.stopped == "cost"
     assert _delegate_result(events) == (
         "explorer finished: cost\n\n"
-        "stopped at $0.25 of cost, read 1 file, listed 1 folder\n\n"
+        "stopped at $0.25 of cost, read 1 file, listed 1 folder (a.py)\n\n"
         "from what I know"
     )
     # parent, helper, helper (spent $0.20), helper (spent $0.40: the last one), parent.
@@ -377,7 +433,7 @@ async def test_the_token_limit_counts_input_and_output_and_gives_a_last_call(
     assert _ended(events).data.stopped == "tokens"
     assert _delegate_result(events) == (
         "explorer finished: tokens\n\n"
-        "stopped at 3000 tokens, read 1 file, listed 1 folder\n\n"
+        "stopped at 3000 tokens, read 1 file, listed 1 folder (a.py)\n\n"
         "from what I know"
     )
     assert len(model.offered) == 4

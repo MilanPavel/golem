@@ -22,7 +22,14 @@ from golem.models.facts import ModelFacts
 from golem.models.pick import Choice, Traits
 from golem.models.pick_helper import HelperChoice, pick_helper
 from golem.permissions.engine import Allowance
-from golem.sessions.helper_limits import Used, before_last_call, reached, used_of
+from golem.sessions.helper_clock import working_ms
+from golem.sessions.helper_limits import (
+    Used,
+    before_last_call,
+    reached,
+    soft_time_reached,
+    used_of,
+)
 from golem.tools.registry import ToolError
 from golem.tools.sandbox import git_dirs
 from golem_protocol.events import (
@@ -334,6 +341,17 @@ def started_at(events: Sequence[ChatEvent]) -> float | None:
     return None
 
 
+def _soft_time(agent: AgentSnapshot, events: Sequence[ChatEvent]) -> bool:
+    """Whether the last model call was sent after ``SOFT_TIME`` of the limit was worked."""
+    for event in reversed(events):
+        if isinstance(event, ModelCallStartedEvent):
+            at = _seconds(event.ts)
+            if at is None:
+                return False
+            return soft_time_reached(agent.limits, working_ms(events, at))
+    return False
+
+
 def stop_reason(
     status: str | None,
     run_events: Sequence[ChatEvent],
@@ -362,7 +380,11 @@ def stop_reason(
             before = before_last_call(run_events if events is None else events)
             used = used_of(before)
             hit = reached(agent.limits, Used(cost_usd=used.cost_usd, tokens=used.tokens))
-            return hit if hit in ("cost", "tokens") else "done"
+            if hit in ("cost", "tokens"):
+                return hit
+            if _soft_time(agent, run_events if events is None else events):
+                return "time"
+            return "done"
         return "done"
     if status == "cancelled":
         if timed_out:
