@@ -71,7 +71,8 @@ async def test_the_report_holds_json_and_a_short_summary(tmp_path: Path) -> None
     usecases.write_report(outcomes, tmp_path / "out")
 
     rows = json.loads((tmp_path / "out" / "usecases.json").read_text(encoding="utf-8"))
-    assert rows[0]["case"] == "sweep" and rows[0]["passed"] is True
+    assert rows[0]["case"] == "sweep"
+    assert rows[0]["passed"] is True, rows[0]["conditions"]
     assert rows[0]["mode"] == "scripted"
     assert {"name", "result", "detail"} <= set(rows[0]["conditions"][0])
     text = (tmp_path / "out" / "usecases.md").read_text(encoding="utf-8")
@@ -103,6 +104,16 @@ def test_live_prints_its_cost_note_and_needs_a_named_model() -> None:
     agents = usecases.SCENARIOS["sweep"].agents
     config = usecases.live_config("local-only", "ollama/qwen3.5:9b", agents)
     assert "parallel = 1" in config and 'model = "same"' in config
+    assert "start = false" in config
+
+
+async def test_live_local_only_stops_when_ollama_does_not_answer(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setattr(usecases, "ollama_answers", lambda: False)
+
+    with pytest.raises(SystemExit, match="--live local-only needs Ollama running"):
+        await usecases.run_live("sweep", "local-only", "ollama/x", tmp_path)
 
 
 @pytest.mark.parametrize("case", CASES)
