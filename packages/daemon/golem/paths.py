@@ -58,6 +58,21 @@ class GolemPaths:
         return self.home / "copies"
 
     @property
+    def data_dir(self) -> Path:
+        """What the data engine keeps: its DuckDB extensions and scratch space."""
+        return self.home / "data"
+
+    @property
+    def data_extensions_dir(self) -> Path:
+        """DuckDB extensions, installed once. A query never downloads one."""
+        return self.data_dir / "extensions"
+
+    @property
+    def data_temp_dir(self) -> Path:
+        """Where a query that outgrows its memory limit spills."""
+        return self.data_dir / "tmp"
+
+    @property
     def logs_dir(self) -> Path:
         return self.home / "logs"
 

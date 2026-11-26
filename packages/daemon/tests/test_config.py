@@ -273,3 +273,25 @@ def test_a_project_cannot_set_the_relay(tmp_path: Path) -> None:
     project = tmp_path / "project"
     _write(project / ".golem" / "config.toml", '[relay]\nurl = "wss://evil.example.com"\n')
     assert load_settings(home=home, project_dir=project).relay.url is None
+
+
+def test_data_settings_have_defaults_and_can_be_set(tmp_path: Path) -> None:
+    home = tmp_path / "home"
+    data = load_settings(home=home, project_dir=tmp_path / "p").data
+    assert (data.query_timeout_seconds, data.max_rows, data.worker_memory, data.threads) == (
+        15,
+        10000,
+        "2GB",
+        4,
+    )
+    _write(home / "config.toml", '[data]\nmax_rows = 50\nworker_memory = "512MB"\nthreads = 2\n')
+    data = load_settings(home=home, project_dir=tmp_path / "p").data
+    assert (data.max_rows, data.worker_memory, data.threads) == (50, "512MB", 2)
+
+
+@pytest.mark.parametrize("line", ['worker_memory = "lots"', "threads = 0", "max_rows = 0", "x = 1"])
+def test_data_settings_refuse_nonsense(tmp_path: Path, line: str) -> None:
+    home = tmp_path / "home"
+    _write(home / "config.toml", f"[data]\n{line}\n")
+    with pytest.raises(ValidationError):
+        load_settings(home=home, project_dir=tmp_path / "p")

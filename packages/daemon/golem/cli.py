@@ -5,6 +5,7 @@
 checks as JSON for ``golem doctor``. ``skills check <path>`` validates skills
 without a daemon. ``coding bench <model>`` measures how often a model's edits apply.
 ``evals helpers`` measures helpers on and off in four arms (``--live`` for real models).
+``data-worker`` is the data engine's worker process, started by the daemon (no help line).
 The user-facing ``golem`` bin is
 the TypeScript package; it delegates these subcommands here.
 """
@@ -50,6 +51,9 @@ def _parser() -> argparse.ArgumentParser:
 
     serve = sub.add_parser("serve", help="run the daemon in the foreground")
     serve.set_defaults(func=_serve)
+
+    worker = sub.add_parser("data-worker")  # hidden: the daemon starts it, see golem.data.client
+    worker.set_defaults(func=_data_worker)
 
     daemon = sub.add_parser("daemon", help="manage the launchd agent")
     daemon_sub = daemon.add_subparsers(dest="action", required=True)
@@ -179,6 +183,13 @@ def _evals_helpers(args: argparse.Namespace) -> int:
         allow_tight=cast(bool, args.allow_tight),
         own_risk=cast(bool, args.own_risk),
     )
+
+
+def _data_worker(_args: argparse.Namespace) -> int:
+    """The data engine's worker process. A frozen app has no ``-m``, so it is a subcommand."""
+    from golem.data.worker import main as worker_main
+
+    return worker_main()
 
 
 def _serve(_args: argparse.Namespace) -> int:

@@ -23,6 +23,7 @@ packages = [
     "langgraph",
     "langgraph.checkpoint.sqlite",
     "pydantic",
+    "duckdb",
 ]
 if sys.platform == "darwin":
     packages.append("keyring.backends.macOS")
@@ -50,6 +51,7 @@ for distribution in (
     "pydantic-settings",
     "keyring",
     "openai",
+    "duckdb",
 ):
     datas += copy_metadata(distribution)
 
