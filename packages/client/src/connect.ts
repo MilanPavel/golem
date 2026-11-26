@@ -73,6 +73,7 @@ import type { MemoryChanged } from "../../protocol/gen/memory-changed.ts";
 import type { DataAddParams } from "../../protocol/gen/data-add-params.ts";
 import type { DataAddResult } from "../../protocol/gen/data-add-result.ts";
 import type { DataChanged } from "../../protocol/gen/data-changed.ts";
+import type { DataExtensionInstallResult } from "../../protocol/gen/data-extension-install-result.ts";
 import type { DataCancelResult } from "../../protocol/gen/data-cancel-result.ts";
 import type { DataDescribeResult } from "../../protocol/gen/data-describe-result.ts";
 import type { DataInspectResult } from "../../protocol/gen/data-inspect-result.ts";
@@ -314,6 +315,7 @@ import {
   isDeviceRevokeResult,
   isDataChanged,
   isDataCancelResult,
+  isDataExtensionInstallResult,
   isDataDescribeResult,
   isDataInspectResult,
   isDataListResult,
@@ -943,6 +945,8 @@ export interface GolemClient {
   pageDataResult(resultId: string, offset: number, limit: number): Promise<DataResult>;
   /** `data.cancel`: stop a query that is still running, by its `result_id`. */
   cancelData(resultId: string): Promise<DataCancelResult>;
+  /** `data.extension.install`: download the Excel or SQLite add-on once. Only when the person asks. */
+  installDataExtension(name: "excel" | "sqlite"): Promise<DataExtensionInstallResult>;
   /** `data.inspect`: look at a location before it is added. Nothing is saved. */
   inspectData(location: string): Promise<DataInspectResult>;
   /** `data.add`: add a source. `password` goes to the Keychain and is never written to a file. */
@@ -3324,6 +3328,14 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       const result = await call("data.cancel", { result_id: resultId });
       if (!isDataCancelResult(result)) {
         throw new Error("invalid data.cancel result");
+      }
+      return result;
+    },
+    async installDataExtension(name: "excel" | "sqlite"): Promise<DataExtensionInstallResult> {
+      await ready;
+      const result = await call("data.extension.install", { name });
+      if (!isDataExtensionInstallResult(result)) {
+        throw new Error("invalid data.extension.install result");
       }
       return result;
     },

@@ -53,6 +53,11 @@ function usePage(): Page {
   return page;
 }
 
+/** The page's actions, or null outside a PageProvider (the gallery draws parts of the page without one). */
+export function usePageActionsOrNull(): PageActions | null {
+  return useContext(PageContext)?.actions ?? null;
+}
+
 export function useRoute(): Route {
   const { router } = usePage();
   return useSyncExternalStore(router.subscribe, router.getSnapshot);
@@ -630,9 +635,9 @@ export function useWorkflowStatus(workflowRunId: string): UseQueryResult<Workflo
 }
 
 /** The data sources, or the news that the daemon does not know them yet. Marked stale by `data.changed` and by every data action. */
-export function useDataList(): UseQueryResult<DataAnswer<DataListResult>> {
+export function useDataList(enabled = true): UseQueryResult<DataAnswer<DataListResult>> {
   const { queries } = usePage();
-  return useQuery({ queryKey: [...DATA_LIST_KEY], queryFn: queries.dataList, retry: false });
+  return useQuery({ queryKey: [...DATA_LIST_KEY], queryFn: queries.dataList, enabled, retry: false });
 }
 
 /** One source with its tables, sample, notes and saved queries. `table` asks for that table's sample on its own; `enabled` false waits. */

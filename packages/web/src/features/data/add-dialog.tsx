@@ -16,8 +16,9 @@ import { cn } from "../../ui/cn.ts";
 import { Button } from "../../ui/button.tsx";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "../../ui/dialog.tsx";
 import { Input } from "../../ui/input.tsx";
-import { dataErrorText, type DataAddParams, type DataInspectResult, type DataSource } from "../../store/data.ts";
+import { dataErrorText, type DataAddParams, type DataExtensionName, type DataInspectResult, type DataSource } from "../../store/data.ts";
 import { folderName } from "../sessions/folder.ts";
+import { ExtensionRow } from "./extension-row.tsx";
 import { PrivacyChip } from "./privacy-chip.tsx";
 import { RowsTable } from "./rows-table.tsx";
 
@@ -46,6 +47,8 @@ export type AddFormProps = {
   folder: string | null;
   /** Looks at a location. Rejects with the daemon's reason. */
   onInspect: (location: string) => Promise<DataInspectResult>;
+  /** Downloads an add-on the location needs. Rejects with the reason. Without it the dialog only says the add-on is missing. */
+  onInstallExtension?: (name: DataExtensionName) => Promise<void>;
   /** Adds the source. Rejects with the daemon's reason. */
   onAdd: (params: DataAddParams) => Promise<DataSource>;
   /** The source was added: open its page. */
@@ -127,7 +130,7 @@ function Found({ check }: { check: Check }) {
 }
 
 /** The three steps of Add a source: what kind, where it is, who may see rows. Nothing is saved until Add source. */
-export function AddForm({ folder, onInspect, onAdd, onAdded, onCancel, onOpenMcp, inline = false, initial }: AddFormProps) {
+export function AddForm({ folder, onInspect, onInstallExtension, onAdd, onAdded, onCancel, onOpenMcp, inline = false, initial }: AddFormProps) {
   const ids = useId();
   const [step, setStep] = useState<AddStep>(initial?.step ?? "kind");
   const [kind, setKind] = useState<AddKind>(initial?.kind ?? "files");
@@ -340,6 +343,7 @@ export function AddForm({ folder, onInspect, onAdd, onAdded, onCancel, onOpenMcp
           <div aria-live="polite">
             <Found check={result !== null || check.state === "checking" ? check : { state: "idle" }} />
           </div>
+          {result?.needs_extension != null && onInstallExtension !== undefined ? <ExtensionRow name={result.needs_extension} onInstall={onInstallExtension} onDone={() => void inspect()} /> : null}
           {failure !== null ? <p className="text-meta text-muted">You can still go on. Adding the source shows the real error if there is one.</p> : null}
         </div>
       ) : null}

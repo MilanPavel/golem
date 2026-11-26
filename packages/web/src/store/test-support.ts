@@ -137,6 +137,8 @@ export function fakeClient() {
       sample: {},
     })),
     inspectData: vi.fn<PageClient["inspectData"]>(async () => ({ kind: "files", tables: [], sample: {}, suggested_name: "x", suggested_privacy: "local" })),
+    pageDataResult: vi.fn<PageClient["pageDataResult"]>(async (resultId) => ({ result_id: resultId, source: "bank", columns: [], rows: [], total_rows: 0, truncated: false, elapsed_ms: 0 })),
+    installDataExtension: vi.fn<PageClient["installDataExtension"]>(async () => ({})),
     addData: vi.fn<PageClient["addData"]>(async (params) => ({
       source: { name: params.name, kind: params.kind ?? "files", scope: params.scope, location: params.location, privacy: params.privacy, status: "ready" },
     })),

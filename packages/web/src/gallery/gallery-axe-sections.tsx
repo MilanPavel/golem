@@ -19,6 +19,7 @@ export const GALLERY_SECTIONS = [
   "routines",
   "workflows",
   "data",
+  "data-result",
   "runs",
   "workflow-run",
   "rail",

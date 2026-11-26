@@ -22,9 +22,10 @@ import { Badge } from "../../ui/badge.tsx";
 import { Button } from "../../ui/button.tsx";
 import { Code } from "../../ui/code.tsx";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../ui/tabs.tsx";
-import { dataErrorText, type DataDescribeResult, type DataSavedQuery, type DataSource, type DataTable } from "../../store/data.ts";
+import { dataErrorText, type DataDescribeResult, type DataExtensionName, type DataSavedQuery, type DataSource, type DataTable } from "../../store/data.ts";
 import { DATA_TABS, type DataTab } from "../../store/router.ts";
 import { CodeEditor } from "../settings/config/code-editor.tsx";
+import { ExtensionRow } from "./extension-row.tsx";
 import { PrivacyChip } from "./privacy-chip.tsx";
 import { RowsTable, type Rows } from "./rows-table.tsx";
 
@@ -394,6 +395,8 @@ export type SourcePageProps = {
   onPrivacy: (privacy: DataPrivacy) => Promise<void>;
   onWatch: (watch: boolean) => Promise<void>;
   onRemove: () => Promise<void>;
+  /** Downloads the add-on the source needs. Without it the page only says the add-on is missing. */
+  onInstallExtension?: (name: DataExtensionName) => Promise<void>;
 };
 
 /** One source in the main area: a top bar, then the Tables, Notes, Queries and Settings tabs. */
@@ -413,6 +416,7 @@ export function SourcePage({
   onPrivacy,
   onWatch,
   onRemove,
+  onInstallExtension,
 }: SourcePageProps) {
   const detail = sourceDetail(source);
   return (
@@ -434,6 +438,11 @@ export function SourcePage({
         <Button kind="primary" size="sm" onClick={onAsk}>
           Ask in a chat
         </Button>
+        {source.needs_extension != null && onInstallExtension !== undefined ? (
+          <div className="basis-full">
+            <ExtensionRow name={source.needs_extension} onInstall={onInstallExtension} />
+          </div>
+        ) : null}
       </header>
       <Tabs value={tab} onValueChange={(next) => onTab(next as DataTab)} className="flex flex-col gap-4">
         <TabsList aria-label={`${source.name} details`}>

@@ -1,6 +1,6 @@
 import { BUILD_TEXT, turnFooterLine, canTryStronger, lastQuestion, NO_STRONGER_NOTICE, STRONGER_ACTION, strongerLabel, helperLine, isDelegate, openPlan, displayToolName, groupTurns, stepCount, stepMark, summarizeSteps, turnFooter, LIVE_OUTPUT_CHARS, thinkingLine, unreadCallNotice, writingLabel, REPLY_CUT_NOTE, type ChatMessage, type ChatState, type Detail, type HelperBatch, type IsLocal, isLocalFrom, type StepMark, type ToolBlock, type WritingBlock, noticesAfter, type ChatNotice, turnSources, type TurnSource, checksOf, checksSummary, turnRoutedNote, sessionModelOf, type SessionModelRef, rewoundLine, UNDO_WAIT } from "@golem/view";
 import { Fragment, memo, useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
-import { useConfig, usePageActions, usePulls, useSession, useModelList, useTurnCards } from "../../store/page-context.tsx";
+import { useConfig, usePageActions, usePageActionsOrNull, usePulls, useSession, useModelList, useTurnCards } from "../../store/page-context.tsx";
 import type { PullsSnapshot } from "../../store/pulls.ts";
 import type { SessionModel } from "../../store/session-store.ts";
 import { pullShare, shortName } from "../models/index.ts";
@@ -21,6 +21,7 @@ import { DiffModeSwitch } from "../diff/diff-mode-switch.tsx";
 import { useDiffMode } from "../diff/diff-mode.ts";
 import { DiffView } from "../diff/diff-view.tsx";
 import { activeComposer } from "../composer/active-composer.ts";
+import { ResultTable } from "../data/result-table.tsx";
 import { ChecksStrip } from "./checks-strip.tsx";
 import { EditCards, isEditCard } from "./edit-card.tsx";
 import { isPlanCard, PlanCard, type PlanActions } from "./plan-card.tsx";
@@ -72,6 +73,12 @@ function Label({ children }: { children: string }) {
   return <p className="mb-1 text-faint">{children}</p>;
 }
 
+/** The table of a `data_query` call, paging through the daemon when the page has a connection. */
+function LiveResultTable({ tool, table }: { tool: ToolBlock; table: NonNullable<ToolBlock["table"]> }) {
+  const actions = usePageActionsOrNull();
+  return <ResultTable table={table} rowsWithheld={tool.rowsWithheld === true} {...(actions === null ? {} : { onPage: actions.dataResultPage })} />;
+}
+
 function ToolOutput({ tool, mode }: { tool: ToolBlock; mode: DiffMode }) {
   switch (tool.status) {
     case "running": {
@@ -88,7 +95,9 @@ function ToolOutput({ tool, mode }: { tool: ToolBlock; mode: DiffMode }) {
       return (
         <section>
           <Label>output</Label>
-          {tool.preview ? (
+          {tool.table ? (
+            <LiveResultTable tool={tool} table={tool.table} />
+          ) : tool.preview ? (
             tool.name === "git_diff" ? <DiffView diff={tool.preview} mode={mode} /> : <pre className={TABLET_TEXT}>{tool.preview}</pre>
           ) : (
             <p className="text-faint">no output</p>

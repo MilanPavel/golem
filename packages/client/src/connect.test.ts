@@ -1768,6 +1768,39 @@ test("data.* calls send their params, a password stays out of the wire view, and
   }
 });
 
+test("data.extension.install sends the name, and a malformed result is refused", async () => {
+  const sent: Record<string, unknown>[] = [];
+  const server = await listen((socket) => {
+    attach(socket, {
+      answerPing: true,
+      results: { "data.extension.install": {} },
+      onRequest: (_socket, method, params) => {
+        if (method.startsWith("data.")) {
+          sent.push({ method, ...params });
+        }
+      },
+    });
+  });
+  const client = connectGolem({ socketPath: server.socketPath, clientName: "cli", reconnect: false, heartbeatMs: 60_000 });
+  try {
+    await client.installDataExtension("excel");
+    assert.deepEqual(sent, [{ method: "data.extension.install", name: "excel" }]);
+  } finally {
+    client.close();
+    await server.close();
+  }
+  const bad = await listen((socket) => {
+    attach(socket, { answerPing: true, results: { "data.extension.install": "no" } });
+  });
+  const other = connectGolem({ socketPath: bad.socketPath, clientName: "cli", reconnect: false, heartbeatMs: 60_000 });
+  try {
+    await assert.rejects(other.installDataExtension("sqlite"), /invalid data.extension.install result/);
+  } finally {
+    other.close();
+    await bad.close();
+  }
+});
+
 test("data.query sends its params and result_id, data.cancel sends the id, and a malformed query result is refused", async () => {
   const result = {
     result_id: "cli-1",
