@@ -263,14 +263,31 @@ export function RoutineDetail({ routine, runs, now, onNavigate, onRun, onRemove,
       ) : null}
       {routine.blocked === true ? <p className="text-sm text-muted">This project is not trusted, so its routines are listed and never run.</p> : null}
       <dl className="flex flex-col gap-1.5 text-sm">
-        <Fact label="Runs">
-          <span className="text-meta">{config.prompt}</span>
-        </Fact>
-        <Fact label="Folder">{config.folder ? <Code>{config.folder}</Code> : <span className="text-muted">none</span>}</Fact>
-        <Fact label="Model">{config.model ? <Code>{config.model}</Code> : <span className="text-muted">the default</span>}</Fact>
-        <Fact label="MCP servers">
-          {config.mcp && config.mcp.length > 0 ? <Code>{config.mcp.join(", ")}</Code> : <span className="text-muted">none</span>}
-        </Fact>
+        {config.workflow ? (
+          <>
+            <Fact label="Workflow">
+              <Code>{config.workflow}</Code>
+            </Fact>
+            <Fact label="Inputs">
+              {config.inputs && Object.keys(config.inputs).length > 0 ? (
+                <Code>{Object.entries(config.inputs).map(([key, value]) => `${key}=${String(value)}`).join(", ")}</Code>
+              ) : (
+                <span className="text-muted">none</span>
+              )}
+            </Fact>
+          </>
+        ) : (
+          <>
+            <Fact label="Runs">
+              <span className="text-meta">{config.prompt}</span>
+            </Fact>
+            <Fact label="Folder">{config.folder ? <Code>{config.folder}</Code> : <span className="text-muted">none</span>}</Fact>
+            <Fact label="Model">{config.model ? <Code>{config.model}</Code> : <span className="text-muted">the default</span>}</Fact>
+            <Fact label="MCP servers">
+              {config.mcp && config.mcp.length > 0 ? <Code>{config.mcp.join(", ")}</Code> : <span className="text-muted">none</span>}
+            </Fact>
+          </>
+        )}
       </dl>
       <Tabs value={tab} onValueChange={(next) => setTab(next as Tab)} className="flex flex-col gap-4">
         <TabsList aria-label={`${config.name} details`}>

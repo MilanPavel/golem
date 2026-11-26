@@ -1,4 +1,4 @@
-import { OLLAMA_FAILED, RpcError, type ApprovalChoice, type ConfigGetResult, type ConfigRawGetResult, type ConfigRawResult, type FsListDirsResult, type GitBranchesResult, type GitInfoResult, type FsChooseFolderResult, type McpAddParams, type McpCallResult, type McpImportApplyParams, type McpImportApplyResult, type McpImportScanResult, type McpCatalogResult, type McpListResult, type McpLogsResult, type McpServerConfig, type McpServerDetail, type McpServerLog, type McpLoginDone, type McpTestProgress, type McpTestResult, type GolemClient, type RuntimeName, type SetupStatusResult, type SkillListResult, type AgentsListResult, type AgentsSaveResult, type AgentsDeleteResult, type TraceGetResult, type TraceSpanResult, type ArtifactReadResult, type ChangesDiffResult, type ChangesDiffTarget, type ChangesListResult, type ChangesRevertResult, type ChangesRevertTarget, type ChangesCommitResult, type ChangesCommitInfoResult, type ChangesSuggestMessageResult, type ModelOptionsGetResult, type ModelOptionsSetResult, type SessionSetOptionsResult, type SkillCreateResult, type SkillReadResult, type SkillWriteResult, type AuthListResult, type FileListResult, type FileReadResult, type CostGetResult, type SessionCompactResult, type ConsentChoice, type RoutingGetResult, type RoutingSetParams, type RoutingSetResult, type NotificationsValues, type NotificationsSetParams, type NotificationsSetResult, type NotifyTestResult, type ChatSetParams, type ChatSetResult, type ChatValues, type ChatPromptResult, type ChatDraftResult, type ChatSuggestionsResult, type ChatSuggestionDismissResult, type AgentLimitsChange } from "@golem/client";
+import { OLLAMA_FAILED, RpcError, type ApprovalChoice, type ConfigGetResult, type ConfigRawGetResult, type ConfigRawResult, type FsListDirsResult, type GitBranchesResult, type GitInfoResult, type FsChooseFolderResult, type McpAddParams, type McpCallResult, type McpImportApplyParams, type McpImportApplyResult, type McpImportScanResult, type McpCatalogResult, type McpListResult, type McpLogsResult, type McpServerConfig, type McpServerDetail, type McpServerLog, type McpLoginDone, type McpTestProgress, type McpTestResult, type GolemClient, type RoutinePreviewCheck, type RuntimeName, type SetupStatusResult, type SkillListResult, type AgentsListResult, type AgentsSaveResult, type AgentsDeleteResult, type TraceGetResult, type TraceSpanResult, type ArtifactReadResult, type ChangesDiffResult, type ChangesDiffTarget, type ChangesListResult, type ChangesRevertResult, type ChangesRevertTarget, type ChangesCommitResult, type ChangesCommitInfoResult, type ChangesSuggestMessageResult, type ModelOptionsGetResult, type ModelOptionsSetResult, type SessionSetOptionsResult, type SkillCreateResult, type SkillReadResult, type SkillWriteResult, type AuthListResult, type FileListResult, type FileReadResult, type CostGetResult, type SessionCompactResult, type ConsentChoice, type RoutingGetResult, type RoutingSetParams, type RoutingSetResult, type NotificationsValues, type NotificationsSetParams, type NotificationsSetResult, type NotifyTestResult, type ChatSetParams, type ChatSetResult, type ChatValues, type ChatPromptResult, type ChatDraftResult, type ChatSuggestionsResult, type ChatSuggestionDismissResult, type AgentLimitsChange } from "@golem/client";
 import { changeToolFilter, installEventOf, type InstallEvent, type PermissionMode, type CompactAction, type RouteMode, type UseHelpersValue } from "@golem/view";
 import type { QueryClient } from "@tanstack/react-query";
 import { createDrafts, type Drafts } from "./drafts.ts";
@@ -406,6 +406,8 @@ export type PageActions = {
   saveRoutine(name: string, fields: Record<string, unknown>, create: boolean): Promise<RoutineInfo>;
   /** The next three times a schedule fires, as ISO times. Rejects with the daemon's reason when the schedule does not parse. */
   previewRoutine(schedule: string): Promise<readonly string[]>;
+  /** What is wrong with a workflow routine's workflow and inputs, in words, from `routine.preview`. Empty when nothing is. Rejects with the daemon's reason. */
+  checkRoutine(check: RoutinePreviewCheck): Promise<readonly string[]>;
   /** One server's whole config, with secrets as Keychain references, and the file that names it. */
   getMcp(name: string, sessionId: string | null): Promise<McpServerDetail>;
   /** Replaces the server's `[mcp.<name>]`. `secrets` (by reference) are stored first, and only those sent change. */
@@ -941,6 +943,9 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
           await queryClient.invalidateQueries({ queryKey: ROUTINE_LIST_KEY });
           await queryClient.invalidateQueries({ queryKey: ROUTINE_GET_KEY });
         }
+      },
+      async checkRoutine(check) {
+        return (await client.previewRoutine(null, check)).problems ?? [];
       },
       async previewRoutine(schedule) {
         return (await client.previewRoutine(schedule)).next;

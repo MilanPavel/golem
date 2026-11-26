@@ -25,6 +25,31 @@ test("the gallery's Workflows section shows the panels and a detail for each tab
   expect(within(screen.getByRole("region", { name: "Workflow detail, broken, slip" })).getByRole("alert").textContent).toContain("ImportError");
 });
 
+test("the gallery's Triggers stories and the routine editor stories show each state, in both themes", () => {
+  for (const theme of ["slip", "kiln"] as const) {
+    showTheme(theme);
+    const { unmount } = render(<Gallery />);
+    const story = (name: string) => within(screen.getByRole("region", { name: `${name}, ${theme}` }));
+    const rows = story("Workflow detail, Triggers").getAllByRole("listitem");
+    expect(rows.map((row) => row.textContent).join("|")).toContain("weekday-pr-digest");
+    expect(story("Workflow detail, Triggers, none").getByText(/No routine starts this workflow/)).toBeTruthy();
+    expect(story("Routine detail, workflow").getByText("repo=MilanPavel/golem, since=1d")).toBeTruthy();
+    expect((story("Routine editor, workflow, inputs filled").getByRole("combobox", { name: "Workflow" }) as HTMLSelectElement).value).toBe("pr_digest");
+    expect(story("Routine editor, workflow, required input missing").getByText("Fill in the inputs marked required.")).toBeTruthy();
+    expect(story("Routine editor, workflow, required input missing").getAllByText("Required.").length).toBeGreaterThan(0);
+    expect(story("Routine editor, workflow, daemon problems").getByRole("list", { name: "Problems" }).textContent).toContain("input repo is required");
+    expect(story("Routine editor, workflow, watch folder").getByText(/Its full path is passed as the input path/)).toBeTruthy();
+    expect(story("Routine editor, workflow, none picked").getByText("Pick the workflow to run.")).toBeTruthy();
+    expect(story("Routine editor, prompt").getByRole("textbox", { name: "Prompt" })).toBeTruthy();
+    // A routine's workflow run reads as the routine, with the workflow named after it.
+    const run = story("Runs list, routine workflow run").getByRole("link");
+    expect(run.textContent).toContain("weekday-pr-digest");
+    expect(run.textContent).toContain("workflow pr_digest");
+    expect(run.textContent).toContain("by schedule");
+    unmount();
+  }
+});
+
 test("the gallery's Run dialog stories show each state, in both themes", () => {
   for (const theme of ["slip", "kiln"] as const) {
     showTheme(theme);

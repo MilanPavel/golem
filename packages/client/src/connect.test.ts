@@ -1538,6 +1538,7 @@ test("routine.list, get, run and update send their params", async () => {
     await client.updateRoutine("brief", { enabled: false });
     await client.updateRoutine("brief", { prompt: "p" }, { create: true });
     assert.deepEqual(await client.previewRoutine("weekdays 08:30"), { next: ["2026-02-09T08:30:00+01:00"] });
+    await client.previewRoutine(null, { workflow: "pr_digest", inputs: { repo: "a/b" }, onWatch: true });
     assert.deepEqual(sent, [
       { method: "routine.list", folders: ["/repo"] },
       { method: "routine.get", name: "brief" },
@@ -1545,6 +1546,7 @@ test("routine.list, get, run and update send their params", async () => {
       { method: "routine.update", name: "brief", fields: { enabled: false } },
       { method: "routine.update", name: "brief", fields: { prompt: "p" }, create: true },
       { method: "routine.preview", schedule: "weekdays 08:30" },
+      { method: "routine.preview", workflow: "pr_digest", inputs: { repo: "a/b" }, on_watch: true },
     ]);
   } finally {
     client.close();

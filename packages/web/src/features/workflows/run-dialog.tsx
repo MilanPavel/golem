@@ -3,8 +3,8 @@ import { actionErrorText } from "../../store/errors.ts";
 import type { WorkflowEntryInfo } from "../../store/workflows.ts";
 import { Button } from "../../ui/button.tsx";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "../../ui/dialog.tsx";
-import { fieldClass, Input } from "../../ui/input.tsx";
-import { fieldProblem, initialValues, inputFields, startInputs, type InputField } from "./run-inputs.ts";
+import { InputFieldList } from "./input-fields.tsx";
+import { fieldProblem, initialValues, inputFields, startInputs } from "./run-inputs.ts";
 
 export type RunFormProps = {
   workflow: WorkflowEntryInfo;
@@ -18,90 +18,6 @@ export type RunFormProps = {
   /** The state the form opens in. For the gallery and tests; a person never sets it. */
   initial?: { values?: Record<string, string>; touched?: boolean; error?: string | null; starting?: boolean };
 };
-
-type FieldProps = {
-  field: InputField;
-  id: string;
-  value: string;
-  problem: string | null;
-  disabled: boolean;
-  onChange: (value: string) => void;
-  onChooseFolder?: (start: string | null) => Promise<string | null>;
-};
-
-function hintText(field: InputField): string {
-  const parts = [field.typeName === "" ? "any" : field.typeName];
-  parts.push(field.required ? "required" : `default ${field.default === "" ? "empty" : field.default}`);
-  return parts.join(" · ");
-}
-
-function Control({ field, id, value, problem, disabled, onChange, onChooseFolder }: FieldProps) {
-  const described = `${id}-hint`;
-  const invalid = problem === null ? undefined : true;
-  if (field.kind === "bool") {
-    return (
-      <label className="flex items-center gap-2 text-sm">
-        <input id={id} type="checkbox" className="size-4 accent-clay" checked={value === "true"} disabled={disabled} aria-describedby={described} onChange={(event) => onChange(String(event.target.checked))} />
-        <span className="font-medium">{field.name}</span>
-      </label>
-    );
-  }
-  const label = (
-    <label htmlFor={id} className="text-sm font-medium">
-      {field.name}
-      {field.required ? <span className="text-deny"> *</span> : null}
-    </label>
-  );
-  if (field.kind === "choice") {
-    return (
-      <>
-        {label}
-        <select id={id} className={fieldClass} value={value} disabled={disabled} aria-invalid={invalid} aria-describedby={described} onChange={(event) => onChange(event.target.value)}>
-          {field.required ? <option value="">Choose…</option> : null}
-          {field.choices.map((choice) => (
-            <option key={choice} value={choice}>
-              {choice}
-            </option>
-          ))}
-        </select>
-      </>
-    );
-  }
-  return (
-    <>
-      {label}
-      <div className="flex items-center gap-2">
-        <Input
-          id={id}
-          className="font-mono"
-          inputMode={field.kind === "number" ? "decimal" : undefined}
-          value={value}
-          disabled={disabled}
-          aria-invalid={invalid}
-          aria-describedby={described}
-          placeholder={field.kind === "folder" ? "/path/to/folder" : undefined}
-          spellCheck={false}
-          onChange={(event) => onChange(event.target.value)}
-        />
-        {field.kind === "folder" && onChooseFolder !== undefined ? (
-          <Button
-            disabled={disabled}
-            aria-label={`Choose a folder for ${field.name}`}
-            onClick={() => {
-              onChooseFolder(value === "" ? null : value)
-                .then((path) => {
-                  if (path !== null) onChange(path);
-                })
-                .catch(() => {});
-            }}
-          >
-            Choose…
-          </Button>
-        ) : null}
-      </div>
-    </>
-  );
-}
 
 /** The form of the Run… dialog: one field per input, from the workflow's declared inputs. */
 export function RunForm({ workflow, onStart, onCancel, onChooseFolder, inline = false, initial }: RunFormProps) {
@@ -137,33 +53,16 @@ export function RunForm({ workflow, onStart, onCancel, onChooseFolder, inline = 
       {inline ? <h2 className="text-base font-semibold">Run {workflow.name}</h2> : <DialogTitle>Run {workflow.name}</DialogTitle>}
       {inline ? <p className="mt-1 text-sm text-muted">{intro}</p> : <DialogDescription>{intro}</DialogDescription>}
       {fields.length === 0 ? null : (
-        <div className="mt-4 flex flex-col gap-4">
-          {fields.map((field, at) => {
-            const id = `${ids}-${field.name}`;
-            const problem = touched ? (problems[at] ?? null) : null;
-            return (
-              <div key={field.name} className="flex flex-col gap-1">
-                <Control
-                  field={field}
-                  id={id}
-                  value={values[field.name] ?? ""}
-                  problem={problem}
-                  disabled={starting}
-                  onChange={(value) => setValues((current) => ({ ...current, [field.name]: value }))}
-                  onChooseFolder={onChooseFolder}
-                />
-                <span id={`${id}-hint`} className="text-xs text-muted">
-                  {hintText(field)}
-                </span>
-                {problem === null ? null : (
-                  <span role="alert" className="text-xs text-deny">
-                    {problem}
-                  </span>
-                )}
-              </div>
-            );
-          })}
-        </div>
+        <InputFieldList
+          className="mt-4"
+          idPrefix={ids}
+          fields={fields}
+          values={values}
+          showProblems={touched}
+          disabled={starting}
+          onChange={(name, value) => setValues((current) => ({ ...current, [name]: value }))}
+          onChooseFolder={onChooseFolder}
+        />
       )}
       {error === null ? null : (
         <p role="alert" className="mt-4 rounded-md border border-deny bg-deny-soft px-3 py-2 text-sm text-deny wrap-anywhere">
