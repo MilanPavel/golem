@@ -6,8 +6,8 @@ backed off. It is rebuilt from the stored events each time, so it survives a res
 
 The waits for a model are read from ``waited_ms`` of ``model.call.completed``, and from a
 ``model.waiting`` that is still stored: one open now, or left by a call that never completed.
-A wait is never counted twice. ``helper.state`` is not read: nothing writes it. ``helper.wait``
-is the lead waiting for its helpers, so it is not read either.
+A wait is never counted twice. ``helper.state`` and ``helper.wait`` are not read: they are
+summaries on the lead's log, and this reads the helper's own events, which hold the real waits.
 
 Pure: no I/O, and no manager.
 """

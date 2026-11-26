@@ -202,7 +202,7 @@ A worker's `helper.ended` also carries `diff_artifact_id` (its diff, read with `
 | `route.consent.answer` | Answers a helper's paid question | Addressed to the helper. The answer covers the helpers of the same call that wait on the same question |
 | `session.fork` of a helper | "Continue as chat" | The new session is an ordinary chat with no parent. A trimmed helper is refused |
 
-Applying goes through the change set: each file is written and recorded as a change with the source `helper`, all under one run id, with a `file.changed` event for each. One `changes.revert` of that run puts the folder back. Before anything is written, `apply_worker.plan` checks that every file in your folder is still what the copy started from.
+Applying goes through the change set: each file is written and recorded as a change with the source `helper`, all under one run id, with a `file.changed` event for each. One `changes.revert` of that run rewinds the folder to before the apply, so changes made after it are undone too. Before anything is written, `apply_worker.plan` checks that every file in your folder is still what the copy started from.
 
 ### Storage
 

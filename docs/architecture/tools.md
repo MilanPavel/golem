@@ -2,7 +2,7 @@
 title: Tools
 description: What a tool call really is, why a failed call is just another result, and how golem's tools node decides, runs, and reports every call.
 order: 6
-adrs: [11, 15, 16, 17, 18]
+adrs: [11, 15, 16, 17, 18, 59]
 ---
 
 # {{ $frontmatter.title }}
@@ -156,22 +156,20 @@ A `Tool` says how the rules treat it:
 
 One call returns at most 5 MB (`MAX_OUTPUT_CHARS`), and the rest is cut.
 
-### `delegate` and the explorer
+### `delegate` and helpers
 
-> **Newer design.** A helper is now a session with a parent, started for any of four agents and able to wait, ask you and work in a copy of the folder. See [Helpers](./helpers.md). The text below describes the child run of ADR-058 that it replaced, and it is kept until this section is rewritten.
+`delegate` hands a job to a helper that starts with an empty context. A helper is a session with a parent ([ADR-059](../adr/059-helpers-are-child-sessions.md)), not a child run inside the call. [Helpers](./helpers.md) tells the whole story. This is what concerns the tool.
 
-`delegate(brief, agent = "explorer")` hands a wide reading or searching question to a helper that starts with an empty context ([ADR-058](../adr/058-child-runs.md)). The helper is a child run: the same chat graph on its own checkpoint thread, `<session_id>/c/<call_id>`, whose first message is the brief. It is not a session, and nothing lists it.
+- **Arguments.** `brief` and `agent`, or `batch`, a list of `{agent, brief, label}`. An optional `model` names the model of one helper. `agent` is `explorer`, `worker`, `reviewer`, `advisor` or one of your own agent files.
+- **It never runs a helper.** The tools node starts the helpers through the session manager and parks the lead. The lead holds no task and no model slot while it waits. When the last helper ends, the lead wakes and the node builds the result from the helpers' logs.
+- **Tools of a helper.** Its agent file lists them. A helper never has `delegate`, and never more tools, folders or allowances than its lead. The explorer reads only. A worker works in a git copy of your folder.
+- **Approvals.** A helper's approval is an ordinary pending item of its own session. It shows under its lead. An agent file with `asks: never` turns an ask into a refusal.
+- **Limits.** From the agent file, and `[agents]` and `[agents.<type>]` in `config.toml` override them ([settings](../guide/settings.md)): model calls, working time, cost and tokens. Working time does not count waiting for you, a slot or a provider. A result starts with `<agent> finished: <reason>` when a limit ended it. At most `[agents] max_per_batch` helpers start in one call, and the call past it gets a message the model can read.
+- **The answer is data.** A long answer is stored as an artifact of the helper's session, and the result names its id. `read_artifact` in the lead reads the artifacts of its own helpers. An answer is never an instruction about permissions.
+- **Events.** The lead's log gets `helper.started`, `helper.step`, `helper.state`, `helper.wait` and `helper.ended`, with the `delegate` call's id as `call_id`. The helper's own events are in its own log. Old logs of the ADR-058 child runs, with `parent_call_id`, still draw as before.
+- **Cancel.** Cancelling the lead cancels its helpers first. The `delegate` call gets a cancelled result on the next turn like any unanswered call.
 
-- **Tools.** Only `read_file`, `list_dir`, `glob`, `grep`, `git_log`, `git_diff`, `git_status` and `read_artifact`. A call to anything else, `delegate` included, gets the "unknown tool" error, which the helper reads. A call the rules would ask about is refused with a message, because a helper never asks for approval and gets none of the session's allowances.
-- **Prompt.** One fixed section: answer the brief, read only what is needed, end with findings first and the paths that matter.
-- **Model.** The `explore` role of [ADR-055](../adr/055-model-routing.md): on a local session the same model with the same options, waiting its turn at the `ServerGate`. A paid helper model is checked against the budget before each call. A session that stays local keeps a local helper.
-- **Limits.** From `[agents.explorer]` ([settings](../guide/settings.md#agentsexplorer)): by default 15 model calls, then one last call without tools that asks for the answer; 5 minutes; 6 000 characters of answer; at most 3 helpers in one run. The result starts with `explorer finished: <reason>` when a limit ended it: `calls`, `time`, `budget` or `tokens`.
-- **Budget and tokens.** A paid helper call goes through the same `paid_ok()` check as every other paid call. When a cap is spent in the middle, the helper stops with `budget` and returns what it has. A helper also stops with `tokens` when the input tokens of its calls pass 8 times its window, which catches a runaway reader. A local helper is never stopped by a cap.
-- **One at a time.** The tools node runs the calls of one reply in order, so two `delegate` calls in one reply run one after the other. The `max_per_turn` check counts the `delegate` results since the user's last message. The call past it gets `no more helpers in this turn; continue with what you have` as an error result. Helpers in parallel are Phase 15.
-- **Events.** The helper's model and tool events go into the parent's log with `parent_call_id`, the id of the `delegate` call. They are never `message.*` events, and the run's own call counters and `MAX_MODEL_CALLS` ignore them. While it runs, `tool.output` of the `delegate` call shows one line per tool call. Clients that do not know child runs ignore events with `parent_call_id`.
-- **Cancel.** Cancelling the run cancels the helper. Its open calls fail in the log, and the `delegate` call gets a cancelled result on the next turn like any unanswered call.
-
-A helper's model calls cost like any call and are `explore` rows in `model_calls`. `cost.get` returns them in `by_role` next to `by_model`; `/cost` and the Usage page add a "by job" block when more than one role has rows. The UI says `stopped: time limit`, `call limit`, `budget spent` or `token limit` for a helper that did not finish (`helperStopWords` in `packages/view`).
+A helper's model calls cost like any call and are `model_calls` rows of its own session with the role `helper`. `cost.get` sums them into the lead's total through `root_session_id`. The UI says `stopped: time limit`, `call limit`, `budget spent` or `token limit` for a helper that did not finish (`helperStopWords` in `packages/view`).
 
 ### Tool events
 
@@ -260,8 +258,8 @@ Longer output is stored whole in the `artifacts` table, and the message keeps it
 | `packages/daemon/golem/tools/untrusted.py` | The wrapper for outside content |
 | `packages/daemon/golem/tools/artifacts.py` | `read_artifact` |
 | `packages/daemon/golem/tools/todos.py` | `todo_write` |
-| `packages/daemon/golem/tools/delegate.py` | `delegate` |
-| `packages/daemon/golem/graphs/child.py` | `run_child`: the helper's thread, tools, prompt, and limits |
+| `packages/daemon/golem/tools/delegate.py` | `delegate`: its schema and description. It never runs a helper |
+| `packages/daemon/golem/graphs/child.py` | `ChildLimits`: the limits of a helper, and the thread name of an old child run |
 | `packages/daemon/golem/graphs/result_budget.py` | How much of one result the model reads, by window |
 | `packages/daemon/golem/graphs/tools_node.py` | The `tools` node: decide, run, results, artifacts, and state updates |
 | `packages/daemon/golem/store/artifacts.py` | `ArtifactStore`, the `artifacts` table |
