@@ -429,6 +429,23 @@ def _relay_url(value: str | None) -> str | None:
     return value
 
 
+class DataSettings(BaseModel):
+    """``[data]``. Limits for the data engine, which runs SQL over files and databases.
+
+    A query is cut after ``query_timeout_seconds`` and returns at most ``max_rows`` rows.
+    The worker process may use ``worker_memory`` (a size such as ``"2GB"``) and ``threads``.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    query_timeout_seconds: float = Field(default=15.0, gt=0)
+    max_rows: int = Field(default=10000, ge=1)
+    worker_memory: str = Field(
+        default="2GB", pattern=r"^\d+(\.\d+)?\s?(B|KB|MB|GB|TB|KiB|MiB|GiB|TiB)$"
+    )
+    threads: int = Field(default=4, ge=1)
+
+
 class RelaySettings(BaseModel):
     """``[relay]``. The relay a paired phone reaches this Mac through (ADR-051).
 
@@ -1005,6 +1022,7 @@ BROWSER_SETTINGS = frozenset(
         "budget",
         "memory",
         "agents",
+        "data",
     }
 )
 """Top-level settings the browser may edit. Every ``GolemSettings`` field is in one list."""
@@ -1082,6 +1100,7 @@ class GolemSettings(BaseSettings):
     budget: BudgetSettings = Field(default_factory=BudgetSettings)
     memory: MemorySettings = Field(default_factory=MemorySettings)
     relay: RelaySettings = Field(default_factory=RelaySettings)
+    data: DataSettings = Field(default_factory=DataSettings)
     agents: AgentSettings = Field(default_factory=AgentSettings)
     notifications: NotificationSettings = Field(default_factory=NotificationSettings)
     chat: ChatSettings = Field(default_factory=ChatSettings)
