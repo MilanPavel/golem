@@ -211,6 +211,10 @@ A step that stops to ask you a question runs again from its first line when you 
 - **Cost.** `aget_state_history` reads from newest to oldest, so forking near the start of a long session reads most of its history.
 - **In the TUI**, `/fork` cuts at the newest finished message on the screen and switches to the new session. A message picker is not built.
 
+### Helpers are sessions
+
+A helper ([Helpers](./helpers.md)) is a headless session with a parent: it has its own log, checkpoint thread and runs, and five columns in `sessions` (`parent_session_id`, `root_session_id`, `parent_call_id`, `helper_index`, `agent`) that the projection fills from `session.created`. The list, `watch` and `run.list` leave helpers out, so the Inbox shows a helper's question under its lead. A restart resumes a helper's `running` run, and `reconcile_helpers` runs after `recover_runs`.
+
 ### The session list
 
 `session.list {watch: true}` returns the list and marks the connection as a watcher until it closes. After every stored event except `message.delta`, `SessionLog` sends that session's `session.summary` to every watcher, inside the per-session lock, so one session's summaries arrive in order ([ADR-009](../adr/009-session-list.md)). A session gets a title once, after its first completed run, as a `session.updated` in its own log. The title is asked of the model for the role `titles` (`[routing.roles]`, `golem.models.roles.for_role`): on a local session the session's own model, called with the session's options so Ollama keeps it loaded, and on a hosted session a ready budget model when there is one. A title on Ollama is capped at 64 tokens, with `think` off when the model takes it. `/sessions` in the TUI is that list.
@@ -233,5 +237,6 @@ A step that stops to ask you a question runs again from its first line when you 
 ## Read more
 
 - Next: [Tools](./tools.md), what happens when the reply asks for a tool.
+- [Helpers](./helpers.md): sessions that a session starts.
 - Before: [The protocol](./protocol.md).
 - [The overview](../architecture.md): the whole system on one page.

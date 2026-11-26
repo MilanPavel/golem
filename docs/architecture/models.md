@@ -305,6 +305,12 @@ A turn that would run on a paid model without the user's yes becomes a run that 
 
 `sessions.paid_ok` is a column set by `session.updated`. A fork does not copy it. A pinned session never asks, and a spent cap still refuses a pinned paid model with `budget_spent`.
 
+### Helpers and the dispatcher
+
+A helper's model is a wish in its agent file, and `pick_helper` (`models/pick_helper.py`) turns it into a model. It is pure and never fails on an empty tier: the wished tier, then the nearest tier you have, then the lead's model. With local models only, `stronger` is the lead's model in a fresh window. With cloud models only, `cheapest` is the cheapest hosted model and no paid question is asked. A local-only folder or a `local` route keeps every helper local. When a helper would go to a paid model from a local lead, the paid question is asked once for the chat, worded for a helper. The pick is written to the helper's `model.routed` and to `helper.started.pick_reason`.
+
+A helper's model call takes a slot of the dispatcher like any other call, with the role `helper`. A call that waits more than a second tells its lead with `helper.state waiting` and the reason `slot` or `provider`, and the card shows the line, the place in it and the backoff. `[agents] at_once` limits how many helpers of one lead run, and the dispatcher limits how many calls a model runs. See [Helpers](./helpers.md) and [ADR-060](../adr/060-dispatcher-and-engine-profile.md).
+
 ### Model errors
 
 A run ends in `run.failed` with a `message` and no traceback. A failure a client can act on also has a `code`. `model_unreachable`: the model's server did not answer. `not_installed`: the model needs a local Ollama, and no `ollama` binary is on `PATH` or at a known install path. Either comes with the `provider` and a `hint` that says how to fix it, such as `run ollama serve`. `budget_spent`: a cap in `[budget]` is spent, so a run stopped before its next paid call (see `models/budget.py`); it has a `hint` and no `provider`. `local_only`: the chat's folder stays on this Mac and a hosted model was about to be called, so nothing was sent (the backstop in `ModelRouter.chat_model(local_only=True)`; `message.send` refuses earlier with `-32018`).

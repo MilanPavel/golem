@@ -34,6 +34,10 @@ golem also ships a few skills of its own. They come last, so a skill of the same
 
 Put each skill in its own folder, named like the skill: `~/.golem/skills/release-notes/SKILL.md`. Save a change and golem sees it within two seconds, with no restart.
 
+## Skills and agents
+
+A skill is a procedure the model loads and follows. An **agent** is a different thing: a type of [helper](./helpers.md), a second agent that golem starts for one job. It is also one Markdown file, in `~/.golem/agents/` or `.golem/agents/`, but its body is the prompt of the helper, not instructions for the model.
+
 ## See them
 
 Type `/skills` in the chat, or open Settings, Skills in the web app, to see every skill golem found, and why one is not used: it is broken, turned off, or a skill of the same name in the project hides it. In the web app you can also create a skill, edit its `SKILL.md`, turn it off, or copy a bundled one to your own skills.

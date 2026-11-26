@@ -48,6 +48,7 @@ golem's architecture, one idea per chapter. Each chapter explains an idea that m
 | MCP | [architecture/mcp.md](architecture/mcp.md) | |
 | The terminal app | [architecture/tui.md](architecture/tui.md) | |
 | The web UI | [architecture/web.md](architecture/web.md) | |
+| Helpers | [architecture/helpers.md](architecture/helpers.md) | [#1379](https://github.com/MilanPavel/golem/issues/1379) |
 | Tracing | [architecture/tracing.md](architecture/tracing.md) | |
 | What comes next | `architecture/whats-next.md` | [#291](https://github.com/MilanPavel/golem/issues/291) |
 
