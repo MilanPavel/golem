@@ -974,9 +974,11 @@ def open_chat(
             text = "\n\n".join(t for _, t in parts)
             if pin is None and not final and made == 0:
                 prefixes[thread] = _Prefix(profile, names, plan_first, schemas, prices, text)
-            elif reuse and pin is not None and pin.text != text:
-                # Live parts of the prompt (such as the row counts of a data source) changed
-                # during the message. Send the first call's text, so the signatures hold (B.78).
+            elif reuse and pin is not None and pin.text != text and _has_signed_thinking(plain):
+                # A live part of the prompt (such as the row counts of a data source) changed
+                # during the message, and the history sent holds signed thinking. Send the first
+                # call's text, so the signatures hold (B.78). Without signed thinking, the
+                # rebuilt text is sent, so a changed memory section is read again.
                 text = pin.text
             system = SystemMessage(content=text) if text else None
             # The system message is sent, never returned, so it stays out of the checkpoint.
@@ -1935,6 +1937,16 @@ def _without_signed_thinking(
                 message = message.model_copy(update={"content": parts})
         kept.append(message)
     return kept
+
+
+def _has_signed_thinking(messages: Sequence[BaseMessage]) -> bool:
+    """Whether a reply in ``messages`` has a signed ``thinking`` or ``redacted_thinking`` part."""
+    return any(
+        isinstance(m, AIMessage)
+        and isinstance(m.content, list)
+        and any(isinstance(p, dict) and p.get("type") in _SIGNED for p in m.content)
+        for m in messages
+    )
 
 
 def _without_thinking(messages: Sequence[BaseMessage]) -> list[BaseMessage]:

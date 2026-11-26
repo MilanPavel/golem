@@ -19,6 +19,7 @@ from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 
 from golem.evals import usecases
 from golem.evals.usecases import InProcess, PlanModel, Turn
+from golem.graphs import chat as chat_module
 from golem.graphs.chat import _without_signed_thinking
 from golem.graphs.notes import note
 from golem.graphs.prompt import PromptContext, SystemPrompt
@@ -186,7 +187,7 @@ async def _two_messages(
     def live(_context: PromptContext) -> str:
         return f"Rows: {len(CALLS) if len(CALLS) > limit else 0}."
 
-    real = usecases.open_chat
+    real = chat_module.open_chat
 
     def open_chat(*args: Any, **kwargs: Any) -> Any:
         return real(*args, prompt=SystemPrompt((live,)), **kwargs)
