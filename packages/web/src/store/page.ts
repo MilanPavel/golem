@@ -17,7 +17,7 @@ import { MODEL_LIST_ALL_KEY, MODEL_LIST_KEY, SETUP_STATUS_KEY, type HfFilesResul
 import { SKILL_LIST_KEY } from "./skills.ts";
 import { MEMORY_LIST_KEY, MEMORY_PAGE, type MemoryExportParams, type MemoryExportResult, type MemoryListRequest, type MemoryListResult, type MemoryPrivacy, type MemoryScope } from "./memory.ts";
 import { ROUTINE_GET_KEY, ROUTINE_LIST_KEY, type RoutineGetResult, type RoutineInfo, type RoutineListResult, type RoutineRunResult } from "./routines.ts";
-import { type RunListResult } from "./runs.ts";
+import { RUN_LIST_KEY, type RunListResult } from "./runs.ts";
 import type { WorkflowGetResult, WorkflowListResult } from "./workflows.ts";
 import { createPulls, type Pulls } from "./pulls.ts";
 import { createQueryClient, keepQueriesHonest } from "./query.ts";
@@ -71,6 +71,8 @@ export type PageClient = Pick<
   | "listRoutines"
   | "listWorkflows"
   | "getWorkflow"
+  | "startWorkflow"
+  | "workflowStatus"
   | "onWorkflowEvent"
   | "listRuns"
   | "getRoutine"
@@ -396,6 +398,8 @@ export type PageActions = {
   removeMcp(name: string): Promise<void>;
   /** Fires a routine now. Resolves with the run and the headless session it started; its History row arrives with `routine.fired`. */
   runRoutine(name: string, folder: string | null): Promise<RoutineRunResult>;
+  /** Starts a run of the workflow `id` with `inputs`. Resolves with the id the Runs page opens it by: the run's session when it has one, else the workflow run's id. */
+  startWorkflow(id: string, inputs: Record<string, unknown>): Promise<string>;
   /** Deletes a user routine from config.toml. */
   removeRoutine(name: string): Promise<void>;
   /** Writes a user routine: merges `fields` into `name` (a null removes a key), or with `create` makes it. Rejects with the daemon's reason. */
@@ -915,6 +919,15 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
         } finally {
           await queryClient.invalidateQueries({ queryKey: MCP_TOOLS_KEY });
           await queryClient.invalidateQueries({ queryKey: MCP_LIST_KEY });
+        }
+      },
+      async startWorkflow(id, inputs) {
+        const started = await client.startWorkflow(id, inputs);
+        void queryClient.invalidateQueries({ queryKey: RUN_LIST_KEY });
+        try {
+          return (await client.workflowStatus(started.workflow_run_id)).run.session_id ?? started.workflow_run_id;
+        } catch {
+          return started.workflow_run_id;
         }
       },
       async runRoutine(name, folder) {

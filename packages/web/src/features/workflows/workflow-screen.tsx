@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { actionErrorText, revealErrorText } from "../../store/errors.ts";
+import { actionErrorText, folderDialogErrorText, revealErrorText } from "../../store/errors.ts";
 import { useFolderDialog, useNavigate, usePageActions, useRunList, useWorkflow, useWorkflowList } from "../../store/page-context.tsx";
 import { useNow } from "../sessions/use-now.ts";
 import { WorkflowDetail } from "./workflow-detail.tsx";
@@ -69,6 +69,21 @@ export function WorkflowScreen({ id }: { id: string }) {
         runs={workflowRuns(runs.data?.runs ?? [], workflow.name)}
         now={now}
         onNavigate={navigate}
+        onStart={async (inputs) => {
+          const runId = await actions.startWorkflow(workflow.id, inputs);
+          navigate(`/runs/${encodeURIComponent(runId)}`);
+        }}
+        onChooseFolder={
+          dialog
+            ? async (start) => {
+                try {
+                  return (await actions.chooseFolder(start)).path ?? null;
+                } catch (error) {
+                  throw new Error(folderDialogErrorText(error));
+                }
+              }
+            : undefined
+        }
         onReveal={
           dialog
             ? async (path) => {

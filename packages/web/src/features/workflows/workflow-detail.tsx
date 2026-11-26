@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../ui/tabs.tsx";
 import { RunRow } from "../runs/index.ts";
 import { PendingButton } from "../routines/routine-detail.tsx";
 import { CodeEditor } from "../settings/config/code-editor.tsx";
+import { RunDialog } from "./run-dialog.tsx";
 import { WorkflowDot } from "./workflow-dot.tsx";
 import { errorLine, stepLines, stepNotes, stepStart, triggerText } from "./text.ts";
 
@@ -24,6 +25,12 @@ export type WorkflowDetailProps = {
   onNavigate: (path: string) => void;
   /** Opens the file's folder in Finder. Without it, the action is not offered. */
   onReveal?: (path: string) => Promise<void>;
+  /** Starts a run with these inputs and opens it. Rejects with the daemon's reason, which the Run… dialog shows. Without it, Run… is not offered. */
+  onStart?: (inputs: Record<string, unknown>) => Promise<void>;
+  /** Opens the folder dialog on the daemon's Mac. Without it, a folder input is typed. */
+  onChooseFolder?: (start: string | null) => Promise<string | null>;
+  /** Opens the Run… dialog at the start. For the gallery and tests. */
+  initialRunOpen?: boolean;
   /** The tab shown first. The Overview by default. */
   initialTab?: "overview" | "code" | "runs" | "triggers";
 };
@@ -179,8 +186,9 @@ function RunsTab({ runs, now, onNavigate }: Pick<WorkflowDetailProps, "runs" | "
 }
 
 /** One workflow in the main area: its state, Run…, and the Overview, Code, Runs and Triggers tabs. */
-export function WorkflowDetail({ workflow, steps, code, runs, now, onNavigate, onReveal, initialTab = "overview" }: WorkflowDetailProps) {
+export function WorkflowDetail({ workflow, steps, code, runs, now, onNavigate, onReveal, onStart, onChooseFolder, initialRunOpen = false, initialTab = "overview" }: WorkflowDetailProps) {
   const [tab, setTab] = useState<Tab>(initialTab);
+  const [runOpen, setRunOpen] = useState(initialRunOpen);
   return (
     <div className="flex min-w-0 flex-col gap-4">
       <header className="flex flex-wrap-reverse items-start justify-between gap-x-3 gap-y-2">
@@ -193,8 +201,12 @@ export function WorkflowDetail({ workflow, steps, code, runs, now, onNavigate, o
           <p className="text-meta text-muted">{STATE_LINE[workflow.state]}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {workflow.state === "ok" ? (
-            <PendingButton kind="primary" reason="The Run dialog comes with 3.9.2">
+          {workflow.state === "ok" && onStart !== undefined ? (
+            <Button kind="primary" size="sm" onClick={() => setRunOpen(true)}>
+              Run…
+            </Button>
+          ) : workflow.state === "ok" ? (
+            <PendingButton kind="primary" reason="Not available here">
               Run…
             </PendingButton>
           ) : (
@@ -204,6 +216,12 @@ export function WorkflowDetail({ workflow, steps, code, runs, now, onNavigate, o
           )}
         </div>
       </header>
+      {onStart === undefined ? null : <RunDialog open={runOpen} workflow={workflow}
+          onStart={async (inputs) => {
+            await onStart(inputs);
+            setRunOpen(false);
+          }}
+          onCancel={() => setRunOpen(false)} onChooseFolder={onChooseFolder} />}
       {workflow.state === "broken" && workflow.error ? <ErrorBox error={workflow.error} /> : null}
       <Tabs value={tab} onValueChange={(next) => setTab(next as Tab)} className="flex flex-col gap-4">
         <TabsList aria-label={`${workflow.name} details`}>

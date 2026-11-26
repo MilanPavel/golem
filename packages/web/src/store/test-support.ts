@@ -132,6 +132,8 @@ export function fakeClient() {
       steps: [],
       code: "",
     })),
+    startWorkflow: vi.fn<PageClient["startWorkflow"]>(async () => ({ workflow_run_id: "wr_1" })),
+    workflowStatus: vi.fn<PageClient["workflowStatus"]>(async () => ({ run: { workflow_run_id: "wr_1", workflow_id: "x", name: "x", status: "running", trigger: "manual", inputs: {}, session_id: "s_wr" }, steps: [], reviews: [] }) as never),
     listRoutines: vi.fn<PageClient["listRoutines"]>(async () => ({ routines: [] })),
     listRuns: vi.fn<PageClient["listRuns"]>(async () => ({ runs: [] })),
     getRoutine: vi.fn<PageClient["getRoutine"]>(async (name) => ({ routine: { config: { name, prompt: "" }, path: "/Users/me/.golem/config.toml", source: "user" }, runs: [] })),
