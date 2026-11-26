@@ -105,7 +105,7 @@ import { LeadRun, RunBanner, RunsList, RunsPanel, WorkflowRunView } from "../fea
 import { SAMPLE_RUN_CANCELLED, SAMPLE_RUN_DONE, SAMPLE_RUN_FAILED, SAMPLE_RUN_REVIEW, SAMPLE_RUN_RUNNING, SAMPLE_RUN_TOOL_ASK, WORKFLOW_RUN_NOW } from "../features/runs/workflow-sample.ts";
 import { DataGallery } from "./gallery-data.tsx";
 import { RunForm, WorkflowDetail, WorkflowsPanel } from "../features/workflows/index.ts";
-import { SAMPLE_BROKEN, SAMPLE_PR_DIGEST, SAMPLE_PR_DIGEST_CODE, SAMPLE_PR_DIGEST_STEPS, SAMPLE_ROUTINE_WORKFLOW_RUN, SAMPLE_UNTRUSTED, SAMPLE_WORKFLOW_LIST, SAMPLE_WORKFLOW_LIST_TWO_PROJECTS, SAMPLE_WORKFLOW_RUNS, WORKFLOWS_NOW } from "../features/workflows/sample.ts";
+import { SAMPLE_BROKEN, SAMPLE_PR_DIGEST, SAMPLE_PR_DIGEST_CODE, SAMPLE_PR_DIGEST_EDITED_CODE, SAMPLE_PR_DIGEST_EDITED_STEPS, SAMPLE_PR_DIGEST_HASH, SAMPLE_PR_DIGEST_PROBLEMS, SAMPLE_PR_DIGEST_STEPS, SAMPLE_SAVE_CONFLICT, SAMPLE_ROUTINE_WORKFLOW_RUN, SAMPLE_UNTRUSTED, SAMPLE_WORKFLOW_LIST, SAMPLE_WORKFLOW_LIST_TWO_PROJECTS, SAMPLE_WORKFLOW_RUNS, WORKFLOWS_NOW } from "../features/workflows/sample.ts";
 import { RUNS_NOW, SAMPLE_RUN_LIST, SAMPLE_WAITING_RUN } from "../features/runs/sample.ts";
 import { HelperRowCardBody, Rail, SessionsPanel, SidebarPanel, WaitingChip } from "../features/sidebar/index.ts";
 import { ConnectionStrip } from "../features/connection/index.ts";
@@ -2381,6 +2381,34 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
         ).map(([title, tab, workflow, steps, code, runs, routines]) => (
           <div key={title} className="mt-4 rounded-lg border border-line bg-bg p-5" role="region" aria-label={`${title}, ${theme}`}>
             <WorkflowDetail workflow={workflow} steps={steps} code={code} runs={runs} routines={routines} now={WORKFLOWS_NOW} onNavigate={() => {}} onReveal={() => Promise.resolve()} initialTab={tab} />
+          </div>
+        ))}
+        {(
+          [
+            ["Workflow editor, clean", SAMPLE_PR_DIGEST, SAMPLE_PR_DIGEST_STEPS, SAMPLE_PR_DIGEST_CODE, { problems: [] }],
+            ["Workflow editor, edited, not saved", SAMPLE_PR_DIGEST, SAMPLE_PR_DIGEST_STEPS, SAMPLE_PR_DIGEST_CODE, { text: SAMPLE_PR_DIGEST_EDITED_CODE, steps: SAMPLE_PR_DIGEST_EDITED_STEPS, problems: [] }],
+            ["Workflow editor, problems", SAMPLE_PR_DIGEST, SAMPLE_PR_DIGEST_STEPS, SAMPLE_PR_DIGEST_CODE, { text: `${SAMPLE_PR_DIGEST_CODE}\n`, problems: SAMPLE_PR_DIGEST_PROBLEMS, selected: "s2" }],
+            ["Workflow editor, conflict", SAMPLE_PR_DIGEST, SAMPLE_PR_DIGEST_STEPS, SAMPLE_PR_DIGEST_CODE, { text: SAMPLE_PR_DIGEST_EDITED_CODE, steps: SAMPLE_PR_DIGEST_EDITED_STEPS, problems: [], saveError: SAMPLE_SAVE_CONFLICT }],
+            ["Workflow editor, selected step", SAMPLE_PR_DIGEST, SAMPLE_PR_DIGEST_STEPS, SAMPLE_PR_DIGEST_CODE, { problems: [], selected: "s2" }],
+            ["Workflow editor, outline only", SAMPLE_PR_DIGEST, SAMPLE_PR_DIGEST_STEPS, SAMPLE_PR_DIGEST_CODE, { problems: [], selected: "s3", view: "outline" }],
+            ["Workflow editor, broken file", SAMPLE_BROKEN, [], null, undefined],
+            ["Workflow editor, untrusted, read only", SAMPLE_UNTRUSTED, SAMPLE_PR_DIGEST_STEPS, SAMPLE_PR_DIGEST_CODE, { problems: [] }],
+          ] as const
+        ).map(([title, workflow, steps, code, initialEditor]) => (
+          <div key={title} className="mt-4 rounded-lg border border-line bg-bg p-5" role="region" aria-label={`${title}, ${theme}`}>
+            <WorkflowDetail
+              workflow={workflow}
+              steps={steps}
+              code={code}
+              codeHash={SAMPLE_PR_DIGEST_HASH}
+              runs={[]}
+              now={WORKFLOWS_NOW}
+              onNavigate={() => {}}
+              onReveal={() => Promise.resolve()}
+              onSave={() => Promise.reject(new Error(SAMPLE_SAVE_CONFLICT))}
+              initialEditor={initialEditor}
+              initialTab="code"
+            />
           </div>
         ))}
         <div className="mt-4 flex flex-wrap items-start gap-4">

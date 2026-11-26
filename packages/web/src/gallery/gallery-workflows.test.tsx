@@ -50,6 +50,31 @@ test("the gallery's Triggers stories and the routine editor stories show each st
   }
 });
 
+test("the gallery's Workflow editor stories show each state, in both themes", () => {
+  for (const theme of ["slip", "kiln"] as const) {
+    showTheme(theme);
+    const { container, unmount } = render(<Gallery />);
+    // A selector on the region finds a story at once; a role query over the whole gallery is slow.
+    const story = (name: string) => {
+      const region = container.querySelector<HTMLElement>(`[role="region"][aria-label="${name}, ${theme}"]`);
+      if (region === null) throw new Error(`no story ${name}`);
+      return within(region);
+    };
+    expect(story("Workflow editor, clean").getByText("✓ checks pass")).toBeTruthy();
+    expect(within(story("Workflow editor, clean").getByRole("list", { name: "Outline" })).getAllByRole("listitem")).toHaveLength(4);
+    expect(story("Workflow editor, edited, not saved").getByText("1 change not saved")).toBeTruthy();
+    expect(within(story("Workflow editor, edited, not saved").getByRole("list", { name: "Outline" })).getAllByRole("listitem")).toHaveLength(3);
+    expect(story("Workflow editor, problems").getByText("✕ 2 problems, 1 warning")).toBeTruthy();
+    expect(story("Workflow editor, problems").getByRole("list", { name: "Problems" }).textContent).toContain('no agent "upgrader"');
+    expect(story("Workflow editor, conflict").getByRole("alert").textContent).toContain("The file changed on disk");
+    expect(story("Workflow editor, selected step").getByRole("group", { name: "Selected step" }).textContent).toContain("Summarise each pull request");
+    expect(story("Workflow editor, outline only").queryByRole("textbox")).toBeNull();
+    expect(story("Workflow editor, broken file").getByRole("alert").textContent).toContain("ImportError");
+    expect((story("Workflow editor, untrusted, read only").getByRole("textbox", { name: "Code of deploy" }) as HTMLTextAreaElement).readOnly).toBe(true);
+    unmount();
+  }
+});
+
 test("the gallery's Run dialog stories show each state, in both themes", () => {
   for (const theme of ["slip", "kiln"] as const) {
     showTheme(theme);

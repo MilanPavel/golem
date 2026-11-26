@@ -1,10 +1,9 @@
-import { useState, type ReactNode } from "react";
+import { useCallback, useState, type ReactNode } from "react";
 import { nextRunText, routineState, triggerWords } from "@golem/view";
-import { actionErrorText } from "../../store/errors.ts";
 import { routineNewPath, routinePath } from "../../store/router.ts";
 import type { RoutineInfo } from "../../store/routines.ts";
 import type { RunInfo } from "../../store/runs.ts";
-import type { WorkflowEntryInfo, WorkflowOutlineStep } from "../../store/workflows.ts";
+import type { WorkflowCheckResult, WorkflowEntryInfo, WorkflowOutlineStep, WorkflowSaveResult } from "../../store/workflows.ts";
 import { Badge } from "../../ui/badge.tsx";
 import { Button } from "../../ui/button.tsx";
 import { Code } from "../../ui/code.tsx";
@@ -13,10 +12,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../ui/tabs.tsx";
 import { RunRow } from "../runs/index.ts";
 import { PendingButton } from "../routines/routine-detail.tsx";
 import { RoutineDot } from "../routines/routine-dot.tsx";
-import { CodeEditor } from "../settings/config/code-editor.tsx";
 import { RunDialog } from "./run-dialog.tsx";
 import { WorkflowDot } from "./workflow-dot.tsx";
-import { errorLine, stepLines, stepNotes, stepStart, triggerText } from "./text.ts";
+import { WorkflowEditor, type WorkflowEditorProps } from "./workflow-editor.tsx";
+import { errorLine, stepNotes, stepStart, triggerText } from "./text.ts";
 
 export type WorkflowDetailProps = {
   workflow: WorkflowEntryInfo;
@@ -26,6 +25,14 @@ export type WorkflowDetailProps = {
   code: string | null;
   /** This workflow's runs, newest first. */
   runs: readonly RunInfo[];
+  /** The hash of `code`, which a save names as its base. Without it the code is read only. */
+  codeHash?: string | null;
+  /** Checks a text without writing it, for the editor. Without it the outline is not redrawn as you type. */
+  onCheck?: (code: string) => Promise<WorkflowCheckResult>;
+  /** Writes the code. Rejects with the daemon's reason. Without it the code is read only. */
+  onSave?: (code: string, baseHash: string) => Promise<WorkflowSaveResult>;
+  /** The editor's state to start in. For the gallery and tests. */
+  initialEditor?: WorkflowEditorProps["initial"];
   /** The routines whose `workflow` is this one, for the Triggers tab. */
   routines?: readonly RoutineInfo[];
   now: number;
@@ -141,43 +148,29 @@ function Overview({ workflow, steps }: { workflow: WorkflowEntryInfo; steps: rea
   );
 }
 
-function CodeTab({ workflow, steps, code, onReveal }: Pick<WorkflowDetailProps, "workflow" | "steps" | "code" | "onReveal">) {
-  const [error, setError] = useState<string | null>(null);
-  const marked = stepLines(steps);
-  return (
-    <div className="flex flex-col gap-2">
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-        <p className="min-w-0 flex-1 wrap-anywhere">
+function CodeTab({ workflow, steps, code, codeHash, onCheck, onSave, onReveal, onDirtyChange, initialEditor }: Pick<WorkflowDetailProps, "workflow" | "steps" | "code" | "codeHash" | "onCheck" | "onSave" | "onReveal" | "initialEditor"> & { onDirtyChange: (dirty: boolean) => void }) {
+  if (code === null) {
+    return (
+      <div className="flex flex-col gap-2">
+        <p className="min-w-0 wrap-anywhere">
           <Code tone="muted">{workflow.path}</Code>
         </p>
-        {onReveal === undefined ? null : (
-          <Button
-            size="sm"
-            onClick={() => {
-              setError(null);
-              onReveal(workflow.path).catch((err: unknown) => setError(actionErrorText(err, "Could not open the folder.")));
-            }}
-          >
-            Show in Finder
-          </Button>
-        )}
-      </div>
-      {error === null ? null : (
-        <p role="alert" className="text-sm text-deny">
-          {error}
-        </p>
-      )}
-      {code === null ? (
         <p className="text-sm text-muted">{workflow.state === "ok" ? "The file could not be read." : "The code is not shown for a file that does not load or is not trusted."}</p>
-      ) : (
-        <>
-          <CodeEditor value={code} onChange={() => {}} marked={marked} label={`Code of ${workflow.name}`} language="python" readOnly markKind="step" />
-          <p className="text-meta text-faint">
-            {marked.size === 0 ? "Read only. Edit the file in your own editor." : "Read only. A dot marks the line where a step starts. Edit the file in your own editor."}
-          </p>
-        </>
-      )}
-    </div>
+      </div>
+    );
+  }
+  return (
+    <WorkflowEditor
+      workflow={workflow}
+      steps={steps}
+      code={code}
+      codeHash={codeHash ?? null}
+      onCheck={onCheck}
+      onSave={onSave}
+      onReveal={onReveal}
+      onDirtyChange={onDirtyChange}
+      initial={initialEditor}
+    />
   );
 }
 
@@ -240,9 +233,16 @@ function TriggersTab({ routines, now, onNavigate }: { routines: readonly Routine
 }
 
 /** One workflow in the main area: its state, Run…, and the Overview, Code, Runs and Triggers tabs. */
-export function WorkflowDetail({ workflow, steps, code, runs, routines = [], now, onNavigate, onReveal, onStart, onChooseFolder, initialRunOpen = false, initialTab = "overview" }: WorkflowDetailProps) {
+export function WorkflowDetail({ workflow, steps, code, runs, routines = [], codeHash, onCheck, onSave, initialEditor, now, onNavigate: navigateTo, onReveal, onStart, onChooseFolder, initialRunOpen = false, initialTab = "overview" }: WorkflowDetailProps) {
   const [tab, setTab] = useState<Tab>(initialTab);
   const [runOpen, setRunOpen] = useState(initialRunOpen);
+  const [dirty, setDirty] = useState(false);
+  const onDirtyChange = useCallback((next: boolean) => setDirty(next), []);
+  // Leaving with code that is not saved asks first.
+  const onNavigate = (path: string) => {
+    if (dirty && !window.confirm("The code has changes that are not saved. Leave and lose them?")) return;
+    navigateTo(path);
+  };
   return (
     <div className="flex min-w-0 flex-col gap-4">
       <header className="flex flex-wrap-reverse items-start justify-between gap-x-3 gap-y-2">
@@ -287,8 +287,9 @@ export function WorkflowDetail({ workflow, steps, code, runs, routines = [], now
         <TabsContent value="overview">
           <Overview workflow={workflow} steps={steps} />
         </TabsContent>
-        <TabsContent value="code">
-          <CodeTab workflow={workflow} steps={steps} code={code} onReveal={onReveal} />
+        {/* Kept mounted, so an edit survives a look at another tab. */}
+        <TabsContent value="code" forceMount hidden={tab !== "code"}>
+          <CodeTab workflow={workflow} steps={steps} code={code} codeHash={codeHash} onCheck={onCheck} onSave={onSave} onReveal={onReveal} onDirtyChange={onDirtyChange} initialEditor={initialEditor} />
         </TabsContent>
         <TabsContent value="runs">
           <RunsTab runs={runs} now={now} onNavigate={onNavigate} />

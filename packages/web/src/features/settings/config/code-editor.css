@@ -36,3 +36,18 @@
 .code-editor textarea::selection {
   background: color-mix(in srgb, var(--color-clay) 30%, transparent);
 }
+
+/* A band of lines behind the text: the lines of the selected step, or of a problem. */
+.code-editor-band {
+  position: absolute;
+  inset-inline: 0;
+  pointer-events: none;
+}
+
+.code-editor-band[data-kind="step"] {
+  background: color-mix(in srgb, var(--color-clay) 10%, transparent);
+}
+
+.code-editor-band[data-kind="problem"] {
+  background: color-mix(in srgb, var(--color-deny) 12%, transparent);
+}

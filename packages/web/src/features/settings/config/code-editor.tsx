@@ -44,6 +44,11 @@ export function CodeEditor({
   language = "toml",
   readOnly = false,
   markKind = "problem",
+  problems,
+  stepNumbers,
+  bands,
+  onCursor,
+  reveal,
   className,
 }: {
   value: string;
@@ -55,6 +60,16 @@ export function CodeEditor({
   readOnly?: boolean;
   /** What a marked line is: `problem` (a cross, in deny) or `step` (a dot, in clay: where a workflow step starts). */
   markKind?: "problem" | "step";
+  /** Lines (from 1) with a problem. They show a cross over any other mark. */
+  problems?: ReadonlySet<number>;
+  /** Line to step number: a step's line shows its number in the margin instead of a dot. */
+  stepNumbers?: ReadonlyMap<number, number>;
+  /** Lines (from 1) tinted behind the text: the selected step, or a problem. */
+  bands?: readonly { from: number; to: number; kind: "step" | "problem" }[];
+  /** The caret moved: its line (from 1). */
+  onCursor?: (line: number) => void;
+  /** Scrolls this line into view whenever `nonce` changes. */
+  reveal?: { line: number; nonce: number };
   /** Replaces the default sizing: fills the free height of its parent, at least `min-h-72`. */
   className?: string;
 }) {
@@ -62,6 +77,21 @@ export function CodeEditor({
   const under = useRef<HTMLPreElement>(null);
   const gutter = useRef<HTMLDivElement>(null);
   const count = value.split("\n").length;
+  const area = useRef<HTMLTextAreaElement>(null);
+  const nonce = reveal?.nonce;
+  const revealLine = reveal?.line;
+  useEffect(() => {
+    const box = area.current;
+    if (box === null || nonce === undefined || revealLine === undefined) return;
+    const height = Number.parseFloat(getComputedStyle(box).lineHeight) || 20;
+    box.scrollTop = Math.max(0, (revealLine - 3) * height);
+  }, [nonce, revealLine]);
+
+  function cursor(event: { currentTarget: HTMLTextAreaElement }): void {
+    if (onCursor === undefined) return;
+    const { value: text, selectionStart } = event.currentTarget;
+    onCursor(text.slice(0, selectionStart).split("\n").length);
+  }
 
   function follow(event: React.UIEvent<HTMLTextAreaElement>): void {
     const { scrollTop, scrollLeft } = event.currentTarget;
@@ -80,13 +110,22 @@ export function CodeEditor({
         className="code-editor-layer overflow-hidden border-r border-line text-right text-faint select-none"
       >
         {Array.from({ length: count }, (_, at) => (
-          <div key={at} className={cn(marked.has(at + 1) && (markKind === "step" ? "font-semibold text-clay-ink" : "font-semibold text-deny"))}>
-            {marked.has(at + 1) ? (markKind === "step" ? "●" : "✘") : ""}
+          <div key={at} className={cn((problems?.has(at + 1) ?? false) ? "font-semibold text-deny" : marked.has(at + 1) && (markKind === "step" ? "font-semibold text-clay-ink" : "font-semibold text-deny"))}>
+            {problems?.has(at + 1) ? "✘" : stepNumbers?.has(at + 1) ? `${stepNumbers.get(at + 1)} ●` : marked.has(at + 1) ? (markKind === "step" ? "●" : "✘") : ""}
             {at + 1}
           </div>
         ))}
       </div>
       <div className="relative min-w-0 flex-1">
+        {(bands ?? []).map((band, at) => (
+          <div
+            key={at}
+            aria-hidden="true"
+            className="code-editor-band"
+            data-kind={band.kind}
+            style={{ top: `${0.5 + (band.from - 1) * 1.25}rem`, height: `${(band.to - band.from + 1) * 1.25}rem` }}
+          />
+        ))}
         <pre ref={under} aria-hidden="true" className="code-editor-layer absolute inset-0 overflow-hidden text-ink">
           {tokens === null
             ? value
@@ -110,11 +149,13 @@ export function CodeEditor({
           {"\n"}
         </pre>
         <textarea
+          ref={area}
           aria-label={label}
           value={value}
           readOnly={readOnly}
           onChange={(event) => onChange(event.target.value)}
           onScroll={follow}
+          onSelect={cursor}
           wrap="off"
           spellCheck={false}
           autoCapitalize="off"
