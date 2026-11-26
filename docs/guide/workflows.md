@@ -361,6 +361,8 @@ Each line says the line of the file, the step (from the outline) and the problem
 
 The editor uses the same check while you type (`workflow.check` with the text), and saves with `workflow.save`. A save is refused when the text has an error, when the file changed on disk since you opened it, and for a folder that is not trusted.
 
+The selected step has fields: brief, agent, model (a wish), budget and key. Changing one calls `workflow.edit_step`, which replaces exactly that argument in the text (or adds `name=value` when the call lacks it) and leaves comments and formatting alone. It returns the new text, its outline and its problems, and writes nothing: the editor keeps the text as an unsaved edit until you save. A value the code computes (a name, a call, an f-string with expressions) is shown as its source and is set in code; a code step has no fields.
+
 ## Ask golem
 
 In the editor, the **ask golem** box (⌘K) under the code takes one sentence: "make it cheaper", "add a step after 2", "run the tests as a separate step". golem makes **one** model call and answers with a proposal. Nothing is written.

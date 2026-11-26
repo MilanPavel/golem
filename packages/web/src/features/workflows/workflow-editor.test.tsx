@@ -2,8 +2,8 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/rea
 import userEvent from "@testing-library/user-event";
 import axe from "axe-core";
 import { afterEach, expect, test, vi } from "vitest";
-import type { WorkflowCheckResult, WorkflowSaveResult } from "../../store/workflows.ts";
-import { SAMPLE_PR_DIGEST, SAMPLE_PR_DIGEST_CODE, SAMPLE_PR_DIGEST_EDITED_STEPS, SAMPLE_PR_DIGEST_HASH, SAMPLE_PR_DIGEST_PROBLEMS, SAMPLE_PR_DIGEST_PROPOSAL, SAMPLE_PR_DIGEST_PROPOSAL_PROBLEM, SAMPLE_PR_DIGEST_STEPS, SAMPLE_UNTRUSTED, WORKFLOWS_NOW } from "./sample.ts";
+import type { WorkflowCheckResult, WorkflowEditStepResult, WorkflowSaveResult } from "../../store/workflows.ts";
+import { SAMPLE_PR_DIGEST, SAMPLE_PR_DIGEST_CODE, SAMPLE_PR_DIGEST_EDITED_STEPS, SAMPLE_PR_DIGEST_HASH, SAMPLE_PR_DIGEST_PROBLEMS, SAMPLE_PR_DIGEST_PROPOSAL, SAMPLE_PR_DIGEST_PROPOSAL_PROBLEM, SAMPLE_PR_DIGEST_STEPS, SAMPLE_UNTRUSTED, WORKFLOWS_NOW, SAMPLE_UPGRADE, SAMPLE_UPGRADE_AGENTS, SAMPLE_UPGRADE_CODE, SAMPLE_UPGRADE_STEPS } from "./sample.ts";
 import { WorkflowDetail } from "./workflow-detail.tsx";
 import { WorkflowEditor, type WorkflowEditorProps } from "./workflow-editor.tsx";
 
@@ -280,4 +280,94 @@ test("⌘K focuses the ask box", async () => {
   await user.click(screen.getByRole("textbox", { name: "Code of pr_digest" }));
   await user.keyboard("{Meta>}k{/Meta}");
   expect(document.activeElement).toBe(screen.getByRole("textbox", { name: "Ask golem to change this workflow" }));
+});
+
+type EditFn = (code: string, stepId: string, name: string, value: string) => Promise<WorkflowEditStepResult>;
+
+function fieldsEditor(onEditStep: EditFn, extra: Partial<WorkflowEditorProps> = {}) {
+  return <WorkflowEditor workflow={SAMPLE_UPGRADE} steps={SAMPLE_UPGRADE_STEPS} code={SAMPLE_UPGRADE_CODE} codeHash={SAMPLE_PR_DIGEST_HASH} onEditStep={onEditStep} onSave={async () => saved("h2")} agents={SAMPLE_UPGRADE_AGENTS} initial={{ selected: "agent:worker", problems: [] }} {...extra} />;
+}
+
+test("a field writes one argument: the daemon's text becomes an unsaved edit and the outline follows", async () => {
+  const user = userEvent.setup();
+  const edited = SAMPLE_UPGRADE_CODE.replace("Upgrade httpx. Fix what breaks.", "Upgrade httpx.");
+  const steps = SAMPLE_UPGRADE_STEPS.map((step) => (step.id === "agent:worker" ? { ...step, title: "worker: Upgrade httpx." } : step));
+  const onEditStep = vi.fn<EditFn>(async () => ({ code: edited, steps, problems: [] }));
+  render(fieldsEditor(onEditStep));
+  const pane = within(screen.getByRole("group", { name: "Selected step" }));
+  const brief = pane.getByLabelText("brief");
+  await user.clear(brief);
+  await user.type(brief, "Upgrade httpx.");
+  await user.tab();
+  await waitFor(() => expect(onEditStep).toHaveBeenCalledTimes(1));
+  expect(onEditStep).toHaveBeenCalledWith(SAMPLE_UPGRADE_CODE, "agent:worker", "brief", "Upgrade httpx.");
+  await waitFor(() => expect((screen.getByRole("textbox", { name: "Code of upgrade" }) as HTMLTextAreaElement).value).toBe(edited));
+  expect(screen.getByText("1 change not saved")).toBeTruthy();
+  expect(screen.getByRole("button", { name: /worker: Upgrade httpx\./ })).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Save" }).hasAttribute("disabled")).toBe(false);
+});
+
+test("the agent and the model are selects, and a change is sent at once", async () => {
+  const user = userEvent.setup();
+  const onEditStep = vi.fn<EditFn>(async (code) => ({ code, steps: SAMPLE_UPGRADE_STEPS, problems: [] }));
+  const onOpenAgent = vi.fn();
+  render(fieldsEditor(onEditStep, { onOpenAgent }));
+  const pane = within(screen.getByRole("group", { name: "Selected step" }));
+  expect(within(pane.getByLabelText("agent")).getAllByRole("option").map((option) => option.textContent)).toEqual([...SAMPLE_UPGRADE_AGENTS]);
+  expect(within(pane.getByLabelText("model")).getAllByRole("option").map((option) => option.textContent)).toEqual(["cheapest", "same", "stronger", "local", "budget", "frontier"]);
+  await user.selectOptions(pane.getByLabelText("model"), "local");
+  await waitFor(() => expect(onEditStep).toHaveBeenCalledWith(SAMPLE_UPGRADE_CODE, "agent:worker", "model", "local"));
+  await user.selectOptions(pane.getByLabelText("agent"), "reviewer");
+  await waitFor(() => expect(onEditStep).toHaveBeenCalledWith(SAMPLE_UPGRADE_CODE, "agent:worker", "type", "reviewer"));
+  await user.click(pane.getByRole("button", { name: "agents/worker.md ↗" }));
+  expect(onOpenAgent).toHaveBeenCalledWith("worker");
+});
+
+test("a field that was not changed writes nothing, and a missing one is added when set", async () => {
+  const user = userEvent.setup();
+  const onEditStep = vi.fn<EditFn>(async (code) => ({ code, steps: SAMPLE_UPGRADE_STEPS, problems: [] }));
+  render(fieldsEditor(onEditStep));
+  const pane = within(screen.getByRole("group", { name: "Selected step" }));
+  await user.click(pane.getByLabelText("brief"));
+  await user.tab();
+  expect(onEditStep).not.toHaveBeenCalled();
+  expect(pane.getByText("Not written in the code. Setting it adds it.")).toBeTruthy();
+  await user.type(pane.getByLabelText("key"), "up{enter}");
+  await waitFor(() => expect(onEditStep).toHaveBeenCalledWith(SAMPLE_UPGRADE_CODE, "agent:worker", "key", "up"));
+});
+
+test("a value the code computes is shown as source, set in code, and jumps to its line", async () => {
+  const user = userEvent.setup();
+  const onEditStep = vi.fn<EditFn>(async (code) => ({ code, steps: SAMPLE_UPGRADE_STEPS, problems: [] }));
+  render(fieldsEditor(onEditStep, { initial: { selected: "agent:reviewer", problems: [] } }));
+  const pane = within(screen.getByRole("group", { name: "Selected step" }));
+  expect(pane.queryByLabelText("brief")).toBeNull();
+  expect(pane.getByText(`f"Check {fix['answer']}"`)).toBeTruthy();
+  await user.click(pane.getByRole("button", { name: "Set brief in code, line 8" }));
+  expect(onEditStep).not.toHaveBeenCalled();
+});
+
+test("a refused field shows the daemon's reason and the text stays", async () => {
+  const user = userEvent.setup();
+  const onEditStep = vi.fn<EditFn>(async () => {
+    throw new Error("budget must be more than $0");
+  });
+  render(fieldsEditor(onEditStep));
+  const pane = within(screen.getByRole("group", { name: "Selected step" }));
+  const budget = pane.getByLabelText("budget");
+  await user.clear(budget);
+  await user.type(budget, "$0{enter}");
+  expect((await pane.findByRole("alert")).textContent).toContain("budget must be more than $0");
+  expect((screen.getByRole("textbox", { name: "Code of upgrade" }) as HTMLTextAreaElement).value).toBe(SAMPLE_UPGRADE_CODE);
+  expect(screen.queryByText("1 change not saved")).toBeNull();
+});
+
+test("a code step has no fields, and without onEditStep the fields are not offered", () => {
+  const { unmount } = render(fieldsEditor(vi.fn<EditFn>(), { initial: { selected: "code-1", problems: [] } }));
+  expect(screen.getByRole("group", { name: "Selected step" }).textContent).toContain("A code step has no fields to edit here");
+  expect(screen.queryByLabelText("brief")).toBeNull();
+  unmount();
+  render(fieldsEditor(vi.fn<EditFn>(), { onEditStep: undefined }));
+  expect(screen.queryByLabelText("brief")).toBeNull();
+  expect(screen.getByRole("group", { name: "Selected step" }).textContent).toContain("Read only");
 });

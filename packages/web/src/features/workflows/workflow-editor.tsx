@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { actionErrorText } from "../../store/errors.ts";
-import type { WorkflowCheckResult, WorkflowEntryInfo, WorkflowOutlineStep, WorkflowProblem, WorkflowProposeResult, WorkflowSaveResult } from "../../store/workflows.ts";
+import type { WorkflowCheckResult, WorkflowEditStepResult, WorkflowEntryInfo, WorkflowOutlineStep, WorkflowProblem, WorkflowProposeResult, WorkflowSaveResult } from "../../store/workflows.ts";
 import { Badge } from "../../ui/badge.tsx";
 import { Button } from "../../ui/button.tsx";
 import { Code } from "../../ui/code.tsx";
 import { Input } from "../../ui/input.tsx";
 import { cn } from "../../ui/cn.ts";
 import { CodeEditor } from "../settings/config/code-editor.tsx";
+import { StepFields } from "./step-fields.tsx";
 import { changedLines, compareSteps, lineDiff, problemCounts, stepAtLine, stepNotes, stepNumberLines, stepRange, type StepChange } from "./text.ts";
 
 /** How long the code rests before it is checked. */
@@ -34,12 +35,18 @@ export type WorkflowEditorProps = {
   onSave?: (code: string, baseHash: string) => Promise<WorkflowSaveResult>;
   /** Asks golem for a change to `code` (workflow.propose), with the last proposal and its note for a refine. Rejects with the daemon's reason. Without it, the ask box is not offered. */
   onPropose?: (code: string, ask: string, previous?: { code: string; note: string }) => Promise<WorkflowProposeResult>;
+  /** Sets one argument of one step in a text, without writing it (`workflow.edit_step`). Without it, the fields of a step are shown but not edited. */
+  onEditStep?: (code: string, stepId: string, name: string, value: string) => Promise<WorkflowEditStepResult>;
+  /** The agent types a step may name, for its agent field. */
+  agents?: readonly string[];
+  /** Opens the agent file of a type. Without it, the field has no link. */
+  onOpenAgent?: (name: string) => void;
   /** Opens the file's folder in Finder. Without it, the action is not offered. */
   onReveal?: (path: string) => Promise<void>;
   /** Told whenever the text differs from the saved one, or stops doing so. */
   onDirtyChange?: (dirty: boolean) => void;
   /** A state to start in, for the gallery and tests. */
-  initial?: { text?: string; steps?: readonly WorkflowOutlineStep[]; problems?: readonly WorkflowProblem[]; selected?: string; view?: EditorView; saveError?: string; ask?: string; proposal?: WorkflowProposeResult; writing?: boolean; proposeError?: string };
+  initial?: { text?: string; steps?: readonly WorkflowOutlineStep[]; problems?: readonly WorkflowProblem[]; selected?: string; view?: EditorView; saveError?: string; ask?: string; proposal?: WorkflowProposeResult; writing?: boolean; proposeError?: string; refusedField?: { name: string; message: string } };
 };
 
 function ProblemMark({ problem }: { problem: WorkflowProblem }) {
@@ -106,10 +113,25 @@ function Field({ name, children }: { name: string; children: React.ReactNode }) 
   );
 }
 
-function StepPane({ step, number, lines, text }: { step: WorkflowOutlineStep | null; number: number; lines: readonly string[]; text: string }) {
+type StepPaneProps = {
+  step: WorkflowOutlineStep | null;
+  number: number;
+  lines: readonly string[];
+  text: string;
+  /** Sets one argument of the step. Without it, the fields are only shown. */
+  onEdit?: (name: string, value: string) => Promise<void>;
+  agents?: readonly string[];
+  onOpenAgent?: (name: string) => void;
+  onJump?: (line: number) => void;
+  refused?: { name: string; message: string } | null;
+};
+
+function StepPane({ step, number, lines, text, onEdit, agents, onOpenAgent, onJump, refused }: StepPaneProps) {
   if (step === null) return <p className="text-sm text-muted">Pick a step in the outline, or put the cursor in its lines.</p>;
   const range = stepRange(step);
   const brief = step.brief_line === null || step.brief_line === undefined ? null : (text.split("\n")[step.brief_line - 1]?.trim() ?? null);
+  const editable = onEdit !== undefined && step.kind !== "code";
+  const where = range === null ? null : range[0] === range[1] ? `${range[0]}` : `${range[0]}–${range[1]}`;
   return (
     <div className="flex flex-col gap-3">
       <h3 className="flex items-baseline gap-2 text-sm font-medium">
@@ -118,8 +140,8 @@ function StepPane({ step, number, lines, text }: { step: WorkflowOutlineStep | n
       </h3>
       <dl className="flex flex-col gap-1.5">
         <Field name="kind">{step.kind}</Field>
-        {step.agent ? <Field name="agent">{step.agent}</Field> : null}
-        {brief === null ? null : (
+        {editable || !step.agent ? null : <Field name="agent">{step.agent}</Field>}
+        {editable || brief === null ? null : (
           <Field name="brief">
             <Code tone="muted">{brief}</Code>
           </Field>
@@ -127,16 +149,23 @@ function StepPane({ step, number, lines, text }: { step: WorkflowOutlineStep | n
         {step.for_each ? <Field name="for each">{step.for_each}</Field> : null}
         {step.condition ? <Field name="if">{step.condition}</Field> : null}
         {step.gets ? <Field name="gets">{step.gets}</Field> : null}
-        {step.key ? (
+        {editable || !step.key ? null : (
           <Field name="key">
             <Code tone="muted">{step.key}</Code>
           </Field>
-        ) : null}
-        {step.budget ? <Field name="budget">{step.budget}</Field> : null}
-        {range === null ? null : <Field name="lines">{range[0] === range[1] ? `${range[0]}` : `${range[0]}–${range[1]}`}</Field>}
+        )}
+        {editable || !step.budget ? null : <Field name="budget">{step.budget}</Field>}
+        {where === null ? null : <Field name="lines">{where}</Field>}
       </dl>
+      {editable ? <StepFields step={step} onEdit={onEdit} agents={agents} onOpenAgent={onOpenAgent} onJump={onJump} refused={refused} /> : null}
       {lines.length === 0 ? null : <pre aria-label="Lines of the step" className="overflow-x-auto rounded-md border border-line bg-surface p-2 font-mono text-code text-ink">{lines.join("\n")}</pre>}
-      <p className="text-meta text-faint">Read only. Each field is read from the code. Change the code to change a step.</p>
+      <p className="text-meta text-faint">
+        {step.kind === "code"
+          ? "A code step has no fields to edit here. Its function opens in the code pane."
+          : editable
+            ? `Each field writes one argument${where === null ? "" : ` on line${range !== null && range[0] !== range[1] ? "s" : ""} ${where}`}. A value the code computes is shown "set in code", never edited here.`
+            : "Read only. Each field is read from the code. Change the code to change a step."}
+      </p>
     </div>
   );
 }
@@ -204,7 +233,7 @@ function AskBox({ value, onChange, onAsk, chips, refining, working, inputRef }: 
  * and the selected step. Typing redraws the outline and the problems after a pause (`workflow.check`); Save
  * (or ⌘S) writes the file (`workflow.save`) against the hash the editor started from.
  */
-export function WorkflowEditor({ workflow, steps: savedSteps, code, codeHash, onCheck, onSave, onPropose, onReveal, onDirtyChange, initial }: WorkflowEditorProps) {
+export function WorkflowEditor({ workflow, steps: savedSteps, code, codeHash, onCheck, onSave, onPropose, onEditStep, agents, onOpenAgent, onReveal, onDirtyChange, initial }: WorkflowEditorProps) {
   const readOnly = workflow.state !== "ok" || onSave === undefined || codeHash === null;
   const [text, setText] = useState(initial?.text ?? code);
   const [saved, setSaved] = useState(code);
@@ -349,6 +378,25 @@ export function WorkflowEditor({ workflow, steps: savedSteps, code, codeHash, on
     turn.current += 1;
     setChecking(false);
     setProposal(null);
+  }
+
+  // One field of the selected step: the daemon writes that one argument into the text, and the text is an unsaved edit.
+  async function editField(name: string, value: string): Promise<void> {
+    if (selected === null || onEditStep === undefined) return;
+    const at = steps.indexOf(selected);
+    const result = await onEditStep(text, selected.id, name, value);
+    const next = result.steps ?? [];
+    setText(result.code);
+    setSteps(next);
+    setProblems(result.problems ?? []);
+    setChecked(true);
+    setCheckError(null);
+    setChecking(false);
+    asked.current = result.code;
+    turn.current += 1;
+    // The id may follow the argument (the agent type or the key): the step stays selected by its place.
+    const same = next.find((step) => step.id === selected.id) ?? (next.length === steps.length ? next[at] : undefined);
+    if (same !== undefined) setSelectedId(same.id);
   }
 
   function onCursor(line: number): void {
@@ -589,7 +637,17 @@ export function WorkflowEditor({ workflow, steps: savedSteps, code, codeHash, on
         {showStep ? (
           <div role="group" aria-label="Selected step" className="flex min-w-0 flex-col gap-2 lg:w-72 lg:shrink-0">
             <h2 className="text-meta font-medium text-faint">Step</h2>
-            <StepPane step={selected} number={selectedAt} lines={range === null ? [] : lines.slice(range[0] - 1, range[1])} text={text} />
+            <StepPane
+              step={selected}
+              number={selectedAt}
+              lines={range === null ? [] : lines.slice(range[0] - 1, range[1])}
+              text={text}
+              onEdit={readOnly || onEditStep === undefined ? undefined : editField}
+              agents={agents}
+              onOpenAgent={onOpenAgent}
+              onJump={(line) => setReveal({ line, nonce: (reveal?.nonce ?? 0) + 1 })}
+              refused={initial?.refusedField ?? null}
+            />
           </div>
         ) : null}
       </div>
