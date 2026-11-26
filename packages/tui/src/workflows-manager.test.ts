@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import type { WorkflowEntryInfo } from "@golem/client";
+import type { RunInfo, WorkflowEntryInfo } from "@golem/client";
 
 import type { Press } from "./keys.ts";
 import {
@@ -13,6 +13,7 @@ import {
   pressWorkflowsManager,
   workflowsManagerKeyOf,
   workflowsManagerTyping,
+  type WorkflowDetailData,
   type WorkflowList,
   type WorkflowsKey,
   type WorkflowsManagerState,
@@ -63,7 +64,7 @@ test("the list groups This project first, then Yours, with the broken error and 
   assert.ok(lines.some((line) => line.startsWith("❯ ✔ pr-digest") && line.includes("pr-digest does things")));
   assert.ok(lines.some((line) => line.startsWith("  ✘ release-check") && line.endsWith("ImportError: no module named gh")));
   assert.ok(lines.some((line) => line.startsWith("  ! new-one") && line.endsWith("not trusted")));
-  assert.equal(lines.at(-1), "↑/↓ to navigate · Enter to run · Esc to close");
+  assert.equal(lines.at(-1), "↑/↓ to navigate · e edit · r run · Enter last run · h runs · Esc to close");
 });
 
 test("the list says when there are none, when it is loading, and why it failed", () => {
@@ -83,7 +84,7 @@ test("up and down move the pointer within the list, Esc closes", () => {
 });
 
 test("Enter opens the form with each field at its default, typed by its declared type", () => {
-  const form = press(openWorkflowsManager(), "enter").state.view;
+  const form = press(openWorkflowsManager(), "run").state.view;
   assert.equal(form.kind, "form");
   if (form.kind !== "form") return;
   assert.deepEqual(form.fields.map((field) => [field.name, field.kind, field.required]), [
@@ -95,7 +96,7 @@ test("Enter opens the form with each field at its default, typed by its declared
   assert.deepEqual(form.values, { repo: "", days: "7", mode: "fast", dry: "false" });
   const lines = screen(openWorkflowsManager(), 24);
   assert.equal(lines[0], "Workflows");
-  const formLines = screen(press(openWorkflowsManager(), "enter").state);
+  const formLines = screen(press(openWorkflowsManager(), "run").state);
   assert.equal(formLines[0], "Run pr-digest");
   assert.ok(formLines.some((line) => line.startsWith("❯ repo *") && line.includes("[▏]") && line.includes("str · required")));
   assert.ok(formLines.some((line) => line.includes("days") && line.includes("[7]") && line.includes("int · default 7")));
@@ -104,7 +105,7 @@ test("Enter opens the form with each field at its default, typed by its declared
 });
 
 test("the form edits text, deletes, clears, and moves between fields", () => {
-  let state = press(openWorkflowsManager(), "enter").state;
+  let state = press(openWorkflowsManager(), "run").state;
   state = press(state, text("my/repo"), "space", text("x")).state;
   assert.equal(state.view.kind === "form" ? state.view.values["repo"] : null, "my/repo x");
   state = press(state, "delete").state;
@@ -120,7 +121,7 @@ test("the form edits text, deletes, clears, and moves between fields", () => {
 });
 
 test("a choice cycles with the arrows and Space, a bool flips", () => {
-  let state = press(openWorkflowsManager(), "enter", "down", "down").state;
+  let state = press(openWorkflowsManager(), "run", "down", "down").state;
   state = press(state, "right").state;
   assert.equal(state.view.kind === "form" ? state.view.values["mode"] : null, "slow");
   state = press(state, "right").state;
@@ -133,7 +134,7 @@ test("a choice cycles with the arrows and Space, a bool flips", () => {
 });
 
 test("Enter with a required field empty or a number that is not one stays, complains, and focuses the first", () => {
-  let state = press(openWorkflowsManager(), "enter", "down", "clear").state;
+  let state = press(openWorkflowsManager(), "run", "down", "clear").state;
   state = press(state, text("abc")).state;
   const sent = press(state, "enter");
   assert.deepEqual(sent.action, { kind: "none" });
@@ -144,7 +145,7 @@ test("Enter with a required field empty or a number that is not one stays, compl
 });
 
 test("Enter on a valid form starts the workflow with typed inputs, and the keys wait until it answers", () => {
-  let state = press(openWorkflowsManager(), "enter", text("golem")).state;
+  let state = press(openWorkflowsManager(), "run", text("golem")).state;
   state = press(state, "down", "clear", text("3")).state;
   const sent = press(state, "enter");
   assert.deepEqual(sent.action, {
@@ -163,19 +164,19 @@ test("Enter on a valid form starts the workflow with typed inputs, and the keys 
 });
 
 test("a field with a default may be left empty, and the default then applies in the daemon", () => {
-  const state = press(openWorkflowsManager(), "enter", text("golem"), "down", "clear").state;
+  const state = press(openWorkflowsManager(), "run", text("golem"), "down", "clear").state;
   const sent = press(state, "enter");
   assert.deepEqual(sent.action.kind === "start" ? sent.action.inputs : null, { repo: "golem", mode: "fast", dry: false });
 });
 
 test("Esc in the form goes back to the list", () => {
-  const back = press(openWorkflowsManager(), "enter", "back");
+  const back = press(openWorkflowsManager(), "run", "back");
   assert.equal(back.state.view.kind, "list");
   assert.equal(back.state.open, true);
 });
 
 test("a broken workflow opens a form with its error as a warning, and a workflow without inputs says so", () => {
-  const form = press(openWorkflowsManager(), "down", "enter").state;
+  const form = press(openWorkflowsManager(), "down", "run").state;
   assert.equal(form.view.kind, "form");
   const lines = screen(form);
   assert.equal(lines[0], "Run release-check");
@@ -185,9 +186,89 @@ test("a broken workflow opens a form with its error as a warning, and a workflow
   assert.deepEqual(sent.action.kind === "start" ? sent.action.inputs : null, {});
 });
 
-test("an untrusted workflow warns in its form", () => {
-  const form = press(openWorkflowsManager(), "down", "down", "enter").state;
-  assert.ok(screen(form).some((line) => line.includes("not trusted yet")));
+const SEEN: WorkflowDetailData = {
+  id: digest.id,
+  steps: [
+    { id: "s1", kind: "tool", title: "List pull requests", lines: [10, 12], key: "list", after: [] },
+    { id: "s2", kind: "agent", title: "Write a note", agent: "writer", for_each: "prs", condition: "prs", lines: [14, 20], key: "note", after: [] },
+    { id: "s3", kind: "review", title: "Look it over", lines: [22, 23], after: [] },
+  ],
+  lastRun: {
+    run: { workflow_run_id: "wr1", name: "pr-digest", workflow_id: digest.id, status: "done", trigger: "manual", started_at: "2026-11-26T08:30:00" },
+    steps: [
+      { key: "list", kind: "tool", title: "List", status: "done", started_at: "2026-11-26T08:30:00", cost_usd: 0.01 },
+      { key: "note", kind: "agent", title: "Note", status: "done", started_at: "2026-11-26T08:31:00", cost_usd: 0.03 },
+    ],
+  },
+  error: null,
+} as WorkflowDetailData;
+const NOW = new Date("2026-11-26T12:00:00").getTime();
+const RUNS = [
+  { kind: "workflow", origin: "workflow:pr-digest", workflow_run_id: "wr2", session_id: "s", status: "running", started_at: "2026-11-26T11:00:00" },
+  { kind: "workflow", origin: "workflow:pr-digest", workflow_run_id: "wr1", session_id: "s", status: "succeeded", started_at: "2026-11-26T08:30:00" },
+  { kind: "workflow", origin: "workflow:other", workflow_run_id: "wr9", session_id: "s", status: "succeeded", started_at: "2026-11-26T07:00:00" },
+] as unknown as RunInfo[];
+
+const outline = (state: WorkflowsManagerState, detail: WorkflowDetailData | null = SEEN, rows = 40) =>
+  layoutWorkflowsManager({ state, list: LIST, columns: 120, rows, detail, runs: RUNS, now: NOW }).map((line) => `${line.prefix ?? ""}${line.mark ? `${line.mark.text} ` : ""}${line.text}`);
+
+test("the selected workflow shows its outline below the list, with last-run times and the header", () => {
+  const lines = outline(openWorkflowsManager());
+  const at = lines.indexOf("pr-digest");
+  assert.ok(at > 0);
+  assert.equal(lines[at + 1], "last run 08:30 · done · $0.04");
+  assert.equal(lines[at + 2], "1  08:30  List pull requests  tool");
+  assert.equal(lines[at + 3], "2  08:31  Write a note  agent · agent writer · for each prs · if prs");
+  assert.equal(lines[at + 4], "3         Look it over  review");
+  assert.ok(outline(openWorkflowsManager(), null).includes("reading the file…"));
+  assert.ok(outline(openWorkflowsManager(), { ...SEEN, steps: [], lastRun: null }).includes("No steps found in the file."));
+  assert.ok(outline(openWorkflowsManager(), { ...SEEN, error: "boom" }).includes("✘ boom"));
+});
+
+test("a broken workflow shows its traceback instead of the outline", () => {
+  const lines = outline(press(openWorkflowsManager(), "down").state);
+  const at = lines.indexOf("release-check");
+  assert.ok(at > 0);
+  assert.deepEqual(lines.slice(at + 1, at + 4), ["Traceback", "  File x", "✘ ImportError: no module named gh"]);
+  assert.ok(!lines.some((line) => line.includes("List pull requests")));
+});
+
+test("an untrusted workflow says trust first and has no key that runs", () => {
+  const state = press(openWorkflowsManager(), "down", "down").state;
+  assert.ok(outline(state).some((line) => line.startsWith("! Not trusted: add this project to trusted_projects")));
+  assert.equal(outline(state).at(-1), "↑/↓ to navigate · e edit · Esc to close");
+  for (const key of ["run", "enter", "history"] as const) {
+    const pressed = pressWorkflowsManager(state, WORKFLOWS, key, RUNS);
+    assert.deepEqual(pressed.action, { kind: "none" });
+    assert.equal(pressed.state.view.kind, "list");
+  }
+  assert.ok(layoutWorkflowsManager({ state: pressWorkflowsManager(state, WORKFLOWS, "run", RUNS).state, list: LIST, columns: 120, rows: 40 }).some((line) => line.text.startsWith("Not trusted")));
+  assert.deepEqual(pressWorkflowsManager(state, WORKFLOWS, "edit", RUNS).action, { kind: "edit", path: "/w/new-one.py", name: "new-one" });
+});
+
+test("e edits the file, r opens the form, Enter opens the newest run, h lists the runs", () => {
+  const start = openWorkflowsManager();
+  const pressed = (key: WorkflowsKey, state = start) => pressWorkflowsManager(state, WORKFLOWS, key, RUNS);
+  assert.deepEqual(pressed("edit").action, { kind: "edit", path: "/w/pr-digest.py", name: "pr-digest" });
+  assert.equal(pressed("run").state.view.kind, "form");
+  assert.deepEqual(pressed("enter").action, { kind: "open-run", workflowRunId: "wr2" });
+  const history = pressed("history").state;
+  assert.deepEqual(history.view, { kind: "runs", id: digest.id, name: "pr-digest", selected: 0 });
+  const lines = outline(history);
+  assert.equal(lines[0], "pr-digest: runs");
+  assert.ok(lines.includes("❯ 11:00 · running"));
+  assert.ok(lines.includes("  08:30 · succeeded"));
+  assert.deepEqual(pressed("enter", pressed("down", history).state).action, { kind: "open-run", workflowRunId: "wr1" });
+  assert.deepEqual(pressed("back", history).state.view, { kind: "list", selected: 0 });
+});
+
+test("with no run yet, Enter and h say so and r still runs", () => {
+  const state = press(openWorkflowsManager(), "down", "down", "down").state;
+  const mineNever = pressWorkflowsManager(state, WORKFLOWS, "enter", RUNS);
+  assert.deepEqual(mineNever.action, { kind: "none" });
+  assert.ok(layoutWorkflowsManager({ state: mineNever.state, list: LIST, columns: 120, rows: 40 }).some((line) => line.text === "morning has not run yet. Press r to run it."));
+  assert.equal(pressWorkflowsManager(state, WORKFLOWS, "history", RUNS).state.view.kind, "list");
+  assert.equal(pressWorkflowsManager(state, WORKFLOWS, "run", RUNS).state.view.kind, "form");
 });
 
 test("the keys: arrows and Enter always, letters only while typing", () => {
@@ -196,6 +277,11 @@ test("the keys: arrows and Enter always, letters only while typing", () => {
   assert.equal(workflowsManagerKeyOf(key("return")), "enter");
   assert.equal(workflowsManagerKeyOf(key("escape")), "back");
   assert.equal(workflowsManagerKeyOf(key(null, "a")), null);
+  assert.equal(workflowsManagerKeyOf(key(null, "e")), "edit");
+  assert.equal(workflowsManagerKeyOf(key(null, "r")), "run");
+  assert.equal(workflowsManagerKeyOf(key(null, "h")), "history");
+  assert.equal(workflowsManagerKeyOf(key(null, "e", { ctrl: true })), null);
+  assert.deepEqual(workflowsManagerKeyOf(key(null, "e"), true), { text: "e" });
   assert.deepEqual(workflowsManagerKeyOf(key(null, "a"), true), { text: "a" });
   assert.equal(workflowsManagerKeyOf(key(null, " "), true), "space");
   assert.equal(workflowsManagerKeyOf(key("tab"), true), "tab");
@@ -203,7 +289,7 @@ test("the keys: arrows and Enter always, letters only while typing", () => {
   assert.equal(workflowsManagerKeyOf(key("backspace"), true), "delete");
   assert.equal(workflowsManagerKeyOf(key("ctrl-u"), true), "clear");
   assert.equal(workflowsManagerTyping(openWorkflowsManager()), false);
-  assert.equal(workflowsManagerTyping(press(openWorkflowsManager(), "enter").state), true);
+  assert.equal(workflowsManagerTyping(press(openWorkflowsManager(), "run").state), true);
 });
 
 test("a narrow terminal cuts every line, and a short one keeps the hint", () => {

@@ -1,11 +1,17 @@
-import type { WorkflowEntryInfo } from "@golem/client";
+import type { RunInfo, WorkflowEntryInfo, WorkflowOutlineStep, WorkflowStatusResult } from "@golem/client";
 import {
+  errorLine,
   fieldProblem,
   initialValues,
   inputFields,
+  lastRunLine,
+  outlineRows,
+  runStartedText,
   startInputs,
+  stepRanTimes,
   workflowGroups,
   workflowRowLine,
+  workflowRunWords,
   type InputField,
 } from "@golem/view";
 
@@ -35,7 +41,20 @@ export type WorkflowForm = {
   starting: boolean;
 };
 
-export type WorkflowsView = { kind: "list"; selected: number } | WorkflowForm;
+/** This workflow's runs: `h`. Newest first. */
+export type WorkflowRunsView = { kind: "runs"; id: string; name: string; selected: number };
+
+export type WorkflowsView = { kind: "list"; selected: number; notice?: string | null } | WorkflowRunsView | WorkflowForm;
+
+/** What the app read for the selected workflow: its outline (`workflow.get`) and its newest run (`workflow.status`). */
+export type WorkflowDetailData = {
+  /** The workflow's id, so a late answer for another workflow is not shown. */
+  id: string;
+  steps: readonly WorkflowOutlineStep[];
+  /** The newest run with its steps, or null when it never ran or could not be read. */
+  lastRun: Pick<WorkflowStatusResult, "run" | "steps"> | null;
+  error: string | null;
+};
 
 export type WorkflowsManagerState = { open: boolean; view: WorkflowsView };
 
@@ -60,11 +79,19 @@ export type WorkflowsKey =
   | "space"
   | "delete"
   | "clear"
+  /** `e`, `r` and `h` in the list. */
+  | "edit"
+  | "run"
+  | "history"
   | { text: string };
 
 export type WorkflowsAction =
   | { kind: "none" }
   | { kind: "close" }
+  /** Open the workflow's file in `$EDITOR`. */
+  | { kind: "edit"; path: string; name: string }
+  /** Open this run's steps. */
+  | { kind: "open-run"; workflowRunId: string }
   /** Start the workflow `id`. The app answers with `failedWorkflowStart` or opens the run. */
   | { kind: "start"; id: string; name: string; inputs: Record<string, unknown> };
 
@@ -79,7 +106,10 @@ export function workflowsManagerKeyOf(press: Press, typing = false): WorkflowsKe
   if (press.name === "up" || press.name === "down" || press.name === "left" || press.name === "right") return press.name;
   if (press.name === "return") return "enter";
   if (press.name === "escape") return "back";
-  if (!typing) return null;
+  if (!typing) {
+    if (press.name !== null || press.ctrl || press.meta) return null;
+    return press.input === "e" ? "edit" : press.input === "r" ? "run" : press.input === "h" ? "history" : null;
+  }
   if (press.name === "tab") return press.shift === true ? "shift-tab" : "tab";
   if (press.name === "backspace") return "delete";
   if (press.name === "ctrl-u" || press.name === "ctrl-w") return "clear";
@@ -94,6 +124,19 @@ export function workflowsManagerKeyOf(press: Press, typing = false): WorkflowsKe
 export function orderedWorkflows(workflows: readonly WorkflowEntryInfo[]): WorkflowEntryInfo[] {
   return workflowGroups(workflows).flatMap((group) => group.workflows);
 }
+
+/** This workflow's runs from the Runs list, including the ones a routine started. Newest first, as the list is. */
+export function workflowRunsOf(runs: readonly RunInfo[], name: string): RunInfo[] {
+  return runs.filter(
+    (run) =>
+      (run.kind === "workflow" || run.kind === "routine") &&
+      run.origin === `workflow:${name}` &&
+      typeof run.workflow_run_id === "string" &&
+      run.workflow_run_id !== "",
+  );
+}
+
+const TRUST_FIRST = "Not trusted: add this project to trusted_projects in your config first. Until then nothing runs.";
 
 function clamp(index: number, count: number): number {
   return Math.min(Math.max(index, 0), Math.max(0, count - 1));
@@ -171,15 +214,41 @@ export function pressWorkflowsManager(
   state: WorkflowsManagerState,
   workflows: readonly WorkflowEntryInfo[],
   key: WorkflowsKey,
+  runs: readonly RunInfo[] = [],
 ): { state: WorkflowsManagerState; action: WorkflowsAction } {
   const view = state.view;
   if (view.kind === "form") return pressForm(state, view, key);
   const items = orderedWorkflows(workflows);
+  if (view.kind === "runs") {
+    const mine = workflowRunsOf(runs, view.name);
+    const at = clamp(view.selected, mine.length);
+    if (key === "back") return { state: { ...state, view: { kind: "list", selected: Math.max(0, items.findIndex((item) => item.id === view.id)) } }, action: NONE };
+    if (key === "up" || key === "down") return { state: { ...state, view: { ...view, selected: clamp(at + (key === "up" ? -1 : 1), mine.length) } }, action: NONE };
+    const id = mine[at]?.workflow_run_id;
+    if (key === "enter" && typeof id === "string") return { state, action: { kind: "open-run", workflowRunId: id } };
+    return { state, action: NONE };
+  }
   const selected = clamp(view.selected, items.length);
+  const stay = (notice: string | null): WorkflowsManagerState => ({ ...state, view: { kind: "list", selected, ...(notice === null ? {} : { notice }) } });
   if (key === "back") return { state: closedWorkflowsManager, action: { kind: "close" } };
   if (key === "up" || key === "down") return { state: { ...state, view: { kind: "list", selected: clamp(selected + (key === "up" ? -1 : 1), items.length) } }, action: NONE };
   const picked = items[selected];
-  if (key === "enter" && picked !== undefined) return { state: { ...state, view: startForm(picked) }, action: NONE };
+  if (picked === undefined) return { state, action: NONE };
+  if (key === "edit") return { state: stay(null), action: { kind: "edit", path: picked.path, name: picked.name } };
+  if (picked.state === "untrusted" && (key === "run" || key === "enter" || key === "history")) return { state: stay(TRUST_FIRST), action: NONE };
+  if (key === "run") return { state: { ...state, view: startForm(picked) }, action: NONE };
+  const mine = workflowRunsOf(runs, picked.name);
+  if (key === "history") {
+    return mine.length === 0
+      ? { state: stay(`${picked.name} has not run yet.`), action: NONE }
+      : { state: { ...state, view: { kind: "runs", id: picked.id, name: picked.name, selected: 0 } }, action: NONE };
+  }
+  if (key === "enter") {
+    const id = mine[0]?.workflow_run_id;
+    return typeof id === "string"
+      ? { state: stay(null), action: { kind: "open-run", workflowRunId: id } }
+      : { state: stay(`${picked.name} has not run yet. Press r to run it.`), action: NONE };
+  }
   return { state, action: NONE };
 }
 
@@ -190,7 +259,9 @@ export function workflowMark(workflow: Pick<WorkflowEntryInfo, "state">): { text
   return { text: "✔", tone: "ok" };
 }
 
-const LIST_HINT = "↑/↓ to navigate · Enter to run · Esc to close";
+const LIST_HINT = "↑/↓ to navigate · e edit · r run · Enter last run · h runs · Esc to close";
+const LOCKED_HINT = "↑/↓ to navigate · e edit · Esc to close";
+const RUNS_HINT = "↑/↓ to navigate · Enter to open · Esc to go back";
 const FORM_HINT = "↑/↓ field · type to edit · ←/→ or Space to choose · Enter to run · Esc to go back";
 const STARTING_HINT = "Starting…";
 const NO_WORKFLOWS = "Put a workflow in workflows/ of this folder or in ~/.golem/workflows/, and it shows here.";
@@ -268,6 +339,47 @@ function formLines(form: WorkflowForm, rows: number): McpManagerLine[] {
   return lines.slice(0, Math.max(0, rows));
 }
 
+const READING = "reading the file…";
+
+/** The outline below the list: the steps, the traceback of a broken file, or why an untrusted one is not read. */
+export function outlineLines(workflow: WorkflowEntryInfo, detail: WorkflowDetailData | null, runs: readonly RunInfo[], now: number): McpManagerLine[] {
+  const head: McpManagerLine = { text: workflow.name, bold: true };
+  if (workflow.state === "untrusted") return [head, { text: TRUST_FIRST, mark: { text: "!", tone: "wait" } }];
+  if (workflow.state === "broken") {
+    const tail = (workflow.error ?? "").split("\n").filter((line) => line.trim() !== "").slice(-6);
+    const texts = tail.length === 0 ? [errorLine(workflow.error)] : tail;
+    return [head, ...texts.map((text, index): McpManagerLine => (index === texts.length - 1 ? { text, mark: { text: "✘", tone: "bad" } } : { text, dim: true }))];
+  }
+  if (detail === null || detail.id !== workflow.id) return [head, { text: READING, dim: true }];
+  if (detail.error !== null) return [head, { text: detail.error, mark: { text: "✘", tone: "bad" } }];
+  const last = detail.lastRun;
+  const lines: McpManagerLine[] = [head];
+  const when = lastRunLine(last === null ? null : last.run, last?.steps ?? [], now);
+  if (when !== "") lines.push({ text: when, dim: true });
+  const rows = outlineRows(detail.steps);
+  if (rows.length === 0) return [...lines, { text: "No steps found in the file.", dim: true }];
+  const ran = stepRanTimes(last?.steps ?? [], now);
+  const timeOf = (key: string | null): string => (key === null ? "" : (ran.get(key) ?? ""));
+  const timeWidth = Math.max(0, ...rows.map((row) => timeOf(row.key).length));
+  const numberWidth = String(rows.length).length;
+  for (const row of rows) {
+    const time = timeWidth > 0 ? `${timeOf(row.key).padEnd(timeWidth)}  ` : "";
+    lines.push({ text: `${String(row.number).padStart(numberWidth)}  ${time}${row.title}  ${row.notes.join(" · ")}` });
+  }
+  return lines;
+}
+
+function runsLines(view: WorkflowRunsView, runs: readonly RunInfo[], now: number): McpManagerLine[] {
+  const mine = workflowRunsOf(runs, view.name);
+  const lines: McpManagerLine[] = [{ text: `${view.name}: runs`, bold: true }, { text: `${mine.length} ${mine.length === 1 ? "run" : "runs"}, newest first`, dim: true }, { text: "" }];
+  const at = clamp(view.selected, mine.length);
+  for (const [index, run] of mine.entries()) {
+    const words = [runStartedText(run, now), workflowRunWords(run.status)].filter((part) => part !== "");
+    lines.push({ prefix: index === at ? "❯ " : "  ", text: words.join(" · "), selected: index === at });
+  }
+  return lines;
+}
+
 /** Keep the selected line on screen. */
 function scrollToSelected(lines: McpManagerLine[], room: number): McpManagerLine[] {
   if (lines.length <= room) return lines;
@@ -276,10 +388,22 @@ function scrollToSelected(lines: McpManagerLine[], room: number): McpManagerLine
   return lines.slice(start, start + room);
 }
 
-export function layoutWorkflowsManager(input: { state: WorkflowsManagerState; list: WorkflowList; columns: number; rows: number }): McpManagerLine[] {
+export function layoutWorkflowsManager(input: {
+  state: WorkflowsManagerState;
+  list: WorkflowList;
+  columns: number;
+  rows: number;
+  /** The outline and newest run of the selected workflow. Null while they are read. */
+  detail?: WorkflowDetailData | null;
+  /** The Runs list, for `h` and the last run. */
+  runs?: readonly RunInfo[];
+  now?: number;
+}): McpManagerLine[] {
   const width = Math.max(1, input.columns);
   const room = Math.max(0, input.rows - 2);
   const view = input.state.view;
+  const runs = input.runs ?? [];
+  const now = input.now ?? Date.now();
   let body: McpManagerLine[];
   let hint = LIST_HINT;
   if (view.kind === "form") {
@@ -289,8 +413,18 @@ export function layoutWorkflowsManager(input: { state: WorkflowsManagerState; li
     body = [{ text: "Workflows", bold: true }, { text: "" }, { text: input.list.error }];
   } else if (input.list.workflows === null) {
     body = [{ text: "Workflows", bold: true }, { text: "" }, { text: "asking the daemon…", dim: true }];
+  } else if (view.kind === "runs") {
+    body = scrollToSelected(runsLines(view, runs, now), room);
+    hint = RUNS_HINT;
   } else {
-    body = scrollToSelected(listLines(input.list.workflows, view.selected), room);
+    const picked = orderedWorkflows(input.list.workflows)[clamp(view.selected, input.list.workflows.length)];
+    const outline = picked === undefined ? [] : outlineLines(picked, input.detail ?? null, runs, now);
+    const outlineRoom = Math.min(outline.length, Math.floor(room / 2));
+    const listRoom = outline.length === 0 ? room : Math.max(1, room - outlineRoom - 1);
+    body = scrollToSelected(listLines(input.list.workflows, view.selected), listRoom);
+    if (outline.length > 0) body = [...body, { text: "" }, ...outline.slice(0, outlineRoom)];
+    if (view.notice) body = [...body.slice(0, Math.max(0, room - 1)), { text: view.notice, mark: { text: "!", tone: "wait" } }];
+    if (picked?.state === "untrusted") hint = LOCKED_HINT;
   }
   const lines = [...body.slice(0, room), { text: "" }, { text: hint, dim: true }];
   return lines.slice(0, Math.max(0, input.rows)).map((line) => {

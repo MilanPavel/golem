@@ -474,9 +474,12 @@ import {
   failedWorkflowStart,
   layoutWorkflowsManager,
   openWorkflowsManager,
+  orderedWorkflows,
   pressWorkflowsManager,
+  workflowRunsOf,
   workflowsManagerKeyOf,
   workflowsManagerTyping,
+  type WorkflowDetailData,
   type WorkflowList,
   type WorkflowsAction,
   type WorkflowsManagerState,
@@ -790,6 +793,7 @@ export function App({
   const [workflowList, setWorkflowList] = useState<WorkflowList>({ workflows: null, error: null });
   const workflowListRef = useRef(workflowList);
   workflowListRef.current = workflowList;
+  const [workflowDetail, setWorkflowDetail] = useState<WorkflowDetailData | null>(null);
   const [workflowRun, setWorkflowRun] = useState<WorkflowRunManagerState>(closedWorkflowRun);
   const workflowRunRef = useRef(workflowRun);
   workflowRunRef.current = workflowRun;
@@ -1729,6 +1733,45 @@ export function App({
       loadWorkflowRun(open.workflowRunId);
     });
   }, [client]);
+
+  // `/workflows` reads the outline of the selected workflow, and the steps of its newest run, when the pointer moves or the lists change.
+  const workflowsView = workflowsManager.view;
+  const pickedWorkflow =
+    workflowsManager.open && workflowsView.kind === "list" && workflowList.workflows !== null
+      ? orderedWorkflows(workflowList.workflows)[Math.min(workflowsView.selected, Math.max(0, workflowList.workflows.length - 1))]
+      : undefined;
+  const pickedWorkflowId = pickedWorkflow?.state === "ok" ? pickedWorkflow.id : null;
+  const pickedWorkflowName = pickedWorkflow?.name ?? "";
+  const pickedLastRunId = pickedWorkflowId === null ? null : (workflowRunsOf(runList.runs ?? [], pickedWorkflowName)[0]?.workflow_run_id ?? null);
+  useEffect(() => {
+    if (pickedWorkflowId === null) {
+      return;
+    }
+    let live = true;
+    void (async () => {
+      let data: WorkflowDetailData;
+      try {
+        const got = await client.getWorkflow(pickedWorkflowId);
+        data = { id: pickedWorkflowId, steps: got.steps ?? [], lastRun: null, error: null };
+      } catch (error) {
+        data = { id: pickedWorkflowId, steps: [], lastRun: null, error: messageOf(error) };
+      }
+      if (live && data.error === null && pickedLastRunId !== null) {
+        try {
+          const status = await client.workflowStatus(pickedLastRunId);
+          data = { ...data, lastRun: { run: status.run, steps: status.steps ?? [] } };
+        } catch {
+          // The outline stands without the run.
+        }
+      }
+      if (live) {
+        setWorkflowDetail(data);
+      }
+    })();
+    return () => {
+      live = false;
+    };
+  }, [client, pickedWorkflowId, pickedLastRunId, workflowList]);
 
   // A session that stopped waiting is forgotten, so it can show again when it waits again.
   useEffect(() => {
@@ -2687,6 +2730,7 @@ export function App({
       setSwitcher(closedSwitcher);
       showWorkflowsManager(openWorkflowsManager());
       loadWorkflows();
+      loadRuns();
       return;
     }
     if (outcome.kind === "runs") {
@@ -4896,12 +4940,38 @@ export function App({
     if (key === null) {
       return;
     }
-    const pressed = pressWorkflowsManager(workflowsManagerRef.current, workflowListRef.current.workflows ?? [], key);
+    const pressed = pressWorkflowsManager(workflowsManagerRef.current, workflowListRef.current.workflows ?? [], key, runListRef.current.runs ?? []);
     showWorkflowsManager(pressed.state);
     runWorkflowsAction(pressed.action);
   }
 
+  /** Open a workflow's file in `$EDITOR`, then read the workflows again, so the outline shows the saved file. */
+  async function editWorkflowFile(path: string, name: string): Promise<void> {
+    if (editing.current) {
+      return;
+    }
+    editing.current = true;
+    let notice = "";
+    try {
+      notice = (await editFile(path, suspendTerminal)) ? "" : "the editor did not exit cleanly";
+    } catch (error) {
+      notice = messageOf(error);
+    } finally {
+      editing.current = false;
+    }
+    loadWorkflows();
+    if (notice !== "") {
+      setChat((state) => ({ ...state, notice: `${name}: ${notice}` }));
+    }
+  }
+
   function runWorkflowsAction(action: WorkflowsAction): void {
+    if (action.kind === "edit") {
+      void editWorkflowFile(action.path, action.name);
+    } else if (action.kind === "open-run") {
+      showWorkflowsManager(closedWorkflowsManager);
+      showWorkflowRun(action.workflowRunId, "workflows");
+    }
     if (action.kind === "start") {
       client.startWorkflow(action.id, action.inputs).then(
         (started) => {
@@ -4935,6 +5005,7 @@ export function App({
       } else if (action.from === "workflows") {
         showWorkflowsManager(openWorkflowsManager());
         loadWorkflows();
+        loadRuns();
       }
     } else if (action.kind === "open-chat" || action.kind === "open-review") {
       showWorkflowRunState(closedWorkflowRun);
@@ -6537,7 +6608,7 @@ export function App({
         />
       ) : workflowsManager.open ? (
         <Box flexDirection="column" width={columns} height={budget.body} flexShrink={0} overflow="hidden">
-          {layoutWorkflowsManager({ state: workflowsManager, list: workflowList, columns, rows: budget.body }).map((line, index) => (
+          {layoutWorkflowsManager({ state: workflowsManager, list: workflowList, columns, rows: budget.body, detail: workflowDetail, runs: runList.runs ?? [], now: Date.now() }).map((line, index) => (
             <McpManagerRow key={index} line={line} />
           ))}
         </Box>
