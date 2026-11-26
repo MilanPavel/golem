@@ -2,13 +2,12 @@ import type { RoutineInfo } from "../../store/routines.ts";
 import type { RunInfo } from "../../store/runs.ts";
 import type { WorkflowOutlineStep } from "../../store/workflows.ts";
 
+import { outlineLine, outlineNotes } from "@golem/view";
+
 export { errorLine, triggerText, workflowGroups, workflowRowLine, type WorkflowGroup } from "@golem/view";
 
-/** The step's first line in the file (from 1), or null when the daemon sent none. The generated type leaves the pair open. */
-export function stepStart(step: WorkflowOutlineStep): number | null {
-  const first: unknown = step.lines[0];
-  return typeof first === "number" && Number.isInteger(first) && first >= 1 ? first : null;
-}
+/** The step's first line in the file (from 1), or null when the daemon sent none. */
+export const stepStart = outlineLine;
 
 /** The lines where a step starts, for the gutter of the Code tab. */
 export function stepLines(steps: readonly WorkflowOutlineStep[]): Set<number> {
@@ -31,12 +30,4 @@ export function routinesStarting(routines: readonly RoutineInfo[], name: string)
 }
 
 /** How one outline step reads in the Overview: what it is, then what repeats or guards it. */
-export function stepNotes(step: WorkflowOutlineStep): string[] {
-  const notes: string[] = [step.kind];
-  if (step.agent) notes.push(`agent ${step.agent}`);
-  if (step.for_each) notes.push(`for each ${step.for_each}`);
-  if (step.condition) notes.push(`if ${step.condition}`);
-  if (step.gets) notes.push(`gets ${step.gets}`);
-  if (step.budget) notes.push(`budget ${step.budget}`);
-  return notes;
-}
+export const stepNotes = outlineNotes;
