@@ -1,0 +1,160 @@
+{
+  "$defs": {
+    "DataSource": {
+      "additionalProperties": false,
+      "description": "One data source. ``location`` is for display and never holds a password.",
+      "properties": {
+        "error": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Error"
+        },
+        "kind": {
+          "enum": [
+            "builtin",
+            "files",
+            "sqlite",
+            "postgres",
+            "mysql",
+            "url"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "location": {
+          "title": "Location",
+          "type": "string"
+        },
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "notes_path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Notes Path"
+        },
+        "privacy": {
+          "enum": [
+            "open",
+            "local",
+            "schema"
+          ],
+          "title": "Privacy",
+          "type": "string"
+        },
+        "privacy_reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Privacy Reason"
+        },
+        "project": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Project"
+        },
+        "rows": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Rows"
+        },
+        "scope": {
+          "enum": [
+            "builtin",
+            "user",
+            "project"
+          ],
+          "title": "Scope",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "ready",
+            "reading",
+            "untrusted",
+            "error"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "tables": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tables"
+        },
+        "watch": {
+          "default": false,
+          "title": "Watch",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "name",
+        "kind",
+        "scope",
+        "location",
+        "privacy",
+        "status"
+      ],
+      "title": "DataSource",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "The new source.",
+  "properties": {
+    "source": {
+      "$ref": "#/$defs/DataSource"
+    }
+  },
+  "required": [
+    "source"
+  ],
+  "title": "DataAddResult",
+  "type": "object"
+}

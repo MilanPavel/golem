@@ -1,0 +1,33 @@
+{
+  "additionalProperties": false,
+  "description": "``data.export``. Write a kept result to a file.",
+  "properties": {
+    "format": {
+      "enum": [
+        "csv",
+        "parquet",
+        "json",
+        "xlsx"
+      ],
+      "title": "Format",
+      "type": "string"
+    },
+    "path": {
+      "minLength": 1,
+      "title": "Path",
+      "type": "string"
+    },
+    "result_id": {
+      "minLength": 1,
+      "title": "Result Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "result_id",
+    "path",
+    "format"
+  ],
+  "title": "DataExportParams",
+  "type": "object"
+}

@@ -1,0 +1,15 @@
+{
+  "additionalProperties": false,
+  "description": "Where the notes were saved.",
+  "properties": {
+    "path": {
+      "title": "Path",
+      "type": "string"
+    }
+  },
+  "required": [
+    "path"
+  ],
+  "title": "DataNotesSetResult",
+  "type": "object"
+}

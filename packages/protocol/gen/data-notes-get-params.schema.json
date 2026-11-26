@@ -1,0 +1,29 @@
+{
+  "additionalProperties": false,
+  "description": "``data.notes.get``.",
+  "properties": {
+    "session_id": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Session Id"
+    },
+    "source": {
+      "minLength": 1,
+      "title": "Source",
+      "type": "string"
+    }
+  },
+  "required": [
+    "source"
+  ],
+  "title": "DataNotesGetParams",
+  "type": "object"
+}

@@ -1,0 +1,46 @@
+{
+  "additionalProperties": false,
+  "description": "``data.result.page``. One page of a kept result, sorted if asked.",
+  "properties": {
+    "limit": {
+      "default": 200,
+      "maximum": 1000,
+      "minimum": 1,
+      "title": "Limit",
+      "type": "integer"
+    },
+    "offset": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Offset",
+      "type": "integer"
+    },
+    "result_id": {
+      "minLength": 1,
+      "title": "Result Id",
+      "type": "string"
+    },
+    "sort_column": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Sort Column"
+    },
+    "sort_desc": {
+      "default": false,
+      "title": "Sort Desc",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "result_id"
+  ],
+  "title": "DataResultPageParams",
+  "type": "object"
+}

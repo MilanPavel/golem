@@ -1,0 +1,218 @@
+{
+  "$defs": {
+    "DataColumn": {
+      "additionalProperties": false,
+      "description": "One column. The stats are null when unknown or hidden.",
+      "properties": {
+        "distinct": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Distinct"
+        },
+        "max": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Max"
+        },
+        "min": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Min"
+        },
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "null_fraction": {
+          "anyOf": [
+            {
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Null Fraction"
+        },
+        "type": {
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "type"
+      ],
+      "title": "DataColumn",
+      "type": "object"
+    },
+    "DataTable": {
+      "additionalProperties": false,
+      "description": "One table. ``rows`` is null when unknown or hidden.",
+      "properties": {
+        "columns": {
+          "items": {
+            "$ref": "#/$defs/DataColumn"
+          },
+          "title": "Columns",
+          "type": "array"
+        },
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "rows": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Rows"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "DataTable",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "What a location holds. ``notes`` are plain-language guesses. ``sample``: 20 rows a table.",
+  "properties": {
+    "files": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Files"
+    },
+    "kind": {
+      "enum": [
+        "builtin",
+        "files",
+        "sqlite",
+        "postgres",
+        "mysql",
+        "url"
+      ],
+      "title": "Kind",
+      "type": "string"
+    },
+    "notes": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Notes",
+      "type": "array"
+    },
+    "privacy_reason": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Privacy Reason"
+    },
+    "sample": {
+      "additionalProperties": {
+        "items": {
+          "items": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "type": "array"
+        },
+        "type": "array"
+      },
+      "title": "Sample",
+      "type": "object"
+    },
+    "suggested_name": {
+      "title": "Suggested Name",
+      "type": "string"
+    },
+    "suggested_privacy": {
+      "enum": [
+        "open",
+        "local",
+        "schema"
+      ],
+      "title": "Suggested Privacy",
+      "type": "string"
+    },
+    "tables": {
+      "items": {
+        "$ref": "#/$defs/DataTable"
+      },
+      "title": "Tables",
+      "type": "array"
+    }
+  },
+  "required": [
+    "kind",
+    "tables",
+    "sample",
+    "suggested_name",
+    "suggested_privacy"
+  ],
+  "title": "DataInspectResult",
+  "type": "object"
+}

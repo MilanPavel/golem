@@ -1,0 +1,42 @@
+{
+  "additionalProperties": false,
+  "description": "``data.describe``. A source, or one table of it.",
+  "properties": {
+    "session_id": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Session Id"
+    },
+    "source": {
+      "minLength": 1,
+      "title": "Source",
+      "type": "string"
+    },
+    "table": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Table"
+    }
+  },
+  "required": [
+    "source"
+  ],
+  "title": "DataDescribeParams",
+  "type": "object"
+}

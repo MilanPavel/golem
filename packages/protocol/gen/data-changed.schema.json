@@ -1,0 +1,35 @@
+{
+  "additionalProperties": false,
+  "description": "A source or the list changed. List again. ``source`` is null when the list itself changed.",
+  "properties": {
+    "reason": {
+      "enum": [
+        "added",
+        "updated",
+        "removed",
+        "files",
+        "notes",
+        "queries"
+      ],
+      "title": "Reason",
+      "type": "string"
+    },
+    "source": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Source"
+    }
+  },
+  "required": [
+    "reason"
+  ],
+  "title": "DataChanged",
+  "type": "object"
+}
