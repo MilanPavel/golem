@@ -86,7 +86,7 @@ test("a bad stored item gives Sessions, and a good one is read", async () => {
 });
 
 test("every rail item has a panel in one map", () => {
-  expect(Object.keys(PANELS)).toEqual(["sessions", "inbox", "routines", "workflows", "runs"]);
+  expect(Object.keys(PANELS)).toEqual(["sessions", "inbox", "data", "routines", "workflows", "runs"]);
 });
 
 test("clicking the picked item hides and shows the panel", async () => {

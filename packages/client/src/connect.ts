@@ -70,6 +70,18 @@ import type { DevicePairConfirmResult } from "../../protocol/gen/device-pair-con
 import type { DeviceRenameResult } from "../../protocol/gen/device-rename-result.ts";
 import type { DeviceRevokeResult } from "../../protocol/gen/device-revoke-result.ts";
 import type { MemoryChanged } from "../../protocol/gen/memory-changed.ts";
+import type { DataAddParams } from "../../protocol/gen/data-add-params.ts";
+import type { DataAddResult } from "../../protocol/gen/data-add-result.ts";
+import type { DataChanged } from "../../protocol/gen/data-changed.ts";
+import type { DataDescribeResult } from "../../protocol/gen/data-describe-result.ts";
+import type { DataInspectResult } from "../../protocol/gen/data-inspect-result.ts";
+import type { DataListResult } from "../../protocol/gen/data-list-result.ts";
+import type { DataNotesDraftResult } from "../../protocol/gen/data-notes-draft-result.ts";
+import type { DataNotesGetResult } from "../../protocol/gen/data-notes-get-result.ts";
+import type { DataNotesSetResult } from "../../protocol/gen/data-notes-set-result.ts";
+import type { DataRemoveResult } from "../../protocol/gen/data-remove-result.ts";
+import type { DataUpdateParams } from "../../protocol/gen/data-update-params.ts";
+import type { DataUpdateResult } from "../../protocol/gen/data-update-result.ts";
 import type { MemoryDeleteResult } from "../../protocol/gen/memory-delete-result.ts";
 import type { MemoryExportParams } from "../../protocol/gen/memory-export-params.ts";
 import type { MemoryExportResult } from "../../protocol/gen/memory-export-result.ts";
@@ -293,6 +305,15 @@ import {
   isDevicePairConfirmResult,
   isDeviceRenameResult,
   isDeviceRevokeResult,
+  isDataChanged,
+  isDataDescribeResult,
+  isDataInspectResult,
+  isDataListResult,
+  isDataNotesDraftResult,
+  isDataNotesGetResult,
+  isDataNotesSetResult,
+  isDataRemoveResult,
+  isDataSourceResult,
   isMemoryChanged,
   isMemoryDeleteResult,
   isMemoryExportResult,
@@ -891,6 +912,26 @@ export interface GolemClient {
   memorySettings(change?: { scope: "you" | "project" | "history"; privacy: "chat" | "local" }): Promise<MemorySettingsResult>;
   /** `memory.changed`: a memory was made, edited, deleted, went stale or was resolved, so a list read before is stale. */
   onMemoryChanged(listener: (change: MemoryChanged) => void): () => void;
+  /** `data.list`: every data source the person can see. */
+  listData(): Promise<DataListResult>;
+  /** `data.describe`: one source with its tables, a sample, its notes and saved queries. */
+  describeData(source: string, table?: string): Promise<DataDescribeResult>;
+  /** `data.inspect`: look at a location before it is added. Nothing is saved. */
+  inspectData(location: string): Promise<DataInspectResult>;
+  /** `data.add`: add a source. `password` goes to the Keychain and is never written to a file. */
+  addData(params: DataAddParams): Promise<DataAddResult>;
+  /** `data.update`: change the privacy or the watch of a source. */
+  updateData(params: DataUpdateParams): Promise<DataUpdateResult>;
+  /** `data.remove`: forget a source. The files and the database stay as they are. */
+  removeData(name: string): Promise<DataRemoveResult>;
+  /** `data.notes.get`: the notes of a source, `text` null when there are none. */
+  getDataNotes(source: string): Promise<DataNotesGetResult>;
+  /** `data.notes.set`: save the notes of a source. */
+  setDataNotes(source: string, text: string): Promise<DataNotesSetResult>;
+  /** `data.notes.draft`: a proposal for the notes. It is not saved. */
+  draftDataNotes(source: string): Promise<DataNotesDraftResult>;
+  /** `data.changed`: a source or the list of them changed, so what was read before is stale. */
+  onDataChanged(listener: (change: DataChanged) => void): () => void;
   /** `device.list`: every paired phone, revoked ones last. */
   deviceList(): Promise<DeviceListResult>;
   /** `device.pair.begin`: open a pairing. The result holds the `golem://pair` link for the QR code. It fails when no relay is set. */
@@ -978,6 +1019,7 @@ export function connectGolem(options: ConnectOptions): GolemClient {
   const workflowListeners = new Set<(notice: WorkflowNotice) => void>();
   const routineListeners = new Set<(kind: "changed" | "fired" | "finished") => void>();
   const memoryListeners = new Set<(change: MemoryChanged) => void>();
+  const dataListeners = new Set<(change: DataChanged) => void>();
   const pairListeners = new Set<(change: DevicePairChanged) => void>();
   const deviceListeners = new Set<() => void>();
   const serverListeners = new Set<(status: ModelServerStatus) => void>();
@@ -1444,6 +1486,20 @@ export function connectGolem(options: ConnectOptions): GolemClient {
           listener();
         } catch {
           // A listener must not tear the socket down.
+        }
+      }
+      return;
+    }
+    if (isRecord(message) && message["method"] === "data.changed") {
+      const params = message["params"];
+      record({ direction: "in", kind: "data.changed", detail: isDataChanged(params) ? params.reason : "", json: line });
+      if (isDataChanged(params)) {
+        for (const listener of dataListeners) {
+          try {
+            listener(params);
+          } catch {
+            // A listener must not tear the socket down.
+          }
         }
       }
       return;
@@ -3169,6 +3225,84 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       deviceListeners.add(listener);
       return () => {
         deviceListeners.delete(listener);
+      };
+    },
+    async listData(): Promise<DataListResult> {
+      await ready;
+      const result = await call("data.list", {});
+      if (!isDataListResult(result)) {
+        throw new Error("invalid data.list result");
+      }
+      return result;
+    },
+    async describeData(source: string, table?: string): Promise<DataDescribeResult> {
+      await ready;
+      const result = await call("data.describe", table === undefined ? { source } : { source, table });
+      if (!isDataDescribeResult(result)) {
+        throw new Error("invalid data.describe result");
+      }
+      return result;
+    },
+    async inspectData(location: string): Promise<DataInspectResult> {
+      await ready;
+      const result = await call("data.inspect", { location });
+      if (!isDataInspectResult(result)) {
+        throw new Error("invalid data.inspect result");
+      }
+      return result;
+    },
+    async addData(params: DataAddParams): Promise<DataAddResult> {
+      await ready;
+      const result = await call("data.add", { ...params });
+      if (!isDataSourceResult(result)) {
+        throw new Error("invalid data.add result");
+      }
+      return result;
+    },
+    async updateData(params: DataUpdateParams): Promise<DataUpdateResult> {
+      await ready;
+      const result = await call("data.update", { ...params });
+      if (!isDataSourceResult(result)) {
+        throw new Error("invalid data.update result");
+      }
+      return result;
+    },
+    async removeData(name: string): Promise<DataRemoveResult> {
+      await ready;
+      const result = await call("data.remove", { name });
+      if (!isDataRemoveResult(result)) {
+        throw new Error("invalid data.remove result");
+      }
+      return result;
+    },
+    async getDataNotes(source: string): Promise<DataNotesGetResult> {
+      await ready;
+      const result = await call("data.notes.get", { source });
+      if (!isDataNotesGetResult(result)) {
+        throw new Error("invalid data.notes.get result");
+      }
+      return result;
+    },
+    async setDataNotes(source: string, text: string): Promise<DataNotesSetResult> {
+      await ready;
+      const result = await call("data.notes.set", { source, text });
+      if (!isDataNotesSetResult(result)) {
+        throw new Error("invalid data.notes.set result");
+      }
+      return result;
+    },
+    async draftDataNotes(source: string): Promise<DataNotesDraftResult> {
+      await ready;
+      const result = await call("data.notes.draft", { source });
+      if (!isDataNotesDraftResult(result)) {
+        throw new Error("invalid data.notes.draft result");
+      }
+      return result;
+    },
+    onDataChanged(listener: (change: DataChanged) => void): () => void {
+      dataListeners.add(listener);
+      return () => {
+        dataListeners.delete(listener);
       };
     },
     onMemoryChanged(listener: (change: MemoryChanged) => void): () => void {

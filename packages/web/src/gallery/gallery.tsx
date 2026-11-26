@@ -103,6 +103,7 @@ import { RoutineDetail, RoutineEditor, RoutinesEmpty, RoutinesPanel } from "../f
 import { SAMPLE_LIST, SAMPLE_MORNING_BRIEF, SAMPLE_WORKFLOW_ROUTINE, SAMPLE_WORKFLOW_WATCH_ROUTINE, ROUTINES_NOW, SAMPLE_RUNS } from "../features/routines/sample.ts";
 import { LeadRun, RunBanner, RunsList, RunsPanel, WorkflowRunView } from "../features/runs/index.ts";
 import { SAMPLE_RUN_CANCELLED, SAMPLE_RUN_DONE, SAMPLE_RUN_FAILED, SAMPLE_RUN_REVIEW, SAMPLE_RUN_RUNNING, SAMPLE_RUN_TOOL_ASK, WORKFLOW_RUN_NOW } from "../features/runs/workflow-sample.ts";
+import { DataGallery } from "./gallery-data.tsx";
 import { RunForm, WorkflowDetail, WorkflowsPanel } from "../features/workflows/index.ts";
 import { SAMPLE_BROKEN, SAMPLE_PR_DIGEST, SAMPLE_PR_DIGEST_CODE, SAMPLE_PR_DIGEST_STEPS, SAMPLE_ROUTINE_WORKFLOW_RUN, SAMPLE_UNTRUSTED, SAMPLE_WORKFLOW_LIST, SAMPLE_WORKFLOW_LIST_TWO_PROJECTS, SAMPLE_WORKFLOW_RUNS, WORKFLOWS_NOW } from "../features/workflows/sample.ts";
 import { RUNS_NOW, SAMPLE_RUN_LIST, SAMPLE_WAITING_RUN } from "../features/runs/sample.ts";
@@ -2399,6 +2400,10 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
           ))}
         </div>
       </section>
+      </Only>
+
+      <Only id="data">
+        <DataGallery theme={theme} id={anchor("Data")} />
       </Only>
 
       <Only id="runs">

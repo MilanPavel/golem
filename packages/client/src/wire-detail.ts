@@ -32,6 +32,9 @@ export function shownParams(method: string, params: Record<string, unknown>): Re
     return { ...params, key: REDACTED };
   }
   let shown = params;
+  if (method === "data.add" && typeof shown["password"] === "string") {
+    shown = { ...shown, password: REDACTED };
+  }
   if (method === "mcp.add" && "token" in shown) {
     shown = { ...shown, token: REDACTED };
   }

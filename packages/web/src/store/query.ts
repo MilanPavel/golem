@@ -4,7 +4,7 @@ import { CHANGES_REFETCH_MS } from "./changes.ts";
 
 export type QueryWiringClient = Pick<
   GolemClient,
-  "state" | "onState" | "onEvent" | "onSessionSummary" | "onSkillsChanged" | "onAgentsChanged" | "onMemoryChanged" | "onDevicesChanged" | "onRoutinesChanged" | "onWorkflowEvent" | "onMcpStatus" | "onPull" | "onModelServer"
+  "state" | "onState" | "onEvent" | "onSessionSummary" | "onSkillsChanged" | "onAgentsChanged" | "onMemoryChanged" | "onDevicesChanged" | "onRoutinesChanged" | "onWorkflowEvent" | "onDataChanged" | "onMcpStatus" | "onPull" | "onModelServer"
 >;
 
 /** Answers stay fresh until a pushed event says otherwise. Keys are `[method, ...params]`. */
@@ -64,6 +64,17 @@ export function keepQueriesHonest(client: QueryWiringClient, queryClient: QueryC
       stale("run.list");
       // The open run view follows its steps and reviews.
       stale("workflow.status");
+    }),
+    client.onDataChanged((change) => {
+      // The list changed, or one source did: what was read of it is stale.
+      stale("data.list");
+      if (change.source === undefined || change.source === null) {
+        stale("data.describe");
+        stale("data.notes.get");
+      } else {
+        stale("data.describe", change.source);
+        stale("data.notes.get", change.source);
+      }
     }),
     client.onMcpStatus(() => {
       stale("mcp.list");

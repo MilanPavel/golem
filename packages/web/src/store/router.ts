@@ -8,12 +8,18 @@ export type Route =
   | { name: "routines" }
   | { name: "routine-new"; starter: string | null }
   | { name: "routine"; routine: string; folder: string | null }
+  | { name: "data" }
+  | { name: "data-source"; source: string; tab: DataTab }
   | { name: "workflows" }
   | { name: "workflow"; id: string }
   | { name: "runs" }
   | { name: "run"; id: string }
   | { name: "welcome"; step: WelcomeStep; from: "send" | null }
   | { name: "not-found" };
+
+/** The tabs of a data source's page, in order. */
+export const DATA_TABS = ["tables", "notes", "queries", "settings"] as const;
+export type DataTab = (typeof DATA_TABS)[number];
 
 /** The steps of `/welcome`, in order. */
 export const WELCOME_STEPS = ["engine", "model", "tools", "ready"] as const;
@@ -41,6 +47,7 @@ export type Router = StoreSource<Route> & {
  * and `?new=<starter>` fills it from a starter.
  * `/workflows` is the workflows page with none picked, and `/workflows/:id` one workflow (its id, `<path>::<name>`, decoded).
  * `/runs` is the Runs page: what needs you, what is running, and what ran. `/runs/:id` is one workflow run, by its `workflow_run_id` (decoded, not empty).
+ * `/data` is the Data page with none picked, and `/data/:name` one source (name decoded, no further `/`); `?tab=` names its tab (tables when missing or unknown).
  * `/welcome` is first run: `?step=engine|model|tools|ready` (engine when missing or unknown) and `?from=send`.
  * On `/s/:id`, `?inspect` opens the inspector panel and `?inspect=<span>` opens it at that span.
  */
@@ -71,6 +78,21 @@ export function parseRoute(pathname: string, search = ""): Route {
       if (id !== "") return { name: "run", id };
     } catch {
       // A malformed escape is not a run.
+    }
+  }
+  if (pathname === "/data") {
+    return { name: "data" };
+  }
+  const matched = /^\/data\/([^/]+)$/.exec(pathname)?.[1];
+  if (matched !== undefined) {
+    try {
+      const name = decodeURIComponent(matched);
+      if (name !== "" && !name.includes("/")) {
+        const asked = new URLSearchParams(search).get("tab");
+        return { name: "data-source", source: name, tab: DATA_TABS.find((tab) => tab === asked) ?? "tables" };
+      }
+    } catch {
+      // A malformed escape is not a source.
     }
   }
   if (pathname === "/workflows") {
@@ -168,6 +190,13 @@ export function workflowPath(id?: string): string {
   return id === undefined ? "/workflows" : `/workflows/${encodeURIComponent(id)}`;
 }
 
+/** The path of the Data page, or of one source on it, at a tab other than the first. */
+export function dataPath(name?: string, tab: DataTab = "tables"): string {
+  if (name === undefined) return "/data";
+  const base = `/data/${encodeURIComponent(name)}`;
+  return tab === "tables" ? base : `${base}?tab=${tab}`;
+}
+
 /** The path of the Runs page. */
 export function runsPath(): string {
   return "/runs";
@@ -200,6 +229,7 @@ function sameRoute(a: Route, b: Route): boolean {
   if (a.name === "welcome") return b.name === "welcome" && a.step === b.step && a.from === b.from;
   if (a.name === "routine-new") return b.name === "routine-new" && a.starter === b.starter;
   if (a.name === "run") return b.name === "run" && a.id === b.id;
+  if (a.name === "data-source") return b.name === "data-source" && a.source === b.source && a.tab === b.tab;
   if (a.name === "workflow") return b.name === "workflow" && a.id === b.id;
   if (a.name === "routine") return b.name === "routine" && a.routine === b.routine && a.folder === b.folder;
   if (a.name === "settings") return b.name === "settings" && a.section === b.section;

@@ -1,5 +1,5 @@
 import { afterEach, expect, test, vi } from "vitest";
-import { createRouter, helperPath, inspectPath, parseRoute, routineNewPath, routinePath, runPath, runsPath, workflowPath, sessionPath, settingsPath, tracePath, welcomePath } from "./router.ts";
+import { createRouter, dataPath, helperPath, inspectPath, parseRoute, routineNewPath, routinePath, runPath, runsPath, workflowPath, sessionPath, settingsPath, tracePath, welcomePath } from "./router.ts";
 
 afterEach(() => {
   history.replaceState(null, "", "/");
@@ -83,6 +83,19 @@ test("parseRoute reads the workflows page and one workflow, and workflowPath rou
   expect(workflowPath()).toBe("/workflows");
   expect(parseRoute(workflowPath(id))).toEqual({ name: "workflow", id });
   for (const bad of ["/workflows/", "/workflows/a/b", "/workflowsx"]) {
+    expect(parseRoute(bad)).toEqual({ name: "not-found" });
+  }
+});
+
+test("parseRoute reads the data page and one source with its tab, and dataPath round-trips", () => {
+  expect(parseRoute("/data")).toEqual({ name: "data" });
+  expect(dataPath()).toBe("/data");
+  expect(parseRoute(dataPath("my bank"))).toEqual({ name: "data-source", source: "my bank", tab: "tables" });
+  expect(parseRoute("/data/bank", "?tab=notes")).toEqual({ name: "data-source", source: "bank", tab: "notes" });
+  expect(parseRoute("/data/bank", "?tab=nope")).toEqual({ name: "data-source", source: "bank", tab: "tables" });
+  const [pathname, search] = dataPath("bank", "settings").split("?");
+  expect(parseRoute(pathname ?? "", `?${search ?? ""}`)).toEqual({ name: "data-source", source: "bank", tab: "settings" });
+  for (const bad of ["/data/", "/data/a/b", "/datax"]) {
     expect(parseRoute(bad)).toEqual({ name: "not-found" });
   }
 });

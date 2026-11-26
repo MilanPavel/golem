@@ -3,6 +3,7 @@ import { useInbox } from "../../store/inbox.ts";
 import { InboxPanel } from "../inbox/index.ts";
 import { LiveSessionsPanel } from "./sessions-panel.tsx";
 import { LiveRoutinesPanel } from "../routines/index.ts";
+import { LiveDataPanel } from "../data/index.ts";
 import { LiveRunsPanel } from "../runs/index.ts";
 import { LiveWorkflowsPanel } from "../workflows/index.ts";
 import type { RailItem } from "./rail.tsx";
@@ -17,6 +18,7 @@ function InboxBody() {
 export const PANELS: Record<RailItem, { title: string; Body: ComponentType }> = {
   sessions: { title: "Sessions", Body: LiveSessionsPanel },
   inbox: { title: "Inbox", Body: InboxBody },
+  data: { title: "Data", Body: LiveDataPanel },
   routines: { title: "Routines", Body: LiveRoutinesPanel },
   workflows: { title: "Workflows", Body: LiveWorkflowsPanel },
   runs: { title: "Runs", Body: LiveRunsPanel },

@@ -4,7 +4,7 @@ import type { RailItem } from "./rail.tsx";
 
 export const SIDEBAR_ITEM_KEY = "golem.sidebar.item";
 
-export const SIDEBAR_ITEMS: readonly RailItem[] = ["sessions", "inbox", "routines", "workflows", "runs"];
+export const SIDEBAR_ITEMS: readonly RailItem[] = ["sessions", "inbox", "data", "routines", "workflows", "runs"];
 
 function read(): RailItem {
   try {

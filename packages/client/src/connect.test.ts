@@ -1722,6 +1722,52 @@ test("memory.list reads a page, and memory.changed reaches onMemoryChanged unles
   }
 });
 
+test("data.* calls send their params, a password stays out of the wire view, and data.changed reaches onDataChanged unless it is malformed", async () => {
+  const source = { name: "bank", kind: "files", scope: "user", location: "~/b/*.csv", privacy: "local", status: "ready" };
+  const sent: Record<string, unknown>[] = [];
+  const server = await listen((socket) => {
+    attach(socket, {
+      answerPing: true,
+      results: {
+        "data.list": { sources: [source] },
+        "data.add": { source },
+        "data.describe": { source, tables: [], sample: {} },
+        "data.notes.draft": { text: "# bank\n" },
+      },
+      onRequest: (_socket, method, params) => {
+        if (method.startsWith("data.")) {
+          sent.push({ method, ...params });
+        }
+      },
+      onHello: (current) => {
+        write(current, { jsonrpc: "2.0", method: "data.changed", params: { reason: "nope" } });
+        write(current, { jsonrpc: "2.0", method: "data.changed", params: { reason: "added", source: "bank" } });
+      },
+    });
+  });
+  const client = connectGolem({ socketPath: server.socketPath, clientName: "tui", reconnect: false, heartbeatMs: 60_000 });
+  const seen: string[] = [];
+  const stop = client.onDataChanged((change) => {
+    seen.push(`${change.reason} ${change.source ?? ""}`);
+  });
+  try {
+    assert.deepEqual((await client.listData()).sources.map((each) => each.name), ["bank"]);
+    await client.describeData("bank", "transactions");
+    await client.addData({ name: "bank", location: "~/b/*.csv", privacy: "local", scope: "user", password: "s3cret" });
+    assert.equal((await client.draftDataNotes("bank")).text, "# bank\n");
+    assert.deepEqual(sent.map((each) => each["method"]), ["data.list", "data.describe", "data.add", "data.notes.draft"]);
+    assert.deepEqual(sent[1], { method: "data.describe", source: "bank", table: "transactions" });
+    for (let tries = 0; tries < 50 && seen.length < 1; tries += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+    assert.deepEqual(seen, ["added bank"]);
+  } finally {
+    stop();
+    client.close();
+    await server.close();
+  }
+});
+
 test("device.* calls send their params, and device.pair.changed and device.changed reach their listeners", async () => {
   const phone = { id: "a".repeat(32), name: "iPhone 16", paired_at: "2026-11-21T10:00:00+01:00", last_seen: null, revoked_at: null, rules: 1 };
   const sent: Record<string, unknown>[] = [];
