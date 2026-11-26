@@ -52,10 +52,10 @@ DESCRIBE: Calls = [("data_describe", {"source": "shop"})]
     [
         ("open", ChatPrivacy(), HOSTED, True),
         ("open", ChatPrivacy(), ON_DEVICE, True),
-        ("open", LOCAL_CHAT, HOSTED, True),
+        ("open", LOCAL_CHAT, HOSTED, False),
         ("local", ChatPrivacy(), HOSTED, False),
         ("local", ChatPrivacy(), ON_DEVICE, True),
-        ("local", LOCAL_CHAT, HOSTED, True),
+        ("local", LOCAL_CHAT, HOSTED, False),
         ("local", LOCAL_CHAT, ON_DEVICE, True),
         ("schema", ChatPrivacy(), HOSTED, False),
         ("schema", ChatPrivacy(), ON_DEVICE, False),
@@ -73,6 +73,8 @@ def test_rows_go_to_a_model_by_the_level_of_the_source(
 
 def test_the_reason_says_which_level_kept_the_rows_back() -> None:
     assert may_use_rows("local", ChatPrivacy(), HOSTED).reason == "source_local"
+    assert may_use_rows("local", LOCAL_CHAT, HOSTED).reason == "source_local"
+    assert may_use_rows("open", LOCAL_CHAT, HOSTED).reason == "chat_local"
     assert may_use_rows("schema", ChatPrivacy(), ON_DEVICE).reason == "source_schema"
 
 
@@ -178,7 +180,6 @@ async def test_an_open_source_is_unchanged_for_a_hosted_model(
     _shop(paths, "open")
     result = await DATA_QUERY.call(QUERY[0][1], _ctx(sources, HOSTED))
     assert SECRET in result.output and result.rows_withheld is False
-    assert result.data is not None and result.data.hosted is None
     assert result.shown is None
 
 
@@ -187,13 +188,18 @@ async def test_the_builtin_source_is_unchanged_for_a_hosted_model(sources: DataS
         {"source": "golem", "sql": "select count(*) as n from usage"}, _ctx(sources, HOSTED)
     )
     assert "n" in result.output and result.rows_withheld is False
+    assert result.data is not None
+    stamp = {"source": "golem", "privacy": "open", "hosted": result.data.hosted}
     message = ToolMessage(
         content=result.output,
         tool_call_id="c1",
         name="data_query",
-        additional_kwargs={DATA_KEY: {"source": "golem", "privacy": "open", "hosted": None}},
+        additional_kwargs={DATA_KEY: stamp},
     )
     assert stub_local_rows([message])[0].content == result.output
+    # In a local chat a hosted call gets no rows, even of the built-in source.
+    stubbed = str(stub_local_rows([message], LOCAL_CHAT)[0].content)
+    assert stubbed == result.data.hosted and "not sent to this model" in stubbed
 
 
 async def test_describing_a_local_source_gives_a_hosted_model_no_range_and_no_sample(
@@ -239,9 +245,13 @@ def test_the_stub_changes_only_a_result_the_model_may_not_read() -> None:
         "rows 32.5",
         "error: no",
     ]
-    # A local chat may send the rows of a local source anywhere, a schema source never.
-    both = stub_local_rows([local, schema], LOCAL_CHAT)
-    assert [m.content for m in both] == ["rows 32.5", "3 rows, withheld"]
+    # A local chat sends no rows to a hosted model, whatever the level of the source.
+    both = stub_local_rows([local, schema, open_], LOCAL_CHAT)
+    assert [m.content for m in both] == [
+        "3 rows from shop, withheld",
+        "3 rows, withheld",
+        "unused",
+    ]
     # The input is not changed: the checkpoint keeps the whole result.
     assert local.content == "rows 32.5"
 

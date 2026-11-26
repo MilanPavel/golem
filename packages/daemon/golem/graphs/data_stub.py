@@ -55,10 +55,10 @@ def _stubbed(message: BaseMessage, chat: ChatPrivacy) -> BaseMessage:
         return message.model_copy(update={"content": STUB})
     if may_use_rows(privacy, chat, _HOSTED).allowed:
         return message
-    # A result with no hosted text holds no value already: a schema source's result.
-    if not isinstance(hosted, str):
-        return message
-    return message.model_copy(update={"content": hosted})
+    if isinstance(hosted, str):
+        return message.model_copy(update={"content": hosted})
+    # A schema source's result holds no value already. Any other result with no text is stubbed.
+    return message if privacy == "schema" else message.model_copy(update={"content": STUB})
 
 
 __all__ = ["STUB", "stub_local_rows"]

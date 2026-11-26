@@ -13,7 +13,7 @@ from typing import Literal
 from golem.config import DataPrivacyLevel
 from golem.memory.privacy import ChatPrivacy, Target, chat_is_local
 
-RowsReason = Literal["source_local", "source_schema"]
+RowsReason = Literal["source_local", "source_schema", "chat_local"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -27,16 +27,19 @@ class RowsVerdict:
 def may_use_rows(privacy: DataPrivacyLevel, chat: ChatPrivacy, target: Target) -> RowsVerdict:
     """Whether the rows of a source of this level may be shown to ``target``.
 
-    ``open`` goes to any model. ``local`` goes to a local model, or to any model in a chat that
-    is local. ``schema`` goes to none: its rows are for the user only.
+    Mirrors ``golem.memory.privacy.may_use``. ``schema`` goes to no model. A local model gets
+    the rest. A hosted model gets nothing of a ``local`` source, and nothing at all in a chat
+    that is local, so ``open`` rows reach it only in a chat that is not.
     """
-    if privacy == "open":
-        return RowsVerdict(True)
     if privacy == "schema":
         return RowsVerdict(False, "source_schema")
-    if target.local or chat_is_local(chat):
+    if target.local:
         return RowsVerdict(True)
-    return RowsVerdict(False, "source_local")
+    if privacy == "local":
+        return RowsVerdict(False, "source_local")
+    if chat_is_local(chat):
+        return RowsVerdict(False, "chat_local")
+    return RowsVerdict(True)
 
 
 _PERSONAL = re.compile(

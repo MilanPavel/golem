@@ -210,14 +210,14 @@ async def _describe(args: DataDescribeArgs, ctx: ToolContext) -> ToolResult:
     full: Detail = "none" if privacy == "schema" else "full"
     text = _describe_text(found, args.source, stats=full, samples=shows_rows)
     hosted = None
-    if privacy == "local":
+    if privacy != "schema":
         hosted = _describe_text(found, args.source, stats="counts", samples=False)
     names = ", ".join(table.name for table in found.tables)
     return ToolResult(
         output=text,
         summary=f"{args.source}: {names}"[:80],
         data=DataRead(source=args.source, privacy=privacy, hosted=hosted),
-        rows_withheld=privacy == "local" and _withheld(privacy, ctx),
+        rows_withheld=_withheld(privacy, ctx),
     )
 
 
@@ -256,12 +256,12 @@ async def _query(args: DataQueryArgs, ctx: ToolContext) -> ToolResult:
             shown=full,
             rows_withheld=True,
         )
-    hosted = withheld_text(result, args.source, to="this model") if privacy == "local" else None
+    hosted = withheld_text(result, args.source, to="this model")
     return ToolResult(
         output=full,
         summary=summary,
         data=DataRead(source=args.source, privacy=privacy, hosted=hosted),
-        rows_withheld=privacy == "local" and _withheld(privacy, ctx),
+        rows_withheld=_withheld(privacy, ctx),
     )
 
 
