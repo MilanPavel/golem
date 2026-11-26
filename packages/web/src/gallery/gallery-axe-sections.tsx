@@ -17,6 +17,7 @@ export const GALLERY_SECTIONS = [
   "helpers-in-the-list",
   "helper-card",
   "routines",
+  "workflows",
   "runs",
   "rail",
   "sessions-flyout",

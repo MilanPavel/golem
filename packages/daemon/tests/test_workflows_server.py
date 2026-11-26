@@ -240,9 +240,11 @@ async def test_get_returns_the_outline_and_tolerates_a_bad_file(short_home: Path
         got = rpc_result(await client.call("workflow.get", {"id": f"{good}::adder"}))
         steps = cast(Rows, got["steps"])
         assert [s["title"] for s in steps] == ["first", "second"]
+        assert got["code"] == TWO_STEPS
         broken = rpc_result(await client.call("workflow.get", {"id": str(bad)}))
         assert cast(dict[str, object], broken["workflow"])["state"] == "broken"
         assert broken["steps"] == []
+        assert broken["code"] is None
     finally:
         await client.close()
         await stop_daemon(app, task)

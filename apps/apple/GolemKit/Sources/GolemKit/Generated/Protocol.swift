@@ -30242,17 +30242,24 @@ public struct WorkflowGetParams: Codable {
 }
 
 /// The workflow and its outline steps (empty for a ``broken`` or ``untrusted`` file).
+///
+/// ``code`` is the text of the file, for the Code tab. It is set only for a workflow the
+/// registry
+/// lists as ``ok`` (a trusted one), and null when the file cannot be read.
 // MARK: - WorkflowGetResult
 public struct WorkflowGetResult: Codable {
+    public let code: String?
     public let steps: [StepClass]?
     public let workflow: WorkflowGetResultWorkflow
 
     public enum CodingKeys: String, CodingKey {
+        case code = "code"
         case steps = "steps"
         case workflow = "workflow"
     }
 
-    public init(steps: [StepClass]?, workflow: WorkflowGetResultWorkflow) {
+    public init(code: String?, steps: [StepClass]?, workflow: WorkflowGetResultWorkflow) {
+        self.code = code
         self.steps = steps
         self.workflow = workflow
     }

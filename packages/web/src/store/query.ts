@@ -4,7 +4,7 @@ import { CHANGES_REFETCH_MS } from "./changes.ts";
 
 export type QueryWiringClient = Pick<
   GolemClient,
-  "state" | "onState" | "onEvent" | "onSessionSummary" | "onSkillsChanged" | "onAgentsChanged" | "onMemoryChanged" | "onDevicesChanged" | "onRoutinesChanged" | "onMcpStatus" | "onPull" | "onModelServer"
+  "state" | "onState" | "onEvent" | "onSessionSummary" | "onSkillsChanged" | "onAgentsChanged" | "onMemoryChanged" | "onDevicesChanged" | "onRoutinesChanged" | "onWorkflowEvent" | "onMcpStatus" | "onPull" | "onModelServer"
 >;
 
 /** Answers stay fresh until a pushed event says otherwise. Keys are `[method, ...params]`. */
@@ -57,6 +57,10 @@ export function keepQueriesHonest(client: QueryWiringClient, queryClient: QueryC
       stale("routine.list");
       stale("routine.get");
       // A firing starts or ends a run.
+      stale("run.list");
+    }),
+    client.onWorkflowEvent(() => {
+      // A workflow run starts, waits or ends: its row in Runs changes.
       stale("run.list");
     }),
     client.onMcpStatus(() => {
