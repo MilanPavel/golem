@@ -297,6 +297,17 @@ export {
   type WorkflowEntryLike,
   type WorkflowGroup,
 } from "./workflow-list.ts";
+export {
+  lastRunLine,
+  outlineLine,
+  outlineNotes,
+  outlineRows,
+  stepRanTimes,
+  type OutlineRow,
+  type OutlineStepLike,
+  type RanRunLike,
+  type RanStepLike,
+} from "./outline-rows.ts";
 export { groupTurns, turnFooter, type Turn } from "./turns.ts";
 export {
   answerTarget,
