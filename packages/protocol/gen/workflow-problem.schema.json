@@ -1,0 +1,55 @@
+{
+  "additionalProperties": false,
+  "description": "One finding of ``workflow.check``, with the line it is on and the outline step it belongs\nto (null for the header or the whole file). ``fix`` is a short replacement text or the name\nof an action.",
+  "properties": {
+    "fix": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Fix"
+    },
+    "line": {
+      "minimum": 1,
+      "title": "Line",
+      "type": "integer"
+    },
+    "message": {
+      "minLength": 1,
+      "title": "Message",
+      "type": "string"
+    },
+    "severity": {
+      "enum": [
+        "error",
+        "warning"
+      ],
+      "title": "Severity",
+      "type": "string"
+    },
+    "step_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Step Id"
+    }
+  },
+  "required": [
+    "severity",
+    "line",
+    "message"
+  ],
+  "title": "WorkflowProblem",
+  "type": "object"
+}

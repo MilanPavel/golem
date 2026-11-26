@@ -1,0 +1,28 @@
+{
+  "additionalProperties": false,
+  "description": "``workflow.check``. Check the workflow ``id``. Without ``code`` it checks the saved file;\nwith ``code`` it checks that text and returns its outline (no file is read or written, and\nno model is asked).",
+  "properties": {
+    "code": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Code"
+    },
+    "id": {
+      "minLength": 1,
+      "title": "Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id"
+  ],
+  "title": "WorkflowCheckParams",
+  "type": "object"
+}

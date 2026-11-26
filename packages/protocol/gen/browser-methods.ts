@@ -147,10 +147,12 @@ export const BROWSER_METHODS: ReadonlySet<string> = new Set([
   "trace.get",
   "trace.span",
   "workflow.cancel",
+  "workflow.check",
   "workflow.get",
   "workflow.list",
   "workflow.resume",
   "workflow.review.answer",
+  "workflow.save",
   "workflow.start",
   "workflow.status",
 ]);

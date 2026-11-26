@@ -6167,6 +6167,67 @@ class WorkflowGetResult(BaseModel):
     workflow: WorkflowEntryInfo
     steps: list[WorkflowOutlineStep] = Field(default_factory=list[WorkflowOutlineStep])
     code: str | None = None
+    code_hash: str | None = None
+    """sha256 of the file's bytes, the ``base_hash`` of a ``workflow.save``."""
+
+
+class WorkflowProblem(BaseModel):
+    """One finding of ``workflow.check``, with the line it is on and the outline step it belongs
+    to (null for the header or the whole file). ``fix`` is a short replacement text or the name
+    of an action."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    severity: Literal["error", "warning"]
+    line: int = Field(ge=1)
+    step_id: str | None = None
+    message: str = Field(min_length=1)
+    fix: str | None = None
+
+
+class WorkflowCheckParams(BaseModel):
+    """``workflow.check``. Check the workflow ``id``. Without ``code`` it checks the saved file;
+    with ``code`` it checks that text and returns its outline (no file is read or written, and
+    no model is asked)."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    id: str = Field(min_length=1)
+    code: str | None = None
+
+
+class WorkflowCheckResult(BaseModel):
+    """The problems, in line order, and the outline steps of the checked text."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    problems: list[WorkflowProblem] = Field(default_factory=list[WorkflowProblem])
+    steps: list[WorkflowOutlineStep] = Field(default_factory=list[WorkflowOutlineStep])
+
+
+class WorkflowSaveParams(BaseModel):
+    """``workflow.save``. Write ``code`` as the file of the workflow ``id``.
+
+    ``base_hash`` is the ``code_hash`` the editor started from. The call is refused when the file
+    changed on disk since, when ``code`` has an ``error`` problem, and for an untrusted folder.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    id: str = Field(min_length=1)
+    code: str
+    base_hash: str = Field(min_length=1)
+
+
+class WorkflowSaveResult(BaseModel):
+    """The workflow as the registry reloaded it, its steps, the warnings and the new hash."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    workflow: WorkflowEntryInfo
+    steps: list[WorkflowOutlineStep] = Field(default_factory=list[WorkflowOutlineStep])
+    problems: list[WorkflowProblem] = Field(default_factory=list[WorkflowProblem])
+    code_hash: str = Field(min_length=1)
 
 
 class WorkflowStartParams(BaseModel):

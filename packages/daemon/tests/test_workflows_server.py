@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import threading
 from pathlib import Path
 from typing import cast
@@ -248,6 +249,83 @@ async def test_get_returns_the_outline_and_tolerates_a_bad_file(short_home: Path
     finally:
         await client.close()
         await stop_daemon(app, task)
+
+
+async def test_check_and_save(short_home: Path, tmp_path: Path) -> None:
+    good = _write(short_home / "workflows", "adder.py", TWO_STEPS)
+    bad = _write(short_home / "workflows", "bad.py", "def (:\n")
+    project = (tmp_path / "proj").resolve()
+    other = _write(project / "workflows", "mine.py", TWO_STEPS.replace("adder", "mine"))
+    app, task = await start_daemon(short_home)
+    client = await RpcClient.connect(app.paths.socket_path)
+    try:
+        await client.call("hello", HELLO)
+        await client.call("workflow.list", {"folders": [str(project)]}, timeout=20)
+        ident = f"{good}::adder"
+        got = rpc_result(await client.call("workflow.get", {"id": ident}))
+        digest = str(got["code_hash"])
+        assert len(digest) == 64
+
+        saved_file = rpc_result(await client.call("workflow.check", {"id": ident}))
+        assert saved_file["problems"] == []
+        assert len(cast(Rows, saved_file["steps"])) == 2
+
+        broken_code = TWO_STEPS.replace("run.step(", "run.llm(", 1).replace(
+            '"first", add, n, 1', '"x", modle="local"'
+        )
+        checked = rpc_result(
+            await client.call("workflow.check", {"id": ident, "code": broken_code})
+        )
+        problems = cast(Rows, checked["problems"])
+        assert [p["severity"] for p in problems] == ["error"]
+        assert problems[0]["line"] == 10 and problems[0]["step_id"]
+        assert good.read_text(encoding="utf-8") == TWO_STEPS
+
+        refused = await client.call(
+            "workflow.save", {"id": ident, "code": broken_code, "base_hash": digest}
+        )
+        assert error_code(refused) == INVALID_PARAMS
+        assert good.read_text(encoding="utf-8") == TWO_STEPS
+
+        changed = TWO_STEPS.replace("Adds up.", "Adds more.")
+        stale = await client.call(
+            "workflow.save", {"id": ident, "code": changed, "base_hash": "0" * 64}
+        )
+        assert error_code(stale) == INVALID_PARAMS
+        assert good.read_text(encoding="utf-8") == TWO_STEPS
+
+        done = rpc_result(
+            await client.call("workflow.save", {"id": ident, "code": changed, "base_hash": digest})
+        )
+        assert good.read_text(encoding="utf-8") == changed
+        assert cast(dict[str, object], done["workflow"])["description"] == "Adds more."
+        assert done["code_hash"] != digest and len(cast(Rows, done["steps"])) == 2
+
+        fixed = rpc_result(
+            await client.call(
+                "workflow.save",
+                {"id": str(bad), "code": TWO_STEPS.replace("adder", "bad"), "base_hash": _sha(bad)},
+            )
+        )
+        assert cast(dict[str, object], fixed["workflow"])["state"] == "ok"
+
+        untrusted = str(other)
+        text = other.read_text(encoding="utf-8")
+        again = await client.call(
+            "workflow.save", {"id": untrusted, "code": text, "base_hash": _sha(other)}
+        )
+        assert error_code(again) == INVALID_PARAMS
+        check_only = rpc_result(
+            await client.call("workflow.check", {"id": untrusted, "code": text})
+        )
+        assert check_only["problems"] == []
+    finally:
+        await client.close()
+        await stop_daemon(app, task)
+
+
+def _sha(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
 def test_two_threads_can_refresh_the_registry_together(tmp_path: Path) -> None:

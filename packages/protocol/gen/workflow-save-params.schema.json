@@ -1,0 +1,27 @@
+{
+  "additionalProperties": false,
+  "description": "``workflow.save``. Write ``code`` as the file of the workflow ``id``.\n\n``base_hash`` is the ``code_hash`` the editor started from. The call is refused when the file\nchanged on disk since, when ``code`` has an ``error`` problem, and for an untrusted folder.",
+  "properties": {
+    "base_hash": {
+      "minLength": 1,
+      "title": "Base Hash",
+      "type": "string"
+    },
+    "code": {
+      "title": "Code",
+      "type": "string"
+    },
+    "id": {
+      "minLength": 1,
+      "title": "Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "code",
+    "base_hash"
+  ],
+  "title": "WorkflowSaveParams",
+  "type": "object"
+}

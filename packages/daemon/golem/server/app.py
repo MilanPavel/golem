@@ -109,6 +109,7 @@ from golem.store.workflow_runs import WorkflowRuns
 from golem.tools import default_registry
 from golem.tools.registry import ToolRegistry, ToolScope
 from golem.workflows.agents import WorkflowAgents
+from golem.workflows.check import CheckEnv
 from golem.workflows.llm import WorkflowLlm
 from golem.workflows.service import WorkflowService
 from golem.workflows.tools import WorkflowTools
@@ -462,6 +463,16 @@ class DaemonApp:
                     self.paths.home,
                 )
                 self.state.routine_runs = RoutineRuns(database)
+                wf_llm = WorkflowLlm(
+                    router,
+                    dispatch,
+                    local_only=sessions.local_only,
+                    tier_of_profile=lambda profile: _tier_of(router, models, profile),
+                    budget_refs=models.budget_refs,
+                    price_of=lambda profile: _price_of(router, models, profile),
+                    paid_ok=budget.paid_ok,
+                    usage=usage,
+                )
                 self.state.workflows = WorkflowService(
                     runs=WorkflowRuns(database),
                     user_dir=self.paths.workflows_dir,
@@ -485,15 +496,18 @@ class DaemonApp:
                         settings=router.agent_settings,
                         skills=self.state.skills,
                     ),
-                    llm=WorkflowLlm(
-                        router,
-                        dispatch,
+                    llm=wf_llm,
+                    check_env=CheckEnv(
+                        agents=lambda folder: {
+                            a.name: a.wish
+                            for a in self.state.agents.view(
+                                Path(folder) if folder else None
+                            ).usable()
+                        },
                         local_only=sessions.local_only,
-                        tier_of_profile=lambda profile: _tier_of(router, models, profile),
-                        budget_refs=models.budget_refs,
-                        price_of=lambda profile: _price_of(router, models, profile),
-                        paid_ok=budget.paid_ok,
-                        usage=usage,
+                        tier_of_wish=lambda wish, local_only: _tier_of(
+                            router, models, wf_llm.profile_for(wish, local_only)
+                        ),
                     ),
                 )
                 sessions.review_items = self.state.workflows.pending_items
