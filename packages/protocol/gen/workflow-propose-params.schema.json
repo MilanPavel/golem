@@ -1,0 +1,51 @@
+{
+  "additionalProperties": false,
+  "description": "``workflow.propose``. Ask golem for a change to the workflow ``id``: ``code`` is the text\nin the editor and ``ask`` the sentence. ``previous_code`` and ``previous_note`` are the last\nproposal and its note, for a refine (one more sentence on top of it). Nothing is written.",
+  "properties": {
+    "ask": {
+      "minLength": 1,
+      "title": "Ask",
+      "type": "string"
+    },
+    "code": {
+      "title": "Code",
+      "type": "string"
+    },
+    "id": {
+      "minLength": 1,
+      "title": "Id",
+      "type": "string"
+    },
+    "previous_code": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Previous Code"
+    },
+    "previous_note": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Previous Note"
+    }
+  },
+  "required": [
+    "id",
+    "code",
+    "ask"
+  ],
+  "title": "WorkflowProposeParams",
+  "type": "object"
+}

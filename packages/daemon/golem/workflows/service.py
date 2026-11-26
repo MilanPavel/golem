@@ -13,7 +13,7 @@ import hashlib
 import json
 import logging
 import os
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Mapping
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -27,6 +27,7 @@ from golem.workflows.agents import WorkflowAgents
 from golem.workflows.check import CheckEnv, Problem, check
 from golem.workflows.engine import AgentStarted, WorkflowEngine, restart_policy
 from golem.workflows.llm import Llm
+from golem.workflows.propose import Proposal, propose
 from golem.workflows.registry import WorkflowEntry, WorkflowRegistry
 from golem.workflows.tools import WorkflowTools
 from golem_protocol import rpc
@@ -138,6 +139,7 @@ class WorkflowService:
     ) -> None:
         self.runs = runs
         self.check_env = check_env or CheckEnv()
+        self._llm = llm
         self._agents = agents
         self._touch_session = touch_session
         self._touches: set[asyncio.Task[None]] = set()
@@ -370,6 +372,29 @@ class WorkflowService:
         the local-only rule). Reads nothing, imports nothing and asks no model."""
         folder = None if entry.project is None else str(entry.project)
         return check(code, folder, self.check_env)
+
+    async def propose_code(
+        self,
+        entry: WorkflowEntry,
+        code: str,
+        ask: str,
+        previous: tuple[str, str] | None = None,
+    ) -> Proposal:
+        """One model call that proposes a change to ``code``, checked, never saved. Raises
+        :class:`~golem.workflows.propose.ProposeError`."""
+        folder = None if entry.project is None else str(entry.project)
+        agents: Mapping[str, str] = (
+            {} if self.check_env.agents is None else self.check_env.agents(folder)
+        )
+        return await propose(
+            llm=self._llm,
+            folder=folder,
+            code=code,
+            ask=ask,
+            check=lambda text: self.check_code(text, entry),
+            agents=agents,
+            previous=previous,
+        )
 
     def save_code(self, entry: WorkflowEntry, code: str, base_hash: str) -> list[Problem]:
         """Write ``code`` as the file of ``entry`` and reload the registry.
