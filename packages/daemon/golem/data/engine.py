@@ -5,8 +5,9 @@ files, or an attached database) and then closed in three steps, in this order:
 ``allowed_paths`` names only the source's own files (not the folder: DuckDB writes a
 file's replacement next to it, and that is refused), ``enable_external_access`` turns off
 everything else, and ``lock_configuration`` stops a query from turning either back on or
-raising its own memory limit. Views and attached databases made before the lock keep working. ``guard.refusal`` runs first
-on every query and gives the model a sentence instead of a permission error.
+raising its own memory limit. Views and attached databases made before the lock keep
+working. ``guard.refusal`` runs first on every query and gives the model a sentence
+instead of a permission error.
 """
 
 from __future__ import annotations
