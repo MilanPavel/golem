@@ -16,12 +16,15 @@ Each runs in two setups, ``local-only`` (nothing may leave the Mac: no paid mode
 Scripted mode (the default) runs the real chat graph, tools, ``delegate`` and session manager with
 scripted models and a fake check runner, so it needs no network, no model and no shell sandbox.
 ``--live`` plays the same scenarios and conditions through a real daemon with real models. It costs
-time and, in the cloud setup, money, so it needs the flag, and it prints a size note first.
+time and, in the cloud setup, money, so it needs the flag, and it prints a size note first. On
+a small project a model may rightly read the files itself and start no helper; ``--ask-helpers``
+names the helpers in the request, so the run tests how they work rather than the model's choice.
 
     uv run python -m golem.evals.usecases                              # scripted, all of it
     uv run python -m golem.evals.usecases --case sweep --setup local-only --out /tmp/usecases
     uv run python -m golem.evals.usecases --live --setup local-only --local-model qwen3.5:9b
     uv run python -m golem.evals.usecases --live --setup cloud-only --cloud-model anthropic/x
+    uv run python -m golem.evals.usecases --live --ask-helpers --setup local-only --local-model m
 
 A condition that cannot be read from what a mode records is shown as ``not checked``, with the
 reason, and does not fail the case.
@@ -41,7 +44,7 @@ import time
 import tomllib
 from collections.abc import AsyncGenerator, Callable, Generator, Mapping, Sequence
 from contextlib import asynccontextmanager, contextmanager
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, Literal, Protocol, cast
@@ -160,6 +163,9 @@ class Trace:
     after_undo: dict[str, str] = field(default_factory=dict[str, str])
     undo_runs: int = 0
     scripted: bool = False
+    profiles: dict[str, str] = field(default_factory=dict[str, str])
+    """The model profiles of the run's config, name to ``provider/model``: a helper given the
+    lead's model (``same``) names the profile, not the provider."""
 
 
 # --- reading events -------------------------------------------------------------------------------
@@ -407,6 +413,9 @@ class Scenario:
     delay: float = 0.0
     git: bool = False
     """Whether the project is a git checkout (a worker needs one for its copy)."""
+    hint: str = ""
+    """What ``--ask-helpers`` adds to the request in a live run: it names the helpers, so the
+    run tests how they work rather than whether the model chose them."""
 
 
 def _broad_plan(turn: Turn) -> Reply:
@@ -489,11 +498,12 @@ def _stuck_check(trace: Trace, setup: SetupName) -> list[Condition]:
         ),
     ]
     if setup == "local-only" and advisors:
+        model = str(data(advisors[0])["model"])
         conditions.append(
             has(
                 "a local advisor runs on a local model",
-                data(advisors[0])["model"].startswith("ollama/"),
-                str(data(advisors[0])["model"]),
+                trace.profiles.get(model, model).startswith("ollama/"),
+                model,
             )
         )
     # The nudge is a hint of a lead on route auto; this harness does not turn that route on.
@@ -621,6 +631,7 @@ SCENARIOS: dict[str, Scenario] = {
             _broad_check,
             AgentSettings(at_once=2),
             delay=0.02,
+            hint="Use helpers: delegate one explorer per service, in one batch.",
         ),
         Scenario(
             "stuck-bug",
@@ -629,6 +640,7 @@ SCENARIOS: dict[str, Scenario] = {
             _stuck_plan,
             _stuck_check,
             AgentSettings(at_once=2),
+            hint="Before you answer, delegate the question to the advisor agent.",
         ),
         Scenario(
             "sweep",
@@ -638,6 +650,7 @@ SCENARIOS: dict[str, Scenario] = {
             _sweep_check,
             AgentSettings(at_once=AT_ONCE, max_per_batch=SWEEP_JOBS),
             delay=0.03,
+            hint="Use helpers: delegate one explorer per module, in one batch.",
         ),
         Scenario(
             "upgrades",
@@ -647,6 +660,7 @@ SCENARIOS: dict[str, Scenario] = {
             _upgrades_check,
             AgentSettings(at_once=WORKERS, max_per_batch=WORKERS),
             git=True,
+            hint="Use helpers: delegate one worker per service, in one batch.",
         ),
     )
 }
@@ -670,7 +684,9 @@ def models_used(trace: Trace) -> set[str]:
         if data(event).get("provider"):
             found.add(str(data(event)["provider"]))
     for kind in ("helper.started", "helper.model"):
-        found |= {str(data(e)["model"]).partition("/")[0] for e in of_type(trace.events, kind)}
+        for event in of_type(trace.events, kind):
+            model = str(data(event)["model"])
+            found.add(trace.profiles.get(model, model).partition("/")[0])
     found.discard("")
     return found
 
@@ -978,15 +994,25 @@ COST_NOTE = (
 )
 
 
+LIVE_PROFILE = "t"
+"""The one model profile of a live run's config."""
+
+
 def live_config(setup: SetupName, model: str, agents: AgentSettings) -> str:
-    """The ``config.toml`` of a throwaway golem home. Local: one model, one slot, helpers on it."""
-    text = f'default_model = "t"\n[models.t]\nmodel = "{model}"\n'
-    text += f"[agents]\nat_once = {agents.at_once}\nmax_per_batch = {agents.max_per_batch}\n"
-    if setup == "local-only":
-        text += "[ollama]\nparallel = 1\n"
-        text += "".join(
-            f'[agents.{name}]\nmodel = "same"\n' for name in ("explorer", "worker", "advisor")
-        )
+    """The ``config.toml`` of a throwaway golem home: one model, and every helper on it.
+
+    Local: one slot. Cloud: golem starts no Ollama. The daemon still sees an Ollama that is
+    already running on this Mac, and ``cheapest`` would pick its free models, so the helpers
+    are pinned to the lead's model (``same``) in both setups.
+    """
+    text = f'default_model = "{LIVE_PROFILE}"\n[models.{LIVE_PROFILE}]\nmodel = "{model}"\n'
+    text += f"[agents]\nat_once = {agents.at_once}\n"
+    if agents.max_per_batch is not None:
+        text += f"max_per_batch = {agents.max_per_batch}\n"
+    text += "[ollama]\nparallel = 1\n" if setup == "local-only" else "[ollama]\nstart = false\n"
+    text += "".join(
+        f'[agents.{name}]\nmodel = "same"\n' for name in ("explorer", "worker", "advisor")
+    )
     text += CHECKS_TOML + '[permissions]\nmode = "autopilot"\n'
     return text
 
@@ -1072,12 +1098,21 @@ class Rpc:
 
 
 async def run_live(
-    case: str, setup: SetupName, model: str, scratch: Path, *, timeout: float = 900.0
+    case: str,
+    setup: SetupName,
+    model: str,
+    scratch: Path,
+    *,
+    timeout: float = 900.0,
+    ask_helpers: bool = False,
 ) -> Outcome:
-    """Play one case through a real daemon with a real model."""
+    """Play one case through a real daemon with a real model. ``ask_helpers``: the request
+    names the helpers (the scenario's ``hint``), instead of leaving the choice to the model."""
     from golem_protocol import PROTOCOL_MAJOR
 
     scenario = SCENARIOS[case]
+    if ask_helpers:
+        scenario = replace(scenario, request=f"{scenario.request} {scenario.hint}")
     started = time.monotonic()
     out = Outcome(case, setup, "live")
     root = Path(tempfile.mkdtemp(prefix="gu", dir="/var/tmp")).resolve()
@@ -1090,7 +1125,7 @@ async def run_live(
     (home / "config.toml").write_text(live_config(setup, model, scenario.agents), "utf-8")
     env = {**os.environ, "GOLEM_HOME": str(home), "HOME": str(user)}
     if setup == "cloud-only":
-        env.update(key_env(cast(Any, SimpleNamespace(lead=model)), None))
+        env.update(key_env(cast(Any, SimpleNamespace(lead=model, others=())), None))
     daemon = subprocess.Popen(
         serve_command(frozen=bool(getattr(sys, "frozen", False))),
         env=env,
@@ -1112,6 +1147,7 @@ async def run_live(
         await client.call("session.attach", {"session_id": session, "after_seq": 0})
         played = Rpc(client, folder, home, session)
         trace = await asyncio.wait_for(drive(scenario, played, folder), timeout * 2)
+        trace.profiles = {LIVE_PROFILE: model}
         out = evaluate(scenario, setup, trace, "live")
     except Exception as exc:
         out.error = f"{type(exc).__name__}: {exc}"
@@ -1171,6 +1207,7 @@ async def run_all(
     local_model: str | None = None,
     cloud_model: str | None = None,
     scratch: Path | None = None,
+    ask_helpers: bool = False,
 ) -> list[Outcome]:
     """Play ``cases`` in ``setups``. ``live`` is explicit: it is never the default."""
     base = scratch or Path(tempfile.mkdtemp(prefix="golem-usecases-"))
@@ -1181,7 +1218,9 @@ async def run_all(
             for case in cases:
                 folder = base / setup / case
                 if live:
-                    outcomes.append(await run_live(case, setup, model, folder))
+                    outcomes.append(
+                        await run_live(case, setup, model, folder, ask_helpers=ask_helpers)
+                    )
                 else:
                     outcomes.append(await run_scripted(case, setup, folder))
     finally:
@@ -1198,6 +1237,11 @@ def main(argv: Sequence[str] | None = None, out: Callable[[str], None] = print) 
     parser.add_argument("--out", type=Path, help="a folder for usecases.json and usecases.md")
     parser.add_argument("--local-model", help="live local-only: an Ollama model, e.g. qwen3.5:9b")
     parser.add_argument("--cloud-model", help="live cloud-only: provider/model (default: yours)")
+    parser.add_argument(
+        "--ask-helpers",
+        action="store_true",
+        help="live: the request names the helpers, so the run tests them, not the model's choice",
+    )
     args = parser.parse_args(argv)
     setups = SETUPS if args.setup == "both" else (cast(SetupName, args.setup),)
     cases = CASES if args.case == "all" else (cast(CaseName, args.case),)
@@ -1210,6 +1254,7 @@ def main(argv: Sequence[str] | None = None, out: Callable[[str], None] = print) 
             live=args.live,
             local_model=args.local_model,
             cloud_model=args.cloud_model,
+            ask_helpers=args.ask_helpers,
         )
     )
     out(summary(outcomes))
