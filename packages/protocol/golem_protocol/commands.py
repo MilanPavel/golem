@@ -6453,6 +6453,7 @@ DataPrivacy = Literal["open", "local", "schema"]
 
 DataSourceKind = Literal["builtin", "files", "sqlite", "duckdb", "postgres", "mysql", "url"]
 DataScope = Literal["builtin", "user", "project"]
+DataExtension = Literal["excel", "sqlite"]
 DataSourceStatus = Literal["ready", "reading", "untrusted", "error"]
 DataValue = str | int | float | bool | None
 """One cell on the wire. Dates and times are ISO strings, decimals are numbers."""
@@ -6499,6 +6500,8 @@ class DataSource(BaseModel):
     rows: int | None = Field(default=None, ge=0)
     watch: bool = False
     notes_path: str | None = None
+    needs_extension: DataExtension | None = None
+    """The extension to download once before this source can be read."""
 
 
 class DataSavedQuery(BaseModel):
@@ -6564,6 +6567,9 @@ class DataInspectResult(BaseModel):
     suggested_privacy: DataPrivacy
     privacy_reason: str | None = None
     notes: list[str] = Field(default_factory=list[str])
+    needs_extension: DataExtension | None = None
+    """Set when the location cannot be read until that extension is downloaded. ``notes`` then
+    holds the sentence that asks, and ``tables`` is empty."""
 
 
 class DataAddParams(BaseModel):
@@ -6608,6 +6614,20 @@ class DataUpdateResult(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     source: DataSource
+
+
+class DataExtensionInstallParams(BaseModel):
+    """``data.extension.install``. Download a DuckDB extension once, into golem's folder."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    name: DataExtension
+
+
+class DataExtensionInstallResult(BaseModel):
+    """Empty."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
 
 
 class DataRemoveParams(BaseModel):
@@ -6893,6 +6913,9 @@ __all__ = [
     "DataDescribeResult",
     "DataExportParams",
     "DataExportResult",
+    "DataExtension",
+    "DataExtensionInstallParams",
+    "DataExtensionInstallResult",
     "DataInspectParams",
     "DataInspectResult",
     "DataListParams",

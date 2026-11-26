@@ -27,7 +27,7 @@ from typing import Any, cast
 import duckdb
 
 from golem.data import guard
-from golem.data.types import EXTENSION_FILES, DataError, SourceSpec
+from golem.data.types import EXTENSION_FILES, DataError, NeedsExtension, SourceSpec
 
 _FILE_KINDS = {
     ".csv": "csv",
@@ -36,6 +36,14 @@ _FILE_KINDS = {
     ".json": "json",
     ".jsonl": "json",
     ".ndjson": "json",
+    ".xlsx": "excel",
+}
+_DATABASE_SUFFIXES = {
+    ".sqlite": "sqlite",
+    ".sqlite3": "sqlite",
+    ".db": "sqlite",
+    ".duckdb": "duckdb",
+    ".ddb": "duckdb",
 }
 _READERS = {
     "csv": "read_csv({files}, filename=true)",
@@ -45,10 +53,6 @@ _READERS = {
 _WILDCARDS = re.compile(r"[*?\[]")
 _TABLE_NAME = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
 _COLUMN_TYPES = frozenset({"VARCHAR", "BIGINT", "DOUBLE", "BOOLEAN", "DATE", "TIMESTAMP"})
-_NO_SQLITE = (
-    "SQLite files need a one-time download of DuckDB's sqlite extension. "
-    "golem could not reach extensions.duckdb.org."
-)
 _SIZE = re.compile(r"^\d+(\.\d+)?\s?(B|KB|MB|GB|TB|KiB|MiB|GiB|TiB)$", re.IGNORECASE)
 
 
@@ -222,7 +226,7 @@ class Source:
             con.execute("set temp_directory = ?", [str(limits.temp_dir)])
         spec = self.spec
         if spec.kind == "files":
-            allowed = self._files(spec)
+            allowed = self._files(spec, limits)
         elif spec.kind == "builtin":
             allowed = []
         else:
@@ -237,14 +241,7 @@ class Source:
             raise DataError(f"There is no file at {path}.")
         real = path.resolve()
         if spec.kind == "sqlite":
-            if limits.extension_dir is None or not extension_installed(
-                limits.extension_dir, "sqlite"
-            ):
-                raise DataError(_NO_SQLITE)
-            try:
-                self._connection.execute("load sqlite_scanner")
-            except duckdb.Error as exc:
-                raise DataError(f"{_NO_SQLITE} ({_message(exc)})") from exc
+            self._load("sqlite", "sqlite_scanner", limits)
             kind = "(type sqlite, read_only)"
         else:
             kind = "(read_only)"
@@ -258,48 +255,151 @@ class Source:
             ) from exc
         return [str(real)]
 
-    def _files(self, spec: SourceSpec) -> list[str]:
-        base, pattern = _split(spec.location)
-        if not base.is_dir():
-            raise DataError(f"There is no folder at {base}.")
-        real_base = base.resolve()
-        found: list[Path] = []
-        for name in sorted(globlib.glob(str(real_base / pattern), recursive=True)):
-            path = Path(name)
-            if path.suffix.lower() not in _FILE_KINDS or not path.is_file():
-                continue
-            if not _inside(path.resolve(), real_base):
-                continue  # a link that leaves the folder is not part of the source
-            found.append(path)
+    def _load(self, extension: str, file: str, limits: Limits) -> None:
+        """Load an extension from golem's folder. It is never downloaded here."""
+        if limits.extension_dir is None or not extension_installed(limits.extension_dir, extension):
+            raise NeedsExtension(extension)
+        try:
+            self._connection.execute(f"load {file}")
+        except duckdb.Error as exc:
+            raise NeedsExtension(extension) from exc
+
+    def _files(self, spec: SourceSpec, limits: Limits) -> list[str]:
+        found = matched_files(spec.location)
         if not found:
             raise DataError(
-                f"No CSV, Parquet or JSON files match {spec.location}. "
-                "A source reads .csv, .tsv, .parquet, .json, .jsonl and .ndjson."
+                f"No CSV, TSV, Parquet, JSON or Excel files match {spec.location}. "
+                "A source reads .csv, .tsv, .parquet, .json, .jsonl, .ndjson and .xlsx."
             )
+        if any(kind == "excel" for _, kind in found):
+            self._load("excel", "excel", limits)
         groups: dict[tuple[str, tuple[str, ...]], list[Path]] = defaultdict(list)
-        for path in found:
-            kind = _FILE_KINDS[path.suffix.lower()]
+        for path, kind in found:
             groups[(kind, self._columns(kind, path))].append(path)
-        glob_name = _glob_name(pattern, real_base)
+        base, pattern = _split(spec.location)
+        glob_name = _glob_name(pattern, base.resolve())
         taken: set[str] = set()
         for (kind, _), paths in groups.items():
             stem = glob_name if len(paths) > 1 else paths[0].stem
             name = _unique(_table_name(stem), taken)
-            files = "[" + ", ".join(_literal(str(p)) for p in paths) + "]"
-            reader = _READERS[kind].format(files=files)
-            self._connection.execute(
-                f"create view {_ident(name)} as "
-                f"select filename as file, * exclude (filename) from {reader}"
-            )
-        return [str(path.resolve()) for path in found]
+            if kind == "excel":
+                body = " union all by name ".join(
+                    f"select {_literal(str(p))} as file, * from read_xlsx({_literal(str(p))})"
+                    for p in paths
+                )
+            else:
+                files = "[" + ", ".join(_literal(str(p)) for p in paths) + "]"
+                reader = _READERS[kind].format(files=files)
+                body = f"select filename as file, * exclude (filename) from {reader}"
+            self._connection.execute(f"create view {_ident(name)} as {body}")
+        return [str(path.resolve()) for path, _ in found]
 
     def _columns(self, kind: str, path: Path) -> tuple[str, ...]:
-        reader = _READERS[kind].format(files=_literal(str(path)))
+        if kind == "excel":
+            reader = f"read_xlsx({_literal(str(path))})"
+        else:
+            reader = _READERS[kind].format(files=_literal(str(path)))
         try:
             cursor = self._connection.execute(f"select * from {reader} limit 0")
         except duckdb.Error as exc:
             raise DataError(f"Cannot read {path.name}: {_message(exc)}") from exc
         return tuple(str(d[0]) for d in cursor.description)
+
+
+# -- what a location holds ---------------------------------------------------------------
+
+
+def sniff_kind(path: Path) -> str | None:
+    """What a file with no known suffix is, from its first bytes: a file kind or a database."""
+    try:
+        with path.open("rb") as handle:
+            head = handle.read(4096)
+    except OSError:
+        return None
+    if head.startswith(b"SQLite format 3\x00"):
+        return "sqlite"
+    if head[8:12] == b"DUCK":
+        return "duckdb"
+    if head.startswith(b"PAR1"):
+        return "parquet"
+    if head.startswith(b"PK\x03\x04"):
+        return "excel"
+    if not head:
+        return None
+    try:
+        text = head.decode("utf-8").lstrip()
+    except UnicodeDecodeError:
+        return None
+    if text[:1] in ("{", "["):
+        return "json"
+    first = text.splitlines()[0] if text else ""
+    return "csv" if "," in first or "\t" in first else None
+
+
+def location_kind(location: str) -> str:
+    """The source kind of ``location``: a database file by its suffix or first bytes, else files."""
+    path = Path(location).expanduser()
+    suffix = path.suffix.lower()
+    if suffix in _DATABASE_SUFFIXES:
+        return _DATABASE_SUFFIXES[suffix]
+    if suffix in _FILE_KINDS or _WILDCARDS.search(location) or not path.is_file():
+        return "files"
+    sniffed = sniff_kind(path)
+    return sniffed if sniffed in ("sqlite", "duckdb") else "files"
+
+
+def matched_files(location: str) -> list[tuple[Path, str]]:
+    """The files a ``files`` source reads, with the reader of each, sorted by path.
+
+    A link that leaves the folder is left out. A single file with no known suffix is read as
+    what its first bytes say it is.
+    """
+    base, pattern = _split(location)
+    if not base.is_dir():
+        raise DataError(f"There is no folder at {base}.")
+    real_base = base.resolve()
+    found: list[tuple[Path, str]] = []
+    for name in sorted(globlib.glob(str(real_base / pattern), recursive=True)):
+        path = Path(name)
+        if not path.is_file() or not _inside(path.resolve(), real_base):
+            continue  # a link that leaves the folder is not part of the source
+        kind = _FILE_KINDS.get(path.suffix.lower())
+        if kind is None and not _WILDCARDS.search(location) and not path.suffix:
+            sniffed = sniff_kind(path)
+            kind = sniffed if sniffed in _READERS or sniffed == "excel" else None
+        if kind is not None:
+            found.append((path, kind))
+    return found
+
+
+def stamp(spec: SourceSpec) -> tuple[tuple[str, int, int], ...]:
+    """The path, modified time and size of each file a source reads. Empty when it has none."""
+    try:
+        if spec.kind == "files":
+            paths = [path for path, _ in matched_files(spec.location)]
+        else:
+            paths = [Path(spec.location).expanduser()]
+        out: list[tuple[str, int, int]] = []
+        for path in paths:
+            info = path.stat()
+            out.append((str(path), info.st_mtime_ns, info.st_size))
+        return tuple(out)
+    except (OSError, DataError):
+        return ()
+
+
+def needed_extension(spec: SourceSpec) -> str | None:
+    """The extension a source needs, from its files alone. It does not open the source."""
+    try:
+        if spec.kind == "sqlite":
+            return "sqlite"
+        if spec.kind == "files" and any(
+            kind == "excel" for _, kind in matched_files(spec.location)
+        ):
+            return "excel"
+    except DataError:
+        return None
+    return None
 
 
 # -- names and values --------------------------------------------------------------------

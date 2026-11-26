@@ -88,11 +88,22 @@ def count(number: int | None, word: str) -> str:
     return f"{shown} {word}" if number == 1 else f"{shown} {word}s"
 
 
+def size_parts(info: SourceInfo) -> list[str]:
+    """``3 tables``, ``36 files``, ``18 302 rows`` and the months a date column spans."""
+    parts = [count(len(info.tables or ()), "table")]
+    if info.files is not None:
+        parts.append(count(info.files, "file"))
+    parts.append(count(info.rows, "row"))
+    if info.dates is not None:
+        parts.append(f"{info.dates[0]} … {info.dates[1]}")
+    return parts
+
+
 def source_line(info: SourceInfo) -> str:
     """One source on one line: name, kind, size, what a model may read, and a problem if any."""
     parts = [info.kind]
     if info.tables is not None:
-        parts += [count(len(info.tables), "table"), count(info.rows, "row")]
+        parts += size_parts(info)
     elif info.description:
         parts.append(info.description)
     parts.append(privacy_text(info.privacy))
@@ -336,5 +347,6 @@ __all__ = [
     "count",
     "privacy_text",
     "render_table",
+    "size_parts",
     "source_line",
 ]

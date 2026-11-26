@@ -1,0 +1,19 @@
+{
+  "additionalProperties": false,
+  "description": "``data.extension.install``. Download a DuckDB extension once, into golem's folder.",
+  "properties": {
+    "name": {
+      "enum": [
+        "excel",
+        "sqlite"
+      ],
+      "title": "Name",
+      "type": "string"
+    }
+  },
+  "required": [
+    "name"
+  ],
+  "title": "DataExtensionInstallParams",
+  "type": "object"
+}

@@ -18,8 +18,27 @@ EXTENSION_FILES = {
 """The extensions golem installs once, by the name it uses and the file DuckDB writes."""
 
 
+EXTENSION_NEEDS = {
+    "excel": ("Excel", "2 MB"),
+    "sqlite": ("SQLite files", "3 MB"),
+}
+"""What a person is told about an extension a source needs: what it reads, and how big it is."""
+
+
 class DataError(Exception):
     """A plain sentence the model or the user can act on."""
+
+
+class NeedsExtension(DataError):
+    """A source cannot be read until a DuckDB extension is downloaded once."""
+
+    def __init__(self, extension: str) -> None:
+        reading, size = EXTENSION_NEEDS.get(extension, (extension, "a few MB"))
+        super().__init__(
+            f"Reading {reading} needs a one-time download ({size}) from extensions.duckdb.org. "
+            "Get it?"
+        )
+        self.extension = extension
 
 
 @dataclass(frozen=True, slots=True)

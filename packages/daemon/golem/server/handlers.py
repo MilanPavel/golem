@@ -82,7 +82,17 @@ from golem.server.chat_edit import (
     chat_suggestion_dismiss,
     chat_suggestions,
 )
-from golem.server.data_rpc import data_cancel, data_describe, data_list, data_query
+from golem.server.data_rpc import (
+    data_add,
+    data_cancel,
+    data_describe,
+    data_extension_install,
+    data_inspect,
+    data_list,
+    data_query,
+    data_remove,
+    data_update,
+)
 from golem.server.device_rpc import (
     connection_identify,
     device_list,
@@ -279,10 +289,15 @@ from golem_protocol.commands import (
     CostRoleRow,
     CostTotals,
     DaemonStatus,
+    DataAddParams,
     DataCancelParams,
     DataDescribeParams,
+    DataExtensionInstallParams,
+    DataInspectParams,
     DataListParams,
     DataQueryParams,
+    DataRemoveParams,
+    DataUpdateParams,
     DeviceListParams,
     DevicePairBeginParams,
     DevicePairConfirmParams,
@@ -2549,6 +2564,13 @@ def standard_methods() -> dict[str, Method]:
         "data.describe": Method("data.describe", DataDescribeParams, True, data_describe),
         "data.query": Method("data.query", DataQueryParams, True, data_query),
         "data.cancel": Method("data.cancel", DataCancelParams, True, data_cancel),
+        "data.inspect": Method("data.inspect", DataInspectParams, True, data_inspect),
+        "data.add": Method("data.add", DataAddParams, True, data_add),
+        "data.update": Method("data.update", DataUpdateParams, True, data_update),
+        "data.remove": Method("data.remove", DataRemoveParams, True, data_remove),
+        "data.extension.install": Method(
+            "data.extension.install", DataExtensionInstallParams, True, data_extension_install
+        ),
         "relay.sign": Method("relay.sign", RelaySignParams, True, relay_sign),
         "relay.dh": Method("relay.dh", RelayDhParams, True, relay_dh),
         "device.sync": Method("device.sync", DeviceSyncParams, True, device_sync),

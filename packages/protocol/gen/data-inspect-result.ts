@@ -2,6 +2,7 @@
 
 export type Files = number | null;
 export type Kind = 'builtin' | 'files' | 'sqlite' | 'duckdb' | 'postgres' | 'mysql' | 'url';
+export type NeedsExtension = ('excel' | 'sqlite') | null;
 export type Notes = string[];
 export type PrivacyReason = string | null;
 export type SuggestedName = string;
@@ -23,6 +24,7 @@ export type Tables = DataTable[];
 export interface DataInspectResult {
   files?: Files;
   kind: Kind;
+  needs_extension?: NeedsExtension;
   notes?: Notes;
   privacy_reason?: PrivacyReason;
   sample: Sample;

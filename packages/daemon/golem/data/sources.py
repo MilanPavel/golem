@@ -12,6 +12,8 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
+import re
+import tempfile
 import time
 import uuid
 from collections.abc import Callable
@@ -20,10 +22,11 @@ from fnmatch import fnmatchcase
 from pathlib import Path
 from typing import Any, Literal
 
-from golem.config import DataSourceSettings, load_data_sources
+from golem.config import DATA_RESERVED, DataSourceSettings, load_data_sources
 from golem.data import builtin
 from golem.data.client import DataWorker
-from golem.data.types import DataError, SourceSpec
+from golem.data.privacy import guess_privacy
+from golem.data.types import DataError, NeedsExtension, SourceSpec
 from golem.paths import GolemPaths
 
 log = logging.getLogger(__name__)
@@ -33,6 +36,17 @@ CACHE_SECONDS = 60.0
 MAX_DESCRIBED = 30
 """The most tables one ``describe`` of a whole source reads the columns of."""
 SAMPLE_ROWS = 5
+INSPECT_ROWS = 20
+"""Sample rows of each table ``inspect`` returns."""
+WATCH_SECONDS = 5.0
+"""How often a watched source's files are looked at."""
+_SYSTEM_FOLDERS = (
+    "/etc", "/System", "/private", "/var", "/usr", "/bin", "/sbin", "/dev", "/proc", "/sys",
+    "/boot", "/Library", "/Applications",
+)  # fmt: skip
+_NAME_CHARS = re.compile(r"[^A-Za-z0-9_]+")
+_WILDCARD = re.compile(r"[*?\[]")
+_NO_HEADER = re.compile(r"^column\d+$")
 
 Kind = Literal["builtin", "files", "sqlite", "duckdb", "postgres", "mysql", "url"]
 Scope = Literal["builtin", "user", "project"]
@@ -73,6 +87,10 @@ class SourceInfo:
     watch: bool = False
     tables: tuple[TableInfo, ...] | None = None
     description: str | None = None
+    files: int | None = None
+    dates: tuple[str, str] | None = None
+    """The first and last month of a date column, such as ``2024-01``, for a ``files`` source."""
+    needs_extension: str | None = None
 
     @property
     def rows(self) -> int | None:
@@ -89,6 +107,21 @@ class Description:
     tables: tuple[TableInfo, ...]
     notes: str | None = None
     sample: dict[str, list[list[Any]]] = field(default_factory=dict[str, list[list[Any]]])
+
+
+@dataclass(frozen=True, slots=True)
+class Inspection:
+    """What a location holds, before it is a source."""
+
+    kind: Kind
+    tables: tuple[TableInfo, ...]
+    sample: dict[str, list[list[Any]]]
+    suggested_name: str
+    suggested_privacy: Privacy
+    privacy_reason: str | None
+    files: int | None = None
+    notes: tuple[str, ...] = ()
+    needs_extension: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -135,8 +168,13 @@ class _Entry:
 class _Open:
     signature: tuple[str, str]
     at: float
+    entry: _Entry
     tables: tuple[TableInfo, ...] = ()
     error: str | None = None
+    needs: str | None = None
+    files: int | None = None
+    dates: tuple[str, str] | None = None
+    stamp: tuple[tuple[str, int, int], ...] = ()
     described: dict[str, tuple[float, TableInfo]] = field(
         default_factory=dict[str, tuple[float, TableInfo]]
     )
@@ -152,6 +190,7 @@ class DataSources:
         *,
         trusted: Callable[[Path], bool] = lambda _root: False,
         clock: Callable[[], float] = time.monotonic,
+        watch_seconds: float = WATCH_SECONDS,
     ) -> None:
         self._worker = worker
         self._paths = paths
@@ -161,6 +200,15 @@ class DataSources:
         self._locks: dict[str, asyncio.Lock] = {}
         self._loaded_at = 0.0
         self._warming: set[asyncio.Task[None]] = set()
+        self._watch_seconds = watch_seconds
+        self._watcher: asyncio.Task[None] | None = None
+        self.changed: Callable[[str, str], None] = lambda _name, _reason: None
+        """Called with a source's name and a reason (``files``) when its files changed."""
+
+    @property
+    def config_file(self) -> Path:
+        """The user's ``config.toml``, where a user's source is written."""
+        return self._paths.config_file
 
     @property
     def worker(self) -> DataWorker:
@@ -171,7 +219,7 @@ class DataSources:
         return DataAccess(self, root)
 
     async def close(self) -> None:
-        for task in list(self._warming):
+        for task in [*self._warming, *([self._watcher] if self._watcher else [])]:
             task.cancel()
         await self._worker.close()
 
@@ -213,6 +261,8 @@ class DataSources:
             watch=False if settings is None else settings.watch,
             description=builtin.DESCRIPTION if settings is None else None,
         )
+        if opened is not None and opened.needs is not None:
+            base = replace(base, needs_extension=opened.needs)
         if self._untrusted(entry):
             return replace(
                 base,
@@ -223,7 +273,12 @@ class DataSources:
             return base
         if opened.error is not None:
             return replace(base, status="error", error=opened.error)
-        return replace(base, tables=self._visible(entry, opened.tables))
+        return replace(
+            base,
+            tables=self._visible(entry, opened.tables),
+            files=opened.files,
+            dates=None if base.privacy == "schema" else opened.dates,
+        )
 
     def _visible(self, entry: _Entry, tables: tuple[TableInfo, ...]) -> tuple[TableInfo, ...]:
         if entry.settings is None:
@@ -286,22 +341,28 @@ class DataSources:
             now = self._clock()
             fresh = opened is not None and now - opened.at < CACHE_SECONDS
             if opened is not None and opened.signature == signature and fresh:
+                if opened.needs is not None:
+                    raise NeedsExtension(opened.needs)
                 if opened.error is not None:
                     raise DataError(opened.error)
                 if entry.settings is None:
                     await self._load_builtin(entry, opened)
                 return opened
-            opened = _Open(signature, now)
+            opened = _Open(signature, now, entry)
             try:
-                opened.tables = await self._attach(entry)
+                opened.tables = await self._attach(entry, opened)
             except DataError as exc:
                 opened.error = str(exc)
+                if isinstance(exc, NeedsExtension):
+                    opened.needs = exc.extension
                 self._open[entry.key] = opened
                 raise
             self._open[entry.key] = opened
+            if entry.settings is not None and entry.settings.watch:
+                self._start_watching()
             return opened
 
-    async def _attach(self, entry: _Entry) -> tuple[TableInfo, ...]:
+    async def _attach(self, entry: _Entry, opened: _Open) -> tuple[TableInfo, ...]:
         if entry.kind == "builtin":
             spec = SourceSpec(entry.key, "builtin", str(self._paths.database_file))
             await self._worker.attach(spec)
@@ -311,8 +372,37 @@ class DataSources:
         if entry.kind not in _ENGINE_KINDS:
             raise DataError(f"golem cannot open {entry.kind} sources yet.")
         spec = SourceSpec(entry.key, entry.kind, entry.location)  # type: ignore[arg-type]
+        await self._need_extension(spec)
         listed = await self._worker.attach(spec)
-        return await self._count(entry.key, [item["name"] for item in listed])
+        tables = await self._count(entry.key, [item["name"] for item in listed])
+        opened.stamp = await asyncio.to_thread(_stamp, spec)
+        if entry.kind == "files":
+            opened.files = len(opened.stamp)
+            opened.dates = await self._dates(entry, opened, tables)
+        return tables
+
+    async def _need_extension(self, spec: SourceSpec) -> None:
+        """Raise :class:`NeedsExtension` when ``spec`` needs one that is not installed yet."""
+        from golem.data.engine import extension_installed, needed_extension
+
+        need = await asyncio.to_thread(needed_extension, spec)
+        if need is not None and not extension_installed(self._paths.data_extensions_dir, need):
+            raise NeedsExtension(need)
+
+    async def _dates(
+        self, entry: _Entry, opened: _Open, tables: tuple[TableInfo, ...]
+    ) -> tuple[str, str] | None:
+        """The first and last month of the first date column of the first few tables."""
+        for table in tables[:3]:
+            try:
+                described = await self._table(entry, opened, table)
+            except DataError:
+                continue
+            for column in described.columns:
+                kind = column.type.upper()
+                if (kind == "DATE" or kind.startswith("TIMESTAMP")) and column.min and column.max:
+                    return column.min[:7], column.max[:7]
+        return None
 
     async def _count(self, key: str, names: list[str]) -> tuple[TableInfo, ...]:
         found: list[TableInfo] = []
@@ -344,7 +434,164 @@ class DataSources:
             await self._worker.load_table(builtin.NAME, table.name, columns, rows)
         self._loaded_at = self._clock()
 
+    # -- watching -----------------------------------------------------------------------------
+
+    def _start_watching(self) -> None:
+        if self._watcher is not None and not self._watcher.done():
+            return
+        try:
+            self._watcher = asyncio.get_running_loop().create_task(self._watch())
+        except RuntimeError:
+            return
+
+    async def _watch(self) -> None:
+        """Look at the files of every open source that is watched, and reopen it on a change."""
+        while True:
+            await asyncio.sleep(self._watch_seconds)
+            for key, opened in list(self._open.items()):
+                try:
+                    await self._check(key, opened)
+                except Exception:
+                    log.exception("could not look at the files of %s", opened.entry.name)
+
+    async def _check(self, key: str, opened: _Open) -> None:
+        entry = opened.entry
+        current = next((e for e in self._entries(entry.project) if e.name == entry.name), None)
+        if current is None or current.settings is None or not current.settings.watch:
+            return
+        if (
+            opened.error is not None
+            or self._untrusted(current)
+            or self._open.get(key) is not opened
+        ):
+            return
+        spec = SourceSpec(current.key, current.kind, current.location)  # type: ignore[arg-type]
+        if await asyncio.to_thread(_stamp, spec) == opened.stamp:
+            return
+        self._open.pop(key, None)
+        with contextlib.suppress(DataError):
+            await self._ensure(current)
+        self.changed(current.name, "files")
+
+    async def forget(self, name: str) -> None:
+        """Close the source called ``name`` everywhere, so the next use opens it again."""
+        for key in [k for k in self._open if k == name or k.startswith(f"{name}@")]:
+            self._open.pop(key, None)
+            with contextlib.suppress(DataError):
+                await self._worker.detach(key)
+
+    async def install_extension(self, name: str) -> None:
+        """Download extension ``name`` once. Only a person's request calls this, never a model."""
+        await self._worker.ensure_extension(name)
+        for key, opened in list(self._open.items()):
+            if opened.needs == name:
+                del self._open[key]
+
     # -- what a caller asks for ---------------------------------------------------------------
+
+    def taken_names(self, root: Path | None) -> set[str]:
+        """The names of the sources ``root`` sees."""
+        return {entry.name for entry in self._entries(root)}
+
+    async def inspect(self, location: str, root: Path | None = None) -> Inspection:
+        """Open ``location`` read-only in a source of its own, look at it, and close it.
+
+        Raises :class:`DataError` with a sentence for a path that is missing, empty or a system
+        folder.
+        """
+        from golem.data.engine import (
+            extension_installed,
+            location_kind,
+            matched_files,
+            needed_extension,
+        )
+
+        place = Path(location).expanduser()
+        _check_place(place, location)
+        kind = await asyncio.to_thread(location_kind, str(place))
+        name = self.suggest_name(place, root)
+        spec = SourceSpec(f"inspect_{uuid.uuid4().hex[:8]}", kind, str(place))  # type: ignore[arg-type]
+        files: int | None = None
+        notes: list[str] = []
+        if kind == "files":
+            found = await asyncio.to_thread(matched_files, str(place))
+            if not found:
+                raise DataError(
+                    f"No CSV, TSV, Parquet, JSON or Excel files in {location}. "
+                    "golem reads .csv, .tsv, .parquet, .json, .jsonl, .ndjson and .xlsx."
+                )
+            files = len(found)
+            if place.is_dir() or _WILDCARD.search(location):
+                notes += await asyncio.to_thread(_skipped, place, {p for p, _ in found})
+        need = await asyncio.to_thread(needed_extension, spec)
+        if need is not None and not extension_installed(self._paths.data_extensions_dir, need):
+            privacy, reason = guess_privacy(location, [])
+            return Inspection(
+                kind,  # type: ignore[arg-type]
+                (),
+                {},
+                name,
+                privacy,
+                reason,
+                files,
+                (str(NeedsExtension(need)),),
+                need,
+            )
+        described: list[TableInfo] = []
+        sample: dict[str, list[list[Any]]] = {}
+        try:
+            listed = await self._worker.attach(spec)
+            for item in listed[:MAX_DESCRIBED]:
+                answer = await self._worker.describe(spec.name, item["name"])
+                described.append(_table_info(item["name"], answer))
+                shown = await self._worker.query(
+                    spec.name, f"select * from {_quote(item['name'])}", INSPECT_ROWS
+                )
+                sample[item["name"]] = shown["rows"]
+        finally:
+            with contextlib.suppress(DataError):
+                await self._worker.detach(spec.name)
+        if kind == "files" and len(described) > 1:
+            names = ", ".join(t.name for t in described)
+            notes.append(
+                f"The files have {len(described)} different sets of columns, so they are "
+                f"{len(described)} tables: {names}."
+            )
+        for table in described:
+            own = [c.name for c in table.columns if c.name != "file"]
+            if own and all(_NO_HEADER.match(name) for name in own):
+                notes.append(
+                    f"{table.name} has no header row, so its columns are named "
+                    f"{', '.join(own[:3])}, and so on."
+                )
+        columns = [c.name for table in described for c in table.columns]
+        privacy, reason = guess_privacy(location, columns)
+        return Inspection(
+            kind,  # type: ignore[arg-type]
+            tuple(described),
+            sample,
+            name,
+            privacy,
+            reason,
+            files,
+            tuple(notes),
+        )
+
+    def suggest_name(self, place: Path, root: Path | None) -> str:
+        """A source name from a file or folder name: valid, not ``golem``, not taken."""
+        stem = place.name if place.is_dir() else place.stem
+        match = _WILDCARD.search(stem)
+        fixed = stem[: match.start()] if match else stem
+        base = _NAME_CHARS.sub("_", fixed).strip("_")
+        if not base or not base[0].isalpha():
+            base = f"data_{base}".strip("_")
+        base = base[:28]
+        taken = self.taken_names(root) | DATA_RESERVED
+        candidate, number = base, 1
+        while candidate in taken:
+            number += 1
+            candidate = f"{base}_{number}"
+        return candidate
 
     async def list(self, root: Path | None) -> list[SourceInfo]:
         """Every source of ``root``, each opened once. A source that cannot open has an error."""
@@ -386,21 +633,7 @@ class DataSources:
         if cached is not None and self._clock() - cached[0] < CACHE_SECONDS:
             return cached[1]
         answer = await self._worker.describe(entry.key, table.name)
-        info = TableInfo(
-            table.name,
-            int(answer["rows"]),
-            tuple(
-                ColumnInfo(
-                    name=str(column["name"]),
-                    type=str(column["type"]),
-                    min=_text(column.get("min")),
-                    max=_text(column.get("max")),
-                    distinct=_whole(column.get("distinct")),
-                    null_fraction=_fraction(column.get("null_percent")),
-                )
-                for column in answer["columns"]
-            ),
-        )
+        info = _table_info(table.name, answer)
         opened.described[table.name] = (self._clock(), info)
         return info
 
@@ -467,6 +700,75 @@ class DataAccess:
         return {t.name: [c.name for c in t.columns] for t in description.tables if t.columns}
 
 
+def _stamp(spec: SourceSpec) -> tuple[tuple[str, int, int], ...]:
+    from golem.data.engine import stamp
+
+    return stamp(spec)
+
+
+def _check_place(place: Path, shown: str) -> None:
+    """Refuse a location that is missing, or a system folder outside the home folder."""
+    base = place
+    while _WILDCARD.search(str(base)) and base != base.parent:
+        base = base.parent
+    if not base.exists():
+        raise DataError(f"There is nothing at {shown}.")
+    real = base.resolve()
+    allowed = [
+        Path.home().resolve(),
+        Path(tempfile.gettempdir()).resolve(),
+        Path("/tmp").resolve(),
+        Path("/var/tmp").resolve(),
+    ]
+    if any(real == p or p in real.parents for p in allowed):
+        return
+    for folder in _SYSTEM_FOLDERS:
+        if real == Path(folder) or Path(folder) in real.parents:
+            raise DataError(
+                f"{shown} is a system folder. Pick a file or folder of your own, "
+                "such as one in your home folder."
+            )
+
+
+def _skipped(place: Path, used: set[Path]) -> list[str]:
+    """A note about files next to the matched ones that golem does not read."""
+    folder = place if place.is_dir() else place.parent
+    while _WILDCARD.search(str(folder)) and folder != folder.parent:
+        folder = folder.parent
+    resolved = {p.resolve() for p in used}
+    try:
+        names = [
+            p
+            for p in folder.iterdir()
+            if p.is_file() and not p.name.startswith(".") and p.resolve() not in resolved
+        ]
+    except OSError:
+        return []
+    if not names or (not place.is_dir() and not _WILDCARD.search(str(place))):
+        return []
+    kinds = sorted({p.suffix.lower() or "no suffix" for p in names})
+    many = "files were" if len(names) > 1 else "file was"
+    return [f"{len(names)} {many} skipped ({', '.join(kinds)}): golem does not read them."]
+
+
+def _table_info(name: str, answer: dict[str, Any]) -> TableInfo:
+    return TableInfo(
+        name,
+        int(answer["rows"]),
+        tuple(
+            ColumnInfo(
+                name=str(column["name"]),
+                type=str(column["type"]),
+                min=_text(column.get("min")),
+                max=_text(column.get("max")),
+                distinct=_whole(column.get("distinct")),
+                null_fraction=_fraction(column.get("null_percent")),
+            )
+            for column in answer["columns"]
+        ),
+    )
+
+
 def _quote(name: str) -> str:
     return '"' + name.replace('"', '""') + '"'
 
@@ -491,6 +793,7 @@ __all__ = [
     "DataAccess",
     "DataSources",
     "Description",
+    "Inspection",
     "QueryResult",
     "SourceInfo",
     "TableInfo",
