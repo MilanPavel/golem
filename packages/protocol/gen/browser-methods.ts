@@ -38,6 +38,7 @@ export const BROWSER_METHODS: ReadonlySet<string> = new Set([
   "data.list",
   "data.query",
   "data.remove",
+  "data.result.page",
   "data.update",
   "device.list",
   "device.pair.begin",

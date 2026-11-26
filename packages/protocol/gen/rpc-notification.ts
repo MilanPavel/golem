@@ -372,12 +372,20 @@ export type Snippet = string;
 export type Title1 = string;
 export type Url = string;
 export type Summary1 = string;
+export type Name5 = string;
+export type Type26 = string;
+export type Columns = ToolTableColumn[];
+export type ResultId = string;
+export type Rows = (string | number | boolean | null)[][];
+export type Source1 = string;
+export type TotalRows = number;
 export type Truncated = boolean;
+export type Truncated1 = boolean;
 export type RunId27 = string;
 export type Seq26 = number;
 export type SessionId28 = string;
 export type Ts26 = string;
-export type Type26 = 'tool.completed';
+export type Type27 = 'tool.completed';
 export type CallId5 = string;
 export type DurationMs1 = number | null;
 export type Message1 = string;
@@ -386,7 +394,7 @@ export type RunId28 = string;
 export type Seq27 = number;
 export type SessionId29 = string;
 export type Ts27 = string;
-export type Type27 = 'tool.failed';
+export type Type28 = 'tool.failed';
 export type AllowedUsd = number | null;
 export type AskOverUsd = number | null;
 export type CallId6 = string;
@@ -395,28 +403,28 @@ export type Diff1 = string | null;
 export type EstimateUsd = number | null;
 export type MessageId10 = string | null;
 export type Model3 = string | null;
-export type Name5 = string;
-export type Source1 = string;
+export type Name6 = string;
+export type Source2 = string;
 export type Subject1 = string | null;
 export type RunId29 = string;
 export type Seq28 = number;
 export type SessionId30 = string;
 export type Ts28 = string;
-export type Type28 = 'approval.needed';
+export type Type29 = 'approval.needed';
 export type Args3 = {
   [k: string]: unknown;
 } | null;
 export type CallId7 = string;
 export type Decision = 'allow' | 'allow_session' | 'allow_always' | 'deny';
 export type Device = string | null;
-export type Name6 = string;
+export type Name7 = string;
 export type Rule = string | null;
 export type Subject2 = string | null;
 export type RunId30 = string;
 export type Seq29 = number;
 export type SessionId31 = string;
 export type Ts29 = string;
-export type Type29 = 'approval.resolved';
+export type Type30 = 'approval.resolved';
 export type Agent = string | null;
 export type Alternatives = ('session' | 'once' | 'local')[];
 export type Brief = string | null;
@@ -465,13 +473,13 @@ export type RunId31 = string;
 export type Seq30 = number;
 export type SessionId32 = string;
 export type Ts30 = string;
-export type Type30 = 'route.consent.needed';
+export type Type31 = 'route.consent.needed';
 export type Answer = 'session' | 'once' | 'local';
 export type RunId32 = string;
 export type Seq31 = number;
 export type SessionId33 = string;
 export type Ts31 = string;
-export type Type31 = 'route.consent.answered';
+export type Type32 = 'route.consent.answered';
 export type CallId8 = string | null;
 export type Id = string;
 export type Status1 = 'pending' | 'in_progress' | 'done';
@@ -481,7 +489,7 @@ export type RunId33 = string | null;
 export type Seq32 = number;
 export type SessionId34 = string;
 export type Ts32 = string;
-export type Type32 = 'todos.updated';
+export type Type33 = 'todos.updated';
 export type CallId9 = string;
 export type PlanId = string;
 /**
@@ -804,67 +812,67 @@ export type RunId34 = string;
 export type Seq33 = number;
 export type SessionId35 = string;
 export type Ts33 = string;
-export type Type33 = 'plan.proposed';
+export type Type34 = 'plan.proposed';
 export type Added = number;
 export type CallId10 = string | null;
 export type ChangeId = string;
 export type Path1 = string;
 export type Removed = number;
 export type Reverts = string | null;
-export type Source2 = 'tool' | 'shell' | 'revert' | 'helper';
+export type Source3 = 'tool' | 'shell' | 'revert' | 'helper';
 export type Status2 = 'created' | 'modified' | 'deleted';
 export type RunId35 = string | null;
 export type Seq34 = number;
 export type SessionId36 = string;
 export type Ts34 = string;
-export type Type34 = 'file.changed';
+export type Type35 = 'file.changed';
 export type Hash = string;
 export type How = 'invoked' | 'pinned' | 'model';
-export type Name7 = string;
+export type Name8 = string;
 export type Path2 = string;
-export type Source3 = 'project' | 'user' | 'bundled';
+export type Source4 = 'project' | 'user' | 'bundled';
 export type RunId36 = string | null;
 export type Seq35 = number;
 export type SessionId37 = string;
 export type Ts35 = string;
-export type Type35 = 'skill.activated';
-export type Name8 = string;
+export type Type36 = 'skill.activated';
+export type Name9 = string;
 export type Reason4 = 'unpinned';
 export type RunId37 = string | null;
 export type Seq36 = number;
 export type SessionId38 = string;
 export type Ts36 = string;
-export type Type36 = 'skill.deactivated';
+export type Type37 = 'skill.deactivated';
 export type Message2 = string;
-export type Name9 = string;
+export type Name10 = string;
 export type Reason5 = 'missing' | 'disabled' | 'broken';
 export type RunId38 = string | null;
 export type Seq37 = number;
 export type SessionId39 = string;
 export type Ts37 = string;
-export type Type37 = 'skill.skipped';
+export type Type38 = 'skill.skipped';
 export type Command = string;
-export type Name10 = string;
+export type Name11 = string;
 export type Checks = CheckInfo[];
 export type RunId39 = string;
 export type Seq38 = number;
 export type SessionId40 = string;
 export type Ts38 = string;
-export type Type38 = 'check.offered';
+export type Type39 = 'check.offered';
 export type CheckId = string;
 export type Command1 = string;
-export type Name11 = string;
+export type Name12 = string;
 export type Round = number;
 export type RunId40 = string;
 export type Seq39 = number;
 export type SessionId41 = string;
 export type Ts39 = string;
-export type Type39 = 'check.started';
+export type Type40 = 'check.started';
 export type ArtifactId1 = string | null;
 export type CheckId1 = string;
 export type DurationMs2 = number;
 export type ExitCode = number | null;
-export type Name12 = string;
+export type Name13 = string;
 export type Output2 = string;
 export type Round1 = number;
 export type Status3 = 'passed' | 'failed' | 'timed_out';
@@ -872,7 +880,7 @@ export type RunId41 = string;
 export type Seq40 = number;
 export type SessionId42 = string;
 export type Ts40 = string;
-export type Type40 = 'check.completed';
+export type Type41 = 'check.completed';
 export type Agent1 = string;
 export type CallId11 = string;
 export type HelperId1 = string;
@@ -885,7 +893,7 @@ export type RunId42 = string | null;
 export type Seq41 = number;
 export type SessionId43 = string;
 export type Ts41 = string;
-export type Type41 = 'helper.started';
+export type Type42 = 'helper.started';
 export type CallId12 = string;
 export type HelperId2 = string;
 export type Index4 = number;
@@ -895,11 +903,11 @@ export type RunId43 = string | null;
 export type Seq42 = number;
 export type SessionId44 = string;
 export type Ts42 = string;
-export type Type42 = 'helper.model';
+export type Type43 = 'helper.model';
 export type CallId13 = string;
 export type Calls = number;
 export type Index5 = number;
-export type Name13 = string;
+export type Name14 = string;
 export type Status4 = 'running' | 'done' | 'failed';
 export type StepId = string;
 export type Summary2 = string | null;
@@ -907,7 +915,7 @@ export type RunId44 = string | null;
 export type Seq43 = number;
 export type SessionId45 = string;
 export type Ts43 = string;
-export type Type43 = 'helper.step';
+export type Type44 = 'helper.step';
 export type CallId14 = string;
 export type CapUsd = number | null;
 export type Holder1 = string | null;
@@ -922,7 +930,7 @@ export type RunId45 = string | null;
 export type Seq44 = number;
 export type SessionId46 = string;
 export type Ts44 = string;
-export type Type44 = 'helper.state';
+export type Type45 = 'helper.state';
 export type CallId15 = string;
 export type HelperIds = string[];
 export type State1 = 'parked' | 'resumed';
@@ -930,7 +938,7 @@ export type RunId46 = string | null;
 export type Seq45 = number;
 export type SessionId47 = string;
 export type Ts45 = string;
-export type Type45 = 'helper.wait';
+export type Type46 = 'helper.wait';
 export type Added1 = number | null;
 export type AnswerTokens = number;
 export type CallId16 = string;
@@ -955,26 +963,26 @@ export type RunId47 = string | null;
 export type Seq46 = number;
 export type SessionId48 = string;
 export type Ts46 = string;
-export type Type46 = 'helper.ended';
+export type Type47 = 'helper.ended';
 export type ChangeIds = string[];
 export type HelperId3 = string;
 export type RunId48 = string | null;
 export type Seq47 = number;
 export type SessionId49 = string;
 export type Ts47 = string;
-export type Type47 = 'helper.applied';
+export type Type48 = 'helper.applied';
 export type HelperId4 = string;
 export type RunId49 = string | null;
 export type Seq48 = number;
 export type SessionId50 = string;
 export type Ts48 = string;
-export type Type48 = 'helper.discarded';
+export type Type49 = 'helper.discarded';
 export type Removed3 = number;
 export type RunId50 = null;
 export type Seq49 = number;
 export type SessionId51 = string;
 export type Ts49 = string;
-export type Type49 = 'session.trimmed';
+export type Type50 = 'session.trimmed';
 export type FromBranch = string;
 export type PathsCount = number | null;
 export type ToBranch = string;
@@ -982,7 +990,7 @@ export type RunId51 = string | null;
 export type Seq50 = number;
 export type SessionId52 = string;
 export type Ts50 = string;
-export type Type50 = 'branch.changed';
+export type Type51 = 'branch.changed';
 
 /**
  * Server → client event. No ``id``; this is not a response to a request.
@@ -1995,7 +2003,7 @@ export interface ToolCompletedEvent {
   seq: Seq26;
   session_id: SessionId28;
   ts: Ts26;
-  type: Type26;
+  type: Type27;
 }
 /**
  * A tool call finished.
@@ -2021,6 +2029,9 @@ export interface ToolCompletedEvent {
  * call did not get: it got a line with the row count and the columns instead. A client can
  * say so beside the rows.
  *
+ * ``table`` is the kept result of a ``data_query`` call: its columns, the first page and
+ * the row count. None for any other call.
+ *
  * ``parent_call_id`` is legacy. Old logs set it on an event of a child run: the id of
  * the ``delegate`` call that started it. The event is in the parent's run, and a client
  * that does not know child runs ignores it. None for the run's own events. A new helper
@@ -2041,7 +2052,8 @@ export interface ToolCompletedData {
   rows_withheld?: RowsWithheld;
   sources?: Sources;
   summary: Summary1;
-  truncated?: Truncated;
+  table?: ToolTable | null;
+  truncated?: Truncated1;
 }
 /**
  * A web page a tool call found or read.
@@ -2059,6 +2071,34 @@ export interface ToolSource {
   url: Url;
 }
 /**
+ * A query result a ``data_query`` call kept, so a client can show it and page it.
+ *
+ * ``rows`` is the first page. The rest is read with ``data.result.page`` by ``result_id``.
+ * ``total_rows`` is how many rows were kept, and ``truncated`` says the query had more.
+ * Dates and times are ISO strings, other values are text, numbers or booleans.
+ *
+ * This interface was referenced by `RpcNotification`'s JSON-Schema
+ * via the `definition` "ToolTable".
+ */
+export interface ToolTable {
+  columns: Columns;
+  result_id: ResultId;
+  rows: Rows;
+  source: Source1;
+  total_rows: TotalRows;
+  truncated?: Truncated;
+}
+/**
+ * One column of a kept query result.
+ *
+ * This interface was referenced by `RpcNotification`'s JSON-Schema
+ * via the `definition` "ToolTableColumn".
+ */
+export interface ToolTableColumn {
+  name: Name5;
+  type: Type26;
+}
+/**
  * The tool call was refused, raised, or was cut off by a stopped run.
  *
  * This interface was referenced by `RpcNotification`'s JSON-Schema
@@ -2070,7 +2110,7 @@ export interface ToolFailedEvent {
   seq: Seq27;
   session_id: SessionId29;
   ts: Ts27;
-  type: Type27;
+  type: Type28;
 }
 /**
  * A tool call did not run, or stopped with an error. The model sees the same message.
@@ -2105,7 +2145,7 @@ export interface ApprovalNeededEvent {
   seq: Seq28;
   session_id: SessionId30;
   ts: Ts28;
-  type: Type28;
+  type: Type29;
 }
 /**
  * A tool call waits for the user. The run is paused until ``approval.respond``.
@@ -2131,8 +2171,8 @@ export interface ApprovalNeededData {
   estimate_usd?: EstimateUsd;
   message_id?: MessageId10;
   model?: Model3;
-  name: Name5;
-  source: Source1;
+  name: Name6;
+  source: Source2;
   subject?: Subject1;
 }
 export interface Args2 {
@@ -2150,7 +2190,7 @@ export interface ApprovalResolvedEvent {
   seq: Seq29;
   session_id: SessionId31;
   ts: Ts29;
-  type: Type29;
+  type: Type30;
 }
 /**
  * The user answered.
@@ -2169,7 +2209,7 @@ export interface ApprovalResolvedData {
   call_id: CallId7;
   decision: Decision;
   device?: Device;
-  name: Name6;
+  name: Name7;
   rule?: Rule;
   subject?: Subject2;
 }
@@ -2185,7 +2225,7 @@ export interface RouteConsentNeededEvent {
   seq: Seq30;
   session_id: SessionId32;
   ts: Ts30;
-  type: Type30;
+  type: Type31;
 }
 /**
  * The run waits for the user's yes to a paid model. It is paused until
@@ -2259,7 +2299,7 @@ export interface RouteConsentAnsweredEvent {
   seq: Seq31;
   session_id: SessionId33;
   ts: Ts31;
-  type: Type31;
+  type: Type32;
 }
 /**
  * The user answered the paid step-up question, and the run goes on.
@@ -2282,7 +2322,7 @@ export interface TodosUpdatedEvent {
   seq: Seq32;
   session_id: SessionId34;
   ts: Ts32;
-  type: Type32;
+  type: Type33;
 }
 /**
  * The agent's todo list, whole, after ``todo_write`` replaced it.
@@ -2320,7 +2360,7 @@ export interface PlanProposedEvent {
   seq: Seq33;
   session_id: SessionId35;
   ts: Ts33;
-  type: Type33;
+  type: Type34;
 }
 /**
  * The plan a plan first run ended with, sent for the user to read.
@@ -2360,7 +2400,7 @@ export interface FileChangedEvent {
   seq: Seq34;
   session_id: SessionId36;
   ts: Ts34;
-  type: Type34;
+  type: Type35;
 }
 /**
  * One change to one file, recorded before this event was sent.
@@ -2379,7 +2419,7 @@ export interface FileChangedData {
   path: Path1;
   removed: Removed;
   reverts?: Reverts;
-  source: Source2;
+  source: Source3;
   status: Status2;
 }
 /**
@@ -2397,7 +2437,7 @@ export interface SkillActivatedEvent {
   seq: Seq35;
   session_id: SessionId37;
   ts: Ts35;
-  type: Type35;
+  type: Type36;
 }
 /**
  * A skill is active in the session.
@@ -2418,9 +2458,9 @@ export interface SkillActivatedEvent {
 export interface SkillActivatedData {
   hash: Hash;
   how: How;
-  name: Name7;
+  name: Name8;
   path: Path2;
-  source: Source3;
+  source: Source4;
 }
 /**
  * A pinned skill was turned off. Not part of a run, so ``run_id`` is null.
@@ -2434,7 +2474,7 @@ export interface SkillDeactivatedEvent {
   seq: Seq36;
   session_id: SessionId38;
   ts: Ts36;
-  type: Type36;
+  type: Type37;
 }
 /**
  * A pinned skill is off again. ``unpinned``: the user turned it off.
@@ -2443,7 +2483,7 @@ export interface SkillDeactivatedEvent {
  * via the `definition` "SkillDeactivatedData".
  */
 export interface SkillDeactivatedData {
-  name: Name8;
+  name: Name9;
   reason: Reason4;
 }
 /**
@@ -2460,7 +2500,7 @@ export interface SkillSkippedEvent {
   seq: Seq37;
   session_id: SessionId39;
   ts: Ts37;
-  type: Type37;
+  type: Type38;
 }
 /**
  * A pinned skill was left out of a model call. It stays pinned.
@@ -2475,7 +2515,7 @@ export interface SkillSkippedEvent {
  */
 export interface SkillSkippedData {
   message: Message2;
-  name: Name9;
+  name: Name10;
   reason: Reason5;
 }
 /**
@@ -2490,7 +2530,7 @@ export interface CheckOfferedEvent {
   seq: Seq38;
   session_id: SessionId40;
   ts: Ts38;
-  type: Type38;
+  type: Type39;
 }
 /**
  * The turn changed files and the session has not said whether golem may run checks.
@@ -2511,7 +2551,7 @@ export interface CheckOfferedData {
  */
 export interface CheckInfo {
   command: Command;
-  name: Name10;
+  name: Name11;
 }
 /**
  * A check is running.
@@ -2525,7 +2565,7 @@ export interface CheckStartedEvent {
   seq: Seq39;
   session_id: SessionId41;
   ts: Ts39;
-  type: Type39;
+  type: Type40;
 }
 /**
  * A check began. ``round`` is 0 for the first run after a turn.
@@ -2536,7 +2576,7 @@ export interface CheckStartedEvent {
 export interface CheckStartedData {
   check_id: CheckId;
   command: Command1;
-  name: Name11;
+  name: Name12;
   round?: Round;
 }
 /**
@@ -2551,7 +2591,7 @@ export interface CheckCompletedEvent {
   seq: Seq40;
   session_id: SessionId42;
   ts: Ts40;
-  type: Type40;
+  type: Type41;
 }
 /**
  * A check ended. ``exit_code`` is null when it timed out.
@@ -2567,7 +2607,7 @@ export interface CheckCompletedData {
   check_id: CheckId1;
   duration_ms: DurationMs2;
   exit_code: ExitCode;
-  name: Name12;
+  name: Name13;
   output: Output2;
   round?: Round1;
   status: Status3;
@@ -2584,7 +2624,7 @@ export interface HelperStartedEvent {
   seq: Seq41;
   session_id: SessionId43;
   ts: Ts41;
-  type: Type41;
+  type: Type42;
 }
 /**
  * A helper session was made for one ``delegate`` call.
@@ -2621,7 +2661,7 @@ export interface HelperModelEvent {
   seq: Seq42;
   session_id: SessionId44;
   ts: Ts42;
-  type: Type42;
+  type: Type43;
 }
 /**
  * The model a helper runs on changed after ``helper.started``.
@@ -2653,7 +2693,7 @@ export interface HelperStepEvent {
   seq: Seq43;
   session_id: SessionId45;
   ts: Ts43;
-  type: Type43;
+  type: Type44;
 }
 /**
  * A tool call of a helper started or ended.
@@ -2672,7 +2712,7 @@ export interface HelperStepData {
   call_id: CallId13;
   calls: Calls;
   index: Index5;
-  name: Name13;
+  name: Name14;
   status: Status4;
   step_id: StepId;
   summary?: Summary2;
@@ -2692,7 +2732,7 @@ export interface HelperStateEvent {
   seq: Seq44;
   session_id: SessionId46;
   ts: Ts44;
-  type: Type44;
+  type: Type45;
 }
 /**
  * A helper queued, started running, started waiting, or went on.
@@ -2736,7 +2776,7 @@ export interface HelperWaitEvent {
   seq: Seq45;
   session_id: SessionId47;
   ts: Ts45;
-  type: Type45;
+  type: Type46;
 }
 /**
  * The lead parked to wait for its helpers, or went on.
@@ -2763,7 +2803,7 @@ export interface HelperEndedEvent {
   seq: Seq46;
   session_id: SessionId48;
   ts: Ts46;
-  type: Type46;
+  type: Type47;
 }
 /**
  * A helper's run ended.
@@ -2830,7 +2870,7 @@ export interface HelperAppliedEvent {
   seq: Seq47;
   session_id: SessionId49;
   ts: Ts47;
-  type: Type47;
+  type: Type48;
 }
 /**
  * A worker's diff was taken into the project by ``helper.apply``.
@@ -2857,7 +2897,7 @@ export interface HelperDiscardedEvent {
   seq: Seq48;
   session_id: SessionId50;
   ts: Ts48;
-  type: Type48;
+  type: Type49;
 }
 /**
  * A worker's diff was dropped by ``helper.discard``. On the lead's log.
@@ -2880,7 +2920,7 @@ export interface SessionTrimmedEvent {
   seq: Seq49;
   session_id: SessionId51;
   ts: Ts49;
-  type: Type49;
+  type: Type50;
 }
 /**
  * A finished helper's steps were removed and a receipt kept (ADR-059, section 9).
@@ -2906,7 +2946,7 @@ export interface BranchChangedEvent {
   seq: Seq50;
   session_id: SessionId52;
   ts: Ts50;
-  type: Type50;
+  type: Type51;
 }
 /**
  * The branch of a session's folder is not the one its model last heard of.

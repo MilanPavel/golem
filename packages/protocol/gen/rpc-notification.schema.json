@@ -5441,7 +5441,7 @@
     },
     "ToolCompletedData": {
       "additionalProperties": false,
-      "description": "A tool call finished.\n\n``summary`` is one short line, such as ``42 lines``. ``preview`` is the\nstart of the output, cut at a few kilobytes, and ``truncated`` says\nwhether it was cut. Output too long for the model is stored whole in the\nartifact ``artifact_id``, which ``artifact.read`` reads.\n\n``failed`` is true when the call ran but what it ran did not succeed,\nsuch as a shell command that exited non-zero or timed out. The model\nstill gets the output.\n\n``duration_ms`` is how long the tool ran, from ``tool.started`` to its\nresult, without the wait for an approval. None means it was not measured.\n\n``diff`` is the change a file tool made, as a unified diff.\n\n``sources`` are the web pages a ``web_search`` or ``web_fetch`` call found or read, for\nthe screen's source chips. None for any other call. The model does not get them.\n\n``rows_withheld`` is true when ``preview`` shows rows of a data source that the model of this\ncall did not get: it got a line with the row count and the columns instead. A client can\nsay so beside the rows.\n\n``parent_call_id`` is legacy. Old logs set it on an event of a child run: the id of\nthe ``delegate`` call that started it. The event is in the parent's run, and a client\nthat does not know child runs ignores it. None for the run's own events. A new helper\nwrites none, because it has its own session and ``helper.*`` events. The field stays,\nsince removing it would break old logs.",
+      "description": "A tool call finished.\n\n``summary`` is one short line, such as ``42 lines``. ``preview`` is the\nstart of the output, cut at a few kilobytes, and ``truncated`` says\nwhether it was cut. Output too long for the model is stored whole in the\nartifact ``artifact_id``, which ``artifact.read`` reads.\n\n``failed`` is true when the call ran but what it ran did not succeed,\nsuch as a shell command that exited non-zero or timed out. The model\nstill gets the output.\n\n``duration_ms`` is how long the tool ran, from ``tool.started`` to its\nresult, without the wait for an approval. None means it was not measured.\n\n``diff`` is the change a file tool made, as a unified diff.\n\n``sources`` are the web pages a ``web_search`` or ``web_fetch`` call found or read, for\nthe screen's source chips. None for any other call. The model does not get them.\n\n``rows_withheld`` is true when ``preview`` shows rows of a data source that the model of this\ncall did not get: it got a line with the row count and the columns instead. A client can\nsay so beside the rows.\n\n``table`` is the kept result of a ``data_query`` call: its columns, the first page and\nthe row count. None for any other call.\n\n``parent_call_id`` is legacy. Old logs set it on an event of a child run: the id of\nthe ``delegate`` call that started it. The event is in the parent's run, and a client\nthat does not know child runs ignores it. None for the run's own events. A new helper\nwrites none, because it has its own session and ``helper.*`` events. The field stays,\nsince removing it would break old logs.",
       "properties": {
         "artifact_id": {
           "anyOf": [
@@ -5531,6 +5531,17 @@
         "summary": {
           "title": "Summary",
           "type": "string"
+        },
+        "table": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ToolTable"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         },
         "truncated": {
           "default": false,
@@ -5945,6 +5956,94 @@
         "data"
       ],
       "title": "ToolStartedEvent",
+      "type": "object"
+    },
+    "ToolTable": {
+      "additionalProperties": false,
+      "description": "A query result a ``data_query`` call kept, so a client can show it and page it.\n\n``rows`` is the first page. The rest is read with ``data.result.page`` by ``result_id``.\n``total_rows`` is how many rows were kept, and ``truncated`` says the query had more.\nDates and times are ISO strings, other values are text, numbers or booleans.",
+      "properties": {
+        "columns": {
+          "items": {
+            "$ref": "#/$defs/ToolTableColumn"
+          },
+          "title": "Columns",
+          "type": "array"
+        },
+        "result_id": {
+          "minLength": 1,
+          "title": "Result Id",
+          "type": "string"
+        },
+        "rows": {
+          "items": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": "array"
+          },
+          "title": "Rows",
+          "type": "array"
+        },
+        "source": {
+          "title": "Source",
+          "type": "string"
+        },
+        "total_rows": {
+          "minimum": 0,
+          "title": "Total Rows",
+          "type": "integer"
+        },
+        "truncated": {
+          "default": false,
+          "title": "Truncated",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "result_id",
+        "source",
+        "columns",
+        "rows",
+        "total_rows"
+      ],
+      "title": "ToolTable",
+      "type": "object"
+    },
+    "ToolTableColumn": {
+      "additionalProperties": false,
+      "description": "One column of a kept query result.",
+      "properties": {
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "type": {
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "type"
+      ],
+      "title": "ToolTableColumn",
       "type": "object"
     },
     "ToolWritingData": {

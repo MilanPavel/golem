@@ -34,6 +34,8 @@ Before DuckDB sees a query, `golem.data.guard` checks it: exactly one statement 
 
 **Packaging.** A PyInstaller binary has no `-m`, so `golem-daemon data-worker` (a subcommand with no help line) is the frozen worker and `worker_argv()` picks it when `sys.frozen` is set. `golem-daemon.spec` collects `duckdb` and its metadata; `pyinstaller-hooks-contrib` already has a `duckdb` hook for the native module.
 
+**Kept results.** A query's rows are also kept as a Parquet file in `~/.golem/data/results/<result_id>.parquet`, so the user can page through all of them while the model reads only the first rows. The sources stay locked, and `COPY ... TO` stays refused on them. The worker writes the file from a second, throwaway in-memory database that holds no source: it receives the rows of the finished query as plain values, its `allowed_paths` names only the temporary file it writes (renamed when whole), and it is locked like a source (`enable_external_access = false`, `lock_configuration = true`). A page is read the same way, by a locked database that may read only that one result file. The source, the SQL and the time go into the file's own key-value metadata. No new path leads into a source's folder, and the escape tests still hold. A file older than 30 days goes, then the oldest until all of them take at most 1 GB, at start and once a day. A result a chat made is also an artifact of the kind `table`, so closing the session removes its file.
+
 ## Measured
 
 On a MacBook (arm64, 14 cores, 36 GB, macOS 26.7), DuckDB 1.5.5, Python 3.12, through `DataWorker` with the defaults (2GB, 4 threads). The file is 14 million rows and 6 columns: an id, a customer, a region, an amount, a date and a 64-character note, 1.47 GB of CSV (a generated file, not golem's).

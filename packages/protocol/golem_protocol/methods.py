@@ -170,6 +170,7 @@ METHOD_ACCESS: Final[Mapping[str, Access]] = {
     "data.update": "browser",
     "data.remove": "browser",
     "data.extension.install": "browser",
+    "data.result.page": "browser",
     "agents.list": "browser",
     "agents.get": "browser",
     "agents.set_wish": "browser",

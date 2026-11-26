@@ -20,6 +20,7 @@ import re
 import time
 import uuid
 from collections import defaultdict
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, cast
@@ -183,7 +184,18 @@ class Source:
             raise DataError(f"Cannot load {table}: {_message(exc)}") from exc
         return int(count[0]) if count else 0
 
-    def query(self, sql: str, limit: int, cursor: Any | None = None) -> dict[str, Any]:
+    def query(
+        self,
+        sql: str,
+        limit: int,
+        cursor: Any | None = None,
+        keep: Callable[[list[str], list[str], list[Any]], None] | None = None,
+    ) -> dict[str, Any]:
+        """Run ``sql``. ``keep`` gets the column names, their types and the raw rows to store.
+
+        A ``keep`` that raises :class:`DataError` leaves the answer as it is, with ``stored``
+        false: a result that cannot be kept is still a result.
+        """
         reason = guard.refusal(sql)
         if reason is not None:
             raise DataError(reason)
@@ -204,10 +216,22 @@ class Source:
             if own:
                 run.close()
         truncated = len(rows) > limit
+        kept = rows[:limit]
+        names = unique_names([str(d[0]) for d in description])
+        stored = False
+        if keep is not None and names:
+            try:
+                keep(names, [str(d[1]) for d in description], kept)
+                stored = True
+            except DataError:
+                stored = False
         return {
-            "columns": [{"name": str(d[0]), "type": str(d[1])} for d in description],
-            "rows": [[_json(value) for value in row] for row in rows[:limit]],
+            "columns": [
+                {"name": n, "type": str(d[1])} for n, d in zip(names, description, strict=True)
+            ],
+            "rows": [[_json(value) for value in row] for row in kept],
             "truncated": truncated,
+            "stored": stored,
             "elapsed_ms": int((time.monotonic() - started) * 1000),
         }
 
@@ -478,3 +502,22 @@ def _json(value: Any) -> Any:
     if isinstance(value, dict):
         return {str(key): _json(item) for key, item in cast("dict[Any, Any]", value).items()}
     return str(value)
+
+
+def unique_names(names: Sequence[str]) -> list[str]:
+    """``names`` with a repeat renamed ``name_2``, ``name_3``: a table has one column per name."""
+    seen: set[str] = set()
+    out: list[str] = []
+    for index, name in enumerate(names):
+        base = name or f"column{index + 1}"
+        candidate, number = base, 1
+        while candidate in seen:
+            number += 1
+            candidate = f"{base}_{number}"
+        seen.add(candidate)
+        out.append(candidate)
+    return out
+
+
+json_value = _json
+"""A value DuckDB returned, as something JSON can carry (for the result files)."""

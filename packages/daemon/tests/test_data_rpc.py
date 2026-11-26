@@ -127,6 +127,27 @@ async def test_data_errors_are_invalid_params_with_a_reason(short_home: Path) ->
         assert error_code(session) == INVALID_PARAMS
 
 
+async def test_data_result_page_pages_a_kept_result_of_any_source(short_home: Path) -> None:
+    shop = _shop(short_home)
+    short_home.mkdir(exist_ok=True)
+    (short_home / "config.toml").write_text(
+        f'[data.shop]\npath = "{shop}/*.csv"\nprivacy = "schema"\n', encoding="utf-8"
+    )
+    async with _daemon(short_home) as (_app, client):
+        sql = "select id, total from orders order by id"
+        query = await _call(client, "data.query", source="shop", sql=sql, result_id="res_page1")
+        assert (query["total_rows"], query["rows"]) == (2, [[1, 10.0], [2, 32.5]])
+        page = await _call(client, "data.result.page", result_id="res_page1", offset=1, limit=5)
+        assert page["source"] == "shop" and page["total_rows"] == 2
+        assert page["rows"] == [[2, 32.5]]
+        desc = await _call(
+            client, "data.result.page", result_id="res_page1", sort_column="id", sort_desc=True
+        )
+        assert [row[0] for row in desc["rows"]] == [2, 1]
+        bad = await client.call("data.result.page", {"result_id": "res_nope"})
+        assert error_code(bad) == INVALID_PARAMS
+
+
 async def test_data_cancel_stops_a_slow_query_by_its_result_id(short_home: Path) -> None:
     async with _daemon(short_home) as (_, client):
         await _call(client, "data.list")  # open the built-in source first

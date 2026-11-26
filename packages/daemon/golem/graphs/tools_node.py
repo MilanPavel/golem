@@ -43,6 +43,7 @@ from langgraph.types import interrupt
 from pydantic import ValidationError
 
 from golem.config import PERMISSION_MODES, PermissionMode
+from golem.data.results import table_record
 from golem.data.sources import DataSources
 from golem.graphs.adapter import (
     APPROVAL_KIND,
@@ -75,6 +76,7 @@ from golem.tools.registry import (
     DataRead,
     InvalidArguments,
     Preview,
+    TableRead,
     ToolContext,
     ToolError,
     ToolRegistry,
@@ -509,6 +511,7 @@ def tools_node(
                         "source": edit.source,
                     }
                 )
+            table = await _kept_table(artifacts, session_id, call_id, result.table)
             shown = result.output if result.shown is None else result.shown
             preview = shown[:PREVIEW_CHARS]
             write(
@@ -519,6 +522,7 @@ def tools_node(
                     "preview": preview,
                     "truncated": len(preview) < len(shown),
                     "rows_withheld": result.rows_withheld,
+                    "table": table,
                     "artifact_id": artifact_id,
                     "failed": result.failed,
                     "duration_ms": duration_ms,
@@ -695,6 +699,37 @@ async def _for_model(
         f"{artifact_id}. Read it with read_artifact(artifact_id, offset, limit).]"
     )
     return f"{output[: budget.head_chars]}\n{note}\n{output[-budget.tail_chars :]}", artifact_id
+
+
+async def _kept_table(
+    artifacts: Artifacts | None, session_id: str | None, call_id: str, read: TableRead | None
+) -> dict[str, object] | None:
+    """The ``table`` of a ``tool.completed`` event, and the artifact that ties the result file
+    to its session (so closing the session removes the file)."""
+    if read is None:
+        return None
+    if artifacts is not None and session_id is not None:
+        await artifacts.put(
+            session_id,
+            call_id,
+            "table",
+            table_record(
+                result_id=read.result_id,
+                source=read.source,
+                sql=read.sql,
+                columns=read.columns,
+                rows=read.total_rows,
+                truncated=read.truncated,
+            ),
+        )
+    return {
+        "result_id": read.result_id,
+        "source": read.source,
+        "columns": read.columns,
+        "rows": read.rows,
+        "total_rows": read.total_rows,
+        "truncated": read.truncated,
+    }
 
 
 def _ms(started: float) -> int:

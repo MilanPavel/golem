@@ -60,5 +60,22 @@ class ArtifactStore:
             kind=str(row["kind"]),
         )
 
+    async def tables(self, session_id: str | None = None) -> list[tuple[str, str, str]]:
+        """``(artifact_id, session_id, data)`` of the kept query results, of one session or all."""
+        where, args = ("AND session_id = ?", (session_id,)) if session_id else ("", ())
+        rows = await self._database.fetch_all(
+            f"SELECT artifact_id, session_id, data FROM artifacts WHERE kind = 'table' {where}",
+            args,
+        )
+        return [(str(r["artifact_id"]), str(r["session_id"]), str(r["data"])) for r in rows]
+
+    async def drop(self, artifact_ids: list[str]) -> None:
+        """Remove these artifacts."""
+        if not artifact_ids:
+            return
+        async with self._database.transaction() as tx:
+            for artifact_id in artifact_ids:
+                await tx.execute("DELETE FROM artifacts WHERE artifact_id = ?", (artifact_id,))
+
 
 __all__ = ["ArtifactStore"]

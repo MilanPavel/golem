@@ -145,6 +145,23 @@ class DataRead:
 
 
 @dataclass(frozen=True, slots=True)
+class TableRead:
+    """A query result a ``data_query`` call kept in a file, for the screen's table.
+
+    ``rows`` is the first page, as cells the wire can carry. ``total_rows`` is how many rows
+    the file holds. The model never gets this: it is for the user's client.
+    """
+
+    result_id: str
+    source: str
+    sql: str
+    columns: list[dict[str, str]]
+    rows: list[list[Any]]
+    total_rows: int
+    truncated: bool
+
+
+@dataclass(frozen=True, slots=True)
 class ToolResult:
     """``output`` goes to the model. ``summary`` is one short line for the screen.
 
@@ -163,7 +180,8 @@ class ToolResult:
 
     ``data`` says which data source a ``data_*`` result read. ``shown`` is what the screen
     gets in place of ``output`` when the two differ, and ``rows_withheld`` says the model of
-    this call did not get the rows the screen shows.
+    this call did not get the rows the screen shows. ``table`` is the kept result of a
+    ``data_query``, for the screen's table.
     """
 
     output: str
@@ -177,6 +195,7 @@ class ToolResult:
     data: DataRead | None = None
     shown: str | None = None
     rows_withheld: bool = False
+    table: TableRead | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -458,6 +477,7 @@ __all__ = [
     "InvalidArguments",
     "Network",
     "Preview",
+    "TableRead",
     "Tool",
     "ToolContext",
     "ToolError",

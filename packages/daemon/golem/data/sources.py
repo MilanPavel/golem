@@ -26,6 +26,7 @@ from golem.config import DATA_RESERVED, DataSourceSettings, load_data_sources
 from golem.data import builtin
 from golem.data.client import DataWorker
 from golem.data.privacy import guess_privacy
+from golem.data.results import ResultStore
 from golem.data.types import DataError, NeedsExtension, SourceSpec
 from golem.paths import GolemPaths
 
@@ -132,6 +133,20 @@ class QueryResult:
     rows: list[list[Any]]
     truncated: bool
     elapsed_ms: int
+    stored: bool = False
+    """True when the rows are kept in a file that :meth:`DataSources.page` reads."""
+    sql: str = ""
+
+
+@dataclass(frozen=True, slots=True)
+class ResultPage:
+    """Rows ``offset`` on of a kept result."""
+
+    result_id: str
+    source: str
+    columns: list[dict[str, str]]
+    rows: list[list[Any]]
+    total_rows: int
 
 
 @dataclass(frozen=True, slots=True)
@@ -194,6 +209,7 @@ class DataSources:
     ) -> None:
         self._worker = worker
         self._paths = paths
+        self.results = ResultStore(paths.data_results_dir)
         self._trusted = trusted
         self._clock = clock
         self._open: dict[str, _Open] = {}
@@ -219,6 +235,7 @@ class DataSources:
         return DataAccess(self, root)
 
     async def close(self) -> None:
+        await self.results.aclose()
         for task in [*self._warming, *([self._watcher] if self._watcher else [])]:
             task.cancel()
         await self._worker.close()
@@ -653,7 +670,8 @@ class DataSources:
         entry = self._entry(root, name)
         await self._ensure(entry)
         ident = result_id or f"res_{uuid.uuid4().hex[:12]}"
-        answer = await self._worker.query(entry.key, sql, limit, result_id=ident)
+        store = self.results.path(ident)
+        answer = await self._worker.query(entry.key, sql, limit, result_id=ident, store=store)
         return QueryResult(
             result_id=ident,
             source=name,
@@ -661,6 +679,27 @@ class DataSources:
             rows=answer["rows"],
             truncated=bool(answer["truncated"]),
             elapsed_ms=int(answer["elapsed_ms"]),
+            stored=bool(answer.get("stored", False)),
+            sql=sql,
+        )
+
+    async def page(
+        self,
+        result_id: str,
+        offset: int,
+        limit: int,
+        sort_column: str | None = None,
+        sort_desc: bool = False,
+    ) -> ResultPage:
+        """Rows of a kept result, sorted when asked. Raises :class:`DataError`."""
+        path = self.results.path(result_id)
+        answer = await self._worker.result_page(path, offset, limit, sort_column, sort_desc)
+        return ResultPage(
+            result_id=result_id,
+            source=str(answer.get("meta", {}).get("source", "")),
+            columns=answer["columns"],
+            rows=answer["rows"],
+            total_rows=int(answer["total_rows"]),
         )
 
     async def cancel(self, result_id: str) -> bool:
@@ -795,6 +834,7 @@ __all__ = [
     "Description",
     "Inspection",
     "QueryResult",
+    "ResultPage",
     "SourceInfo",
     "TableInfo",
 ]

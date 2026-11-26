@@ -355,6 +355,8 @@ class DaemonApp:
                 )
                 self.state.data = data
                 self.state.artifacts = ArtifactStore(database)
+                data.results.artifacts = self.state.artifacts
+                data.results.start()
                 self.state.changes = ChangeStore(database, BlobStore(database))
                 usage = Usage(database)
                 scores = Scores(database)

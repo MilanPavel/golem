@@ -72,7 +72,7 @@
       "data": {
         "cleared_ids": [],
         "context_window": null,
-        "estimated_tokens": 4806,
+        "estimated_tokens": 4871,
         "index": 1,
         "message_bytes": [
           6
@@ -104,9 +104,9 @@
           }
         ],
         "tier": null,
-        "tools_bytes": 15532,
-        "tools_chars": 15532,
-        "tools_sha": "c165402bce4cbff8b16db092282ac1d6703f8a43c58eafaba15d620a9284111e",
+        "tools_bytes": 15747,
+        "tools_chars": 15747,
+        "tools_sha": "a1706f7e39bca1c6a1261db4f99baad2d5703e6789498b1ada4950b9d17fcb9a",
         "window_estimated": false,
         "window_planned": false
       },
@@ -370,7 +370,7 @@
       "data": {
         "cleared_ids": [],
         "context_window": null,
-        "estimated_tokens": 4806,
+        "estimated_tokens": 4871,
         "index": 1,
         "message_bytes": [
           6
@@ -402,9 +402,9 @@
           }
         ],
         "tier": null,
-        "tools_bytes": 15532,
-        "tools_chars": 15532,
-        "tools_sha": "c165402bce4cbff8b16db092282ac1d6703f8a43c58eafaba15d620a9284111e",
+        "tools_bytes": 15747,
+        "tools_chars": 15747,
+        "tools_sha": "a1706f7e39bca1c6a1261db4f99baad2d5703e6789498b1ada4950b9d17fcb9a",
         "window_estimated": false,
         "window_planned": false
       },
