@@ -862,6 +862,7 @@ def open_chat(
     rules = Policy(None) if policy is None else policy
     binder = _ToolBinder()
     system_prompt = SystemPrompt() if prompt is None else prompt
+    prefixes: dict[str, _Prefix] = {}
 
     async def call_model(state: AgentState, config: RunnableConfig) -> dict[str, object]:
         messages = list(state["messages"])
@@ -906,7 +907,28 @@ def open_chat(
         tools = registry.scoped(scope)
         plan_first = _plan(config)
         schemas = [] if final else tools.schemas(plan_first=plan_first)
+        # Anthropic binds a signed thinking block to the system prompt and tools before it. The
+        # tools and the helper prices (read from the model listing, which may finish while helpers
+        # run) are kept from the first call of the message. If the prompt still differs, or the
+        # tools or the model do, the signed thinking parts of earlier replies are not sent.
+        thread = state.get("session_id")
+        pin = prefixes.get(thread) if made > 0 else None
+        names = tuple(_schema_name(item) for item in schemas)
+        reuse = (
+            pin is not None
+            and not final
+            and pin.profile == profile
+            and pin.names == names
+            and pin.plan_first == plan_first
+        )
+        if reuse and pin is not None:
+            schemas = pin.schemas
+        prices = None if helper_prices is None else helper_prices(profile)
+        if reuse and pin is not None:
+            prices = pin.prices
         plain = _portable(_without_thinking(messages), router.kind(profile))
+        if made > 0 and not reuse:
+            plain = _without_signed_thinking(plain)
         if tier_of is None or tier_of(profile) != "local":
             # A hosted model never reads a local note. Only the copy sent changes.
             plain = await stub_local_notes(plain, memory_of(config))
@@ -932,12 +954,17 @@ def open_chat(
                 window=window.window,
                 memory=await _memory_block(memory_of(config), tier_of, profile),
                 tier=None if tier_of is None else tier_of(profile),
-                prices=None if helper_prices is None else helper_prices(profile),
+                prices=prices,
             )
             parts = (
                 [("helper", child.prompt)] if child is not None else system_prompt.parts(context)
             )
             text = "\n\n".join(t for _, t in parts)
+            if pin is None and not final and made == 0:
+                prefixes[thread] = _Prefix(profile, names, plan_first, schemas, prices, text)
+            elif reuse and pin is not None and pin.text != text:
+                plain = _without_signed_thinking(plain)
+                history = view(plain, state.get("context_view"))
             system = SystemMessage(content=text) if text else None
             # The system message is sent, never returned, so it stays out of the checkpoint.
             sent = _outgoing(system, history, final, lead=child is None)
@@ -1845,6 +1872,39 @@ def _learn(
         tokens,
     )
     learned.note(profile, chars=chars, tokens=tokens, window=window)
+
+
+@dataclass(frozen=True, slots=True)
+class _Prefix:
+    """The system prompt and tools a message's first model call was sent with."""
+
+    profile: str
+    names: tuple[str, ...]
+    plan_first: bool
+    schemas: list[dict[str, object]]
+    prices: Prices | None
+    text: str
+
+
+_SIGNED = frozenset({"thinking", "redacted_thinking"})
+
+
+def _without_signed_thinking(messages: Sequence[BaseMessage]) -> list[BaseMessage]:
+    """``messages`` with Anthropic's signed ``thinking`` parts removed from every reply.
+
+    A signature is bound to the prefix it was made for, so a call whose system prompt or
+    tools differ from that call's must not send them. The checkpoint keeps the parts.
+    """
+    kept: list[BaseMessage] = []
+    for message in messages:
+        if isinstance(message, AIMessage) and isinstance(message.content, list):
+            parts = [
+                p for p in message.content if not (isinstance(p, dict) and p.get("type") in _SIGNED)
+            ]
+            if len(parts) != len(message.content):
+                message = message.model_copy(update={"content": parts})
+        kept.append(message)
+    return kept
 
 
 def _without_thinking(messages: Sequence[BaseMessage]) -> list[BaseMessage]:
