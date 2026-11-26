@@ -1,7 +1,7 @@
 # ADR-058: A helper is a child run on its own thread, with its steps in the parent's log
 
 **Date**: 2026-11-15
-**Status**: accepted; superseded in part by [ADR-059](059-helpers-are-child-sessions.md) once step 15.2 is built (a helper becomes a child session)
+**Status**: superseded by [ADR-059](059-helpers-are-child-sessions.md) (a helper is a child session). The limits, the read-only tool set and the rule that an answer is data carry over
 
 ## Context
 

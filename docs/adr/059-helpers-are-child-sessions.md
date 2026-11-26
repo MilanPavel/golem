@@ -1,13 +1,13 @@
 # ADR-059: A helper is a headless session with a parent, started for a reason, never by habit
 
 **Date**: 2026-11-19
-**Status**: proposed
+**Status**: accepted
 
 ## Context
 
 [ADR-058](058-child-runs.md) made a helper a child run: the chat graph on its own checkpoint thread, inside the `delegate` tool call of its parent, with its steps in the parent's log. It was built small on purpose, so that Phase 15 (#733) could promote it to a session. Phase 15 needs what a child run cannot do: ask you a question, survive a restart, run beside others, and be opened as a chat. Headless sessions now exist ([ADR-050](050-routines-and-headless-sessions.md)), and they do all four.
 
-What exists today, with the file that does it (paths are under `packages/daemon/golem/` unless noted):
+What existed when this was written, before steps 15.1 to 15.11, with the file that did it (paths are under `packages/daemon/golem/` unless noted). Most of this is now replaced; [Helpers](../architecture/helpers.md) describes the built code:
 
 - `delegate` takes `brief` and `agent`, and `agent` can only be `explorer` (`tools/delegate.py`). It runs the helper through `ctx.delegate`, inside the parent's run task.
 - `run_child` runs the chat graph on the thread `<session_id>/c/<call_id>` with a fixed read-only tool set, no approvals and four limits (`graphs/child.py`, `ChatRuntime.stream_child` in `graphs/chat.py`). The model is the `explore` role (`models/roles.py`, `explore_role`).
@@ -41,7 +41,7 @@ golem does the work in the chat. It starts a helper for one of three reasons, an
 2. **Independent jobs that can truly run at once.**
 3. **A different model fits better:** one hard question to a stronger model, or a large read on a cheaper one.
 
-There are no chains of helpers (find, fix, check). Anything with a fixed order is a lead's decision or a workflow. A procedure is a skill the lead loads, not an agent. Thresholds are a share of the window plus a price, not a token count, and the eval of 15.4 (#1212) sets them. Since step 15.14 you can measure them on your own Mac (Settings › Agents › Measure, `golem eval helpers`): the daemon runs the measurement as one job, and "Use these numbers" writes the result to `[agents.delegate]`. The numbers shape what golem suggests to the model; they never gate a helper. **Open, decided by that eval:** whether a cloud lead hands large sweeps to a cheaper cloud model by default, or only with "save money" on.
+There are no chains of helpers (find, fix, check). Anything with a fixed order is a lead's decision or a workflow. A procedure is a skill the lead loads, not an agent. Thresholds are a share of the window plus a price, not a token count, and the eval of 15.4 (#1212) sets them. Since step 15.14 you can measure them on your own Mac (Settings › Agents › Measure, `golem evals helpers`): the daemon runs the measurement as one job, and "Use these numbers" writes the result to `[agents.delegate]`. The numbers shape what golem suggests to the model; they never gate a helper. **Open, decided by that eval:** whether a cloud lead hands large sweeps to a cheaper cloud model by default, or only with "save money" on.
 
 ### 3. `delegate` starts one helper or a batch
 
@@ -67,7 +67,7 @@ The wish of a bundled type is changed in `config.toml`, not in a copy of its fil
 
 ### 5. A helper's model is a wish
 
-The agent file names a wish: `cheapest`, `same`, `stronger`, a tier, or a model. A pure `pick_helper(wish, lead, candidates, traits)` in `models/pick.py` turns it into a model. It reads no clock and no file, and **it never fails on an empty tier**: the wished tier, then the nearest tier you have, then the lead's model. Its result says which and why.
+The agent file names a wish: `cheapest`, `same`, `stronger`, a tier, or a model. A pure `pick_helper(wish, lead, candidates, traits)` in `models/pick_helper.py` turns it into a model. It reads no clock and no file, and **it never fails on an empty tier**: the wished tier, then the nearest tier you have, then the lead's model. Its result says which and why.
 
 | Wish | Becomes |
 |---|---|
@@ -81,7 +81,7 @@ The agent file names a wish: `cheapest`, `same`, `stronger`, a tier, or a model.
 - A cloud-only setup gets caps and an estimate before a large batch (15.6) instead of the question.
 - The helper session is pinned to its picked model. `model.routed` in its log records the pick. A helper on the lead's own model starts with the lead's options.
 - The lead may name the model of one helper: `delegate` takes an optional `model` (a tier, a profile name or `provider/model`). The part after the slash also works alone, with case, hyphens and dots ignored: `gpt6-luna` names `openai/gpt-6-luna`. If two models fit, it names none. It is the wish of that one helper, in place of the agent's wish and of `[roles] explore`, and goes through the same `pick_helper`, so privacy, the paid question and the spent cap hold. A name that is unknown, or that the rules refuse, never fails the call: the helper runs on what the pick gives, and its `pick_reason` names the asked model and why ("gpt6-luna is not set up, so the lead's model"). `helper.started.wish` is that call's wish. The tool description lists the models the lead may name, read from the settings and the cached model list, with no call, so it is the same text until they change. It lists the tiers, then a few local models, then the hosted ones that are ready, cheapest first.
-- The `explore` role of `models/roles.py` is retired when 15.3 lands. `[roles] explore` is read as the wish of `explorer` until then.
+- The `explore` role is retired as a role. A `[roles] explore` that is not the default is still read as the wish of `explorer`, so an old `config.toml` runs the explorer as before (`sessions/helpers.py`).
 
 ### 6. Where the events live
 
@@ -90,10 +90,13 @@ The helper's session log has everything a session has: `session.created`, the br
 | Event | When | Fields |
 |---|---|---|
 | `helper.started` | a helper session is made | `call_id`, `index`, `helper_id`, `agent`, `label`, `model`, `wish`, `pick_reason` |
+| `helper.model` | a "no" to the paid question moved the helper to a local model | `call_id`, `index`, `helper_id`, `model`, `pick_reason` |
 | `helper.step` | a tool call of the helper starts or ends | `call_id`, `index`, `step_id`, `name`, `args` (path, pattern, query, ref only), `status`, `calls`, `summary` (when the call ended) |
 | `helper.state` | a helper queues, runs, waits or goes on | `call_id`, `index`, `state` (`queued`, `running`, `waiting`), `reason` |
 | `helper.wait` | the lead parks or goes on | `call_id`, `state` (`parked`, `resumed`), `helper_ids` |
-| `helper.ended` | a helper's run ends | `call_id`, `index`, `stopped`, `model_calls`, `tokens`, `answer_tokens`, `cost_usd`, `duration_ms`, `working_ms` |
+| `helper.ended` | a helper's run ends | `call_id`, `index`, `stopped`, `model_calls`, `tokens`, `answer_tokens`, `cost_usd`, `duration_ms`, `working_ms`; for a worker also its diff, files and checks (section 14) |
+| `helper.applied` | `helper.apply` took a worker's diff in | `helper_id`, `change_ids` |
+| `helper.discarded` | `helper.discard` dropped it | `helper_id` |
 
 - When `[agents] at_once` helpers of the lead already run, a new helper is stored with `helper.state` `queued` and the reason `team`, has no run, and starts when a turn frees. A helper on a paid model that a spent `[budget]` cap holds back is stored the same way, with `helper.state` `waiting`, the reason `budget`, and `spent_usd` and `cap_usd`; it starts when the cap allows it, and a helper behind it may start first. The event carries no sentence: the view words it. A queued helper is stopped by `helper.stop` and ends `cancelled` with its lead. A restart ends one that never started, as any helper with no run. The slots of the model itself are Phase 18.
 - A wait reason is one of the seven words of ADR-060, which owns the list: `you` (an approval or the paid question) and `team` (a lead waits for its helpers) now; `slot`, `load`, `provider`, `budget` and `stalled` as Phase 18 and 15.6 land. Every wait has one and an event (invariant 2).
@@ -146,7 +149,7 @@ The 058 rule that cancelling the parent cancels the child ([ADR-008](008-cancell
 
 ### 11. Protocol and old clients
 
-- Minor bumps, in separate steps: `session.created` fields; the `helper.*` events; `agents.list`, `agents.get`, `agent.registry.changed`; `helper.stop`; `pending_items` and the `PendingItem` fields; `scope` on `approval.respond`; `SessionSummary.parent_session_id` and `agent`.
+- Minor bumps, in separate steps: `session.created` fields; the `helper.*` events; `agents.list`, `agents.get`, `agent.registry.changed`; `helper.stop`; `helper.apply`, `helper.discard`, `helper.retry`, `helper.applied`, `helper.discarded` and the error `HELPER_CONFLICT` (-32027), in 2.163; `pending_items` and the `PendingItem` fields; `scope` on `approval.respond`; `SessionSummary.parent_session_id` and `agent`.
 - An older client drops events and methods it does not know. It draws a helper's `delegate` step with its start and its result and no inner steps, and it never sees a helper in the list. It reads `pending` and `status` as before.
 - The reducer keeps folding events with `parent_call_id`, forever, so old logs look as they did. It folds `helper.*` into the same `HelperRun`, so 9.7's card is unchanged on screen.
 - Run views are reached through the Inspector's Steps tab and Runs in the rail. There is no Chat/Map switch.
@@ -164,6 +167,16 @@ The 058 rule that cancelling the parent cancels the child ([ADR-008](008-cancell
 ### 13. The three setups are an acceptance rule
 
 Every ticket that touches models states its behaviour and has a test for a setup with local models only and one with cloud models only. A mixed setup is the default. The wish table above is the reference: with no local model `cheapest` is the cheapest hosted model and no paid question is asked; with no hosted model `stronger` is the same model in a fresh window.
+
+### 14. A worker works in a copy
+
+A `worker` never writes to your folder. It works in a git copy, and its diff comes back for you to decide.
+
+- **The copy.** `coding/copies.py` makes `~/.golem/copies/<helper id>` with `git worktree add --detach` of `HEAD`. Your uncommitted state is laid on top, and golem makes one baseline commit, so the worker's diff holds only its own work. Ignored folders are not copied. A folder that is not a git checkout is refused: there is no plain-copy fallback.
+- **The result.** When the worker ends, `coding/worker_result.py` takes the diff against the baseline, stores it as an artifact and runs the project's checks in the copy. `helper.ended` carries the diff, the files and the check result.
+- **Apply, discard, retry.** `helper.apply` takes the diff into the folder (`coding/apply_worker.py`). It is refused while the lead has a run. Every file is checked first: if one changed since the copy was made, nothing is written and the error is `HELPER_CONFLICT` (-32027), naming the path. `helper.discard` drops the diff. `helper.retry` runs the brief again on a stronger model in a fresh copy, as a new sibling of the same `delegate` call.
+- **Undo.** Each applied file is recorded as a change with the source `helper`, all under one fresh run id ([ADR-057](057-change-set.md)). One `changes.revert` of that run rewinds the folder to before it, so changes made after the apply are undone too.
+- **Cleanup.** The copy is removed on apply, on discard and when the lead closes. At startup `recovery.sweep_copies` removes each copy that no helper record names, or whose lead is closed or gone.
 
 ## Alternatives Considered
 

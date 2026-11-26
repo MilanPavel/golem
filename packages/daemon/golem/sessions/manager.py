@@ -2901,7 +2901,9 @@ class SessionManager:
 
         Every file is checked first: the project's file must be what the copy started from.
         Then each file is written and recorded as a change with source ``helper``, all under one
-        fresh run id, so one ``changes.revert`` of that run restores the folder. Stores
+        fresh run id, so one ``changes.revert`` of that run restores the folder. That is a rewind
+        of the folder to before the apply: it undoes later changes too, including a later apply.
+        Stores
         ``file.changed`` for each and ``helper.applied``, and removes the copy. Returns the
         change ids. A file that is not UTF-8 text is written but cannot be recorded, so an undo
         leaves it.

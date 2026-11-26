@@ -66,12 +66,12 @@ You see as much as you want, and nothing new sits in the top bar.
 - **Normal:** one card for the batch, a row for each helper with what it read and what it saved. The right column is always a state or a wait reason.
 - **Verbose:** the model each helper got and why.
 - **A helper's chat** opens read-only from its name. **Continue as chat** turns a finished helper into a chat of your own: a fork with its messages, no lead, and the normal tools and prompt of a chat. **How it ran** is the Steps tab of the Inspector, and **Runs** in the rail lists the same steps full width. In the terminal a tree sits under the turn.
-- A worker's diff comes back in the Changes tab, one block for each worker, to view, apply or try again on a stronger model. Nothing in your folder changes until you apply.
+- A worker's diff comes back in the Changes tab, one block for each worker, to view, apply, discard or try again on a stronger model. Nothing in your folder changes until you apply. If a file changed in your folder since the worker's copy was made, the apply stops and names the file. Undo of an apply rewinds your folder to before it, so later changes are undone too.
 
 ### Somewhere else
 
-A helper does not have to run on your Mac. The same helper can start in a container, on a machine you own over `ssh`, or on a rented GPU with a bigger open model, and come back **as a diff you review**, never as a write to your files. Your Keychain and your other chats never cross. A forgotten GPU is the main risk to money, so every remote helper has a time limit and stops when idle. This is later work.
+Today every helper runs on your Mac, and a worker edits a git copy of your folder. A helper does not have to stay there. The same helper could start in a container, on a machine you own over `ssh`, or on a rented GPU with a bigger open model, and come back **as a diff you review**, never as a write to your files. Your Keychain and your other chats never cross. A forgotten GPU is the main risk to money, so every remote helper has a time limit and stops when idle. This is later work, and none of it is built.
 
 ### Where it is built
 
-Phase 15 (#733) builds helpers. Phase 18 (#1198, ADR-060) builds the dispatcher that decides how many run at once and why anything waits. Phase 5 (#90, ADR-061) builds the memory a helper may be given and may propose to. The design record is [ADR-059](../adr/059-helpers-are-child-sessions.md).
+Phase 15 (#733) built helpers: the four agent types, parking, questions, workers in copies, and Measure. How it works is in [Helpers](../architecture/helpers.md), and the design record is [ADR-059](../adr/059-helpers-are-child-sessions.md). Phase 18 (#1198, ADR-060) builds the dispatcher that decides how many run at once and why anything waits. Phase 5 (#90, ADR-061) builds the memory a helper may be given and may propose to. Helpers on other machines are later.
