@@ -53,7 +53,7 @@ function WorkerBlock({ step }: { step: WorkflowStepInfo }) {
   const worker = workerResult(step.result);
   if (worker === null) return null;
   return (
-    <dl className="m-0 grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-meta">
+    <dl className="m-0 grid cols-label-value gap-x-3 gap-y-0.5 text-meta">
       <dt className="text-faint">Copy</dt>
       <dd className="m-0 min-w-0 truncate">
         <Code>{worker.worktree}</Code>
