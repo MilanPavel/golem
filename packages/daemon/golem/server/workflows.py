@@ -281,10 +281,13 @@ async def workflow_propose(
     steps, _ = _outline_of(made.code, entry.name)
     return WorkflowProposeResult(
         code=made.code,
-        note=made.note,
+        # An older client reads the answer as a note on a file that did not change.
+        note=made.answer or made.note,
         steps=steps,
         problems=[_problem(p) for p in made.problems],
         model=made.model,
+        kind=made.kind,
+        answer=made.answer if made.kind == "answer" else None,
     )
 
 
