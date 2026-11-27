@@ -14,16 +14,89 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 # `just check` runs these parts one after the other. Here each is a job, so they run side by side.
+# The generated-files check and the docs build are parts of the required check, so they always run;
+# a filter step skips the work on a pull request that leaves their inputs alone. A push to main runs
+# everything.
 jobs:
-  static:
+  gen:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Does this change touch the protocol or the generators?
+        id: filter
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if [ "$EVENT" != "pull_request" ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          git fetch --depth=1 origin "$BASE_SHA"
+          if git diff --name-only "$BASE_SHA" HEAD | grep -qE '^(packages/protocol/|apps/apple/GolemKit/Sources/GolemKit/Generated/|justfile$|pyproject\.toml$|uv\.lock$|package\.json$|pnpm-lock\.yaml$|pnpm-workspace\.yaml$|\.github/workflows/ci\.yml$)'; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "The generated files cannot have changed, so they are not checked."
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: ./.github/actions/setup
+        if: steps.filter.outputs.run == 'true'
+
+      - name: Generated files
+        if: steps.filter.outputs.run == 'true'
+        run: just check-gen
+
+  lint:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
 
       - uses: ./.github/actions/setup
 
-      - name: Generated files, lint, typecheck, docs
-        run: just check-gen && just lint && just typecheck && just docs-build
+      - name: Lint
+        run: just lint
+
+  typecheck:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: ./.github/actions/setup
+
+      - name: Typecheck
+        run: just typecheck
+
+  docs:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Does this change touch the docs or what they build from?
+        id: filter
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if [ "$EVENT" != "pull_request" ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          git fetch --depth=1 origin "$BASE_SHA"
+          if git diff --name-only "$BASE_SHA" HEAD | grep -qE '^(docs/|packages/web/|packages/view/|packages/client/|packages/protocol/gen/|packages/gateway/|packages/tui/src/logo\.ts$|README\.md$|CONTRIBUTING\.md$|justfile$|package\.json$|pnpm-lock\.yaml$|pnpm-workspace\.yaml$|\.github/workflows/ci\.yml$)'; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "The docs and the web gallery are untouched, so the site is not built."
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: ./.github/actions/setup
+        if: steps.filter.outputs.run == 'true'
+
+      - name: Build the docs
+        if: steps.filter.outputs.run == 'true'
+        run: just docs-build
 
   test-py:
     runs-on: ubuntu-24.04
@@ -181,7 +254,7 @@ jobs:
 
   check:
     if: always()
-    needs: [static, test-py, test-js, test-web, relay-image, swift]
+    needs: [gen, lint, typecheck, docs, test-py, test-js, test-web, relay-image, swift]
     runs-on: ubuntu-24.04
     steps:
       - name: Every part passed
