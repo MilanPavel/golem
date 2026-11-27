@@ -122,6 +122,8 @@ import type { WorkflowProposeResult } from "../../protocol/gen/workflow-propose-
 import type { WorkflowGetResult } from "../../protocol/gen/workflow-get-result.ts";
 import type { WorkflowEditStepResult } from "../../protocol/gen/workflow-edit-step-result.ts";
 import type { WorkflowSaveResult } from "../../protocol/gen/workflow-save-result.ts";
+import type { WorkflowCreateResult } from "../../protocol/gen/workflow-create-result.ts";
+import type { WorkflowDraftResult } from "../../protocol/gen/workflow-draft-result.ts";
 import type { WorkflowListResult } from "../../protocol/gen/workflow-list-result.ts";
 import type { WorkflowStartersResult } from "../../protocol/gen/workflow-starters-result.ts";
 import type { WorkflowAddStarterResult } from "../../protocol/gen/workflow-add-starter-result.ts";
@@ -371,6 +373,8 @@ import {
   isWorkflowGetResult,
   isWorkflowEditStepResult,
   isWorkflowSaveResult,
+  isWorkflowCreateResult,
+  isWorkflowDraftResult,
   isWorkflowListResult,
   isWorkflowStartersResult,
   isWorkflowAddStarterResult,
@@ -938,6 +942,10 @@ export interface GolemClient {
   editWorkflowStep(id: string, code: string, stepId: string, name: string, value: string | number | boolean | null): Promise<WorkflowEditStepResult>;
   /** `workflow.save`: write `code` as the workflow's file. Refused for an error problem, a file that changed since `baseHash`, or an untrusted folder. */
   saveWorkflow(id: string, code: string, baseHash: string): Promise<WorkflowSaveResult>;
+  /** Writes a new workflow file (workflow.create): `name` is what the person typed, `folder` a trusted project or none for the user's folder, `code` the whole file (a proposal's) or none for a two-step skeleton. Rejects with the daemon's reason: the name is taken (it gives the path and a free name), the folder is not trusted, the check refused the code. */
+  createWorkflow(name: string, folder?: string, code?: string): Promise<WorkflowCreateResult>;
+  /** Asks golem to write a new workflow from a few sentences (workflow.draft): one model call, checked, never saved. `model` is the model the person picked; without one golem's default model writes it. */
+  draftWorkflow(name: string, ask: string, folder?: string, model?: string): Promise<WorkflowDraftResult>;
   /** Asks golem for a change to `code` (workflow.propose): one model call, checked, never saved. `previous` is the last proposal and its note, for a refine. Rejects with the daemon's reason, such as no model for that folder. */
   proposeWorkflow(id: string, code: string, ask: string, previous?: { code: string; note: string }): Promise<WorkflowProposeResult>;
   /** `workflow.start`: start a run of the workflow `id`. It returns at once; the steps arrive on `onWorkflowEvent`. `model` is this one run's choice of model: it beats the steps' and the workflow's. */
@@ -3216,6 +3224,22 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       const result = await call("workflow.save", { id, code, base_hash: baseHash });
       if (!isWorkflowSaveResult(result)) {
         throw new Error("invalid workflow.save result");
+      }
+      return result;
+    },
+    async createWorkflow(name: string, folder?: string, code?: string): Promise<WorkflowCreateResult> {
+      await ready;
+      const result = await call("workflow.create", { name, ...(folder === undefined ? {} : { folder }), ...(code === undefined ? {} : { code }) });
+      if (!isWorkflowCreateResult(result)) {
+        throw new Error("invalid workflow.create result");
+      }
+      return result;
+    },
+    async draftWorkflow(name: string, ask: string, folder?: string, model?: string): Promise<WorkflowDraftResult> {
+      await ready;
+      const result = await call("workflow.draft", { name, ask, ...(folder === undefined ? {} : { folder }), ...(model === undefined ? {} : { model }) });
+      if (!isWorkflowDraftResult(result)) {
+        throw new Error("invalid workflow.draft result");
       }
       return result;
     },

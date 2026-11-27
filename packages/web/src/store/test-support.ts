@@ -167,6 +167,18 @@ export function fakeClient() {
     })),
     checkWorkflow: vi.fn<PageClient["checkWorkflow"]>(async () => ({ problems: [], steps: [] })),
     proposeWorkflow: vi.fn<PageClient["proposeWorkflow"]>(async (_id, code) => ({ code, note: "", steps: [], problems: [], model: "fake/model" })),
+    createWorkflow: vi.fn<PageClient["createWorkflow"]>(async (name, folder, code) => {
+      const file = name.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_");
+      const path = `${folder ?? "/Users/me/.golem"}/workflows/${file}.py`;
+      return {
+        code: code ?? "",
+        code_hash: "h1",
+        problems: [],
+        steps: [],
+        workflow: { id: `${path}::${file}`, name: file, path, state: "ok", inputs: [], description: "" },
+      };
+    }),
+    draftWorkflow: vi.fn<PageClient["draftWorkflow"]>(async () => ({ code: "", note: "", steps: [], problems: [], model: "fake/model" })),
     editWorkflowStep: vi.fn<PageClient["editWorkflowStep"]>(async (_id, code) => ({ code, problems: [], steps: [] })),
     saveWorkflow: vi.fn<PageClient["saveWorkflow"]>(async (id) => ({
       code_hash: "h2",

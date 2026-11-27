@@ -1,8 +1,10 @@
 import { useId, useMemo, useState } from "react";
+import { NEW_WORKFLOW_BUTTON } from "@golem/view";
 import { cn } from "../../ui/cn.ts";
+import { Button } from "../../ui/button.tsx";
 import { Input } from "../../ui/input.tsx";
 import { useNavigate, useNewSessionFolder, useRoute, useWorkflowList, useWorkflowStarters } from "../../store/page-context.tsx";
-import { workflowPath } from "../../store/router.ts";
+import { workflowNewPath, workflowPath } from "../../store/router.ts";
 import type { WorkflowEntryInfo, WorkflowListResult, WorkflowStarterInfo } from "../../store/workflows.ts";
 import { Link } from "../../ui/link.tsx";
 import { folderName } from "../sessions/folder.ts";
@@ -51,7 +53,7 @@ function Group({ group, selected, onNavigate }: { group: WorkflowGroup<WorkflowE
   );
 }
 
-/** The starters not added yet. Each opens `/workflows`, where its card adds it. */
+/** The starters not added yet. Each opens the New workflow page, where its card adds it. */
 function StarterGroup({ starters, onNavigate }: { starters: readonly WorkflowStarterInfo[]; onNavigate: (path: string) => void }) {
   const headingId = useId();
   return (
@@ -63,7 +65,7 @@ function StarterGroup({ starters, onNavigate }: { starters: readonly WorkflowSta
         {starters.map((starter) => (
           <li key={starter.id}>
             <Link
-              href={workflowPath()}
+              href={workflowNewPath()}
               onNavigate={onNavigate}
               className="flex items-center gap-2 rounded-md py-1.5 pr-2.5 pl-2.5 text-muted outline-offset-2 outline-clay hover:bg-line hover:text-ink focus-visible:outline-2"
             >
@@ -107,6 +109,11 @@ export function WorkflowsPanel({ list, error = null, starters = [], selected, on
   else if (shown.length === 0) note = "No workflows match.";
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2">
+      <div>
+        <Button kind="primary" size="sm" onClick={() => onNavigate(workflowNewPath())}>
+          {NEW_WORKFLOW_BUTTON}
+        </Button>
+      </div>
       <Input
         type="text"
         aria-label="Filter workflows"

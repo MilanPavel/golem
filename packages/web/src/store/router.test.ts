@@ -1,5 +1,5 @@
 import { afterEach, expect, test, vi } from "vitest";
-import { createRouter, dataPath, helperPath, inspectPath, parseRoute, routineNewPath, routinePath, runPath, runsPath, workflowPath, sessionPath, settingsPath, tracePath, welcomePath } from "./router.ts";
+import { createRouter, dataPath, helperPath, inspectPath, parseRoute, routineNewPath, routinePath, runPath, runsPath, workflowNewPath, workflowPath, sessionPath, settingsPath, tracePath, welcomePath } from "./router.ts";
 
 afterEach(() => {
   history.replaceState(null, "", "/");
@@ -97,6 +97,13 @@ test("parseRoute reads the workflows page and one workflow, and workflowPath rou
   // The old tab paths land on the page.
   expect(parseRoute(`${workflowPath(id)}/runs`)).toEqual({ name: "workflow", id });
   expect(parseRoute(`${workflowPath(id)}/triggers`)).toEqual({ name: "workflow", id });
+});
+
+test("parseRoute reads the page that makes a new workflow, and workflowNewPath round-trips", () => {
+  expect(parseRoute("/workflows/new")).toEqual({ name: "workflow-new" });
+  expect(parseRoute(workflowNewPath())).toEqual({ name: "workflow-new" });
+  // A workflow id is a path and a name, so `new` alone is never one; a path that ends in new is.
+  expect(parseRoute(workflowPath("/a/new.py::new"))).toEqual({ name: "workflow", id: "/a/new.py::new" });
 });
 
 test("runsPath filters the Runs page by a workflow", () => {

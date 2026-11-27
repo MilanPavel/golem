@@ -1,0 +1,40 @@
+{
+  "additionalProperties": false,
+  "description": "``workflow.create``. Write a new workflow file called ``name`` and load it.\n\n``name`` is what the person typed (\"Weekly invoices\"): the file and the function are its\nlower-case words joined with ``_``. ``folder`` is a trusted project (the file goes in its\n``workflows`` folder); without it the file goes in the user's folder. ``code`` is the whole\nfile, such as a proposal from ``workflow.draft``; without it the file is a two-step skeleton.\nRefused, with the reason, for a name that cannot be a file name, a name in use (the reason\ngives the path of the file and a free name), an untrusted folder and code the check refuses.",
+  "properties": {
+    "code": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Code"
+    },
+    "folder": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Folder"
+    },
+    "name": {
+      "minLength": 1,
+      "title": "Name",
+      "type": "string"
+    }
+  },
+  "required": [
+    "name"
+  ],
+  "title": "WorkflowCreateParams",
+  "type": "object"
+}

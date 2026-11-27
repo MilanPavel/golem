@@ -1,4 +1,5 @@
 import { useId, useState } from "react";
+import { NEW_WORKFLOW_BUTTON } from "@golem/view";
 import type { WorkflowEntryInfo, WorkflowStarterInfo } from "../../store/workflows.ts";
 import { Button } from "../../ui/button.tsx";
 import { Card } from "../../ui/card.tsx";
@@ -18,7 +19,7 @@ function whyOff(starter: WorkflowStarterInfo, folder: string | null): string | n
   return starter.needs_folder && folder === null ? "This one works on a project. Start a session in a project folder first, then come back." : null;
 }
 
-function StarterCard({ starter, folder, onAdd, failed }: { starter: WorkflowStarterInfo; folder: string | null; onAdd: AddStarter; failed: StarterFailure | undefined }) {
+export function StarterCard({ starter, folder, onAdd, failed }: { starter: WorkflowStarterInfo; folder: string | null; onAdd: AddStarter; failed: StarterFailure | undefined }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(failed?.id === starter.id ? failed.text : null);
   const off = whyOff(starter, folder);
@@ -66,15 +67,12 @@ function StarterCard({ starter, folder, onAdd, failed }: { starter: WorkflowStar
 export type StarterFailure = { id: string; text: string };
 
 export type WorkflowsEmptyProps = {
-  starters: readonly WorkflowStarterInfo[];
-  /** The current project folder, or null when none is known. */
-  folder: string | null;
-  onAdd: AddStarter;
-  failed?: StarterFailure;
+  /** Opens the page that makes a new workflow. */
+  onNew: () => void;
 };
 
-/** What `/workflows` shows when there are none: what a workflow is, and the starters to add. */
-export function WorkflowsEmpty({ starters, folder, onAdd, failed }: WorkflowsEmptyProps) {
+/** What `/workflows` shows when there are none: what a workflow is, and the way to make one. The starters are on the New workflow page. */
+export function WorkflowsEmpty({ onNew }: WorkflowsEmptyProps) {
   return (
     <div data-screen="workflows-empty" className="flex max-w-2xl flex-col gap-4">
       <div className="flex flex-col gap-1">
@@ -83,33 +81,12 @@ export function WorkflowsEmpty({ starters, folder, onAdd, failed }: WorkflowsEmp
           A workflow runs several steps for you, on a schedule or when you ask, and leaves its result in the Inbox. Each one is a Python file in ~/.golem/workflows.
         </p>
       </div>
-      <ul aria-label="Starter workflows" className="grid gap-3 sm:grid-cols-2">
-        {starters.map((starter) => (
-          <li key={starter.id}>
-            <StarterCard starter={starter} folder={folder} onAdd={onAdd} failed={failed} />
-          </li>
-        ))}
-      </ul>
+      <div>
+        <Button kind="primary" onClick={onNew}>
+          {NEW_WORKFLOW_BUTTON}
+        </Button>
+      </div>
+      <p className="text-sm text-muted">Describe what you want, start from a starter, or begin with an empty file.</p>
     </div>
-  );
-}
-
-/** A quiet list of the starters not added yet, under the workflows. Shows nothing when all are added. */
-export function WorkflowStarters({ starters, folder, onAdd, failed }: WorkflowsEmptyProps) {
-  const headingId = useId();
-  if (starters.length === 0) return null;
-  return (
-    <section aria-labelledby={headingId} className="mt-6 flex max-w-2xl flex-col gap-2">
-      <h2 id={headingId} className="text-xs font-medium text-faint">
-        Starters
-      </h2>
-      <ul aria-label="Starter workflows" className="grid gap-3 sm:grid-cols-2">
-        {starters.map((starter) => (
-          <li key={starter.id}>
-            <StarterCard starter={starter} folder={folder} onAdd={onAdd} failed={failed} />
-          </li>
-        ))}
-      </ul>
-    </section>
   );
 }

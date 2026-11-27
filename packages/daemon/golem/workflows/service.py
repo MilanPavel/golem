@@ -27,9 +27,10 @@ from golem.store.workflow_runs import WorkflowReviewRecord, WorkflowRunRecord, W
 from golem.workflow import WorkflowError
 from golem.workflows.agents import WorkflowAgents
 from golem.workflows.check import CheckEnv, Problem, check
+from golem.workflows.create import CreateError, Named, create_file, file_name, skeleton
 from golem.workflows.engine import AgentStarted, WorkflowEngine, restart_policy
 from golem.workflows.llm import Llm
-from golem.workflows.propose import Proposal, numbered_outline, propose
+from golem.workflows.propose import Proposal, ProposeError, draft, numbered_outline, propose
 from golem.workflows.registry import WorkflowEntry, WorkflowRegistry
 from golem.workflows.starter import StarterError, add_starter
 from golem.workflows.tools import WorkflowTools
@@ -418,6 +419,61 @@ class WorkflowService:
             if entry.path == path:
                 return entry
         raise StarterError(f"{path} was written, but the registry does not list it")
+
+    async def create(
+        self, typed: str, folder: Path | None, code: str | None
+    ) -> tuple[WorkflowEntry, Named]:
+        """Write a new workflow file in ``folder`` (or the user's folder) and reload the registry.
+
+        ``code`` None writes the two-step skeleton. Raises :class:`CreateError`.
+        """
+        named = file_name(typed)
+        text = skeleton(named) if code is None else code
+        folder_text = None if folder is None else str(folder)
+
+        def taken(directory: Path, name: str) -> list[str]:
+            return [e.name for e in self.registry.entries() if e.path.parent == directory]
+
+        await self.refresh([] if folder is None else [folder])
+        path = await asyncio.to_thread(
+            create_file,
+            named,
+            text,
+            folder,
+            user_dir=self._user_dir,
+            trusted=self._trusted,
+            check=lambda source: check(source, folder_text, self.check_env),
+            taken=taken,
+        )
+        entries = await self.refresh([] if folder is None else [folder])
+        for entry in entries:
+            if entry.path == path:
+                return entry, named
+        raise CreateError(f"{path} was written, but the registry does not list it")
+
+    async def draft_code(
+        self, typed: str, ask: str, folder: Path | None, model: str | None
+    ) -> Proposal:
+        """One model call that writes a new workflow from ``ask``, checked, never saved. Raises
+        :class:`~golem.workflows.propose.ProposeError`."""
+        try:
+            named = file_name(typed)
+        except CreateError as exc:
+            raise ProposeError(str(exc)) from exc
+        folder_text = None if folder is None else str(folder)
+        agents: Mapping[str, str] = (
+            {} if self.check_env.agents is None else self.check_env.agents(folder_text)
+        )
+        return await draft(
+            llm=self._llm,
+            folder=folder_text,
+            ask=ask,
+            function=named.file,
+            title=named.title,
+            check=lambda text: check(text, folder_text, self.check_env),
+            agents=agents,
+            model=model,
+        )
 
     def check_code(self, code: str, entry: WorkflowEntry) -> list[Problem]:
         """The problems of ``code`` as the file of ``entry`` (its folder decides the agents and

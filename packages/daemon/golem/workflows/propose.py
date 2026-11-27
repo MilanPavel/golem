@@ -18,10 +18,19 @@ from typing import Any, Literal
 
 from golem.workflow import Run, WorkflowError
 from golem.workflows.check import Problem
+from golem.workflows.edit import DECORATOR, EditError, remove_argument, set_workflow_model
 from golem.workflows.llm import Llm, parse_object
 from golem.workflows.outline import OutlineError, outline
 
-__all__ = ["Proposal", "ProposeError", "api_reference", "numbered_outline", "propose"]
+__all__ = [
+    "Proposal",
+    "ProposeError",
+    "api_reference",
+    "build_draft_prompt",
+    "draft",
+    "numbered_outline",
+    "propose",
+]
 
 _FENCE = re.compile(r"^```[a-zA-Z]*\s*\n(.*?)\n```\s*$", re.DOTALL)
 MAX_ASK = 4000
@@ -192,5 +201,110 @@ async def propose(
     text = _unfence(new)
     if not text.endswith("\n"):
         text += "\n"
+    said = note.strip() if isinstance(note, str) else ""
+    return Proposal(text, said[:MAX_NOTE], check(text), answer.model)
+
+
+def build_draft_prompt(
+    ask: str, function: str, title: str, agents: Mapping[str, str], model: str | None
+) -> str:
+    """The prompt for a new workflow file: the API, the agents, the rules and the ask."""
+    model_rule = (
+        f'Write @workflow(..., model="{model}") with exactly that model name.'
+        if model
+        else "Do not write model= on @workflow or on a step: the person did not pick a model."
+    )
+    parts = [
+        "You write a new golem workflow file. It is Python that uses `golem.workflow`: one"
+        " `@workflow(...)` async function that takes `run: Run` and calls `run.*` steps.",
+        "The step API:\n" + api_reference(),
+        "Agents known in this folder (only these may be named in run.agent):\n"
+        + _agents_text(agents),
+        "Rules:\n"
+        f'- Name the function `{function}` and write `title="{title}"` in @workflow(...), and a'
+        " short description= in plain words.\n"
+        "- Every step has a title= in plain words that says what it does, such as"
+        ' "Read the new files". Put each step on its own call.\n'
+        "- A step that repeats over a list gets item= (what this one is: a file name, an"
+        " address) and runs inside run.parallel with a title= for the group.\n"
+        "- Leave the result with `await run.output(value, title=...)` and return it.\n"
+        "- Do not write trigger=: a routine starts a workflow. Do not write wish words"
+        " (cheapest, same, stronger, local) anywhere.\n"
+        f"- {model_rule}\n"
+        "- Anything that sends, deletes or posts something goes through `run.review` first.\n"
+        "- Do not invent run.* methods or keyword arguments. Keep it short: only the steps"
+        " the ask needs.",
+        f"The ask:\n{ask}",
+        'Answer with one JSON object: {"kind": "change", "code": <the whole file>, "note":'
+        " <one or two sentences on what the steps do>}.",
+    ]
+    return "\n\n".join(parts)
+
+
+def _rename_function(code: str, function: str) -> str:
+    """The only ``@workflow`` function of ``code``, called ``function`` (its def line only)."""
+    try:
+        found = outline(code)
+    except OutlineError:
+        return code
+    if len(found) != 1 or found[0].name == function:
+        return code
+    old = re.escape(found[0].name)
+    return re.sub(rf"(def\s+){old}\b", rf"\g<1>{function}", code, count=1)
+
+
+def _with_model(code: str, function: str, model: str | None) -> str:
+    """``code`` with ``@workflow(model=)`` as the person picked: that name, or none at all."""
+    try:
+        if model:
+            return set_workflow_model(code, model, function)
+        return remove_argument(code, DECORATOR, "model", function)
+    except EditError:
+        return code
+
+
+async def draft(
+    *,
+    llm: Llm | None,
+    folder: str | None,
+    ask: str,
+    function: str,
+    title: str,
+    check: Callable[[str], list[Problem]],
+    agents: Mapping[str, str] | None = None,
+    model: str | None = None,
+) -> Proposal:
+    """One model call that writes a whole new file from a few sentences, then a check.
+
+    ``model`` is the model the person picked: it writes the file, and it is the workflow's
+    ``model=``. Without one golem's default model writes it and the file names no model.
+    Nothing is written to disk. Raises :class:`ProposeError`.
+    """
+    if llm is None:
+        raise ProposeError("no model is available to write a proposal")
+    wish = ask.strip()
+    if not wish:
+        raise ProposeError("say what the workflow should do")
+    if len(wish) > MAX_ASK:
+        raise ProposeError(f"the ask is too long (at most {MAX_ASK} characters)")
+    prompt = build_draft_prompt(wish, function, title, agents or {}, model)
+    try:
+        answer = await llm(prompt, SCHEMA, model, folder)
+    except WorkflowError as exc:
+        raise ProposeError(str(exc)) from exc
+    except Exception as exc:
+        raise ProposeError(f"no model could write a proposal: {exc}") from exc
+    try:
+        found = parse_object(answer.text)
+    except WorkflowError as exc:
+        raise ProposeError("the model did not answer with a workflow; try again") from exc
+    new = found.get("code")
+    note = found.get("note")
+    if found.get("kind", "change") != "change" or not isinstance(new, str) or not new.strip():
+        raise ProposeError("the model did not write a workflow; try again")
+    text = _unfence(new)
+    if not text.endswith("\n"):
+        text += "\n"
+    text = _with_model(_rename_function(text, function), function, model)
     said = note.strip() if isinstance(note, str) else ""
     return Proposal(text, said[:MAX_NOTE], check(text), answer.model)

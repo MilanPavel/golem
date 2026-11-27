@@ -18,7 +18,7 @@ import { SKILL_LIST_KEY } from "./skills.ts";
 import { MEMORY_LIST_KEY, MEMORY_PAGE, type MemoryExportParams, type MemoryExportResult, type MemoryListRequest, type MemoryListResult, type MemoryPrivacy, type MemoryScope } from "./memory.ts";
 import { ROUTINE_GET_KEY, ROUTINE_LIST_KEY, type RoutineGetResult, type RoutineInfo, type RoutineListResult, type RoutineRunResult } from "./routines.ts";
 import { RUN_LIST_KEY, type RunListResult } from "./runs.ts";
-import { WORKFLOW_LIST_KEY, WORKFLOW_STATUS_KEY, workflowGetKey, type ReviewVerdict, type WorkflowAddStarterResult, type WorkflowCancelResult, type WorkflowCheckResult, type WorkflowProposeResult, type WorkflowSaveResult, type WorkflowGetResult, type WorkflowListResult, type WorkflowStartersResult, type WorkflowReadOutputResult, type WorkflowResumeResult, type WorkflowStatusResult, type WorkflowEditStepResult } from "./workflows.ts";
+import { WORKFLOW_LIST_KEY, WORKFLOW_STATUS_KEY, workflowGetKey, type ReviewVerdict, type WorkflowAddStarterResult, type WorkflowCancelResult, type WorkflowCheckResult, type WorkflowProposeResult, type WorkflowCreateResult, type WorkflowDraftResult, type WorkflowSaveResult, type WorkflowGetResult, type WorkflowListResult, type WorkflowStartersResult, type WorkflowReadOutputResult, type WorkflowResumeResult, type WorkflowStatusResult, type WorkflowEditStepResult } from "./workflows.ts";
 import { DATA_DESCRIBE_KEY, DATA_LIST_KEY, DATA_NOTES_KEY, dataAnswer, type DataBrowseKeepResult, type DataBrowseKeepView, type DataBrowseResult, type DataBrowseView, type DataProfileResult, type DataAddParams, type DataAnswer, type DataExportParams, type DataExportResult, type DataExtensionName, type DataResult, type DataResultPageParams, type DataDescribeResult, type DataInspectParams, type DataInspectResult, type DataListResult, type DataNotesGetResult, type DataSource, type DataUpdateParams, type DataRunParams, type DataSaveQueryParams, type DataSavedQuery } from "./data.ts";
 import { createPulls, type Pulls } from "./pulls.ts";
 import { createQueryClient, keepQueriesHonest } from "./query.ts";
@@ -95,6 +95,8 @@ export type PageClient = Pick<
   | "checkWorkflow"
   | "saveWorkflow"
   | "proposeWorkflow"
+  | "createWorkflow"
+  | "draftWorkflow"
   | "editWorkflowStep"
   | "startWorkflow"
   | "listWorkflowStarters"
@@ -467,6 +469,10 @@ export type PageActions = {
   checkWorkflow(id: string, code: string): Promise<WorkflowCheckResult>;
   /** Asks golem for a change to `code`, the file of the workflow `id`: one model call, the answer checked, nothing written. `previous` is the last proposal and its note, for a refine. Rejects with the daemon's reason, such as no model for that folder. */
   proposeWorkflow(id: string, code: string, ask: string, previous?: { code: string; note: string }): Promise<WorkflowProposeResult>;
+  /** Writes a new workflow file called `name` (what the person typed): in `folder` (a trusted project), or in the user's folder when `folder` is null. `code` is the whole file, or null for a two-step skeleton. The workflow list is read again. Rejects with the daemon's reason: the name is taken (the text gives the path and a free name), the folder is not trusted, the check refused the code. */
+  createWorkflow(name: string, folder: string | null, code: string | null): Promise<WorkflowCreateResult>;
+  /** Asks golem to write a new workflow from `ask`, before any file exists: one model call, checked, never saved. `model` is the model the person picked, or null for golem's default. Rejects with the daemon's reason, such as no model set up. */
+  draftWorkflow(name: string, ask: string, folder: string | null, model: string | null): Promise<WorkflowDraftResult>;
   /** Sets one argument of one step in `code`: the new text with its outline and problems. Nothing is written. Rejects with the daemon's reason: a code step, an argument the code computes, a value that is not valid. */
   editWorkflowStep(id: string, code: string, stepId: string, name: string, value: string | number | boolean | null): Promise<WorkflowEditStepResult>;
   /** Writes `code` as the file of the workflow `id`. `baseHash` is the `code_hash` the editor started from. Rejects with the daemon's reason: the file changed on disk, the code has errors, the folder is not trusted. */
@@ -1096,6 +1102,14 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
           await queryClient.invalidateQueries({ queryKey: ROUTINE_LIST_KEY });
         }
       },
+      async createWorkflow(name, folder, code) {
+        try {
+          return await client.createWorkflow(name, folder ?? undefined, code ?? undefined);
+        } finally {
+          await queryClient.invalidateQueries({ queryKey: WORKFLOW_LIST_KEY });
+        }
+      },
+      draftWorkflow: (name, ask, folder, model) => client.draftWorkflow(name, ask, folder ?? undefined, model ?? undefined),
       checkWorkflow: (id, code) => client.checkWorkflow(id, code),
       proposeWorkflow: (id, code, ask, previous) => client.proposeWorkflow(id, code, ask, previous),
       editWorkflowStep: (id, code, stepId, name, value) => client.editWorkflowStep(id, code, stepId, name, value),

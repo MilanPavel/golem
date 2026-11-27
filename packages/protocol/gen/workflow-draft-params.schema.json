@@ -1,0 +1,46 @@
+{
+  "additionalProperties": false,
+  "description": "``workflow.draft``. Ask golem to write a new workflow from a few sentences, before any\nfile exists. ``name`` is the typed name (as in ``workflow.create``), ``folder`` the project it\nwould be saved in (it decides the agents and the local-only rule), and ``model`` the model\nthe person picked: it writes the file and is the workflow's ``model=``. Without a model\ngolem's default model writes it and the file names none. Nothing is written.",
+  "properties": {
+    "ask": {
+      "minLength": 1,
+      "title": "Ask",
+      "type": "string"
+    },
+    "folder": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Folder"
+    },
+    "model": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Model"
+    },
+    "name": {
+      "minLength": 1,
+      "title": "Name",
+      "type": "string"
+    }
+  },
+  "required": [
+    "name",
+    "ask"
+  ],
+  "title": "WorkflowDraftParams",
+  "type": "object"
+}

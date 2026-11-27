@@ -1,11 +1,12 @@
 import { useState, type ReactNode } from "react";
-import { modelNames } from "@golem/view";
+import { NEW_WORKFLOW_BUTTON, modelNames } from "@golem/view";
 import { actionErrorText, folderDialogErrorText, revealErrorText } from "../../store/errors.ts";
 import { useAgentList, useFolderDialog, useModelList, useNavigate, useNewSessionFolder, usePageActions, useRoutineList, useRunList, useWorkflow, useWorkflowList, useWorkflowStarters } from "../../store/page-context.tsx";
 import { useNow } from "../sessions/use-now.ts";
-import { workflowPath } from "../../store/router.ts";
+import { workflowNewPath, workflowPath } from "../../store/router.ts";
 import { WorkflowDetail } from "./workflow-detail.tsx";
-import { WorkflowStarters, WorkflowsEmpty, starterStillToAdd } from "./workflows-empty.tsx";
+import { WorkflowNew } from "./workflow-new.tsx";
+import { WorkflowsEmpty } from "./workflows-empty.tsx";
 import { routinesStarting, workflowRuns } from "./text.ts";
 
 function Frame({ children }: { children: ReactNode }) {
@@ -16,15 +17,10 @@ function Frame({ children }: { children: ReactNode }) {
   );
 }
 
-/** `/workflows`: the starters when there are no workflows, else a hint to pick one from the panel and the starters not added yet. */
+/** `/workflows`: a way to the New workflow page when there are none, else a hint to pick one from the panel. */
 export function WorkflowsScreen() {
   const list = useWorkflowList();
-  const starters = useWorkflowStarters();
-  const actions = usePageActions();
   const navigate = useNavigate();
-  const [folder] = useNewSessionFolder();
-  const [routineNote, setRoutineNote] = useState<string | null>(null);
-  const note = routineNote === null ? null : <p role="status" className="mb-3 max-w-2xl rounded-md border border-line px-2.5 py-1.5 text-sm text-pretty wrap-anywhere">{routineNote}</p>;
   if (list.data === undefined) {
     return (
       <Frame>
@@ -34,7 +30,37 @@ export function WorkflowsScreen() {
   }
   const workflows = list.data.workflows;
   const broken = workflows.filter((workflow) => workflow.state === "broken").length;
-  const known = starters.data?.starters ?? [];
+  if (workflows.length === 0) {
+    return (
+      <Frame>
+        <WorkflowsEmpty onNew={() => navigate(workflowNewPath())} />
+      </Frame>
+    );
+  }
+  return (
+    <Frame>
+      <div className="flex max-w-2xl flex-col gap-1">
+        <h1 className="font-prose text-2xl font-normal tracking-tight">Workflows</h1>
+        <p className="text-sm text-muted">
+          {workflows.length === 1 ? "1 workflow" : `${workflows.length} workflows`}
+          {broken === 0 ? "" : ` · ${broken} broken`}
+        </p>
+        <p className="text-sm text-pretty text-muted">Pick one from the list to see what it does, or make a new one with {NEW_WORKFLOW_BUTTON}.</p>
+      </div>
+    </Frame>
+  );
+}
+
+/** `/workflows/new`: the ways to start a workflow, with the starters on it. */
+export function WorkflowNewScreen() {
+  const list = useWorkflowList();
+  const starters = useWorkflowStarters();
+  const actions = usePageActions();
+  const navigate = useNavigate();
+  const [folder] = useNewSessionFolder();
+  const models = useModelList();
+  const agents = useAgentList(folder);
+  const [routineNote, setRoutineNote] = useState<string | null>(null);
   // A starter that reads a project goes in the folder a new session would start in.
   const add = async (starter: { id: string; needs_folder: boolean }, routine: boolean) => {
     try {
@@ -50,30 +76,24 @@ export function WorkflowsScreen() {
       throw new Error(actionErrorText(error, "The workflow could not be added."));
     }
   };
-  if (workflows.length === 0 && known.length > 0) {
-    return (
-      <Frame>
-        {note}
-        <WorkflowsEmpty starters={known} folder={folder} onAdd={add} />
-      </Frame>
-    );
-  }
   return (
     <Frame>
-      {note}
-      <div className="flex max-w-2xl flex-col gap-1">
-        <h1 className="font-prose text-2xl font-normal tracking-tight">Workflows</h1>
-        <p className="text-sm text-muted">
-          {workflows.length === 0 ? "No workflows yet." : workflows.length === 1 ? "1 workflow" : `${workflows.length} workflows`}
-          {broken === 0 ? "" : ` · ${broken} broken`}
-        </p>
-        <p className="text-sm text-pretty text-muted">
-          {workflows.length === 0
-            ? "A workflow is a Python file in ~/.golem/workflows, or in .golem/workflows in a project. It chains steps that run one after another, each with its own model and tools."
-            : "Pick one from the list to see what it does."}
-        </p>
-      </div>
-      <WorkflowStarters starters={starterStillToAdd(known, workflows, folder)} folder={folder} onAdd={add} />
+      {routineNote === null ? null : <p role="status" className="mb-3 max-w-2xl rounded-md border border-line px-2.5 py-1.5 text-sm text-pretty wrap-anywhere">{routineNote}</p>}
+      <WorkflowNew
+        starters={starters.data?.starters ?? []}
+        workflows={list.data?.workflows ?? []}
+        folder={folder}
+        models={modelNames(models.data ?? null)}
+        defaultModel={models.data?.default ?? null}
+        agents={agents.data?.agents.map((agent) => agent.name)}
+        onAddStarter={add}
+        onDraft={actions.draftWorkflow}
+        onCreate={actions.createWorkflow}
+        onSave={actions.saveWorkflow}
+        onCheck={actions.checkWorkflow}
+        onEditStep={actions.editWorkflowStep}
+        onNavigate={navigate}
+      />
     </Frame>
   );
 }

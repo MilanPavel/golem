@@ -107,6 +107,8 @@ import type { WorkflowProposeResult } from "../../protocol/gen/workflow-propose-
 import type { WorkflowGetResult } from "../../protocol/gen/workflow-get-result.ts";
 import type { WorkflowEditStepResult } from "../../protocol/gen/workflow-edit-step-result.ts";
 import type { WorkflowSaveResult } from "../../protocol/gen/workflow-save-result.ts";
+import type { WorkflowCreateResult } from "../../protocol/gen/workflow-create-result.ts";
+import type { WorkflowDraftResult } from "../../protocol/gen/workflow-draft-result.ts";
 import type { WorkflowListResult } from "../../protocol/gen/workflow-list-result.ts";
 import type { WorkflowStartersResult } from "../../protocol/gen/workflow-starters-result.ts";
 import type { WorkflowAddStarterResult } from "../../protocol/gen/workflow-add-starter-result.ts";
@@ -407,6 +409,14 @@ export function isWorkflowEditStepResult(value: unknown): value is WorkflowEditS
 
 export function isWorkflowSaveResult(value: unknown): value is WorkflowSaveResult {
   return isRecord(value) && isRecord(value["workflow"]) && typeof value["code_hash"] === "string" && Array.isArray(value["problems"]);
+}
+
+export function isWorkflowCreateResult(value: unknown): value is WorkflowCreateResult {
+  return isRecord(value) && isRecord(value["workflow"]) && typeof value["code_hash"] === "string" && typeof value["code"] === "string" && Array.isArray(value["problems"]);
+}
+
+export function isWorkflowDraftResult(value: unknown): value is WorkflowDraftResult {
+  return isRecord(value) && typeof value["code"] === "string" && typeof value["note"] === "string" && Array.isArray(value["steps"]) && Array.isArray(value["problems"]);
 }
 
 export function isWorkflowStartResult(value: unknown): value is WorkflowStartResult {
