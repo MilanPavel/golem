@@ -406,12 +406,13 @@ test("the agent and the model are selects, and a change is sent at once", async 
   const user = userEvent.setup();
   const onEditStep = vi.fn<EditFn>(async (code) => ({ code, steps: SAMPLE_UPGRADE_STEPS, problems: [] }));
   const onOpenAgent = vi.fn();
-  render(fieldsEditor(onEditStep, { onOpenAgent }));
+  render(fieldsEditor(onEditStep, { onOpenAgent, models: ["qwen3.5:9b", "deepseek/chat"] }));
   const pane = within(screen.getByRole("group", { name: "Selected step" }));
   expect(within(pane.getByLabelText("agent")).getAllByRole("option").map((option) => option.textContent)).toEqual([...SAMPLE_UPGRADE_AGENTS]);
-  expect(within(pane.getByLabelText("model")).getAllByRole("option").map((option) => option.textContent)).toEqual(["cheapest", "same", "stronger", "local", "budget", "frontier"]);
-  await user.selectOptions(pane.getByLabelText("model"), "local");
-  await waitFor(() => expect(onEditStep).toHaveBeenCalledWith(SAMPLE_UPGRADE_CODE, "agent:worker", "model", "local"));
+  // The models you have set up are offered; the old wish word the file has stays, marked, and no other is offered.
+  expect(within(pane.getByLabelText("model")).getAllByRole("option").map((option) => option.textContent)).toEqual(["cheapest (old word)", "qwen3.5:9b", "deepseek/chat"]);
+  await user.selectOptions(pane.getByLabelText("model"), "deepseek/chat");
+  await waitFor(() => expect(onEditStep).toHaveBeenCalledWith(SAMPLE_UPGRADE_CODE, "agent:worker", "model", "deepseek/chat"));
   await user.selectOptions(pane.getByLabelText("agent"), "reviewer");
   await waitFor(() => expect(onEditStep).toHaveBeenCalledWith(SAMPLE_UPGRADE_CODE, "agent:worker", "type", "reviewer"));
   await user.click(pane.getByRole("button", { name: "agents/worker.md ↗" }));
@@ -498,4 +499,29 @@ test("the pane says what a step does, what it repeats and what it uses, and its 
   await user.click(pane.getByRole("button", { name: "Show in the file" }));
   expect(screen.getByRole("textbox", { name: "Code of pr_digest" })).toBeTruthy();
   expect(screen.getByRole("button", { name: "Steps and code" }).getAttribute("aria-pressed")).toBe("true");
+});
+
+const MINE = { model: null, now: "qwen3.5:9b", ready: true, note: null } as const;
+
+test("the header says the workflow's model, and picking one writes it into @workflow as an unsaved edit", async () => {
+  const user = userEvent.setup();
+  const edited = SAMPLE_UPGRADE_CODE.replace("@workflow(", '@workflow(model="deepseek/chat", ');
+  const onEditStep = vi.fn<EditFn>(async () => ({ code: edited, steps: SAMPLE_UPGRADE_STEPS, problems: [], workflow_model: { model: "deepseek/chat", now: "deepseek/chat", ready: true, note: null } }));
+  render(fieldsEditor(onEditStep, { models: ["qwen3.5:9b", "deepseek/chat"], workflowModel: MINE }));
+  const pill = screen.getByRole("button", { name: "Model of this workflow" });
+  expect(pill.textContent).toContain("golem's default model · now qwen3.5:9b");
+  await user.click(pill);
+  expect(screen.getByText(/No model is written in the file/)).toBeTruthy();
+  await user.click(screen.getByRole("button", { name: "deepseek/chat" }));
+  await waitFor(() => expect(onEditStep).toHaveBeenCalledWith(SAMPLE_UPGRADE_CODE, "@workflow", "model", "deepseek/chat"));
+  await waitFor(() => expect((screen.getByRole("textbox", { name: "Code of upgrade" }) as HTMLTextAreaElement).value).toBe(edited));
+  expect(screen.getByRole("button", { name: "Model of this workflow" }).textContent).toContain("deepseek/chat · set in the file");
+  expect(screen.getByText("1 change not saved")).toBeTruthy();
+});
+
+test("a model that is not set up here is said beside the pill and in the step's field", () => {
+  const steps = SAMPLE_UPGRADE_STEPS.map((step) => (step.id === "agent:worker" ? { ...step, model: "gone/model", model_now: "gone/model", model_ready: false } : step));
+  render(fieldsEditor(vi.fn<EditFn>(), { steps, workflowModel: { model: "gone/model", now: "gone/model", ready: false, note: "gone/model is not set up on this machine" } }));
+  expect(screen.getByRole("button", { name: "Model of this workflow" }).textContent).toContain("not set up here");
+  expect(screen.getByText(/gone\/model is not set up on this machine, so this step would stop/)).toBeTruthy();
 });

@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from "react";
+import { modelNames } from "@golem/view";
 import { actionErrorText, folderDialogErrorText, revealErrorText } from "../../store/errors.ts";
-import { useAgentList, useFolderDialog, useNavigate, useNewSessionFolder, usePageActions, useRoutineList, useRunList, useWorkflow, useWorkflowList, useWorkflowStarters } from "../../store/page-context.tsx";
+import { useAgentList, useFolderDialog, useModelList, useNavigate, useNewSessionFolder, usePageActions, useRoutineList, useRunList, useWorkflow, useWorkflowList, useWorkflowStarters } from "../../store/page-context.tsx";
 import { useNow } from "../sessions/use-now.ts";
 import { workflowPath } from "../../store/router.ts";
 import { WorkflowDetail } from "./workflow-detail.tsx";
@@ -87,6 +88,7 @@ export function WorkflowScreen({ id }: { id: string }) {
   const navigate = useNavigate();
   const now = useNow();
   const agents = useAgentList(query.data?.workflow.project ?? null, query.data !== undefined);
+  const models = useModelList(query.data !== undefined);
   if (query.data === undefined) {
     return (
       <Frame>
@@ -94,7 +96,7 @@ export function WorkflowScreen({ id }: { id: string }) {
       </Frame>
     );
   }
-  const { workflow, steps, code, code_hash: codeHash } = query.data;
+  const { workflow, steps, code, code_hash: codeHash, workflow_model: workflowModel } = query.data;
   return (
     <Frame>
       <WorkflowDetail
@@ -108,6 +110,8 @@ export function WorkflowScreen({ id }: { id: string }) {
         onPropose={(text, ask, previous) => actions.proposeWorkflow(workflow.id, text, ask, previous)}
         onEditStep={(text, stepId, name, value) => actions.editWorkflowStep(workflow.id, text, stepId, name, value)}
         agents={agents.data?.agents.map((agent) => agent.name)}
+        models={modelNames(models.data ?? null)}
+        workflowModel={workflowModel ?? null}
         runs={workflowRuns(runs.data?.runs ?? [], workflow.name)}
         routines={routinesStarting(routines.data?.routines ?? [], workflow.name)}
         now={now}

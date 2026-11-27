@@ -3,7 +3,7 @@ import { ADD_ROUTINE_WORDS, allRunsWords, checksWords, lastRunWords, routinePill
 import { routineNewPath, routinePath, runsPath, settingsPath } from "../../store/router.ts";
 import type { RoutineInfo } from "../../store/routines.ts";
 import type { RunInfo } from "../../store/runs.ts";
-import type { WorkflowCheckResult, WorkflowEntryInfo, WorkflowOutlineStep, WorkflowSaveResult } from "../../store/workflows.ts";
+import type { WorkflowCheckResult, WorkflowEntryInfo, WorkflowModelInfo, WorkflowOutlineStep, WorkflowSaveResult } from "../../store/workflows.ts";
 import { Badge } from "../../ui/badge.tsx";
 import { Button } from "../../ui/button.tsx";
 import { Code } from "../../ui/code.tsx";
@@ -33,6 +33,10 @@ export type WorkflowDetailProps = {
   onEditStep?: WorkflowEditorProps["onEditStep"];
   /** The agent types a step may name. */
   agents?: readonly string[];
+  /** The names of the models you have set up, for the model of the workflow and of a step. */
+  models?: readonly string[];
+  /** The workflow's own model, as `workflow.get` gave it. */
+  workflowModel?: WorkflowModelInfo | null;
   /** Writes the code. Rejects with the daemon's reason. Without it the code is read only. */
   onSave?: (code: string, baseHash: string) => Promise<WorkflowSaveResult>;
   /** Asks golem for a change to the code (workflow.propose). Without it, the ask box is not offered. */
@@ -71,7 +75,7 @@ function ErrorBox({ error }: { error: string }) {
 const PILL = "inline-flex items-center gap-1.5 rounded-full border border-line bg-surface px-2.5 py-0.5 text-meta text-muted";
 const PILL_LINK = `${PILL} outline-offset-2 outline-clay hover:border-line-strong focus-visible:outline-2`;
 
-function CodeTab({ workflow, steps, code, codeHash, onCheck, onSave, onPropose, onEditStep, agents, onOpenAgent, onReveal, onDirtyChange, onProblemsChange, initialEditor }: Pick<WorkflowDetailProps, "workflow" | "steps" | "code" | "codeHash" | "onCheck" | "onSave" | "onPropose" | "onEditStep" | "agents" | "onReveal" | "initialEditor"> & { onDirtyChange: (dirty: boolean) => void; onProblemsChange: (count: number | null) => void; onOpenAgent: (name: string) => void }) {
+function CodeTab({ workflow, steps, code, codeHash, onCheck, onSave, onPropose, onEditStep, agents, models, workflowModel, onOpenAgent, onReveal, onDirtyChange, onProblemsChange, initialEditor }: Pick<WorkflowDetailProps, "workflow" | "steps" | "code" | "codeHash" | "onCheck" | "onSave" | "onPropose" | "onEditStep" | "agents" | "models" | "workflowModel" | "onReveal" | "initialEditor"> & { onDirtyChange: (dirty: boolean) => void; onProblemsChange: (count: number | null) => void; onOpenAgent: (name: string) => void }) {
   if (code === null) {
     return (
       <div className="flex flex-col gap-2">
@@ -93,6 +97,8 @@ function CodeTab({ workflow, steps, code, codeHash, onCheck, onSave, onPropose, 
       onPropose={onPropose}
       onEditStep={onEditStep}
       agents={agents}
+      models={models}
+      workflowModel={workflowModel}
       onOpenAgent={onOpenAgent}
       onReveal={onReveal}
       onDirtyChange={onDirtyChange}
@@ -182,7 +188,7 @@ function fileName(path: string): string {
 }
 
 /** One workflow in the main area: its title, its pills, Run…, and the editor (Steps, Steps and code, Code). */
-export function WorkflowDetail({ workflow, steps, code, runs, routines = [], codeHash, onCheck, onSave, onPropose, onEditStep, agents, initialEditor, now, onNavigate: navigateTo, onReveal, onStart, onChooseFolder, initialRunOpen = false }: WorkflowDetailProps) {
+export function WorkflowDetail({ workflow, steps, code, runs, routines = [], codeHash, onCheck, onSave, onPropose, onEditStep, agents, models, workflowModel, initialEditor, now, onNavigate: navigateTo, onReveal, onStart, onChooseFolder, initialRunOpen = false }: WorkflowDetailProps) {
   const [runOpen, setRunOpen] = useState(initialRunOpen);
   const [dirty, setDirty] = useState(false);
   const [problems, setProblems] = useState<number | null>(initialEditor?.problems?.length ?? null);
@@ -235,7 +241,7 @@ export function WorkflowDetail({ workflow, steps, code, runs, routines = [], cod
           onCancel={() => setRunOpen(false)} onChooseFolder={onChooseFolder} />}
       {workflow.state === "broken" && workflow.error ? <ErrorBox error={workflow.error} /> : null}
       <div className="min-h-0 flex-1 overflow-y-auto">
-        <CodeTab workflow={workflow} steps={steps} code={code} codeHash={codeHash} onCheck={onCheck} onSave={onSave} onPropose={onPropose} onEditStep={onEditStep} agents={agents} onOpenAgent={() => onNavigate(settingsPath("agents"))} onReveal={onReveal} onDirtyChange={onDirtyChange} onProblemsChange={onProblemsChange} initialEditor={initialEditor} />
+        <CodeTab workflow={workflow} steps={steps} code={code} codeHash={codeHash} onCheck={onCheck} onSave={onSave} onPropose={onPropose} onEditStep={onEditStep} agents={agents} models={models} workflowModel={workflowModel} onOpenAgent={() => onNavigate(settingsPath("agents"))} onReveal={onReveal} onDirtyChange={onDirtyChange} onProblemsChange={onProblemsChange} initialEditor={initialEditor} />
       </div>
     </div>
   );
