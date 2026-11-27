@@ -7,7 +7,7 @@ request, and ``cancel`` (``args.id``) can interrupt it. A request that fails ans
 its error and the worker stays up. The worker ends when stdin closes.
 
 Ops: ``ping``, ``attach``, ``detach``, ``tables``, ``describe``, ``query``,
-``install_extension``, ``load_table``, ``result_page``, ``cancel``.
+``install_extension``, ``load_table``, ``result_page``, ``export``, ``cancel``.
 """
 
 from __future__ import annotations
@@ -88,6 +88,13 @@ class Worker:
                 int(args.get("limit", 200)),
                 None if args.get("sort_column") is None else str(args["sort_column"]),
                 bool(args.get("sort_desc", False)),
+            )
+        if op == "export":
+            return parquet.export(
+                Path(str(args["path"])),
+                Path(str(args["target"])),
+                str(args["format"]),
+                _path(args.get("extension_dir")),
             )
         source = self._source(args)
         if op == "tables":

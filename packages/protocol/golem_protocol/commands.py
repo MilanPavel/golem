@@ -6772,22 +6772,26 @@ class DataResultPageParams(BaseModel):
 
 
 class DataExportParams(BaseModel):
-    """``data.export``. Write a kept result to a file."""
+    """``data.export``. Write a kept result to a new file. It never overwrites one."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     result_id: str = Field(min_length=1)
     path: str = Field(min_length=1)
-    format: Literal["csv", "parquet", "json", "xlsx"]
+    format: Literal["csv", "parquet", "json", "xlsx"] | None = None
+    """None: from the end of ``path``."""
+    session_id: str | None = Field(default=None, min_length=1)
+    """The session whose folder a relative ``path`` is relative to, and whose sources count."""
 
 
 class DataExportResult(BaseModel):
-    """The file written."""
+    """The file written. With ``needs_extension`` nothing was written: that add-on is not here."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     path: str
     rows: int = Field(ge=0)
+    needs_extension: DataExtension | None = None
 
 
 class DataCancelParams(BaseModel):

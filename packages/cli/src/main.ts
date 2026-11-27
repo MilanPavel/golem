@@ -34,7 +34,7 @@ import { formatStatus } from "./format-status.ts";
 import { formatCliVersion } from "./format-version.ts";
 import { DEVICES_USAGE, parseDevicesArgs, runDevicesList, runDevicesPair, runDevicesRename, runDevicesRevoke, type DevicesDeps } from "./devices.ts";
 import { DATA_HELP, parseDataArgs } from "./data-command.ts";
-import { runDataDescribe, runDataList, runDataNotes, runDataQuery, type DataDeps } from "./data-run.ts";
+import { runDataDescribe, runDataExport, runDataList, runDataNotes, runDataQuery, type DataDeps } from "./data-run.ts";
 import { parseMcpArgs, type McpArgs } from "./mcp-command.ts";
 import { planAdd } from "./add-plan.ts";
 import { exportServers } from "./mcp-export.ts";
@@ -646,6 +646,8 @@ async function runData(given: string[]): Promise<number> {
         return runDataNotes(client, parsed.source, parsed.edit, deps);
       case "query":
         return runDataQuery(client, parsed, deps);
+      case "export":
+        return runDataExport(client, parsed, deps);
     }
   });
 }

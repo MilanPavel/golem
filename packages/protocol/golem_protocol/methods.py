@@ -172,6 +172,7 @@ METHOD_ACCESS: Final[Mapping[str, Access]] = {
     "data.remove": "browser",
     "data.extension.install": "browser",
     "data.result.page": "browser",
+    "data.export": "browser",
     "data.notes.get": "browser",
     "data.notes.set": "browser",
     "data.notes.draft": "browser",

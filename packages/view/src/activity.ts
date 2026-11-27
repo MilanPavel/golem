@@ -101,9 +101,11 @@ export function isDetail(value: string | null | undefined): value is Detail {
 
 /**
  * The question for a call whose approval says more than "allow it": turning on an MCP server also
- * lets the model use that server's tools in this chat. Null for any other call, which gets the usual question.
+ * lets the model use that server's tools in this chat, and a data export writes a file. Null for any
+ * other call, which gets the usual question.
  */
 export function approvalQuestion(name: string, args: Readonly<Record<string, unknown>>): string | null {
+  if (name === "data_export") return "golem wants to write a file";
   const server = args.name;
   if (name !== "mcp_enable" || typeof server !== "string" || server === "") return null;
   return `Turn on ${server} and let it use its tools in this chat?`;

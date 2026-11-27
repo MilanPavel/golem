@@ -15,12 +15,15 @@ import {
   rowRangeText,
   sortRows,
   SORTED_ON_PAGE,
+  type DataExtensionName,
+  EXPORT_BUTTON,
   type ResultCell,
 } from "@golem/view";
 import { cn } from "../../ui/cn.ts";
 import { Button } from "../../ui/button.tsx";
-import { dataErrorText, type DataResult, type DataResultPageParams, type ToolTable } from "../../store/data.ts";
+import { dataErrorText, type DataExportParams, type DataExportResult, type DataResult, type DataResultPageParams, type ToolTable } from "../../store/data.ts";
 import { Code } from "../../ui/code.tsx";
+import { ExportDialog } from "./export-dialog.tsx";
 import { ResultChart } from "./result-chart.tsx";
 
 type Sort = { column: number; descending: boolean };
@@ -54,9 +57,23 @@ export type ResultTableInitial = { page?: Page; size?: number; sort?: Sort; view
 /**
  * A kept query result: its columns with their types, a page of rows, paging through the daemon, a sort of
  * the loaded page, a chart when the column types allow one, and a line when the model got no rows.
- * `onPage` is missing where the page cannot ask the daemon.
+ * `onPage` and `onExport` are missing where the page cannot ask the daemon: there is no Export button then.
  */
-export function ResultTable({ table, rowsWithheld = false, onPage, initial }: { table: ToolTable; rowsWithheld?: boolean; onPage?: (params: DataResultPageParams) => Promise<DataResult>; initial?: ResultTableInitial }) {
+export function ResultTable({
+  table,
+  rowsWithheld = false,
+  onPage,
+  onExport,
+  onInstallExtension,
+  initial,
+}: {
+  table: ToolTable;
+  rowsWithheld?: boolean;
+  onPage?: (params: DataResultPageParams) => Promise<DataResult>;
+  onExport?: (params: DataExportParams) => Promise<DataExportResult>;
+  onInstallExtension?: (name: DataExtensionName) => Promise<void>;
+  initial?: ResultTableInitial;
+}) {
   const ids = useId();
   const [size, setSize] = useState(initial?.size ?? RESULT_DEFAULT_PAGE_SIZE);
   const [page, setPage] = useState<Page>(initial?.page ?? { offset: 0, rows: table.rows, total: table.total_rows });
@@ -67,6 +84,7 @@ export function ResultTable({ table, rowsWithheld = false, onPage, initial }: { 
   const [error, setError] = useState<string | null>(initial?.error ?? null);
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set());
   const [showStub, setShowStub] = useState(initial?.showStub ?? false);
+  const [exporting, setExporting] = useState(false);
   const latest = useRef(0);
 
   const pick = useMemo(() => pickChart(table.columns), [table.columns]);
@@ -107,20 +125,30 @@ export function ResultTable({ table, rowsWithheld = false, onPage, initial }: { 
     <div data-result={table.result_id} className="flex flex-col gap-2">
       <div className="flex flex-wrap items-center gap-2">
         <Code tone="muted" className="text-meta">{resultHeader({ ...table })}</Code>
-        {pick === null ? null : (
-          <span role="group" aria-label="Show as" className="ml-auto flex overflow-hidden rounded-md border border-line-strong text-meta">
-            {(["table", "chart"] as const).map((each) => (
-              <button
-                key={each}
-                type="button"
-                aria-pressed={view === each}
-                onClick={() => setView(each)}
-                className={cn("px-2 py-0.5 outline-offset-2 outline-clay focus-visible:outline-2", view === each ? "bg-clay text-on-clay" : "text-muted hover:text-ink")}
-              >
-                {each}
-              </button>
-            ))}
-          </span>
+        {pick === null && onExport === undefined ? null : (
+          <div className="ml-auto flex items-center gap-2">
+          {pick === null ? null : (
+            <span role="group" aria-label="Show as" className="flex overflow-hidden rounded-md border border-line-strong text-meta">
+              {(["table", "chart"] as const).map((each) => (
+                <button
+                  key={each}
+                  type="button"
+                  aria-pressed={view === each}
+                  onClick={() => setView(each)}
+                  className={cn("px-2 py-0.5 outline-offset-2 outline-clay focus-visible:outline-2", view === each ? "bg-clay text-on-clay" : "text-muted hover:text-ink")}
+                >
+                  {each}
+                </button>
+              ))}
+            </span>
+          )}
+          {onExport === undefined ? null : (
+            <Button size="sm" aria-haspopup="dialog" onClick={() => setExporting(true)}>
+              <span aria-hidden="true">⤓ </span>
+              {EXPORT_BUTTON}
+            </Button>
+          )}
+          </div>
         )}
       </div>
 
@@ -265,6 +293,17 @@ export function ResultTable({ table, rowsWithheld = false, onPage, initial }: { 
             </pre> : null}
         </div>
       ) : null}
+      {onExport === undefined ? null : (
+        <ExportDialog
+          open={exporting}
+          resultId={table.result_id}
+          source={table.source}
+          rows={table.total_rows}
+          onExport={onExport}
+          {...(onInstallExtension === undefined ? {} : { onInstallExtension })}
+          onClose={() => setExporting(false)}
+        />
+      )}
     </div>
   );
 }

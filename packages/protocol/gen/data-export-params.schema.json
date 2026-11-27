@@ -1,16 +1,24 @@
 {
   "additionalProperties": false,
-  "description": "``data.export``. Write a kept result to a file.",
+  "description": "``data.export``. Write a kept result to a new file. It never overwrites one.",
   "properties": {
     "format": {
-      "enum": [
-        "csv",
-        "parquet",
-        "json",
-        "xlsx"
+      "anyOf": [
+        {
+          "enum": [
+            "csv",
+            "parquet",
+            "json",
+            "xlsx"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
       ],
-      "title": "Format",
-      "type": "string"
+      "default": null,
+      "title": "Format"
     },
     "path": {
       "minLength": 1,
@@ -21,12 +29,24 @@
       "minLength": 1,
       "title": "Result Id",
       "type": "string"
+    },
+    "session_id": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Session Id"
     }
   },
   "required": [
     "result_id",
-    "path",
-    "format"
+    "path"
   ],
   "title": "DataExportParams",
   "type": "object"

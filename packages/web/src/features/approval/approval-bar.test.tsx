@@ -3,7 +3,7 @@ import { useState } from "react";
 import { beforeEach, expect, test, vi } from "vitest";
 import { diffModeStore } from "../diff/diff-mode.ts";
 import { ApprovalBar } from "./approval-bar.tsx";
-import { PENDING_EDIT, PENDING_SHELL } from "./sample.ts";
+import { PENDING_EDIT, PENDING_EXPORT, PENDING_SHELL } from "./sample.ts";
 
 beforeEach(() => {
   diffModeStore.set("unified");
@@ -25,6 +25,21 @@ test("a pending edit asks the question, says who asked, and shows the diff open"
   expect(screen.getByRole("table", { name: "Change to src/socket.ts" })).toBeTruthy();
   expect(screen.getByRole("group", { name: "Diff layout" })).toBeTruthy();
   expect(screen.getByRole("button", { name: "Details" }).getAttribute("aria-expanded")).toBe("true");
+});
+
+test("a data export asks to write a file and shows what, how, where and what stays as it is", () => {
+  const onAnswer = vi.fn();
+  render(<ApprovalBar tool={PENDING_EXPORT} onAnswer={onAnswer} />);
+  const bar = screen.getByRole("group", { name: "Approval" });
+  expect(bar.querySelector("p")?.textContent).toBe("golem wants to write a file");
+  const lines = screen.getByLabelText("What would be written").textContent ?? "";
+  expect(lines).toContain("format  csv");
+  expect(lines).toContain("new file");
+  expect(lines).toContain("source  @bank stays as it is: read-only");
+  expect(screen.queryByRole("table")).toBeNull();
+  expect(screen.getByRole("button", { name: "Details" }).getAttribute("aria-expanded")).toBe("true");
+  fireEvent.click(screen.getByRole("button", { name: /^Allow once/ }));
+  expect(onAnswer).toHaveBeenCalledWith("allow");
 });
 
 test("an MCP tool reads server and tool, and a call without arguments has no target", () => {

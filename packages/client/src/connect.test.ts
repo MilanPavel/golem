@@ -1882,6 +1882,45 @@ test("data.result.page sends the id, offset and limit, and a malformed page is r
   }
 });
 
+test("data.export sends the id, path and format, and a malformed answer is refused", async () => {
+  const sent: Record<string, unknown>[] = [];
+  const server = await listen((socket) => {
+    attach(socket, {
+      answerPing: true,
+      results: { "data.export": { path: "/tmp/a.csv", rows: 9 } },
+      onRequest: (_socket, method, params) => {
+        if (method.startsWith("data.")) {
+          sent.push({ method, ...params });
+        }
+      },
+    });
+  });
+  const client = connectGolem({ socketPath: server.socketPath, clientName: "web", reconnect: false, heartbeatMs: 60_000 });
+  try {
+    assert.deepEqual(await client.exportDataResult("r_1", "/tmp/a.csv", "csv"), { path: "/tmp/a.csv", rows: 9 });
+    await client.exportDataResult("r_1", "/tmp/b.parquet");
+    await client.exportDataResult("r_1", "b.json", "json", "s_1");
+    assert.deepEqual(sent, [
+      { method: "data.export", result_id: "r_1", path: "/tmp/a.csv", format: "csv" },
+      { method: "data.export", result_id: "r_1", path: "/tmp/b.parquet" },
+      { method: "data.export", result_id: "r_1", path: "b.json", format: "json", session_id: "s_1" },
+    ]);
+  } finally {
+    client.close();
+    await server.close();
+  }
+  const bad = await listen((socket) => {
+    attach(socket, { answerPing: true, results: { "data.export": { rows: "no" } } });
+  });
+  const other = connectGolem({ socketPath: bad.socketPath, clientName: "web", reconnect: false, heartbeatMs: 60_000 });
+  try {
+    await assert.rejects(other.exportDataResult("r_1", "/tmp/a.csv"), /invalid data.export result/);
+  } finally {
+    other.close();
+    await bad.close();
+  }
+});
+
 test("device.* calls send their params, and device.pair.changed and device.changed reach their listeners", async () => {
   const phone = { id: "a".repeat(32), name: "iPhone 16", paired_at: "2026-11-21T10:00:00+01:00", last_seen: null, revoked_at: null, rules: 1 };
   const sent: Record<string, unknown>[] = [];

@@ -150,6 +150,19 @@ class ResultPage:
     columns: list[dict[str, str]]
     rows: list[list[Any]]
     total_rows: int
+    sql: str = ""
+
+
+@dataclass(frozen=True, slots=True)
+class ExportPlan:
+    """A kept result and the new file it would be written to. Nothing is written yet."""
+
+    result_id: str
+    source: str
+    sql: str
+    rows: int
+    path: Path
+    format: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -724,7 +737,33 @@ class DataSources:
             columns=answer["columns"],
             rows=answer["rows"],
             total_rows=int(answer["total_rows"]),
+            sql=str(answer.get("meta", {}).get("sql", "")),
         )
+
+    def _locations(self, root: Path | None) -> list[str]:
+        """The places the sources of ``root`` read, so an export never lands in one."""
+        return [e.location for e in self._entries(root) if e.kind in _ENGINE_KINDS]
+
+    async def plan_export(
+        self, root: Path | None, result_id: str, raw_path: str, fmt: str | None = None
+    ) -> ExportPlan:
+        """Check an export and say what it would write. Raises :class:`DataError`.
+
+        Raises :class:`NeedsExtension` for Excel when its add-on is not installed.
+        """
+        from golem.data.engine import extension_installed
+        from golem.data.export import infer_format, target_path
+
+        found = await self.page(result_id, 0, 1)
+        target = await asyncio.to_thread(target_path, raw_path, root, self._locations(root))
+        kind = fmt or infer_format(raw_path)
+        if kind == "xlsx" and not extension_installed(self._paths.data_extensions_dir, "excel"):
+            raise NeedsExtension("excel")
+        return ExportPlan(result_id, found.source, found.sql, found.total_rows, target, kind)
+
+    async def export(self, plan: ExportPlan) -> int:
+        """Write the whole of the result of ``plan`` to its new file. Returns the row count."""
+        return await self._worker.export(self.results.path(plan.result_id), plan.path, plan.format)
 
     async def cancel(self, result_id: str) -> bool:
         """Stop the query running with ``result_id``. False when there is none."""
@@ -756,6 +795,14 @@ class DataAccess:
                 return info
         known = ", ".join(info.name for info in self._sources.snapshot(self._root))
         raise DataError(f"There is no source called {name}. The sources are: {known}.")
+
+    async def plan_export(
+        self, result_id: str, raw_path: str, fmt: str | None = None
+    ) -> ExportPlan:
+        return await self._sources.plan_export(self._root, result_id, raw_path, fmt)
+
+    async def export(self, plan: ExportPlan) -> int:
+        return await self._sources.export(plan)
 
     async def columns(self, name: str) -> dict[str, list[str]]:
         """The tables of a source and their column names, for an error that names them."""
@@ -856,6 +903,7 @@ __all__ = [
     "DataAccess",
     "DataSources",
     "Description",
+    "ExportPlan",
     "Inspection",
     "QueryResult",
     "ResultPage",

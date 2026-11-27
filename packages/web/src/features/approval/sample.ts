@@ -22,6 +22,21 @@ export const PENDING_SHELL: ToolBlock = {
   approval: { source: "project rule", subject: "pnpm --filter @golem/web test && just check" },
 };
 
+/** A data export waiting for an answer: the lines of the file it would write, not a diff. */
+export const PENDING_EXPORT: ToolBlock = {
+  callId: "ap3",
+  name: "data_export",
+  args: { result: "r_7f2", path: "~/Documents/bank-subscriptions-2026.csv" },
+  status: "waiting",
+  diff: [
+    "query   r_7f2 (select name, count(*) as months, sum(amount) as total from transactions…, 9 rows)",
+    "format  csv",
+    "path    /Users/you/Documents/bank-subscriptions-2026.csv   new file",
+    "source  @bank stays as it is: read-only",
+  ].join("\n"),
+  approval: { source: "built-in default", subject: null },
+};
+
 const answered = (callId: string, answer: NonNullable<ToolBlock["approval"]>["answer"]): ToolBlock => ({
   ...PENDING_EDIT,
   callId,

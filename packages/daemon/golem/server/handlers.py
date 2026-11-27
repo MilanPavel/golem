@@ -86,6 +86,7 @@ from golem.server.data_rpc import (
     data_add,
     data_cancel,
     data_describe,
+    data_export,
     data_extension_install,
     data_inspect,
     data_list,
@@ -298,6 +299,7 @@ from golem_protocol.commands import (
     DataAddParams,
     DataCancelParams,
     DataDescribeParams,
+    DataExportParams,
     DataExtensionInstallParams,
     DataInspectParams,
     DataListParams,
@@ -2597,6 +2599,7 @@ def standard_methods() -> dict[str, Method]:
         "data.result.page": Method(
             "data.result.page", DataResultPageParams, True, data_result_page
         ),
+        "data.export": Method("data.export", DataExportParams, True, data_export),
         "relay.sign": Method("relay.sign", RelaySignParams, True, relay_sign),
         "relay.dh": Method("relay.dh", RelayDhParams, True, relay_dh),
         "device.sync": Method("device.sync", DeviceSyncParams, True, device_sync),

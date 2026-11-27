@@ -5063,45 +5063,51 @@ public struct PurpleDataColumn: Codable {
     }
 }
 
-/// ``data.export``. Write a kept result to a file.
+/// ``data.export``. Write a kept result to a new file. It never overwrites one.
 // MARK: - DataExportParams
 public struct DataExportParams: Codable {
-    public let format: DataExportParamsFormat
+    public let format: FormatEnum?
     public let path: String
     public let resultID: String
+    public let sessionID: String?
 
     public enum CodingKeys: String, CodingKey {
         case format = "format"
         case path = "path"
         case resultID = "result_id"
+        case sessionID = "session_id"
     }
 
-    public init(format: DataExportParamsFormat, path: String, resultID: String) {
+    public init(format: FormatEnum?, path: String, resultID: String, sessionID: String?) {
         self.format = format
         self.path = path
         self.resultID = resultID
+        self.sessionID = sessionID
     }
 }
 
-public enum DataExportParamsFormat: String, Codable {
+public enum FormatEnum: String, Codable {
     case csv = "csv"
     case json = "json"
     case parquet = "parquet"
     case xlsx = "xlsx"
 }
 
-/// The file written.
+/// The file written. With ``needs_extension`` nothing was written: that add-on is not here.
 // MARK: - DataExportResult
 public struct DataExportResult: Codable {
+    public let needsExtension: NeedsExtensionEnum?
     public let path: String
     public let rows: Int
 
     public enum CodingKeys: String, CodingKey {
+        case needsExtension = "needs_extension"
         case path = "path"
         case rows = "rows"
     }
 
-    public init(path: String, rows: Int) {
+    public init(needsExtension: NeedsExtensionEnum?, path: String, rows: Int) {
+        self.needsExtension = needsExtension
         self.path = path
         self.rows = rows
     }

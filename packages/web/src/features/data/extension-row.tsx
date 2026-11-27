@@ -7,7 +7,7 @@ import { Button } from "../../ui/button.tsx";
  * The offer to fetch the Excel or SQLite add-on. Nothing downloads until the person presses the button;
  * a download that fails says why and can be tried again.
  */
-export function ExtensionRow({ name, onInstall, onDone }: { name: DataExtensionName; onInstall: (name: DataExtensionName) => Promise<void>; onDone?: () => void }) {
+export function ExtensionRow({ name, onInstall, onDone, note }: { name: DataExtensionName; onInstall: (name: DataExtensionName) => Promise<void>; onDone?: () => void; note?: string }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   function install(): void {
@@ -26,7 +26,7 @@ export function ExtensionRow({ name, onInstall, onDone }: { name: DataExtensionN
   }
   return (
     <div data-extension={name} className="flex flex-col gap-2 rounded-lg border border-line bg-bg p-3">
-      <p className="text-sm text-muted">{extensionNote(name)}</p>
+      <p className="text-sm text-muted">{note ?? extensionNote(name)}</p>
       <div className="flex flex-wrap items-center gap-2">
         <Button size="sm" kind="primary" aria-disabled={busy} onClick={busy ? undefined : install}>
           {EXTENSION_BUTTON}

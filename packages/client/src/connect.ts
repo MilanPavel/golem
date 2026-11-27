@@ -73,6 +73,8 @@ import type { MemoryChanged } from "../../protocol/gen/memory-changed.ts";
 import type { DataAddParams } from "../../protocol/gen/data-add-params.ts";
 import type { DataAddResult } from "../../protocol/gen/data-add-result.ts";
 import type { DataChanged } from "../../protocol/gen/data-changed.ts";
+import type { DataExportParams } from "../../protocol/gen/data-export-params.ts";
+import type { DataExportResult } from "../../protocol/gen/data-export-result.ts";
 import type { DataExtensionInstallResult } from "../../protocol/gen/data-extension-install-result.ts";
 import type { DataCancelResult } from "../../protocol/gen/data-cancel-result.ts";
 import type { DataDescribeResult } from "../../protocol/gen/data-describe-result.ts";
@@ -315,6 +317,7 @@ import {
   isDeviceRevokeResult,
   isDataChanged,
   isDataCancelResult,
+  isDataExportResult,
   isDataExtensionInstallResult,
   isDataDescribeResult,
   isDataInspectResult,
@@ -943,6 +946,11 @@ export interface GolemClient {
   queryData(params: DataQueryParams): Promise<DataResult>;
   /** `data.result.page`: one page of a kept result, by its `result_id`. */
   pageDataResult(resultId: string, offset: number, limit: number): Promise<DataResult>;
+  /**
+   * `data.export`: write a kept result to a new file. `format` is taken from the end of `path` when it is null.
+   * The answer has `needs_extension` and no file when the Excel add-on is not here yet. A file that exists is never overwritten.
+   */
+  exportDataResult(resultId: string, path: string, format?: DataExportParams["format"], sessionId?: string): Promise<DataExportResult>;
   /** `data.cancel`: stop a query that is still running, by its `result_id`. */
   cancelData(resultId: string): Promise<DataCancelResult>;
   /** `data.extension.install`: download the Excel or SQLite add-on once. Only when the person asks. */
@@ -3320,6 +3328,19 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       const result = await call("data.result.page", { result_id: resultId, offset, limit });
       if (!isDataQueryResult(result)) {
         throw new Error("invalid data.result.page result");
+      }
+      return result;
+    },
+    async exportDataResult(resultId: string, path: string, format?: DataExportParams["format"], sessionId?: string): Promise<DataExportResult> {
+      await ready;
+      const result = await call("data.export", {
+        result_id: resultId,
+        path,
+        ...(format === undefined || format === null ? {} : { format }),
+        ...(sessionId === undefined ? {} : { session_id: sessionId }),
+      });
+      if (!isDataExportResult(result)) {
+        throw new Error("invalid data.export result");
       }
       return result;
     },

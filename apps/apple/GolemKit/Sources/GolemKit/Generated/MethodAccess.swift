@@ -57,6 +57,7 @@ public enum MethodAccess {
         "data.add",
         "data.cancel",
         "data.describe",
+        "data.export",
         "data.extension.install",
         "data.inspect",
         "data.list",

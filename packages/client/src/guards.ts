@@ -75,6 +75,7 @@ import type { EvalsStopResult } from "../../protocol/gen/evals-stop-result.ts";
 import type { MemoryChanged } from "../../protocol/gen/memory-changed.ts";
 import type { DataAddResult } from "../../protocol/gen/data-add-result.ts";
 import type { DataChanged } from "../../protocol/gen/data-changed.ts";
+import type { DataExportResult } from "../../protocol/gen/data-export-result.ts";
 import type { DataExtensionInstallResult } from "../../protocol/gen/data-extension-install-result.ts";
 import type { DataCancelResult } from "../../protocol/gen/data-cancel-result.ts";
 import type { DataDescribeResult } from "../../protocol/gen/data-describe-result.ts";
@@ -583,6 +584,10 @@ export function isDataQueryResult(value: unknown): value is DataResult {
 
 export function isDataCancelResult(value: unknown): value is DataCancelResult {
   return isRecord(value);
+}
+
+export function isDataExportResult(value: unknown): value is DataExportResult {
+  return isRecord(value) && typeof value["path"] === "string" && typeof value["rows"] === "number" && (value["needs_extension"] === undefined || value["needs_extension"] === null || typeof value["needs_extension"] === "string");
 }
 
 export function isDataExtensionInstallResult(value: unknown): value is DataExtensionInstallResult {
