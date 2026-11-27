@@ -2,7 +2,6 @@ import { useId, useState } from "react";
 import type { WorkflowEntryInfo, WorkflowStarterInfo } from "../../store/workflows.ts";
 import { Button } from "../../ui/button.tsx";
 import { Card } from "../../ui/card.tsx";
-import { folderName } from "../sessions/folder.ts";
 
 /** Adds a starter. Rejects with the reason, which the card shows. The live page opens the new workflow when it resolves. */
 export type AddStarter = (starter: WorkflowStarterInfo) => Promise<void>;
@@ -12,12 +11,6 @@ export function starterStillToAdd(starters: readonly WorkflowStarterInfo[], work
   return starters.filter(
     (starter) => !workflows.some((workflow) => workflow.name === starter.id && (starter.needs_folder ? folder !== null && workflow.project === folder : workflow.project === undefined || workflow.project === null)),
   );
-}
-
-/** Where the starter's file goes, for the line under its text. */
-function placeText(starter: WorkflowStarterInfo, folder: string | null): string {
-  if (!starter.needs_folder) return "Goes in ~/.golem/workflows";
-  return folder === null ? "Goes in the project's workflows folder" : `Goes in ${folderName(folder)}/workflows`;
 }
 
 /** What the card says when its button is off, or null when it can be used. */
@@ -45,8 +38,6 @@ function StarterCard({ starter, folder, onAdd, failed }: { starter: WorkflowStar
     <Card className="flex h-full flex-col gap-3">
       <h2 className="text-sm font-semibold">{starter.title}</h2>
       <p className="flex-1 text-sm text-pretty text-muted">{starter.line}</p>
-      <p className="text-xs text-faint">{placeText(starter, folder)}</p>
-      {starter.schedule === undefined || starter.schedule === null ? null : <p className="text-xs font-medium text-ink">{starter.schedule}</p>}
       {off === null ? null : (
         <p id={reasonId} className="text-xs text-muted">
           {off}
@@ -59,7 +50,7 @@ function StarterCard({ starter, folder, onAdd, failed }: { starter: WorkflowStar
       )}
       <div>
         <Button size="sm" disabled={off !== null || busy} aria-describedby={off === null ? undefined : reasonId} onClick={() => void add()}>
-          {busy ? "Adding" : "Add this workflow"}
+          {busy ? "Adding" : "Use this starter"}
         </Button>
       </div>
     </Card>
@@ -83,8 +74,8 @@ export function WorkflowsEmpty({ starters, folder, onAdd, failed }: WorkflowsEmp
     <div data-screen="workflows-empty" className="flex max-w-2xl flex-col gap-4">
       <div className="flex flex-col gap-1">
         <h1 className="font-prose text-2xl font-normal tracking-tight">No workflows yet</h1>
-        <p className="text-sm text-pretty text-muted">
-          A workflow is a Python file that runs steps for you: some at the same time, some by agents in their own copy of your project. Each step is kept, so a stopped run goes on where it left off. Add a starter to see one, then change it.
+        <p className="text-sm text-muted">
+          A workflow runs several steps for you, on a schedule or when you ask, and leaves its result in the Inbox. Each one is a Python file in ~/.golem/workflows.
         </p>
       </div>
       <ul aria-label="Starter workflows" className="grid gap-3 sm:grid-cols-2">

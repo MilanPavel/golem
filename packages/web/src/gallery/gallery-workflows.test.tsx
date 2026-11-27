@@ -146,10 +146,10 @@ test("the gallery's starter stories show the empty page, a project starter, no f
     };
     const nothing = story("Workflows, nothing yet");
     expect(nothing.getByRole("heading", { name: "No workflows yet" })).toBeTruthy();
-    expect(nothing.getByText("Runs every weekday at 07:30")).toBeTruthy();
-    expect(story("Workflows, nothing yet, project starter").getByText("Goes in golem/workflows")).toBeTruthy();
+    expect(nothing.getByText(/Every weekday at 07:30/)).toBeTruthy();
+    expect(story("Workflows, nothing yet, project starter").getAllByRole("button", { name: "Use this starter" }).every((button) => !(button as HTMLButtonElement).disabled)).toBe(true);
     const noFolder = story("Workflows, nothing yet, no folder");
-    expect(noFolder.getAllByRole("button", { name: "Add this workflow" }).filter((button) => (button as HTMLButtonElement).disabled)).toHaveLength(1);
+    expect(noFolder.getAllByRole("button", { name: "Use this starter" }).filter((button) => (button as HTMLButtonElement).disabled)).toHaveLength(1);
     expect(story("Workflows, nothing yet, add refused").getByRole("alert").textContent).toContain("exists already");
     expect(story("Workflows, starters left").getByRole("heading", { name: "Starters" })).toBeTruthy();
     unmount();

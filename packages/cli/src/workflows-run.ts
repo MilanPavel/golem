@@ -177,7 +177,7 @@ export async function runWorkflowCheck(client: WorkflowClient, args: { name: str
 
 /** The table of `golem workflow starters`: id, what it needs, and its one line. */
 export function formatStarters(starters: readonly WorkflowStarterInfo[]): string {
-  const rows = starters.map((s) => [s.id, s.needs_folder ? "project" : "(user)", s.schedule === undefined || s.schedule === null ? s.line : `${s.line} ${s.schedule}.`]);
+  const rows = starters.map((s) => [s.id, s.needs_folder ? "project" : "(user)", s.line]);
   const head = ["STARTER", "GOES IN", "WHAT IT DOES"];
   const widths = head.map((title, col) => Math.max(title.length, ...rows.map((row) => (row[col] as string).length)));
   const line = (cells: readonly string[]): string => cells.map((cell, col) => (col === cells.length - 1 ? cell : cell.padEnd(widths[col] as number))).join("  ").trimEnd();

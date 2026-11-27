@@ -380,7 +380,7 @@ test("starters lists them with where each goes", async () => {
   assert.equal(await runWorkflowStarters(client, deps), 0);
   assert.match(out[0] as string, /^STARTER\s+GOES IN\s+WHAT IT DOES/);
   assert.match(out[0] as string, /fix_check\s+project\s+Fixes it in a copy\./);
-  assert.match(out[0] as string, /morning_briefing\s+\(user\)\s+Reads your logs\. Runs every weekday at 07:30\./);
+  assert.match(out[0] as string, /morning_briefing\s+\(user\)\s+Reads your logs\./);
 });
 
 test("add puts a project starter in the current folder, or in --folder, and a user one in no folder", async () => {

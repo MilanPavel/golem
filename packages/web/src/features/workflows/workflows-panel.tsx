@@ -69,7 +69,7 @@ export function WorkflowsPanel({ list, error = null, selected, onNavigate }: Wor
   const grouped = useMemo(() => workflowGroups(shown), [shown]);
   let note: string | null = null;
   if (list === null) note = error === null ? "Loading workflows." : "Could not load workflows.";
-  else if (list.workflows.length === 0) note = "No workflows yet. A workflow is a Python file in ~/.golem/workflows.";
+  else if (list.workflows.length === 0) note = "No workflows yet.";
   else if (shown.length === 0) note = "No workflows match.";
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2">
@@ -90,7 +90,19 @@ export function WorkflowsPanel({ list, error = null, selected, onNavigate }: Wor
         className="py-1.5"
       />
       <div className="flex min-h-0 flex-1 flex-col gap-3.5 overflow-y-auto pr-0.5">
-        {note === null ? null : <p className="px-2.5 py-2 text-sm text-muted">{note}</p>}
+        {note === null ? null : (
+          <p className="px-2.5 py-2 text-sm text-muted">
+            {note}
+            {list !== null && list.workflows.length === 0 ? (
+              <>
+                {" "}
+                <Link href={workflowPath()} onNavigate={onNavigate} className="text-clay-ink underline underline-offset-2 outline-offset-2 outline-clay focus-visible:outline-2">
+                  See what a workflow does
+                </Link>
+              </>
+            ) : null}
+          </p>
+        )}
         {grouped.map((group) => (
           <Group key={group.key} group={group} selected={selected} onNavigate={onNavigate} />
         ))}

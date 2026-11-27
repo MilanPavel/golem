@@ -248,7 +248,7 @@ export const SAMPLE_FIELD_REFUSED = { name: "model", message: "model is a wish, 
 export const SAMPLE_BRIEFING: WorkflowStarterInfo = {
   id: "morning_briefing",
   title: "Morning briefing",
-  line: "Reads your project folders, logs and feeds since yesterday and leaves one short briefing in the Inbox.",
+  line: "Every weekday at 07:30, read your project folders, logs and feeds and leave one short briefing in the Inbox.",
   needs_folder: false,
   schedule: "Runs every weekday at 07:30",
 };

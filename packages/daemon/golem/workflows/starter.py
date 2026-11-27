@@ -36,7 +36,7 @@ STARTERS: tuple[Starter, ...] = (
     Starter(
         "morning_briefing",
         "Morning briefing",
-        "Reads your project folders, logs and feeds since yesterday and leaves one short "
+        "Every weekday at 07:30, read your project folders, logs and feeds and leave one short "
         "briefing in the Inbox.",
         False,
         "Runs every weekday at 07:30",
