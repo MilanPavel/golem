@@ -184,7 +184,7 @@ function StepPane({ step, number, steps, lines, text, onEdit, agents, onOpenAgen
         </span>
         <KindTag kind={step.kind} />
       </h3>
-      {step.does ? <p className="max-w-[70ch] text-sm text-pretty text-ink-soft">{step.does}</p> : null}
+      {step.does ? <p className="max-w-prose text-sm text-pretty text-ink-soft">{step.does}</p> : null}
       <dl aria-label="About the step" className="flex flex-col gap-1.5">
         {step.for_each ? <Field name="Repeats">{repeatWords(step.for_each)}</Field> : null}
         {step.condition ? (
