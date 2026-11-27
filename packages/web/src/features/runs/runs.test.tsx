@@ -58,7 +58,7 @@ test("the list groups runs as Needs you, Running, Today and Earlier, and a waiti
   expect(groups.map((group) => group.label)).toEqual(["Needs you", "Running", "Today", "Earlier"]);
   const headings = screen.getAllByRole("heading", { level: 2 }).map((heading) => heading.textContent);
   expect(headings).toEqual(groups.map(runGroupHeading));
-  const needs = within(screen.getByRole("region", { name: runGroupHeading(groups[0]!) }));
+  const needs = within(screen.getByRole("group", { name: runGroupHeading(groups[0]!) }));
   const waiting = needs.getByRole("link", { name: /sentry-triage/ });
   expect(waiting.textContent).toContain(runRowLine(SAMPLE_WAITING_RUN, RUNS_NOW));
   expect(waiting.textContent).toContain(runResultLine(SAMPLE_WAITING_RUN));
@@ -150,7 +150,7 @@ test("/runs loads run.list and groups the rows; a click opens the session", asyn
     raw.listRuns.mockResolvedValue({ runs: SAMPLE_RUN_LIST });
   });
   expect(await screen.findByRole("heading", { name: "Runs", level: 1 })).toBeTruthy();
-  const needs = await screen.findByRole("region", { name: /^Needs you \(1\)$/ });
+  const needs = await screen.findByRole("group", { name: /^Needs you \(1\)$/ });
   expect(fake.raw.listRuns).toHaveBeenCalledWith();
   expect(screen.getByText(/1 needs you · 7 runs/)).toBeTruthy();
   await user.click(within(needs).getByRole("link", { name: /sentry-triage/ }));
@@ -173,7 +173,7 @@ test("a headless session that changes marks the runs stale, and a chat of yours 
   const fake = mount("/runs", ({ raw }) => {
     raw.listRuns.mockResolvedValue({ runs: SAMPLE_RUN_LIST });
   });
-  await screen.findByRole("region", { name: /^Needs you/ });
+  await screen.findByRole("group", { name: /^Needs you/ });
   const calls = fake.raw.listRuns.mock.calls.length;
   act(() => {
     fake.emitSummary({ ...summary("s_mine", "2026-11-17T10:00:00Z"), origin: "user" });

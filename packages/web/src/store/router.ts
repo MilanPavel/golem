@@ -12,7 +12,7 @@ export type Route =
   | { name: "data-source"; source: string; tab: DataTab }
   | { name: "workflows" }
   | { name: "workflow"; id: string }
-  | { name: "runs" }
+  | { name: "runs"; /** The workflow whose runs are shown, by its id; null shows every run. */ workflow: string | null }
   | { name: "run"; id: string }
   | { name: "welcome"; step: WelcomeStep; from: "send" | null }
   | { name: "not-found" };
@@ -46,7 +46,7 @@ export type Router = StoreSource<Route> & {
  * and `?folder=` in `search` names the project of a project routine. `/routines?new` is the form for a new routine,
  * `?new=<starter>` fills it from a starter, and `&workflow=<id>` from a workflow (its id, decoded).
  * `/workflows` is the workflows page with none picked, and `/workflows/:id` one workflow (its id, `<path>::<name>`, decoded).
- * `/runs` is the Runs page: what needs you, what is running, and what ran. `/runs/:id` is one workflow run, by its `workflow_run_id` (decoded, not empty).
+ * `/runs` is the Runs page: what needs you, what is running, and what ran. `?workflow=<id>` shows only that workflow's runs. `/runs/:id` is one workflow run, by its `workflow_run_id` (decoded, not empty).
  * `/data` is the Data page with none picked, and `/data/:name` one source (name decoded, no further `/`); `?tab=` names its tab (tables when missing or unknown).
  * `/welcome` is first run: `?step=engine|model|tools|ready` (engine when missing or unknown) and `?from=send`.
  * On `/s/:id`, `?inspect` opens the inspector panel and `?inspect=<span>` opens it at that span.
@@ -71,7 +71,8 @@ export function parseRoute(pathname: string, search = ""): Route {
     return make === null ? { name: "routines" } : { name: "routine-new", starter: make === "" ? null : make, workflow: workflow === "" ? null : workflow };
   }
   if (pathname === "/runs") {
-    return { name: "runs" };
+    const workflow = new URLSearchParams(search).get("workflow");
+    return { name: "runs", workflow: workflow === null || workflow === "" ? null : workflow };
   }
   const run = /^\/runs\/([^/]+)$/.exec(pathname)?.[1];
   if (run !== undefined) {
@@ -199,9 +200,9 @@ export function dataPath(name?: string, tab: DataTab = "tables"): string {
   return tab === "tables" ? base : `${base}?tab=${tab}`;
 }
 
-/** The path of the Runs page. */
-export function runsPath(): string {
-  return "/runs";
+/** The path of the Runs page, with the runs of the workflow `workflow` (its id) when given. */
+export function runsPath(workflow?: string | null): string {
+  return workflow === undefined || workflow === null || workflow === "" ? "/runs" : `/runs?workflow=${encodeURIComponent(workflow)}`;
 }
 
 /** The path of one workflow run, by its `workflow_run_id`. */
@@ -231,6 +232,7 @@ function sameRoute(a: Route, b: Route): boolean {
   if (a.name === "trace") return b.name === "trace" && a.id === b.id && a.span === b.span;
   if (a.name === "welcome") return b.name === "welcome" && a.step === b.step && a.from === b.from;
   if (a.name === "routine-new") return b.name === "routine-new" && a.starter === b.starter && a.workflow === b.workflow;
+  if (a.name === "runs") return b.name === "runs" && a.workflow === b.workflow;
   if (a.name === "run") return b.name === "run" && a.id === b.id;
   if (a.name === "data-source") return b.name === "data-source" && a.source === b.source && a.tab === b.tab;
   if (a.name === "workflow") return b.name === "workflow" && a.id === b.id;

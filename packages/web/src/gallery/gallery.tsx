@@ -104,6 +104,7 @@ import { SAMPLE_LIST, SAMPLE_MORNING_BRIEF, SAMPLE_WORKFLOW_ROUTINE, SAMPLE_WORK
 import { LeadRun, ResultView, RunBanner, RunsList, RunsPanel, WorkflowRunView } from "../features/runs/index.ts";
 import { SAMPLE_FILE_CUT, SAMPLE_FILE_READ, SAMPLE_RUN_CANCELLED, SAMPLE_RUN_DONE, SAMPLE_RUN_FAILED, SAMPLE_RUN_FILE, SAMPLE_RUN_LOOP, SAMPLE_RUN_OUTPUTS, SAMPLE_RUN_REVIEW, SAMPLE_RUN_RUNNING, SAMPLE_RESULTS, SAMPLE_RUN_TEXT, SAMPLE_RUN_TOOL_ASK, WORKFLOW_RUN_NOW } from "../features/runs/workflow-sample.ts";
 import { DataGallery } from "./gallery-data.tsx";
+import { RunsPageGallery } from "./gallery-runs-page.tsx";
 import { DataIconsGallery } from "./gallery-data-icons.tsx";
 import { DataResultGallery } from "./gallery-data-result.tsx";
 import { DataTableViewGallery } from "./gallery-data-table-view.tsx";
@@ -2539,6 +2540,7 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
         <div className="mt-4 rounded-lg border border-line bg-bg p-5" role="region" aria-label={`Runs list, routine workflow run, ${theme}`}>
           <RunsList runs={[SAMPLE_ROUTINE_WORKFLOW_RUN]} now={WORKFLOWS_NOW} onNavigate={() => {}} />
         </div>
+        <RunsPageGallery theme={theme} />
         <div className="mt-4 flex flex-col gap-3 overflow-hidden rounded-lg border border-line bg-bg" role="region" aria-label={`Routine banners, ${theme}`}>
           <RunBanner run={SAMPLE_WAITING_RUN} label="Routine run, schedule" now={RUNS_NOW} onNavigate={() => {}} />
           <RunBanner run={{ ...SAMPLE_WAITING_RUN, status: "running", approvals: 0, trigger: "manual" }} label="Routine run, manual" now={RUNS_NOW} onNavigate={() => {}} />
