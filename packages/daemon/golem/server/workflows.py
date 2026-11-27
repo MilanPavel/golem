@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any
 
 from golem.server.dispatcher import INTERNAL_ERROR, INVALID_PARAMS, RequestContext, RpcCallError
+from golem.server.routines import routine_update
 from golem.store.workflow_runs import WorkflowRunRecord, WorkflowStepRecord
 from golem.workflows.check import Problem
 from golem.workflows.edit import EditError, set_argument
@@ -23,7 +24,9 @@ from golem.workflows.propose import ProposeError
 from golem.workflows.registry import WorkflowEntry
 from golem.workflows.service import ResumeError, ReviewError, SaveError, WorkflowService
 from golem.workflows.starter import STARTERS, StarterError
+from golem.workflows.starter import get as get_starter
 from golem_protocol.commands import (
+    RoutineUpdateParams,
     WorkflowAddStarterParams,
     WorkflowAddStarterResult,
     WorkflowCancelParams,
@@ -51,6 +54,7 @@ from golem_protocol.commands import (
     WorkflowSaveParams,
     WorkflowSaveResult,
     WorkflowStarterInfo,
+    WorkflowStarterRoutine,
     WorkflowStartersParams,
     WorkflowStartersResult,
     WorkflowStartParams,
@@ -246,6 +250,11 @@ async def workflow_starters(
                 line=s.line,
                 needs_folder=s.needs_folder,
                 schedule=s.schedule,
+                routine=None
+                if s.routine is None
+                else WorkflowStarterRoutine(
+                    name=s.routine.name, schedule=s.routine.schedule, words=s.routine.words
+                ),
             )
             for s in STARTERS
         ]
@@ -262,7 +271,36 @@ async def workflow_add_starter(
         entry = await service.add_starter(params.id, folder)
     except StarterError as exc:
         raise RpcCallError(INVALID_PARAMS, str(exc)) from exc
-    return WorkflowAddStarterResult(id=entry.id, name=entry.name, path=str(entry.path))
+    routine: str | None = None
+    problem: str | None = None
+    if params.routine:
+        made = get_starter(params.id)
+        if made is None or made.routine is None:
+            problem = f"{params.id} has no routine"
+        else:
+            try:
+                await routine_update(
+                    ctx,
+                    RoutineUpdateParams(
+                        name=made.routine.name,
+                        create=True,
+                        fields={
+                            "name": made.routine.name,
+                            "schedule": made.routine.schedule,
+                            "workflow": entry.name,
+                        },
+                    ),
+                )
+                routine = made.routine.name
+            except RpcCallError as exc:
+                problem = f"the routine {made.routine.name} was not added: {exc}"
+    return WorkflowAddStarterResult(
+        id=entry.id,
+        name=entry.name,
+        path=str(entry.path),
+        routine=routine,
+        routine_problem=problem,
+    )
 
 
 async def workflow_propose(

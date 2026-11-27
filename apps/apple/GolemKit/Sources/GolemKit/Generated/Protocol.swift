@@ -32216,35 +32216,46 @@ public struct WorkerFile: Codable {
 public struct WorkflowAddStarterParams: Codable {
     public let folder: String?
     public let id: String
+    public let routine: Bool?
 
     public enum CodingKeys: String, CodingKey {
         case folder = "folder"
         case id = "id"
+        case routine = "routine"
     }
 
-    public init(folder: String?, id: String) {
+    public init(folder: String?, id: String, routine: Bool?) {
         self.folder = folder
         self.id = id
+        self.routine = routine
     }
 }
 
-/// The new workflow: ``id`` is the one ``workflow.get`` takes.
+/// The new workflow: ``id`` is the one ``workflow.get`` takes. ``routine`` is the name of
+/// the
+/// routine that was created; ``routine_problem`` says why it was asked for and not made.
 // MARK: - WorkflowAddStarterResult
 public struct WorkflowAddStarterResult: Codable {
     public let id: String
     public let name: String
     public let path: String
+    public let routine: String?
+    public let routineProblem: String?
 
     public enum CodingKeys: String, CodingKey {
         case id = "id"
         case name = "name"
         case path = "path"
+        case routine = "routine"
+        case routineProblem = "routine_problem"
     }
 
-    public init(id: String, name: String, path: String) {
+    public init(id: String, name: String, path: String, routine: String?, routineProblem: String?) {
         self.id = id
         self.name = name
         self.path = path
+        self.routine = routine
+        self.routineProblem = routineProblem
     }
 }
 
@@ -34589,12 +34600,14 @@ public struct WorkflowStartResult: Codable {
 }
 
 /// One starter workflow golem ships. ``needs_folder`` says it reads a project, so it goes
-/// in that project's ``workflows`` folder; the others go in the user's.
+/// in that project's ``workflows`` folder; the others go in the user's. ``routine`` is the
+/// routine that can be added with it.
 // MARK: - WorkflowStarterInfo
 public struct WorkflowStarterInfo: Codable {
     public let id: String
     public let line: String
     public let needsFolder: Bool
+    public let routine: WorkflowStarterInfoWorkflowStarterRoutine?
     public let schedule: String?
     public let title: String
 
@@ -34602,16 +34615,39 @@ public struct WorkflowStarterInfo: Codable {
         case id = "id"
         case line = "line"
         case needsFolder = "needs_folder"
+        case routine = "routine"
         case schedule = "schedule"
         case title = "title"
     }
 
-    public init(id: String, line: String, needsFolder: Bool, schedule: String?, title: String) {
+    public init(id: String, line: String, needsFolder: Bool, routine: WorkflowStarterInfoWorkflowStarterRoutine?, schedule: String?, title: String) {
         self.id = id
         self.line = line
         self.needsFolder = needsFolder
+        self.routine = routine
         self.schedule = schedule
         self.title = title
+    }
+}
+
+/// The routine that comes with a starter: ``name`` and ``schedule`` as ``routine.update``
+/// takes them, and ``words`` as a short phrase for the card ("every weekday at 07:30").
+// MARK: - WorkflowStarterInfoWorkflowStarterRoutine
+public struct WorkflowStarterInfoWorkflowStarterRoutine: Codable {
+    public let name: String
+    public let schedule: String
+    public let words: String
+
+    public enum CodingKeys: String, CodingKey {
+        case name = "name"
+        case schedule = "schedule"
+        case words = "words"
+    }
+
+    public init(name: String, schedule: String, words: String) {
+        self.name = name
+        self.schedule = schedule
+        self.words = words
     }
 }
 
@@ -34637,12 +34673,14 @@ public struct WorkflowStartersResult: Codable {
 }
 
 /// One starter workflow golem ships. ``needs_folder`` says it reads a project, so it goes
-/// in that project's ``workflows`` folder; the others go in the user's.
+/// in that project's ``workflows`` folder; the others go in the user's. ``routine`` is the
+/// routine that can be added with it.
 // MARK: - StarterElement
 public struct StarterElement: Codable {
     public let id: String
     public let line: String
     public let needsFolder: Bool
+    public let routine: StarterWorkflowStarterRoutine?
     public let schedule: String?
     public let title: String
 
@@ -34650,16 +34688,39 @@ public struct StarterElement: Codable {
         case id = "id"
         case line = "line"
         case needsFolder = "needs_folder"
+        case routine = "routine"
         case schedule = "schedule"
         case title = "title"
     }
 
-    public init(id: String, line: String, needsFolder: Bool, schedule: String?, title: String) {
+    public init(id: String, line: String, needsFolder: Bool, routine: StarterWorkflowStarterRoutine?, schedule: String?, title: String) {
         self.id = id
         self.line = line
         self.needsFolder = needsFolder
+        self.routine = routine
         self.schedule = schedule
         self.title = title
+    }
+}
+
+/// The routine that comes with a starter: ``name`` and ``schedule`` as ``routine.update``
+/// takes them, and ``words`` as a short phrase for the card ("every weekday at 07:30").
+// MARK: - StarterWorkflowStarterRoutine
+public struct StarterWorkflowStarterRoutine: Codable {
+    public let name: String
+    public let schedule: String
+    public let words: String
+
+    public enum CodingKeys: String, CodingKey {
+        case name = "name"
+        case schedule = "schedule"
+        case words = "words"
+    }
+
+    public init(name: String, schedule: String, words: String) {
+        self.name = name
+        self.schedule = schedule
+        self.words = words
     }
 }
 

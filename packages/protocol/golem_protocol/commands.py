@@ -6332,9 +6332,21 @@ class WorkflowSaveResult(BaseModel):
     code_hash: str = Field(min_length=1)
 
 
+class WorkflowStarterRoutine(BaseModel):
+    """The routine that comes with a starter: ``name`` and ``schedule`` as ``routine.update``
+    takes them, and ``words`` as a short phrase for the card ("every weekday at 07:30")."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    name: str = Field(min_length=1)
+    schedule: str = Field(min_length=1)
+    words: str = Field(min_length=1)
+
+
 class WorkflowStarterInfo(BaseModel):
     """One starter workflow golem ships. ``needs_folder`` says it reads a project, so it goes
-    in that project's ``workflows`` folder; the others go in the user's."""
+    in that project's ``workflows`` folder; the others go in the user's. ``routine`` is the
+    routine that can be added with it."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -6344,6 +6356,7 @@ class WorkflowStarterInfo(BaseModel):
     needs_folder: bool
     schedule: str | None = None
     """When it runs by itself, as a line to show before it is added. Null for never."""
+    routine: WorkflowStarterRoutine | None = None
 
 
 class WorkflowStartersParams(BaseModel):
@@ -6369,16 +6382,22 @@ class WorkflowAddStarterParams(BaseModel):
 
     id: str = Field(min_length=1)
     folder: str | None = None
+    routine: bool = False
+    """Also create the starter's routine, pointing at the new workflow. The workflow is added
+    even when the routine cannot be."""
 
 
 class WorkflowAddStarterResult(BaseModel):
-    """The new workflow: ``id`` is the one ``workflow.get`` takes."""
+    """The new workflow: ``id`` is the one ``workflow.get`` takes. ``routine`` is the name of the
+    routine that was created; ``routine_problem`` says why it was asked for and not made."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     id: str = Field(min_length=1)
     name: str = Field(min_length=1)
     path: str = Field(min_length=1)
+    routine: str | None = None
+    routine_problem: str | None = None
 
 
 class WorkflowStartParams(BaseModel):
@@ -7628,6 +7647,7 @@ __all__ = [
     "WorkflowStartResult",
     "WorkflowStartTrigger",
     "WorkflowStarterInfo",
+    "WorkflowStarterRoutine",
     "WorkflowStartersParams",
     "WorkflowStartersResult",
     "WorkflowState",

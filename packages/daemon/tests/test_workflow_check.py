@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from golem.workflows.check import CheckEnv, Problem, check
+from golem.workflows.check import TRIGGER_UNUSED, CheckEnv, Problem, check
 
 HEAD = "from golem.workflow import workflow, Run, schedule, on_file\n\n\n"
 
@@ -21,6 +21,11 @@ def _env(*, local_only: bool = False, paid: tuple[str, ...] = ("stronger", "fron
         local_only=lambda folder: local_only,
         tier_of_wish=lambda wish, local: "cloud" if wish in paid else "local",
     )
+
+
+def _errors(problems: list[Problem]) -> Problem:
+    """The one error among the problems; the trigger= note is checked on its own."""
+    return _one([p for p in problems if p.severity == "error"])
 
 
 def _one(problems: list[Problem]) -> Problem:
@@ -117,13 +122,21 @@ def test_a_wish_that_cannot_resolve_is_a_warning() -> None:
 
 
 def test_triggers() -> None:
-    assert check(_flow("pass", '@workflow(trigger=schedule("weekly mon 06:00"))')) == []
-    bad = _one(check(_flow("pass", '@workflow(trigger=schedule("whenever"))')))
+    bad = _errors(check(_flow("pass", '@workflow(trigger=schedule("whenever"))')))
     assert bad.severity == "error" and bad.step_id is None
-    empty = _one(check(_flow("pass", '@workflow(trigger=on_file(""))')))
+    empty = _errors(check(_flow("pass", '@workflow(trigger=on_file(""))')))
     assert "on_file" in empty.message
-    watch = _one(check(_flow("pass", '@workflow(trigger=watch("a.txt"))')))
+    watch = _errors(check(_flow("pass", '@workflow(trigger=watch("a.txt"))')))
     assert watch.fix == "on_file"
+
+
+def test_trigger_is_not_used_and_says_so_on_its_line() -> None:
+    code = _flow("pass", '@workflow(trigger=schedule("weekly mon 06:00"))')
+    found = _one(check(code))
+    assert found.severity == "warning" and found.step_id is None
+    assert found.message == TRIGGER_UNUSED
+    assert "trigger=" in code.splitlines()[found.line - 1]
+    assert check(_flow("pass", "@workflow")) == []
 
 
 def test_check_never_imports_the_file() -> None:

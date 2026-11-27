@@ -3,12 +3,17 @@
 export type Id = string;
 export type Name = string;
 export type Path = string;
+export type Routine = string | null;
+export type RoutineProblem = string | null;
 
 /**
- * The new workflow: ``id`` is the one ``workflow.get`` takes.
+ * The new workflow: ``id`` is the one ``workflow.get`` takes. ``routine`` is the name of the
+ * routine that was created; ``routine_problem`` says why it was asked for and not made.
  */
 export interface WorkflowAddStarterResult {
   id: Id;
   name: Name;
   path: Path;
+  routine?: Routine;
+  routine_problem?: RoutineProblem;
 }

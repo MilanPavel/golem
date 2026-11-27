@@ -3,17 +3,34 @@
 export type Id = string;
 export type Line = string;
 export type NeedsFolder = boolean;
-export type Schedule = string | null;
+export type Name = string;
+export type Schedule = string;
+export type Words = string;
+export type Schedule1 = string | null;
 export type Title = string;
 
 /**
  * One starter workflow golem ships. ``needs_folder`` says it reads a project, so it goes
- * in that project's ``workflows`` folder; the others go in the user's.
+ * in that project's ``workflows`` folder; the others go in the user's. ``routine`` is the
+ * routine that can be added with it.
  */
 export interface WorkflowStarterInfo {
   id: Id;
   line: Line;
   needs_folder: NeedsFolder;
-  schedule?: Schedule;
+  routine?: WorkflowStarterRoutine | null;
+  schedule?: Schedule1;
   title: Title;
+}
+/**
+ * The routine that comes with a starter: ``name`` and ``schedule`` as ``routine.update``
+ * takes them, and ``words`` as a short phrase for the card ("every weekday at 07:30").
+ *
+ * This interface was referenced by `WorkflowStarterInfo`'s JSON-Schema
+ * via the `definition` "WorkflowStarterRoutine".
+ */
+export interface WorkflowStarterRoutine {
+  name: Name;
+  schedule: Schedule;
+  words: Words;
 }

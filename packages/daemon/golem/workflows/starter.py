@@ -22,14 +22,23 @@ class StarterError(Exception):
 
 
 @dataclass(frozen=True, slots=True)
+class StarterRoutine:
+    """The routine that can come with a starter: it starts the workflow on a schedule."""
+
+    name: str
+    schedule: str
+    words: str
+    """The schedule as a short phrase for a button, such as "every weekday at 07:30"."""
+
+
+@dataclass(frozen=True, slots=True)
 class Starter:
     id: str
     title: str
     line: str
     needs_folder: bool
     """True when the workflow reads a project (it goes in the project's ``workflows/``)."""
-    schedule: str | None = None
-    """Said before the starter is added when its file starts runs by itself, else None."""
+    routine: StarterRoutine | None = None
 
 
 STARTERS: tuple[Starter, ...] = (
@@ -38,6 +47,7 @@ STARTERS: tuple[Starter, ...] = (
         "Morning briefing",
         "Read your project folders, logs and feeds and leave one short briefing in the Inbox.",
         False,
+        routine=StarterRoutine("morning-briefing", "weekdays 07:30", "every weekday at 07:30"),
     ),
 )
 

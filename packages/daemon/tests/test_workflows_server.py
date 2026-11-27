@@ -11,6 +11,7 @@ from typing import cast
 from test_server import HELLO, RpcClient, error_code, rpc_result, start_daemon, stop_daemon
 
 from golem.server.dispatcher import INVALID_PARAMS
+from golem.workflows.check import TRIGGER_UNUSED
 from golem.workflows.registry import WorkflowRegistry
 
 TWO_STEPS = """\
@@ -263,10 +264,18 @@ async def test_starters_are_listed_and_added(short_home: Path, tmp_path: Path) -
         assert [(s["id"], s["needs_folder"], s["schedule"]) for s in listed] == [
             ("morning_briefing", False, None)
         ]
+        assert listed[0]["routine"] == {
+            "name": "morning-briefing",
+            "schedule": "weekdays 07:30",
+            "words": "every weekday at 07:30",
+        }
         added = rpc_result(await client.call("workflow.add_starter", {"id": "morning_briefing"}))
         path = short_home / "workflows" / "morning_briefing.py"
         assert (added["name"], added["path"]) == ("morning_briefing", str(path))
         assert path.is_file() and added["id"] == f"{path}::morning_briefing"
+        assert (added["routine"], added["routine_problem"]) == (None, None)
+        none = rpc_result(await client.call("routine.list", {}))
+        assert none["routines"] == []
         got = rpc_result(await client.call("workflow.get", {"id": added["id"]}, timeout=20))
         info = cast(dict[str, object], got["workflow"])
         assert info["state"] == "ok"
@@ -279,6 +288,42 @@ async def test_starters_are_listed_and_added(short_home: Path, tmp_path: Path) -
         ):
             assert error_code(await client.call("workflow.add_starter", params)) == INVALID_PARAMS
         assert not (project / "workflows").exists()
+    finally:
+        await client.close()
+        await stop_daemon(app, task)
+
+
+async def test_a_starter_comes_with_its_routine_and_a_taken_name_does_not_stop_it(
+    short_home: Path,
+) -> None:
+    app, task = await start_daemon(short_home)
+    client = await RpcClient.connect(app.paths.socket_path)
+    try:
+        await client.call("hello", HELLO)
+        added = rpc_result(
+            await client.call(
+                "workflow.add_starter", {"id": "morning_briefing", "routine": True}, timeout=20
+            )
+        )
+        assert (added["routine"], added["routine_problem"]) == ("morning-briefing", None)
+        listed = rpc_result(await client.call("routine.list", {}))
+        [routine] = cast(Rows, listed["routines"])
+        config = cast(dict[str, object], routine["config"])
+        assert (config["name"], config["schedule"], config["workflow"]) == (
+            "morning-briefing",
+            "weekdays 07:30",
+            "morning_briefing",
+        )
+        # The workflow goes away; the routine stays, so a second add finds its name taken.
+        (short_home / "workflows" / "morning_briefing.py").unlink()
+        again = rpc_result(
+            await client.call(
+                "workflow.add_starter", {"id": "morning_briefing", "routine": True}, timeout=20
+            )
+        )
+        assert again["routine"] is None
+        assert "morning-briefing" in str(again["routine_problem"])
+        assert (short_home / "workflows" / "morning_briefing.py").is_file()
     finally:
         await client.close()
         await stop_daemon(app, task)
@@ -300,7 +345,7 @@ async def test_check_and_save(short_home: Path, tmp_path: Path) -> None:
         assert len(digest) == 64
 
         saved_file = rpc_result(await client.call("workflow.check", {"id": ident}))
-        assert saved_file["problems"] == []
+        assert [p["message"] for p in cast(Rows, saved_file["problems"])] == [TRIGGER_UNUSED]
         assert len(cast(Rows, saved_file["steps"])) == 2
 
         broken_code = TWO_STEPS.replace("run.step(", "run.llm(", 1).replace(
@@ -309,8 +354,8 @@ async def test_check_and_save(short_home: Path, tmp_path: Path) -> None:
         checked = rpc_result(
             await client.call("workflow.check", {"id": ident, "code": broken_code})
         )
-        problems = cast(Rows, checked["problems"])
-        assert [p["severity"] for p in problems] == ["error"]
+        problems = [p for p in cast(Rows, checked["problems"]) if p["severity"] == "error"]
+        assert len(problems) == 1
         assert problems[0]["line"] == 10 and problems[0]["step_id"]
         assert good.read_text(encoding="utf-8") == TWO_STEPS
 
@@ -351,7 +396,7 @@ async def test_check_and_save(short_home: Path, tmp_path: Path) -> None:
         check_only = rpc_result(
             await client.call("workflow.check", {"id": untrusted, "code": text})
         )
-        assert check_only["problems"] == []
+        assert [p["message"] for p in cast(Rows, check_only["problems"])] == [TRIGGER_UNUSED]
     finally:
         await client.close()
         await stop_daemon(app, task)

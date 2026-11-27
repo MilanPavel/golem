@@ -2,6 +2,7 @@
 
 export type Folder = string | null;
 export type Id = string;
+export type Routine = boolean;
 
 /**
  * ``workflow.add_starter``. Write the starter ``id`` as a workflow file.
@@ -12,4 +13,5 @@ export type Id = string;
 export interface WorkflowAddStarterParams {
   folder?: Folder;
   id: Id;
+  routine?: Routine;
 }

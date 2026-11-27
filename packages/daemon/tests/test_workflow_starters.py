@@ -138,6 +138,16 @@ def test_each_starter_loads_and_checks_clean(one: Starter) -> None:
     assert one.schedule is None
 
 
+def test_the_briefing_comes_with_a_weekday_routine() -> None:
+    [one] = STARTERS
+    assert one.routine == starters.StarterRoutine(
+        "morning-briefing", "weekdays 07:30", "every weekday at 07:30"
+    )
+    from golem.routines import parse_schedule
+
+    parse_schedule(one.routine.schedule)
+
+
 # morning_briefing: the gather functions
 
 briefing = _load("morning_briefing")
