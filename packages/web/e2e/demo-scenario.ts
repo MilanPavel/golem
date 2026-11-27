@@ -182,6 +182,7 @@ export function routineConfig(watchDir: string, briefDir: string): string[] {
 export async function runMorningBrief(model: FakeModel, second: SecondClient): Promise<void> {
   model.reply("Two meetings today, at 10:00 and 14:30, and one pull request waits for your review.", { delayMs: 20 });
   const { session_id: id } = await second.client.runRoutine(BRIEF_ROUTINE);
+  if (id === undefined || id === null) throw new Error("the morning brief started without a session");
   const end = Date.now() + 30_000;
   for (;;) {
     const { runs } = await second.client.listRuns({ limit: 10 });
@@ -203,7 +204,7 @@ export async function titleRun(second: SecondClient, routine: string, title: str
   for (;;) {
     const { runs } = await second.client.listRuns({ limit: 10 });
     const run = runs.find((r) => r.routine === routine);
-    if (run !== undefined) {
+    if (run !== undefined && run.session_id !== undefined && run.session_id !== null) {
       await second.client.renameSession(run.session_id, title);
       return;
     }

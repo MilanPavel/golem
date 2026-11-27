@@ -100,6 +100,18 @@ test("in the panel a workflow run opens its run page and is marked on it, and an
   expect(links[1]?.getAttribute("aria-current")).toBeNull();
 });
 
+test("a workflow run with no session is a row keyed and linked by its run id, in the list and the panel", () => {
+  const bare: RunInfo = { ...SAMPLE_WAITING_RUN, kind: "workflow", origin: "workflow:morning_briefing", workflow_run_id: "wr_bare" };
+  delete (bare as { session_id?: string | null }).session_id;
+  const { unmount } = render(<RunsList runs={[bare, SAMPLE_WAITING_RUN]} now={RUNS_NOW} onNavigate={() => {}} />);
+  expect(screen.getAllByRole("link").map((link) => link.getAttribute("href"))).toEqual(["/runs/wr_bare", `/s/${SAMPLE_WAITING_RUN.session_id}`]);
+  unmount();
+  render(<RunsPanel runs={[bare]} selected={null} selectedRun="wr_bare" now={RUNS_NOW} onNavigate={() => {}} />);
+  const links = screen.getAllByRole("link").filter((link) => link.getAttribute("href") !== "/runs");
+  expect(links.map((link) => link.getAttribute("href"))).toEqual(["/runs/wr_bare"]);
+  expect(links[0]?.getAttribute("aria-current")).toBe("page");
+});
+
 test("the banner says the routine, when, why, and what waits, for each trigger, with links", async () => {
   const onNavigate = vi.fn();
   const kinds: [RunInfo, string][] = [

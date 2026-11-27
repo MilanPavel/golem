@@ -1,10 +1,11 @@
-import { runGroupHeading, runGroups, runName, runResultLine, runStatusWords } from "@golem/view";
-import { runPath, runsPath, sessionPath } from "../../store/router.ts";
+import { runGroupHeading, runGroups, runKey, runName, runResultLine, runStatusWords } from "@golem/view";
+import { runsPath } from "../../store/router.ts";
 import { useNavigate, useRoute, useRunList } from "../../store/page-context.tsx";
 import type { RunInfo } from "../../store/runs.ts";
 import { cn } from "../../ui/cn.ts";
 import { Link } from "../../ui/link.tsx";
 import { RunDot } from "../routines/index.ts";
+import { runHref } from "./runs-list.tsx";
 import { useNow } from "../sessions/use-now.ts";
 
 const LINK = "text-clay-ink underline underline-offset-2 outline-offset-2 outline-clay focus-visible:outline-2";
@@ -43,11 +44,11 @@ export function RunsPanel({ runs, error = null, selected, selectedRun = null, no
                 <div className="mb-1 px-2.5 text-xs font-medium text-faint">{runGroupHeading(group)}</div>
                 <ul aria-label={group.label} className="flex flex-col gap-px">
                   {group.items.map((run) => {
-                    const open = run.workflow_run_id != null ? selectedRun === run.workflow_run_id : selected === run.session_id;
+                    const open = run.workflow_run_id != null ? selectedRun === run.workflow_run_id : run.session_id != null && selected === run.session_id;
                     return (
-                    <li key={run.session_id}>
+                    <li key={runKey(run)}>
                       <Link
-                        href={run.workflow_run_id != null ? runPath(run.workflow_run_id) : sessionPath(run.session_id)}
+                        href={runHref(run)}
                         onNavigate={onNavigate}
                         aria-current={open ? "page" : undefined}
                         className={cn(

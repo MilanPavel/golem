@@ -1,6 +1,6 @@
 import { useId } from "react";
-import { runDuration, runGroupHeading, runGroups, runName, runResultLine, runRowLine, runStatusWords, type RunGroup } from "@golem/view";
-import { runPath, sessionPath } from "../../store/router.ts";
+import { runDuration, runGroupHeading, runGroups, runKey, runName, runResultLine, runRowLine, runStatusWords, type RunGroup } from "@golem/view";
+import { runPath, runsPath, sessionPath } from "../../store/router.ts";
 import type { RunInfo } from "../../store/runs.ts";
 import { cn } from "../../ui/cn.ts";
 import { Link } from "../../ui/link.tsx";
@@ -13,13 +13,19 @@ function kindWords(run: RunInfo): string {
   return run.kind === "routine" && run.origin.startsWith("workflow:") ? `workflow ${run.origin.slice("workflow:".length)}` : run.kind;
 }
 
+/** Where a row goes: a workflow run opens its run page, any other run its session. A run with neither goes to the Runs page. */
+export function runHref(run: RunInfo): string {
+  if (run.workflow_run_id != null) return runPath(run.workflow_run_id);
+  return run.session_id == null ? runsPath() : sessionPath(run.session_id);
+}
+
 /** One run: its mark, name and kind, how it began, and on the right how it went and how long it took. Opens the session, or for a workflow run its steps. */
 export function RunRow({ run, now, onNavigate }: { run: RunInfo; now: number; onNavigate: (path: string) => void }) {
   const duration = runDuration(run, now);
   return (
     <li>
       <Link
-        href={run.workflow_run_id != null ? runPath(run.workflow_run_id) : sessionPath(run.session_id)}
+        href={runHref(run)}
         onNavigate={onNavigate}
         className="flex items-start gap-3 rounded-lg border border-transparent px-3 py-2 text-left outline-offset-2 outline-clay hover:border-line hover:bg-surface focus-visible:outline-2"
       >
@@ -51,7 +57,7 @@ function Group({ group, now, onNavigate }: { group: RunGroup<RunInfo>; now: numb
       </h2>
       <ul className="flex flex-col gap-0.5">
         {group.items.map((run) => (
-          <RunRow key={run.session_id} run={run} now={now} onNavigate={onNavigate} />
+          <RunRow key={runKey(run)} run={run} now={now} onNavigate={onNavigate} />
         ))}
       </ul>
     </section>
