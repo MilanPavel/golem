@@ -4736,6 +4736,226 @@ public enum SourceStatus: String, Codable {
     case untrusted = "untrusted"
 }
 
+/// One test on a column. ``=`` needs a ``value``; ``is null`` takes none.
+// MARK: - DataBrowseFilter
+public struct DataBrowseFilter: Codable {
+    public let column: String
+    public let op: Op
+    public let value: ValueElement?
+
+    public enum CodingKeys: String, CodingKey {
+        case column = "column"
+        case op = "op"
+        case value = "value"
+    }
+
+    public init(column: String, op: Op, value: ValueElement?) {
+        self.column = column
+        self.op = op
+        self.value = value
+    }
+}
+
+public enum Op: String, Codable {
+    case empty = "="
+    case isNull = "is null"
+}
+
+public enum ValueElement: Codable {
+    case bool(Bool)
+    case double(Double)
+    case integer(Int)
+    case string(String)
+    case null
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        if let x = try? container.decode(Bool.self) {
+            self = .bool(x)
+            return
+        }
+        if let x = try? container.decode(Int.self) {
+            self = .integer(x)
+            return
+        }
+        if let x = try? container.decode(Double.self) {
+            self = .double(x)
+            return
+        }
+        if let x = try? container.decode(String.self) {
+            self = .string(x)
+            return
+        }
+        if container.decodeNil() {
+            self = .null
+            return
+        }
+        throw DecodingError.typeMismatch(ValueElement.self, DecodingError.Context(codingPath: decoder.codingPath, debugDescription: "Wrong type for ValueElement"))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        switch self {
+        case .bool(let x):
+            try container.encode(x)
+        case .double(let x):
+            try container.encode(x)
+        case .integer(let x):
+            try container.encode(x)
+        case .string(let x):
+            try container.encode(x)
+        case .null:
+            try container.encodeNil()
+        }
+    }
+}
+
+/// ``data.browse``. A page of a table, sorted and filtered across all of its rows.
+///
+/// It carries no SQL: the daemon builds it from names it checks against the table.
+// MARK: - DataBrowseParams
+public struct DataBrowseParams: Codable {
+    public let filters: [FilterElement]?
+    public let limit: Int?
+    public let offset: Int?
+    public let search: String?
+    public let sessionID: String?
+    public let sort: DataBrowseSortClass?
+    public let source: String
+    public let table: String
+
+    public enum CodingKeys: String, CodingKey {
+        case filters = "filters"
+        case limit = "limit"
+        case offset = "offset"
+        case search = "search"
+        case sessionID = "session_id"
+        case sort = "sort"
+        case source = "source"
+        case table = "table"
+    }
+
+    public init(filters: [FilterElement]?, limit: Int?, offset: Int?, search: String?, sessionID: String?, sort: DataBrowseSortClass?, source: String, table: String) {
+        self.filters = filters
+        self.limit = limit
+        self.offset = offset
+        self.search = search
+        self.sessionID = sessionID
+        self.sort = sort
+        self.source = source
+        self.table = table
+    }
+}
+
+/// One test on a column. ``=`` needs a ``value``; ``is null`` takes none.
+// MARK: - FilterElement
+public struct FilterElement: Codable {
+    public let column: String
+    public let op: Op
+    public let value: ValueElement?
+
+    public enum CodingKeys: String, CodingKey {
+        case column = "column"
+        case op = "op"
+        case value = "value"
+    }
+
+    public init(column: String, op: Op, value: ValueElement?) {
+        self.column = column
+        self.op = op
+        self.value = value
+    }
+}
+
+/// A column to sort a view by.
+// MARK: - DataBrowseSortClass
+public struct DataBrowseSortClass: Codable {
+    public let column: String
+    public let desc: Bool?
+
+    public enum CodingKeys: String, CodingKey {
+        case column = "column"
+        case desc = "desc"
+    }
+
+    public init(column: String, desc: Bool?) {
+        self.column = column
+        self.desc = desc
+    }
+}
+
+/// The page, and how many rows the view has.
+// MARK: - DataBrowseResult
+public struct DataBrowseResult: Codable {
+    public let columns: [DataBrowseResultColumn]
+    public let elapsedMS: Int
+    public let rows: [[ValueElement]]
+    public let totalRows: Int?
+
+    public enum CodingKeys: String, CodingKey {
+        case columns = "columns"
+        case elapsedMS = "elapsed_ms"
+        case rows = "rows"
+        case totalRows = "total_rows"
+    }
+
+    public init(columns: [DataBrowseResultColumn], elapsedMS: Int, rows: [[ValueElement]], totalRows: Int?) {
+        self.columns = columns
+        self.elapsedMS = elapsedMS
+        self.rows = rows
+        self.totalRows = totalRows
+    }
+}
+
+/// One column. The stats are null when unknown or hidden.
+// MARK: - DataBrowseResultColumn
+public struct DataBrowseResultColumn: Codable {
+    public let distinct: Int?
+    public let distinctEstimate: Bool?
+    public let max: String?
+    public let min: String?
+    public let name: String
+    public let nullFraction: Double?
+    public let type: String
+
+    public enum CodingKeys: String, CodingKey {
+        case distinct = "distinct"
+        case distinctEstimate = "distinct_estimate"
+        case max = "max"
+        case min = "min"
+        case name = "name"
+        case nullFraction = "null_fraction"
+        case type = "type"
+    }
+
+    public init(distinct: Int?, distinctEstimate: Bool?, max: String?, min: String?, name: String, nullFraction: Double?, type: String) {
+        self.distinct = distinct
+        self.distinctEstimate = distinctEstimate
+        self.max = max
+        self.min = min
+        self.name = name
+        self.nullFraction = nullFraction
+        self.type = type
+    }
+}
+
+/// A column to sort a view by.
+// MARK: - DataBrowseSort
+public struct DataBrowseSort: Codable {
+    public let column: String
+    public let desc: Bool?
+
+    public enum CodingKeys: String, CodingKey {
+        case column = "column"
+        case desc = "desc"
+    }
+
+    public init(column: String, desc: Bool?) {
+        self.column = column
+        self.desc = desc
+    }
+}
+
 /// ``data.cancel``. Stop a query that is still running.
 // MARK: - DataCancelParams
 public struct DataCancelParams: Codable {
@@ -4825,6 +5045,90 @@ public struct DataChanged: Codable {
     }
 }
 
+/// What one column looks like. For a person's screen: it never goes to a model.
+// MARK: - DataColumnProfile
+public struct DataColumnProfile: Codable {
+    public let avgLength: Double?
+    public let bins: [Int]?
+    public let distinct: Int
+    public let distinctEstimate: Bool?
+    public let empty: Double
+    public let max: ValueElement?
+    public let mean: Double?
+    public let min: ValueElement?
+    public let moreRows: Int?
+    public let moreValues: Int?
+    public let mostCommon: DataColumnProfileDataTopValue?
+    public let name: String
+    public let shape: DataColumnProfileShape
+    public let top: [DataColumnProfileDataTopValue]?
+    public let type: String
+    public let uniqueRatio: Double?
+
+    public enum CodingKeys: String, CodingKey {
+        case avgLength = "avg_length"
+        case bins = "bins"
+        case distinct = "distinct"
+        case distinctEstimate = "distinct_estimate"
+        case empty = "empty"
+        case max = "max"
+        case mean = "mean"
+        case min = "min"
+        case moreRows = "more_rows"
+        case moreValues = "more_values"
+        case mostCommon = "most_common"
+        case name = "name"
+        case shape = "shape"
+        case top = "top"
+        case type = "type"
+        case uniqueRatio = "unique_ratio"
+    }
+
+    public init(avgLength: Double?, bins: [Int]?, distinct: Int, distinctEstimate: Bool?, empty: Double, max: ValueElement?, mean: Double?, min: ValueElement?, moreRows: Int?, moreValues: Int?, mostCommon: DataColumnProfileDataTopValue?, name: String, shape: DataColumnProfileShape, top: [DataColumnProfileDataTopValue]?, type: String, uniqueRatio: Double?) {
+        self.avgLength = avgLength
+        self.bins = bins
+        self.distinct = distinct
+        self.distinctEstimate = distinctEstimate
+        self.empty = empty
+        self.max = max
+        self.mean = mean
+        self.min = min
+        self.moreRows = moreRows
+        self.moreValues = moreValues
+        self.mostCommon = mostCommon
+        self.name = name
+        self.shape = shape
+        self.top = top
+        self.type = type
+        self.uniqueRatio = uniqueRatio
+    }
+}
+
+/// A value and how many rows have it.
+// MARK: - DataColumnProfileDataTopValue
+public struct DataColumnProfileDataTopValue: Codable {
+    public let count: Int
+    public let value: ValueElement
+
+    public enum CodingKeys: String, CodingKey {
+        case count = "count"
+        case value = "value"
+    }
+
+    public init(count: Int, value: ValueElement) {
+        self.count = count
+        self.value = value
+    }
+}
+
+public enum DataColumnProfileShape: String, Codable {
+    case category = "category"
+    case date = "date"
+    case key = "key"
+    case number = "number"
+    case text = "text"
+}
+
 /// One column. The stats are null when unknown or hidden.
 // MARK: - DataColumn
 public struct DataColumn: Codable {
@@ -4882,7 +5186,7 @@ public struct DataDescribeParams: Codable {
 public struct DataDescribeResult: Codable {
     public let notes: String?
     public let queries: [QueryElement]?
-    public let sample: [String: [[Row]]]
+    public let sample: [String: [[ValueElement]]]
     public let source: DataDescribeResultSource
     public let tables: [DataDescribeResultTable]
 
@@ -4894,7 +5198,7 @@ public struct DataDescribeResult: Codable {
         case tables = "tables"
     }
 
-    public init(notes: String?, queries: [QueryElement]?, sample: [String: [[Row]]], source: DataDescribeResultSource, tables: [DataDescribeResultTable]) {
+    public init(notes: String?, queries: [QueryElement]?, sample: [String: [[ValueElement]]], source: DataDescribeResultSource, tables: [DataDescribeResultTable]) {
         self.notes = notes
         self.queries = queries
         self.sample = sample
@@ -4923,55 +5227,6 @@ public struct QueryElement: Codable {
         self.lastRunAt = lastRunAt
         self.name = name
         self.sql = sql
-    }
-}
-
-public enum Row: Codable {
-    case bool(Bool)
-    case double(Double)
-    case integer(Int)
-    case string(String)
-    case null
-
-    public init(from decoder: Decoder) throws {
-        let container = try decoder.singleValueContainer()
-        if let x = try? container.decode(Bool.self) {
-            self = .bool(x)
-            return
-        }
-        if let x = try? container.decode(Int.self) {
-            self = .integer(x)
-            return
-        }
-        if let x = try? container.decode(Double.self) {
-            self = .double(x)
-            return
-        }
-        if let x = try? container.decode(String.self) {
-            self = .string(x)
-            return
-        }
-        if container.decodeNil() {
-            self = .null
-            return
-        }
-        throw DecodingError.typeMismatch(Row.self, DecodingError.Context(codingPath: decoder.codingPath, debugDescription: "Wrong type for Row"))
-    }
-
-    public func encode(to encoder: Encoder) throws {
-        var container = encoder.singleValueContainer()
-        switch self {
-        case .bool(let x):
-            try container.encode(x)
-        case .double(let x):
-            try container.encode(x)
-        case .integer(let x):
-            try container.encode(x)
-        case .string(let x):
-            try container.encode(x)
-        case .null:
-            try container.encodeNil()
-        }
     }
 }
 
@@ -5218,7 +5473,7 @@ public struct DataInspectResult: Codable {
     public let needsExtension: NeedsExtensionEnum?
     public let notes: [String]?
     public let privacyReason: String?
-    public let sample: [String: [[Row]]]
+    public let sample: [String: [[ValueElement]]]
     public let serverVersion: String?
     public let suggestedName: String
     public let suggestedPrivacy: SuggestedPrivacyEnum
@@ -5241,7 +5496,7 @@ public struct DataInspectResult: Codable {
         case warning = "warning"
     }
 
-    public init(files: Int?, kind: KindKind, needsExtension: NeedsExtensionEnum?, notes: [String]?, privacyReason: String?, sample: [String: [[Row]]], serverVersion: String?, suggestedName: String, suggestedPrivacy: SuggestedPrivacyEnum, tables: [DataInspectResultTable], url: String?, warning: String?) {
+    public init(files: Int?, kind: KindKind, needsExtension: NeedsExtensionEnum?, notes: [String]?, privacyReason: String?, sample: [String: [[ValueElement]]], serverVersion: String?, suggestedName: String, suggestedPrivacy: SuggestedPrivacyEnum, tables: [DataInspectResultTable], url: String?, warning: String?) {
         self.files = files
         self.kind = kind
         self.needsExtension = needsExtension
@@ -5498,6 +5753,128 @@ public struct DataNotesSetResult: Codable {
     }
 }
 
+/// ``data.profile``. The shape of each column of one table.
+// MARK: - DataProfileParams
+public struct DataProfileParams: Codable {
+    public let sessionID: String?
+    public let source: String
+    public let table: String
+
+    public enum CodingKeys: String, CodingKey {
+        case sessionID = "session_id"
+        case source = "source"
+        case table = "table"
+    }
+
+    public init(sessionID: String?, source: String, table: String) {
+        self.sessionID = sessionID
+        self.source = source
+        self.table = table
+    }
+}
+
+/// The columns of a table, one entry each, in their order.
+// MARK: - DataProfileResult
+public struct DataProfileResult: Codable {
+    public let columns: [ColumnElement]
+    public let distinctEstimate: Bool?
+    public let rows: Int
+    public let source: String
+    public let table: String
+
+    public enum CodingKeys: String, CodingKey {
+        case columns = "columns"
+        case distinctEstimate = "distinct_estimate"
+        case rows = "rows"
+        case source = "source"
+        case table = "table"
+    }
+
+    public init(columns: [ColumnElement], distinctEstimate: Bool?, rows: Int, source: String, table: String) {
+        self.columns = columns
+        self.distinctEstimate = distinctEstimate
+        self.rows = rows
+        self.source = source
+        self.table = table
+    }
+}
+
+/// What one column looks like. For a person's screen: it never goes to a model.
+// MARK: - ColumnElement
+public struct ColumnElement: Codable {
+    public let avgLength: Double?
+    public let bins: [Int]?
+    public let distinct: Int
+    public let distinctEstimate: Bool?
+    public let empty: Double
+    public let max: ValueElement?
+    public let mean: Double?
+    public let min: ValueElement?
+    public let moreRows: Int?
+    public let moreValues: Int?
+    public let mostCommon: ColumnDataTopValue?
+    public let name: String
+    public let shape: DataColumnProfileShape
+    public let top: [ColumnDataTopValue]?
+    public let type: String
+    public let uniqueRatio: Double?
+
+    public enum CodingKeys: String, CodingKey {
+        case avgLength = "avg_length"
+        case bins = "bins"
+        case distinct = "distinct"
+        case distinctEstimate = "distinct_estimate"
+        case empty = "empty"
+        case max = "max"
+        case mean = "mean"
+        case min = "min"
+        case moreRows = "more_rows"
+        case moreValues = "more_values"
+        case mostCommon = "most_common"
+        case name = "name"
+        case shape = "shape"
+        case top = "top"
+        case type = "type"
+        case uniqueRatio = "unique_ratio"
+    }
+
+    public init(avgLength: Double?, bins: [Int]?, distinct: Int, distinctEstimate: Bool?, empty: Double, max: ValueElement?, mean: Double?, min: ValueElement?, moreRows: Int?, moreValues: Int?, mostCommon: ColumnDataTopValue?, name: String, shape: DataColumnProfileShape, top: [ColumnDataTopValue]?, type: String, uniqueRatio: Double?) {
+        self.avgLength = avgLength
+        self.bins = bins
+        self.distinct = distinct
+        self.distinctEstimate = distinctEstimate
+        self.empty = empty
+        self.max = max
+        self.mean = mean
+        self.min = min
+        self.moreRows = moreRows
+        self.moreValues = moreValues
+        self.mostCommon = mostCommon
+        self.name = name
+        self.shape = shape
+        self.top = top
+        self.type = type
+        self.uniqueRatio = uniqueRatio
+    }
+}
+
+/// A value and how many rows have it.
+// MARK: - ColumnDataTopValue
+public struct ColumnDataTopValue: Codable {
+    public let count: Int
+    public let value: ValueElement
+
+    public enum CodingKeys: String, CodingKey {
+        case count = "count"
+        case value = "value"
+    }
+
+    public init(count: Int, value: ValueElement) {
+        self.count = count
+        self.value = value
+    }
+}
+
 /// ``data.queries.remove``.
 // MARK: - DataQueriesRemoveParams
 public struct DataQueriesRemoveParams: Codable {
@@ -5672,7 +6049,7 @@ public struct DataResult: Codable {
     public let columns: [DataResultColumn]
     public let elapsedMS: Int
     public let resultID: String
-    public let rows: [[Row]]
+    public let rows: [[ValueElement]]
     public let source: String
     public let totalRows: Int?
     public let truncated: Bool?
@@ -5687,7 +6064,7 @@ public struct DataResult: Codable {
         case truncated = "truncated"
     }
 
-    public init(columns: [DataResultColumn], elapsedMS: Int, resultID: String, rows: [[Row]], source: String, totalRows: Int?, truncated: Bool?) {
+    public init(columns: [DataResultColumn], elapsedMS: Int, resultID: String, rows: [[ValueElement]], source: String, totalRows: Int?, truncated: Bool?) {
         self.columns = columns
         self.elapsedMS = elapsedMS
         self.resultID = resultID
@@ -5864,6 +6241,23 @@ public struct DataTableColumn: Codable {
         self.name = name
         self.nullFraction = nullFraction
         self.type = type
+    }
+}
+
+/// A value and how many rows have it.
+// MARK: - DataTopValue
+public struct DataTopValue: Codable {
+    public let count: Int
+    public let value: ValueElement
+
+    public enum CodingKeys: String, CodingKey {
+        case count = "count"
+        case value = "value"
+    }
+
+    public init(count: Int, value: ValueElement) {
+        self.count = count
+        self.value = value
     }
 }
 
@@ -15405,7 +15799,7 @@ public struct ModelBenchDoneNotificationParams: Codable {
 public struct PurpleModelBenchRow: Codable {
     public let atOnce: Int
     public let each: [Double]
-    public let shape: Shape
+    public let shape: RowShape
     public let total: Double
     public let window: Double
 
@@ -15417,7 +15811,7 @@ public struct PurpleModelBenchRow: Codable {
         case window = "window"
     }
 
-    public init(atOnce: Int, each: [Double], shape: Shape, total: Double, window: Double) {
+    public init(atOnce: Int, each: [Double], shape: RowShape, total: Double, window: Double) {
         self.atOnce = atOnce
         self.each = each
         self.shape = shape
@@ -15426,7 +15820,7 @@ public struct PurpleModelBenchRow: Codable {
     }
 }
 
-public enum Shape: String, Codable {
+public enum RowShape: String, Codable {
     case prompt = "prompt"
     case tools = "tools"
 }
@@ -15461,7 +15855,7 @@ public struct ModelBenchDone: Codable {
 public struct ModelBenchDoneRow: Codable {
     public let atOnce: Int
     public let each: [Double]
-    public let shape: Shape
+    public let shape: RowShape
     public let total: Double
     public let window: Double
 
@@ -15473,7 +15867,7 @@ public struct ModelBenchDoneRow: Codable {
         case window = "window"
     }
 
-    public init(atOnce: Int, each: [Double], shape: Shape, total: Double, window: Double) {
+    public init(atOnce: Int, each: [Double], shape: RowShape, total: Double, window: Double) {
         self.atOnce = atOnce
         self.each = each
         self.shape = shape
@@ -15558,7 +15952,7 @@ public struct ModelBenchProgressNotificationParams: Codable {
 public struct FluffyModelBenchRow: Codable {
     public let atOnce: Int
     public let each: [Double]
-    public let shape: Shape
+    public let shape: RowShape
     public let total: Double
     public let window: Double
 
@@ -15570,7 +15964,7 @@ public struct FluffyModelBenchRow: Codable {
         case window = "window"
     }
 
-    public init(atOnce: Int, each: [Double], shape: Shape, total: Double, window: Double) {
+    public init(atOnce: Int, each: [Double], shape: RowShape, total: Double, window: Double) {
         self.atOnce = atOnce
         self.each = each
         self.shape = shape
@@ -15609,7 +16003,7 @@ public struct ModelBenchProgress: Codable {
 public struct ModelBenchProgressRow: Codable {
     public let atOnce: Int
     public let each: [Double]
-    public let shape: Shape
+    public let shape: RowShape
     public let total: Double
     public let window: Double
 
@@ -15621,7 +16015,7 @@ public struct ModelBenchProgressRow: Codable {
         case window = "window"
     }
 
-    public init(atOnce: Int, each: [Double], shape: Shape, total: Double, window: Double) {
+    public init(atOnce: Int, each: [Double], shape: RowShape, total: Double, window: Double) {
         self.atOnce = atOnce
         self.each = each
         self.shape = shape
@@ -15654,7 +16048,7 @@ public struct ModelBenchResult: Codable {
 public struct ModelBenchRow: Codable {
     public let atOnce: Int
     public let each: [Double]
-    public let shape: Shape
+    public let shape: RowShape
     public let total: Double
     public let window: Double
 
@@ -15666,7 +16060,7 @@ public struct ModelBenchRow: Codable {
         case window = "window"
     }
 
-    public init(atOnce: Int, each: [Double], shape: Shape, total: Double, window: Double) {
+    public init(atOnce: Int, each: [Double], shape: RowShape, total: Double, window: Double) {
         self.atOnce = atOnce
         self.each = each
         self.shape = shape
@@ -23906,7 +24300,7 @@ public struct TentacledPromptSectionInfo: Codable {
 public struct PurpleToolTable: Codable {
     public let columns: [PurpleToolTableColumn]
     public let resultID: String
-    public let rows: [[Row]]
+    public let rows: [[ValueElement]]
     public let source: String
     public let totalRows: Int
     public let truncated: Bool?
@@ -23920,7 +24314,7 @@ public struct PurpleToolTable: Codable {
         case truncated = "truncated"
     }
 
-    public init(columns: [PurpleToolTableColumn], resultID: String, rows: [[Row]], source: String, totalRows: Int, truncated: Bool?) {
+    public init(columns: [PurpleToolTableColumn], resultID: String, rows: [[ValueElement]], source: String, totalRows: Int, truncated: Bool?) {
         self.columns = columns
         self.resultID = resultID
         self.rows = rows
@@ -28565,7 +28959,7 @@ public struct FluffyToolSource: Codable {
 public struct ToolCompletedDataToolTable: Codable {
     public let columns: [FluffyToolTableColumn]
     public let resultID: String
-    public let rows: [[Row]]
+    public let rows: [[ValueElement]]
     public let source: String
     public let totalRows: Int
     public let truncated: Bool?
@@ -28579,7 +28973,7 @@ public struct ToolCompletedDataToolTable: Codable {
         case truncated = "truncated"
     }
 
-    public init(columns: [FluffyToolTableColumn], resultID: String, rows: [[Row]], source: String, totalRows: Int, truncated: Bool?) {
+    public init(columns: [FluffyToolTableColumn], resultID: String, rows: [[ValueElement]], source: String, totalRows: Int, truncated: Bool?) {
         self.columns = columns
         self.resultID = resultID
         self.rows = rows
@@ -28749,7 +29143,7 @@ public struct TentacledToolSource: Codable {
 public struct FluffyToolTable: Codable {
     public let columns: [TentacledToolTableColumn]
     public let resultID: String
-    public let rows: [[Row]]
+    public let rows: [[ValueElement]]
     public let source: String
     public let totalRows: Int
     public let truncated: Bool?
@@ -28763,7 +29157,7 @@ public struct FluffyToolTable: Codable {
         case truncated = "truncated"
     }
 
-    public init(columns: [TentacledToolTableColumn], resultID: String, rows: [[Row]], source: String, totalRows: Int, truncated: Bool?) {
+    public init(columns: [TentacledToolTableColumn], resultID: String, rows: [[ValueElement]], source: String, totalRows: Int, truncated: Bool?) {
         self.columns = columns
         self.resultID = resultID
         self.rows = rows

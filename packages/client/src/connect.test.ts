@@ -1886,6 +1886,47 @@ test("data.result.page sends the id, offset and limit, and a malformed page is r
   }
 });
 
+test("data.profile and data.browse send the table and the view, and a malformed answer is refused", async () => {
+  const sent: Record<string, unknown>[] = [];
+  const profile = { source: "bank", table: "t", rows: 2, columns: [{ name: "id", type: "BIGINT", shape: "key", empty: 0, distinct: 2 }] };
+  const page = { columns: [{ name: "id", type: "BIGINT" }], rows: [[1], [2]], total_rows: 2, elapsed_ms: 3 };
+  const server = await listen((socket) => {
+    attach(socket, {
+      answerPing: true,
+      results: { "data.profile": profile, "data.browse": page },
+      onRequest: (_socket, method, params) => {
+        if (method.startsWith("data.")) {
+          sent.push({ method, ...params });
+        }
+      },
+    });
+  });
+  const client = connectGolem({ socketPath: server.socketPath, clientName: "tui", reconnect: false, heartbeatMs: 60_000 });
+  try {
+    assert.deepEqual(await client.profileData("bank", "t"), profile);
+    const view = { source: "bank", table: "t", offset: 200, limit: 200, sort: { column: "id", desc: true }, filters: [{ column: "id", op: "=" as const, value: 1 }], search: "ann" };
+    assert.deepEqual(await client.browseData(view), page);
+    assert.deepEqual(sent, [
+      { method: "data.profile", source: "bank", table: "t" },
+      { method: "data.browse", ...view },
+    ]);
+  } finally {
+    client.close();
+    await server.close();
+  }
+  const bad = await listen((socket) => {
+    attach(socket, { answerPing: true, results: { "data.profile": { rows: "no" }, "data.browse": { rows: "no" } } });
+  });
+  const other = connectGolem({ socketPath: bad.socketPath, clientName: "tui", reconnect: false, heartbeatMs: 60_000 });
+  try {
+    await assert.rejects(other.profileData("bank", "t"), /invalid data.profile result/);
+    await assert.rejects(other.browseData({ source: "bank", table: "t" }), /invalid data.browse result/);
+  } finally {
+    other.close();
+    await bad.close();
+  }
+});
+
 test("data.export sends the id, path and format, and a malformed answer is refused", async () => {
   const sent: Record<string, unknown>[] = [];
   const server = await listen((socket) => {

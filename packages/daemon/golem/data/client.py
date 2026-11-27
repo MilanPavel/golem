@@ -126,6 +126,26 @@ class DataWorker:
         timeout = self._settings.query_timeout_seconds
         return await self.request("describe", {"source": source, "table": table}, timeout=timeout)
 
+    async def profile(self, source: str, table: str, *, tag: str | None = None) -> dict[str, Any]:
+        """The shape of each column of one table: shapes, counts, bins and top values."""
+        timeout = self._settings.query_timeout_seconds
+        return await self.request(
+            "profile", {"source": source, "table": table}, timeout=timeout, tag=tag
+        )
+
+    async def browse(
+        self, source: str, table: str, args: dict[str, Any], *, tag: str | None = None
+    ) -> dict[str, Any]:
+        """One page of a table: ``columns``, ``rows``, ``total_rows`` (when asked), ``elapsed_ms``.
+
+        ``args`` hold ``offset``, ``limit``, ``sort``, ``filters``, ``search`` and ``count``.
+        The worker builds the SQL from them and checks every name.
+        """
+        timeout = self._settings.query_timeout_seconds
+        return await self.request(
+            "browse", {"source": source, "table": table, **args}, timeout=timeout, tag=tag
+        )
+
     async def query(
         self,
         source: str,

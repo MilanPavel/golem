@@ -287,7 +287,9 @@ test("a source page whose source needs an add-on offers the download", async () 
       onTab={() => {}}
       onAsk={() => {}}
       onRun={() => {}}
-      onLoadSample={() => Promise.resolve([])}
+      onLoadProfile={() => Promise.reject(new Error("no"))}
+      onBrowse={() => Promise.reject(new Error("no"))}
+      onAskView={() => {}}
       onSaveNotes={() => Promise.resolve("")}
       onDraftNotes={() => Promise.resolve("")}
       onPrivacy={() => Promise.resolve()}

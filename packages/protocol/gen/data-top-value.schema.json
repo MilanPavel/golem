@@ -1,0 +1,37 @@
+{
+  "additionalProperties": false,
+  "description": "A value and how many rows have it.",
+  "properties": {
+    "count": {
+      "minimum": 0,
+      "title": "Count",
+      "type": "integer"
+    },
+    "value": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "integer"
+        },
+        {
+          "type": "number"
+        },
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Value"
+    }
+  },
+  "required": [
+    "value",
+    "count"
+  ],
+  "title": "DataTopValue",
+  "type": "object"
+}

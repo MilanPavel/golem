@@ -24,7 +24,7 @@ import { ARTIFACT_PAGE, artifactKey, traceKey, traceSpanKey, type ArtifactReadRe
 import { ROUTINE_LIST_KEY, routineGetKey, type RoutineGetResult, type RoutineListResult } from "./routines.ts";
 import { WORKFLOW_LIST_KEY, WORKFLOW_STARTERS_KEY, workflowGetKey, workflowStatusKey, type WorkflowGetResult, type WorkflowListResult, type WorkflowStartersResult, type WorkflowStatusResult } from "./workflows.ts";
 import { RpcError } from "@golem/client";
-import { DATA_LIST_KEY, dataDescribeKey, dataNotesKey, type DataAnswer, type DataDescribeResult, type DataListResult, type DataNotesGetResult, type DataSampleRows } from "./data.ts";
+import { DATA_LIST_KEY, dataDescribeKey, dataNotesKey, type DataAnswer, type DataProfileResult, type DataDescribeResult, type DataListResult, type DataNotesGetResult } from "./data.ts";
 import { RUN_LIST_KEY, sessionRunKey, type RunInfo, type RunListResult } from "./runs.ts";
 import { mcpCatalogKey, mcpListKey, mcpToolsKey, type McpCatalogResult, type McpToolsResult } from "./mcp.ts";
 import { turnCards, type NotesState, type Pastes, type ReviewNote, type ShellTracking, type TurnCard } from "@golem/view";
@@ -652,13 +652,13 @@ export function useDataDescribe(name: string, table: string | null = null, enabl
   return useQuery({ queryKey: dataDescribeKey(name, table), queryFn: () => queries.dataDescribe(name, table), enabled, retry: false });
 }
 
-/** Reads the sample rows of one table of a source, on request. A missing method rejects with its error. */
-export function useDataSampleLoader(name: string): (table: string) => Promise<DataSampleRows> {
+/** Reads the shape of each column of one table of a source. A missing method rejects with its error. */
+export function useDataProfileLoader(name: string): (table: string) => Promise<DataProfileResult> {
   const { queries } = usePage();
   return async (table) => {
-    const answer = await queries.dataDescribe(name, table);
+    const answer = await queries.dataProfile(name, table);
     if (answer.status === "missing") throw new RpcError(-32601, "method not found");
-    return answer.data.sample[table] ?? [];
+    return answer.data;
   };
 }
 

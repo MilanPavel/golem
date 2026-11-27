@@ -198,7 +198,8 @@ class Source:
             cursor.execute(f"use src.{_ident(self._schema)}" if self._schema else "use src")
         return cursor
 
-    def tables(self) -> list[dict[str, Any]]:
+    def tables(self, cursor: Any | None = None) -> list[dict[str, Any]]:
+        """The tables. A request that runs beside others passes its own ``cursor``."""
         if self.spec.kind in DATABASE_KINDS:
             return [
                 {
@@ -208,11 +209,15 @@ class Source:
                 }
                 for name, kind in self._remote_kinds.items()
             ]
-        rows = self._connection.execute(
-            "select table_name, table_type from information_schema.tables "
-            "where table_catalog = current_database() and table_schema = current_schema() "
-            "order by table_name"
-        ).fetchall()
+        rows = (
+            (cursor if cursor is not None else self._connection)
+            .execute(
+                "select table_name, table_type from information_schema.tables "
+                "where table_catalog = current_database() and table_schema = current_schema() "
+                "order by table_name"
+            )
+            .fetchall()
+        )
         return [
             {"name": str(name), "type": "view" if "VIEW" in str(kind) else "table"}
             for name, kind in rows
@@ -368,6 +373,66 @@ class Source:
             "stored": stored,
             "elapsed_ms": int((time.monotonic() - started) * 1000),
         }
+
+    # -- a table, for a person looking at it -----------------------------------------------
+
+    def _table(self, table: str, cursor: Any) -> tuple[str, list[tuple[str, str]]]:
+        """The SQL name of ``table`` and its columns. Raises :class:`DataError` for any other.
+
+        It reads through ``cursor``, so requests that run together do not share a connection.
+        """
+        names = {t["name"] for t in self.tables(cursor)}
+        if table not in names:
+            known = ", ".join(sorted(names)) or "none"
+            raise DataError(f"There is no table called {table}. The tables are: {known}.")
+        if self.spec.kind in DATABASE_KINDS:
+            schema, name = self._remote[table]
+            sql = f"src.{_ident(schema)}.{_ident(name)}"
+        else:
+            sql = _ident(table)
+        try:
+            description = cursor.execute(f"select * from {sql} limit 0").description
+        except duckdb.Error as exc:
+            raise DataError(_message(exc)) from exc
+        names_in_order = unique_names([str(d[0]) for d in description])
+        return sql, [(n, str(d[1])) for n, d in zip(names_in_order, description, strict=True)]
+
+    def profile(self, table: str, cursor: Any | None = None) -> dict[str, Any]:
+        """The shape of each column of ``table``. See :mod:`golem.data.profile`."""
+        from golem.data.profile import profile
+
+        own = cursor is None
+        run = cursor if cursor is not None else self.cursor()
+        try:
+            sql, columns = self._table(table, run)
+            return profile(run, sql, columns)
+        finally:
+            if own:
+                run.close()
+
+    def browse(self, table: str, args: dict[str, Any], cursor: Any | None = None) -> dict[str, Any]:
+        """One page of ``table``. See :mod:`golem.data.browse`: the browser sends no SQL."""
+        from golem.data.browse import browse
+
+        own = cursor is None
+        run = cursor if cursor is not None else self.cursor()
+        try:
+            sql, columns = self._table(table, run)
+            return browse(
+                run,
+                sql,
+                columns,
+                offset=int(args.get("offset", 0)),
+                limit=int(args.get("limit", 200)),
+                sort=args.get("sort"),
+                filters=list(args.get("filters") or []),
+                search=args.get("search"),
+                count=bool(args.get("count", True)),
+                fixed_order=self.spec.kind in DATABASE_KINDS,
+            )
+        finally:
+            if own:
+                run.close()
 
     # -- opening ---------------------------------------------------------------------------
 
@@ -730,3 +795,6 @@ def unique_names(names: Sequence[str]) -> list[str]:
 
 json_value = _json
 """A value DuckDB returned, as something JSON can carry (for the result files)."""
+
+message = _message
+"""A DuckDB error as one sentence with any password hidden (for the profile and browse code)."""

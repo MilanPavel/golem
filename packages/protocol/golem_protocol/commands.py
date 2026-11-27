@@ -6849,6 +6849,118 @@ class DataResultPageParams(BaseModel):
     sort_desc: bool = False
 
 
+class DataProfileParams(BaseModel):
+    """``data.profile``. The shape of each column of one table."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    source: str = Field(min_length=1)
+    table: str = Field(min_length=1)
+    session_id: str | None = Field(default=None, min_length=1)
+
+
+class DataTopValue(BaseModel):
+    """A value and how many rows have it."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    value: DataValue
+    count: int = Field(ge=0)
+
+
+class DataColumnProfile(BaseModel):
+    """What one column looks like. For a person's screen: it never goes to a model."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    name: str = Field(min_length=1)
+    type: str
+    shape: Literal["key", "number", "date", "category", "text"]
+    empty: float = Field(ge=0, le=1)
+    """The fraction of rows with no value."""
+    distinct: int = Field(ge=0)
+    distinct_estimate: bool = False
+    """True when ``distinct`` is an estimate, not an exact count."""
+    min: DataValue = None
+    max: DataValue = None
+    mean: float | None = None
+    bins: list[int] | None = None
+    """A number or a date: the rows in each of 24 equal-width bins from ``min`` to ``max``."""
+    top: list[DataTopValue] = Field(default_factory=list[DataTopValue])
+    """A category: its most frequent values, most frequent first."""
+    more_values: int = Field(default=0, ge=0)
+    """A category: how many more values there are than ``top`` lists."""
+    more_rows: int = Field(default=0, ge=0)
+    """A category: how many rows have those values."""
+    unique_ratio: float | None = Field(default=None, ge=0, le=1)
+    avg_length: float | None = None
+    most_common: DataTopValue | None = None
+    """Text: the value that repeats most, when one repeats."""
+
+
+class DataProfileResult(BaseModel):
+    """The columns of a table, one entry each, in their order."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    source: str
+    table: str
+    rows: int = Field(ge=0)
+    distinct_estimate: bool = False
+    """True when the table is big enough that its distinct counts are estimates."""
+    columns: list[DataColumnProfile]
+
+
+class DataBrowseSort(BaseModel):
+    """A column to sort a view by."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    column: str = Field(min_length=1)
+    desc: bool = False
+
+
+class DataBrowseFilter(BaseModel):
+    """One test on a column. ``=`` needs a ``value``; ``is null`` takes none."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    column: str = Field(min_length=1)
+    op: Literal["=", "is null"]
+    value: DataValue = None
+
+
+class DataBrowseParams(BaseModel):
+    """``data.browse``. A page of a table, sorted and filtered across all of its rows.
+
+    It carries no SQL: the daemon builds it from names it checks against the table.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    source: str = Field(min_length=1)
+    table: str = Field(min_length=1)
+    offset: int = Field(default=0, ge=0)
+    limit: int = Field(default=200, ge=1, le=500)
+    sort: DataBrowseSort | None = None
+    filters: list[DataBrowseFilter] = Field(default_factory=list[DataBrowseFilter])
+    """At most 20: the data engine refuses more."""
+    search: str | None = Field(default=None, max_length=200)
+    """Rows with this text in any text column, in any case."""
+    session_id: str | None = Field(default=None, min_length=1)
+
+
+class DataBrowseResult(BaseModel):
+    """The page, and how many rows the view has."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    columns: list[DataColumn]
+    rows: list[list[DataValue]]
+    total_rows: int | None = Field(default=None, ge=0)
+    elapsed_ms: int = Field(ge=0)
+
+
 class DataExportParams(BaseModel):
     """``data.export``. Write a kept result to a new file. It never overwrites one."""
 
@@ -7066,10 +7178,15 @@ __all__ = [
     "DaemonStatus",
     "DataAddParams",
     "DataAddResult",
+    "DataBrowseFilter",
+    "DataBrowseParams",
+    "DataBrowseResult",
+    "DataBrowseSort",
     "DataCancelParams",
     "DataCancelResult",
     "DataChanged",
     "DataColumn",
+    "DataColumnProfile",
     "DataDescribeParams",
     "DataDescribeResult",
     "DataExportParams",
@@ -7088,6 +7205,8 @@ __all__ = [
     "DataNotesSetParams",
     "DataNotesSetResult",
     "DataPrivacy",
+    "DataProfileParams",
+    "DataProfileResult",
     "DataQueriesRemoveParams",
     "DataQueriesRemoveResult",
     "DataQueriesSaveParams",
@@ -7103,6 +7222,7 @@ __all__ = [
     "DataSourceKind",
     "DataSourceStatus",
     "DataTable",
+    "DataTopValue",
     "DataUpdateParams",
     "DataUpdateResult",
     "DataValue",

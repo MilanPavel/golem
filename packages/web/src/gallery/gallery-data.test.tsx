@@ -15,9 +15,9 @@ test("the gallery's Data section shows the panel, each tab of a source, and the 
     expect(within(screen.getByRole("complementary", { name: `Data, empty, ${theme}` })).getByText(/No sources yet/)).toBeTruthy();
     expect(within(screen.getByRole("complementary", { name: `Data, loading, ${theme}` })).getByText("Loading sources.")).toBeTruthy();
     expect(within(screen.getByRole("complementary", { name: `Data, not available yet, ${theme}` })).getByText(/not available yet/)).toBeTruthy();
-    expect(region("Source, rows open").getByText("Sample rows · you and every model")).toBeTruthy();
-    expect(region("Source, rows local").getByText("Sample rows · you and local models")).toBeTruthy();
-    expect(region("Source, schema only").getByRole("button", { name: "Show sample rows" })).toBeTruthy();
+    expect(region("Source, rows open").getByText("Columns · every model may see these")).toBeTruthy();
+    expect(region("Source, rows local").getByRole("tab", { name: "Rows" })).toBeTruthy();
+    expect(region("Source, schema only").getByRole("tab", { name: "Columns" }).getAttribute("aria-selected")).toBe("true");
     expect(region("Source, not trusted").getAllByText(/trust this folder to use it/).length).toBeGreaterThan(0);
     expect(region("Source, notes").getByLabelText("Notes of bank")).toBeTruthy();
     expect(region("Source, notes, not available yet").getByText("Notes come in a later version of golem.")).toBeTruthy();

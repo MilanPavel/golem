@@ -1,0 +1,148 @@
+{
+  "$defs": {
+    "DataBrowseFilter": {
+      "additionalProperties": false,
+      "description": "One test on a column. ``=`` needs a ``value``; ``is null`` takes none.",
+      "properties": {
+        "column": {
+          "minLength": 1,
+          "title": "Column",
+          "type": "string"
+        },
+        "op": {
+          "enum": [
+            "=",
+            "is null"
+          ],
+          "title": "Op",
+          "type": "string"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "integer"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Value"
+        }
+      },
+      "required": [
+        "column",
+        "op"
+      ],
+      "title": "DataBrowseFilter",
+      "type": "object"
+    },
+    "DataBrowseSort": {
+      "additionalProperties": false,
+      "description": "A column to sort a view by.",
+      "properties": {
+        "column": {
+          "minLength": 1,
+          "title": "Column",
+          "type": "string"
+        },
+        "desc": {
+          "default": false,
+          "title": "Desc",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "column"
+      ],
+      "title": "DataBrowseSort",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "``data.browse``. A page of a table, sorted and filtered across all of its rows.\n\nIt carries no SQL: the daemon builds it from names it checks against the table.",
+  "properties": {
+    "filters": {
+      "items": {
+        "$ref": "#/$defs/DataBrowseFilter"
+      },
+      "title": "Filters",
+      "type": "array"
+    },
+    "limit": {
+      "default": 200,
+      "maximum": 500,
+      "minimum": 1,
+      "title": "Limit",
+      "type": "integer"
+    },
+    "offset": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Offset",
+      "type": "integer"
+    },
+    "search": {
+      "anyOf": [
+        {
+          "maxLength": 200,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Search"
+    },
+    "session_id": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Session Id"
+    },
+    "sort": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/DataBrowseSort"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "source": {
+      "minLength": 1,
+      "title": "Source",
+      "type": "string"
+    },
+    "table": {
+      "minLength": 1,
+      "title": "Table",
+      "type": "string"
+    }
+  },
+  "required": [
+    "source",
+    "table"
+  ],
+  "title": "DataBrowseParams",
+  "type": "object"
+}

@@ -51,10 +51,13 @@ from golem.sessions.manager import SchemaMismatchError, SessionNotFoundError
 from golem_protocol.commands import (
     DataAddParams,
     DataAddResult,
+    DataBrowseParams,
+    DataBrowseResult,
     DataCancelParams,
     DataCancelResult,
     DataChanged,
     DataColumn,
+    DataColumnProfile,
     DataDescribeParams,
     DataDescribeResult,
     DataExportParams,
@@ -71,6 +74,8 @@ from golem_protocol.commands import (
     DataNotesGetResult,
     DataNotesSetParams,
     DataNotesSetResult,
+    DataProfileParams,
+    DataProfileResult,
     DataQueryParams,
     DataRemoveParams,
     DataRemoveResult,
@@ -170,6 +175,50 @@ async def data_describe(ctx: RequestContext, params: DataDescribeParams) -> Data
         tables=[wire_table(table) for table in found.tables],
         sample={name: _rows(rows) for name, rows in found.sample.items()},
         notes=found.notes,
+    )
+
+
+async def data_profile(ctx: RequestContext, params: DataProfileParams) -> DataProfileResult:
+    """The shape of each column of a table, for you to look at. Any source: no model gets it."""
+    root = await _root(ctx, params.session_id)
+    try:
+        found = await _sources(ctx).profile(root, params.source, params.table)
+    except DataError as exc:
+        raise RpcCallError(INVALID_PARAMS, str(exc)) from exc
+    return DataProfileResult(
+        source=params.source,
+        table=params.table,
+        rows=found["rows"],
+        distinct_estimate=found["distinct_estimate"],
+        columns=[DataColumnProfile.model_validate(column) for column in found["columns"]],
+    )
+
+
+async def data_browse(ctx: RequestContext, params: DataBrowseParams) -> DataBrowseResult:
+    """A page of a table, sorted and filtered over all its rows, for you to read.
+
+    It is you reading your own data, so any source's rows. The SQL is built in the data engine
+    from names it checks; nothing from the browser is run as SQL.
+    """
+    root = await _root(ctx, params.session_id)
+    try:
+        page = await _sources(ctx).browse(
+            root,
+            params.source,
+            params.table,
+            offset=params.offset,
+            limit=params.limit,
+            sort=None if params.sort is None else params.sort.model_dump(),
+            filters=[f.model_dump() for f in params.filters],
+            search=params.search,
+        )
+    except DataError as exc:
+        raise RpcCallError(INVALID_PARAMS, str(exc)) from exc
+    return DataBrowseResult(
+        columns=[DataColumn(name=c["name"], type=c["type"]) for c in page.columns],
+        rows=_rows(page.rows),
+        total_rows=page.total_rows,
+        elapsed_ms=page.elapsed_ms,
     )
 
 

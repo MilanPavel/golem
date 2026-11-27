@@ -251,3 +251,32 @@ async def test_a_workflow_step_calls_data_query(tmp_path: Path) -> None:
         assert step is not None and step.status == "done"
         text = json.loads(step.result_json or "null")
         assert "model" in text and "sonnet  0.5" in text and "<data_rows" in text
+
+
+async def test_data_profile_and_browse_round_trip(short_home: Path) -> None:
+    shop = _shop(short_home)
+    short_home.mkdir(exist_ok=True)
+    (short_home / "config.toml").write_text(
+        f'[data.shop]\npath = "{shop}/*.csv"\nprivacy = "schema"\n', encoding="utf-8"
+    )
+    async with _daemon(short_home) as (_app, client):
+        profile = await _call(client, "data.profile", source="shop", table="orders")
+        assert profile["rows"] == 2
+        assert {c["name"]: c["shape"] for c in profile["columns"]}["id"] == "key"
+        # You read your own data, so a schema-only source pages too.
+        page = await _call(
+            client,
+            "data.browse",
+            source="shop",
+            table="orders",
+            sort={"column": "total", "desc": True},
+            filters=[{"column": "id", "op": "=", "value": 2}],
+        )
+        assert page["total_rows"] == 1
+        assert [row[2] for row in page["rows"]] == [32.5]
+        refused = await client.call(
+            "data.browse",
+            {"source": "shop", "table": "orders", "sort": {"column": 'x"; drop'}},
+            timeout=20,
+        )
+        assert error_code(refused) == INVALID_PARAMS

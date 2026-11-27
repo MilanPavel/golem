@@ -1,0 +1,46 @@
+{
+  "additionalProperties": false,
+  "description": "One test on a column. ``=`` needs a ``value``; ``is null`` takes none.",
+  "properties": {
+    "column": {
+      "minLength": 1,
+      "title": "Column",
+      "type": "string"
+    },
+    "op": {
+      "enum": [
+        "=",
+        "is null"
+      ],
+      "title": "Op",
+      "type": "string"
+    },
+    "value": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "integer"
+        },
+        {
+          "type": "number"
+        },
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Value"
+    }
+  },
+  "required": [
+    "column",
+    "op"
+  ],
+  "title": "DataBrowseFilter",
+  "type": "object"
+}

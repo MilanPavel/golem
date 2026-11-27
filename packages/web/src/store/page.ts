@@ -19,7 +19,7 @@ import { MEMORY_LIST_KEY, MEMORY_PAGE, type MemoryExportParams, type MemoryExpor
 import { ROUTINE_GET_KEY, ROUTINE_LIST_KEY, type RoutineGetResult, type RoutineInfo, type RoutineListResult, type RoutineRunResult } from "./routines.ts";
 import { RUN_LIST_KEY, type RunListResult } from "./runs.ts";
 import { WORKFLOW_LIST_KEY, WORKFLOW_STATUS_KEY, workflowGetKey, type ReviewVerdict, type WorkflowCancelResult, type WorkflowCheckResult, type WorkflowProposeResult, type WorkflowSaveResult, type WorkflowGetResult, type WorkflowListResult, type WorkflowStartersResult, type WorkflowResumeResult, type WorkflowStatusResult, type WorkflowEditStepResult } from "./workflows.ts";
-import { DATA_DESCRIBE_KEY, DATA_LIST_KEY, DATA_NOTES_KEY, dataAnswer, type DataAddParams, type DataAnswer, type DataExportParams, type DataExportResult, type DataExtensionName, type DataResult, type DataResultPageParams, type DataDescribeResult, type DataInspectParams, type DataInspectResult, type DataListResult, type DataNotesGetResult, type DataSource, type DataUpdateParams } from "./data.ts";
+import { DATA_DESCRIBE_KEY, DATA_LIST_KEY, DATA_NOTES_KEY, dataAnswer, type DataBrowseResult, type DataBrowseView, type DataProfileResult, type DataAddParams, type DataAnswer, type DataExportParams, type DataExportResult, type DataExtensionName, type DataResult, type DataResultPageParams, type DataDescribeResult, type DataInspectParams, type DataInspectResult, type DataListResult, type DataNotesGetResult, type DataSource, type DataUpdateParams } from "./data.ts";
 import { createPulls, type Pulls } from "./pulls.ts";
 import { createQueryClient, keepQueriesHonest } from "./query.ts";
 import { createRouter, type Router } from "./router.ts";
@@ -76,6 +76,8 @@ export type PageClient = Pick<
   | "inspectData"
   | "inspectDatabase"
   | "pageDataResult"
+  | "profileData"
+  | "browseData"
   | "exportDataResult"
   | "installDataExtension"
   | "addData"
@@ -426,6 +428,8 @@ export type PageActions = {
   dataInspect(location: string): Promise<DataInspectResult>;
   /** Connects to a Postgres or MySQL database with a password for this one look, and reads its tables. Nothing is saved. Rejects with the daemon's reason. */
   dataInspectDatabase(params: DataInspectParams): Promise<DataInspectResult>;
+  /** One page of a table of a source, sorted and filtered across all of it. Rejects with the daemon's reason, such as a column that is not there. */
+  dataBrowse(name: string, table: string, view: DataBrowseView): Promise<DataBrowseResult>;
   /** One page of a kept query result. Rejects with the daemon's reason, such as a result that is no longer kept. */
   dataResultPage(params: DataResultPageParams): Promise<DataResult>;
   /** Writes a kept result to a new file. The answer has `needs_extension` and no file when the Excel add-on is not here. Rejects with the reason, such as a file that exists. */
@@ -548,6 +552,8 @@ export type PageQueries = {
   dataList(): Promise<DataAnswer<DataListResult>>;
   /** One source with its tables and sample. With `table`, that table's sample on its own. */
   dataDescribe(name: string, table: string | null): Promise<DataAnswer<DataDescribeResult>>;
+  /** The shape of each column of one table of a source, or the news that the daemon does not know `data.profile`. */
+  dataProfile(name: string, table: string): Promise<DataAnswer<DataProfileResult>>;
   /** The notes of a source. */
   dataNotes(name: string): Promise<DataAnswer<DataNotesGetResult>>;
   /** The runs, one per headless session, newest first. With `sessionId`, that session's row alone. */
@@ -699,6 +705,7 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
       workflowStatus: (workflowRunId) => client.workflowStatus(workflowRunId),
       dataList: () => dataAnswer(() => client.listData()),
       dataDescribe: (name, table) => dataAnswer(() => (table === null ? client.describeData(name) : client.describeData(name, table))),
+      dataProfile: (name, table) => dataAnswer(() => client.profileData(name, table)),
       dataNotes: (name) => dataAnswer(() => client.getDataNotes(name)),
       runList: (sessionId) => (sessionId === null ? client.listRuns() : client.listRuns({ sessionId })),
       routineGet: (name, folder) => (folder === null ? client.getRoutine(name) : client.getRoutine(name, folder)),
@@ -1000,6 +1007,7 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
       },
       dataInspect: (location) => client.inspectData(location),
       dataInspectDatabase: (params) => client.inspectDatabase(params),
+      dataBrowse: (name, table, view) => client.browseData({ source: name, table, ...view }),
       dataResultPage: (params) => client.pageDataResult(params.result_id, params.offset, params.limit),
       dataExportResult: (params) => client.exportDataResult(params.result_id, params.path, params.format),
       async dataInstallExtension(name) {

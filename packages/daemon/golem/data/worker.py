@@ -6,8 +6,8 @@ Each request runs in a thread of its own, so a slow query does not hold up the n
 request, and ``cancel`` (``args.id``) can interrupt it. A request that fails answers with
 its error and the worker stays up. The worker ends when stdin closes.
 
-Ops: ``ping``, ``attach``, ``detach``, ``tables``, ``describe``, ``query``,
-``install_extension``, ``load_table``, ``result_page``, ``export``, ``cancel``.
+Ops: ``ping``, ``attach``, ``detach``, ``tables``, ``describe``, ``profile``, ``browse``,
+``query``, ``install_extension``, ``load_table``, ``result_page``, ``export``, ``cancel``.
 """
 
 from __future__ import annotations
@@ -103,6 +103,8 @@ class Worker:
             return source.describe(str(args.get("table", "")))
         if op == "query":
             return self._query(ident, source, args)
+        if op in ("profile", "browse"):
+            return self._view(ident, op, source, args)
         if op == "load_table":
             rows = source.load_table(
                 str(args.get("table", "")),
@@ -154,6 +156,25 @@ class Worker:
             return source.query(
                 str(args.get("sql", "")), int(args.get("limit", 1000)), cursor, keep
             )
+        finally:
+            with self._lock:
+                self._running.pop(ident, None)
+            cursor.close()
+
+    def _view(self, ident: int, op: str, source: Source, args: dict[str, Any]) -> dict[str, Any]:
+        """A profile or a page of a table: a cursor that ``cancel`` can interrupt."""
+        cursor = source.cursor()
+        with self._lock:
+            if ident in self._cancelled:
+                self._cancelled.discard(ident)
+                cursor.close()
+                raise DataError("The query was cancelled.")
+            self._running[ident] = cursor
+        try:
+            table = str(args.get("table", ""))
+            if op == "profile":
+                return source.profile(table, cursor)
+            return source.browse(table, args, cursor)
         finally:
             with self._lock:
                 self._running.pop(ident, None)
