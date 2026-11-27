@@ -3,9 +3,10 @@
 export type Limit = number | null;
 export type Project = string | null;
 export type ResultId = string | null;
+export type Saved = string | null;
 export type SessionId = string | null;
 export type Source = string;
-export type Sql = string;
+export type Sql = string | null;
 
 /**
  * ``data.query``. Run SQL on one source.
@@ -14,7 +15,8 @@ export interface DataQueryParams {
   limit?: Limit;
   project?: Project;
   result_id?: ResultId;
+  saved?: Saved;
   session_id?: SessionId;
   source: Source;
-  sql: Sql;
+  sql?: Sql;
 }

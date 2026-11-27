@@ -2,6 +2,9 @@
 
 export type Notes = string | null;
 export type Description = string | null;
+export type LastError = string | null;
+export type LastMs = number | null;
+export type LastRows = number | null;
 export type LastRunAt = string | null;
 export type Name = string;
 export type Sql = string;
@@ -53,6 +56,9 @@ export interface DataDescribeResult {
  */
 export interface DataSavedQuery {
   description?: Description;
+  last_error?: LastError;
+  last_ms?: LastMs;
+  last_rows?: LastRows;
   last_run_at?: LastRunAt;
   name: Name;
   sql: Sql;

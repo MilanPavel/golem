@@ -6788,6 +6788,11 @@ class DataSavedQuery(BaseModel):
     sql: str
     description: str | None = None
     last_run_at: str | None = None
+    """When it last ran, as an ISO time. None: it has not run."""
+    last_rows: int | None = Field(default=None, ge=0)
+    last_ms: int | None = Field(default=None, ge=0)
+    last_error: str | None = None
+    """The engine's words when the last run failed."""
 
 
 class DataResult(BaseModel):
@@ -6973,7 +6978,9 @@ class DataQueryParams(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     source: str = Field(min_length=1)
-    sql: str = Field(min_length=1)
+    sql: str | None = Field(default=None, min_length=1)
+    saved: str | None = Field(default=None, min_length=1)
+    """The name of a saved query to run instead of ``sql``. Exactly one of the two."""
     limit: int | None = Field(default=None, ge=1)
     result_id: str | None = Field(default=None, min_length=1)
     """An id the client picks, so it can ``data.cancel`` the query by it. None: the daemon picks."""
@@ -7247,7 +7254,13 @@ class DataQueriesSaveParams(BaseModel):
     name: str = Field(min_length=1)
     sql: str = Field(min_length=1)
     description: str | None = None
+    replace: bool = False
+    """Save over a query that has this name. Without it, a taken name is an error."""
+    previous_name: str | None = Field(default=None, min_length=1)
+    """The name the query had, when this save renames it."""
     session_id: str | None = Field(default=None, min_length=1)
+    project: str | None = Field(default=None, min_length=1)
+    """A trusted project folder whose sources count, when there is no ``session_id``."""
 
 
 class DataQueriesSaveResult(BaseModel):
@@ -7266,6 +7279,8 @@ class DataQueriesRemoveParams(BaseModel):
     source: str = Field(min_length=1)
     name: str = Field(min_length=1)
     session_id: str | None = Field(default=None, min_length=1)
+    project: str | None = Field(default=None, min_length=1)
+    """A trusted project folder whose sources count, when there is no ``session_id``."""
 
 
 class DataQueriesRemoveResult(BaseModel):

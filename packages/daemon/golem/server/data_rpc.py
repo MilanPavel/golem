@@ -31,6 +31,7 @@ from golem.data.database import DatabaseTarget, build_url, kind_of_url, parse_ur
 from golem.data.draft import INSTRUCTION, UNUSABLE, build_prompt, clean
 from golem.data.draft import SAMPLE_ROWS as DRAFT_ROWS
 from golem.data.notes import MAX_BYTES, TOO_LONG, write_notes
+from golem.data.queries import SavedQuery
 from golem.data.results import KIND, table_record, wire_rows
 from golem.data.sources import DataSources, SourceInfo, TableInfo
 from golem.data.types import DataError, NeedsExtension
@@ -78,11 +79,16 @@ from golem_protocol.commands import (
     DataNotesSetResult,
     DataProfileParams,
     DataProfileResult,
+    DataQueriesRemoveParams,
+    DataQueriesRemoveResult,
+    DataQueriesSaveParams,
+    DataQueriesSaveResult,
     DataQueryParams,
     DataRemoveParams,
     DataRemoveResult,
     DataResult,
     DataResultPageParams,
+    DataSavedQuery,
     DataSource,
     DataTable,
     DataUpdateParams,
@@ -200,6 +206,19 @@ async def data_describe(ctx: RequestContext, params: DataDescribeParams) -> Data
         tables=[wire_table(table) for table in found.tables],
         sample={name: _rows(rows) for name, rows in found.sample.items()},
         notes=found.notes,
+        queries=[wire_query(q) for q in found.queries],
+    )
+
+
+def wire_query(query: SavedQuery) -> DataSavedQuery:
+    return DataSavedQuery(
+        name=query.name,
+        sql=query.sql,
+        description=query.description,
+        last_run_at=query.last_run_at,
+        last_rows=query.last_rows,
+        last_ms=query.last_ms,
+        last_error=query.last_error,
     )
 
 
@@ -272,10 +291,17 @@ async def data_browse_keep(
 
 async def data_query(ctx: RequestContext, params: DataQueryParams) -> DataResult:
     root = await _where(ctx, params.session_id, params.project)
+    if (params.sql is None) == (params.saved is None):
+        raise RpcCallError(INVALID_PARAMS, "Give either sql or the name of a saved query.")
     try:
-        result = await _sources(ctx).query(
-            root, params.source, params.sql, params.limit, params.result_id
-        )
+        if params.saved is not None:
+            result = await _sources(ctx).query_saved(
+                root, params.source, params.saved, params.limit, params.result_id
+            )
+        else:
+            result = await _sources(ctx).query(
+                root, params.source, params.sql or "", params.limit, params.result_id
+            )
     except DataError as exc:
         raise RpcCallError(INVALID_PARAMS, str(exc)) from exc
     if result.stored and params.session_id is not None and ctx.state.artifacts is not None:
@@ -622,6 +648,55 @@ async def data_notes_set(ctx: RequestContext, params: DataNotesSetParams) -> Dat
         raise RpcCallError(INTERNAL_ERROR, f"could not write {path}: {exc}") from exc
     _announce(ctx, params.source, "notes")
     return DataNotesSetResult(path=str(path))
+
+
+async def _query_source(
+    ctx: RequestContext, source: str, session_id: str | None, project: str | None
+) -> tuple[Path | None, DataSources]:
+    """The folder and sources for a change to the queries of ``source``. A project's source
+    needs a trusted project, as its notes do."""
+    root = await _where(ctx, session_id, project)
+    sources = _sources(ctx)
+    info = next((i for i in sources.snapshot(root) if i.name == source), None)
+    if info is None:
+        raise RpcCallError(INVALID_PARAMS, f"There is no source called {source}.")
+    if info.scope == "project" and session_id is not None:
+        # A project folder named without a session was checked as trusted when it was resolved.
+        await config_target(ctx, "project", await get_scope(ctx, session_id))
+    return root, sources
+
+
+async def data_queries_save(
+    ctx: RequestContext, params: DataQueriesSaveParams
+) -> DataQueriesSaveResult:
+    """Keep a query with its source: new, replaced by name, or renamed from ``previous_name``."""
+    root, sources = await _query_source(ctx, params.source, params.session_id, params.project)
+    try:
+        saved = await sources.save_query(
+            root,
+            params.source,
+            params.name,
+            params.sql,
+            params.description,
+            replace=params.replace,
+            previous_name=params.previous_name,
+        )
+    except DataError as exc:
+        raise RpcCallError(INVALID_PARAMS, str(exc)) from exc
+    _announce(ctx, params.source, "queries")
+    return DataQueriesSaveResult(query=wire_query(saved))
+
+
+async def data_queries_remove(
+    ctx: RequestContext, params: DataQueriesRemoveParams
+) -> DataQueriesRemoveResult:
+    root, sources = await _query_source(ctx, params.source, params.session_id, params.project)
+    try:
+        await sources.remove_query(root, params.source, params.name)
+    except DataError as exc:
+        raise RpcCallError(INVALID_PARAMS, str(exc)) from exc
+    _announce(ctx, params.source, "queries")
+    return DataQueriesRemoveResult()
 
 
 async def data_notes_draft(

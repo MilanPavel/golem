@@ -12,7 +12,7 @@ import {
   formatQueryTable,
   truncatedNote,
 } from "./data-format.ts";
-import { NO_DATA_METHODS, runDataAdd, runDataDescribe, runDataExport, runDataList, runDataNotes, runDataQuery, type DataDeps } from "./data-run.ts";
+import { NO_DATA_METHODS, runDataAdd, runDataDescribe, runDataExport, runDataList, runDataNotes, runDataQuery, runQueriesList, runQueriesRemove, runQueriesRun, runQueriesSave, type DataDeps } from "./data-run.ts";
 import { explainDaemonDown } from "./daemon-down.ts";
 
 const GOLEM = { name: "golem", kind: "builtin", scope: "builtin", location: "golem", privacy: "open", status: "ready", tables: 2, rows: 1204 } as const;
@@ -195,7 +195,7 @@ function harness(options: { tty?: boolean; stdin?: string; password?: string; pr
   };
 }
 
-function client(overrides: Partial<Record<"addData" | "listData" | "describeData" | "queryData" | "cancelData" | "getDataNotes" | "setDataNotes" | "exportDataResult", (...args: never[]) => unknown>> = {}) {
+function client(overrides: Partial<Record<"addData" | "listData" | "describeData" | "queryData" | "cancelData" | "getDataNotes" | "setDataNotes" | "exportDataResult" | "saveDataQuery" | "removeDataQuery", (...args: never[]) => unknown>> = {}) {
   return {
     listData: async () => ({ sources: [GOLEM] }),
     describeData: async () => ({ source: GOLEM, tables: [], sample: {} }),
@@ -497,4 +497,71 @@ test("add of a folder sends no password and says a folder has none when one is p
   assert.deepEqual(sent, [{ name: "bank", location: "~/bank/*.csv", privacy: "local", scope: "user" }]);
   assert.equal(await runDataAdd(fake, { kind: "add", name: "bank", location: "~/bank", privacy: null, passwordStdin: true }, run.deps), 1);
   assert.match(run.err.join(""), /no password/);
+});
+
+test("query list, run, save and remove parse, and an ordinary query still does", () => {
+  assert.deepEqual(parseDataArgs(["query", "list", "bank", "--json"]), { kind: "queries-list", source: "bank", json: true });
+  assert.deepEqual(parseDataArgs(["query", "run", "bank", "Totals", "--limit", "5"]), { kind: "queries-run", source: "bank", name: "Totals", limit: 5, format: "table" });
+  assert.deepEqual(parseDataArgs(["query", "save", "bank", "Totals", "--sql", "select 1", "--description", "One", "--replace"]), {
+    kind: "queries-save",
+    source: "bank",
+    name: "Totals",
+    sql: "select 1",
+    description: "One",
+    replace: true,
+  });
+  assert.deepEqual(parseDataArgs(["query", "remove", "bank", "Totals"]), { kind: "queries-remove", source: "bank", name: "Totals" });
+  assert.equal(parseDataArgs(["query", "save", "bank", "Totals"]).kind, "error");
+  assert.equal(parseDataArgs(["query", "run", "bank"]).kind, "error");
+  assert.equal(parseDataArgs(["query", "save", "bank", "T", "--sql", "x", "--nope"]).kind, "error");
+  assert.deepEqual(parseDataArgs(["query", "bank", "select 1"]), { kind: "query", source: "bank", sql: "select 1", limit: null, format: "table" });
+});
+
+test("query list prints the saved queries and their last run", async () => {
+  const fake = client({
+    describeData: async () => ({
+      source: BANK,
+      tables: [],
+      sample: {},
+      queries: [
+        { name: "Totals", sql: "select 1", description: "All of it", last_run_at: "2026-11-27T09:14:00+00:00", last_rows: 3 },
+        { name: "Broken", sql: "select nope", last_error: "column nope not found" },
+      ],
+    }),
+  });
+  const run = harness();
+  assert.equal(await runQueriesList(fake, "bank", false, run.deps), 0);
+  assert.match(run.out.join(""), /Totals +All of it +2026-11-27T09:14:00\+00:00 · 3 rows/);
+  assert.match(run.out.join(""), /Broken +failed: column nope not found/);
+  const none = harness();
+  assert.equal(await runQueriesList(client(), "bank", false, none.deps), 0);
+  assert.match(none.out.join(""), /no saved queries for bank/);
+});
+
+test("query run asks for the saved name, query save and remove call the daemon", async () => {
+  const sent: DataQueryParams[] = [];
+  const saved: unknown[] = [];
+  const removed: unknown[][] = [];
+  const fake = client({
+    queryData: async (params: DataQueryParams) => {
+      sent.push(params);
+      return SPEND;
+    },
+    saveDataQuery: async (params: unknown) => {
+      saved.push(params);
+      return { query: { name: "Totals", sql: "select 1" } };
+    },
+    removeDataQuery: async (...args: unknown[]) => {
+      removed.push(args);
+      return {};
+    },
+  });
+  const run = harness();
+  assert.equal(await runQueriesRun(fake, { kind: "queries-run", source: "bank", name: "Totals", limit: null, format: "table" }, run.deps), 0);
+  assert.deepEqual(sent, [{ source: "bank", saved: "Totals", result_id: "cli-fixed" }]);
+  assert.match(run.out.join(""), /3 rows/);
+  assert.equal(await runQueriesSave(fake, { kind: "queries-save", source: "bank", name: "Totals", sql: "select 1", description: null, replace: false }, run.deps), 0);
+  assert.deepEqual(saved, [{ source: "bank", name: "Totals", sql: "select 1" }]);
+  assert.equal(await runQueriesRemove(fake, { kind: "queries-remove", source: "bank", name: "Totals" }, run.deps), 0);
+  assert.deepEqual(removed, [["bank", "Totals"]]);
 });

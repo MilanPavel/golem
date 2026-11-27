@@ -88,6 +88,8 @@ import type { DataListResult } from "../../protocol/gen/data-list-result.ts";
 import type { DataNotesDraftResult } from "../../protocol/gen/data-notes-draft-result.ts";
 import type { DataNotesGetResult } from "../../protocol/gen/data-notes-get-result.ts";
 import type { DataNotesSetResult } from "../../protocol/gen/data-notes-set-result.ts";
+import type { DataQueriesRemoveResult } from "../../protocol/gen/data-queries-remove-result.ts";
+import type { DataQueriesSaveResult } from "../../protocol/gen/data-queries-save-result.ts";
 import type { DataRemoveResult } from "../../protocol/gen/data-remove-result.ts";
 import type { DataSource } from "../../protocol/gen/data-source.ts";
 import type { DataUpdateResult } from "../../protocol/gen/data-update-result.ts";
@@ -654,6 +656,15 @@ export function isDataNotesGetResult(value: unknown): value is DataNotesGetResul
 
 export function isDataNotesSetResult(value: unknown): value is DataNotesSetResult {
   return isRecord(value) && typeof value["path"] === "string";
+}
+
+export function isDataQueriesSaveResult(value: unknown): value is DataQueriesSaveResult {
+  const query = isRecord(value) ? value["query"] : undefined;
+  return isRecord(query) && typeof query["name"] === "string" && typeof query["sql"] === "string";
+}
+
+export function isDataQueriesRemoveResult(value: unknown): value is DataQueriesRemoveResult {
+  return isRecord(value);
 }
 
 export function isDataNotesDraftResult(value: unknown): value is DataNotesDraftResult {

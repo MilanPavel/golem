@@ -2,6 +2,9 @@
 
 export type Description = string | null;
 export type Name = string;
+export type PreviousName = string | null;
+export type Project = string | null;
+export type Replace = boolean;
 export type SessionId = string | null;
 export type Source = string;
 export type Sql = string;
@@ -12,6 +15,9 @@ export type Sql = string;
 export interface DataQueriesSaveParams {
   description?: Description;
   name: Name;
+  previous_name?: PreviousName;
+  project?: Project;
+  replace?: Replace;
   session_id?: SessionId;
   source: Source;
   sql: Sql;

@@ -72,7 +72,7 @@
       "data": {
         "cleared_ids": [],
         "context_window": null,
-        "estimated_tokens": 5209,
+        "estimated_tokens": 5338,
         "index": 1,
         "message_bytes": [
           10
@@ -90,12 +90,12 @@
         "profile": "remote",
         "provider": null,
         "summary_chars": null,
-        "system_bytes": 474,
-        "system_chars": 473,
-        "system_prompt_sha": "ac1167f70482a9551bc94dafcbd09d604012f96f3509fee703b3c5aabbbd5659",
+        "system_bytes": 605,
+        "system_chars": 604,
+        "system_prompt_sha": "554abf63f47d61751d4ae0c146e14527bafb04ebef3efa8b2a7159a46220dd70",
         "system_sections": [
           {
-            "chars": 205,
+            "chars": 336,
             "name": "data_sources"
           },
           {
@@ -104,9 +104,9 @@
           }
         ],
         "tier": null,
-        "tools_bytes": 16871,
-        "tools_chars": 16871,
-        "tools_sha": "68b980daf74d9f4715e50771ef6cd0319165f22c45251fb16b3c6e48d17f7b27",
+        "tools_bytes": 17168,
+        "tools_chars": 17168,
+        "tools_sha": "688fe818f81caa363938d2b6f9fce5eb4ab1a3de3807e619f32fda1cfe4b1ca3",
         "window_estimated": false,
         "window_planned": false
       },
@@ -300,7 +300,7 @@
       "data": {
         "cleared_ids": [],
         "context_window": null,
-        "estimated_tokens": 5249,
+        "estimated_tokens": 5378,
         "index": 2,
         "message_bytes": [
           10,
@@ -324,12 +324,12 @@
         "profile": "remote",
         "provider": null,
         "summary_chars": null,
-        "system_bytes": 474,
-        "system_chars": 473,
-        "system_prompt_sha": "ac1167f70482a9551bc94dafcbd09d604012f96f3509fee703b3c5aabbbd5659",
+        "system_bytes": 605,
+        "system_chars": 604,
+        "system_prompt_sha": "554abf63f47d61751d4ae0c146e14527bafb04ebef3efa8b2a7159a46220dd70",
         "system_sections": [
           {
-            "chars": 205,
+            "chars": 336,
             "name": "data_sources"
           },
           {
@@ -338,9 +338,9 @@
           }
         ],
         "tier": null,
-        "tools_bytes": 16871,
-        "tools_chars": 16871,
-        "tools_sha": "68b980daf74d9f4715e50771ef6cd0319165f22c45251fb16b3c6e48d17f7b27",
+        "tools_bytes": 17168,
+        "tools_chars": 17168,
+        "tools_sha": "688fe818f81caa363938d2b6f9fce5eb4ab1a3de3807e619f32fda1cfe4b1ca3",
         "window_estimated": false,
         "window_planned": false
       },
@@ -472,7 +472,7 @@
       "data": {
         "cleared_ids": [],
         "context_window": null,
-        "estimated_tokens": 5209,
+        "estimated_tokens": 5338,
         "index": 1,
         "message_bytes": [
           10
@@ -490,12 +490,12 @@
         "profile": "remote",
         "provider": null,
         "summary_chars": null,
-        "system_bytes": 474,
-        "system_chars": 473,
-        "system_prompt_sha": "ac1167f70482a9551bc94dafcbd09d604012f96f3509fee703b3c5aabbbd5659",
+        "system_bytes": 605,
+        "system_chars": 604,
+        "system_prompt_sha": "554abf63f47d61751d4ae0c146e14527bafb04ebef3efa8b2a7159a46220dd70",
         "system_sections": [
           {
-            "chars": 205,
+            "chars": 336,
             "name": "data_sources"
           },
           {
@@ -504,9 +504,9 @@
           }
         ],
         "tier": null,
-        "tools_bytes": 16871,
-        "tools_chars": 16871,
-        "tools_sha": "68b980daf74d9f4715e50771ef6cd0319165f22c45251fb16b3c6e48d17f7b27",
+        "tools_bytes": 17168,
+        "tools_chars": 17168,
+        "tools_sha": "688fe818f81caa363938d2b6f9fce5eb4ab1a3de3807e619f32fda1cfe4b1ca3",
         "window_estimated": false,
         "window_planned": false
       },
@@ -700,7 +700,7 @@
       "data": {
         "cleared_ids": [],
         "context_window": null,
-        "estimated_tokens": 5249,
+        "estimated_tokens": 5378,
         "index": 2,
         "message_bytes": [
           10,
@@ -724,12 +724,12 @@
         "profile": "remote",
         "provider": null,
         "summary_chars": null,
-        "system_bytes": 474,
-        "system_chars": 473,
-        "system_prompt_sha": "ac1167f70482a9551bc94dafcbd09d604012f96f3509fee703b3c5aabbbd5659",
+        "system_bytes": 605,
+        "system_chars": 604,
+        "system_prompt_sha": "554abf63f47d61751d4ae0c146e14527bafb04ebef3efa8b2a7159a46220dd70",
         "system_sections": [
           {
-            "chars": 205,
+            "chars": 336,
             "name": "data_sources"
           },
           {
@@ -738,9 +738,9 @@
           }
         ],
         "tier": null,
-        "tools_bytes": 16871,
-        "tools_chars": 16871,
-        "tools_sha": "68b980daf74d9f4715e50771ef6cd0319165f22c45251fb16b3c6e48d17f7b27",
+        "tools_bytes": 17168,
+        "tools_chars": 17168,
+        "tools_sha": "688fe818f81caa363938d2b6f9fce5eb4ab1a3de3807e619f32fda1cfe4b1ca3",
         "window_estimated": false,
         "window_planned": false
       },

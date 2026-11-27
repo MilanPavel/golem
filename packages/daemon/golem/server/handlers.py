@@ -96,6 +96,8 @@ from golem.server.data_rpc import (
     data_notes_get,
     data_notes_set,
     data_profile,
+    data_queries_remove,
+    data_queries_save,
     data_query,
     data_remove,
     data_result_page,
@@ -315,6 +317,8 @@ from golem_protocol.commands import (
     DataNotesGetParams,
     DataNotesSetParams,
     DataProfileParams,
+    DataQueriesRemoveParams,
+    DataQueriesSaveParams,
     DataQueryParams,
     DataRemoveParams,
     DataResultPageParams,
@@ -2621,6 +2625,12 @@ def standard_methods() -> dict[str, Method]:
         ),
         "data.notes.get": Method("data.notes.get", DataNotesGetParams, True, data_notes_get),
         "data.notes.set": Method("data.notes.set", DataNotesSetParams, True, data_notes_set),
+        "data.queries.save": Method(
+            "data.queries.save", DataQueriesSaveParams, True, data_queries_save
+        ),
+        "data.queries.remove": Method(
+            "data.queries.remove", DataQueriesRemoveParams, True, data_queries_remove
+        ),
         "data.notes.draft": Method(
             "data.notes.draft", DataNotesDraftParams, True, data_notes_draft
         ),

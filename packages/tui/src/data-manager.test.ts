@@ -123,6 +123,15 @@ test("a source shows its tables with columns and types, the sample rows, notes a
   assert.ok(rows.includes("  subscriptions"));
 });
 
+test("a saved query shows its name and what it answers, and nothing to run or change", () => {
+  const result: DataDescribeResult = { ...RESULT, queries: [{ name: "Spending by month", sql: "select 1", description: "Money out per month" }, { name: "Plain", sql: "select 2" }] };
+  const rows = texts(detailLines({ name: "bank", result, error: null }, "bank", 80));
+  assert.ok(rows.includes("saved queries"));
+  assert.ok(rows.includes("  Spending by month  Money out per month"));
+  assert.ok(rows.includes("  Plain"));
+  assert.ok(!rows.some((row) => row.includes("select 1")));
+});
+
 test("a schema-only source says no rows are fetched", () => {
   const result: DataDescribeResult = { ...RESULT, source: source("shop_prod", { privacy: "schema" }), sample: {}, notes: null, queries: [] };
   const rows = texts(detailLines({ name: "shop_prod", result, error: null }, "shop_prod", 80));

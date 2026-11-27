@@ -8,6 +8,7 @@ import type { DataArgs, ExportFormat } from "./data-command.ts";
 import {
   formatDataDescribe,
   formatDataList,
+  formatSavedQueries,
   formatQueryCsv,
   formatQueryJson,
   formatQueryTable,
@@ -47,7 +48,7 @@ async function guarded<T>(body: () => Promise<T>): Promise<T> {
   }
 }
 
-type Client = Pick<GolemClient, "addData" | "listData" | "describeData" | "queryData" | "cancelData" | "getDataNotes" | "setDataNotes" | "exportDataResult">;
+type Client = Pick<GolemClient, "addData" | "listData" | "describeData" | "queryData" | "cancelData" | "getDataNotes" | "setDataNotes" | "exportDataResult" | "saveDataQuery" | "removeDataQuery">;
 
 /** `golem data list`. */
 export async function runDataList(client: Client, json: boolean, deps: DataDeps): Promise<number> {
@@ -176,6 +177,39 @@ export async function runDataQuery(client: Client, args: Extract<DataArgs, { kin
   } finally {
     unhook();
   }
+}
+
+/** `golem data query list`: the saved queries of a source. */
+export async function runQueriesList(client: Client, source: string, json: boolean, deps: DataDeps): Promise<number> {
+  const result: DataDescribeResult = await guarded(() => client.describeData(source));
+  const queries = result.queries ?? [];
+  deps.write(`${json ? JSON.stringify(queries, null, 2) : formatSavedQueries(queries, source)}\n`);
+  return 0;
+}
+
+/** `golem data query run`: a saved query by name, with no model. */
+export async function runQueriesRun(client: Client, args: Extract<DataArgs, { kind: "queries-run" }>, deps: DataDeps): Promise<number> {
+  const resultId = (deps.newId ?? (() => `cli-${randomUUID()}`))();
+  const result = await guarded(() => client.queryData({ source: args.source, saved: args.name, result_id: resultId, ...(args.limit === null ? {} : { limit: args.limit }) }));
+  if (args.out !== undefined) return exportResult(client, result.result_id, args.out, null, deps);
+  printQuery(result, args.format, deps);
+  return 0;
+}
+
+/** `golem data query save`: keep a query with its source. A taken name needs `--replace`. */
+export async function runQueriesSave(client: Client, args: Extract<DataArgs, { kind: "queries-save" }>, deps: DataDeps): Promise<number> {
+  const saved = await guarded(() =>
+    client.saveDataQuery({ source: args.source, name: args.name, sql: args.sql, ...(args.description === null ? {} : { description: args.description }), ...(args.replace ? { replace: true } : {}) }),
+  );
+  deps.write(`Saved "${saved.query.name}" with ${args.source}.\n`);
+  return 0;
+}
+
+/** `golem data query remove`. */
+export async function runQueriesRemove(client: Client, args: Extract<DataArgs, { kind: "queries-remove" }>, deps: DataDeps): Promise<number> {
+  await guarded(() => client.removeDataQuery(args.source, args.name));
+  deps.write(`Removed "${args.name}" from ${args.source}.\n`);
+  return 0;
 }
 
 /** The path as the daemon should read it: `~` stays for the daemon, a relative name is made absolute here. */

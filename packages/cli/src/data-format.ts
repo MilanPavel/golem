@@ -1,4 +1,4 @@
-import type { DataColumn, DataDescribeResult, DataListResult } from "@golem/client";
+import type { DataColumn, DataDescribeResult, DataListResult, DataSavedQuery } from "@golem/client";
 import { countText, kindWord, PRIVACY_CHIP, withoutSingleFile } from "@golem/view";
 
 type Source = DataListResult["sources"][number];
@@ -151,4 +151,20 @@ export function formatQueryJson(result: QueryOutput): string {
 export function formatQueryTable(result: QueryOutput): string {
   const body = result.columns.length === 0 ? "" : `${formatRows(result.columns, result.rows)}\n`;
   return `${body}\n${queryFooter(result)}`;
+}
+
+/** One line per saved query: name, what it answers, and its last run. */
+export function formatSavedQueries(queries: readonly DataSavedQuery[], source: string): string {
+  if (queries.length === 0) return `no saved queries for ${source}`;
+  const rows = [["NAME", "ANSWERS", "LAST RUN"]];
+  for (const query of queries) {
+    const last =
+      query.last_error !== null && query.last_error !== undefined
+        ? `failed: ${query.last_error.split("\n")[0] ?? ""}`
+        : query.last_run_at === null || query.last_run_at === undefined
+          ? "never"
+          : `${query.last_run_at}${query.last_rows === null || query.last_rows === undefined ? "" : ` · ${query.last_rows} rows`}`;
+    rows.push([query.name, query.description ?? "", last]);
+  }
+  return table(rows);
 }

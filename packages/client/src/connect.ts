@@ -91,6 +91,9 @@ import type { DataResult } from "../../protocol/gen/data-result.ts";
 import type { DataNotesDraftResult } from "../../protocol/gen/data-notes-draft-result.ts";
 import type { DataNotesGetResult } from "../../protocol/gen/data-notes-get-result.ts";
 import type { DataNotesSetResult } from "../../protocol/gen/data-notes-set-result.ts";
+import type { DataQueriesSaveParams } from "../../protocol/gen/data-queries-save-params.ts";
+import type { DataQueriesRemoveResult } from "../../protocol/gen/data-queries-remove-result.ts";
+import type { DataQueriesSaveResult } from "../../protocol/gen/data-queries-save-result.ts";
 import type { DataRemoveResult } from "../../protocol/gen/data-remove-result.ts";
 import type { DataUpdateParams } from "../../protocol/gen/data-update-params.ts";
 import type { DataUpdateResult } from "../../protocol/gen/data-update-result.ts";
@@ -335,6 +338,8 @@ import {
   isDataNotesGetResult,
   isDataNotesSetResult,
   isDataBrowseKeepResult,
+  isDataQueriesRemoveResult,
+  isDataQueriesSaveResult,
   isDataBrowseResult,
   isDataProfileResult,
   isDataQueryResult,
@@ -998,6 +1003,10 @@ export interface GolemClient {
   setDataNotes(source: string, text: string, project?: string): Promise<DataNotesSetResult>;
   /** `data.notes.draft`: a proposal for the notes. It is not saved. */
   draftDataNotes(source: string, project?: string): Promise<DataNotesDraftResult>;
+  /** `data.queries.save`: keep a query with its source. A taken name is refused unless `replace` is set; `previous_name` renames. */
+  saveDataQuery(params: Omit<DataQueriesSaveParams, "session_id">): Promise<DataQueriesSaveResult>;
+  /** `data.queries.remove`: delete a saved query. */
+  removeDataQuery(source: string, name: string, project?: string): Promise<DataQueriesRemoveResult>;
   /** `data.changed`: a source or the list of them changed, so what was read before is stale. */
   onDataChanged(listener: (change: DataChanged) => void): () => void;
   /** `device.list`: every paired phone, revoked ones last. */
@@ -3499,6 +3508,22 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       const result = await call("data.notes.draft", { source, ...(project === undefined ? {} : { project }) });
       if (!isDataNotesDraftResult(result)) {
         throw new Error("invalid data.notes.draft result");
+      }
+      return result;
+    },
+    async saveDataQuery(params: Omit<DataQueriesSaveParams, "session_id">): Promise<DataQueriesSaveResult> {
+      await ready;
+      const result = await call("data.queries.save", { ...params });
+      if (!isDataQueriesSaveResult(result)) {
+        throw new Error("invalid data.queries.save result");
+      }
+      return result;
+    },
+    async removeDataQuery(source: string, name: string, project?: string): Promise<DataQueriesRemoveResult> {
+      await ready;
+      const result = await call("data.queries.remove", project === undefined ? { source, name } : { source, name, project });
+      if (!isDataQueriesRemoveResult(result)) {
+        throw new Error("invalid data.queries.remove result");
       }
       return result;
     },

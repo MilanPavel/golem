@@ -106,6 +106,7 @@ import { SAMPLE_FILE_CUT, SAMPLE_FILE_READ, SAMPLE_RUN_CANCELLED, SAMPLE_RUN_DON
 import { DataGallery } from "./gallery-data.tsx";
 import { RunsPageGallery } from "./gallery-runs-page.tsx";
 import { DataIconsGallery } from "./gallery-data-icons.tsx";
+import { DataQueriesGallery } from "./gallery-data-queries.tsx";
 import { DataResultGallery } from "./gallery-data-result.tsx";
 import { DataTableViewGallery } from "./gallery-data-table-view.tsx";
 import { RunForm, WorkflowDetail, WorkflowStarters, WorkflowsEmpty, WorkflowsPanel } from "../features/workflows/index.ts";
@@ -2512,6 +2513,10 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
 
       <Only id="data-result">
         <DataResultGallery theme={theme} id={anchor("Data result")} />
+      </Only>
+
+      <Only id="data-saved-queries">
+        <DataQueriesGallery theme={theme} id={anchor("Data saved queries")} />
       </Only>
 
       <Only id="data-table-view">

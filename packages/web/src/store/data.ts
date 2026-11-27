@@ -1,6 +1,6 @@
-import { RpcError, type DataBrowseParams, type DataBrowseKeepParams, type DataBrowseKeepResult, type DataBrowseResult, type DataColumnProfile, type DataProfileResult, type DataAddParams, type DataAddResult, type DataChanged, type DataColumn, type DataDescribeResult, type DataExportResult, type DataInspectParams, type DataInspectResult, type DataListResult, type DataNotesGetResult, type DataResult, type DataSavedQuery, type DataSource, type DataTable, type DataUpdateParams, type ToolTable } from "@golem/client";
+import { RpcError, type DataBrowseParams, type DataBrowseKeepParams, type DataBrowseKeepResult, type DataBrowseResult, type DataColumnProfile, type DataProfileResult, type DataAddParams, type DataAddResult, type DataChanged, type DataColumn, type DataDescribeResult, type DataExportResult, type DataInspectParams, type DataInspectResult, type DataListResult, type DataNotesGetResult, type DataResult, type DataSavedQuery, type DataSource, type DataTable, type DataUpdateParams, type ToolTable, type DataQueriesSaveParams, type DataQueryParams } from "@golem/client";
 
-export type { DataBrowseKeepParams, DataBrowseKeepResult, DataBrowseParams, DataBrowseResult, DataColumnProfile, DataProfileResult, DataAddParams, DataAddResult, DataChanged, DataColumn, DataDescribeResult, DataExportResult, DataInspectParams, DataInspectResult, DataListResult, DataNotesGetResult, DataResult, DataSavedQuery, DataSource, DataTable, DataUpdateParams, ToolTable };
+export type { DataBrowseKeepParams, DataBrowseKeepResult, DataBrowseParams, DataBrowseResult, DataColumnProfile, DataProfileResult, DataAddParams, DataAddResult, DataChanged, DataColumn, DataDescribeResult, DataExportResult, DataInspectParams, DataInspectResult, DataListResult, DataNotesGetResult, DataResult, DataSavedQuery, DataSource, DataTable, DataUpdateParams, ToolTable, DataQueriesSaveParams, DataQueryParams };
 
 /** The query key of `data.list`. A pushed `data.changed` and every action below mark it stale. */
 export const DATA_LIST_KEY = ["data.list"] as const;
@@ -63,3 +63,9 @@ export type DataBrowseView = Omit<DataBrowseParams, "session_id" | "project" | "
 
 /** What a view is kept by to export it: the same view as a page of the table, without paging. It never holds SQL. */
 export type DataBrowseKeepView = Omit<DataBrowseKeepParams, "session_id" | "project" | "source" | "table">;
+
+/** What a query is run by: SQL, or the name of a saved query. */
+export type DataRunParams = Omit<DataQueryParams, "session_id">;
+
+/** What a saved query is kept by. */
+export type DataSaveQueryParams = Omit<DataQueriesSaveParams, "session_id">;

@@ -184,7 +184,11 @@ function Page({ onBrowse, onAskView = () => {} }: { onBrowse: (table: string, vi
       tab={tab}
       onTab={setTab}
       onAsk={() => {}}
-      onRun={() => {}}
+      onAskQuery={() => {}}
+      onRunQuery={() => Promise.reject(new Error("no"))}
+      onTryQuery={() => Promise.reject(new Error("no"))}
+      onSaveQuery={() => Promise.resolve()}
+      onRemoveQuery={() => Promise.resolve()}
       onLoadProfile={() => Promise.resolve(SAMPLE_PASSENGER_PROFILE)}
       onBrowse={onBrowse}
       onAskView={onAskView}

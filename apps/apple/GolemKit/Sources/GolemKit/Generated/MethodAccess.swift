@@ -67,6 +67,8 @@ public enum MethodAccess {
         "data.notes.get",
         "data.notes.set",
         "data.profile",
+        "data.queries.remove",
+        "data.queries.save",
         "data.query",
         "data.remove",
         "data.result.page",
