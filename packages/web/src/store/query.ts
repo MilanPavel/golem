@@ -56,6 +56,7 @@ export function keepQueriesHonest(client: QueryWiringClient, queryClient: QueryC
     }),
     client.onRoutinesChanged(() => {
       stale("routine.list");
+      stale("inbox.list");
       stale("routine.get");
       // A firing starts or ends a run.
       stale("run.list");

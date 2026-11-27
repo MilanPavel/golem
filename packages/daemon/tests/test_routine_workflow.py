@@ -215,9 +215,9 @@ async def test_the_inputs_are_checked_against_the_workflow(rig: Rig) -> None:
 
 def test_a_routine_has_exactly_one_of_prompt_and_workflow() -> None:
     base = {"name": "r", "schedule": "daily 09:30"}
-    with pytest.raises(ValidationError, match="exactly one of prompt and workflow"):
+    with pytest.raises(ValidationError, match="exactly one of prompt, workflow and query"):
         RoutineSettings.model_validate(base)
-    with pytest.raises(ValidationError, match="exactly one of prompt and workflow"):
+    with pytest.raises(ValidationError, match="exactly one of prompt, workflow and query"):
         RoutineSettings.model_validate({**base, "prompt": "x", "workflow": "w"})
     with pytest.raises(ValidationError, match="inputs belong to a routine that starts"):
         RoutineSettings.model_validate({**base, "prompt": "x", "inputs": {"a": 1}})

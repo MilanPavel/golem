@@ -332,7 +332,8 @@ async def test_starters_are_listed_and_added(short_home: Path, tmp_path: Path) -
         await client.call("hello", HELLO)
         listed = cast(Rows, rpc_result(await client.call("workflow.starters", {}))["starters"])
         assert [(s["id"], s["needs_folder"], s["schedule"]) for s in listed] == [
-            ("morning_briefing", False, None)
+            ("morning_briefing", False, None),
+            ("data_report", False, None),
         ]
         assert listed[0]["routine"] == {
             "name": "morning-briefing",

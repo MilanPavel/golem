@@ -5,7 +5,7 @@ import { resetThemeAfterEach, showTheme } from "./gallery-test-utils.ts";
 
 resetThemeAfterEach();
 
-test("the gallery's saved queries section shows Save query, both dialogs, the tab with a run open, a failed run and the empty tab, in both themes", () => {
+test("the gallery's saved queries section shows Save query, both dialogs, the tab with a run open, a failed run the empty tab, the routine dialog, chips and Inbox posts, in both themes", () => {
   for (const theme of ["slip", "kiln"] as const) {
     showTheme(theme);
     const { unmount } = render(<Gallery only="data-saved-queries" />);
@@ -22,6 +22,15 @@ test("the gallery's saved queries section shows Save query, both dialogs, the ta
     expect(region("Edit dialog, after Try").getByText("2 rows · 31 ms")).toBeTruthy();
     expect(region("Edit dialog, Try failed").getByRole("alert").textContent).toContain('"amout" not found');
     expect(region("New query dialog").queryByRole("button", { name: "Remove" })).toBeNull();
+    const withRoutines = region("Queries tab, with routines");
+    expect(withRoutines.getByRole("button", { name: /Open the routine spending/ })).toBeTruthy();
+    expect(withRoutines.getAllByRole("button", { name: /^Routine for / }).length).toBeGreaterThan(0);
+    expect(region("Routine dialog").getByText('New routine for "Big payments this week"')).toBeTruthy();
+    expect(region("Routine dialog, new file").getByText("~/Documents/bank")).toBeTruthy();
+    expect(region("Routine dialog, failed").getByRole("alert")).toBeTruthy();
+    expect(region("Chips on a query row").getAllByRole("button")).toHaveLength(3);
+    expect(within(screen.getByRole("list", { name: `Inbox post, rows, ${theme}` })).getByText("IKEA PRAHA")).toBeTruthy();
+    expect(within(screen.getByRole("list", { name: `Inbox post, failed, ${theme}` })).getByRole("alert").textContent).toContain("amout");
     unmount();
   }
 });

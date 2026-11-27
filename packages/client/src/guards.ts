@@ -97,6 +97,8 @@ import type { RoutineGetResult } from "../../protocol/gen/routine-get-result.ts"
 import type { RoutineInfo, RoutineListResult } from "../../protocol/gen/routine-list-result.ts";
 import type { RoutinePreviewResult } from "../../protocol/gen/routine-preview-result.ts";
 import type { RoutineRemoveResult } from "../../protocol/gen/routine-remove-result.ts";
+import type { InboxDoneResult } from "../../protocol/gen/inbox-done-result.ts";
+import type { InboxListResult } from "../../protocol/gen/inbox-list-result.ts";
 import type { RoutineRunResult } from "../../protocol/gen/routine-run-result.ts";
 import type { WorkflowCancelResult } from "../../protocol/gen/workflow-cancel-result.ts";
 import type { WorkflowReadOutputResult } from "../../protocol/gen/workflow-read-output-result.ts";
@@ -468,6 +470,28 @@ export function isRoutinePreviewResult(value: unknown): value is RoutinePreviewR
 
 export function isRoutineRemoveResult(value: unknown): value is RoutineRemoveResult {
   return isRecord(value) && typeof value["name"] === "string";
+}
+
+export function isInboxListResult(value: unknown): value is InboxListResult {
+  return (
+    isRecord(value) &&
+    Array.isArray(value["posts"]) &&
+    value["posts"].every(
+      (post) =>
+        isRecord(post) &&
+        typeof post["post_id"] === "string" &&
+        typeof post["routine"] === "string" &&
+        typeof post["source"] === "string" &&
+        typeof post["saved"] === "string" &&
+        typeof post["row_count"] === "number" &&
+        Array.isArray(post["columns"]) &&
+        Array.isArray(post["rows"]),
+    )
+  );
+}
+
+export function isInboxDoneResult(value: unknown): value is InboxDoneResult {
+  return isRecord(value) && typeof value["post_id"] === "string";
 }
 
 export function isListedSkill(value: unknown): value is ListedSkill {

@@ -109,6 +109,8 @@ METHOD_ACCESS: Final[Mapping[str, Access]] = {
     "routine.remove": "browser",
     "routine.run": "browser",
     "routine.preview": "browser",
+    "inbox.list": "browser",
+    "inbox.done": "browser",
     "run.list": "device",
     "workflow.list": "browser",
     "workflow.get": "browser",

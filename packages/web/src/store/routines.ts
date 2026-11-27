@@ -1,9 +1,12 @@
-import type { RoutineConfig, RoutineGetResult, RoutineInfo, RoutineListResult, RoutineRunResult, RoutineRunSummary } from "@golem/client";
+import type { InboxListResult, InboxPost, RoutineConfig, RoutineGetResult, RoutineInfo, RoutineListResult, RoutineRunResult, RoutineRunSummary } from "@golem/client";
 
-export type { RoutineConfig, RoutineGetResult, RoutineInfo, RoutineListResult, RoutineRunResult, RoutineRunSummary };
+export type { InboxListResult, InboxPost, RoutineConfig, RoutineGetResult, RoutineInfo, RoutineListResult, RoutineRunResult, RoutineRunSummary };
 
 /** The query key of `routine.list`. The pushed `routine.changed`, `routine.fired` and `routine.finished` mark it stale. */
 export const ROUTINE_LIST_KEY = ["routine.list"] as const;
+
+/** The query key of `inbox.list`: what query routines left in the Inbox. The pushed `routine.*` notifications mark it stale. */
+export const INBOX_POSTS_KEY = ["inbox.list"] as const;
 
 /** The query key of `routine.get`, which holds a routine's recent runs. The same pushes mark it stale. */
 export const ROUTINE_GET_KEY = ["routine.get"] as const;

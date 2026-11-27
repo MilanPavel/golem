@@ -1054,6 +1054,19 @@ class RoutineWatch(BaseModel):
     glob: str = Field(default="*", min_length=1)
 
 
+class RoutineQuery(BaseModel):
+    """``query = { source, saved }``: the saved query of a data source that a routine runs."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    source: str = Field(min_length=1)
+    saved: str = Field(min_length=1)
+
+
+RoutinePost = Literal["always", "rows"]
+"""What a query routine posts: ``always`` the result every time, ``rows`` only when it has rows."""
+
+
 class RoutineSettings(BaseModel):
     """One ``[[routine]]``: a trigger, and what to run when it fires (ADR-050).
 
@@ -1062,7 +1075,8 @@ class RoutineSettings(BaseModel):
     is the text or the ``/skill`` the session starts with, in ``folder`` with
     ``model`` and the on-demand MCP servers in ``mcp``. Instead of
     ``prompt``, ``workflow`` names a workflow to start, with ``inputs`` (a watch routine
-    adds ``path``). ``missed`` says what happens
+    adds ``path``). Or ``query`` runs a saved query of a data source with no model and no
+    session, and ``post`` says when the result goes to the Inbox. ``missed`` says what happens
     to a firing that came due while the daemon was down or the Mac asleep:
     ``skip`` drops it, ``run_once`` fires it once, late. ``notify_finished`` and
     ``notify_failed`` override the notification settings for this routine.
@@ -1077,6 +1091,8 @@ class RoutineSettings(BaseModel):
     on: RoutineWatch | None = None
     prompt: str | None = Field(default=None, min_length=1)
     workflow: str | None = Field(default=None, min_length=1)
+    query: RoutineQuery | None = None
+    post: RoutinePost | None = None
     inputs: dict[str, str | int | float | bool] = Field(
         default_factory=dict[str, str | int | float | bool]
     )
@@ -1102,15 +1118,27 @@ class RoutineSettings(BaseModel):
     def _one_trigger(self) -> RoutineSettings:
         if (self.schedule is None) == (self.on is None):
             raise ValueError("a routine needs exactly one of schedule and on")
-        if (self.prompt is None) == (self.workflow is None):
-            raise ValueError("a routine needs exactly one of prompt and workflow")
+        kinds = [self.prompt, self.workflow, self.query]
+        if sum(kind is not None for kind in kinds) != 1:
+            raise ValueError("a routine needs exactly one of prompt, workflow and query")
         if self.workflow is None and self.inputs:
             raise ValueError("inputs belong to a routine that starts a workflow")
+        if self.query is None and self.post is not None:
+            raise ValueError("post belongs to a routine that runs a query")
         if self.workflow is not None:
             for name in ("folder", "model", "mcp"):
                 if getattr(self, name):
                     raise ValueError(f"{name} is for a prompt routine: a workflow chooses its own")
+        if self.query is not None:
+            for name in ("folder", "model", "mcp"):
+                if getattr(self, name):
+                    raise ValueError(f"{name} is for a prompt routine: a query uses no model")
         return self
+
+    @property
+    def posts(self) -> RoutinePost:
+        """When a query routine posts to the Inbox. ``always`` unless ``post`` says otherwise."""
+        return self.post or "always"
 
     @property
     def text(self) -> str:

@@ -86,3 +86,13 @@ test("the list has a row per routine, with paused and blocked marked", () => {
   assert.match(formatRoutines([], NOW), /^no routines/);
   assert.ok(formatRoutines([brief], NOW, 20).endsWith("…"));
 });
+
+test("a query routine shows its kind and what it posts", () => {
+  const info: RoutineInfo = {
+    config: { name: "big-payments", schedule: "every 1h", query: { source: "bank", saved: "Big payments this week" }, post: "rows" },
+    path: "/h/config.toml",
+    source: "user",
+  };
+  const line = formatRoutines([info], NOW);
+  assert.match(line, /query · bank › Big payments this week, posts only when it finds rows/);
+});

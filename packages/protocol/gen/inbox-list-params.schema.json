@@ -1,0 +1,7 @@
+{
+  "additionalProperties": false,
+  "description": "``inbox.list``. The posts not yet marked done.",
+  "properties": {},
+  "title": "InboxListParams",
+  "type": "object"
+}

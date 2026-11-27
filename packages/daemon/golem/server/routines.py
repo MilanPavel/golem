@@ -83,7 +83,12 @@ async def routine_list(ctx: RequestContext, params: RoutineListParams) -> Routin
     now = ctx.state.clock()
     folders = _folders(params.folders)
     routines, issues = await asyncio.to_thread(_collect, ctx, folders, now)
-    issues = [*issues, *_watch_problems(ctx, folders), *_workflow_problems(ctx, routines)]
+    issues = [
+        *issues,
+        *_watch_problems(ctx, folders),
+        *_workflow_problems(ctx, routines),
+        *await _query_problems(ctx, routines),
+    ]
     shown: list[RoutineInfo] = []
     for info in routines:
         rows = await _rows(ctx, info, 1)
@@ -420,6 +425,23 @@ def _workflow_problems(ctx: RequestContext, shown: list[RoutineInfo]) -> list[Ro
         why = routine_problem(settings, folder, service)
         if why is not None:
             found.append(RoutineProblem(info.path, why))
+    return found
+
+
+async def _query_problems(ctx: RequestContext, shown: list[RoutineInfo]) -> list[RoutineProblem]:
+    """The query routines whose source or saved query is gone. They are shown, never refused."""
+    runner = ctx.state.query_routines
+    if runner is None:
+        return []
+    found: list[RoutineProblem] = []
+    for info in shown:
+        query = info.config.query
+        if query is None or not info.config.enabled or info.blocked:
+            continue
+        folder = None if info.folder is None else Path(info.folder)
+        why = await runner.problem(query.source, query.saved, folder)
+        if why is not None:
+            found.append(RoutineProblem(info.path, f"{info.config.name}: {why}"))
     return found
 
 

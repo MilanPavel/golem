@@ -156,6 +156,7 @@ from golem.server.evals_rpc import (
     evals_start,
     evals_stop,
 )
+from golem.server.inbox import inbox_done, inbox_list
 from golem.server.mcp_catalog import mcp_catalog, runtime_install, runtime_install_cancel
 from golem.server.mcp_edit import (
     config_raw_get,
@@ -377,6 +378,8 @@ from golem_protocol.commands import (
     HfSearchParams,
     HfSearchResult,
     HfSize,
+    InboxDoneParams,
+    InboxListParams,
     InspectMessage,
     ListedModel,
     ListedProvider,
@@ -2532,6 +2535,8 @@ def standard_methods() -> dict[str, Method]:
         "routine.remove": Method("routine.remove", RoutineRemoveParams, True, routine_remove),
         "routine.run": Method("routine.run", RoutineRunParams, True, routine_run),
         "routine.preview": Method("routine.preview", RoutinePreviewParams, True, routine_preview),
+        "inbox.list": Method("inbox.list", InboxListParams, True, inbox_list),
+        "inbox.done": Method("inbox.done", InboxDoneParams, True, inbox_done),
         "workflow.list": Method("workflow.list", WorkflowListParams, True, workflow_list),
         "workflow.get": Method("workflow.get", WorkflowGetParams, True, workflow_get),
         "workflow.check": Method("workflow.check", WorkflowCheckParams, True, workflow_check),

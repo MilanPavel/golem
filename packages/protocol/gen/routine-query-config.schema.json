@@ -1,0 +1,22 @@
+{
+  "additionalProperties": false,
+  "description": "``query = { source, saved }``: the saved query of a data source that a routine runs.",
+  "properties": {
+    "saved": {
+      "minLength": 1,
+      "title": "Saved",
+      "type": "string"
+    },
+    "source": {
+      "minLength": 1,
+      "title": "Source",
+      "type": "string"
+    }
+  },
+  "required": [
+    "source",
+    "saved"
+  ],
+  "title": "RoutineQueryConfig",
+  "type": "object"
+}

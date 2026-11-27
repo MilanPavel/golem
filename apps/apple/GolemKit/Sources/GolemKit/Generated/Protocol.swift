@@ -11171,6 +11171,153 @@ public struct HFSize: Codable {
     }
 }
 
+/// ``inbox.done``. Mark a post done: it leaves the Inbox.
+// MARK: - InboxDoneParams
+public struct InboxDoneParams: Codable {
+    public let postID: String
+
+    public enum CodingKeys: String, CodingKey {
+        case postID = "post_id"
+    }
+
+    public init(postID: String) {
+        self.postID = postID
+    }
+}
+
+// MARK: - InboxDoneResult
+public struct InboxDoneResult: Codable {
+    public let postID: String
+
+    public enum CodingKeys: String, CodingKey {
+        case postID = "post_id"
+    }
+
+    public init(postID: String) {
+        self.postID = postID
+    }
+}
+
+/// ``inbox.list``. The posts not yet marked done.
+// MARK: - InboxListParams
+public struct InboxListParams: Codable {
+
+    public init() {
+    }
+}
+
+/// The open posts, newest first.
+// MARK: - InboxListResult
+public struct InboxListResult: Codable {
+    public let posts: [PostElement]
+
+    public enum CodingKeys: String, CodingKey {
+        case posts = "posts"
+    }
+
+    public init(posts: [PostElement]) {
+        self.posts = posts
+    }
+}
+
+/// One thing a query routine left in the Inbox: its first rows, or the error it hit.
+///
+/// ``rows`` holds at most ten rows, each a list of cells in the order of ``columns``;
+/// ``row_count``
+/// is how many rows the query returned. ``error`` is set (and ``rows`` empty) for a failed
+/// run.
+/// ``source`` and ``saved`` say which saved query it was, so the post can open it. ``scope``
+/// is
+/// ``user`` or a project folder. ``at`` is an ISO 8601 time.
+// MARK: - PostElement
+public struct PostElement: Codable {
+    public let at: String
+    public let columns: [String]?
+    public let error: String?
+    public let postID: String
+    public let routine: String
+    public let rowCount: Int
+    public let rows: [[JSONAny]]?
+    public let saved: String
+    public let scope: String
+    public let source: String
+
+    public enum CodingKeys: String, CodingKey {
+        case at = "at"
+        case columns = "columns"
+        case error = "error"
+        case postID = "post_id"
+        case routine = "routine"
+        case rowCount = "row_count"
+        case rows = "rows"
+        case saved = "saved"
+        case scope = "scope"
+        case source = "source"
+    }
+
+    public init(at: String, columns: [String]?, error: String?, postID: String, routine: String, rowCount: Int, rows: [[JSONAny]]?, saved: String, scope: String, source: String) {
+        self.at = at
+        self.columns = columns
+        self.error = error
+        self.postID = postID
+        self.routine = routine
+        self.rowCount = rowCount
+        self.rows = rows
+        self.saved = saved
+        self.scope = scope
+        self.source = source
+    }
+}
+
+/// One thing a query routine left in the Inbox: its first rows, or the error it hit.
+///
+/// ``rows`` holds at most ten rows, each a list of cells in the order of ``columns``;
+/// ``row_count``
+/// is how many rows the query returned. ``error`` is set (and ``rows`` empty) for a failed
+/// run.
+/// ``source`` and ``saved`` say which saved query it was, so the post can open it. ``scope``
+/// is
+/// ``user`` or a project folder. ``at`` is an ISO 8601 time.
+// MARK: - InboxPost
+public struct InboxPost: Codable {
+    public let at: String
+    public let columns: [String]?
+    public let error: String?
+    public let postID: String
+    public let routine: String
+    public let rowCount: Int
+    public let rows: [[JSONAny]]?
+    public let saved: String
+    public let scope: String
+    public let source: String
+
+    public enum CodingKeys: String, CodingKey {
+        case at = "at"
+        case columns = "columns"
+        case error = "error"
+        case postID = "post_id"
+        case routine = "routine"
+        case rowCount = "row_count"
+        case rows = "rows"
+        case saved = "saved"
+        case scope = "scope"
+        case source = "source"
+    }
+
+    public init(at: String, columns: [String]?, error: String?, postID: String, routine: String, rowCount: Int, rows: [[JSONAny]]?, saved: String, scope: String, source: String) {
+        self.at = at
+        self.columns = columns
+        self.error = error
+        self.postID = postID
+        self.routine = routine
+        self.rowCount = rowCount
+        self.rows = rows
+        self.saved = saved
+        self.scope = scope
+        self.source = source
+    }
+}
+
 /// One checkpoint message as plain text.
 // MARK: - InspectMessage
 public struct InspectMessage: Codable {
@@ -20634,10 +20781,13 @@ public struct RoutineChanged: Codable {
 
 /// One ``[[routine]]`` as written. The daemon checks it when it loads.
 ///
-/// Exactly one of ``schedule`` and ``on`` is set, and exactly one of ``prompt`` and
-/// ``workflow``. ``workflow`` names a workflow to start, with ``inputs`` (a watch routine
-/// also passes ``path``); it takes no ``folder``, ``model`` or ``mcp``. ``schedule`` is
-/// cron, or
+/// Exactly one of ``schedule`` and ``on`` is set, and exactly one of ``prompt``,
+/// ``workflow`` and ``query``. ``query`` runs a saved query of a data source with no model
+/// and
+/// no session; ``post`` says when its result goes to the Inbox: ``always`` (the default) or
+/// ``rows`` (only when the query finds rows), and it is only for a query. ``workflow`` names
+/// a workflow to start, with ``inputs`` (a watch routine also passes ``path``); it takes no
+/// ``folder``, ``model`` or ``mcp``. ``schedule`` is cron, or
 /// ``every 15m``, ``every 1h``, ``daily 08:30``, ``weekdays 08:30``, ``weekly mon 06:00``.
 /// ``missed`` is what happens to a firing that came due while golem could not
 /// run it: ``skip`` drops it, ``run_once`` fires it once, late.
@@ -20655,7 +20805,9 @@ public struct RoutineConfig: Codable {
     public let notifyFailed: Bool?
     public let notifyFinished: Bool?
     public let on: RoutineConfigRoutineWatchConfig?
+    public let post: Post?
     public let prompt: String?
+    public let query: RoutineConfigRoutineQueryConfig?
     public let schedule: String?
     public let workflow: String?
 
@@ -20670,12 +20822,14 @@ public struct RoutineConfig: Codable {
         case notifyFailed = "notify_failed"
         case notifyFinished = "notify_finished"
         case on = "on"
+        case post = "post"
         case prompt = "prompt"
+        case query = "query"
         case schedule = "schedule"
         case workflow = "workflow"
     }
 
-    public init(enabled: Bool?, folder: String?, inputs: [String: Input]?, mcp: [String]?, missed: Missed?, model: String?, name: String, notifyFailed: Bool?, notifyFinished: Bool?, on: RoutineConfigRoutineWatchConfig?, prompt: String?, schedule: String?, workflow: String?) {
+    public init(enabled: Bool?, folder: String?, inputs: [String: Input]?, mcp: [String]?, missed: Missed?, model: String?, name: String, notifyFailed: Bool?, notifyFinished: Bool?, on: RoutineConfigRoutineWatchConfig?, post: Post?, prompt: String?, query: RoutineConfigRoutineQueryConfig?, schedule: String?, workflow: String?) {
         self.enabled = enabled
         self.folder = folder
         self.inputs = inputs
@@ -20686,7 +20840,9 @@ public struct RoutineConfig: Codable {
         self.notifyFailed = notifyFailed
         self.notifyFinished = notifyFinished
         self.on = on
+        self.post = post
         self.prompt = prompt
+        self.query = query
         self.schedule = schedule
         self.workflow = workflow
     }
@@ -20753,6 +20909,28 @@ public struct RoutineConfigRoutineWatchConfig: Codable {
     public init(glob: String?, watch: String) {
         self.glob = glob
         self.watch = watch
+    }
+}
+
+public enum Post: String, Codable {
+    case always = "always"
+    case rows = "rows"
+}
+
+/// ``query = { source, saved }``: the saved query of a data source that a routine runs.
+// MARK: - RoutineConfigRoutineQueryConfig
+public struct RoutineConfigRoutineQueryConfig: Codable {
+    public let saved: String
+    public let source: String
+
+    public enum CodingKeys: String, CodingKey {
+        case saved = "saved"
+        case source = "source"
+    }
+
+    public init(saved: String, source: String) {
+        self.saved = saved
+        self.source = source
     }
 }
 
@@ -21014,10 +21192,13 @@ public struct RoutineGetResultRoutine: Codable {
 
 /// One ``[[routine]]`` as written. The daemon checks it when it loads.
 ///
-/// Exactly one of ``schedule`` and ``on`` is set, and exactly one of ``prompt`` and
-/// ``workflow``. ``workflow`` names a workflow to start, with ``inputs`` (a watch routine
-/// also passes ``path``); it takes no ``folder``, ``model`` or ``mcp``. ``schedule`` is
-/// cron, or
+/// Exactly one of ``schedule`` and ``on`` is set, and exactly one of ``prompt``,
+/// ``workflow`` and ``query``. ``query`` runs a saved query of a data source with no model
+/// and
+/// no session; ``post`` says when its result goes to the Inbox: ``always`` (the default) or
+/// ``rows`` (only when the query finds rows), and it is only for a query. ``workflow`` names
+/// a workflow to start, with ``inputs`` (a watch routine also passes ``path``); it takes no
+/// ``folder``, ``model`` or ``mcp``. ``schedule`` is cron, or
 /// ``every 15m``, ``every 1h``, ``daily 08:30``, ``weekdays 08:30``, ``weekly mon 06:00``.
 /// ``missed`` is what happens to a firing that came due while golem could not
 /// run it: ``skip`` drops it, ``run_once`` fires it once, late.
@@ -21035,7 +21216,9 @@ public struct PurpleRoutineConfig: Codable {
     public let notifyFailed: Bool?
     public let notifyFinished: Bool?
     public let on: PurpleRoutineWatchConfig?
+    public let post: Post?
     public let prompt: String?
+    public let query: PurpleRoutineQueryConfig?
     public let schedule: String?
     public let workflow: String?
 
@@ -21050,12 +21233,14 @@ public struct PurpleRoutineConfig: Codable {
         case notifyFailed = "notify_failed"
         case notifyFinished = "notify_finished"
         case on = "on"
+        case post = "post"
         case prompt = "prompt"
+        case query = "query"
         case schedule = "schedule"
         case workflow = "workflow"
     }
 
-    public init(enabled: Bool?, folder: String?, inputs: [String: Input]?, mcp: [String]?, missed: Missed?, model: String?, name: String, notifyFailed: Bool?, notifyFinished: Bool?, on: PurpleRoutineWatchConfig?, prompt: String?, schedule: String?, workflow: String?) {
+    public init(enabled: Bool?, folder: String?, inputs: [String: Input]?, mcp: [String]?, missed: Missed?, model: String?, name: String, notifyFailed: Bool?, notifyFinished: Bool?, on: PurpleRoutineWatchConfig?, post: Post?, prompt: String?, query: PurpleRoutineQueryConfig?, schedule: String?, workflow: String?) {
         self.enabled = enabled
         self.folder = folder
         self.inputs = inputs
@@ -21066,7 +21251,9 @@ public struct PurpleRoutineConfig: Codable {
         self.notifyFailed = notifyFailed
         self.notifyFinished = notifyFinished
         self.on = on
+        self.post = post
         self.prompt = prompt
+        self.query = query
         self.schedule = schedule
         self.workflow = workflow
     }
@@ -21086,6 +21273,23 @@ public struct PurpleRoutineWatchConfig: Codable {
     public init(glob: String?, watch: String) {
         self.glob = glob
         self.watch = watch
+    }
+}
+
+/// ``query = { source, saved }``: the saved query of a data source that a routine runs.
+// MARK: - PurpleRoutineQueryConfig
+public struct PurpleRoutineQueryConfig: Codable {
+    public let saved: String
+    public let source: String
+
+    public enum CodingKeys: String, CodingKey {
+        case saved = "saved"
+        case source = "source"
+    }
+
+    public init(saved: String, source: String) {
+        self.saved = saved
+        self.source = source
     }
 }
 
@@ -21187,10 +21391,13 @@ public struct RoutineInfo: Codable {
 
 /// One ``[[routine]]`` as written. The daemon checks it when it loads.
 ///
-/// Exactly one of ``schedule`` and ``on`` is set, and exactly one of ``prompt`` and
-/// ``workflow``. ``workflow`` names a workflow to start, with ``inputs`` (a watch routine
-/// also passes ``path``); it takes no ``folder``, ``model`` or ``mcp``. ``schedule`` is
-/// cron, or
+/// Exactly one of ``schedule`` and ``on`` is set, and exactly one of ``prompt``,
+/// ``workflow`` and ``query``. ``query`` runs a saved query of a data source with no model
+/// and
+/// no session; ``post`` says when its result goes to the Inbox: ``always`` (the default) or
+/// ``rows`` (only when the query finds rows), and it is only for a query. ``workflow`` names
+/// a workflow to start, with ``inputs`` (a watch routine also passes ``path``); it takes no
+/// ``folder``, ``model`` or ``mcp``. ``schedule`` is cron, or
 /// ``every 15m``, ``every 1h``, ``daily 08:30``, ``weekdays 08:30``, ``weekly mon 06:00``.
 /// ``missed`` is what happens to a firing that came due while golem could not
 /// run it: ``skip`` drops it, ``run_once`` fires it once, late.
@@ -21208,7 +21415,9 @@ public struct RoutineInfoConfig: Codable {
     public let notifyFailed: Bool?
     public let notifyFinished: Bool?
     public let on: FluffyRoutineWatchConfig?
+    public let post: Post?
     public let prompt: String?
+    public let query: FluffyRoutineQueryConfig?
     public let schedule: String?
     public let workflow: String?
 
@@ -21223,12 +21432,14 @@ public struct RoutineInfoConfig: Codable {
         case notifyFailed = "notify_failed"
         case notifyFinished = "notify_finished"
         case on = "on"
+        case post = "post"
         case prompt = "prompt"
+        case query = "query"
         case schedule = "schedule"
         case workflow = "workflow"
     }
 
-    public init(enabled: Bool?, folder: String?, inputs: [String: Input]?, mcp: [String]?, missed: Missed?, model: String?, name: String, notifyFailed: Bool?, notifyFinished: Bool?, on: FluffyRoutineWatchConfig?, prompt: String?, schedule: String?, workflow: String?) {
+    public init(enabled: Bool?, folder: String?, inputs: [String: Input]?, mcp: [String]?, missed: Missed?, model: String?, name: String, notifyFailed: Bool?, notifyFinished: Bool?, on: FluffyRoutineWatchConfig?, post: Post?, prompt: String?, query: FluffyRoutineQueryConfig?, schedule: String?, workflow: String?) {
         self.enabled = enabled
         self.folder = folder
         self.inputs = inputs
@@ -21239,7 +21450,9 @@ public struct RoutineInfoConfig: Codable {
         self.notifyFailed = notifyFailed
         self.notifyFinished = notifyFinished
         self.on = on
+        self.post = post
         self.prompt = prompt
+        self.query = query
         self.schedule = schedule
         self.workflow = workflow
     }
@@ -21259,6 +21472,23 @@ public struct FluffyRoutineWatchConfig: Codable {
     public init(glob: String?, watch: String) {
         self.glob = glob
         self.watch = watch
+    }
+}
+
+/// ``query = { source, saved }``: the saved query of a data source that a routine runs.
+// MARK: - FluffyRoutineQueryConfig
+public struct FluffyRoutineQueryConfig: Codable {
+    public let saved: String
+    public let source: String
+
+    public enum CodingKeys: String, CodingKey {
+        case saved = "saved"
+        case source = "source"
+    }
+
+    public init(saved: String, source: String) {
+        self.saved = saved
+        self.source = source
     }
 }
 
@@ -21435,10 +21665,13 @@ public struct RoutineElement: Codable {
 
 /// One ``[[routine]]`` as written. The daemon checks it when it loads.
 ///
-/// Exactly one of ``schedule`` and ``on`` is set, and exactly one of ``prompt`` and
-/// ``workflow``. ``workflow`` names a workflow to start, with ``inputs`` (a watch routine
-/// also passes ``path``); it takes no ``folder``, ``model`` or ``mcp``. ``schedule`` is
-/// cron, or
+/// Exactly one of ``schedule`` and ``on`` is set, and exactly one of ``prompt``,
+/// ``workflow`` and ``query``. ``query`` runs a saved query of a data source with no model
+/// and
+/// no session; ``post`` says when its result goes to the Inbox: ``always`` (the default) or
+/// ``rows`` (only when the query finds rows), and it is only for a query. ``workflow`` names
+/// a workflow to start, with ``inputs`` (a watch routine also passes ``path``); it takes no
+/// ``folder``, ``model`` or ``mcp``. ``schedule`` is cron, or
 /// ``every 15m``, ``every 1h``, ``daily 08:30``, ``weekdays 08:30``, ``weekly mon 06:00``.
 /// ``missed`` is what happens to a firing that came due while golem could not
 /// run it: ``skip`` drops it, ``run_once`` fires it once, late.
@@ -21456,7 +21689,9 @@ public struct FluffyRoutineConfig: Codable {
     public let notifyFailed: Bool?
     public let notifyFinished: Bool?
     public let on: TentacledRoutineWatchConfig?
+    public let post: Post?
     public let prompt: String?
+    public let query: TentacledRoutineQueryConfig?
     public let schedule: String?
     public let workflow: String?
 
@@ -21471,12 +21706,14 @@ public struct FluffyRoutineConfig: Codable {
         case notifyFailed = "notify_failed"
         case notifyFinished = "notify_finished"
         case on = "on"
+        case post = "post"
         case prompt = "prompt"
+        case query = "query"
         case schedule = "schedule"
         case workflow = "workflow"
     }
 
-    public init(enabled: Bool?, folder: String?, inputs: [String: Input]?, mcp: [String]?, missed: Missed?, model: String?, name: String, notifyFailed: Bool?, notifyFinished: Bool?, on: TentacledRoutineWatchConfig?, prompt: String?, schedule: String?, workflow: String?) {
+    public init(enabled: Bool?, folder: String?, inputs: [String: Input]?, mcp: [String]?, missed: Missed?, model: String?, name: String, notifyFailed: Bool?, notifyFinished: Bool?, on: TentacledRoutineWatchConfig?, post: Post?, prompt: String?, query: TentacledRoutineQueryConfig?, schedule: String?, workflow: String?) {
         self.enabled = enabled
         self.folder = folder
         self.inputs = inputs
@@ -21487,7 +21724,9 @@ public struct FluffyRoutineConfig: Codable {
         self.notifyFailed = notifyFailed
         self.notifyFinished = notifyFinished
         self.on = on
+        self.post = post
         self.prompt = prompt
+        self.query = query
         self.schedule = schedule
         self.workflow = workflow
     }
@@ -21507,6 +21746,23 @@ public struct TentacledRoutineWatchConfig: Codable {
     public init(glob: String?, watch: String) {
         self.glob = glob
         self.watch = watch
+    }
+}
+
+/// ``query = { source, saved }``: the saved query of a data source that a routine runs.
+// MARK: - TentacledRoutineQueryConfig
+public struct TentacledRoutineQueryConfig: Codable {
+    public let saved: String
+    public let source: String
+
+    public enum CodingKeys: String, CodingKey {
+        case saved = "saved"
+        case source = "source"
+    }
+
+    public init(saved: String, source: String) {
+        self.saved = saved
+        self.source = source
     }
 }
 
@@ -21614,6 +21870,23 @@ public struct RoutinePreviewResult: Codable {
     public init(next: [String], problems: [String]?) {
         self.next = next
         self.problems = problems
+    }
+}
+
+/// ``query = { source, saved }``: the saved query of a data source that a routine runs.
+// MARK: - RoutineQueryConfig
+public struct RoutineQueryConfig: Codable {
+    public let saved: String
+    public let source: String
+
+    public enum CodingKeys: String, CodingKey {
+        case saved = "saved"
+        case source = "source"
+    }
+
+    public init(saved: String, source: String) {
+        self.saved = saved
+        self.source = source
     }
 }
 
@@ -21828,10 +22101,13 @@ public struct RoutineUpdateResultRoutine: Codable {
 
 /// One ``[[routine]]`` as written. The daemon checks it when it loads.
 ///
-/// Exactly one of ``schedule`` and ``on`` is set, and exactly one of ``prompt`` and
-/// ``workflow``. ``workflow`` names a workflow to start, with ``inputs`` (a watch routine
-/// also passes ``path``); it takes no ``folder``, ``model`` or ``mcp``. ``schedule`` is
-/// cron, or
+/// Exactly one of ``schedule`` and ``on`` is set, and exactly one of ``prompt``,
+/// ``workflow`` and ``query``. ``query`` runs a saved query of a data source with no model
+/// and
+/// no session; ``post`` says when its result goes to the Inbox: ``always`` (the default) or
+/// ``rows`` (only when the query finds rows), and it is only for a query. ``workflow`` names
+/// a workflow to start, with ``inputs`` (a watch routine also passes ``path``); it takes no
+/// ``folder``, ``model`` or ``mcp``. ``schedule`` is cron, or
 /// ``every 15m``, ``every 1h``, ``daily 08:30``, ``weekdays 08:30``, ``weekly mon 06:00``.
 /// ``missed`` is what happens to a firing that came due while golem could not
 /// run it: ``skip`` drops it, ``run_once`` fires it once, late.
@@ -21849,7 +22125,9 @@ public struct TentacledRoutineConfig: Codable {
     public let notifyFailed: Bool?
     public let notifyFinished: Bool?
     public let on: StickyRoutineWatchConfig?
+    public let post: Post?
     public let prompt: String?
+    public let query: StickyRoutineQueryConfig?
     public let schedule: String?
     public let workflow: String?
 
@@ -21864,12 +22142,14 @@ public struct TentacledRoutineConfig: Codable {
         case notifyFailed = "notify_failed"
         case notifyFinished = "notify_finished"
         case on = "on"
+        case post = "post"
         case prompt = "prompt"
+        case query = "query"
         case schedule = "schedule"
         case workflow = "workflow"
     }
 
-    public init(enabled: Bool?, folder: String?, inputs: [String: Input]?, mcp: [String]?, missed: Missed?, model: String?, name: String, notifyFailed: Bool?, notifyFinished: Bool?, on: StickyRoutineWatchConfig?, prompt: String?, schedule: String?, workflow: String?) {
+    public init(enabled: Bool?, folder: String?, inputs: [String: Input]?, mcp: [String]?, missed: Missed?, model: String?, name: String, notifyFailed: Bool?, notifyFinished: Bool?, on: StickyRoutineWatchConfig?, post: Post?, prompt: String?, query: StickyRoutineQueryConfig?, schedule: String?, workflow: String?) {
         self.enabled = enabled
         self.folder = folder
         self.inputs = inputs
@@ -21880,7 +22160,9 @@ public struct TentacledRoutineConfig: Codable {
         self.notifyFailed = notifyFailed
         self.notifyFinished = notifyFinished
         self.on = on
+        self.post = post
         self.prompt = prompt
+        self.query = query
         self.schedule = schedule
         self.workflow = workflow
     }
@@ -21900,6 +22182,23 @@ public struct StickyRoutineWatchConfig: Codable {
     public init(glob: String?, watch: String) {
         self.glob = glob
         self.watch = watch
+    }
+}
+
+/// ``query = { source, saved }``: the saved query of a data source that a routine runs.
+// MARK: - StickyRoutineQueryConfig
+public struct StickyRoutineQueryConfig: Codable {
+    public let saved: String
+    public let source: String
+
+    public enum CodingKeys: String, CodingKey {
+        case saved = "saved"
+        case source = "source"
+    }
+
+    public init(saved: String, source: String) {
+        self.saved = saved
+        self.source = source
     }
 }
 

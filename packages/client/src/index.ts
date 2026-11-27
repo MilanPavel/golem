@@ -132,11 +132,14 @@ export type { MemoryUpdateParams } from "../../protocol/gen/memory-update-params
 export type { MemoryUpdateResult } from "../../protocol/gen/memory-update-result.ts";
 export type { MemoryWriteParams } from "../../protocol/gen/memory-write-params.ts";
 export type { MemoryWriteResult } from "../../protocol/gen/memory-write-result.ts";
-export type { RoutineConfig, RoutineWatchConfig } from "../../protocol/gen/routine-config.ts";
+export type { RoutineConfig, RoutineQueryConfig, RoutineWatchConfig } from "../../protocol/gen/routine-config.ts";
 export type { RoutineGetResult } from "../../protocol/gen/routine-get-result.ts";
 export type { RoutineInfo } from "../../protocol/gen/routine-info.ts";
 export type { RoutineIssue } from "../../protocol/gen/routine-issue.ts";
 export type { RoutineListResult } from "../../protocol/gen/routine-list-result.ts";
+export type { InboxDoneResult } from "../../protocol/gen/inbox-done-result.ts";
+export type { InboxListResult } from "../../protocol/gen/inbox-list-result.ts";
+export type { InboxPost } from "../../protocol/gen/inbox-post.ts";
 export type { RoutinePreviewResult } from "../../protocol/gen/routine-preview-result.ts";
 export type { RoutineRunResult } from "../../protocol/gen/routine-run-result.ts";
 export type { RoutineRunSummary } from "../../protocol/gen/routine-run-summary.ts";

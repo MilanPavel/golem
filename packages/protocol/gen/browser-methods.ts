@@ -77,6 +77,8 @@ export const BROWSER_METHODS: ReadonlySet<string> = new Set([
   "helpers.respond",
   "hf.files",
   "hf.search",
+  "inbox.done",
+  "inbox.list",
   "mcp.add",
   "mcp.call",
   "mcp.catalog",

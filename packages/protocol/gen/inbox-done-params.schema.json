@@ -1,0 +1,16 @@
+{
+  "additionalProperties": false,
+  "description": "``inbox.done``. Mark a post done: it leaves the Inbox.",
+  "properties": {
+    "post_id": {
+      "minLength": 1,
+      "title": "Post Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "post_id"
+  ],
+  "title": "InboxDoneParams",
+  "type": "object"
+}

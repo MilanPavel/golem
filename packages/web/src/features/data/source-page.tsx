@@ -29,7 +29,7 @@ import { DATA_TABS, type DataTab } from "../../store/router.ts";
 import { CodeEditor } from "../settings/config/code-editor.tsx";
 import { ExtensionRow } from "./extension-row.tsx";
 import { PrivacyChip } from "./privacy-chip.tsx";
-import { QueriesTab } from "./queries-tab.tsx";
+import { QueriesTab, type QueryRoutinesView } from "./queries-tab.tsx";
 import { ColumnProfile } from "./column-profile.tsx";
 import { EMPTY_VIEW, RowsBrowser, type RowsView } from "./rows-browser.tsx";
 
@@ -437,6 +437,8 @@ export type SourcePageProps = {
   onAskQuery: (query: DataSavedQuery) => void;
   /** Runs a saved query by name, with no model. */
   onRunQuery: (name: string) => Promise<DataResult>;
+  /** The routines of the saved queries: the chip on a row and the ⏱ Routine button. */
+  routines?: QueryRoutinesView;
   /** Runs SQL with a small limit, for Try in the New and Edit dialog. */
   onTryQuery: (sql: string) => Promise<DataResult>;
   onSaveQuery: (params: DataSaveQueryParams) => Promise<unknown>;
@@ -477,6 +479,7 @@ export function SourcePage({
   onAsk,
   onAskQuery,
   onRunQuery,
+  routines,
   onTryQuery,
   onSaveQuery,
   onRemoveQuery,
@@ -573,7 +576,7 @@ export function SourcePage({
         <NotesTab source={source} notes={notes} onSave={onSaveNotes} onDraft={onDraftNotes} />
       </TabsContent>
       <TabsContent value="queries">
-        {described === null ? <p className="text-sm text-muted">{describeMissing ? DATA_NOT_AVAILABLE : "Loading the queries."}</p> : <QueriesTab source={source} queries={described.queries ?? []} onRun={onRunQuery} onTry={onTryQuery} onAsk={onAskQuery} onSave={onSaveQuery} onRemove={onRemoveQuery} {...(onPage === undefined ? {} : { onPage })} {...(onExport === undefined ? {} : { onExport })} {...(onInstallExtension === undefined ? {} : { onInstallExtension })} />}
+        {described === null ? <p className="text-sm text-muted">{describeMissing ? DATA_NOT_AVAILABLE : "Loading the queries."}</p> : <QueriesTab source={source} queries={described.queries ?? []} onRun={onRunQuery} onTry={onTryQuery} onAsk={onAskQuery} onSave={onSaveQuery} onRemove={onRemoveQuery} {...(routines === undefined ? {} : { routines })} {...(onPage === undefined ? {} : { onPage })} {...(onExport === undefined ? {} : { onExport })} {...(onInstallExtension === undefined ? {} : { onInstallExtension })} />}
       </TabsContent>
       <TabsContent value="settings">
         <SettingsTab source={source} onPrivacy={onPrivacy} onWatch={onWatch} onRemove={onRemove} {...(onChangePassword === undefined ? {} : { onChangePassword })} />

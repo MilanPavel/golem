@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { lastRunOf, NEW_QUERY_BUTTON, oneLineSql, QUERIES_EMPTY, QUERIES_EMPTY_MORE, QUERIES_LEDE, ranNowText } from "@golem/view";
+import { lastRunOf, type RoutineConfigLike, NEW_QUERY_BUTTON, oneLineSql, QUERIES_EMPTY, QUERIES_EMPTY_MORE, QUERIES_LEDE, ranNowText } from "@golem/view";
 import { Button } from "../../ui/button.tsx";
 import { Code } from "../../ui/code.tsx";
 import { writeClipboard } from "../../ui/clipboard.ts";
@@ -16,8 +16,21 @@ import {
   type DataSource,
   type ToolTable,
 } from "../../store/data.ts";
+import type { QueryRoutineRequest } from "../../store/query-routines.ts";
 import { EditQueryDialog } from "./query-dialogs.tsx";
+import { QueryRoutineChip } from "./query-routine-chip.tsx";
+import { QueryRoutineDialog } from "./query-routine-dialog.tsx";
 import { ResultTable } from "./result-table.tsx";
+
+/** What the tab needs to show and make the routines of its queries. Without it the tab has no Routine button. */
+export type QueryRoutinesView = {
+  /** The routine that runs this saved query, if any. */
+  routineOf: (saved: string) => RoutineConfigLike | undefined;
+  /** The names of the routines that exist, so a new name does not clash. */
+  names: readonly string[];
+  create: (request: QueryRoutineRequest) => Promise<void>;
+  open: (name: string) => void;
+};
 
 export type QueriesTabProps = {
   source: DataSource;
@@ -33,10 +46,11 @@ export type QueriesTabProps = {
   onPage?: (params: DataResultPageParams) => Promise<DataResult>;
   onExport?: (params: DataExportParams) => Promise<DataExportResult>;
   onInstallExtension?: (name: DataExtensionName) => Promise<void>;
+  routines?: QueryRoutinesView;
   /** The time the last runs are told against. Now by default. */
   now?: Date;
   /** For the gallery and tests: what is open when the tab shows. */
-  initial?: { ran?: Record<string, { table: ToolTable; ms: number }>; editing?: string | "new"; confirming?: string };
+  initial?: { ran?: Record<string, { table: ToolTable; ms: number }>; editing?: string | "new"; confirming?: string; routine?: string };
 };
 
 type Ran = { table: ToolTable; ms: number };
@@ -85,12 +99,13 @@ function LastRun({ query, failure, now }: { query: DataSavedQuery; failure: stri
 }
 
 /** The queries saved with a source: run one in place, ask about it in a chat, change it, copy its SQL or remove it. */
-export function QueriesTab({ source, queries, onRun, onTry, onAsk, onSave, onRemove, onPage, onExport, onInstallExtension, now, initial }: QueriesTabProps) {
+export function QueriesTab({ source, queries, onRun, onTry, onAsk, onSave, onRemove, onPage, onExport, onInstallExtension, routines, now, initial }: QueriesTabProps) {
   const [ran, setRan] = useState<Record<string, Ran>>(initial?.ran ?? {});
   const [running, setRunning] = useState<string | null>(null);
   const [failures, setFailures] = useState<Record<string, string>>({});
   const [editing, setEditing] = useState<string | "new" | null>(initial?.editing ?? null);
   const [confirming, setConfirming] = useState<string | null>(initial?.confirming ?? null);
+  const [scheduling, setScheduling] = useState<string | null>(initial?.routine ?? null);
   const [note, setNote] = useState<string | null>(null);
   const clock = now ?? new Date();
 
@@ -146,6 +161,7 @@ export function QueriesTab({ source, queries, onRun, onTry, onAsk, onSave, onRem
         <ul aria-label="Saved queries" className="flex flex-col gap-2">
           {queries.map((query) => {
             const open = ran[query.name];
+            const chip = routines?.routineOf(query.name);
             return (
               <li key={query.name} data-query={query.name} className="rounded-lg border border-line bg-surface">
                 <div className="flex flex-wrap items-center gap-3 p-3">
@@ -155,6 +171,11 @@ export function QueriesTab({ source, queries, onRun, onTry, onAsk, onSave, onRem
                     <span className="truncate text-meta text-faint" title={query.sql}>
                       <Code tone="inherit">{oneLineSql(query.sql)}</Code>
                     </span>
+                    {chip === undefined || routines === undefined ? null : (
+                      <span className="mt-0.5 flex">
+                        <QueryRoutineChip config={chip} onOpen={routines.open} />
+                      </span>
+                    )}
                   </div>
                   <LastRun query={query} failure={failures[query.name]} now={clock} />
                   <div className="flex items-center gap-1.5">
@@ -162,6 +183,12 @@ export function QueriesTab({ source, queries, onRun, onTry, onAsk, onSave, onRem
                       <span aria-hidden="true">▶ </span>
                       {running === query.name ? "Running…" : "Run"}
                     </Button>
+                    {routines === undefined ? null : (
+                      <Button size="sm" aria-haspopup="dialog" aria-label={`Routine for ${query.name}`} onClick={() => setScheduling(query.name)}>
+                        <span aria-hidden="true">⏱ </span>
+                        Routine
+                      </Button>
+                    )}
                     <Button size="sm" aria-label={`Ask in chat: ${query.name}`} onClick={() => onAsk(query)}>
                       Ask in chat
                     </Button>
@@ -213,6 +240,17 @@ export function QueriesTab({ source, queries, onRun, onTry, onAsk, onSave, onRem
         <p role="status" className="text-meta text-muted">
           {note}
         </p>
+      )}
+      {routines === undefined || scheduling === null ? null : (
+        <QueryRoutineDialog
+          open
+          key={scheduling}
+          source={{ name: source.name, kind: source.kind, location: source.location }}
+          saved={scheduling}
+          taken={routines.names}
+          onCreate={routines.create}
+          onClose={() => setScheduling(null)}
+        />
       )}
       {editing === null ? null : (
         <EditQueryDialog

@@ -1,4 +1,5 @@
 import type { RoutineInfo, RoutineRunSummary } from "@golem/client";
+import { postWords, queryKindWords } from "@golem/view";
 
 const EMPTY = "no routines. Add a [[routine]] to ~/.golem/config.toml with `golem routines edit`.";
 const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -105,6 +106,8 @@ export function formatLast(run: RoutineRunSummary | null | undefined, now: Date)
 function flags(info: RoutineInfo): string {
   const found: string[] = [];
   if (info.config.workflow) found.push(`workflow: ${info.config.workflow}`);
+  const query = queryKindWords(info.config);
+  if (query !== null) found.push(`${query}, ${postWords(info.config) ?? ""}`);
   if (info.paused === true || info.config.enabled === false) found.push("paused");
   if (info.blocked === true) found.push("blocked: folder not trusted");
   if (info.source === "project") found.push("project");
