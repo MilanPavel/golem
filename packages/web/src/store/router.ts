@@ -18,7 +18,7 @@ export type Route =
   | { name: "not-found" };
 
 /** The tabs of a data source's page, in order. */
-export const DATA_TABS = ["tables", "notes", "queries", "settings"] as const;
+export const DATA_TABS = ["tables", "rows", "notes", "queries", "settings"] as const;
 export type DataTab = (typeof DATA_TABS)[number];
 
 /** The steps of `/welcome`, in order. */

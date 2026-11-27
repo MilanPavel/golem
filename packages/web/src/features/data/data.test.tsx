@@ -23,6 +23,7 @@ import {
   SAMPLE_SHOP_PROD,
 } from "./sample.ts";
 import { SourcePage, type SourcePageProps } from "./source-page.tsx";
+import { profileOfTable } from "./table-sample.ts";
 
 const CONNECTED: ConnectionSnapshot = { state: { status: "connected" }, daemonVersion: "0.9.1" };
 
@@ -72,7 +73,9 @@ function page(over: Partial<SourcePageProps> = {}): SourcePageProps {
     onTab: () => {},
     onAsk: () => {},
     onRun: () => {},
-    onLoadSample: () => Promise.resolve([]),
+    onLoadProfile: (table) => Promise.resolve(profileOfTable("bank", (over.described ?? SAMPLE_BANK_DESCRIBED).tables.find((each) => each.name === table))),
+    onBrowse: () => Promise.resolve({ columns: [], rows: [], total_rows: 0, elapsed_ms: 0 }),
+    onAskView: () => {},
     onSaveNotes: () => Promise.resolve("~/.golem/data/bank.md"),
     onDraftNotes: () => Promise.resolve("# drafted\n"),
     onPrivacy: () => Promise.resolve(),
@@ -82,12 +85,12 @@ function page(over: Partial<SourcePageProps> = {}): SourcePageProps {
   };
 }
 
-test("a rows-local source shows its columns, and its sample under the local caption", () => {
+test("a source shows its columns with a chart for each, under the caption that says what models see", async () => {
   render(<SourcePage {...page()} />);
   expect(screen.getByText("Columns · every model may see these")).toBeTruthy();
-  expect(screen.getByText("Sample rows · you and local models")).toBeTruthy();
-  expect(screen.getByRole("table", { name: "Sample rows of transactions" }).textContent).toContain("SPOTIFY P1A2");
-  expect(screen.getByRole("table", { name: "Columns of transactions" }).textContent).toContain("DECIMAL(10,2)");
+  const list = await screen.findByRole("list", { name: "Columns of transactions" });
+  expect(list.textContent).toContain("decimal(10,2)");
+  expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["Columns", "Rows", "Notes", "Queries", "Settings"]);
 });
 
 const LONG_NAME = "Cumings, Mrs. John Bradley (Florence Briggs Thayer)";
@@ -106,67 +109,96 @@ function withFiles(files: string[], over: { min: string; max: string }): SourceP
         ],
       },
     ],
-    sample: { passengers: files.map((file, at) => [at + 1, LONG_NAME, file]) },
+    sample: {},
   };
-  return page({ described });
+  const onBrowse = vi.fn().mockResolvedValue({
+    columns: [
+      { name: "id", type: "BIGINT" },
+      { name: "name", type: "VARCHAR" },
+      { name: "file", type: "VARCHAR" },
+    ],
+    rows: files.map((file, at) => [at + 1, LONG_NAME, file]),
+    total_rows: files.length,
+    elapsed_ms: 1,
+  });
+  return page({ described, tab: "rows", onBrowse });
 }
 
-test("the header and the tab bar stick together, and the sample table's header sticks in its own box", () => {
-  const { container } = render(<SourcePage {...page()} />);
+test("the header and the tab bar stick together, and the rows grid's header sticks in its own box", async () => {
+  const { container } = render(<SourcePage {...withFiles(["/data/a.csv"], { min: "/data/a.csv", max: "/data/a.csv" })} />);
   const sticky = container.querySelector('[data-sticky="source-header"]');
   expect(sticky?.className).toContain("sticky");
   expect(sticky?.className).toContain("-top-5");
   expect(sticky?.className).toContain("bg-bg");
   expect(within(sticky as HTMLElement).getByRole("tablist")).toBeTruthy();
   expect(within(sticky as HTMLElement).getByRole("heading", { level: 1 })).toBeTruthy();
-  const sample = screen.getByRole("table", { name: "Sample rows of transactions" });
-  expect(sample.querySelector("th")?.className).toContain("sticky");
-  expect(sample.parentElement?.className).toContain("overflow-auto");
+  const grid = await screen.findByRole("table", { name: "Rows of passengers" });
+  expect(grid.querySelector("th")?.className).toContain("sticky");
+  expect(grid.closest(".overflow-auto")?.className).toContain("overflow-auto");
 });
 
-test("a table from one file hides its file column in the stats and the sample", () => {
-  render(<SourcePage {...withFiles(["/data/titanic.csv", "/data/titanic.csv"], { min: "/data/titanic.csv", max: "/data/titanic.csv" })} />);
-  expect(screen.getByRole("table", { name: "Sample rows of passengers" }).textContent).not.toContain("titanic.csv");
-  expect(within(screen.getByRole("table", { name: "Sample rows of passengers" })).queryByRole("columnheader", { name: "file" })).toBeNull();
-  expect(within(screen.getByRole("table", { name: "Columns of passengers" })).queryByText("file")).toBeNull();
+test("a table from one file hides its file column in the profile and in the rows", async () => {
+  const one = withFiles(["/data/titanic.csv", "/data/titanic.csv"], { min: "/data/titanic.csv", max: "/data/titanic.csv" });
+  const { rerender } = render(<SourcePage {...one} />);
+  const grid = await screen.findByRole("table", { name: "Rows of passengers" });
+  expect(within(grid).queryByRole("columnheader", { name: /file/ })).toBeNull();
+  expect(grid.textContent).not.toContain("titanic.csv");
+  rerender(<SourcePage {...one} tab="tables" />);
+  const list = await screen.findByRole("list", { name: "Columns of passengers" });
+  expect(within(list).queryByText("file")).toBeNull();
+  expect(screen.getByText(/The file column is hidden because the source is one file/)).toBeTruthy();
 });
 
-test("a table from several files shows the file name, with the whole path on hover", () => {
+test("a table from several files shows the file name, with the whole path on hover", async () => {
   render(<SourcePage {...withFiles(["/data/a/jan.csv", "/data/a/feb.csv"], { min: "/data/a/feb.csv", max: "/data/a/jan.csv" })} />);
-  const sample = screen.getByRole("table", { name: "Sample rows of passengers" });
-  expect(within(sample).getByRole("columnheader", { name: "file" })).toBeTruthy();
-  const cell = within(sample).getByText("jan.csv");
-  expect(cell.getAttribute("title")).toBe("/data/a/jan.csv");
-  expect(sample.textContent).not.toContain("/data/a/");
+  const grid = await screen.findByRole("table", { name: "Rows of passengers" });
+  expect(within(grid).getByRole("columnheader", { name: /file/ })).toBeTruthy();
+  const cell = within(grid).getByText("jan.csv");
+  expect(cell.closest("td")?.getAttribute("title")).toBe("/data/a/jan.csv");
+  expect(grid.textContent).not.toContain("/data/a/");
 });
 
-test("a long text cell is one line cut at a width, with the whole value in its title; numbers stay right-aligned", () => {
+test("a long text cell is one line cut at a width, with the whole value in its title; numbers stay right-aligned", async () => {
   render(<SourcePage {...withFiles(["/data/a.csv"], { min: "/data/a.csv", max: "/data/a.csv" })} />);
-  const sample = screen.getByRole("table", { name: "Sample rows of passengers" });
-  const long = within(sample).getByText(LONG_NAME);
-  expect(long.getAttribute("title")).toBe(LONG_NAME);
-  expect(long.getAttribute("tabindex")).toBe("0");
-  expect(long.className).toContain("truncate");
-  expect(long.className).toContain("max-w-64");
-  expect(within(sample).getByText("1").closest("td")?.className).toContain("text-right");
+  const grid = await screen.findByRole("table", { name: "Rows of passengers" });
+  const long = within(grid).getByText(LONG_NAME);
+  expect(long.closest("td")?.getAttribute("title")).toBe(LONG_NAME);
+  expect(long.closest("td")?.className).toContain("truncate");
+  expect(long.closest("td")?.className).toContain("max-w-64");
+  expect(within(grid).getByText("1").closest("td")?.className).toContain("text-right");
 });
 
-test("an estimated distinct count starts with a tilde and an exact one does not", () => {
-  render(<SourcePage {...withFiles(["/data/a.csv"], { min: "/data/a.csv", max: "/data/a.csv" })} />);
-  const columns = screen.getByRole("table", { name: "Columns of passengers" });
+test("an estimated distinct count starts with a tilde and an exact one does not", async () => {
+  const props = withFiles(["/data/a.csv"], { min: "/data/a.csv", max: "/data/a.csv" });
+  render(
+    <SourcePage
+      {...props}
+      tab="tables"
+      onLoadProfile={() =>
+        Promise.resolve({
+          source: "bank",
+          table: "passengers",
+          rows: 1,
+          columns: [
+            { name: "id", type: "BIGINT", shape: "text", empty: 0, distinct: 891 },
+            { name: "name", type: "VARCHAR", shape: "text", empty: 0, distinct: 1045, distinct_estimate: true },
+          ],
+        })
+      }
+    />,
+  );
+  const columns = await screen.findByRole("list", { name: "Columns of passengers" });
   expect(columns.textContent).toContain("891 distinct");
   expect(columns.textContent).not.toContain("~891");
   expect(columns.textContent).toMatch(/~1\s045 distinct/);
 });
 
-test("a schema-only source does not fetch its sample until asked", async () => {
-  const onLoadSample = vi.fn().mockResolvedValue([[1, "a@example.test"]]);
-  render(<SourcePage {...page({ source: SAMPLE_SHOP_PROD, described: SAMPLE_PROD_DESCRIBED, onLoadSample })} />);
-  expect(screen.getByText("Sample rows · only you, on request")).toBeTruthy();
-  expect(onLoadSample).not.toHaveBeenCalled();
-  await userEvent.setup().click(screen.getByRole("button", { name: "Show sample rows" }));
-  expect(onLoadSample).toHaveBeenCalledWith("users");
-  expect(await screen.findByRole("table", { name: "Sample rows of users" })).toBeTruthy();
+test("a schema-only source browses its rows too: they go to your screen, not to a model", async () => {
+  const onBrowse = vi.fn().mockResolvedValue({ columns: [{ name: "id", type: "BIGINT" }], rows: [[7]], total_rows: 1, elapsed_ms: 1 });
+  render(<SourcePage {...page({ source: SAMPLE_SHOP_PROD, described: SAMPLE_PROD_DESCRIBED, tab: "rows", onBrowse })} />);
+  expect(screen.queryByRole("button", { name: "Show sample rows" })).toBeNull();
+  await waitFor(() => expect(onBrowse).toHaveBeenCalled());
+  expect(onBrowse.mock.calls[0]?.[0]).toBe("users");
 });
 
 test("the built-in source has no Remove and no privacy choice, and says why", () => {
@@ -446,7 +478,7 @@ test("/data/:name loads the source and its tables, and a data.changed push reads
     raw.describeData.mockResolvedValue(SAMPLE_BANK_DESCRIBED);
   });
   expect(await screen.findByRole("heading", { name: /bank/ })).toBeTruthy();
-  expect(await screen.findByRole("table", { name: "Columns of transactions" })).toBeTruthy();
+  expect(await screen.findByRole("list", { name: "Columns of transactions" })).toBeTruthy();
   const calls = fake.raw.listData.mock.calls.length;
   fake.emitData({ reason: "added", source: null });
   await waitFor(() => expect(fake.raw.listData.mock.calls.length).toBeGreaterThan(calls));

@@ -106,6 +106,7 @@ import { SAMPLE_RUN_CANCELLED, SAMPLE_RUN_DONE, SAMPLE_RUN_FAILED, SAMPLE_RUN_RE
 import { DataGallery } from "./gallery-data.tsx";
 import { DataIconsGallery } from "./gallery-data-icons.tsx";
 import { DataResultGallery } from "./gallery-data-result.tsx";
+import { DataTableViewGallery } from "./gallery-data-table-view.tsx";
 import { RunForm, WorkflowDetail, WorkflowStarters, WorkflowsEmpty, WorkflowsPanel } from "../features/workflows/index.ts";
 import { SAMPLE_BROKEN, SAMPLE_FIELD_REFUSED, SAMPLE_PR_DIGEST, SAMPLE_PR_DIGEST_CODE, SAMPLE_PR_DIGEST_EDITED_CODE, SAMPLE_PR_DIGEST_EDITED_STEPS, SAMPLE_PR_DIGEST_HASH, SAMPLE_PR_DIGEST_PROBLEMS, SAMPLE_PR_DIGEST_PROPOSAL, SAMPLE_PR_DIGEST_PROPOSAL_PROBLEM, SAMPLE_PR_DIGEST_STEPS, SAMPLE_ROUTINE_WORKFLOW_RUN, SAMPLE_SAVE_CONFLICT, SAMPLE_BRIEFING, SAMPLE_PROJECT_STARTER, SAMPLE_STARTERS, SAMPLE_STARTER_FOLDER, SAMPLE_UNTRUSTED, SAMPLE_UPGRADE, SAMPLE_UPGRADE_AGENTS, SAMPLE_UPGRADE_CODE, SAMPLE_UPGRADE_STEPS, SAMPLE_WORKFLOW_LIST, SAMPLE_WORKFLOW_LIST_TWO_PROJECTS, SAMPLE_WORKFLOW_RUNS, WORKFLOWS_NOW } from "../features/workflows/sample.ts";
 import { RUNS_NOW, SAMPLE_RUN_LIST, SAMPLE_WAITING_RUN } from "../features/runs/sample.ts";
@@ -2510,6 +2511,10 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
 
       <Only id="data-result">
         <DataResultGallery theme={theme} id={anchor("Data result")} />
+      </Only>
+
+      <Only id="data-table-view">
+        <DataTableViewGallery theme={theme} id={anchor("Data table view")} />
       </Only>
 
       <Only id="runs">

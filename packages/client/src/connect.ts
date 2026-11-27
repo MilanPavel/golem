@@ -77,6 +77,9 @@ import type { DataExportParams } from "../../protocol/gen/data-export-params.ts"
 import type { DataExportResult } from "../../protocol/gen/data-export-result.ts";
 import type { DataExtensionInstallResult } from "../../protocol/gen/data-extension-install-result.ts";
 import type { DataCancelResult } from "../../protocol/gen/data-cancel-result.ts";
+import type { DataBrowseParams } from "../../protocol/gen/data-browse-params.ts";
+import type { DataBrowseResult } from "../../protocol/gen/data-browse-result.ts";
+import type { DataProfileResult } from "../../protocol/gen/data-profile-result.ts";
 import type { DataDescribeResult } from "../../protocol/gen/data-describe-result.ts";
 import type { DataInspectParams } from "../../protocol/gen/data-inspect-params.ts";
 import type { DataInspectResult } from "../../protocol/gen/data-inspect-result.ts";
@@ -328,6 +331,8 @@ import {
   isDataNotesDraftResult,
   isDataNotesGetResult,
   isDataNotesSetResult,
+  isDataBrowseResult,
+  isDataProfileResult,
   isDataQueryResult,
   isDataRemoveResult,
   isDataSourceResult,
@@ -953,6 +958,10 @@ export interface GolemClient {
   describeData(source: string, table?: string): Promise<DataDescribeResult>;
   /** `data.query`: run SQL on one source. Pass `result_id` to be able to cancel it with `cancelData`. */
   queryData(params: DataQueryParams): Promise<DataResult>;
+  /** `data.profile`: the shape of each column of one table, for a person's screen. */
+  profileData(source: string, table: string): Promise<DataProfileResult>;
+  /** `data.browse`: a page of one table, sorted and filtered across all of its rows. It sends no SQL. */
+  browseData(params: Omit<DataBrowseParams, "session_id">): Promise<DataBrowseResult>;
   /** `data.result.page`: one page of a kept result, by its `result_id`. */
   pageDataResult(resultId: string, offset: number, limit: number): Promise<DataResult>;
   /**
@@ -3347,6 +3356,22 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       const result = await call("data.query", { ...params });
       if (!isDataQueryResult(result)) {
         throw new Error("invalid data.query result");
+      }
+      return result;
+    },
+    async profileData(source: string, table: string): Promise<DataProfileResult> {
+      await ready;
+      const result = await call("data.profile", { source, table });
+      if (!isDataProfileResult(result)) {
+        throw new Error("invalid data.profile result");
+      }
+      return result;
+    },
+    async browseData(params: Omit<DataBrowseParams, "session_id">): Promise<DataBrowseResult> {
+      await ready;
+      const result = await call("data.browse", { ...params });
+      if (!isDataBrowseResult(result)) {
+        throw new Error("invalid data.browse result");
       }
       return result;
     },

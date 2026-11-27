@@ -3,7 +3,7 @@ import { askText, DATA_NOT_AVAILABLE, runQueryText } from "@golem/view";
 import { dataErrorText, type DataSavedQuery, type DataSource } from "../../store/data.ts";
 import { NEW_DRAFT_KEY } from "../../store/drafts.ts";
 import { dataPath, settingsPath, type DataTab } from "../../store/router.ts";
-import { useDataDescribe, useDataList, useDataNotes, useDataSampleLoader, useDraft, useNavigate, useNewSessionFolder, usePageActions, useRoute } from "../../store/page-context.tsx";
+import { useDataDescribe, useDataList, useDataNotes, useDataProfileLoader, useDraft, useNavigate, useNewSessionFolder, usePageActions, useRoute } from "../../store/page-context.tsx";
 import { Button } from "../../ui/button.tsx";
 import { Link } from "../../ui/link.tsx";
 import { AddDialog } from "./add-dialog.tsx";
@@ -96,7 +96,7 @@ export function DataSourceScreen({ name, tab }: { name: string; tab: DataTab }) 
   const list = useDataList();
   const described = useDataDescribe(name);
   const notes = useDataNotes(name);
-  const loadSample = useDataSampleLoader(name);
+  const loadProfile = useDataProfileLoader(name);
   const actions = usePageActions();
   const navigate = useNavigate();
   const [, setDraft] = useDraft(NEW_DRAFT_KEY);
@@ -155,7 +155,9 @@ export function DataSourceScreen({ name, tab }: { name: string; tab: DataTab }) 
         onTab={(next) => navigate(dataPath(name, next))}
         onAsk={() => askInChat(askText(name))}
         onRun={(query: DataSavedQuery) => askInChat(runQueryText(name, query.sql))}
-        onLoadSample={loadSample}
+        onLoadProfile={loadProfile}
+        onBrowse={(table, view) => actions.dataBrowse(name, table, view)}
+        onAskView={askInChat}
         onSaveNotes={(text) => actions.dataNotesSet(name, text)}
         onDraftNotes={() => actions.dataNotesDraft(name)}
         onPrivacy={async (privacy) => {

@@ -78,7 +78,9 @@ import type { DataChanged } from "../../protocol/gen/data-changed.ts";
 import type { DataExportResult } from "../../protocol/gen/data-export-result.ts";
 import type { DataExtensionInstallResult } from "../../protocol/gen/data-extension-install-result.ts";
 import type { DataCancelResult } from "../../protocol/gen/data-cancel-result.ts";
+import type { DataBrowseResult } from "../../protocol/gen/data-browse-result.ts";
 import type { DataDescribeResult } from "../../protocol/gen/data-describe-result.ts";
+import type { DataProfileResult } from "../../protocol/gen/data-profile-result.ts";
 import type { DataResult } from "../../protocol/gen/data-result.ts";
 import type { DataInspectResult } from "../../protocol/gen/data-inspect-result.ts";
 import type { DataListResult } from "../../protocol/gen/data-list-result.ts";
@@ -578,6 +580,26 @@ export function isDataListResult(value: unknown): value is DataListResult {
 
 export function isDataDescribeResult(value: unknown): value is DataDescribeResult {
   return isRecord(value) && isDataSource(value["source"]) && Array.isArray(value["tables"]) && isRecord(value["sample"]);
+}
+
+export function isDataProfileResult(value: unknown): value is DataProfileResult {
+  return (
+    isRecord(value) &&
+    typeof value["rows"] === "number" &&
+    Array.isArray(value["columns"]) &&
+    value["columns"].every((column) => isRecord(column) && typeof column["name"] === "string" && typeof column["shape"] === "string" && typeof column["empty"] === "number" && typeof column["distinct"] === "number")
+  );
+}
+
+export function isDataBrowseResult(value: unknown): value is DataBrowseResult {
+  return (
+    isRecord(value) &&
+    Array.isArray(value["columns"]) &&
+    value["columns"].every((column) => isRecord(column) && typeof column["name"] === "string") &&
+    Array.isArray(value["rows"]) &&
+    value["rows"].every(Array.isArray) &&
+    (value["total_rows"] === undefined || value["total_rows"] === null || typeof value["total_rows"] === "number")
+  );
 }
 
 export function isDataQueryResult(value: unknown): value is DataResult {

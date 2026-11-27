@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import json
 import logging
 import re
 import tempfile
@@ -43,6 +44,8 @@ log = logging.getLogger(__name__)
 
 CACHE_SECONDS = 60.0
 """How long a source's tables and descriptions are kept."""
+MAX_COUNTS = 200
+"""How many row counts of filtered views a source keeps."""
 MAX_DESCRIBED = 30
 """The most tables one ``describe`` of a whole source reads the columns of."""
 SAMPLE_ROWS = 5
@@ -176,6 +179,16 @@ class ResultPage:
 
 
 @dataclass(frozen=True, slots=True)
+class BrowsePage:
+    """Rows ``offset`` on of a table, and how many rows the view has."""
+
+    columns: list[dict[str, str]]
+    rows: list[list[Any]]
+    total_rows: int | None
+    elapsed_ms: int
+
+
+@dataclass(frozen=True, slots=True)
 class ExportPlan:
     """A kept result and the new file it would be written to. Nothing is written yet."""
 
@@ -232,6 +245,11 @@ class _Open:
     described: dict[str, tuple[float, TableInfo]] = field(
         default_factory=dict[str, tuple[float, TableInfo]]
     )
+    profiled: dict[str, tuple[float, dict[str, Any]]] = field(
+        default_factory=dict[str, tuple[float, dict[str, Any]]]
+    )
+    counts: dict[str, int] = field(default_factory=dict[str, int])
+    """How many rows a view of a table has, by table, filters and search."""
 
 
 class DataSources:
@@ -844,6 +862,77 @@ class DataSources:
         opened.described[table.name] = (self._clock(), info)
         return info
 
+    def _visible_table(self, entry: _Entry, opened: _Open, table: str) -> TableInfo:
+        found = next((t for t in self._visible(entry, opened.tables) if t.name == table), None)
+        if found is None:
+            names = ", ".join(t.name for t in self._visible(entry, opened.tables)) or "none"
+            raise DataError(
+                f"There is no table called {table} in {entry.name}. The tables are: {names}."
+            )
+        return found
+
+    async def profile(self, root: Path | None, name: str, table: str) -> dict[str, Any]:
+        """The shape of each column of ``table``, kept with the other stats of the source.
+
+        It is for a person's screen: no model reads it. Raises :class:`DataError`.
+        """
+        entry = self._entry(root, name)
+        opened = await self._ensure(entry)
+        self._visible_table(entry, opened, table)
+        cached = opened.profiled.get(table)
+        if cached is not None and self._clock() - cached[0] < CACHE_SECONDS:
+            return cached[1]
+        answer = await self._worker.profile(entry.key, table)
+        opened.profiled[table] = (self._clock(), answer)
+        return answer
+
+    async def browse(
+        self,
+        root: Path | None,
+        name: str,
+        table: str,
+        *,
+        offset: int,
+        limit: int,
+        sort: dict[str, Any] | None = None,
+        filters: list[dict[str, Any]] | None = None,
+        search: str | None = None,
+    ) -> BrowsePage:
+        """``limit`` rows of ``table`` from ``offset``, sorted and filtered across all of it.
+
+        The page runs straight against the source, so a big file is not copied. The worker
+        builds the SQL and checks every name. The row count of a view is kept by table, filters
+        and search, so scrolling does not count again. Raises :class:`DataError`.
+        """
+        entry = self._entry(root, name)
+        opened = await self._ensure(entry)
+        info = self._visible_table(entry, opened, table)
+        view = [f for f in filters or []]
+        needle = (search or "").strip()
+        key = json.dumps([table, view, needle], sort_keys=True, default=str)
+        known = opened.counts.get(key)
+        if known is None and not view and not needle and info.rows is not None:
+            known = info.rows
+        args: dict[str, Any] = {
+            "offset": offset,
+            "limit": limit,
+            "sort": sort,
+            "filters": view,
+            "search": needle or None,
+            "count": known is None,
+        }
+        answer = await self._worker.browse(entry.key, table, args)
+        total = answer.get("total_rows")
+        if total is not None:
+            if len(opened.counts) >= MAX_COUNTS:
+                opened.counts.clear()
+            opened.counts[key] = int(total)
+        else:
+            total = known
+        return BrowsePage(
+            answer["columns"], answer["rows"], total, int(answer.get("elapsed_ms", 0))
+        )
+
     async def _sample(self, entry: _Entry, table: str, count: int) -> list[list[Any]]:
         server = entry.kind in DATABASE_KINDS
         bound = f" limit {count}" if server else ""
@@ -1069,6 +1158,7 @@ def _fraction(value: object) -> float | None:
 
 __all__ = [
     "CACHE_SECONDS",
+    "BrowsePage",
     "ColumnInfo",
     "DataAccess",
     "DataSources",

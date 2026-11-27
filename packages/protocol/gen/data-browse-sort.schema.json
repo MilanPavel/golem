@@ -1,0 +1,21 @@
+{
+  "additionalProperties": false,
+  "description": "A column to sort a view by.",
+  "properties": {
+    "column": {
+      "minLength": 1,
+      "title": "Column",
+      "type": "string"
+    },
+    "desc": {
+      "default": false,
+      "title": "Desc",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "column"
+  ],
+  "title": "DataBrowseSort",
+  "type": "object"
+}

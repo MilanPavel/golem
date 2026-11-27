@@ -17,6 +17,7 @@ import {
   SAMPLE_SHOP_DEV,
   SAMPLE_SHOP_PROD,
 } from "../features/data/sample.ts";
+import { profileOfTable } from "../features/data/table-sample.ts";
 import { SidebarPanel } from "../features/sidebar/index.ts";
 import type { DataAnswer, DataDescribeResult, DataListResult, DataSource } from "../store/data.ts";
 import type { DataTab } from "../store/router.ts";
@@ -36,7 +37,9 @@ function Story({ title, theme, source, described, tab, notes = NOTES_READY, desc
         onTab={setShown}
         onAsk={() => {}}
         onRun={() => {}}
-        onLoadSample={() => Promise.resolve([["4210", "dev+4210@example.test", 2]])}
+        onLoadProfile={(table) => Promise.resolve(profileOfTable(source.name, described?.tables.find((each) => each.name === table)))}
+        onBrowse={() => new Promise(() => {})}
+        onAskView={() => {}}
         onSaveNotes={() => Promise.resolve("~/.golem/data/bank.md")}
         onDraftNotes={() => Promise.resolve("# bank\n\nDrafted from the schema.\n")}
         onPrivacy={() => Promise.resolve()}

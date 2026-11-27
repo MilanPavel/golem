@@ -1,8 +1,6 @@
 import { useId, useState, type ReactNode } from "react";
 import {
   BUILTIN_PRIVACY_NOTE,
-  COLUMNS_CAPTION,
-  columnStats,
   countText,
   DATA_NOT_AVAILABLE,
   DATA_PRIVACIES,
@@ -16,11 +14,10 @@ import {
   QUERIES_EMPTY_MORE,
   withoutSingleFile,
   REMOVE_SENTENCE,
-  sampleCaption,
-  SAMPLE_SCHEMA_NOTE,
   savedInText,
   sourceDetail,
   type DataPrivacy,
+  type ViewCell,
 } from "@golem/view";
 import { cn } from "../../ui/cn.ts";
 import { Badge } from "../../ui/badge.tsx";
@@ -29,12 +26,13 @@ import { Code } from "../../ui/code.tsx";
 import { DataSourceIcon } from "../../ui/data-icons.tsx";
 import { Input } from "../../ui/input.tsx";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../ui/tabs.tsx";
-import { dataErrorText, type DataDescribeResult, type DataExtensionName, type DataSavedQuery, type DataSource, type DataTable } from "../../store/data.ts";
+import { dataErrorText, type DataBrowseResult, type DataBrowseView, type DataDescribeResult, type DataExtensionName, type DataProfileResult, type DataSavedQuery, type DataSource, type DataTable } from "../../store/data.ts";
 import { DATA_TABS, type DataTab } from "../../store/router.ts";
 import { CodeEditor } from "../settings/config/code-editor.tsx";
 import { ExtensionRow } from "./extension-row.tsx";
 import { PrivacyChip } from "./privacy-chip.tsx";
-import { RowsTable, type Rows } from "./rows-table.tsx";
+import { ColumnProfile } from "./column-profile.tsx";
+import { EMPTY_VIEW, RowsBrowser, type RowsView } from "./rows-browser.tsx";
 
 /** What the notes tab has to show. */
 export type NotesView =
@@ -43,121 +41,58 @@ export type NotesView =
   | { state: "error"; message: string }
   | { state: "ready"; text: string | null; path: string | null };
 
-const TAB_NAMES: Record<DataTab, string> = { tables: "Tables", notes: "Notes", queries: "Queries", settings: "Settings" };
+/** The `tables` tab is the one with a chart for each column, so it is called Columns. */
+const TAB_NAMES: Record<DataTab, string> = { tables: "Columns", rows: "Rows", notes: "Notes", queries: "Queries", settings: "Settings" };
 
 function Caption({ children }: { children: ReactNode }) {
   return <h2 className="text-meta font-medium text-faint">{children}</h2>;
 }
 
-type SampleState = { state: "loading" } | { state: "error"; message: string } | { state: "ready"; rows: Rows };
+/** The tables of a source as a list to pick from. A source with one table has nothing to pick. */
+function TableList({ tables, current, onPick }: { tables: readonly DataTable[]; current: string; onPick: (name: string) => void }) {
+  return (
+    <ul aria-label="Tables" className="flex w-48 shrink-0 flex-col gap-px">
+      {tables.map((each) => (
+        <li key={each.name}>
+          <button
+            type="button"
+            aria-current={each.name === current ? "true" : undefined}
+            onClick={() => onPick(each.name)}
+            className={cn(
+              "flex w-full flex-col rounded-md px-2.5 py-1.5 text-left outline-offset-2 outline-clay hover:bg-line focus-visible:outline-2",
+              each.name === current ? "bg-surface text-ink ring-1 ring-line ring-inset" : "text-muted",
+            )}
+          >
+            <Code className="truncate text-sm">{each.name}</Code>
+            <span className="text-xs text-faint">
+              {each.rows === null || each.rows === undefined ? "rows hidden" : `${countText(each.rows)} rows`} · {(each.columns ?? []).length} columns
+            </span>
+          </button>
+        </li>
+      ))}
+    </ul>
+  );
+}
 
-function TablesTab({
-  source,
-  described,
-  onLoadSample,
-}: {
-  source: DataSource;
-  described: DataDescribeResult | null;
-  /** Reads the sample of one table. Only a schema-only source needs it: the rest came with the description. */
-  onLoadSample: (table: string) => Promise<Rows>;
-}) {
+/** The frame of the Columns and Rows tabs: the list of tables when there are several, and one table's heading above its content. */
+function TableFrame({ source, described, picked, onPick, children }: { source: DataSource; described: DataDescribeResult | null; picked: string | null; onPick: (name: string) => void; children: (table: DataTable) => ReactNode }) {
   const tables: readonly DataTable[] = described?.tables ?? [];
-  const [picked, setPicked] = useState<string | null>(null);
-  const [samples, setSamples] = useState<Record<string, SampleState>>({});
   if (described === null) return <p className="text-sm text-muted">Loading the tables.</p>;
   const table = tables.find((each) => each.name === picked) ?? tables[0];
   if (table === undefined) {
     return <p className="text-sm text-muted">{source.status === "ready" ? "No tables found." : sourceDetail(source)}</p>;
   }
-  const columns = table.columns ?? [];
-  const listed = withoutSingleFile(columns, []).columns;
-  const schemaOnly = source.privacy === "schema";
-  const loaded = samples[table.name];
-  const rows: Rows | null = schemaOnly ? (loaded?.state === "ready" ? loaded.rows : null) : (described.sample[table.name] ?? []);
-
-  function showSample(name: string): void {
-    setSamples((now) => ({ ...now, [name]: { state: "loading" } }));
-    onLoadSample(name).then(
-      (got) => setSamples((now) => ({ ...now, [name]: { state: "ready", rows: got } })),
-      (failure: unknown) => setSamples((now) => ({ ...now, [name]: { state: "error", message: dataErrorText(failure, "Could not read the rows.") } })),
-    );
-  }
-
   return (
     <div className="flex min-h-0 gap-5">
-      <ul aria-label="Tables" className="flex w-48 shrink-0 flex-col gap-px">
-        {tables.map((each) => (
-          <li key={each.name}>
-            <button
-              type="button"
-              aria-current={each.name === table.name ? "true" : undefined}
-              onClick={() => setPicked(each.name)}
-              className={cn(
-                "flex w-full flex-col rounded-md px-2.5 py-1.5 text-left outline-offset-2 outline-clay hover:bg-line focus-visible:outline-2",
-                each.name === table.name ? "bg-surface text-ink ring-1 ring-line ring-inset" : "text-muted",
-              )}
-            >
-              <Code className="truncate text-sm">{each.name}</Code>
-              <span className="text-xs text-faint">
-                {each.rows === null || each.rows === undefined ? "rows hidden" : `${countText(each.rows)} rows`} · {(each.columns ?? []).length} columns
-              </span>
-            </button>
-          </li>
-        ))}
-      </ul>
-      <div className="flex min-w-0 flex-1 flex-col gap-5">
-        <section className="flex flex-col gap-1.5">
-          <div className="flex items-center gap-2">
-            <h2 className="text-sm font-medium"><Code>{table.name}</Code></h2>
-            <Badge>{table.rows === null || table.rows === undefined ? "rows hidden" : `${countText(table.rows)} rows`}</Badge>
-          </div>
-          <Caption>{COLUMNS_CAPTION}</Caption>
-          <table className="w-full border-collapse text-code">
-            <caption className="sr-only">Columns of {table.name}</caption>
-            <thead>
-              <tr className="border-b border-line-strong text-left text-faint">
-                <th scope="col" className="px-2 py-1 font-normal">
-                  name
-                </th>
-                <th scope="col" className="px-2 py-1 font-normal">
-                  type
-                </th>
-                <th scope="col" className="px-2 py-1 font-normal">
-                  stats
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {listed.map((column) => (
-                <tr key={column.name} className="border-b border-line">
-                  <td className="px-2 py-1"><Code>{column.name}</Code></td>
-                  <td className="px-2 py-1"><Code tone="muted">{column.type}</Code></td>
-                  <td className="px-2 py-1"><Code tone="muted">{columnStats(column)}</Code></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </section>
-        <section className="flex flex-col gap-1.5">
-          <Caption>Sample rows · {sampleCaption(source.privacy)}</Caption>
-          {rows !== null && rows.length > 0 ? (
-            <RowsTable columns={columns} rows={rows} label={`Sample rows of ${table.name}`} />
-          ) : schemaOnly && rows === null ? (
-            <div className="flex flex-col items-start gap-2">
-              <p className="text-sm text-muted">{SAMPLE_SCHEMA_NOTE}</p>
-              <Button size="sm" disabled={loaded?.state === "loading"} onClick={() => showSample(table.name)}>
-                {loaded?.state === "loading" ? "Reading rows…" : "Show sample rows"}
-              </Button>
-              {loaded?.state === "error" ? (
-                <p role="alert" className="text-sm text-deny">
-                  {loaded.message}
-                </p>
-              ) : null}
-            </div>
-          ) : (
-            <p className="text-sm text-muted">No rows yet.</p>
-          )}
-        </section>
+      {tables.length > 1 ? <TableList tables={tables} current={table.name} onPick={onPick} /> : null}
+      <div className="flex min-w-0 flex-1 flex-col gap-3">
+        <div className="flex items-center gap-2">
+          <h2 className="text-sm font-medium">
+            <Code>{table.name}</Code>
+          </h2>
+          <Badge>{table.rows === null || table.rows === undefined ? "rows hidden" : `${countText(table.rows)} rows`}</Badge>
+        </div>
+        {children(table)}
       </div>
     </div>
   );
@@ -530,7 +465,12 @@ export type SourcePageProps = {
   onAsk: () => void;
   /** Opens a chat that runs a saved query. */
   onRun: (query: DataSavedQuery) => void;
-  onLoadSample: (table: string) => Promise<Rows>;
+  /** The shape of each column of one table, from `data.profile`. */
+  onLoadProfile: (table: string) => Promise<DataProfileResult>;
+  /** One page of a table, from `data.browse`. */
+  onBrowse: (table: string, view: DataBrowseView) => Promise<DataBrowseResult>;
+  /** Opens a new chat with this text in the composer, to ask about a view of the rows. */
+  onAskView: (text: string) => void;
   onSaveNotes: (text: string) => Promise<string>;
   onDraftNotes: () => Promise<string>;
   onPrivacy: (privacy: DataPrivacy) => Promise<void>;
@@ -553,7 +493,9 @@ export function SourcePage({
   onTab,
   onAsk,
   onRun,
-  onLoadSample,
+  onLoadProfile,
+  onBrowse,
+  onAskView,
   onSaveNotes,
   onDraftNotes,
   onPrivacy,
@@ -563,6 +505,14 @@ export function SourcePage({
   onInstallExtension,
 }: SourcePageProps) {
   const detail = sourceDetail(source);
+  const [picked, setPicked] = useState<string | null>(null);
+  const [views, setViews] = useState<Record<string, RowsView>>({});
+  const viewOf = (table: string): RowsView => views[table] ?? EMPTY_VIEW;
+  // A click on a bar of a category opens the rows with that value.
+  const openRows = (table: string, column: string, value: ViewCell): void => {
+    setViews((now) => ({ ...now, [table]: { ...EMPTY_VIEW, filters: [{ column, op: "=", value }] } }));
+    onTab("rows");
+  };
   return (
     <Tabs value={tab} onValueChange={(next) => onTab(next as DataTab)} className="flex min-w-0 flex-col gap-4">
       {/* Stays at the top of the page while the rest scrolls. The negative margins and offset cancel the page's padding, so nothing shows above or beside it. */}
@@ -607,7 +557,25 @@ export function SourcePage({
             {describeError}
           </p>
         ) : (
-          <TablesTab key={source.name} source={source} described={described} onLoadSample={onLoadSample} />
+          <TableFrame source={source} described={described} picked={picked} onPick={setPicked}>
+            {(table) => <ColumnProfile key={table.name} table={table} refresh={described} onLoadProfile={onLoadProfile} onPick={(column, value) => openRows(table.name, column, value)} />}
+          </TableFrame>
+        )}
+      </TabsContent>
+      <TabsContent value="rows">
+        {describeMissing ? (
+          <p className="text-sm text-muted">{DATA_NOT_AVAILABLE}</p>
+        ) : describeError !== null ? (
+          <p role="alert" className="text-sm text-deny">
+            {describeError}
+          </p>
+        ) : (
+          <TableFrame source={source} described={described} picked={picked} onPick={setPicked}>
+            {(table) => {
+              const shown = withoutSingleFile(table.columns ?? [], []).columns;
+              return <RowsBrowser key={table.name} source={source.name} table={table.name} columns={shown} tableRows={table.rows ?? null} view={viewOf(table.name)} onView={(next) => setViews((now) => ({ ...now, [table.name]: next }))} onBrowse={onBrowse} onAskView={onAskView} />;
+            }}
+          </TableFrame>
         )}
       </TabsContent>
       <TabsContent value="notes">

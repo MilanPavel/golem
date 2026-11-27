@@ -1,0 +1,254 @@
+{
+  "$defs": {
+    "DataColumnProfile": {
+      "additionalProperties": false,
+      "description": "What one column looks like. For a person's screen: it never goes to a model.",
+      "properties": {
+        "avg_length": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Avg Length"
+        },
+        "bins": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "integer"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Bins"
+        },
+        "distinct": {
+          "minimum": 0,
+          "title": "Distinct",
+          "type": "integer"
+        },
+        "distinct_estimate": {
+          "default": false,
+          "title": "Distinct Estimate",
+          "type": "boolean"
+        },
+        "empty": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Empty",
+          "type": "number"
+        },
+        "max": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "integer"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Max"
+        },
+        "mean": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Mean"
+        },
+        "min": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "integer"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Min"
+        },
+        "more_rows": {
+          "default": 0,
+          "minimum": 0,
+          "title": "More Rows",
+          "type": "integer"
+        },
+        "more_values": {
+          "default": 0,
+          "minimum": 0,
+          "title": "More Values",
+          "type": "integer"
+        },
+        "most_common": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DataTopValue"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "shape": {
+          "enum": [
+            "key",
+            "number",
+            "date",
+            "category",
+            "text"
+          ],
+          "title": "Shape",
+          "type": "string"
+        },
+        "top": {
+          "items": {
+            "$ref": "#/$defs/DataTopValue"
+          },
+          "title": "Top",
+          "type": "array"
+        },
+        "type": {
+          "title": "Type",
+          "type": "string"
+        },
+        "unique_ratio": {
+          "anyOf": [
+            {
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Unique Ratio"
+        }
+      },
+      "required": [
+        "name",
+        "type",
+        "shape",
+        "empty",
+        "distinct"
+      ],
+      "title": "DataColumnProfile",
+      "type": "object"
+    },
+    "DataTopValue": {
+      "additionalProperties": false,
+      "description": "A value and how many rows have it.",
+      "properties": {
+        "count": {
+          "minimum": 0,
+          "title": "Count",
+          "type": "integer"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "integer"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Value"
+        }
+      },
+      "required": [
+        "value",
+        "count"
+      ],
+      "title": "DataTopValue",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "The columns of a table, one entry each, in their order.",
+  "properties": {
+    "columns": {
+      "items": {
+        "$ref": "#/$defs/DataColumnProfile"
+      },
+      "title": "Columns",
+      "type": "array"
+    },
+    "distinct_estimate": {
+      "default": false,
+      "title": "Distinct Estimate",
+      "type": "boolean"
+    },
+    "rows": {
+      "minimum": 0,
+      "title": "Rows",
+      "type": "integer"
+    },
+    "source": {
+      "title": "Source",
+      "type": "string"
+    },
+    "table": {
+      "title": "Table",
+      "type": "string"
+    }
+  },
+  "required": [
+    "source",
+    "table",
+    "rows",
+    "columns"
+  ],
+  "title": "DataProfileResult",
+  "type": "object"
+}

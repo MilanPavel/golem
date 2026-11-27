@@ -1,0 +1,143 @@
+{
+  "$defs": {
+    "DataColumn": {
+      "additionalProperties": false,
+      "description": "One column. The stats are null when unknown or hidden.",
+      "properties": {
+        "distinct": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Distinct"
+        },
+        "distinct_estimate": {
+          "default": false,
+          "title": "Distinct Estimate",
+          "type": "boolean"
+        },
+        "max": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Max"
+        },
+        "min": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Min"
+        },
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "null_fraction": {
+          "anyOf": [
+            {
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Null Fraction"
+        },
+        "type": {
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "type"
+      ],
+      "title": "DataColumn",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "The page, and how many rows the view has.",
+  "properties": {
+    "columns": {
+      "items": {
+        "$ref": "#/$defs/DataColumn"
+      },
+      "title": "Columns",
+      "type": "array"
+    },
+    "elapsed_ms": {
+      "minimum": 0,
+      "title": "Elapsed Ms",
+      "type": "integer"
+    },
+    "rows": {
+      "items": {
+        "items": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "integer"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "type": "array"
+      },
+      "title": "Rows",
+      "type": "array"
+    },
+    "total_rows": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Total Rows"
+    }
+  },
+  "required": [
+    "columns",
+    "rows",
+    "elapsed_ms"
+  ],
+  "title": "DataBrowseResult",
+  "type": "object"
+}

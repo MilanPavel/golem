@@ -1,0 +1,35 @@
+{
+  "additionalProperties": false,
+  "description": "``data.profile``. The shape of each column of one table.",
+  "properties": {
+    "session_id": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Session Id"
+    },
+    "source": {
+      "minLength": 1,
+      "title": "Source",
+      "type": "string"
+    },
+    "table": {
+      "minLength": 1,
+      "title": "Table",
+      "type": "string"
+    }
+  },
+  "required": [
+    "source",
+    "table"
+  ],
+  "title": "DataProfileParams",
+  "type": "object"
+}

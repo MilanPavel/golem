@@ -21,6 +21,7 @@ export const GALLERY_SECTIONS = [
   "data",
   "data-icons",
   "data-result",
+  "data-table-view",
   "runs",
   "workflow-run",
   "rail",
