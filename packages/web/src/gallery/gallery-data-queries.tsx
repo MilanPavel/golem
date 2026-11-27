@@ -3,6 +3,7 @@ import { EditQueryForm, SaveQueryForm } from "../features/data/query-dialogs.tsx
 import { QueriesTab } from "../features/data/queries-tab.tsx";
 import { ResultTable } from "../features/data/result-table.tsx";
 import { SAMPLE_NOW, SAMPLE_QUERIES, SAMPLE_QUERY_RESULT, SAMPLE_SAVABLE_RESULT, SAMPLE_TRIED_ROWS } from "../features/data/queries-sample.ts";
+import { QueryRoutinesFrames } from "./gallery-query-routines.tsx";
 import { SAMPLE_BANK } from "../features/data/sample.ts";
 
 const NEVER = () => new Promise<never>(() => {});
@@ -48,6 +49,24 @@ export function DataQueriesGallery({ theme, id }: { theme: string; id: string })
             initial={{ ran: { "Spending by month": { table: SAMPLE_QUERY_RESULT, ms: 38 } } }}
           />
         </Frame>
+        <Frame title="Queries tab, with routines" theme={theme} wide>
+          <QueriesTab
+            source={SAMPLE_BANK}
+            queries={SAMPLE_QUERIES}
+            now={SAMPLE_NOW}
+            onRun={NEVER}
+            onTry={NEVER}
+            onAsk={() => {}}
+            onSave={OK}
+            onRemove={OK}
+            routines={{
+              routineOf: (saved) => (saved === SAMPLE_QUERIES[0]?.name ? { name: "spending", schedule: "0 8 * * 1", query: { source: "bank", saved }, post: "always" } : undefined),
+              names: ["spending"],
+              create: OK,
+              open: () => {},
+            }}
+          />
+        </Frame>
         <Frame title="Queries tab, remove asked" theme={theme} wide>
           <QueriesTab source={SAMPLE_BANK} queries={SAMPLE_QUERIES.slice(1)} now={SAMPLE_NOW} onRun={NEVER} onTry={NEVER} onAsk={() => {}} onSave={OK} onRemove={OK} initial={{ confirming: "Subscriptions" }} />
         </Frame>
@@ -85,6 +104,7 @@ export function DataQueriesGallery({ theme, id }: { theme: string; id: string })
         <Frame title="New query dialog" theme={theme}>
           <EditQueryForm inline source="bank" query={null} onTry={NEVER} onSave={OK} onClose={() => {}} />
         </Frame>
+        <QueryRoutinesFrames theme={theme} />
       </div>
     </section>
   );

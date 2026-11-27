@@ -49,6 +49,12 @@ STARTERS: tuple[Starter, ...] = (
         False,
         routine=StarterRoutine("morning-briefing", "weekdays 07:30", "every weekday at 07:30"),
     ),
+    Starter(
+        "data_report",
+        "Data report",
+        "Run saved queries with no model, and have one model step write a short report.",
+        False,
+    ),
 )
 
 

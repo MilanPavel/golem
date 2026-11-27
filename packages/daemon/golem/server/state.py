@@ -31,6 +31,7 @@ from golem.notify import Notifier
 from golem.pairing import PairingManager
 from golem.paths import GolemPaths
 from golem.permissions.policy import Policy
+from golem.routine_query import QueryRoutines
 from golem.routine_scheduler import RoutineScheduler
 from golem.routine_watcher import FileWatcher
 from golem.routines import local_zone
@@ -43,6 +44,7 @@ from golem.sessions.usage import Usage
 from golem.skills.registry import SkillRegistry
 from golem.store.artifacts import ArtifactStore
 from golem.store.devices import DeviceStore
+from golem.store.inbox_posts import InboxPosts
 from golem.store.routine_runs import RoutineRuns
 from golem.tools.registry import ToolRegistry
 from golem.workflows.service import WorkflowService
@@ -62,6 +64,8 @@ class DaemonState:
     watcher: FileWatcher | None = None
     """The file watcher of the ``on`` routines, once the daemon serves."""
     routine_runs: RoutineRuns | None = None
+    inbox_posts: InboxPosts | None = None
+    query_routines: QueryRoutines | None = None
     workflows: WorkflowService | None = None
     """Workflow files, the engine and the runs in flight (``workflow.*``)."""
     devices: DeviceStore | None = None

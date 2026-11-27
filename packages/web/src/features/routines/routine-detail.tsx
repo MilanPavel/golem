@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react";
-import { fileName, formatElapsed, lastResultText, routineHeadline, routineState, routineToml, runStatusWords, runWhenText } from "@golem/view";
+import { fileName, formatElapsed, lastResultText, postWords, queryKindWords, routineHeadline, routineState, routineToml, runStatusWords, runWhenText } from "@golem/view";
 import { actionErrorText } from "../../store/errors.ts";
 import { sessionPath, workflowPath } from "../../store/router.ts";
 import type { RoutineInfo, RoutineRunResult, RoutineRunSummary } from "../../store/routines.ts";
@@ -173,6 +173,21 @@ function ProjectNote({ path, onOpenConfig }: { path: string; onOpenConfig: () =>
   );
 }
 
+/** The Edit tab of a query routine: its query is chosen where it is saved, so what it does is changed in the file. */
+function QueryNote({ path, onOpenConfig }: { path: string; onOpenConfig: () => void }) {
+  return (
+    <div className="flex flex-col items-start gap-2">
+      <p className="text-sm text-muted">This routine runs a saved query. Change the query on its source's Queries tab, and the schedule or what it posts in the config file.</p>
+      <p className="wrap-anywhere">
+        <Code tone="muted">{path}</Code>
+      </p>
+      <Button size="sm" onClick={onOpenConfig}>
+        Open config
+      </Button>
+    </div>
+  );
+}
+
 /** One routine in the main area: what it runs, when, its actions, and the History, Edit and Config tabs. */
 export function RoutineDetail({ routine, workflowId = null, runs, now, onNavigate, onRun, onRemove, editor }: RoutineDetailProps) {
   const { config } = routine;
@@ -265,7 +280,16 @@ export function RoutineDetail({ routine, workflowId = null, runs, now, onNavigat
       ) : null}
       {routine.blocked === true ? <p className="text-sm text-muted">This project is not trusted, so its routines are listed and never run.</p> : null}
       <dl className="flex flex-col gap-1.5 text-sm">
-        {config.workflow ? (
+        {config.query ? (
+          <>
+            <Fact label="Runs">
+              <span data-routine-kind="query">{queryKindWords(config)}</span>
+            </Fact>
+            <Fact label="Posts">
+              <span className="text-muted">{postWords(config)}, with no model</span>
+            </Fact>
+          </>
+        ) : config.workflow ? (
           <>
             <Fact label="Workflow">
               <Code>{config.workflow}</Code>
@@ -310,7 +334,9 @@ export function RoutineDetail({ routine, workflowId = null, runs, now, onNavigat
         </TabsContent>
         {editable ? (
           <TabsContent value="edit">
-            {routine.source === "project" || editor === undefined ? (
+            {config.query ? (
+              <QueryNote path={routine.path} onOpenConfig={() => setTab("config")} />
+            ) : routine.source === "project" || editor === undefined ? (
               <ProjectNote path={routine.path} onOpenConfig={() => setTab("config")} />
             ) : (
               editor((wasSaved) => {

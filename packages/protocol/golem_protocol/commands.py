@@ -2864,12 +2864,24 @@ class RoutineWatchConfig(BaseModel):
     glob: str = Field(default="*", min_length=1)
 
 
+class RoutineQueryConfig(BaseModel):
+    """``query = { source, saved }``: the saved query of a data source that a routine runs."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    source: str = Field(min_length=1)
+    saved: str = Field(min_length=1)
+
+
 class RoutineConfig(BaseModel):
     """One ``[[routine]]`` as written. The daemon checks it when it loads.
 
-    Exactly one of ``schedule`` and ``on`` is set, and exactly one of ``prompt`` and
-    ``workflow``. ``workflow`` names a workflow to start, with ``inputs`` (a watch routine
-    also passes ``path``); it takes no ``folder``, ``model`` or ``mcp``. ``schedule`` is cron, or
+    Exactly one of ``schedule`` and ``on`` is set, and exactly one of ``prompt``,
+    ``workflow`` and ``query``. ``query`` runs a saved query of a data source with no model and
+    no session; ``post`` says when its result goes to the Inbox: ``always`` (the default) or
+    ``rows`` (only when the query finds rows), and it is only for a query. ``workflow`` names
+    a workflow to start, with ``inputs`` (a watch routine also passes ``path``); it takes no
+    ``folder``, ``model`` or ``mcp``. ``schedule`` is cron, or
     ``every 15m``, ``every 1h``, ``daily 08:30``, ``weekdays 08:30``, ``weekly mon 06:00``.
     ``missed`` is what happens to a firing that came due while golem could not
     run it: ``skip`` drops it, ``run_once`` fires it once, late.
@@ -2884,6 +2896,8 @@ class RoutineConfig(BaseModel):
     on: RoutineWatchConfig | None = None
     prompt: str | None = Field(default=None, min_length=1)
     workflow: str | None = Field(default=None, min_length=1)
+    query: RoutineQueryConfig | None = None
+    post: Literal["always", "rows"] | None = None
     inputs: dict[str, str | int | float | bool] = Field(
         default_factory=dict[str, str | int | float | bool]
     )
@@ -3192,6 +3206,57 @@ class RoutineRemoveResult(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     name: str = Field(min_length=1)
+
+
+class InboxPost(BaseModel):
+    """One thing a query routine left in the Inbox: its first rows, or the error it hit.
+
+    ``rows`` holds at most ten rows, each a list of cells in the order of ``columns``; ``row_count``
+    is how many rows the query returned. ``error`` is set (and ``rows`` empty) for a failed run.
+    ``source`` and ``saved`` say which saved query it was, so the post can open it. ``scope`` is
+    ``user`` or a project folder. ``at`` is an ISO 8601 time.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    post_id: str = Field(min_length=1)
+    routine: str = Field(min_length=1)
+    scope: str = Field(min_length=1)
+    source: str = Field(min_length=1)
+    saved: str = Field(min_length=1)
+    row_count: int = Field(ge=0)
+    columns: list[str] = Field(default_factory=list[str])
+    rows: list[list[Any]] = Field(default_factory=list[list[Any]])
+    error: str | None = None
+    at: str = Field(min_length=1)
+
+
+class InboxListParams(BaseModel):
+    """``inbox.list``. The posts not yet marked done."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+
+class InboxListResult(BaseModel):
+    """The open posts, newest first."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    posts: list[InboxPost]
+
+
+class InboxDoneParams(BaseModel):
+    """``inbox.done``. Mark a post done: it leaves the Inbox."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    post_id: str = Field(min_length=1)
+
+
+class InboxDoneResult(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    post_id: str = Field(min_length=1)
 
 
 class RoutineChanged(BaseModel):
@@ -7659,6 +7724,11 @@ __all__ = [
     "HelperRetryResult",
     "HelperStopParams",
     "HelperStopResult",
+    "InboxDoneParams",
+    "InboxDoneResult",
+    "InboxListParams",
+    "InboxListResult",
+    "InboxPost",
     "InspectMessage",
     "InstallMethod",
     "KeychainWait",
@@ -7824,6 +7894,7 @@ __all__ = [
     "RoutineListResult",
     "RoutinePreviewParams",
     "RoutinePreviewResult",
+    "RoutineQueryConfig",
     "RoutineRemoveParams",
     "RoutineRemoveResult",
     "RoutineRunParams",

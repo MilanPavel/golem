@@ -101,6 +101,8 @@ public enum MethodAccess {
         "helpers.respond",
         "hf.files",
         "hf.search",
+        "inbox.done",
+        "inbox.list",
         "mcp.add",
         "mcp.call",
         "mcp.catalog",

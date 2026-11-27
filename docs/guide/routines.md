@@ -49,7 +49,29 @@ Drop a PDF in `~/Downloads` and one session starts for it.
 
 ## Start a workflow
 
-Instead of a `prompt`, a routine can start a [workflow](workflows.md#run-a-workflow-from-a-routine) with `workflow = "name"` and `inputs = { ... }`. A routine has exactly one of `prompt` and `workflow`. The run has its own session and reviews, and the routine's run row points at it. A watch routine passes the file as the input `path`.
+Instead of a `prompt`, a routine can start a [workflow](workflows.md#run-a-workflow-from-a-routine) with `workflow = "name"` and `inputs = { ... }`. A routine has exactly one of `prompt`, `workflow` and `query`. The run has its own session and reviews, and the routine's run row points at it. A watch routine passes the file as the input `path`.
+
+## Run a saved query
+
+Instead of a `prompt` or a `workflow`, a routine can run a saved query of a data source, with no model and no session:
+
+```toml
+[[routine]]
+name     = "big-payments"
+schedule = "every 1h"
+query    = { source = "bank", saved = "Big payments this week" }
+post     = "rows"   # "always" (the default), or only when the query finds rows
+```
+
+- The query runs through the data engine with its usual limits. A routine has exactly one of `prompt`, `workflow` and `query`, and `post` is only for a `query`.
+- With `post = "always"`, or `"rows"` and at least one row, the result goes to the Inbox: the routine's name, the row count, the source and the first ten rows, with **Open the query**, **Ask in chat** and **Done**. With `"rows"` and no rows nothing is posted, and the run says "0 rows, nothing posted".
+- Put the threshold in the query (`where`, `having`): "only when it finds rows" is the whole alert rule.
+- A failed run posts the engine's error in the Inbox.
+- The Inbox is on this Mac, so it shows rows whatever the source's privacy. A push to a phone says only the routine's name and the row count.
+- A watch routine (`on`) works for a files source: it runs the query for each new file in the folder.
+- A source or saved query that is gone is listed in the `issues` of `routine.list`, and the routine fails with the engine's words each time it fires.
+
+On the source's **Queries** tab, **⏱ Routine** makes this routine, or the *data report* workflow (`workflow = "data_report"`, `inputs = { source, queries }`) when a model should write a summary.
 
 ## In the web page
 

@@ -2,6 +2,7 @@ import { useState, type ReactNode } from "react";
 import { askText, DATA_NOT_AVAILABLE, runQueryText, TRY_ROWS } from "@golem/view";
 import { dataErrorText, type DataSavedQuery, type DataSource } from "../../store/data.ts";
 import { NEW_DRAFT_KEY } from "../../store/drafts.ts";
+import { useQueryRoutines } from "../../store/query-routines.ts";
 import { dataPath, settingsPath, type DataTab } from "../../store/router.ts";
 import { useDataDescribe, useDataList, useDataNotes, useDataProfileLoader, useDraft, useNavigate, useNewSessionFolder, usePageActions, useRoute } from "../../store/page-context.tsx";
 import { Button } from "../../ui/button.tsx";
@@ -102,6 +103,7 @@ export function DataSourceScreen({ name, tab }: { name: string; tab: DataTab }) 
   const notes = useDataNotes(name, project, listed !== undefined);
   const loadProfile = useDataProfileLoader(name, project);
   const actions = usePageActions();
+  const queryRoutines = useQueryRoutines(name, project);
   const navigate = useNavigate();
   const [, setDraft] = useDraft(NEW_DRAFT_KEY);
 
@@ -159,6 +161,7 @@ export function DataSourceScreen({ name, tab }: { name: string; tab: DataTab }) 
         onTab={(next) => navigate(dataPath(name, next))}
         onAsk={() => askInChat(askText(name))}
         onAskQuery={(query: DataSavedQuery) => askInChat(runQueryText(name, query.sql))}
+        routines={queryRoutines}
         onRunQuery={(saved) => actions.dataRunQuery({ source: name, saved, ...inProject })}
         onTryQuery={(sql) => actions.dataRunQuery({ source: name, sql, limit: TRY_ROWS, ...inProject })}
         onSaveQuery={(params) => actions.dataSaveQuery({ ...params, ...inProject })}

@@ -16,7 +16,7 @@ import type { AgentInfo, AgentsListResult as AgentsListed } from "./agents.ts";
 import { MODEL_LIST_ALL_KEY, MODEL_LIST_KEY, SETUP_STATUS_KEY, type HfFilesResult, type HfSearchResult, type ModelListResult, type OllamaLibraryResult } from "./models.ts";
 import { SKILL_LIST_KEY } from "./skills.ts";
 import { MEMORY_LIST_KEY, MEMORY_PAGE, type MemoryExportParams, type MemoryExportResult, type MemoryListRequest, type MemoryListResult, type MemoryPrivacy, type MemoryScope } from "./memory.ts";
-import { ROUTINE_GET_KEY, ROUTINE_LIST_KEY, type RoutineGetResult, type RoutineInfo, type RoutineListResult, type RoutineRunResult } from "./routines.ts";
+import { INBOX_POSTS_KEY, ROUTINE_GET_KEY, ROUTINE_LIST_KEY, type InboxListResult, type RoutineGetResult, type RoutineInfo, type RoutineListResult, type RoutineRunResult } from "./routines.ts";
 import { RUN_LIST_KEY, type RunListResult } from "./runs.ts";
 import { WORKFLOW_LIST_KEY, WORKFLOW_STATUS_KEY, workflowGetKey, type ReviewVerdict, type WorkflowAddStarterResult, type WorkflowCancelResult, type WorkflowCheckResult, type WorkflowProposeResult, type WorkflowCreateResult, type WorkflowDraftResult, type WorkflowSaveResult, type WorkflowGetResult, type WorkflowListResult, type WorkflowStartersResult, type WorkflowReadOutputResult, type WorkflowResumeResult, type WorkflowStatusResult, type WorkflowEditStepResult } from "./workflows.ts";
 import { DATA_DESCRIBE_KEY, DATA_LIST_KEY, DATA_NOTES_KEY, dataAnswer, type DataBrowseKeepResult, type DataBrowseKeepView, type DataBrowseResult, type DataBrowseView, type DataProfileResult, type DataAddParams, type DataAnswer, type DataExportParams, type DataExportResult, type DataExtensionName, type DataResult, type DataResultPageParams, type DataDescribeResult, type DataInspectParams, type DataInspectResult, type DataListResult, type DataNotesGetResult, type DataSource, type DataUpdateParams, type DataRunParams, type DataSaveQueryParams, type DataSavedQuery } from "./data.ts";
@@ -111,6 +111,8 @@ export type PageClient = Pick<
   | "getRoutine"
   | "runRoutine"
   | "removeRoutine"
+  | "listInbox"
+  | "doneInbox"
   | "updateRoutine"
   | "previewRoutine"
   | "onMcpStatus"
@@ -485,6 +487,8 @@ export type PageActions = {
   resumeWorkflow(workflowRunId: string, model?: string): Promise<WorkflowResumeResult>;
   /** Answers the review `key` of a waiting run. `text` is what an edit says. The run continues once none of its reviews waits. */
   answerWorkflowReview(workflowRunId: string, key: string, verdict: ReviewVerdict, text?: string): Promise<void>;
+  /** Marks an Inbox post done, so it leaves the Inbox. */
+  doneInboxPost(postId: string): Promise<void>;
   /** Deletes a user routine from config.toml. */
   removeRoutine(name: string): Promise<void>;
   /** Writes a user routine: merges `fields` into `name` (a null removes a key), or with `create` makes it. Rejects with the daemon's reason. */
@@ -561,6 +565,8 @@ export type PageQueries = {
   deviceList(): Promise<DeviceListResult>;
   /** The routines, with each one's next and last run. */
   routineList(): Promise<RoutineListResult>;
+  /** What query routines left in the Inbox and nobody marked done, newest first. */
+  inboxList(): Promise<InboxListResult>;
   /** The workflows of the user and of `folders`, each with its state. */
   workflowList(folders: readonly string[]): Promise<WorkflowListResult>;
   /** The starter workflows golem ships. */
@@ -720,6 +726,7 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
         client.listMemories({ scope, limit: MEMORY_PAGE, ...(query === "" ? {} : { query }), ...(after === null ? {} : { after }) }),
       deviceList: () => client.deviceList(),
       routineList: () => client.listRoutines(),
+      inboxList: () => client.listInbox(),
       workflowList: (folders) => client.listWorkflows([...folders]),
       workflowStarters: () => client.listWorkflowStarters(),
       workflowGet: (id) => client.getWorkflow(id),
@@ -1165,6 +1172,13 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
       },
       async previewRoutine(schedule) {
         return (await client.previewRoutine(schedule)).next;
+      },
+      async doneInboxPost(postId) {
+        try {
+          await client.doneInbox(postId);
+        } finally {
+          await queryClient.invalidateQueries({ queryKey: INBOX_POSTS_KEY });
+        }
       },
       async removeRoutine(name) {
         try {

@@ -21,7 +21,7 @@ import type { Route } from "./router.ts";
 import type { AuthListResult, FileListResult, CostGetResult, NotificationsValues, RoutingGetResult, McpListResult, SessionSummary, SetupStatusResult, SkillListResult, AgentsListResult } from "@golem/client";
 import { isAgentsMissing } from "./agents.ts";
 import { ARTIFACT_PAGE, artifactKey, traceKey, traceSpanKey, type ArtifactReadResult, type TraceGetResult, type TraceSpanResult } from "./trace.ts";
-import { ROUTINE_LIST_KEY, routineGetKey, type RoutineGetResult, type RoutineListResult } from "./routines.ts";
+import { INBOX_POSTS_KEY, ROUTINE_LIST_KEY, routineGetKey, type InboxListResult, type RoutineGetResult, type RoutineListResult } from "./routines.ts";
 import { WORKFLOW_LIST_KEY, WORKFLOW_STARTERS_KEY, workflowGetKey, workflowStatusKey, type WorkflowGetResult, type WorkflowListResult, type WorkflowStartersResult, type WorkflowStatusResult } from "./workflows.ts";
 import { RpcError } from "@golem/client";
 import { DATA_LIST_KEY, dataDescribeKey, dataNotesKey, type DataAnswer, type DataProfileResult, type DataDescribeResult, type DataListResult, type DataNotesGetResult } from "./data.ts";
@@ -607,6 +607,12 @@ export function usePairing(): { snapshot: PairingSnapshot; begin(): Promise<void
 export function useRoutineList(): UseQueryResult<RoutineListResult> {
   const { queries } = usePage();
   return useQuery({ queryKey: [...ROUTINE_LIST_KEY], queryFn: queries.routineList, retry: false });
+}
+
+/** What query routines left in the Inbox. Marked stale by the pushed `routine.*` notifications, so a firing shows at once. */
+export function useInboxPosts(): UseQueryResult<InboxListResult> {
+  const { queries } = usePage();
+  return useQuery({ queryKey: [...INBOX_POSTS_KEY], queryFn: queries.inboxList, retry: false });
 }
 
 /** One routine with its recent runs. Marked stale by the same notifications, so a firing shows in its History. */

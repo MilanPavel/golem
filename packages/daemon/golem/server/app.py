@@ -62,6 +62,7 @@ from golem.notify import Notifier, NotifierKinds, Poster, SessionFacts, default_
 from golem.pairing import PairingManager
 from golem.paths import GolemPaths, resolve_paths
 from golem.permissions.policy import Policy
+from golem.routine_query import DataQueryRoutines
 from golem.routine_scheduler import RoutineScheduler
 from golem.routine_watcher import FileWatcher
 from golem.secrets import KeychainSecrets, SecretStore
@@ -105,6 +106,7 @@ from golem.store.checkpoints import open_checkpoints
 from golem.store.database import Database, DatabaseTooNewError
 from golem.store.devices import DeviceStore
 from golem.store.events import EventLog
+from golem.store.inbox_posts import InboxPosts
 from golem.store.records import RunRecords, SessionRecords
 from golem.store.routine_runs import RoutineRuns
 from golem.store.suggestions import SuggestionStore
@@ -481,6 +483,8 @@ class DaemonApp:
                     self.paths.home,
                 )
                 self.state.routine_runs = RoutineRuns(database)
+                self.state.inbox_posts = InboxPosts(database)
+                self.state.query_routines = DataQueryRoutines(data)
                 wf_llm = WorkflowLlm(
                     router,
                     dispatch,
@@ -554,6 +558,9 @@ class DaemonApp:
                     broadcast=self._broadcast,
                     now=lambda: self.state.clock(),
                     workflows=self.state.workflows,
+                    queries=self.state.query_routines,
+                    inbox=self.state.inbox_posts,
+                    tell=self.state.notifier.tell,
                 )
                 self.state.workflows.on_ended = routines.on_workflow_ended
                 bus.observe(routines.on_event)
@@ -715,6 +722,8 @@ class DaemonApp:
                 await self.state.workflows.aclose()
             self.state.workflows = None
             self.state.routine_runs = None
+            self.state.inbox_posts = None
+            self.state.query_routines = None
             if self.state.pairing is not None:
                 self.state.pairing.close()
             self.state.pairing = None

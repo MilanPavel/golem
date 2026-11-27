@@ -193,6 +193,8 @@ export function fakeClient() {
     resumeWorkflow: vi.fn<PageClient["resumeWorkflow"]>(async (id) => ({ run: { ...WORKFLOW_RUN, workflow_run_id: id } })),
     answerWorkflowReview: vi.fn<PageClient["answerWorkflowReview"]>(async (id) => ({ run: { ...WORKFLOW_RUN, workflow_run_id: id } })),
     listRoutines: vi.fn<PageClient["listRoutines"]>(async () => ({ routines: [] })),
+    listInbox: vi.fn<PageClient["listInbox"]>(async () => ({ posts: [] })),
+    doneInbox: vi.fn<PageClient["doneInbox"]>(async (post_id) => ({ post_id })),
     listRuns: vi.fn<PageClient["listRuns"]>(async () => ({ runs: [] })),
     getRoutine: vi.fn<PageClient["getRoutine"]>(async (name) => ({ routine: { config: { name, prompt: "" }, path: "/Users/me/.golem/config.toml", source: "user" }, runs: [] })),
     runRoutine: vi.fn<PageClient["runRoutine"]>(async () => ({ routine_run_id: "rr_1", session_id: "s_run" })),

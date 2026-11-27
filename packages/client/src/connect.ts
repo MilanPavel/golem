@@ -112,6 +112,8 @@ import type { RoutineGetResult } from "../../protocol/gen/routine-get-result.ts"
 import type { RoutineListResult } from "../../protocol/gen/routine-list-result.ts";
 import type { RoutinePreviewResult } from "../../protocol/gen/routine-preview-result.ts";
 import type { RoutineRemoveResult } from "../../protocol/gen/routine-remove-result.ts";
+import type { InboxDoneResult } from "../../protocol/gen/inbox-done-result.ts";
+import type { InboxListResult } from "../../protocol/gen/inbox-list-result.ts";
 import type { RoutineRunResult } from "../../protocol/gen/routine-run-result.ts";
 import type { WorkflowCancelResult } from "../../protocol/gen/workflow-cancel-result.ts";
 import type { WorkflowReadOutputResult } from "../../protocol/gen/workflow-read-output-result.ts";
@@ -363,6 +365,8 @@ import {
   isRoutineListResult,
   isRoutinePreviewResult,
   isRoutineRemoveResult,
+  isInboxDoneResult,
+  isInboxListResult,
   isRoutineRunResult,
   isWorkflowCancelResult,
   isWorkflowReadOutputResult,
@@ -921,6 +925,10 @@ export interface GolemClient {
   deleteAgent(name: string, cwd?: string): Promise<AgentsDeleteResult>;
   /** `agent.registry.changed`: agent files changed. `root` is the folder whose project agents changed, or `null` for every folder. */
   onAgentsChanged(listener: (root: string | null) => void): () => void;
+  /** `inbox.list`: what query routines left in the Inbox and nobody marked done, newest first. */
+  listInbox(): Promise<InboxListResult>;
+  /** `inbox.done`: mark one post done, so it leaves the Inbox. */
+  doneInbox(postId: string): Promise<InboxDoneResult>;
   /** `routine.remove`: delete a user routine from `config.toml`. */
   removeRoutine(name: string): Promise<RoutineRemoveResult>;
   /**
@@ -3147,6 +3155,22 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       return () => {
         agentListeners.delete(listener);
       };
+    },
+    async listInbox(): Promise<InboxListResult> {
+      await ready;
+      const result = await call("inbox.list", {});
+      if (!isInboxListResult(result)) {
+        throw new Error("invalid inbox.list result");
+      }
+      return result;
+    },
+    async doneInbox(postId: string): Promise<InboxDoneResult> {
+      await ready;
+      const result = await call("inbox.done", { post_id: postId });
+      if (!isInboxDoneResult(result)) {
+        throw new Error("invalid inbox.done result");
+      }
+      return result;
     },
     async removeRoutine(name: string): Promise<RoutineRemoveResult> {
       await ready;

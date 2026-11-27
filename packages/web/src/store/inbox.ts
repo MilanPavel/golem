@@ -1,9 +1,11 @@
-import { answerTarget, inboxCount, inboxGroups, inboxItems, type ApprovalChoice, type InboxGroup, type InboxItem } from "@golem/view";
+import { answerTarget, askAboutPostText, inboxCount, inboxGroups, inboxItems, type ApprovalChoice, type InboxGroup, type InboxItem } from "@golem/view";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { usePageActions, useNavigate, useSessionList } from "./page-context.tsx";
+import { useDraft, useInboxPosts, usePageActions, useNavigate, useSessionList } from "./page-context.tsx";
+import { NEW_DRAFT_KEY } from "./drafts.ts";
+import type { InboxPost } from "./routines.ts";
 import { sendErrorText } from "./errors.ts";
 import type { PageActions } from "./page.ts";
-import { sessionPath } from "./router.ts";
+import { dataPath, sessionPath } from "./router.ts";
 
 /** The answers the Inbox gives. "Always allow" stays in the session's own approval card. */
 export type InboxChoice = "allow" | "allow_session" | "deny";
@@ -38,15 +40,20 @@ export function answerInboxItem(
   return scope === undefined ? actions.respond(sessionId, callId, choice) : actions.respond(sessionId, callId, choice, undefined, scope);
 }
 
-type Doc = Pick<Document, "getElementById" | "body">;
+type Doc = Pick<Document, "getElementById" | "querySelector" | "body">;
 
 /**
  * Scrolls to the element with `id` once it exists, which is after the session has loaded. Gives up
  * after ten seconds. Returns a function that stops the wait.
  */
 export function scrollToCard(id: string, doc: Doc = document): () => void {
+  return scrollToElement(() => doc.getElementById(id), doc);
+}
+
+/** Scrolls to what `find` finds, now or once it is drawn, giving up after a few seconds. */
+function scrollToElement(find: () => Element | null, doc: Doc): () => void {
   const reveal = (): boolean => {
-    const el = doc.getElementById(id);
+    const el = find();
     if (el === null) return false;
     el.scrollIntoView({ block: "center" });
     return true;
@@ -72,7 +79,28 @@ export function openInboxItem(item: Pick<InboxItem, "sessionId" | "callId">, nav
   return scrollToCard(item.callId === null ? CONSENT_CARD_ID : approvalCardId(item.callId), doc);
 }
 
+/** The selector of a saved query's row on its source's Queries tab, so an Inbox post can scroll to it. A row has no id: the same query can show in more than one place, and a name may hold spaces. */
+export function queryRowSelector(name: string): string {
+  return `[data-query="${name.replaceAll("\\", "\\\\").replaceAll('"', '\\"')}"]`;
+}
+
+/** Goes to the Queries tab of the post's source and scrolls to the query's row. */
+export function openInboxPostQuery(post: Pick<InboxPost, "source" | "saved">, navigate: (path: string) => void, doc: Doc = document): () => void {
+  navigate(dataPath(post.source, "queries"));
+  return scrollToElement(() => doc.querySelector(queryRowSelector(post.saved)), doc);
+}
+
 export type Inbox = {
+  /** What query routines left: their first rows, or the error they hit. Newest first. */
+  posts: InboxPost[];
+  /** Marks a post done, so it leaves the Inbox. */
+  donePost(post: InboxPost): void;
+  /** Opens the post's query on its source's Queries tab. */
+  openPost(post: InboxPost): void;
+  /** Starts a chat with the post in the draft. */
+  askPost(post: InboxPost): void;
+  /** The line a failed Done left on its post, by `post_id`. */
+  postErrors: Readonly<Record<string, string>>;
   items: InboxItem[];
   /** The items by lead, the lead with the oldest item first. */
   groups: InboxGroup[];
@@ -107,6 +135,32 @@ export function useInbox(): Inbox {
   }, []);
   const items = useMemo(() => inboxItems(list, now), [list, now]);
   const groups = useMemo(() => inboxGroups(list, now), [list, now]);
+  const found = useInboxPosts();
+  const posts = useMemo(() => found.data?.posts ?? [], [found.data]);
+  const [, setDraft] = useDraft(NEW_DRAFT_KEY);
+  const [postErrors, setPostErrors] = useState<Readonly<Record<string, string>>>({});
+  const donePost = useCallback(
+    (post: InboxPost) => {
+      setPostErrors((current) => Object.fromEntries(Object.entries(current).filter(([each]) => each !== post.post_id)));
+      actions.doneInboxPost(post.post_id).catch((err: unknown) => {
+        setPostErrors((current) => ({ ...current, [post.post_id]: sendErrorText(err) }));
+      });
+    },
+    [actions],
+  );
+  const openPost = useCallback(
+    (post: InboxPost) => {
+      openInboxPostQuery(post, navigate);
+    },
+    [navigate],
+  );
+  const askPost = useCallback(
+    (post: InboxPost) => {
+      setDraft(askAboutPostText(post));
+      navigate("/");
+    },
+    [navigate, setDraft],
+  );
   const [sent, setSent] = useState<ReadonlySet<string>>(new Set());
   const [failed, setFailed] = useState<Readonly<Record<string, string>>>({});
 
@@ -145,6 +199,6 @@ export function useInbox(): Inbox {
     },
     [navigate],
   );
-  const count = useMemo(() => inboxCount(items), [items]);
-  return { items, groups, count, busy, errors, answer, open };
+  const count = useMemo(() => inboxCount(items) + posts.length, [items, posts]);
+  return { posts, donePost, openPost, askPost, postErrors, items, groups, count, busy, errors, answer, open };
 }

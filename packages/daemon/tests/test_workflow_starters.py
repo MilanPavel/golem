@@ -147,7 +147,10 @@ def test_each_starter_loads_and_checks_clean(one: Starter) -> None:
 
 
 def test_the_briefing_comes_with_a_weekday_routine() -> None:
-    [one] = STARTERS
+    one = starters.get("morning_briefing")
+    assert one is not None
+    report = starters.get("data_report")
+    assert report is not None and report.routine is None
     assert one.routine == starters.StarterRoutine(
         "morning-briefing", "weekdays 07:30", "every weekday at 07:30"
     )
@@ -527,3 +530,48 @@ async def test_the_service_adds_a_starter_and_lists_it(
     assert user.project is None and user.state == "ok"
     with pytest.raises(StarterError, match="exists already"):
         await service.add_starter(project_starter, project)
+
+
+# data_report
+
+report = _load("data_report")
+SOURCES = "bank  files · 1 table · 7 412 rows · rows local\ndemo  files · 1 table · rows open"
+
+
+def test_the_report_reads_the_names_and_the_privacy_of_the_source() -> None:
+    assert report.names_of("A\n\n B \nA") == ["A", "B"]
+    assert report.keeps_rows_local(SOURCES, "bank") is True
+    assert report.keeps_rows_local(SOURCES, "demo") is False
+    assert report.keeps_rows_local(SOURCES, "missing") is True
+
+
+async def test_the_report_runs_each_query_with_no_model_and_one_model_step_writes_it(
+    store: WorkflowRuns, fakes: Fakes
+) -> None:
+    fakes.tool_out["data_sources"] = SOURCES
+    fakes.tool_out["data_query"] = "2 rows from demo"
+    fakes.llm_out = "Spending fell. Subscriptions are steady."
+    inputs = {"source": "demo", "queries": "Spending by month\nSubscriptions"}
+    rid = await run_starter(store, fakes, "data_report", inputs)
+    queries = [args for name, args in fakes.tool_calls if name == "data_query"]
+    assert queries == [
+        {"source": "demo", "saved": "Spending by month"},
+        {"source": "demo", "saved": "Subscriptions"},
+    ]
+    [(prompt, _wish)] = fakes.prompts
+    assert "Spending by month" in prompt and "2 rows from demo" in prompt
+    assert fakes.sent == [("Data report: demo", "Spending fell. Subscriptions are steady.", rid)]
+
+
+async def test_a_rows_local_source_sends_no_rows_to_a_model_and_says_so(
+    store: WorkflowRuns, fakes: Fakes
+) -> None:
+    fakes.tool_out["data_sources"] = SOURCES
+    fakes.tool_out["data_query"] = "3 rows from bank"
+    inputs = {"source": "bank", "queries": "Big payments"}
+    rid = await run_starter(store, fakes, "data_report", inputs)
+    assert fakes.prompts == []
+    [(title, text, sent_rid)] = fakes.sent
+    assert (title, sent_rid) == ("Data report: bank", rid)
+    assert "stay on this computer, so no model wrote this report" in text
+    assert "3 rows from bank" in text

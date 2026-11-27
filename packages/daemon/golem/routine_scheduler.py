@@ -29,9 +29,11 @@ from pydantic import BaseModel
 
 from golem.config import RoutineSettings
 from golem.routine_files import project_config, read_project_routines, read_routines
+from golem.routine_query import QueryRoutines
 from golem.routine_watcher import fill_prompt
 from golem.routines import ScheduleError, local_zone, next_after
 from golem.sessions.summaries import cut_summary
+from golem.store.inbox_posts import InboxPosts
 from golem.store.routine_runs import RoutineRunRecord, RoutineRuns, WatchedFile
 from golem_protocol.commands import RoutineFinished, RoutineFired
 from golem_protocol.events import ChatEvent, SessionCompletedEvent
@@ -185,8 +187,14 @@ class RoutineScheduler:
         sleep: Callable[[float], Awaitable[object]] = asyncio.sleep,
         zone: tzinfo | None = None,
         workflows: WorkflowStarter | None = None,
+        queries: QueryRoutines | None = None,
+        inbox: InboxPosts | None = None,
+        tell: Callable[[str, str, str | None, str | None], Awaitable[None]] | None = None,
     ) -> None:
         self._workflows = workflows
+        self._queries = queries
+        self._inbox = inbox
+        self._tell = tell
         self._runs = runs
         self._launcher = launcher
         self._user_file = user_file
@@ -314,7 +322,7 @@ class RoutineScheduler:
                 self._user_file
             ):
                 return False
-            if routine.settings.workflow is not None:
+            if routine.settings.workflow is not None or routine.settings.query is not None:
                 await self._fire(routine, "watch", None, watched=file, path=path)
                 return True
             update = {"prompt": fill_prompt(routine.settings.text, path)}
@@ -464,6 +472,8 @@ class RoutineScheduler:
         try:
             if routine.settings.workflow is not None:
                 session_id = await self._start_workflow(run_id, routine, trigger, path)
+            elif routine.settings.query is not None:
+                session_id = None
             else:
                 session_id = await self._launcher.create(routine)
             if session_id is not None:
@@ -491,6 +501,11 @@ class RoutineScheduler:
                 )
             )
         )
+        if routine.settings.query is not None:
+            task = asyncio.create_task(self._run_query(run_id, routine), name="golem-routine-query")
+            self._tasks.add(task)
+            task.add_done_callback(self._tasks.discard)
+            return run_id, None
         if routine.settings.workflow is not None or session_id is None:
             return run_id, session_id
         try:
@@ -501,6 +516,65 @@ class RoutineScheduler:
         except Exception as exc:
             await self._failed(run_id, routine, exc)
         return run_id, session_id
+
+    async def _run_query(self, run_id: str, routine: Planned) -> None:
+        """Run the routine's saved query with no session and no model, then post and end the run."""
+        query = routine.settings.query
+        assert query is not None
+        row = await self._runs.get(run_id)
+        if row is None:
+            return
+        try:
+            if self._queries is None:
+                raise RuntimeError("this daemon cannot run saved queries")
+            answer = await self._queries.run(query.source, query.saved, routine.folder)
+        except Exception as exc:
+            log.warning(
+                "routine %s: its query failed: %s",
+                routine.name,
+                exc,
+                extra={"routine": routine.name},
+            )
+            error = " ".join(str(exc).split())[:300] or type(exc).__name__
+            await self._post(routine, run_id, 0, [], [], error)
+            await self._end(row, "failed", None, error)
+            return
+        posted = routine.settings.posts == "always" or answer.row_count > 0
+        if posted:
+            await self._post(routine, run_id, answer.row_count, answer.columns, answer.rows, None)
+        said = "posted" if posted else "nothing posted"
+        await self._end(row, "succeeded", f"{_rows_word(answer.row_count)}, {said}", None)
+
+    async def _post(
+        self,
+        routine: Planned,
+        run_id: str,
+        row_count: int,
+        columns: list[str],
+        rows: list[list[Any]],
+        error: str | None,
+    ) -> None:
+        """Leave the result in the Inbox, and tell the phone the name and the count only."""
+        query = routine.settings.query
+        assert query is not None
+        try:
+            if self._inbox is not None:
+                await self._inbox.add(
+                    routine=routine.name,
+                    scope=routine.scope,
+                    source=query.source,
+                    saved=query.saved,
+                    row_count=row_count,
+                    columns=columns,
+                    rows=rows,
+                    error=error,
+                    at=_stamp(self._now()) or "",
+                )
+            if self._tell is not None:
+                body = "could not run" if error is not None else _rows_word(row_count)
+                await self._tell(routine.name, body, None, run_id)
+        except Exception:
+            log.exception("could not post the result of routine %s", routine.name)
 
     async def _start_workflow(
         self, run_id: str, routine: Planned, trigger: Trigger, path: Path | None
@@ -588,6 +662,10 @@ class RoutineScheduler:
                 )
             )
         )
+
+
+def _rows_word(count: int) -> str:
+    return "1 row" if count == 1 else f"{count} rows"
 
 
 def _stamp(moment: datetime | None) -> str | None:

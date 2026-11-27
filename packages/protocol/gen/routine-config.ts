@@ -10,16 +10,22 @@ export type NotifyFailed = boolean | null;
 export type NotifyFinished = boolean | null;
 export type Glob = string;
 export type Watch = string;
+export type Post = ('always' | 'rows') | null;
 export type Prompt = string | null;
+export type Saved = string;
+export type Source = string;
 export type Schedule = string | null;
 export type Workflow = string | null;
 
 /**
  * One ``[[routine]]`` as written. The daemon checks it when it loads.
  *
- * Exactly one of ``schedule`` and ``on`` is set, and exactly one of ``prompt`` and
- * ``workflow``. ``workflow`` names a workflow to start, with ``inputs`` (a watch routine
- * also passes ``path``); it takes no ``folder``, ``model`` or ``mcp``. ``schedule`` is cron, or
+ * Exactly one of ``schedule`` and ``on`` is set, and exactly one of ``prompt``,
+ * ``workflow`` and ``query``. ``query`` runs a saved query of a data source with no model and
+ * no session; ``post`` says when its result goes to the Inbox: ``always`` (the default) or
+ * ``rows`` (only when the query finds rows), and it is only for a query. ``workflow`` names
+ * a workflow to start, with ``inputs`` (a watch routine also passes ``path``); it takes no
+ * ``folder``, ``model`` or ``mcp``. ``schedule`` is cron, or
  * ``every 15m``, ``every 1h``, ``daily 08:30``, ``weekdays 08:30``, ``weekly mon 06:00``.
  * ``missed`` is what happens to a firing that came due while golem could not
  * run it: ``skip`` drops it, ``run_once`` fires it once, late.
@@ -37,7 +43,9 @@ export interface RoutineConfig {
   notify_failed?: NotifyFailed;
   notify_finished?: NotifyFinished;
   on?: RoutineWatchConfig | null;
+  post?: Post;
   prompt?: Prompt;
+  query?: RoutineQueryConfig | null;
   schedule?: Schedule;
   workflow?: Workflow;
 }
@@ -53,4 +61,14 @@ export interface Inputs {
 export interface RoutineWatchConfig {
   glob?: Glob;
   watch: Watch;
+}
+/**
+ * ``query = { source, saved }``: the saved query of a data source that a routine runs.
+ *
+ * This interface was referenced by `RoutineConfig`'s JSON-Schema
+ * via the `definition` "RoutineQueryConfig".
+ */
+export interface RoutineQueryConfig {
+  saved: Saved;
+  source: Source;
 }

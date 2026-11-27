@@ -10,6 +10,10 @@ export type RoutineConfigLike = {
   /** The text or `/skill` of a prompt routine. A workflow routine has `workflow` instead. */
   prompt?: string | null;
   workflow?: string | null;
+  /** A query routine runs this saved query of a data source with no model. */
+  query?: { source: string; saved: string } | null;
+  /** What a query routine posts: every time (`always`, the default) or only when the query finds rows. */
+  post?: "always" | "rows" | null;
   inputs?: Readonly<Record<string, string | number | boolean>>;
   schedule?: string | null;
   on?: { watch: string; glob?: string } | null;
@@ -113,6 +117,17 @@ export function triggerWords(config: Pick<RoutineConfigLike, "schedule" | "on">)
     return glob === "*" ? `New files in ${config.on.watch}` : `New ${glob} in ${config.on.watch}`;
   }
   return config.schedule ? scheduleWords(config.schedule) : "No schedule";
+}
+
+/** What a routine runs, in words, for a query routine: "query · bank › Big payments this week". Null for the other kinds. */
+export function queryKindWords(config: Pick<RoutineConfigLike, "query">): string | null {
+  return config.query ? `query · ${config.query.source} › ${config.query.saved}` : null;
+}
+
+/** What a query routine posts, in words. Null for a routine that runs no query. */
+export function postWords(config: Pick<RoutineConfigLike, "query" | "post">): string | null {
+  if (!config.query) return null;
+  return config.post === "rows" ? "posts only when it finds rows" : "posts every time";
 }
 
 /** The name of a file, from its path. */
@@ -235,7 +250,8 @@ export function routineRowLine(routine: RoutineLike, now: number): string {
     const next = nextRunText(routine.next_at, now);
     tail = next !== "" ? next : routine.last ? lastResultText(routine.last) : "watching";
   }
-  return `${trigger} · ${tail}`;
+  const kind = queryKindWords(routine.config);
+  return kind === null ? `${trigger} · ${tail}` : `${trigger} · ${kind} · ${tail}`;
 }
 
 const MONTH_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"] as const;
@@ -268,6 +284,11 @@ export function routineToml(config: RoutineConfigLike): string {
   if (config.enabled === false) lines.push("enabled = false");
   if (config.notify_finished !== null && config.notify_finished !== undefined) lines.push(`notify_finished = ${config.notify_finished}`);
   if (config.notify_failed !== null && config.notify_failed !== undefined) lines.push(`notify_failed = ${config.notify_failed}`);
+  if (config.query) {
+    lines.push(`query = { source = ${quote(config.query.source)}, saved = ${quote(config.query.saved)} }`);
+    if (config.post) lines.push(`post = ${quote(config.post)}`);
+    return lines.join("\n");
+  }
   if (config.workflow) {
     lines.push(`workflow = ${quote(config.workflow)}`);
     const inputs = Object.entries(config.inputs ?? {});

@@ -2,7 +2,7 @@
   "$defs": {
     "RoutineConfig": {
       "additionalProperties": false,
-      "description": "One ``[[routine]]`` as written. The daemon checks it when it loads.\n\nExactly one of ``schedule`` and ``on`` is set, and exactly one of ``prompt`` and\n``workflow``. ``workflow`` names a workflow to start, with ``inputs`` (a watch routine\nalso passes ``path``); it takes no ``folder``, ``model`` or ``mcp``. ``schedule`` is cron, or\n``every 15m``, ``every 1h``, ``daily 08:30``, ``weekdays 08:30``, ``weekly mon 06:00``.\n``missed`` is what happens to a firing that came due while golem could not\nrun it: ``skip`` drops it, ``run_once`` fires it once, late.\n``notify_finished`` and ``notify_failed`` override the notification settings\nfor this routine, and null keeps them.",
+      "description": "One ``[[routine]]`` as written. The daemon checks it when it loads.\n\nExactly one of ``schedule`` and ``on`` is set, and exactly one of ``prompt``,\n``workflow`` and ``query``. ``query`` runs a saved query of a data source with no model and\nno session; ``post`` says when its result goes to the Inbox: ``always`` (the default) or\n``rows`` (only when the query finds rows), and it is only for a query. ``workflow`` names\na workflow to start, with ``inputs`` (a watch routine also passes ``path``); it takes no\n``folder``, ``model`` or ``mcp``. ``schedule`` is cron, or\n``every 15m``, ``every 1h``, ``daily 08:30``, ``weekdays 08:30``, ``weekly mon 06:00``.\n``missed`` is what happens to a firing that came due while golem could not\nrun it: ``skip`` drops it, ``run_once`` fires it once, late.\n``notify_finished`` and ``notify_failed`` override the notification settings\nfor this routine, and null keeps them.",
       "properties": {
         "enabled": {
           "default": true,
@@ -109,6 +109,22 @@
           ],
           "default": null
         },
+        "post": {
+          "anyOf": [
+            {
+              "enum": [
+                "always",
+                "rows"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Post"
+        },
         "prompt": {
           "anyOf": [
             {
@@ -121,6 +137,17 @@
           ],
           "default": null,
           "title": "Prompt"
+        },
+        "query": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RoutineQueryConfig"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         },
         "schedule": {
           "anyOf": [
@@ -152,6 +179,28 @@
         "name"
       ],
       "title": "RoutineConfig",
+      "type": "object"
+    },
+    "RoutineQueryConfig": {
+      "additionalProperties": false,
+      "description": "``query = { source, saved }``: the saved query of a data source that a routine runs.",
+      "properties": {
+        "saved": {
+          "minLength": 1,
+          "title": "Saved",
+          "type": "string"
+        },
+        "source": {
+          "minLength": 1,
+          "title": "Source",
+          "type": "string"
+        }
+      },
+      "required": [
+        "source",
+        "saved"
+      ],
+      "title": "RoutineQueryConfig",
       "type": "object"
     },
     "RoutineRunSummary": {

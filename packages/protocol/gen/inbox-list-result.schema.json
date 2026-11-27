@@ -1,0 +1,99 @@
+{
+  "$defs": {
+    "InboxPost": {
+      "additionalProperties": false,
+      "description": "One thing a query routine left in the Inbox: its first rows, or the error it hit.\n\n``rows`` holds at most ten rows, each a list of cells in the order of ``columns``; ``row_count``\nis how many rows the query returned. ``error`` is set (and ``rows`` empty) for a failed run.\n``source`` and ``saved`` say which saved query it was, so the post can open it. ``scope`` is\n``user`` or a project folder. ``at`` is an ISO 8601 time.",
+      "properties": {
+        "at": {
+          "minLength": 1,
+          "title": "At",
+          "type": "string"
+        },
+        "columns": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Columns",
+          "type": "array"
+        },
+        "error": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Error"
+        },
+        "post_id": {
+          "minLength": 1,
+          "title": "Post Id",
+          "type": "string"
+        },
+        "routine": {
+          "minLength": 1,
+          "title": "Routine",
+          "type": "string"
+        },
+        "row_count": {
+          "minimum": 0,
+          "title": "Row Count",
+          "type": "integer"
+        },
+        "rows": {
+          "items": {
+            "items": {},
+            "type": "array"
+          },
+          "title": "Rows",
+          "type": "array"
+        },
+        "saved": {
+          "minLength": 1,
+          "title": "Saved",
+          "type": "string"
+        },
+        "scope": {
+          "minLength": 1,
+          "title": "Scope",
+          "type": "string"
+        },
+        "source": {
+          "minLength": 1,
+          "title": "Source",
+          "type": "string"
+        }
+      },
+      "required": [
+        "post_id",
+        "routine",
+        "scope",
+        "source",
+        "saved",
+        "row_count",
+        "at"
+      ],
+      "title": "InboxPost",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "The open posts, newest first.",
+  "properties": {
+    "posts": {
+      "items": {
+        "$ref": "#/$defs/InboxPost"
+      },
+      "title": "Posts",
+      "type": "array"
+    }
+  },
+  "required": [
+    "posts"
+  ],
+  "title": "InboxListResult",
+  "type": "object"
+}

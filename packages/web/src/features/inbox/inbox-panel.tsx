@@ -2,6 +2,8 @@ import { helperCardOf, helperEstimateLine, inboxAnswerOptions, inboxHelperAskWor
 import { Button } from "../../ui/button.tsx";
 import { inboxKey, type InboxChoice } from "../../store/inbox.ts";
 import { Headline } from "./headline.tsx";
+import { InboxPostCard } from "./post-card.tsx";
+import type { InboxPost } from "../../store/routines.ts";
 
 type OnAnswer = (item: InboxItem, choice: ApprovalChoice, scope?: "batch", cheaper?: boolean) => void;
 
@@ -130,9 +132,21 @@ export function InboxPanel({
   busy = {},
   errors = {},
   label = "Inbox",
+  posts = [],
+  postErrors = {},
   onAnswer,
   onOpen,
+  onOpenPostQuery = () => undefined,
+  onAskPost = () => undefined,
+  onDonePost = () => undefined,
 }: {
+  /** What query routines left: shown first, newest first, each with Open the query, Ask in chat and Done. */
+  posts?: readonly InboxPost[];
+  /** The line a failed Done left on a post, by `post_id`. */
+  postErrors?: Readonly<Record<string, string>>;
+  onOpenPostQuery?: (post: InboxPost) => void;
+  onAskPost?: (post: InboxPost) => void;
+  onDonePost?: (post: InboxPost) => void;
   items: readonly InboxItem[];
   groups?: readonly InboxGroup[];
   busy?: Readonly<Record<string, boolean>>;
@@ -141,7 +155,7 @@ export function InboxPanel({
   onAnswer: OnAnswer;
   onOpen: (item: InboxItem) => void;
 }) {
-  if (items.length === 0 && (groups === undefined || groups.length === 0)) {
+  if (posts.length === 0 && items.length === 0 && (groups === undefined || groups.length === 0)) {
     return <p className="px-3 py-6 text-center text-sm text-muted">Nothing is waiting for you.</p>;
   }
   const card = (item: InboxItem) => {
@@ -150,6 +164,9 @@ export function InboxPanel({
   };
   return (
     <ul aria-label={label} className="m-0 flex list-none flex-col gap-2 p-0">
+      {posts.map((post) => (
+        <InboxPostCard key={post.post_id} post={post} error={postErrors[post.post_id]} onOpenQuery={onOpenPostQuery} onAsk={onAskPost} onDone={onDonePost} />
+      ))}
       {groups === undefined
         ? items.map(card)
         : groups.map((group) =>

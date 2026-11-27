@@ -465,4 +465,23 @@ MIGRATIONS: tuple[tuple[str, ...], ...] = (
         # One run's choice of model (``workflow.start {model}``); it beats the file's.
         "ALTER TABLE workflow_runs ADD COLUMN model TEXT",
     ),
+    (
+        # What a query routine leaves in the Inbox: its first rows, or its error, until done.
+        """
+        CREATE TABLE inbox_posts (
+            post_id TEXT PRIMARY KEY,
+            routine TEXT NOT NULL,
+            scope TEXT NOT NULL,
+            source TEXT NOT NULL,
+            saved TEXT NOT NULL,
+            row_count INTEGER NOT NULL,
+            columns_json TEXT NOT NULL,
+            rows_json TEXT NOT NULL,
+            error TEXT,
+            at TEXT NOT NULL,
+            done_at TEXT
+        )
+        """,
+        "CREATE INDEX inbox_posts_open ON inbox_posts (at) WHERE done_at IS NULL",
+    ),
 )
