@@ -420,4 +420,9 @@ MIGRATIONS: tuple[tuple[str, ...], ...] = (
         "ALTER TABLE routine_runs ADD COLUMN workflow_run_id TEXT",
         "CREATE INDEX routine_runs_workflow ON routine_runs (workflow_run_id)",
     ),
+    (
+        # A step may carry the part that changes in a loop, and the title of its parallel group.
+        "ALTER TABLE workflow_steps ADD COLUMN item TEXT",
+        "ALTER TABLE workflow_steps ADD COLUMN group_title TEXT",
+    ),
 )

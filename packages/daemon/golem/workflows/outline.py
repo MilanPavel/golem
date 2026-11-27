@@ -15,6 +15,12 @@ Rules, in short:
 * A statement that calls an arbitrary helper, or a ``with``/``try``/``while``/
   ``match`` with no run call inside, is a ``code`` step. Consecutive ones merge.
   Plain assignments of simple expressions are not steps.
+* A step's title is its ``title=``; for ``run.step`` its name; for ``run.notify`` its
+  ``title=``; else words from what the call says (the key, the agent type, the skill or
+  tool name), never a prompt, a brief or a notification text. ``item`` is the source of the
+  ``item=`` expression, ``group_title`` the ``title=`` of the ``run.parallel`` around the
+  call, and ``does`` the first sentence of the docstring of the function a ``run.step`` calls,
+  when the file defines it.
 * ``getattr(run, x)(...)`` and unknown ``run.foo(...)`` are ``code`` steps titled
   by their source text.
 * ``after`` lists the steps whose results this step reads, by following names.
@@ -39,16 +45,16 @@ _PURE_BUILTINS = frozenset(
 _TITLE_MAX = 80
 PARAMS: dict[str, tuple[str, ...]] = {
     "step": ("name", "fn"),
-    "agent": ("type", "brief", "model", "key", "gets", "budget", "worktree"),
-    "review": ("draft", "ask", "key"),
+    "agent": ("type", "brief", "model", "key", "gets", "budget", "worktree", "title"),
+    "review": ("draft", "ask", "key", "title"),
     "notify": ("text", "title", "key"),
-    "llm": ("prompt", "schema", "model", "key"),
+    "llm": ("prompt", "schema", "model", "key", "title"),
     "tool": ("name",),
-    "skill": ("name", "args", "key"),
+    "skill": ("name", "args", "key", "title"),
 }
 """The positional parameter names of each ``run.*`` method, for naming a positional argument."""
 KEYWORD_ONLY: dict[str, tuple[str, ...]] = {
-    "step": ("key", "retries", "backoff"),
+    "step": ("key", "retries", "backoff", "item"),
     "tool": ("key",),
 }
 """The keyword-only parameters that ``PARAMS`` does not list."""
@@ -121,6 +127,9 @@ class OutlineStep:
     budget_line: int | None = None
     after: tuple[str, ...] = ()
     args: tuple[OutlineArg, ...] = ()
+    item: str | None = None
+    group_title: str | None = None
+    does: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -139,6 +148,9 @@ class OutlineStep:
             "budget_line": self.budget_line,
             "after": list(self.after),
             "args": [a.to_dict() for a in self.args],
+            "item": self.item,
+            "group_title": self.group_title,
+            "does": self.does,
         }
 
 
@@ -186,11 +198,12 @@ def builders(source: str) -> list[Builder]:
         raise OutlineError(e.msg, e.lineno) from e
     except ValueError as e:  # null bytes
         raise OutlineError(str(e)) from e
-    return [
-        Builder(node, source)
+    defined = {
+        node.name: node
         for node in tree.body
-        if isinstance(node, ast.AsyncFunctionDef | ast.FunctionDef) and _workflow_deco(node)
-    ]
+        if isinstance(node, ast.AsyncFunctionDef | ast.FunctionDef)
+    }
+    return [Builder(node, source, defined) for node in defined.values() if _workflow_deco(node)]
 
 
 def literal_text(node: ast.expr) -> str | None:
@@ -258,6 +271,17 @@ def _first_line(text: str) -> str:
     return line if len(line) <= _TITLE_MAX else line[: _TITLE_MAX - 1].rstrip() + "…"
 
 
+def _first_sentence(doc: str) -> str:
+    """The first sentence of a docstring, on one line."""
+    text = " ".join(doc.split())
+    end = re.search(r"[.!?](\s|$)", text)
+    return text[: end.start() + 1] if end else text
+
+
+def _capital(text: str) -> str:
+    return text[:1].upper() + text[1:]
+
+
 def _slug(text: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")[:40]
 
@@ -268,6 +292,7 @@ def _slug(text: str) -> str:
 @dataclass(frozen=True)
 class _Ctx:
     group: str | None = None
+    group_title: str | None = None
     for_each: tuple[str, ...] = ()
     conditions: tuple[str, ...] = ()
     deps: frozenset[str] = frozenset()
@@ -276,8 +301,14 @@ class _Ctx:
 
 
 class Builder:
-    def __init__(self, fn: ast.AsyncFunctionDef | ast.FunctionDef, source: str) -> None:
+    def __init__(
+        self,
+        fn: ast.AsyncFunctionDef | ast.FunctionDef,
+        source: str,
+        defined: dict[str, ast.AsyncFunctionDef | ast.FunctionDef] | None = None,
+    ) -> None:
         self.fn = fn
+        self.defined = defined or {}
         self.source = source
         self.src = source.splitlines()
         params = [a.arg for a in [*fn.args.posonlyargs, *fn.args.args]]
@@ -512,7 +543,14 @@ class Builder:
             method = self.run_method(node)
             if method == "parallel" or (method is None and self.is_gather(node)):
                 self.groups += 1
-                return self.visit_children(node, replace(ctx, group=f"parallel-{self.groups}"))
+                named = {k.arg: k.value for k in node.keywords if k.arg}.get("title")
+                if named is None and len(node.args) > 1:
+                    named = node.args[1]
+                words = literal_text(named) if named is not None else None
+                grouped = replace(
+                    ctx, group=f"parallel-{self.groups}", group_title=(words or "").strip() or None
+                )
+                return self.visit_children(node, grouped)
             if method is not None:
                 return self.visit_step(node, method, ctx)
         if isinstance(node, ast.ListComp | ast.SetComp | ast.GeneratorExp | ast.DictComp):
@@ -569,24 +607,37 @@ class Builder:
         brief = kw.get("brief")
         agent: str | None = None
         slug: str | None = None
+        # A tool's keyword arguments are the tool's own, so ``title=`` is never its title.
+        given = None if kind in ("tool", "step") else self.given_title(call, kind, kw)
+        item: str | None = None
+        does: str | None = None
         if kind == "agent":
             agent = (_text(first) if first is not None else "") or None
-            brief_text = _first_line(_text(brief)) if brief is not None else ""
-            title = f"{agent or 'agent'}: {brief_text}" if brief_text else (agent or "agent")
+            title = given or f"{_capital(agent or 'agent')} agent"
+            worktree = kw.get("worktree")
+            if worktree is not None:
+                title = f"{title} \u00b7 {_text(worktree)}"
             slug = _slug(agent) if agent else None
         elif kind == "review":
             ask = kw.get("ask")
-            title = _first_line(_text(ask)) if ask is not None else "Ask you"
-        else:
-            fallback = {
-                "step": "step",
-                "notify": "Tell you",
-                "llm": "Ask a model",
-                "tool": "tool",
-                "skill": "skill",
-            }
-            title = _first_line(_text(first)) if first is not None else fallback[kind]
-            if kind != "notify" and isinstance(first, ast.Constant):
+            title = given or (_first_line(_text(ask)) if ask is not None else "Ask you")
+        elif kind == "notify":
+            title = given or "Notification"
+        elif kind == "llm":
+            key_text = _text(key_node) if key_node is not None else ""
+            title = given or (_capital(key_text) if key_text else "Ask the model")
+            if isinstance(first, ast.Constant):
+                slug = _slug(_first_line(_text(first)))
+        elif kind == "step":
+            title = _first_line(_text(first)) if first is not None else "step"
+            if isinstance(first, ast.Constant):
+                slug = _slug(title)
+            item_node = kw.get("item")
+            item = self.seg(item_node) if item_node is not None else None
+            does = self.does_of(call)
+        else:  # tool and skill: the name
+            title = given or (_first_line(_text(first)) if first is not None else kind)
+            if isinstance(first, ast.Constant):
                 slug = _slug(title)
         budget_node = kw.get("budget")
         budget = (
@@ -610,9 +661,31 @@ class Builder:
             extra_deps=deps,
             node=call,
             args=self.args_of(call, kind),
+            item=item,
+            does=does,
         )
         self.nodes[sid] = call
         return [sid]
+
+    def given_title(self, call: ast.Call, kind: str, kw: dict[str, ast.expr]) -> str | None:
+        """The text of the ``title=`` argument (also when it is passed by position), or None."""
+        node = kw.get("title")
+        names = PARAMS.get(kind, ())
+        if node is None and "title" in names and names.index("title") < len(call.args):
+            node = call.args[names.index("title")]
+        text = _text(node).strip() if node is not None else ""
+        return _first_line(text) if text else None
+
+    def does_of(self, call: ast.Call) -> str | None:
+        """The first sentence of the docstring of the function a ``run.step`` calls."""
+        fn = (
+            call.args[1]
+            if len(call.args) > 1
+            else next((k.value for k in call.keywords if k.arg == "fn"), None)
+        )
+        found = self.defined.get(fn.id) if isinstance(fn, ast.Name) else None
+        doc = ast.get_docstring(found) if found is not None else None
+        return _first_sentence(doc) if doc else None
 
     @staticmethod
     def span(call: ast.Call, ctx: _Ctx) -> tuple[int, int]:
@@ -638,6 +711,8 @@ class Builder:
         extra_deps: frozenset[str] = frozenset(),
         node: ast.AST | None = None,
         args: tuple[OutlineArg, ...] = (),
+        item: str | None = None,
+        does: str | None = None,
     ) -> str:
         sid = self.make_id(kind, key_literal, slug)
         reads: frozenset[str] = ctx.deps | extra_deps
@@ -661,6 +736,9 @@ class Builder:
                 budget_line=budget_line,
                 after=after,
                 args=args,
+                item=item,
+                group_title=ctx.group_title,
+                does=does,
             )
         )
         return sid

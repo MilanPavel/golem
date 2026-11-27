@@ -63,6 +63,18 @@
           "title": "State",
           "type": "string"
         },
+        "title": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Title"
+        },
         "trigger": {
           "anyOf": [
             {

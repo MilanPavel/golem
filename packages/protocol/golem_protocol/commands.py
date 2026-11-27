@@ -6099,6 +6099,8 @@ class WorkflowEntryInfo(BaseModel):
     trigger: WorkflowTriggerInfo | None = None
     inputs: list[WorkflowInputInfo] = Field(default_factory=list[WorkflowInputInfo])
     description: str = ""
+    title: str | None = None
+    """The name from ``@workflow(title=)``; null when the file gives none."""
 
 
 class WorkflowStepArg(BaseModel):
@@ -6149,6 +6151,13 @@ class WorkflowOutlineStep(BaseModel):
     after: list[str] = Field(default_factory=list[str])
     args: list[WorkflowStepArg] = Field(default_factory=list[WorkflowStepArg])
     """The arguments of the step's ``run.*`` call, in source order. A code step has none."""
+    item: str | None = None
+    """The source text of the ``item=`` expression of a ``run.step``."""
+    group_title: str | None = None
+    """The ``title=`` of the ``run.parallel`` the step is in, when it is a string literal."""
+    does: str | None = None
+    """The first sentence of the docstring of the function a ``run.step`` calls, when that
+    function is in the same file."""
 
 
 class WorkflowListParams(BaseModel):
@@ -6416,6 +6425,10 @@ class WorkflowStepInfo(BaseModel):
     title: str
     status: WorkflowStepStatus
     group: str | None = None
+    group_title: str | None = None
+    """The title of the ``run.parallel`` group, when the workflow gave one."""
+    item: str | None = None
+    """The part that changes in a loop (``item=`` of a ``run.step``)."""
     attempts: int = Field(default=0, ge=0)
     error: str | None = None
     child_session_id: str | None = Field(default=None, min_length=1)
@@ -6563,6 +6576,10 @@ class WorkflowStepEvent(BaseModel):
     title: str
     status: WorkflowStepStatus
     group: str | None = None
+    group_title: str | None = None
+    """The title of the ``run.parallel`` group, when the workflow gave one."""
+    item: str | None = None
+    """The part that changes in a loop (``item=`` of a ``run.step``)."""
     attempts: int = Field(default=0, ge=0)
     error: str | None = None
     child_session_id: str | None = Field(default=None, min_length=1)

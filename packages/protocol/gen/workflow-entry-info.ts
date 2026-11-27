@@ -11,6 +11,7 @@ export type Name1 = string;
 export type Path = string;
 export type Project = string | null;
 export type State = 'ok' | 'broken' | 'untrusted';
+export type Title = string | null;
 export type Expr = string | null;
 export type Kind = 'manual' | 'schedule' | 'on_file';
 export type Path1 = string | null;
@@ -31,6 +32,7 @@ export interface WorkflowEntryInfo {
   path: Path;
   project?: Project;
   state: State;
+  title?: Title;
   trigger?: WorkflowTriggerInfo | null;
 }
 /**

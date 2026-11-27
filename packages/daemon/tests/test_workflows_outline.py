@@ -111,7 +111,7 @@ def test_upgrade_dependencies() -> None:
     assert listing.lines == (6, 6)
     assert listing.after == ()
 
-    assert worker.title == "worker: Upgrade {p.name} to {p.latest}. Fix what breaks. Run the tests."
+    assert worker.title == "Worker agent \u00b7 upgrade/{p.name}"
     assert worker.agent == "worker"
     assert worker.group == "parallel-1"
     assert worker.for_each == "for each p in outdated"
@@ -125,7 +125,7 @@ def test_upgrade_dependencies() -> None:
     assert reviewer.brief_line == 17
     assert reviewer.after == ("agent:worker",)
 
-    assert notify.title.startswith("{len(green)} ready")
+    assert notify.title == "Notification"
     assert notify.lines == (20, 20)
     assert notify.after == ("agent:worker",)
 
@@ -169,7 +169,7 @@ def test_invoices_to_sheet() -> None:
     assert [i.name for i in wf.inputs] == ["file"]
     assert [s.kind for s in wf.steps] == ["llm", "review", "step", "notify"]
     read, review, add, notify = wf.steps
-    assert read.title == "Read this invoice."
+    assert read.title == "Ask the model"
     assert review.condition == "inv.total > 500"
     assert review.after == (read.id,)
     assert review.lines == (8, 8)
@@ -262,7 +262,7 @@ async def w(run, items):
     assert agent.for_each == "for each a in got; for each b in a.children"
     assert agent.condition == "a.ok"
     assert agent.lines == (4, 7)
-    assert agent.title == "worker: Fix it"
+    assert agent.title == "Worker agent"
     assert agent.budget == "1"
     assert agent.after == (load.id,)
     assert notify.condition == "not (a.ok)"
@@ -284,7 +284,7 @@ async def w(r: Run):
     (wf,) = outline(src)
     # `run` is not the parameter here, so that call is just code
     assert [(s.kind, s.title) for s in wf.steps] == [
-        ("notify", "a"),
+        ("notify", "Notification"),
         ("step", "b"),
         ("code", 'run.notify("not this one")'),
     ]

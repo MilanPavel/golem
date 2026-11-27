@@ -103,6 +103,7 @@ def _info(entry: WorkflowEntry) -> WorkflowEntryInfo:
         trigger=_trigger(entry),
         inputs=[] if spec is None else [WorkflowInputInfo(name=n, type=t) for n, t in spec.inputs],
         description="" if spec is None else spec.description,
+        title=None if spec is None else spec.title,
     )
 
 
@@ -352,6 +353,8 @@ def _step_info(step: WorkflowStepRecord) -> WorkflowStepInfo:
             "title": step.title or step.step_key,
             "status": step.status,
             "group": step.group_key,
+            "group_title": step.group_title,
+            "item": step.item,
             "attempts": step.attempts,
             "error": step.error,
             "child_session_id": step.child_session_id,

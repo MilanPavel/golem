@@ -258,6 +258,8 @@ async def test_events_come_in_order(store: WorkflowRuns, calls: Any, tmp_path: P
         "title",
         "status",
         "group",
+        "group_title",
+        "item",
         "attempts",
         "error",
         "child_session_id",
