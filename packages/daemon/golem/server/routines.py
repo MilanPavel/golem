@@ -12,6 +12,7 @@ the runs of ``routine.get`` come from ``routine_runs``. Pause is not built, so
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 from datetime import datetime
 from pathlib import Path
@@ -262,6 +263,8 @@ async def _workflow_row(runs: WorkflowRuns, row: HeadlessRun, info: RunInfo) -> 
     summary = run.error if run.status == "failed" else None
     if asked:
         summary = review_item(run.workflow_run_id, asked[0]).ask
+    elif run.status == "done":
+        summary = await _came_out(runs, run.workflow_run_id, run.result_json)
     return info.model_copy(
         update={
             "status": _WORKFLOW_STATUS.get(run.status, run.status),
@@ -274,6 +277,51 @@ async def _workflow_row(runs: WorkflowRuns, row: HeadlessRun, info: RunInfo) -> 
             "workflow_run_id": run.workflow_run_id,
         }
     )
+
+
+_LINE = 120
+
+
+def _one_line(text: str) -> str:
+    line = next((part.strip() for part in text.splitlines() if part.strip()), "")
+    return line if len(line) <= _LINE else line[: _LINE - 1].rstrip() + "\u2026"
+
+
+def _value_line(value: Any) -> str | None:
+    """One line for a saved value, or None when it is empty."""
+    if value is None:
+        return None
+    if isinstance(value, str):
+        return _one_line(value) or None
+    if isinstance(value, list):
+        if not value:
+            return None
+        if all(isinstance(item, dict) for item in value):
+            return f"{len(value)} {'row' if len(value) == 1 else 'rows'}"
+    elif isinstance(value, dict):
+        if not value:
+            return None
+        summary = value.get("summary")
+        if isinstance(summary, str) and summary.strip():
+            return _one_line(summary)
+        return f"{len(value)} {'field' if len(value) == 1 else 'fields'}"
+    return _one_line(json.dumps(value))
+
+
+def _decode(text: str | None) -> Any:
+    try:
+        return None if text is None else json.loads(text)
+    except ValueError:
+        return None
+
+
+async def _came_out(runs: WorkflowRuns, run_id: str, result_json: str | None) -> str:
+    """What a finished run came out with, in one line: its first result, else its return value."""
+    for output in await runs.list_outputs(run_id):
+        line = _one_line(output.summary or "") or _value_line(_decode(output.value_json))
+        if line:
+            return line
+    return _value_line(_decode(result_json)) or "Nothing found"
 
 
 def _question(pending: PendingItem) -> str:
