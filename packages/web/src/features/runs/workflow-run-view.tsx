@@ -1,15 +1,17 @@
-import { stepMetaLine, stepOutputLine, workflowRunTook, workflowStepsList, type StepLike } from "@golem/view";
-import { useState, type ReactNode } from "react";
+import { foldSteps, stepMetaLine, stepOutputLine, stepsProgress, stepTook, workflowRunTook } from "@golem/view";
+import { useRef, useState, type ReactNode } from "react";
 import { actionErrorText } from "../../store/errors.ts";
 import { runsPath } from "../../store/router.ts";
-import type { ReviewVerdict, WorkflowReviewInfo, WorkflowRunInfo, WorkflowStepInfo } from "../../store/workflows.ts";
+import type { ReviewVerdict, WorkflowReadOutputResult, WorkflowReviewInfo, WorkflowRunInfo, WorkflowStepInfo } from "../../store/workflows.ts";
 import { Badge, type BadgeProps } from "../../ui/badge.tsx";
 import { Button } from "../../ui/button.tsx";
+import { Code } from "../../ui/code.tsx";
 import { Link } from "../../ui/link.tsx";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../ui/tabs.tsx";
-import { StepsView, type StepExtra } from "../workbench/index.ts";
 import { ResultView } from "./result-view.tsx";
 import { ReviewCard } from "./review-card.tsx";
+import { RunResult, runOutputs } from "./run-result.tsx";
+import { RESULT_KEY, RunSteps } from "./run-steps.tsx";
 
 const STATUS: Record<WorkflowRunInfo["status"], { word: string; tone: NonNullable<BadgeProps["tone"]> }> = {
   pending: { word: "queued", tone: "neutral" },
@@ -34,76 +36,112 @@ export type WorkflowRunViewProps = {
   onCancel: () => Promise<unknown>;
   onResume: () => Promise<unknown>;
   onAnswer: (key: string, verdict: ReviewVerdict, text?: string) => Promise<void>;
+  /** The text of output `index` when it is a file path the run marked (`workflow.read_output`). Without it a file is shown as its path. */
+  onReadOutput?: (index: number) => Promise<WorkflowReadOutputResult>;
+  /** Asks golem a question about the run (the Ask golem path of the workflow page) and resolves with its answer. Without it "Why did this fail?" is not offered. */
+  onAsk?: (question: string) => Promise<string>;
   /** The Trace tab's content. Without it the tab is not offered. */
   trace?: ReactNode;
   initialTab?: "steps" | "trace";
+  /** The row selected at first: `result` or a step's key. A failed run starts on its failed step. */
+  initialSelected?: string;
 };
 
-/** The detail line under a step's bar, and what the step unfolds: its output, its chat, its error. */
-function stepExtra(step: WorkflowStepInfo, props: Pick<WorkflowRunViewProps, "run" | "chatPath" | "onNavigate" | "onResume">, resume: ReactNode): StepExtra {
-  const output = stepOutputLine(step);
-  const meta = stepMetaLine(step);
-  const detail = (
-    <>
-      <span className="text-faint">{meta}</span>
-      {step.status === "failed" && step.error !== null && step.error !== undefined ? <span className="block truncate text-deny">{step.error}</span> : output === "" ? null : <span className="block truncate">{output}</span>}
-    </>
-  );
-  const hasResult = step.result !== null && step.result !== undefined;
-  const child = step.child_session_id;
-  const failed = step.status === "failed" || step.status === "in_doubt";
-  if (!hasResult && child === null && !failed) return { detail };
-  return {
-    detail,
-    open: (
-      <div className="flex flex-col gap-2">
-        {failed && step.error !== null && step.error !== undefined ? <p className="m-0 text-sm break-words text-deny">{step.error}</p> : null}
-        <ResultView result={step.result} label={`Output of ${step.title}`} />
-        <div className="flex flex-wrap items-center gap-3">
-          {child === null || child === undefined ? null : (
-            <Link href={props.chatPath(child)} onNavigate={props.onNavigate} className={LINK}>
-              Open chat
-            </Link>
-          )}
-          {step.status === "failed" ? resume : null}
-        </div>
-      </div>
-    ),
-  };
+/** The sentence the ask carries: the question, and the failed step with its reason, so golem has what it needs. */
+export function whyQuestion(run: Pick<WorkflowRunInfo, "error">, steps: readonly WorkflowStepInfo[]): string {
+  const failed = steps.find((step) => step.status === "failed" || step.status === "in_doubt");
+  const reason = failed?.error ?? run.error ?? null;
+  const where = failed === undefined ? "" : ` The step "${failed.title}"${failed.item ? ` (${failed.item})` : ""} failed`;
+  return `Why did this fail?${where}${reason === null ? "." : failed === undefined ? ` The run failed with: ${reason}` : ` with: ${reason}`} Explain it and what to do; change nothing.`;
 }
 
-function StepsPanel(props: WorkflowRunViewProps & { resume: ReactNode }) {
-  const { steps, now } = props;
-  if (steps.length === 0) return <p className="text-sm text-muted">No step has started yet.</p>;
-  const byKey = new Map(steps.map((step) => [step.key, step]));
-  const list = workflowStepsList(steps as readonly StepLike[], now);
+const money = (usd: number): string => (usd === 0 ? "$0" : `$${usd < 0.01 ? usd.toFixed(4) : usd.toFixed(2)}`);
+
+/** Who started it, when, how long, which models and what it cost, as the run's facts. */
+function facts(run: WorkflowRunInfo, steps: readonly WorkflowStepInfo[], now: number): string {
+  const took = workflowRunTook(run, now);
+  const models = [...new Set(steps.map((step) => step.model).filter((model): model is string => model !== null && model !== undefined && model !== ""))];
+  const costs = steps.map((step) => step.cost_usd).filter((cost): cost is number => cost !== null && cost !== undefined);
+  return [
+    run.trigger,
+    run.started_at === null || run.started_at === undefined ? "" : `started ${new Date(run.started_at).toLocaleString()}`,
+    took,
+    models.join(", "),
+    costs.length === 0 ? "" : money(costs.reduce((sum, cost) => sum + cost, 0)),
+  ]
+    .filter((part) => part !== "")
+    .join(" · ");
+}
+
+/** One step shown in the place of the result: what it is, its output with Readable / Raw, its chat and Resume. */
+function StepPane({ step, now, resume, props }: { step: WorkflowStepInfo; now: number; resume: ReactNode; props: Pick<WorkflowRunViewProps, "chatPath" | "onNavigate"> }) {
+  const took = stepTook(step, now);
+  const child = step.child_session_id;
+  const failed = step.status === "failed" || step.status === "in_doubt";
   return (
-    <>
-      <h2 className="sr-only">Steps of the run</h2>
-      <StepsView
-        batches={[{ callId: props.run.workflow_run_id, head: `${props.run.name} · ${STATUS[props.run.status].word}`, list, refs: [] }]}
-        extra={(row) => {
-          const step = byKey.get(row.id);
-          return step === undefined ? undefined : stepExtra(step, props, props.resume);
-        }}
-      />
-    </>
+    <div role="group" aria-label={`Step ${step.title}`} className="flex flex-col gap-2">
+      <h3 className="m-0 flex flex-wrap items-baseline gap-2 text-sm font-medium">
+        {step.title}
+        {step.item ? <Code tone="muted">{step.item}</Code> : null}
+      </h3>
+      <p className="m-0 text-meta text-faint">{[stepMetaLine(step), took === "" ? "" : `took ${took}`].filter((part) => part !== "").join(" · ")}</p>
+      {failed && step.error !== null && step.error !== undefined ? <p className="m-0 text-sm break-words text-deny">{step.error}</p> : null}
+      {step.result === null || step.result === undefined ? <p className="m-0 text-meta text-muted">{step.status === "running" ? "Working. Its result shows here when it is done." : step.status === "pending" ? "Not started yet." : "This step has no result."}</p> : <ResultView result={step.result} label={`Output of ${step.title}`} />}
+      <div className="flex flex-wrap items-center gap-3">
+        {child === null || child === undefined ? null : (
+          <Link href={props.chatPath(child)} onNavigate={props.onNavigate} className={LINK}>
+            Open chat
+          </Link>
+        )}
+        {step.status === "failed" ? resume : null}
+      </div>
+    </div>
+  );
+}
+
+/** The thin bar and the count of steps done of steps known; while the run goes, the step that works. */
+function Progress({ done, total, words, current, status }: { done: number; total: number; words: string; current: string | null; status: WorkflowRunInfo["status"] }) {
+  const live = status === "running" || status === "waiting" || status === "pending";
+  const percent = total === 0 ? 0 : Math.round((done / total) * 100);
+  const fill = status === "failed" ? "bg-deny" : status === "done" ? "bg-allow" : "bg-clay";
+  return (
+    <div className="flex flex-col gap-1.5">
+      <p className="m-0 text-sm">
+        <span className="font-medium">{words}</span>
+        {live && current !== null ? <span className="text-muted"> · {current}</span> : null}
+      </p>
+      <div role="progressbar" aria-label="Steps done" aria-valuemin={0} aria-valuemax={total} aria-valuenow={done} className="h-1 overflow-hidden rounded-full bg-line">
+        <div className={`h-full rounded-full ${fill}`} style={{ width: `${percent}%` }} />
+      </div>
+    </div>
   );
 }
 
 /**
- * One workflow run: its state and what you can do (Cancel, Resume), the reviews it waits on as cards, and the
- * steps with their time bars, each opening its output. The trace is a tab of its own. Pure: it takes the run as
- * `workflow.status` sent it, and the actions come in as callbacks.
+ * One workflow run as a page about its result: the workflow's title with its state and its goal, one thin bar
+ * and a vertical list of steps (a loop is one row), and beside them the result by its kind, or the step you
+ * picked. Reviews that wait come first. Pure: it takes the run as `workflow.status` sent it, and the actions
+ * (Cancel, Resume, the file's text, the question to golem) come in as callbacks.
  */
 export function WorkflowRunView(props: WorkflowRunViewProps) {
-  const { run, reviews, now, onNavigate, onCancel, onResume, trace, initialTab = "steps" } = props;
+  const { run, steps, reviews, now, onNavigate, onCancel, onResume, onReadOutput, onAsk, trace, initialTab = "steps" } = props;
   const [tab, setTab] = useState<"steps" | "trace">(initialTab);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const failedStep = steps.find((step) => step.status === "failed" || step.status === "in_doubt");
+  const [selected, setSelected] = useState(props.initialSelected ?? (run.status === "failed" && failedStep !== undefined ? failedStep.key : RESULT_KEY));
+  const [answer, setAnswer] = useState<{ status: "asking" } | { status: "answered"; text: string } | { status: "error"; reason: string } | null>(null);
+  const asked = useRef(0);
   const status = STATUS[run.status];
-  const took = workflowRunTook(run, now);
   const live = run.status === "running" || run.status === "waiting" || run.status === "pending";
+  const rows = foldSteps(steps);
+  const progress = stepsProgress(rows);
+  const title = run.title !== null && run.title !== undefined && run.title !== "" ? run.title : run.name;
+  const goal = run.description !== null && run.description !== undefined && run.description !== "" ? run.description : null;
+  const summary = run.summary !== null && run.summary !== undefined && run.summary !== "" ? run.summary : null;
+  const factsLine = facts(run, steps, now);
+  const outputs = runOutputs(run);
+  const picked = selected === RESULT_KEY ? null : (steps.find((step) => step.key === selected) ?? null);
 
   async function act(call: () => Promise<unknown>, fallback: string): Promise<void> {
     setBusy(true);
@@ -116,6 +154,16 @@ export function WorkflowRunView(props: WorkflowRunViewProps) {
       setBusy(false);
     }
   }
+  function askWhy(): void {
+    if (onAsk === undefined) return;
+    asked.current += 1;
+    const mine = asked.current;
+    setAnswer({ status: "asking" });
+    onAsk(whyQuestion(run, steps)).then(
+      (text) => mine === asked.current && setAnswer({ status: "answered", text }),
+      (caught: unknown) => mine === asked.current && setAnswer({ status: "error", reason: actionErrorText(caught, "golem could not answer.") }),
+    );
+  }
   const resume = (
     <Button size="sm" kind="primary" disabled={busy} onClick={() => void act(onResume, "The run did not resume.")}>
       Resume from here
@@ -123,27 +171,32 @@ export function WorkflowRunView(props: WorkflowRunViewProps) {
   );
 
   return (
-    <div className="flex min-w-0 max-w-4xl flex-col gap-4">
+    <div className="flex min-w-0 max-w-5xl flex-col gap-4">
       <header className="flex flex-wrap-reverse items-start justify-between gap-x-3 gap-y-2">
         <div className="flex min-w-0 flex-1 basis-48 flex-col gap-1">
           <Link href={runsPath()} onNavigate={onNavigate} className={`${LINK} text-meta`}>
             All runs
           </Link>
           <h1 className="flex flex-wrap items-center gap-2 font-ui text-lg font-semibold">
-            <span className="min-w-0 truncate">{run.name}</span>
+            <span className="min-w-0 truncate">{title}</span>
             <Badge tone={status.tone}>{status.word}</Badge>
           </h1>
-          <p className="text-meta text-muted">
-            {run.trigger}
-            {run.started_at === null || run.started_at === undefined ? "" : ` · started ${new Date(run.started_at).toLocaleString()}`}
-            {took === "" ? "" : ` · ${took}`}
-          </p>
+          {goal === null ? null : (
+            <p className="m-0 max-w-prose text-sm break-words text-muted">
+              <span className="text-faint">Goal:</span> {goal}
+            </p>
+          )}
+          {summary === null ? null : <p className="m-0 text-sm font-medium break-words">{summary}</p>}
+          <p className="m-0 text-meta text-muted">{factsLine}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {run.status === "failed" ? (
-            <Button kind="primary" disabled={busy} onClick={() => void act(onResume, "The run did not resume.")}>
-              Resume
-            </Button>
+            <>
+              {onAsk === undefined ? null : <Button onClick={askWhy}>Why did this fail?</Button>}
+              <Button kind="primary" disabled={busy} onClick={() => void act(onResume, "The run did not resume.")}>
+                Resume
+              </Button>
+            </>
           ) : null}
           {live ? (
             <Button kind="danger" disabled={busy} onClick={() => void act(onCancel, "The run did not stop.")}>
@@ -163,16 +216,51 @@ export function WorkflowRunView(props: WorkflowRunViewProps) {
           <p className="m-0 text-sm break-words text-ink">{run.error}</p>
         </div>
       ) : null}
+      {answer === null ? null : (
+        <div role="group" aria-label="Answer" className="flex flex-col gap-2 rounded-lg border border-line bg-bg p-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge>Answer · nothing is changed</Badge>
+            <span className="min-w-0 flex-1" />
+            <Button
+              size="sm"
+              aria-label="Close"
+              onClick={() => {
+                asked.current += 1;
+                setAnswer(null);
+              }}
+            >
+              ✕
+            </Button>
+          </div>
+          {answer.status === "asking" ? <p className="m-0 text-sm text-muted">golem is looking at the failed step.</p> : answer.status === "error" ? <p className="m-0 text-sm text-deny">{answer.reason}</p> : <p className="m-0 max-w-prose text-sm break-words whitespace-pre-wrap">{answer.text}</p>}
+        </div>
+      )}
       {reviews.map((review) => (
         <ReviewCard key={review.key} review={review} onAnswer={props.onAnswer} />
       ))}
       <Tabs value={tab} onValueChange={(next) => setTab(next as "steps" | "trace")} className="flex flex-col gap-4">
-        <TabsList aria-label={`${run.name} run`}>
+        <TabsList aria-label={`${title} run`}>
           <TabsTrigger value="steps">Steps</TabsTrigger>
           {trace === undefined ? null : <TabsTrigger value="trace">Trace</TabsTrigger>}
         </TabsList>
-        <TabsContent value="steps">
-          <StepsPanel {...props} resume={resume} />
+        <TabsContent value="steps" className="flex flex-col gap-4">
+          {steps.length === 0 ? <p className="m-0 text-sm text-muted">No step has started yet.</p> : <Progress done={progress.done} total={progress.total} words={progress.words} current={progress.current} status={run.status} />}
+          <div className="flex min-w-0 flex-col gap-4 lg:flex-row lg:items-start">
+            <div className="flex min-w-0 flex-col gap-1 lg:w-80 lg:shrink-0">
+              <h2 className="sr-only">Steps of the run</h2>
+              <RunSteps
+                rows={rows}
+                now={now}
+                selected={selected}
+                onSelect={setSelected}
+                resultWord={live ? "Live" : "Result"}
+                resultLine={outputs[0]?.summary ?? (outputs.length > 0 ? stepOutputLine({ kind: "step", result: outputs[0]!.value }) : live ? "What is happening now" : "What it did")}
+              />
+            </div>
+            <div className="min-w-0 flex-1 rounded-lg border border-line bg-bg p-4">
+              {picked === null ? <RunResult run={run} steps={steps} onReadOutput={onReadOutput ?? (() => Promise.reject(new Error("The file cannot be read here.")))} /> : <StepPane step={picked} now={now} resume={resume} props={props} />}
+            </div>
+          </div>
         </TabsContent>
         {trace === undefined ? null : (
           <TabsContent value="trace" className="flex h-96 min-h-0 flex-col overflow-hidden rounded-md border border-line">

@@ -12,6 +12,8 @@ const run = (extra: Partial<WorkflowRunInfo>): WorkflowRunInfo => ({
   workflow_run_id: "wr_digest",
   workflow_id: "/Users/you/.golem/workflows/pr_digest.py::pr_digest",
   name: "pr_digest",
+  title: "PR digest",
+  description: "Tell the team which pull requests need them.",
   status: "done",
   trigger: "manual",
   inputs: {},
@@ -142,5 +144,65 @@ export const SAMPLE_RESULTS: ReadonlyArray<readonly [string, unknown]> = [
 export const SAMPLE_RUN_DONE: WorkflowRunSample = {
   run: run({}),
   steps: [LIST, SUMMARISE, REVIEWER, WORKER, REVIEW_STEP("done", { finished_at: at(22), result: { verdict: "edit", text: "Hi team, twelve pull requests are open." } })],
+  reviews: [],
+};
+
+const BRIEFING = "# Morning briefing\n\n**3 things need you.** Device sync is failing.\n\n- Review the typer pull request\n- Look at the sync log";
+
+/** A finished run that marked one text result: the briefing, drawn as Markdown. */
+export const SAMPLE_RUN_TEXT: WorkflowRunSample = {
+  run: run({ title: "Morning briefing", description: "Tell me what needs me today.", summary: "3 things need you", outputs: [{ title: "Morning briefing", summary: "3 things need you", value: raw(BRIEFING) }] }),
+  steps: [LIST, SUMMARISE],
+  reviews: [],
+};
+
+export const SAMPLE_BRIEFING_PATH = "/Users/you/.golem/briefings/2026-11-27.md";
+
+/** What `workflow.read_output` sends for the file of `SAMPLE_RUN_FILE`. */
+export const SAMPLE_FILE_READ = { path: SAMPLE_BRIEFING_PATH, text: BRIEFING, truncated: false, size: BRIEFING.length };
+
+/** The same, for a file that is longer than the daemon reads. */
+export const SAMPLE_FILE_CUT = { ...SAMPLE_FILE_READ, truncated: true, size: 482_113 };
+
+/** A finished run whose result is a file path: the page reads the file and shows it. */
+export const SAMPLE_RUN_FILE: WorkflowRunSample = {
+  run: run({ title: "Morning briefing", description: "Tell me what needs me today.", summary: "Saved as 2026-11-27.md", outputs: [{ title: "Briefing file", summary: "Saved as 2026-11-27.md", value: raw(SAMPLE_BRIEFING_PATH) }] }),
+  steps: [LIST, SUMMARISE],
+  reviews: [],
+};
+
+/** A finished run with several results: a text, a table and a link, one tab each. */
+export const SAMPLE_RUN_OUTPUTS: WorkflowRunSample = {
+  run: run({
+    title: "Weekly report",
+    description: "Collect the week into one report.",
+    summary: "12 pull requests, 3 need you",
+    outputs: [
+      { title: "Report", summary: "12 pull requests", value: raw(BRIEFING) },
+      { title: "Failing checks", value: raw(SAMPLE_RESULTS[2]![1]) },
+      { title: "Pull request", value: raw("https://github.com/golem/golem/pull/1921") },
+    ],
+  }),
+  steps: [LIST, SUMMARISE],
+  reviews: [],
+};
+
+/** A run that read thirty feeds: one row, "Read each feed", with a count. Two items still work and one failed. */
+export const SAMPLE_RUN_LOOP: WorkflowRunSample = {
+  run: run({ status: "running", finished_at: null, title: "Read the news", description: "Read each feed and keep what is new.", started_at: at(28) }),
+  steps: [
+    { ...LIST, title: "List the feeds", started_at: at(28), finished_at: at(28, 1), result: raw("30 feeds") },
+    ...Array.from({ length: 30 }, (_, i) =>
+      step(`read:${i}`, {
+        title: "Read each feed",
+        item: `feed-${i + 1}.example.com`,
+        status: i === 4 ? "failed" : i >= 27 ? "running" : "done",
+        started_at: at(28, 2 + i),
+        finished_at: i >= 27 ? null : at(28, 3 + i),
+        error: i === 4 ? "the feed did not answer" : undefined,
+        result: i >= 27 || i === 4 ? undefined : raw(`${(i % 5) + 1} new items`),
+      }),
+    ),
+  ],
   reviews: [],
 };

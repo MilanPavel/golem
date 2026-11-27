@@ -634,6 +634,12 @@ export function useWorkflow(id: string): UseQueryResult<WorkflowGetResult> {
   return useQuery({ queryKey: workflowGetKey(id), queryFn: () => queries.workflowGet(id), retry: false });
 }
 
+/** Reads one workflow with the text of its file (`workflow.get`), once and when asked: the run page uses it to ask golem about a failed run. */
+export function useWorkflowReader(): (id: string) => Promise<WorkflowGetResult> {
+  const { queries } = usePage();
+  return queries.workflowGet;
+}
+
 /** One run of a workflow with its steps and open reviews. Marked stale by every `workflow.run.*` and `workflow.step.*` notification, so an open run view ticks along. */
 export function useWorkflowStatus(workflowRunId: string): UseQueryResult<WorkflowStatusResult> {
   const { queries } = usePage();

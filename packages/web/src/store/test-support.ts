@@ -173,6 +173,7 @@ export function fakeClient() {
     startWorkflow: vi.fn<PageClient["startWorkflow"]>(async () => ({ workflow_run_id: "wr_1" })),
     workflowStatus: vi.fn<PageClient["workflowStatus"]>(async (id) => ({ run: { ...WORKFLOW_RUN, workflow_run_id: id }, steps: [], reviews: [] })),
     cancelWorkflow: vi.fn<PageClient["cancelWorkflow"]>(async () => ({ cancelled: true })),
+    readWorkflowOutput: vi.fn<PageClient["readWorkflowOutput"]>(async () => ({ path: "/tmp/x.md", text: "", truncated: false, size: 0 })),
     resumeWorkflow: vi.fn<PageClient["resumeWorkflow"]>(async (id) => ({ run: { ...WORKFLOW_RUN, workflow_run_id: id } })),
     answerWorkflowReview: vi.fn<PageClient["answerWorkflowReview"]>(async (id) => ({ run: { ...WORKFLOW_RUN, workflow_run_id: id } })),
     listRoutines: vi.fn<PageClient["listRoutines"]>(async () => ({ routines: [] })),

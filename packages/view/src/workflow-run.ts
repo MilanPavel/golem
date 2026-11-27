@@ -229,3 +229,78 @@ export function workflowRunTook(run: { started_at?: string | null; finished_at?:
   if (start === null) return "";
   return formatElapsed(Math.max(0, (parseTs(run.finished_at) ?? nowMs) - start));
 }
+
+/** A time on the run page: `<1s`, `47s`, `2m 05s`. Empty when the number is not a duration. */
+export function shortTime(ms: number): string {
+  if (!Number.isFinite(ms) || ms < 0) return "";
+  if (ms < 1000) return "<1s";
+  const seconds = Math.round(ms / 1000);
+  return seconds < 60 ? `${seconds}s` : `${Math.floor(seconds / 60)}m ${String(seconds % 60).padStart(2, "0")}s`;
+}
+
+/** How long a step took, or has taken so far when it is still going. Empty for a step that has not started. */
+export function stepTook(step: Pick<StepLike, "started_at" | "finished_at" | "status">, nowMs: number): string {
+  const start = parseTs(step.started_at);
+  if (start === null) return "";
+  const open = step.status === "running" || step.status === "waiting";
+  const end = open ? nowMs : (parseTs(step.finished_at) ?? start);
+  return shortTime(Math.max(0, end - start));
+}
+
+/** One row of the run page's step list: a step on its own, or the steps that share one title, folded into one row. */
+export type RunStepRow<T extends StepLike = StepLike> = { kind: "step"; step: T } | { kind: "repeat"; title: string; items: T[]; state: string; done: number };
+
+/** The state of a folded row: failed if any item failed, working if any is going, done when all are, else not started. */
+function repeatState(items: readonly StepLike[]): string {
+  if (items.some((item) => item.status === "failed" || item.status === "in_doubt")) return "failed";
+  if (items.some((item) => item.status === "running")) return "running";
+  if (items.some((item) => item.status === "waiting")) return "waiting";
+  if (items.every((item) => item.status === "pending")) return "pending";
+  return items.every((item) => item.status === "done" || item.status === "skipped") ? "done" : "running";
+}
+
+/**
+ * The steps of a run as rows. Steps with an `item` and the same title fold into one row at the place of the
+ * first, so a loop of 30 is one row as a loop of 3 is. A step with no item is a row of its own.
+ */
+export function foldSteps<T extends StepLike>(steps: readonly T[]): RunStepRow<T>[] {
+  const rows: RunStepRow<T>[] = [];
+  const folds = new Map<string, Extract<RunStepRow<T>, { kind: "repeat" }>>();
+  for (const step of steps) {
+    if (step.item === null || step.item === undefined || step.item === "") {
+      rows.push({ kind: "step", step });
+      continue;
+    }
+    let fold = folds.get(step.title);
+    if (fold === undefined) {
+      fold = { kind: "repeat", title: step.title, items: [], state: "pending", done: 0 };
+      folds.set(step.title, fold);
+      rows.push(fold);
+    }
+    fold.items.push(step);
+  }
+  for (const fold of folds.values()) {
+    fold.state = repeatState(fold.items);
+    fold.done = fold.items.filter((item) => item.status === "done" || item.status === "skipped").length;
+  }
+  return rows;
+}
+
+/** The state of a row: a step's own, or a folded row's. */
+export function stepRowState(row: RunStepRow): string {
+  return row.kind === "step" ? row.step.status : row.state;
+}
+
+/** The rows finished of the rows known, for the bar and the count, and the title of the one that works now. */
+export function stepsProgress(rows: readonly RunStepRow[]): { done: number; total: number; current: string | null; words: string } {
+  const finished = (row: RunStepRow) => ["done", "skipped"].includes(stepRowState(row));
+  const done = rows.filter(finished).length;
+  const now = rows.find((row) => ["running", "waiting", "failed", "in_doubt"].includes(stepRowState(row)));
+  const current = now === undefined ? null : now.kind === "step" ? now.step.title : now.title;
+  return { done, total: rows.length, current, words: `${done} of ${rows.length} ${rows.length === 1 ? "step" : "steps"}` };
+}
+
+/** The steps that did something worth telling when the run marked no result: a notice sent, a review answered, a tool called. */
+export function whatItDid<T extends StepLike>(steps: readonly T[]): T[] {
+  return steps.filter((step) => (step.kind === "notify" || step.kind === "review" || step.kind === "tool") && step.status === "done" && step.result !== null && step.result !== undefined);
+}

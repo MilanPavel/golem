@@ -102,7 +102,7 @@ import { ASKING_HELPER, DONE_HELPER, HELPER_NOW, RUNNING_HELPER, TRIMMED_AT, TRI
 import { RoutineDetail, RoutineEditor, RoutinesEmpty, RoutinesPanel } from "../features/routines/index.ts";
 import { SAMPLE_LIST, SAMPLE_MORNING_BRIEF, SAMPLE_WORKFLOW_ROUTINE, SAMPLE_WORKFLOW_WATCH_ROUTINE, ROUTINES_NOW, SAMPLE_RUNS } from "../features/routines/sample.ts";
 import { LeadRun, ResultView, RunBanner, RunsList, RunsPanel, WorkflowRunView } from "../features/runs/index.ts";
-import { SAMPLE_RUN_CANCELLED, SAMPLE_RUN_DONE, SAMPLE_RUN_FAILED, SAMPLE_RUN_REVIEW, SAMPLE_RUN_RUNNING, SAMPLE_RESULTS, SAMPLE_RUN_TOOL_ASK, WORKFLOW_RUN_NOW } from "../features/runs/workflow-sample.ts";
+import { SAMPLE_FILE_CUT, SAMPLE_FILE_READ, SAMPLE_RUN_CANCELLED, SAMPLE_RUN_DONE, SAMPLE_RUN_FAILED, SAMPLE_RUN_FILE, SAMPLE_RUN_LOOP, SAMPLE_RUN_OUTPUTS, SAMPLE_RUN_REVIEW, SAMPLE_RUN_RUNNING, SAMPLE_RESULTS, SAMPLE_RUN_TEXT, SAMPLE_RUN_TOOL_ASK, WORKFLOW_RUN_NOW } from "../features/runs/workflow-sample.ts";
 import { DataGallery } from "./gallery-data.tsx";
 import { DataIconsGallery } from "./gallery-data-icons.tsx";
 import { DataResultGallery } from "./gallery-data-result.tsx";
@@ -2562,7 +2562,12 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
             ["Workflow run, tool ask and worker row", SAMPLE_RUN_TOOL_ASK],
             ["Workflow run, failed", SAMPLE_RUN_FAILED],
             ["Workflow run, cancelled", SAMPLE_RUN_CANCELLED],
-            ["Workflow run, done, agent and worker rows", SAMPLE_RUN_DONE],
+            ["Workflow run, done with no result: what it did", SAMPLE_RUN_DONE],
+            ["Workflow run, done with a text result", SAMPLE_RUN_TEXT],
+            ["Workflow run, done with a file result", SAMPLE_RUN_FILE],
+            ["Workflow run, done with a file result that was cut", SAMPLE_RUN_FILE],
+            ["Workflow run, done with several results", SAMPLE_RUN_OUTPUTS],
+            ["Workflow run, thirty steps in a loop", SAMPLE_RUN_LOOP],
           ] as const
         ).map(([title, sample]) => (
           <div key={title} className="mt-4 rounded-lg border border-line bg-bg p-5" role="region" aria-label={`${title}, ${theme}`}>
@@ -2576,6 +2581,8 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
               onCancel={() => Promise.resolve()}
               onResume={() => Promise.resolve()}
               onAnswer={() => Promise.resolve()}
+              onReadOutput={() => Promise.resolve(title.endsWith("cut") ? SAMPLE_FILE_CUT : SAMPLE_FILE_READ)}
+              onAsk={() => Promise.resolve("The sign-in for the GitHub tool ran out. Sign in again in Settings, then resume the run.")}
               trace={<p className="m-auto p-5 text-sm text-muted">The trace of the run&apos;s session.</p>}
             />
           </div>
