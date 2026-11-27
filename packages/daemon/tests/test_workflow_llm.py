@@ -151,10 +151,10 @@ async def test_a_text_answer_is_the_step_result_with_its_model_and_cost(
     [step] = [s for s in await store.list_steps(rid) if s.kind == "llm"]
     assert step.step_key.startswith("llm:") and len(step.step_key) == len("llm:") + 8
     assert step.result_json == '"hi there"'
-    assert step.model == "deepseek/cheap"
+    assert step.model == "anthropic/big"
     assert step.cost_usd == 2.0
     info = _step_info(step)
-    assert (info.model, info.cost_usd) == ("deepseek/cheap", 2.0)
+    assert (info.model, info.cost_usd) == ("anthropic/big", 2.0)
     assert info.result == "hi there"
 
 
@@ -167,9 +167,9 @@ async def test_a_schema_answer_is_a_dict_and_a_wrong_one_fails_the_step(
     rid = await engine.start(write(tmp_path, SCHEMA), "flow")
     step = await store.get_step(rid, "keep")
     assert step is not None and step.result_json == '[{"title": "T", "count": 3}, {"x": 1}]'
-    assert "JSON schema" in router.models[CHEAP].seen[0][0]
+    assert "JSON schema" in router.models[BIG].seen[0][0]
 
-    router.models[CHEAP].replies[:] = ['{"title": "T", "count": "many"}']
+    router.models[BIG].replies[:] = ['{"title": "T", "count": "many"}']
     rid = await engine.start(write(tmp_path, SCHEMA), "flow")
     run = await store.get_run(rid)
     assert run is not None and run.status == "failed"
@@ -186,7 +186,7 @@ async def test_executing_again_does_not_call_the_model_again(
     engine = WorkflowEngine(store, llm=_llm(router))
     rid = await engine.start(write(tmp_path, TEXT), "flow")
     await engine.execute(rid)
-    assert router.asked(CHEAP) == 1
+    assert router.asked(BIG) == 1
     [step] = [s for s in await store.list_steps(rid) if s.kind == "llm"]
     assert step.cost_usd == 2.0
 
@@ -224,7 +224,7 @@ async def test_step_events_carry_the_model_and_cost(store: WorkflowRuns, tmp_pat
     engine = WorkflowEngine(store, lambda n, p: seen.append((n, p)), llm=_llm(router))
     await engine.start(write(tmp_path, TEXT), "flow")
     done = [p for n, p in seen if n == "workflow.step.done" and p["kind"] == "llm"]
-    assert done[0]["model"] == "deepseek/cheap" and done[0]["cost_usd"] == 2.0
+    assert done[0]["model"] == "anthropic/big" and done[0]["cost_usd"] == 2.0
     assert done[0]["result"] == "hi"
 
 
@@ -234,11 +234,82 @@ async def test_cloud_only_a_wish_picks_by_tier_and_never_needs_a_local_model(
     router = _Router(BIG)
     router.replies = ["a", "b", "c"]
     llm = _llm(router)
-    assert (await llm("p", None, None, None)).model == "deepseek/cheap"
+    assert (await llm("p", None, None, None)).model == "anthropic/big"
+    assert (await llm("p", None, "cheapest", None)).model == "deepseek/cheap"
     assert (await llm("p", None, "stronger", None)).model == "anthropic/big"
     assert router.asked(LOCAL) == 0
-    with pytest.raises(WorkflowError, match="is a wish"):
+
+
+async def test_a_model_name_is_used_as_it_is_and_an_unknown_one_stops_the_step() -> None:
+    router = _Router(BIG)
+    router.replies = ["a", "b"]
+    llm = _llm(router)
+    assert (await llm("p", None, "deepseek/cheap", None)).model == "deepseek/cheap"
+    assert (await llm("p", None, "anthropic/big", None)).model == "anthropic/big"
+    with pytest.raises(WorkflowError, match="not set up on this machine"):
+        await llm("p", None, "nowhere/model", None)
+
+
+async def test_a_hosted_name_in_a_local_only_folder_stops_the_step_and_asks_nothing() -> None:
+    router = _Router(LOCAL)
+    router.replies = ["never"]
+    llm = _llm(router, local_only=True)
+    with pytest.raises(WorkflowError, match="stays on this Mac"):
+        await llm("p", None, "deepseek/cheap", "/work")
+    assert router.asked(CHEAP) == 0
+    assert (await llm("p", None, "ollama/small", "/work")).model == "ollama/small"
+
+
+async def test_a_spent_budget_cap_still_stops_a_paid_named_model() -> None:
+    router = _Router(LOCAL)
+
+    async def spent(session: str | None) -> bool:
+        return False
+
+    llm = _llm(router, paid_ok=spent)
+    with pytest.raises(Exception, match="budget cap is spent"):
         await llm("p", None, "deepseek/cheap", None)
+    assert router.asked(CHEAP) == 0
+
+
+async def test_the_runs_choice_beats_the_step_and_the_step_beats_the_workflow(
+    store: WorkflowRuns, tmp_path: Path
+) -> None:
+    body = """
+        @workflow(model="deepseek/cheap")
+        async def flow(run: Run):
+            a = await run.llm("one", key="a")
+            b = await run.llm("two", model="anthropic/big", key="b")
+            await run.step("keep", lambda x, y: [x, y], a, b)
+    """
+    router = _Router(LOCAL)
+    router.replies = ["x", "y"]
+    engine = WorkflowEngine(store, llm=_llm(router))
+    rid = await engine.start(write(tmp_path, body), "flow")
+    models = {s.step_key: s.model for s in await store.list_steps(rid) if s.kind == "llm"}
+    assert models == {"a": "deepseek/cheap", "b": "anthropic/big"}
+
+    rid = await engine.start(write(tmp_path, body), "flow", model="ollama/small")
+    models = {s.step_key: s.model for s in await store.list_steps(rid) if s.kind == "llm"}
+    assert models == {"a": "ollama/small", "b": "ollama/small"}
+
+
+async def test_a_file_with_no_model_runs_on_the_default_and_a_wish_works_as_before(
+    store: WorkflowRuns, tmp_path: Path
+) -> None:
+    body = """
+        @workflow()
+        async def flow(run: Run):
+            a = await run.llm("one", key="a")
+            b = await run.llm("two", model="cheapest", key="b")
+            await run.step("keep", lambda x, y: [x, y], a, b)
+    """
+    router = _Router(BIG)
+    router.replies = ["x", "y"]
+    engine = WorkflowEngine(store, llm=_llm(router))
+    rid = await engine.start(write(tmp_path, body), "flow")
+    models = {s.step_key: s.model for s in await store.list_steps(rid) if s.kind == "llm"}
+    assert models == {"a": "anthropic/big", "b": "deepseek/cheap"}
 
 
 async def test_local_only_forces_a_local_model_whatever_the_wish(

@@ -14,7 +14,6 @@ import json
 import re
 import tokenize
 
-from golem.agents.model import WISHES
 from golem.workflows.outline import (
     KEYWORD_ONLY,
     PARAMS,
@@ -47,13 +46,62 @@ def _literal(name: str, value: str | float | bool) -> str:
         return json.dumps(shown, ensure_ascii=False) if isinstance(value, str) else shown
     if not isinstance(value, str):
         raise EditError(f"{name} is text")
-    if name == "model" and value not in WISHES:
-        raise EditError(f"model is a wish, one of {', '.join(WISHES)}; got {value!r}")
+    if name == "model" and not value.strip():
+        raise EditError("model is the name of a model, such as the chat's model picker shows")
     if name in _NO_EMPTY and not value.strip():
         raise EditError(f"{name} cannot be empty")
     if "\x00" in value:
         raise EditError(f"{name} cannot hold a null character")
     return json.dumps(value, ensure_ascii=False)
+
+
+DECORATOR = "@workflow"
+"""The ``step_id`` that stands for the ``@workflow(...)`` decorator, whose ``model=`` is the
+workflow's default model."""
+
+
+def set_workflow_model(code: str, value: str, workflow: str | None = None) -> str:
+    """``code`` with ``@workflow(model=...)`` set to ``value``; the call is added when the
+    decorator has none, and ``@workflow`` becomes ``@workflow(model=...)``."""
+    text = _literal("model", value)
+    try:
+        found = builders(code)
+    except OutlineError as exc:
+        raise EditError(f"the code cannot be read: {exc}") from exc
+    builder = next((b for b in found if workflow is None or b.fn.name == workflow), None)
+    if builder is None:
+        raise EditError("there is no @workflow function")
+    deco = next(
+        (d for d in builder.fn.decorator_list if _is_workflow(d)),
+        None,
+    )
+    if deco is None:
+        raise EditError("there is no @workflow function")
+    lines = builder.raw
+    if not isinstance(deco, ast.Call):
+        end = (
+            deco.end_lineno or deco.lineno,
+            builder.char_col(deco.end_lineno or deco.lineno, deco.end_col_offset or 0),
+        )
+        return _splice(lines, end, end, f"(model={text})")
+    for kw in deco.keywords:
+        if kw.arg == "model":
+            value_node = kw.value
+            start = (value_node.lineno, builder.char_col(value_node.lineno, value_node.col_offset))
+            end_line = value_node.end_lineno or value_node.lineno
+            end = (end_line, builder.char_col(end_line, value_node.end_col_offset or 0))
+            if not isinstance(value_node, ast.Constant):
+                raise EditError(f"model is computed ({ast.unparse(value_node)}); set in code")
+            return _splice(lines, start, end, text)
+    at, trailing = _closing(code, builder, deco)
+    if not deco.args and not deco.keywords:
+        return _splice(lines, at, at, f"model={text}")
+    return _splice(lines, at, at, f" model={text}," if trailing else f", model={text}")
+
+
+def _is_workflow(deco: ast.expr) -> bool:
+    target = deco.func if isinstance(deco, ast.Call) else deco
+    return ast.unparse(target).rsplit(".", 1)[-1] == "workflow"
 
 
 def _find(
@@ -85,6 +133,10 @@ def set_argument(
     :class:`EditError` for an unknown step, a code step, a name the step does not take, an
     argument the code computes ("set in code") and a value that is not valid for it.
     """
+    if step_id == DECORATOR:
+        if name != "model" or not isinstance(value, str):
+            raise EditError("only the model can be set on the workflow")
+        return set_workflow_model(code, value, workflow)
     builder, step, call = _find(code, step_id, workflow)
     if call is None or step.kind == "code":
         raise EditError("a code step has no fields; its function opens in the code pane")

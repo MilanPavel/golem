@@ -79,6 +79,8 @@ class WorkflowSpec:
     """What the daemon does with a run it finds ``running`` after a restart."""
     title: str | None = None
     """The name shown for the workflow, from ``@workflow(title=)``."""
+    model: str | None = None
+    """The workflow's default model, from ``@workflow(model=)``: a model name or a wish word."""
 
 
 class WorkflowError(Exception):
@@ -170,6 +172,7 @@ class StepBackend(Protocol):
         group_key: str | None,
         title: str | None = None,
         group_title: str | None = None,
+        model: str | None = None,
     ) -> dict[str, Any]:
         """Run a skill as a helper of the run's session (the ``skill`` step)."""
         ...
@@ -440,8 +443,10 @@ class Run:
         failing checks) and ``checks_note``. ``worktree="upgrade/httpx"`` names the copy in the
         step and the result; it fails the step for an agent that only reads.
         The agent is a helper of the run's session, with golem's permissions, and ``session_id``
-        is its session. ``model`` is a wish (``cheapest``, ``stronger``, ...), never a model
-        name. A helper that fails or is stopped fails the step. A step of kind ``agent`` keyed
+        is its session. ``model`` is the name of a model you have set up, as the chat's model
+        picker shows it (it wins over ``@workflow(model=)``); the old wish words (``cheapest``,
+        ``stronger``, ...) still work. A helper that fails or is stopped fails the step. A step
+        of kind ``agent`` keyed
         ``key or f"agent:{type}"``: each key may be used once per run, so two agents of one type
         need their own ``key=``. After a restart the same agent is waited for, not started again.
 
@@ -489,9 +494,11 @@ class Run:
         """Ask a model one question, with no tools, as one step.
 
         Without ``schema`` the answer is the text. ``schema`` is a Pydantic model class or a
-        JSON-schema dict; the answer is then a dict that follows it. ``model`` is a wish
-        (``cheapest``, ``same``, ``stronger``, ``local``, ...), never a model name:
-        routing picks the model, and a local-only folder only ever gets a local one. The step
+        JSON-schema dict; the answer is then a dict that follows it. ``model`` is the name of a
+        model you have set up, as the chat's model picker shows it; without one the workflow's
+        ``@workflow(model=)`` is used, then golem's default model. The old wish words
+        (``cheapest``, ``same``, ``stronger``, ``local``, ...) still work. A local-only folder
+        never gets a hosted model: the step stops and says so. The step
         saves the model and the cost; a run that is executed again does not ask again. The
         step key is ``key`` or ``llm:<short hash of the prompt>``, once per run. ``title=`` is
         the name the step is listed under (the key in words, else "Ask the model").
@@ -546,7 +553,12 @@ class Run:
         )
 
     async def skill(
-        self, name: str, args: str = "", key: str | None = None, title: str | None = None
+        self,
+        name: str,
+        args: str = "",
+        key: str | None = None,
+        title: str | None = None,
+        model: str | None = None,
     ) -> str:
         """Run the skill ``name`` with ``args`` as one short agent turn and return its answer.
 
@@ -557,7 +569,8 @@ class Run:
         thread you can open, and ``child_session_id`` is set on the step. An unknown skill fails
         the step and names the known ones. A step of kind ``skill`` keyed
         ``key or f"skill:{name}"``: each key may be used once per run. After a restart the same
-        helper is waited for, not started again.
+        helper is waited for, not started again. ``model`` is the name of a model you have set
+        up; without one the workflow's model is used, then the skill's own.
         """
         step_key = key or f"skill:{name}"
         self._use_key(step_key, f"skill {name}")
@@ -569,6 +582,7 @@ class Run:
             _group.get(),
             _clean(title) or name,
             _group_title.get(),
+            _clean(model),
         )
         return found["answer"]
 
@@ -611,10 +625,15 @@ def workflow(
     description: str | None = None,
     on_restart: OnRestart = "resume",
     title: str | None = None,
+    model: str | None = None,
 ) -> Callable[[F], F]:
     """Mark a function as a workflow.
 
     ``title=`` is the name shown for it; without one the function name is shown.
+
+    ``model=`` is the workflow's default model: the name of a model you have set up, as the
+    chat's model picker shows it. A ``model=`` on a model step wins over it; without either,
+    golem's default model is used.
 
     ``on_restart`` says what happens to a run the daemon stopped in the middle of: ``"resume"``
     continues it (finished steps are not run again), ``"fail"`` fails it, ``"ask"`` leaves it
@@ -636,6 +655,7 @@ def workflow(
             line=code.co_firstlineno if code is not None else 0,
             on_restart=on_restart,
             title=_clean(title),
+            model=_clean(model),
         )
         setattr(fn, SPEC_ATTR, spec)
         return fn

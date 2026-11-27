@@ -72,10 +72,39 @@ def test_budget_must_be_money_text() -> None:
     assert check(_flow('await run.agent("explorer", "x", budget="$1.5")'), "/p", _env()) == []
 
 
-def test_a_model_name_is_an_error_a_wish_is_not() -> None:
-    found = _one(check(_flow('await run.llm("hi", model="gpt-5")')))
-    assert found.severity == "error" and "do not name models" in found.message
+def test_a_model_name_is_fine_and_a_wish_is_too() -> None:
+    assert check(_flow('await run.llm("hi", model="gpt-5")')) == []
     assert check(_flow('await run.llm("hi", model="stronger")')) == []
+
+
+def test_a_model_not_set_up_is_a_note_beside_the_line_never_an_error() -> None:
+    env = CheckEnv(model_problem=lambda name: None if name == "ollama/small" else f"{name} is off")
+    code = _flow('await run.llm("hi", model="gpt-5")')
+    found = _one(check(code, "/p", env))
+    assert found.severity == "warning" and "gpt-5 is off" in found.message
+    assert found.step_id is not None
+    assert check(_flow('await run.llm("hi", model="ollama/small")'), "/p", env) == []
+    skill = _one(check(_flow('await run.skill("x", model="gpt-5")'), "/p", env))
+    assert skill.severity == "warning"
+
+
+def test_the_workflow_model_is_checked_too() -> None:
+    env = CheckEnv(model_problem=lambda name: f"{name} is off")
+    code = (
+        "from golem.workflow import workflow, Run\n\n"
+        '@workflow(model="gpt-5")\n'
+        "async def flow(run: Run):\n"
+        '    await run.llm("hi")\n'
+    )
+    found = _one(check(code, "/p", env))
+    assert found.severity == "warning" and "gpt-5 is off" in found.message and found.line == 3
+
+
+def test_a_wish_word_suggests_a_model_name_when_there_is_a_default() -> None:
+    env = CheckEnv(default_model=lambda: "anthropic/big")
+    found = _one(check(_flow('await run.llm("hi", model="cheapest")'), "/p", env))
+    assert found.severity == "warning" and "anthropic/big" in found.message
+    assert found.fix == '"anthropic/big"'
 
 
 def test_unknown_agent_lists_the_known_ones() -> None:

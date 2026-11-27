@@ -66,8 +66,9 @@ AgentRunner = Callable[
 worker's copy (``worktree=``) and a callback for the helper's session id. Returns the step's
 result. ``workflows/agents.py`` is behind it."""
 
-SkillRunner = Callable[[str, str, str, str, AgentStarted], Awaitable[dict[str, Any]]]
-"""Runs a skill step: workflow run id, step key, skill name, arguments and the same callback."""
+SkillRunner = Callable[[str, str, str, str, str | None, AgentStarted], Awaitable[dict[str, Any]]]
+"""Runs a skill step: workflow run id, step key, skill name, arguments, the model and the same
+callback."""
 
 
 SessionOf = Callable[[str], Awaitable[str | None]]
@@ -121,8 +122,16 @@ class WorkflowEngine:
         self._emit: Emit = emit or _no_emit
         self._notify = notify
         self._agent = agent
+        self._models: dict[str, tuple[str | None, str | None]] = {}
+        """Per running run: the run's own model choice and the file's ``@workflow(model=)``."""
         self.stopping = False
         """True while the daemon shuts down: a cancelled run stays ``running`` and resumes later."""
+
+    def model_for(self, workflow_run_id: str, step_model: str | None) -> str | None:
+        """The model a step asks for: this run's choice, the step's, the workflow's, else None
+        (golem's default model, or what the step's own file says)."""
+        run, workflow = self._models.get(workflow_run_id, (None, None))
+        return run or step_model or workflow
 
     async def notify(self, workflow_run_id: str, title: str | None, text: str) -> None:
         """Send a ``run.notify`` text. Without a notifier the step still completes."""
@@ -152,11 +161,20 @@ class WorkflowEngine:
             await self.step_event("workflow.step.started", workflow_run_id, key)
 
         return await self._agent(
-            workflow_run_id, key, agent_type, brief, model, batch, gets, budget, worktree, started
+            workflow_run_id,
+            key,
+            agent_type,
+            brief,
+            self.model_for(workflow_run_id, model),
+            batch,
+            gets,
+            budget,
+            worktree,
+            started,
         )
 
     async def run_skill(
-        self, workflow_run_id: str, key: str, name: str, args: str
+        self, workflow_run_id: str, key: str, name: str, args: str, model: str | None = None
     ) -> dict[str, Any]:
         """Run a skill step's helper; its session id is saved on the step as soon as it exists."""
         if self._skill is None:
@@ -166,7 +184,9 @@ class WorkflowEngine:
             await self._store.set_step_child_session(workflow_run_id, key, session_id)
             await self.step_event("workflow.step.started", workflow_run_id, key)
 
-        return await self._skill(workflow_run_id, key, name, args, started)
+        return await self._skill(
+            workflow_run_id, key, name, args, self.model_for(workflow_run_id, model), started
+        )
 
     async def llm(
         self,
@@ -181,7 +201,12 @@ class WorkflowEngine:
         if self._llm is None:
             raise WorkflowError("run.llm needs a model, and this daemon has none set up")
         record = await self._store.get_run(workflow_run_id)
-        answer = await self._llm(prompt, schema, wish, record.project if record else None)
+        answer = await self._llm(
+            prompt,
+            schema,
+            self.model_for(workflow_run_id, wish),
+            record.project if record else None,
+        )
         await self._store.set_step_model(workflow_run_id, key, answer.model, answer.cost_usd)
         if schema is None:
             return answer.text
@@ -254,6 +279,7 @@ class WorkflowEngine:
         workflow_name: str,
         inputs: dict[str, Any] | None = None,
         trigger: str = "manual",
+        model: str | None = None,
     ) -> str:
         """Create the run row and run it to its end. Returns the run id."""
         path = Path(entry_path)
@@ -266,6 +292,7 @@ class WorkflowEngine:
             inputs_json=json.dumps(inputs or {}),
             trigger=trigger,
             source_hash=digest,
+            model=model,
         )
         await self.execute(run_id)
         return run_id
@@ -341,6 +368,11 @@ class WorkflowEngine:
         await self._run_event("workflow.run.started", workflow_run_id)
         try:
             fn = await asyncio.to_thread(_find, Path(record.path), record.name)
+            label = getattr(fn, SPEC_ATTR, None)
+            self._models[workflow_run_id] = (
+                record.model,
+                label.model if isinstance(label, WorkflowSpec) else None,
+            )
             inputs: dict[str, Any] = json.loads(record.inputs_json or "{}")
             names = list(inspect.signature(fn).parameters)[1:]
             kwargs = {k: v for k, v in inputs.items() if k in names}
@@ -363,6 +395,8 @@ class WorkflowEngine:
             await self._store.set_run_status(workflow_run_id, "failed", _now(), error)
             await self._run_event("workflow.run.failed", workflow_run_id)
             return
+        finally:
+            self._models.pop(workflow_run_id, None)
         await self._store.set_run_status(workflow_run_id, "done", _now())
         await self._run_event("workflow.run.done", workflow_run_id)
 
@@ -521,6 +555,7 @@ class _Journal:
         group_key: str | None,
         title: str | None = None,
         group_title: str | None = None,
+        model: str | None = None,
     ) -> dict[str, Any]:
         return await self.run_step(
             workflow_run_id,
@@ -529,7 +564,7 @@ class _Journal:
             title or name,
             group_key,
             self._engine.run_skill,
-            (workflow_run_id, key, name, args),
+            (workflow_run_id, key, name, args, model),
             {},
             group_title=group_title,
         )

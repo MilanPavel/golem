@@ -17,8 +17,9 @@ from typing import Any
 from golem.server.dispatcher import INTERNAL_ERROR, INVALID_PARAMS, RequestContext, RpcCallError
 from golem.server.routines import routine_update
 from golem.store.workflow_runs import WorkflowRunRecord, WorkflowStepRecord
-from golem.workflows.check import Problem
+from golem.workflows.check import CheckEnv, Problem
 from golem.workflows.edit import EditError, set_argument
+from golem.workflows.model_view import step_model, workflow_model
 from golem.workflows.outline import OutlineError, WorkflowOutline, outline
 from golem.workflows.outputs import OutputError, read_marked_file
 from golem.workflows.propose import ProposeError
@@ -42,6 +43,7 @@ from golem_protocol.commands import (
     WorkflowInputInfo,
     WorkflowListParams,
     WorkflowListResult,
+    WorkflowModelInfo,
     WorkflowOutlineStep,
     WorkflowProblem,
     WorkflowProposeParams,
@@ -111,6 +113,7 @@ def _info(entry: WorkflowEntry) -> WorkflowEntryInfo:
         inputs=[] if spec is None else [WorkflowInputInfo(name=n, type=t) for n, t in spec.inputs],
         description="" if spec is None else spec.description,
         title=None if spec is None else spec.title,
+        model=None if spec is None else spec.model,
     )
 
 
@@ -129,28 +132,50 @@ async def workflow_list(ctx: RequestContext, params: WorkflowListParams) -> Work
     return WorkflowListResult(workflows=[_info(e) for e in shown])
 
 
-def _outline_of(text: str, name: str) -> tuple[list[WorkflowOutlineStep], str | None]:
-    """The outline steps of the workflow ``name`` in ``text``, or why they cannot be read."""
+def _outline_all(
+    text: str, name: str, env: CheckEnv | None
+) -> tuple[list[WorkflowOutlineStep], str | None, WorkflowModelInfo | None]:
+    """The steps, the reason they cannot be read, and the workflow's own model."""
     try:
         found: list[WorkflowOutline] = outline(text)
     except OutlineError as exc:
-        return [], str(exc)
+        return [], str(exc), None
     for one in found:
-        if one.name == name:
-            return [WorkflowOutlineStep.model_validate(s.to_dict()) for s in one.steps], None
-    return [], None
+        if one.name != name:
+            continue
+        steps: list[WorkflowOutlineStep] = []
+        for s in one.steps:
+            made = WorkflowOutlineStep.model_validate(s.to_dict())
+            seen = None if env is None else step_model(s, one.model, env)
+            if seen is not None:
+                made = made.model_copy(
+                    update={
+                        "model": seen.written,
+                        "model_now": seen.now,
+                        "model_ready": seen.ready,
+                    }
+                )
+            steps.append(made)
+        info = None
+        if env is not None:
+            base = workflow_model(one.model, env)
+            info = WorkflowModelInfo(
+                model=one.model, now=base.now, ready=base.ready, note=base.note
+            )
+        return steps, None, info
+    return [], None, None
 
 
 def _outline_steps(
-    entry: WorkflowEntry,
-) -> tuple[list[WorkflowOutlineStep], str | None, str | None]:
+    entry: WorkflowEntry, env: CheckEnv | None = None
+) -> tuple[list[WorkflowOutlineStep], str | None, str | None, WorkflowModelInfo | None]:
     """The outline steps and the text of the entry's file, or the reason they cannot be read."""
     try:
         text = entry.path.read_text(encoding="utf-8")
     except (OSError, UnicodeDecodeError) as exc:
-        return [], str(exc), None
-    steps, problem = _outline_of(text, entry.name)
-    return steps, problem, text
+        return [], str(exc), None, None
+    steps, problem, info = _outline_all(text, entry.name, env)
+    return steps, problem, text, info
 
 
 def _hash_of(path: Path) -> str | None:
@@ -166,11 +191,13 @@ async def workflow_get(ctx: RequestContext, params: WorkflowGetParams) -> Workfl
     info = _info(entry)
     if entry.state != "ok":
         return WorkflowGetResult(workflow=info)
-    steps, problem, code = await asyncio.to_thread(_outline_steps, entry)
+    steps, problem, code, mine = await asyncio.to_thread(_outline_steps, entry, service.check_env)
     if problem is not None:
         info = info.model_copy(update={"error": f"the steps cannot be read: {problem}"})
     digest = await asyncio.to_thread(_hash_of, entry.path) if code is not None else None
-    return WorkflowGetResult(workflow=info, steps=steps, code=code, code_hash=digest)
+    return WorkflowGetResult(
+        workflow=info, steps=steps, code=code, code_hash=digest, workflow_model=mine
+    )
 
 
 def _problem(p: Problem) -> WorkflowProblem:
@@ -181,10 +208,10 @@ def _problem(p: Problem) -> WorkflowProblem:
 
 def _checked(
     service: WorkflowService, entry: WorkflowEntry, code: str
-) -> tuple[list[WorkflowProblem], list[WorkflowOutlineStep]]:
+) -> tuple[list[WorkflowProblem], list[WorkflowOutlineStep], WorkflowModelInfo | None]:
     problems = [_problem(p) for p in service.check_code(code, entry)]
-    steps, _ = _outline_of(code, entry.name)
-    return problems, steps
+    steps, _, mine = _outline_all(code, entry.name, service.check_env)
+    return problems, steps, mine
 
 
 async def workflow_check(ctx: RequestContext, params: WorkflowCheckParams) -> WorkflowCheckResult:
@@ -198,8 +225,8 @@ async def workflow_check(ctx: RequestContext, params: WorkflowCheckParams) -> Wo
             code = await asyncio.to_thread(entry.path.read_text, encoding="utf-8")
         except (OSError, UnicodeDecodeError) as exc:
             raise RpcCallError(INVALID_PARAMS, f"the file cannot be read: {exc}") from exc
-    problems, steps = await asyncio.to_thread(_checked, service, entry, code)
-    return WorkflowCheckResult(problems=problems, steps=steps)
+    problems, steps, mine = await asyncio.to_thread(_checked, service, entry, code)
+    return WorkflowCheckResult(problems=problems, steps=steps, workflow_model=mine)
 
 
 async def workflow_edit_step(
@@ -215,8 +242,8 @@ async def workflow_edit_step(
         )
     except EditError as exc:
         raise RpcCallError(INVALID_PARAMS, str(exc)) from exc
-    problems, steps = await asyncio.to_thread(_checked, service, entry, code)
-    return WorkflowEditStepResult(code=code, steps=steps, problems=problems)
+    problems, steps, mine = await asyncio.to_thread(_checked, service, entry, code)
+    return WorkflowEditStepResult(code=code, steps=steps, problems=problems, workflow_model=mine)
 
 
 async def workflow_save(ctx: RequestContext, params: WorkflowSaveParams) -> WorkflowSaveResult:
@@ -230,11 +257,12 @@ async def workflow_save(ctx: RequestContext, params: WorkflowSaveParams) -> Work
     saved = next((e for e in reloaded if e.name == entry.name), None) or (
         reloaded[0] if reloaded else entry
     )
-    steps, _ = _outline_of(params.code, saved.name)
+    steps, _, mine = _outline_all(params.code, saved.name, service.check_env)
     digest = await asyncio.to_thread(_hash_of, entry.path)
     return WorkflowSaveResult(
         workflow=_info(saved),
         steps=steps,
+        workflow_model=mine,
         problems=[_problem(p) for p in warnings],
         code_hash=digest or hashlib.sha256(params.code.encode("utf-8")).hexdigest(),
     )
@@ -319,12 +347,13 @@ async def workflow_propose(
         made = await service.propose_code(entry, params.code, params.ask, previous)
     except ProposeError as exc:
         raise RpcCallError(INVALID_PARAMS, str(exc)) from exc
-    steps, _ = _outline_of(made.code, entry.name)
+    steps, _, mine = _outline_all(made.code, entry.name, service.check_env)
     return WorkflowProposeResult(
         code=made.code,
         # An older client reads the answer as a note on a file that did not change.
         note=made.answer or made.note,
         steps=steps,
+        workflow_model=mine,
         problems=[_problem(p) for p in made.problems],
         model=made.model,
         kind=made.kind,
@@ -368,7 +397,7 @@ async def workflow_start(ctx: RequestContext, params: WorkflowStartParams) -> Wo
         last = (entry.error or "it cannot be loaded").strip().splitlines()[-1:]
         raise RpcCallError(INVALID_PARAMS, f"{entry.name} is broken: {''.join(last)}")
     inputs = _coerce(entry, params.inputs)
-    run_id, _ = await service.start_run(entry, inputs, params.trigger)
+    run_id, _ = await service.start_run(entry, inputs, params.trigger, params.model)
     return WorkflowStartResult(workflow_run_id=run_id)
 
 
@@ -478,7 +507,7 @@ async def workflow_resume(
 ) -> WorkflowResumeResult:
     service = _service(ctx)
     try:
-        run = await service.resume(params.workflow_run_id)
+        run = await service.resume(params.workflow_run_id, params.model)
     except ResumeError as exc:
         raise RpcCallError(INVALID_PARAMS, str(exc)) from exc
     return WorkflowResumeResult(run=await _run_info(service, run))

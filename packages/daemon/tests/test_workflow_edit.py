@@ -106,8 +106,8 @@ def test_refuses_computed_code_and_bad_values() -> None:
         set_argument(SRC, "nope", "brief", "x")
     with pytest.raises(EditError, match="no argument"):
         set_argument(SRC, "notify-1", "model", "same")
-    with pytest.raises(EditError, match="wish"):
-        set_argument(SRC, "agent:worker", "model", "gpt-9")
+    with pytest.raises(EditError, match="name of a model"):
+        set_argument(SRC, "agent:worker", "model", "  ")
     with pytest.raises(EditError, match="money"):
         set_argument(SRC, "agent:worker", "budget", "lots")
     with pytest.raises(EditError, match="more than"):

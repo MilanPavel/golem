@@ -87,13 +87,26 @@ class WorkflowAgents:
         bus: EventBus,
         settings: Callable[[], AgentSettings],
         skills: SkillRegistry | None = None,
+        model_problem: Callable[[str, str | None], str | None] | None = None,
     ) -> None:
+        self._model_problem = model_problem
         self._skills = skills
         self._sessions = sessions
         self._agents = agents
         self._settings = settings
         self._waiters: dict[str, set[asyncio.Event]] = {}
         bus.observe(self._seen)
+
+    def _check_model(self, model: str | None, folder: str | None) -> None:
+        """Stop with the reason when ``model`` names a model that is not set up here.
+
+        A wish word needs no check: it always finds a model. A named model is never swapped for
+        the lead's, so a step that cannot get it stops and says so."""
+        if model is None or model in WISHES or self._model_problem is None:
+            return
+        problem = self._model_problem(model, folder)
+        if problem is not None:
+            raise WorkflowError(problem)
 
     @property
     def has_skills(self) -> bool:
@@ -135,11 +148,7 @@ class WorkflowAgents:
         asks for, and ``budget`` (dollars) caps the helper's cost, the lower of it and the
         file's own ``max_cost``.
         """
-        if model is not None and model not in WISHES:
-            raise WorkflowError(
-                f"run.agent model= is a wish, one of {', '.join(WISHES)}; got {model!r}."
-                " Workflow files do not name models"
-            )
+        self._check_model(model, cwd)
         view = self._agents.view(None if cwd is None else Path(cwd))
         agent = view.get(agent_type)
         if agent is None:
@@ -191,6 +200,7 @@ class WorkflowAgents:
         name: str,
         args: str,
         started: Started,
+        model: str | None = None,
     ) -> dict[str, Any]:
         """Run the skill ``name`` as one short turn of a helper of ``session_id``.
 
@@ -201,6 +211,7 @@ class WorkflowAgents:
         """
         if self._skills is None:
             raise WorkflowError("run.skill is not available: this daemon has no skills")
+        self._check_model(model, cwd)
         view = self._skills.view(None if cwd is None else Path(cwd))
         if not any(e.skill.name == name for e in view.listed):
             known = ", ".join(s.name for s in view.usable()) or "none"
@@ -246,7 +257,7 @@ class WorkflowAgents:
             call.text,
             started,
             prompt=SKILL_PROMPT,
-            asked_model=None,
+            asked_model=model,
             gets=(),
             batch=None,
         )
