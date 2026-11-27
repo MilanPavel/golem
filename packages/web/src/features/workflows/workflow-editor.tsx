@@ -174,9 +174,9 @@ function StepPane({ step, number, lines, text, onEdit, agents, onOpenAgent, onJu
 function DiffView({ before, after, name }: { before: string; after: string; name: string }) {
   const { rows } = lineDiff(before, after);
   return (
-    <div className="flex min-h-96 min-w-0 flex-1 flex-col gap-2">
+    <div className="flex min-h-96 min-w-0 flex-1 flex-col gap-2 lg:min-h-0">
       <h2 className="text-meta font-medium text-faint">Diff, {name}</h2>
-      <ol aria-label="Diff" className="overflow-x-auto rounded-lg border border-line bg-surface py-1 text-code">
+      <ol aria-label="Diff" className="min-h-0 flex-1 overflow-auto rounded-lg border border-line bg-surface py-1 text-code">
         {rows.map((row, at) => (
           <li key={at} className={cn("flex gap-2 whitespace-pre px-2", row.kind === "add" && "bg-allow-soft text-allow", row.kind === "del" && "bg-deny-soft text-deny", row.kind === "skip" && "text-faint")}>
             <span aria-hidden="true" className="w-8 shrink-0 text-right text-faint">
@@ -459,7 +459,7 @@ export function WorkflowEditor({ workflow, steps: savedSteps, code, codeHash, on
 
   return (
     // The wrapper only catches ⌘S from the editor inside it.
-    <div className="flex flex-col gap-3" onKeyDown={onKeyDown}>
+    <div className="flex flex-col gap-3 lg:h-full" onKeyDown={onKeyDown}>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
         <div role="group" aria-label="View" className="flex overflow-hidden rounded-md border border-line-strong">
           {VIEWS.map((option) => (
@@ -577,7 +577,7 @@ export function WorkflowEditor({ workflow, steps: savedSteps, code, codeHash, on
         </p>
       )}
       {shownProblems.length === 0 ? null : (
-        <ul aria-label="Problems" className="flex flex-col gap-1.5 rounded-lg border border-line bg-bg p-3 text-sm">
+        <ul aria-label="Problems" className="flex max-h-40 shrink-0 flex-col overflow-y-auto gap-1.5 rounded-lg border border-line bg-bg p-3 text-sm">
           {shownProblems.map((problem, at) => (
             <li key={at} className="flex gap-2">
               <span className={cn("shrink-0", problem.severity === "error" ? "text-deny" : "text-wait")}>
@@ -600,9 +600,9 @@ export function WorkflowEditor({ workflow, steps: savedSteps, code, codeHash, on
           ))}
         </ul>
       )}
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-stretch">
+      <div className="flex flex-col gap-3 lg:min-h-48 lg:flex-1 lg:flex-row lg:items-stretch">
         {showOutline ? (
-          <div className="flex min-w-0 flex-col gap-2 lg:w-72 lg:shrink-0">
+          <div className="flex min-w-0 flex-col gap-2 lg:min-h-0 lg:w-72 lg:shrink-0 lg:overflow-y-auto">
             <h2 className="text-meta font-medium text-faint">Outline, read from the code</h2>
             <Outline steps={shownSteps} selected={proposing ? null : selectedId} problemsOf={problemsOf} changes={changes} onSelect={proposing ? () => undefined : pick} />
           </div>
@@ -610,7 +610,7 @@ export function WorkflowEditor({ workflow, steps: savedSteps, code, codeHash, on
         {showCode && diff !== null ? (
           <DiffView before={text} after={proposal?.code ?? text} name={workflow.name} />
         ) : showCode ? (
-          <div className="flex min-h-96 min-w-0 flex-1 flex-col gap-2">
+          <div className="flex min-h-96 min-w-0 flex-1 flex-col gap-2 lg:min-h-0">
             <CodeEditor
               value={text}
               onChange={setText}
@@ -624,6 +624,7 @@ export function WorkflowEditor({ workflow, steps: savedSteps, code, codeHash, on
               language="python"
               readOnly={readOnly}
               markKind="step"
+              className="lg:min-h-0"
             />
             <p className="text-meta text-faint">
               {readOnly
@@ -635,7 +636,7 @@ export function WorkflowEditor({ workflow, steps: savedSteps, code, codeHash, on
           </div>
         ) : null}
         {showStep ? (
-          <div role="group" aria-label="Selected step" className="flex min-w-0 flex-col gap-2 lg:w-72 lg:shrink-0">
+          <div role="group" aria-label="Selected step" className="flex min-w-0 flex-col gap-2 lg:min-h-0 lg:w-72 lg:shrink-0 lg:overflow-y-auto">
             <h2 className="text-meta font-medium text-faint">Step</h2>
             <StepPane
               step={selected}

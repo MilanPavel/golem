@@ -2388,13 +2388,12 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
         ))}
         {(
           [
-            ["Workflow detail, Overview", "overview", SAMPLE_PR_DIGEST, SAMPLE_PR_DIGEST_STEPS, SAMPLE_PR_DIGEST_CODE, SAMPLE_WORKFLOW_RUNS],
             ["Workflow detail, Code", "code", SAMPLE_PR_DIGEST, SAMPLE_PR_DIGEST_STEPS, SAMPLE_PR_DIGEST_CODE, SAMPLE_WORKFLOW_RUNS],
             ["Workflow detail, Runs", "runs", SAMPLE_PR_DIGEST, SAMPLE_PR_DIGEST_STEPS, SAMPLE_PR_DIGEST_CODE, SAMPLE_WORKFLOW_RUNS],
             ["Workflow detail, Runs, none yet", "runs", SAMPLE_PR_DIGEST, SAMPLE_PR_DIGEST_STEPS, SAMPLE_PR_DIGEST_CODE, []],
             ["Workflow detail, Triggers", "triggers", SAMPLE_PR_DIGEST, SAMPLE_PR_DIGEST_STEPS, SAMPLE_PR_DIGEST_CODE, SAMPLE_WORKFLOW_RUNS, [SAMPLE_WORKFLOW_ROUTINE, SAMPLE_WORKFLOW_WATCH_ROUTINE]],
             ["Workflow detail, Triggers, none", "triggers", SAMPLE_PR_DIGEST, SAMPLE_PR_DIGEST_STEPS, SAMPLE_PR_DIGEST_CODE, SAMPLE_WORKFLOW_RUNS, []],
-            ["Workflow detail, broken", "overview", SAMPLE_BROKEN, [], null, []],
+            ["Workflow detail, broken", "code", SAMPLE_BROKEN, [], null, []],
             ["Workflow detail, not trusted", "code", SAMPLE_UNTRUSTED, [], null, []],
           ] as const
         ).map(([title, tab, workflow, steps, code, runs, routines]) => (

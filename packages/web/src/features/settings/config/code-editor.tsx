@@ -70,7 +70,7 @@ export function CodeEditor({
   onCursor?: (line: number) => void;
   /** Scrolls this line into view whenever `nonce` changes. */
   reveal?: { line: number; nonce: number };
-  /** Replaces the default sizing: fills the free height of its parent, at least `min-h-72`. */
+  /** Replaces the default sizing: fills the free height of its parent, at least `min-h-72`; a `min-h-0` of its own lets it shrink and scroll inside. */
   className?: string;
 }) {
   const tokens = useTokens(value, language);
@@ -83,8 +83,11 @@ export function CodeEditor({
   useEffect(() => {
     const box = area.current;
     if (box === null || nonce === undefined || revealLine === undefined) return;
-    const height = Number.parseFloat(getComputedStyle(box).lineHeight) || 20;
-    box.scrollTop = Math.max(0, (revealLine - 3) * height);
+    const style = getComputedStyle(box);
+    const height = Number.parseFloat(style.lineHeight) || 20;
+    const pad = Number.parseFloat(style.paddingTop) || 0;
+    // The line goes to the middle of the box. Only the scroll moves: the caret and the focus stay where they are.
+    box.scrollTop = Math.max(0, pad + (revealLine - 1) * height - (box.clientHeight - height) / 2);
   }, [nonce, revealLine]);
 
   function cursor(event: { currentTarget: HTMLTextAreaElement }): void {

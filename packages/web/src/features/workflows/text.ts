@@ -29,7 +29,7 @@ export function routinesStarting(routines: readonly RoutineInfo[], name: string)
   return routines.filter((routine) => routine.config.workflow === name);
 }
 
-/** How one outline step reads in the Overview: what it is, then what repeats or guards it. */
+/** How one outline step reads in the outline: what it is, then what repeats or guards it. */
 export const stepNotes = outlineNotes;
 
 /** The first and last line of a step (from 1), or null when the daemon sent none. The last is never before the first. */

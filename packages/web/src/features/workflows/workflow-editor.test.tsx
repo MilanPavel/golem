@@ -41,6 +41,22 @@ test("a step in the outline selects it, shows its fields and marks its lines", a
   expect(screen.getByRole("button", { name: /Summarise each pull request/ }).getAttribute("aria-current")).toBe("step");
 });
 
+test("picking a step scrolls the code to its first line, and the focus stays on the step", async () => {
+  const user = userEvent.setup();
+  render(editor());
+  const box = screen.getByRole("textbox", { name: "Code of pr_digest" }) as HTMLTextAreaElement;
+  const card = screen.getByRole("button", { name: /Summarise each pull request/ });
+  expect(box.scrollTop).toBe(0);
+  await user.click(card);
+  const first = box.scrollTop;
+  expect(first).toBeGreaterThan(0);
+  expect(document.activeElement).toBe(card);
+  expect(box.selectionStart).toBe(0);
+  // A later step is further down.
+  await user.click(screen.getByRole("button", { name: /Tell you/ }));
+  expect(box.scrollTop).toBeGreaterThan(first);
+});
+
 test("the caret in a step's lines selects that step", async () => {
   render(editor());
   const box = screen.getByRole("textbox", { name: "Code of pr_digest" }) as HTMLTextAreaElement;
