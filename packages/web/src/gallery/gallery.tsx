@@ -104,6 +104,7 @@ import { SAMPLE_LIST, SAMPLE_MORNING_BRIEF, SAMPLE_WORKFLOW_ROUTINE, SAMPLE_WORK
 import { LeadRun, RunBanner, RunsList, RunsPanel, WorkflowRunView } from "../features/runs/index.ts";
 import { SAMPLE_RUN_CANCELLED, SAMPLE_RUN_DONE, SAMPLE_RUN_FAILED, SAMPLE_RUN_REVIEW, SAMPLE_RUN_RUNNING, SAMPLE_RUN_TOOL_ASK, WORKFLOW_RUN_NOW } from "../features/runs/workflow-sample.ts";
 import { DataGallery } from "./gallery-data.tsx";
+import { DataIconsGallery } from "./gallery-data-icons.tsx";
 import { DataResultGallery } from "./gallery-data-result.tsx";
 import { RunForm, WorkflowDetail, WorkflowStarters, WorkflowsEmpty, WorkflowsPanel } from "../features/workflows/index.ts";
 import { SAMPLE_BROKEN, SAMPLE_FIELD_REFUSED, SAMPLE_PR_DIGEST, SAMPLE_PR_DIGEST_CODE, SAMPLE_PR_DIGEST_EDITED_CODE, SAMPLE_PR_DIGEST_EDITED_STEPS, SAMPLE_PR_DIGEST_HASH, SAMPLE_PR_DIGEST_PROBLEMS, SAMPLE_PR_DIGEST_PROPOSAL, SAMPLE_PR_DIGEST_PROPOSAL_PROBLEM, SAMPLE_PR_DIGEST_STEPS, SAMPLE_ROUTINE_WORKFLOW_RUN, SAMPLE_SAVE_CONFLICT, SAMPLE_BRIEFING, SAMPLE_PROJECT_STARTER, SAMPLE_STARTERS, SAMPLE_STARTER_FOLDER, SAMPLE_UNTRUSTED, SAMPLE_UPGRADE, SAMPLE_UPGRADE_AGENTS, SAMPLE_UPGRADE_CODE, SAMPLE_UPGRADE_STEPS, SAMPLE_WORKFLOW_LIST, SAMPLE_WORKFLOW_LIST_TWO_PROJECTS, SAMPLE_WORKFLOW_RUNS, WORKFLOWS_NOW } from "../features/workflows/sample.ts";
@@ -2502,6 +2503,10 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
 
       <Only id="data">
         <DataGallery theme={theme} id={anchor("Data")} />
+      </Only>
+
+      <Only id="data-icons">
+        <DataIconsGallery theme={theme} id={anchor("Data icons")} />
       </Only>
 
       <Only id="data-result">

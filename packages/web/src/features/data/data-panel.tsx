@@ -1,7 +1,8 @@
 import { useId } from "react";
-import { DATA_NOT_AVAILABLE, groupSources, kindGlyph, sourceDetail } from "@golem/view";
+import { DATA_NOT_AVAILABLE, groupSources, sourceDetail } from "@golem/view";
 import { cn } from "../../ui/cn.ts";
 import { Button } from "../../ui/button.tsx";
+import { DataSourceIcon } from "../../ui/data-icons.tsx";
 import { Link } from "../../ui/link.tsx";
 import type { DataAnswer, DataListResult, DataSource } from "../../store/data.ts";
 import { dataPath } from "../../store/router.ts";
@@ -22,9 +23,7 @@ function SourceRow({ source, selected, onNavigate }: { source: DataSource; selec
         )}
       >
         <span className="flex items-center gap-2">
-          <span aria-hidden="true" className="w-4 shrink-0 text-center text-meta text-faint">
-            {kindGlyph(source.kind)}
-          </span>
+          <DataSourceIcon kind={source.kind} location={source.location} className="shrink-0" />
           <span className="min-w-0 flex-1 truncate">{source.name}</span>
           <PrivacyChip privacy={source.privacy} className="shrink-0 px-2 py-0.5" />
         </span>

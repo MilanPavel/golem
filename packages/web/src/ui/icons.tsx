@@ -1,9 +1,9 @@
 import type { ComponentProps } from "react";
 
-type IconProps = Omit<ComponentProps<"svg">, "children">;
+export type IconProps = Omit<ComponentProps<"svg">, "children">;
 
 // 16 px, drawn in currentColor, hidden from screen readers: the control that holds an icon names it.
-function Icon({ children, ...props }: ComponentProps<"svg">) {
+export function Icon({ children, ...props }: ComponentProps<"svg">) {
   return (
     <svg
       viewBox="0 0 16 16"
@@ -176,11 +176,11 @@ export const InboxIcon = (props: IconProps) => (
     <path d="M2 9.5h3.5l.8 1.5h3.4l.8-1.5H14" />
   </Icon>
 );
-/** A small table: a header row and two columns. */
+/** A database: a stack of three discs. */
 export const DataIcon = (props: IconProps) => (
   <Icon {...props}>
-    <rect x="2" y="3" width="12" height="10" rx="1.5" />
-    <path d="M2 6.5h12M6.5 6.5V13" />
+    <ellipse cx="8" cy="4" rx="5" ry="2" />
+    <path d="M3 4v8c0 1.1 2.2 2 5 2s5-.9 5-2V4M3 8c0 1.1 2.2 2 5 2s5-.9 5-2" />
   </Icon>
 );
 /** A clock: things that run on a schedule. */

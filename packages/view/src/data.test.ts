@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { askText, columnStats, countText, groupSources, inspectSummary, kindWord, sampleCaption, sourceDetail, stepName, type DataSourceLike } from "./data.ts";
+import { askText, columnStats, countText, groupSources, inspectSummary, kindGlyph, kindWord, sampleCaption, sourceDetail, sourceFileType, stepName, type DataSourceLike } from "./data.ts";
 
 const source = (over: Partial<DataSourceLike> = {}): DataSourceLike => ({ name: "bank", kind: "files", scope: "user", privacy: "local", status: "ready", ...over });
 
@@ -45,4 +45,24 @@ test("small words", () => {
   assert.equal(stepName("where"), "2 · where");
   assert.equal(inspectSummary({ files: 36, tables: [{ name: "transactions" }] }), "36 files match, one table: transactions.");
   assert.equal(inspectSummary({ tables: [] }), "Found no tables.");
+});
+
+test("the type of a source's files comes from its location", () => {
+  assert.equal(sourceFileType("~/Documents/bank/*.csv"), "csv");
+  assert.equal(sourceFileType("a.TSV"), "csv");
+  assert.equal(sourceFileType("~/receipts/*.xlsx"), "excel");
+  assert.equal(sourceFileType("a.parquet"), "parquet");
+  assert.equal(sourceFileType("./var/log/*.jsonl"), "json");
+  assert.equal(sourceFileType("data.json"), "json");
+  assert.equal(sourceFileType("logs/"), "folder");
+  assert.equal(sourceFileType("~/Documents/bank"), "folder");
+  assert.equal(sourceFileType("~/Documents/bank/*"), "folder");
+  assert.equal(sourceFileType("a.db"), "sheet");
+  assert.equal(sourceFileType(""), "sheet");
+  assert.equal(sourceFileType("https://example.com/data.csv?download=1"), "csv");
+  assert.equal(sourceFileType("https://example.com/export.parquet#top"), "parquet");
+});
+
+test("every kind has a one-character glyph for the terminal", () => {
+  for (const kind of ["builtin", "files", "sqlite", "duckdb", "postgres", "mysql", "url"] as const) assert.equal([...kindGlyph(kind)].length, 1);
 });
