@@ -16,7 +16,7 @@ import json
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from pydantic import ValidationError
 
@@ -294,17 +294,19 @@ def _value_line(value: Any) -> str | None:
     if isinstance(value, str):
         return _one_line(value) or None
     if isinstance(value, list):
-        if not value:
+        rows = cast("list[object]", value)
+        if not rows:
             return None
-        if all(isinstance(item, dict) for item in value):
-            return f"{len(value)} {'row' if len(value) == 1 else 'rows'}"
+        if all(isinstance(item, dict) for item in rows):
+            return f"{len(rows)} {'row' if len(rows) == 1 else 'rows'}"
     elif isinstance(value, dict):
-        if not value:
+        record = cast("dict[str, object]", value)
+        if not record:
             return None
-        summary = value.get("summary")
+        summary = record.get("summary")
         if isinstance(summary, str) and summary.strip():
             return _one_line(summary)
-        return f"{len(value)} {'field' if len(value) == 1 else 'fields'}"
+        return f"{len(record)} {'field' if len(record) == 1 else 'fields'}"
     return _one_line(json.dumps(value))
 
 
