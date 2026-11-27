@@ -33539,8 +33539,7 @@ public struct WorkflowResumeResult: Codable {
 /// One run of a workflow, from its ``workflow_runs`` row.
 ///
 /// The times are ISO 8601 with an offset. ``session_id`` is the run's headless session, null
-/// until a step needs one.
-/// ``error`` says why a ``failed`` run failed.
+/// until a step needs one. ``error`` says why a ``failed`` run failed.
 // MARK: - WorkflowResumeResultRun
 public struct WorkflowResumeResultRun: Codable {
     public let error: String?
@@ -33642,8 +33641,7 @@ public struct WorkflowReviewAnswerResult: Codable {
 /// One run of a workflow, from its ``workflow_runs`` row.
 ///
 /// The times are ISO 8601 with an offset. ``session_id`` is the run's headless session, null
-/// until a step needs one.
-/// ``error`` says why a ``failed`` run failed.
+/// until a step needs one. ``error`` says why a ``failed`` run failed.
 // MARK: - WorkflowReviewAnswerResultRun
 public struct WorkflowReviewAnswerResultRun: Codable {
     public let error: String?
@@ -33953,8 +33951,7 @@ public struct WorkflowRunFailedNotificationParams: Codable {
 /// One run of a workflow, from its ``workflow_runs`` row.
 ///
 /// The times are ISO 8601 with an offset. ``session_id`` is the run's headless session, null
-/// until a step needs one.
-/// ``error`` says why a ``failed`` run failed.
+/// until a step needs one. ``error`` says why a ``failed`` run failed.
 // MARK: - WorkflowRunInfo
 public struct WorkflowRunInfo: Codable {
     public let error: String?
@@ -34722,8 +34719,7 @@ public struct ReviewElement: Codable {
 /// One run of a workflow, from its ``workflow_runs`` row.
 ///
 /// The times are ISO 8601 with an offset. ``session_id`` is the run's headless session, null
-/// until a step needs one.
-/// ``error`` says why a ``failed`` run failed.
+/// until a step needs one. ``error`` says why a ``failed`` run failed.
 // MARK: - WorkflowStatusResultRun
 public struct WorkflowStatusResultRun: Codable {
     public let error: String?

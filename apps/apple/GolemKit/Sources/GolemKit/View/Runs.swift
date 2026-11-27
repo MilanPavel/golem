@@ -38,6 +38,48 @@ public struct RunLike: Codable, Sendable, Equatable, Identifiable {
     enum CodingKeys: String, CodingKey {
         case kind, routine, trigger, status, summary, reason, approvals, steps
         case sessionId = "session_id", startedAt = "started_at", endedAt = "ended_at", watchPath = "watch_path"
+        case workflowRunId = "workflow_run_id"
+    }
+
+    /// A workflow run has no session until a step needs one, so its row has no `session_id`: the
+    /// run's own id stands in, and a row is keyed the same way (the web uses `runKey`).
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let session = try container.decodeIfPresent(String.self, forKey: .sessionId)
+        let workflow = try container.decodeIfPresent(String.self, forKey: .workflowRunId)
+        guard let key = workflow ?? session else {
+            throw DecodingError.keyNotFound(
+                CodingKeys.sessionId,
+                DecodingError.Context(codingPath: decoder.codingPath, debugDescription: "a run has no id"))
+        }
+        sessionId = key
+        kind = try container.decodeIfPresent(String.self, forKey: .kind)
+        routine = try container.decodeIfPresent(String.self, forKey: .routine)
+        trigger = try container.decodeIfPresent(String.self, forKey: .trigger)
+        status = try container.decode(RunStatus.self, forKey: .status)
+        startedAt = try container.decodeIfPresent(String.self, forKey: .startedAt)
+        endedAt = try container.decodeIfPresent(String.self, forKey: .endedAt)
+        summary = try container.decodeIfPresent(String.self, forKey: .summary)
+        reason = try container.decodeIfPresent(String.self, forKey: .reason)
+        approvals = try container.decodeIfPresent(Int.self, forKey: .approvals)
+        watchPath = try container.decodeIfPresent(String.self, forKey: .watchPath)
+        steps = try container.decodeIfPresent(Int.self, forKey: .steps)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(sessionId, forKey: .sessionId)
+        try container.encodeIfPresent(kind, forKey: .kind)
+        try container.encodeIfPresent(routine, forKey: .routine)
+        try container.encodeIfPresent(trigger, forKey: .trigger)
+        try container.encode(status, forKey: .status)
+        try container.encodeIfPresent(startedAt, forKey: .startedAt)
+        try container.encodeIfPresent(endedAt, forKey: .endedAt)
+        try container.encodeIfPresent(summary, forKey: .summary)
+        try container.encodeIfPresent(reason, forKey: .reason)
+        try container.encodeIfPresent(approvals, forKey: .approvals)
+        try container.encodeIfPresent(watchPath, forKey: .watchPath)
+        try container.encodeIfPresent(steps, forKey: .steps)
     }
 
     public init(
