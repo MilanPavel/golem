@@ -327,7 +327,7 @@ async def test_a_cancel_during_begin_leaves_no_transaction_open(database: Databa
 
 async def test_the_migration_removes_empty_workflow_sessions_only(tmp_path: Path) -> None:
     path = tmp_path / "golem.db"
-    async with Database.open(path, MIGRATIONS[:-1]):
+    async with Database.open(path, MIGRATIONS[:31]):  # up to migration 31; 32 is under test
         pass
     with sqlite3.connect(path) as raw:
         for sid, origin in (

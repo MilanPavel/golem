@@ -344,7 +344,8 @@ class WorkflowEngine:
             inputs: dict[str, Any] = json.loads(record.inputs_json or "{}")
             names = list(inspect.signature(fn).parameters)[1:]
             kwargs = {k: v for k, v in inputs.items() if k in names}
-            await fn(Run(_Journal(self), workflow_run_id, inputs), **kwargs)
+            returned = await fn(Run(_Journal(self), workflow_run_id, inputs), **kwargs)
+            await self._store.set_run_result(workflow_run_id, _result_json(returned))
         except WorkflowWaiting:
             # A review is out: end the task, hold nothing. The answer runs the workflow again.
             await self.mark_waiting(workflow_run_id)
@@ -374,6 +375,23 @@ class _Journal:
 
     async def notify(self, workflow_run_id: str, title: str | None, text: str) -> None:
         await self._engine.notify(workflow_run_id, title, text)
+
+    async def output(
+        self,
+        workflow_run_id: str,
+        position: int,
+        value: Any,
+        title: str | None,
+        summary: str | None,
+    ) -> None:
+        try:
+            encoded = json.dumps(value)
+        except (TypeError, ValueError) as exc:
+            raise WorkflowError(
+                f"run.output got a value that is not JSON ({exc}); give text, numbers, lists"
+                " and dicts"
+            ) from exc
+        await self._engine.store.add_output(workflow_run_id, position, title, encoded, summary)
 
     async def llm(
         self,
@@ -652,6 +670,17 @@ class _Journal:
         await store.set_step_status(workflow_run_id, key, "waiting")
         await event("workflow.step.waiting", workflow_run_id, key)
         raise WorkflowWaiting
+
+
+def _result_json(value: Any) -> str | None:
+    """What the workflow function returned as JSON text; None for nothing. A value that is not
+    JSON is kept as its text, so a finished run is never failed by its return value."""
+    if value is None:
+        return None
+    try:
+        return json.dumps(value)
+    except (TypeError, ValueError):
+        return json.dumps(str(value))
 
 
 def _refuse(reason: str) -> None:

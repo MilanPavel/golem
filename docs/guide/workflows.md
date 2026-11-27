@@ -196,6 +196,19 @@ await run.notify("Release 1.4 is out", title="Release")
 
 `run.notify(text, title=None, key=None)` sends a banner through the Notifier and is saved as a step of kind `notify`, so a run that is executed again does not send it twice. The step key is `key` or `notify:<text>`; inside a loop, give each notice its own `key=`. A click on the banner opens the run's session (when the run has none, the banner has no open hint). Without a notifier the step still completes.
 
+### What came out
+
+```python
+await run.output(report_path, title="Weekly report", summary="12 pull requests, 3 need you")
+return {"merged": 9}
+```
+
+`run.output(value, title=None, summary=None)` marks a result of the run: text, a record, rows, a file path or a URL. Call it as often as you like; the results are kept in order. It is not a step. A run that is executed again after a restart or a resume marks the same results again, and the ones already saved are kept, so none shows twice. `summary` is one line for a list; the summary of the first output is the run's summary.
+
+What the workflow function returns is saved on the run as its `result`. A workflow that marks no output still shows its return value.
+
+An output that is an absolute path to a text file can be read with `workflow.read_output {workflow_run_id, index}`. Only a path the run marked is read, a file in a secret folder (`~/.ssh`, `~/.golem`, and the like) is refused, and a long file is cut with `truncated` set.
+
 ### Asking an agent
 
 ```python

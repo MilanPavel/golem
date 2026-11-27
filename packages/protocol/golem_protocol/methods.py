@@ -120,6 +120,7 @@ METHOD_ACCESS: Final[Mapping[str, Access]] = {
     "workflow.edit_step": "browser",
     "workflow.start": "browser",
     "workflow.status": "browser",
+    "workflow.read_output": "browser",
     "workflow.cancel": "browser",
     "workflow.resume": "browser",
     "workflow.review.answer": "browser",

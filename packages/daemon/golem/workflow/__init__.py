@@ -113,6 +113,17 @@ class StepBackend(Protocol):
         group_title: str | None = None,
     ) -> Any: ...
 
+    async def output(
+        self,
+        workflow_run_id: str,
+        position: int,
+        value: Any,
+        title: str | None,
+        summary: str | None,
+    ) -> None:
+        """Save result number ``position`` of the run (kept once, however often it is run)."""
+        ...
+
     async def notify(self, workflow_run_id: str, title: str | None, text: str) -> None:
         """Tell the person ``text`` (through the Notifier, when the engine has one)."""
         ...
@@ -254,6 +265,7 @@ class Run:
         self.inputs: dict[str, Any] = dict(inputs or {})
         self._keys: set[str] = set()
         self._groups = 0
+        self._outputs = 0
 
     async def step(
         self,
@@ -362,6 +374,21 @@ class Run:
             draft,
             _clean(title) or ask,
             _group_title.get(),
+        )
+
+    async def output(
+        self, value: Any, title: str | None = None, summary: str | None = None
+    ) -> None:
+        """Mark a result of the run: text, a record, rows, a file path or a URL.
+
+        It may be called more than once; the results are kept in order. It is not a step. A run
+        that is executed again after a restart or a resume marks the same results again, and the
+        ones already saved are kept, so none shows twice. ``summary`` is one line for a list.
+        """
+        position = self._outputs
+        self._outputs += 1
+        await self._backend.output(
+            self.workflow_run_id, position, value, _clean(title), _clean(summary)
         )
 
     async def notify(self, text: str, title: str | None = None, key: str | None = None) -> None:

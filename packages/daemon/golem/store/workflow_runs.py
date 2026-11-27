@@ -14,7 +14,13 @@ from dataclasses import dataclass
 from golem.sessions.ids import new_id
 from golem.store.database import Database, Params, Transaction
 
-__all__ = ["WorkflowReviewRecord", "WorkflowRunRecord", "WorkflowRuns", "WorkflowStepRecord"]
+__all__ = [
+    "WorkflowOutputRecord",
+    "WorkflowReviewRecord",
+    "WorkflowRunRecord",
+    "WorkflowRuns",
+    "WorkflowStepRecord",
+]
 
 _ACTIVE = ("running", "waiting")
 
@@ -35,6 +41,16 @@ class WorkflowRunRecord:
     started_at: str | None
     finished_at: str | None
     source_hash: str | None
+    result_json: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class WorkflowOutputRecord:
+    workflow_run_id: str
+    position: int
+    title: str | None
+    value_json: str
+    summary: str | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -74,6 +90,10 @@ def _run(row: sqlite3.Row) -> WorkflowRunRecord:
 
 def _step(row: sqlite3.Row) -> WorkflowStepRecord:
     return WorkflowStepRecord(**dict(zip(row.keys(), tuple(row), strict=True)))  # type: ignore[arg-type]
+
+
+def _output(row: sqlite3.Row) -> WorkflowOutputRecord:
+    return WorkflowOutputRecord(**dict(zip(row.keys(), tuple(row), strict=True)))  # type: ignore[arg-type]
 
 
 def _review(row: sqlite3.Row) -> WorkflowReviewRecord:
@@ -167,6 +187,33 @@ class WorkflowRuns:
             "UPDATE workflow_runs SET session_id = ? WHERE workflow_run_id = ?",
             (session_id, run_id),
         )
+
+    async def set_run_result(self, run_id: str, result_json: str | None) -> None:
+        """Keep what the workflow function returned (JSON text, or None for nothing)."""
+        await self._write(
+            "UPDATE workflow_runs SET result_json = ? WHERE workflow_run_id = ?",
+            (result_json, run_id),
+        )
+
+    # Outputs
+
+    async def add_output(
+        self, run_id: str, position: int, title: str | None, value_json: str, summary: str | None
+    ) -> None:
+        """Save output ``position``. A run that is executed again marks the same ones; the one
+        already saved is kept, so none is written twice."""
+        await self._write(
+            "INSERT OR IGNORE INTO workflow_outputs"
+            " (workflow_run_id, position, title, value_json, summary) VALUES (?, ?, ?, ?, ?)",
+            (run_id, position, title, value_json, summary),
+        )
+
+    async def list_outputs(self, run_id: str) -> list[WorkflowOutputRecord]:
+        rows = await self._database.fetch_all(
+            "SELECT * FROM workflow_outputs WHERE workflow_run_id = ? ORDER BY position",
+            (run_id,),
+        )
+        return [_output(row) for row in rows]
 
     async def steps_for_recovery(self) -> list[tuple[WorkflowRunRecord, list[WorkflowStepRecord]]]:
         """Every run that is ``running`` or ``waiting``, oldest first, with its steps."""

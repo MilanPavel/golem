@@ -20,6 +20,7 @@ from golem.store.workflow_runs import WorkflowRunRecord, WorkflowStepRecord
 from golem.workflows.check import Problem
 from golem.workflows.edit import EditError, set_argument
 from golem.workflows.outline import OutlineError, WorkflowOutline, outline
+from golem.workflows.outputs import OutputError, read_marked_file
 from golem.workflows.propose import ProposeError
 from golem.workflows.registry import WorkflowEntry
 from golem.workflows.service import ResumeError, ReviewError, SaveError, WorkflowService
@@ -45,6 +46,8 @@ from golem_protocol.commands import (
     WorkflowProblem,
     WorkflowProposeParams,
     WorkflowProposeResult,
+    WorkflowReadOutputParams,
+    WorkflowReadOutputResult,
     WorkflowResumeParams,
     WorkflowResumeResult,
     WorkflowReviewAnswerParams,
@@ -369,7 +372,10 @@ async def workflow_start(ctx: RequestContext, params: WorkflowStartParams) -> Wo
     return WorkflowStartResult(workflow_run_id=run_id)
 
 
-def _run_info(run: WorkflowRunRecord) -> WorkflowRunInfo:
+async def _run_info(service: WorkflowService, run: WorkflowRunRecord) -> WorkflowRunInfo:
+    entry = next((e for e in service.registry.entries() if e.id == run.workflow_id), None)
+    spec = None if entry is None else entry.spec
+    outputs = await service.runs.list_outputs(run.workflow_run_id)
     return WorkflowRunInfo.model_validate(
         {
             "workflow_run_id": run.workflow_run_id,
@@ -382,6 +388,14 @@ def _run_info(run: WorkflowRunRecord) -> WorkflowRunInfo:
             "started_at": run.started_at,
             "finished_at": run.finished_at,
             "error": run.error,
+            "title": None if spec is None else spec.title,
+            "description": "" if spec is None else spec.description,
+            "result": json.loads(run.result_json) if run.result_json else None,
+            "outputs": [
+                {"title": o.title, "value": json.loads(o.value_json), "summary": o.summary}
+                for o in outputs
+            ],
+            "summary": outputs[0].summary if outputs else None,
         }
     )
 
@@ -411,7 +425,8 @@ def _step_info(step: WorkflowStepRecord) -> WorkflowStepInfo:
 async def workflow_status(
     ctx: RequestContext, params: WorkflowStatusParams
 ) -> WorkflowStatusResult:
-    runs = _service(ctx).runs
+    service = _service(ctx)
+    runs = service.runs
     run = await runs.get_run(params.workflow_run_id)
     if run is None:
         raise RpcCallError(INVALID_PARAMS, f"no workflow run {params.workflow_run_id}")
@@ -426,8 +441,27 @@ async def workflow_status(
         for r in await runs.list_open_reviews(params.workflow_run_id)
     ]
     return WorkflowStatusResult(
-        run=_run_info(run), steps=[_step_info(s) for s in steps], reviews=reviews
+        run=await _run_info(service, run), steps=[_step_info(s) for s in steps], reviews=reviews
     )
+
+
+async def workflow_read_output(
+    ctx: RequestContext, params: WorkflowReadOutputParams
+) -> WorkflowReadOutputResult:
+    """The text of an output of a run that is a file path the run marked."""
+    runs = _service(ctx).runs
+    if await runs.get_run(params.workflow_run_id) is None:
+        raise RpcCallError(INVALID_PARAMS, f"no workflow run {params.workflow_run_id}")
+    outputs = await runs.list_outputs(params.workflow_run_id)
+    if params.index >= len(outputs):
+        raise RpcCallError(INVALID_PARAMS, f"the run has no output {params.index}")
+    try:
+        path, text, truncated, size = await asyncio.to_thread(
+            read_marked_file, json.loads(outputs[params.index].value_json), Path.home()
+        )
+    except OutputError as exc:
+        raise RpcCallError(INVALID_PARAMS, str(exc)) from exc
+    return WorkflowReadOutputResult(path=path, text=text, truncated=truncated, size=size)
 
 
 async def workflow_cancel(
@@ -447,19 +481,20 @@ async def workflow_resume(
         run = await service.resume(params.workflow_run_id)
     except ResumeError as exc:
         raise RpcCallError(INVALID_PARAMS, str(exc)) from exc
-    return WorkflowResumeResult(run=_run_info(run))
+    return WorkflowResumeResult(run=await _run_info(service, run))
 
 
 async def workflow_review_answer(
     ctx: RequestContext, params: WorkflowReviewAnswerParams
 ) -> WorkflowReviewAnswerResult:
+    service = _service(ctx)
     try:
-        run = await _service(ctx).answer_review(
+        run = await service.answer_review(
             params.workflow_run_id, params.key, params.verdict, params.text
         )
     except ReviewError as exc:
         raise RpcCallError(INVALID_PARAMS, str(exc)) from exc
-    return WorkflowReviewAnswerResult(run=_run_info(run))
+    return WorkflowReviewAnswerResult(run=await _run_info(service, run))
 
 
 __all__ = [
@@ -468,6 +503,7 @@ __all__ = [
     "workflow_get",
     "workflow_list",
     "workflow_propose",
+    "workflow_read_output",
     "workflow_resume",
     "workflow_review_answer",
     "workflow_save",

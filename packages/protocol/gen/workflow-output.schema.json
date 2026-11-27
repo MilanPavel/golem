@@ -1,0 +1,36 @@
+{
+  "additionalProperties": false,
+  "description": "One result a run marked with ``run.output``.\n\n``value`` is the JSON given (text, a record, rows, a file path or a URL).",
+  "properties": {
+    "summary": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Summary"
+    },
+    "title": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Title"
+    },
+    "value": {
+      "default": null,
+      "title": "Value"
+    }
+  },
+  "title": "WorkflowOutput",
+  "type": "object"
+}

@@ -1,0 +1,31 @@
+{
+  "additionalProperties": false,
+  "description": "The file's text, cut at ``limit`` characters; ``truncated`` says it was cut.",
+  "properties": {
+    "path": {
+      "title": "Path",
+      "type": "string"
+    },
+    "size": {
+      "minimum": 0,
+      "title": "Size",
+      "type": "integer"
+    },
+    "text": {
+      "title": "Text",
+      "type": "string"
+    },
+    "truncated": {
+      "default": false,
+      "title": "Truncated",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "path",
+    "text",
+    "size"
+  ],
+  "title": "WorkflowReadOutputResult",
+  "type": "object"
+}

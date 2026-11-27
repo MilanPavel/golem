@@ -446,4 +446,19 @@ MIGRATIONS: tuple[tuple[str, ...], ...] = (
         f"DELETE FROM events WHERE session_id IN ({_EMPTY_WORKFLOW})",
         f"DELETE FROM sessions WHERE session_id IN ({_EMPTY_WORKFLOW})",
     ),
+    (
+        # A run keeps what its function returned, and what it marked with ``run.output``.
+        "ALTER TABLE workflow_runs ADD COLUMN result_json TEXT",
+        """
+        CREATE TABLE workflow_outputs (
+            workflow_run_id TEXT NOT NULL REFERENCES workflow_runs (workflow_run_id)
+                ON DELETE CASCADE,
+            position INTEGER NOT NULL,
+            title TEXT,
+            value_json TEXT NOT NULL,
+            summary TEXT,
+            PRIMARY KEY (workflow_run_id, position)
+        )
+        """,
+    ),
 )

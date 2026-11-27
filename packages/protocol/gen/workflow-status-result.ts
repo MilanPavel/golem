@@ -5,12 +5,18 @@ export type Ask = string;
 export type CreatedAt = string;
 export type Key = string;
 export type Reviews = WorkflowReviewInfo[];
+export type Description = string;
 export type Error = string | null;
 export type FinishedAt = string | null;
 export type Name = string;
+export type Summary = string | null;
+export type Title = string | null;
+export type Outputs = WorkflowOutput[];
 export type SessionId = string | null;
 export type StartedAt = string | null;
 export type Status = 'pending' | 'running' | 'waiting' | 'done' | 'failed' | 'cancelled';
+export type Summary1 = string | null;
+export type Title1 = string | null;
 export type Trigger = string;
 export type WorkflowId = string;
 export type WorkflowRunId = string;
@@ -27,7 +33,7 @@ export type Kind = 'step' | 'agent' | 'review' | 'notify' | 'llm' | 'tool' | 'sk
 export type Model = string | null;
 export type StartedAt1 = string | null;
 export type Status1 = 'pending' | 'running' | 'waiting' | 'done' | 'failed' | 'skipped' | 'in_doubt';
-export type Title = string;
+export type Title2 = string;
 export type Steps = WorkflowStepInfo[];
 
 /**
@@ -71,18 +77,42 @@ export interface Draft {
  * via the `definition` "WorkflowRunInfo".
  */
 export interface WorkflowRunInfo {
+  description?: Description;
   error?: Error;
   finished_at?: FinishedAt;
   inputs?: Inputs;
   name: Name;
+  outputs?: Outputs;
+  result?: Result;
   session_id?: SessionId;
   started_at?: StartedAt;
   status: Status;
+  summary?: Summary1;
+  title?: Title1;
   trigger: Trigger;
   workflow_id: WorkflowId;
   workflow_run_id: WorkflowRunId;
 }
 export interface Inputs {
+  [k: string]: unknown;
+}
+/**
+ * One result a run marked with ``run.output``.
+ *
+ * ``value`` is the JSON given (text, a record, rows, a file path or a URL).
+ *
+ * This interface was referenced by `WorkflowStatusResult`'s JSON-Schema
+ * via the `definition` "WorkflowOutput".
+ */
+export interface WorkflowOutput {
+  summary?: Summary;
+  title?: Title;
+  value?: Value;
+}
+export interface Value {
+  [k: string]: unknown;
+}
+export interface Result {
   [k: string]: unknown;
 }
 /**
@@ -108,11 +138,11 @@ export interface WorkflowStepInfo {
   key: Key1;
   kind: Kind;
   model?: Model;
-  result?: Result;
+  result?: Result1;
   started_at?: StartedAt1;
   status: Status1;
-  title: Title;
+  title: Title2;
 }
-export interface Result {
+export interface Result1 {
   [k: string]: unknown;
 }
