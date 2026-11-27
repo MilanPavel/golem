@@ -43,7 +43,7 @@ const broken: WorkflowEntryInfo = {
 
 const STARTERS = [
   { id: "fix_check", title: "Fix a failing check", line: "Fixes it in a copy.", needs_folder: true },
-  { id: "morning_briefing", title: "Morning briefing", line: "Reads your logs.", needs_folder: false, schedule: "Runs every weekday at 07:30" },
+  { id: "morning_briefing", title: "Morning briefing", line: "Reads your logs.", needs_folder: false, schedule: "Runs every weekday at 07:30", routine: { name: "morning-briefing", schedule: "weekdays 07:30", words: "every weekday at 07:30" } },
 ];
 
 const T0 = "2026-11-25T10:00:00+00:00";
@@ -74,9 +74,9 @@ function fake(script: WorkflowNotice[], entries: WorkflowEntryInfo[] = [ok, brok
       calls.push("starters");
       return { starters: STARTERS };
     },
-    addWorkflowStarter: async (id, folder) => {
-      calls.push(`add ${id} ${folder ?? "-"}`);
-      return { id: `/p/workflows/${id}.py::${id}`, name: id, path: `/p/workflows/${id}.py` };
+    addWorkflowStarter: async (id, folder, routine) => {
+      calls.push(`add ${id} ${folder ?? "-"}${routine === true ? " routine" : ""}`);
+      return { id: `/p/workflows/${id}.py::${id}`, name: id, path: `/p/workflows/${id}.py`, ...(routine === true ? { routine: "morning-briefing" } : {}) };
     },
     checkWorkflow: async (id) => {
       calls.push(`check ${id}`);
@@ -367,8 +367,9 @@ test("check prints line, step and message, and exits 1 only for an error", async
 
 test("the starter arguments parse", () => {
   assert.deepEqual(parseWorkflowArgs(["starters"]), { kind: "starters" });
-  assert.deepEqual(parseWorkflowArgs(["add", "fix_check"]), { kind: "add", id: "fix_check", folder: null });
-  assert.deepEqual(parseWorkflowArgs(["add", "fix_check", "--folder", "/p"]), { kind: "add", id: "fix_check", folder: "/p" });
+  assert.deepEqual(parseWorkflowArgs(["add", "fix_check"]), { kind: "add", id: "fix_check", folder: null, routine: false });
+  assert.deepEqual(parseWorkflowArgs(["add", "fix_check", "--folder", "/p"]), { kind: "add", id: "fix_check", folder: "/p", routine: false });
+  assert.deepEqual(parseWorkflowArgs(["add", "morning_briefing", "--routine"]), { kind: "add", id: "morning_briefing", folder: null, routine: true });
   for (const bad of [["starters", "x"], ["add"], ["add", "a", "b"], ["add", "a", "--folder"], ["add", "--nope", "a"]]) {
     assert.equal(parseWorkflowArgs(bad).kind, "error", bad.join(" "));
   }
@@ -391,6 +392,27 @@ test("add puts a project starter in the current folder, or in --folder, and a us
   assert.equal(await runWorkflowAdd(client, { id: "morning_briefing", folder: null }, deps), 0);
   assert.deepEqual(calls.filter((c) => c.startsWith("add")), ["add fix_check /work/proj", "add fix_check /work/other", "add morning_briefing -"]);
   assert.match(out[0] as string, /^added fix_check: \/p\/workflows\/fix_check\.py$/);
+});
+
+test("add --routine asks for the routine and says what was made", async () => {
+  const { client, calls } = fake([]);
+  const { deps, out, err } = setup();
+  assert.equal(await runWorkflowAdd(client, { id: "morning_briefing", folder: null, routine: true }, deps), 0);
+  assert.deepEqual(calls.filter((c) => c.startsWith("add")), ["add morning_briefing - routine"]);
+  assert.equal(out[1], "added routine morning-briefing (weekdays 07:30): it starts morning_briefing");
+  assert.deepEqual(err, []);
+});
+
+test("add --routine still adds the workflow when the routine could not be made, and says why", async () => {
+  const { client } = fake([]);
+  const partial: WorkflowClient = {
+    ...client,
+    addWorkflowStarter: async (id) => ({ id: `/p/${id}.py::${id}`, name: id, path: `/p/${id}.py`, routine_problem: "the routine morning-briefing was not added: it exists" }),
+  };
+  const { deps, out, err } = setup();
+  assert.equal(await runWorkflowAdd(partial, { id: "morning_briefing", folder: null, routine: true }, deps), 0);
+  assert.match(out[0] as string, /^added morning_briefing: /);
+  assert.deepEqual(err, ["the routine morning-briefing was not added: it exists"]);
 });
 
 test("add says so for an unknown starter, and shows the daemon's reason when it refuses", async () => {

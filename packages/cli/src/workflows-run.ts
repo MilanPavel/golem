@@ -15,12 +15,12 @@ export interface WorkflowDeps {
   onInterrupt(handler: () => void): () => void;
 }
 
-export const WORKFLOW_USAGE = "usage: golem workflow [list] | golem workflow starters | golem workflow add <starter> [--folder PATH] | golem workflow check <name|id> | golem workflow run <name|id> [--input k=v]… | golem workflow status <workflow_run_id> | golem workflow resume <workflow_run_id> | golem workflow answer <workflow_run_id> [--key K] [--edit TEXT | --reject]";
+export const WORKFLOW_USAGE = "usage: golem workflow [list] | golem workflow starters | golem workflow add <starter> [--folder PATH] [--routine] | golem workflow check <name|id> | golem workflow run <name|id> [--input k=v]… | golem workflow status <workflow_run_id> | golem workflow resume <workflow_run_id> | golem workflow answer <workflow_run_id> [--key K] [--edit TEXT | --reject]";
 
 export type WorkflowParse =
   | { kind: "list" }
   | { kind: "starters" }
-  | { kind: "add"; id: string; folder: string | null }
+  | { kind: "add"; id: string; folder: string | null; routine: boolean }
   | { kind: "check"; name: string }
   | { kind: "run"; name: string; inputs: Record<string, string> }
   | { kind: "status"; runId: string }
@@ -37,9 +37,12 @@ export function parseWorkflowArgs(given: readonly string[]): WorkflowParse {
   if (sub === "add") {
     let id: string | undefined;
     let folder: string | null = null;
+    let routine = false;
     for (let i = 0; i < rest.length; i += 1) {
       const arg = rest[i] as string;
-      if (arg === "--folder") {
+      if (arg === "--routine") {
+        routine = true;
+      } else if (arg === "--folder") {
         const value = rest[i + 1];
         if (value === undefined || value === "") return fail("--folder takes the project folder, for example --folder ~/work/app");
         folder = value;
@@ -50,7 +53,7 @@ export function parseWorkflowArgs(given: readonly string[]): WorkflowParse {
         id = arg;
       }
     }
-    return id === undefined ? fail() : { kind: "add", id, folder };
+    return id === undefined ? fail() : { kind: "add", id, folder, routine };
   }
   if (sub === "status" || sub === "resume") {
     const [runId, ...extra] = rest;
@@ -196,8 +199,8 @@ export async function runWorkflowStarters(client: WorkflowClient, deps: Workflow
   }
 }
 
-/** `golem workflow add <starter> [--folder PATH]`: a starter that reads a project goes in `--folder` (the current folder when not given). */
-export async function runWorkflowAdd(client: WorkflowClient, args: { id: string; folder: string | null }, deps: WorkflowDeps): Promise<number> {
+/** `golem workflow add <starter> [--folder PATH] [--routine]`: a starter that reads a project goes in `--folder` (the current folder when not given). `--routine` also adds the starter's routine. */
+export async function runWorkflowAdd(client: WorkflowClient, args: { id: string; folder: string | null; routine?: boolean }, deps: WorkflowDeps): Promise<number> {
   try {
     const known = (await client.listWorkflowStarters()).starters.find((s) => s.id === args.id);
     if (known === undefined) {
@@ -205,8 +208,13 @@ export async function runWorkflowAdd(client: WorkflowClient, args: { id: string;
       return 1;
     }
     const folder = known.needs_folder ? resolve(deps.cwd, args.folder ?? ".") : undefined;
-    const added = await client.addWorkflowStarter(known.id, folder);
+    const added = args.routine === true ? await client.addWorkflowStarter(known.id, folder, true) : await client.addWorkflowStarter(known.id, folder);
     deps.write(`added ${added.name}: ${added.path}`);
+    if (added.routine !== undefined && added.routine !== null) {
+      const when = known.routine?.schedule === undefined ? "" : ` (${known.routine.schedule})`;
+      deps.write(`added routine ${added.routine}${when}: it starts ${added.name}`);
+    }
+    if (added.routine_problem !== undefined && added.routine_problem !== null) deps.error(added.routine_problem);
     deps.write(`Run it with: golem workflow run ${added.name}`);
     return 0;
   } catch (error) {
