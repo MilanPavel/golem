@@ -5,7 +5,7 @@ import { resetThemeAfterEach, showTheme } from "./gallery-test-utils.ts";
 
 resetThemeAfterEach();
 
-test("the gallery's Workflows section shows the panels and a detail for each tab and state", () => {
+test("the gallery's Workflows section shows the panels and the detail header in each state", () => {
   showTheme("slip");
   render(<Gallery />);
   const panel = within(screen.getByRole("complementary", { name: "Workflows, slip" }));
@@ -15,21 +15,23 @@ test("the gallery's Workflows section shows the panels and a detail for each tab
   expect(within(screen.getByRole("complementary", { name: "Workflows, two projects, slip" })).getByRole("link", { name: /deploy/ }).textContent).toContain("not trusted");
   expect(within(screen.getByRole("complementary", { name: "Workflows, empty, slip" })).getByText(/No workflows yet/)).toBeTruthy();
   expect(within(screen.getByRole("complementary", { name: "Workflows, loading, slip" })).getByText("Loading workflows.")).toBeTruthy();
-  const code = within(screen.getByRole("region", { name: "Workflow detail, Code, slip" }));
-  expect(code.getByRole("textbox", { name: "Code of pr_digest" })).toBeTruthy();
-  expect(within(screen.getByRole("region", { name: "Workflow detail, Runs, slip" })).getByRole("list", { name: "Runs" })).toBeTruthy();
-  expect(within(screen.getByRole("region", { name: "Workflow detail, Runs, none yet, slip" })).getByText("No runs yet.")).toBeTruthy();
+  const detail = (name: string) => within(screen.getByRole("region", { name: `Workflow detail, ${name}, slip` }));
+  expect(detail("one routine").getByRole("textbox", { name: "Code of pr_digest" })).toBeTruthy();
+  expect(detail("one routine").getByRole("link", { name: /Weekdays at 09:00/ })).toBeTruthy();
+  expect(detail("two routines").getByRole("button", { name: /2 routines/ })).toBeTruthy();
+  expect(detail("not scheduled").getByRole("link", { name: /Not scheduled/ }).getAttribute("href")).toContain("/routines?new&workflow=");
+  expect(detail("never run").getByText("never run")).toBeTruthy();
+  expect(detail("last run failed").getByRole("link", { name: /Last run/ }).textContent).toContain("failed");
+  expect(detail("checks failing").getByText(/problems?$/, { selector: "span" })).toBeTruthy();
+  expect(detail("one routine").queryByRole("tab")).toBeNull();
   expect(within(screen.getByRole("region", { name: "Workflow detail, broken, slip" })).getByRole("alert").textContent).toContain("ImportError");
 });
 
-test("the gallery's Triggers stories and the routine editor stories show each state, in both themes", () => {
+test("the gallery's routine editor stories show each state, in both themes", () => {
   for (const theme of ["slip", "kiln"] as const) {
     showTheme(theme);
     const { unmount } = render(<Gallery />);
     const story = (name: string) => within(screen.getByRole("region", { name: `${name}, ${theme}` }));
-    const rows = story("Workflow detail, Triggers").getAllByRole("listitem");
-    expect(rows.map((row) => row.textContent).join("|")).toContain("weekday-pr-digest");
-    expect(story("Workflow detail, Triggers, none").getByText(/No routine starts this workflow/)).toBeTruthy();
     expect(story("Routine detail, workflow").getByText("repo=MilanPavel/golem, since=1d")).toBeTruthy();
     expect((story("Routine editor, workflow, inputs filled").getByRole("combobox", { name: "Workflow" }) as HTMLSelectElement).value).toBe("pr_digest");
     expect(story("Routine editor, workflow, required input missing").getByText("Fill in the inputs marked required.")).toBeTruthy();

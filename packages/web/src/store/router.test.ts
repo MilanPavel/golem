@@ -94,6 +94,14 @@ test("parseRoute reads the workflows page and one workflow, and workflowPath rou
   for (const bad of ["/workflows/", "/workflows/a/b", "/workflowsx"]) {
     expect(parseRoute(bad)).toEqual({ name: "not-found" });
   }
+  // The old tab paths land on the page.
+  expect(parseRoute(`${workflowPath(id)}/runs`)).toEqual({ name: "workflow", id });
+  expect(parseRoute(`${workflowPath(id)}/triggers`)).toEqual({ name: "workflow", id });
+});
+
+test("runsPath filters the Runs page by a workflow", () => {
+  expect(runsPath()).toBe("/runs");
+  expect(runsPath("/a/b.py::b")).toBe("/runs?workflow=%2Fa%2Fb.py%3A%3Ab");
 });
 
 test("parseRoute reads the data page and one source with its tab, and dataPath round-trips", () => {

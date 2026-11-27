@@ -101,7 +101,8 @@ export function parseRoute(pathname: string, search = ""): Route {
   if (pathname === "/workflows") {
     return { name: "workflows" };
   }
-  const workflow = /^\/workflows\/([^/]+)$/.exec(pathname)?.[1];
+  // The old `/workflows/:id/runs` and `/workflows/:id/triggers` land on the workflow's page: it has no tabs now.
+  const workflow = /^\/workflows\/([^/]+)(?:\/(?:runs|triggers))?$/.exec(pathname)?.[1];
   if (workflow !== undefined) {
     try {
       const id = decodeURIComponent(workflow);

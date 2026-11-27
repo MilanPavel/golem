@@ -1,21 +1,21 @@
-import { useCallback, useState, type ReactNode } from "react";
-import { nextRunText, routineState, triggerWords } from "@golem/view";
-import { routineNewPath, routinePath, settingsPath } from "../../store/router.ts";
+import { useCallback, useState } from "react";
+import { ADD_ROUTINE_WORDS, allRunsWords, checksWords, lastRunWords, routinePillWords } from "@golem/view";
+import { routineNewPath, routinePath, runsPath, settingsPath } from "../../store/router.ts";
 import type { RoutineInfo } from "../../store/routines.ts";
 import type { RunInfo } from "../../store/runs.ts";
 import type { WorkflowCheckResult, WorkflowEntryInfo, WorkflowOutlineStep, WorkflowSaveResult } from "../../store/workflows.ts";
 import { Badge } from "../../ui/badge.tsx";
 import { Button } from "../../ui/button.tsx";
 import { Code } from "../../ui/code.tsx";
+import { cn } from "../../ui/cn.ts";
 import { Link } from "../../ui/link.tsx";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../ui/tabs.tsx";
-import { RunRow } from "../runs/index.ts";
+import { Popover, PopoverContent, PopoverTrigger } from "../../ui/popover.tsx";
+import { runHref } from "../runs/index.ts";
 import { PendingButton } from "../routines/routine-detail.tsx";
-import { RoutineDot } from "../routines/routine-dot.tsx";
 import { RunDialog } from "./run-dialog.tsx";
 import { WorkflowDot } from "./workflow-dot.tsx";
 import { WorkflowEditor, type WorkflowEditorProps } from "./workflow-editor.tsx";
-import { errorLine, triggerText } from "./text.ts";
+import { errorLine } from "./text.ts";
 
 export type WorkflowDetailProps = {
   workflow: WorkflowEntryInfo;
@@ -23,7 +23,7 @@ export type WorkflowDetailProps = {
   steps: readonly WorkflowOutlineStep[];
   /** The text of the file, or null when it is not shown (a broken or untrusted file, or one that cannot be read). */
   code: string | null;
-  /** This workflow's runs, newest first. */
+  /** This workflow's runs, newest first, for the Last run and All runs pills. */
   runs: readonly RunInfo[];
   /** The hash of `code`, which a save names as its base. Without it the code is read only. */
   codeHash?: string | null;
@@ -39,7 +39,7 @@ export type WorkflowDetailProps = {
   onPropose?: WorkflowEditorProps["onPropose"];
   /** The editor's state to start in. For the gallery and tests. */
   initialEditor?: WorkflowEditorProps["initial"];
-  /** The routines whose `workflow` is this one, for the Triggers tab. */
+  /** The routines whose `workflow` is this one, for the Routine pill. */
   routines?: readonly RoutineInfo[];
   now: number;
   onNavigate: (path: string) => void;
@@ -51,29 +51,13 @@ export type WorkflowDetailProps = {
   onChooseFolder?: (start: string | null) => Promise<string | null>;
   /** Opens the Run… dialog at the start. For the gallery and tests. */
   initialRunOpen?: boolean;
-  /** The tab shown first. The Code by default. */
-  initialTab?: "code" | "runs" | "triggers";
 };
-
-type Tab = "code" | "runs" | "triggers";
-
-/** A tab body: the header and the tab list stay put and this scrolls. The Code tab fills it from lg up and scrolls inside its columns. */
-const BODY = "min-h-0 flex-1 overflow-y-auto";
 
 const STATE_LINE: Record<WorkflowEntryInfo["state"], string> = {
   ok: "Ready",
   broken: "Broken: the file does not load",
   untrusted: "Not trusted: the project is not trusted, so the file is listed and never run",
 };
-
-function Section({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <section className="flex flex-col gap-2">
-      <h2 className="text-meta font-medium text-faint">{title}</h2>
-      {children}
-    </section>
-  );
-}
 
 function ErrorBox({ error }: { error: string }) {
   return (
@@ -84,9 +68,10 @@ function ErrorBox({ error }: { error: string }) {
   );
 }
 
-const LINK = "text-clay-ink underline underline-offset-2 outline-offset-2 outline-clay focus-visible:outline-2";
+const PILL = "inline-flex items-center gap-1.5 rounded-full border border-line bg-surface px-2.5 py-0.5 text-meta text-muted";
+const PILL_LINK = `${PILL} outline-offset-2 outline-clay hover:border-line-strong focus-visible:outline-2`;
 
-function CodeTab({ workflow, steps, code, codeHash, onCheck, onSave, onPropose, onEditStep, agents, onOpenAgent, onReveal, onDirtyChange, initialEditor }: Pick<WorkflowDetailProps, "workflow" | "steps" | "code" | "codeHash" | "onCheck" | "onSave" | "onPropose" | "onEditStep" | "agents" | "onReveal" | "initialEditor"> & { onDirtyChange: (dirty: boolean) => void; onOpenAgent: (name: string) => void }) {
+function CodeTab({ workflow, steps, code, codeHash, onCheck, onSave, onPropose, onEditStep, agents, onOpenAgent, onReveal, onDirtyChange, onProblemsChange, initialEditor }: Pick<WorkflowDetailProps, "workflow" | "steps" | "code" | "codeHash" | "onCheck" | "onSave" | "onPropose" | "onEditStep" | "agents" | "onReveal" | "initialEditor"> & { onDirtyChange: (dirty: boolean) => void; onProblemsChange: (count: number) => void; onOpenAgent: (name: string) => void }) {
   if (code === null) {
     return (
       <div className="flex flex-col gap-2">
@@ -111,74 +96,96 @@ function CodeTab({ workflow, steps, code, codeHash, onCheck, onSave, onPropose, 
       onOpenAgent={onOpenAgent}
       onReveal={onReveal}
       onDirtyChange={onDirtyChange}
+      onProblemsChange={onProblemsChange}
       initial={initialEditor}
     />
   );
 }
 
-function RunsTab({ runs, now, onNavigate }: Pick<WorkflowDetailProps, "runs" | "now" | "onNavigate">) {
-  if (runs.length === 0) return <p className="text-sm text-muted">No runs yet.</p>;
+/** The Routine pill: one routine opens it, two or more list them, none offers a new one filled in with this workflow. */
+function RoutinePill({ workflow, routines, now, onNavigate }: { workflow: WorkflowEntryInfo; routines: readonly RoutineInfo[]; now: number; onNavigate: (path: string) => void }) {
+  const words = routinePillWords(routines, now);
+  const [only, second] = routines;
+  if (only === undefined) {
+    return (
+      <Link href={routineNewPath(null, workflow.id)} onNavigate={onNavigate} className={cn(PILL_LINK, "border-dashed")}>
+        <span>
+          <b className="font-medium text-ink">Not scheduled</b>
+          {words.slice("Not scheduled".length)} · <span className="text-clay-ink underline underline-offset-2">{ADD_ROUTINE_WORDS}</span>
+        </span>
+      </Link>
+    );
+  }
+  if (second === undefined) {
+    return (
+      <Link href={routinePath(only.config.name, only.folder)} onNavigate={onNavigate} className={PILL_LINK}>
+        Routine <b className="font-medium text-ink">{words}</b>
+        <span aria-hidden="true">→</span>
+      </Link>
+    );
+  }
   return (
-    <ul aria-label="Runs" className="flex max-w-4xl flex-col gap-0.5">
-      {runs.map((run) => (
-        <RunRow key={run.session_id} run={run} now={now} onNavigate={onNavigate} />
-      ))}
-    </ul>
+    <Popover>
+      <PopoverTrigger className={cn(PILL_LINK, "cursor-pointer")}>
+        <b className="font-medium text-ink">{words}</b>
+        <span aria-hidden="true">▾</span>
+      </PopoverTrigger>
+      <PopoverContent className="flex w-auto min-w-56 flex-col gap-1 p-2" align="start">
+        <ul aria-label="Routines that start it" className="flex flex-col gap-0.5">
+          {routines.map((routine) => (
+            <li key={`${routine.config.name}/${routine.folder ?? ""}`}>
+              <Link href={routinePath(routine.config.name, routine.folder)} onNavigate={onNavigate} className="flex flex-col rounded-md px-2 py-1.5 outline-offset-2 outline-clay hover:bg-line focus-visible:outline-2">
+                <span className="text-sm font-medium">{routine.config.name}</span>
+                <span className="text-meta text-muted">{routinePillWords([routine], now)}</span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </PopoverContent>
+    </Popover>
   );
 }
 
-/** The inputs a routine gives the workflow: `repo=MilanPavel/golem, since=1d`. Empty for none. */
-function inputsText(routine: RoutineInfo): string {
-  return Object.entries(routine.config.inputs ?? {})
-    .map(([key, value]) => `${key}=${String(value)}`)
-    .join(", ");
-}
-
-function TriggersTab({ workflow, routines, now, onNavigate }: { workflow: WorkflowEntryInfo; routines: readonly RoutineInfo[]; now: number; onNavigate: (path: string) => void }) {
+/** The pills under the title: the routine, the last run, all the runs, and the checks. */
+function Pills({ workflow, routines, runs, problems, now, onNavigate }: { workflow: WorkflowEntryInfo; routines: readonly RoutineInfo[]; runs: readonly RunInfo[]; problems: number; now: number; onNavigate: (path: string) => void }) {
+  const last = runs[0];
   return (
-    <div className="flex max-w-3xl flex-col gap-3">
-      <p className="text-sm text-muted">Everything that can start this workflow. A workflow has no trigger of its own; routines hold the &quot;when&quot;, so this tab lists the routines that point here.</p>
-      <p className="text-sm">Starts: {triggerText(workflow.trigger)}</p>
-      <Section title="Routines that start it">
-        {routines.length === 0 ? (
-          <p className="text-sm text-muted">
-            No routine starts this workflow. Make one in{" "}
-            <Link href={routineNewPath()} onNavigate={onNavigate} className={LINK}>
-              Routines
-            </Link>
-            : choose &quot;A workflow&quot; under Run, then pick this one.
-          </p>
-        ) : (
-          <ul aria-label="Routines that start it" className="flex flex-col gap-2">
-            {routines.map((routine) => {
-              const inputs = inputsText(routine);
-              return (
-                <li key={`${routine.config.name}/${routine.folder ?? ""}`} className="flex flex-col gap-1 rounded-lg border border-line bg-surface p-3">
-                  <div className="flex items-center gap-2">
-                    <RoutineDot state={routineState(routine)} />
-                    <span className="min-w-0 truncate text-sm font-medium">{routine.config.name}</span>
-                    <span className="text-meta text-faint">{routine.config.enabled === false ? "off" : nextRunText(routine.next_at, now)}</span>
-                    <Link href={routinePath(routine.config.name, routine.folder)} onNavigate={onNavigate} className={`ml-auto shrink-0 whitespace-nowrap text-sm ${LINK}`}>
-                      Open routine<span aria-hidden="true"> ›</span>
-                    </Link>
-                  </div>
-                  <p className="pl-5.5 text-meta text-muted wrap-anywhere">{[triggerWords(routine.config), inputs].filter((part) => part !== "").join(" · ")}</p>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </Section>
+    <div aria-label="About this workflow" role="group" className="flex flex-wrap items-center gap-2">
+      <RoutinePill workflow={workflow} routines={routines} now={now} onNavigate={onNavigate} />
+      {last === undefined ? (
+        <span className={PILL}>
+          Last run <b className="font-medium text-ink">never run</b>
+        </span>
+      ) : (
+        <Link href={runHref(last)} onNavigate={onNavigate} className={PILL_LINK}>
+          <span className={last.status === "failed" ? "text-deny" : undefined}>Last run</span> <b className={cn("font-medium", last.status === "failed" ? "text-deny" : "text-ink")}>{lastRunWords(last, now)}</b>
+        </Link>
+      )}
+      {runs.length === 0 ? null : (
+        <Link href={runsPath(workflow.id)} onNavigate={onNavigate} className={PILL_LINK}>
+          {allRunsWords(runs.length)}
+          <span aria-hidden="true">→</span>
+        </Link>
+      )}
+      <span className={cn(PILL, problems === 0 ? "text-allow" : "text-deny")}>
+        <span aria-hidden="true">{problems === 0 ? "✓" : "✕"}</span> {checksWords(problems)}
+      </span>
     </div>
   );
 }
 
-/** One workflow in the main area: its state, Run…, and the Code, Runs and Triggers tabs. */
-export function WorkflowDetail({ workflow, steps, code, runs, routines = [], codeHash, onCheck, onSave, onPropose, onEditStep, agents, initialEditor, now, onNavigate: navigateTo, onReveal, onStart, onChooseFolder, initialRunOpen = false, initialTab = "code" }: WorkflowDetailProps) {
-  const [tab, setTab] = useState<Tab>(initialTab);
+/** The file's name without its folder. */
+function fileName(path: string): string {
+  return path.slice(path.lastIndexOf("/") + 1);
+}
+
+/** One workflow in the main area: its title, its pills, Run…, and the editor (Steps, Steps and code, Code). */
+export function WorkflowDetail({ workflow, steps, code, runs, routines = [], codeHash, onCheck, onSave, onPropose, onEditStep, agents, initialEditor, now, onNavigate: navigateTo, onReveal, onStart, onChooseFolder, initialRunOpen = false }: WorkflowDetailProps) {
   const [runOpen, setRunOpen] = useState(initialRunOpen);
   const [dirty, setDirty] = useState(false);
+  const [problems, setProblems] = useState(initialEditor?.problems?.length ?? 0);
   const onDirtyChange = useCallback((next: boolean) => setDirty(next), []);
+  const onProblemsChange = useCallback((next: number) => setProblems(next), []);
   // Leaving with code that is not saved asks first.
   const onNavigate = (path: string) => {
     if (dirty && !window.confirm("The code has changes that are not saved. Leave and lose them?")) return;
@@ -190,7 +197,8 @@ export function WorkflowDetail({ workflow, steps, code, runs, routines = [], cod
         <div className="flex min-w-0 flex-1 basis-48 flex-col gap-1">
           <h1 className="flex items-center gap-2 font-ui text-lg font-semibold">
             <WorkflowDot state={workflow.state} />
-            <span className="min-w-0 truncate">{workflow.name}</span>
+            <span className="min-w-0 truncate">{workflow.title ?? workflow.name}</span>
+            <Code tone="muted" className="shrink-0 font-normal">{fileName(workflow.path)}</Code>
             {workflow.project === null || workflow.project === undefined ? null : <Badge>project</Badge>}
           </h1>
           <p className="text-meta text-muted">{STATE_LINE[workflow.state]}</p>
@@ -216,6 +224,7 @@ export function WorkflowDetail({ workflow, steps, code, runs, routines = [], cod
           )}
         </div>
       </header>
+      <Pills workflow={workflow} routines={routines} runs={runs} problems={problems} now={now} onNavigate={onNavigate} />
       {onStart === undefined ? null : <RunDialog open={runOpen} workflow={workflow}
           onStart={async (inputs) => {
             await onStart(inputs);
@@ -223,23 +232,9 @@ export function WorkflowDetail({ workflow, steps, code, runs, routines = [], cod
           }}
           onCancel={() => setRunOpen(false)} onChooseFolder={onChooseFolder} />}
       {workflow.state === "broken" && workflow.error ? <ErrorBox error={workflow.error} /> : null}
-      <Tabs value={tab} onValueChange={(next) => setTab(next as Tab)} className="flex min-h-0 flex-1 flex-col gap-4">
-        <TabsList className="shrink-0" aria-label={`${workflow.name} details`}>
-          <TabsTrigger value="code">Code</TabsTrigger>
-          <TabsTrigger value="runs">Runs</TabsTrigger>
-          <TabsTrigger value="triggers">Triggers</TabsTrigger>
-        </TabsList>
-        {/* Kept mounted, so an edit survives a look at another tab. */}
-        <TabsContent value="code" forceMount hidden={tab !== "code"} className={BODY}>
-          <CodeTab workflow={workflow} steps={steps} code={code} codeHash={codeHash} onCheck={onCheck} onSave={onSave} onPropose={onPropose} onEditStep={onEditStep} agents={agents} onOpenAgent={() => onNavigate(settingsPath("agents"))} onReveal={onReveal} onDirtyChange={onDirtyChange} initialEditor={initialEditor} />
-        </TabsContent>
-        <TabsContent value="runs" className={BODY}>
-          <RunsTab runs={runs} now={now} onNavigate={onNavigate} />
-        </TabsContent>
-        <TabsContent value="triggers" className={BODY}>
-          <TriggersTab workflow={workflow} routines={routines} now={now} onNavigate={onNavigate} />
-        </TabsContent>
-      </Tabs>
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        <CodeTab workflow={workflow} steps={steps} code={code} codeHash={codeHash} onCheck={onCheck} onSave={onSave} onPropose={onPropose} onEditStep={onEditStep} agents={agents} onOpenAgent={() => onNavigate(settingsPath("agents"))} onReveal={onReveal} onDirtyChange={onDirtyChange} onProblemsChange={onProblemsChange} initialEditor={initialEditor} />
+      </div>
     </div>
   );
 }
