@@ -321,11 +321,39 @@
     }
   },
   "additionalProperties": false,
-  "description": "The proposed file, one or two sentences on what changed and why, its outline steps, the\nproblems the check found in it and the model that wrote it. The proposal is never saved.",
+  "description": "The proposed file, one or two sentences on what changed and why, its outline steps, the\nproblems the check found in it and the model that wrote it. The proposal is never saved.\n\n``kind`` is ``change`` (a new file) or ``answer`` (a reply to a question: ``answer`` holds the\ntext and ``code`` is the file as it was). Without ``kind`` the reply is a change.",
   "properties": {
+    "answer": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Answer"
+    },
     "code": {
       "title": "Code",
       "type": "string"
+    },
+    "kind": {
+      "anyOf": [
+        {
+          "enum": [
+            "answer",
+            "change"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Kind"
     },
     "model": {
       "title": "Model",

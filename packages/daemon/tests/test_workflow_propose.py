@@ -4,7 +4,8 @@
 from __future__ import annotations
 
 import json
-from typing import Any
+from types import SimpleNamespace
+from typing import Any, cast
 
 import pytest
 from test_workflow_llm import (  # pyright: ignore[reportUnknownVariableType]
@@ -14,9 +15,12 @@ from test_workflow_llm import (  # pyright: ignore[reportUnknownVariableType]
     _Router,
 )
 
+from golem.server.dispatcher import RequestContext
+from golem.server.workflows import workflow_propose
 from golem.workflows.check import CheckEnv, check
 from golem.workflows.llm import LlmAnswer
-from golem.workflows.propose import ProposeError, api_reference, propose
+from golem.workflows.propose import ProposeError, api_reference, numbered_outline, propose
+from golem_protocol.commands import WorkflowProposeParams
 
 HEAD = "from golem.workflow import workflow, Run\n\n\n"
 OLD = HEAD + '@workflow()\nasync def flow(run: Run):\n    await run.notify("hi")\n'
@@ -123,6 +127,85 @@ async def test_a_local_only_folder_never_calls_a_cloud_model() -> None:
     )
     assert made.model == "ollama/small" and made.code == NEW
     assert local.asked(LOCAL) == 1 and local.asked(BIG) == 0
+
+
+def answer_reply(text: str = "It says hi in step 1.") -> str:
+    return json.dumps({"kind": "answer", "answer": text})
+
+
+async def test_a_question_comes_back_as_an_answer_and_the_file_is_untouched() -> None:
+    llm = Fake(answer_reply())
+    made = await propose(
+        llm=llm, folder=None, code=OLD, ask="what does it do?", check=_check, steps="1. notify: hi"
+    )
+    assert made.kind == "answer" and made.answer == "It says hi in step 1."
+    assert made.code == OLD and made.problems == [] and made.note == ""
+    prompt = llm.asked[0][0]
+    assert "1. notify: hi" in prompt and "step 3" in prompt
+
+
+async def test_an_explicit_change_is_a_change() -> None:
+    text = json.dumps({"kind": "change", "code": NEW, "note": "Added."})
+    made = await propose(llm=Fake(text), folder=None, code=OLD, ask="x", check=_check)
+    assert made.kind == "change" and made.code == NEW and made.answer == ""
+
+
+async def test_a_reply_without_a_kind_but_with_a_file_is_a_change() -> None:
+    made = await propose(llm=Fake(reply(NEW)), folder=None, code=OLD, ask="x", check=_check)
+    assert made.kind == "change" and made.code == NEW
+
+
+async def test_a_reply_that_cannot_be_read_is_an_error_not_a_change() -> None:
+    for bad in (
+        '{"kind": "answer", "answer": "  "}',
+        '{"kind": "answer"}',
+        '{"kind": "maybe", "code": "x = 1"}',
+        '{"kind": "change", "note": "n"}',
+        '{"note": "only a note"}',
+        "[]",
+    ):
+        with pytest.raises(ProposeError):
+            await propose(llm=Fake(bad), folder=None, code=OLD, ask="x", check=_check)
+
+
+def test_the_outline_is_numbered_for_the_prompt() -> None:
+    text = (
+        HEAD
+        + '@workflow()\nasync def flow(run: Run):\n    await run.notify("a")\n'
+        + '    await run.notify("b")\n'
+    )
+    lines = numbered_outline(text, "flow").splitlines()
+    assert len(lines) == 2 and lines[0].startswith("1. ") and lines[1].startswith("2. ")
+    assert numbered_outline(text, "other") == "" and numbered_outline("def (:", "flow") == ""
+
+
+class _Service:
+    def __init__(self, made: Any) -> None:
+        self.made = made
+
+    async def refresh(self, folders: list[Any]) -> list[Any]:
+        return [SimpleNamespace(id="w1", name="flow")]
+
+    async def propose_code(self, *args: Any) -> Any:
+        return self.made
+
+
+def _ctx(service: _Service) -> RequestContext:
+    return cast(RequestContext, SimpleNamespace(state=SimpleNamespace(workflows=service)))
+
+
+async def test_the_handler_returns_an_answer_and_a_change() -> None:
+    llm = Fake(answer_reply("Step 1 says hi."), reply(NEW))
+    params = WorkflowProposeParams(id="w1", code=OLD, ask="what is this?")
+    answered = await propose(llm=llm, folder=None, code=OLD, ask="q", check=_check)
+    got = await workflow_propose(_ctx(_Service(answered)), params)
+    assert got.kind == "answer" and got.answer == "Step 1 says hi." and got.code == OLD
+    assert got.note == "Step 1 says hi." and len(got.steps) == 1
+
+    changed = await propose(llm=llm, folder=None, code=OLD, ask="x", check=_check)
+    got = await workflow_propose(_ctx(_Service(changed)), params)
+    assert got.kind == "change" and got.answer is None and got.code == NEW
+    assert got.note == "I added a line." and len(got.steps) == 2
 
 
 def test_the_api_reference_lists_the_run_methods() -> None:

@@ -70,6 +70,11 @@ test("the gallery's Workflow editor stories show each state, in both themes", ()
     const ask = (name: string) => story(`Workflow editor, ask golem, ${name}`);
     expect((ask("asking").getByRole("textbox", { name: "Ask golem to change this workflow" }) as HTMLInputElement).value).toBe("add a step after 1");
     expect(ask("writing").getByText(/golem is writing/)).toBeTruthy();
+    expect(ask("answer").getByText("Answer · nothing is changed")).toBeTruthy();
+    expect(ask("answer").getAllByRole("button", { name: "step 2" })).toHaveLength(2);
+    expect(ask("answer").queryByRole("button", { name: "Apply" })).toBeNull();
+    expect(ask("proposal with checks passing").getByText("Change · not saved yet")).toBeTruthy();
+    expect(ask("proposal with checks passing").getByRole("button", { name: "Apply" })).toBeTruthy();
     expect(ask("proposal with checks passing").getByText("✓ checks pass on the proposal")).toBeTruthy();
     expect(within(ask("proposal with checks passing").getByRole("list", { name: "Outline" })).getAllByRole("listitem")).toHaveLength(5);
     expect(ask("proposal with checks passing").getByRole("list", { name: "Diff" }).textContent).toContain("Leave out drafts");

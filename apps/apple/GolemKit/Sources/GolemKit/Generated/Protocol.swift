@@ -33340,29 +33340,44 @@ public struct WorkflowProposeParams: Codable {
 
 /// The proposed file, one or two sentences on what changed and why, its outline steps, the
 /// problems the check found in it and the model that wrote it. The proposal is never saved.
+///
+/// ``kind`` is ``change`` (a new file) or ``answer`` (a reply to a question: ``answer``
+/// holds the
+/// text and ``code`` is the file as it was). Without ``kind`` the reply is a change.
 // MARK: - WorkflowProposeResult
 public struct WorkflowProposeResult: Codable {
+    public let answer: String?
     public let code: String
+    public let kind: FluffyKind?
     public let model: String
     public let note: String
     public let problems: [WorkflowProposeResultProblem]?
     public let steps: [WorkflowProposeResultStep]?
 
     public enum CodingKeys: String, CodingKey {
+        case answer = "answer"
         case code = "code"
+        case kind = "kind"
         case model = "model"
         case note = "note"
         case problems = "problems"
         case steps = "steps"
     }
 
-    public init(code: String, model: String, note: String, problems: [WorkflowProposeResultProblem]?, steps: [WorkflowProposeResultStep]?) {
+    public init(answer: String?, code: String, kind: FluffyKind?, model: String, note: String, problems: [WorkflowProposeResultProblem]?, steps: [WorkflowProposeResultStep]?) {
+        self.answer = answer
         self.code = code
+        self.kind = kind
         self.model = model
         self.note = note
         self.problems = problems
         self.steps = steps
     }
+}
+
+public enum FluffyKind: String, Codable {
+    case answer = "answer"
+    case change = "change"
 }
 
 /// One finding of ``workflow.check``, with the line it is on and the outline step it belongs

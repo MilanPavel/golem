@@ -108,7 +108,7 @@ import { DataIconsGallery } from "./gallery-data-icons.tsx";
 import { DataResultGallery } from "./gallery-data-result.tsx";
 import { DataTableViewGallery } from "./gallery-data-table-view.tsx";
 import { RunForm, WorkflowDetail, WorkflowStarters, WorkflowsEmpty, WorkflowsPanel } from "../features/workflows/index.ts";
-import { SAMPLE_BROKEN, SAMPLE_FIELD_REFUSED, SAMPLE_PR_DIGEST, SAMPLE_PR_DIGEST_CODE, SAMPLE_PR_DIGEST_EDITED_CODE, SAMPLE_PR_DIGEST_EDITED_STEPS, SAMPLE_PR_DIGEST_HASH, SAMPLE_PR_DIGEST_PROBLEMS, SAMPLE_PR_DIGEST_PROPOSAL, SAMPLE_PR_DIGEST_PROPOSAL_PROBLEM, SAMPLE_PR_DIGEST_STEPS, SAMPLE_ROUTINE_WORKFLOW_RUN, SAMPLE_SAVE_CONFLICT, SAMPLE_BRIEFING, SAMPLE_PROJECT_STARTER, SAMPLE_STARTERS, SAMPLE_STARTER_FOLDER, SAMPLE_UNTRUSTED, SAMPLE_UPGRADE, SAMPLE_UPGRADE_AGENTS, SAMPLE_UPGRADE_CODE, SAMPLE_UPGRADE_STEPS, SAMPLE_WORKFLOW_LIST, SAMPLE_WORKFLOW_LIST_TWO_PROJECTS, SAMPLE_WORKFLOW_RUNS, WORKFLOWS_NOW } from "../features/workflows/sample.ts";
+import { SAMPLE_BROKEN, SAMPLE_FIELD_REFUSED, SAMPLE_PR_DIGEST, SAMPLE_PR_DIGEST_CODE, SAMPLE_PR_DIGEST_EDITED_CODE, SAMPLE_PR_DIGEST_EDITED_STEPS, SAMPLE_PR_DIGEST_HASH, SAMPLE_PR_DIGEST_PROBLEMS, SAMPLE_PR_DIGEST_PROPOSAL, SAMPLE_PR_DIGEST_PROPOSAL_PROBLEM, SAMPLE_PR_DIGEST_ANSWER, SAMPLE_PR_DIGEST_STEPS, SAMPLE_ROUTINE_WORKFLOW_RUN, SAMPLE_SAVE_CONFLICT, SAMPLE_BRIEFING, SAMPLE_PROJECT_STARTER, SAMPLE_STARTERS, SAMPLE_STARTER_FOLDER, SAMPLE_UNTRUSTED, SAMPLE_UPGRADE, SAMPLE_UPGRADE_AGENTS, SAMPLE_UPGRADE_CODE, SAMPLE_UPGRADE_STEPS, SAMPLE_WORKFLOW_LIST, SAMPLE_WORKFLOW_LIST_TWO_PROJECTS, SAMPLE_WORKFLOW_RUNS, WORKFLOWS_NOW } from "../features/workflows/sample.ts";
 import { RUNS_NOW, SAMPLE_RUN_LIST, SAMPLE_WAITING_RUN } from "../features/runs/sample.ts";
 import { HelperRowCardBody, Rail, SessionsPanel, SidebarPanel, WaitingChip } from "../features/sidebar/index.ts";
 import { ConnectionStrip } from "../features/connection/index.ts";
@@ -2434,7 +2434,8 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
           [
             ["Workflow editor, ask golem, asking", { problems: [], ask: "add a step after 1" }],
             ["Workflow editor, ask golem, writing", { problems: [], ask: "", writing: true }],
-            ["Workflow editor, ask golem, proposal with checks passing", { problems: [], proposal: SAMPLE_PR_DIGEST_PROPOSAL }],
+            ["Workflow editor, ask golem, answer", { problems: [], selected: "s2", asked: "explain this workflow", proposal: SAMPLE_PR_DIGEST_ANSWER }],
+            ["Workflow editor, ask golem, proposal with checks passing", { problems: [], asked: "make it cheaper", proposal: SAMPLE_PR_DIGEST_PROPOSAL }],
             ["Workflow editor, ask golem, proposal with a problem", { problems: [], proposal: SAMPLE_PR_DIGEST_PROPOSAL_PROBLEM }],
             ["Workflow editor, ask golem, refine", { problems: [], proposal: SAMPLE_PR_DIGEST_PROPOSAL, ask: "and skip pull requests from bots" }],
             ["Workflow editor, ask golem, no model", { problems: [], proposeError: "No model is available for this folder." }],

@@ -87,7 +87,19 @@ export const SAMPLE_PR_DIGEST_PROBLEMS: WorkflowProblem[] = [
 /** What golem proposes for "leave out draft pull requests, and summarise on a cheap model": a new code step, and the summary step with a budget. */
 export const SAMPLE_PR_DIGEST_PROPOSED_CODE = SAMPLE_PR_DIGEST_CODE.replace("    pulls = json.loads(listing)\n", '    pulls = json.loads(listing)\n    pulls = await run.step("Leave out drafts", lambda: [pr for pr in pulls if not pr.get("draft")])\n').replace("key=f\"summarise #{i}\")", 'key=f"summarise #{i}", budget="$0.10")');
 
+/** What golem says to "explain this workflow": text only, the file as it was, steps named by number. */
+export const SAMPLE_PR_DIGEST_ANSWER: WorkflowProposeResult = {
+  kind: "answer",
+  answer: "It lists the open pull requests (step 1), asks a model to summarise each one (step 2), has the digest checked (step 3) and tells you (step 4). Only step 2 uses a model.",
+  code: SAMPLE_PR_DIGEST_CODE,
+  note: "",
+  steps: SAMPLE_PR_DIGEST_STEPS,
+  problems: [],
+  model: "ollama/qwen3:14b",
+};
+
 export const SAMPLE_PR_DIGEST_PROPOSAL: WorkflowProposeResult = {
+  kind: "change",
   code: SAMPLE_PR_DIGEST_PROPOSED_CODE,
   note: "I added a step that leaves draft pull requests out before they are summarised, and capped each summary at ten cents.",
   steps: [

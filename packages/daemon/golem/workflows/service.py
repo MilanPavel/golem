@@ -29,7 +29,7 @@ from golem.workflows.agents import WorkflowAgents
 from golem.workflows.check import CheckEnv, Problem, check
 from golem.workflows.engine import AgentStarted, WorkflowEngine, restart_policy
 from golem.workflows.llm import Llm
-from golem.workflows.propose import Proposal, propose
+from golem.workflows.propose import Proposal, numbered_outline, propose
 from golem.workflows.registry import WorkflowEntry, WorkflowRegistry
 from golem.workflows.starter import StarterError, add_starter
 from golem.workflows.tools import WorkflowTools
@@ -418,6 +418,7 @@ class WorkflowService:
             check=lambda text: self.check_code(text, entry),
             agents=agents,
             previous=previous,
+            steps=numbered_outline(code, entry.name),
         )
 
     def save_code(self, entry: WorkflowEntry, code: str, base_hash: str) -> list[Problem]:

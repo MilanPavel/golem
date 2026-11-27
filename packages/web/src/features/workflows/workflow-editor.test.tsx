@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import axe from "axe-core";
 import { afterEach, expect, test, vi } from "vitest";
 import type { WorkflowCheckResult, WorkflowEditStepResult, WorkflowSaveResult } from "../../store/workflows.ts";
-import { SAMPLE_PR_DIGEST, SAMPLE_PR_DIGEST_CODE, SAMPLE_PR_DIGEST_EDITED_STEPS, SAMPLE_PR_DIGEST_HASH, SAMPLE_PR_DIGEST_PROBLEMS, SAMPLE_PR_DIGEST_PROPOSAL, SAMPLE_PR_DIGEST_PROPOSAL_PROBLEM, SAMPLE_PR_DIGEST_STEPS, SAMPLE_UNTRUSTED, WORKFLOWS_NOW, SAMPLE_UPGRADE, SAMPLE_UPGRADE_AGENTS, SAMPLE_UPGRADE_CODE, SAMPLE_UPGRADE_STEPS } from "./sample.ts";
+import { SAMPLE_PR_DIGEST, SAMPLE_PR_DIGEST_CODE, SAMPLE_PR_DIGEST_ANSWER, SAMPLE_PR_DIGEST_EDITED_STEPS, SAMPLE_PR_DIGEST_HASH, SAMPLE_PR_DIGEST_PROBLEMS, SAMPLE_PR_DIGEST_PROPOSAL, SAMPLE_PR_DIGEST_PROPOSAL_PROBLEM, SAMPLE_PR_DIGEST_STEPS, SAMPLE_UNTRUSTED, WORKFLOWS_NOW, SAMPLE_UPGRADE, SAMPLE_UPGRADE_AGENTS, SAMPLE_UPGRADE_CODE, SAMPLE_UPGRADE_STEPS } from "./sample.ts";
 import { WorkflowDetail } from "./workflow-detail.tsx";
 import { WorkflowEditor, type WorkflowEditorProps } from "./workflow-editor.tsx";
 
@@ -232,12 +232,12 @@ test("a suggested question asks at once", async () => {
   expect(onPropose).toHaveBeenCalledWith(SAMPLE_PR_DIGEST_CODE, "explain this workflow", undefined);
 });
 
-test("Accept puts the proposal into the editor as an unsaved edit, and Save writes it", async () => {
+test("Apply puts the proposal into the editor as an unsaved edit, and Save writes it", async () => {
   const user = userEvent.setup();
   const onSave = vi.fn<SaveFn>(async () => saved("h2"));
   render(editor({ onPropose: async () => SAMPLE_PR_DIGEST_PROPOSAL, onSave, initial: { problems: [], ask: "drop drafts" } }));
   await user.click(screen.getByRole("button", { name: "Ask" }));
-  await user.click(await screen.findByRole("button", { name: "Accept" }));
+  await user.click(await screen.findByRole("button", { name: "Apply" }));
   const box = screen.getByRole("textbox", { name: "Code of pr_digest" }) as HTMLTextAreaElement;
   expect(box.value).toBe(SAMPLE_PR_DIGEST_PROPOSAL.code);
   expect(screen.getByText(/changes? not saved/)).toBeTruthy();
@@ -260,7 +260,7 @@ test("Refine sends one more sentence with the proposal and its note", async () =
   const user = userEvent.setup();
   const onPropose = vi.fn<ProposeFn>(async () => ({ ...SAMPLE_PR_DIGEST_PROPOSAL, note: "Also skipped bots." }));
   render(editor({ onSave: async () => saved("h2"), onPropose, initial: { problems: [], proposal: SAMPLE_PR_DIGEST_PROPOSAL } }));
-  await user.click(screen.getByRole("button", { name: "Refine…" }));
+  await user.click(screen.getByRole("button", { name: "Change it…" }));
   expect(document.activeElement).toBe(screen.getByRole("textbox", { name: "One more sentence on the proposal" }));
   await user.type(screen.getByRole("textbox", { name: "One more sentence on the proposal" }), "skip bots");
   await user.click(screen.getByRole("button", { name: "Refine" }));
@@ -299,9 +299,64 @@ test("a proposal that leaves the file as it is is shown as an answer", async () 
   await user.click(screen.getByRole("button", { name: "Ask" }));
   const answer = await screen.findByRole("group", { name: "Answer" });
   expect(answer.textContent).toContain("It lists pull requests");
-  expect(screen.queryByRole("button", { name: "Accept" })).toBeNull();
-  await user.click(within(answer).getByRole("button", { name: "Dismiss" }));
+  expect(screen.queryByRole("button", { name: "Apply" })).toBeNull();
+  await user.click(within(answer).getByRole("button", { name: "Close" }));
   expect(screen.queryByRole("group", { name: "Answer" })).toBeNull();
+});
+
+test("an answer is marked as changing nothing, has no Apply, and a step number selects the step", async () => {
+  const user = userEvent.setup();
+  const onSave = vi.fn<SaveFn>(async () => saved("h2"));
+  const onPropose = vi.fn<ProposeFn>(async () => SAMPLE_PR_DIGEST_ANSWER);
+  render(editor({ onSave, onPropose, initial: { problems: [] } }));
+  await user.click(screen.getByRole("button", { name: "explain this workflow" }));
+  const answer = within(await screen.findByRole("group", { name: "Answer" }));
+  expect(answer.getByText("explain this workflow")).toBeTruthy();
+  expect(answer.getByText("Answer · nothing is changed")).toBeTruthy();
+  expect(answer.getByText(/asks a model to summarise each one/)).toBeTruthy();
+  expect(screen.queryByRole("button", { name: "Apply" })).toBeNull();
+  // The file is still in the editor, and no step is selected until a number is clicked.
+  expect((screen.getByRole("textbox", { name: "Code of pr_digest" }) as HTMLTextAreaElement).value).toBe(SAMPLE_PR_DIGEST_CODE);
+  expect(within(screen.getByRole("list", { name: "Outline" })).queryByRole("button", { current: "step" })).toBeNull();
+  await user.click(answer.getAllByRole("button", { name: "step 2" })[0]!);
+  expect(screen.getByRole("group", { name: "Selected step" }).textContent).toContain("Summarise each pull request");
+  // The step is now selected, so it can be explained, and the answer can be closed.
+  expect(screen.getByRole("button", { name: "explain step 2" })).toBeTruthy();
+  await user.click(answer.getByRole("button", { name: "Close" }));
+  expect(screen.queryByRole("group", { name: "Answer" })).toBeNull();
+  expect(onSave).not.toHaveBeenCalled();
+});
+
+test("a change names the new and changed steps, and Discard drops it", async () => {
+  const user = userEvent.setup();
+  render(editor({ onSave: async () => saved("h2"), onPropose: async () => SAMPLE_PR_DIGEST_PROPOSAL, initial: { problems: [], ask: "make it cheaper" } }));
+  await user.click(screen.getByRole("button", { name: "Ask" }));
+  const change = within(await screen.findByRole("group", { name: "Proposal" }));
+  expect(change.getByText("Change · not saved yet")).toBeTruthy();
+  expect(change.getByText("make it cheaper")).toBeTruthy();
+  const listed = within(change.getByRole("list", { name: "What changes" })).getAllByRole("listitem");
+  expect(listed.map((item) => item.textContent)).toEqual(["New · Leave out drafts", "Changed · Summarise each pull request"]);
+  for (const name of ["Apply", "See the code change", "Change it…", "Discard"]) expect(change.getByRole("button", { name })).toBeTruthy();
+  await user.click(change.getByRole("button", { name: "Discard" }));
+  expect(screen.queryByRole("group", { name: "Proposal" })).toBeNull();
+  expect((screen.getByRole("textbox", { name: "Code of pr_digest" }) as HTMLTextAreaElement).value).toBe(SAMPLE_PR_DIGEST_CODE);
+});
+
+test("See the code change shows the diff from the outline view", async () => {
+  const user = userEvent.setup();
+  render(editor({ onSave: async () => saved("h2"), onPropose: async () => SAMPLE_PR_DIGEST_PROPOSAL, initial: { problems: [], proposal: SAMPLE_PR_DIGEST_PROPOSAL, view: "outline" } }));
+  expect(screen.queryByRole("list", { name: "Diff" })).toBeNull();
+  await user.click(screen.getByRole("button", { name: "See the code change" }));
+  expect(screen.getByRole("list", { name: "Diff" })).toBeTruthy();
+});
+
+test("the suggestions follow the selected step, and there is one change to ask for", async () => {
+  const onPropose = vi.fn<ProposeFn>(async () => SAMPLE_PR_DIGEST_ANSWER);
+  render(editor({ onSave: async () => saved("h2"), onPropose, initial: { problems: [], selected: "s3" } }));
+  expect(screen.getAllByRole("button").filter((b) => b.className.includes("rounded-full")).map((b) => b.textContent)).toEqual(["explain this workflow", "explain step 3", "make it cheaper"]);
+  expect(screen.getByRole("textbox", { name: "Ask golem to change this workflow" }).getAttribute("placeholder")).toBe("Ask a question, or say what to change");
+  await userEvent.setup().click(screen.getByRole("button", { name: "explain step 3" }));
+  expect(onPropose).toHaveBeenCalledWith(SAMPLE_PR_DIGEST_CODE, "explain step 3", undefined);
 });
 
 test("a refused ask shows the daemon's words", async () => {

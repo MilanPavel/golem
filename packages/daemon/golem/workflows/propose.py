@@ -14,28 +14,39 @@ import inspect
 import re
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Literal
 
 from golem.workflow import Run, WorkflowError
 from golem.workflows.check import Problem
 from golem.workflows.llm import Llm, parse_object
+from golem.workflows.outline import OutlineError, outline
 
-__all__ = ["Proposal", "ProposeError", "api_reference", "propose"]
+__all__ = ["Proposal", "ProposeError", "api_reference", "numbered_outline", "propose"]
 
 _FENCE = re.compile(r"^```[a-zA-Z]*\s*\n(.*?)\n```\s*$", re.DOTALL)
 MAX_ASK = 4000
 MAX_NOTE = 1000
+MAX_ANSWER = 4000
 
 SCHEMA: dict[str, Any] = {
     "type": "object",
     "properties": {
+        "kind": {
+            "type": "string",
+            "enum": ["answer", "change"],
+            "description": "answer for a question, change for a new file.",
+        },
+        "answer": {
+            "type": "string",
+            "description": "For an answer: the reply in plain words. Leave out for a change.",
+        },
         "code": {"type": "string", "description": "The whole new text of the workflow file."},
         "note": {
             "type": "string",
             "description": "One or two sentences: what changed and why.",
         },
     },
-    "required": ["code", "note"],
+    "required": ["kind"],
 }
 
 
@@ -45,10 +56,14 @@ class ProposeError(Exception):
 
 @dataclass(frozen=True, slots=True)
 class Proposal:
+    """A ``change`` (the whole new file and a note) or an ``answer`` (text, the file untouched)."""
+
     code: str
     note: str
     problems: list[Problem]
     model: str
+    kind: Literal["answer", "change"] = "change"
+    answer: str = ""
 
 
 def api_reference() -> str:
@@ -65,6 +80,18 @@ def api_reference() -> str:
     return "\n".join(lines)
 
 
+def numbered_outline(code: str, name: str) -> str:
+    """The steps of workflow ``name`` as ``1. kind: title`` lines, or "" when none can be read."""
+    try:
+        found = outline(code)
+    except OutlineError:
+        return ""
+    for one in found:
+        if one.name == name:
+            return "\n".join(f"{n}. {s.kind}: {s.title}" for n, s in enumerate(one.steps, 1))
+    return ""
+
+
 def _agents_text(agents: Mapping[str, str]) -> str:
     if not agents:
         return "No agents are known in this folder: do not use run.agent."
@@ -76,19 +103,25 @@ def build_prompt(
     ask: str,
     agents: Mapping[str, str],
     previous: tuple[str, str] | None,
+    steps: str = "",
 ) -> str:
     parts = [
-        "You change a golem workflow file. The file is Python that uses `golem.workflow`:"
-        " `@workflow()` async functions that take `run: Run` and call `run.*` steps.",
+        "You answer questions about a golem workflow file and change it. The file is Python that"
+        " uses `golem.workflow`: `@workflow()` async functions that take `run: Run` and call"
+        " `run.*` steps.",
         "The step API:\n" + api_reference(),
         "Agents known in this folder (only these may be named in run.agent):\n"
         + _agents_text(agents),
         "Rules: keep what the ask does not touch. model= is a wish (cheapest, same, stronger,"
         " local ...), never a model name. Do not invent run.* methods or keyword arguments."
-        " If the ask is a question (such as an explanation), give the file back unchanged and"
-        " answer in the note.",
+        " If the ask is a question (such as an explanation), do not change the file: answer it.",
         f"The current file:\n```python\n{code}\n```",
     ]
+    if steps:
+        parts.append(
+            "The steps of the workflow, numbered as the person sees them (when you refer to a"
+            ' step in an answer, write "step 3" with its number, never its line):\n' + steps
+        )
     if previous is not None:
         prev_code, prev_note = previous
         parts.append(
@@ -99,8 +132,10 @@ def build_prompt(
         )
     parts.append(f"The ask:\n{ask}")
     parts.append(
-        'Answer with one JSON object: {"code": <the whole new file>, "note": <one or two'
-        " sentences on what changed and why>}."
+        "Decide what the ask is, and answer with one JSON object. A question: "
+        '{"kind": "answer", "answer": <the reply in plain words, short, with "step N" for steps>}.'
+        ' A request to change the file: {"kind": "change", "code": <the whole new file>, "note":'
+        " <one or two sentences on what changed and why>}."
     )
     return "\n\n".join(parts)
 
@@ -119,6 +154,7 @@ async def propose(
     check: Callable[[str], list[Problem]],
     agents: Mapping[str, str] | None = None,
     previous: tuple[str, str] | None = None,
+    steps: str = "",
 ) -> Proposal:
     """One model call, then a check of the answer. Raises :class:`ProposeError`."""
     if llm is None:
@@ -128,7 +164,7 @@ async def propose(
         raise ProposeError("say what to change")
     if len(wish) > MAX_ASK:
         raise ProposeError(f"the ask is too long (at most {MAX_ASK} characters)")
-    prompt = build_prompt(code, wish, agents or {}, previous)
+    prompt = build_prompt(code, wish, agents or {}, previous, steps)
     try:
         answer = await llm(prompt, SCHEMA, "same", folder)
     except WorkflowError as exc:
@@ -139,6 +175,16 @@ async def propose(
         found = parse_object(answer.text)
     except WorkflowError as exc:
         raise ProposeError("the model did not answer with a proposal; try again") from exc
+    kind = found.get("kind")
+    if kind is None and "code" in found:
+        kind = "change"  # An older style reply: the file and a note.
+    if kind == "answer":
+        said_answer = found.get("answer")
+        if not isinstance(said_answer, str) or not said_answer.strip():
+            raise ProposeError("the model gave no answer; try again")
+        return Proposal(code, "", [], answer.model, "answer", said_answer.strip()[:MAX_ANSWER])
+    if kind != "change":
+        raise ProposeError("the model did not answer with a proposal; try again")
     new = found.get("code")
     note = found.get("note")
     if not isinstance(new, str) or not new.strip():
