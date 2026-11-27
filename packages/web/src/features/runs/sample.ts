@@ -38,6 +38,7 @@ const flow = (id: string, extra: Partial<RunInfo>): RunInfo => ({
   approvals: 0,
   steps: 5,
   workflow_run_id: id,
+  workflow_id: SAMPLE_FILTER_WORKFLOW,
   ...extra,
 });
 
@@ -49,6 +50,14 @@ export const SAMPLE_FILTER_RUNS: RunInfo[] = [
   flow("wr_run", { started_at: at(0, 18, 25), status: "running", steps: 3 }),
   flow("wr_old", { started_at: at(1, 8, 30), ended_at: at(1, 8, 31, 2), summary: "Saved as 2026-11-16.md" }),
 ];
+
+/** A run of a workflow with the same name in another folder: the filter, which matches by id, leaves it out. */
+export const SAMPLE_OTHER_FOLDER_RUN: RunInfo = flow("wr_other_folder", {
+  workflow_id: "/Users/you/projects/web/workflows/pr_digest.py::pr_digest",
+  started_at: at(0, 9, 5),
+  ended_at: at(0, 9, 6),
+  summary: "Digest of the web project",
+});
 
 /** One run of each kind and state the list shows: waiting, running, today, earlier, a watch firing, and a detached ask. */
 export const SAMPLE_RUN_LIST: RunInfo[] = [
@@ -78,4 +87,4 @@ export const SAMPLE_RUN_LIST: RunInfo[] = [
 ];
 
 /** Every run, with those of the workflow among them: the page the filter narrows. */
-export const SAMPLE_MIXED_RUNS: RunInfo[] = [...SAMPLE_RUN_LIST, ...SAMPLE_FILTER_RUNS];
+export const SAMPLE_MIXED_RUNS: RunInfo[] = [...SAMPLE_RUN_LIST, ...SAMPLE_FILTER_RUNS, SAMPLE_OTHER_FOLDER_RUN];

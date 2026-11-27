@@ -1,6 +1,7 @@
-import type { GolemClient } from "@golem/client";
+import type { GolemClient, WorkflowStatusResult } from "@golem/client";
 import { QueryClient } from "@tanstack/react-query";
 import { CHANGES_REFETCH_MS } from "./changes.ts";
+import { foldWorkflowNotice, liveStatusKey } from "./workflow-live.ts";
 
 export type QueryWiringClient = Pick<
   GolemClient,
@@ -59,11 +60,21 @@ export function keepQueriesHonest(client: QueryWiringClient, queryClient: QueryC
       // A firing starts or ends a run.
       stale("run.list");
     }),
-    client.onWorkflowEvent(() => {
-      // A workflow run starts, waits or ends: its row in Runs changes.
-      stale("run.list");
-      // The open run view follows its steps and reviews.
-      stale("workflow.status");
+    client.onWorkflowEvent((notice) => {
+      // A workflow run starts, waits or ends: its row in Runs changes. A step or an output does not need the list again.
+      if (notice.kind === "run" || notice.method === "workflow.step.waiting") stale("run.list");
+      // The open run view follows its steps, outputs and result as the events carry them, with no second read.
+      const key = liveStatusKey(notice.params.workflow_run_id);
+      const cached = queryClient.getQueryData<WorkflowStatusResult>(key);
+      const folded = cached === undefined ? null : foldWorkflowNotice(cached, notice);
+      if (folded === null) {
+        // Nothing cached, or nothing that this notice is about: a view opened later reads the run itself.
+        if (cached === undefined) stale("workflow.status", notice.params.workflow_run_id);
+        return;
+      }
+      queryClient.setQueryData(key, folded.status);
+      // A review's draft, or a result too large for an event, is read with `workflow.status`.
+      if (folded.stale) stale("workflow.status", notice.params.workflow_run_id);
     }),
     client.onDataChanged((change) => {
       // The list changed, or one source did: what was read of it is stale.

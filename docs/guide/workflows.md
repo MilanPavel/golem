@@ -180,6 +180,14 @@ await run.parallel(
 
 The page shows "Count lines" and the item after it. `item=` is kept as text (cut at 80 characters) and is never passed to the function. Without `key=`, the item is part of the step key (`Count lines: a.md`), so the steps of a loop need no names that change. Titles and items are only labels: a file that uses none of them runs, and resumes a run made before, exactly as it did.
 
+While a run goes, its page counts steps against what golem reads from your file (the number of `run.step`, `run.llm` and other calls), and says "5 steps so far" when it cannot know, for example when a step sits under an `if`. A loop is one row. Pass `of=` with the number of items when you know it, and the row says "12 of 30" instead of "12 so far":
+
+```python
+await run.step("Read feed", read, url, item=url, of=len(feeds))
+```
+
+`of=` is a label too; it is never passed to the function.
+
 ### Retries
 
 ```python

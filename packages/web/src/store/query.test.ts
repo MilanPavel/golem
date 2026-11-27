@@ -66,13 +66,38 @@ test("session.updated and a summary mark only that session's inspect", () => {
   expect(stale()).toEqual(["session.inspect:a", "session.inspect:b"]);
 });
 
-test("a workflow notification marks run.list and workflow.status", () => {
+const CACHED = { run: { workflow_run_id: "wr_1", status: "running", outputs: [] }, steps: [{ key: "a", kind: "step", title: "A", status: "running", attempts: 1 }], reviews: [] };
+
+test("a run notification marks run.list and is folded into the cached workflow.status, which is not read again", () => {
   const { fake, queryClient } = setup();
   queryClient.setQueryData(["run.list"], 1);
-  queryClient.setQueryData(["workflow.status", "wr_1"], 1);
-  fake.emitWorkflow({ kind: "step", method: "workflow.step.done", params: {} as never });
+  queryClient.setQueryData(["workflow.status", "wr_1"], CACHED);
+  fake.emitWorkflow({ kind: "run", method: "workflow.run.updated", params: { workflow_run_id: "wr_1", status: "running", steps_expected: 4 } as never });
   expect(queryClient.getQueryState(["run.list"])?.isInvalidated).toBe(true);
+  expect(queryClient.getQueryState(["workflow.status", "wr_1"])?.isInvalidated).toBe(false);
+  expect((queryClient.getQueryData(["workflow.status", "wr_1"]) as typeof CACHED & { run: { steps_expected: number } }).run.steps_expected).toBe(4);
+});
+
+test("a step or an output is folded in with no read, and leaves run.list alone", () => {
+  const { fake, queryClient } = setup();
+  queryClient.setQueryData(["run.list"], 1);
+  queryClient.setQueryData(["workflow.status", "wr_1"], CACHED);
+  fake.emitWorkflow({ kind: "step", method: "workflow.step.done", params: { workflow_run_id: "wr_1", key: "a", kind: "step", title: "A", status: "done", attempts: 1, line: "ok", result: "ok", result_size: 4 } as never });
+  fake.emitWorkflow({ kind: "output", method: "workflow.output.added", params: { workflow_run_id: "wr_1", position: 0, title: "T", value: "v", size: 3 } as never });
+  expect(queryClient.getQueryState(["run.list"])?.isInvalidated).toBe(false);
+  expect(queryClient.getQueryState(["workflow.status", "wr_1"])?.isInvalidated).toBe(false);
+  const now = queryClient.getQueryData(["workflow.status", "wr_1"]) as typeof CACHED & { steps: { line: string }[]; run: { outputs: unknown[] } };
+  expect([now.steps[0]!.line, now.run.outputs.length]).toEqual(["ok", 1]);
+});
+
+test("a result that an event left out, or a run nobody has read yet, marks workflow.status", () => {
+  const { fake, queryClient } = setup();
+  queryClient.setQueryData(["workflow.status", "wr_1"], CACHED);
+  fake.emitWorkflow({ kind: "step", method: "workflow.step.done", params: { workflow_run_id: "wr_1", key: "a", kind: "step", title: "A", status: "done", attempts: 1, result: null, result_size: 9000 } as never });
   expect(queryClient.getQueryState(["workflow.status", "wr_1"])?.isInvalidated).toBe(true);
+  queryClient.setQueryData(["workflow.status", "wr_2"], 1);
+  fake.emitWorkflow({ kind: "step", method: "workflow.step.done", params: { workflow_run_id: "wr_3", key: "a", status: "done" } as never });
+  expect(queryClient.getQueryState(["workflow.status", "wr_2"])?.isInvalidated).toBe(false);
 });
 
 test("the first connect marks nothing, a reconnect marks everything", () => {

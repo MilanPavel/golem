@@ -1,4 +1,4 @@
-import { foldSteps, stepMetaLine, stepOutputLine, stepsProgress, stepTook, workflowRunTook } from "@golem/view";
+import { foldSteps, liveLines, stepMetaLine, stepOutputLine, stepsProgress, stepTook, workflowRunTook, type LiveLine } from "@golem/view";
 import { useRef, useState, type ReactNode } from "react";
 import { actionErrorText } from "../../store/errors.ts";
 import { runsPath } from "../../store/router.ts";
@@ -138,20 +138,40 @@ function StepPane({ step, now, resume, props }: { step: WorkflowStepInfo; now: n
   );
 }
 
-/** The thin bar and the count of steps done of steps known; while the run goes, the step that works. */
-function Progress({ done, total, words, current, status }: { done: number; total: number; words: string; current: string | null; status: WorkflowRunInfo["status"] }) {
+/**
+ * The thin bar and the count of steps done of steps known; while the run goes, what works now, one line each (a group that
+ * goes at once shows each of its steps). With no total to count against the words say "so far" and the bar has no end.
+ */
+function Progress({ done, total, known, words, current, status, working }: { done: number; total: number; known: boolean; words: string; current: string | null; status: WorkflowRunInfo["status"]; working: readonly LiveLine[] }) {
   const live = status === "running" || status === "waiting" || status === "pending";
   const percent = total === 0 ? 0 : Math.round((done / total) * 100);
   const fill = status === "failed" ? "bg-deny" : status === "done" ? "bg-allow" : "bg-clay";
+  const open = live && !known;
   return (
     <div className="flex flex-col gap-1.5">
       <p className="m-0 text-sm">
         <span className="font-medium">{words}</span>
-        {live && current !== null ? <span className="text-muted"> · {current}</span> : null}
+        {live && current !== null && working.length === 0 ? <span className="text-muted"> · {current}</span> : null}
       </p>
-      <div role="progressbar" aria-label="Steps done" aria-valuemin={0} aria-valuemax={total} aria-valuenow={done} className="h-1 overflow-hidden rounded-full bg-line">
-        <div className={`h-full rounded-full ${fill}`} style={{ width: `${percent}%` }} />
-      </div>
+      {open ? (
+        <div role="progressbar" aria-label="Steps done" aria-valuetext={words} className="h-1 overflow-hidden rounded-full bg-line">
+          <div className="h-full w-1/3 animate-pulse rounded-full bg-clay" />
+        </div>
+      ) : (
+        <div role="progressbar" aria-label="Steps done" aria-valuemin={0} aria-valuemax={total} aria-valuenow={done} className="h-1 overflow-hidden rounded-full bg-line">
+          <div className={`h-full rounded-full ${fill}`} style={{ width: `${percent}%` }} />
+        </div>
+      )}
+      {live && working.length > 0 ? (
+        <ul aria-label="Working now" className="m-0 flex list-none flex-col gap-0.5 p-0 text-meta text-muted">
+          {working.map((line) => (
+            <li key={line.key} className="flex min-w-0 items-baseline gap-2">
+              <span className="min-w-0 truncate">{line.text}</span>
+              <span className="ml-auto shrink-0 text-faint">{line.took}</span>
+            </li>
+          ))}
+        </ul>
+      ) : null}
     </div>
   );
 }
@@ -174,7 +194,8 @@ export function WorkflowRunView(props: WorkflowRunViewProps) {
   const status = STATUS[run.status];
   const live = run.status === "running" || run.status === "waiting" || run.status === "pending";
   const rows = foldSteps(steps);
-  const progress = stepsProgress(rows);
+  const progress = stepsProgress(rows, { live, expected: run.steps_expected ?? null });
+  const working = live ? liveLines(rows, now) : [];
   const title = run.title !== null && run.title !== undefined && run.title !== "" ? run.title : run.name;
   const goal = run.description !== null && run.description !== undefined && run.description !== "" ? run.description : null;
   const summary = run.summary !== null && run.summary !== undefined && run.summary !== "" ? run.summary : null;
@@ -291,7 +312,7 @@ export function WorkflowRunView(props: WorkflowRunViewProps) {
           {trace === undefined ? null : <TabsTrigger value="trace">Trace</TabsTrigger>}
         </TabsList>
         <TabsContent value="steps" className="flex flex-col gap-4">
-          {steps.length === 0 ? <p className="m-0 text-sm text-muted">No step has started yet.</p> : <Progress done={progress.done} total={progress.total} words={progress.words} current={progress.current} status={run.status} />}
+          {steps.length === 0 ? <p className="m-0 text-sm text-muted">No step has started yet.</p> : <Progress done={progress.done} total={progress.total} known={progress.known} words={progress.words} current={progress.current} status={run.status} working={working} />}
           <div className="flex min-w-0 flex-col gap-4 lg:flex-row lg:items-start">
             <div className="flex min-w-0 flex-col gap-1 lg:w-80 lg:shrink-0">
               <h2 className="sr-only">Steps of the run</h2>

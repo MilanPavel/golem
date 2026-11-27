@@ -88,12 +88,46 @@ const REVIEW_STEP = (status: WorkflowStepInfo["status"], extra: Partial<Workflow
 export type WorkflowRunSample = { run: WorkflowRunInfo; steps: WorkflowStepInfo[]; reviews: WorkflowReviewInfo[] };
 
 /** A run of each state the page draws: running, waiting on a review, waiting on a tool ask, failed, cancelled and done. */
+/** A run that goes, with a total to count against: the daemon read five steps from the file. */
 export const SAMPLE_RUN_RUNNING: WorkflowRunSample = {
-  run: run({ status: "running", finished_at: null, started_at: at(28) }),
+  run: run({ status: "running", finished_at: null, started_at: at(28), steps_expected: 5 }),
   steps: [
     { ...LIST, started_at: at(28), finished_at: at(28, 3) },
     { ...SUMMARISE, started_at: at(28, 3), finished_at: at(28, 40) },
     step("reviewer", { kind: "agent", title: "reviewer", status: "running", started_at: at(28, 40), finished_at: null, child_session_id: "s_reviewer" }),
+  ],
+  reviews: [],
+};
+
+/** A run that goes where the daemon cannot say how many steps there will be (a step may be skipped): "3 steps so far", and a bar with no end. */
+export const SAMPLE_RUN_UNKNOWN_TOTAL: WorkflowRunSample = {
+  run: run({ status: "running", finished_at: null, started_at: at(28), steps_expected: null }),
+  steps: SAMPLE_RUN_RUNNING.steps,
+  reviews: [],
+};
+
+/** Four steps at the same time, as `run.parallel` starts them, each in the live lines. */
+export const SAMPLE_RUN_PARALLEL: WorkflowRunSample = {
+  run: run({ status: "running", finished_at: null, started_at: at(28), title: "Morning briefing", description: "Tell me what needs me today.", steps_expected: 4 }),
+  steps: [
+    ...[
+      ["facts:folder", "Check folder", "golem", "done", "2 files changed"],
+      ["facts:log", "Read log", "app.log", "running", undefined],
+      ["facts:feed", "Fetch feed", "example.com/rss", "running", undefined],
+      ["facts:calendar", "Read calendar", "today", "running", undefined],
+    ].map(([key, title, item, status, line]) =>
+      step(key as string, {
+        title: title as string,
+        item: item as string,
+        status: status as WorkflowStepInfo["status"],
+        group: "parallel-1",
+        group_title: "Gather the facts",
+        started_at: at(28, 2),
+        finished_at: status === "done" ? at(28, 6) : null,
+        line: (line as string | undefined) ?? null,
+        result: status === "done" ? raw(line) : undefined,
+      }),
+    ),
   ],
   reviews: [],
 };
@@ -189,18 +223,39 @@ export const SAMPLE_RUN_OUTPUTS: WorkflowRunSample = {
 
 /** A run that read thirty feeds: one row, "Read each feed", with a count. Two items still work and one failed. */
 export const SAMPLE_RUN_LOOP: WorkflowRunSample = {
-  run: run({ status: "running", finished_at: null, title: "Read the news", description: "Read each feed and keep what is new.", started_at: at(28) }),
+  run: run({ status: "running", finished_at: null, title: "Read the news", description: "Read each feed and keep what is new.", started_at: at(28), steps_expected: 3 }),
   steps: [
     { ...LIST, title: "List the feeds", started_at: at(28), finished_at: at(28, 1), result: raw("30 feeds") },
     ...Array.from({ length: 30 }, (_, i) =>
       step(`read:${i}`, {
         title: "Read each feed",
+        of: 30,
         item: `feed-${i + 1}.example.com`,
         status: i === 4 ? "failed" : i >= 27 ? "running" : "done",
         started_at: at(28, 2 + i),
         finished_at: i >= 27 ? null : at(28, 3 + i),
         error: i === 4 ? "the feed did not answer" : undefined,
         result: i >= 27 || i === 4 ? undefined : raw(`${(i % 5) + 1} new items`),
+      }),
+    ),
+  ],
+  reviews: [],
+};
+
+/** A loop of thirty feeds that has read twelve: it says "12 of 30", and the squares still to come are empty. */
+export const SAMPLE_RUN_LOOP_MIDWAY: WorkflowRunSample = {
+  run: run({ status: "running", finished_at: null, title: "Read the news", description: "Read each feed and keep what is new.", started_at: at(28), steps_expected: 3 }),
+  steps: [
+    { ...LIST, title: "List the feeds", started_at: at(28), finished_at: at(28, 1), result: raw("30 feeds") },
+    ...Array.from({ length: 13 }, (_, i) =>
+      step(`read:${i}`, {
+        title: "Reading feed",
+        of: 30,
+        item: `feed-${i + 1}.example.com/rss`,
+        status: i === 12 ? "running" : "done",
+        started_at: at(28, 2 + i),
+        finished_at: i === 12 ? null : at(28, 3 + i),
+        result: i === 12 ? undefined : raw(`${(i % 5) + 1} new items`),
       }),
     ),
   ],

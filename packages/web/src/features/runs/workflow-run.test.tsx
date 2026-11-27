@@ -13,7 +13,7 @@ import { sidebarItemStore } from "../sidebar/sidebar-item.ts";
 import { RunRow } from "./runs-list.tsx";
 import { RUNS_NOW } from "./sample.ts";
 import { WorkflowRunView, type WorkflowRunViewProps } from "./workflow-run-view.tsx";
-import { SAMPLE_BRIEFING_PATH, SAMPLE_FILE_CUT, SAMPLE_FILE_READ, SAMPLE_RESULTS, SAMPLE_RUN_CANCELLED, SAMPLE_RUN_DONE, SAMPLE_RUN_FAILED, SAMPLE_RUN_FILE, SAMPLE_RUN_LOOP, SAMPLE_RUN_OUTPUTS, SAMPLE_RUN_REVIEW, SAMPLE_RUN_RUNNING, SAMPLE_RUN_TEXT, SAMPLE_RUN_TOOL_ASK, WORKFLOW_RUN_NOW, type WorkflowRunSample } from "./workflow-sample.ts";
+import { SAMPLE_BRIEFING_PATH, SAMPLE_FILE_CUT, SAMPLE_FILE_READ, SAMPLE_RESULTS, SAMPLE_RUN_CANCELLED, SAMPLE_RUN_DONE, SAMPLE_RUN_FAILED, SAMPLE_RUN_FILE, SAMPLE_RUN_LOOP, SAMPLE_RUN_LOOP_MIDWAY, SAMPLE_RUN_OUTPUTS, SAMPLE_RUN_PARALLEL, SAMPLE_RUN_REVIEW, SAMPLE_RUN_RUNNING, SAMPLE_RUN_TEXT, SAMPLE_RUN_TOOL_ASK, SAMPLE_RUN_UNKNOWN_TOTAL, WORKFLOW_RUN_NOW, type WorkflowRunSample } from "./workflow-sample.ts";
 
 const noContrast = { rules: { "color-contrast": { enabled: false } } };
 const CONNECTED: ConnectionSnapshot = { state: { status: "connected" }, daemonVersion: "0.9.1" };
@@ -60,12 +60,53 @@ test("the steps list is vertical: each step's state, time and the line of its ou
 
 test("one bar and a count say how far the run is", () => {
   view(SAMPLE_RUN_RUNNING);
-  expect(screen.getByText("2 of 3 steps")).toBeTruthy();
-  expect(screen.getByText(/· reviewer/)).toBeTruthy();
+  expect(screen.getByText("2 of 5 steps")).toBeTruthy();
   const bar = screen.getByRole("progressbar");
   expect(bar.getAttribute("aria-valuenow")).toBe("2");
-  expect(bar.getAttribute("aria-valuemax")).toBe("3");
+  expect(bar.getAttribute("aria-valuemax")).toBe("5");
   expect(screen.getAllByRole("progressbar")).toHaveLength(1);
+});
+
+test("with no total to count against the words say so far and the bar has no end", () => {
+  view(SAMPLE_RUN_UNKNOWN_TOTAL);
+  expect(screen.getByText("3 steps so far")).toBeTruthy();
+  const bar = screen.getByRole("progressbar");
+  expect(bar.getAttribute("aria-valuenow")).toBeNull();
+  expect(bar.getAttribute("aria-valuemax")).toBeNull();
+  expect(bar.getAttribute("aria-valuetext")).toBe("3 steps so far");
+  expect(screen.queryByText(/ of \d+ steps/)).toBeNull();
+});
+
+test("a run that is over counts the steps it had, whatever was expected", () => {
+  view({ ...SAMPLE_RUN_DONE, run: { ...SAMPLE_RUN_DONE.run, steps_expected: 9 } });
+  expect(screen.getByText("5 of 5 steps")).toBeTruthy();
+  expect(screen.getByRole("progressbar").getAttribute("aria-valuemax")).toBe("5");
+});
+
+test("what runs now is a vertical list with how long, and a loop row says its place against the total", () => {
+  view(SAMPLE_RUN_LOOP_MIDWAY);
+  const now = within(screen.getByRole("list", { name: "Working now" }));
+  const lines = now.getAllByRole("listitem");
+  expect(lines).toHaveLength(1);
+  expect(lines[0]!.textContent).toContain("Reading feed 13 of 30 · feed-13.example.com/rss");
+  expect(lines[0]!.textContent).toMatch(/\d+s/);
+  expect(screen.getByRole("button", { name: /^Reading feed, 12 of 30/ })).toBeTruthy();
+  // The squares still to come are drawn, so the row is 30 squares wide.
+  expect(document.querySelectorAll("[data-fold] [aria-hidden='true'] > span")).toHaveLength(30);
+});
+
+test("a repeating row that was not told its total counts the ones done so far, never a total it made up", () => {
+  const steps = SAMPLE_RUN_LOOP_MIDWAY.steps.map((step) => ({ ...step, of: null }));
+  view({ ...SAMPLE_RUN_LOOP_MIDWAY, steps });
+  expect(screen.getByRole("button", { name: /^Reading feed, 12 so far/ })).toBeTruthy();
+  expect(document.querySelectorAll("[data-fold] [aria-hidden='true'] > span")).toHaveLength(13);
+});
+
+test("steps that go at once are each a line of what runs now", () => {
+  view(SAMPLE_RUN_PARALLEL);
+  const lines = within(screen.getByRole("list", { name: "Working now" })).getAllByRole("listitem");
+  expect(lines.map((line) => line.querySelector("span")?.textContent)).toEqual(["Read log · app.log", "Fetch feed · example.com/rss", "Read calendar · today"]);
+  expect(screen.getByText("1 of 4 steps")).toBeTruthy();
 });
 
 test("the header has the workflow's title with its state, and the goal under it", () => {
@@ -356,7 +397,7 @@ test("/runs/:id reads workflow.status, answers a review through the client, and 
   fake.raw.workflowStatus.mockResolvedValue({ ...STATUS("wr_1", { status: "done", finished_at: SAMPLE_RUN_DONE.run.finished_at }), reviews: [] });
   const before = fake.raw.workflowStatus.mock.calls.length;
   act(() => {
-    fake.emitWorkflow({ kind: "run", method: "workflow.run.done", params: { ...SAMPLE_RUN_DONE.run } as never });
+    fake.emitWorkflow({ kind: "run", method: "workflow.run.done", params: { ...SAMPLE_RUN_DONE.run, workflow_run_id: "wr_1" } as never });
   });
   await waitFor(() => expect(fake.raw.workflowStatus.mock.calls.length).toBeGreaterThan(before));
   await waitFor(() => expect(screen.queryByRole("region", { name: "Review, Send this digest?" })).toBeNull());
@@ -391,4 +432,46 @@ test("a run that stopped at a model step offers Resume with another model, and t
 test("a run that stopped at a tool step does not offer another model", () => {
   view(SAMPLE_RUN_FAILED, { models: ["qwen3.5:9b"] });
   expect(screen.queryByRole("button", { name: "Resume with another model…" })).toBeNull();
+});
+
+test("/runs/:id folds the run's events into the page and reads nothing again", async () => {
+  const fake = mount("/runs/wr_live", (one) => {
+    one.raw.workflowStatus.mockResolvedValue({ run: { ...SAMPLE_RUN_RUNNING.run, workflow_run_id: "wr_live" }, steps: SAMPLE_RUN_RUNNING.steps, reviews: [] });
+  });
+  expect(await screen.findByText("2 of 5 steps")).toBeTruthy();
+  const reads = fake.raw.workflowStatus.mock.calls.length;
+  const reviewer = SAMPLE_RUN_RUNNING.steps[2]!;
+  act(() => {
+    fake.emitWorkflow({ kind: "step", method: "workflow.step.done", params: { ...reviewer, workflow_run_id: "wr_live", status: "done", finished_at: reviewer.started_at, line: "3 files checked", result_size: 0 } as never });
+  });
+  expect(await screen.findByText("3 of 5 steps")).toBeTruthy();
+  expect(screen.getByText("3 files checked")).toBeTruthy();
+  // The next step starts, and the daemon says it now expects six.
+  act(() => {
+    fake.emitWorkflow({ kind: "step", method: "workflow.step.started", params: { key: "write", kind: "llm", title: "Writing the briefing", status: "running", attempts: 1, started_at: reviewer.started_at, workflow_run_id: "wr_live", result_size: 0 } as never });
+    fake.emitWorkflow({ kind: "run", method: "workflow.run.updated", params: { ...SAMPLE_RUN_RUNNING.run, workflow_run_id: "wr_live", steps_expected: 6 } as never });
+  });
+  expect(await screen.findByText("3 of 6 steps")).toBeTruthy();
+  expect(within(screen.getByRole("list", { name: "Working now" })).getByText("Writing the briefing")).toBeTruthy();
+  // An output as it is marked, then the end of the run with its result.
+  act(() => {
+    fake.emitWorkflow({ kind: "output", method: "workflow.output.added", params: { workflow_run_id: "wr_live", position: 0, title: "Briefing", summary: "Three things need you", value: "Read the mail first.", size: 20 } as never });
+    fake.emitWorkflow({ kind: "run", method: "workflow.run.done", params: { ...SAMPLE_RUN_RUNNING.run, workflow_run_id: "wr_live", status: "done", finished_at: reviewer.started_at, steps_expected: null, result: null, result_size: 0 } as never });
+  });
+  await waitFor(() => expect(within(screen.getByRole("heading", { level: 1 })).getByText("done")).toBeTruthy());
+  expect(screen.getAllByText("Three things need you").length).toBeGreaterThan(0);
+  expect(fake.raw.workflowStatus.mock.calls.length).toBe(reads);
+});
+
+test("/runs/:id reads the run again when an event left out a large result", async () => {
+  const fake = mount("/runs/wr_live", (one) => {
+    one.raw.workflowStatus.mockResolvedValue({ run: { ...SAMPLE_RUN_RUNNING.run, workflow_run_id: "wr_live" }, steps: SAMPLE_RUN_RUNNING.steps, reviews: [] });
+  });
+  expect(await screen.findByText("2 of 5 steps")).toBeTruthy();
+  const reads = fake.raw.workflowStatus.mock.calls.length;
+  const reviewer = SAMPLE_RUN_RUNNING.steps[2]!;
+  act(() => {
+    fake.emitWorkflow({ kind: "step", method: "workflow.step.done", params: { ...reviewer, workflow_run_id: "wr_live", status: "done", result: null, line: "6000 characters of notes\u2026", result_size: 6000 } as never });
+  });
+  await waitFor(() => expect(fake.raw.workflowStatus.mock.calls.length).toBeGreaterThan(reads));
 });
