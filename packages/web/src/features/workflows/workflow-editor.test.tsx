@@ -169,7 +169,7 @@ test("an untrusted workflow's code is read only, with no Save", () => {
   expect(screen.getByText(/The project is not trusted/)).toBeTruthy();
 });
 
-test("leaving with code not saved asks first, and an edit survives a look at another tab", async () => {
+test("leaving with code not saved asks first", async () => {
   const user = userEvent.setup();
   const onNavigate = vi.fn();
   const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
@@ -183,18 +183,16 @@ test("leaving with code not saved asks first, and an edit survives a look at ano
       now={WORKFLOWS_NOW}
       onNavigate={onNavigate}
       onSave={async () => saved("h2")}
-      initialTab="code"
     />,
   );
   await user.type(screen.getByRole("textbox", { name: "Code of pr_digest" }), "#");
-  await user.click(screen.getByRole("tab", { name: "Triggers" }));
-  await user.click(screen.getByRole("link", { name: "Routines" }));
+  const add = () => screen.getByRole("link", { name: /Add a routine/ });
+  await user.click(add());
   expect(confirm).toHaveBeenCalledTimes(1);
   expect(onNavigate).not.toHaveBeenCalled();
   confirm.mockReturnValue(true);
-  await user.click(screen.getByRole("link", { name: "Routines" }));
+  await user.click(add());
   expect(onNavigate).toHaveBeenCalledTimes(1);
-  await user.click(screen.getByRole("tab", { name: "Code" }));
   expect((screen.getByRole("textbox", { name: "Code of pr_digest" }) as HTMLTextAreaElement).value.endsWith("#")).toBe(true);
 });
 

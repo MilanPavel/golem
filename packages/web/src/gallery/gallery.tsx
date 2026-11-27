@@ -2390,17 +2390,19 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
         ))}
         {(
           [
-            ["Workflow detail, Code", "code", SAMPLE_PR_DIGEST, SAMPLE_PR_DIGEST_STEPS, SAMPLE_PR_DIGEST_CODE, SAMPLE_WORKFLOW_RUNS],
-            ["Workflow detail, Runs", "runs", SAMPLE_PR_DIGEST, SAMPLE_PR_DIGEST_STEPS, SAMPLE_PR_DIGEST_CODE, SAMPLE_WORKFLOW_RUNS],
-            ["Workflow detail, Runs, none yet", "runs", SAMPLE_PR_DIGEST, SAMPLE_PR_DIGEST_STEPS, SAMPLE_PR_DIGEST_CODE, []],
-            ["Workflow detail, Triggers", "triggers", SAMPLE_PR_DIGEST, SAMPLE_PR_DIGEST_STEPS, SAMPLE_PR_DIGEST_CODE, SAMPLE_WORKFLOW_RUNS, [SAMPLE_WORKFLOW_ROUTINE, SAMPLE_WORKFLOW_WATCH_ROUTINE]],
-            ["Workflow detail, Triggers, none", "triggers", SAMPLE_PR_DIGEST, SAMPLE_PR_DIGEST_STEPS, SAMPLE_PR_DIGEST_CODE, SAMPLE_WORKFLOW_RUNS, []],
-            ["Workflow detail, broken", "code", SAMPLE_BROKEN, [], null, []],
-            ["Workflow detail, not trusted", "code", SAMPLE_UNTRUSTED, [], null, []],
+            ["Workflow detail, one routine", SAMPLE_PR_DIGEST, SAMPLE_PR_DIGEST_STEPS, SAMPLE_PR_DIGEST_CODE, SAMPLE_WORKFLOW_RUNS, [SAMPLE_WORKFLOW_ROUTINE], { problems: [] }],
+            ["Workflow detail, no check yet", SAMPLE_PR_DIGEST, SAMPLE_PR_DIGEST_STEPS, SAMPLE_PR_DIGEST_CODE, SAMPLE_WORKFLOW_RUNS, [SAMPLE_WORKFLOW_ROUTINE], undefined],
+            ["Workflow detail, two routines", SAMPLE_PR_DIGEST, SAMPLE_PR_DIGEST_STEPS, SAMPLE_PR_DIGEST_CODE, SAMPLE_WORKFLOW_RUNS, [SAMPLE_WORKFLOW_ROUTINE, SAMPLE_WORKFLOW_WATCH_ROUTINE], undefined],
+            ["Workflow detail, not scheduled", SAMPLE_PR_DIGEST, SAMPLE_PR_DIGEST_STEPS, SAMPLE_PR_DIGEST_CODE, SAMPLE_WORKFLOW_RUNS, [], undefined],
+            ["Workflow detail, never run", SAMPLE_PR_DIGEST, SAMPLE_PR_DIGEST_STEPS, SAMPLE_PR_DIGEST_CODE, [], [], undefined],
+            ["Workflow detail, last run failed", SAMPLE_PR_DIGEST, SAMPLE_PR_DIGEST_STEPS, SAMPLE_PR_DIGEST_CODE, SAMPLE_WORKFLOW_RUNS.filter((run) => run.status === "failed"), [SAMPLE_WORKFLOW_ROUTINE], undefined],
+            ["Workflow detail, checks failing", SAMPLE_PR_DIGEST, SAMPLE_PR_DIGEST_STEPS, SAMPLE_PR_DIGEST_CODE, SAMPLE_WORKFLOW_RUNS, [SAMPLE_WORKFLOW_ROUTINE], { problems: SAMPLE_PR_DIGEST_PROBLEMS }],
+            ["Workflow detail, broken", SAMPLE_BROKEN, [], null, [], [], undefined],
+            ["Workflow detail, not trusted", SAMPLE_UNTRUSTED, [], null, [], [], undefined],
           ] as const
-        ).map(([title, tab, workflow, steps, code, runs, routines]) => (
+        ).map(([title, workflow, steps, code, runs, routines, initialEditor]) => (
           <div key={title} className="mt-4 rounded-lg border border-line bg-bg p-5" role="region" aria-label={`${title}, ${theme}`}>
-            <WorkflowDetail workflow={workflow} steps={steps} code={code} runs={runs} routines={routines} now={WORKFLOWS_NOW} onNavigate={() => {}} onReveal={() => Promise.resolve()} initialTab={tab} />
+            <WorkflowDetail workflow={workflow} steps={steps} code={code} runs={runs} routines={routines} now={WORKFLOWS_NOW} onNavigate={() => {}} onReveal={() => Promise.resolve()} initialEditor={initialEditor} />
           </div>
         ))}
         {(
@@ -2427,7 +2429,6 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
               onReveal={() => Promise.resolve()}
               onSave={() => Promise.reject(new Error(SAMPLE_SAVE_CONFLICT))}
               initialEditor={initialEditor}
-              initialTab="code"
             />
           </div>
         ))}
@@ -2455,7 +2456,6 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
               onSave={() => Promise.reject(new Error(SAMPLE_SAVE_CONFLICT))}
               onPropose={() => new Promise(() => {})}
               initialEditor={initialEditor}
-              initialTab="code"
             />
           </div>
         ))}
@@ -2480,7 +2480,6 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
               onEditStep={() => Promise.reject(new Error(SAMPLE_FIELD_REFUSED.message))}
               agents={SAMPLE_UPGRADE_AGENTS}
               initialEditor={{ problems: [], selected, view: "outline", ...(refusedField === undefined ? {} : { refusedField }) }}
-              initialTab="code"
             />
           </div>
         ))}

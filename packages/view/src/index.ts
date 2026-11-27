@@ -196,6 +196,7 @@ export {
   type RunGroupLabel,
   type RunLike,
 } from "./runs.ts";
+export { ADD_ROUTINE_WORDS, allRunsWords, checksWords, lastRunWords, routinePillWords } from "./workflow-header.ts";
 export {
   citeCounts,
   citedTimes,

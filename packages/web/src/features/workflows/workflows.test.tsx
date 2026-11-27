@@ -9,7 +9,7 @@ import { createPage } from "../../store/page.ts";
 import { PageProvider } from "../../store/page-context.tsx";
 import { fakeClient, fakeFrame, summary } from "../../store/test-support.ts";
 import { sidebarItemStore } from "../sidebar/sidebar-item.ts";
-import { SAMPLE_BROKEN, SAMPLE_PR_DIGEST, SAMPLE_PR_DIGEST_CODE, SAMPLE_PR_DIGEST_GET, SAMPLE_PR_DIGEST_STEPS, SAMPLE_BRIEFING, SAMPLE_PROJECT_STARTER, SAMPLE_STARTER_FOLDER, SAMPLE_STARTERS, SAMPLE_UNTRUSTED, SAMPLE_WORKFLOW_LIST, SAMPLE_WORKFLOW_LIST_TWO_PROJECTS, SAMPLE_WORKFLOW_RUNS, WORKFLOWS_NOW } from "./sample.ts";
+import { SAMPLE_BROKEN, SAMPLE_PR_DIGEST, SAMPLE_PR_DIGEST_CODE, SAMPLE_PR_DIGEST_GET, SAMPLE_PR_DIGEST_PROBLEMS, SAMPLE_PR_DIGEST_STEPS, SAMPLE_BRIEFING, SAMPLE_PROJECT_STARTER, SAMPLE_STARTER_FOLDER, SAMPLE_STARTERS, SAMPLE_UNTRUSTED, SAMPLE_WORKFLOW_LIST, SAMPLE_WORKFLOW_LIST_TWO_PROJECTS, SAMPLE_WORKFLOW_RUNS, WORKFLOWS_NOW } from "./sample.ts";
 import { SAMPLE_MORNING_BRIEF, SAMPLE_WORKFLOW_ROUTINE, SAMPLE_WORKFLOW_WATCH_ROUTINE } from "../routines/sample.ts";
 import { routinesStarting, stepLines, workflowGroups, workflowRuns } from "./text.ts";
 import { WorkflowDetail } from "./workflow-detail.tsx";
@@ -92,35 +92,114 @@ function detail(extra: Partial<Parameters<typeof WorkflowDetail>[0]> = {}) {
   );
 }
 
-test("the header shows the name, the state and the description on one line, and the tabs are Code, Runs and Triggers", async () => {
+test("the header shows the title and file, the state and the description, and there are no tabs", async () => {
   const { container } = render(detail());
   expect(screen.getByRole("heading", { name: /pr_digest/ })).toBeTruthy();
+  expect(screen.getByText("pr_digest.py")).toBeTruthy();
   const description = screen.getByText("One line for each open pull request, checked by you, then a notice.");
   expect(description.getAttribute("title")).toBe(SAMPLE_PR_DIGEST.description);
-  expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["Code", "Runs", "Triggers"]);
-  expect(screen.getByRole("tab", { name: "Code" }).getAttribute("aria-selected")).toBe("true");
+  expect(screen.queryAllByRole("tab")).toEqual([]);
+  expect(screen.queryByRole("tablist")).toBeNull();
   expect(screen.queryByRole("table", { name: "Inputs" })).toBeNull();
   // Without a way to start, Run… is there and disabled.
   expect((screen.getByRole("button", { name: "Run…" }) as HTMLButtonElement).disabled).toBe(true);
   expect((await axe.run(container, noContrast)).violations).toEqual([]);
 });
 
-test("the Triggers tab says By hand with no routine, and shows a routine's next run", async () => {
+test("a title replaces the name in the heading", () => {
+  render(detail({ workflow: { ...SAMPLE_PR_DIGEST, title: "Pull request digest" } }));
+  expect(screen.getByRole("heading", { name: /Pull request digest/ })).toBeTruthy();
+});
+
+test("the Routine pill says Not scheduled with no routine and opens New routine with this workflow filled in", async () => {
   const user = userEvent.setup();
-  const { unmount } = render(detail({ initialTab: "triggers" }));
-  expect(screen.getByText("Starts: By hand")).toBeTruthy();
-  expect(screen.getByText(/No routine starts this workflow/)).toBeTruthy();
+  const onNavigate = vi.fn();
+  const { container } = render(detail({ routines: [], onNavigate }));
+  const pill = screen.getByRole("link", { name: /Not scheduled/ });
+  expect(pill.textContent).toContain("it runs only when you press Run");
+  expect(pill.textContent).toContain("+ Add a routine");
+  expect(pill.getAttribute("href")).toBe(`/routines?new&workflow=${encodeURIComponent(SAMPLE_PR_DIGEST.id)}`);
+  await user.click(pill);
+  expect(onNavigate).toHaveBeenCalledWith(`/routines?new&workflow=${encodeURIComponent(SAMPLE_PR_DIGEST.id)}`);
+  expect((await axe.run(container, noContrast)).violations).toEqual([]);
+});
+
+test("the Routine pill shows the one routine's schedule and opens it", async () => {
+  const user = userEvent.setup();
+  const onNavigate = vi.fn();
+  const { container } = render(detail({ routines: [SAMPLE_WORKFLOW_ROUTINE], onNavigate }));
+  const pill = screen.getByRole("link", { name: /Weekdays at 09:00/ });
+  expect(pill.textContent).toMatch(/^Routine /);
+  expect(pill.getAttribute("href")).toBe("/routines/weekday-pr-digest");
+  await user.click(pill);
+  expect(onNavigate).toHaveBeenCalledWith("/routines/weekday-pr-digest");
+  expect((await axe.run(container, noContrast)).violations).toEqual([]);
+});
+
+test("the Routine pill with two routines says how many and lists them, each a link", async () => {
+  const user = userEvent.setup();
+  const onNavigate = vi.fn();
+  render(detail({ routines: [SAMPLE_WORKFLOW_ROUTINE, SAMPLE_WORKFLOW_WATCH_ROUTINE], onNavigate }));
+  await user.click(screen.getByRole("button", { name: /2 routines/ }));
+  const rows = within(screen.getByRole("list", { name: "Routines that start it" })).getAllByRole("listitem");
+  expect(rows).toHaveLength(2);
+  expect(rows[0]?.textContent).toContain("weekday-pr-digest");
+  const link = within(rows[1]!).getByRole("link");
+  expect(link.getAttribute("href")).toBe(`/routines/${SAMPLE_WORKFLOW_WATCH_ROUTINE.config.name}`);
+  await user.click(link);
+  expect(onNavigate).toHaveBeenCalledWith(`/routines/${SAMPLE_WORKFLOW_WATCH_ROUTINE.config.name}`);
+});
+
+test("the Last run pill gives the state and when, and opens that run", async () => {
+  const user = userEvent.setup();
+  const onNavigate = vi.fn();
+  const { container } = render(detail({ runs: SAMPLE_WORKFLOW_RUNS.filter((run) => run.status === "failed"), onNavigate }));
+  const pill = screen.getByRole("link", { name: /Last run/ });
+  expect(pill.textContent).toMatch(/failed/);
+  expect(pill.getAttribute("href")).toBe("/s/w_fail");
+  await user.click(pill);
+  expect(onNavigate).toHaveBeenCalledWith("/s/w_fail");
+  expect((await axe.run(container, noContrast)).violations).toEqual([]);
+});
+
+test("a workflow that never ran says so and has no All runs link", () => {
+  render(detail({ runs: [] }));
+  expect(screen.getByText("never run")).toBeTruthy();
+  expect(screen.queryByRole("link", { name: /^(All \d+ runs|1 run)/ })).toBeNull();
+});
+
+test("the All runs pill counts the runs and opens the Runs page filtered by this workflow", async () => {
+  const user = userEvent.setup();
+  const onNavigate = vi.fn();
+  render(detail({ onNavigate }));
+  const pill = screen.getByRole("link", { name: /All 4 runs/ });
+  expect(pill.getAttribute("href")).toBe(`/runs?workflow=${encodeURIComponent(SAMPLE_PR_DIGEST.id)}`);
+  await user.click(pill);
+  expect(onNavigate).toHaveBeenCalledWith(`/runs?workflow=${encodeURIComponent(SAMPLE_PR_DIGEST.id)}`);
+});
+
+test("there is no Checks pill before a check has come back, and none for a file with no code shown", () => {
+  const { unmount } = render(detail());
+  expect(screen.queryByText(/checks pass|problem/)).toBeNull();
   unmount();
-  render(detail({ routines: [SAMPLE_WORKFLOW_ROUTINE] }));
-  await user.click(screen.getByRole("tab", { name: "Triggers" }));
-  expect(screen.getByRole("list", { name: "Routines that start it" }).textContent).toMatch(/next in \d+ h/); // WORKFLOWS_NOW is local time and next_at is fixed at +01:00, so the hours depend on the time zone.
+  render(detail({ workflow: SAMPLE_BROKEN, steps: [], code: null }));
+  expect(screen.queryByText(/checks pass|problem/)).toBeNull();
+});
+
+test("the Checks pill says the checks pass after a clean check, or counts the problems", () => {
+  const { unmount } = render(detail({ initialEditor: { problems: [] } }));
+  expect(within(screen.getByRole("group", { name: "About this workflow" })).getByText(/checks pass/)).toBeTruthy();
+  unmount();
+  render(detail({ initialEditor: { problems: SAMPLE_PR_DIGEST_PROBLEMS } }));
+  const pills = within(screen.getByRole("group", { name: "About this workflow" }));
+  expect(pills.getByText(`${SAMPLE_PR_DIGEST_PROBLEMS.length} problems`)).toBeTruthy();
+  expect(pills.queryByText(/checks pass/)).toBeNull();
 });
 
 test("the Code tab shows the file read only with a dot on each step's line, and Show in Finder reveals it", async () => {
   const user = userEvent.setup();
   const onReveal = vi.fn(() => Promise.resolve());
   const { container } = render(detail({ onReveal }));
-  await user.click(screen.getByRole("tab", { name: "Code" }));
   const editor = screen.getByRole("textbox", { name: "Code of pr_digest" }) as HTMLTextAreaElement;
   expect(editor.readOnly).toBe(true);
   expect(editor.value).toBe(SAMPLE_PR_DIGEST_CODE);
@@ -135,53 +214,9 @@ test("the Code tab shows the file read only with a dot on each step's line, and 
 });
 
 test("a step with no line number marks nothing", async () => {
-  const user = userEvent.setup();
   const steps = SAMPLE_PR_DIGEST_STEPS.map((step) => ({ ...step, lines: [null, null] as never }));
   const { container } = render(detail({ steps }));
-  await user.click(screen.getByRole("tab", { name: "Code" }));
   expect(container.querySelector(".code-editor-layer")?.textContent ?? "").not.toContain("●");
-});
-
-test("the Runs tab lists this workflow's runs, each opening its session", async () => {
-  const user = userEvent.setup();
-  const { container } = render(detail());
-  await user.click(screen.getByRole("tab", { name: "Runs" }));
-  const runs = within(screen.getByRole("list", { name: "Runs" }));
-  expect(runs.getAllByRole("listitem")).toHaveLength(4);
-  expect(runs.getAllByRole("link")[0]?.getAttribute("href")).toBe("/s/w_wait");
-  expect((await axe.run(container, noContrast)).violations).toEqual([]);
-});
-
-test("the Runs tab says so when there are none", async () => {
-  const user = userEvent.setup();
-  render(detail({ runs: [] }));
-  await user.click(screen.getByRole("tab", { name: "Runs" }));
-  expect(screen.getByText("No runs yet.")).toBeTruthy();
-});
-
-test("the Triggers tab lists the routines that start the workflow, each with its schedule or watch and a link", async () => {
-  const user = userEvent.setup();
-  const onNavigate = vi.fn();
-  const { container } = render(detail({ routines: [SAMPLE_WORKFLOW_ROUTINE, SAMPLE_WORKFLOW_WATCH_ROUTINE], onNavigate }));
-  await user.click(screen.getByRole("tab", { name: "Triggers" }));
-  const rows = within(screen.getByRole("list", { name: "Routines that start it" })).getAllByRole("listitem");
-  expect(rows).toHaveLength(2);
-  expect(rows[0]?.textContent).toContain("weekday-pr-digest");
-  expect(rows[0]?.textContent).toContain("Weekdays at 09:00 · repo=MilanPavel/golem, since=1d");
-  expect(rows[1]?.textContent).toContain("New *.pdf in ~/Downloads · repo=MilanPavel/golem");
-  const link = within(rows[0]!).getByRole("link", { name: /Open routine/ });
-  expect(link.getAttribute("href")).toBe("/routines/weekday-pr-digest");
-  await user.click(link);
-  expect(onNavigate).toHaveBeenCalledWith("/routines/weekday-pr-digest");
-  expect((await axe.run(container, noContrast)).violations).toEqual([]);
-});
-
-test("the Triggers tab says no routine starts the workflow, with a way to make one", async () => {
-  const user = userEvent.setup();
-  render(detail({ routines: [] }));
-  await user.click(screen.getByRole("tab", { name: "Triggers" }));
-  expect(screen.getByText(/No routine starts this workflow/)).toBeTruthy();
-  expect(screen.getByRole("link", { name: "Routines" }).getAttribute("href")).toBe("/routines?new");
 });
 
 test("routinesStarting picks the routines whose workflow is this one", () => {
@@ -190,11 +225,9 @@ test("routinesStarting picks the routines whose workflow is this one", () => {
 });
 
 test("a broken workflow shows its traceback, does not show code, and cannot run", async () => {
-  const user = userEvent.setup();
   const { container } = render(detail({ workflow: SAMPLE_BROKEN, steps: [], code: null, runs: [] }));
   expect(screen.getByRole("alert").textContent).toContain("ImportError: cannot import name 'Runn'");
   expect((screen.getByRole("button", { name: "Run…" }) as HTMLButtonElement).disabled).toBe(true);
-  await user.click(screen.getByRole("tab", { name: "Code" }));
   expect(screen.getByText(/not shown for a file that does not load/)).toBeTruthy();
   expect((await axe.run(container, noContrast)).violations).toEqual([]);
 });
@@ -231,19 +264,17 @@ test("/workflows says how many there are and how many are broken, and the rail's
   expect(await screen.findByRole("link", { name: /pr_digest/ })).toBeTruthy();
 });
 
-test("/workflows/:id loads the workflow, its code and its runs, and a pushed workflow event refreshes the runs", async () => {
-  const user = userEvent.setup();
+test("/workflows/:id loads the workflow, its code and its runs for the pills, and a pushed workflow event refreshes the runs", async () => {
   const fake = mount(`/workflows/${encodeURIComponent(SAMPLE_PR_DIGEST.id)}`, ({ raw }) => {
     raw.getWorkflow.mockResolvedValue(SAMPLE_PR_DIGEST_GET);
     raw.listRuns.mockResolvedValue({ runs: [SAMPLE_WORKFLOW_RUNS[1]!] });
   });
   expect(await screen.findByRole("heading", { name: /pr_digest/ })).toBeTruthy();
   expect(fake.raw.getWorkflow).toHaveBeenCalledWith(SAMPLE_PR_DIGEST.id);
-  await user.click(screen.getByRole("tab", { name: "Runs" }));
-  expect(within(await screen.findByRole("list", { name: "Runs" })).getAllByRole("listitem")).toHaveLength(1);
+  expect(await screen.findByRole("link", { name: /1 run/ })).toBeTruthy();
   fake.raw.listRuns.mockResolvedValue({ runs: SAMPLE_WORKFLOW_RUNS });
   fake.emitWorkflow({ kind: "run", method: "workflow.run.started", params: {} as never });
-  await waitFor(() => expect(within(screen.getByRole("list", { name: "Runs" })).getAllByRole("listitem")).toHaveLength(4));
+  await waitFor(() => expect(screen.getByRole("link", { name: /All 4 runs/ })).toBeTruthy());
 });
 
 test("a workflow the daemon does not know says so", async () => {
