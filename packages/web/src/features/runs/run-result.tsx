@@ -5,6 +5,7 @@ import type { WorkflowReadOutputResult, WorkflowRunInfo, WorkflowStepInfo } from
 import { Code } from "../../ui/code.tsx";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../ui/tabs.tsx";
 import { Markdown } from "../chat/markdown-view.tsx";
+import { ResultActions } from "./result-actions.tsx";
 import { RAW_TEXT, ReadableRawSwitch, ResultView } from "./result-view.tsx";
 
 /** One result a run marked, or, with no marked result, what the run returned. `index` is the place in `outputs`, or null for the return value. */
@@ -88,13 +89,14 @@ function FileOutput({ path, index, label, onReadOutput }: { path: string; index:
   );
 }
 
-function OutputBody({ output, runId, onReadOutput }: { output: RunOutput; runId: string; onReadOutput: (index: number) => Promise<WorkflowReadOutputResult> }) {
+function OutputBody({ output, runId, onReadOutput, onAskAbout, onReveal }: { output: RunOutput; runId: string; onReadOutput: (index: number) => Promise<WorkflowReadOutputResult>; onAskAbout?: (text: string) => void; onReveal?: RunResultProps["onReveal"] }) {
   const label = `Result: ${output.title}`;
   const { index } = output;
   return (
     <div className="flex flex-col gap-2">
       {output.summary === null ? null : <p className="m-0 text-sm text-muted">{output.summary}</p>}
       {resultKind(output.value) === "file" && index !== null ? <FileOutput key={`${runId}:${index}`} path={output.value as string} index={index} label={label} onReadOutput={onReadOutput} /> : <ResultView result={output.value} label={label} />}
+      <ResultActions title={output.title} value={output.value} onAskAbout={onAskAbout} onReveal={onReveal === undefined || index === null || resultKind(output.value) !== "file" ? undefined : () => onReveal(output.value as string, index)} />
     </div>
   );
 }
@@ -125,17 +127,21 @@ export type RunResultProps = {
   run: WorkflowRunInfo;
   steps: readonly WorkflowStepInfo[];
   onReadOutput: (index: number) => Promise<WorkflowReadOutputResult>;
+  /** Starts a new chat with this text in its box. Without it "Ask about this" is not offered. */
+  onAskAbout?: (text: string) => void;
+  /** Shows the file of output `index` in Finder (`fs.reveal` with the run and the index). Without it "Show in Finder" is not offered. */
+  onReveal?: (path: string, index: number) => Promise<void>;
 };
 
 /**
  * What the run came out with, drawn by its kind (text, a record, a table, a file, a link, changes): the first
  * result open and, when it marked several, the others as tabs. With none, what its steps did.
  */
-export function RunResult({ run, steps, onReadOutput }: RunResultProps) {
+export function RunResult({ run, steps, onReadOutput, onAskAbout, onReveal }: RunResultProps) {
   const outputs = runOutputs(run);
   const [tab, setTab] = useState("0");
   if (outputs.length === 0) return <WhatItDid steps={steps} working={run.status === "running" || run.status === "pending" || run.status === "waiting"} ended={run.status === "failed" || run.status === "cancelled"} />;
-  if (outputs.length === 1) return <OutputBody output={outputs[0]!} runId={run.workflow_run_id} onReadOutput={onReadOutput} />;
+  if (outputs.length === 1) return <OutputBody output={outputs[0]!} runId={run.workflow_run_id} onReadOutput={onReadOutput} onAskAbout={onAskAbout} onReveal={onReveal} />;
   const open = outputs[Number(tab)] === undefined ? "0" : tab;
   return (
     <Tabs value={open} onValueChange={setTab} className="flex flex-col gap-3">
@@ -148,7 +154,7 @@ export function RunResult({ run, steps, onReadOutput }: RunResultProps) {
       </TabsList>
       {outputs.map((output, at) => (
         <TabsContent key={at} value={String(at)}>
-          <OutputBody output={output} runId={run.workflow_run_id} onReadOutput={onReadOutput} />
+          <OutputBody output={output} runId={run.workflow_run_id} onReadOutput={onReadOutput} onAskAbout={onAskAbout} onReveal={onReveal} />
         </TabsContent>
       ))}
     </Tabs>

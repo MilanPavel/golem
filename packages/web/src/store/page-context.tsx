@@ -13,6 +13,7 @@ import { KEYS_KEY } from "./keys.ts";
 import type { FsListDirsResult, GitInfoResult } from "./dirs.ts";
 import type { GitBranchesResult } from "@golem/client";
 import { MODEL_LIST_ALL_KEY, MODEL_LIST_KEY, SETUP_STATUS_KEY, type ModelListResult } from "./models.ts";
+import { NEW_DRAFT_KEY } from "./drafts.ts";
 import type { Page, PageActions } from "./page.ts";
 import type { AppInstallSnapshot } from "./app-install.ts";
 import type { PageHostSnapshot } from "./page-host.ts";
@@ -192,6 +193,19 @@ export function useDraft(key: string): [string, (text: string) => void] {
   const text = useSyncExternalStore(drafts.subscribe, () => drafts.get(key).text);
   const set = useCallback((next: string) => drafts.setText(key, next), [drafts, key]);
   return [text, set];
+}
+
+/** Starts a new chat with `text` already in the box of the empty screen, and opens that screen. An unsent draft there stays, above it. */
+export function useStartChatWith(): (text: string) => void {
+  const { drafts, router } = usePage();
+  return useCallback(
+    (text: string) => {
+      const before = drafts.get(NEW_DRAFT_KEY).text;
+      drafts.setText(NEW_DRAFT_KEY, before.trim() === "" ? text : `${before.trimEnd()}\n\n${text}`);
+      router.navigate("/");
+    },
+    [drafts, router],
+  );
 }
 
 /** The long pastes behind the tokens in a draft. */
@@ -647,9 +661,10 @@ export function useWorkflowReader(): (id: string) => Promise<WorkflowGetResult> 
 }
 
 /** One run of a workflow with its steps and open reviews. Marked stale by every `workflow.run.*` and `workflow.step.*` notification, so an open run view ticks along. */
-export function useWorkflowStatus(workflowRunId: string): UseQueryResult<WorkflowStatusResult> {
+export function useWorkflowStatus(workflowRunId: string | null): UseQueryResult<WorkflowStatusResult> {
   const { queries } = usePage();
-  return useQuery({ queryKey: workflowStatusKey(workflowRunId), queryFn: () => queries.workflowStatus(workflowRunId), retry: false });
+  // Null waits: the workflow page asks for its last run only when it has one.
+  return useQuery({ queryKey: workflowStatusKey(workflowRunId ?? ""), queryFn: () => queries.workflowStatus(workflowRunId ?? ""), enabled: workflowRunId !== null, retry: false });
 }
 
 /** The data sources, or the news that the daemon does not know them yet. Marked stale by `data.changed` and by every data action. */

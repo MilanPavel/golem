@@ -1,5 +1,6 @@
 import type { RunInfo } from "../../store/runs.ts";
-import type { WorkflowCreateResult, WorkflowDraftResult, WorkflowEntryInfo, WorkflowGetResult, WorkflowListResult, WorkflowOutlineStep, WorkflowProblem, WorkflowProposeResult, WorkflowStarterInfo, WorkflowStepArg } from "../../store/workflows.ts";
+import type { WorkflowCreateResult, WorkflowDraftResult, WorkflowEntryInfo, WorkflowGetResult, WorkflowListResult, WorkflowOutlineStep, WorkflowProblem, WorkflowProposeResult, WorkflowStarterInfo, WorkflowStepArg, WorkflowStepInfo } from "../../store/workflows.ts";
+import type { LastRun } from "./last-run.tsx";
 
 /** "Now" for the samples: a Tuesday evening. Run times are placed relative to it, so Today and Earlier hold in any time zone. */
 export const WORKFLOWS_NOW = new Date(2026, 10, 17, 18, 30).getTime();
@@ -63,7 +64,21 @@ export const SAMPLE_PR_DIGEST_STEPS: WorkflowOutlineStep[] = [
 ];
 
 /** The hash `workflow.get` gave for the sample code. */
-export const SAMPLE_PR_DIGEST_HASH = "9f2c1ab04e7d";
+const given = (key: string, kind: WorkflowStepInfo["kind"], title: string, result: unknown, extra: Partial<WorkflowStepInfo> = {}): WorkflowStepInfo => ({ key, kind, title, status: "done", attempts: 1, result: result as WorkflowStepInfo["result"], ...extra });
+
+/** The last run of `pr_digest`, as the workflow page shows it: what each step gave. The loop gave one result per pull request. */
+export const SAMPLE_PR_DIGEST_LAST_RUN: LastRun = {
+  runId: "wr_digest",
+  when: "ran today 9:05",
+  steps: [
+    given("s1", "tool", "List the pull requests", { summary: "12 pull requests", artifact_id: "a_prs", size: 48211 }),
+    given("summarise:1912", "llm", "Summarise each pull request", "Bumps httpx to 0.28. Checks fail on one test.", { item: "pr 1912" }),
+    given("summarise:1915", "llm", "Summarise each pull request", "Fixes the typer help text.", { item: "pr 1915" }),
+    given("review:Check the digest", "review", "Check the digest", { verdict: "edit", text: "Hi team, twelve pull requests are open." }),
+  ],
+};
+
+export const SAMPLE_PR_DIGEST_HASH ="9f2c1ab04e7d";
 
 export const SAMPLE_PR_DIGEST_GET: WorkflowGetResult = { workflow: SAMPLE_PR_DIGEST, steps: SAMPLE_PR_DIGEST_STEPS, code: SAMPLE_PR_DIGEST_CODE, code_hash: SAMPLE_PR_DIGEST_HASH };
 

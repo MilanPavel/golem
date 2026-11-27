@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { actionErrorText } from "../../store/errors.ts";
 import { modelNames } from "@golem/view";
-import { useModelList, useNavigate, usePageActions, useWorkflowReader, useWorkflowStatus } from "../../store/page-context.tsx";
-import { helperPath, sessionPath } from "../../store/router.ts";
+import { useModelList, useNavigate, usePageActions, useStartChatWith, useWorkflowReader, useWorkflowStatus } from "../../store/page-context.tsx";
+import { helperPath, sessionPath, workflowPath } from "../../store/router.ts";
+import { outlineStepOf } from "../workflows/last-run.tsx";
 import { TraceBody, useTraceData } from "../trace/trace-screen.tsx";
 import { useNow } from "../sessions/use-now.ts";
 import { WorkflowRunView } from "./workflow-run-view.tsx";
@@ -29,6 +30,7 @@ export function WorkflowRunScreen({ id }: { id: string }) {
   const readWorkflow = useWorkflowReader();
   const models = useModelList();
   const navigate = useNavigate();
+  const startChat = useStartChatWith();
   const status = query.data?.run.status;
   // A run that moves shows its seconds; one that has stopped does not need the tick.
   const now = useNow(status === "running" || status === "waiting" ? 1000 : 60_000);
@@ -61,6 +63,15 @@ export function WorkflowRunScreen({ id }: { id: string }) {
           const workflow = await readWorkflow(run.workflow_id);
           const reply = await actions.proposeWorkflow(run.workflow_id, workflow.code ?? "", question);
           return reply.answer ?? reply.note;
+        }}
+        onAskAbout={startChat}
+        onReveal={(path, index) => actions.reveal(path, { workflowRunId: id, outputIndex: index })}
+        onSeeStep={(step) => {
+          // The step's place in the workflow's outline, read when asked. When it cannot be found the workflow opens with no step picked.
+          readWorkflow(run.workflow_id).then(
+            (workflow) => navigate(workflowPath(run.workflow_id, outlineStepOf(workflow.steps ?? [], step)?.id ?? null)),
+            () => navigate(workflowPath(run.workflow_id)),
+          );
         }}
         trace={sessionId === null || sessionId === undefined ? undefined : <RunTrace sessionId={sessionId} />}
       />

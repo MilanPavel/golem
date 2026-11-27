@@ -90,20 +90,22 @@ test("parseRoute reads the workflows page and one workflow, and workflowPath rou
   expect(parseRoute("/workflows")).toEqual({ name: "workflows" });
   const id = "/Users/me/.golem/workflows/pr_digest.py::pr_digest";
   expect(workflowPath()).toBe("/workflows");
-  expect(parseRoute(workflowPath(id))).toEqual({ name: "workflow", id });
+  expect(parseRoute(workflowPath(id))).toEqual({ name: "workflow", id, step: null });
+  expect(workflowPath(id, "llm:brief")).toBe(`${workflowPath(id)}?step=llm%3Abrief`);
+  expect(parseRoute(workflowPath(id), "?step=llm%3Abrief")).toEqual({ name: "workflow", id, step: "llm:brief" });
   for (const bad of ["/workflows/", "/workflows/a/b", "/workflowsx"]) {
     expect(parseRoute(bad)).toEqual({ name: "not-found" });
   }
   // The old tab paths land on the page.
-  expect(parseRoute(`${workflowPath(id)}/runs`)).toEqual({ name: "workflow", id });
-  expect(parseRoute(`${workflowPath(id)}/triggers`)).toEqual({ name: "workflow", id });
+  expect(parseRoute(`${workflowPath(id)}/runs`)).toEqual({ name: "workflow", id, step: null });
+  expect(parseRoute(`${workflowPath(id)}/triggers`)).toEqual({ name: "workflow", id, step: null });
 });
 
 test("parseRoute reads the page that makes a new workflow, and workflowNewPath round-trips", () => {
   expect(parseRoute("/workflows/new")).toEqual({ name: "workflow-new" });
   expect(parseRoute(workflowNewPath())).toEqual({ name: "workflow-new" });
   // A workflow id is a path and a name, so `new` alone is never one; a path that ends in new is.
-  expect(parseRoute(workflowPath("/a/new.py::new"))).toEqual({ name: "workflow", id: "/a/new.py::new" });
+  expect(parseRoute(workflowPath("/a/new.py::new"))).toEqual({ name: "workflow", id: "/a/new.py::new", step: null });
 });
 
 test("runsPath filters the Runs page by a workflow", () => {

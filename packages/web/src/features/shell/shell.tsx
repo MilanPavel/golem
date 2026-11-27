@@ -66,7 +66,7 @@ function Content() {
     case "workflow-new":
       return <WorkflowNewScreen />;
     case "workflow":
-      return <WorkflowScreen id={route.id} />;
+      return <WorkflowScreen id={route.id} step={route.step} />;
     case "runs":
       return <RunsScreen />;
     case "run":

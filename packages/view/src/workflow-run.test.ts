@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { resultKind, reviewDraftText, reviewTitle, stepLabel, stepMetaLine, stepOutputLine, toolAsk, workerLine, workerResult, workflowRunTook, workflowStepsList } from "./workflow-run.ts";
+import { askAboutResult, resultCopyText, resultKind, reviewDraftText, reviewTitle, stepLabel, stepMetaLine, stepOutputLine, toolAsk, workerLine, workerResult, workflowRunTook, workflowStepsList } from "./workflow-run.ts";
 
 const T = (s: number) => new Date(Date.UTC(2026, 10, 26, 8, 0, s)).toISOString();
 const step = (key: string, extra: Record<string, unknown> = {}) => ({ key, kind: "step", title: key, status: "done", started_at: T(0), finished_at: T(10), ...extra });
@@ -87,4 +87,17 @@ test("a tool ask is a review with the tool in its title", () => {
 test("how long a run took", () => {
   assert.equal(workflowRunTook({ started_at: T(0), finished_at: T(70) }, 0), "1m 10s");
   assert.equal(workflowRunTook({ started_at: null }, 0), "");
+});
+
+test("Copy takes the text, the path, the address, or JSON for data", () => {
+  assert.equal(resultCopyText("  Twelve open pull requests.\n"), "Twelve open pull requests.");
+  assert.equal(resultCopyText("/Users/me/briefing.md"), "/Users/me/briefing.md");
+  assert.equal(resultCopyText("https://example.com/a"), "https://example.com/a");
+  assert.equal(resultCopyText({ a: 1 }), '{\n  "a": 1\n}');
+});
+
+test("Ask about this quotes text, names a file by its path and fences data", () => {
+  assert.equal(askAboutResult("Briefing", "One\n\nTwo"), 'About this from the result "Briefing":\n\n> One\n>\n> Two\n\n');
+  assert.equal(askAboutResult("Briefing", "/Users/me/b.md"), 'About the file from the result "Briefing":\n\n/Users/me/b.md\n\n');
+  assert.ok(askAboutResult("Rows", [{ a: 1 }]).includes("```json\n"));
 });

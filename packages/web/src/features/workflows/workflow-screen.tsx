@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from "react";
 import { NEW_WORKFLOW_BUTTON, modelNames } from "@golem/view";
 import { actionErrorText, folderDialogErrorText, revealErrorText } from "../../store/errors.ts";
-import { useAgentList, useFolderDialog, useModelList, useNavigate, useNewSessionFolder, usePageActions, useRoutineList, useRunList, useWorkflow, useWorkflowList, useWorkflowStarters } from "../../store/page-context.tsx";
+import { useAgentList, useFolderDialog, useModelList, useNavigate, useNewSessionFolder, usePageActions, useRoutineList, useRunList, useWorkflow, useWorkflowList, useWorkflowStarters, useWorkflowStatus } from "../../store/page-context.tsx";
 import { useNow } from "../sessions/use-now.ts";
 import { workflowNewPath, workflowPath } from "../../store/router.ts";
 import { WorkflowDetail } from "./workflow-detail.tsx";
@@ -99,9 +99,12 @@ export function WorkflowNewScreen() {
 }
 
 /** `/workflows/:id`: one workflow, from `workflow.get`, with its runs from `run.list`. */
-export function WorkflowScreen({ id }: { id: string }) {
+export function WorkflowScreen({ id, step = null }: { id: string; /** The step of the outline selected at first, by its id. */ step?: string | null }) {
   const query = useWorkflow(id);
   const runs = useRunList();
+  // What the steps gave in the last run: its `workflow.status`, asked once and only when the workflow has a run.
+  const lastRunId = query.data === undefined ? null : (workflowRuns(runs.data?.runs ?? [], query.data.workflow.name).find((run) => run.workflow_run_id != null)?.workflow_run_id ?? null);
+  const last = useWorkflowStatus(lastRunId);
   const routines = useRoutineList();
   const actions = usePageActions();
   const dialog = useFolderDialog();
@@ -120,7 +123,9 @@ export function WorkflowScreen({ id }: { id: string }) {
   return (
     <Frame>
       <WorkflowDetail
-        key={id}
+        key={`${id}?${step ?? ""}`}
+        initialEditor={step === null ? undefined : { selected: step }}
+        lastRun={lastRunId === null || last.data === undefined ? null : { runId: lastRunId, when: last.data.run.started_at == null ? "" : `ran ${new Date(last.data.run.started_at).toLocaleString()}`, steps: last.data.steps ?? [] }}
         workflow={workflow}
         steps={steps ?? []}
         code={code ?? null}
