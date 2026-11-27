@@ -766,3 +766,24 @@ class Builder:
             n += 1
         self.used.add(sid)
         return sid
+
+
+def expected_steps(source: str, name: str) -> int | None:
+    """How many steps the workflow ``name`` is expected to list, or None when it cannot be known.
+
+    A repeating step is one row, as the run page folds it. None for a file that cannot be read,
+    a workflow with no step, and one with a step under an ``if``: that step may be skipped, so
+    a count would be a guess.
+    """
+    try:
+        found = outline(source)
+    except OutlineError:
+        return None
+    for one in found:
+        if one.name != name:
+            continue
+        steps = [s for s in one.steps if s.kind in STEP_KINDS]
+        if not steps or any(s.condition is not None for s in steps):
+            return None
+        return len(steps)
+    return None

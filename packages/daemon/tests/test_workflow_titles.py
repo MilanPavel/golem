@@ -39,6 +39,7 @@ class Seen:
         backoff: float = 0.0,
         item: str | None = None,
         group_title: str | None = None,
+        of: int | None = None,
     ) -> Any:
         self.steps.append(
             {

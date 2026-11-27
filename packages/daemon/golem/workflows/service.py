@@ -34,7 +34,12 @@ from golem.workflows.registry import WorkflowEntry, WorkflowRegistry
 from golem.workflows.starter import StarterError, add_starter
 from golem.workflows.tools import WorkflowTools
 from golem_protocol import rpc
-from golem_protocol.commands import PendingItem, WorkflowRunEvent, WorkflowStepEvent
+from golem_protocol.commands import (
+    PendingItem,
+    WorkflowOutputEvent,
+    WorkflowRunEvent,
+    WorkflowStepEvent,
+)
 
 log = logging.getLogger("golem.server")
 
@@ -46,6 +51,7 @@ _NOTIFICATIONS: dict[str, type[BaseModel]] = {
     "workflow.run.done": rpc.WorkflowRunDoneNotification,
     "workflow.run.failed": rpc.WorkflowRunFailedNotification,
     "workflow.run.cancelled": rpc.WorkflowRunCancelledNotification,
+    "workflow.output.added": rpc.WorkflowOutputAddedNotification,
     "workflow.step.started": rpc.WorkflowStepStartedNotification,
     "workflow.step.done": rpc.WorkflowStepDoneNotification,
     "workflow.step.failed": rpc.WorkflowStepFailedNotification,
@@ -249,7 +255,13 @@ class WorkflowService:
         session_id = payload.get("session_id")
         if name in _TOUCHING and isinstance(session_id, str) and self._touch_session is not None:
             self._touch(session_id)
-        params = WorkflowRunEvent if name.startswith("workflow.run.") else WorkflowStepEvent
+        params: type[BaseModel] = (
+            WorkflowRunEvent
+            if name.startswith("workflow.run.")
+            else WorkflowOutputEvent
+            if name.startswith("workflow.output.")
+            else WorkflowStepEvent
+        )
         self._broadcast(model(params=params.model_validate(payload)))
         ended = _ENDED.get(name)
         if ended is not None and self.on_ended is not None:

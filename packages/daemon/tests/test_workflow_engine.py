@@ -268,6 +268,9 @@ async def test_events_come_in_order(store: WorkflowRuns, calls: Any, tmp_path: P
         "started_at",
         "finished_at",
         "result",
+        "result_size",
+        "line",
+        "of",
     }
     assert step["result"] is None
     assert events.items[2][1]["result"] == 1
@@ -284,7 +287,13 @@ async def test_events_come_in_order(store: WorkflowRuns, calls: Any, tmp_path: P
         "started_at",
         "finished_at",
         "error",
+        "steps_expected",
+        "result",
+        "result_size",
+        "summary",
     }
+    assert events.items[0][1]["steps_expected"] == 1
+    assert (done["steps_expected"], done["result"], done["summary"]) == (None, None, None)
 
 
 async def test_top_level_code_does_not_block_the_loop(

@@ -30,7 +30,9 @@ from golem.workflow import (
     WorkflowWaiting,
     agent_title,
 )
+from golem.workflows.lines import result_line, small
 from golem.workflows.llm import Llm, parse_object
+from golem.workflows.outline import expected_steps
 from golem.workflows.tools import SESSION_TOOLS, ToolVerdict, WorkflowTools
 
 __all__ = ["BIG_OUTPUT_CHARS", "WorkflowEngine", "restart_policy"]
@@ -124,6 +126,10 @@ class WorkflowEngine:
         self._agent = agent
         self._models: dict[str, tuple[str | None, str | None]] = {}
         """Per running run: the run's own model choice and the file's ``@workflow(model=)``."""
+        self._expected: dict[str, int | None] = {}
+        """Per run that has not ended: how many steps its file's outline lists (None: unknown)."""
+        self._totals: dict[str, dict[str, int]] = {}
+        """Per run: ``run.step(of=)`` by step title, how many such steps the workflow said."""
         self.stopping = False
         """True while the daemon shuts down: a cancelled run stays ``running`` and resumes later."""
 
@@ -297,38 +303,79 @@ class WorkflowEngine:
         await self.execute(run_id)
         return run_id
 
+    async def expected(self, workflow_run_id: str) -> int | None:
+        """How many steps the run is expected to have in all, read once from its file's outline.
+
+        None when it cannot be known (see :func:`expected_steps`) or the run has ended."""
+        if workflow_run_id in self._expected:
+            return self._expected[workflow_run_id]
+        record = await self._store.get_run(workflow_run_id)
+        if record is None or record.status not in ("pending", "running", "waiting"):
+            return None
+        try:
+            text = await asyncio.to_thread(Path(record.path).read_text, encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            found = None
+        else:
+            found = expected_steps(text, record.name)
+        self._expected[workflow_run_id] = found
+        return found
+
+    def say_total(self, workflow_run_id: str, title: str, of: int) -> None:
+        """Note that the workflow said it has ``of`` steps titled ``title`` in all."""
+        self._totals.setdefault(workflow_run_id, {})[title] = of
+
+    def total_of(self, workflow_run_id: str, title: str) -> int | None:
+        """How many steps titled ``title`` the workflow said the run has (``of=``), or None."""
+        return self._totals.get(workflow_run_id, {}).get(title)
+
     async def _run_event(self, name: str, workflow_run_id: str) -> None:
         """Send a run event from the row as it is now (the shape of ``WorkflowRunEvent``)."""
         run = await self._store.get_run(workflow_run_id)
         if run is None:
             return
-        self.send(
-            name,
-            {
-                "workflow_run_id": run.workflow_run_id,
-                "workflow_id": run.workflow_id,
-                "name": run.name,
-                "status": run.status,
-                "trigger": run.trigger,
-                "session_id": run.session_id,
-                "started_at": run.started_at,
-                "finished_at": run.finished_at,
-                "error": run.error,
-            },
-        )
+        ended = run.status in ("done", "failed", "cancelled")
+        payload: dict[str, Any] = {
+            "workflow_run_id": run.workflow_run_id,
+            "workflow_id": run.workflow_id,
+            "name": run.name,
+            "status": run.status,
+            "trigger": run.trigger,
+            "session_id": run.session_id,
+            "started_at": run.started_at,
+            "finished_at": run.finished_at,
+            "error": run.error,
+            "steps_expected": None if ended else await self.expected(workflow_run_id),
+        }
+        if name == "workflow.run.done":
+            returned = json.loads(run.result_json) if run.result_json else None
+            value, size = small(returned)
+            payload["result"] = value
+            payload["result_size"] = size
+            outputs = await self._store.list_outputs(workflow_run_id)
+            payload["summary"] = next((o.summary for o in outputs if o.summary), None) or (
+                result_line(returned)
+            )
+        if ended:
+            self._expected.pop(workflow_run_id, None)
+            self._totals.pop(workflow_run_id, None)
+        self.send(name, payload)
 
     async def step_event(self, name: str, workflow_run_id: str, key: str) -> None:
         """Send a step event from the row as it is now (the shape of ``WorkflowStepEvent``)."""
         step = await self._store.get_step(workflow_run_id, key)
         if step is None:
             return
+        saved = json.loads(step.result_json) if step.result_json else None
+        value, size = small(saved)
+        title = step.title or step.step_key
         self.send(
             name,
             {
                 "workflow_run_id": step.workflow_run_id,
                 "key": step.step_key,
                 "kind": step.kind,
-                "title": step.title or step.step_key,
+                "title": title,
                 "status": step.status,
                 "group": step.group_key,
                 "group_title": step.group_title,
@@ -340,7 +387,10 @@ class WorkflowEngine:
                 "cost_usd": step.cost_usd,
                 "started_at": step.started_at,
                 "finished_at": step.finished_at,
-                "result": json.loads(step.result_json) if step.result_json else None,
+                "result": value,
+                "result_size": size,
+                "line": result_line(saved, step.kind),
+                "of": self.total_of(workflow_run_id, title),
             },
         )
 
@@ -426,6 +476,18 @@ class _Journal:
                 " and dicts"
             ) from exc
         await self._engine.store.add_output(workflow_run_id, position, title, encoded, summary)
+        shown, size = small(value)
+        self._engine.send(
+            "workflow.output.added",
+            {
+                "workflow_run_id": workflow_run_id,
+                "position": position,
+                "title": title,
+                "summary": summary,
+                "value": shown,
+                "size": size,
+            },
+        )
 
     async def llm(
         self,
@@ -453,9 +515,12 @@ class _Journal:
         backoff: float = 0.0,
         item: str | None = None,
         group_title: str | None = None,
+        of: int | None = None,
     ) -> Any:
         store = self._engine.store
         event = self._engine.step_event
+        if of is not None:
+            self._engine.say_total(workflow_run_id, title, of)
         before = await store.get_step(workflow_run_id, key)
         doubt = before is not None and before.status in ("running", "in_doubt") and keyed
         if doubt and before is not None and before.status == "running":

@@ -113,6 +113,7 @@ class StepBackend(Protocol):
         backoff: float = 0.0,
         item: str | None = None,
         group_title: str | None = None,
+        of: int | None = None,
     ) -> Any: ...
 
     async def output(
@@ -279,13 +280,16 @@ class Run:
         retries: int = 0,
         backoff: float = 0.0,
         item: Any = None,
+        of: int | None = None,
         **kwargs: Any,
     ) -> Any:
         """Run ``fn(*args, **kwargs)`` once and keep its JSON result under ``key or name``.
 
         ``item=`` is the part that changes in a loop (a folder, a file); it is shown after the
-        title and is never passed to ``fn``. Without ``key=``, an ``item`` is part of the step key
-        (``"count: a.md"``), so a loop needs no name that changes.
+        title and is never passed to ``fn``. ``of=`` is how many such steps the loop has in all,
+        when you know (``of=len(feeds)``): the run page then says "12 of 30" and not only what is
+        done so far. It is never passed to ``fn`` either. Without ``key=``, an ``item`` is part of
+        the step key (``"count: a.md"``), so a loop needs no name that changes.
 
         Each key may be used once per run; inside a loop pass distinct names or keys.
         An explicit ``key=`` marks a step that changes something outside golem: if golem
@@ -310,6 +314,7 @@ class Run:
             backoff=max(0.0, backoff),
             item=shown,
             group_title=_group_title.get(),
+            of=of if isinstance(of, int) and not isinstance(of, bool) and of > 0 else None,
         )
 
     def _use_key(self, step_key: str, name: str) -> None:
