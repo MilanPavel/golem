@@ -1,7 +1,7 @@
 # examples/workflows/hello.py
 from pathlib import Path
 
-from golem.workflow import Run, manual, workflow
+from golem.workflow import Run, workflow
 
 
 def find_files(folder: str) -> list[str]:
@@ -21,7 +21,6 @@ def add_up(counts: list[int]) -> int:
 
 
 @workflow(
-    trigger=manual(),
     inputs={"folder": str},
     title="Count the lines",
     description="Count lines in three Markdown files.",

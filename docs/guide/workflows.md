@@ -12,7 +12,7 @@ Use a workflow when the same job comes back: every Monday, for each file in a fo
 | Word | Who decides the next step | Written as |
 |---|---|---|
 | Skill | The model, following instructions | `SKILL.md` |
-| Routine | A trigger: a time or a new file | `[[routine]]` in `config.toml` |
+| Routine | The when: a time or a new file. It can start a workflow | `[[routine]]` in `config.toml` |
 | Workflow | Your code | `workflows/*.py` |
 
 ## Where the files go
@@ -32,7 +32,7 @@ This one needs no network and no model. It counts the lines in three Markdown fi
 # examples/workflows/hello.py
 from pathlib import Path
 
-from golem.workflow import Run, manual, workflow
+from golem.workflow import Run, workflow
 
 
 def find_files(folder: str) -> list[str]:
@@ -52,7 +52,6 @@ def add_up(counts: list[int]) -> int:
 
 
 @workflow(
-    trigger=manual(),
     inputs={"folder": str},
     title="Count the lines",
     description="Count lines in three Markdown files.",
@@ -68,7 +67,7 @@ async def hello(run: Run) -> None:
 
 | Part | What it does |
 |---|---|
-| `@workflow(trigger=, inputs=)` | Marks the function as a workflow. `manual()` means it starts only when you ask |
+| `@workflow(inputs=)` | Marks the function as a workflow. It starts when you ask, or when a [routine](./routines.md) starts it. A `trigger=` is still accepted but never used: the check says so |
 | `run.inputs` | The values you pass with `--input` |
 | `run.step(name, fn, *args)` | Runs `fn` once and saves its result under `name` |
 | `run.parallel([...])` | Runs the steps at the same time and returns their results in order |
@@ -85,9 +84,10 @@ cp examples/workflows/hello.py ~/.golem/workflows/
 ```bash
 golem workflow starters
 golem workflow add morning_briefing
+golem workflow add morning_briefing --routine
 ```
 
-`morning_briefing` goes in `~/.golem/workflows` and runs every weekday at 07:30: it reads your project folders, logs and feeds, and leaves one short briefing in the Inbox and in `~/.golem/briefings`. Adding it turns its schedule on. The Workflows page offers the same starters, and says when each one runs before you add it. An existing file is never overwritten.
+`morning_briefing` goes in `~/.golem/workflows`: it reads your project folders, logs and feeds, and leaves one short briefing in the Inbox and in `~/.golem/briefings`. A workflow does not run by itself: a routine schedules it. With `--routine` golem also adds the routine `morning-briefing` (`weekdays 07:30`) that starts it; without it you add a routine yourself in Routines. If the routine cannot be added (its name is taken, say), the workflow is still added and golem says why. The Workflows page offers the same starters, with an "Add and run every weekday at 07:30" button. An existing file is never overwritten.
 
 ## Run it
 
@@ -340,7 +340,7 @@ Without `--key` the run must wait on exactly one review. The command then follow
 
 ## Run a workflow from a routine
 
-A `[[routine]]` can start a workflow instead of a prompt. Give it `workflow` (the workflow's name) and `inputs`, and leave `prompt` out: a routine has exactly one of the two.
+A routine is the only "when" of a workflow. A `[[routine]]` can start a workflow instead of a prompt. In the web app, New routine from a workflow's page opens the form with the workflow chosen. Give it `workflow` (the workflow's name) and `inputs`, and leave `prompt` out: a routine has exactly one of the two.
 
 ```toml
 [[routine]]

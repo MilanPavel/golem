@@ -327,9 +327,21 @@ test("the empty state shows a starter card whose line says what it leaves, and a
   const card = cardOf("Morning briefing");
   expect(card.getByRole("heading").textContent).toBe("Morning briefing");
   expect(card.getByText(/leave one short briefing/)).toBeTruthy();
-  await user.click(card.getByRole("button", { name: "Use this starter" }));
-  expect(onAdd).toHaveBeenCalledWith(SAMPLE_BRIEFING);
+  await user.click(card.getByRole("button", { name: "Add" }));
+  expect(onAdd).toHaveBeenLastCalledWith(SAMPLE_BRIEFING, false);
+  await user.click(card.getByRole("button", { name: "Add and run every weekday at 07:30" }));
+  expect(onAdd).toHaveBeenLastCalledWith(SAMPLE_BRIEFING, true);
   expect((await axe.run(container, noContrast)).violations).toEqual([]);
+});
+
+test("a starter without a routine has the one button, and adds without one", async () => {
+  const user = userEvent.setup();
+  const onAdd = vi.fn(async () => {});
+  render(<WorkflowsEmpty starters={[SAMPLE_PROJECT_STARTER]} folder={SAMPLE_STARTER_FOLDER} onAdd={onAdd} />);
+  const card = cardOf("Review the changes");
+  expect(card.getAllByRole("button")).toHaveLength(1);
+  await user.click(card.getByRole("button", { name: "Use this starter" }));
+  expect(onAdd).toHaveBeenCalledWith(SAMPLE_PROJECT_STARTER, false);
 });
 
 test("without a project folder a project starter says why and its button is off, and the others work", () => {
@@ -339,7 +351,7 @@ test("without a project folder a project starter says why and its button is off,
   expect((button as HTMLButtonElement).disabled).toBe(true);
   expect(review.getByText(/This one works on a project/)).toBeTruthy();
   expect(button.getAttribute("aria-describedby")).toBeTruthy();
-  expect((cardOf("Morning briefing").getByRole("button", { name: "Use this starter" }) as HTMLButtonElement).disabled).toBe(false);
+  expect((cardOf("Morning briefing").getByRole("button", { name: "Add" }) as HTMLButtonElement).disabled).toBe(false);
 });
 
 test("with a project folder a project starter's button is on", () => {
@@ -354,9 +366,9 @@ test("a refused add shows the daemon's reason on its card and the button works a
   });
   render(<WorkflowsEmpty starters={SAMPLE_STARTERS} folder="/x" onAdd={onAdd} />);
   const card = cardOf("Morning briefing");
-  await user.click(card.getByRole("button", { name: "Use this starter" }));
+  await user.click(card.getByRole("button", { name: "Add" }));
   expect((await card.findByRole("alert")).textContent).toContain("trusted_projects");
-  expect((card.getByRole("button", { name: "Use this starter" }) as HTMLButtonElement).disabled).toBe(false);
+  expect((card.getByRole("button", { name: "Add" }) as HTMLButtonElement).disabled).toBe(false);
 });
 
 test("starterStillToAdd drops a starter whose file is in the project folder or in your own folder", () => {
@@ -386,9 +398,36 @@ test("/workflows with none lists the starter, adds it in your own folder and ope
   act(() => fake.emitSummary(summary("x", "2026-11-01T11:59:00Z", SAMPLE_STARTER_FOLDER)));
   expect(await screen.findByRole("heading", { name: "No workflows yet" })).toBeTruthy();
   expect(screen.getByText(/leave one short briefing/)).toBeTruthy();
-  await user.click(await screen.findByRole("button", { name: "Use this starter" }));
+  await user.click(await screen.findByRole("button", { name: "Add" }));
   await waitFor(() => expect(location.pathname).toBe(`/workflows/${encodeURIComponent(id)}`));
   expect(fake.raw.addWorkflowStarter).toHaveBeenCalledWith("morning_briefing");
+});
+
+test("Add and run asks for the routine too and opens the workflow; a routine that failed is said on the page", async () => {
+  const user = userEvent.setup();
+  const id = "/h/.golem/workflows/morning_briefing.py::morning_briefing";
+  const path = "/h/.golem/workflows/morning_briefing.py";
+  const fake = mount("/workflows", ({ raw }) => {
+    raw.listWorkflows.mockResolvedValue({ workflows: [] });
+    raw.listWorkflowStarters.mockResolvedValue({ starters: SAMPLE_STARTERS });
+    raw.addWorkflowStarter.mockResolvedValue({ id, name: "morning_briefing", path, routine: "morning-briefing" });
+  });
+  await user.click(await screen.findByRole("button", { name: "Add and run every weekday at 07:30" }));
+  await waitFor(() => expect(location.pathname).toBe(`/workflows/${encodeURIComponent(id)}`));
+  expect(fake.raw.addWorkflowStarter).toHaveBeenCalledWith("morning_briefing", undefined, true);
+});
+
+test("when the routine could not be made the workflow is still added, the page stays and says why", async () => {
+  const user = userEvent.setup();
+  const id = "/h/.golem/workflows/morning_briefing.py::morning_briefing";
+  mount("/workflows", ({ raw }) => {
+    raw.listWorkflows.mockResolvedValue({ workflows: [] });
+    raw.listWorkflowStarters.mockResolvedValue({ starters: SAMPLE_STARTERS });
+    raw.addWorkflowStarter.mockResolvedValue({ id, name: "morning_briefing", path: "/h/x.py", routine_problem: "the routine morning-briefing was not added: there is already a routine called morning-briefing" });
+  });
+  await user.click(await screen.findByRole("button", { name: "Add and run every weekday at 07:30" }));
+  expect((await screen.findByRole("status")).textContent).toBe("The workflow was added. The routine morning-briefing was not added: there is already a routine called morning-briefing");
+  expect(location.pathname).toBe("/workflows");
 });
 
 test("/workflows shows a refusal of the add on the card and stays on the page", async () => {
@@ -398,7 +437,7 @@ test("/workflows shows a refusal of the add on the card and stays on the page", 
     raw.listWorkflowStarters.mockResolvedValue({ starters: SAMPLE_STARTERS });
     raw.addWorkflowStarter.mockRejectedValue(new Error("/h/.golem/workflows/morning_briefing.py exists already; it was not changed"));
   });
-  await user.click(await screen.findByRole("button", { name: "Use this starter" }));
+  await user.click(await screen.findByRole("button", { name: "Add" }));
   expect((await screen.findByRole("alert")).textContent).toContain("exists already");
   expect(fake.raw.addWorkflowStarter).toHaveBeenCalledTimes(1);
   expect(location.pathname).toBe("/workflows");

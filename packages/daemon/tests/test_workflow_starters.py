@@ -15,6 +15,7 @@ from typing import Any, cast
 
 import pytest
 
+from golem.routines import parse_schedule
 from golem.store.database import Database
 from golem.store.workflow_runs import WorkflowRuns
 from golem.workflows import starter as starters
@@ -136,6 +137,15 @@ def test_each_starter_loads_and_checks_clean(one: Starter) -> None:
     problems = check(path.read_text(encoding="utf-8"), None)
     assert [p for p in problems if p.severity == "error"] == []
     assert one.schedule is None
+
+
+def test_the_briefing_comes_with_a_weekday_routine() -> None:
+    [one] = STARTERS
+    assert one.routine == starters.StarterRoutine(
+        "morning-briefing", "weekdays 07:30", "every weekday at 07:30"
+    )
+    assert one.routine is not None
+    parse_schedule(one.routine.schedule)
 
 
 # morning_briefing: the gather functions

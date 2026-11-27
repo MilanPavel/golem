@@ -3,8 +3,8 @@ import type { WorkflowEntryInfo, WorkflowStarterInfo } from "../../store/workflo
 import { Button } from "../../ui/button.tsx";
 import { Card } from "../../ui/card.tsx";
 
-/** Adds a starter. Rejects with the reason, which the card shows. The live page opens the new workflow when it resolves. */
-export type AddStarter = (starter: WorkflowStarterInfo) => Promise<void>;
+/** Adds a starter, and its routine when `routine` is true. Rejects with the reason, which the card shows. The live page opens the new workflow when it resolves. */
+export type AddStarter = (starter: WorkflowStarterInfo, routine: boolean) => Promise<void>;
 
 /** The starters that have no file yet: a project starter counts as added when the project folder has a workflow of that name, a user starter when your own folder has. */
 export function starterStillToAdd(starters: readonly WorkflowStarterInfo[], workflows: readonly WorkflowEntryInfo[], folder: string | null): WorkflowStarterInfo[] {
@@ -23,11 +23,11 @@ function StarterCard({ starter, folder, onAdd, failed }: { starter: WorkflowStar
   const [error, setError] = useState<string | null>(failed?.id === starter.id ? failed.text : null);
   const off = whyOff(starter, folder);
   const reasonId = useId();
-  const add = async () => {
+  const add = async (routine: boolean) => {
     setBusy(true);
     setError(null);
     try {
-      await onAdd(starter);
+      await onAdd(starter, routine);
     } catch (reason) {
       setError(reason instanceof Error && reason.message !== "" ? reason.message : "The workflow could not be added.");
     } finally {
@@ -48,10 +48,15 @@ function StarterCard({ starter, folder, onAdd, failed }: { starter: WorkflowStar
           {error}
         </p>
       )}
-      <div>
-        <Button size="sm" disabled={off !== null || busy} aria-describedby={off === null ? undefined : reasonId} onClick={() => void add()}>
-          {busy ? "Adding" : "Use this starter"}
+      <div className="flex flex-wrap gap-2">
+        <Button size="sm" kind={starter.routine ? "secondary" : "primary"} disabled={off !== null || busy} aria-describedby={off === null ? undefined : reasonId} onClick={() => void add(false)}>
+          {busy ? "Adding" : starter.routine ? "Add" : "Use this starter"}
         </Button>
+        {starter.routine ? (
+          <Button size="sm" disabled={off !== null || busy} aria-describedby={off === null ? undefined : reasonId} onClick={() => void add(true)}>
+            Add and run {starter.routine.words}
+          </Button>
+        ) : null}
       </div>
     </Card>
   );

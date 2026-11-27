@@ -912,8 +912,8 @@ export interface GolemClient {
   listWorkflows(folders?: string[]): Promise<WorkflowListResult>;
   /** `workflow.starters`: the starter workflows golem ships. */
   listWorkflowStarters(): Promise<WorkflowStartersResult>;
-  /** `workflow.add_starter`: write a starter as a workflow file, in `folder` (a trusted project) or the user's folder. Rejects with the daemon's reason: an untrusted folder, an existing file, an unknown id. */
-  addWorkflowStarter(id: string, folder?: string): Promise<WorkflowAddStarterResult>;
+  /** `workflow.add_starter`: write a starter as a workflow file, in `folder` (a trusted project) or the user's folder. Rejects with the daemon's reason: an untrusted folder, an existing file, an unknown id. With `routine` it also makes the starter's routine; the result's `routine_problem` says why that part failed while the workflow was still added. */
+  addWorkflowStarter(id: string, folder?: string, routine?: boolean): Promise<WorkflowAddStarterResult>;
   /** `workflow.get`: one workflow with its outline steps and, for a trusted one, the text of its file. */
   getWorkflow(id: string): Promise<WorkflowGetResult>;
   /** `workflow.check`: the problems of the saved file, or of `code` when given (with the outline of that text). It imports nothing and asks no model. */
@@ -3142,9 +3142,9 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       }
       return result;
     },
-    async addWorkflowStarter(id: string, folder?: string): Promise<WorkflowAddStarterResult> {
+    async addWorkflowStarter(id: string, folder?: string, routine?: boolean): Promise<WorkflowAddStarterResult> {
       await ready;
-      const result = await call("workflow.add_starter", folder === undefined ? { id } : { id, folder });
+      const result = await call("workflow.add_starter", { id, ...(folder === undefined ? {} : { folder }), ...(routine === true ? { routine: true } : {}) });
       if (!isWorkflowAddStarterResult(result)) {
         throw new Error("invalid workflow.add_starter result");
       }

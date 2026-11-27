@@ -12,7 +12,8 @@ What it checks, and nothing more:
 * the agent a ``run.agent`` names exists for the folder;
 * a wish resolves in this setup, and a wish that would use a paid model in a local-only folder
   is a warning (a run would stop at that step);
-* ``schedule(...)`` and ``on_file(...)`` triggers are valid, with the routines' parser.
+* ``schedule(...)`` and ``on_file(...)`` triggers are valid, with the routines' parser;
+* ``trigger=`` is not used: a warning on its line says a routine starts a workflow.
 """
 
 from __future__ import annotations
@@ -33,6 +34,7 @@ from golem.workflows.outline import OutlineError, OutlineStep, outline
 Severity = Literal["error", "warning"]
 
 _TRIGGERS = ("schedule", "on_file", "manual", "Schedule", "OnFile", "Manual")
+TRIGGER_UNUSED = "trigger= is not used. A routine starts a workflow: add one in Routines."
 _DEFAULT_BUDGET = '"$0.50"'
 
 
@@ -118,7 +120,10 @@ class _Checker:
             return
         for kw in deco.keywords:
             node = kw.value
-            if kw.arg != "trigger" or not isinstance(node, ast.Call):
+            if kw.arg != "trigger":
+                continue
+            self.add("warning", node.lineno, None, TRIGGER_UNUSED)
+            if not isinstance(node, ast.Call):
                 continue
             name = ""
             if isinstance(node.func, ast.Attribute):

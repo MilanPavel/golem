@@ -1,6 +1,36 @@
 {
+  "$defs": {
+    "WorkflowStarterRoutine": {
+      "additionalProperties": false,
+      "description": "The routine that comes with a starter: ``name`` and ``schedule`` as ``routine.update``\ntakes them, and ``words`` as a short phrase for the card (\"every weekday at 07:30\").",
+      "properties": {
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "schedule": {
+          "minLength": 1,
+          "title": "Schedule",
+          "type": "string"
+        },
+        "words": {
+          "minLength": 1,
+          "title": "Words",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "schedule",
+        "words"
+      ],
+      "title": "WorkflowStarterRoutine",
+      "type": "object"
+    }
+  },
   "additionalProperties": false,
-  "description": "One starter workflow golem ships. ``needs_folder`` says it reads a project, so it goes\nin that project's ``workflows`` folder; the others go in the user's.",
+  "description": "One starter workflow golem ships. ``needs_folder`` says it reads a project, so it goes\nin that project's ``workflows`` folder; the others go in the user's. ``routine`` is the\nroutine that can be added with it.",
   "properties": {
     "id": {
       "minLength": 1,
@@ -14,6 +44,17 @@
     "needs_folder": {
       "title": "Needs Folder",
       "type": "boolean"
+    },
+    "routine": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/WorkflowStarterRoutine"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
     },
     "schedule": {
       "anyOf": [

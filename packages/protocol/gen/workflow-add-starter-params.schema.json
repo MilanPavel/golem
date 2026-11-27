@@ -18,6 +18,11 @@
       "minLength": 1,
       "title": "Id",
       "type": "string"
+    },
+    "routine": {
+      "default": false,
+      "title": "Routine",
+      "type": "boolean"
     }
   },
   "required": [

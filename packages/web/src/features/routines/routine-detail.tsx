@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from "react";
 import { fileName, formatElapsed, lastResultText, routineHeadline, routineState, routineToml, runStatusWords, runWhenText } from "@golem/view";
 import { actionErrorText } from "../../store/errors.ts";
-import { sessionPath } from "../../store/router.ts";
+import { sessionPath, workflowPath } from "../../store/router.ts";
 import type { RoutineInfo, RoutineRunResult, RoutineRunSummary } from "../../store/routines.ts";
 import { Button } from "../../ui/button.tsx";
 import { cn } from "../../ui/cn.ts";
@@ -141,6 +141,8 @@ function RemoveDialog({ name, open, onOpenChange, onConfirm }: { name: string; o
 
 export type RoutineDetailProps = {
   routine: RoutineInfo;
+  /** The id of the workflow the routine runs, when it is known: the Workflow row then links to its page. */
+  workflowId?: string | null;
   /** Recent runs, newest first. */
   runs: readonly RoutineRunSummary[];
   now: number;
@@ -172,7 +174,7 @@ function ProjectNote({ path, onOpenConfig }: { path: string; onOpenConfig: () =>
 }
 
 /** One routine in the main area: what it runs, when, its actions, and the History, Edit and Config tabs. */
-export function RoutineDetail({ routine, runs, now, onNavigate, onRun, onRemove, editor }: RoutineDetailProps) {
+export function RoutineDetail({ routine, workflowId = null, runs, now, onNavigate, onRun, onRemove, editor }: RoutineDetailProps) {
   const { config } = routine;
   const [tab, setTab] = useState<Tab>("history");
   const [running, setRunning] = useState(false);
@@ -267,6 +269,14 @@ export function RoutineDetail({ routine, runs, now, onNavigate, onRun, onRemove,
           <>
             <Fact label="Workflow">
               <Code>{config.workflow}</Code>
+              {workflowId === null ? null : (
+                <>
+                  {" "}
+                  <Link href={workflowPath(workflowId)} onNavigate={onNavigate} className={LINK}>
+                    Open the workflow<span aria-hidden="true"> ›</span>
+                  </Link>
+                </>
+              )}
             </Fact>
             <Fact label="Inputs">
               {config.inputs && Object.keys(config.inputs).length > 0 ? (

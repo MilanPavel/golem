@@ -1,7 +1,7 @@
 # examples/workflows/pr_digest.py
 import json
 
-from golem.workflow import Run, manual, workflow
+from golem.workflow import Run, workflow
 
 
 def pulls_of(text: str) -> list[dict]:
@@ -13,7 +13,6 @@ def pulls_of(text: str) -> list[dict]:
 
 
 @workflow(
-    trigger=manual(),
     inputs={"tool": str, "repo": str},
     title="Pull request digest",
     description="One line for each open pull request, checked by you, then a notice.",

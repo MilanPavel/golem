@@ -151,6 +151,19 @@ test("a workflow routine's detail shows Workflow and its inputs instead of the p
   expect((await axe.run(container, noContrast)).violations).toEqual([]);
 });
 
+test("a workflow routine's detail links to its workflow's page when the workflow is known, and not when it is not", async () => {
+  const user = userEvent.setup();
+  const onNavigate = vi.fn();
+  const id = "/Users/you/.golem/workflows/pr_digest.py::pr_digest";
+  const { rerender } = render(<RoutineDetail routine={SAMPLE_WORKFLOW_ROUTINE} workflowId={id} runs={[]} now={ROUTINES_NOW} onNavigate={onNavigate} onRun={() => Promise.resolve({ routine_run_id: "r", session_id: "s" })} />);
+  const link = screen.getByRole("link", { name: /Open the workflow/ });
+  expect(link.getAttribute("href")).toBe(`/workflows/${encodeURIComponent(id)}`);
+  await user.click(link);
+  expect(onNavigate).toHaveBeenCalledWith(`/workflows/${encodeURIComponent(id)}`);
+  rerender(<RoutineDetail routine={SAMPLE_WORKFLOW_ROUTINE} runs={[]} now={ROUTINES_NOW} onNavigate={onNavigate} onRun={() => Promise.resolve({ routine_run_id: "r", session_id: "s" })} />);
+  expect(screen.queryByRole("link", { name: /Open the workflow/ })).toBeNull();
+});
+
 test("a routine whose workflow is gone keeps its inputs and says it is not found", async () => {
   const user = userEvent.setup();
   const { onSave } = setup({ create: false, workflows: [] }, { name: "digest", schedule: "30 8 * * 1-5", workflow: "gone", inputs: { a: "1" } });
