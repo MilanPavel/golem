@@ -91,10 +91,11 @@ export function WorkflowsEmpty({ starters, folder, onAdd, failed }: WorkflowsEmp
 
 /** A quiet list of the starters not added yet, under the workflows. Shows nothing when all are added. */
 export function WorkflowStarters({ starters, folder, onAdd, failed }: WorkflowsEmptyProps) {
+  const headingId = useId();
   if (starters.length === 0) return null;
   return (
-    <section aria-labelledby="workflow-starters-heading" className="mt-6 flex max-w-2xl flex-col gap-2">
-      <h2 id="workflow-starters-heading" className="text-xs font-medium text-faint">
+    <section aria-labelledby={headingId} className="mt-6 flex max-w-2xl flex-col gap-2">
+      <h2 id={headingId} className="text-xs font-medium text-faint">
         Starters
       </h2>
       <ul aria-label="Starter workflows" className="grid gap-3 sm:grid-cols-2">
