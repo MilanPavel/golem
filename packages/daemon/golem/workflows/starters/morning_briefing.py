@@ -1,7 +1,8 @@
-# A golem starter. Every weekday morning it reads your project folders, your logs and your
-# feeds, and leaves one short briefing in the Inbox and in ~/.golem/briefings.
+# A golem starter. It reads your project folders, your logs and your feeds, and leaves one
+# short briefing in the Inbox and in ~/.golem/briefings.
 # Everything is gathered by plain Python steps; one model call writes the briefing.
-# Edit the three lists below, and the schedule in @workflow.
+# It runs when you press Run; a routine can schedule it, for example every weekday morning.
+# Edit the three lists below.
 import contextlib
 import json
 import re
@@ -14,7 +15,7 @@ from email.utils import parsedate_to_datetime
 from pathlib import Path
 from typing import Any
 
-from golem.workflow import Run, schedule, workflow
+from golem.workflow import Run, workflow
 
 PROJECTS: list[str] = []
 """Git folders to report on. The trusted_projects of ~/.golem/config.toml are added."""
@@ -159,10 +160,9 @@ def save(day: str, text: str) -> str:
 
 
 @workflow(
-    trigger=schedule("weekdays 07:30"),
     description=(
-        "Every weekday at 07:30, reads your project folders, logs and feeds since yesterday "
-        "and leaves one short briefing in the Inbox."
+        "Reads your project folders, logs and feeds since yesterday and leaves one short "
+        "briefing in the Inbox."
     ),
 )
 async def morning_briefing(run: Run) -> str:

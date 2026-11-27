@@ -244,13 +244,13 @@ export const SAMPLE_UPGRADE_AGENTS = ["explorer", "worker", "reviewer", "advisor
 /** What `workflow.edit_step` says to a value that is not a wish. */
 export const SAMPLE_FIELD_REFUSED = { name: "model", message: "model is a wish, one of cheapest, same, stronger, local, budget, frontier; got 'gpt-9'" } as const;
 
-/** The starter golem ships, as `workflow.starters` lists it. It goes in your own folder and turns on its schedule. */
+/** The starter golem ships, as `workflow.starters` lists it. It goes in your own folder; a routine can schedule it. */
 export const SAMPLE_BRIEFING: WorkflowStarterInfo = {
   id: "morning_briefing",
   title: "Morning briefing",
-  line: "Every weekday at 07:30, read your project folders, logs and feeds and leave one short briefing in the Inbox.",
+  line: "Read your project folders, logs and feeds and leave one short briefing in the Inbox.",
   needs_folder: false,
-  schedule: "Runs every weekday at 07:30",
+  schedule: null,
 };
 
 /** A starter that works on a project, which none ships yet. The gallery shows how it reads, so the page is ready for one. */

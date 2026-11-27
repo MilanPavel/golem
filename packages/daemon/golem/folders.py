@@ -11,6 +11,7 @@ import asyncio
 import logging
 import os
 import sys
+from collections.abc import Iterable
 from pathlib import Path
 
 from golem.tools.sandbox import SECRET_DIRS
@@ -22,6 +23,7 @@ MAX_ENTRIES = 500
 """One call stays small: a longer list is cut, and ``truncated`` says so."""
 
 OUTSIDE = "That folder is outside your home folder."
+PRIVATE = "golem keeps that folder private, so it is not opened."
 
 
 class FolderError(Exception):
@@ -55,10 +57,10 @@ def checked_folder(path: str, home: Path) -> str:
         target = Path(path).resolve()
     except (OSError, RuntimeError) as exc:
         raise FolderError(OUTSIDE) from exc
-    if not is_under(target, root) or any(
-        is_under(target, hidden) for hidden in hidden_folders(root)
-    ):
+    if not is_under(target, root):
         raise FolderError(OUTSIDE)
+    if any(is_under(target, hidden) for hidden in hidden_folders(root)):
+        raise FolderError(PRIVATE)
     if not target.is_dir():
         raise FolderError(f"There is no folder at {path}.")
     return str(target)
@@ -203,10 +205,13 @@ OPEN_SECONDS = 10.0
 """How long ``open`` may take to hand the folder to Finder."""
 
 
-async def _run_open(path: str) -> int:
-    """Run ``open`` on ``path`` and return its exit code. The path is one argument."""
+async def _run_open(path: str, *, select: bool = False) -> int:
+    """Run ``open`` on ``path`` and return its exit code. The path is one argument.
+
+    With ``select`` Finder opens the folder that holds the file, with the file selected."""
     process = await asyncio.create_subprocess_exec(
         "open",
+        *(["-R"] if select else []),
         "--",
         path,
         stdin=asyncio.subprocess.DEVNULL,
@@ -222,19 +227,38 @@ async def _run_open(path: str) -> int:
         raise
 
 
-async def reveal_folder(path: str, home: Path) -> None:
-    """Open ``path`` in Finder on this Mac.
+async def reveal_folder(path: str, home: Path, allowed: Iterable[Path] = ()) -> None:
+    """Show ``path`` in Finder on this Mac: a folder is opened, a file is selected.
 
-    The path is checked as ``git.info`` checks it. Raises :class:`DialogUnsupportedError` off
-    macOS, :class:`FolderError` for a path that is refused, and :class:`RevealFailedError` when
-    ``open`` fails.
+    A path in ``allowed`` (the workflow files, and the folders that hold them) is shown
+    wherever it is; any other path is checked as ``git.info`` checks it. Raises
+    :class:`DialogUnsupportedError` off macOS, :class:`FolderError` for a path that is
+    refused, and :class:`RevealFailedError` when ``open`` fails.
     """
     if not dialog_supported():
         raise DialogUnsupportedError("Open in Finder is only available on macOS.")
-    folder = checked_folder(path, home)
+    target = _allowed_target(path, allowed)
+    select = target is not None and target.is_file()
+    shown = str(target) if target is not None else checked_folder(path, home)
     try:
-        code = await _run_open(folder)
+        code = await _run_open(shown, select=select)
     except (OSError, TimeoutError) as exc:
         raise RevealFailedError("golem could not open the folder in Finder.") from exc
     if code != 0:
         raise RevealFailedError("golem could not open the folder in Finder.")
+
+
+def _allowed_target(path: str, allowed: Iterable[Path]) -> Path | None:
+    """``path`` resolved, when it is an existing path in ``allowed`` or the folder of one."""
+    if not Path(path).is_absolute():
+        return None
+    try:
+        target = Path(path).resolve()
+        listed = {Path(item).resolve() for item in allowed}
+    except (OSError, RuntimeError):
+        return None
+    if not target.exists():
+        return None
+    if target in listed or any(item.parent == target for item in listed):
+        return target
+    return None

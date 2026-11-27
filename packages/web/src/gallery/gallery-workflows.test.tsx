@@ -143,7 +143,7 @@ test("the gallery's starter stories show the empty page, a project starter, no f
     };
     const nothing = story("Workflows, nothing yet");
     expect(nothing.getByRole("heading", { name: "No workflows yet" })).toBeTruthy();
-    expect(nothing.getByText(/Every weekday at 07:30/)).toBeTruthy();
+    expect(nothing.getByText(/leave one short briefing/)).toBeTruthy();
     expect(story("Workflows, nothing yet, project starter").getAllByRole("button", { name: "Use this starter" }).every((button) => !(button as HTMLButtonElement).disabled)).toBe(true);
     const noFolder = story("Workflows, nothing yet, no folder");
     expect(noFolder.getAllByRole("button", { name: "Use this starter" }).filter((button) => (button as HTMLButtonElement).disabled)).toHaveLength(1);
